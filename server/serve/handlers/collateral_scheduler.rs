@@ -78,6 +78,7 @@ struct WorkerResult {
 
 #[derive(Clone)]
 struct PendingOffer {
+  root_graph : Option<std::sync::Arc<crate::dbs::in_rust_graph::InRustGraph>>,
   uri           : ViewUri,
   base_revision : u64,
   base_view_graph_generation : u64,
@@ -458,6 +459,7 @@ impl CollateralScheduler {
       self . sort_queue ();
       return; }
     self . pending_offer = Some ((operation_id, PendingOffer {
+      root_graph: Some (batch . env . in_rust_graph_snapshot ()),
       uri: finished . uri,
       base_revision: finished . base_revision,
       base_view_graph_generation: finished . base_view_graph_generation,
@@ -506,6 +508,7 @@ impl CollateralScheduler {
       self . sort_queue ();
       return; }
     self . pending_offer = Some ((operation_id, PendingOffer {
+      root_graph: None,
       uri: uri . clone (),
       base_revision,
       base_view_graph_generation,
@@ -547,6 +550,7 @@ impl CollateralScheduler {
       self . sort_queue ();
       return; }
     self . pending_offer = Some ((operation_id, PendingOffer {
+      root_graph: None,
       uri: finished . uri . clone (),
       base_revision: finished . base_revision,
       base_view_graph_generation: finished . base_view_graph_generation,
@@ -570,6 +574,7 @@ impl CollateralScheduler {
   /// eventual forest/token transition.
   pub fn stage_view_application (
     &mut self,
+    graph : &std::sync::Arc<crate::dbs::in_rust_graph::InRustGraph>,
     views_state : &ViewsState,
     uri         : &ViewUri,
     generation  : RenderGeneration,
@@ -598,6 +603,7 @@ impl CollateralScheduler {
       resulting_source_set: state . source_set . clone (),
     };
     self . pending_offer = Some ((operation_id, PendingOffer {
+      root_graph: Some (graph . clone ()),
       uri: uri . clone (),
       base_revision: state . revision,
       base_view_graph_generation: state . graph_generation,
@@ -724,6 +730,8 @@ impl CollateralScheduler {
       let viewforest = pending . viewforest
         . expect ("application offer carries a forest");
       if ! views_state . open_views . update_view_if_revision (
+          pending . root_graph . as_deref ()
+            . ok_or ("application offer lost its selected graph")?,
           &pending . uri, pending . base_revision, viewforest)
       { return Err ("Collateral view advanced before its ACK" . into ()); }
       views_state . open_views
@@ -929,6 +937,7 @@ mod tests {
     let mut scheduler = CollateralScheduler::new ();
     scheduler . next_operation = 1;
     scheduler . pending_offer = Some (("collateral-1" . into (), PendingOffer {
+      root_graph: Some (std::sync::Arc::new (crate::dbs::in_rust_graph::InRustGraph::new ())),
       uri: ViewUri::ContentView ("view-uri" . into ()),
       base_revision: 4,
       base_view_graph_generation: 1,
@@ -1066,7 +1075,7 @@ mod tests {
       open_views: crate::types::views_state::OpenViews::new (),
     };
     views . open_views . register_view_with_authority (
-      uri . clone (), ViewForest::new (), &[], 1, 7, 12,
+      &crate::dbs::in_rust_graph::InRustGraph::new (), uri . clone (), ViewForest::new (), &[], 1, 7, 12,
       crate::maintenance::BufferKind::ContentView,
       "private" . into (), None);
     views . open_views . views . get_mut (&uri) . unwrap () . revision = 4;

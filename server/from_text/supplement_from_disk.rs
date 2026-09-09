@@ -14,9 +14,8 @@ use crate::from_text::local_instruction_collection::lower::{
 use crate::from_text::weave::{member_is_visible, set_difference_merge, weave};
 use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
-use crate::dbs::in_rust_graph::snapshot_global;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, MSV, MemberAtSource, SkgConfig, SourceName, members_of, members_at_source};
-use crate::types::phantom::home_from_disk;
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use std::collections::HashMap;
@@ -53,6 +52,7 @@ impl Definenodes_with_Sourcemoves {
 }
 
 pub async fn build_diskSupplemented_defineNodes (
+  graph : &InRustGraph,
   intents : Vec<NodeIntent>,
   config  : &SkgConfig,
   driver  : &TypeDBDriver,
@@ -62,12 +62,13 @@ pub async fn build_diskSupplemented_defineNodes (
     Definenodes_with_Sourcemoves::with_capacity (intents . len());
   for intent in intents {
     let supplemented : Definenode_with_Opt_Sourcemove =
-      supplement_nodeeditintent_from_disk (
+      supplement_nodeeditintent_from_disk (graph,
         intent, config, driver, restricted_source_set ) . await ?;
     result . push (supplemented); }
   Ok (result) }
 
 async fn supplement_nodeeditintent_from_disk (
+  graph : &InRustGraph,
   intent : NodeIntent,
   config : &SkgConfig,
   driver : &TypeDBDriver,
@@ -84,13 +85,14 @@ async fn supplement_nodeeditintent_from_disk (
           . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
         source_move : None,
       }) },
-    _ => supplement_saveintent_from_disk (
+    _ => supplement_saveintent_from_disk (graph,
       intent . save_intent()
         . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
       config, driver, restricted_source_set ) . await,
   }}
 
 async fn supplement_saveintent_from_disk (
+  graph : &InRustGraph,
   from_buffer : NodeSaveIntent,
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
@@ -99,7 +101,7 @@ async fn supplement_saveintent_from_disk (
   let pid : ID =
     from_buffer . pid . clone();
   let from_disk : Option<NodeComplete> =
-    optNodeComplete_rustFIrst_by_id (
+    optNodeComplete_rustFIrst_by_id (graph,
       config, driver, &pid) . await ?;
   match from_disk {
     None => {
@@ -118,7 +120,7 @@ async fn supplement_saveintent_from_disk (
         source : supplemented . source . clone (),
         .. empty_node_complete () };
       let supplemented : NodeComplete =
-        apply_sticky_sources (
+        apply_sticky_sources (graph,
           supplemented, &empty_disk, &explicit_sources, config )
         . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
       Ok (Definenode_with_Opt_Sourcemove {
@@ -146,9 +148,9 @@ async fn supplement_saveintent_from_disk (
         let supplemented : NodeComplete =
           match restricted_source_set {
             None => supplemented,
-            Some (active) => preserve_invisible_members (
+            Some (active) => preserve_invisible_members (graph,
               supplemented, &disk_node, config, active ) };
-        apply_sticky_sources (
+        apply_sticky_sources (graph,
           supplemented, &disk_node, &explicit_sources, config )
           . map_err ( |e| -> Box<dyn Error> { e . into () } ) ? };
       Ok (Definenode_with_Opt_Sourcemove {
@@ -166,13 +168,14 @@ async fn supplement_saveintent_from_disk (
 /// changed it, so an untouched field keeps its MSV shape (and the
 /// noop filter can still recognize an unchanged node).
 fn preserve_invisible_members (
+  graph : &InRustGraph,
   mut supplemented : NodeComplete,
   disk_node        : &NodeComplete,
   config           : &SkgConfig,
   active           : &ActiveSourceSet,
 ) -> NodeComplete {
   let is_visible = |id : &ID| -> bool {
-    member_is_visible (id, config, active) };
+    member_is_visible (graph, id, config, active) };
   let owner_source : SourceName = supplemented . source . clone ();
   { let disk_contains : Vec<ID> = members_of (&disk_node . contains);
     let buffer_contains : Vec<ID> = members_of (&supplemented . contains);
@@ -259,6 +262,7 @@ pub fn refuse_delete_with_inactive_sections (
 ///   explicit-source path: the col that displays them is read-only
 ///   (the set-relationship-source gesture refuses there).
 pub(crate) fn apply_sticky_sources (
+  graph : &InRustGraph,
   mut supplemented : NodeComplete,
   disk_node        : &NodeComplete,
   explicit         : &ExplicitSources,
@@ -267,14 +271,10 @@ pub(crate) fn apply_sticky_sources (
   let owner_pid  : ID         = supplemented . pid    . clone ();
   let owner_home : SourceName = supplemented . source . clone ();
   let resolve = |id : &ID| -> ID {
-    snapshot_global ()
-      . and_then ( |snap| snap . pid_of (id) )
+    graph . pid_of (id)
       . unwrap_or_else ( || id . clone () ) };
   let home_of = |id : &ID| -> Option<SourceName> {
-    snapshot_global ()
-      . and_then ( |snap| snap . pid_and_source (id)
-                   . map ( |(_pid, src)| src ))
-      . or_else ( || home_from_disk (id, config) ) };
+    graph . pid_and_source (id) . map (|(_pid, src)| src) };
   // The DEFAULT floor for one member. Owned-to-owned edges use the
   // more private endpoint home. An owned-to-foreign edge stays at
   // the owner's home; Skg never proposes writing a foreign section.
@@ -382,7 +382,7 @@ pub(crate) fn apply_sticky_sources (
           . map ( |d| d . source . clone () );
         let unclamped : SourceName = match sticky {
           Some (source) => source,
-          None => hide_source (
+          None => hide_source (graph,
             config, &owner_home, &m . member, &subscribes,
             &resolve ), };
         m . source = config . more_private_of (
@@ -429,6 +429,7 @@ pub(crate) fn apply_sticky_sources (
 /// source, and with no subscriptions at all, to the endpoint rule
 /// alone (junk-tolerant; the validators report residue).
 fn hide_source (
+  graph : &InRustGraph,
   config     : &SkgConfig,
   owner_home : &SourceName,
   hidden     : &ID,
@@ -437,21 +438,17 @@ fn hide_source (
 ) -> SourceName {
   let endpoint_floor : SourceName = {
     let target_home : Option<SourceName> =
-      snapshot_global ()
-      . and_then ( |snap| snap . pid_and_source (hidden)
-                   . map ( |(_pid, src)| src ));
+      graph . pid_and_source (hidden) . map (|(_pid, src)| src);
     match target_home {
       Some (h) => config . more_private_of (
         owner_home . clone (), h ),
       None => owner_home . clone (), }};
   let hidden_key : ID = resolve (hidden);
   let explaining_sources : Vec<SourceName> = {
-    let Some (snap) = snapshot_global () else {
-      return endpoint_floor; };
     subscribes . iter ()
       . filter ( |sub| {
-        snap . pid_of ( & sub . member )
-          . and_then ( |p| snap . nodes . get (&p) )
+        graph . pid_of ( & sub . member )
+          . and_then ( |p| graph . nodes . get (&p) )
           . map ( |subscribee| subscribee . contains . iter ()
                   . any ( |c| resolve ( &c . member ) == hidden_key ))
           . unwrap_or (false) } )

@@ -4,7 +4,7 @@ use skg::dbs::filesystem::one_node::nodecomplete_from_id;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::save::update_fs_from_saveinstructions;
 use skg::save::update_typedb_from_saveinstructions;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::{graph_handle_from_config, run_with_test_db};
 use skg::types::misc::{ID, members_of};
 use skg::types::nodes::complete::NodeComplete;
 
@@ -47,6 +47,7 @@ fn test_birth_and_indefinitive(
         "};
         let ( _viewforest, save_plan, _warnings ) =
           buffer_to_validated_saveplan(
+            &graph_handle_from_config (config) ? . load_full () . graph,
             org_text,
             config,
             driver, None ) . await?;

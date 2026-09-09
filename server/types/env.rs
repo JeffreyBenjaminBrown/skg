@@ -7,15 +7,14 @@
 //! the in-process snapshot; 'tantivy_index' is in-process and indexed;
 //! 'driver' talks over the wire to TypeDB.
 
-use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, snapshot_global};
-use crate::dbs::tantivy::title_and_source_by_id;
+use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
-use crate::types::phantom::home_from_disk;
 use crate::telescope::invariants::TelescopeViolation;
 
 use std::collections::HashMap;
 use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
+use tantivy::Searcher;
 
 #[derive(Clone)]
 pub struct SkgEnv {
@@ -23,6 +22,8 @@ pub struct SkgEnv {
   pub in_rust_graph : InRustGraphHandle,
   pub tantivy_index : TantivyIndex,
   pub driver        : Arc<TypeDBDriver>,
+  /// Actual read snapshot captured with this environment's selected graph.
+  pub searcher      : Searcher,
   /// Load-time telescope warnings waiting to be presented during the
   /// connection handshake. Kept as structured data, not only a log/report.
   pub startup_warnings : Arc<Vec<(ID, TelescopeViolation)>>,
@@ -33,69 +34,20 @@ impl SkgEnv {
   pub fn in_rust_graph_snapshot (&self) -> Arc<InRustGraph> {
     self . in_rust_graph . load_full () . graph . clone () }
 
-  /// Resolve an ID to its source by checking, in order:
-  ///
-  /// 1. The in-Rust graph snapshot (freshest; reflects in-flight
-  ///    edits before they reach the indexed DBs or disk).
-  /// 2. The caller's 'deleted_since_head_pid_src_map' hint (only
-  ///    relevant in diff view; covers IDs whose '.skg' file has been
-  ///    deleted between HEAD and now).
-  /// 3. Tantivy (in-process indexed lookup; ~6us at p50).
-  /// 4. Disk scan (slow last resort; covers nodes that were created
-  ///    out-of-band since the last index sync).
-  ///
-  /// TypeDB is intentionally absent: production paths populate
-  /// TypeDB and Tantivy together (both 'init' and 'save' write
-  /// from the same node set), so any ID TypeDB knows is also
-  /// Tantivy-known. Skipping TypeDB keeps this lookup synchronous.
+  /// Resolve only from the supplied graph and explicitly captured Git evidence.
   pub fn find_source (
     &self,
-    id                             : &ID,
+    id : &ID,
     deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   ) -> Option<SourceName> {
-    if let Some ((_pid, src)) =
-      self . in_rust_graph_snapshot () . pid_and_source (id)
-    { return Some (src); }
-    if let Some (s) = deleted_since_head_pid_src_map . get (id)
-    { return Some (s . clone ()); }
-    if let Some ((_title, src)) =
-      title_and_source_by_id (&self . tantivy_index, id)
-    { return Some (src); }
-    home_from_disk (id, &self . config) }
+    find_source (id, deleted_since_head_pid_src_map,
+      &self . in_rust_graph_snapshot ()) }
 }
 
-/// Free-function variant of 'SkgEnv::find_source' for callers that
-/// don't have a 'SkgEnv' on hand. Uses the process-global in-Rust graph
-/// snapshot ('snapshot_global'); returns 'None' when no snapshot
-/// has been installed (e.g. tests that bypass startup).
-///
-/// Layered the same way as 'SkgEnv::find_source':
-/// in-Rust graph → deletion-map → Tantivy → disk scan.
 pub fn find_source (
-  id                             : &ID,
+  id : &ID,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  tantivy_index                  : &TantivyIndex,
-  config                         : &SkgConfig,
+  graph : &InRustGraph,
 ) -> Option<SourceName> {
-  find_source_with_optional_tantivy (
-    id, deleted_since_head_pid_src_map,
-    Some (tantivy_index), config ) }
-
-/// Like 'find_source', but accepts 'None' for the Tantivy index.
-/// Tests that don't populate Tantivy (and don't need it for
-/// resolution) can pass 'None'; the lookup falls through to disk.
-pub fn find_source_with_optional_tantivy (
-  id                             : &ID,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  tantivy_index                  : Option<&TantivyIndex>,
-  config                         : &SkgConfig,
-) -> Option<SourceName> {
-  if let Some (snap) = snapshot_global () {
-    if let Some ((_pid, src)) = snap . pid_and_source (id)
-    { return Some (src); } }
-  if let Some (s) = deleted_since_head_pid_src_map . get (id)
-  { return Some (s . clone ()); }
-  if let Some (idx) = tantivy_index {
-    if let Some ((_title, src)) = title_and_source_by_id (idx, id)
-    { return Some (src); } }
-  home_from_disk (id, config) }
+  graph . pid_and_source (id) . map (|(_pid, source)| source)
+    . or_else (|| deleted_since_head_pid_src_map . get (id) . cloned ()) }

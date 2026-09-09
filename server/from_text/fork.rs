@@ -11,7 +11,7 @@
 //! in the save handler.
 
 use crate::dbs::in_rust_graph::override_invariants::existing_user_owned_overrider_of;
-use crate::dbs::in_rust_graph::snapshot_global;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName, members_of, members_at_source};
@@ -287,18 +287,16 @@ pub fn build_fork_confirmation_buffer (
 ///   silently; reject with 'ForkSourceInactive'.
 ///
 /// 'restricted_source_set' is None when nothing is restricted (the set
-/// 'all'); the monogamy graph is the process-global snapshot, absent
-/// only in tests that bypass it (then monogamy is left to the commit-time
-/// invariant check).
+/// 'all'); monogamy uses the same supplied graph as save preparation.
 pub fn validate_fork_specs (
+  graph : &InRustGraph,
   fork_specs            : &[ForkSpec],
   config                : &SkgConfig,
   restricted_source_set : Option<&ActiveSourceSet>,
 ) -> Vec<BufferValidationError> {
   let mut errors : Vec<BufferValidationError> = Vec::new ();
-  let graph_snap = snapshot_global ();
   for spec in fork_specs {
-    if let Some (graph) = graph_snap . as_deref () {
+    {
       if let Some (existing) = existing_user_owned_overrider_of (
         config, graph, & spec . original_id )
       { errors . push (

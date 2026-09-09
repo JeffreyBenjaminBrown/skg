@@ -3,6 +3,7 @@
 // To understand the graph, see
 // tests/typedb/paths/fixtures/README.org
 
+use skg::test_utils::graph_handle_from_config;
 use skg::dbs::typedb::paths::{
   path_containerward_to_first_nonlinearity,
   PathToFirstNonlinearity};
@@ -69,6 +70,7 @@ async fn test_multi_cycle_fork_impl(
     viewforest . root () . first_child () . unwrap () . id ();
 
   build_and_integrate_containerward_path (
+    &graph_handle_from_config (config) ? . load_full () . graph,
     &mut viewforest, node_a_id, &config, driver
   ) . await ?;
   // Sorted branches [b, d, f] are prepended in order,

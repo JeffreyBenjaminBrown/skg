@@ -1,5 +1,6 @@
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
-use crate::types::env::SkgEnv;
+use crate::types::env::{SkgEnv, find_source};
 use crate::to_org::complete::partner_col::child_data::{ChildData, apply_membership_axes_to_col_members, build_child_data, reconcile_partnerCol_children_against_goal_list};
 use crate::to_org::complete::partner_col::goal_list::goal_list_for_hiddenoutsideof_subscribeecol;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
@@ -37,6 +38,7 @@ struct HiddenOutsideContext {
 /// Collects nodes that the subscriber hides from its subscriptions
 /// but that are NOT top-level content of any subscribee.
 pub fn reconcile_hiddenoutside_subscribee_col_children (
+  graph : &InRustGraph,
   node                           : NodeId,
   tree                           : &mut Tree<ViewNode>,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
@@ -53,19 +55,19 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   // subscriber through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 1 validates the
   // [SubscribeeCol, Normal] prefix), so a separate validation is unneeded.
   let context : HiddenOutsideContext =
-    read_hiddenoutside_context (tree, node, kind, env, active_source_set) ?;
+    read_hiddenoutside_context (graph, tree, node, kind, env, active_source_set) ?;
   let (goal_list, removed_ids, member_axes)
     : (Vec<ID>, HashSet<ID>, HashMap<ID, MembershipAxes>) =
     goal_list_for_hiddenoutsideof_subscribeecol (
-      &context . subscriber_pid, &context . subscriber_source,
+      graph, &context . subscriber_pid, &context . subscriber_source,
       &context . subscriber_hides, &context . subscribees,
-      source_diffs, &env . config );
+      source_diffs, active_source_set );
   let goal_list : Vec<ID> =
     // TODO/full-schema/9-2_source-set-safety.org: omit inactive
     // members; no retention for this filter col.
     omit_inactive_members (
       goal_list, active_source_set,
-      |id : &ID| env . find_source (id, deleted_since_head_pid_src_map) );
+      |id : &ID| find_source (id, deleted_since_head_pid_src_map, graph) );
   // TODO/DONE/local-view-update/plan_v2.org §5.5: a col fills its members WHOLE and is budget-neutral -- the owning
   // subscriber already spent its budget unit when it expanded, so drawing all
   // these hidden members here costs nothing and never truncates the group.
@@ -84,7 +86,7 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
             staged : None, unstaged : Some (Sign::Minus) } )) };
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
-      tree, node,
+      graph, tree, node,
       &goal_list, &removed_ids, &axes_for_removed,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
   let summary =
@@ -109,6 +111,7 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   Ok(( )) }
 
 fn read_hiddenoutside_context (
+  graph : &InRustGraph,
   tree               : &Tree<ViewNode>,
   node               : NodeId,
   kind               : PartnerCol,
@@ -121,7 +124,7 @@ fn read_hiddenoutside_context (
       tree, node, 1, kind . caller_label () ) ?;
   let wt_subscriber_nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
-      &env . config, &subscriber_pid, &subscriber_source ) ?;
+      graph, &env . config, &subscriber_pid, &subscriber_source ) ?;
   // Edge-source gating (render-and-gating, 5_plan.org): both are the
   // subscriber's own outbound lists (hides_from_its_subscriptions,
   // subscribes_to); a membership recorded in an inactive source must

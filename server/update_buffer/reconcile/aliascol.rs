@@ -1,3 +1,4 @@
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::git::{MembershipAxes, NodeChanges, SourceDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_activeNode};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
@@ -28,6 +29,7 @@ use std::error::Error;
 /// - Create new Alias nodes for values in 'aliases' not already present
 /// - Order the final Alias children to match the order in 'aliases'
 pub fn reconcile_alias_col_children (
+  graph : &InRustGraph,
   tree             : &mut Tree<ViewNode>,
   aliascol_node_id : NodeId,
   source_diffs     : &Option<HashMap<SourceName, SourceDiff>>,
@@ -48,7 +50,7 @@ pub fn reconcile_alias_col_children (
       "reconcile_alias_col_children" ) ?;
   let parent_nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
-      config, &parent_pid, &parent_source )
+      graph, config, &parent_pid, &parent_source )
     . map_err ( |_| "reconcile_alias_col_children: parent NodeComplete not found" ) ?;
   let alias_sources : HashMap<String, SourceName> =
     parent_nodecomplete . aliases . or_default () . iter ()

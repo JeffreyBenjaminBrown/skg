@@ -83,8 +83,10 @@ fn test_source_move_updates_collateral_view_metadata (
       let uri_2 : ViewUri =
         ViewUri::ContentView ( "source-move-buffer-2" . to_string() );
       views_state . open_views . register_view (
+        &graph . load_full () . graph,
         uri_1 . clone(), viewforest . clone(), &pids );
       views_state . open_views . register_view (
+        &graph . load_full () . graph,
         uri_2 . clone(), viewforest, &pids );
 
       let save_input : String =

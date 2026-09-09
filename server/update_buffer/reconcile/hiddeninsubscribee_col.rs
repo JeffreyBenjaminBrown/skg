@@ -1,5 +1,6 @@
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
-use crate::types::env::SkgEnv;
+use crate::types::env::{SkgEnv, find_source};
 use crate::to_org::complete::partner_col::child_data::{ChildData, apply_membership_axes_to_col_members, build_child_data, reconcile_partnerCol_children_against_goal_list};
 use crate::to_org::complete::partner_col::goal_list::goal_list_for_hiddeninsubscribee_col;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
@@ -39,6 +40,7 @@ struct HiddenInContext {
 /// hides from its subscriptions AND that are top-level content
 /// of the subscribee.
 pub fn reconcile_hiddenin_subscribee_col_children (
+  graph : &InRustGraph,
   node                           : NodeId,
   tree                           : &mut Tree<ViewNode>,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
@@ -52,7 +54,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   let context : HiddenInContext =
-    read_hiddenin_context (tree, node, kind, env, active_source_set) ?;
+    read_hiddenin_context (graph, tree, node, kind, env, active_source_set) ?;
   let (goal_list, removed_ids, member_axes)
     : (Vec<ID>, HashSet<ID>, HashMap<ID, MembershipAxes>) =
     goal_list_for_hiddeninsubscribee_col (
@@ -65,7 +67,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
     // members; no retention for this filter col.
     omit_inactive_members (
       goal_list, active_source_set,
-      |id : &ID| env . find_source (id, deleted_since_head_pid_src_map) );
+      |id : &ID| find_source (id, deleted_since_head_pid_src_map, graph) );
   // TODO/DONE/local-view-update/plan_v2.org §5.5: a col fills its members WHOLE and is budget-neutral -- the owning
   // subscribee already spent its budget unit when it expanded, so drawing all
   // the hidden members here costs nothing and never truncates the group.
@@ -83,7 +85,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
             staged : None, unstaged : Some (Sign::Minus) } )) };
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
-      tree, node,
+      graph, tree, node,
       &goal_list, &removed_ids, &axes_for_removed,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
   let summary =
@@ -110,6 +112,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
   Ok(( )) }
 
 fn read_hiddenin_context (
+  graph : &InRustGraph,
   tree               : &Tree<ViewNode>,
   node               : NodeId,
   kind               : PartnerCol,
@@ -139,7 +142,7 @@ fn read_hiddenin_context (
   let subscribee_contains : Vec<ID> = {
     let subscribee_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
-        &env . config, &subscribee_pid, &subscribee_source ) ?;
+        graph, &env . config, &subscribee_pid, &subscribee_source ) ?;
     subscribee_nodecomplete . contains . iter ()
       . filter ( |m| source_active (& m . source) )
       . map ( |m| m . member . clone () )
@@ -147,7 +150,7 @@ fn read_hiddenin_context (
   let subscriber_hides : Vec<ID> = {
     let subscriber_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
-        &env . config, &subscriber_pid, &subscriber_source ) ?;
+        graph, &env . config, &subscriber_pid, &subscriber_source ) ?;
     subscriber_nodecomplete . hides_from_its_subscriptions
       . or_default () . iter ()
       . filter ( |m| source_active (& m . source) )

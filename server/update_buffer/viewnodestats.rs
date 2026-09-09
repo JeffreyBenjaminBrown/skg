@@ -1,4 +1,4 @@
-use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole };
 use crate::herald_tokens::{AncestorFlags, relationship_heralds_sexp};
@@ -9,7 +9,6 @@ use crate::types::viewnode::{
 use crate::update_buffer::ancestry::required_ancestor;
 use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 
 /// The five graph relations whose flags the H/S/O/L checks consult via
 /// the in-Rust graph (contains is checked via the containment maps).
@@ -20,6 +19,7 @@ const GRAPH_RELATIONS : [NodeRelation; 4] = [
   NodeRelation::OverridesViewOf, ];
 
 pub fn set_viewnodestats_in_viewforest (
+  graph : &InRustGraph,
   viewforest            : &mut Tree<ViewNode>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
@@ -27,18 +27,13 @@ pub fn set_viewnodestats_in_viewforest (
   active                : Option<&ActiveSourceSet>,
 ) {
   let multi_source : bool = config . sources . len () > 1;
-  let graph : Option<Arc<InRustGraph>> =
-    // None only on paths that bypass the global handle (some tests);
-    // then the relation flags stay empty and only contains-based
-    // heralds (via the maps) can appear.
-    snapshot_global ();
   let mut ancestor_ids : HashSet<ID> = HashSet::new ();
   let root_treeid : NodeId = viewforest . root () . id ();
   set_viewnodestats_recursive (
     viewforest,
     root_treeid,
     multi_source,
-    graph . as_deref (),
+    graph,
     config,
     active,
     &mut ancestor_ids,
@@ -49,7 +44,7 @@ fn set_viewnodestats_recursive (
   tree                  : &mut Tree<ViewNode>,
   treeid                : NodeId,
   multi_source          : bool,
-  graph                 : Option<&InRustGraph>,
+  graph                 : &InRustGraph,
   config                : &SkgConfig,
   active                : Option<&ActiveSourceSet>,
   ancestor_ids          : &mut HashSet<ID>,
@@ -110,7 +105,7 @@ fn set_herald_strings_in_viewnode (
   tree                  : &mut Tree<ViewNode>,
   treeid                : NodeId,
   node_pid              : &ID,
-  graph                 : Option<&InRustGraph>,
+  graph                 : &InRustGraph,
   active                : Option<&ActiveSourceSet>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
@@ -199,7 +194,7 @@ fn active_vognode_pid (
 /// (some test paths, which never restrict) it degrades to ungated.
 fn flag_ancestor_relations (
   flags                 : &mut AncestorFlags,
-  graph                 : Option<&InRustGraph>,
+  graph                 : &InRustGraph,
   active                : Option<&ActiveSourceSet>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
@@ -209,7 +204,7 @@ fn flag_ancestor_relations (
 ) {
   let contains_edge_visible = |owner : &ID, target : &ID| -> bool {
     match (graph, active) {
-      (Some (g), Some (a)) if ! a . is_all () =>
+      (g, Some (a)) if ! a . is_all () =>
         g . edge_source (owner, NodeRelation::Contains, target)
           . map ( |source| a . contains_source (&source) )
           . unwrap_or (false),
@@ -224,7 +219,6 @@ fn flag_ancestor_relations (
     . map_or (false, |s| s . contains (anc_pid))
     && contains_edge_visible (node_pid, anc_pid) {
     flags . record (NodeRelation::Contains, false, generation); }
-  let graph = match graph { Some (g) => g, None => return, };
   for rel in GRAPH_RELATIONS {
     // inbound: ancestor R's node (ancestor plays the first role).
     if graph . relation_membership_is_visible (
@@ -296,18 +290,18 @@ fn set_hidden_body (
   tree     : &mut Tree<ViewNode>,
   treeid   : NodeId,
   node_pid : &ID,
-  graph    : Option<&InRustGraph>,
+  graph    : &InRustGraph,
 ) {
   let hidden_body : bool = {
     let ViewNodeKind::Vognode (Vognode::Active (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
     t . is_indefinitive ()
-      && graph . map_or ( false, |g| {
-           let pid : ID = g . pid_of (node_pid)
+      && {
+           let pid : ID = graph . pid_of (node_pid)
              . unwrap_or_else ( || node_pid . clone () );
-           g . nodes . get (&pid)
-             . map_or ( false, |n| n . body . is_some () ) } ) };
+           graph . nodes . get (&pid)
+             . map_or ( false, |n| n . body . is_some () ) } };
   if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . hidden_body = hidden_body; }}
@@ -329,12 +323,10 @@ fn set_hidden_body (
 fn set_rel_source (
   tree   : &mut Tree<ViewNode>,
   treeid : NodeId,
-  graph  : Option<&InRustGraph>,
+  graph  : &InRustGraph,
   config : &SkgConfig,
 ) {
   let rel_source : Option<SourceName> = 'compute : {
-    let graph : &InRustGraph = match graph {
-      Some (g) => g, None => break 'compute None, };
     let (node_pid, parentIs, birth) : (ID, ParentIs, Birth) = {
       let ViewNodeKind::Vognode (Vognode::Active (t)) =
         & tree . get (treeid) . unwrap () . value () . kind
@@ -438,7 +430,7 @@ mod relationship_default_tests {
         "member" . to_string (), None ) ) . id ();
 
     set_rel_source (
-      &mut tree, member_treeid, Some (&graph), &config );
+      &mut tree, member_treeid, &graph, &config );
     let ViewNodeKind::Vognode (Vognode::Active (rendered_member)) =
       & tree . get (member_treeid) . unwrap () . value () . kind
     else { panic! ("member should be active"); };

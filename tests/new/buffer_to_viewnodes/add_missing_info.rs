@@ -7,7 +7,9 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::{
 use skg::from_text::buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest,
   absent_parentIs_under_visible_parent_becomes_isContainer};
-use skg::test_utils::{run_with_shared_test_db, compare_viewnode_trees_modulo_id, compare_viewnode_trees};
+use skg::test_utils::{
+  run_with_shared_test_db, graph_handle_from_config,
+  compare_viewnode_trees_modulo_id, compare_viewnode_trees};
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, MpViewnodeKind, MpVognode};
 use skg::types::misc::{SkgConfig, ID, SourceName, TantivyIndex};
@@ -66,6 +68,7 @@ async fn test_sourceless_col_member_gets_graph_source (
   let mut viewforest : MpViewForest =
     org_to_uninterpreted_viewforest (input) . unwrap() . 0;
   add_missing_info_to_viewforest (
+    &graph_handle_from_config (config) ? . load_full () . graph,
     &mut viewforest, &config . db_name, driver ) . await ?;
   let owner = viewforest . root() . first_child() . unwrap();
   let col   = owner . first_child() . unwrap();
@@ -122,6 +125,7 @@ async fn test_add_missing_info_logic (
     org_to_uninterpreted_viewforest (
       with_missing_info) . unwrap() . 0;
   add_missing_info_to_viewforest(
+    &graph_handle_from_config (config) ? . load_full () . graph,
     &mut after_adding_missing_info,
     &config . db_name,
     driver ) . await ?;
@@ -221,6 +225,7 @@ async fn test_source_inheritance_logic (
   let mut actual_viewforest: MpViewForest =
     org_to_uninterpreted_viewforest (input) . unwrap() . 0;
   add_missing_info_to_viewforest(
+    &graph_handle_from_config (config) ? . load_full () . graph,
     &mut actual_viewforest,
     &config . db_name,
     driver ) . await ?;

@@ -3,6 +3,7 @@
 /// - when treatment should be Alias, make it so
 /// - add missing IDs where treatment is Content
 
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::git::MembershipAxes;
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::MpVognode;
@@ -11,8 +12,8 @@ use crate::types::viewnode::{IndefOrDef, QualCol, Qual};
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
-use crate::dbs::typedb::util::pids_from_ids::replace_ids_with_pids;
-use crate::dbs::typedb::search::pid_and_source_from_id;
+use crate::dbs::typedb::util::pids_from_ids::{
+  collect_ids_in_tree, assign_pids_throughout_tree_from_map};
 use ego_tree::{NodeId, NodeMut, NodeRef};
 use std::boxed::Box;
 use std::collections::{HashMap, HashSet};
@@ -41,14 +42,20 @@ pub struct EnrichmentProvenance {
 /// 'supplement_unspecified_fields_from_disk' does some of that, too,
 /// although it operates on DefineNodes, downstream.
 pub async fn add_missing_info_to_viewforest(
+  graph : &InRustGraph,
   viewforest  : &mut MpViewForest,
   db_name : &str,
   driver  : &TypeDBDriver,
 ) -> Result<EnrichmentProvenance, Box<dyn Error>> {
   let root_id: NodeId =
     viewforest . internal_root_id ();
-  replace_ids_with_pids(
-    viewforest, root_id, db_name, driver ) . await ?;
+  let mut ids : Vec<ID> = Vec::new ();
+  collect_ids_in_tree (viewforest . root (), &mut ids);
+  let pids : HashMap<ID, Option<ID>> = ids . into_iter ()
+    . map (|id| { let pid : Option<ID> = graph . pid_of (&id); (id, pid) })
+    . collect ();
+  if let Some (root) = viewforest . get_mut (root_id) {
+    assign_pids_throughout_tree_from_map (root, &pids); }
   let source_of_id : HashMap<ID, SourceName> =
     // A sourceless INDEFINITIVE ActiveNode that already carries an id
     // (e.g. a col member pasted from the link stack as a bare id -- a
@@ -65,7 +72,7 @@ pub async fn add_missing_info_to_viewforest(
     // not looked up -- it still inherits its parent's source in the DFS.
     // An id the graph does not know resolves to nothing and falls
     // through to parent-inheritance too.
-    resolve_sources_for_sourceless_ided_nodes (
+    resolve_sources_for_sourceless_ided_nodes (graph,
       viewforest, db_name, driver ) . await ?;
   let mut provenance : EnrichmentProvenance =
     EnrichmentProvenance {
@@ -177,16 +184,17 @@ fn inherit_parent_source_if_possible(
 /// omitted from the map, so those nodes fall through to
 /// parent-inheritance in the DFS.
 async fn resolve_sources_for_sourceless_ided_nodes (
+  graph : &InRustGraph,
   viewforest : &MpViewForest,
-  db_name    : &str,
-  driver     : &TypeDBDriver,
+  _db_name   : &str,
+  _driver    : &TypeDBDriver,
 ) -> Result<HashMap<ID, SourceName>, Box<dyn Error>> {
   let mut ids : HashSet<ID> = HashSet::new ();
   collect_sourceless_active_ids ( viewforest . root (), &mut ids );
   let mut source_of_id : HashMap<ID, SourceName> = HashMap::new ();
   for id in ids {
     if let Some ((_pid, source)) =
-      pid_and_source_from_id ( db_name, driver, &id ) . await ? {
+      graph . pid_and_source (&id) {
       source_of_id . insert ( id, source ); }}
   Ok (source_of_id) }
 

@@ -379,7 +379,8 @@ async fn rebuild_stores (
 
   let selected = Arc::new (old_selected . with_acknowledged_rebuild (
       (*candidate . graph) . clone (), candidate . manifest . clone ())
-    . with_cyclic_roots (context . cyclic_roots));
+    . with_cyclic_roots (context . cyclic_roots)
+    . with_searcher (replacement_tantivy . reader . searcher ()));
   env . startup_warnings = Arc::new (warnings . clone ());
   env . config = (*candidate . config) . clone ();
   env . tantivy_index = replacement_tantivy;

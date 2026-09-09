@@ -10,11 +10,11 @@ use crate::to_org::complete::partner_col::goal_list::{
   outbound_member_axes,
 };
 use crate::to_org::complete::partner_col::inverse_scan::inverse_scan_for_inbound_col;
-use crate::types::env::SkgEnv;
+use crate::types::env::{SkgEnv, find_source};
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
 use crate::types::misc::{ID, SourceName};
 use crate::source_sets::ActiveSourceSet;
-use crate::types::phantom::{phantom_axes, home_from_disk};
+use crate::types::phantom::phantom_axes;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::update_buffer::util::RepairSummary;
@@ -58,8 +58,7 @@ pub fn reconcile_partnerCol_children (
     member_role . opposite_role ();
   let source_resolver = |id : &ID| -> Option<SourceName> {
     graph_snap . pid_and_source (id)
-      . map ( |(_pid, src)| src )
-      . or_else ( || home_from_disk (id, &env . config) ) };
+      . map ( |(_pid, src)| src ) };
   let outbound : bool = // the col shows a list in the OWNER's file
     owner_role . is_first_role ();
   let inbound_scan : HashMap<ID, MembershipAxes> =
@@ -131,8 +130,8 @@ pub fn reconcile_partnerCol_children (
         tail = // phantoms of inactive members are omitted too
           omit_inactive_members (
             tail, active_source_set,
-            |id : &ID| env . find_source (
-              id, deleted_since_head_pid_src_map ));
+            |id : &ID| find_source (
+              id, deleted_since_head_pid_src_map , graph_snap));
         tail . sort_by ( |a, b| a . 0 . cmp (&b . 0) );
         let removed : HashSet<ID> =
           tail . iter () . cloned () . collect ();
@@ -164,7 +163,7 @@ pub fn reconcile_partnerCol_children (
   // budget bounds how many vognodes EXPAND, not how big one group is.)
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
-      tree, node,
+      graph_snap, tree, node,
       &goal_list, &removed_ids, axes_for_removed,
       source_diffs, deleted_since_head_pid_src_map, env ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §6.0/§16: the reconciler deletes a stale member that is a view-leaf and

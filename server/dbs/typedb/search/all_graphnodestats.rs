@@ -104,7 +104,7 @@ pub async fn fetch_all_graphnodestats_with_source_set (
 /// NODE itself is active (still checked separately via
 /// 'pid_source_is_active', matching every other render surface's
 /// two-part gate).
-fn fetch_all_graphnodestats_in_rust (
+pub fn fetch_all_graphnodestats_in_rust (
   graph   : &InRustGraph,
   pids    : &[ID],
   pid_set : &HashSet<ID>,

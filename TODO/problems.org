@@ -1264,3 +1264,24 @@
   F, F2, and R shape and semantic override facts, but the rendered
   overriders lack the expected =Oa= herald marker.  No Rust production
   code changed in the navigation fix.
+* Historical relation-diff privacy needs source-aware captured evidence (2026-09-09)
+  Inspection during the selected-graph read migration found that
+  'inverse_scan_for_inbound_col' scans every source's diff, including inactive
+  sources. Its Modified-file arm in
+  [[file:../server/to_org/complete/partner_col/inverse_scan.rs][inverse_scan.rs]]
+  reads ID-only 'NodeChanges' relation lists and applies no source gate.
+  Consequently a private section's added/removed relation can shape a public
+  inbound PartnerCol's membership signs or phantom membership even when both
+  endpoint nodes are public.
+
+  [[file:../server/git_ops/diff.rs][git_ops/diff.rs]] discards Modified-file
+  before/after nodes, retaining ID-only changes. Added/Deleted snapshots are
+  parsed with an empty source, so their per-member source checks also need
+  verification against the actual SourceDiff key and section interpretation.
+  Fix using explicitly captured section/source identity and add a real Git
+  fixture covering a private relation edit between public nodes; do not recover
+  missing historical provenance by rereading current disk.
+
+  This is separate from the ordinary HiddenOutside membership calculation's
+  private-contains suppression bug, which is fixed and covered by
+  'private_contains_does_not_suppress_a_public_hiddenoutside_member'.

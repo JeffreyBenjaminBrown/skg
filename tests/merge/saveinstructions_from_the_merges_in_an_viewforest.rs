@@ -2,7 +2,7 @@ use indoc::indoc;
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_viewforest;
 use skg::types::tree::forest::ViewForest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::{graph_handle_from_config, run_with_test_db};
 use skg::types::misc::{ID, MSV, SourceName, members_msv};
 use skg::types::save::SaveNode;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
@@ -25,6 +25,7 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
         let viewforest = maybePlaced_to_placed_tree (unchecked_viewforest)?;
         let nodeMerge_instructions =
         nodeMerge_instructions_from_viewforest(
+         &graph_handle_from_config (config) ? . load_full () . graph,
          &ViewForest::from_internal_tree (viewforest), config, driver)
         . await?;
 

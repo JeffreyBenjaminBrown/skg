@@ -18,7 +18,7 @@ use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, NodeMerge, SaveNode};
 use std::error::Error;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
 
@@ -91,10 +91,10 @@ pub(crate) async fn merge_nodes_with_hoist_approval (
     nodeMerge_instructions . iter ()
     . flat_map ( |m| m . to_vec () )
     . collect ();
+  let old_selected = graph . load_full ();
   let neighbor_savenodes : Vec<SaveNode> =
     neighbor_savenodes_for_nodeMerges (
-      nodeMerge_instructions, &config, driver ) . await ?;
-  let old_selected = graph . load_full ();
+      &old_selected . graph, nodeMerge_instructions, &config, driver ) . await ?;
   let mut candidate_graph : InRustGraph = (*old_selected . graph) . clone ();
   apply_definenodes_to_inRustGraph (
     &mut candidate_graph, &primary_definenodes);
@@ -140,10 +140,23 @@ pub(crate) async fn merge_nodes_with_hoist_approval (
     } else {
       tracing::info!("   TypeDB merge complete."); } }
 
+  let context_labels : HashMap<ID, String> = crate::context::context_origin_types_for_transition (
+    &old_selected . graph, &candidate_graph, &primary_definenodes,
+    &old_selected . cyclic_roots);
+  let mut index_definitions : Vec<DefineNode> = primary_definenodes . clone ();
+  let instructed : HashSet<ID> = primary_definenodes . iter ()
+    . map (|definition| match definition {
+      DefineNode::Save (node) => node . 0 . pid . clone (),
+      DefineNode::Delete (node) => node . id . clone (),
+    }) . collect ();
+  for node in &candidate_nodes {
+    if context_labels . contains_key (&node . pid)
+       && !instructed . contains (&node . pid) {
+      index_definitions . push (DefineNode::Save (SaveNode (node . clone ()))); }}
   let replacement : Option<TantivyIndex> =
     match update_tantivy_from_saveinstructions (
-      &primary_definenodes, tantivy_index,
-      &std::collections::HashMap::new () ) // merged nodes index with "" context type; refreshed at next rebuild
+      &index_definitions, tantivy_index,
+      &context_labels )
     { Ok (_count) => {
         tracing::info!("   Tantivy merge complete.");
         None }
@@ -151,22 +164,24 @@ pub(crate) async fn merge_nodes_with_hoist_approval (
         tracing::error!(
           "Tantivy merge failed: {}. Rebuilding from candidate graph...", e);
         let new_index : TantivyIndex = match
-          rebuild_tantivy_from_nodes (&config, &candidate_nodes) {
+          rebuild_tantivy_from_nodes (tantivy_index, &candidate_nodes,
+            &crate::context::context_origin_types_for_graph (
+              &candidate_graph, &old_selected . cyclic_roots)) {
           Ok (index) => index,
           Err (rebuild_error) => {
             let reason = format! (
               "Tantivy is poisoned after node merge: candidate reconstruction \
                failed ({})", rebuild_error);
-            let selected = old_selected . with_acknowledged_rebuild (
-              candidate_graph, selected_manifest);
             graph . store (Arc::new (
-              selected . with_tantivy_poisoned (reason . clone ())));
+              old_selected . with_tantivy_poisoned (reason . clone ())));
             return Err (reason . into ()); }};
         tracing::warn!(
           "NodeMerge succeeded, but Tantivy used candidate reconstruction.");
         Some (new_index) }};
   graph . store (Arc::new (
     old_selected . with_acknowledged_rebuild (
-      candidate_graph, selected_manifest)));
+      candidate_graph, selected_manifest)
+      . with_searcher (replacement . as_ref () . unwrap_or (tantivy_index)
+        . reader . searcher ())));
   tracing::info!("   In-Rust graph and selected manifest published.");
   Ok (replacement) }

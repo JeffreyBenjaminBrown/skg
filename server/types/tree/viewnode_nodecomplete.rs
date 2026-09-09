@@ -1,3 +1,4 @@
+use crate::dbs::in_rust_graph::InRustGraph;
 /// Node access utilities for ego_tree::Tree<ViewNode> and Tree<MpViewnode>
 
 use crate::to_org::util::get_id_from_treenode;
@@ -95,6 +96,7 @@ pub fn unique_scaffold_child_of_viewnode (
 
 /// Extract PIDs for the subscriber and its subscribees.
 pub fn pids_for_subscriber_and_its_subscribees (
+  graph : &InRustGraph,
   tree    : &Tree<ViewNode>,
   node_id : NodeId,
   config  : &SkgConfig,
@@ -104,13 +106,14 @@ pub fn pids_for_subscriber_and_its_subscribees (
     pid_and_source_from_treenode (
       tree, node_id, "pids_for_subscriber_and_its_subscribees" ) ?;
   let nodecomplete : NodeComplete =
-    nodecomplete_rustFirst_by_pid_and_source ( config, &pid, &source ) ?;
+    nodecomplete_rustFirst_by_pid_and_source (graph,  config, &pid, &source ) ?;
   Ok (( nodecomplete . pid . clone (),
         members_of ( nodecomplete . subscribes_to . or_default() ) )) }
 
 /// Extract PIDs for a Subscribee and its grandparent (the subscriber).
 /// Expects: subscriber -> SubscribeeCol -> Subscribee (this node)
 pub fn pid_for_subscribee_and_its_subscriber_grandparent (
+  graph : &InRustGraph,
   tree    : &Tree<ViewNode>,
   node_id : NodeId,
   config  : &SkgConfig,
@@ -135,7 +138,7 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
       "pid_for_subscribee_and_its_subscriber_grandparent" ) ?;
   let nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
-      config, &subscriber_id, &subscriber_source ) ?;
+      graph, config, &subscriber_id, &subscriber_source ) ?;
   Ok (( subscribee_pid,
         nodecomplete . pid . clone() )) }
 

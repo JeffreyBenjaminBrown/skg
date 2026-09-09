@@ -7,7 +7,7 @@ use skg::types::errors::BufferValidationError;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::{graph_handle_from_config, run_with_test_db};
 use std::error::Error;
 
 #[test]
@@ -91,7 +91,9 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
       let viewforest: MpViewForest =
         org_to_uninterpreted_viewforest (input_with_multiple_defining_containers) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
+        find_buffer_errors_for_saving(
+          &graph_handle_from_config (config) ? . load_full () . graph,
+          &viewforest, config, driver) . await?;
 
       let multiple_defining_errors: Vec<&BufferValidationError> = errors . iter()
         . filter(|e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes (_)))

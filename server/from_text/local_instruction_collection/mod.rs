@@ -20,6 +20,7 @@ pub mod lower;
 pub mod resolve_visibility;
 pub mod validate_text_claims;
 
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::nodecomplete_from_in_rust_graph;
 use crate::from_text::supplement_from_disk::{
   build_diskSupplemented_defineNodes,
@@ -50,6 +51,7 @@ pub struct NonmergeSavePlan {
 /// (acquirer, acquiree) pairs that nodeMerge expansion consumes.
 #[allow(non_snake_case)]
 pub async fn extract_nonmergeSavePlan_locally (
+  graph : &InRustGraph,
   viewforest : &ViewForest,
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
@@ -60,22 +62,22 @@ pub async fn extract_nonmergeSavePlan_locally (
   let collected : CollectedIntents =
     collect_instructions_locally (viewforest)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  validate_text_claims (&collected, config, driver) . await ?;
+  validate_text_claims (graph, &collected, config, driver) . await ?;
   let nodeMerge_acquisitions : Vec<(ID, ID)> =
     nodeMerge_pairs (&collected);
   let resolved : lower::LoweredIntents = {
     let LoweringOutput { intents, visibility } =
       lower_collected_intents (collected)
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-    resolve_visibility (
+    resolve_visibility (graph,
       intents, &visibility, config, driver,
       restricted_source_set ) . await ? };
   let with_disk : Definenodes_with_Sourcemoves =
-    build_diskSupplemented_defineNodes (
+    build_diskSupplemented_defineNodes (graph,
       resolved . into_ordered_intents(),
       config, driver, restricted_source_set ) . await ?;
   let sans_noops : Vec<DefineNode> =
-    filter_wouldbe_noop_defineNodes (with_disk . instructions);
+    filter_wouldbe_noop_defineNodes (graph, with_disk . instructions);
   let (define_nodes, source_moves, suppressed_writes)
     : (Vec<DefineNode>, Vec<SourceMove>, bool)
     = suppress_writes_to_inactive_nodes (
@@ -93,8 +95,8 @@ pub async fn extract_nonmergeSavePlan_locally (
           let kept : Vec<(ID, ID)> =
             nodeMerge_acquisitions . into_iter ()
             . filter ( |(acquirer, acquiree)|
-                member_is_visible (acquirer, config, active)
-                && member_is_visible (acquiree, config, active) )
+                member_is_visible (graph, acquirer, config, active)
+                && member_is_visible (graph, acquiree, config, active) )
             . collect ();
           let suppressed : bool = kept . len () < before;
           (kept, suppressed) }};
@@ -116,6 +118,7 @@ pub async fn extract_nonmergeSavePlan_locally (
 /// supplementation so unspecified fields have already been restored
 /// to their disk values before comparison.
 fn filter_wouldbe_noop_defineNodes (
+  graph : &InRustGraph,
   instructions : Vec<DefineNode>,
 ) -> Vec<DefineNode> {
   let initial_count : usize = instructions . len();
@@ -123,7 +126,7 @@ fn filter_wouldbe_noop_defineNodes (
     . into_iter()
     . filter(|instr| match instr {
       DefineNode::Save(SaveNode (node)) => {
-        match nodecomplete_from_in_rust_graph (&node . pid) {
+        match nodecomplete_from_in_rust_graph (graph, &node . pid) {
           Some (pre_save) =>
             buffernode_differs_from_disknode (node, &pre_save),
           None => true, }}

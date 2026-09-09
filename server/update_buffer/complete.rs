@@ -10,7 +10,7 @@ use crate::to_org::expand::definitive::{ apply_definitive_draw_rule, DrawOutcome
 use crate::to_org::util::DefinitiveMap;
 use crate::types::env::SkgEnv;
 use crate::types::git::SourceDiff;
-use crate::types::misc::{ID, SourceName, TantivyIndex};
+use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, read_at_ancestor_in_tree};
 use crate::to_org::complete::partner_col::maybe_add_partnerCol_branches;
 use crate::update_buffer::ancestry::{ col_is_generalized_orphan, deaden_generalized_orphan_col, is_col_kind};
@@ -63,10 +63,6 @@ pub(super) struct CompletionContext<'a> {
   /// the saved buffer and re-creating them would change the buffer and break the
   /// save round-trip (TODO/DONE/local-view-update/plan_v2.org §18). So post-save stays byte-identical.
   pub(super) create_partnerCols_for_fresh_nodes : bool,
-  /// TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the tantivy index for the inline diff's phantom-source
-  /// resolution. None on the post-save path (the deleted-id map + disk scan
-  /// suffice); Some on the de-novo path.
-  pub(super) diff_tantivy_index : Option<&'a TantivyIndex>,
   /// Some only when this completion serves the view the user just
   /// saved: read-only PartnerCol reconcilers report their repairs
   /// here, and the save response surfaces them as warnings. None for
@@ -161,18 +157,18 @@ async fn dispatch_node_update (
       // vognode already spent its 1 budget unit when it expanded, so drawing all
       // the members here costs nothing more and never truncates a group.
       reconcile_subscribee_col_children (
-        treeid, tree, context . source_diffs, context . env,
+        context . graph_snap, treeid, tree, context . source_diffs, context . env,
         context . deleted_since_head_pid_src_map,
         context . active_source_set ) . await ?,
     ViewNodeKind::PartnerCol (PartnerCol::HiddenInSubscribee) =>
       reconcile_hiddenin_subscribee_col_children (
-        treeid, tree, context . source_diffs, context . env,
+        context . graph_snap, treeid, tree, context . source_diffs, context . env,
         context . deleted_since_head_pid_src_map,
         context . active_source_set,
         context . warning_sink . as_deref_mut () ) ?,
     ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutside_subscribee_col_children (
-        treeid, tree, context . source_diffs, context . env,
+        context . graph_snap, treeid, tree, context . source_diffs, context . env,
         context . deleted_since_head_pid_src_map,
         context . active_source_set,
         context . warning_sink . as_deref_mut () ) ?,
@@ -194,10 +190,10 @@ async fn dispatch_node_update (
     // diff entries. Diffs flow inline for both de-novo and post-save.
     ViewNodeKind::QualCol (QualCol::Alias) =>
       super::reconcile::aliascol::reconcile_alias_col_children (
-        tree, treeid, context . source_diffs, &context . env . config ) ?,
+        context . graph_snap, tree, treeid, context . source_diffs, &context . env . config ) ?,
     ViewNodeKind::QualCol (QualCol::ID) =>
       super::reconcile::id_col::reconcile_id_col_children (
-        treeid, tree, context . source_diffs, &context . env . config ) ?,
+        context . graph_snap, treeid, tree, context . source_diffs, &context . env . config ) ?,
     _ => {
       // No-op for: Inactive (an anonymous placeholder -- it carries no
       // identity, and flipping it to a "DELETED" marker would leak that
@@ -249,7 +245,7 @@ async fn visit_normal_node (
     settled = true;
   } else if had_dvr {
     match apply_definitive_draw_rule (
-      tree, treeid, &context . env . config, context . defmap ) ? {
+      context . graph_snap, tree, treeid, &context . env . config, context . defmap ) ? {
       DrawOutcome::Deferred => {
         // Deferred to an existing Final occurrence: the node is now
         // indefinitive; the content engine (settled) will clobber+return.
@@ -287,7 +283,7 @@ async fn visit_normal_node (
       . unwrap_or (false);
     if ! parent_is_partner_col {
       maybe_add_partnerCol_branches (
-        tree, treeid, &context . env . config,
+        context . graph_snap, tree, treeid, &context . env . config,
         &context . env . driver,
         context . active_source_set,
         context . source_diffs ) . await ?; } }
@@ -295,13 +291,13 @@ async fn visit_normal_node (
   // Remaining view requests (Aliases / Containerward / Sourceward); the
   // Definitive request was already consumed by apply_definitive_draw_rule.
   super::reconcile::view_requests::execute_activeNode_view_requests (
-    treeid, tree, &context . env . config, &context . env . driver,
+    context . graph_snap, treeid, tree, &context . env . config, &context . env . driver,
     context . errors, context . active_source_set ) . await ?;
   cancellation_checkpoint (context) ?;
   // Ensure a definitive subscribee's HiddenInSubscribeeCol exists; the BFS
   // reconciles it on reaching it.
   super::reconcile::view_requests::ensure_hiddenin_col_under_definitive_subscribee (
-    tree, treeid, &context . env . config, &context . env . driver,
+    context . graph_snap, tree, treeid, &context . env . config, &context . env . driver,
     context . active_source_set,
     context . source_diffs ) . await ?;
   cancellation_checkpoint (context) ?;
@@ -316,9 +312,8 @@ async fn visit_normal_node (
     let node_mut : NodeMut<ViewNode> =
       tree . get_mut (treeid) . unwrap ();
     process_activeNode_diff (
-      node_mut, real_diffs,
+      context . graph_snap, node_mut, real_diffs,
       context . deleted_since_head_pid_src_map,
-      context . diff_tantivy_index,
       &context . env . config )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   Ok(( )) }

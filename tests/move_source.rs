@@ -5,21 +5,35 @@ use indoc::indoc;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::one_node::nodecomplete_from_id;
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
-use skg::from_text::buffer_to_validated_saveplan;
+use skg::from_text::buffer_to_validated_saveplan as buffer_to_validated_saveplan_with_graph;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::save::update_graph_minus_nodeMerges;
 use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::errors::{SaveError, BufferValidationError};
+use skg::source_sets::ActiveSourceSet;
 
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex, members_of};
 use skg::types::nodes::complete::NodeComplete;
-use skg::types::save::DefineNode;
+use skg::types::save::{DefineNode, SavePlan};
+use skg::types::tree::forest::ViewForest;
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tantivy::{DocAddress, TantivyDocument};
 use tantivy::schema::document::Value;
 use typedb_driver::TypeDBDriver;
+
+async fn buffer_to_validated_saveplan (
+  buffer_text      : &str,
+  config           : &SkgConfig,
+  driver           : &TypeDBDriver,
+  active_source_set : Option<&ActiveSourceSet>,
+) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config)
+    . map_err (SaveError::DatabaseError) ?;
+  buffer_to_validated_saveplan_with_graph (
+    &graph . load_full () . graph,
+    buffer_text, config, driver, active_source_set ) . await }
 
 /// Query Tantivy for a node by title and return its source.
 fn tantivy_source_for_id (
@@ -33,7 +47,7 @@ fn tantivy_source_for_id (
   skg::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
   let (matches, searcher)
     : (Vec<(f32, DocAddress)>, tantivy::Searcher) =
-    search_index (tantivy_index, query, &SearchOptions::default ())?;
+    search_index (tantivy_index, &tantivy_index . reader . searcher (), query, &SearchOptions::default ())?;
   for (_score, doc_address) in matches {
     let doc : TantivyDocument =
       searcher . doc (doc_address)?;

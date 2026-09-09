@@ -359,12 +359,9 @@ pub fn apply_definenodes_to_inRustGraph (
 /// panics — the caller wraps in 'debug_assert!' so release builds pay
 /// no cost.
 pub fn in_rust_graph_coherent_with_save_instructions (
+  graph : &InRustGraph,
   save_instructions : &[DefineNode],
 ) -> Result<(), String> {
-  let snap : Option<Arc<InRustGraph>> = snapshot_global ();
-  let graph : &InRustGraph = match snap . as_deref () {
-    Some (g) => g,
-    None     => return Ok (( )), }; // in-Rust graph not yet initialized (tests); nothing to check
   for instr in save_instructions {
     match instr {
       DefineNode::Save (SaveNode (node)) => {

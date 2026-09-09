@@ -1,3 +1,4 @@
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::complete::partner_col::{ maybe_add_hiddenInSubscribeeCol_branch, type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::expand::definitive::execute_view_requests;
 use crate::source_sets::ActiveSourceSet;
@@ -14,6 +15,7 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 pub async fn execute_activeNode_view_requests (
+  graph : &InRustGraph,
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
   config             : &SkgConfig,
@@ -31,11 +33,12 @@ pub async fn execute_activeNode_view_requests (
     extract_view_requests( tree, node ) ?;
   if ! requests . is_empty() {
     execute_view_requests(
-      tree, requests, config, driver, errors,
+      graph, tree, requests, config, driver, errors,
       active_source_set ) . await ?; }
   Ok(( )) }
 
 pub async fn ensure_hiddenin_col_under_definitive_subscribee (
+  graph : &InRustGraph,
   tree   : &mut Tree<ViewNode>,
   node   : NodeId,
   config : &SkgConfig,
@@ -56,7 +59,7 @@ pub async fn ensure_hiddenin_col_under_definitive_subscribee (
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   if is_indefinitive { return Ok (( )); }
   maybe_add_hiddenInSubscribeeCol_branch (
-    tree, node, config, driver,
+    graph, tree, node, config, driver,
     active_source_set, source_diffs ) . await }
 
 /// Read the node's non-consumed view_requests as a Vec. View completion

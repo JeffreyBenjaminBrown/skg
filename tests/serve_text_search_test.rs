@@ -69,7 +69,7 @@ fn test_text_search_org_format (
       let search_terms : &str =
         "the bear eats cheese";
       let ( best_matches, searcher ) =
-        search_index ( &tantivy_index, search_terms, &SearchOptions::default () ) ?;
+        search_index ( &tantivy_index, &tantivy_index . reader . searcher (), search_terms, &SearchOptions::default () ) ?;
       let matches_by_id =
         group_matches_by_id (
           best_matches, searcher, &tantivy_index,
@@ -198,7 +198,7 @@ fn test_search_results_preserve_textlinks_in_title (
         wipe_then_init_tantivy_db (
           &nodes, Path::new (index_dir) ) ?;
       let ( best_matches, searcher ) =
-        search_index ( &tantivy_index, "science",
+        search_index ( &tantivy_index, &tantivy_index . reader . searcher (), "science",
                        &SearchOptions::default () ) ?;
       let matches_by_id = group_matches_by_id (
         best_matches, searcher, &tantivy_index,
@@ -280,7 +280,7 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
         wipe_then_init_tantivy_db (
           &nodes, Path::new (index_dir) ) ?;
       let ( best_matches, searcher ) =
-        search_index ( &tantivy_index, "axiom thesis lemma",
+        search_index ( &tantivy_index, &tantivy_index . reader . searcher (), "axiom thesis lemma",
                        &SearchOptions::default () ) ?;
       let matches_by_id = group_matches_by_id (
         best_matches, searcher, &tantivy_index,
@@ -315,7 +315,7 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
         regex: true, body: false, operators: false,
         exclude_ugly_telescope : false };
       let ( best_matches_re, searcher_re ) =
-        search_index ( &tantivy_index, "axiom thesis lemma",
+        search_index ( &tantivy_index, &tantivy_index . reader . searcher (), "axiom thesis lemma",
                        &regex_opts ) ?;
       let matches_re = group_matches_by_id (
         best_matches_re, searcher_re, &tantivy_index,
@@ -377,7 +377,7 @@ fn private_alias_documents_are_filtered_before_grouping (
           . into_iter () . collect (), };
       { // Restricted search: the private alias doc must not match.
         let ( best_matches, searcher ) =
-          search_index ( &tantivy_index, "zanzibar",
+          search_index ( &tantivy_index, &tantivy_index . reader . searcher (), "zanzibar",
                          &SearchOptions::default () ) ?;
         let matches_by_id = group_matches_by_id (
           best_matches, searcher, &tantivy_index,
@@ -388,7 +388,7 @@ fn private_alias_documents_are_filtered_before_grouping (
                   "private alias doc leaked into a main-only search" ); }
       { // Unrestricted (None): the alias matches.
         let ( best_matches, searcher ) =
-          search_index ( &tantivy_index, "zanzibar",
+          search_index ( &tantivy_index, &tantivy_index . reader . searcher (), "zanzibar",
                          &SearchOptions::default () ) ?;
         let matches_by_id = group_matches_by_id (
           best_matches, searcher, &tantivy_index,
@@ -397,7 +397,7 @@ fn private_alias_documents_are_filtered_before_grouping (
                     &ID::new ("id_leveled")) ); }
       { // The title doc still matches under the restricted set.
         let ( best_matches, searcher ) =
-          search_index ( &tantivy_index, "public title",
+          search_index ( &tantivy_index, &tantivy_index . reader . searcher (), "public title",
                          &SearchOptions::default () ) ?;
         let matches_by_id = group_matches_by_id (
           best_matches, searcher, &tantivy_index,

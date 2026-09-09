@@ -18,28 +18,24 @@
 ///   the user; an invisible one absent from the buffer was OMITTED
 ///   by rendering and must survive.
 
-use crate::dbs::in_rust_graph::snapshot_global;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::phantom::home_from_disk;
 
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
 /// Whether saving may treat this member as visible: its source
-/// resolves (in-Rust graph first, then disk) and is in the active
+/// resolves in the supplied selected graph and is in the active
 /// set.
 pub fn member_is_visible (
+  graph : &InRustGraph,
   id     : &ID,
-  config : &SkgConfig,
+  _config : &SkgConfig,
   active : &ActiveSourceSet,
 ) -> bool {
-  let source : Option<SourceName> = {
-    let from_graph : Option<SourceName> =
-      snapshot_global ()
-      . and_then ( |snap| snap . pid_and_source (id)
-                          . map ( |(_pid, src)| src ));
-    from_graph . or_else ( || home_from_disk (id, config) ) };
+  let source : Option<SourceName> =
+    graph . pid_and_source (id) . map (|(_pid, source)| source);
   match source {
     Some (src) => active . contains_source (&src),
     None       => false, }}

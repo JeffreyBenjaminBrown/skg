@@ -1,3 +1,4 @@
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::backpath::build_and_integrate_path_view_then_drop_request;
@@ -15,6 +16,7 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 pub async fn execute_view_requests (
+  graph : &InRustGraph,
   viewforest    : &mut Tree<ViewNode>,
   requests      : Vec < (NodeId, ViewRequest) >,
   config        : &SkgConfig,
@@ -26,11 +28,11 @@ pub async fn execute_view_requests (
     match request {
       ViewRequest::Col (ColRelation::Aliases) => {
         build_and_integrate_aliases_view_then_drop_request (
-          viewforest, node_id, config, typedb_driver, errors )
+          graph, viewforest, node_id, config, typedb_driver, errors )
           . await ?; },
       ViewRequest::Col (rel) => {
         build_and_integrate_col_then_drop_request (
-          viewforest, node_id, rel, config, typedb_driver, errors,
+          graph, viewforest, node_id, rel, config, typedb_driver, errors,
           active_source_set ) . await ?; },
       ViewRequest::Path (role) => {
         // Relation-generic: every partner role routes through the one
@@ -38,7 +40,7 @@ pub async fn execute_view_requests (
         // roles alike). A view-ROOT's container request is handled
         // separately (finish_viewforest) and removed before this pass.
         build_and_integrate_path_view_then_drop_request (
-          viewforest, node_id, role, config, typedb_driver, errors,
+          graph, viewforest, node_id, role, config, typedb_driver, errors,
           active_source_set ) . await ?; },
       ViewRequest::Definitive =>
         // View completion (dispatch_node_update) settles every Definitive
@@ -80,6 +82,7 @@ pub enum DrawOutcome {
 /// Final-ness before view completion (complete_nodes_in_level_order) draws
 /// (and cascades) content.
 pub fn apply_definitive_draw_rule (
+  graph : &InRustGraph,
   viewforest : &mut Tree<ViewNode>,
   node_id    : NodeId,
   config     : &SkgConfig,
@@ -101,7 +104,7 @@ pub fn apply_definitive_draw_rule (
         . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
       return Ok ( DrawOutcome::Deferred ); }
     if prior . node_id () != node_id {
-      indefinitize_content_subtree ( viewforest,
+      indefinitize_content_subtree (graph,  viewforest,
                                      prior . node_id (),
                                      visited, config ) ?; }}
   { // Remove request, mark definitive, replace title/body, add to visited.
@@ -112,8 +115,8 @@ pub fn apply_definitive_draw_rule (
           body         : None,
           edit_request : None }; } )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-    from_disk_replace_title_body_and_nodecomplete (
-      viewforest, node_id, config ) ?;
+    from_graph_replace_title_body_and_nodecomplete (
+      graph, viewforest, node_id, config ) ?;
     // A DVR target is Final (TODO/DONE/local-view-update/plan_v2.org §5.2): later DVRs for this ID defer to it.
     visited . insert ( node_pid . clone(), Finalizable::Final (node_id) ); }
   Ok ( DrawOutcome::MadeFinal ) }
@@ -126,6 +129,7 @@ pub fn apply_definitive_draw_rule (
 /// TODO : This will need complication to properly handle
 ///   sharing-related nodes among the input node's descendents.
 fn indefinitize_content_subtree (
+  graph : &InRustGraph,
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
   visited : &mut DefinitiveMap,
@@ -148,25 +152,26 @@ fn indefinitize_content_subtree (
       (node_pid, content_child_treeids) };
   if ! activeNode_in_tree_is_indefinitive ( tree, node_id ) ? {
     visited . remove (&node_pid);
-    makeIndefinitiveAndClobber ( tree, node_id, config ) ?; }
+    makeIndefinitiveAndClobber (graph,  tree, node_id, config ) ?; }
   for child_treeid in content_child_treeids { // recurse
     indefinitize_content_subtree (
-      tree, child_treeid, visited, config ) ?; }
+      graph, tree, child_treeid, visited, config ) ?; }
   Ok (( )) }
 
 /// Fetches NodeComplete from the in-Rust graph or disk.
 /// Updates title and body.
 /// Preserves all other ViewNode data.
-fn from_disk_replace_title_body_and_nodecomplete (
+fn from_graph_replace_title_body_and_nodecomplete (
+  graph : &InRustGraph,
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   let (pid, src) : (ID, SourceName) =
     pid_and_source_from_treenode ( tree, node_id,
-      "from_disk_replace_title_body_and_nodecomplete" ) ?;
+      "from_graph_replace_title_body_and_nodecomplete" ) ?;
   let nodecomplete : NodeComplete = nodecomplete_rustFirst_by_pid_and_source (
-    config, &pid, &src ) ?;
+    graph, config, &pid, &src ) ?;
   let title : String = nodecomplete . title . clone();
   if title . is_empty () {
     return Err ( format! ( "NodeComplete {} has empty title", pid ) . into () ); }

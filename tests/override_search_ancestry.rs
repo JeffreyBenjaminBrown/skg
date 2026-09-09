@@ -98,7 +98,7 @@ async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
     let mut ids : HashSet<ID> =
       search_results . iter () . cloned () . collect ();
     ids . extend (
-      collect_override_relative_ids ( &search_results, active ) );
+      collect_override_relative_ids ( &search_results, active, &graph ) );
     ids . into_iter () . collect () };
   let stats : AllGraphNodeStats =
     fetch_all_graphnodestats_with_source_set (
@@ -106,12 +106,14 @@ async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
   // Phase 2: graft, then the same stats/herald/render passes as
   // handle_snapshot_response.
   insert_override_ancestries_into_search_view (
-    &mut viewforest, &search_results, active );
+    &mut viewforest, &search_results, active, &graph );
   let root_id : NodeId = viewforest . root () . id ();
   set_metadata_relationships_in_node_recursive (
+    &graph,
     &mut viewforest, root_id, &stats, config );
   mark_view_roots_parent_absent ( &mut viewforest );
   set_viewnodestats_in_viewforest (
+    &graph,
     &mut viewforest,
     & stats . container_to_contents,
     & stats . content_to_containers,
@@ -184,7 +186,8 @@ fn override_relatives_graft_as_descendants (
   let (mut viewforest, results) =
     build_search_viewforest ( "cooking", &matches, &HashSet::new () );
   insert_override_ancestries_into_search_view (
-    &mut viewforest, &results, active );
+    &mut viewforest, &results, active,
+    &snapshot_global () . expect ("fixture graph installed above") );
   let tree : Tree<ViewNode> = viewforest . into_internal_tree ();
   let u : NodeRef<ViewNode> =
     find_result_root ( &tree, "U" ) . expect ("U is a result root");

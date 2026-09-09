@@ -4,6 +4,7 @@
 // then the node's source is not heralded,
 // even if the parent ignores it.
 
+use skg::dbs::in_rust_graph::InRustGraph;
 use skg::types::misc::{ ID, SourceName, SkgConfig, SkgfileSource };
 use skg::types::viewnode::{ ParentIs, ViewNode, ViewNodeKind, viewforest_root_viewnode, mk_definitive_viewnode, mk_indefinitive_viewnode };
 use skg::types::viewnode::Vognode;
@@ -56,6 +57,7 @@ fn source_inheritance_across_non_content_same_source () {
       ParentIs::Independent );
     viewforest . get_mut (a_id) . unwrap () . append (vn); }
   set_viewnodestats_in_viewforest (
+    &InRustGraph::from_nodecompletes (&[]),
     &mut viewforest,
     &container_to_contents,
     &content_to_containers,
@@ -97,6 +99,7 @@ fn source_inheritance_across_non_content_different_source () {
       ParentIs::Independent );
     viewforest . get_mut (a_id) . unwrap () . append (vn); }
   set_viewnodestats_in_viewforest (
+    &InRustGraph::from_nodecompletes (&[]),
     &mut viewforest,
     &container_to_contents,
     &content_to_containers,

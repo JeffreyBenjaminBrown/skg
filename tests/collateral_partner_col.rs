@@ -107,6 +107,7 @@ fn collateral_partner_col_update_and_warning_scoping
                 && n_view . contains ("(id S)"),
         "N's view should show S in a subscriberCol:\n{}", n_view );
       views_state . open_views . register_view (
+        &graph . load_full () . graph,
         n_uri . clone (), n_vf, &n_pids );
 
       // Render S (subscribeeCol shows N) and register it as the saved
@@ -118,6 +119,7 @@ fn collateral_partner_col_update_and_warning_scoping
                 && s_view . contains ("(id N)"),
         "S's view should show N in a subscribeeCol:\n{}", s_view );
       views_state . open_views . register_view (
+        &graph . load_full () . graph,
         s_uri . clone (), s_vf, &s_pids );
 
       // Drop N from S's subscribeeCol (emptying it = explicit empty

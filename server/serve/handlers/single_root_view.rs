@@ -54,7 +54,7 @@ pub fn handle_single_root_view_request (
   match node_id_from_single_root_view_request (request) {
     Ok (node_id) => {
       match active_source_set . id_source_is_active (
-        &env . config, &node_id ) {
+        &env . in_rust_graph_snapshot (), &node_id ) {
         Ok (true) => {},
         Ok (false) => {
           let response_sexp : String =
@@ -174,7 +174,7 @@ pub fn handle_single_root_view_request (
                   release, ScalarReleaseDecision::Challenge { .. } ) {
                   return challenge_response (&release) . unwrap (); }
                 views_state . open_views . register_view_with_authority (
-                  menu_uri . clone (),
+                    &env . in_rust_graph_snapshot (),                   menu_uri . clone (),
                   menu_forest,
                   &menu_pids,
                   env . in_rust_graph . load_full ()
@@ -235,7 +235,7 @@ pub fn handle_single_root_view_request (
                   return challenge_response (&release) . unwrap (); }
                 if let Ok (view_uri) = &view_uri_result {
                   views_state . open_views . register_view_with_authority (
-                    view_uri . clone (),
+                    &env . in_rust_graph_snapshot (),                     view_uri . clone (),
                     viewforest,
                     &pids,
                     env . in_rust_graph . load_full ()

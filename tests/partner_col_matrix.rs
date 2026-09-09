@@ -522,8 +522,11 @@ async fn saveplan_nodes (
   driver : &Arc<TypeDBDriver>,
   active : Option<&ActiveSourceSet>,
 ) -> Result<Vec<DefineNode>, Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let (_vf, plan, _warnings) =
-    buffer_to_validated_saveplan (buf, config, driver, active) . await ?;
+    buffer_to_validated_saveplan (
+      &graph . load_full () . graph,
+      buf, config, driver, active ) . await ?;
   Ok (plan . define_nodes) }
 
 /// A fresh indefinitive public member line at the given indentation.
@@ -766,6 +769,7 @@ fn buffer_save_rejects_second_user_owned_overrider
       // filesystem write, so mono-r2 still overrides nothing.
       let r2 : NodeComplete =
         nodeComplete_rustFIrst_by_id (
+          &graph . load_full () . graph,
           config, driver, &ID::from ("mono-r2") ) . await ?;
       let overrides_empty : bool = match &r2 . overrides_view_of {
         MSV::Unspecified       => true,

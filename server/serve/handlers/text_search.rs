@@ -11,15 +11,14 @@ use coverage::{CoverageMatcher, build_coverage_matcher, coverage_factor};
 
 use crate::consts::SEARCH_DISPLAY_LIMIT;
 use crate::context::ContextOriginType;
-use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
 use crate::dbs::tantivy::search::{
   SearchOptions, has_ugly_telescope, search_index};
-use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
+use crate::dbs::typedb::ancestry::{ AncestryTree, full_containerward_ancestry_from_in_rust_graph};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::typedb::search::all_graphnodestats::{
   AllGraphNodeStats,
-  fetch_all_graphnodestats_with_source_set};
+  fetch_all_graphnodestats_in_rust};
 use crate::runtime::RuntimeQueryLease;
 use crate::runtime::ServerRuntime;
 use crate::org_to_text::viewforest_to_string;
@@ -40,7 +39,6 @@ use crate::serve::util::{
 };
 use crate::types::git::MembershipAxes;
 use crate::types::views_state::{ViewUri, search_recipe};
-use crate::types::store_state::StoreHealth;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::source_sets::{ActiveSourceSet, search_ids_for_source_set_for_test as search_ids_for_source_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
@@ -83,7 +81,7 @@ pub fn enriched_search_buffer_for_source_set_for_test (
   matches_by_id  : &MatchGroups,
   search_results : &[ID],
   ancestry_by_id : &HashMap<ID, AncestryTree>,
-  tantivy_index  : &TantivyIndex,
+  graph          : &InRustGraph,
   config         : &SkgConfig,
   active         : &ActiveSourceSet,
 ) -> Result<String, Box<dyn std::error::Error>> {
@@ -93,14 +91,15 @@ pub fn enriched_search_buffer_for_source_set_for_test (
     &mut viewforest,
     search_results,
     ancestry_by_id,
-    tantivy_index,
+    graph,
     config,
     active );
   render_enriched_search_buffer::insert_override_ancestries_into_search_view (
     &mut viewforest,
     search_results,
-    active );
+    active, graph );
   set_viewnodestats_in_viewforest (
+    graph,
     // Mirror the production enrichment path (handle_snapshot_response):
     // compute view-relative stats so the rendered buffer carries the
     // sourceHerald at source boundaries. Empty containment maps suffice
@@ -176,21 +175,8 @@ pub fn handle_text_search_request (
         return; }};
   match search_terms {
     Ok (search_terms) => {
-      // Wait for any in-flight background save-index writes to commit, so
-      // the search reflects every save issued so far (read-your-writes).
-      wait_for_tantivy_writes_idle ();
-      if let StoreHealth::Poisoned (reason) =
-          &env . in_rust_graph . load_full () . tantivy_health {
-        let _ = send_response_with_length_prefix (
-          stream,
-          &tag_text_response (
-            TcpToClient::Error,
-            &format! (
-              "Search is unavailable because the Tantivy index could not be repaired: {}. Run skg-rebuild-dbs.",
-              reason)));
-        return; }
       let index_has_ugly : bool =
-        match has_ugly_telescope (&env . tantivy_index) {
+        match has_ugly_telescope (&env . tantivy_index, &env . searcher) {
           Ok (has_ugly) => has_ugly,
           Err (error) => {
             let _ = send_response_with_length_prefix (
@@ -215,7 +201,7 @@ pub fn handle_text_search_request (
         exclude_ugly_telescope : ! include_ugly_telescopes,
       };
       // --- Phase 1: immediate results without paths ---
-      match search_index ( &env . tantivy_index,
+      match search_index ( &env . tantivy_index, &env . searcher,
                            &search_terms,
                            &search_opts ) {
         Ok (( best_matches, searcher )) => {
@@ -290,7 +276,7 @@ pub fn handle_text_search_request (
             // Replace prior search with the same terms.
             views_state . open_views . unregister_view (&uri); }
           views_state . open_views . register_view_with_authority (
-            uri . clone (), viewforest, &search_results,
+                    &env . in_rust_graph_snapshot (),             uri . clone (), viewforest, &search_results,
             env . in_rust_graph . load_full () . graph_generation . get (),
             presentation_generation,
             1,
@@ -399,10 +385,9 @@ fn spawn_enrichment_thread (
     tracing::info! ("search enrichment: thread started for {} IDs",
               ids_clone . len ());
     let ancestry_by_id : HashMap<ID, AncestryTree> =
-      futures::executor::block_on (
-        ancestry_by_id_from_ids_async (
-          &ids_clone, &config . db_name,
-          &env . driver, max_depth ));
+      ids_clone . iter () . map (|id| (id . clone (),
+        full_containerward_ancestry_from_in_rust_graph (
+          &graph, id, max_depth))) . collect ();
     tracing::info! ("search enrichment: ancestry computed ({} entries)",
               ancestry_by_id . len ());
     if cancel_clone . load (Ordering::SeqCst) {
@@ -421,20 +406,16 @@ fn spawn_enrichment_thread (
         render_enriched_search_buffer::collect_override_relative_ids_from_graph (
           &ids_clone, &active_clone, &graph ) );
       id_set . into_iter () . collect () };
-    let title_and_source_by_id = all_enriched_ids . iter ()
-      . filter_map (|id| crate::dbs::tantivy::title_and_source_by_id (
-        &env . tantivy_index, id) . map (|value| (id . clone (), value)))
+    let title_and_source_by_id : HashMap<ID, (String, SourceName)> =
+      all_enriched_ids . iter () . filter_map (|id|
+        graph . get (id) . map (|node|
+          (id . clone (), (node . title . clone (), node . source . clone ()))))
       . collect ();
     let graphnodestats : AllGraphNodeStats =
-      futures::executor::block_on (
-        fetch_all_graphnodestats_with_source_set (
-          &config . db_name,
-          &env . driver,
-          &all_enriched_ids,
-          Some (&active_clone) ) )
-      . unwrap_or_else ( |e| {
-        tracing::warn! ("search enrichment: graphnodestats failed: {}", e);
-        AllGraphNodeStats::empty () } );
+      fetch_all_graphnodestats_in_rust (
+        &graph, &all_enriched_ids,
+        &all_enriched_ids . iter () . cloned () . collect (),
+        Some (&active_clone));
     tracing::info! ("search enrichment: graphnodestats fetched for {} IDs",
               all_enriched_ids . len ());
     if cancel_clone . load (Ordering::SeqCst) {

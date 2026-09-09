@@ -1512,3 +1512,52 @@ The baseline native-undo package skips remain unverified coverage.
 ** choices determining the future
 No architectural question. Continue the pinned graph/search publication and
 ordinary-save recovery prerequisites before changing release authority.
+
+* Simplify/cohere checkpoint: explicit selected reads and completed search pairs
+** what's done and went well
+Selected runtime environments now retain the actual Tantivy Searcher.
+Search hits, privacy preflight, ID/title reads, negative lookups and enrichment
+use that captured graph/search pair. Rendering, completion, save preparation,
+extra-ID lookup, source inheritance, fork/merge validation and retained-view
+root indexing receive explicit graph inputs instead of recapturing globals
+or falling back to newer source files. Ordinary export uses selected content.
+Readable Git IDs explicitly request Git evidence; ordinary missing-title
+queries do not silently consult changed worktrees.
+
+The Tantivy worker returns completion for its named batch without mutating
+selected graph authority. Save publication waits for that exact completion;
+a failed index preparation retains the earlier graph/searcher and marks
+writes as requiring recovery. Merge repair reconstructs the index without
+removing live readers' directory and updates affected ranking neighbors.
+Unreachable deleted-node rendering machinery was preserved under
+'_burying/not_using/obsolete/typedb/'.
+
+A focused privacy regression found private Contains edges affecting public
+HiddenOutside membership. The current-graph path now gates those edges before
+classifying membership. The historical-diff variant is separately recorded
+as open in 'TODO/problems.org'.
+
+Validation: all-target checking passes; the recorded full library run passed
+325 tests with one optional real-corpus skip. Twenty-seven search/title/model
+tests pass, including an old Searcher retained across index updates and
+ordinary missing-title requests while new disk files exist. Eight focused
+render/lookup/privacy tests passed. The source-enrichment test now uses its
+actual in-memory fixture nodes and passes. Its first build failure after the
+fixture edit is retained separately from the fixed run.
+Logs: 'temp/simplify-cohere-baseline/pinned-*.log' and
+'/tmp/cohere-focused-nextest2.log'.
+** Changes to the plan's envisioned order.
+The broad signature change is one checkpoint because removing implicit graph
+inputs requires updating every caller together. Pure TypeDB replacements and
+ordinary-save journal primitives were developed independently; their active
+integration follows this checkpoint.
+** what's imperfect about what's done
+The runtime still uses temporary selected-publication and mutation adapters.
+TypeDB and its remaining global query wrappers have not yet been removed;
+this checkpoint does not claim the final single-owner architecture. Git
+presentation evidence still needs the later identity/revalidation audit.
+Native-undo package skips and full process/editor acceptance remain open.
+** choices determining the future
+No new architectural question. Switch the verified graph query replacements,
+remove TypeDB, and integrate durable source effects and owner reservations
+before enabling independent release.

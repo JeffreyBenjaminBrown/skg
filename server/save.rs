@@ -15,7 +15,7 @@ use crate::dbs::in_rust_graph::{
   },
 };
 use crate::dbs::tantivy::background_writer::{
-  enqueue_tantivy_write_after,
+  enqueue_tantivy_write,
   lock_tantivy_writes,
   wait_for_tantivy_generation,
   TantivyGenerationStatus,
@@ -234,30 +234,33 @@ pub(crate) async fn apply_define_nodes_to_stores (
     } else {
       tracing::info!("   TypeDB update complete."); }
 
-  // Tantivy (background): the search index is a derived cache that the
-  // save's response never reads, so enqueue the index update to commit
-  // off the critical path, in FIFO order (a single worker). Searches
-  // block on 'wait_for_tantivy_writes_idle' until it lands. A
-  // background failure is logged, not propagated — the filesystem is
-  // the source of truth, so 'rebuild dbs' resyncs the index.
-  let mut graph_generation = old_selected . graph_generation;
-  let store_for_completion = graph . clone ();
-  let recovery_graph = Arc::new (new_graph . clone ());
-  let tantivy_generation = enqueue_tantivy_write_after ( TantivyWriteTask {
-    tantivy_index : tantivy_index . clone (),
-    instructions  : tantivy_instructions,
+  // Finish the exact index batch before selecting its graph. Existing
+  // readers retain their captured Searcher throughout this preparation.
+  let tantivy_generation = enqueue_tantivy_write (TantivyWriteTask {
+    tantivy_index: tantivy_index . clone (),
+    instructions: tantivy_instructions,
     context_types,
-    recovery_graph,
+    recovery_graph: Arc::new (new_graph . clone ()),
     cyclic_roots: old_selected . cyclic_roots . clone (),
-    selected_store: Some (store_for_completion), },
-    |tantivy_generation| {
-      let selected = old_selected . with_selected_transition (
-        new_graph, selected_manifest, tantivy_generation);
-      graph_generation = selected . graph_generation;
-      graph . store (Arc::new (selected)); } );
-  Ok (StoreUpdateOutcome {
-    graph_generation,
-    tantivy_generation, }) }
+  });
+  match wait_for_tantivy_generation (tantivy_generation) {
+    TantivyGenerationStatus::Committed
+    | TantivyGenerationStatus::Reconstructed (_) => {},
+    TantivyGenerationStatus::Failed (reason) => {
+      graph . store (Arc::new (
+        old_selected . with_tantivy_poisoned (reason . clone ())));
+      return Err (format! (
+        "The replacement search index failed: {}. The previous graph remains selected; source effects require recovery.",
+        reason) . into ()); },
+    TantivyGenerationStatus::Pending => unreachable! (),
+  }
+  let selected = old_selected . with_selected_transition (
+    new_graph, selected_manifest, tantivy_generation)
+    . with_tantivy_terminal (tantivy_generation, None)
+    . with_searcher (tantivy_index . reader . searcher ());
+  let graph_generation = selected . graph_generation;
+  graph . store (Arc::new (selected));
+  Ok (StoreUpdateOutcome { graph_generation, tantivy_generation }) }
 
 /// Runs 'update_graph_minus_nodeMerges' and then 'merge_nodes' in that
 /// order, applying any Tantivy rebuild from either step to the

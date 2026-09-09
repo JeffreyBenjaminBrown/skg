@@ -1,6 +1,6 @@
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::typedb::search::all_graphnodestats::{
-  fetch_all_graphnodestats,
-  fetch_all_graphnodestats_with_source_set,
+  fetch_all_graphnodestats_in_rust,
   graphnodestats_for_pid,
   AllGraphNodeStats};
 use crate::source_sets::ActiveSourceSet;
@@ -16,10 +16,11 @@ use std::error::Error;
 use ego_tree::{NodeId, Tree};
 use typedb_driver::TypeDBDriver;
 
-/// Enrich all nodes in a viewforest with graphStats from TypeDB.
+/// Enrich all nodes with graphStats from the supplied snapshot.
 /// Also fetches and returns the containment maps, which callers
 /// can pass to `set_viewnodestats_in_viewforest`.
 pub async fn set_graphnodestats_in_viewforest (
+  graph : &InRustGraph,
   viewforest : &mut Tree<ViewNode>,
   config : &SkgConfig,
   driver : &TypeDBDriver,
@@ -27,9 +28,10 @@ pub async fn set_graphnodestats_in_viewforest (
                HashMap < ID, HashSet < ID > > ),
 	             Box<dyn Error> > {
   set_graphnodestats_in_viewforest_inner (
-    viewforest, config, driver, None ) . await }
+    graph, viewforest, config, driver, None ) . await }
 
 pub async fn set_graphnodestats_in_viewforest_with_source_set (
+  graph : &InRustGraph,
   viewforest : &mut Tree<ViewNode>,
   config : &SkgConfig,
   driver : &TypeDBDriver,
@@ -38,12 +40,13 @@ pub async fn set_graphnodestats_in_viewforest_with_source_set (
 	               HashMap < ID, HashSet < ID > > ),
 	             Box<dyn Error> > {
   set_graphnodestats_in_viewforest_inner (
-    viewforest, config, driver, Some (active) ) . await }
+    graph, viewforest, config, driver, Some (active) ) . await }
 
 async fn set_graphnodestats_in_viewforest_inner (
+  graph : &InRustGraph,
   viewforest : &mut Tree<ViewNode>,
   config : &SkgConfig,
-  driver : &TypeDBDriver,
+  _driver : &TypeDBDriver,
   active : Option<&ActiveSourceSet>,
 ) -> Result < ( HashMap < ID, HashSet < ID > >,
 	               HashMap < ID, HashSet < ID > > ),
@@ -55,19 +58,13 @@ async fn set_graphnodestats_in_viewforest_inner (
   let stats : AllGraphNodeStats =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "fetch_all_graphnodestats" ). entered();
-      match active {
-        Some (active) =>
-          fetch_all_graphnodestats_with_source_set (
-            & config . db_name, driver, & pids, Some (active) ) . await,
-        None =>
-          fetch_all_graphnodestats (
-            & config . db_name, driver, & pids ) . await,
-      }} ?;
+      let pid_set : HashSet<ID> = pids . iter () . cloned () . collect ();
+      fetch_all_graphnodestats_in_rust (graph, &pids, &pid_set, active) };
   let root_treeid : NodeId = viewforest . root () . id ();
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "set_graphnodestats_recursive" ). entered();
     set_metadata_relationships_in_node_recursive (
-      viewforest,
+      graph, viewforest,
       root_treeid,
       & stats,
       config ) };
@@ -75,6 +72,7 @@ async fn set_graphnodestats_in_viewforest_inner (
         stats . content_to_containers )) }
 
 pub fn set_metadata_relationships_in_node_recursive (
+  graph : &InRustGraph,
   tree   : &mut Tree<ViewNode>,
   treeid : NodeId,
   stats  : &AllGraphNodeStats,
@@ -89,14 +87,14 @@ pub fn set_metadata_relationships_in_node_recursive (
         ViewNodeKind::Vognode (Vognode::Active (t))
           => { let nodecomplete_opt : Option<NodeComplete>
                  = nodecomplete_rustFirst_by_pid_and_source (
-                     config, &t . id, &t . source
+                     graph, config, &t . id, &t . source
                    ). ok ();
                Some ( graphnodestats_for_pid (
                  &t . id, stats, nodecomplete_opt . as_ref () )) },
         ViewNodeKind::Phantom (Phantom::Diff (p))
           => { let nodecomplete_opt : Option<NodeComplete>
                  = nodecomplete_rustFirst_by_pid_and_source (
-                     config, &p . id, &p . source
+                     graph, config, &p . id, &p . source
                    ). ok ();
                Some ( graphnodestats_for_pid (
                  &p . id, stats, nodecomplete_opt . as_ref () )) },
@@ -118,7 +116,7 @@ pub fn set_metadata_relationships_in_node_recursive (
     . children () . map ( | c | c . id () ) . collect ();
   for child_treeid in child_treeids {
     set_metadata_relationships_in_node_recursive (
-      tree,
+      graph, tree,
       child_treeid,
       stats,
       config ); } }

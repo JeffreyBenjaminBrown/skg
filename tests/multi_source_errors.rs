@@ -2,7 +2,10 @@
 
 use indoc::indoc;
 use regex::Regex;
-use skg::test_utils::{strip_org_comments, cleanup_test_tantivy_and_typedb_dbs};
+use skg::test_utils::{
+  strip_org_comments, cleanup_test_tantivy_and_typedb_dbs,
+  graph_handle_from_config};
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
@@ -54,6 +57,7 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
     create_all_sources(&config . db_name, &driver, &config) . await?;
     create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
+    let graph : InRustGraphHandle = graph_handle_from_config (&config) ?;
 
     // Test buffer with multiple error conditions
     // Comments indicate the expected error for each line/group
@@ -69,10 +73,12 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
     let mut viewforest: MpViewForest =
       org_to_uninterpreted_viewforest (&buffer_text)?. 0;
     add_missing_info_to_viewforest(
+      &graph . load_full () . graph,
       &mut viewforest, &config . db_name, &driver
       ) . await?;
     let errors: Vec<BufferValidationError> =
       find_buffer_errors_for_saving(
+        &graph . load_full () . graph,
         &viewforest, &config, &driver) . await?;
 
     { // Source validation errors: one for dub-1 (nonexistent source "dub")
@@ -154,6 +160,7 @@ fn test_foreign_node_modification_errors(
     create_all_sources(&config . db_name, &driver, &config) . await?;
     create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
+    let graph : InRustGraphHandle = graph_handle_from_config (&config) ?;
 
     // Test 1: Foreign node modifications
     // (all other errors removed so initial validation passes)
@@ -176,6 +183,7 @@ fn test_foreign_node_modification_errors(
       let buffer_text: String =
         strip_org_comments (buffer_with_errors);
       let result = buffer_to_validated_saveplan(
+        &graph . load_full () . graph,
         &buffer_text,
         &config,
         &driver,
@@ -251,6 +259,7 @@ fn test_foreign_node_modification_errors(
       let buffer_text: String = strip_org_comments(
         buffer_with_merges);
       let result = buffer_to_validated_saveplan(
+        &graph . load_full () . graph,
         &buffer_text,
         &config,
         &driver,
@@ -331,6 +340,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     create_all_sources(&config . db_name, &driver, &config) . await?;
     create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
     create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
+    let graph : InRustGraphHandle = graph_handle_from_config (&config) ?;
 
     // Test 1: Source move between owned sources is now allowed
     // priv-1 exists on disk in "private" source, but buffer specifies "public"
@@ -344,6 +354,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
         strip_org_comments (buffer_with_move);
 
       let result = buffer_to_validated_saveplan(
+        &graph . load_full () . graph,
         &buffer_text,
         &config,
         &driver,
@@ -374,6 +385,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
 
       // This should fail during validation (before indefinitives are filtered)
       let result = buffer_to_validated_saveplan(
+        &graph . load_full () . graph,
         &buffer_text,
         &config,
         &driver,

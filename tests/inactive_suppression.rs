@@ -17,6 +17,7 @@
 use indoc::indoc;
 
 use skg::from_text::buffer_to_validated_saveplan;
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::source_sets::{ActiveSourceSet, SourceSetName, run_with_source_set_test_db};
 use skg::types::misc::{ID, members_of};
 use skg::types::nodes::complete::NodeComplete;
@@ -50,8 +51,9 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
     "tests/source_sets/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-inactive-suppression",
     |config, driver, _tantivy| Box::pin ( async move {
-      skg::dbs::in_rust_graph::try_init_global_handle (
-        skg::test_utils::graph_handle_from_config (config) ? );
+      let graph : InRustGraphHandle =
+        skg::test_utils::graph_handle_from_config (config) ?;
+      skg::dbs::in_rust_graph::try_init_global_handle (graph . clone ());
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           config, SourceSetName ("public" . to_string ())) ?;
@@ -64,6 +66,7 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
         "};
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
+            &graph . load_full () . graph,
             buffer, config, driver, Some (&active) ) . await ?;
         assert! (
           ! save_ids (&plan . define_nodes)
@@ -87,6 +90,7 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
         "};
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
+            &graph . load_full () . graph,
             buffer, config, driver, Some (&active) ) . await ?;
         assert! (
           ! save_ids (&plan . define_nodes)
@@ -105,6 +109,7 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
         "};
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
+            &graph . load_full () . graph,
             buffer, config, driver, Some (&active) ) . await ?;
         assert! (
           plan . source_moves . is_empty (),

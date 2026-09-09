@@ -13,7 +13,7 @@
 // cannot see it); nobody shows z (no subscribee contains it).
 
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
 use skg::types::misc::{ID, MemberAtSource};
 use skg::types::save::NodeMerge;
 
@@ -29,6 +29,7 @@ fn all_tests
                  "tests/merge/merge_hides_intersection/fixtures") . await ?;
       let merges : Vec<NodeMerge> =
         nodeMerge_instructions_from_pairs (
+          &graph_handle_from_config (&s . config) ? . load_full () . graph,
           & [ ( ID::from ("a"), ID::from ("b") ) ],
           &s . config, &s . driver ) . await ?;
       assert_eq! ( merges . len (), 1 );

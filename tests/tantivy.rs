@@ -46,7 +46,7 @@ fn test_many_tantivy_things (
   let (best_matches, searcher)
     : (Vec<(f32, tantivy::DocAddress)>, tantivy::Searcher)
     = search_index(
-      &tantivy_index,
+      &tantivy_index, &tantivy_index . reader . searcher (),
       "test second",
       &SearchOptions::default())?; // the search query
   assert!(!best_matches . is_empty(),
@@ -74,7 +74,7 @@ fn test_many_tantivy_things (
   // First search for "This is one big tuna." - should find node 1 as top result
   let (initial_matches, initial_searcher)
     : (Vec<(f32, tantivy::DocAddress)>, tantivy::Searcher)
-    = search_index(&tantivy_index, "This is one big tuna.", &SearchOptions::default())?;
+    = search_index(&tantivy_index, &tantivy_index . reader . searcher (), "This is one big tuna.", &SearchOptions::default())?;
 
   assert!(!initial_matches . is_empty(),
          "Expected to find at least one match for 'This is one big tuna.'");
@@ -111,7 +111,7 @@ fn test_many_tantivy_things (
   // Search again - now node 6 should be first, node 1 should be second
   let (final_matches, final_searcher)
     : (Vec<(f32, tantivy::DocAddress)>, tantivy::Searcher)
-    = search_index(&tantivy_index, "This is one big tuna.", &SearchOptions::default())?;
+    = search_index(&tantivy_index, &tantivy_index . reader . searcher (), "This is one big tuna.", &SearchOptions::default())?;
 
   assert!(final_matches . len() >= 2,
          "Expected at least 2 matches after update, but got: {}",
@@ -213,7 +213,7 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   // Test 1: Search for "eat apple"
   let (matches1, searcher1) =
     search_index(
-      &tantivy_index, "eat apple",
+      &tantivy_index, &tantivy_index . reader . searcher (), "eat apple",
       &SearchOptions::default())?;
   let ids1: Vec<String> =
     matches1 . iter()
@@ -235,7 +235,7 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
 
   // Test 2: Search for "chomp apple"
   let (matches2, searcher2) =
-    search_index(&tantivy_index, "chomp apple", &SearchOptions::default())?;
+    search_index(&tantivy_index, &tantivy_index . reader . searcher (), "chomp apple", &SearchOptions::default())?;
   let ids2: Vec<String> = matches2 . iter()
     . map(|(_score, doc_address)| {
       let doc = searcher2 . doc::<TantivyDocument> (*doc_address) . unwrap();
@@ -250,7 +250,7 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   println!("✓ Test 2 passed: 'chomp apple' returned {:?}", ids2);
 
   // Test 3: Search for "throw banana"
-  let (matches3, searcher3) = search_index(&tantivy_index, "throw banana", &SearchOptions::default())?;
+  let (matches3, searcher3) = search_index(&tantivy_index, &tantivy_index . reader . searcher (), "throw banana", &SearchOptions::default())?;
   let ids3: Vec<String> = matches3 . iter()
     . map(|(_score, doc_address)| {
       let doc = searcher3 . doc::<TantivyDocument> (*doc_address) . unwrap();
@@ -368,7 +368,7 @@ fn test_search_finds_titles_with_special_chars (
     ("cat:dog",      "colons"),
   ] { let (matches, searcher) :
         (Vec<(f32, tantivy::DocAddress)>, tantivy::Searcher) =
-        search_index (&tantivy_index, query, &SearchOptions::default ()) ?;
+        search_index (&tantivy_index, &tantivy_index . reader . searcher (), query, &SearchOptions::default ()) ?;
       assert! ( !matches . is_empty (),
                 "literal '{}' should find a result", query );
       let top_doc : TantivyDocument =
@@ -400,13 +400,13 @@ fn test_search_body_axis (
       &nodes, Path::new ("/tmp/tantivy-test-body-axis") ) ?;
   { // body=false: body content is NOT findable
     let (matches, _searcher) =
-      search_index (&ti, "paprika", &SearchOptions::default ()) ?;
+      search_index (&ti, &ti . reader . searcher (), "paprika", &SearchOptions::default ()) ?;
     assert! ( matches . is_empty (),
               "body word should NOT match when body=false" ); }
   { // body=true: body content IS findable
     let opts = SearchOptions { body: true, ..SearchOptions::default () };
     let (matches, searcher) =
-      search_index (&ti, "paprika", &opts) ?;
+      search_index (&ti, &ti . reader . searcher (), "paprika", &opts) ?;
     assert! ( !matches . is_empty (),
               "body word should match when body=true" );
     let top_doc : TantivyDocument =
@@ -434,12 +434,12 @@ fn ugly_telescope_filter_runs_inside_the_search_query (
     MSV::Specified (vec! ["dirty alias secret" . to_string ()]) );
   let (index, _) = wipe_then_init_tantivy_db (
     &[clean, ugly], Path::new ("/tmp/tantivy-test-ugly-filter") ) ?;
-  assert! ( has_ugly_telescope (&index) ? );
+  assert! ( has_ugly_telescope (&index, &index . reader . searcher ()) ? );
   let opts : SearchOptions = SearchOptions {
     exclude_ugly_telescope : true,
     .. SearchOptions::default () };
   for terms in ["shared privacy term", "dirty alias secret"] {
-    let (matches, searcher) = search_index (&index, terms, &opts) ?;
+    let (matches, searcher) = search_index (&index, &index . reader . searcher (), terms, &opts) ?;
     let ids : Vec<String> = matches . iter ()
       . map ( |(_, address)|
         searcher . doc::<TantivyDocument> (*address) . unwrap ()
@@ -473,7 +473,7 @@ fn test_search_regex_axis (
   { // Prefix via regex: 'histor.*' matches history, historical.
     let opts = SearchOptions { regex: true, ..SearchOptions::default () };
     let (matches, searcher) =
-      search_index (&ti, "histor.*", &opts) ?;
+      search_index (&ti, &ti . reader . searcher (), "histor.*", &opts) ?;
     let mut ids : Vec<String> = Vec::new ();
     for (_, addr) in &matches {
       let doc : TantivyDocument = searcher . doc (*addr) ?;
@@ -513,7 +513,7 @@ fn test_search_regex_multiword (
   let gather = | pattern : &str | -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let opts : SearchOptions =
       SearchOptions { regex: true, ..SearchOptions::default () };
-    let (matches, searcher) = search_index (&ti, pattern, &opts) ?;
+    let (matches, searcher) = search_index (&ti, &ti . reader . searcher (), pattern, &opts) ?;
     let mut ids : Vec<String> = Vec::new ();
     for (_, addr) in &matches {
       let doc : TantivyDocument = searcher . doc (*addr) ?;
@@ -567,7 +567,7 @@ fn test_search_regex_with_operators (
     let opts : SearchOptions =
       SearchOptions { regex: true, operators: true,
                       ..SearchOptions::default () };
-    let (matches, searcher) = search_index (&ti, pattern, &opts) ?;
+    let (matches, searcher) = search_index (&ti, &ti . reader . searcher (), pattern, &opts) ?;
     let mut ids : Vec<String> = Vec::new ();
     for (_, addr) in &matches {
       let doc : TantivyDocument = searcher . doc (*addr) ?;
@@ -638,7 +638,7 @@ fn test_search_regex_operator_grouping (
     let opts : SearchOptions =
       SearchOptions { regex: true, operators: true,
                       ..SearchOptions::default () };
-    let (matches, searcher) = search_index (&ti, pattern, &opts) ?;
+    let (matches, searcher) = search_index (&ti, &ti . reader . searcher (), pattern, &opts) ?;
     let mut ids : Vec<String> = Vec::new ();
     for (_, addr) in &matches {
       let doc : TantivyDocument = searcher . doc (*addr) ?;
@@ -688,7 +688,7 @@ fn test_search_regex_operator_grouping (
       SearchOptions { regex: true, operators: true,
                       ..SearchOptions::default () };
     let err : String =
-      search_index (&ti, "( cat.*", &opts)
+      search_index (&ti, &ti . reader . searcher (), "( cat.*", &opts)
       . err () . expect ("unclosed lone '(' should error")
       . to_string ();
     assert! ( err . contains ("unclosed '('"),
@@ -716,14 +716,14 @@ fn test_title_by_id_returns_title_not_alias (
     "Expected 3 documents (1 title + 2 aliases)");
   let result : Option<(String, SourceName)> =
     title_and_source_by_id (
-      &tantivy_index,
+      &tantivy_index, &tantivy_index . reader . searcher (),
       &ID::new ("node-with-aliases") );
   assert_eq! (result . as_ref () . map ( |(t, _)| t . as_str () ),
     Some ("The Real Title"),
     "title_and_source_by_id should return the title, not an alias");
   let missing : Option<(String, SourceName)> =
     title_and_source_by_id (
-      &tantivy_index,
+      &tantivy_index, &tantivy_index . reader . searcher (),
       &ID::new ("nonexistent-id") );
   assert_eq! (missing, None,
     "title_and_source_by_id should return None for missing IDs");
@@ -741,7 +741,7 @@ fn ugly_telescope_flag_survives_index_build_and_update (
     &[node . clone ()], Path::new ("/tmp/tantivy-test-ugly-flag") )?;
   let stored_flag = |index : &TantivyIndex| -> Result<String, Box<dyn std::error::Error>> {
     let (matches, searcher) = search_index (
-      index, "uniquely ugly indexed title", &SearchOptions::default ())?;
+      index, &index . reader . searcher (), "uniquely ugly indexed title", &SearchOptions::default ())?;
     let (_, address) = matches . first ()
       .ok_or ("expected the indexed title")?;
     let document : TantivyDocument = searcher . doc (*address)?;
@@ -772,9 +772,9 @@ fn complete_in_place_reconstruction_replaces_old_documents_and_labels (
   reconstruct_index_from_nodes (&[fresh . clone ()], &index, &labels)?;
 
   assert! (title_and_source_by_id (
-    &index, &ID::new ("old-reconstruction-node")) . is_none (),
+    &index, &index . reader . searcher (), &ID::new ("old-reconstruction-node")) . is_none (),
     "reconstruction must remove documents absent from the selected graph");
-  assert_eq! (title_and_source_by_id (&index, &fresh . pid)
+  assert_eq! (title_and_source_by_id (&index, &index . reader . searcher (), &fresh . pid)
     . map (|(title, _)| title), Some (fresh . title));
   let searcher = index . reader . searcher ();
   let query = tantivy::query::TermQuery::new (
@@ -788,3 +788,39 @@ fn complete_in_place_reconstruction_replaces_old_documents_and_labels (
     . and_then (|value| value . as_str ()), Some ("CyclicRoot"));
   Ok (( ))
 }
+
+#[test]
+fn captured_searcher_keeps_hits_privacy_and_absence_coherent (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let root = tempfile::tempdir ()?;
+  let mut old : NodeComplete = empty_node_complete ();
+  old . pid = ID::new ("stable");
+  old . title = "former paprika" . into ();
+  let (index, _) = wipe_then_init_tantivy_db (
+    &[old . clone ()], root . path ())?;
+  let selected : tantivy::Searcher = index . reader . searcher ();
+  let mut changed : NodeComplete = old;
+  changed . title = "replacement saffron" . into ();
+  changed . ugly_telescope = true;
+  let mut added : NodeComplete = empty_node_complete ();
+  added . pid = ID::new ("newcomer");
+  added . title = "new saffron" . into ();
+  update_index_with_nodes (
+    &[NodeTantivy::from (&changed), NodeTantivy::from (&added)], &index)?;
+
+  assert! (!has_ugly_telescope (&index, &selected)?);
+  assert_eq! (search_index (&index, &selected, "paprika",
+    &SearchOptions::default ())? . 0 . len (), 1);
+  assert! (search_index (&index, &selected, "saffron",
+    &SearchOptions::default ())? . 0 . is_empty ());
+  assert_eq! (title_and_source_by_id (&index, &selected, &changed . pid)
+    . map (|(title, _)| title), Some ("former paprika" . into ()));
+  assert! (title_and_source_by_id (&index, &selected, &added . pid) . is_none ());
+  assert! (!skg::dbs::tantivy::titles_by_ids (
+    &index, &selected, &[added . pid . clone ()]) . contains_key (&added . pid));
+
+  let published : tantivy::Searcher = index . reader . searcher ();
+  assert! (has_ugly_telescope (&index, &published)?);
+  assert_eq! (search_index (&index, &published, "saffron",
+    &SearchOptions::default ())? . 0 . len (), 2);
+  Ok (()) }

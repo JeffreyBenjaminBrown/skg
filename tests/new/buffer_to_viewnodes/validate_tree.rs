@@ -5,16 +5,27 @@ use regex::Regex;
 use skg::types::errors::BufferValidationError;
 use skg::types::misc::{SkgConfig, SkgfileSource, SourceName, TantivyIndex};
 use skg::types::tree::forest::MpViewForest;
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use skg::from_text::buffer_to_viewnodes::local::validate_local_structure;
-use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
-use skg::test_utils::run_with_shared_test_db;
+use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving as find_buffer_errors_for_saving_with_graph;
+use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
 use std::error::Error;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
 use skg::types::maybe_placed_viewnode::{MpVognode, MpViewnodeKind};
+
+async fn find_buffer_errors_for_saving (
+  viewforest : &MpViewForest,
+  config     : &SkgConfig,
+  driver     : &TypeDBDriver,
+) -> Result<Vec<BufferValidationError>, Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  find_buffer_errors_for_saving_with_graph (
+    &graph . load_full () . graph,
+    viewforest, config, driver ) . await }
 
 #[test]
 fn all_tests

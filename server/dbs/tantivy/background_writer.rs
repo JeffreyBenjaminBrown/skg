@@ -1,28 +1,14 @@
-//! Background Tantivy index writer.
+//! One ordered worker prepares Tantivy updates from a named candidate graph.
+//! It returns the terminal result for the exact batch; only the owner may
+//! publish that graph with its completed Searcher. Existing readers keep
+//! their previous immutable search snapshot while this worker runs.
 //!
-//! Each save's Tantivy update — the ~60% of the save spent in
-//! 'writer.commit()' (see profiling-save.org) — used to block the
-//! response, even though the save's re-rendered result is built from
-//! the in-Rust graph and never reads the search index. The save now
-//! ENQUEUES its index update here and returns; the commit happens off
-//! the critical path.
-//!
-//! A single worker thread applies the queued updates in FIFO order, so
-//! two rapid saves of the same node can never commit out of order.  Every
-//! accepted batch has a monotonic generation and a durable terminal status.
-//! A search captures the newest generation and waits through that point, so
-//! later enqueues cannot accidentally lengthen its read-your-writes barrier.
-//!
-//! 'lock_tantivy_writes' serializes EVERY Tantivy writer (this worker,
-//! search-make-link's 'update_index_with_nodes', the init/rebuild
-//! context pass), since backgrounding the worker means it can now run
-//! concurrently with those.  A background-write or enqueue failure is both
-//! logged and recorded against its generation.  Callers can therefore avoid
-//! acknowledging a graph transition whose exact search-index update failed.
+//! The completion ledger is process-local. Durable operation outcomes and
+//! source-effect recovery belong to the owner's transaction journal.
 
 use crate::context::context_origin_types_for_graph;
 use crate::save::{nodecompletes_from_graph, update_tantivy_from_saveinstructions};
-use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::tantivy::write::reconstruct_index_from_nodes;
 use crate::types::misc::{ID, TantivyIndex};
 use crate::types::save::DefineNode;
@@ -52,9 +38,8 @@ pub struct TantivyWriteTask {
   /// incremental write fails.  An Arc makes the common path cheap.
   pub recovery_graph : Arc<InRustGraph>,
   pub cyclic_roots   : BTreeSet<ID>,
-  /// Store publication whose selected paths await this task.  Tests and
-  /// index-only callers may omit it.
-  pub selected_store : Option<InRustGraphHandle>, }
+}
+
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TantivyGeneration (u64);
@@ -106,8 +91,7 @@ impl GenerationLedger {
 }
 
 /// Shared between the worker and enqueue/wait APIs.  Completed entries are
-/// intentionally retained: incidents and reconnecting clients need to ask
-/// about the exact generation which represented their graph transition.
+/// retained while callers may ask about their exact in-process index batch.
 struct CompletionState {
   ledger  : Mutex<GenerationLedger>,
   changed : Condvar, }
@@ -145,10 +129,6 @@ fn worker () -> &'static Worker {
           Err (_) => recover_generation (
             queued . generation, &queued . task,
             "Tantivy writer panicked while applying the batch" . into ()), };
-        record_store_terminal (
-          &queued . task . selected_store,
-          queued . generation,
-          &terminal);
         finish_generation (
           &worker_completion, queued . generation, terminal); } });
     Worker { sender: Mutex::new (sender), completion } } ) }
@@ -206,47 +186,14 @@ fn recover_generation (
         incremental_reason)), }
 }
 
-fn record_store_terminal (
-  selected_store : &Option<InRustGraphHandle>,
-  generation     : TantivyGeneration,
-  terminal       : &TantivyGenerationStatus,
-) {
-  let Some (selected_store) = selected_store else { return; };
-  let failure = match terminal {
-    TantivyGenerationStatus::Committed
-    | TantivyGenerationStatus::Reconstructed (_) => None,
-    TantivyGenerationStatus::Failed (reason) => Some (reason . clone ()),
-    TantivyGenerationStatus::Pending => unreachable! (), };
-  // This is a metadata-only compare-and-swap.  It may race a later graph
-  // publication, so retry from that publication rather than overwriting it.
-  // Graph mutations themselves remain serialized by the writer mutex.
-  loop {
-    let old = selected_store . load_full ();
-    let next = Arc::new (old . with_tantivy_terminal (
-      generation, failure . clone ()));
-    let observed = selected_store . compare_and_swap (&old, next);
-    if Arc::ptr_eq (&observed, &old) { break; }} }
-
 /// Enqueue a Tantivy index update to commit in the background, in FIFO
 /// order.  Returns the generation immediately; callers decide when they
 /// need to wait for or present its terminal result.
 pub fn enqueue_tantivy_write (
   task : TantivyWriteTask,
 ) -> TantivyGeneration {
-  enqueue_tantivy_write_after (task, |_| {})
-}
-
-/// Reserve the generation, let the graph transaction publish bookkeeping
-/// which names it, and only then make the task visible to the worker.
-pub fn enqueue_tantivy_write_after<F> (
-  task        : TantivyWriteTask,
-  before_send : F,
-) -> TantivyGeneration
-where F : FnOnce (TantivyGeneration)
-{
   let worker : &Worker = worker ();
   let generation = lock_ledger (&worker . completion) . begin ();
-  before_send (generation);
   let queued = QueuedTantivyWrite { generation, task };
   if let Err (e) = worker . sender . lock ()
     . unwrap_or_else ( |p| p . into_inner () ) . send (queued)
@@ -395,14 +342,13 @@ mod tests {
       context_types: HashMap::new (),
       recovery_graph: graph,
       cyclic_roots: BTreeSet::new (),
-      selected_store: None,
     };
     assert_eq! (
       recover_generation (
         TantivyGeneration (700), &task, "injected failure" . into ()),
       TantivyGenerationStatus::Reconstructed ("injected failure" . into ()));
     assert_eq! (
-      title_and_source_by_id (&index, &node . pid)
+      title_and_source_by_id (&index, &index . reader . searcher (), &node . pid)
         . map (|(title, _)| title),
       Some (node . title));
   }

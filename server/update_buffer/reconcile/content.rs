@@ -6,8 +6,7 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::{
     OverrideResolution, resolve_override};
-use crate::types::env::find_source_with_optional_tantivy;
-use crate::types::phantom::home_from_disk;
+use crate::types::env::find_source;
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::util::setlike_vector_subtraction;
@@ -103,7 +102,7 @@ pub fn expand_true_content_at_activeNode (
             => t . is_indefinitive (),
           _ => false } ) ?;
     if is_indefinitive {
-      clobberIndefinitiveViewnode( tree, node, config ) ?;
+      clobberIndefinitiveViewnode(graph_snap,  tree, node, config ) ?;
       return Ok (( )); }}
   if deleted_by_this_save_pids . contains (&pid) {
     mutate_activeNode_to_deletednode (
@@ -118,12 +117,12 @@ pub fn expand_true_content_at_activeNode (
   clear_edit_request (tree, node) ?;
   let nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
-      config, &pid, &initial_source ) ?;
+      graph_snap, config, &pid, &initial_source ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §8.3: EVERY definitive node re-syncs title/body/source from the snapshot,
   // saved and collateral alike. (After extraction the snapshot already reflects
   // the saved buffer's text, so re-syncing the saved node yields the same
   // content it just defined -- a no-op.)
-  sync_activeNode_from_disk (tree, node, &nodecomplete) ?;
+  sync_activeNode_from_graph (tree, node, &nodecomplete) ?;
   reconcile_content_children (
     tree, node, &nodecomplete, config, graph_snap,
     deleted_since_head_pid_src_map,
@@ -176,21 +175,21 @@ fn clear_edit_request (
 /// the snapshot. TODO/DONE/local-view-update/plan_v2.org §8.3: every definitive node re-syncs, saved and collateral
 /// alike -- after extraction the snapshot already holds the saved buffer's text,
 /// so the saved node re-syncs to the same content it just defined.
-fn sync_activeNode_from_disk (
+fn sync_activeNode_from_graph (
   tree         : &mut Tree<ViewNode>,
   node         : NodeId,
   nodecomplete : &NodeComplete,
 ) -> Result<(), Box<dyn Error>> {
-  let disk_title : String = nodecomplete . title . clone ();
-  let disk_body  : Option<String> = nodecomplete . body . clone ();
-  let disk_source : SourceName = nodecomplete . source . clone ();
+  let selected_title : String = nodecomplete . title . clone ();
+  let selected_body  : Option<String> = nodecomplete . body . clone ();
+  let selected_source : SourceName = nodecomplete . source . clone ();
   write_at_activeNode_in_tree (
     tree, node,
-    |t| { t . title = disk_title;
-          t . source = disk_source;
+    |t| { t . title = selected_title;
+          t . source = selected_source;
           if let IndefOrDef::Definitive { body, .. }
             = &mut t . indef_or_def
-            { *body = disk_body; }} ) ?;
+            { *body = selected_body; }} ) ?;
   Ok (( )) }
 
 /// Compute the content goal list (diff-aware), reconcile
@@ -245,8 +244,7 @@ fn reconcile_content_children (
     omit_inactive_members (
       apparent_content_ids, active_source_set,
       |id : &ID| graph_snap . pid_and_source (id)
-                 . map ( |(_pid, src)| src )
-                 . or_else ( || home_from_disk (id, config) ));
+                 . map ( |(_pid, src)| src ));
   // TODO/DONE/local-view-update/plan_v2.org §5.5: the content group is drawn WHOLE -- never truncated mid-group. The
   // budget is spent once per expanding vognode (in expand_true_content_at_activeNode),
   // not per child, so a node either fully expands or is left indefinitive; we
@@ -425,7 +423,7 @@ fn content_goal_list (
                                     "content_goal_list" ) ?;
     let grandparent_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
-        config, &grandparent_pid, &grandparent_source ) ?;
+        graph_snap, config, &grandparent_pid, &grandparent_source ) ?;
     // Resolve the subtrahends through extra_id -> pid the same way
     // 'content_ids' (the minuend) was resolved by the caller. Without
     // this, a child the subscriber has integrated under a now-MERGED id
@@ -674,8 +672,8 @@ fn build_child_creation_data (
     // this save just deleted, since their .skg file is gone.
     if child_sources . contains_key (id) { continue; }
     let child_source : SourceName =
-      match find_source_with_optional_tantivy (
-        id, deleted_since_head_pid_src_map, None, config )
+      match find_source (
+        id, deleted_since_head_pid_src_map, graph_snap )
       { Some (s) => s,
         None => {
           // TODO/DONE/local-view-update/plan_v2.org §7.6: the id resolves to nothing (a dangling reference). Render an
@@ -727,7 +725,7 @@ fn build_child_creation_data (
           drawn . 0 )) ? };
     let skg : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
-        config, fetch_id, &fetch_source ) ?;
+        graph_snap, config, fetch_id, &fetch_source ) ?;
     result . insert( id . clone(),
                    ChildData { title: skg . title . clone(),
                                source: skg . source . clone(),

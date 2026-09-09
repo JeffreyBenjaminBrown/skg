@@ -32,6 +32,8 @@ impl SelectedRuntimeSnapshot {
   fn from_env (env : &SkgEnv) -> Self {
     let selected = env . in_rust_graph . load_full ();
     let mut pinned_env = env . clone ();
+    pinned_env . searcher = selected . searcher . clone ()
+      . expect ("a live publication has a matching Searcher");
     pinned_env . in_rust_graph = Arc::new (
       ArcSwap::from (selected . clone ()));
     Self { env: pinned_env, selected }
@@ -74,7 +76,12 @@ pub struct ServerRuntime {
 }
 
 impl ServerRuntime {
-  pub fn new (env : SkgEnv) -> Result<Self, String> {
+  pub fn new (mut env : SkgEnv) -> Result<Self, String> {
+    env . searcher = env . tantivy_index . reader . searcher ();
+    let initial = env . in_rust_graph . load_full ();
+    if initial . searcher . is_none () {
+      env . in_rust_graph . store (Arc::new (
+        (*initial) . clone () . with_searcher (env . searcher . clone ()))); }
     let snapshot = SelectedRuntimeSnapshot::from_env (&env);
     let graph_generation = snapshot . selected . graph_generation;
     let mut interactive = InteractiveSession::new (&env . config)?;

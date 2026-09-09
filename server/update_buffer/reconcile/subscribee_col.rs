@@ -1,5 +1,6 @@
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
-use crate::types::env::SkgEnv;
+use crate::types::env::{SkgEnv, find_source};
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::to_org::complete::partner_col::child_data::{ChildData, build_child_data, apply_membership_axes_to_col_members, reconcile_partnerCol_children_against_goal_list};
 use crate::update_buffer::reconcile::omit_inactive_members;
@@ -36,6 +37,7 @@ struct SubscribeeColContext {
 /// - Reconcile the subscribee children from the graph.
 /// - Ensure HiddenOutsideOfSubscribeeCol exists and is last.
 pub async fn reconcile_subscribee_col_children (
+  graph : &InRustGraph,
   node                           : NodeId,
   tree                           : &mut Tree<ViewNode>,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
@@ -47,7 +49,7 @@ pub async fn reconcile_subscribee_col_children (
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   let context : SubscribeeColContext =
-    read_subscribee_col_context (tree, node, env, active_source_set) ?;
+    read_subscribee_col_context (graph, tree, node, env, active_source_set) ?;
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
     goal_list_for_outbound_col (
       &context . parent_pid, &context . parent_source,
@@ -60,7 +62,7 @@ pub async fn reconcile_subscribee_col_children (
     // -- the col reconciler treats it as irrelevant, not goal-matched.
     omit_inactive_members (
       goal_list, active_source_set,
-      |id : &ID| env . find_source (id, deleted_since_head_pid_src_map) );
+      |id : &ID| find_source (id, deleted_since_head_pid_src_map, graph) );
 
   // TODO/DONE/local-view-update/plan_v2.org §3.4/§6.7 exception: an *empty* SubscribeeCol is PRESERVED, not
   // self-deleted. It is the editable interface onto the origin's outgoing
@@ -95,7 +97,7 @@ pub async fn reconcile_subscribee_col_children (
                      source_diffs . as_ref () ) };
     let child_data : HashMap<ID, ChildData> =
       build_child_data (
-        tree, node,
+        graph, tree, node,
         &goal_list, &removed_ids, &axes_for_removed,
         source_diffs, deleted_since_head_pid_src_map, env ) ?;
     reconcile_partnerCol_children_against_goal_list(
@@ -114,6 +116,7 @@ pub async fn reconcile_subscribee_col_children (
   Ok(( )) }
 
 fn read_subscribee_col_context (
+  graph : &InRustGraph,
   tree               : &Tree<ViewNode>,
   node               : NodeId,
   env                : &SkgEnv,
@@ -143,7 +146,7 @@ fn read_subscribee_col_context (
     // inactive level must not appear here even though the
     // subscribee node itself may be active.
     nodecomplete_rustFirst_by_pid_and_source (
-      &env . config, &parent_pid, &parent_source )
+      graph, &env . config, &parent_pid, &parent_source )
       . ok ()
       . map ( |skg| skg . subscribes_to . or_default () . iter ()
               . filter ( |m| match active_source_set {

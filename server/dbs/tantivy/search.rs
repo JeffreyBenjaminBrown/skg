@@ -32,6 +32,7 @@ pub struct SearchOptions {
 /// every match. The caller truncates after reranking.
 pub fn search_index (
   tantivy_index : &TantivyIndex,
+  searcher      : &Searcher,
   query_text    : &str,
   opts          : &SearchOptions,
 ) -> Result <
@@ -46,17 +47,6 @@ pub fn search_index (
     body = opts . body,
     operators = opts . operators,
     "Finding matches." );
-  // Tantivy index writes commit on a background worker (see
-  // server/dbs/tantivy/background_writer.rs). The worker reloads the
-  // shared reader after each commit, but reloading again here, on the
-  // reading thread immediately before we take a searcher, is what makes
-  // read-your-writes deterministic: a caller that has
-  // 'wait_for_tantivy_writes_idle'd first is then guaranteed to see every
-  // committed write. Without this, a search right after a save could
-  // occasionally observe a stale reader.
-  tantivy_index . reader . reload () ?;
-  let searcher : Searcher =
-    tantivy_index . reader . searcher ();
   let text_query : Box < dyn Query > =
     if opts . regex {
       build_regex_query (
@@ -78,15 +68,14 @@ pub fn search_index (
           TANTIVY_SEARCH_LIMIT )
           . order_by_score () )?;
     best_matches },
-       searcher )) }
+       searcher . clone () )) }
 
 /// Whether the current index contains any telescope-coarse ugly document.
 /// This is used only for search preflight; it returns no matching IDs.
 pub fn has_ugly_telescope (
   tantivy_index : &TantivyIndex,
+  searcher : &Searcher,
 ) -> Result<bool, Box<dyn std::error::Error>> {
-  tantivy_index . reader . reload () ?;
-  let searcher : Searcher = tantivy_index . reader . searcher ();
   let matches = searcher . search (
     &* ugly_telescope_query (tantivy_index),
     &TopDocs::with_limit (1) . order_by_score () ) ?;

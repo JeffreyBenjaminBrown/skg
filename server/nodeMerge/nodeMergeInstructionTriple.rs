@@ -1,5 +1,5 @@
-use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
-use crate::dbs::typedb::search::find_related_nodes;
+use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::{nodeComplete_rustFIrst_by_id, optNodeComplete_rustFIrst_by_id};
 use crate::from_text::local_instruction_collection::lower::nodeMerge_pairs;
 use crate::from_text::local_instruction_collection::traverse::collect_instructions_locally;
@@ -24,17 +24,17 @@ use typedb_driver::TypeDBDriver;
 /// re-creates the edges (extra_id resolution then redirects them to
 /// the acquirer).
 pub async fn affected_neighbors_of_nodeMerge (
-  db_name     : &str,
-  driver      : &TypeDBDriver,
+  graph : &InRustGraph,
+  _db_name    : &str,
+  _driver     : &TypeDBDriver,
   acquiree_id : &ID,
 ) -> Result < HashSet<ID>, Box<dyn Error> > {
-  let inputs : [ID; 1] = [ acquiree_id . clone () ];
   let mut all : HashSet<ID> = HashSet::new ();
-  for (relation, neighbor_role, acquiree_role) in OUTBOUND_RELATIONSHIP_TYPES {
-    let neighbors : HashSet<ID> = find_related_nodes (
-      db_name, driver, &inputs,
-      relation, acquiree_role, neighbor_role ) . await ?;
-    all . extend (neighbors); }
+  for relation in [NodeRelation::Contains, NodeRelation::Subscribes,
+      NodeRelation::HidesFromItsSubscriptions, NodeRelation::OverridesViewOf,
+      NodeRelation::TextlinksTo] {
+    all . extend (graph . inbound_pids_for_relation_gated (
+      acquiree_id, relation, None)); }
   Ok (all) }
 
 /// For a batch of merges, discover every affected neighbor across all
@@ -46,6 +46,7 @@ pub async fn affected_neighbors_of_nodeMerge (
 /// resolution handles the redirection to acquirer at TypeDB
 /// relationship-creation time.
 pub async fn neighbor_savenodes_for_nodeMerges (
+  graph : &InRustGraph,
   nodeMerges : &[NodeMerge],
   config : &SkgConfig,
   driver : &TypeDBDriver,
@@ -59,7 +60,7 @@ pub async fn neighbor_savenodes_for_nodeMerges (
     . collect ();
   let mut neighbors : HashSet<ID> = HashSet::new ();
   for nodeMerge in nodeMerges {
-    let for_this : HashSet<ID> = affected_neighbors_of_nodeMerge (
+    let for_this : HashSet<ID> = affected_neighbors_of_nodeMerge (graph,
       &config . db_name, driver, nodeMerge . acquiree_id ()
     ) . await ?;
     neighbors . extend (for_this); }
@@ -69,7 +70,7 @@ pub async fn neighbor_savenodes_for_nodeMerges (
     Vec::with_capacity (to_load . len ());
   for pid in &to_load {
     let node : NodeComplete =
-      nodeComplete_rustFIrst_by_id (config, driver, pid) . await ?;
+      nodeComplete_rustFIrst_by_id (graph, config, driver, pid) . await ?;
     save_nodes . push ( SaveNode (node) ); }
   Ok (save_nodes) }
 
@@ -83,6 +84,7 @@ pub async fn neighbor_savenodes_for_nodeMerges (
 /// pipeline collects once and calls the pair form directly.
 #[allow(non_snake_case)]
 pub async fn nodeMerge_instructions_from_viewforest (
+  graph : &InRustGraph,
   viewforest : &ViewForest,
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
@@ -90,7 +92,7 @@ pub async fn nodeMerge_instructions_from_viewforest (
   let collected : CollectedIntents =
     collect_instructions_locally (viewforest)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  nodeMerge_instructions_from_pairs (
+  nodeMerge_instructions_from_pairs (graph,
     &nodeMerge_pairs (&collected), config, driver ) . await }
 
 /// This builds the NodeMerge triples for a batch of (acquirer,
@@ -98,6 +100,7 @@ pub async fn nodeMerge_instructions_from_viewforest (
 /// instruction collection ('nodeMerge_pairs').
 #[allow(non_snake_case)]
 pub async fn nodeMerge_instructions_from_pairs (
+  graph : &InRustGraph,
   pairs  : &[(ID, ID)],
   config : &SkgConfig,
   driver : &TypeDBDriver,
@@ -106,21 +109,22 @@ pub async fn nodeMerge_instructions_from_pairs (
     Vec::with_capacity (pairs . len());
   for (acquirer_id, acquiree_id) in pairs {
     merges . push (
-      nodeMerge_from_acquirer_and_acquiree (
+      nodeMerge_from_acquirer_and_acquiree (graph,
         acquirer_id, acquiree_id, config, driver ) . await ? ); }
   Ok (merges) }
 
 async fn nodeMerge_from_acquirer_and_acquiree (
+  graph : &InRustGraph,
   acquirer_id : &ID,
   acquiree_id : &ID,
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
 ) -> Result<NodeMerge, Box<dyn Error>> {
   let acquirer_from_disk : NodeComplete =
-    nodeComplete_rustFIrst_by_id (
+    nodeComplete_rustFIrst_by_id (graph,
       config, driver, acquirer_id ) . await?;
   let acquiree_from_disk : NodeComplete =
-    nodeComplete_rustFIrst_by_id (
+    nodeComplete_rustFIrst_by_id (graph,
       config, driver, &acquiree_id ) . await?;
   let acquiree_text_preserver : NodeComplete =
     create_acquiree_text_preserver (&acquiree_from_disk);
@@ -131,10 +135,10 @@ async fn nodeMerge_from_acquirer_and_acquiree (
     // when merging"), so these ids are dropped from the combined
     // hides below.
     let mut shown : HashSet<ID> =
-      ids_shown_through_subscriptions (
+      ids_shown_through_subscriptions (graph,
         &acquirer_from_disk, config, driver ) . await ?;
     shown . extend (
-      ids_shown_through_subscriptions (
+      ids_shown_through_subscriptions (graph,
         &acquiree_from_disk, config, driver ) . await ? );
     shown };
   let updated_acquirer : NodeComplete =
@@ -278,6 +282,7 @@ fn three_nodeMerged_nodecompletes(
 /// docs/sharing-model.md). A subscribee with no disk entry
 /// contributes nothing.
 async fn ids_shown_through_subscriptions (
+  graph : &InRustGraph,
   node   : &NodeComplete,
   config : &SkgConfig,
   driver : &TypeDBDriver,
@@ -288,7 +293,7 @@ async fn ids_shown_through_subscriptions (
   let contains : Vec<ID> =
     members_of ( & node . contains );
   for subscribee_id in members_of ( node . subscribes_to . or_default () ) {
-    let Some (subscribee) = optNodeComplete_rustFIrst_by_id (
+    let Some (subscribee) = optNodeComplete_rustFIrst_by_id (graph,
       config, driver, &subscribee_id ) . await ?
     else { continue; };
     for id in members_of ( & subscribee . contains ) {

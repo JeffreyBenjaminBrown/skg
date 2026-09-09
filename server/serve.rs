@@ -457,8 +457,7 @@ fn dispatch_request (
     RequestType::TitlesByIds => {
       if let Err (error) = with_query_session (runtime, |env, interactive| {
         handle_titles_by_ids_request_with_source_set (
-          stream, request, &env . tantivy_index, &env . config,
-          interactive . views . diff_mode_enabled,
+          stream, request, &env . config,
           &interactive . active_source_set,
           &env . in_rust_graph_snapshot ()); })
       { send_runtime_error (stream, &error); }}
@@ -500,7 +499,7 @@ fn dispatch_request (
     RequestType::ExportToOrg => {
       let snapshot = runtime . selected_snapshot ();
       handle_export_to_org_request (
-        stream, &snapshot . env . config, request); }
+        stream, &snapshot . env . config, &snapshot . selected . graph, request); }
     RequestType::RebuildDbs => {
       handle_rebuild_dbs_request (stream, runtime); }
     RequestType::StripBodyWhitespace => {
@@ -760,13 +759,13 @@ fn handle_snapshot_response (
   { let root_treeid : NodeId =
       viewforest . root () . id ();
     set_metadata_relationships_in_node_recursive (
-      &mut viewforest, root_treeid,
+      &payload . graph, &mut viewforest, root_treeid,
       &payload . graphnodestats,
       &payload . config ); }
   mark_view_roots_parent_absent (
     &mut viewforest );
   set_viewnodestats_in_viewforest (
-    &mut viewforest,
+    &payload . graph, &mut viewforest,
     & payload . graphnodestats . container_to_contents,
     & payload . graphnodestats . content_to_containers,
     & payload . config,
@@ -809,7 +808,7 @@ fn handle_snapshot_response (
     viewforest_to_string ( &viewforest, &payload . config )
     . expect ("search viewforest rendering never fails");
   let offer = match collateral_scheduler . stage_view_application (
-      views_state,
+    &payload . graph,       views_state,
       &uri,
       RenderGeneration {
         graph: payload . graph_generation,

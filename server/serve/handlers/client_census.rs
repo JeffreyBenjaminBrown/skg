@@ -284,7 +284,7 @@ pub fn handle_client_census_request (
       let Some (uri) = descriptor . view_uri . clone () else { continue; };
       let descriptor_kind = validate_live_descriptor (&descriptor)?;
       let census_application = census_application_ack (
-        &maintenance . state, &descriptor)?;
+        &env . in_rust_graph_snapshot (), &maintenance . state, &descriptor)?;
       if !live_uris . insert (uri . clone ()) {
         return Err (format! (
           "client census names view '{}' more than once",
@@ -396,6 +396,7 @@ fn reconcile_maintenance_census (
 }
 
 fn census_application_ack (
+  graph : &crate::dbs::in_rust_graph::InRustGraph,
   state      : &CoordinatorState,
   descriptor : &CensusDescriptor,
 ) -> Result<Option<ViewApplicationAcknowledgement>, String> {
@@ -433,7 +434,7 @@ fn census_application_ack (
       "could not place staged census application '{}': {}",
       descriptor . buffer_id, error))?;
   let offered_roots : HashSet<String> = root_ids_from_viewforest (
-    &offered_forest) . into_iter () . map (|id| id . 0) . collect ();
+    graph, &offered_forest) . into_iter () . map (|id| id . 0) . collect ();
   let described_roots : HashSet<String> = descriptor . root_ids . iter ()
     . cloned () . collect ();
   let described_uri = descriptor . view_uri . as_ref ()
@@ -511,7 +512,7 @@ fn reconcile_census_applications (
         presentation_generation, application_token, search_stale,
       } => {
         if !interactive . views . open_views . update_view_if_revision (
-            &uri, base_revision, viewforest)
+            &runtime . selected_snapshot () . selected . graph,             &uri, base_revision, viewforest)
         {
           return Err ("census application base advanced after validation"
             . into ()); }
@@ -576,7 +577,7 @@ pub fn handle_client_census_texts_request (
       let pids : Vec<_> = pids_from_viewforest (&viewforest)
         . into_iter () . collect ();
       interactive . views . open_views . register_view_with_authority (
-        uri . clone (), viewforest, &pids,
+        &env . in_rust_graph_snapshot (),         uri . clone (), viewforest, &pids,
         descriptor . graph_generation,
         descriptor . presentation_generation,
         descriptor . application_token,
@@ -616,7 +617,7 @@ pub fn handle_client_census_texts_request (
     let mut census_applications = Vec::new ();
     for descriptor in &restored_descriptors {
       if let Some (ack) = census_application_ack (
-          &maintenance . state, descriptor)?
+          &env . in_rust_graph_snapshot (), &maintenance . state, descriptor)?
       {
         census_applications . push ((descriptor . clone (), ack)); }
     }
@@ -1251,10 +1252,10 @@ mod tests {
       current_sha256: content_sha,
     };
     assert! (census_application_ack (
-      &coordinator . state, &descriptor) . unwrap () . is_some ());
+      &crate::dbs::in_rust_graph::InRustGraph::new (), &coordinator . state, &descriptor) . unwrap () . is_some ());
     let mut changed = descriptor;
     changed . current_sha256 = "f" . repeat (64);
     assert! (census_application_ack (
-      &coordinator . state, &changed) . unwrap () . is_none ());
+      &crate::dbs::in_rust_graph::InRustGraph::new (), &coordinator . state, &changed) . unwrap () . is_none ());
   }
 }

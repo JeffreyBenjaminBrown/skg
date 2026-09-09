@@ -1,6 +1,7 @@
 // cargo test --test rebuild -- integrate_backpath
 
 use indoc::indoc;
+use skg::test_utils::graph_handle_from_config;
 use skg::to_org::expand::backpath::{
   integrate_path_that_might_fork_or_cycle,
   build_and_integrate_containerward_path};
@@ -81,7 +82,8 @@ async fn test_path_with_cycle_impl(
 
   // Integrate the path
 
-  integrate_path_that_might_fork_or_cycle(
+  integrate_path_that_might_fork_or_cycle (
+    &graph_handle_from_config (config) ? . load_full () . graph,
     &mut viewforest, root_id, path, branches,
     cycle_nodes, &config, driver, Birth::Backpath (RelationRole::CONTAINER)
   ). await?;
@@ -158,7 +160,8 @@ async fn test_path_with_branches_no_cycle_impl(
 
   // Integrate the path
 
-  integrate_path_that_might_fork_or_cycle(
+  integrate_path_that_might_fork_or_cycle (
+    &graph_handle_from_config (config) ? . load_full () . graph,
     &mut viewforest, node_1_id, path, branches,
     cycle_nodes, &config, driver, Birth::Backpath (RelationRole::CONTAINER)
   ). await?;
@@ -238,7 +241,8 @@ async fn test_path_with_branches_with_cycle_impl(
 
   // Integrate the path
 
-  integrate_path_that_might_fork_or_cycle(
+  integrate_path_that_might_fork_or_cycle (
+    &graph_handle_from_config (config) ? . load_full () . graph,
     &mut viewforest, node_1_id, path, branches,
     cycle_nodes, &config, driver, Birth::Backpath (RelationRole::CONTAINER)
   ). await?;
@@ -291,6 +295,7 @@ async fn test_fork_expansion_at_origin_impl(
     viewforest . root () . first_child () . unwrap () . id ();
 
   build_and_integrate_containerward_path (
+    &graph_handle_from_config (config) ? . load_full () . graph,
     &mut viewforest, node_a11_id, &config, driver
   ) . await ?;
   // Expected: a11 gets two children (a1 and a2).

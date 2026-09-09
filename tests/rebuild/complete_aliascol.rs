@@ -7,7 +7,8 @@ use std::error::Error;
 use skg::update_buffer::reconcile::aliascol::reconcile_alias_col_children;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::types::viewnode::ViewNode;
 use skg::types::misc::SkgConfig;
 use skg::types::misc::SourceName;
@@ -47,6 +48,7 @@ async fn test_reconcile_alias_col_children_logic (
 ) -> Result < (), Box<dyn Error> > {
 
   let source_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
 
   // Create org text with three AliasCol scenarios
   let org_text : &str =
@@ -87,7 +89,9 @@ async fn test_reconcile_alias_col_children_logic (
   };
 
   // Test 1: First AliasCol should have b and c (deduped, valid only, disk order)
-  reconcile_alias_col_children ( &mut viewforest, aliascol_1_id, &source_diffs, config )?;
+  reconcile_alias_col_children (
+    &graph . load_full () . graph,
+    &mut viewforest, aliascol_1_id, &source_diffs, config )?;
 
   {
     let aliascol_1_ref =
@@ -115,7 +119,9 @@ async fn test_reconcile_alias_col_children_logic (
   }
 
   // Test 2: Second AliasCol should have b and c, and gain focus
-  reconcile_alias_col_children ( &mut viewforest, aliascol_2_id, &source_diffs, config )?;
+  reconcile_alias_col_children (
+    &graph . load_full () . graph,
+    &mut viewforest, aliascol_2_id, &source_diffs, config )?;
 
   {
     let aliascol_2_ref =
@@ -156,6 +162,7 @@ async fn test_reconcile_alias_col_children_logic (
 
   let result : Result < (), Box<dyn Error> > =
     reconcile_alias_col_children (
+      &graph . load_full () . graph,
       &mut viewforest,
       aliascol_3_id,
       &source_diffs,
@@ -183,6 +190,7 @@ async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders_lo
 ) -> Result < (), Box<dyn Error> > {
 
   let source_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
 
   let org_text : &str =
     indoc! { "
@@ -218,6 +226,7 @@ async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders_lo
 
   // Test first AliasCol
   reconcile_alias_col_children (
+    &graph . load_full () . graph,
     &mut viewforest,
     first_aliascol_id,
     &source_diffs,
@@ -264,6 +273,7 @@ async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders_lo
 
   // Test second AliasCol
   reconcile_alias_col_children (
+    &graph . load_full () . graph,
     &mut viewforest,
     second_aliascol_id,
     &source_diffs,

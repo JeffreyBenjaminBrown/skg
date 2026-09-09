@@ -7,7 +7,8 @@ use crate::dbs::init::{
 use crate::dbs::typedb::nodes::create_all_nodes;
 use crate::dbs::typedb::relationships::create_all_relationships;
 use crate::dbs::typedb::sources::create_all_sources;
-use crate::types::env::find_source_with_optional_tantivy;
+use crate::types::env::find_source;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 pub use crate::types::misc::SourceSetName;
 use crate::types::nodes::complete::NodeComplete;
@@ -64,15 +65,15 @@ impl ActiveSourceSet {
 
   pub fn id_source_is_active (
     &self,
-    config : &SkgConfig,
+    graph  : &InRustGraph,
     id     : &ID,
   ) -> Result<bool, Box<dyn Error>> {
     if self . is_all () {
       return Ok (true); }
     let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
       HashMap::new ();
-    Ok ( match find_source_with_optional_tantivy (
-      id, &deleted_since_head_pid_src_map, None, config ) {
+    Ok ( match find_source (
+      id, &deleted_since_head_pid_src_map, graph ) {
       Some (source) => self . contains_source (&source),
       None          => false } ) }
 }
@@ -82,13 +83,15 @@ pub fn filter_path_to_active_sources_for_test (
   active : &ActiveSourceSet,
   path   : Vec<ID>,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
+  let graph : InRustGraph = InRustGraph::from_nodecompletes (
+    &read_all_skg_files_from_sources (config)?);
   let mut result : Vec<ID> = Vec::new ();
   let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
     HashMap::new ();
   for id in path {
     let source : SourceName =
-      match find_source_with_optional_tantivy (
-        &id, &deleted_since_head_pid_src_map, None, config ) {
+      match find_source (
+        &id, &deleted_since_head_pid_src_map, &graph ) {
         Some (source) => source,
         None => break };
     if active . contains_source (&source) {
@@ -102,13 +105,15 @@ pub fn filter_branches_to_active_sources_for_test (
   active   : &ActiveSourceSet,
   branches : BTreeSet<ID>,
 ) -> Result<BTreeSet<ID>, Box<dyn Error>> {
+  let graph : InRustGraph = InRustGraph::from_nodecompletes (
+    &read_all_skg_files_from_sources (config)?);
   let mut result : BTreeSet<ID> = BTreeSet::new ();
   let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
     HashMap::new ();
   for id in branches {
     if let Some (source) =
-      find_source_with_optional_tantivy (
-        &id, &deleted_since_head_pid_src_map, None, config )
+      find_source (
+        &id, &deleted_since_head_pid_src_map, &graph )
     {
       if active . contains_source (&source) {
         result . insert (id); }}}

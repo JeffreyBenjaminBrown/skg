@@ -552,6 +552,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
         &ID ("r" . to_string()),
         false ) . await?;
     views_state . open_views . register_view (
+      &graph . load_full () . graph,
       saved_uri . clone(), viewforest, &pids);
 
     let (expanded, collateral_views) =
@@ -571,6 +572,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
     let expanded_pids : Vec<ID> =
       views_state . open_views . viewuri_to_pids (&saved_uri);
     views_state . open_views . register_view (
+      &graph . load_full () . graph,
       collateral_uri, expanded_viewforest, &expanded_pids);
 
     let edited : String =
@@ -1018,6 +1020,7 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
         &ID ("R" . to_string()),
         false ) . await?;
     views_state . open_views . register_view (
+      &graph . load_full () . graph,
       saved_uri . clone(), viewforest, &pids);
 
     let (expanded, collateral_views) =
@@ -1037,6 +1040,7 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
     let expanded_pids : Vec<ID> =
       views_state . open_views . viewuri_to_pids (&saved_uri);
     views_state . open_views . register_view (
+      &graph . load_full () . graph,
       collateral_uri, expanded_viewforest, &expanded_pids);
 
     let edited : String =

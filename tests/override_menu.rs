@@ -421,6 +421,7 @@ async fn handler_precedence_and_menu_dedup (
               "Z" . to_string (), ParentIs::Absent ));
           f };
         views_state . open_views . register_view (
+          &graph . load_full () . graph,
           ViewUri::ContentView ("raw-z-uuid" . to_string ()),
           raw_forest,
           &[ ID::from ("Z") ] );

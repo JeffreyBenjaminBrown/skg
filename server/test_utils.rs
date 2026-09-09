@@ -517,6 +517,7 @@ pub fn skg_env_from_parts (
   SkgEnv {
     config        : config . clone (),
     in_rust_graph : graph . clone (),
+    searcher: tantivy_index . reader . searcher (),
     tantivy_index : tantivy_index . clone (),
     driver,
     startup_warnings : Arc::new (Vec::new ()), } }
@@ -987,7 +988,7 @@ pub fn tantivy_contains_id(
 ) -> Result<bool, Box<dyn Error>> {
   let (matches, searcher)
     : (Vec<(f32, DocAddress)>, Searcher)
-    = search_index ( tantivy_index, query,
+    = search_index ( tantivy_index, &tantivy_index . reader . searcher (), query,
                      & SearchOptions::default () )?;
   for (_score, doc_address) in matches {
     let doc: TantivyDocument = searcher . doc (doc_address)?;

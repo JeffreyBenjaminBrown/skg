@@ -7,7 +7,6 @@
 use indoc::indoc;
 use ego_tree::{NodeId, Tree};
 
-use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::typedb::ancestry::AncestryTree;
@@ -23,14 +22,14 @@ use skg::source_sets::{
   filter_branches_to_active_sources_for_test,
   prepare_git_diff_fixture,
   run_with_source_set_test_db};
-use skg::dbs::in_rust_graph::install_or_swap_global_handle;
+use skg::dbs::in_rust_graph::{InRustGraph, install_or_swap_global_handle};
 use skg::to_org::render::content_view::multi_root_view;
 use skg::test_utils::{
   apply_next_scheduled_view,
   set_source_retagging_member_sources,
 };
-use skg::test_utils::run_with_shared_test_db;
-use skg::from_text::buffer_to_validated_saveplan;
+use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
+use skg::from_text::buffer_to_validated_saveplan as buffer_to_validated_saveplan_with_graph;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::org_to_text::viewforest_to_string;
 use skg::to_org::expand::backpath::{
@@ -41,7 +40,8 @@ use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::errors::SaveError;
 use skg::types::misc::{ID, MSV, SkgConfig, SourceName, TantivyIndex, members_of, members_at_source_msv};
 use skg::types::nodes::complete::NodeComplete;
-use skg::types::save::{DefineNode, SaveNode};
+use skg::types::save::{DefineNode, SaveNode, SavePlan};
+use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{
   Birth,
   ViewNode,
@@ -59,6 +59,19 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use typedb_driver::TypeDBDriver;
+
+async fn buffer_to_validated_saveplan (
+  buffer_text       : &str,
+  config            : &SkgConfig,
+  driver            : &TypeDBDriver,
+  active_source_set : Option<&ActiveSourceSet>,
+) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
+  let graph : skg::dbs::in_rust_graph::InRustGraphHandle =
+    graph_handle_from_config (config)
+      . map_err (SaveError::DatabaseError) ?;
+  buffer_to_validated_saveplan_with_graph (
+    &graph . load_full () . graph,
+    buffer_text, config, driver, active_source_set ) . await }
 
 #[test]
 fn all_tests
@@ -720,6 +733,7 @@ async fn containerward_expansion_truncates_before_inactive_container (
         "})?;
       let child_id : NodeId = first_child_id (&viewforest);
       build_and_integrate_containerward_path_with_source_set (
+        &graph_handle_from_config (config) ? . load_full () . graph,
         &mut viewforest,
         child_id,
         config,
@@ -760,6 +774,7 @@ async fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
         "})?;
       let child_id : NodeId = first_child_id (&viewforest);
       integrate_path_that_might_fork_or_cycle_with_source_set (
+        &graph_handle_from_config (config) ? . load_full () . graph,
         &mut viewforest,
         child_id,
         Vec::new (),
@@ -785,6 +800,7 @@ async fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
       let empty_fork_child_id : NodeId =
         first_child_id (&empty_fork_viewforest);
       integrate_path_that_might_fork_or_cycle_with_source_set (
+        &graph_handle_from_config (config) ? . load_full () . graph,
         &mut empty_fork_viewforest,
         empty_fork_child_id,
         Vec::new (),
@@ -831,12 +847,8 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
   private_container . title =
     "private container title must not leak" . to_string ();
   set_source_retagging_member_sources ( &mut private_container, &SourceName::from ("private") );
-  let index_dir : &str =
-    "/tmp/tantivy-test-source-sets-search-enrichment-truncation";
-  let (tantivy, _count) =
-    wipe_then_init_tantivy_db (
-      &[ result_node, active_container, private_container ],
-      Path::new (index_dir))?;
+  let graph : InRustGraph = InRustGraph::from_nodecompletes (
+    &[result_node, active_container, private_container]);
   let mut matches_by_id =
     skg::serve::handlers::text_search::MatchGroups::new ();
   matches_by_id . insert (
@@ -859,7 +871,7 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
         &matches_by_id,
         &[ID::from ("active-search-hit")],
         &ancestry_by_id,
-        &tantivy,
+        &graph,
         &config,
         &active)?;
   assert! (
@@ -880,8 +892,6 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
     ! rendered . contains ("private container title must not leak"),
     "inactive enrichment ancestry must not reveal title text: {}",
     rendered );
-  if Path::new (index_dir) . exists () {
-    fs::remove_dir_all (index_dir)?; }
   Ok (( )) }
 
 #[test]

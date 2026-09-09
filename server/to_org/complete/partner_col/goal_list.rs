@@ -5,14 +5,13 @@
 /// that should appear as phantoms (present at HEAD but absent in the
 /// worktree). Outside diff view, the second element is empty.
 
-use crate::dbs::in_rust_graph::snapshot_global;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::types::git::{GitDiffStatus, MembershipAxes, NodeChanges, NodeCompleteDiff, Sign, SourceDiff, axes_from_per_stage_diffs, net_diff_from_per_stage, per_stage_node_changes_for_activeNode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
+use crate::source_sets::ActiveSourceSet;
+use crate::types::misc::{ID, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::phantom::home_from_disk;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -242,12 +241,13 @@ pub fn goal_list_for_hiddeninsubscribee_col (
 /// 'newM'.  Returns (goal list, removed-id set, per-member
 /// membership axes).
 pub fn goal_list_for_hiddenoutsideof_subscribeecol (
+  graph : &InRustGraph,
   subscriber_pid       : &ID,
   subscriber_source    : &SourceName,
   wt_subscriber_hides  : &[ID],
   wt_subscribees       : &[ID],
   source_diffs         : &Option<HashMap<SourceName, SourceDiff>>,
-  config               : &SkgConfig,
+  active               : Option<&ActiveSourceSet>,
 ) -> (Vec<ID>, HashSet<ID>, HashMap<ID, MembershipAxes>) {
   let derived = | hides : &[ID],
                   all_subscribee_content : &HashSet<ID> | -> Vec<ID> {
@@ -255,13 +255,8 @@ pub fn goal_list_for_hiddenoutsideof_subscribeecol (
       . filter ( |id| ! all_subscribee_content . contains (id) )
       . cloned () . collect () };
   let wt_subscribee_content_of = | pid : &ID | -> Vec<ID> {
-    match snapshot_global_source (pid, config) {
-      Some (src) =>
-        nodecomplete_rustFirst_by_pid_and_source ( config, pid, &src )
-          . ok ()
-          . map ( |skg| members_of (& skg . contains) )
-          . unwrap_or_default (),
-      None => Vec::new () } };
+    graph . outbound_pids_for_relation_gated (
+      pid, NodeRelation::Contains, active ) };
   if source_diffs . is_none () {
     let wt_all_subscribee_content : HashSet<ID> =
       wt_subscribees . iter ()
@@ -290,7 +285,7 @@ pub fn goal_list_for_hiddenoutsideof_subscribeecol (
           let wt_contains : Vec<ID> =
             wt_subscribee_content_of (&pid);
           let source : Option<SourceName> =
-            snapshot_global_source (&pid, config)
+            graph . pid_and_source (&pid) . map ( |(_, source)| source )
             . or_else ( || source_in_diffs_for_file (
                 &pid, source_diffs ));
           let snapshots : [Vec<ID>; 3] = match source {
@@ -340,19 +335,3 @@ fn source_in_diffs_for_file (
 #[cfg(test)]
 #[path = "../../../../tests/unit/three_snapshots.rs"]
 mod three_snapshot_tests;
-
-/// Resolve a node's source: try the in-Rust graph snapshot first,
-/// fall back to scanning source directories for the matching '.skg'
-/// file. Tests that bypass
-/// `init_global_handle_for_first_time_or_panic` rely on the disk
-/// fallback.
-fn snapshot_global_source (
-  pid    : &ID,
-  config : &SkgConfig,
-) -> Option<SourceName> {
-  if let Some (s) =
-    snapshot_global ()
-      . as_deref ()
-      . and_then ( |g| g . pid_and_source (pid) . map ( |(_, s)| s ) )
-  { return Some (s); }
-  home_from_disk (pid, config) }

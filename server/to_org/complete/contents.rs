@@ -1,3 +1,4 @@
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
@@ -8,12 +9,13 @@ use ego_tree::{NodeId, Tree};
 use std::error::Error;
 
 /// PURPOSE: Given an indefinitive node N,
-/// reads in-Rust-graph-or-disk to:
+/// reads the supplied immutable graph to:
 /// - Reset title.
 /// - Reset source.
 ///
 /// EXPECTS: The input node is indefinitive.
 pub fn clobberIndefinitiveViewnode (
+  graph : &InRustGraph,
   tree    : &mut Tree<ViewNode>,
   treeid  : NodeId,
   config  : &SkgConfig,
@@ -23,7 +25,7 @@ pub fn clobberIndefinitiveViewnode (
     pid_and_source_from_treenode (
       tree, treeid, "clobberIndefinitiveViewnode" ) ?;
   let nodecomplete : NodeComplete =
-    nodecomplete_rustFirst_by_pid_and_source ( config, &node_id, &source ) ?;
+    nodecomplete_rustFirst_by_pid_and_source (graph,  config, &node_id, &source ) ?;
   let title : String = nodecomplete . title . clone();
   let source : SourceName = nodecomplete . source . clone();
   write_at_activeNode_in_tree (

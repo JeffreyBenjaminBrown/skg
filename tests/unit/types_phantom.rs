@@ -1,4 +1,6 @@
 use super::*;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::types::nodes::complete::NodeComplete;
 use super::super::git::{GitDiffStatus, NodeChanges};
 use super::super::misc::SkgfileSource;
 
@@ -167,7 +169,7 @@ fn each_relation_reads_its_own_diff_when_one_owner_bears_both () {
 /// for every assertion also gives its HashMap a fresh randomized state,
 /// catching any accidental return to raw map iteration.
 #[test]
-fn home_from_disk_is_the_most_public_section () {
+fn selected_home_is_the_most_public_section () {
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
   let foreign_path : PathBuf = dir . path () . join ("foreign");
   let public_path  : PathBuf = dir . path () . join ("zed");
@@ -203,14 +205,23 @@ fn home_from_disk_is_the_most_public_section () {
                      "pid: N\ncontains:\n- C\n" ) . unwrap ();
     for _ in 0 .. 20 {
       let config : SkgConfig = make_config ();
-      assert_eq! ( home_from_disk ( &id ("N"), &config ),
+      assert_eq! ( selected_home (&id ("N"), &config),
                    Some ( source_name ("zed") ) ); }}
   { // A section in only the more private source: that is the home.
     std::fs::write ( private_path . join ("P.skg"),
                      "pid: P\ntitle: P\n" ) . unwrap ();
     let config : SkgConfig = make_config ();
-    assert_eq! ( home_from_disk ( &id ("P"), &config ),
+    assert_eq! ( selected_home (&id ("P"), &config),
                  Some ( source_name ("alpha") ) ); }
   let config : SkgConfig = make_config ();
-  assert_eq! ( home_from_disk ( &id ("absent"), &config ), None );
+  assert_eq! ( selected_home (&id ("absent"), &config), None );
 }
+
+fn selected_home (
+  id     : &ID,
+  config : &SkgConfig,
+) -> Option<SourceName> {
+  let nodes : Vec<NodeComplete> =
+    read_all_skg_files_from_sources (config) . unwrap ();
+  InRustGraph::from_nodecompletes (&nodes)
+    . pid_and_source (id) . map ( |(_, source)| source ) }

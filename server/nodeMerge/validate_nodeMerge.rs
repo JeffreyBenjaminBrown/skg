@@ -7,11 +7,11 @@
 ///     - No node can be an acquirer and an acquiree.
 ///     - No node can be involved in more than one merge.
 
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::viewnode::EditRequest;
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpActiveNode};
 use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::misc::{ID, SkgConfig};
-use crate::dbs::typedb::search::pid_and_source_from_id;
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -27,6 +27,7 @@ struct NodeMergeValidationData<'a> {
 /// Returns a vector of validation error messages,
 /// which is empty if all are valid.
 pub async fn validate_nodeMerge_requests(
+  graph : &InRustGraph,
   viewforest: &Tree<MpViewnode>,
   config: &SkgConfig,
   driver: &TypeDBDriver,
@@ -47,7 +48,7 @@ pub async fn validate_nodeMerge_requests(
                 continue; }};
     if let Some(EditRequest::NodeMerge (acquiree_id))
       = t . edit_request ()
-    { let pair_errors : Vec<String> = validate_nodeMerge_pair(
+    { let pair_errors : Vec<String> = validate_nodeMerge_pair(graph,
         config, driver, acquirer_id, acquiree_id,
         &nodeMerge_validation_data . to_delete_ids) . await?;
       errors . extend (pair_errors); }}
@@ -97,16 +98,16 @@ fn collect_nodeMerge_validation_data<'a>(
 /// Returns a vector of validation errors for this pair.
 /// The error messages explain what each passage does.
 async fn validate_nodeMerge_pair(
-  config: &SkgConfig,
-  driver: &TypeDBDriver,
+  graph : &InRustGraph,
+  _config: &SkgConfig,
+  _driver: &TypeDBDriver,
   acquirer_id: &ID,
   acquiree_id: &ID,
   to_delete_ids: &HashSet<ID>,
 ) -> Result<Vec<String>, Box<dyn Error>> {
   let mut errors: Vec<String> = Vec::new();
   let acquirer_pid : ID = (
-    match pid_and_source_from_id (
-      &config . db_name, driver, acquirer_id) . await?
+    match graph . pid_and_source (acquirer_id)
     { Some((pid, _source)) => pid,
       None      => {
         errors . push(format!(
@@ -114,8 +115,7 @@ async fn validate_nodeMerge_pair(
           acquirer_id . as_str() ));
         return Ok (errors); }} );
   let acquiree_pid : ID = (
-    match pid_and_source_from_id(
-      &config . db_name, driver, acquiree_id) . await?
+    match graph . pid_and_source (acquiree_id)
     { Some((pid, _source)) => pid,
       None => {
         errors . push(format!(

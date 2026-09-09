@@ -1,3 +1,4 @@
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::git::{MembershipAxes, NodeChanges};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName};
@@ -22,6 +23,7 @@ use std::error::Error;
 /// - In diff view, also build a diff-status map from NodeChanges.ids_diff
 /// - Reconcile children via complete_relevant_children_in_viewnodetree
 pub fn reconcile_id_col_children (
+  graph : &InRustGraph,
   idcol_node_id : NodeId,
   tree          : &mut Tree<ViewNode>,
   source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
@@ -40,7 +42,7 @@ pub fn reconcile_id_col_children (
       "reconcile_id_col_children" ) ?;
   let parent_nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
-      config, &parent_pid, &parent_source )
+      graph, config, &parent_pid, &parent_source )
     . map_err ( |_| "reconcile_id_col_children: parent NodeComplete not found" ) ?;
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =

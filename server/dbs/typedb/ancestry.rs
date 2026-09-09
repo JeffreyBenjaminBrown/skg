@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
 
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
@@ -213,8 +212,8 @@ fn assemble(
 /// In-Rust-graph containerward ancestry, walking the 'contained_by'
 /// inverse index. Same BFS structure as the TypeDB version but no
 /// async / no parallel queries / no frontier-batching.
-fn full_containerward_ancestry_from_in_rust_graph (
-  graph     : &Arc<InRustGraph>,
+pub fn full_containerward_ancestry_from_in_rust_graph (
+  graph     : &InRustGraph,
   origin    : &ID,
   max_depth : usize,
 ) -> AncestryTree {

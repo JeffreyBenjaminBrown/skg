@@ -100,6 +100,7 @@ fn collateral_definitive_subscriber_subscribeeCol_refreshes
                 && a_view . contains ("(id N)"),
         "view A should show M and N in S's subscribeeCol:\n{}", a_view );
       views_state . open_views . register_view (
+        &graph . load_full () . graph,
         a_uri . clone (), a_vf, &a_pids );
 
       // View B rooted at S too -- the collateral view. S is definitive
@@ -111,6 +112,7 @@ fn collateral_definitive_subscriber_subscribeeCol_refreshes
                 && b_view . contains ("(id N)"),
         "view B should show M and N in S's subscribeeCol:\n{}", b_view );
       views_state . open_views . register_view (
+        &graph . load_full () . graph,
         b_uri . clone (), b_vf, &b_pids );
 
       // In view A, drop N from S's subscribeeCol (subscribes_to -> [M])

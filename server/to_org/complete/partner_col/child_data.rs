@@ -1,3 +1,4 @@
+use crate::dbs::in_rust_graph::InRustGraph;
 /// Shared per-child information for PartnerCol reconciliation.
 ///
 /// Used by the rerender-time completers for SubscribeeCol,
@@ -19,7 +20,7 @@
 ///   needed to create any missing goal child without querying while
 ///   the tree is being mutated.
 
-use crate::types::env::SkgEnv;
+use crate::types::env::{SkgEnv, find_source};
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff};
 use crate::types::misc::{ID, SourceName};
 use crate::types::phantom::title_for_phantom;
@@ -58,6 +59,7 @@ pub struct ChildData {
 /// compare derived membership), so an axis can never silently come
 /// from a different relation involving the same ID.
 pub fn build_child_data (
+  graph : &InRustGraph,
   tree                           : &Tree<ViewNode>,
   col_node                       : NodeId,
   goal_list                      : &[ID],
@@ -88,12 +90,12 @@ pub fn build_child_data (
       // source can't be determined, fall back to the NOT_FOUND sentinel
       // rather than aborting the whole render (TODO/DONE/local-view-update/plan_v2.org §7.6).
       let child_src : SourceName =
-        env . find_source (child_skgid, deleted_since_head_pid_src_map)
+        find_source (child_skgid, deleted_since_head_pid_src_map, graph)
         . unwrap_or_else ( SourceName::not_found );
       let axes : (ExistenceAxes, MembershipAxes) =
         axes_for_removed ( child_skgid, &child_src );
       let child_title : String =
-        title_for_phantom ( child_skgid, &child_src,
+        title_for_phantom (graph,  child_skgid, &child_src,
                             source_diffs . as_ref (), &env . config );
       result . insert ( child_skgid . clone (),
                         ChildData { source  : child_src,
@@ -106,12 +108,12 @@ pub fn build_child_data (
                                     phantom : None } );
     } else {
       let child_src : SourceName =
-        env . find_source (child_skgid, deleted_since_head_pid_src_map)
+        find_source (child_skgid, deleted_since_head_pid_src_map, graph)
         . ok_or_else ( || -> Box<dyn Error> { format! (
           "build_child_data: no source found for {}", child_skgid . 0
         ) . into () } ) ?;
       let skg : NodeComplete = nodecomplete_rustFirst_by_pid_and_source (
-        &env . config, child_skgid, &child_src ) ?;
+        graph, &env . config, child_skgid, &child_src ) ?;
       result . insert ( child_skgid . clone (),
                         ChildData { source  : skg . source . clone (),
                                     title   : skg . title . clone (),

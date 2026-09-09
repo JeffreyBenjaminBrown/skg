@@ -1,13 +1,11 @@
-use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::serve::handlers::titles_by_ids::{
   add_deleted_node_titles_by_ids,
-  handle_titles_by_ids_request,
   handle_titles_by_ids_request_with_source_set};
 use skg::source_sets::ActiveSourceSet;
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::test_utils::read_lp_message;
 use skg::types::git::SourceDiff;
-use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, SourceSetName, TantivyIndex, members_at_source_msv};
+use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, SourceSetName, members_at_source_msv};
 use skg::types::nodes::complete::{empty_node_complete, NodeComplete};
 
 use std::collections::{BTreeSet, HashMap};
@@ -38,10 +36,11 @@ fn titles_by_ids_handler_sends_parseable_titles (
     "The Real Title, with spaces" . to_string ();
   spaced_title_node . source =
     SourceName::from ("main");
-  let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
-    wipe_then_init_tantivy_db (
-      &vec![node, spaced_title_node],
-      Path::new ("/tmp/tantivy-test-titles-by-ids-handler"))?;
+  let graph : InRustGraph = InRustGraph::from_nodecompletes (
+    &[node, spaced_title_node]);
+  let config : SkgConfig = SkgConfig::dummyFromSources (HashMap::new ());
+  let active : ActiveSourceSet = ActiveSourceSet::named (
+    &config, SourceSetName::from ("all"))?;
   let listener : TcpListener =
     TcpListener::bind ("127.0.0.1:0")?;
   let addr =
@@ -54,12 +53,8 @@ fn titles_by_ids_handler_sends_parseable_titles (
     "((request . \"titles by ids\") \
       (ids \"11111111-1111-4111-8111-111111111111\" \
            \"44444444-4444-4444-8444-444444444444\"))";
-  handle_titles_by_ids_request (
-    &mut server,
-    request,
-    &tantivy_index,
-    &SkgConfig::dummyFromSources (HashMap::new ()),
-    false );
+  handle_titles_by_ids_request_with_source_set (
+    &mut server, request, &config, &active, &graph);
   drop (server);
   let mut reader =
     std::io::BufReader::new (client);
@@ -98,8 +93,6 @@ fn restricted_title_lookup_challenges_without_releasing_text (
   node . ugly_telescope = true;
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes (&[node . clone ()]);
-  let (index, _) = wipe_then_init_tantivy_db (
-    &[node], Path::new ("/tmp/tantivy-test-title-release") ) ?;
   let config : SkgConfig = SkgConfig::dummyFromSources (HashMap::from ([
     (source . clone (), SkgfileSource {
       name         : source . clone (),
@@ -117,7 +110,7 @@ fn restricted_title_lookup_challenges_without_releasing_text (
     let client : TcpStream = TcpStream::connect (listener . local_addr ()?)?;
     let (mut server, _) = listener . accept ()?;
     handle_titles_by_ids_request_with_source_set (
-      &mut server, request, &index, &config, false, &active, &graph );
+      &mut server, request, &config, &active, &graph );
     drop (server);
     Ok (read_lp_message (&mut std::io::BufReader::new (client))?)
   };
@@ -189,10 +182,6 @@ fn titles_by_ids_finds_deleted_git_file_title_without_diff_mode (
   commit_all (&repo, "initial commit")?;
   fs::remove_file (
     source_dir . join (format! ("{}.skg", id . 0)))?;
-  let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
-    wipe_then_init_tantivy_db (
-      &Vec::<NodeComplete>::new (),
-      &temp_dir . path () . join ("tantivy"))?;
   let config : SkgConfig =
     SkgConfig::dummyFromSources (HashMap::from ([
       (source_name . clone (),
@@ -211,14 +200,12 @@ fn titles_by_ids_finds_deleted_git_file_title_without_diff_mode (
     listener . accept ()?;
   let request : String =
     format! (
-      "((request . \"titles by ids\") (ids \"{}\"))",
+      "((request . \"titles by ids\") (git-evidence . \"true\") (ids \"{}\"))",
       id . 0);
-  handle_titles_by_ids_request (
-    &mut server,
-    &request,
-    &tantivy_index,
-    &config,
-    false );
+  let active : ActiveSourceSet = ActiveSourceSet::named (
+    &config, SourceSetName::from ("all"))?;
+  handle_titles_by_ids_request_with_source_set (
+    &mut server, &request, &config, &active, &InRustGraph::new ());
   drop (server);
   let mut reader =
     std::io::BufReader::new (client);
@@ -249,10 +236,6 @@ fn titles_by_ids_finds_untracked_git_file_title_without_diff_mode (
   fs::write (
     source_dir . join (format! ("{}.skg", id . 0)),
     format! ("title: Untracked Title\npid: {}\n", id . 0))?;
-  let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
-    wipe_then_init_tantivy_db (
-      &Vec::<NodeComplete>::new (),
-      &temp_dir . path () . join ("tantivy"))?;
   let config : SkgConfig =
     SkgConfig::dummyFromSources (HashMap::from ([
       (source_name . clone (),
@@ -271,14 +254,12 @@ fn titles_by_ids_finds_untracked_git_file_title_without_diff_mode (
     listener . accept ()?;
   let request : String =
     format! (
-      "((request . \"titles by ids\") (ids \"{}\"))",
+      "((request . \"titles by ids\") (git-evidence . \"true\") (ids \"{}\"))",
       id . 0);
-  handle_titles_by_ids_request (
-    &mut server,
-    &request,
-    &tantivy_index,
-    &config,
-    false );
+  let active : ActiveSourceSet = ActiveSourceSet::named (
+    &config, SourceSetName::from ("all"))?;
+  handle_titles_by_ids_request_with_source_set (
+    &mut server, &request, &config, &active, &InRustGraph::new ());
   drop (server);
   let mut reader =
     std::io::BufReader::new (client);
@@ -326,3 +307,39 @@ fn commit_all (
     &tree,
     &parent_refs)?;
   Ok (( )) }
+
+#[test]
+fn ordinary_title_lookup_preserves_selected_absence_and_text (
+) -> Result<(), Box<dyn Error>> {
+  let directory : TempDir = TempDir::new ()?;
+  let source : SourceName = SourceName::from ("main");
+  let mut node : NodeComplete = empty_node_complete ();
+  node . pid = ID::new ("selected");
+  node . source = source . clone ();
+  node . title = "Selected title" . into ();
+  let graph : InRustGraph = InRustGraph::from_nodecompletes (&[node]);
+  fs::write (directory . path () . join ("selected.skg"),
+    "pid: selected\ntitle: Newer disk title\n")?;
+  fs::write (directory . path () . join ("newcomer.skg"),
+    "pid: newcomer\ntitle: Unselected disk secret\n")?;
+  let config : SkgConfig = SkgConfig::dummyFromSources (HashMap::from ([
+    (source . clone (), SkgfileSource {
+      name: source, abbreviation: None,
+      path: directory . path () . to_path_buf (), user_owns_it: true,
+    })]));
+  let active : ActiveSourceSet = ActiveSourceSet::named (
+    &config, SourceSetName::from ("all"))?;
+  let listener : TcpListener = TcpListener::bind ("127.0.0.1:0")?;
+  let client : TcpStream = TcpStream::connect (listener . local_addr ()?)?;
+  let (mut server, _) = listener . accept ()?;
+  handle_titles_by_ids_request_with_source_set (
+    &mut server,
+    "((request . \"titles by ids\") (ids \"selected\" \"newcomer\"))",
+    &config, &active, &graph);
+  drop (server);
+  let response : String = read_lp_message (&mut std::io::BufReader::new (client))?;
+  assert! (response . contains ("Selected title"));
+  assert! (!response . contains ("Newer disk title"));
+  assert! (!response . contains ("Unselected disk secret"));
+  assert! (!response . contains ("newcomer"));
+  Ok (()) }

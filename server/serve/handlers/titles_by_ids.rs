@@ -1,5 +1,4 @@
-use crate::dbs::tantivy::titles_by_ids;
-use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::handlers::scalar_release::{
   ScalarReleaseDecision,
   approved_pids_from_request,
@@ -10,18 +9,16 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::send_response_with_length_prefix;
 use crate::source_sets::{
   ActiveSourceSet,
-  SourceSetName,
   titles_for_source_set_for_test,
 };
-use crate::types::env::find_source_with_optional_tantivy;
+use crate::types::env::find_source;
 use crate::types::git::SourceDiff;
-use crate::types::misc::{ID, SourceName, SkgConfig, TantivyIndex};
+use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::sexp::extract_string_list_from_sexp;
 
 use sexp::{Sexp, Atom};
 use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
-use std::sync::Arc;
 
 pub fn titles_by_ids_for_source_set_for_test (
   config : &SkgConfig,
@@ -30,35 +27,12 @@ pub fn titles_by_ids_for_source_set_for_test (
 ) -> Result<HashMap<ID, String>, Box<dyn std::error::Error>> {
   titles_for_source_set_for_test (config, active, ids) }
 
-/// Handle a "titles by ids" request from Emacs.
-/// Parses the ID list, performs a bulk Tantivy lookup, supplements
-/// deleted-node titles from git diff data when needed,
-/// and returns an alist of (id . title) pairs.
-pub fn handle_titles_by_ids_request (
-  stream            : &mut TcpStream,
-  request           : &str,
-  tantivy_index     : &TantivyIndex,
-  config            : &SkgConfig,
-  diff_mode_enabled : bool,
-) {
-  let active : ActiveSourceSet =
-    ActiveSourceSet::named (
-      config,
-      SourceSetName::from ("all"))
-    . expect ("reserved source-set all should always resolve");
-  let graph : Arc<InRustGraph> =
-    snapshot_global () . unwrap_or_else (
-      || Arc::new (InRustGraph::new ()) );
-  handle_titles_by_ids_request_with_source_set (
-    stream, request, tantivy_index, config,
-    diff_mode_enabled, &active, &graph ) }
-
+/// Look up titles in the selected graph. Git displays explicitly request
+/// captured diff evidence for nodes absent from that graph.
 pub fn handle_titles_by_ids_request_with_source_set (
   stream            : &mut TcpStream,
   request           : &str,
-  tantivy_index     : &TantivyIndex,
   config            : &SkgConfig,
-  diff_mode_enabled : bool,
   active            : &ActiveSourceSet,
   graph             : &InRustGraph,
 ) {
@@ -85,9 +59,13 @@ pub fn handle_titles_by_ids_request_with_source_set (
     . map (ID)
     . collect ();
   let mut title_map : HashMap<ID, String> =
-    titles_by_ids (tantivy_index, &ids);
+    ids . iter () . filter_map (|id|
+      graph . pid_of (id) . and_then (|pid| graph . get (&pid))
+        . map (|node| (id . clone (), node . title . clone ())))
+    . collect ();
   let source_diffs : Option<HashMap<SourceName, SourceDiff>> =
-    if diff_mode_enabled || title_map . len () < ids . len () {
+    if crate::types::sexp::extract_v_from_kv_pair_in_sexp (
+      &parsed, "git-evidence") . as_deref () == Ok ("true") {
       Some (compute_diff_for_every_source (config))
     } else { None };
   if let Some (source_diffs) = &source_diffs {
@@ -95,17 +73,17 @@ pub fn handle_titles_by_ids_request_with_source_set (
       &mut title_map, &ids, source_diffs );
     add_deleted_node_titles_by_ids (
       &mut title_map, &ids, source_diffs ); }
-  title_map . retain ( |id, _| {
-    if active . is_all () {
-      true
-    } else {
-      let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
-        HashMap::new ();
-      find_source_with_optional_tantivy (
-        id, &deleted_since_head_pid_src_map,
-        Some (tantivy_index), config )
-      . map ( |source| active . contains_source (&source) )
-      . unwrap_or (false) } } );
+  let evidence_sources : HashMap<ID, SourceName> = source_diffs . iter ()
+    . flat_map (|diffs| diffs . values ())
+    . flat_map (|diff| diff . added_nodes . values ()
+      . chain (diff . deleted_nodes . values ()))
+    . flat_map (|node| node . all_ids ()
+      . map (|id| (id . clone (), node . source . clone ())))
+    . collect ();
+  title_map . retain (|id, _|
+    active . is_all () || find_source (id, &evidence_sources, graph)
+      . map (|source| active . contains_source (&source))
+      . unwrap_or (false));
   let requested : HashSet<ID> = ids . iter () . cloned () . collect ();
   let mut ugly_pids : Vec<ID> = ids . iter ()
     . filter_map ( |id| graph . pid_of (id) )

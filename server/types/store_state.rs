@@ -15,6 +15,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+use tantivy::Searcher;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct GraphGeneration (u64);
@@ -84,6 +85,8 @@ pub enum StoreHealth {
 #[derive(Clone, Debug)]
 pub struct SelectedStoreState {
   pub graph             : Arc<InRustGraph>,
+  /// Absent only in graph-only fixture/build state. Live publications require it.
+  pub searcher          : Option<Searcher>,
   pub graph_generation  : GraphGeneration,
   pub manifest_revision : ManifestRevision,
   pub manifest          : SelectedPathManifest,
@@ -107,6 +110,7 @@ impl SelectedStoreState {
       })) . collect ();
     Self {
       graph: Arc::new (graph),
+      searcher: None,
       graph_generation,
       manifest_revision: ManifestRevision::INITIAL,
       manifest,
@@ -115,12 +119,20 @@ impl SelectedStoreState {
       typedb_health: StoreHealth::Healthy,
       tantivy_health: StoreHealth::Healthy, } }
 
+  pub fn with_searcher (
+    mut self,
+    searcher : Searcher,
+  ) -> Self {
+    self . searcher = Some (searcher);
+    self }
+
   pub fn with_graph_preserving_disk_selection (
     &self,
     graph : InRustGraph,
   ) -> Self {
     let mut next = self . clone ();
     next . graph = Arc::new (graph);
+    next . searcher = None;
     next . graph_generation = self . graph_generation . successor ();
     next }
 
@@ -152,6 +164,7 @@ impl SelectedStoreState {
       })) . collect ();
     Self {
       graph: Arc::new (graph),
+      searcher: None,
       graph_generation,
       manifest_revision: self . manifest_revision . successor (),
       manifest,
@@ -184,6 +197,7 @@ impl SelectedStoreState {
           tantivy_generation }, }); }
     Self {
       graph: Arc::new (graph),
+      searcher: None,
       graph_generation,
       manifest_revision: self . manifest_revision . successor (),
       manifest,

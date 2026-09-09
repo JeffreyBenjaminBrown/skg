@@ -1,4 +1,5 @@
 use crate::from_text::fork::{CloneSourceInputs, fork_spec_from_buffer_node};
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
 use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::types::errors::BufferValidationError;
@@ -31,6 +32,7 @@ use typedb_driver::TypeDBDriver;
 /// harmless only after unspecified fields have been filled from disk,
 /// and foreign creates are recognized by checking disk for the pid.
 pub async fn validate_and_filter_foreign_instructions(
+  graph : &InRustGraph,
   instructions       : Vec<DefineNode>,
   nodeMerge_instructions : &[NodeMerge],
   clone_source_inputs : &CloneSourceInputs, // everything clone-source resolution can draw on, in priority order
@@ -50,14 +52,14 @@ pub async fn validate_and_filter_foreign_instructions(
   // acquiree) is NOT a fork -- it stays a ModifiedForeignNode rejection.
   for instruction in instructions . iter () {
     outcomes . push (
-      apply_foreign_policy(
+      apply_foreign_policy(graph,
         instruction, /* fork_eligible = */ true,
         adopt_clone_source, config, driver
       ) . await? ); }
   { let no_adoptions : HashMap<ID, ID> = HashMap::new ();
     for instruction in nodeMerge_definenodes . iter () {
       outcomes . push (
-        apply_foreign_policy(
+        apply_foreign_policy(graph,
           instruction, /* fork_eligible = */ false,
           &no_adoptions, config, driver
         ) . await? ); }}
@@ -95,6 +97,7 @@ enum ForeignPolicyOutcome {
 }
 
 async fn apply_foreign_policy(
+  graph : &InRustGraph,
   instr: &DefineNode,
   fork_eligible: bool, // true for a direct buffer edit (which forks a changed foreign node); false for a nodeMerge-derived save (which still rejects).
   adopt_clone_source: &HashMap<ID, ID>, // new node -> forked N (empty for nodeMerge-derived saves)
@@ -115,7 +118,7 @@ async fn apply_foreign_policy(
       if !source_is_foreign (config, &node . source) {
         // not foreign, so keep
         return Ok (ForeignPolicyOutcome::Keep); }
-      match optNodeComplete_rustFIrst_by_id(
+      match optNodeComplete_rustFIrst_by_id(graph,
         config, driver, &node . pid
       ) . await {
         Ok(Some (disk_node)) => {

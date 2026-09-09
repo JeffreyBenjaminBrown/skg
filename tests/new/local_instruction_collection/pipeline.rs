@@ -16,7 +16,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::{
 use skg::from_text::local_instruction_collection::{
   extract_nonmergeSavePlan_locally, NonmergeSavePlan };
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
 use skg::types::errors::BufferValidationError;
 use skg::types::git::Sign;
 use skg::types::maybe_placed_viewnode::{
@@ -54,6 +54,7 @@ async fn placed_forest_from_org_with_disk (
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>) =
     org_to_uninterpreted_viewforest (input) ?;
   add_missing_info_to_viewforest (
+    &graph_handle_from_config (config) ? . load_full () . graph,
     &mut maybePlaced_viewforest, &config . db_name, driver) . await?;
   Ok ( maybePlaced_to_placed_viewforest (maybePlaced_viewforest) ? ) }
 
@@ -139,6 +140,7 @@ async fn pipeline_basic_mixed_tree (
       let (plan, nodeMerge_acquisitions)
         : (NonmergeSavePlan, Vec<(ID, ID)>) =
         extract_nonmergeSavePlan_locally (
+          &graph_handle_from_config (config) ? . load_full () . graph,
           &placed_forest_from_org (input), config, driver, None) . await?;
       assert_eq!(
         save_ids (&plan . define_nodes),
@@ -191,6 +193,7 @@ async fn pipeline_subscribee_hiderels (
           input, config, driver) . await?;
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
+          &graph_handle_from_config (config) ? . load_full () . graph,
           &forest, config, driver, None) . await?;
       assert_eq!(
         members_msv (&saved_node_by_id (&plan . define_nodes, "r")
@@ -220,6 +223,7 @@ async fn pipeline_readonly_col_member_edits (
             "};
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
+          &graph_handle_from_config (config) ? . load_full () . graph,
           &placed_forest_from_org (input), config, driver, None) . await?;
       assert_eq!(
         save_ids (&plan . define_nodes),
@@ -246,6 +250,7 @@ async fn pipeline_inactive_subtree (
             "};
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
+          &graph_handle_from_config (config) ? . load_full () . graph,
           &placed_forest_from_org (input), config, driver, None) . await?;
       assert_eq!(
         save_ids (&plan . define_nodes),
@@ -292,6 +297,7 @@ async fn pipeline_phantom_subtree (
         ViewForest::from_internal_tree (tree) };
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
+          &graph_handle_from_config (config) ? . load_full () . graph,
           &forest, config, driver, None) . await?;
       assert_eq!(
         save_ids (&plan . define_nodes),
@@ -320,11 +326,13 @@ async fn pipeline_nodeMerge_requests (
           input, config, driver) . await?;
       let (_plan, nodeMerge_acquisitions) =
         extract_nonmergeSavePlan_locally (
+          &graph_handle_from_config (config) ? . load_full () . graph,
           &forest, config, driver, None) . await?;
       assert_eq!( nodeMerge_acquisitions,
                   vec![ (ID::from ("1"), ID::from ("2")) ]);
       let nodeMerges : Vec<NodeMerge> =
         nodeMerge_instructions_from_pairs (
+          &graph_handle_from_config (config) ? . load_full () . graph,
           &nodeMerge_acquisitions, config, driver) . await?;
       assert_eq!( nodeMerges . len(), 1 );
       assert_eq!( nodeMerges [0] . acquirer_id(), &ID::from ("1") );
@@ -349,6 +357,7 @@ async fn pipeline_rejects_text_claim_mismatch (
           input, config, driver) . await?;
       let error : String =
         extract_nonmergeSavePlan_locally (
+          &graph_handle_from_config (config) ? . load_full () . graph,
           &forest, config, driver , None) . await
         . err() . expect ("the title edit should be rejected")
         . to_string();

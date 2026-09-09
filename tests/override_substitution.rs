@@ -113,7 +113,10 @@ async fn define_nodes_from (
   config : &SkgConfig,
   driver : &Arc<TypeDBDriver>,
 ) -> Result<Vec<DefineNode>, SaveError> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config)
+    . map_err (SaveError::DatabaseError) ?;
   Ok ( buffer_to_validated_saveplan (
+         &graph . load_full () . graph,
          buffer, config, driver, None ) . await ?
        . 1 . define_nodes ) }
 
@@ -393,6 +396,7 @@ async fn marked_view_is_shape_stable_across_diff_toggle (
             driver, config, None,
             &[ ID::from ("P") ], false ) . await ?;
         views_state . open_views . register_view (
+          &graph . load_full () . graph,
           skg::types::views_state::ViewUri::ContentView (
             "toggle-subst-uuid" . to_string ()),
           tree, &pids );

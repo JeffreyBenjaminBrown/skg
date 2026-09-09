@@ -1,4 +1,5 @@
-use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
+use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
 use crate::types::git::MembershipAxes;
 use crate::types::misc::{ID, MemberAtSource, SkgConfig, SourceName};
@@ -13,6 +14,7 @@ use std::error::Error;
 use typedb_driver::TypeDBDriver;
 
 pub async fn build_and_integrate_aliases_view_then_drop_request (
+  graph : &InRustGraph,
   tree          : &mut Tree<ViewNode>,
   node_id       : ego_tree::NodeId,
   config        : &SkgConfig,
@@ -21,7 +23,7 @@ pub async fn build_and_integrate_aliases_view_then_drop_request (
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
     build_and_integrate_aliases (
-      tree, node_id, config, typedb_driver ) . await;
+      graph, tree, node_id, config, typedb_driver ) . await;
   remove_completed_view_request (
     tree, node_id,
     ViewRequest::Col (ColRelation::Aliases),
@@ -31,7 +33,7 @@ pub async fn build_and_integrate_aliases_view_then_drop_request (
 /// Integrate an AliasCol child with its Alias grandchildren
 /// into the ViewNode tree containing the target node.
 ///
-/// PITFALL: This function fetches aliases from disk and
+/// PITFALL: This function fetches aliases from the supplied graph and
 /// populates them immediately, whereas 'reconcile_alias_col_children' (in
 /// update_buffer) is only called on an AliasCol already in the tree.
 /// These two distinct ways of populating an AliasCol are necessary,
@@ -41,6 +43,7 @@ pub async fn build_and_integrate_aliases_view_then_drop_request (
 /// so any newly-created empty AliasCol
 /// would not be visited in the same save cycle.
 pub async fn build_and_integrate_aliases (
+  graph : &InRustGraph,
   tree      : &mut Tree<ViewNode>,
   node_id   : ego_tree::NodeId,
   config    : &SkgConfig,
@@ -55,7 +58,7 @@ pub async fn build_and_integrate_aliases (
     // then reconcile_alias_col_children (in update_buffer) already handled it.
     return Ok (( )); }
   let node : Option<NodeComplete> =
-    optnodecomplete_from_id (config, driver, &node_id_val) . await ?;
+    optNodeComplete_rustFIrst_by_id (graph, config, driver, &node_id_val) . await ?;
   let home : Option<SourceName> =
     node . as_ref () . map ( |node| node . source . clone () );
   let aliases : Vec<MemberAtSource<String>> = node

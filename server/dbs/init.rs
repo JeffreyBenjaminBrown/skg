@@ -33,7 +33,7 @@ use crate::dbs::in_rust_graph::{
 };
 
 use futures::executor::block_on;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -281,6 +281,7 @@ fn env_and_handoff_from_nodes (
   ( SkgEnv {
       config : config . clone (),
       in_rust_graph,
+    searcher: tantivy_index . reader . searcher (),
       tantivy_index,
       driver,
       startup_warnings : Arc::new (startup_warnings), },
@@ -427,15 +428,13 @@ fn wipe_then_init_tantivy_db_with_logs_and_errors (
 /// Callers are responsible for reading the .skg files
 /// (and, if desired, checking for ids claimed by two nodes) beforehand.
 pub fn rebuild_tantivy_from_nodes (
-  config : &SkgConfig,
+  index  : &TantivyIndex,
   nodes  : &[NodeComplete],
+  labels : &HashMap<ID, String>,
 ) -> Result<TantivyIndex, Box<dyn Error>> {
-  let (tantivy_index, _indexed_count)
-    : ( TantivyIndex, usize ) =
-    wipe_then_init_tantivy_db (
-      nodes,
-      Path::new ( & config . tantivy_folder )) ?;
-  Ok (tantivy_index) }
+  crate::dbs::tantivy::write::reconstruct_index_from_nodes (
+    nodes, index, labels)?;
+  Ok (index . clone ()) }
 
 /// Create an empty TantivyIndex, cleaning up any existing index first.
 pub fn create_empty_tantivy_index (

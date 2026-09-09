@@ -1,9 +1,8 @@
-use crate::dbs::tantivy::title_and_source_by_id;
-use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::typedb::ancestry::AncestryTree;
 use crate::source_sets::ActiveSourceSet;
-use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::viewnode::{Birth, ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_viewnode_with_birth};
 use crate::types::viewnode::Vognode;
@@ -18,7 +17,7 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
   viewforest     : &mut Tree<ViewNode>,
   search_results : &[ID],
   ancestry_by_id : &HashMap<ID, AncestryTree>,
-  tantivy_index  : &TantivyIndex,
+  graph          : &InRustGraph,
   config         : &SkgConfig,
   active         : &ActiveSourceSet,
 ) {
@@ -26,12 +25,12 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
   for ancestry in ancestry_by_id . values () {
     collect_ancestry_ids (ancestry, &mut ids); }
   let titles = ids . into_iter () . filter_map (|id|
-    title_and_source_by_id (tantivy_index, &id) . map (|value| (id, value)))
+    graph . pid_of (&id) . and_then (|pid| graph . get (&pid))
+      . map (|node| (id, (node . title . clone (), node . source . clone ()))))
     . collect ();
-  let graph = snapshot_global ();
   insert_containerward_ancestries_from_snapshot (
     viewforest, search_results, ancestry_by_id, &titles,
-    graph . as_deref (), config, active);
+    Some (graph), config, active);
 }
 
 /// Generation-pinned form used by the live search pipeline.  Every title,
@@ -130,8 +129,8 @@ pub fn insert_override_ancestries_into_search_view (
   viewforest     : &mut Tree<ViewNode>,
   search_results : &[ID],
   active         : &ActiveSourceSet,
+  graph          : &InRustGraph,
 ) {
-  let Some (graph) = snapshot_global () else { return; };
   insert_override_ancestries_from_graph (
     viewforest, search_results, active, &graph);
 }
@@ -172,8 +171,8 @@ pub(crate) fn insert_override_ancestries_from_graph (
 pub fn collect_override_relative_ids (
   search_results : &[ID],
   active         : &ActiveSourceSet,
+  graph          : &InRustGraph,
 ) -> HashSet<ID> {
-  let Some (graph) = snapshot_global () else { return HashSet::new (); };
   collect_override_relative_ids_from_graph (search_results, active, &graph)
 }
 

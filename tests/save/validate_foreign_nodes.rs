@@ -1,15 +1,30 @@
 // cargo test validate_foreign_nodes
 
 use indoc::indoc;
-use skg::from_text::buffer_to_validated_saveplan;
-use skg::test_utils::run_with_shared_test_db;
+use skg::from_text::buffer_to_validated_saveplan as buffer_to_validated_saveplan_with_graph;
+use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
+use skg::dbs::in_rust_graph::InRustGraphHandle;
+use skg::source_sets::ActiveSourceSet;
 use skg::types::errors::{SaveError, BufferValidationError};
 use skg::types::misc::{SkgConfig, ID, SourceName};
 
-use skg::types::save::{DefineNode, SaveNode, DeleteNode};
+use skg::types::save::{DefineNode, SaveNode, DeleteNode, SavePlan};
+use skg::types::tree::forest::ViewForest;
 use std::error::Error;
 use std::sync::Arc;
 use typedb_driver::TypeDBDriver;
+
+async fn buffer_to_validated_saveplan (
+  buffer_text       : &str,
+  config            : &SkgConfig,
+  driver            : &TypeDBDriver,
+  active_source_set : Option<&ActiveSourceSet>,
+) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config)
+    . map_err (SaveError::DatabaseError) ?;
+  buffer_to_validated_saveplan_with_graph (
+    &graph . load_full () . graph,
+    buffer_text, config, driver, active_source_set ) . await }
 
 const CONFIG_PATH: &str = "tests/save/validate_foreign_nodes/skgconfig.toml";
 

@@ -34,7 +34,6 @@ use crate::types::save::DefineNode;
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
 use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_parent_absent, validate_parentIs_relationships, mark_orphans_under_dead_parents_independent};
-use crate::dbs::in_rust_graph::snapshot_global;
 use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
 use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind};
 use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual, ViewRequest};
@@ -300,7 +299,7 @@ pub async fn update_views_after_save (
 
   if let Ok (uri) = viewuri_from_request_result {
     views_state . open_views . update_view (
-      uri, saved_view_mut);
+      &context . graph_snap,       uri, saved_view_mut);
     // TODO/DONE/local-view-update/plan_v2.org §8.1 step 3: relax the early (broad) lock to the EXACT collateral
     // set now that the SavePlan is known. Emacs keeps saved + these locked and
     // unlocks everything else it locked early, so the user can edit truly-
@@ -325,7 +324,7 @@ pub async fn update_views_after_save (
           . collect::<Vec<_>> ()); }
     for rendered in collateral_views {
       views_state . open_views . update_view (
-        &rendered . uri, rendered . viewforest);
+      &context . graph_snap,         &rendered . uri, rendered . viewforest);
       let _ = send_response_with_length_prefix (
         stream,
         & tag_sexp_response (
@@ -413,6 +412,7 @@ async fn rerender_collateral_view (
 /// notices. (Col-repair warnings stay silent for de novo renders;
 /// see the warning-sink filtering at the bottom.)
 pub async fn render_initial_view (
+  graph_snap : &Arc<InRustGraph>,
   env       : &SkgEnv,
   root_ids  : &[ID],
   active    : Option<&ActiveSourceSet>,
@@ -424,7 +424,7 @@ pub async fn render_initial_view (
   let mut stub_defmap : DefinitiveMap = DefinitiveMap::new ();
   let mut viewforest : ViewForest =
     crate::to_org::util::stub_viewforest_from_root_ids (
-      root_ids, &env . config, &env . driver, &mut stub_defmap,
+      &graph_snap, root_ids, &env . config, &env . driver, &mut stub_defmap,
       active ) . await ?;
   // De-novo (and ONLY de-novo) asks each view-root for its containerward
   // ancestry, as a self-consuming view request. The during-completion dispatch
@@ -439,8 +439,6 @@ pub async fn render_initial_view (
       if let ViewNodeKind::Vognode (Vognode::Active (t)) =
         &mut node_mut . value () . kind
       { t . view_requests . insert ( ViewRequest::Path (RelationRole::CONTAINER) ); }} }
-  let graph_snap : Arc<InRustGraph> =
-    env . in_rust_graph . load_full () . graph . clone ();
   let mut defmap : DefinitiveMap = DefinitiveMap::new ();
   let mut errors : Vec<String> = Vec::new ();
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): de-novo diff is computed INLINE by view completion, exactly
@@ -466,8 +464,6 @@ pub async fn render_initial_view (
     active_source_set              : active,
     node_budget                    : env . config . initial_node_limit,
     create_partnerCols_for_fresh_nodes : true,
-      diff_tantivy_index : if diff_mode { Some (&env . tantivy_index) }
-                         else         { None },
       warning_sink : Some (&mut sink),
       cancellation : None, };
   complete_viewforest ( &mut viewforest, &mut context ) . await ?;
@@ -512,9 +508,6 @@ pub async fn rerender_view (
       // source-switch rerender passes true: its prune removed the cols, and the
       // new set decides which return.
       create_partnerCols_for_fresh_nodes : create_partnerCols,
-      // Post-save: phantom sources resolve via the deleted-id map + disk scan
-      // (the de-novo path passes the tantivy index instead).
-      diff_tantivy_index : None,
       warning_sink,
       cancellation : context . cancellation . as_ref (), };
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -529,7 +522,7 @@ pub async fn rerender_view (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "finish_viewforest" ). entered();
       finish_viewforest_cancellable (
-        viewforest,
+        &context . graph_snap, viewforest,
         &context . env . config,
         &context . env . driver,
         context . active_source_set,
@@ -550,25 +543,25 @@ pub async fn rerender_view (
 ///     never re-generates the containerward (it round-trips as ordinary content).
 ///   - attaches containerward ancestry to every removed-here phantom,
 ///   - marks view-root and orphan parentIs,
-///   - validates parentIs against the in-Rust graph (a no-op when markers
-///     already agree, and when the global handle isn't initialized; the de-novo
-///     path could skip it for speed, but running it in both keeps the tails one),
+///   - validates parentIs against the supplied graph,
 ///   - computes graph- then view-node stats,
 ///   - applies the active source set, and renders to a buffer string.
 /// Step order is immaterial between the parentIs marks and graphnodestats:
 /// parentIs is a view property and graphnodestats reads only the in-Rust graph,
 /// never parentIs, so the final state is identical either way.
 pub async fn finish_viewforest (
+  graph : &InRustGraph,
   viewforest        : &mut ViewForest,
   config            : &SkgConfig,
   driver            : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result<String, Box<dyn Error>> {
   finish_viewforest_cancellable (
-    viewforest, config, driver, active_source_set, None) . await
+    graph, viewforest, config, driver, active_source_set, None) . await
 }
 
 async fn finish_viewforest_cancellable (
+  graph : &InRustGraph,
   viewforest        : &mut ViewForest,
   config            : &SkgConfig,
   driver            : &TypeDBDriver,
@@ -583,35 +576,35 @@ async fn finish_viewforest_cancellable (
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "fulfill_root_containerward_requests" ). entered();
     fulfill_root_containerward_requests (
-      viewforest, config, driver, active_source_set ) . await ? ; }
+      graph, viewforest, config, driver, active_source_set ) . await ? ; }
   checkpoint () ?;
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "attach_containerward_ancestries_to_removedhere_phantoms" ). entered();
     attach_containerward_ancestries_to_removedhere_phantoms (
-      viewforest, config, driver, active_source_set ) . await ? ; }
+      graph, viewforest, config, driver, active_source_set ) . await ? ; }
   checkpoint () ?;
   mark_view_roots_parent_absent ( viewforest );
   // §A (Jeff's invariant): an Active survivor left under a non-container parent
   // (a phantom / Deleted / DeadScaffold) is a non-dead generalized orphan and
   // must become Independent.
   mark_orphans_under_dead_parents_independent ( viewforest );
-  if let Some (snap) = snapshot_global () {
+  {
     // Correct any parentIs markers whose claimed relation to the parent doesn't
     // hold in the in-Rust graph (e.g. user moved a birth=linksToParent node
     // under a new parent it doesn't link to).
-    validate_parentIs_relationships ( viewforest, &snap ); }
+    validate_parentIs_relationships ( viewforest, graph ); }
   let ( container_to_contents, content_to_containers ) =
     match active_source_set {
       Some (active) =>
         set_graphnodestats_in_viewforest_with_source_set (
-          viewforest, config, driver, active ) . await,
+          graph, viewforest, config, driver, active ) . await,
       None =>
         set_graphnodestats_in_viewforest (
-          viewforest, config, driver ) . await,
+          graph, viewforest, config, driver ) . await,
     } ?;
   checkpoint () ?;
   set_viewnodestats_in_viewforest (
-    viewforest, &container_to_contents, &content_to_containers, config,
+    graph, viewforest, &container_to_contents, &content_to_containers, config,
     active_source_set );
   if let Some (active) = active_source_set {
     apply_source_set_to_viewforest ( viewforest, active ); }
@@ -814,6 +807,7 @@ fn clear_diff_metadata (
 /// panic on a cyclic root (one whose containerward path cycles back to the root,
 /// e.g. a contains b contains a). See TODO/DONE/local-view-update/progress.org §17.
 async fn fulfill_root_containerward_requests (
+  graph : &InRustGraph,
   viewforest : &mut ViewForest,
   config     : &SkgConfig,
   driver     : &TypeDBDriver,
@@ -830,7 +824,7 @@ async fn fulfill_root_containerward_requests (
       . collect ();
   if requesting_root_nodeids . is_empty () { return Ok (( )); }
   attach_containerward_ancestries_at_nodeids_with_source_set (
-    viewforest, &requesting_root_nodeids, config, driver, active ) . await ?;
+    graph, viewforest, &requesting_root_nodeids, config, driver, active ) . await ?;
   for nid in requesting_root_nodeids { // drop the now-fulfilled request
     if let Some (mut node_mut) = viewforest . get_mut (nid) {
       if let ViewNodeKind::Vognode (Vognode::Active (t)) =
@@ -842,6 +836,7 @@ async fn fulfill_root_containerward_requests (
 /// ancestry from TypeDB and insert it as indefinitive Content children.
 /// Short-circuits when no RemovedHere phantoms exist.
 async fn attach_containerward_ancestries_to_removedhere_phantoms (
+  graph : &InRustGraph,
   viewforest    : &mut ViewForest,
   config        : &SkgConfig,
   typedb_driver : &TypeDBDriver,
@@ -861,7 +856,7 @@ async fn attach_containerward_ancestries_to_removedhere_phantoms (
         { result . push ( node_ref . id () ); }} }
     result };
   attach_containerward_ancestries_at_nodeids_with_source_set (
-    viewforest, &phantom_nodeids, config, typedb_driver, active ) . await }
+    graph, viewforest, &phantom_nodeids, config, typedb_driver, active ) . await }
 
 #[cfg(test)]
 mod cancellation_tests {

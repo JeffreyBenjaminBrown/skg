@@ -58,6 +58,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       assert! ( p_view . contains ("(id L)"),
         "P's view should show L:\n{}", p_view );
       views_state . open_views . register_view (
+        &graph . load_full () . graph,
         p_uri . clone (), p_vf, &p_pids );
 
       { // A SECOND content view rooted at L, and a search view whose
@@ -68,11 +69,13 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
           single_root_view (
             driver, config, Some (tantivy), &ID::from ("L"), false ) . await ?;
         views_state . open_views . register_view (
+          &graph . load_full () . graph,
           ViewUri::ContentView ("collat-del-L-2" . into ()), vf2, &pids2 );
         let (_v3, pids3, vf3) =
           single_root_view (
             driver, config, Some (tantivy), &ID::from ("L"), false ) . await ?;
         views_state . open_views . register_view (
+          &graph . load_full () . graph,
           ViewUri::SearchView ("to X" . into ()), vf3, &pids3 ); }
 
       // A second view of L alone; register it, then save it with L
@@ -81,6 +84,7 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
         single_root_view (
           driver, config, Some (tantivy), &ID::from ("L"), false ) . await ?;
       views_state . open_views . register_view (
+        &graph . load_full () . graph,
         l_uri . clone (), l_vf, &l_pids );
       let delete_buffer : String =
         "* (skg (node (id L) (source main) (editRequest delete))) [[id:X][to X]]\n"
@@ -119,6 +123,7 @@ fn dead_links_warn_on_save
         "* (skg (node (id P) (source main))) P links to [[id:does-not-exist][nowhere]] and [[id:X][to X]]\n";
       let ( _vf, _plan, warnings ) =
         buffer_to_validated_saveplan (
+          &graph . load_full () . graph,
           buffer, config, driver, None ) . await ?;
       assert! ( warnings . iter () . any ( |w|
           w . contains ("Dead link")

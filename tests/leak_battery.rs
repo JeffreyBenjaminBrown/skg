@@ -148,6 +148,7 @@ fn inbound_containerward_data_hides_N_at_public (
             "* (skg (node (id C) (source public))) leak-battery-C\n" )?;
         let c_id : NodeId = first_child_id (&viewforest);
         build_and_integrate_containerward_path_with_source_set (
+          &graph_handle_from_config (config) ? . load_full () . graph,
           &mut viewforest, c_id, config, driver, Some (&public) ) . await ?;
         let ancestors : BTreeSet<ID> = true_child_ids (&viewforest, c_id);
         assert! (
@@ -166,6 +167,7 @@ fn inbound_containerward_data_hides_N_at_public (
             "* (skg (node (id C) (source public))) leak-battery-C\n" )?;
         let c_id : NodeId = first_child_id (&viewforest);
         build_and_integrate_containerward_path_with_source_set (
+          &graph_handle_from_config (config) ? . load_full () . graph,
           &mut viewforest, c_id, config, driver, Some (&all) ) . await ?;
         let ancestors : BTreeSet<ID> = true_child_ids (&viewforest, c_id);
         assert! (
@@ -248,6 +250,7 @@ fn ancestor_heralds_gate_privately_recorded_relations (
             t . graphStats . rels =
               Some ( RelationCounts::default () ); }}
         set_viewnodestats_in_viewforest (
+          &graph_handle_from_config (config) ? . load_full () . graph,
           &mut viewforest,
           & HashMap::new (),
           & HashMap::new (),

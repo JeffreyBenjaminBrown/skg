@@ -94,7 +94,8 @@ pub fn handle_recompute_cyclic_roots_request (
     let cyclic_root_count = computation . cyclic_roots . len ();
     let changed_count = changed_labels . len ();
     env . in_rust_graph . store (Arc::new (
-      current . with_cyclic_roots (computation . cyclic_roots)));
+      current . with_cyclic_roots (computation . cyclic_roots)
+        . with_searcher (env . tantivy_index . reader . searcher ())));
     break Ok ((cyclic_root_count, changed_count));
   })();
   let (status, message) = match result {

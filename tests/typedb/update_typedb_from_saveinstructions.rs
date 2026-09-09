@@ -1,6 +1,6 @@
 // cargo test --test typedb typedb::update_typedb_from_saveinstructions -- --nocapture
 
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
 use skg::save::update_typedb_from_saveinstructions;
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::typedb::search::find_related_nodes;
@@ -77,6 +77,7 @@ async fn test_update_nodes_and_relationships2 (
     // Convert to instructions (adds missing info and reconciles)
     let (nonmerge_plan, _nodeMerge_acquisitions) =
       extract_nonmergeSavePlan_locally (
+        &graph_handle_from_config (config) ? . load_full () . graph,
         & ViewForest::from_internal_tree (viewforest),
         & config, & driver, None ) . await ?;
 

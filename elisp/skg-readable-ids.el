@@ -145,6 +145,7 @@ GENERATION and BUF are captured for the response handler."
                  (prin1-to-string
                   (append
                    `((request . "titles by ids")
+                     (git-evidence . "true")
                      (ids ,@ids))
                    (when approved-pids
                      `((allow-ugly-telescopes ,@approved-pids)))))

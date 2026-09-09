@@ -1981,7 +1981,7 @@ fn apply_server_settlement_effect (
       search_stale,
     } => {
       assert! (interactive . views . open_views . update_view_if_revision (
-        &uri, base_revision, viewforest),
+        &runtime . selected_snapshot () . selected . graph, &uri, base_revision, viewforest),
         "validated maintenance application advanced during one request");
       interactive . views . open_views . set_client_application_authority (
         &uri,

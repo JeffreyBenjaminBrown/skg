@@ -75,10 +75,13 @@ async fn test_merge_2_into_1_impl(
   let view_node_1 = mk_test_viewnode("1", "1", Some(EditRequest::NodeMerge(ID::from ("2"))));
   let mut viewforest: Tree<ViewNode> = Tree::new(viewforest_root_viewnode());
   viewforest . root_mut() . append (view_node_1);
+  let graph : InRustGraphHandle =
+    graph_handle_from_config (config) ?;
 
   // Generate NodeMerge from merge request
   let nodeMerge_instructions: Vec<NodeMerge> =
     nodeMerge_instructions_from_viewforest(
+      &graph . load_full () . graph,
       &ViewForest::from_internal_tree (viewforest),
       config,
       driver,
@@ -89,8 +92,6 @@ async fn test_merge_2_into_1_impl(
              1,
              "Should have 1 NodeMerge");
 
-  let graph : InRustGraphHandle =
-    graph_handle_from_config (config) ?;
   merge_nodes(
     &nodeMerge_instructions,
     config . clone(),
@@ -310,10 +311,13 @@ async fn test_merge_1_into_2_impl(
   let view_node_2 = mk_test_viewnode("2", "2", Some(EditRequest::NodeMerge(ID::from ("1"))));
   let mut viewforest: Tree<ViewNode> = Tree::new(viewforest_root_viewnode());
   viewforest . root_mut() . append (view_node_2);
+  let graph : InRustGraphHandle =
+    graph_handle_from_config (config) ?;
 
   // Generate NodeMerge from merge request
   let nodeMerge_instructions: Vec<NodeMerge> =
     nodeMerge_instructions_from_viewforest(
+      &graph . load_full () . graph,
       &ViewForest::from_internal_tree (viewforest),
       config,
       driver,
@@ -324,8 +328,6 @@ async fn test_merge_1_into_2_impl(
              1,
              "Should have 1 NodeMerge");
 
-  let graph : InRustGraphHandle =
-    graph_handle_from_config (config) ?;
   merge_nodes(
     &nodeMerge_instructions,
     config . clone(),
@@ -645,12 +647,13 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
                       Some (EditRequest::NodeMerge (ID::from ("1"))));
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   viewforest . root_mut () . append (view_node_2);
-  let nodeMerge_instructions : Vec<NodeMerge> =
-    nodeMerge_instructions_from_viewforest (
-      &ViewForest::from_internal_tree (viewforest),
-      config, driver ) . await?;
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
+  let nodeMerge_instructions : Vec<NodeMerge> =
+    nodeMerge_instructions_from_viewforest (
+      &graph . load_full () . graph,
+      &ViewForest::from_internal_tree (viewforest),
+      config, driver ) . await?;
   merge_nodes (
     &nodeMerge_instructions, config . clone (),
     tantivy, driver, &graph ) . await?;

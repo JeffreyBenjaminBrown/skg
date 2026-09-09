@@ -116,6 +116,7 @@ function M.request_titles (ids, generation, buf, approved_pids)
     for _, id in ipairs(ids) do table.insert(ids_form, id) end
     local request_form = {
       sexpr.pair(sexpr.symbol('request'), 'titles by ids'),
+      sexpr.pair(sexpr.symbol('git-evidence'), 'true'),
       ids_form }
     if approved_pids and #approved_pids > 0 then
       local approval = { sexpr.symbol('allow-ugly-telescopes') }

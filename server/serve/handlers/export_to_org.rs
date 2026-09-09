@@ -1,4 +1,5 @@
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::dbs::in_rust_graph::InRustGraph;
+use crate::save::nodecompletes_from_graph;
 use crate::export_org::{
   export_candidate_pids, export_to_org, ExportReport};
 use crate::serve::handlers::scalar_release::{
@@ -28,11 +29,12 @@ use std::path::PathBuf;
 /// is used as-is. The server applies no default for either: the
 /// client supplies the user a default but always sends a value, so
 /// a missing or blank `output-dir` is an error here, not a silent
-/// "org-exports". Reads .skg files fresh from disk, so the export
-/// reflects current on-disk state. Needs neither TypeDB nor Tantivy.
+/// "org-exports". Export content and privacy checks share the supplied
+/// selected graph, including when newer disk changes await reconciliation.
 pub fn handle_export_to_org_request (
   stream  : &mut TcpStream,
   config  : &SkgConfig,
+  graph   : &InRustGraph,
   request : &str,
 ) {
   let prepared : Result<
@@ -43,8 +45,7 @@ pub fn handle_export_to_org_request (
       ActiveSourceSet::named (config, SourceSetName::from (name))
       . map_err ( |e| e . to_string () ) ?;
     let nodes : Vec<NodeComplete> =
-      read_all_skg_files_from_sources (config)
-      . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
+      nodecompletes_from_graph (graph);
     let output_dir : String =
       value_from_request_sexp ("output-dir", request)
       . map_err ( |e| format! ("output-dir is required: {}", e) ) ?;

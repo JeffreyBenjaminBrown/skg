@@ -16,7 +16,8 @@ use skg::from_text::local_instruction_collection::traverse::collect_instructions
 use skg::from_text::local_instruction_collection::types::SubscribeeVisibility;
 use skg::from_text::validate::validate_and_filter_foreign_instructions;
 use skg::test_utils::extract_nodecomplete_if_save_else_error;
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::types::errors::BufferValidationError;
 use skg::types::git::Sign;
 use skg::types::misc::{ID, MSV, SkgConfig, SourceName, members_of, members_msv};
@@ -141,15 +142,18 @@ async fn save_instructions_from_org_with_disk (
   config   : &skg::types::misc::SkgConfig,
   driver   : &typedb_driver::TypeDBDriver,
 ) -> Result<Vec<DefineNode>, Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let (mut maybePlaced_viewforest, _parsing_errors, _warnings)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>) =
     org_to_uninterpreted_viewforest (org_text) ?;
   add_missing_info_to_viewforest (
+    &graph . load_full () . graph,
     &mut maybePlaced_viewforest, &config . db_name, driver) . await?;
   let viewforest : ViewForest =
     maybePlaced_to_placed_viewforest (maybePlaced_viewforest) ?;
   let (save_plan, _nodeMerge_acquisitions) =
     extract_nonmergeSavePlan_locally (
+      &graph . load_full () . graph,
       &viewforest, config, driver, None) . await?;
   Ok (save_plan . define_nodes) }
 
@@ -913,6 +917,7 @@ async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
           default           : Some (SourceName::from ("owned")), };
       let ( define_nodes, fork_specs ) =
         validate_and_filter_foreign_instructions (
+          &graph_handle_from_config (config) ? . load_full () . graph,
           instructions, &[], &clone_source_inputs,
           &std::collections::HashMap::new(),
           config, driver) . await

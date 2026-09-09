@@ -27,6 +27,7 @@
 // and child counts without depending on order.
 
 use indoc::indoc;
+use skg::test_utils::graph_handle_from_config;
 use skg::to_org::expand::backpath::build_and_integrate_sourceward_path;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
@@ -97,6 +98,7 @@ async fn test_sourceward_ancestry_impl (
 
   // Request sourceward expansion from "a".
   build_and_integrate_sourceward_path (
+    &graph_handle_from_config (config) ? . load_full () . graph,
     &mut viewforest, node_a, config, driver
   ) . await ?;
 

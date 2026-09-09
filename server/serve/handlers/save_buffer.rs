@@ -570,7 +570,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
             "buffer_to_validated_saveplan"
           ) . entered();
         buffer_to_validated_saveplan_with_fork_sources (
-          org_buffer_text, &env . config, &env . driver,
+          &env . in_rust_graph_snapshot (), org_buffer_text, &env . config, &env . driver,
           active_source_set, fork_sources ) . await
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
@@ -691,7 +691,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       // TODO | PITFALL: This is quite a weak assertion.
       // PURPOSE: The in-Rust graph must already reflect every Save and Delete in 'define_nodes' by the time this function runs. Violating this invariant (e.g. by reordering the save pipeline so that 'update_views_after_save' runs before 'apply_definenodes') would let the rerender read stale NodeCompletes from the in-Rust graph.
       in_rust_graph_coherent_with_save_instructions (
-          &define_nodes
+        &env . in_rust_graph_snapshot (),           &define_nodes
         ) . is_ok (),
       "update_views_after_save: in-Rust graph not coherent with define_nodes" ); }
 

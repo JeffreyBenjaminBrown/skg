@@ -1,6 +1,7 @@
 /// Utilities for phantom node lookup in git diff view.
 /// A phantom is a display-only placeholder for a removed node.
 
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 
@@ -9,11 +10,12 @@ use std::path::PathBuf;
 
 use super::git::{ExistenceAxes, MembershipAxes, NodeCompleteDiff, Sign, SourceDiff, existence_axes_in_source_diff};
 use super::list::Diff_Item;
-use super::misc::{ID, SkgConfig, SkgfileSource, SourceName};
+use super::misc::{ID, SkgConfig, SourceName};
 
 /// Unified title lookup for phantom nodes.
-/// Lookup order: source_diffs deleted_nodes → in-Rust graph/disk → fallback.
+/// Lookup order: source_diffs deleted_nodes → supplied graph → fallback.
 pub fn title_for_phantom (
+  graph : &InRustGraph,
   id           : &ID,
   source       : &SourceName,
   source_diffs : Option<&HashMap<SourceName, SourceDiff>>,
@@ -24,7 +26,7 @@ pub fn title_for_phantom (
     . and_then( |sd| sd . deleted_nodes . get (id) )
     . map( |n| n . title . clone() )
     . or_else( || nodecomplete_rustFirst_by_pid_and_source (
-                    config, id, source )
+                    graph, config, id, source )
                   . ok() . map( |n| n . title ) )
     . unwrap_or_else( || format!( "TITLE NOT FOUND for ID {}", id . 0 )) }
 
@@ -100,37 +102,6 @@ pub fn phantom_axes (
     else { membership };
 
   (existence, membership) }
-
-/// A node's HOME read from disk. When owned and non-owned files use
-/// the same pid, the owned telescope wins; otherwise the home is
-/// the most public source holding a section. Returns None if no
-/// source holds one.
-///
-/// Walks 'ordered_sources' (the privacy order, most public first),
-/// never 'config.sources' -- that is a HashMap, whose iteration
-/// order Rust randomizes per process, so returning its first hit
-/// answered arbitrarily for any node with more than one section.
-/// Since the home is DEFINITIONALLY the most public section
-/// (docs/telescopes.md), the first hit in privacy order is the
-/// answer; a home whose section carries no title is a violation the
-/// fold reports, not a reason to keep looking.
-pub fn home_from_disk (
-  id     : &ID,
-  config : &SkgConfig,
-) -> Option<SourceName> {
-  let filename : String = format!( "{}.skg", id . 0 );
-  let ordered_sources : Vec<SourceName> = config . ordered_sources ();
-  for owned_only in [true, false] {
-    for source_name in &ordered_sources {
-      if config . user_owns_source (source_name) != owned_only {
-        continue; }
-      let Some (source_config) : Option<&SkgfileSource> =
-        config . sources . get (source_name) else { continue; };
-      let path : PathBuf =
-        PathBuf::from( &source_config . path ) . join (&filename);
-      if path . exists() {
-        return Some( source_name . clone () ); }} }
-  None }
 
 #[cfg(test)]
 #[path = "../../tests/unit/types_phantom.rs"]

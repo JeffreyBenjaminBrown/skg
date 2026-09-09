@@ -62,10 +62,8 @@ pub async fn multi_root_view (
 /// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): the parts-based de-novo entry -- a thin shim that assembles a
 /// SkgEnv and routes through the ONE view completion path (multi_root_view_via_env). Used only
 /// by tests (production calls multi_root_view_via_env directly).
-/// The env's in-Rust graph is fresh+empty -- de-novo callers/tests don't merge,
-/// so there are no extra_ids to resolve, and content is fetched from the
-/// in-Rust-graph *global* / disk -- and tantivy, when not supplied, is an empty
-/// in-RAM index (find_source falls back past it to the graph/disk).
+/// This fixture adapter explicitly folds source files into a graph before
+/// rendering. Production passes its already selected environment directly.
 async fn multi_root_view_inner (
   driver            : &Arc<TypeDBDriver>,
   config            : &SkgConfig,
@@ -78,16 +76,14 @@ async fn multi_root_view_inner (
   let tantivy_owned : TantivyIndex = match tantivy_index {
     Some (t) => t . clone (),
     None     => empty_in_ram_tantivy_index () ?, };
-  // Build the in-Rust graph from the source .skg files so view completion's content
-  // reconcile can resolve extra_ids (graph_snap.pid_of) -- a node's contains may
-  // reference another node by an extra_id. Production's env carries the real
-  // (global) graph already; this shim is test-only, so a per-call file read is
-  // fine.
+  // The fixture graph includes extra-ID resolution just like a selected
+  // production snapshot. Read the fixture once before entering rendering.
   let nodes : Vec<NodeComplete> =
     read_all_skg_files_from_sources (config) ?;
   let env : SkgEnv = SkgEnv {
     config        : config . clone (),
     in_rust_graph : new_handle ( InRustGraph::from_nodecompletes (&nodes) ),
+    searcher      : tantivy_owned . reader . searcher (),
     tantivy_index : tantivy_owned,
     driver        : Arc::clone (driver),
     startup_warnings : Arc::new (Vec::new ()), };
@@ -111,13 +107,14 @@ pub async fn multi_root_view_via_env (
   warnings_out      : &mut Vec<String>,
 ) -> Result < (String, Vec<ID>, Tree<ViewNode>),
               Box<dyn Error> > {
+  let graph_snap : Arc<InRustGraph> = env . in_rust_graph_snapshot ();
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the diff (when diff_mode_enabled) is computed inline by
   // view completion, per Active node at its BFS visit.
   let mut viewforest : ViewForest =
     { let (viewforest, render_warnings)
         : (ViewForest, Vec<String>) =
         render_initial_view (
-          env, root_ids, active_source_set,
+          &graph_snap, env, root_ids, active_source_set,
           diff_mode_enabled ) . await ?;
       warnings_out . extend (render_warnings);
       viewforest };
@@ -127,7 +124,7 @@ pub async fn multi_root_view_via_env (
   // itself is caller-agnostic -- no mode flag.
   let buffer_content : String =
     finish_viewforest (
-      &mut viewforest, &env . config, &env . driver,
+      &graph_snap, &mut viewforest, &env . config, &env . driver,
       active_source_set ) . await ?;
   // TODO/DONE/local-view-update/plan_v2.org §20.5: the pids the caller registers for this view -- the {Normal, Inactive}
   // set, via the one shared source of which-kinds-count

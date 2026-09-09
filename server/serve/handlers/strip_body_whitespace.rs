@@ -82,7 +82,8 @@ fn strip_body_whitespace_and_refresh_caches (
     env . in_rust_graph . store ( Arc::new (
       old . with_acknowledged_rebuild (
         InRustGraph::from_nodecompletes (&all_nodes),
-        selected_manifest) )); }
+        selected_manifest)
+        . with_searcher (env . tantivy_index . reader . searcher ()) )); }
   let breakdown : String = {
     // BTreeMap so the report lists sources in a stable order.
     let mut counts : BTreeMap<SourceName, usize> = BTreeMap::new ();

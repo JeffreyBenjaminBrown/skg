@@ -138,9 +138,9 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
 /// only is_title="true" docs carry a 'raw_title'.
 pub fn title_and_source_by_id (
   tantivy_index : &TantivyIndex,
+  searcher      : &Searcher,
   id            : &ID,
 ) -> Option < (String, SourceName) > {
-  let searcher : Searcher = tantivy_index . reader . searcher ();
   let doc_addresses : Vec<tantivy::DocAddress> =
     doc_addresses_for_id (
       tantivy_index, &searcher, id,
@@ -166,10 +166,10 @@ pub fn title_and_source_by_id (
 /// IDs not found in Tantivy are absent from the result.
 pub fn titles_by_ids (
   tantivy_index : &TantivyIndex,
+  searcher      : &Searcher,
   ids           : &[ID],
 ) -> HashMap<ID, String> {
   let mut result : HashMap<ID, String> = HashMap::new ();
-  let searcher : Searcher = tantivy_index . reader . searcher ();
   for id in ids {
     let doc_addresses : Vec<tantivy::DocAddress> =
       match doc_addresses_for_id (

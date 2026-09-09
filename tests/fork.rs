@@ -114,7 +114,9 @@ async fn fork_specs_from (
   config : &SkgConfig,
   driver : &Arc<TypeDBDriver>,
 ) -> Result<Vec<ForkSpec>, Box<dyn Error>> {
-  Ok ( buffer_to_validated_saveplan ( buffer, config, driver, None )
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  Ok ( buffer_to_validated_saveplan (
+         &graph . load_full () . graph, buffer, config, driver, None )
        . await ? . 1 . fork_specs ) }
 
 fn node_from_disk (
@@ -244,9 +246,10 @@ async fn explicit_fork_on_unknown_node_errors (
   config : &SkgConfig,
   driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  let _ : InRustGraphHandle =
+  let graph : InRustGraphHandle =
     install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let result = buffer_to_validated_saveplan (
+    &graph . load_full () . graph,
     EXPLICIT_FORK_UNKNOWN_BUFFER, config, driver, None ) . await;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
@@ -287,9 +290,10 @@ async fn explicit_fork_round_trip_and_monogamy (
     "P keeps its own contains; the explicit fork does not rewrite it" );
 
   // Forking P again is rejected: it now has a user-owned overrider.
-  let _ : InRustGraphHandle =
+  let graph : InRustGraphHandle =
     install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let result = buffer_to_validated_saveplan (
+    &graph . load_full () . graph,
     EXPLICIT_FORK_BUFFER, config, driver, None ) . await;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
@@ -312,13 +316,14 @@ async fn fork_default_prefers_active_owned_source (
   config : &SkgConfig,
   driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  let _ : InRustGraphHandle =
+  let graph : InRustGraphHandle =
     install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let active : ActiveSourceSet = ActiveSourceSet {
     name    : SourceSetName ("only-owned2" . to_string ()),
     sources : BTreeSet::from ([ SourceName::from ("owned2"),
                                SourceName::from ("foreign") ]), };
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
+    &graph . load_full () . graph,
     FORK_ROOT_BUFFER, config, driver, Some (&active) ) . await ?;
   assert_eq! ( save_plan . fork_specs . len (), 1,
     "the fork must resolve, not dead-end on an inactive default source" );
@@ -335,11 +340,12 @@ async fn fork_user_set_source_not_owned_rejected (
   config : &SkgConfig,
   driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  let _ : InRustGraphHandle =
+  let graph : InRustGraphHandle =
     install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let fork_sources : HashMap<ID, SourceName> =
     HashMap::from ([ ( ID::from ("N"), SourceName::from ("foreign") ) ]);
   let result = buffer_to_validated_saveplan_with_fork_sources (
+    &graph . load_full () . graph,
     FORK_BUFFER, config, driver, None, &fork_sources ) . await;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
@@ -413,7 +419,7 @@ async fn explicit_new_child_source_confirms_clone_source (
   config : &SkgConfig,
   driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  let _ : InRustGraphHandle =
+  let graph : InRustGraphHandle =
     install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let buffer : &str = indoc! {"
     * (skg (node (id N) (source foreign))) N-original
@@ -422,6 +428,7 @@ async fn explicit_new_child_source_confirms_clone_source (
     ** (skg (node (source owned2))) Can I add to this?
     "};
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
+    &graph . load_full () . graph,
     buffer, config, driver, None ) . await ?;
   assert_eq! ( save_plan . fork_specs . len (), 1 );
   let spec : &ForkSpec = & save_plan . fork_specs[0];
@@ -449,7 +456,7 @@ async fn disagreeing_new_child_sources_leave_clone_source_unconfirmed (
   config : &SkgConfig,
   driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  let _ : InRustGraphHandle =
+  let graph : InRustGraphHandle =
     install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let buffer : &str = indoc! {"
     * (skg (node (id N) (source foreign))) N-original
@@ -457,6 +464,7 @@ async fn disagreeing_new_child_sources_leave_clone_source_unconfirmed (
     ** (skg (node (source owned2))) New thing two
     "};
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
+    &graph . load_full () . graph,
     buffer, config, driver, None ) . await ?;
   assert_eq! ( save_plan . fork_specs . len (), 1 );
   assert! ( ! save_plan . fork_specs[0] . source_confirmed,
@@ -514,9 +522,10 @@ async fn fork_from_bare_new_child_plan (
   config : &SkgConfig,
   driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  let _ : InRustGraphHandle =
+  let graph : InRustGraphHandle =
     install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let ( _vf, save_plan, _warnings ) = buffer_to_validated_saveplan (
+    &graph . load_full () . graph,
     FORK_WITH_BARE_NEW_CHILD_BUFFER, config, driver, None ) . await ?;
   assert_eq! ( save_plan . fork_specs . len (), 1,
     "appending a bare new child must fork N: {:?}",
@@ -583,9 +592,10 @@ async fn explicitly_foreign_new_child_still_rejected (
   config : &SkgConfig,
   driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  let _ : InRustGraphHandle =
+  let graph : InRustGraphHandle =
     install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let result = buffer_to_validated_saveplan (
+    &graph . load_full () . graph,
     FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER, config, driver, None )
     . await;
   match result {
@@ -619,9 +629,10 @@ async fn fork_monogamy (
 
   // Refresh the global graph so the monogamy pre-check sees the new
   // clone, then try to fork the same N again.
-  let _ : InRustGraphHandle =
+  let graph : InRustGraphHandle =
     install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let result = buffer_to_validated_saveplan (
+    &graph . load_full () . graph,
     FORK_BUFFER, config, driver, None ) . await;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
@@ -644,12 +655,13 @@ async fn fork_source_inactive (
   // Refresh the process-global graph from the freshly-reset fixtures so
   // the monogamy pre-check does not see a prior sub-test's clone (reset
   // wipes disk/DB but not the global handle).
-  let _ : InRustGraphHandle =
+  let graph : InRustGraphHandle =
     install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let active : ActiveSourceSet = ActiveSourceSet {
     name    : SourceSetName ("only-foreign" . to_string ()),
     sources : BTreeSet::from ([ SourceName::from ("foreign") ]), };
   let result = buffer_to_validated_saveplan (
+    &graph . load_full () . graph,
     FORK_BUFFER, config, driver, Some (&active) ) . await;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {

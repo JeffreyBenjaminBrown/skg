@@ -58,8 +58,10 @@ async fn test_collateral_view_preserves_diff_annotations (
   let uri_1 : ViewUri = ViewUri::ContentView ( "buffer-1" . to_string() );
   let uri_2 : ViewUri = ViewUri::ContentView ( "buffer-2" . to_string() );
   views_state . open_views . register_view (
+    &graph . load_full () . graph,
     uri_1 . clone (), viewforest . clone (), &pids );
   views_state . open_views . register_view (
+    &graph . load_full () . graph,
     uri_2 . clone (), viewforest . clone (), &pids );
 
   // 4. Save buffer 1 with a new child "c" of "a".
@@ -163,8 +165,10 @@ async fn test_collateral_view_staged_text_and_unstaged_add (
   let uri_1 : ViewUri = ViewUri::ContentView ( "buffer-1" . to_string() );
   let uri_2 : ViewUri = ViewUri::ContentView ( "buffer-2" . to_string() );
   views_state . open_views . register_view (
+    &graph . load_full () . graph,
     uri_1 . clone (), viewforest . clone (), &pids );
   views_state . open_views . register_view (
+    &graph . load_full () . graph,
     uri_2 . clone (), viewforest . clone (), &pids );
 
   let save_input : String = insert_after (

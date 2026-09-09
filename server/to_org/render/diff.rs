@@ -1,3 +1,4 @@
+use crate::dbs::in_rust_graph::InRustGraph;
 /// Per-node git-diff decoration for the git diff view.
 /// process_activeNode_diff decorates one Active vognode and generates its
 /// diff-only children. TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): it is now called INLINE, at each
@@ -12,10 +13,10 @@
 /// Phantoms are inserted wherever some stage's parent.contains had the
 /// child but the worktree's parent.contains lacks it.
 
-use crate::types::env::find_source_with_optional_tantivy;
+use crate::types::env::find_source;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, added_membership_from_per_stage_diffs, existence_axes_in_source_diff, net_diff_from_per_stage, removed_membership_from_per_stage_diffs};
 use crate::types::list::Diff_Item;
-use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
+use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::phantom::title_for_phantom;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, mk_phantom_viewnode };
 use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual};
@@ -31,10 +32,10 @@ use std::path::PathBuf;
 /// the node flips to a phantom here and its cols then self-deaden via their own
 /// generalized-orphan check at their later visits.
 pub(crate) fn process_activeNode_diff (
+  graph : &InRustGraph,
   mut node_mut                   : NodeMut<ViewNode>,
   source_diffs                   : &HashMap<SourceName, SourceDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  tantivy_index                  : Option<&TantivyIndex>,
   config                         : &SkgConfig,
 ) -> Result<(), String> {
   let tree_node_id : NodeId =
@@ -163,9 +164,9 @@ pub(crate) fn process_activeNode_diff (
       staged_changes   . map ( |c| c . contains_diff . as_slice () ),
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
   insert_phantoms_for_missing_contains (
-    &mut node_mut, tree_node_id, &net_contains, &removed_membership_by_id,
+    graph, &mut node_mut, tree_node_id, &net_contains, &removed_membership_by_id,
     source_diff, source_diffs,
-    deleted_since_head_pid_src_map, tantivy_index, config ) ?;
+    deleted_since_head_pid_src_map, config ) ?;
   Ok (( )) }
 
 /// Decide where each removed-member phantom belongs among its surviving
@@ -267,6 +268,7 @@ fn mark_membership_on_existing_children (
 /// siblings (per 'phantom_insertion_plan'), carrying its M axes (from the
 /// merged contains diff) and X axes (if its file is also gone in some stage).
 fn insert_phantoms_for_missing_contains (
+  graph : &InRustGraph,
   node_mut                       : &mut NodeMut<ViewNode>,
   parent_node_id                 : NodeId,
   net_contains                   : &[Diff_Item<ID>],
@@ -274,7 +276,6 @@ fn insert_phantoms_for_missing_contains (
   source_diff                    : &SourceDiff,
   source_diffs                   : &HashMap<SourceName, SourceDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  tantivy_index                  : Option<&TantivyIndex>,
   config                         : &SkgConfig,
 ) -> Result<(), String> {
   let plan : Vec<(ID, Option<ID>)> =
@@ -306,15 +307,14 @@ fn insert_phantoms_for_missing_contains (
     // aborting the whole render (matching the PartnerCol removed-member
     // path; TODO/DONE/local-view-update/plan_v2.org §7.6).
     let child_source : SourceName =
-      find_source_with_optional_tantivy (
-        &id, deleted_since_head_pid_src_map,
-        tantivy_index, config )
+      find_source (
+        &id, deleted_since_head_pid_src_map, graph )
         . unwrap_or_else ( SourceName::not_found );
     let child_existence : ExistenceAxes =
       existence_axes_for_phantom (&id, &child_source, source_diff, source_diffs);
     let child_title : String =
       title_for_phantom (
-        &id, &child_source,
+        graph, &id, &child_source,
         Some (source_diffs), config );
     let phantom : ViewNode =
       mk_phantom_viewnode (
