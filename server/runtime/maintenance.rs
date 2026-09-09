@@ -234,7 +234,7 @@ impl ServerRuntime {
   /// publisher must complete before this request receives durable success.
   pub fn transition_maintenance<T> (
     &self,
-    transition : impl FnOnce (&mut MaintenanceCoordinator) -> Result<T, String>,
+    transition : impl FnMut (&mut MaintenanceCoordinator) -> Result<T, String>,
   ) -> Result<T, String> {
     self . owner . transition (transition)
   }

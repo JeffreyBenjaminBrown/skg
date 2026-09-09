@@ -558,7 +558,7 @@ fn queue_origin_result (
               &active, &verified)?;
             runtime . transition_maintenance (|coordinator|
               coordinator . record_preselection_retirements (
-                &incident, epoch, retirements))
+                &incident, epoch, retirements . clone ()))
           });
           match staged {
             Ok (( )) => error,

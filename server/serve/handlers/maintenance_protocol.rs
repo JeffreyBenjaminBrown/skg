@@ -226,14 +226,14 @@ fn begin_maintenance (
 
   let active = runtime . transition_maintenance (|coordinator| {
     let mut active : crate::maintenance::ActiveMaintenance = coordinator . begin_epoch_with_archive_contract_and_targets (
-      origin,
-      candidate,
+      origin . clone (),
+      candidate . clone (),
       client . session_id . clone (),
       client . kind . label () . into (),
-      source_set,
+      source_set . clone (),
       snapshot . selected . graph_generation,
       snapshot . selected . manifest_revision,
-      targets)?;
+      targets . clone ())?;
     active . server_session_id = Some (runtime . server_session_id () . into ());
     active . archive_root_identity = Some (
       snapshot . env . config . maintenance_archive_identity . clone ());
@@ -304,7 +304,7 @@ fn freeze_maintenance_census (
     . map (CensusDescriptor::frozen_record)
     . collect::<Result<Vec<_>, _>> ()?;
   runtime . transition_maintenance (|coordinator|
-    coordinator . freeze_locked_census (&incident, epoch, frozen_census))?;
+    coordinator . freeze_locked_census (&incident, epoch, frozen_census . clone ()))?;
   let active = matching_active (runtime, &incident, epoch)?;
   let snapshot = runtime . selected_snapshot ();
   Ok (maintenance_offer_payload (
@@ -2176,7 +2176,7 @@ fn maintenance_evidence (
   };
   runtime . transition_maintenance (|coordinator|
     coordinator . record_client_evidence_transfer (
-      &incident, epoch, transfer))?;
+      &incident, epoch, transfer . clone ()))?;
   let payload = maintenance_evidence_payload (&active, &bundle, selected);
   let descriptor = tag_terminal_sexp_response (
     TcpToClient::MaintenanceEvidence, "complete", &payload);

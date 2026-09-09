@@ -57,7 +57,7 @@ impl ServerRuntime {
         Some (plan_recovered_incident_view_settlements (&active, &archive, &report)?)
       } else { None };
     self . transition_maintenance (|coordinator| {
-      if let Some (settlements) = settlements {
+      if let Some (settlements) = settlements . clone () {
         coordinator . record_view_settlements (incident, epoch, settlements)?; }
       coordinator . retire_incident_authority (incident, epoch, self . server_session_id ())
     }) }

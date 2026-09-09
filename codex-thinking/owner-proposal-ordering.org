@@ -1,0 +1,75 @@
+#+title: Owner proposal ordering audit
+
+* Finding
+
+'CoordinatorOwner::transition' in 'server/runtime/owner.rs' evaluates a
+coordinator-only closure under 'preparation', then drops that mutex before
+sending 'Message::Propose'. The owner accepts only one pending proposal. A
+second proposal prepared from the same published revision is therefore
+rejected while the first journal write is pending.
+
+This is a code-derived expected schedule. If the publisher is held after an
+ordinary observer's 'defer_ordinary_observation' or 'observation_started'
+proposal is accepted, and the maintenance 'archive-ready' transition is then
+submitted, the archive transition is prepared from the old published state
+and receives 'coordinator proposal has an obsolete publication base'. The
+journal can still say 'PreparingArchive' while the pending in-memory proposal
+has advanced 'observation_sequence'. The same ordering applies to
+'archive_finalized'. A focused socket reproduction was not established; ten
+repeats passed, so the production occurrence remains unproven.
+
+The relevant callers are the observer workers in
+'server/maintenance/observation.rs' for sequence allocation, ordinary
+observation status, and final or target candidate recording, and the TCP
+handlers in 'server/serve/handlers/maintenance_protocol.rs' for archive,
+settlement, evidence, and terminal transitions. Census, reconnect, selection,
+and incident recovery use the same adapter.
+
+* Replay assessment
+
+Current transition closures only mutate the coordinator clone and pass cloned
+or immutable inputs. The observation sequence callers assign the returned
+sequence only after a successful transition, before starting the disk
+observation, so replaying that closure would return the sequence actually
+used. No current caller provides a concrete non-replayable side effect inside
+the closure. Arbitrary future callers of the public runtime adapter would
+still need the same restriction documented or enforced.
+
+* Recommendation
+
+A small retry of proposals rejected specifically for a pending or obsolete
+publication is viable for the current callers if the closure becomes 'FnMut'
+and the retry is bounded by the owner ordering. A retry must not run after a
+journal I/O failure, because that state requires recovery, and it must retain
+the existing selected-pair and coordinator base fences.
+
+The longer-term owner-ordered design is to send the pure transition operation
+to the owner and execute it against the current coordinator after the pending
+publication completes. Do not hold 'preparation' across blocking durability:
+'reservation_survives_coordinator_publication_without_stalling_status' and
+'slow_publication_keeps_old_authority_readable_and_rejects_late_state' require
+status, save reservations, and competing proposals to remain prompt.
+
+* Evidence
+
+'cargo test -p skg --lib runtime::owner::tests -- --nocapture' passed 23
+owner tests. A full package test compile was blocked by unrelated integration
+changes in 'tests/diff_mode_refusals.rs' and 'tests/source_sets.rs', where
+'SearchEnrichmentPayload' now requires 'base_env'.
+
+* Verified adapter correction
+The pure transition adapter now recomputes only after the specific pending or
+obsolete coordinator-publication refusal. It waits through an owner message,
+without holding preparation, and does not retry selected-base failures or
+journal I/O failures. Captured census, archive and retirement values are cloned
+for replay; no result escapes before its accepted durable publication.
+
+'archive_transition_rebases_after_observer_publication_but_never_after_io_failure'
+holds the real owner publisher after observation starts, submits archive-ready,
+and checks the archive transition waits, then retains the observation sequence
+and reaches ArchiveReady. Its I/O-failure branch proves the archive closure is
+not invoked again after uncertain persistence. All 24 owner tests pass.
+An existing responsiveness test was adapted to submit an immutable precomputed
+proposal, which must still refuse promptly; pure operation rebase behavior is
+covered separately. Status snapshots and mutation reservation checks remain
+available during the held publication.

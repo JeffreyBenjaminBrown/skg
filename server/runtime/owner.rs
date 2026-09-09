@@ -16,6 +16,9 @@ use std::sync::mpsc::{Receiver, Sender, SyncSender, channel, sync_channel};
 use std::thread;
 use uuid::Uuid;
 
+const OBSOLETE_COORDINATOR_PUBLICATION : &str =
+  "coordinator proposal has an obsolete publication base";
+
 /// Opaque authority for one reservation, including when an operation ID is
 /// reused. Dropping a token never releases the owner's reservation.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -87,6 +90,7 @@ enum MutationAction {
 enum Message {
   Propose (Proposal),
   Published (Result<(), String>),
+  AwaitPublication (SyncSender<Result<(), String>>),
   Reserve (Reserve),
   ClaimBlocked {
     expected : MutationStatus,
@@ -308,22 +312,43 @@ impl CoordinatorOwner {
 
   /// The adapter serializes preparation by callers while they are migrated
   /// to typed operation messages. Its closure can propose state, never publish
-  /// it or perform an external effect. Journal I/O runs on the ordered worker.
+  /// it or perform an external effect, and may be replayed before acceptance.
+  /// Journal I/O runs on the ordered worker.
   pub(crate) fn transition<T> (
     &self,
-    transition : impl FnOnce (&mut MaintenanceCoordinator) -> Result<T, String>,
+    mut transition : impl FnMut (&mut MaintenanceCoordinator) -> Result<T, String>,
   ) -> Result<T, String> {
-    let preparation : MutexGuard<'_, ()> = self . admission_guard ()?;
-    let base : Arc<PublishedCoordinator> = self . published . load_full ();
-    if let Some (reason) = &base . failure { return Err (reason . clone ()); }
-    let mut coordinator : MaintenanceCoordinator = base . coordinator . clone ();
-    let result : T = transition (&mut coordinator)?;
-    if coordinator == base . coordinator { return Ok (result); }
-    // Publication may wait for journal I/O. Competing proposals should reach
-    // the owner and be refused promptly, rather than wait behind this mutex.
-    drop (preparation);
-    self . propose (base . revision, coordinator)?;
-    Ok (result) }
+    loop {
+      let preparation : MutexGuard<'_, ()> = self . admission_guard ()?;
+      let base : Arc<PublishedCoordinator> = self . published . load_full ();
+      if let Some (reason) = &base . failure { return Err (reason . clone ()); }
+      let mut coordinator : MaintenanceCoordinator = base . coordinator . clone ();
+      let result : T = transition (&mut coordinator)?;
+      if coordinator == base . coordinator { return Ok (result); }
+      // Release preparation before waiting on durability so status and mutation
+      // admission remain available. Obsolete precomputed states still refuse;
+      // only this pure operation adapter can prepare another proposal.
+      drop (preparation);
+      match self . propose (base . revision, coordinator) {
+        Ok (( )) => return Ok (result),
+        Err (reason) if reason == OBSOLETE_COORDINATOR_PUBLICATION => {
+          // The closure is pure and its result has not escaped. Recompute from
+          // the next durable coordinator after a concurrent observer/report
+          // proposal, never after a selected-base or persistence failure.
+          self . await_publication ()?; }
+        Err (reason) => return Err (reason), }
+    }
+  }
+
+  fn await_publication (
+    &self,
+  ) -> Result<(), String> {
+    let (reply, completed) :
+      (SyncSender<Result<(), String>>, Receiver<Result<(), String>>) = sync_channel (1);
+    self . sender . send (Message::AwaitPublication (reply))
+      . map_err (|_| "state owner stopped before publication wait" . to_string ())?;
+    completed . recv ()
+      . map_err (|_| "state owner stopped during publication wait" . to_string ())? }
 
   pub(crate) fn admission_guard (&self) -> Result<MutexGuard<'_, ()>, String> {
     self . preparation . lock ()
@@ -370,6 +395,7 @@ fn run_owner (
 ) {
   let mut state : PublishedCoordinator = (**published . load ()) . clone ();
   let mut pending : Option<Proposal> = None;
+  let mut publication_waiters : Vec<SyncSender<Result<(), String>>> = Vec::new ();
   while let Ok (message) = receiver . recv () {
     match message {
       Message::Propose (proposal) => {
@@ -389,7 +415,15 @@ fn run_owner (
           state . failure = Some (format! (
             "journal publication failed; recovery required: {}", reason)); }
         publish_state (&published, &mut state);
-        let _ : Result<(), _> = proposal . reply . send (result); }
+        let _ : Result<(), _> = proposal . reply . send (result . clone ());
+        for waiter in publication_waiters . drain (..) {
+          let _ : Result<(), _> = waiter . send (result . clone ()); } }
+      Message::AwaitPublication (reply) => {
+        if pending . is_some () { publication_waiters . push (reply); }
+        else {
+          let result : Result<(), String> = state . failure . clone ()
+            . map_or (Ok (( )), Err);
+          let _ : Result<(), _> = reply . send (result); } }
       Message::Reserve (request) => {
         let result : Result<ReservationToken, String> =
           reserve (&mut state,
@@ -430,7 +464,7 @@ fn admit_proposal (
 ) -> Result<(), String> {
   if let Some (reason) = &state . failure { return Err (reason . clone ()); }
   if journal_pending || proposal . base_revision != state . revision {
-    return Err ("coordinator proposal has an obsolete publication base" . into ()); }
+    return Err (OBSOLETE_COORDINATOR_PUBLICATION . into ()); }
   let committing_selected : bool = admit_selected_incident (state, &proposal . coordinator)?;
   if let Some (reservation) = &state . reservation {
     let completed_selection : bool = committing_selected
@@ -1293,8 +1327,11 @@ mod tests {
       (SyncSender<Result<(), String>>, Receiver<Result<(), String>>) = sync_channel (1);
     let competing_owner : Arc<CoordinatorOwner> = owner . clone ();
     let competing : thread::JoinHandle<()> = thread::spawn (move || {
-      let result : Result<(), String> = competing_owner . transition (|coordinator|
-        coordinator . observation_started ());
+      // A precomputed proposal cannot be replayed and still refuses promptly.
+      // Pure operation retries are covered by the archive/observer schedule.
+      let mut proposal : MaintenanceCoordinator = competing_owner . snapshot ();
+      proposal . observation_started () . unwrap ();
+      let result : Result<(), String> = competing_owner . propose (0, proposal);
       answered . send (result) . unwrap (); });
     let timely : Result<Result<(), String>, _> =
       response . recv_timeout (Duration::from_secs (2));
@@ -1332,6 +1369,68 @@ mod tests {
     owner . finish_mutation (&prepared) . unwrap ();
     assert! (reserve_current (&owner, "after failure") . is_err ());
     assert_eq! (owner . snapshot () . state, CoordinatorState::Idle); }
+
+  #[test]
+  fn archive_transition_rebases_after_observer_publication_but_never_after_io_failure () {
+    for fail_publication in [false, true] {
+      let (entered, started) : (SyncSender<()>, Receiver<()>) = sync_channel (1);
+      let (release, resume) : (SyncSender<()>, Receiver<()>) = sync_channel (1);
+      let (prepared, first_attempt) : (Sender<()>, Receiver<()>) = channel ();
+      let (finished, completion) :
+        (Sender<(Result<(), String>, usize)>, Receiver<(Result<(), String>, usize)>) = channel ();
+      let (coordinator, _) : (MaintenanceCoordinator, String) =
+        fixture_maintenance (MaintenancePhase::PreparingArchive);
+      let active : ActiveMaintenance = match &coordinator . state {
+        CoordinatorState::Active (active) => active . clone (),
+        _ => unreachable! (), };
+      let mut first : bool = true;
+      let owner : Arc<CoordinatorOwner> = Arc::new (
+        CoordinatorOwner::with_snapshot_publisher (
+          coordinator, Some (fixture_snapshot ()), move |_| {
+            if first {
+              first = false;
+              entered . send (( )) . unwrap ();
+              resume . recv () . unwrap ();
+              if fail_publication { return Err ("disk full" . into ()); } }
+            Ok (( )) }));
+      let observing : Arc<CoordinatorOwner> = owner . clone ();
+      let observer : thread::JoinHandle<Result<(), String>> = thread::spawn (move ||
+        observing . transition (|coordinator| {
+          coordinator . defer_ordinary_observation () . expect ("active incident defers");
+          Ok (( )) }));
+      started . recv_timeout (Duration::from_secs (2)) . unwrap ();
+      let archiving : Arc<CoordinatorOwner> = owner . clone ();
+      let archive : thread::JoinHandle<()> = thread::spawn (move || {
+        let mut attempts : usize = 0;
+        let result : Result<(), String> = archiving . transition (|coordinator| {
+          attempts += 1;
+          prepared . send (( )) . unwrap ();
+          coordinator . archive_ready (&active . incident_id, active . epoch, "a" . repeat (64)) });
+        finished . send ((result, attempts)) . unwrap (); });
+      first_attempt . recv_timeout (Duration::from_secs (2)) . unwrap ();
+      assert! (completion . recv_timeout (Duration::from_millis (50)) . is_err (),
+        "archive transition must wait for the pending observer publication");
+      assert! (reserve_current (&owner, "save") . is_err ());
+      assert_eq! (owner . snapshot () . observation_sequence . get (), 0);
+      release . send (( )) . unwrap ();
+      let observation_result : Result<(), String> = observer . join () . unwrap ();
+      let (archive_result, attempts) : (Result<(), String>, usize) =
+        completion . recv_timeout (Duration::from_secs (2)) . unwrap ();
+      archive . join () . unwrap ();
+      if fail_publication {
+        assert_eq! (observation_result, Err ("disk full" . into ()));
+        assert_eq! (archive_result, Err ("disk full" . into ()));
+        assert_eq! (attempts, 1);
+        assert! (owner . failure () . is_some ());
+      } else {
+        observation_result . unwrap ();
+        archive_result . unwrap ();
+        assert_eq! (attempts, 2);
+        assert_eq! (owner . snapshot () . observation_sequence . get (), 1);
+        assert! (matches! (owner . snapshot () . state,
+          CoordinatorState::Active (active) if active . phase == MaintenancePhase::ArchiveReady)); }
+    }
+  }
 
   #[test]
   fn obsolete_proposal_never_reaches_durable_publisher () {
