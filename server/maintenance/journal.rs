@@ -41,6 +41,19 @@ pub struct JournalLoadReport {
   pub malformed : Vec<MalformedJournal>,
 }
 
+impl JournalLoadReport {
+  /// A committed record wins over unused temporary publications. Without a
+  /// valid committed record, ambiguous files cannot mean a clean startup.
+  pub fn require_authority (self) -> Result<Option<LoadedJournal>, String> {
+    if self . active . is_some () || self . malformed . is_empty () {
+      return Ok (self . active); }
+    Err (format! (
+      "maintenance recovery is required before granting authority: {}",
+      self . malformed . iter () . map (|record|
+        format! ("{}: {}", record . path . display (), record . reason))
+        . collect::<Vec<_>> () . join ("; "))) }
+}
+
 #[derive(Clone, Debug)]
 pub struct MaintenanceJournalStore {
   directory       : PathBuf,
@@ -252,7 +265,19 @@ mod tests {
     let report = store . load ();
     assert! (report . active . is_none ());
     assert_eq! (report . malformed . len (), 2);
+    assert! (report . require_authority () . is_err ());
     assert! (active . exists ());
     assert! (partial . exists ());
   }
+
+  #[test]
+  fn committed_journal_proves_unused_temporary_record_is_not_authority () {
+    let temp : tempfile::TempDir = tempdir () . unwrap ();
+    let store : MaintenanceJournalStore = MaintenanceJournalStore::at_root (
+      temp . path () . join ("state"), PathBuf::from ("/config"));
+    store . persist (&MaintenanceCoordinator::new ()) . unwrap ();
+    let temporary : PathBuf = store . directory . join (".active.unused.tmp");
+    fs::write (&temporary, b"incomplete") . unwrap ();
+    assert! (store . load () . require_authority () . unwrap () . is_some ());
+    assert! (temporary . exists ()); }
 }

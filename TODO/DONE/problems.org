@@ -1,3 +1,43 @@
+* FIXED A delayed observer journal write can overwrite a newer maintenance transition
+   [[file:../server/runtime/maintenance.rs::177][persist_maintenance_state]] clones the coordinator under its mutex,
+   releases the mutex, then calls the journal publisher. The observer and
+   disconnect path use this helper. In contrast, 'transition_maintenance'
+   holds the coordinator mutex through persistence, but that does not exclude
+   a previously cloned snapshot which is already outside the mutex.
+
+   [[file:../server/maintenance/journal.rs::78][MaintenanceJournalStore::persist]] unconditionally renames a unique temporary
+   file onto active.yaml. There is no common publication lock or revision
+   comparison. An observer can copy S_old, a foreground operation can publish
+   S_new, and the delayed observer can then overwrite it with S_old. Restart
+   loads active.yaml, potentially forgetting archive, selection, or ACK state.
+   Atomic rename guarantees a complete file, not the newest state.
+
+   Route authoritative publication through one serialized owner, or otherwise
+   make persistence monotonic across every caller. A useful regression forces
+   the old writer to finish after the newer transition and checks recovered
+   authority. Existing journal tests do not exercise concurrent publication.
+
+
+Fixed by the process owner and its sole ordered journal worker. Base revisions
+reject obsolete proposals before publication; an I/O failure blocks further
+authority changes. Three owner tests include delayed publication and recovery
+from the actual journal. Compact idle records are retained rather than deleted
+by an independently arriving terminal ACK.
+
+* FIXED Sustained notifications could postpone observation indefinitely
+The worker now caps each batch at one second while retaining the 175 ms quiet
+interval. A bounded channel test supplies continuing notifications and proves
+collection ends while notifications are still arriving. Full/targeted sweep
+and finer cancellation work remain tracked separately.
+* FIXED Diagnostic retries masked first-attempt integration failures
+The aggregate acceptance result now retains first-attempt failure, independently
+of diagnostic retry. A disposable harness probe verifies exit status 1 when the
+first execution fails and its retry succeeds.
+* FIXED Malformed maintenance authority was silently treated as idle startup
+Runtime construction now refuses ambiguous journal authority. A valid committed
+record establishes which publication won even if an unused temporary file is
+present. Both cases retain the files for inspection and have journal fixtures.
+
 * PID-overlap collateral selection and its lock mismatch (fixed 2026-08-30)
   The old save pipeline selected background views only when they already
   contained a changed PID. That missed inverse-only effects such as a newly

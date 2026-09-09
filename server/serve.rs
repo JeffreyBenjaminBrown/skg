@@ -386,8 +386,12 @@ fn dispatch_request (
       // Retain coordinator admission across the transaction: an observation
       // which finishes concurrently waits, then notices the selected
       // generation change and scans again.
-      let maintenance = runtime . maintenance . lock () . unwrap ();
-      let save_refusal = skg_save_policy_refusal (&maintenance . state);
+      let _admission : MutexGuard<'_, ()> = match runtime . maintenance_admission_guard () {
+        Ok (guard) => guard,
+        Err (error) => { send_runtime_error (stream, &error); return; } };
+      let maintenance = runtime . maintenance_snapshot ();
+      let save_refusal = runtime . authority_failure ()
+        . or_else (|| skg_save_policy_refusal (&maintenance . state));
       if let Err (error) = runtime . with_store_transition (
           false, |env, interactive| {
             let InteractiveSession {
@@ -428,7 +432,7 @@ fn dispatch_request (
       handle_verify_connection_request (stream, request, runtime); }
     RequestType::ClientCensus => {
       let snapshot = runtime . selected_snapshot ();
-      let writes_allowed = runtime . maintenance . lock () . unwrap ()
+      let writes_allowed = runtime . maintenance_snapshot ()
         . state . policy () . skg_saves_allowed;
       let mut interactive = runtime . interactive . lock () . unwrap ();
       handle_client_census_request (
@@ -436,7 +440,7 @@ fn dispatch_request (
         writes_allowed, runtime); }
     RequestType::ClientCensusTexts => {
       let snapshot = runtime . selected_snapshot ();
-      let writes_allowed = runtime . maintenance . lock () . unwrap ()
+      let writes_allowed = runtime . maintenance_snapshot ()
         . state . policy () . skg_saves_allowed;
       let mut interactive = runtime . interactive . lock () . unwrap ();
       handle_client_census_texts_request (

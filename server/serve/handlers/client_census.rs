@@ -74,7 +74,7 @@ pub fn handle_verify_connection_request (
       . active_source_set . name . 0 . clone ();
     let abandoned = runtime . transition_maintenance (|coordinator|
       Ok (coordinator . reconnected_for_session (&client_session_id)))?;
-    let maintenance = runtime . maintenance . lock () . unwrap () . clone ();
+    let maintenance = runtime . maintenance_snapshot ();
     Ok (verify_connection_response (
       &lease . snapshot . env . config,
       &lease . snapshot . env . startup_warnings,
@@ -266,9 +266,7 @@ pub fn handle_client_census_request (
       . map (|descriptor| descriptor . buffer_id . clone ()) . collect ();
     let current_generation = env . in_rust_graph . load_full ()
       . graph_generation . get ();
-    let maintenance = runtime . maintenance . lock ()
-      . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
-      . clone ();
+    let maintenance = runtime . maintenance_snapshot ();
     let mut live_uris : HashSet<ViewUri> = HashSet::new ();
     let mut text_required : Vec<String> = Vec::new ();
     let mut stale : Vec<String> = Vec::new ();
@@ -366,9 +364,7 @@ fn reconcile_maintenance_census (
   let attached_session_id = interactive . attached_client . as_ref ()
     . ok_or_else (|| "client census has no attached session" . to_string ())?
     . session_id . clone ();
-  let coordinator = runtime . maintenance . lock ()
-    . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
-    . clone ();
+  let coordinator = runtime . maintenance_snapshot ();
   let verified = match &coordinator . state {
     CoordinatorState::Active (active)
       if active . selected_store . is_none ()
@@ -480,9 +476,7 @@ fn reconcile_census_applications (
   applications : &[(CensusDescriptor, ViewApplicationAcknowledgement)],
 ) -> Result<(), String> {
   if applications . is_empty () { return Ok (( )); }
-  let coordinator = runtime . maintenance . lock ()
-    . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
-    . clone ();
+  let coordinator = runtime . maintenance_snapshot ();
   let CoordinatorState::Active (active) = &coordinator . state else {
     return Err ("census application lost its active incident" . into ()); };
   let mut effects = Vec::new ();
@@ -618,9 +612,7 @@ pub fn handle_client_census_texts_request (
       coordinator . enroll_presentation_census (
         enrollment_records . clone (), requested_epoch)
         . map (|_| ( )))?;
-    let maintenance = runtime . maintenance . lock ()
-      . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
-      . clone ();
+    let maintenance = runtime . maintenance_snapshot ();
     let mut census_applications = Vec::new ();
     for descriptor in &restored_descriptors {
       if let Some (ack) = census_application_ack (

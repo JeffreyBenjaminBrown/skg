@@ -1,6 +1,7 @@
 pub mod generation_gate;
 pub mod interactive_session;
 mod maintenance;
+mod owner;
 
 use crate::maintenance::journal::MaintenanceJournalStore;
 use crate::maintenance::evidence::MaintenanceEvidenceStore;
@@ -13,6 +14,7 @@ use crate::maintenance::archive::VerifiedInitialArchive;
 use crate::maintenance::observation::ObservationService;
 use crate::runtime::generation_gate::{GenerationGate, QueryLease};
 use crate::runtime::interactive_session::InteractiveSession;
+use crate::runtime::owner::CoordinatorOwner;
 use crate::types::env::SkgEnv;
 use crate::types::store_state::SelectedStoreState;
 
@@ -62,8 +64,7 @@ pub struct ServerRuntime {
   writer_env            : Mutex<SkgEnv>,
   pub generation_gate   : GenerationGate,
   pub interactive       : Mutex<InteractiveSession>,
-  pub maintenance       : Mutex<MaintenanceCoordinator>,
-  pub maintenance_journal : MaintenanceJournalStore,
+  owner                 : CoordinatorOwner,
   pub maintenance_evidence : MaintenanceEvidenceStore,
   pub interactive_slot  : InteractiveConnectionSlot,
   candidates            : Mutex<BTreeMap<CandidateId, Arc<ObservedDiskCandidate>>>,
@@ -81,7 +82,7 @@ impl ServerRuntime {
       tracing::warn! (%error, "could not seed Git presentation signature"); }
     let maintenance_journal =
       MaintenanceJournalStore::for_config (&env . config . config_path);
-    let maintenance = maintenance_journal . load () . active
+    let maintenance = maintenance_journal . load () . require_authority ()?
       . map (|loaded| loaded . coordinator)
       . unwrap_or_else (MaintenanceCoordinator::new);
     let maintenance_evidence = MaintenanceEvidenceStore::alongside (
@@ -91,8 +92,7 @@ impl ServerRuntime {
       writer_env: Mutex::new (env),
       generation_gate: GenerationGate::new (graph_generation),
       interactive: Mutex::new (interactive),
-      maintenance: Mutex::new (maintenance),
-      maintenance_journal,
+      owner: CoordinatorOwner::start (maintenance, maintenance_journal . clone ()),
       maintenance_evidence,
       interactive_slot: InteractiveConnectionSlot::new (),
       candidates: Mutex::new (BTreeMap::new ()),
@@ -103,6 +103,17 @@ impl ServerRuntime {
 
   pub fn selected_snapshot (&self) -> Arc<SelectedRuntimeSnapshot> {
     self . selected . load_full () }
+
+  pub fn maintenance_snapshot (&self) -> MaintenanceCoordinator {
+    self . owner . snapshot () }
+
+  pub fn authority_failure (&self) -> Option<String> {
+    self . owner . failure () }
+
+  pub(crate) fn maintenance_admission_guard (&self)
+    -> Result<MutexGuard<'_, ()>, String>
+  {
+    self . owner . admission_guard () }
 
   pub fn query_lease (&self) -> Result<RuntimeQueryLease, String> {
     loop {

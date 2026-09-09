@@ -652,8 +652,7 @@ fn matching_archive_ready (
   incident_id : &IncidentId,
   epoch       : MaintenanceEpoch,
 ) -> Result<super::types::ActiveMaintenance, String> {
-  let coordinator = runtime . maintenance . lock ()
-    . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
+  let coordinator = runtime . maintenance_snapshot ();
   let CoordinatorState::Active (active) = &coordinator . state else {
     return Err ("no maintenance incident is active" . into ()); };
   if &active . incident_id != incident_id || active . epoch != epoch {
@@ -683,8 +682,7 @@ fn validate_preselection (
   || source_catalog_blake3 (config) != candidate . source_catalog_blake3
   {
     return Err ("candidate configuration/source identity changed" . into ()); }
-  let sequence = runtime . maintenance . lock ()
-    . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
+  let sequence = runtime . maintenance_snapshot ()
     . observation_sequence;
   if sequence != candidate . summary . covered_sequence {
     return Err (format! (
@@ -717,8 +715,7 @@ fn validate_rebuild_preselection (
   {
     return Err ("full-rebuild candidate source identity is inconsistent"
       . into ()); }
-  let sequence = runtime . maintenance . lock ()
-    . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
+  let sequence = runtime . maintenance_snapshot ()
     . observation_sequence;
   if sequence != candidate . summary . covered_sequence {
     return Err (format! (
@@ -736,8 +733,7 @@ fn validate_locked_preselection (
   candidate   : &ObservedDiskCandidate,
 ) -> Result<(), String> {
   let active = {
-    let coordinator = runtime . maintenance . lock ()
-      . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
+    let coordinator = runtime . maintenance_snapshot ();
     let CoordinatorState::Active (active) = &coordinator . state else {
       return Err ("maintenance ended before candidate selection" . into ()); };
     if &active . incident_id != incident_id || active . epoch != epoch
@@ -760,8 +756,7 @@ fn validate_locked_rebuild (
   candidate   : &ObservedDiskCandidate,
 ) -> Result<(), String> {
   let active = {
-    let coordinator = runtime . maintenance . lock ()
-      . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
+    let coordinator = runtime . maintenance_snapshot ();
     let CoordinatorState::Active (active) = &coordinator . state else {
       return Err ("maintenance ended before full rebuild selection" . into ()); };
     if &active . incident_id != incident_id || active . epoch != epoch

@@ -38,7 +38,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Weak, mpsc};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+const OBSERVATION_QUIET_INTERVAL : Duration = Duration::from_millis (175);
+const OBSERVATION_MAX_BATCH_AGE : Duration = Duration::from_secs (1);
 
 #[derive(Clone, Debug)]
 enum ObservationSignal {
@@ -244,25 +247,71 @@ fn canonical_or_original (path : &Path) -> PathBuf {
   path . canonicalize () . unwrap_or_else (|_| path . to_path_buf ())
 }
 
+#[derive(Default)]
+struct ObservationBatch {
+  paths                  : Vec<PathBuf>,
+  reasons                : Vec<String>,
+  maintenance_jobs       : Vec<(IncidentId, MaintenanceEpoch)>,
+  maintenance_final_jobs : Vec<(IncidentId, MaintenanceEpoch)>,
+  observe_presentation    : bool,
+}
+
+fn collect_observation_batch (
+  receiver : &mpsc::Receiver<ObservationSignal>,
+  first    : ObservationSignal,
+) -> ObservationBatch {
+  collect_observation_batch_with_limits (
+    receiver, first, OBSERVATION_QUIET_INTERVAL,
+    OBSERVATION_MAX_BATCH_AGE)
+}
+
+fn collect_observation_batch_with_limits (
+  receiver       : &mpsc::Receiver<ObservationSignal>,
+  first          : ObservationSignal,
+  quiet_interval : Duration,
+  max_batch_age  : Duration,
+) -> ObservationBatch {
+  let started : Instant = Instant::now ();
+  let max_deadline : Instant = started + max_batch_age;
+  let mut quiet_deadline : Instant = started + quiet_interval;
+  let mut batch : ObservationBatch = ObservationBatch::default ();
+  absorb_signal (
+    first, &mut batch . paths, &mut batch . reasons,
+    &mut batch . maintenance_jobs, &mut batch . maintenance_final_jobs,
+    &mut batch . observe_presentation);
+  loop {
+    let now : Instant = Instant::now ();
+    let quiet_remaining : Duration = quiet_deadline
+      . saturating_duration_since (now);
+    let age_remaining : Duration = max_deadline
+      . saturating_duration_since (now);
+    let timeout : Duration = quiet_remaining . min (age_remaining);
+    if timeout . is_zero () { break; }
+    let signal = match receiver . recv_timeout (timeout) {
+      Ok (signal) => signal,
+      Err (mpsc::RecvTimeoutError::Timeout)
+      | Err (mpsc::RecvTimeoutError::Disconnected) => break,
+    };
+    absorb_signal (
+      signal, &mut batch . paths, &mut batch . reasons,
+      &mut batch . maintenance_jobs, &mut batch . maintenance_final_jobs,
+      &mut batch . observe_presentation);
+    quiet_deadline = Instant::now () + quiet_interval;
+  }
+  batch
+}
+
 fn observation_worker (
   runtime  : Weak<ServerRuntime>,
   receiver : mpsc::Receiver<ObservationSignal>,
 ) {
   while let Ok (first) = receiver . recv () {
-    let mut paths = Vec::new ();
-    let mut reasons = Vec::new ();
-    let mut maintenance_jobs = Vec::new ();
-    let mut maintenance_final_jobs = Vec::new ();
-    let mut observe_presentation = false;
-    absorb_signal (
-      first, &mut paths, &mut reasons, &mut maintenance_jobs,
-      &mut maintenance_final_jobs, &mut observe_presentation);
-    while let Ok (signal) = receiver . recv_timeout (
-        Duration::from_millis (175))
-    {
-      absorb_signal (
-        signal, &mut paths, &mut reasons, &mut maintenance_jobs,
-        &mut maintenance_final_jobs, &mut observe_presentation); }
+    let batch : ObservationBatch = collect_observation_batch (
+      &receiver, first);
+    let ObservationBatch {
+      paths, reasons, maintenance_jobs, maintenance_final_jobs,
+      observe_presentation,
+    } = batch;
     let Some (runtime) = runtime . upgrade () else { return; };
     // A process-owned exact sweep is queued when the final bracket closes.
     // Events consumed inside the bracket therefore need no client-side
@@ -356,8 +405,7 @@ fn run_final_observation (
 ) {
   let result = (|| -> Result<Option<String>, OriginObservationFailure> {
     let active = {
-      let coordinator = runtime . maintenance . lock ()
-        . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
+      let coordinator = runtime . maintenance_snapshot ();
       let CoordinatorState::Active (active) = &coordinator . state else {
         return Ok (None); };
       if active . incident_id != incident || active . epoch != epoch
@@ -432,8 +480,7 @@ fn run_target_observation (
 ) {
   let result = (|| -> Result<Option<String>, OriginObservationFailure> {
     let active = {
-      let coordinator = runtime . maintenance . lock ()
-        . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
+      let coordinator = runtime . maintenance_snapshot ();
       let CoordinatorState::Active (active) = &coordinator . state else {
         return Ok (None); };
       if active . incident_id != incident || active . epoch != epoch
@@ -501,9 +548,7 @@ fn queue_origin_result (
           let staged = runtime . transition_maintenance (|coordinator|
             coordinator . block_invalid_disk (
               &incident, epoch, error . clone ())) . and_then (|_| {
-            let active = match &runtime . maintenance . lock ()
-              . map_err (|_|
-                "maintenance coordinator poisoned" . to_string ())?
+            let active = match &runtime . maintenance_snapshot ()
               . state
             {
               CoordinatorState::Active (active)
@@ -532,7 +577,7 @@ fn queue_origin_result (
         }
         OriginObservationFailure::Operational (error) => error,
       };
-      let phase = match &runtime . maintenance . lock () . unwrap () . state {
+      let phase = match &runtime . maintenance_snapshot () . state {
         CoordinatorState::Active (active) => active . phase . label (),
         state => state . label (),
       };
@@ -544,7 +589,7 @@ fn queue_origin_result (
         field ("error", &error),
       ];
       if let CoordinatorState::Active (active) =
-        &runtime . maintenance . lock () . unwrap () . state
+        &runtime . maintenance_snapshot () . state
       {
         if !active . preselection_retirements . is_empty () {
           fields . push (
@@ -626,17 +671,20 @@ fn run_observation (
 ) {
   paths . sort ();
   paths . dedup ();
-  let (sequence, deferred) = {
-    let mut coordinator = runtime . maintenance . lock () . unwrap ();
+  let (sequence, deferred) = match runtime . transition_maintenance (|coordinator| {
     if let Some (sequence) = coordinator . defer_ordinary_observation () {
-      (sequence, true)
+      Ok ((sequence, true))
     } else {
       let sequence = coordinator . next_observation_sequence ();
       let _ = coordinator . observation_started ();
-      (sequence, false)
+      Ok ((sequence, false))
     }
+  }) {
+    Ok (observation) => observation,
+    Err (error) => {
+      tracing::error! (%error, "observation could not record its authority");
+      return; }
   };
-  runtime . persist_maintenance_state ();
   if deferred {
     tracing::debug! (
       observation_sequence = sequence . get (),
@@ -658,9 +706,8 @@ fn run_observation (
   }
   match result {
     DiskObservation::ByteEquivalent => {
-      let _ = runtime . maintenance . lock () . unwrap ()
-        . observation_equal ();
-      runtime . persist_maintenance_state ();
+      let _ = runtime . transition_maintenance (|coordinator|
+        coordinator . observation_equal ());
     }
     DiskObservation::SemanticallyEqual { manifest, .. } => {
       match runtime . publish_semantically_equal_manifest (
@@ -669,9 +716,8 @@ fn run_observation (
           manifest)
       {
         Ok (( )) => {
-          let _ = runtime . maintenance . lock () . unwrap ()
-            . observation_equal ();
-          runtime . persist_maintenance_state ();
+          let _ = runtime . transition_maintenance (|coordinator|
+            coordinator . observation_equal ());
         }
         Err (error) => {
           let _ = runtime . schedule_full_observation (
@@ -683,10 +729,9 @@ fn run_observation (
     DiskObservation::Valid (candidate) => {
       runtime . retain_candidate (candidate . clone ());
       let summary = candidate . summary . clone ();
-      if runtime . maintenance . lock () . unwrap ()
-        . set_pending_valid (summary . clone ()) . is_ok ()
+      if runtime . transition_maintenance (|coordinator|
+        coordinator . set_pending_valid (summary . clone ())) . is_ok ()
       {
-        runtime . persist_maintenance_state ();
         runtime . queue_server_event (QueuedServerEvent {
           frame_kind: TcpToClient::MaintenanceOffer . repr_in_client () . into (),
           operation_id: format! ("candidate-{}", summary . id),
@@ -712,14 +757,13 @@ fn publish_pending_problem (
   reason  : PendingReason,
   details : Vec<String>,
 ) {
-  if runtime . maintenance . lock () . unwrap ()
-    . set_pending_invalid (reason . clone (), details . clone ()) . is_ok ()
+  if runtime . transition_maintenance (|coordinator|
+    coordinator . set_pending_invalid (reason . clone (), details . clone ())) . is_ok ()
   {
-    runtime . persist_maintenance_state ();
     runtime . queue_server_event (QueuedServerEvent {
       frame_kind: TcpToClient::MaintenanceStatus . repr_in_client () . into (),
       operation_id: format! ("observation-{}",
-        runtime . maintenance . lock () . unwrap ()
+        runtime . maintenance_snapshot ()
           . observation_sequence . get ()),
       payload: pending_problem_payload (&reason, &details),
     });
@@ -775,6 +819,7 @@ mod tests {
     ObservationSignal,
     PresentationWatchTarget,
     configured_source_watcher,
+    collect_observation_batch_with_limits,
     event_may_describe_mutation,
     presentation_watch_targets,
     validate_live_config_replacement,
@@ -785,9 +830,10 @@ mod tests {
   use notify::EventKind;
   use std::collections::HashMap;
   use std::fs;
-  use std::path::Path;
+  use std::path::{Path, PathBuf};
   use std::sync::mpsc;
-  use std::time::Duration;
+  use std::thread;
+  use std::time::{Duration, Instant};
   use tempfile::TempDir;
 
   fn config () -> SkgConfig {
@@ -864,6 +910,35 @@ mod tests {
       AccessKind::Close (AccessMode::Write))));
     assert! (event_may_describe_mutation (&EventKind::Modify (
       ModifyKind::Any)));
+  }
+
+  #[test]
+  fn sustained_notifications_reach_the_maximum_batch_age () {
+    let (sender, receiver) = mpsc::channel ();
+    let producer = thread::spawn (move || {
+      let started : Instant = Instant::now ();
+      while started . elapsed () < Duration::from_millis (300) {
+        if sender . send (ObservationSignal::Paths (
+          vec![PathBuf::from ("changed.skg")],
+          crate::maintenance::QueuedObservationReason::FilesystemEvent))
+          . is_err ()
+        {
+          break;
+        }
+        thread::sleep (Duration::from_millis (2));
+      }
+    });
+    let first : ObservationSignal = receiver . recv () . unwrap ();
+    let started : Instant = Instant::now ();
+    let batch = collect_observation_batch_with_limits (
+      &receiver, first, Duration::from_millis (20),
+      Duration::from_millis (80));
+    let elapsed : Duration = started . elapsed ();
+    drop (receiver);
+    producer . join () . unwrap ();
+    assert! (batch . paths . len () > 1);
+    assert! (elapsed < Duration::from_millis (250),
+      "batch waited {:?} despite its maximum age", elapsed);
   }
 
   #[cfg(target_os = "linux")]

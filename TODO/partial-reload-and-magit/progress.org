@@ -1451,3 +1451,38 @@ acceptance coverage. The model is an abstract contract, not adapter evidence.
 ** choices determining the future
 No architectural question. Continue with exclusive state ownership and pinned
 read publication; independent release stays gated on durable save recovery.
+
+* Simplify/cohere checkpoint: exclusive coordinator publication
+** what's done and went well
+The process owner is the sole live coordinator publisher. Callers prepare
+copies and submit proposals with an exact publication revision; the owner
+rejects obsolete proposals. One ordered worker performs journal I/O while the
+owner retains readable committed state. Publication failure withholds further
+authority because an error after rename cannot be undone by reverting memory.
+Observer and disconnect paths now use the same transition boundary. Terminal
+ACK cleanup keeps the compact idle record instead of independently deleting a
+possibly newer journal. Startup rejects ambiguous active records and preserves
+unused temporary files when a valid committed record proves authority.
+
+Observation has a one-second maximum batch age as well as quiet debounce.
+Tests cover sustained notifications, delayed publisher completion, obsolete
+proposals, publisher failure, malformed authority and interrupted replacement.
+All-target checking passes; all 319 non-ignored library tests pass under
+nextest with one test job. Fourteen focused owner/journal/observer tests passed.
+Logs are in 'temp/simplify-cohere-baseline/owner-*.log'.
+
+Completed findings moved from 'TODO/problems.org' to 'TODO/DONE/problems.org'.
+The recursive orientation synthesis is retained in
+'/tmp/skg-recursive-orientation-notes.org'; missing/stale historical links do
+not override the current contract.
+** Changes to the plan's envisioned order.
+The bounded debounce repair was made alongside ownership because it is
+independent. A temporary proposal/admission adapter preserves current save
+exclusion while graph publication and buffer authority move to owner messages.
+** what's imperfect about what's done
+The owner currently governs coordinator publication. Selected graph/search and
+interactive buffer ownership still use the old adapters; this is an intermediate
+checkpoint and does not enable independent buffer release.
+** choices determining the future
+No new architectural choice. Next pin the actual Searcher, remove ordinary
+fallback reads, and converge graph mutation and buffer authority on the owner.

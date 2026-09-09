@@ -534,8 +534,7 @@ fn complete_maintenance (
   let (presentation_generation, signature_blake3) =
     runtime . exact_git_presentation_identity ()?;
   let missing_fence = matches! (
-    &runtime . maintenance . lock ()
-      . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
+    &runtime . maintenance_snapshot ()
       . state,
     CoordinatorState::Active (active) if active . presentation_fence . is_none ());
   if missing_fence {
@@ -569,8 +568,7 @@ fn acknowledge_terminal_maintenance (
     &value_from_request_sexp ("maintenance-epoch", request)?)?;
   let attached = attached_client (runtime)?;
   {
-    let coordinator = runtime . maintenance . lock ()
-      . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
+    let coordinator = runtime . maintenance_snapshot ();
     if let CoordinatorState::Terminal (terminal) = &coordinator . state {
       if terminal . controlling_session_id () != attached . session_id {
         return Err (
@@ -580,14 +578,8 @@ fn acknowledge_terminal_maintenance (
   }
   let newly_acknowledged = runtime . transition_maintenance (|coordinator|
     coordinator . acknowledge_terminal (&incident, epoch))?;
-  let coordinator = runtime . maintenance . lock ()
-    . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
-    . clone ();
-  if let Err (error) = runtime . maintenance_journal
-    . remove_completed (&coordinator)
-  {
-    tracing::warn! (%error,
-      "could not compact acknowledged maintenance journal"); }
+  // Retain the compact idle record and its issuing epoch. An old terminal
+  // ACK must never erase a newer owner's publication or reset its identity.
   let successor_queued = match runtime . schedule_full_observation (
       crate::maintenance::QueuedObservationReason::MaintenanceCompleted)
   {
@@ -614,8 +606,7 @@ fn require_completion_owner (
   manifest_sha256 : &str,
 ) -> Result<(), String> {
   let attached = attached_client (runtime)?;
-  let coordinator = runtime . maintenance . lock ()
-    . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
+  let coordinator = runtime . maintenance_snapshot ();
   match &coordinator . state {
     CoordinatorState::Active (active) => {
       if &active . incident_id != incident || active . epoch != epoch {
@@ -1468,7 +1459,7 @@ pub fn handle_maintenance_status_request (
 ) {
   let result = (|| -> Result<String, String> {
     resume_enrollment_deferred_candidate (runtime)?;
-    let coordinator = runtime . maintenance . lock () . unwrap () . clone ();
+    let coordinator = runtime . maintenance_snapshot ();
     let selected_snapshot = runtime . selected_snapshot ();
     let selected_config = &selected_snapshot . env . config;
     Ok (match coordinator . state {
@@ -1494,8 +1485,7 @@ pub fn handle_maintenance_status_request (
 fn resume_enrollment_deferred_candidate (
   runtime : &ServerRuntime,
 ) -> Result<(), String> {
-  let active = match &runtime . maintenance . lock ()
-      . map_err (|_| "maintenance coordinator poisoned" . to_string ())?
+  let active = match &runtime . maintenance_snapshot ()
       . state
   {
     CoordinatorState::Active (active) => active . clone (),
@@ -2119,8 +2109,7 @@ fn matching_active (
   incident : &IncidentId,
   epoch    : MaintenanceEpoch,
 ) -> Result<crate::maintenance::ActiveMaintenance, String> {
-  let coordinator = runtime . maintenance . lock ()
-    . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
+  let coordinator = runtime . maintenance_snapshot ();
   let CoordinatorState::Active (active) = &coordinator . state else {
     return Err ("no maintenance incident is active" . into ()); };
   if &active . incident_id != incident || active . epoch != epoch {

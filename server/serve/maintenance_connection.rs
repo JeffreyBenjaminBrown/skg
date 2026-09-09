@@ -96,7 +96,7 @@ pub fn handle_idle_maintenance_events (
       break;
     }
   }
-  let maintenance_locked = runtime . maintenance . lock () . unwrap ()
+  let maintenance_locked = runtime . maintenance_snapshot ()
     . state . policy () . maintenance_locked;
   if collateral_pump_allowed (
       snapshot_requested, server_event_send_failed, maintenance_locked)
@@ -115,8 +115,11 @@ pub fn finish_connection_maintenance (
 ) {
   release_connection_reload_batches (runtime, owned_reload_batch_tokens);
   if !interactive_connection { return; }
-  runtime . maintenance . lock () . unwrap () . disconnected ();
-  runtime . persist_maintenance_state ();
+  if let Err (error) = runtime . transition_maintenance (|coordinator| {
+    coordinator . disconnected ();
+    Ok (( )) })
+  {
+    tracing::error! (%error, "disconnect could not be durably recorded"); }
   if let Ok (mut interactive) = runtime . interactive . lock () {
     if let Some (client) = &mut interactive . attached_client {
       client . census_complete = false; }}

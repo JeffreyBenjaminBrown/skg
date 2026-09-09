@@ -137,7 +137,7 @@ impl ServerRuntime {
 
   pub fn retain_candidate (&self, candidate : Arc<ObservedDiskCandidate>) {
     let protected = {
-      let coordinator = self . maintenance . lock () . unwrap ();
+      let coordinator : MaintenanceCoordinator = self . maintenance_snapshot ();
       journal_candidate_id (&coordinator . state) . cloned ()
     };
     let mut candidates = self . candidates . lock () . unwrap ();
@@ -174,12 +174,6 @@ impl ServerRuntime {
       . queued_server_events . push_back (event);
   }
 
-  pub fn persist_maintenance_state (&self) {
-    let coordinator = self . maintenance . lock () . unwrap () . clone ();
-    if let Err (error) = self . maintenance_journal . persist (&coordinator) {
-      tracing::error! (%error, "could not persist maintenance state"); }
-  }
-
   /// Persist the server-known half of a view born during maintenance before
   /// its successful query response is put on the wire.
   pub fn enroll_maintenance_view (
@@ -198,27 +192,13 @@ impl ServerRuntime {
       coordinator . enroll_pending_view (enrollment . clone ()))
   }
 
-  /// Apply one coordinator transition and durably publish it as one critical
-  /// section.  A journal failure restores the previous in-memory state, so a
-  /// successful protocol response can never describe an unjournaled boundary.
+  /// Propose a pure coordinator transition to the process owner. Its ordered
+  /// publisher must complete before this request receives durable success.
   pub fn transition_maintenance<T> (
     &self,
     transition : impl FnOnce (&mut MaintenanceCoordinator) -> Result<T, String>,
   ) -> Result<T, String> {
-    let mut coordinator = self . maintenance . lock ()
-      . map_err (|_| "maintenance coordinator poisoned" . to_string ())?;
-    let before = coordinator . clone ();
-    let result = match transition (&mut coordinator) {
-      Ok (result) => result,
-      Err (error) => {
-        *coordinator = before;
-        return Err (error); }
-    };
-    if let Err (error) = self . maintenance_journal . persist (&coordinator) {
-      *coordinator = before;
-      return Err (format! (
-        "maintenance transition could not be journaled: {}", error)); }
-    Ok (result)
+    self . owner . transition (transition)
   }
 
   pub fn publish_semantically_equal_manifest (
