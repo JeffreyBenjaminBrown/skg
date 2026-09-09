@@ -3,24 +3,6 @@
 # Common library for skg integration tests
 # This file should be sourced by individual test runners
 
-# Uses the HTTP health endpoint rather than pgrep, because TypeDB
-# may run in a different PID namespace (e.g. systemd sandbox).
-is_typedb_running() {
-  curl -sf http://localhost:8000/v1/version >/dev/null 2>&1
-}
-
-# Function to verify TypeDB server is running and exit if not
-check_typedb_server() {
-  echo ""
-  echo "Checking TypeDB server..."
-  if ! is_typedb_running; then
-    echo "ERROR: TypeDB server is not running!"
-    echo "Please start TypeDB server first by running: ./start-servers.sh"
-    exit 1
-  fi
-  echo "✓ TypeDB server is running"
-}
-
 # Function to send shutdown command to skg server via Emacs
 send_shutdown_command() {
   local port=$1
@@ -50,7 +32,7 @@ EOF
   sleep 0.1
 }
 
-# Function to cleanup background processes and test databases
+# Function to clean up the background Skg server
 cleanup() {
   echo ""
   echo "Cleaning up..."
@@ -63,10 +45,8 @@ cleanup() {
 
       # Use SIGINT (not SIGTERM) for graceful shutdown
       # The Rust server only handles SIGINT (Ctrl+C), not SIGTERM
-      # This triggers the delete_on_quit cleanup code
       kill -INT $CARGO_PID 2>/dev/null || true
 
-      # Wait for graceful shutdown (delete_on_quit needs time to clean up database)
       local wait_count=0
       while [ $wait_count -lt 20 ] && kill -0 $CARGO_PID 2>/dev/null; do
         sleep 0.1
@@ -80,26 +60,6 @@ cleanup() {
       fi
 
       wait $CARGO_PID 2>/dev/null || true
-    fi
-  fi
-
-  # Fallback: if the server's delete_on_quit failed (e.g. force-killed
-  # before the delete finished), clean up via TypeDB's HTTP API.
-  if [ -n "$DB_NAME" ]; then
-    sleep 0.2  # let TypeDB release locks from the dead server
-    local token
-    token=$(curl -s -X POST http://127.0.0.1:8000/v1/signin \
-      -H "Content-Type: application/json" \
-      -d '{"username":"admin","password":"password"}' 2>/dev/null \
-      | grep -oP '"token"\s*:\s*"\K[^"]+' 2>/dev/null) || true
-    if [ -n "$token" ]; then
-      local http_status
-      http_status=$(curl -s -o /dev/null -w "%{http_code}" \
-        -X DELETE "http://127.0.0.1:8000/v1/databases/$DB_NAME" \
-        -H "Authorization: Bearer $token" 2>/dev/null) || true
-      if [ "$http_status" = "200" ]; then
-        echo "Fallback: deleted leaked database $DB_NAME via HTTP API"
-      fi
     fi
   fi
 }
@@ -128,14 +88,6 @@ find_available_port() {
   exit 1
 }
 
-# Function to create unique database name for parallel tests
-generate_db_name() {
-  local test_name=$(basename "$TEST_DIR")
-  local timestamp=$(date +%s)
-  local random_id=$((RANDOM % 1000))
-  echo "skg-test-${test_name}-${timestamp}-${random_id}"
-}
-
 # Function to start skg server with test config
 start_skg_server() {
   echo ""
@@ -149,7 +101,7 @@ start_skg_server() {
   echo "Waiting for server to be ready..."
 
   # Wait for "Server ready." in the log, which is printed after
-  # TypeDB + Tantivy initialization completes. Checking the port alone
+  # Graph and index initialization completes. Checking the port alone
   # is not enough — the port is bound before init, for the busy signal.
   local max_attempts=300
   local attempt=0
@@ -189,7 +141,9 @@ run_emacs_test() {
   echo ""
   echo "Running Emacs integration test..."
   cd "$TEST_DIR"
-  if SKG_TEST_PORT="$AVAILABLE_PORT" emacs --batch -l "$test_file"; then
+  if SKG_TEST_PORT="$AVAILABLE_PORT" emacs --batch \
+      --eval '(progn (require (quote package)) (package-initialize))' \
+      -l "$test_file"; then
     echo "✓ Integration test PASSED."
     TEST_RESULT=0
   else

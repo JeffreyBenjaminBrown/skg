@@ -3,7 +3,6 @@
 # Integration test for the save-lock lifecycle (plan_v2 §20.2a).
 # This script:
 # - Backs up and resets test data (a.skg, b.skg, solo.skg) to a clean state
-# - Verifies TypeDB server is running
 # - Starts an independent skg server with test config
 # - Uses Emacs to open three overlapping views, save one, and verify that the
 #   truly-non-collateral view becomes editable once the save stream settles
@@ -79,20 +78,16 @@ trap enhanced_cleanup EXIT
 
 backup_and_reset_test_data
 
-check_typedb_server
 
 AVAILABLE_PORT=$(find_available_port)
 echo ""
 echo "Using port $AVAILABLE_PORT for test server..."
 
 TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml") # inside data/ so the data root (the config-file dir) contains the owned/ folder
-DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
-db_name = "$DB_NAME"
 tantivy_folder = "$TEST_DIR/data/.index.tantivy"
 port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
-delete_on_quit = true
 
 [[sources]]
 name = "main"

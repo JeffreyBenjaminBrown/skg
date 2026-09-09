@@ -1841,3 +1841,23 @@ URI/revision/token bases. Corrected exact-base fixtures pass. Abort handling
 around unresolved external effects still needs the planned integration guard.
 ** choices determining the future
 Continue the accepted lifecycle integration and restart evidence reconstruction.
+
+* Simplify/cohere checkpoint: both clients have integration adapters
+** what's done and went well
+The integration harness has no TypeDB service lifecycle. Every discovered
+scenario now runs for both required clients with separate logs; the previously
+missing Neovim partial-reload adapter covers the three fork/pull phases. The
+shared Emacs integration launcher initializes its installed native undo package.
+Shell syntax, Neovim parsing, paired-adapter discovery and whitespace checks
+pass. This checkpoint includes no live lifecycle success claim.
+** Changes to the plan's envisioned order.
+Checkpoint harness coverage before running it against the completed lifecycle.
+** what's imperfect about what's done
+Real editor acceptance still depends on the current server/client admission
+integration. The first new server read-only socket schedule caught a malformed
+test request list; the diagnostic is preserved before correction.
+** choices determining the future
+The user's latest preference supersedes the earlier model preference: new
+delegates use Luna with high reasoning. Existing higher-cost delegates stopped
+at explicit handoffs. Uncertain reasoning is recorded incrementally under
+[[file:../../codex-thinking/index.org][codex-thinking/]] (implementation questions only).

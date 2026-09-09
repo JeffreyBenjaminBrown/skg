@@ -3,7 +3,6 @@
 # Integration test for collateral buffer updates: title edit + add child
 # This script:
 # - Backs up and resets test data (a.skg and b.skg) to clean state
-# - Verifies TypeDB server is running
 # - Starts an independent skg server with test config
 # - Uses Emacs to test that editing a title and adding a child in one buffer
 #   propagates to another open buffer via collateral completion
@@ -105,7 +104,6 @@ trap enhanced_cleanup EXIT
 # Setup test environment
 backup_and_reset_test_data
 
-check_typedb_server
 
 # Find available port and create dynamic config
 AVAILABLE_PORT=$(find_available_port)
@@ -114,13 +112,10 @@ echo "Using port $AVAILABLE_PORT for test server..."
 
 # Create a dynamic config with the available port
 TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml") # inside data/ so the data root (the config-file dir) contains the owned/ folder
-DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
-db_name = "$DB_NAME"
 tantivy_folder = "$TEST_DIR/data/.index.tantivy"
 port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
-delete_on_quit = true
 
 [[sources]]
 name = "main"

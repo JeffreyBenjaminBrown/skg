@@ -22,7 +22,6 @@ cleanup_rebuild_test() {
 
 trap cleanup_rebuild_test EXIT
 
-check_typedb_server
 
 TEST_WORK_ROOT=$(mktemp -d "$TEST_DIR/work-XXXXXX")
 SOURCE_ROOT="$TEST_WORK_ROOT/notes"
@@ -42,15 +41,12 @@ pid: "y"
 EOF
 
 AVAILABLE_PORT=$(find_available_port)
-DB_NAME=$(generate_db_name)
 TEMP_CONFIG="$TEST_WORK_ROOT/skgconfig.toml"
 cat > "$TEMP_CONFIG" << EOF
-db_name = "$DB_NAME"
 tantivy_folder = "$TEST_WORK_ROOT/.index.tantivy"
 maintenance_archive_folder = "maintenance-archives"
 port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
-delete_on_quit = true
 default_source_set = "main"
 
 [[sources]]

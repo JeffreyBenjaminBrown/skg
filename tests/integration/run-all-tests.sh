@@ -22,11 +22,12 @@ echo "Integration directory: $INTEGRATION_DIR"
 echo "Results will be written to: $TESTS_LOG"
 echo ""
 
-# Clean up any straggler test databases from previous runs
-# Uses TypeDB's API for safe deletion (doesn't require stopping TypeDB)
-echo "Cleaning up straggler test databases..."
-"$PROJECT_ROOT/target/debug/cleanup-test-dbs"
-echo ""
+for client in emacs nvim; do
+  if ! command -v "$client" >/dev/null 2>&1; then
+    echo "ERROR: required integration client '$client' is unavailable." >&2
+    exit 1
+  fi
+done
 
 # Auto-discover test directories (any subdirectory with a run-test.sh)
 TEST_DIRS=()
@@ -56,26 +57,40 @@ run_single_test() {
   echo "Starting test: $test_dir"
   cd "$test_path"
 
-  # Run the test and capture all output to test.log
-  ./run-test.sh > test.log 2>&1
-  local exit_code=$?
+  : > test.log
+  local test_client
+  local client_exit_code
+  local overall_exit_code=0
+  for test_client in emacs nvim; do
+    local client_log="test-$test_client.log"
+    echo "Running $test_dir with $test_client"
+    set +e
+    SKG_TEST_CLIENT="$test_client" ./run-test.sh > "$client_log" 2>&1
+    client_exit_code=$?
+    set -e
+    {
+      echo "=== Client: $test_client ==="
+      cat "$client_log"
+      echo
+    } >> test.log
+    if [ "$client_exit_code" -eq 0 ]; then
+      echo "✓ Test $test_dir ($test_client) PASSED"
+    else
+      echo "✗ Test $test_dir ($test_client) FAILED (exit code: $client_exit_code)"
+      overall_exit_code=1
+    fi
+  done
 
-  if [ $exit_code -eq 0 ]; then
-    echo "✓ Test $test_dir PASSED"
-  else
-    echo "✗ Test $test_dir FAILED (exit code: $exit_code)"
-  fi
-
-  return $exit_code
+  return "$overall_exit_code"
 }
 
 # Clear the master log file
 > "$TESTS_LOG"
 
 echo ""
-echo "Running ${#TEST_DIRS[@]} tests in parallel..."
+echo "Running ${#TEST_DIRS[@]} tests for both required clients in parallel..."
 
-# Max parallel tests. Each test spins up a server (TypeDB + Tantivy init),
+# Max parallel tests. Each test spins up a server with graph and index initialization,
 # so too many at once can starve the system, especially under an RT kernel.
 DEFAULT_PARALLEL="$(skg_default_jobs 2)"
 MAX_PARALLEL="$(skg_positive_int_or_default "${SKG_TEST_PARALLEL:-}" "$DEFAULT_PARALLEL")"
@@ -172,27 +187,5 @@ fi
 echo ""
 echo "Complete results available in: $TESTS_LOG"
 
-# PITFALL: Manual DB deletion here would cause TypeDB to crash
-# (when it tries to checkpoint deleted databases).
-# But test DBs *should* be cleaned up by each test server,
-# due to delete_on_quit = true in their configs.
-
-# Report any straggler test databases that leaked.
-token=$(curl -s -X POST http://127.0.0.1:8000/v1/signin \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"password"}' 2>/dev/null \
-  | grep -oP '"token"\s*:\s*"\K[^"]+' 2>/dev/null) || true
-if [ -n "$token" ]; then
-  stragglers=$(curl -s http://127.0.0.1:8000/v1/databases \
-    -H "Authorization: Bearer $token" 2>/dev/null \
-    | grep -oP '"name"\s*:\s*"\Kskg-test[^"]*' 2>/dev/null) || true
-  if [ -n "$stragglers" ]; then
-    count=$(echo "$stragglers" | wc -l)
-    echo ""
-    echo "⚠  $count straggler test database(s) leaked:"
-    echo "$stragglers" | sed 's/^/  - /'
-    echo "  Run: ./target/debug/cleanup-test-dbs"
-  fi
-fi
 
 exit $overall_result

@@ -14,15 +14,24 @@ source "$TEST_DIR/../test-lib.sh"
 
 echo "=== SKG two-user partial-reload happy-path integration test ==="
 
+TEST_CLIENT="${SKG_TEST_CLIENT:-emacs}"
+case "$TEST_CLIENT" in
+  emacs|nvim) ;;
+  *)
+    echo "ERROR: unsupported SKG_TEST_CLIENT '$TEST_CLIENT'" >&2
+    exit 2
+    ;;
+esac
+
 TEST_WORK_ROOT=""
 CURRENT_SERVER_PID=""
 CURRENT_SERVER_LOG=""
 FAILURES_FILE="$TEST_DIR/failures.log"
 TIMINGS_FILE="$TEST_DIR/timings.log"
 CLIENT_LOGS=(
-  "$TEST_DIR/client-economist-first.log"
-  "$TEST_DIR/client-china-scholar.log"
-  "$TEST_DIR/client-economist-final.log"
+  "$TEST_DIR/client-$TEST_CLIENT-economist-first.log"
+  "$TEST_DIR/client-$TEST_CLIENT-china-scholar.log"
+  "$TEST_DIR/client-$TEST_CLIENT-economist-final.log"
 )
 SERVER_LOGS=(
   "$TEST_DIR/server-economist-first.log"
@@ -55,28 +64,8 @@ stop_phase_server() {
   CURRENT_SERVER_PID=""
 }
 
-delete_test_database() {
-  local database="$1"
-  local token
-  token=$(curl -s -X POST http://127.0.0.1:8000/v1/signin \
-    -H "Content-Type: application/json" \
-    -d '{"username":"admin","password":"password"}' 2>/dev/null \
-    | grep -oP '"token"\s*:\s*"\K[^"]+' 2>/dev/null) || true
-  if [ -n "$token" ]; then
-    curl -s -o /dev/null -X DELETE \
-      "http://127.0.0.1:8000/v1/databases/$database" \
-      -H "Authorization: Bearer $token" 2>/dev/null || true
-  fi
-}
-
 cleanup_happy_path_test() {
   stop_phase_server
-  if [ -n "${ECONOMIST_DB_NAME:-}" ]; then
-    delete_test_database "$ECONOMIST_DB_NAME"
-  fi
-  if [ -n "${CHINA_SCHOLAR_DB_NAME:-}" ]; then
-    delete_test_database "$CHINA_SCHOLAR_DB_NAME"
-  fi
   case "$TEST_WORK_ROOT" in
     "$TEST_DIR"/work-*) rm -rf -- "$TEST_WORK_ROOT" ;;
   esac
@@ -129,7 +118,9 @@ run_emacs_phase() {
       SKG_TEST_FAILURES="$FAILURES_FILE" \
       SKG_TEST_TIMINGS="$TIMINGS_FILE" \
       SKG_PROJECT_ROOT="$PROJECT_ROOT" \
-      timeout 180 emacs --batch -l "$TEST_DIR/test-emacs.el"
+      timeout 180 emacs --batch \
+        --eval '(progn (require (quote package)) (package-initialize))' \
+        -l "$TEST_DIR/test-emacs.el"
   ) > "$log" 2>&1
   local status=$?
   set -e
@@ -140,6 +131,44 @@ run_emacs_phase() {
   fi
 }
 
+run_nvim_phase() {
+  local phase="$1"
+  local config="$2"
+  local log="$3"
+  echo "Running Neovim phase: $phase"
+  set +e
+  (
+    cd "$TEST_DIR" || exit 1
+    env \
+      SKG_TEST_PHASE="$phase" \
+      SKG_TEST_PORT="$AVAILABLE_PORT" \
+      SKG_TEST_CONFIG="$config" \
+      SKG_TEST_WORK_ROOT="$TEST_WORK_ROOT" \
+      SKG_TEST_FAILURES="$FAILURES_FILE" \
+      SKG_TEST_TIMINGS="$TIMINGS_FILE" \
+      SKG_PROJECT_ROOT="$PROJECT_ROOT" \
+      timeout 180 nvim --headless -l "$TEST_DIR/test-nvim.lua"
+  ) > "$log" 2>&1
+  local status=$?
+  set -e
+  cat "$log"
+  if [ "$status" -ne 0 ]; then
+    record_runner_failure \
+      "Neovim phase '$phase' exited $status; see $log"
+  fi
+}
+
+run_client_phase() {
+  local phase="$1"
+  local config="$2"
+  local log="$3"
+  if [ "$TEST_CLIENT" = "nvim" ]; then
+    run_nvim_phase "$phase" "$config" "$log"
+  else
+    run_emacs_phase "$phase" "$config" "$log"
+  fi
+}
+
 configure_git_identity() {
   local repository="$1"
   local user="$2"
@@ -147,7 +176,6 @@ configure_git_identity() {
   git -C "$repository" config user.name "$user"
 }
 
-check_typedb_server
 
 rm -f "$FAILURES_FILE" "$TIMINGS_FILE" \
   "${CLIENT_LOGS[@]}" "${SERVER_LOGS[@]}"
@@ -210,18 +238,14 @@ configure_git_identity "$CHINA_SCHOLAR_ROOT/owned/china-scholar-public" "China-S
 configure_git_identity "$CHINA_SCHOLAR_ROOT/foreign/economist-public" "China-Scholar"
 
 AVAILABLE_PORT=$(find_available_port)
-ECONOMIST_DB_NAME="$(generate_db_name)-economist"
-CHINA_SCHOLAR_DB_NAME="$(generate_db_name)-china-scholar"
 ECONOMIST_CONFIG="$ECONOMIST_ROOT/skgconfig.toml"
 CHINA_SCHOLAR_CONFIG="$CHINA_SCHOLAR_ROOT/skgconfig.toml"
 
 printf '%s\n' \
-  "db_name = \"$ECONOMIST_DB_NAME\"" \
   'tantivy_folder = ".index.tantivy"' \
   'maintenance_archive_folder = "maintenance-archives"' \
   "port = $AVAILABLE_PORT" \
   'beep_when_server_becomes_available = false' \
-  'delete_on_quit = true' \
   '' \
   '[[sources]]' \
   'name = "china-scholar-public"' \
@@ -232,12 +256,10 @@ printf '%s\n' \
   'path = "owned/economist-public"' > "$ECONOMIST_CONFIG"
 
 printf '%s\n' \
-  "db_name = \"$CHINA_SCHOLAR_DB_NAME\"" \
   'tantivy_folder = ".index.tantivy"' \
   'maintenance_archive_folder = "maintenance-archives"' \
   "port = $AVAILABLE_PORT" \
   'beep_when_server_becomes_available = false' \
-  'delete_on_quit = true' \
   '' \
   '[[sources]]' \
   'name = "china-scholar-public"' \
@@ -250,7 +272,7 @@ printf '%s\n' \
 # Economist forks and publishes first.  The other clone remains stale until
 # China-Scholar's client-owned pull.
 if start_phase_server "$ECONOMIST_CONFIG" "${SERVER_LOGS[0]}"; then
-  run_emacs_phase "economist-first" "$ECONOMIST_CONFIG" "${CLIENT_LOGS[0]}"
+  run_client_phase "economist-first" "$ECONOMIST_CONFIG" "${CLIENT_LOGS[0]}"
 fi
 stop_phase_server
 
@@ -258,14 +280,14 @@ stop_phase_server
 # back, and publishes the reciprocal edge.  Economist's foreign clone is
 # still stale while this happens.
 if start_phase_server "$CHINA_SCHOLAR_CONFIG" "${SERVER_LOGS[1]}"; then
-  run_emacs_phase "china-scholar" "$CHINA_SCHOLAR_CONFIG" "${CLIENT_LOGS[1]}"
+  run_client_phase "china-scholar" "$CHINA_SCHOLAR_CONFIG" "${CLIENT_LOGS[1]}"
 fi
 stop_phase_server
 
 # Economist starts from the stale foreign clone, opens the affected view, and
 # pulls the reciprocal subscription through partial rebuild.
 if start_phase_server "$ECONOMIST_CONFIG" "${SERVER_LOGS[2]}"; then
-  run_emacs_phase "economist-final" "$ECONOMIST_CONFIG" "${CLIENT_LOGS[2]}"
+  run_client_phase "economist-final" "$ECONOMIST_CONFIG" "${CLIENT_LOGS[2]}"
 fi
 stop_phase_server
 
@@ -292,5 +314,5 @@ if [ -s "$FAILURES_FILE" ]; then
   exit 1
 fi
 
-echo "PASS: two-user fork/pull/subscribe-back/pull happy path"
+echo "PASS: $TEST_CLIENT two-user fork/pull/subscribe-back/pull happy path"
 exit 0

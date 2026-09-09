@@ -3,7 +3,6 @@
 # Integration test for delete-then-edit-under-deleted collateral updates
 # This script:
 # - Backs up and resets test data (five .skg fixtures) to clean state
-# - Verifies TypeDB server is running
 # - Starts an independent skg server with test config
 # - Uses Emacs to test node deletion via editRequest and subsequent
 #   editing under a DeletedNode across two collateral buffers
@@ -137,7 +136,6 @@ trap enhanced_cleanup EXIT
 # Setup test environment
 backup_and_reset_test_data
 
-check_typedb_server
 
 # Find available port and create dynamic config
 AVAILABLE_PORT=$(find_available_port)
@@ -146,13 +144,10 @@ echo "Using port $AVAILABLE_PORT for test server..."
 
 # Create a dynamic config with the available port
 TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml") # inside data/ so the data root (the config-file dir) contains the owned/ folder
-DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
-db_name = "$DB_NAME"
 tantivy_folder = "$TEST_DIR/data/.index.tantivy"
 port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
-delete_on_quit = true
 
 [[sources]]
 name = "main"
