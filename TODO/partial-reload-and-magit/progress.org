@@ -1576,3 +1576,28 @@ so the behavioral replacement and mechanical adapter removal remain reviewable.
 No new defect identified in this checkpoint.
 ** choices determining the future
 No architectural choice. Active callers and fixtures now migrate to these APIs.
+
+* Simplify/cohere checkpoint: recoverable ordinary-save filesystem primitive
+** what's done and went well
+The standalone save journal retains checksummed before/after bytes and config
+interpretation evidence before authorizing any source mutation. Prepared and
+authorized batches are distinct; replacements use restrictive same-filesystem
+staging, synced files/directories and recoverable per-path progress. Whole-batch
+conflicts fail before further effects. Committed operation identities retain
+the exact result and never replay files after a newer save, even with a lost ACK.
+
+Thirteen focused tests pass, including six actual SIGKILL/restart boundaries,
+partial staging/outcome publication, malformed records, evidence corruption,
+private permissions, deletion and exact versus conflicting duplicates. The
+full library suite passes 347 tests with one optional corpus skip.
+** Changes to the plan's envisioned order.
+Filesystem durability was developed as a separate primitive alongside read
+migration. Runtime startup, owner ordering and editor integration follow;
+independent buffer release remains gated on those real paths.
+** what's imperfect about what's done
+The primitive loads retained operation records for validation. Later completion
+compaction must preserve duplicate rejection while avoiding unbounded retained
+response work on ordinary requests. No automatic archive expiry is introduced.
+** choices determining the future
+No architectural question. Integrate this journal with one combined save batch,
+startup recovery and durable client operation identities before early release.
