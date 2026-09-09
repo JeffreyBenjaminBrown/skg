@@ -1801,3 +1801,19 @@ SaveNode and instead checks the effective graph state. Neither migration run
 establishes the remaining real-editor maintenance lifecycle schedules.
 ** choices determining the future
 Continue the agreed integration and acceptance work without a new decision.
+
+* Simplify/cohere checkpoint: setup and platform service cleanup
+** what's done and went well
+Current setup, usage, command and Windows documentation no longer requires
+TypeDB. The Windows image and launcher consistently use the existing
+'run-servers.sh' and start Skg alone. Obsolete troubleshooting material is
+preserved under '_burying/not_using/obsolete/typedb/docs/troubleshooting/'.
+Terra with high reasoning handled this bounded cleanup from a short brief.
+** Changes to the plan's envisioned order.
+No change; this independent setup cleanup ran beside lifecycle integration.
+** what's imperfect about what's done
+Shell syntax, the Python helper, whitespace and relevant local links pass.
+PowerShell syntax parsing was unavailable because 'pwsh' is not installed;
+no Windows execution claim is made.
+** choices determining the future
+Continue integration and full acceptance on the available platform.

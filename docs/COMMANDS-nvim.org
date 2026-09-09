@@ -700,7 +700,7 @@ raw =.skg= buffer is an unconditional refusal: save or revert it first.
 
 Validation and archival happen before destruction.  Ordinary queries can
 continue against the old generation during that preflight, but are refused
-during the visibly exclusive TypeDB/Tantivy reconstruction window.  A clean
+during the visibly exclusive graph/Tantivy reconstruction window.  A clean
 impacted view is refreshed; a dirty impacted view is retired with its text and
 undo preserved in the archive; an orthogonal dirty view remains editable and
 is marked presentation-stale.  Search membership and ranking are not rerun.

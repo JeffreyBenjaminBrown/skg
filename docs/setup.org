@@ -4,13 +4,19 @@ Skg is free software, without a ghost of a path to making money.
 
 This is just enough for a programmer to see how to get it working.
 Please ask an AI for help setting it up.
-** build the Docker container
-   https://github.com/JeffreyBenjaminBrown/docker-typedb-rust
-** start the Docker container
-   See ../bash/docker.sh
-** within the Docker container
-*** start TypeDB server
-    See ../bash/start-servers.sh
+** build Skg
+   Install a Rust toolchain, then build the server:
+
+   #+begin_src bash
+     cargo build --release --bin skg
+   #+end_src
+** start the server
+   Give the server the path to your =skgconfig.toml=:
+
+   #+begin_src bash
+     cargo run --bin skg -- ../data/skgconfig.toml
+   #+end_src
+
 *** optional : import data from org-roam
     cargo run --bin skg -- import-org-roam [source] [target] [nickname]
     (Eventually importing will support more formats.)

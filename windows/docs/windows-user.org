@@ -35,8 +35,7 @@ The Docker container is named =skg-windows= by default. The script reuses it
 if it already exists and was created from the requested image. If a
 container with that name exists for a different image, the script quits.
 
-The TypeDB port is not exposed to Windows. The Skg server port defaults to
-=1731= and is exposed for native Windows Emacs.
+The Skg server port defaults to =1731= and is exposed for native Windows Emacs.
 
 * Building the package folder
 From the repository root on Linux:

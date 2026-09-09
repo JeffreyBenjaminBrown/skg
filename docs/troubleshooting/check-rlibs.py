@@ -64,8 +64,8 @@ def main():
         print(f'\nCORRUPT: {path}\n  {err}')
     print(f'\n{len(corrupt)} corrupt. To fix, force Cargo to rebuild exactly these '
           f'packages:\n  cargo clean -p <pkg> [-p <pkg> ...]   && cargo build --bin skg')
-    print('Map a file like "libtypedb_driver-<hash>.rlib" to the package name '
-          '"typedb-driver" (underscores become hyphens).')
+    print('Map a file like "libfoo_bar-<hash>.rlib" to the package name '
+          '"foo-bar" (underscores become hyphens).')
     return 1
 
 if __name__ == '__main__':

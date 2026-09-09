@@ -5,8 +5,7 @@ source "$(dirname "$0")/common.sh"
 
 for log in \
   "$HOST_DATA_ROOT/logs/server-to-user.log" \
-  "$HOST_DATA_ROOT/logs/skg-stdout-stderr.log" \
-  "$HOST_DATA_ROOT/logs/typedb.log"
+  "$HOST_DATA_ROOT/logs/skg-stdout-stderr.log"
 do
   echo
   echo "=== $log ==="

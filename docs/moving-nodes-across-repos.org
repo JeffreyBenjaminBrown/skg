@@ -123,15 +123,7 @@ The new source is reflected in the in-memory =NodeRust= via the
 ordinary =SaveNode=, which carries the new source field. There is
 no separate move step in memory — the save is sufficient.
 
-**** 3. TypeDB (=update_typedb_from_saveinstructions=)
-The save instruction phase rebuilds the node's outbound
-relationships, but does *not* touch the =source= attribute. After
-that phase, =update_node_source= is called once per =SourceMove=
-to update the =source= attribute on the existing TypeDB node. The
-node itself is not deleted and recreated; only the attribute
-changes.
-
-**** 4. Tantivy
+**** 3. Tantivy
 Tantivy is not given the =SourceMove= list at all. Source moves are
 applied implicitly: the index update is "delete every doc by ID,
 then re-add docs for every save," and the =SaveNode= carries the
@@ -140,7 +132,7 @@ new =source= field, so the re-added document has the correct source.
 *** how 'extra_id's are handled
 If another node references the moved node by an extra_id, that
 reference does not need updating: the in-memory =extra_id_to_pid=
-map and TypeDB's =has_extra_id= relation both resolve through the
-primary ID, which doesn't change on a move. References by primary
-ID are also unaffected. So no other =.skg= files need to be
-touched. (The test suite confirms this for the extra-id case.)
+map resolves through the primary ID, which doesn't change on a move.
+References by primary ID are also unaffected. So no other =.skg=
+files need to be touched. (The test suite confirms this for the
+extra-id case.)

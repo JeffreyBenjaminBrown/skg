@@ -2,18 +2,18 @@
 This folder is an unfinished Windows packaging attempt.
 
 The intended Windows setup is:
-- Docker Desktop runs the Skg server and TypeDB in a Linux container.
+- Docker Desktop runs the Skg server in a Linux container.
 - Native Windows Emacs runs the Skg Emacs Lisp client.
 - A generated package folder provides =run.ps1=, docs, starter data
   scripts, and the Elisp files.
-- The Docker image provides the prebuilt =skg= server binary and TypeDB.
+- The Docker image provides the prebuilt =skg= server binary.
 
 ** Folder map
 - =Dockerfile= builds the user image =jeffreybbrown/skg:latest=.
 - =build/= contains host-side build and publish scripts.
 - =testing/= contains host-side Docker smoke-test scripts.
-- =container/start-servers.sh= runs inside the container and starts TypeDB
-  plus the prebuilt Skg server binary.
+- =container/run-servers.sh= runs inside the container and starts the
+  prebuilt Skg server binary.
 - =install.ps1= is the Windows-side DockerHub pull script.
 - =run.ps1= is the Windows-side launcher.
 - =build-package.sh= assembles the downloadable Windows package folder.

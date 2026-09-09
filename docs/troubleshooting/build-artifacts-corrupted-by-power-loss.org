@@ -4,9 +4,9 @@ mid-build). Everything in it was verified against that instance.
 
 * TL;DR
 
-After a power loss, crash, or forced reboot, =./bash/start-servers.sh=
-fails even though neither the code nor the data has changed. The
-give-away is a *linker* error, not a compile error:
+After a power loss, crash, or forced reboot, a =cargo build= can fail
+even though neither the code nor the data has changed. The give-away is a
+*linker* error, not a compile error:
 
 #+begin_example
 error: linking with `cc` failed: exit status: 1
@@ -23,13 +23,11 @@ python3 docs/troubleshooting/check-rlibs.py
 Fix -- pass every package the script names:
 
 #+begin_src bash
-cargo clean -p skg -p tantivy -p typedb-driver   # e.g.; use YOUR script output
+cargo clean -p skg -p tantivy   # e.g.; use YOUR script output
 cargo build --bin skg
-./bash/start-servers.sh
 #+end_src
 
-TypeDB is *not* the problem here, so nothing in
-=typedb-will-not-start.org= will help. Do not delete any data.
+Do not delete user data or the search index to fix a damaged build artifact.
 
 * Why this is so confusing
 
@@ -45,14 +43,11 @@ Three things conspire to make this look like a mystery:
    file is a good one, hands it to the linker, and fails the same way
    every single time. The failure is permanent, not flaky. Re-running
    the build does not help, which is exactly what makes people assume
-   the problem must lie elsewhere (TypeDB, the config, the data).
+   the problem must lie elsewhere (the configuration or the data).
 
-3. *The error is buried.* =start-servers.sh= runs the build inside
-   =preflight_check_config=, and on failure prints "ERROR: skg failed
-   to compile". That wording is misleading: the crate compiled fine.
-   It failed to *link*. And if you started the servers backgrounded,
-   the linker error scrolls past or lands in a log you did not think
-   to read.
+3. *The error is buried.* A backgrounded build can put the linker error
+   in a log you did not think to read. The crate compiled fine; it failed
+   to *link*.
 
 * Root cause
 
@@ -63,12 +58,11 @@ cache are simply gone.
 
 The signature is unmistakable once you know it: *the truncated files
 end on an exact power-of-two-MiB boundary*, because that is where the
-page-cache writeback got to. In the 2026-07-14 incident the three
-files written in the final 15 seconds of the machine's life were:
+page-cache writeback got to. In the 2026-07-14 incident, files written
+in the final 15 seconds of the machine's life included:
 
 | artifact          |     size | boundary       |
 |-------------------+----------+----------------|
-| libtypedb_driver  | 58720256 | 56 MiB exactly |
 | libtantivy        | 50331648 | 48 MiB exactly |
 | libskg            | 50331648 | 48 MiB exactly |
 
@@ -107,48 +101,36 @@ python3 docs/troubleshooting/check-rlibs.py
 fingerprints, forcing a genuine rebuild of exactly that package. Use
 it on every package the checker named. Translate the *file* name to
 the *package* name by dropping =lib=/=-<hash>.rlib= and turning
-underscores back into hyphens (=libtypedb_driver-370a4...rlib= ->
-=typedb-driver=).
+underscores back into hyphens (for example, =libfoo_bar-370a4...rlib=
+becomes =foo-bar=).
 
 #+begin_src bash
-cargo clean -p skg -p tantivy -p typedb-driver
+cargo clean -p skg -p tantivy
 cargo build --bin skg
 #+end_src
 
-Rebuilding those three took *26 seconds*, because the other ~500
+Rebuilding the named packages took *26 seconds*, because the other ~500
 dependency artifacts were sound and were reused.
 
 Prefer this to a bare =cargo clean=, which throws away all ~8.5 GiB of
 =target/= and forces a full cold rebuild of every dependency
-(libgit2, ring, openssl, tantivy, typedb-driver...) -- many minutes,
+(libgit2, ring, openssl, tantivy...) -- many minutes,
 to fix three files. A full =cargo clean= is a correct fix, just a
 needlessly expensive one. Reach for it only if =check-rlibs.py=
 reports damage so widespread that enumerating packages is pointless.
 
 * Verifying the fix
 
-Do not stop at "it compiled". Confirm the servers actually come up and
-the data loaded:
+Do not stop at "it compiled". Confirm that the server actually starts:
 
 #+begin_src bash
 python3 docs/troubleshooting/check-rlibs.py    # expect "all intact"
-./bash/start-servers.sh &
+cargo run --bin skg -- path/to/skgconfig.toml
 #+end_src
 
-Then look for =Server ready.= in =data/logs/cargo-watch.log=, preceded
-by a plausible node/edge count, e.g.:
-
-#+begin_example
-INFO initialize_dbs: Incremental init succeeded.
-INFO context_computation:   60794 nodes, 56232 edges, 5979 link dests.
-INFO Server ready.
-#+end_example
-
-and check both ports are listening -- 1729 (TypeDB gRPC) and 1730 (the
-skg <-> Emacs API):
+In another shell, check that the configured Skg port is listening:
 
 #+begin_src bash
-(exec 3<>/dev/tcp/127.0.0.1/1729) && echo "TypeDB up"
 (exec 3<>/dev/tcp/127.0.0.1/1730) && echo "skg up"
 #+end_src
 
@@ -157,15 +139,13 @@ skg <-> Emacs API):
 In the 2026-07-14 incident the power loss damaged *only* build
 artifacts. Specifically intact were:
 
-- The TypeDB database (=skg-real=). TypeDB 3.12.0 started clean.
 - The Tantivy index (=data/.index.tantivy=). Incremental init
   succeeded; no reindex was needed.
 - The git working tree and the source.
 
-So resist the urge to "fix" this by deleting databases or reindexing.
+So resist the urge to "fix" this by deleting data or reindexing.
 The one thing a power loss reliably corrupts is whatever was being
-written at the time -- and during =start-servers.sh=, that is
-=target/=.
+written at the time -- during a build, that is =target/=.
 
 Note that the log files (=data/logs/*=) *were* left with a tail of NUL
 padding, which is the same crash artifact showing up harmlessly. It is
