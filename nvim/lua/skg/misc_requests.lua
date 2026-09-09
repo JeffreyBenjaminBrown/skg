@@ -285,6 +285,13 @@ end
 
 ---Recompute the rank-only cyclic-root cache from the complete current graph.
 function M.recompute_cyclicroots ()
+  client.connect()
+  if not M.ensure_connection_handshake() then
+    error('Cannot recompute cyclic roots before server verification') end
+  local operation_id = require('skg.buffer').generate_uuid()
+  local server_session_id = state.server_session_id
+  if not server_session_id then
+    error('Verified SKG connection has no server session') end
   vim.notify('Recomputing cyclic-root search ranking ...')
   state.register_response_handler('recompute-cyclic-roots',
     function (_payload, response)
@@ -294,7 +301,11 @@ function M.recompute_cyclicroots ()
       vim.notify(content,
         status == 'failed' and vim.log.levels.ERROR or vim.log.levels.INFO)
     end, true)
-  client.submit_request('((request . "recompute cyclic roots"))\n')
+  client.submit_request(sexpr.to_string({
+    sexpr.pair(sexpr.symbol('request'), 'recompute cyclic roots'),
+    sexpr.pair(sexpr.symbol('operation-id'), operation_id),
+    sexpr.pair(sexpr.symbol('server-session-id'), server_session_id),
+  }) .. '\n')
 end
 
 ---Strip trailing whitespace from every line of every body, in every
