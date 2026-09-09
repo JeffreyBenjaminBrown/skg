@@ -625,6 +625,40 @@ impl SaveJournalStore {
     operation_snapshot (&loaded)
   }
 
+  /// Read the exact interpretation evidence retained for an operation.
+  /// Completed operations have compacted this blob after delivery and cannot
+  /// answer command-specific recovery questions from the journal.
+  pub(crate) fn read_interpretation_evidence (
+    &self,
+    operation_id             : &str,
+    request_base_fingerprint : &str,
+  ) -> Result<SaveInterpretationEvidence, SaveJournalError> {
+    let loaded : LoadedSaveOperation = self . load_operation_require_clean (
+      operation_id, request_base_fingerprint)?;
+    let (directory, payload) : (PathBuf, JournalRecordPayload) = match loaded {
+      LoadedSaveOperation::Active (record) =>
+        (record . directory, record . payload),
+      LoadedSaveOperation::Completed (marker) => {
+        let predecessor : Option<JournalRecordPayload> =
+          load_marker_predecessor (&marker)?;
+        match predecessor {
+          Some (payload) => (marker . directory, payload),
+          None => return Err (SaveJournalError::WrongOperationState {
+            operation_id: operation_id . into (),
+            reason: "interpretation evidence was removed during completion cleanup"
+              . into (),
+          }),
+        }
+      },
+    };
+    let bytes : Vec<u8> = read_blob (
+      &directory, &payload . interpretation_evidence)?;
+    Ok (SaveInterpretationEvidence {
+      identity: payload . interpretation_identity,
+      bytes,
+    })
+  }
+
   pub(crate) fn load_all (&self) -> SaveJournalLoadReport {
     let loaded : RawLoadReport = self . load_records ();
     let mut operations : Vec<SaveOperationSnapshot> = Vec::new ();
@@ -2460,6 +2494,52 @@ mod tests {
       SaveOperationStatus::Committed {
         outcome, delivery_acknowledged: true,
       });
+  }
+
+  #[test]
+  fn read_interpretation_evidence_requires_matching_clean_retained_record () {
+    let fixture : Fixture = Fixture::new ();
+    let store : SaveJournalStore = fixture . store ();
+    let request : DurableSaveRequest = fixture . request ();
+    store . prepare (&request) . unwrap ();
+    assert_eq! (
+      store . read_interpretation_evidence (
+        &request . operation_id, &request . request_base_fingerprint)
+        . unwrap (),
+      request . interpretation_evidence );
+    assert! (matches! (
+      store . read_interpretation_evidence (
+        &request . operation_id, "wrong-request-base"),
+      Err (SaveJournalError::OperationIdConflict { .. }) ));
+    let directory : PathBuf = store . root () . join (format! (
+      "operation-{}", operation_key (&request . operation_id)));
+    fs::write (directory . join ("interpretation.bin"), b"tampered")
+      . unwrap ();
+    assert! (matches! (
+      store . read_interpretation_evidence (
+        &request . operation_id, &request . request_base_fingerprint),
+      Err (SaveJournalError::MalformedJournals (_)) ));
+  }
+
+  #[test]
+  fn read_interpretation_evidence_refuses_compacted_operation () {
+    let fixture : Fixture = Fixture::new ();
+    let store : SaveJournalStore = fixture . store ();
+    let request : DurableSaveRequest = fixture . request ();
+    store . prepare (&request) . unwrap ();
+    store . authorize (
+      &request . operation_id, &request . request_base_fingerprint) . unwrap ();
+    store . apply_authorized (
+      &request . operation_id, &request . request_base_fingerprint) . unwrap ();
+    store . record_committed_outcome (
+      &request . operation_id, &request . request_base_fingerprint,
+      &standard_outcome ()) . unwrap ();
+    store . acknowledge_delivery (
+      &request . operation_id, &request . request_base_fingerprint) . unwrap ();
+    assert! (matches! (
+      store . read_interpretation_evidence (
+        &request . operation_id, &request . request_base_fingerprint),
+      Err (SaveJournalError::WrongOperationState { .. }) ));
   }
 
   #[test]
