@@ -5,6 +5,20 @@
 (require 'ert)
 (require 'skg-undo-sidecar)
 
+(ert-deftest test-skg-undo-sidecar-detects-byte-compiled-package-version ()
+  (let* ((directory (make-temp-file "skg-undo-version-" t))
+         (source (expand-file-name "undo-fu-session.el" directory))
+         (compiled (concat source "c")))
+    (unwind-protect
+        (progn
+          (with-temp-file source
+            (insert ";;; undo-fu-session.el --- fixture\n;; Version: 0.8\n"))
+          (with-temp-file compiled (insert ";ELC fixture has no source header"))
+          (cl-letf (((symbol-function 'locate-library)
+                     (lambda (&rest _) compiled)))
+            (should (equal (skg-undo-sidecar-package-version) "0.8"))))
+      (delete-directory directory t))))
+
 (defun skg-test--write-private-utf8 (path text)
   (with-temp-buffer
     (insert text)

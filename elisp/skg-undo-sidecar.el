@@ -24,9 +24,15 @@
   "Return the installed undo-fu-session version, without enabling a mode."
   (when-let ((library (locate-library "undo-fu-session")))
     (require 'lisp-mnt)
-    (with-temp-buffer
-      (insert-file-contents library)
-      (lm-header "version"))))
+    ;; Package installation byte-compiles the library. The compiled file has
+    ;; no Version header; inspect its packaged source without enabling a mode.
+    (let ((source (if (string-suffix-p ".elc" library)
+                      (substring library 0 -1)
+                    library)))
+      (when (file-readable-p source)
+        (with-temp-buffer
+          (insert-file-contents source)
+          (lm-header "version"))))))
 
 (defun skg-undo-sidecar-capability-error ()
   "Return nil when native undo archiving is supported, else a reason."

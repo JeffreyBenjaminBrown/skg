@@ -1,3 +1,12 @@
+* Native undo capability rejected normally byte-compiled package installations
+  Fixed during document 11 execution. 'locate-library' resolves the installed
+  undo-fu-session '.elc' file; that file has no source Version header.
+  The adapter now reads the adjacent packaged '.el' source, without enabling
+  an undo mode. A regression covers compiled lookup and the full native
+  save/restore tests now execute against undo-fu-session 0.8. Batch acceptance
+  initializes installed packages and treats a missing required version as a
+  failure instead of accepting three skipped tests.
+
 * FIXED A delayed observer journal write can overwrite a newer maintenance transition
    [[file:../server/runtime/maintenance.rs::177][persist_maintenance_state]] clones the coordinator under its mutex,
    releases the mutex, then calls the journal publisher. The observer and

@@ -1681,3 +1681,25 @@ independent post-publication incident settlement.
 ** choices determining the future
 No new architectural question. Wire and verify the durable adapters, then
 move committed incident settlement off the graph-changing state.
+
+* Simplify/cohere checkpoint: native undo coverage executes
+** what's done and went well
+Installed the existing local undo-fu-session 0.8 package in this environment.
+Its normal byte-compilation exposed an adapter bug: the version detector read
+the compiled file for a source header and reported the supported package as
+absent. The detector now checks its packaged source. All five focused native
+undo tests pass with zero skips, including save/restore and a compiled-package
+regression. Evidence: 'temp/simplify-cohere-baseline/native-undo-required-fixed.log'.
+
+The batch unit runner initializes installed Emacs packages and explicitly
+requires the supported undo version before accepting the suite. Integration
+launchers receive the same package initialization with the harness checkpoint.
+** Changes to the plan's envisioned order.
+Resolved the baseline native-undo skips while production socket tests and
+fixture migration were running independently.
+** what's imperfect about what's done
+The initial focused dependency run exited successfully but retained three
+skips; its log is preserved as 'native-undo-required.log'. Only the fixed run
+establishes undo coverage. Full editor acceptance will run after protocol work.
+** choices determining the future
+No architectural question. Continue the server/editor lifecycle work.

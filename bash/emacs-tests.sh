@@ -46,6 +46,21 @@ TEMP_TEST_FILE=$(mktemp)
 cat > "$TEMP_TEST_FILE" << 'EOF'
 ;; Temporary test runner
 
+;; Batch Emacs does not activate installed packages automatically. Native undo
+;; recovery is required acceptance coverage, so a missing adapter is a failure.
+(require 'package)
+(package-initialize)
+(require 'lisp-mnt)
+(let* ((library (locate-library "undo-fu-session"))
+       (source (and library (if (string-suffix-p ".elc" library)
+                                (substring library 0 -1) library))))
+  (unless (and library
+               (file-readable-p source)
+               (with-temp-buffer
+                 (insert-file-contents source)
+                 (equal (lm-header "version") "0.8")))
+    (error "Required test dependency missing: install undo-fu-session 0.8")))
+
 ;; Add current directory to load path for relative requires
 (add-to-list 'load-path default-directory)
 ;; Add elisp directory to load path for project files
