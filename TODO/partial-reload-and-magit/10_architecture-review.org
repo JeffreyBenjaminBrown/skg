@@ -1,0 +1,1348 @@
+#+title: Partial reload: architecture review and alternatives
+#+date: 2026-09-06
+#+author: Astra, with two bounded Sol reviews
+
+* My assessment
+
+Your suspicion is substantially right: there is a simpler architecture worth
+considering. The problem is not that you failed to learn CAP. The branch grew
+from partial reload into a durable protocol coordinating the graph, two
+derived databases, Git, editor buffers, recovery archives, and presentation.
+It makes successful completion depend on a large collection of acknowledgments
+and independently changing state. Some central guarantees remain incomplete.
+
+I would favor one owner for state changes, immutable snapshots for reads, and
+a smaller maintenance contract. My preferred longer-term direction is to make
+the existing in-Rust graph the sole authority for live graph queries, paired
+with a specific Tantivy search snapshot, and remove TypeDB from that
+correctness boundary. A less disruptive alternative retains both databases
+and permits an explicit pause while selecting and settling a reload.
+
+I would not begin with STM, a language rewrite, or a new incremental-query
+framework. I also would not promise that deleting a particular number of lines
+will solve this. Significant deletion looks plausible; preserving every
+current lifecycle and recovery promise would retain substantial complexity.
+
+This is an assessment and a comparison of proposals, not an implementation
+plan. No program code, tests, data, running servers, or Git state were changed.
+The other document change records the findings in [[file:../problems.org][TODO/problems.org]].
+
+* One user, one interactive client
+
+All recommendations here assume your intended model: one user and exactly
+one interactive editor connection per server process. Emacs and Neovim are
+alternative implementations of that client. They are not concurrent users.
+
+The implementation has an explicit admission guard:
+[[file:../../server/runtime/mod.rs::181][InteractiveConnectionSlot::try_attach]] refuses another interactive
+connection until the existing guard is dropped. The plans also expressly
+reject secondary read-only clients and hypothetical multi-user machinery
+([[file:07_plan.org::311][single interactive connection]], [[file:07_plan.org::1820][your clarification]]).
+I found no reason to design for multiple simultaneous users.
+
+One user still creates concurrency: the observer, index worker, background
+renderer, socket handler, Git child process, and editor callbacks can overlap.
+Those overlaps, and recovery after either process dies, explain the relevant
+coordination problem. They do not require a multi-user architecture.
+
+* What grew, and why
+
+The fair comparison is commit =971e17b5= to branch HEAD =74e7dfa5=.
+The former is the main-branch parent incorporated by merge =311a5c36=;
+comparing against the original fork would also charge unrelated upstream work.
+
+| Rust source in server/                | Before | After  | Increase |
+|---------------------------------------+--------+--------+----------|
+| All physical lines                    | 42,316 | 64,685 | 22,369   |
+| Embedded cfg(test) spans              | 589    | 5,114  | 4,525    |
+| Approximate production                | 40,525 | 58,280 | 17,755   |
+| --excluding test spans and test_utils |        |        |          |
+
+These are physical lines, including comments and whitespace, not executable
+statement counts or estimates of effort. The production split is approximate:
+it removes conditional test spans and named shared test helpers. The separate
+tests/ tree grew another 9,149 lines. Your impression is therefore accurate;
+embedded tests explain some of the growth, but most server growth is real
+production complexity.
+
+The narrow original implementation added only 379 net server lines.
+The subsequent safety redesign added 5,022; the durable-maintenance work
+added 15,925; later fixes added 1,043. The durable-maintenance work and its
+fixes account for about three quarters of the net increase.
+
+The original [[file:01_vision.org][vision]] concerned reloading files changed through Magit.
+The early [[file:02_discussion.org::55][discussion]] called the required handler thin. The scope then acquired:
+
+- exact source/telescope normalization and global ID validation;
+- external changes from any writer, with detection of missed watcher events;
+- dirty-buffer protection and recoverable Git evidence;
+- coherent selected generations across all stores;
+- a common protocol for pull, partial reload, rebuild, and config changes;
+- durable editor text, native undo, auxiliary workflows, and semantic evidence;
+- continued queries and new views during maintenance;
+- exact view-application acknowledgments and terminal unlock inventories;
+- reconnection and restart recovery across every boundary.
+
+These were largely discussed and accepted, not simply invented during coding.
+Important scope decisions appear in [[file:02_discussion.org::166][disk restoration]],
+[[file:06_bugs.org::572][durable dirty-buffer archives]], [[file:06_bugs.org::690][undo and node evidence]],
+and [[file:06_bugs.org::764][the common maintenance protocol]]. Individually reasonable choices
+accumulated into a much larger product contract than partial reload.
+
+There are good foundations here. Immutable candidates, exact byte manifests,
+one graph writer, conservative dirty-view protection, privacy checks before
+text release, and explicit failures are worth keeping. The later code is also
+mostly isolated in identifiable modules. This is not a case where all recent
+work must be discarded to recover the useful parts.
+
+* Where the architecture becomes expensive
+
+** Completing a graph change also requires completing an editor ceremony
+
+The current path is approximately:
+
+#+begin_example
+allocate incident and epoch
+  -> freeze and census editor buffers
+  -> publish initial archive and verify it
+  -> authorize Git / observe final disk
+  -> publish recovery evidence
+  -> update TypeDB and Tantivy and select the graph
+  -> classify every enrolled view
+  -> authorize protected text where necessary
+  -> apply or retire views and acknowledge each
+  -> transfer evidence and finalize the archive
+  -> send exact unlock inventory
+  -> acknowledge terminal delivery
+  -> return to idle and observe again
+#+end_example
+
+Much of the danger is in interactions between these stages. A new view may
+arrive after the original archive but before finalization. A report may become
+modified because a Git process writes output. A response may have been applied
+even though its ACK was lost. An old render may finish during source changes.
+
+The [[file:07_plan.org::1870][late addition for views born during maintenance]] is especially revealing.
+Supporting those views required provisional server enrollment by ViewUri,
+binding to a later client buffer ID, two related censuses, more presentation
+classification, and a barrier against finalization overtaking enrollment.
+This is a real consequence of that promise. It is also an expensive promise
+for a single-user application, and a good candidate for reconsideration.
+
+Graph validity, preserving authored work, making every view current, and
+finishing a human-readable report are different obligations. The current
+protocol couples them into a global period of restricted operation. Some
+coupling is necessary; the strongest all-buffers/all-receipts coupling is a
+product choice, not a theorem.
+
+An alternative is to let each buffer regain authority once its own disposition
+is safe. A buffer awaiting an application ACK remains unsavable; it need not
+keep unrelated, already reconciled buffers locked. Report finalization could
+continue after selection if the complete recovery evidence is already durable
+and retained server-side. That explicitly relaxes today's requirement for a
+fully finalized client archive before global unlock; it must not relax the
+initial dirty-work archive before risky mutation. This separation is compatible
+with either proposed storage architecture, but is an additional product choice.
+
+** Having a coordinator does not give it exclusive ownership
+
+[[file:07_plan.org::1030][The plan]] correctly calls for a typed transition function and one authority.
+The implementation nevertheless exposes a public mutex-protected coordinator
+to several producers, and uses both strict and best-effort persistence paths.
+Likewise, session state, candidate retention, generation selection, graph
+writes, and index completion have separate synchronization mechanisms.
+
+One actor, in the ordinary programming sense, means one event loop owns these
+decisions. Workers may hash files or render from immutable input; they return
+results as messages. They do not independently mutate or persist authority.
+The owner can reject an obsolete result without sharing its mutable state.
+That is more specific, and stronger, than adding another coordinator mutex.
+
+The many IDs in the plan are not all redundant: a request, an incident, a graph
+version, and an editor application really have different lifetimes. Randomly
+merging their counters would conceal races. The opportunity is to remove
+unnecessary overlapping lifetimes and authorities, then retain the identities
+that the smaller protocol actually needs.
+
+It does not mean doing every expensive calculation on one thread. Nor does
+it make Git or the editor part of an atomic memory operation. Durable effects
+still need explicit intent and completion records, with recovery for the gap.
+
+** Three selected stores create work that the data model may no longer need
+
+The [[file:../../server/dbs/in_rust_graph.rs::87][in-Rust graph]] already stores nodes, outgoing relationships, inverse
+relationships, and extra-ID resolution using persistent collections.
+[[file:../../server/types/nodes/rust.rs::14][NodeRust]] includes titles, bodies, aliases, provenance-bearing relationships,
+and miscellaneous properties.
+
+Several supposedly TypeDB-facing reads already return from that graph in
+production: [[file:../../server/dbs/typedb/search.rs::23][container and relation lookup]] and
+[[file:../../server/dbs/typedb/ancestry.rs::46][containerward ancestry]] are concrete examples. Their TypeDB paths largely
+serve environments that did not initialize the graph, including older tests.
+This is strong evidence for simplifying TypeDB's role, although it is not a
+complete proof that every TypeDB dependency can be removed unchanged.
+
+Today, [[file:../../server/maintenance/selection.rs::456][candidate selection]] drains readers, applies stores, waits for the exact
+index generation, and checks coherence before publishing. The runtime
+snapshot pins the graph, but it contains database handles; it is not by itself
+an immutable snapshot of every fact those handles can later read. The gate
+does important work. Replacing it safely requires changing the read boundary,
+not merely deleting locks.
+
+Global graph lookups and live-disk fallbacks also weaken that boundary.
+For example, [[file:../../server/types/env.rs::51][find_source]] can discover a node from current disk after failing
+to find it in the selected graph. That is convenient for certain diff paths,
+but ordinary selected-graph queries should not silently consult unselected
+data. Explicit snapshot parameters and separately named Git/disk evidence
+queries would make the distinction reviewable.
+
+** The worst observed delay was recovery serialization
+
+The [[file:08_single-node-reload-performance.org][performance investigation]] is useful counterevidence to a blanket
+criticism of incremental database updates. It attributes the roughly
+40-second delay to repeatedly serializing and validating two complete graph
+snapshots as YAML. In that recorded run the TypeDB update was about 13 ms and
+Tantivy work about 148 ms.
+
+The compact evidence format has already fixed that particular pathology.
+The recorded real-corpus title-change reload took about 2.7 seconds afterward.
+These are the branch's recorded measurements, not new measurements by me.
+
+The remaining evidence design still writes a full baseline per incident.
+That is an intentional cost of independently recoverable incidents, explicitly
+accepted in the performance discussion. Sharing immutable baselines could
+reduce it, but adds retention and deletion rules. It should be considered
+separately from repairing lifecycle races.
+
+* Concrete findings in the current code
+
+These findings come from source inspection and independent cross-checking.
+I did not run new crash experiments or the integration suite. The first two
+are specific code defects with identifiable failure sequences, rather than
+general concerns about concurrency.
+
+** A delayed observer can overwrite newer durable maintenance state
+
+[[file:../../server/runtime/maintenance.rs::177][persist_maintenance_state]] copies the coordinator while holding its mutex,
+then releases the mutex before writing. The foreground
+[[file:../../server/runtime/maintenance.rs::204][transition_maintenance]] holds that mutex through its own journal write.
+The [[file:../../server/maintenance/journal.rs::78][journal publisher]] writes a unique temporary file and unconditionally
+renames it onto active.yaml; there is no version check or common write lock.
+
+A possible execution is:
+
+1. Observer copies old state, then is delayed.
+2. Foreground records and durably publishes a newer archive/selection/ACK state.
+3. Observer resumes and renames its old state over the new journal.
+4. A restart loads the old state.
+
+Atomic rename prevents a torn file. It does not prevent an obsolete writer
+from winning. The [[file:../../server/maintenance/observation.rs::629][observer]] and
+[[file:../../server/serve/maintenance_connection.rs::118][disconnect path]] both use this looser publication route. This is a direct
+example of why exclusive state ownership would help.
+
+** Restart does not restore the selected generation recorded by maintenance
+
+Startup initializes stores from current disk before constructing the runtime
+([[file:../../server/main.rs::150][main startup]], [[file:../../server/dbs/init.rs::259][environment construction]]).
+[[file:../../server/types/store_state.rs::95][SelectedStoreState::initial]] resets graph generation and manifest revision
+to 1. [[file:../../server/runtime/mod.rs::76][ServerRuntime::new]] then loads the maintenance coordinator journal without
+restoring that journal's selected snapshot or generation.
+
+Suppose a real transition reached G1, recorded generation 2 or later, and the
+process died before its remaining clean-view presentation completed. The
+journal still names that generation, but startup supplies generation 1.
+[[file:../../server/serve/handlers/maintenance_protocol.rs::923][Presentation staging]] explicitly rejects that mismatch.
+
+The evidence codec can reconstruct G0/G1 semantic maps. I found no startup
+consumer connecting those maps to restored store authority. The
+[[file:../../server/serve/handlers/client_census.rs::356][reconnect census]] restores an initial-archive cache for preselection cases;
+that does not repair post-selection graph identity. If current disk has also
+changed, assigning the old generation number would be wrong anyway: recovery
+must prove or reconstruct the corresponding content.
+
+Thus the strong restart promise in [[file:07_plan.org::1505][the plan]] is not established by merely
+retaining a checksummed journal and a reconstructible evidence file. This also
+explains why codec round-trip tests can pass while actual restart remains
+incomplete.
+
+** Exact save checks do not exclude an uncontrolled external writer
+
+[[file:../../server/save.rs::161][The save path]] validates the prepared before-digests and subsequently
+[[file:../../server/save.rs::736][applies ordinary file writes/deletions]]. An outside process can change a
+target between those operations. Even the apply method's additional read
+only tests whether bytes already equal the proposed result; it is not an
+atomic conditional replacement against the expected old bytes.
+
+This is a limitation of the guarantee, not evidence that your usual pull
+workflow always races. The checks are useful and catch drift already present
+when checked. They cannot support the unrestricted claim in
+[[file:07_plan.org::738][the save-fence exit condition]] that no unselected external byte can be
+overwritten. A Rust lock, STM transaction, or watcher debounce cannot lock out
+an unrelated editor or Git command.
+
+Every proposal needs an explicit rule here: cooperative exclusion for known
+writers, external editing only during a documented non-saving interval, or
+acceptance that arbitrary simultaneous writes are detected only best-effort.
+A private transactional canonical store with import/export is another option,
+but changes the plaintext-worktree contract. Repeating checks forever does
+not create a filesystem transaction.
+
+Ordinary multi-file saves also still use direct writes without a durable
+batch journal at this boundary. A crash can leave a truncated file or a prefix
+of a multi-file operation. This is a pre-existing weakness exposed by the
+review, not a claim that partial reload introduced it. Rebuilding caches from
+disk cannot recreate bytes that never safely reached disk.
+
+** Observation still does whole-corpus work and can wait indefinitely for quiet
+
+[[file:../../server/maintenance/observation.rs::622][run_observation]] deduplicates its path list but calls observe_complete_disk
+for ordinary notifications. The explicit targeted reload path does less work;
+the general watcher path does not yet realize the planned incremental queue.
+
+The [[file:../../server/maintenance/observation.rs::247][worker's debounce loop]] repeatedly waits for another signal with a fresh
+175 ms timeout, with no maximum batch age. A stream of notifications spaced
+less than 175 ms apart can postpone processing, including maintenance jobs
+already in the batch. This is a source-derived starvation case, not a newly
+measured occurrence. The work is off the socket thread, which is an important
+improvement, but it is not the bounded/cooperatively cancellable observer
+described in [[file:07_plan.org::389][the plan]].
+
+* Why passing tests did not end the whack-a-mole
+
+The [[file:09_happy-path-integ-test.org][two-person sharing scenario]] is valuable. It exercises actual Git pulls,
+forking, reciprocal subscriptions, view survival, warnings, and elapsed unlock
+time. It caught a real generated-report problem and a real disagreement
+between save defaults and disclosure warnings. The latter was a semantic
+specification problem, not a race.
+
+But the test makes most operations happen in a safe serial order:
+
+- [[file:../../tests/integration/partial-reload-happy-path/run-test.sh::99][The runner]] waits for Server ready before launching the editor.
+- [[file:../../tests/integration/partial-reload-happy-path/test-emacs.el::228][Initialization]] completes verification before commands run.
+- [[file:../../tests/integration/partial-reload-happy-path/test-emacs.el::188][Each pull helper]] waits for both unlock and complete incident termination
+  before issuing the next view command.
+- Each person/phase uses a fresh editor/server lifetime; it does not preserve
+  a long-lived editor through an interrupted server operation.
+- It exercises pull, not the explicit targeted-reload selector.
+
+These are sensible choices for a readable behavioral test. They also exclude
+the interleavings behind several later bugs. The existing
+[[file:../../tests/integration/maintenance-rebuild/test-emacs.el::116][rebuild test]] does cover a view born during blocked maintenance and eventual
+retry/unlock. It does not establish crash recovery at the journal boundaries.
+
+The [[file:07_plan.org::1519][plan required]] systematic disconnect/restart tests at those boundaries.
+The checked-in integration coverage I found does not provide that matrix.
+Recent reconnect repairs have focused client unit tests and recorded manual
+live checks, which are useful but narrower evidence.
+
+There is also a counterproductive acceptance rule in
+[[file:../../bash/all-tests.sh::223][all-tests.sh]]: failed integration tests are retried, and a successful retry
+can produce [[file:../../bash/all-tests.sh::299][an overall pass]]. Logs retain the first failure, but for concurrency
+acceptance that failure is itself evidence. A retry should help diagnose
+instability, rather than erase it from the success criterion.
+
+The lesson is not to add thousands more assertions around individual message
+handlers. Test the real ownership boundaries: delay a worker result, lose an
+ACK, restart after durable publication, issue a command before census
+completion, or create a buffer immediately before finalization. A small
+deterministic schedule can reveal what many ordinary successful runs cannot.
+
+* Proposals and their tradeoffs
+
+These alternatives concern two partly independent decisions: how much editor
+activity maintenance permits, and how many stores live queries depend on.
+Changing a database alone does not eliminate the editor lifecycle protocol.
+
+| Alternative                                                    | Main benefit                                       | Main cost                                                 | My assessment                                    |
+|----------------------------------------------------------------+----------------------------------------------------+-----------------------------------------------------------+--------------------------------------------------|
+| One owner, finite maintenance barrier, keep current stores     | Fewer lifecycle interleavings; smaller disruption  | Defer new editable views                                  | Best conservative option                         |
+| One owner, immutable Rust graph plus pinned Tantivy searcher   | Remove a live database and cross-store read gate   | Audit/replace remaining TypeDB and global/live-disk reads | Preferred architectural direction                |
+| SQLite graph projection and FTS in one database                | Built-in atomicity for graph and search projection | Query/search migration and filesystem boundary remain     | Credible alternative, needs comparative evidence |
+| Private versioned canonical store; worktrees are import/export | Stronger durable commit boundary                   | Changes everyday plaintext/Git semantics                  | Consider only if that product change is wanted   |
+
+** One owner and a finite maintenance barrier, keeping existing stores
+
+Use a single state owner for saves, maintenance decisions, journal publication,
+and acknowledgment acceptance. Keep the pure candidate builder and existing
+store update machinery. Background work returns immutable results tagged with
+the base that authorized it.
+
+Close admission to new authoritative views before the initial locked census.
+Drain already admitted requests, secure the required dirty-work archive before
+Git or destructive work, and settle that fixed inventory. Later requests to
+create editable views wait until the barrier ends. Existing text stays readable.
+During long Git/observation work, queries could still return temporary read-only
+snapshot results that carry no live save authority and need no maintenance
+settlement; obtaining an editable view would require reopening after the barrier.
+Those are buffers in the same sole editor, not secondary client connections.
+This is a deliberate change in query-result behavior. The even simpler variant
+queues every graph command during maintenance, but slow Git authentication
+makes that restriction unpleasant.
+
+This deliberately relaxes the current promise that new authoritative views
+may be created throughout maintenance. It avoids
+the moving enrollment target that caused the late two-census design.
+It can retain dirty orthogonal views and native undo protection.
+
+Advantages: substantial existing code remains useful; the serial state owner
+has one journal writer; reasoning and fault injection become simpler; TypeDB
+semantics and Tantivy search behavior stay intact.
+
+Costs: editable-view creation waits, and the barrier must have a clear
+failure/authorization UI. Git, archive work, or database work can lengthen it;
+only small local reloads should be expected to make that pause brief.
+The existing three-store recovery obligations remain. Preserving every exact
+current promise would reduce this option's simplification considerably.
+
+** One selected Rust graph and a pinned Tantivy searcher
+
+Here the published read unit would conceptually be:
+
+#+begin_example
+Selected snapshot
+  graph + exact manifest + config/source identity + query context
+  a specific Tantivy Searcher built for that same graph
+
+one writer: candidate -> validated graph/index pair -> publish snapshot
+readers: hold that snapshot until their query is finished
+editor: local drafts and view bases, with explicit safe refresh/retirement
+#+end_example
+
+Tantivy already provides immutable search snapshots. Its
+[[https://github.com/quickwit-oss/tantivy/blob/main/ARCHITECTURE.md][architecture documentation]] explains that a held Searcher keeps a consistent
+segment snapshot across subsequent commits and merges. That supports this
+proposal; publishing the correct graph/searcher pair is still Skg's job.
+A cloned IndexReader that later supplies a new Searcher is not equivalent.
+
+The writer builds the next graph and index state, obtains its corresponding
+searcher, and publishes the pair only when both are ready. Existing queries
+retain the previous pair. Index failure leaves that previous pair selected
+and blocks any operation requiring the unfinished change; reconstruction is
+from a named immutable graph. A full index replacement must retain resources
+needed by old readers until they finish.
+
+TypeDB could be removed from live query/write correctness, or retained only
+as an explicitly optional export/audit tool if it has a separate useful role.
+All ordinary graph reads must use the supplied snapshot, including a lookup
+that finds nothing. No fallback may turn that absence into a read of newer
+disk or process-global graph state.
+
+Advantages: much of the graph machinery exists already; no separate TypeDB
+service is required for ordinary use; old queries can finish without waiting
+for an in-place database transition; one published graph/search pair replaces
+several coordination obligations. No new language or graph-query engine is
+needed.
+
+Costs: remaining TypeDB uses need a real dependency audit and behavioral
+comparison. The existing global-handle shortcuts must be removed from pinned
+paths. Long-lived snapshots retain memory/index resources, so request
+lifetimes must stay bounded. Search must wait for the correct index before a
+new pair becomes visible; that cost should be measured, not hidden by stale
+results. Crash recovery and ordinary filesystem-save durability still need
+an explicit durable boundary.
+
+I favor combining this direction with the finite maintenance barrier above.
+The two changes solve different sources of complexity. Neither requires
+automatically rerunning searches or discarding dirty editor text.
+
+*** DONE (jeff) for searches requested mid-maintenance
+we can just ask the user, 'use the current (stale) index or wait for the updated one'?
+
+Response: yes. That is a good user-facing policy, provided the choice is explicit
+in the result and does not silently create editable authority from stale data.
+"Use current index" can return a coherent, read-only result from the last
+published graph/search snapshot, visibly marked as possibly stale. "Wait" can
+remain pending until the next validated graph/search pair is published. The
+wait should be cancellable, and neither choice should automatically rerun or
+silently replace an existing search result. If the user later requests an
+editable view, that request still follows the maintenance barrier and the
+view-base checks.
+
+** SQLite as one transactional graph-and-search projection
+
+Store nodes, relationships, source provenance, ordering, and FTS in a single
+SQLite database, and apply one candidate in one transaction. Normal readers
+use one database snapshot. SQLite's
+[[https://www.sqlite.org/isolation.html][isolation documentation]] describes serialized writes and snapshot reads in
+WAL mode. Those are a good fit for a single-user application with background
+read work.
+
+This could replace TypeDB and Tantivy together, rather than add a fourth
+authoritative representation. An in-memory graph, if retained, must be a
+versioned derivative of the same committed state, not a separately advancing
+authority. SQLite on the container's local filesystem can be exposed through
+the existing server; the editor need not share a database file.
+
+Advantages: database commit/crash mechanics and graph/search atomicity move
+into a mature storage engine; fewer services and custom cache-recovery paths;
+relational constraints and queries may make some invariants easier to express.
+
+Costs: this is a larger rewrite than using the graph already present.
+Skg depends on ordered relations, telescope provenance, aliases, dangling
+references, override traversal, custom ranking, and per-token regex/operator
+search. An ordinary SQL schema with indiscriminate foreign keys or a default
+FTS query is not behaviorally equivalent. [[https://www.sqlite.org/fts5.html][FTS5]] supplies full-text indexing,
+but its external-content mode still requires keeping the content table and
+index synchronized; both should be updated in the same transaction.
+
+Crucially, a SQLite transaction does not include Git, arbitrary .skg file
+writes, or editor undo. If .skg remains canonical, SQLite is a transactional
+projection of a selected disk snapshot and the external-write boundary stays.
+If SQLite becomes canonical, .skg becomes an import/export working copy.
+Those are different product decisions, not interchangeable implementation
+details. I would not choose this migration without a small comparative
+demonstration of the actual graph and search semantics.
+
+** A private versioned canonical store, with Git worktrees as exchange surfaces
+
+Persist immutable node/file versions and publish one durable root describing
+the selected generation. Git operations modify a working copy; validated
+imports become new selected versions. Old versions remain available for
+recovery, with checkpoints or shared content-addressed objects instead of a
+complete independent baseline per incident.
+
+Advantages: selecting a generation has a clear durable commit point; recovery
+need not infer authority from mutable worktree contents; unchanged data can
+be shared; external imports cannot partially become live graph state.
+
+Costs: the worktree is no longer the sole live authority. Out-of-band edits
+need an explicit import/conflict policy, and exports need failure recovery.
+Retention, private data, garbage collection, and multi-repository publication
+remain real work. Hidden commits in public source repositories would also
+create an undesirable coupling between recovery and publication; a private
+state store would need a clear separation.
+
+This may be a good architecture for a different desired workflow. It is not
+a cheap way to preserve every existing plaintext/Git expectation.
+
+
+* What to keep, and what could go
+
+I would preserve these behavioral requirements and their tests:
+
+- load/fold/unfold semantics, privacy/source ownership, ID and override rules;
+- additions, deletions, alias redirection, and byte-only semantic no-ops;
+- partial selection agreeing with a full reference fold of the selected
+  baseline plus the targeted replacement bytes;
+- no external mutation before required authored-work preservation;
+- dirty text/undo surviving interruption and recovery;
+- no stale response overwriting newly authored text;
+- each query reading one coherent generation;
+- no automatic rerun of search membership/ranking;
+- the real two-person fork/pull/reciprocal-subscription scenario;
+- bounded latency on a representative corpus, separately from tiny fixtures.
+
+Pure parsers, validators, source normalization, semantic deltas, conservative
+impact helpers, archive/undo adapters, and useful Git evidence code can survive
+a coordinator replacement.
+
+Tests prescribing the current number of ACKs, intermediate phase labels,
+provisional enrollment protocol, or multi-store rollback sequence should not
+dictate a replacement architecture. Preserve the property they protect; adapt
+or replace the mechanism-specific test. Tests that use TypeDB merely because
+the global graph was never initialized should not force TypeDB to remain a
+production dependency.
+
+If the smaller contract is accepted, likely deletion candidates include
+continuously growing maintenance enrollment, duplicated orchestration in
+clients and handlers, separate authoritative persistence paths, TypeDB cache
+coordination, and reconstruction plumbing made unnecessary by a single read
+authority. This is a conditional opportunity, not an audited deletion list.
+
+I would resist throwing away the tests or specs wholesale. I would equally
+resist treating the current specs as immutable: they contain precisely the
+expensive promises under review, and some sections contradict one another.
+For example, [[file:../../api-and-formats.md::792][the old fatal-reload section]] says legal subsets are selected when some
+input is invalid, whereas [[file:07_plan.org::527][the later contract]] rejects the candidate as a whole.
+The API's shell pull description also survives even though
+[[file:../../data/bash/pull-all.sh][the script]] now refuses to pull. Retention needs a deliberate behavioral
+baseline, not indiscriminate preservation of every written sentence.
+
+* CAP, STM, relational algebra, and formal methods
+
+** CAP is useful background, but not the missing prerequisite
+
+[[https://www.cs.princeton.edu/courses/archive/spr22/cos418/papers/cap.pdf][Gilbert and Lynch's CAP result]] concerns the inability to guarantee both
+atomic consistency and availability under network partitions in its model.
+It is not a rule that three local stores force you to sacrifice one of three
+desirable properties, nor does its availability definition mean a four-second
+UI latency target.
+
+Skg already permits peers' Git clones to lag. A local server and its editor
+can disconnect, but you do not need both to independently accept conflicting
+authoritative graph writes. Preserving a local draft is different from
+committing that draft while the server is unreachable.
+
+The more useful concepts for this decision are: one writer; immutable read
+snapshots; atomic publication; crash durability; idempotent replay; and the
+difference between observing an effect and proving it never happened. Learn
+CAP if it interests you, but I would not delay this decision to study it.
+
+** STM addresses shared memory, not this entire transaction
+
+STM could make a set of in-process memory changes composable. The classic
+[[https://cs.brown.edu/people/mph/HarrisMPJH05/stm.pdf][Composable Memory Transactions]] paper explicitly separates that problem
+from storage/database interaction and explains why retryable transactions
+cannot freely perform irrevocable I/O.
+
+A retried memory transaction cannot undo a Git pull, retract text already
+displayed by an editor, or restore a file whose write was interrupted. You
+would still need the durable effect protocol. With one intended graph writer,
+exclusive ownership is a simpler starting point than introducing transactional
+memory to manage competing writers you do not need.
+
+** Relational algebra helps graph semantics, not acknowledgment timing
+
+A relation-and-delta formulation can clarify what changes when an edge is
+added, removed, hidden, or redirected. It can support a slow reference model
+for checking the optimized in-Rust graph. That is useful regardless of the
+storage engine.
+
+It does not decide who owns a buffer after disconnect, whether an ACK was
+durably recorded, or whether Git is still changing a file. Moreover, Skg's
+ordered members and source-sensitive folds require more than unordered set
+algebra. The current displayed-ID impact rule is a conservative product
+policy, not a general proof of transaction independence; a stronger proof
+would need to track semantic dependencies, including absent relationships.
+
+** A small executable state model would be useful
+
+I would welcome a small model of the chosen ownership protocol, using a
+deterministic Rust model or TLA+. [[https://lamport.azurewebsites.net/tla/high-level-view.html][Lamport's overview]] explains the role of
+specifying a system and checking its properties before depending on code.
+This should model boundaries, not duplicate thousands of handler lines.
+
+Useful properties include:
+
+- durable authority never moves backward;
+- publication selects exactly one validated graph/search pair;
+- a crash after authorization never implies the external action did not run;
+- no authored buffer is replaced without its base still matching or its
+  recovery copy being secured;
+- a delayed reply cannot grant stale save authority;
+- with no new external changes, working storage, a connected responsive
+  editor, and required user decisions supplied, maintenance can finish.
+
+The last is a liveness property. A system that preserves everything by
+remaining locked forever has not met the user-facing requirement. A model
+must include that distinction. Model checking still requires matching real
+implementation tests; it is not a proof that the filesystem or protocol
+adapter implements the model correctly.
+
+* What would determine my choice
+
+The highest-value product choice is whether you want new authoritative views
+to remain available throughout maintenance, or whether a fixed census with
+deferred editable-view creation is acceptable.
+
+[DONE Jeff speaking : the user should be able to request new views,
+but does not need to be able to edit them during maintenance]
+
+Response: agreed. I would make that the precise compromise: permit a new
+request to produce a temporary read-only snapshot result during maintenance,
+but defer creation of an editable, save-authoritative view until the barrier
+ends. The result should carry the graph generation and stale/current status it
+was based on. This preserves discoverability and query usefulness without
+reintroducing a moving census of buffers that maintenance must settle.
+
+The next is whether every graph change
+must wait for all presentation/report work, or whether unaffected views can
+resume once their own safety conditions hold and remaining work is durable.
+Both revise existing agreements and should be explicit, rather than quietly
+implemented as optimizations.
+
+[DONE Jeff: better if the unaffected views can resume
+as soon as they are recognized safe.
+But note that a buffer that was orthogonal to the maintenance
+when maintenance started could become entangled by user edits.
+As long as the user adds to the buffer no definitive viewnode
+representing a graphnode being maintained, I think,
+the buffer is safe to save. If they do add such a viewnode,
+skg should explain that maintained prevents them from touching it yet,
+and strongly recommend making it indefinitive.
+If they do, they can save mid-maintenance; if not,
+they can only save after maintenance, and their definitive node
+based on stale data might clobber the new data.]
+
+Response: agreed, with the safety test made dependency-based rather than
+determined only by the buffer's status at maintenance start. An initially
+orthogonal buffer may become affected through a later edit. A buffer can save
+while maintenance continues only while its proposed write has no definitive
+viewnode dependency on the maintained graph state, and its base bytes and
+source identity still validate. If the user adds such a definitive viewnode,
+the client should explain why that dependency is blocked and offer the
+indefinitive conversion you describe. Until that conversion is made, the save
+waits; otherwise stale definitive data could overwrite the newly selected
+graph. This gives unaffected buffers early liveness without weakening the
+clobbering guard.
+
+Strong dirty-work preservation, privacy, and coherent reads are worth retaining.
+Seamless continuation of every unfinished workflow across every kind of
+restart is more expensive. Recovering all authored work and requiring a fresh
+live view after a server restart would be a simpler, but intentionally less
+seamless, alternative. It need not sacrifice text or native undo archives.
+
+My preference is the smaller lifecycle contract plus one state owner, with
+the existing Rust graph and a pinned Tantivy searcher as the eventual read
+authority. SQLite is the main competing architecture if you prefer to move
+more invariants and persistence into one database. I see insufficient reason
+to introduce STM or change languages for this feature.
+
+* Scope and confidence
+
+The review used the orientation and coding-advice, the core API/glossary/schema
+and graph/privacy documentation, the partial-reload discussions and plans,
+branch history/diffs, the relevant server ownership/save/recovery/read paths,
+and client/integration tests. Two bounded Sol reviews covered history/size
+and race/test evidence; I cross-checked the central findings.
+
+The orientation's recursive references expand into a broad public knowledge
+graph, old plans, unrelated backlog items, and some unavailable host paths.
+I followed the project and design references relevant to this review, including
+the linked public Skg overview, but did not exhaust that unbounded collection
+or review every line of the branch. In particular, this is not a complete
+audit of every TypeDB read or every client buffer constructor.
+
+No new performance numbers, whole-suite passes, exhaustive model checks, or
+executed crash reproductions are claimed. The architectural ranking is my
+judgment from the inspected code and recorded evidence. The concrete journal
+and restart findings are strong reasons to question the current completion
+claim; they are not proof that every proposed replacement will be smaller or
+correct without validation.
+
+* Jeff asks
+In your "proposals and their tradeoffs" section above,
+are the first and second proposals mutually exclusive?
+
+TypeDB can probably be ditched. My motivation for using it was its
+expressive query language, but skg seems not to need that expressivity.
+
+I responded above to a couple of concrete questions (search for 'Jeff'
+to see where).
+There were a number of other possibilities you mentioned that I did not
+comment on. Could you provide below a list of ways we might
+relax or homogenize the requirements to achieve a simpler, safer design?
+Please include everything you described above,
+and anything else that you think of.
+* Codex responds
+** The first and second proposals are not mutually exclusive.
+The finite maintenance barrier is primarily an editor/protocol policy; the
+immutable Rust graph plus pinned Tantivy searcher is primarily a storage and
+read-consistency policy. I would combine them, as proposed above. SQLite is
+another possible implementation of the read authority and could also be
+combined with the barrier, but it is a larger migration and needs semantic
+comparison first. The private versioned canonical store is compatible in
+principle with either, but changes the product's plaintext/Git authority
+model enough that I would treat it as a separate product direction.
+*** Jeff : let's not do the third or fourth proposal
+**** Codex: agreed
+I will treat SQLite and the private versioned canonical store as rejected
+directions for this design. The working direction is the finite maintenance
+barrier plus the immutable Rust graph and pinned Tantivy searcher. The private
+store can remain a future architectural alternative, but it should not add
+requirements or implementation work to this plan.
+** Here is the complete requirement-reduction menu I see:
+*** the list
+**** ACCEPTED Permit new query results during maintenance, but make them read-only;
+  defer only editable/save-authoritative views. Offer an explicit choice
+  between the current coherent snapshot and waiting for the new index.
+**** ACCEPTED Replace the moving all-buffers enrollment promise
+***** proposal
+Replace the moving all-buffers enrollment promise with a fixed census at
+  the maintenance barrier. Existing buffers remain readable; new editable
+  views wait until the barrier ends.
+***** glossary
+****** *Old enrollment promise*:
+  the previous design promised that a new
+  authoritative/editable view could be created at any time during maintenance
+  and would still be incorporated safely into that maintenance operation. The
+  server had to provisionally enroll the view, bind its eventual client buffer
+  identity, include it in a later census, classify its presentation state,
+  obtain the required archive or application acknowledgments, and prevent
+  finalization from overtaking it. Because another view could appear while
+  those steps were already underway, the set of buffers requiring settlement
+  kept moving and could require another census. The fixed-census proposal
+  withdraws that promise for new editable views: requests may still produce
+  read-only results, but editable views wait until the maintenance barrier
+  ends.
+****** *Query result*: the data returned by a search or graph query. It may be a
+  temporary read-only result or the basis for an editable view.
+****** *Read-only*: usable for inspection, but not authorized to save changes back
+  to the graph or source files.
+****** *Editable view*: a client buffer that the user may modify and eventually
+  save.
+****** *Save-authoritative*: trusted by the server as an allowed source of a graph
+  or file update, subject to the normal base and dependency checks.
+****** *Coherent snapshot*: one internally consistent version of the graph and
+  search index. It may be old, but it must not mix generations.
+****** *Maintenance*: a protected interval during reload, recovery, Git/observation
+  work, or graph publication when some editing operations are restricted.
+****** *Maintenance barrier*: the boundary that determines which buffers and
+  operations maintenance must settle before it can finish.
+****** *Fixed census*: one inventory of the buffers/views admitted to that barrier.
+  New editable views are not added to it while the barrier is active.
+****** *Stale index*: a valid older search index that does not yet include the
+  latest graph change.
+****** *Editable-view creation*: turning a result into a live buffer with editing
+  and possible save authority. A read-only result can exist before this step.
+**** ACCEPTED Let unaffected buffers resume independently once a dependency-based safety
+  predicate passes. Do not require every presentation or report to finish
+  before any safe buffer can save.
+**** ACCEPTED Keep the initial dirty-work archive as the non-negotiable pre-mutation boundary, but ...
+***** brief proposal
+Keep the initial dirty-work archive as the non-negotiable pre-mutation boundary,
+but allow later evidence/report finalization and unrelated buffer
+  cleanup to proceed independently when their state is durable.
+***** Codex elaborates : what may proceed after the initial archive
+The initial dirty-work archive protects authored text before Git operations,
+destructive writes, or other actions that could make recovery harder. It is
+the point after which the system may safely perform the risky external work.
+
+Later work has a different role: it records what happened and completes the
+user-facing recovery/reporting ceremony. Once the graph candidate, selected
+manifest, and required evidence are durably retained on the server, report
+generation, evidence transfer, and cleanup of unrelated already-safe buffers
+need not keep every other buffer locked. They may proceed independently and
+resume after reconnect from the journal.
+
+This does not permit skipping evidence or claiming success early. It means
+that durable evidence and explicit per-buffer safety replace one global
+"everything is finalized" gate. A buffer still waits if its own archive,
+dependency check, or required presentation transfer is incomplete.
+**** ACCEPTED Define one published read unit
+***** proposal
+Define one published read unit: an immutable graph, exact source manifest,
+  configuration/source identity, query context, and the matching searcher.
+  Make every ordinary read use that unit, including negative lookups.
+***** glossary
+****** The *published read unit*
+is the sole version a normal query is allowed to
+read. It is an immutable bundle containing:
+
+- the selected Rust graph;
+- the exact source-file manifest from which that graph was built;
+- the configuration and source identity used to interpret those files;
+- the query context, such as roots, visibility, and selection rules; and
+- the Tantivy *Searcher* built for that same graph/index generation.
+
+****** *Immutable*
+means readers may retain the bundle without it changing beneath
+them.
+****** *Published*
+means the coordinator has made that complete bundle the
+current authority only after both graph and index validation succeed.
+****** A *generation*
+is the monotonically identified version of that published state.
+****** The *exact manifest*
+records the relevant paths, bytes/checksums, or absence,
+so a query is tied to known source inputs rather than merely mtimes.
+
+****** The matching Searcher is Tantivy's read snapshot:
+it lets a query see one
+stable index segment view. A graph lookup that finds no node must also use this
+same bundle; it must not fall back to a newer global graph or disk state and
+accidentally combine generations. A later graph/index publication does not
+change a query already holding the old bundle; it only affects new queries.
+**** ACCEPTED Use one graph writer and one coordinator/journal writer. Replace client and
+  handler-side orchestration with explicit request, incident, operation, and
+  epoch state machines.
+**** ACCEPTED Treat server pushes and terminal responses as independently owned operations
+  with explicit IDs, terminal frames, ACKs, replay rules, and idempotent
+  cleanup. Remove tests that require a particular ACK count or phase label;
+  retain the durability and no-duplicate-effect properties.
+***** A *terminal response* is the final protocol message for one request. It tells
+the client that the request has completed, failed, or been cancelled and
+includes the request identity and result/error information needed to settle
+the client-side state. After it is emitted, that request must not receive a
+second final response or start an unowned successor operation.
+
+This is distinct from an intermediate response or continuation, which says
+that more protocol work is still expected. It is also distinct from an ACK:
+the terminal response is the server's completion message, while the ACK is
+the client's confirmation that it received and applied a particular message
+or operation. Both sides need replay/idempotence rules because either message
+can be lost after its effect occurred.
+**** ACCEPTED Stop promising some stuff
+***** proposal
+Stop promising
+automatic search reruns, automatic replacement of dirty text,
+  or seamless continuation of every unfinished workflow across every restart.
+  Preserve the user's text and make refresh/reopen explicit where necessary.
+***** "explicit" means visible and deliberate
+The requirement is not to turn every refresh into a confirmation
+dialog. It means the system must not silently rerun a search, overwrite dirty
+text, or reopen a workflow on the user's behalf.
+
+Where the choice changes data or authority, ask the user or require a visible
+command—for example, "refresh this result", "reopen as editable", or
+"resume recovery". Where there is no meaningful choice, a deterministic
+policy may act automatically and report what it did. For example, it may
+retain dirty text and mark the view stale, or discard a cancellable read-only
+result after clearly recording that it was based on an old generation.
+**** ACCEPTED Remove TypeDB from ordinary correctness if the Rust graph can provide the
+  required semantics. Retain it only as an optional audit/export tool after a
+  real dependency and behavior audit.
+**** REJECTED If SQLite is chosen, make it the single transactional graph/search
+  projection rather than adding it beside TypeDB and Tantivy. Decide
+  explicitly whether .skg remains canonical or becomes an import/export
+  working copy; do not pretend the SQLite transaction covers Git, arbitrary
+  file writes, or editor undo.
+**** ACCEPTED Keep Git as evidence/import/export machinery
+  rather than as an implicit
+  transaction participant. If stronger durable generations are wanted, move
+  to a private versioned canonical store, accepting the changed worktree and
+  out-of-band-edit semantics.
+***** Codex elaborates : keeping Git as an exchange surface
+In the current product model, .skg files and Git worktrees are the user's
+editable material and collaboration surface. Git can therefore be used to
+collect evidence, create a protected recovery branch, pull/push, or import
+validated external changes. But Git is not part of the same atomic transaction
+as graph publication: a graph update and a Git write can succeed or fail at
+different times.
+
+The coordinator should record those steps and their exact manifests/statuses,
+then recover by replaying or reconciling the recorded boundary. It must not
+infer "Git did not happen" merely because the response or ACK was lost.
+Likewise, an externally changed worktree must be observed and validated
+before becoming a new graph candidate.
+
+The rejected private canonical store would avoid some of this ambiguity by
+making immutable internal versions authoritative and treating worktrees as
+imports/exports. Since we are not choosing that direction, we retain the
+plaintext/Git workflow and accept the explicit boundary between durable graph
+publication and external file/Git effects.
+**** ACCEPTED Keep the behavioral invariants: privacy and source ownership, fold/unfold
+  and override semantics, exact bytes, authored-work preservation, coherent
+  reads, stale-response rejection, the fork/pull scenario, and representative
+  performance bounds. Replace mechanism-specific tests with property tests.
+**** ACCEPTED Use a small executable state model for ownership, publication, crash,
+  replay, stale replies, and maintenance liveness, then cover the filesystem,
+  socket, and editor adapters with focused fault-injection tests.
+* DONE more choices
+
+** DONE stale search result presentation
+
+The plan requires a visible generation and stale/current status, but it does
+not choose the exact UI form. The status could be a modeline marker, a report
+header, a dedicated result field, or all three. The important choice is
+whether a user can mistake a current-unit result for a result from the latest
+disk candidate.
+
+*** What 'dedicated result field' means
+A dedicated result field would be metadata stored with the query result rather
+than only an incidental display string. It could contain the graph generation,
+whether that generation is current or stale relative to the latest known
+candidate, and the action needed to refresh or wait.
+
+It does not need to become a new visible UI widget. The clients could render
+that field in the result header or modeline. The important part is that the
+status travels with the result and cannot be lost when the result is moved,
+saved, or displayed in another presentation.
+
+*** TODO All three!
+
+** DONE wait behavior during maintenance
+
+The plan requires a cancellable wait option. A waiting search survives
+disconnect and reconnect through the incident journal and has no time-based
+expiration. When the requested newer graph/search unit is published, the
+waiting query runs against that unit and delivers a new read-only result. An
+older visible result is not silently replaced, and a waiting result cannot be
+edited while pending.
+
+*** TODO
+Naively, survival seems better; are there good reasons not to implement that?
+
+Why would it expire?
+
+Completion of what? I don't see why to retain the old result when we have a more up-to-date one, unless the user has been editing it, but if we're replacing it we shouldn't let them edit it.
+*** Codex responds
+I agree that survival is the better default. A waiting search should be a
+durable request owned by the incident or maintenance epoch, so a disconnect
+and reconnect can resume it. It should remain pending until the requested
+newer graph/search unit is published or the user explicitly cancels it.
+
+There is no need for time-based expiration. The meaningful terminating events
+are cancellation, supersession by a newer explicit request, an unrecoverable
+failure, or completion. If the journal eventually needs cleanup, that should
+be an explicit completed-request compaction rule, not a timeout that can lose
+user intent.
+
+Completion means that the requested newer graph/search unit has been validated
+and published, after which the waiting query runs against that unit. The
+waiting request has no editable old result to preserve. If the user already
+has an older result visible, leave it alone and deliver the newer result as an
+explicit replacement or a new result according to the client's normal query
+command. Never silently replace a result that the user has edited; in the
+simpler policy, waiting results are read-only and therefore cannot be edited.
+
+** DONE indefinitive conversion
+
+The plan uses the existing =skg-set-indefinitive= command when a user
+deliberately wants to remove the definitive viewnode dependency so an
+otherwise safe buffer may save. No second conversion command or dependency
+model is needed. This choice affects UI wording and undo semantics, not the
+coordinator's safety rule.
+
+*** DONE discussion
+What do you mean by "remove or weaken a definitive viewnode dependency"? If you mean 'make a definitive viewnode indefinitive', for that there is skg-set-indefinitive (described for users in docs/COMMANDS.org), which is what I had in mind.
+**** Codex responds
+Yes, that is exactly what I meant. Use the existing
+=skg-set-indefinitive= command and its documented user-facing behavior; do
+not invent a second conversion command or a new dependency model. The
+maintenance-blocked-save explanation can recommend that command when the
+user deliberately wants to remove the definitive dependency. Its normal undo
+and validation behavior remains authoritative.
+
+** DONE publication persistence boundary
+
+The plan requires the graph and matching searcher to publish together in
+memory and requires the candidate/evidence journal to be durable. On restart,
+the selected graph and matching searcher are reconstructed from the exact
+durable manifest and journaled authority. No serialized graph snapshot or
+additional publication artifact is retained. A slower start is acceptable;
+slow updates and mixed graph/search generations are not.
+
+*** TODO not another artifact
+Slow updates are intolerable but a slow start is,
+at least for now, fine.
+**** Codex responds
+Agreed. We will not retain a serialized graph snapshot or introduce another
+publication artifact. On restart, reconstruct the selected immutable graph and
+matching Tantivy searcher from the exact durable manifest and journaled
+authority. A slower startup is acceptable; once running, candidate updates
+and ordinary queries must not pay for repeated reconstruction or tolerate
+mixed graph/search generations.
+
+** DONE TypeDB removal boundary
+
+There is no TypeDB audit threshold or production comparison gate. The removal
+boundary is the completed Rust-graph fixture and property-test coverage for
+the required semantics, followed by moving the retained historical material
+and removing every runtime TypeDB path.
+
+*** TODO I thought we were removing TypeDB full-stop.
+
+Keeping those two stores has been a thorn in my side.
+I don't think we need TypeDB for anything anymore.
+It's a lot of beautiful code that we *might*
+want to look at someday so I would put it in
+_burying/not_using/obsolete/typedb/
+rather than deleting it outright,
+but unless you find some reason we can't,
+I think we should get rid of it entirely.
+It will simplify the code massively.
+**** Codex responds
+Agreed: remove TypeDB from the product entirely, rather than retain it as an
+optional audit or export tool. Move any source or tests worth preserving into
+_=burying/not_using/obsolete/typedb/= before deletion, as historical reference
+only, and remove its runtime dependencies, initialization paths, adapters,
+configuration, and correctness claims.
+
+The replacement confidence check should use Rust-graph fixtures and property
+tests, not a surviving TypeDB implementation. The plan no longer needs a
+TypeDB audit threshold or a production comparison gate. The semantic behaviors
+that matter remain required; TypeDB is simply no longer the oracle or a
+possible fallback.
+
+** DONE report and evidence release granularity
+
+The plan permits independent progress after durable evidence exists. We still
+need to distinguish the release unit for editor buffers from the durability
+unit for recovery evidence. A view has one current presentation generation and
+one buffer settlement; successive rerenders are operations on that same
+buffer, not independent simultaneous presentations.
+
+*** choice : per-buffer
+*** definitions
+**** *release*
+means allowing some previously restricted capability to
+resume, such as saving a buffer, applying a presentation, or unlocking a
+maintenance-held view. It does not mean deleting the incident journal,
+discarding recovery evidence, or ending the whole maintenance incident.
+
+**** Per buffer
+Each buffer becomes save-authoritative as soon as its own
+archive, dependency, base, and presentation conditions are safe. This gives
+the best liveness and matches the accepted independent-release policy.
+
+**** Per presentation
+This is not a distinct granularity in the current model. A buffer has one
+current presentation generation and one settlement record. A rerender,
+application, or stale-marker update is a presentation operation whose result
+is either accepted into that buffer or rejected; it does not create a second
+independently releasable presentation. Two Emacs windows showing one buffer
+also remain one buffer settlement.
+
+**** Per artifact bundle
+A related group of evidence files is written,
+verified, and acknowledged as one unit. None of the bundle's dependent
+operations release until its complete checksum and manifest are durable. This
+is useful for recovery evidence, where partial visibility would be misleading.
+
+**** Per incident phase
+This is the coarse policy: no dependent operation releases
+until an entire phase, such as evidence transfer or finalization, completes.
+It is easiest to reason about but recreates the global lock and liveness cost
+that this plan is intended to remove.
+
+The recommended combination is per-buffer release for editing, saving, and
+view application, with per-artifact-bundle durability for recovery evidence.
+Incident phases remain journal milestones, not global release gates. The
+per-presentation alternative should be removed from the implementation model,
+not treated as another user-visible choice.
+* TODO more choices
+
+The previous choices in document 10 remain settled. These questions concern
+failure and concurrency boundaries which the plan has not yet distinguished.
+They do not reopen the choices to remove TypeDB, keep plaintext/Git, use a
+fixed census, preserve authored work, or release buffers independently.
+
+** DONE When may an unaffected buffer save?
+
+*** ACCEPTED (but see the TODO) : After graph publication, while other buffers and reports finish
+
+Keep saves excluded while coordinated Git work and selection are in progress.
+After publication, release each buffer as soon as its own checks pass; report
+finalization and unrelated acknowledgments can continue. Close the admission
+barrier once the graph transition is complete, leaving unresolved individual
+buffers restricted under their own records. New editable views can then use
+the selected graph without joining the old fixed census.
+
+This gives early release a precise boundary and avoids merging ordinary saves
+into an unfinished candidate. A blocked or invalid candidate can keep saves
+blocked; read-only queries remain available against the last coherent state.
+
+**** Codex: the publication boundary is accepted
+
+Agreed. Graph publication here means the coordinator has published the new
+graph together with its matching searcher, after coordinated Git work has
+finished. Each buffer can then regain authority independently when its checks
+pass. Unfinished reports do not keep new editable views or already-safe
+buffers waiting. The alternative requiring saves to be combined with a
+still-unpublished candidate is no longer part of the intended design.
+
+*** Alternative: permit proven-independent saves before selection as well
+
+This requires an explicit policy for reserving affected files/dependencies,
+rebasing or rebuilding candidates after intervening saves, and maintaining
+recovery evidence across those saves. During a Git operation with unknown
+effects, or invalid/config-changing maintenance, independence may still be
+unprovable. It is a substantially stronger feature than per-buffer release
+after publication.
+
+*** Choice requested
+
+Does the recommended publication boundary satisfy the intended mid-maintenance
+save behavior, or is saving while a candidate is still pending essential?
+
+*** TODO
+Let's show in the modeline, in orange, that the graph is being rebuilt.
+This will warn a user that, if they save the buffer now,
+it might be a while before they can edit it again.
+
+**** TODO Codex: yes to the orange indicator; clarify what pressing save does
+
+Show an orange "Graph rebuilding; saves paused" indicator in Skg buffer
+modelines while the replacement graph/search pair is being prepared. Keep
+the words visible as well as the color. When publication completes, clear
+that global rebuilding status; a buffer still awaiting its own settlement
+should show that specific reason instead. Report completion must not keep
+the rebuilding indicator on after the graph is ready.
+
+There is one distinction in your explanation: the accepted rule prevents a
+save from executing during rebuilding. It does not yet say that pressing
+save should queue an operation and make the buffer read-only while waiting.
+That would explain the long pause before editing again, but it is additional
+behavior. Queued saves would also need their old bases checked against the
+new graph before they could run.
+
+I recommend refusing promptly with "Graph rebuilding; nothing saved; try
+again when ready," without imposing an additional edit lock or automatically
+retrying. Existing maintenance restrictions still apply. The current
+[[file:../../server/serve/handlers/maintenance_protocol.rs::pub fn skg_save_policy_refusal][server refusal]] already says a rejected save is not retried automatically;
+the simplified client should detect the known restriction before taking its
+ordinary save locks, and release any transient lock if it races with that
+restriction. A save admitted after publication may still hold its normal
+temporary lock while its own work completes.
+
+***** Remaining UI choice
+
+Did you intend pressing save during rebuilding to queue the save and lock the
+buffer until it can run, or is the prompt refusal above acceptable?
+
+***** TODO
+Just show the single token 'rebuilding'. (The modeline is cramped.)
+***** ACCEPTED : "I recommend refusing promptly ..."
+** DONE What must remain recoverable as selected state across a server restart?
+
+*** ACCEPTED : Preserve active recovery obligations; allow a fresh live session
+
+Use the existing compact evidence to reconstruct the generation needed by an
+interrupted incident. Recover incomplete source-write transactions before
+publishing a new live snapshot. Validate current disk explicitly, and require
+fresh live-view authority after server restart where old authority cannot be
+proven. Keep detached text, undo, and durable query recipes recoverable.
+
+Give later committed saves their own durable ordering so finishing recovery
+for an old G1 incident cannot roll the live state back from G2. A normal clean
+restart may establish a fresh validated disk snapshot instead of retaining
+every historical selected state forever. This is compatible with keeping the
+existing recovery evidence and declining an extra startup-cache artifact.
+
+**** Codex: fresh live sessions with recovery obligations preserved is accepted
+
+Agreed. Startup first resolves interrupted effects and validates the data it
+will select. Existing incident evidence remains available to reconstruct and
+finish that incident, while the latest committed save determines any later
+state. Completing an old incident cannot roll that later state back.
+
+A clean restart can select freshly validated disk under new live authority.
+Old buffers whose bases cannot be verified retain their text and undo as
+recovery material and require a fresh live view. This accepts the simpler
+restart contract without adding a graph snapshot solely for startup speed.
+The separate question of how much ordinary-save recovery to implement remains
+open below.
+
+*** Alternative: always restore the exact pre-crash selected state
+
+That includes a selected baseline whose replacement disk candidate was
+declined, with no maintenance evidence yet created, and later saves after an
+older incident's G0/G1 evidence. It needs sufficient retained reconstruction
+data and selection history for those cases. Slower startup alone cannot
+recover information which was never retained.
+
+*** Choice requested
+
+May a clean restart establish a fresh validated disk selection with old views
+detached, or must it preserve the exact prior selection even outside an active
+recovery transaction?
+
+** DONE Does this implementation make ordinary multi-file saves crash-recoverable?
+
+*** ACCEPTED : include recoverable save transactions using the common journal
+
+Retain the prepared operation and enough before/after data to recover a
+partially applied save, stage complete replacements, and record the durable
+outcome before acknowledging success. Define conflict handling if external
+bytes differ during recovery. This protects ordinary saves as well as saves
+released while incident reports remain pending.
+
+A recoverable transaction need not claim atomic visibility to an unrelated
+process reading several worktree files mid-save. The guarantee is that Skg
+can recover a coherent committed outcome or report a recoverable conflict,
+without silently treating a truncated or partial batch as a successful save.
+
+*** Alternative: defer ordinary-save crash durability explicitly
+
+Keep this plan focused on graph/search and maintenance simplification, retain
+the existing partial-save limitation, and track it as separate work. The
+completion criteria would then have to narrow their data-preservation claims
+accordingly. This remains a real limitation even when caches rebuild cleanly.
+
+*** Choice requested
+
+Should recoverable ordinary saves be part of this implementation, or a clearly
+separated follow-up?
+
+*** DONE In what sense can a save be partially applied?
+I thought saving was atomic -- either it works or it doesn't.
+
+**** Codex: the current filesystem save is not atomic
+
+One Skg buffer can describe many graph nodes, and saving it can change several
+=.skg= files. The current
+[[file:../../server/save.rs::pub(crate) fn apply (][PreparedFilesystemUpdate::apply]] loops over those paths, calling
+=std::fs::write= or =std::fs::remove_file= for each one. There is no enclosing
+filesystem transaction which makes all of those changes happen together.
+
+***** A concrete partial save
+
+Suppose you edit the titles of nodes A and B in one buffer. Skg successfully
+writes the new =A.skg=, but the disk fills up when it writes =B.skg=, or the
+process dies between the two writes. A now contains the new title while B
+still contains the old title, or an incomplete file. The buffer save did not
+complete, but its successful first write has already changed disk.
+
+This can happen on an ordinary I/O error as well as a crash. Returning an
+error does not undo writes which have already succeeded.
+
+***** Even a single file needs a deliberate replacement strategy
+
+The current =std::fs::write= call writes to the destination itself; it does
+not first prepare a complete replacement file and atomically rename it into
+place. An interrupted write can therefore leave a truncated destination.
+Writing a temporary file and renaming it would address that individual-file
+replacement problem, but a sequence of such renames would still not make a
+multi-file save atomic. Surviving power loss also requires explicit durable
+write ordering, beyond atomic visibility of a rename.
+
+***** What the graph/search publication guarantee actually covers
+
+Publishing one immutable graph/search pair keeps Skg readers from seeing half
+of that pair. It does not combine all the source-file writes into the same
+atomic operation. Likewise, serializing Skg's writers prevents them from
+running over one another; it does not roll back a failed filesystem save.
+
+***** What the recommended journal would add
+
+Before changing source files, persist the intended batch and the data needed
+to recover it. Record completion only after the required writes are durable.
+After an interruption, Skg can identify which operation was in progress and
+finish or reconcile it under the defined recovery policy, rather than treating
+the mixed files as a completed save. If another writer has changed them in
+the meantime, recovery must report that conflict instead of overwriting it
+blindly.
+
+That is why I recommend including recoverable ordinary saves here. It is a
+missing guarantee in the current implementation, not something the proposed
+TypeDB removal would newly break. Your question leaves the scope choice open;
+I have not treated it as accepting either alternative.
+
+** DONE What external-writer concurrency is supported?
+
+*** ACCEPTED : coordinate known writers and document the remaining limitation
+
+Exclude Skg saves during its coordinated Git/write operations. Preserve exact
+before-byte checks and observation for outside edits, while documenting that
+simultaneous uncontrolled writes to the same files cannot receive the same
+no-clobber guarantee. Users can edit externally during a non-saving interval
+and reconcile before resuming Skg saves.
+
+*** TODO exclude from what?
+
+**** Codex: prevent Skg saves from writing while coordinated Git work runs
+
+"Exclude Skg saves" means temporarily disallow executing a Skg save while a
+Git or other file-changing operation coordinated by Skg is running against
+its sources. For example, while a Skg-initiated pull is changing the worktree,
+a view save cannot also write those =.skg= files. The coordinator keeps that
+restriction until observation and graph/search publication have completed;
+then each safe buffer can resume under the accepted rule above.
+
+The restriction applies to writes. The last coherent graph can remain
+available for read-only queries, and buffer editability follows the separate
+maintenance rules. Whether a save command during that interval is refused or
+queued is the UI question above; either way, it cannot write during the
+excluded interval.
+
+Skg can enforce this ordering for operations it coordinates. An unrelated
+shell command or editor can still write the files without consulting Skg.
+The recommendation therefore also states a limitation: exact checks can catch
+an outside change already present when checked, but cannot guarantee against
+an outside write that races with the subsequent replacement. The alternative
+asks external writers to participate in a common locking protocol.
+
+*** Alternative: require every supported writer to participate in exclusion
+
+Provide an explicit external-edit bracket or shared locking protocol and
+require shell/editor integrations to honor it. The guarantee applies to those
+cooperative writers; arbitrary programs remain outside it. This adds workflow
+requirements even with one user.
+
+*** Choice requested
+
+Is coordinated Git plus an explicit limitation for arbitrary simultaneous
+external edits acceptable, or should supported external edits require a
+cooperative exclusion protocol?

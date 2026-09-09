@@ -93,6 +93,12 @@ This is a complete top-level branch from search results for 'writing':
 * I might like the neovim client better.
 Unable to not show body if present
 resembles the hode text-explains-all-nodelists model.
+* Emacs and Neovim do not have identical recovery artifacts.
+in the case of, e.g., a git-pull that runs into dirty buffer conflicts.
+See headline
+  24. Must Emacs and Neovim have identical recovery artifacts?
+in the file
+  TODO/partial-reload-and-magit/6_bugs.org
 * must be able to set 'parent is affected' on all children of a node
 better, be able to run any operation on a child, with a prefix like 'C-c r' (repeat)
 I needed this because I accidentally created a lot of orphans.

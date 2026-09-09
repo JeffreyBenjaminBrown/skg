@@ -1,0 +1,838 @@
+* simplify and cohere the graph, search, and maintenance protocol
+
+This plan incorporates the review findings and decisions in both "more choices"
+branches of [[file:10_architecture-review.org][10_architecture-review.org]]. Jeff has closed those choices,
+including the later branch whose parent still says TODO. Later explicit
+decisions take precedence over earlier alternatives and retained discussion
+questions. The review's corrections are now part of the implementation below.
+
+This is a plan. Product implementation begins when requested. During execution,
+record progress and implementation deviations in [[file:progress.org][progress.org]]. If a new
+consequential architectural choice arises, describe it at the end of this
+document under *more choices*. Ordinary implementation choices can be resolved
+and recorded without reopening settled product decisions.
+
+This plan supersedes the moving enrollment, global finalization/unlock,
+three-store coordination, and universal workflow-resumption promises in
+[[file:07_plan.org][07_plan.org]]. It retains the source semantics, privacy, archive, and native
+undo requirements identified below. The earlier review is incorporated into
+these steps and completion criteria.
+
+* settled contract
+
+** One user and one owner of state changes
+
+One server process has one interactive user and one interactive connection at
+a time. Emacs and Neovim implement that same contract. Reconnect can replace
+the connection; a narrow, content-blind control role remains allowlisted.
+
+One process-wide event loop owns selection, write admission, maintenance
+decisions, operation outcomes, buffer authority, and journal publication.
+Workers perform expensive computation or authorized I/O and return results
+tagged with the operation and base that authorized them. They cannot
+independently select a graph or overwrite durable coordinator state.
+
+** One immutable graph/search publication
+
+Every ordinary graph read and search uses one published immutable snapshot
+containing the Rust graph, exact selected path manifest, configuration/source
+interpretation, shared ranking inputs, and the matching Tantivy Searcher.
+The graph and index describe the same inputs; their internal generation
+counters need not be equal.
+
+Request-specific roots, search terms, view recipes, and source-set choices
+are captured alongside that snapshot. They do not require publishing a new
+global graph. Negative lookups use the same snapshot. Ordinary reads cannot
+fall back to newer disk, a process-global graph, or a newly reloaded searcher.
+
+Publication occurs only when the complete pair is ready. This includes
+ordinary saves, partial reload, full rebuild, and configuration replacement.
+Readers already holding an older snapshot may finish against it. A byte-only
+semantic no-op may advance the manifest without changing graph or searcher.
+
+** TypeDB leaves the product entirely
+
+Remove TypeDB runtime, build, setup, and test-service dependencies. Preserve
+useful historical code in =_burying/not_using/obsolete/typedb/=, outside active
+build and test discovery. Keep the required behavior covered by Rust-graph
+fixtures, reference folds, and focused tests.
+
+There is no TypeDB fallback or optional production audit/export adapter.
+SQLite and a private canonical store remain rejected. Plaintext =.skg= files
+and Git remain the user's editable data and collaboration surface.
+
+** Saves resume after publication, independently for each buffer
+
+During coordinated Git work, final observation, and graph selection, Skg saves
+are disabled. This plan does not admit independent saves into an unfinished
+maintenance candidate.
+
+Once the complete graph/search pair is published and the graph transition's
+write restriction is lifted, each existing buffer may regain authority as
+soon as its own checks pass. New editable views may also be admitted against
+the selected graph. Unfinished reports, evidence transfer, or another buffer's
+settlement do not keep that admission barrier closed.
+
+A buffer still awaiting its own safe disposition remains restricted. A declined
+candidate or invalid unresolved disk keeps saves disabled under the
+pending-reconciliation policy. Merely removing an epoch lock never authorizes
+a stale definitive overwrite.
+
+** The rebuilding indicator is exactly one orange token
+
+Show =rebuilding= in orange in Skg buffer modelines while the replacement
+graph/search pair is being prepared. Use exactly that token, as requested;
+long explanations belong in messages, help text, or the status report.
+
+When graph publication completes, clear the rebuilding indicator. A buffer
+still restricted for its own settlement must show that reason through its
+normal status mechanism. Background report finalization does not keep the
+graph marked as rebuilding.
+
+A save command during the excluded interval refuses promptly and explains
+that nothing was saved and the user can try again when ready. It does not
+queue a save, retry automatically, or add an edit lock. Existing maintenance
+restrictions still apply. A normally admitted save may hold its own transient
+lock while executing.
+
+** Maintenance starts with a fixed census
+
+Close editable-view admission, settle already admitted constructors and
+requests, and capture one fixed inventory of buffers and attached unfinished
+workflows. Secure the initial dirty-work archive before Skg starts risky
+external mutation or selects externally changed disk.
+
+New queries during the barrier may produce read-only results. Those results
+carry no server save authority and do not enlarge the incident's census.
+Making a local editor buffer writable cannot change that rule.
+
+** Searches may use the selected snapshot or wait for reconciliation
+
+The user may choose a coherent result from the currently selected snapshot
+or a cancellable wait for the relevant maintenance outcome. The wait survives
+disconnect/reconnect through a durable query recipe and operation identity.
+It has no automatic time-based expiration.
+
+Completion depends on the requested outcome, not on seeing a larger graph
+counter. No-change maintenance can satisfy a wait without advancing the graph.
+An unrelated save cannot satisfy a wait for an unfinished reload. Cancellation,
+supersession, and failure have explicit outcomes; recoverable blocking remains
+visible while the user waits.
+
+A new read-only result carries generation and stale/current metadata. Render
+that status in both a header and a modeline indicator, following the accepted
+[[file:10_architecture-review.org::All three!][all-three decision]]. Derive both displays from the same metadata.
+Distinguish graph-relative freshness, pending disk reconciliation, and stale
+search membership without requiring the user to interpret internal counters.
+
+An explicitly waiting or refreshing request may fill its own placeholder or
+designated destination after validating the destination's base. Independently
+edited results are preserved. Existing search membership and ranking are never
+rerun merely because maintenance publishes another graph.
+
+** Ordinary multi-file saves are recoverable transactions
+
+Include ordinary-save crash recovery in this implementation. Persist the
+prepared operation and the recovery data it needs before modifying source
+files. Apply staged replacements/deletions in a recoverable order and record
+the committed outcome durably before acknowledging success.
+
+This covers saves made after early buffer release while an older incident's
+reports remain pending. Recovery can finish an interrupted authorized batch
+or report a conflict with outside changes. It cannot silently treat partially
+written files as a successful save.
+
+The guarantee covers server-managed Skg view saves. Raw file-buffer saves
+retain their separate guards. An unrelated process reading several worktree
+files during application may still observe them at different stages; the
+transaction guarantees recoverability of the logical Skg save.
+
+** Restart preserves recovery obligations and permits fresh live authority
+
+Startup resolves incomplete source-write transactions and restores the durable
+records of outstanding incident obligations before granting new save authority.
+Report finalization may then continue under the independent-release rules.
+Use the existing compact G0 baseline and reversible-delta evidence for incident
+reconstruction.
+
+A manifest contains hashes, not the missing file contents. Reconstruct graph
+semantics from retained evidence, and restore exact bytes only where those
+bytes are actually retained. Required reconstruction data must have been
+secured before the corresponding mutation is allowed.
+
+After interrupted effects are resolved, a clean startup may validate current
+disk and establish a fresh selected snapshot. It need not preserve an old
+declined selection forever. Give the new server session fresh live authority
+so old generation numbers and application tokens cannot accidentally become
+valid.
+
+Old views whose bases cannot be proven retain text and undo as recovery
+material and require a fresh live view. Durable query recipes remain
+recoverable without reconstructing arbitrary editor callbacks.
+
+Do not add a serialized graph cache solely to speed startup. A slower start
+is acceptable. Existing incident evidence and the newly accepted ordinary-save
+recovery data remain necessary durable records.
+
+** Known external writers are coordinated; arbitrary writers have a stated limit
+
+Skg-coordinated Git and file-changing operations run under the same write
+admission policy as saves. Skg view saves cannot write during those external
+operations or the subsequent unresolved graph transition.
+
+Retain exact before-byte checks and observation for outside edits. An unrelated
+editor or shell command can still change a file after validation and before
+replacement. The accepted contract documents that limitation; it does not
+require every external writer to implement a shared locking protocol. External
+editing followed by reconciliation during a non-saving interval remains
+supported.
+
+* implementation sequence
+
+The following sections group work in dependency order, with cross-cutting
+recovery and verification requirements described later. The checkpoints below
+govern when behavior may be enabled. Keep changes small and preserve a working
+path until its replacement passes the relevant checks. All product paths must
+converge on the same owner and publication contract before obsolete
+coordination is removed.
+
+** Execution checkpoints and starting points
+
+*** Record a baseline and trace the existing paths
+
+Before product changes, record the starting revision, relevant worktree edits,
+available test tools, and baseline failures in [[file:progress.org][progress.org]]. Preserve
+existing test evidence before invoking runners that replace their result
+directories. Use disposable source, Git, index, and private-state fixtures;
+never use the user's corpus for crash injection.
+
+Start ownership and publication work in [[file:../../server/runtime/mod.rs][server/runtime/mod.rs]],
+[[file:../../server/runtime/maintenance.rs][runtime/maintenance.rs]], and [[file:../../server/maintenance/coordinator.rs][maintenance/coordinator.rs]].
+Trace save preparation through [[file:../../server/save.rs][server/save.rs]], persistence through
+[[file:../../server/maintenance/journal.rs][maintenance/journal.rs]], and index completion through
+[[file:../../server/dbs/tantivy/background_writer.rs][tantivy/background_writer.rs]]. These are entry points, not prescribed new
+module boundaries; follow their callers before removing a path.
+
+For protocol and editor authority, start at
+[[file:../../server/serve/handlers/maintenance_protocol.rs][maintenance_protocol.rs]], [[file:../../elisp/skg-maintenance.el][skg-maintenance.el]], and
+[[file:../../nvim/lua/skg/maintenance.lua][maintenance.lua]], then follow each client's buffer registry and save code.
+Make both clients implement the same server-enforced contract.
+
+*** Gate behavioral changes on working recovery
+
+First establish the executable model, exclusive owner, and coherent read
+publication. Then integrate durable ordinary saves with their real startup
+recovery path. The later startup section is part of that prerequisite, not
+work which can wait until after early release is enabled.
+
+Enable independent buffer release only after an interrupted save can be
+recovered across a process restart and an older incident cannot overwrite a
+later committed save. Fixed-census, archive, privacy, and both-client authority
+checks must also pass before switching the maintenance lifecycle.
+
+Temporary adapters may preserve existing callers, but must delegate to the
+new owner; never run old and new authoritative writers in parallel. Remove
+TypeDB and obsolete coordination as their replacements become verified, and
+finish with the complete TypeDB-free acceptance run below.
+
+** Establish identities and build the executable state model
+
+Distinguish connection request IDs, durable operation IDs, incidents,
+maintenance epochs, graph generations, manifest revisions, view URIs, client
+buffer IDs, server view revisions, and client application tokens. Scope live
+authority to the appropriate server session. An epoch is an identity and
+policy interval; it does not need its own generic callback state machine.
+
+A terminal response describes one request's logical outcome. An ACK confirms
+application of a named result or operation. Recorded outcomes can be
+redelivered; neither duplicate delivery nor a lost ACK permits a duplicate
+effect or a second incompatible outcome.
+
+Build the accepted small deterministic model before rewriting the lifecycle
+protocol. Model the one active graph transition, durable operation ordering,
+fixed census, per-buffer dispositions, and outstanding report/evidence work.
+
+Exercise an obsolete worker completion, a late pre-census query, an ACK after
+a newer save, a crash between file application and publication, and restart
+with an old incident awaiting finalization. Require eventual progress when
+external changes stop and the needed storage, client, and user decisions
+are available.
+
+** Make state ownership and journal publication exclusive
+
+Replace independently mutable coordinator paths with messages to the owner.
+The current [[file:../../server/runtime/maintenance.rs::pub fn persist_maintenance_state][persist_maintenance_state]] and
+[[file:../../server/runtime/maintenance.rs::pub fn transition_maintenance][transition_maintenance]] illustrate the two publication routes to eliminate.
+One ordered publisher owns all durable transitions; an older serialized state
+cannot overwrite a newer journal.
+
+Keep hashing, graph building, rendering, indexing, and long external I/O off
+the decision loop. A worker result names its operation and expected base.
+Reject obsolete results before they can publish. Delegate serialization only
+with an ordering mechanism controlled by the owner.
+
+Record external-effect intent before dispatch and completion after verification.
+Persistence failure cannot count as durable success, and reverting a memory
+object cannot undo an external write. Define recovery for that gap explicitly.
+
+Keep ordinary read requests transient. Durable writes, maintenance effects,
+and accepted search waits get only the persistent fields needed for recovery.
+Connection-local parsing and socket writes remain local. Request cleanup must
+settle transient locks and pending state on cancellation, parsing/handler
+failure, send failure, or EOF, without releasing unrelated maintenance locks.
+
+*** Hold a mutation reservation across asynchronous work
+
+Serializing event-loop messages is not enough: a worker can remain active
+between messages. The owner reserves the graph-changing operation before
+dispatching its save preparation or coordinated external work, and retains
+that reservation through validation, authorized effects, and publication or
+explicit recovery. No second save or coordinated Git operation may mutate
+under the same reservation or publish a candidate prepared from its old base.
+
+Continue serving coherent reads, status, cancellation requests, and ACKs while
+workers run. Do not block the owner waiting for a worker which needs another
+owner decision. Read-only observation may run concurrently, but its result
+must pass the operation/base checks before selection. Disconnect alone cannot
+release a reservation whose authorized effects are unresolved.
+
+** Build the immutable publication boundary on every read path
+
+Extend the existing selected-state publication to include its actual matching
+Searcher and immutable interpretation inputs. The index worker returns its
+completed result to the owner; it does not independently advance selected
+authority. Retain old graph and index resources until their readers finish.
+
+Audit ordinary reads, enrichment, source/title lookup, ranking, preflight
+privacy checks, and absence checks. The current
+[[file:../../server/dbs/tantivy/search.rs::pub fn search_index][search_index]] and
+[[file:../../server/dbs/tantivy/search.rs::pub fn has_ugly_telescope][has_ugly_telescope]] reload shared readers; convert these paths to the supplied
+snapshot. Remove ordinary live-disk and global-handle fallback.
+
+Keep request parameters separate from shared publication state. Capture Git
+HEAD/index/worktree facts through explicitly named diff/evidence operations
+with their own input identity. Recheck that identity before applying a
+delayed rendering.
+
+Change the ordinary [[file:../../server/save.rs::pub(crate) async fn apply_define_nodes_to_stores][save publication path]] as well as maintenance: enqueueing an index update
+does not yet publish a successful graph change. A failed candidate leaves the
+previous complete read snapshot available where valid, with further writes
+blocked while any source effects remain unresolved.
+
+A full rebuild must preserve resources held by old readers. Reconstruct from
+a named graph and switch the pair together; do not delete resources beneath
+live searches. Capture a Searcher only for actual query work, not while
+waiting on an editor or user. Bound active query work so old resources can
+eventually be released.
+
+** Remove TypeDB and adapt its behavioral tests
+
+Inventory all TypeDB callers, initialization, schema loading, configuration,
+driver/build dependencies, setup scripts, containers, and test runners.
+Replace required graph behavior using the Rust graph. Preserve historical
+code at =_burying/not_using/obsolete/typedb/= and exclude it from active tooling.
+
+Retain tests for fold/unfold behavior, relation ordering, telescope/source
+provenance, aliases, dangling references, override traversal, privacy, search
+ranking, and regex/operator semantics. A database-specific fixture can be
+adapted; its useful assertion should not vanish because the old adapter moves.
+
+Verify startup, normal queries, saves, reload, and tests without a TypeDB
+service. No optional TypeDB path survives in the product.
+
+** Bound observation and preserve targeted reload semantics
+
+Keep observation independent of the editor connection. Use a maximum batch
+age in addition to a quiet-time debounce, bounded work between cancellation
+checks, and prompt handling of already authorized maintenance work. The
+[[file:../../server/maintenance/observation.rs::fn observation_worker][current debounce loop]] must not wait indefinitely for quiet.
+
+Use targeted observation where correctness permits. A startup, watcher gap,
+overflow, source-catalog change, or uncertain continuity schedules an exact
+full sweep. Reconnect alone need not rescan a corpus which the server has
+continuously observed. Keep full-scan fallback when source/alias dependencies
+make narrower validation insufficient.
+
+Return immutable candidates with their base graph and manifest revision,
+config/source interpretation, exact contributing bytes or absence, semantic
+delta, target scope, and covered observation sequence. Only the owner can
+select them after final revalidation.
+
+For partial reload, build from the selected baseline plus targeted replacement
+bytes. If A and B changed on disk but only A was selected for reload, retain
+the selected B. Examine every necessary source path for the targeted nodes
+without silently importing unrelated B changes.
+
+Compare with a slow reference fold of that same baseline and replacement set.
+Include creates, deletions, alias changes, source precedence, invalid inputs,
+and ignored foreign bytes. Invalid participating input rejects the candidate
+as a whole. It never publishes an unrelated legal subset.
+
+Exact equality needs no change. Valid byte-only semantic changes advance the
+manifest while reusing graph and searcher. Pending valid or invalid semantic
+changes keep saves disabled until reconciliation. Declining a valid candidate
+retains the selected graph, local drafts, queries, and visible pending status.
+
+** Make ordinary saves durable before enabling early release
+
+Reuse [[file:../../server/save.rs::pub(crate) fn apply (][PreparedFilesystemUpdate]] preparation while replacing its direct
+write/delete loop with a recoverable batch. Include every source-section
+write, new path, tombstone, move consequence, merge, and cleanup path in the
+complete prepared operation.
+
+*** Deduplicate the operation before executing it
+
+Retain the save's operation identity on the client before its first mutating
+request. Bind that identity to the initiating authority, exact request/base,
+and prepared result. A connection request ID alone is not a durable save ID.
+Reject reuse of an operation ID with different contents. Repeated delivery
+of the same operation returns its pending status or recorded terminal outcome;
+it cannot launch another batch or regenerate node IDs.
+
+Authenticate the caller and check recorded operations before considering a
+repeated request for new write admission. A disconnected client must resolve
+an uncertain save by that identity, not silently submit its text as a new
+save. This recovery/status exchange does not queue or automatically retry a
+save refused during rebuilding.
+
+*** Prepare and validate without source mutation
+
+Check the live buffer base, session/operation identity, source ownership,
+privacy authorization, and selected interpretation. Preserve generated IDs
+and resolved instructions in the operation so a retry cannot generate a
+second logical save.
+
+Compute exact before/after bytes or absence for all affected paths. Validate
+the full proposal, including dependencies on aliases, relationships, sources,
+and absent IDs. Recheck before-values immediately before applying the batch.
+
+A refusal before mutation writes nothing to the source files and names the
+reason. The client must not lose authored text or acquire a persistent edit
+lock from that refusal.
+
+*** Persist intent and apply complete staged replacements
+
+Retain the prepared batch and sufficient recovery bytes privately, using the
+common journal mechanism. Stage replacements on a filesystem where each final
+replacement can be atomic. Make staged contents and the intent durable before
+the first destination change, using the required file and directory syncing.
+
+Distinguish merely staged data from durable authorization to apply it. Without
+that authorization, recovery must not write the batch. Once authorized, resume
+the exact recorded batch or report a conflict; cancellation or lost delivery
+cannot turn it into a claim that nothing happened.
+
+Keep reusable before/after recovery payloads under the private state trust
+boundary. A temporary file consumed by a rename cannot be the only surviving
+after-image. Any destination-filesystem staging needs restrictive access and
+must be excluded from source observation and coordinated Git additions.
+Record the format, checksums, operation identity, and config/source identity
+needed to interpret the retained batch without consulting newer configuration.
+
+After durable authorization, apply the recorded replacements and deletions
+under the single-writer admission policy. Keep before/after data until the
+operation's outcome and required delivery/recovery records are secure.
+
+On recovery, inspect the whole remaining batch before resuming. A path equal
+to the recorded after-value has already been applied; a path equal to its
+before-value can receive the recorded mutation. A different value is an
+external conflict. Preserve it and the recovery data and request reconciliation
+instead of blindly replaying the write. Rechecking does not expand the
+accepted guarantee against uncontrolled concurrent writers.
+
+*** Publish and report the actual outcome
+
+Keep further source mutations serialized until this operation's file effects
+and graph/search result are resolved. The observer must not promote a
+partially applied batch as a new external candidate.
+
+Obtain the matching graph/search pair, durably record the committed selection,
+then expose it and acknowledge success. Startup must handle a crash between
+the durable selection record and the in-memory publication.
+
+The durable outcome must also identify the client result and resulting base
+needed to recognize or redeliver that save's response. Delivery and its ACK
+are later facts, not the file-commit point. A committed operation is never
+replayed as filesystem work, even if its ACK is missing and later saves have
+changed those same paths. Apply before/after recovery checks only to unresolved
+effects, not to completed history. An old result can describe its outcome
+without granting its obsolete base live save authority.
+
+If files changed but indexing or publication failed, retain an explicit
+incomplete operation. Report that files may already have changed and allow
+recovery of that operation; do not invite an unqualified retry as a new save.
+An old complete snapshot can remain available for reads while the operation
+is unresolved, provided its inputs are still retained and coherent.
+
+Test interruption before intent, after intent, between path replacements,
+after durable file application, after index completion, and before/after
+publication and result delivery. Cover I/O failure, deletion, duplicate retry,
+and external conflict during recovery.
+
+** Preserve archive, raw-file, privacy, and undo gates
+
+Retain the private archive trust boundary in
+[[file:07_plan.org::* Define the private recovery archive and its trust boundary][document 7]], its checksummed initial publication, and the required native
+undo preservation in
+[[file:07_plan.org::* Integrate the now-proven native undo sidecars][the native undo section]]. Keep the existing supported adapters in both
+clients; required undo failure aborts by default and needs explicit waiver
+under the existing policy.
+
+Archive dirty Skg text and attached unfinished workflows before coordinated
+risky external mutation or selection of already externally changed disk.
+The initial archive captures that exact buffer revision. Later destructive
+application must preserve any newly authored text/undo that was not in it.
+
+Retain raw =.skg= file-buffer preflight and save guards from
+[[file:07_plan.org::* Fence ordinary saves independently of observation][the save-fence section]]. Modified raw files block maintenance entry under
+the existing policy. Raw saves remain blocked during the graph-changing
+interval; afterwards a visited file still needs its own exact-base check and
+explicit reconciliation if externally stale.
+
+Preserve the scalar-release boundary before protected text is sent or
+installed, including read-only results and delayed responses. Recheck the
+authorization context after source-set changes. Coherent snapshots do not
+by themselves authorize disclosure.
+
+** Close admission, drain constructors, and publish the fixed census
+
+Close server admission and client constructors before fixing the census.
+Already admitted requests must finish client registration, or be cancelled or
+downgraded through an explicit read-only outcome, before the boundary closes.
+They cannot later deliver a response granting unrecorded edit authority.
+
+Cover ordinary views, new-empty views, metadata editors, fork confirmations,
+and delayed continuations. Capture exact buffer identities, bases, text/undo
+requirements, and attached workflow origins. Persist the fixed census and
+the verified initial-archive checksum before authorizing the transition.
+
+Read-only results created afterward are outside that settlement inventory in
+both clients and the server. Reconnect verifies existing identities and
+missing buffers without enrolling every newly displayed result.
+
+** Implement refusal, status, and durable query waits in both clients
+
+Expose the single orange =rebuilding= token from server state while a
+replacement pair is being built. Show detailed waiting/failure reasons
+outside that token. Clear it at graph readiness, independent of reports.
+
+Check known save restrictions before taking normal save locks. If admission
+changes after that check, the server refuses and the client releases only the
+transient lock acquired for this attempt. Preserve any separate maintenance
+restriction. A refused save is never queued or automatically retried.
+
+Implement the current-snapshot versus wait choice. A wait records its query
+recipe, intended maintenance outcome, destination identity, and durable
+operation state. It does not retain a live Searcher while pending.
+
+When the outcome is ready, execute the explicit query against its selected
+snapshot, even for no-change reconciliation. If publication already happened,
+do not wait for an unrelated future generation. Cancellation and failure
+terminate explicitly; recoverable blocking shows its reason.
+
+Deliver results idempotently to the request's verified destination. Reconnect
+or server restart can recover a recipe without reviving arbitrary callbacks;
+an editor restart can expose pending work through recovery/status if its old
+destination no longer exists. Preserve accepted non-expiration and avoid
+duplicate buffers on redelivery.
+
+Keep generation/freshness metadata, header, and modeline synchronized.
+Read-only results gain edit/save authority only through an explicit reopen
+against the current selected snapshot.
+
+** Settle buffers after publication with exact base checks
+
+Use one disposition per buffer per incident. Successive incidents can refer
+to the same buffer, and two windows onto one buffer remain one release unit.
+Application operations do not create independently releasable presentations.
+
+Use conservative impact classification to decide which buffers need
+attention. Separately validate the actual proposed save instructions and
+dependencies before granting or exercising save authority. Initial displayed
+ID disjointness is not a permanent save certificate.
+
+The existing [[file:../../docs/COMMANDS.org::C-c s i : skg-set-indefinitive][skg-set-indefinitive]] command may remove a particular conflict.
+It changes the selected headline, not every descendant or relationship
+dependency. Definitive descendants may still contribute writes. Recheck the
+complete proposal after conversion and explain any remaining conflict.
+
+Clean impacted views may rerender their retained forest against the new
+graph. Preserve search membership and ordering. Clean orthogonal views stay
+untouched. Dirty impacted or uncertain views retain text/undo as detached
+recovery; dirty orthogonal views keep their authored text and proven base,
+with honest stale-presentation status.
+
+A later save resolves its proposal against current selected semantics and
+verifies all required path and authority facts. Ending maintenance alone
+cannot turn stale definitive content into permission to overwrite new data.
+
+Apply delayed responses only when buffer identity, base, revision, source
+context, and application token still match. A stale ACK cannot restore an old
+forest, undo a newer save, or remove another incident's restriction.
+Attached workflows follow their origin only after their own identity checks.
+
+** Route every maintenance entry through the same transition
+
+Use the common owner, archive gate, candidate validation, and publication path
+for client-owned pull, explicit targeted reload, accepted outside changes,
+full rebuild, and config/source replacement. Ordinary saves share publication
+and effect durability, without requiring the full maintenance archive ceremony
+for every routine save.
+
+Refuse saves during coordinated external mutation and final selection. Keep
+the last coherent read snapshot queryable when available. Freeze the complete
+candidate inputs and reject/rebuild obsolete observer work before selection.
+
+After complete pair publication, end graph-transition admission blocking.
+Release safe existing buffers individually and admit new editable views.
+Keep unresolved per-buffer restrictions and evidence/report work under their
+own durable records.
+
+Cancellation before external mutation can leave the old selection unchanged.
+After an external effect may have occurred, cancellation cannot imply rollback:
+observe and reconcile the resulting bytes before restoring write authority.
+Invalid input, authorization refusal, failed indexing, and failed evidence
+publication retain explicit recoverable states and reasons.
+
+** Restore authority before exposing startup and reconnect
+
+Read durable effect and selection records before deriving live authority from
+current disk. Resolve incomplete save batches first, using their retained
+bytes. Use the existing
+[[file:../../server/maintenance/evidence.rs::pub struct MaintenanceRecoveryPayload][MaintenanceRecoveryPayload]] and
+[[file:../../server/maintenance/evidence.rs::pub fn reconstruct_evidence][reconstruct_evidence]] for an interrupted incident's semantic G0/G1 state,
+as established in
+[[file:08_single-node-reload-performance.org::DONE Choice 1][document 8's self-contained recovery decision]].
+
+Retain the config/source interpretation necessary to use recovery data.
+Hashes verify available contents; they do not supply missing bytes. If
+required evidence is absent, corrupt, or conflicts with disk, retain it and
+report repair requirements. Publish reads only from a proven coherent
+snapshot and withhold save authority while source effects remain unresolved.
+
+Order the latest committed selection independently of an older incident's
+report cleanup. If that incident describes G1 and a later save committed G2,
+completing its report must not select G1. Recover the needed incident evidence
+without making it the current graph merely because it is still pending.
+
+When recovery permits, validate disk and establish a fresh live snapshot.
+Invalidate old session authority; reconnect in the same surviving server may
+retain proven bases, while server restart requires fresh authority where
+those bases cannot be established. Preserve text, undo, and durable query
+recipes in either case.
+
+Keep malformed journals and evidence inspectable. Retain the compact
+handshake: the full selected path manifest remains server-side. Neither client
+may issue an authoritative save before its reconnect checks complete.
+
+*** Handle existing journals and incompatible clients explicitly
+
+The current [[file:../../server/maintenance/journal.rs::const JOURNAL_FORMAT_VERSION][journal envelope is version 1]]. Changing the coordinator's in-memory
+shape must not silently make its durable obligations disappear. Preserve the
+original record and archive references while interpreting the known old
+format; migrate only facts whose meaning and authority can be established.
+This does not require retaining the old coordinator as a second live engine.
+
+If an active record is unreadable, unsupported, or cannot establish effect
+authority, preserve it and report the recovery requirement before enabling
+writes. Do not interpret a failed load as a clean idle startup. Distinguish
+such an ambiguous active record from an unused temporary journal file when a
+valid committed record proves which state won publication.
+
+Make incompatible client/server contracts fail explicitly during the handshake,
+before granting view or save authority. Preserve editor text and undo; do not
+fall back to the old enrollment or publication protocol. Cover known-version
+recovery, malformed active records, interrupted journal replacement, and
+protocol mismatch with fixtures.
+
+** Finish evidence and reports independently of new graph work
+
+Maintain one active graph-changing transaction, with separate durable pending
+work from earlier committed incidents. Old reports and acknowledgments cannot
+hold all future graph changes hostage or overwrite newer authority.
+
+Retain the compact G0 baseline and reversible delta representation rather than
+repeated full YAML graph serialization. Publish required evidence before its
+dependent effect or release; transfer related files as verified artifact
+bundles. A bundle is a durability unit, while editor release is per buffer.
+
+An initial archive and its final disposition report remain records of that
+incident. If a buffer edits or saves later, the old incident does not recensus
+it or rewrite its history. Required new preservation belongs to the operation
+which will act on that newer buffer state.
+
+Compact completed transient journal records only after no replay, recovery,
+or delivery obligation depends on them. Preserve the established user recovery
+archive retention policy; no automatic archive deletion or expiration is
+introduced. A lost ACK never proves an effect did not occur.
+
+After compaction, retain a compact completion marker or retire the operation's
+issuing authority so a late duplicate cannot be accepted as new work. Forgetting
+the full response is not permission to execute its operation again.
+
+** Verify behavior, then remove superseded paths and update documentation
+
+*** Semantic and publication coverage
+
+Retain reference folds, exact-byte tests, provenance/privacy cases, and normal
+client tests. Check partial selection versus a full reference fold, semantic
+no-ops, invalid candidates, old-reader coherence, negative lookups, index
+failure, and source/config changes. A successful save must expose its matching
+graph/search pair to subsequent reads.
+
+*** Ownership and failure coverage
+
+Run deterministic model schedules and actual socket, filesystem, and editor
+tests. Cover delayed journal writes, late pre-census replies, lost ACKs,
+reconnect before census completion, server restart, stale replies after a
+newer save or incident, and newly edited text after early release.
+
+Crash tests must also terminate a process without running normal failure
+cleanup, then start a new process against the same disposable source and
+private-state fixture. Include a lost save ACK followed by a newer save to
+the same paths, and a duplicate arriving after terminal-record compaction.
+
+Test normal, no-change, cancelled, blocked, and failed waits; verify no timeout,
+no accidental wait for an unrelated generation, and no duplicate result on
+replay. Verify refusal leaves no new persistent edit lock, the modeline shows
+exactly orange =rebuilding=, and report delay cannot keep it active.
+
+Exercise ordinary save, pull, targeted reload, reconciliation, full rebuild,
+and configuration replacement through the common boundary. Test the durable
+save crash points described above, including a later save while an older
+incident still awaits finalization. Check both Emacs and Neovim.
+
+*** Performance and progress coverage
+
+Retain the [[file:09_happy-path-integ-test.org][fork/pull/reciprocal-subscription scenario]] and its existing
+four-second happy-path bound. Record graph-ready time, per-buffer release time,
+and final report completion separately; verify early release without waiting
+for the report.
+
+Use the [[file:08_single-node-reload-performance.org][recorded real-corpus evidence measurements]] as a baseline when that
+fixture is available. Record the corpus and command for broader measurements;
+do not claim scale performance from the tiny sharing fixture. Check that
+ordinary updates avoid repeated whole-graph serialization and that observation
+progresses under sustained notifications.
+
+A failed first attempt remains a verification failure; a diagnostic retry
+must not erase it from acceptance results.
+
+*** Register and run the actual test suites
+
+**** Rust checks and test discovery
+
+[[file:../../Cargo.toml][Cargo.toml]] sets =autotests = false=. Register new integration-test modules
+in the appropriate [[file:../../tests/grouped_unit.rs][grouped_unit.rs]], [[file:../../tests/grouped_saves.rs][grouped_saves.rs]], or another declared
+test target. A new file under =tests/= alone does not establish coverage.
+Verify the new model and fault-injection cases appear in test discovery.
+
+From the repository root, use bounded build/test concurrency for the checks:
+
+#+begin_src sh
+cargo check --all-targets --jobs 2
+cargo nextest run --build-jobs 2 --jobs 1 --no-fail-fast
+cargo test --doc --jobs 2
+#+end_src
+
+Use the appropriate named test target for focused iterations. Nextest does
+not run doctests; keep that separate command. Adapt TypeDB-dependent fixtures
+and the cleanup calls in [[file:../../bash/nextest.sh][bash/nextest.sh]] and other runners during removal,
+rather than restoring the obsolete service to obtain a passing result.
+
+**** Both editors and real maintenance scenarios
+
+Run =bash bash/emacs-tests.sh= and =bash bash/nvim-tests.sh= from the repository
+root. Extend the existing maintenance-pull, maintenance-rebuild,
+partial-reload-happy-path, and save_lock_lifecycle integration scenarios with
+the relevant accepted behaviors and actual interruption points.
+
+Within each integration scenario's directory, its runner uses
+=SKG_TEST_CLIENT=emacs ./run-test.sh= or =SKG_TEST_CLIENT=nvim ./run-test.sh=.
+Confirm that the requested client adapter exists and actually executes:
+the aggregate runner currently skips Neovim scenarios lacking =test-nvim.lua=,
+including the partial-reload happy path. Add the missing adapter coverage for
+this plan's required scenarios; a skipped client is not a passing client.
+
+**** Final acceptance and evidence
+
+After adapting the harness for TypeDB removal and first-failure reporting,
+run =bash bash/all-tests.sh --no-sound= with both clients enabled and without
+=SKG_SKIP_NVIM_INTEGRATION=1=. Preserve the initial outcome separately from
+diagnostic retries. Record commands, revision, first failures, missing tools
+or fixtures, and measured timings in [[file:progress.org][progress.org]].
+
+A missing optional real-corpus fixture limits the performance claim; a missing
+required editor or unexecuted crash test leaves its acceptance check unverified.
+Do not substitute model-only success for real filesystem/restart and editor
+coverage, or report the implementation complete while required checks remain
+unverified.
+
+*** Remove obsolete authority and publish the new contract
+
+After replacements pass, remove provisional enrollment, growing presentation
+censuses, global finalization unlocks, duplicate journal writers, ordinary
+global/live-disk lookup fallbacks, and every active TypeDB dependency.
+Remove reader-draining and index-pending coordination where the pinned pair
+makes it unnecessary, after checking its remaining consumers.
+
+Adapt mechanism-specific tests rather than retaining obsolete phase counts
+or replacing all existing tests indiscriminately. Update the API, glossary,
+client command documentation, setup instructions, and architecture guidance.
+Mark the superseded portions of older plans with links to this contract.
+
+Document the accepted limitation for simultaneous uncontrolled external writes,
+the prompt save refusal, the fresh-session restart policy, and ordinary-save
+recovery. Verify those documents describe the behavior of both clients.
+
+* completion criteria
+
+** One publication and one owner
+
+All ordinary reads use one complete graph/search snapshot, including
+preflight and absence checks. One owner orders graph and journal publication.
+TypeDB is absent from active build, setup, runtime, and test-service paths.
+
+** A finite maintenance barrier and independent buffer release
+
+The initial census is fixed after prior admissions are settled. New read-only
+results cannot acquire save authority or enlarge it. Saves remain excluded
+until graph publication, then safe buffers and new editable views can resume
+without waiting for unrelated reports. Delayed replies cannot grant obsolete
+authority.
+
+** Explicit and responsive client behavior
+
+The rebuilding modeline token is exactly =rebuilding=, colored orange. Save
+attempts during rebuilding refuse promptly, impose no additional edit lock,
+and are neither queued nor retried automatically. Stale-result metadata,
+header, and modeline agree. Waiting queries survive the agreed interruptions
+without expiring or waiting forever for a nonexistent newer generation.
+
+** Recoverable files and honest restart authority
+
+Ordinary multi-file saves have durable intent, retained recovery data, and
+recoverable outcomes. No partial batch is acknowledged as a successful save.
+Interrupted effects are resolved or reported before new save authority is
+granted. Clean restart may establish freshly validated disk authority; old
+incident cleanup cannot roll back later committed saves.
+
+Duplicate delivery never reapplies a committed batch or creates a second save.
+Existing or malformed durable records cannot silently become idle authority,
+and incompatible clients cannot regain authority through a legacy path.
+
+** Authored work, privacy, and required behavior preserved
+
+Initial dirty-work archives and native undo survive the intended interruptions.
+Raw-file guards and scalar authorization remain effective. Partial reload
+preserves unrelated selected content, and existing search membership is not
+automatically rerun. Buffer settlement and indefinitive conversion never
+bypass stale-base or dependency checks.
+
+** Verification and simplification complete
+
+The executable model and real adapter tests cover the specified races and
+crash boundaries. Performance checks distinguish graph readiness, buffer
+release, and report completion. Superseded orchestration is removed and
+documentation names the supported external-writer limitation. No unresolved
+architectural choice from the two discussions remains in this plan.

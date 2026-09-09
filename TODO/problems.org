@@ -3,6 +3,125 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
+* Problems found in the partial-reload architecture review (2026-09-06)
+  Reviewed branch HEAD =74e7dfa5=. These are source-inspection findings;
+  no new runtime crash reproductions or integration runs were performed.
+  See [[file:partial-reload-and-magit/architecture-review.org][the architecture review]] for context and alternatives.
+
+** A delayed observer journal write can overwrite a newer maintenance transition
+   [[file:../server/runtime/maintenance.rs::177][persist_maintenance_state]] clones the coordinator under its mutex,
+   releases the mutex, then calls the journal publisher. The observer and
+   disconnect path use this helper. In contrast, 'transition_maintenance'
+   holds the coordinator mutex through persistence, but that does not exclude
+   a previously cloned snapshot which is already outside the mutex.
+
+   [[file:../server/maintenance/journal.rs::78][MaintenanceJournalStore::persist]] unconditionally renames a unique temporary
+   file onto active.yaml. There is no common publication lock or revision
+   comparison. An observer can copy S_old, a foreground operation can publish
+   S_new, and the delayed observer can then overwrite it with S_old. Restart
+   loads active.yaml, potentially forgetting archive, selection, or ACK state.
+   Atomic rename guarantees a complete file, not the newest state.
+
+   Route authoritative publication through one serialized owner, or otherwise
+   make persistence monotonic across every caller. A useful regression forces
+   the old writer to finish after the newer transition and checks recovered
+   authority. Existing journal tests do not exercise concurrent publication.
+
+** Active maintenance restart does not restore its recorded selected generation
+   [[file:../server/main.rs::150][Startup]] initializes stores from current disk before constructing the
+   maintenance runtime. [[file:../server/types/store_state.rs::95][SelectedStoreState::initial]] sets graph generation
+   and manifest revision to 1. [[file:../server/runtime/mod.rs::76][ServerRuntime::new]] loads the coordinator
+   journal but does not reconstruct its selected graph or generation.
+
+   A crash after selecting and journaling G1 at generation 2 or later, but
+   before remaining clean-view presentation, leaves a journal/runtime mismatch.
+   [[file:../server/serve/handlers/maintenance_protocol.rs::923][Presentation staging]] explicitly rejects that mismatch. The
+   [[file:../server/serve/handlers/client_census.rs::356][reconnect census]] restores initial-archive verification for preselection;
+   it does not restore post-selection store identity. Recovery evidence can
+   reconstruct semantic G0/G1 maps, but no startup consumer was found that
+   installs them as the journal's selected authority.
+
+   Merely copying a generation number is insufficient if current disk has
+   changed. Startup must recover/prove the corresponding content, or expose
+   a deliberate recovery state before selecting new disk. This falls short
+   of 07_plan.org's active-incident restart contract. It needs a real process
+   restart regression, not just evidence-codec or coordinator round trips.
+
+** Exact save fencing does not exclude arbitrary simultaneous external writes
+   [[file:../server/save.rs::161][The save path]] validates prepared before-digests and subsequently invokes
+   [[file:../server/save.rs::736][file writes/deletions]]. An external editor or Git process can modify a
+   target after validation and before the write. The extra apply-time read
+   compares with proposed after-bytes, not an atomically enforced old value.
+
+   This is a real limitation of the claimed guarantee, not a demonstrated
+   failure of the ordinary serialized pull happy path. The checks protect
+   against drift present when checked. They cannot prove the stronger
+   07_plan.org claim that no unselected external byte can be overwritten.
+   A process-local mutex, STM, or another watcher check cannot exclude a
+   nonparticipating writer. Specify cooperative exclusion, a non-saving
+   external-edit interval, or a weaker explicitly stated guarantee.
+
+** Ordinary multi-file saves lack a durable filesystem transaction boundary
+   [[file:../server/save.rs::736][PreparedFilesystemUpdate::apply]] uses direct fs::write and remove_file
+   operations, with no durable batch intent at this boundary. A crash or I/O
+   error can leave a truncated file or only a prefix of a multi-file save.
+   Cache reconstruction from disk cannot recover unwritten/truncated bytes.
+
+   This weakness predates the latest maintenance protocol. It matters to the
+   architecture review because extensive maintenance recovery does not make
+   ordinary saves equally recoverable. Safe file replacement and a recoverable
+   multi-file commit policy solve different parts of the problem; neither an
+   in-memory transaction nor simply rebuilding the caches supplies both.
+
+** Observer batching has no maximum wait, and normal hints still scan the corpus
+   [[file:../server/maintenance/observation.rs::247][The observation worker]] drains signals with a renewed 175 ms timeout.
+   There is no maximum batch age. Signals arriving more frequently than the
+   timeout can indefinitely postpone processing, including queued explicit
+   maintenance work. This starvation case follows from the loop; it was not
+   newly reproduced on a live server during this review.
+
+   [[file:../server/maintenance/observation.rs::622][run_observation]] deduplicates paths but calls observe_complete_disk for
+   ordinary watcher work. Explicit targeted reload has a separate targeted
+   path. Moving work off the socket thread helped, but the ordinary worker
+   does not implement the bounded, path-coalescing, cancellable processing
+   promised by 07_plan.org. The old 40-second evidence-serialization delay
+   was separately fixed; it should not be confused with this remaining debt.
+
+** Concurrency acceptance can pass despite a failing first integration attempt
+   [[file:../bash/all-tests.sh::223][all-tests.sh]] retries failed integration tests. If they succeed on retry,
+   [[file:../bash/all-tests.sh::299][the final result]] can be an overall pass. Initial logs remain available,
+   but that acceptance rule treats intermittent failures as success.
+
+   Also, the partial-reload happy path waits for full startup and complete
+   incident termination between operations, while the promised real
+   disconnect/restart-at-every-boundary integration matrix was not found.
+   Unit/model tests and recorded manual checks cover narrower cases.
+   Keep retries for diagnosis; lifecycle acceptance should retain an unstable
+   or failing status after a first-attempt failure. Add boundary/interleaving
+   coverage appropriate to whichever architecture is chosen.
+
+** API sections still describe superseded reload and shell-pull behavior
+   [[file:../api-and-formats.md::792][Fatal reload recovery]] says legal subsets are selected when another
+   telescope is invalid. The later maintenance contract rejects that
+   candidate as a whole. [[file:../api-and-formats.md::834][The batch-control description]] says pull-all.sh
+   still pulls without a reachable server, but
+   [[file:../data/bash/pull-all.sh][the script]] now exits 2 without pulling.
+   These contradictions make preserving the specs verbatim unsafe during
+   an architecture change. Choose the intended behavioral contract explicitly.
+
+** Architecture opportunity: reduce live graph authority and editor coordination
+   The in-Rust graph already holds full node data and inverse indexes;
+   several TypeDB query helpers return directly from it in production.
+   A supplied immutable graph snapshot paired with a specific Tantivy Searcher
+   could remove TypeDB from the live consistency boundary. This requires an
+   audit of remaining queries, global-handle reads, and live-disk fallbacks.
+
+   Independently, a finite maintenance census and a short pause in admitting
+   new authoritative views could remove continuously growing enrollment and
+   terminal-unlock coordination. A single state owner would prevent workers
+   from independently persisting authority. These are proposals, not approved
+   behavior changes; their costs and retained guarantees are compared in
+   [[file:partial-reload-and-magit/architecture-review.org][the review]].
 * Problem found while investigating partial-reload pauses (2026-09-03)
 ** A genuine reconnect's exact sweep monopolizes the foreground channel
    The reported hot-reload path no longer creates a new connection or sweep;
