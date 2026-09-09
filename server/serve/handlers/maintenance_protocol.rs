@@ -795,6 +795,8 @@ fn select_and_stage_candidate_payload (
     . ok_or_else (|| "selected candidate was not retained" . to_string ())?;
   let selected_snapshot = runtime . incident_snapshot (incident)?;
   let selected_config = &selected_snapshot . env . config;
+  #[cfg(test)]
+  crate::runtime::save_operations::socket_tests::hold_maintenance_report ();
   let settlements = {
     let interactive = runtime . interactive . lock ()
       . map_err (|_| "interactive session poisoned" . to_string ())?;

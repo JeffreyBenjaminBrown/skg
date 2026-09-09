@@ -29,6 +29,7 @@ use std::os::unix::process::ExitStatusExt;
 
 const WORKER_ROOT : &str = "SKG_SOCKET_SAVE_TEST_ROOT";
 const CRASH_POINT : &str = "SKG_SOCKET_SAVE_TEST_CRASH";
+const REPORT_HOLD : &str = "SKG_SOCKET_SAVE_TEST_REPORT_HOLD";
 const WORKER_NAME : &str =
   "runtime::save_operations::socket_tests::socket_process_worker";
 
@@ -163,6 +164,149 @@ fn barrier_query_remains_read_only_after_admission_reopens () {
 }
 
 #[test]
+fn socket_report_recovery_reconstructs_old_pair_after_restart () {
+  let fixture : Fixture = Fixture::new ();
+  let hold : PathBuf = fixture . root . join ("report-staging-hold");
+  let mut process : ServerProcess = fixture . start_with_report_hold (&hold);
+  let mut client : Client = Client::connect (&fixture);
+  let (initial_request, _, _) : (String, String, String) =
+    client . save_request ("InitialAlpha", "InitialBeta");
+  client . send (&initial_request,
+    Some (&save_body ("InitialAlpha", "InitialBeta")));
+  let initial_result : Sexp = client . terminal ();
+  assert_eq! (field (&initial_result, "save-operation-state") . as_deref (),
+    Some ("committed"), "{}", initial_result);
+
+  client . send ("((request . \"begin maintenance\") (origin . \"explicit-partial-reload\") (ids \"a\"))", None);
+  let offer : Sexp = client . terminal ();
+  let incident : String = field (&offer, "allocated-incident-id")
+    . expect ("maintenance incident");
+  let epoch : String = field (&offer, "maintenance-epoch")
+    . expect ("maintenance epoch");
+  let g0 : u64 = field (&offer, "g0-graph-generation")
+    . expect ("G0 graph generation") . parse () . unwrap ();
+
+  client . send (&format! (
+    "((request . \"maintenance locked census\") (incident-id . \"{}\") (maintenance-epoch . {}) (client-constructor-admission . \"closed\"))",
+    incident, epoch), None);
+  let locked : Sexp = client . terminal ();
+  assert_eq! (field (&locked, "status") . as_deref (),
+    Some ("locked-census-accepted-publish-initial-archive"), "{}", locked);
+  let manifest_sha256 : String = write_empty_initial_archive (&offer);
+  client . send (&format! (
+    "((request . \"maintenance archive ready\") (incident-id . \"{}\") (maintenance-epoch . {}) (lock-census-sha256 . \"{}\") (manifest-sha256 . \"{}\"))",
+    incident, epoch, empty_lock_census_sha256 (), manifest_sha256), None);
+  let archive_ready : Sexp = client . terminal ();
+  assert_eq! (field (&archive_ready, "status") . as_deref (),
+    Some ("archive-ready"), "{}", archive_ready);
+
+  let initial_a : String = fs::read_to_string (fixture . node ("a")) . unwrap ();
+  let modified_a : String = initial_a . replace ("InitialAlpha", "G1Alpha");
+  assert_ne! (modified_a, initial_a);
+  fs::write (fixture . node ("a"), modified_a) . unwrap ();
+  client . send (&format! (
+    "((request . \"run maintenance origin\") (incident-id . \"{}\") (maintenance-epoch . {}))",
+    incident, epoch), None);
+  let origin_started : Sexp = client . terminal ();
+  assert_eq! (field (&origin_started, "status") . as_deref (),
+    Some ("origin-operation-started"), "{}", origin_started);
+  wait_for_path (&hold . with_extension ("ready"));
+
+  client . send (&format! (
+    "((request . \"maintenance status\") (incident-id . \"{}\") (maintenance-epoch . {}))",
+    incident, epoch), None);
+  let held : Sexp = client . terminal ();
+  assert_eq! (field (&held, "phase") . as_deref (), Some ("presenting"), "{}", held);
+  let g1 : u64 = field (&held, "g1-graph-generation")
+    . expect ("G1 graph generation") . parse () . unwrap ();
+  assert_eq! (g1, g0 + 1, "{}", held);
+  client . generation = field (&held, "current-graph-generation")
+    . expect ("current G1 graph generation") . parse () . unwrap ();
+  assert_eq! (client . generation, g1);
+
+  let (g2_request, _, _) : (String, String, String) =
+    client . save_request ("G2Alpha", "G2Beta");
+  client . send (&g2_request, Some (&save_body ("G2Alpha", "G2Beta")));
+  let g2_result : Sexp = client . terminal ();
+  assert_eq! (field (&g2_result, "save-operation-state") . as_deref (),
+    Some ("committed"), "{}", g2_result);
+  let g2_status : Sexp = {
+    client . send (&format! (
+      "((request . \"maintenance status\") (incident-id . \"{}\") (maintenance-epoch . {}))",
+      incident, epoch), None);
+    client . terminal () };
+  let g2 : u64 = field (&g2_status, "current-graph-generation")
+    . expect ("current G2 graph generation") . parse () . unwrap ();
+  assert! (g2 > g1, "{}", g2_status);
+  let g2_a : Vec<u8> = fs::read (fixture . node ("a")) . unwrap ();
+  let g2_b : Vec<u8> = fs::read (fixture . node ("b")) . unwrap ();
+  assert! (String::from_utf8_lossy (&g2_a) . contains ("G2Alpha"));
+  assert! (String::from_utf8_lossy (&g2_b) . contains ("G2Beta"));
+
+  #[cfg(unix)]
+  unsafe { libc::kill (process . child . id () as i32, libc::SIGKILL); }
+  #[cfg(not(unix))]
+  process . child . kill () . unwrap ();
+  let status : ExitStatus = process . child . wait () . unwrap ();
+  #[cfg(unix)]
+  assert_eq! (status . signal (), Some (libc::SIGKILL), "{}", process . logs ());
+  drop (client);
+  drop (process);
+
+  let _restarted : ServerProcess = fixture . start ("none");
+  let mut recovered : Client = Client::connect (&fixture);
+  let restarted_generation : u64 = recovered . generation;
+  recovered . send (&format! (
+    "((request . \"maintenance status\") (incident-id . \"{}\") (maintenance-epoch . {}))",
+    incident, epoch), None);
+  let report : Sexp = recovered . terminal ();
+  assert_eq! (field (&report, "status") . as_deref (), Some ("active"), "{}", report);
+  assert_eq! (field (&report, "phase") . as_deref (), Some ("finalizing-archive"), "{}", report);
+  assert_eq! (field (&report, "g1-graph-generation") . as_deref (),
+    Some (g1 . to_string () . as_str ()), "{}", report);
+  assert_eq! (field (&report, "g0-graph-generation") . as_deref (),
+    Some (g0 . to_string () . as_str ()), "{}", report);
+  assert_eq! (field (&report, "live-authority-retired") . as_deref (),
+    Some ("true"), "{}", report);
+  assert_eq! (field (&report, "current-graph-generation") . as_deref (),
+    Some (restarted_generation . to_string () . as_str ()), "{}", report);
+  assert_eq! (fs::read (fixture . node ("a")) . unwrap (), g2_a);
+  assert_eq! (fs::read (fixture . node ("b")) . unwrap (), g2_b);
+
+  let view_uri : String = format! ("view:test-{}", uuid::Uuid::new_v4 ());
+  recovered . send (&format! (
+    "((request . \"single root content view\") (id . \"a\") (view-uri . \"{}\") (fresh-view . \"true\") (override-choice . \"bypass\") (requested-view-write-authority . \"editable\"))",
+    view_uri), None);
+  let view : Sexp = recovered . receive () . unwrap ();
+  assert_eq! (field (&view, "view-write-authority") . as_deref (),
+    Some ("editable"), "{}", view);
+  let view_body : String = field (&view, "content")
+    . expect ("fresh editable view content") . replace ("G2Alpha", "FreshAlpha");
+  assert_ne! (view_body, field (&view, "content") . unwrap ());
+  let fresh_buffer_id : String = uuid::Uuid::new_v4 () . to_string ();
+  let (fresh_request, _, _) : (String, String, String) =
+    recovered . save_request_with_authority (
+      &view_uri, &fresh_buffer_id,
+      field (&view, "graph-generation") . expect ("fresh view graph")
+        . parse () . unwrap (),
+      field (&view, "server-revision") . expect ("fresh view revision")
+        . parse () . unwrap (),
+      field (&view, "client-application-token")
+        . expect ("fresh view application token") . parse () . unwrap (),
+      &view_body);
+  recovered . send (&fresh_request, Some (&view_body));
+  let fresh_result : Sexp = recovered . terminal ();
+  assert_eq! (field (&fresh_result, "save-operation-state") . as_deref (),
+    Some ("committed"), "{}", fresh_result);
+
+  assert! (fs::read_to_string (fixture . node ("a")) . unwrap ()
+    . contains ("FreshAlpha"));
+  let search : Sexp = recovered . text_search ("G2Beta");
+  assert! (field (&search, "content") . unwrap_or_default ()
+    . contains ("G2Beta"), "{}", search);
+}
+
+#[test]
 fn socket_process_worker () {
   let Some (root) : Option<std::ffi::OsString> = std::env::var_os (WORKER_ROOT)
     else { return; };
@@ -192,6 +336,17 @@ pub(crate) fn crash_point (boundary : &str) {
   std::process::abort ();
 }
 
+/// Test-only barrier used to leave a committed G1 with durable evidence while
+/// report settlement planning is paused. The parent test owns the control
+/// files; the child never fabricates a candidate or journal record.
+pub(crate) fn hold_maintenance_report () {
+  let Some (control) : Option<PathBuf> = std::env::var_os (REPORT_HOLD)
+    . map (PathBuf::from) else { return; };
+  fs::write (control . with_extension ("ready"), b"ready") . unwrap ();
+  while ! control . with_extension ("release") . exists () {
+    std::thread::sleep (Duration::from_millis (10)); }
+}
+
 impl Fixture {
   fn new () -> Self {
     let root : PathBuf = std::env::temp_dir () . join (format! (
@@ -208,13 +363,29 @@ impl Fixture {
   fn node (&self, id : &str) -> PathBuf { self . root . join (format! ("owned/main/{}.skg", id)) }
 
   fn start (&self, boundary : &str) -> ServerProcess {
+    self . start_with_options (boundary, None)
+  }
+
+  fn start_with_report_hold (&self, hold : &PathBuf) -> ServerProcess {
+    self . start_with_options ("none", Some (hold))
+  }
+
+  fn start_with_options (
+    &self,
+    boundary : &str,
+    report_hold : Option<&PathBuf>,
+  ) -> ServerProcess {
     let _ = fs::remove_file (self . root . join ("ready"));
     let log : PathBuf = self . root . join (format! ("server-{}.log", boundary));
     let output : File = File::create (&log) . unwrap ();
-    let child : Child = Command::new (std::env::current_exe () . unwrap ())
-      . args (["--exact", WORKER_NAME, "--nocapture"])
+    let mut command : Command = Command::new (
+      std::env::current_exe () . unwrap ());
+    command . args (["--exact", WORKER_NAME, "--nocapture"])
       . env (WORKER_ROOT, &self . root) . env (CRASH_POINT, boundary)
-      . env ("XDG_STATE_HOME", self . root . join ("private-state"))
+      . env ("XDG_STATE_HOME", self . root . join ("private-state"));
+    if let Some (hold) = report_hold {
+      command . env (REPORT_HOLD, hold); }
+    let child : Child = command
       . stdout (Stdio::from (output . try_clone () . unwrap ()))
       . stderr (Stdio::from (output)) . spawn () . unwrap ();
     let mut process : ServerProcess = ServerProcess { child, log };
@@ -225,6 +396,14 @@ impl Fixture {
       std::thread::sleep (Duration::from_millis (10)); }
     process
   }
+}
+
+fn wait_for_path (path : &PathBuf) {
+  let deadline : Instant = Instant::now () + Duration::from_secs (15);
+  while ! path . exists () {
+    assert! (Instant::now () < deadline,
+      "timed out waiting for {}", path . display ());
+    std::thread::sleep (Duration::from_millis (10)); }
 }
 
 impl Drop for Fixture {
@@ -263,9 +442,36 @@ impl Client {
     let intent : String = format! (
       "((request . \"save buffer\") (view-uri . \"{}\") (client-buffer-id . \"{}\") (view-kind . \"new-empty-content-view\") (graph-generation . {}) (server-revision . 0) (client-application-token . 1) (server-session-id . \"{}\") (operation-id . \"{}\"))",
       uuid::Uuid::new_v4 (), uuid::Uuid::new_v4 (), self . generation, self . session, operation);
+    self . save_request_from_intent (
+      intent, &save_body (a, b), operation)
+  }
+
+  fn save_request_with_authority (
+    &self,
+    view_uri : &str,
+    buffer_id : &str,
+    graph_generation : u64,
+    server_revision : u64,
+    application_token : u64,
+    body : &str,
+  ) -> (String, String, String) {
+    let operation : String = uuid::Uuid::new_v4 () . to_string ();
+    let intent : String = format! (
+      "((request . \"save buffer\") (view-uri . \"{}\") (client-buffer-id . \"{}\") (view-kind . \"content-view\") (graph-generation . {}) (server-revision . {}) (client-application-token . {}) (server-session-id . \"{}\") (operation-id . \"{}\"))",
+      view_uri, buffer_id, graph_generation, server_revision,
+      application_token, self . session, operation);
+    self . save_request_from_intent (intent, body, operation)
+  }
+
+  fn save_request_from_intent (
+    &self,
+    intent : String,
+    body : &str,
+    operation : String,
+  ) -> (String, String, String) {
     let mut digest : Sha256 = Sha256::new ();
     digest . update (intent . as_bytes ()); digest . update ([0]);
-    digest . update (save_body (a, b) . as_bytes ());
+    digest . update (body . as_bytes ());
     let fingerprint : String = format! ("{:x}", digest . finalize ());
     (format! ("{} (request-base-fingerprint . \"{}\"))", &intent [..intent . len () - 1], fingerprint), fingerprint, operation)
   }
@@ -285,6 +491,13 @@ impl Client {
 
   fn receive (&mut self) -> Result<Sexp, String> { read_response (&mut self . reader) }
 
+  fn text_search (&mut self, terms : &str) -> Sexp {
+    self . send (&format! (
+      "((request . \"text search\") (terms . \"{}\") (regex . \"false\") (body . \"true\") (operators . \"false\") (requested-view-write-authority . \"read-only\"))",
+      terms), None);
+    self . receive () . unwrap ()
+  }
+
   fn terminal (&mut self) -> Sexp {
     loop {
       let response : Sexp = self . receive () . unwrap ();
@@ -300,6 +513,89 @@ impl Client {
 
 fn save_body (a : &str, b : &str) -> String {
   format! ("* (skg (node (id a) (source main))) {}\n* (skg (node (id b) (source main))) {}\n", a, b)
+}
+
+fn quoted (value : &str) -> String {
+  format! ("\"{}\"", value . replace ('\\', "\\\\")
+    . replace ('\"', "\\\"") . replace ('\n', "\\n"))
+}
+
+fn artifact_record (path : &str, bytes : &[u8]) -> String {
+  format! ("((path {}) (bytes {}) (sha256 \"{:x}\"))",
+    quoted (path), bytes . len (), Sha256::digest (bytes))
+}
+
+fn write_empty_initial_archive (offer : &Sexp) -> String {
+  let archive_root : PathBuf = PathBuf::from (
+    field (offer, "maintenance-archive-identity")
+      . expect ("maintenance archive identity"));
+  let directory_name : String = field (offer, "archive-directory-name")
+    . expect ("archive directory name");
+  let directory : PathBuf = archive_root . join (&directory_name);
+  fs::create_dir_all (directory . join ("buffer-snapshots")) . unwrap ();
+  fs::create_dir_all (directory . join ("interrupted-buffers")) . unwrap ();
+  #[cfg(unix)]
+  {
+    use std::os::unix::fs::PermissionsExt;
+    for path in [
+      directory . clone (),
+      directory . join ("buffer-snapshots"),
+      directory . join ("interrupted-buffers"),
+    ] {
+      fs::set_permissions (path, fs::Permissions::from_mode (0o700))
+        . unwrap (); }
+  }
+  let incident : &[u8] = b"* Test incident\n";
+  let interrupted : &[u8] = b"* Interrupted buffers\n";
+  fs::write (directory . join ("incident.org"), incident) . unwrap ();
+  fs::write (directory . join ("interrupted-buffers/README.org"), interrupted)
+    . unwrap ();
+  let manifest : String = format! (concat! (
+    "((archive-format-version 1) (manifest-kind \"initial\") ",
+    "(incident-id {}) (maintenance-epoch {}) (origin {}) ",
+    "(started-at-utc {}) (archive-directory-name {}) ",
+    "(client-kind \"neovim\") (client-version \"socket-test\") ",
+    "(client-session-id \"socket-client\") ",
+    "(client-archive-identity \"socket-test-empty-archive\") ",
+    "(server-archive-identity {}) (source-set \"all\") ",
+    "(g0-graph-generation {}) (g0-manifest-revision {}) ",
+    "(directory-sync \"socket-test\") (artifacts ({} {})) ",
+    "(buffers ()) (initial-status \"prepared-for-publication\"))\n"),
+    quoted (&field (offer, "allocated-incident-id")
+      . expect ("incident ID")),
+    field (offer, "maintenance-epoch") . expect ("epoch"),
+    quoted (&field (offer, "origin") . expect ("origin")),
+    quoted (&field (offer, "started-at-utc") . expect ("started at")),
+    quoted (&directory_name), quoted (&archive_root . to_string_lossy ()),
+    field (offer, "g0-graph-generation") . expect ("G0 generation"),
+    field (offer, "g0-manifest-revision") . expect ("G0 revision"),
+    artifact_record ("incident.org", incident),
+    artifact_record ("interrupted-buffers/README.org", interrupted));
+  fs::write (directory . join ("manifest.initial.sexp"), manifest . as_bytes ())
+    . unwrap ();
+  let manifest_sha256 : String = format! ("{:x}", Sha256::digest (
+    manifest . as_bytes ())); 
+  let marker : String = format! (
+    "((archive-format-version 1) (incident-id {}) (manifest-sha256 {}))\n",
+    quoted (&field (offer, "allocated-incident-id")
+      . expect ("incident ID")), quoted (&manifest_sha256));
+  fs::write (directory . join ("ARCHIVE-READY"), marker . as_bytes ())
+    . unwrap ();
+  #[cfg(unix)]
+  for path in [
+    directory . join ("incident.org"),
+    directory . join ("interrupted-buffers/README.org"),
+    directory . join ("manifest.initial.sexp"),
+    directory . join ("ARCHIVE-READY"),
+  ] {
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions (path, fs::Permissions::from_mode (0o600))
+      . unwrap (); }
+  manifest_sha256
+}
+
+fn empty_lock_census_sha256 () -> String {
+  format! ("{:x}", Sha256::digest ([]))
 }
 
 fn field (response : &Sexp, name : &str) -> Option<String> {
