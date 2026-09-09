@@ -1,0 +1,27 @@
+* Responsiveness boundaries still being migrated
+** Observed gap
+The owner in [[file:../server/runtime/owner.rs][runtime/owner.rs]] accepts mutation reservations and publishes immutable
+state independently, but adapters still hold the interactive mutex during
+expensive work. In [[file:../server/maintenance/selection.rs][full rebuild selection]], that covered index construction.
+The TCP reader also acquires this mutex for census admission and collateral
+preemption, so an otherwise prompt request could stall before its handler.
+** First bounded change and check
+Keep the mutation reservation and writer environment throughout rebuilding,
+but take interactive state only for final source interpretation/publication.
+Hold a real child server before index construction; on the same TCP connection,
+check status, a save refusal with unchanged source bytes, and coherent readonly
+view/search responses. Then release the worker and check publication proceeds.
+** Remaining questions
+Ordinary save, normalization, and ranking adapters still run synchronously on
+the connection thread. They need captured inputs and explicit owner-checked
+completion; moving a whole handler to a thread would keep its broad mutex
+scope and would not establish responsive buffer authority.
+Capture a request's selected snapshot and source interpretation together:
+acquiring an old snapshot before waiting for a mutex can pair it with a newer
+source-set interpretation after configuration replacement. Audit this boundary
+as buffer authority moves into owner decisions.
+** Delayed global metadata
+Owner coordinator revision alone did not order graph publication or a failed
+reservation. A separate in-session publication revision now advances whenever
+the readable owner state changes. Clients must use that revision for global
+admission metadata while still processing an older incident's exact outcome.

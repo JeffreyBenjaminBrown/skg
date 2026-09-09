@@ -52,3 +52,19 @@ A small reversible edit usually needs no note. A cross-cutting invariant or
 repeatedly interrupted investigation often does. The notes cost reading and
 maintenance too; shorten or archive resolved sections when they obscure the
 next open question. There is no measured token-saving claim here yet.
+
+** Put the observable check beside the implementation hypothesis
+The retained-base investigation needed more than a test that a pending offer
+held an old snapshot. The actual promise concerns the accepted buffer after
+its ACK, so the check must follow the offer through that transition and inspect
+the buffer's save base. Likewise, testing a census helper was insufficient
+until a test inspected the serialized census submitted by its real caller.
+Writing that end condition in the note makes a delegation easier to review:
+the recipient can change the mechanism while preserving the intended check.
+
+** Give overlapping requirements cumulative meaning
+In the save-dependency review, a node could be both an authored structural
+input and an inverse partner. Choosing the first matching comparison role
+could accidentally apply the weaker check. A short table or explicit statement
+that requirements accumulate helps expose this sort of mistake before code
+turns a classification order into an unintended policy.
