@@ -163,6 +163,7 @@ otherwise generate a new UUID."
        :root-ids (plist-get authority :root-ids)
        :disposable (eq kind 'override-choice-menu)
        :server-session-id (plist-get authority :server-session-id)
+       :view-write-authority (plist-get authority :view-write-authority)
        :graph-generation (plist-get authority :graph-generation)
        :presentation-generation
        (plist-get authority :presentation-generation)
@@ -175,6 +176,8 @@ otherwise generate a new UUID."
       (add-hook 'first-change-hook
                 #'skg-warn-if-other-buffer-modified nil t)
       (set-buffer-modified-p nil)
+      (setq buffer-read-only
+            (eq (plist-get authority :view-write-authority) 'read-only))
       (goto-char (point-min)))
     (switch-to-buffer buffer)))
 

@@ -23,11 +23,13 @@ local M = {}
 ---@param approved_pids string[]|nil
 ---@return string
 function M.request_string (node_id, view_uri, bypass_override,
-                           approved_pids, fresh_view)
+                           approved_pids, fresh_view, requested_authority)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'single root content view'),
     sexpr.pair(sexpr.symbol('id'), node_id),
-    sexpr.pair(sexpr.symbol('view-uri'), view_uri) }
+    sexpr.pair(sexpr.symbol('view-uri'), view_uri),
+    sexpr.pair(sexpr.symbol('requested-view-write-authority'),
+               requested_authority or state.requested_view_write_authority()) }
   if bypass_override then
     table.insert(request,
       sexpr.pair(sexpr.symbol('override-choice'), 'bypass')) end
@@ -53,6 +55,9 @@ function M.request_single_root_content_view_from_id (node_id,
                                                      approved_pids,
                                                      existing_view_uri,
                                                      fresh_view)
+  client.connect()
+  if not require('skg.misc_requests').ensure_connection_handshake() then
+    error('Cannot request a view before server verification completes') end
   local view_uri = existing_view_uri or buffer.generate_uuid()
   state.register_response_handler('content-view',
     function (payload_text, response)
@@ -121,6 +126,9 @@ function M.handle_content_view (payload_text, response, view_uri, fresh_view,
     local server_uri = payload.field_text(response, 'view-uri')
     local effective_uri = server_uri or view_uri
     local root_ids_value = payload.field(response, 'root-ids')
+    -- Every content-view response, including an empty/error result, must
+    -- carry the server's explicit write authority.
+    local view_authority = state.view_write_authority_from_response(response)
     if content_text and content_text ~= '' then
       buffer.open_org_buffer_from_text(
         content_text,
@@ -135,6 +143,7 @@ function M.handle_content_view (payload_text, response, view_uri, fresh_view,
           root_ids = root_ids_value
             and payload.string_list(root_ids_value) or nil,
           server_session_id = server_session_id,
+          view_write_authority = view_authority,
           graph_generation = tonumber(
             payload.field_text(response, 'graph-generation')),
           presentation_generation = tonumber(

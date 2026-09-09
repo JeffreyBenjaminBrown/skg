@@ -8,7 +8,8 @@
 
 (cl-defstruct skg--buffer-record
   id kind lifecycle disposable continuation-id buffer view-uri recipe root-ids
-  source-set server-session-id graph-generation presentation-generation
+  source-set server-session-id view-write-authority
+  graph-generation presentation-generation
   server-revision
   application-token last-fetched last-fetched-sha256 logical-dirty
   origin-buffer-id origin-view-uri origin-application-token origin-location
@@ -94,7 +95,7 @@
             (disposable nil disposable-supplied-p)
             continuation-id origin-buffer origin-location last-fetched
             server-revision graph-generation presentation-generation
-            application-token server-session-id)
+            application-token server-session-id view-write-authority)
   "Register BUFFER under an explicit KIND and return its durable record."
   (unless lifecycle-supplied-p
     (error "Skg buffer constructor omitted its lifecycle"))
@@ -135,6 +136,20 @@
                              (skg--buffer-record-server-session-id
                               origin-record))
                         skg--server-session-id)
+                    :view-write-authority
+                    (if (and (null existing)
+                             (null view-write-authority)
+                             (not (eq skg--client-constructor-admission
+                                      'open)))
+                        'read-only
+                      (or view-write-authority
+                          (and existing
+                               (skg--buffer-record-view-write-authority
+                                existing))
+                          (and origin-record
+                               (skg--buffer-record-view-write-authority
+                                origin-record))
+                          'editable))
                     :graph-generation
                     (or graph-generation
                         (cdr (assq 'graph-generation skg--server-store-state)))
@@ -180,16 +195,6 @@
                 #'skg-warn-buffer-status-on-entry nil t)
       (setq-local mode-line-process
                   '(:eval (skg-buffer-status-indicator)))
-      (when (and (listp skg--maintenance-state)
-                 (equal (format "%s"
-                                (cdr (assq 'state skg--maintenance-state)))
-                        "active"))
-        (let ((epoch (cdr (assq 'epoch skg--maintenance-state))))
-          (unless (natnump epoch)
-            (error "Active maintenance has no valid epoch"))
-          (skg-lock-buffer-for-maintenance buffer epoch)
-          (when (fboundp 'skg-maintenance-enroll-new-buffer)
-            (skg-maintenance-enroll-new-buffer id))))
       (when old-origin-id
         (skg--refresh-attached-workflow-count old-origin-id))
       (when origin-record
@@ -564,7 +569,12 @@ Reload selectors hold only transient command input, never authored state."
            (not (equal skg--server-session-id
                        (skg--buffer-record-server-session-id
                         skg--buffer-record))))
-      "this buffer belongs to an earlier server session; reopen it"))))
+      "this buffer belongs to an earlier server session; reopen it")
+     ((and skg--buffer-record
+           (not (eq (skg--buffer-record-view-write-authority
+                     skg--buffer-record)
+                    'editable)))
+      "this view has read-only result authority; reopen it explicitly"))))
 
 (defun skg-buffer-status-messages ()
   "Return warnings which remain relevant to the current Skg buffer."
@@ -590,6 +600,10 @@ Reload selectors hold only transient command input, never authored state."
                               skg--buffer-record))))
         (concat "This buffer belongs to an earlier server session; "
                 "reopen it before saving"))
+      (when (not (eq (skg--buffer-record-view-write-authority
+                      skg--buffer-record)
+                     'editable))
+        "This result is read-only; reopen it explicitly to gain save authority")
       (when (and (boundp 'skg--raw-file-externally-stale)
                  skg--raw-file-externally-stale)
         "This raw .skg file changed on disk; revert or reconcile before saving")))))
@@ -599,7 +613,7 @@ Reload selectors hold only transient command input, never authored state."
   (when-let ((messages (skg-buffer-status-messages)))
     (message "Skg: %s" (string-join messages "; "))))
 
-(defun skg-buffer-census ()
+(cl-defun skg-buffer-census (&optional (buffers nil buffers-supplied-p))
   "Return a compact, portable census of registered buffers."
   (mapcar
    (lambda (buffer)
@@ -630,6 +644,9 @@ Reload selectors hold only transient command input, never authored state."
            (source-set . ,(or (skg--buffer-record-source-set record) "all"))
            (server-session-id
             . ,(or (skg--buffer-record-server-session-id record) "nil"))
+           (view-write-authority
+            . ,(symbol-name
+                (skg--buffer-record-view-write-authority record)))
            (graph-generation . ,(or (skg--buffer-record-graph-generation record) 0))
            (presentation-generation
             . ,(or (skg--buffer-record-presentation-generation record) 0))
@@ -656,7 +673,7 @@ Reload selectors hold only transient command input, never authored state."
             . ,(if (skg--buffer-record-herald-bearing record) "true" "nil"))
            (last-fetched-sha256 . ,(skg--buffer-record-last-fetched-sha256 record))
            (current-sha256 . ,(skg--sha256-text current))))))
-   (skg-registered-buffers)))
+   (if buffers-supplied-p buffers (skg-registered-buffers))))
 
 (defun skg-buffer-census-texts (buffer-ids)
   "Return exact last-fetched/current texts for requested BUFFER-IDS."

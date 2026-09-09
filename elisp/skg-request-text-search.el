@@ -71,6 +71,10 @@ headline documenting `skg-search-interactive'."
   "Request a text search from the Rust server.
 REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
+         (_verified
+          (unless (skg-connection-handshake-ensure)
+            (error "Cannot search before server verification completes")))
+         (requested-authority (skg-requested-view-write-authority))
          (clean-terms (if (stringp search-terms)
                           (substring-no-properties search-terms)
                         search-terms))
@@ -81,7 +85,9 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
                       (terms     . ,clean-terms)
                       (regex     . ,(skg--bool-to-string regex))
                       (body      . ,(skg--bool-to-string body))
-                      (operators . ,(skg--bool-to-string operators)))
+                      (operators . ,(skg--bool-to-string operators))
+                      (requested-view-write-authority
+                       . ,requested-authority))
                     (when ugly-choice
                       `((ugly-telescopes . ,ugly-choice)))
                     (when view-uri `((view-uri . ,view-uri)))))
@@ -179,6 +185,8 @@ kill-buffer-hook to send close-view to the server."
                              `((ugly-choice . ,ugly-choice))))
            :last-fetched content
            :server-session-id (plist-get authority :server-session-id)
+           :view-write-authority
+           (plist-get authority :view-write-authority)
            :graph-generation (plist-get authority :graph-generation)
            :presentation-generation
            (plist-get authority :presentation-generation)
@@ -189,6 +197,12 @@ kill-buffer-hook to send close-view to the server."
           (heralds-minor-mode)
           (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
           (run-hooks 'skg--search-buffer-setup-hook)
+          ;; Enrichment may run after this response. Preserve a read-only
+          ;; result's UI restriction instead of making it editable locally.
+          (setq buffer-read-only
+                (not (eq (skg--buffer-record-view-write-authority
+                          skg--buffer-record)
+                         'editable)))
           (switch-to-buffer (current-buffer)))))
     (when warnings
       (skg-big-nonfatal-message
@@ -300,7 +314,10 @@ Exits readonly after replacing content."
                  (skg-log 'error 'search
                           "search enrichment refused for %s: %S"
                           (buffer-name) err))))
-            (setq buffer-read-only nil)
+            (setq buffer-read-only
+                  (not (eq (skg--buffer-record-view-write-authority
+                            skg--buffer-record)
+                           'editable)))
             (when applied (message "Search results enriched.")) )) ))
     (when operation-id
       (skg-register-response-handler 'collateral-applied #'ignore t)

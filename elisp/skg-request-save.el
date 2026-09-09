@@ -813,6 +813,7 @@ save target: skg-view-uri is left nil (tripping the nil-view-uri save
 guard) and C-x C-s is rebound to refuse, because a stray normal save of
 its id-less clone-to-be parents would create bare nodes. Only C-c C-c
 \(approve) and C-c C-k (decline) act on it."
+  (skg-require-client-constructor-admission)
   (let ((buf (skg-acquire-generated-buffer "*SKG Fork Confirmation*")))
     (with-current-buffer buf
       (let ((inhibit-read-only t))
@@ -1023,23 +1024,24 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
           (string-to-number value)))))))
 
 (defun skg--view-authority-from-response (response)
-  "Return application authority plist from RESPONSE, or nil when absent."
-  (when (assoc 'client-application-token response)
-    (append
-     (list :server-session-id
-           (skg-require-current-server-session response)
-           :graph-generation
-           (skg--nat-from-response response 'graph-generation)
-           :presentation-generation
-           (skg--nat-from-response response 'presentation-generation)
-           :server-revision
-           (skg--nat-from-response response 'server-revision)
-           :application-token
-           (skg--nat-from-response response 'client-application-token))
-     (when (assoc 'root-ids response)
-       (list :root-ids
-             (mapcar (lambda (id) (format "%s" id))
-                     (or (cadr (assoc 'root-ids response)) nil)))))))
+  "Return mandatory view authority and optional revision facts from RESPONSE."
+  (append
+   (list :server-session-id
+         (skg-require-current-server-session response)
+         :view-write-authority
+         (skg-view-write-authority-from-response response)
+         :graph-generation
+         (skg--nat-from-response response 'graph-generation)
+         :presentation-generation
+         (skg--nat-from-response response 'presentation-generation)
+         :server-revision
+         (skg--nat-from-response response 'server-revision)
+         :application-token
+         (skg--nat-from-response response 'client-application-token))
+   (when (assoc 'root-ids response)
+     (list :root-ids
+           (mapcar (lambda (id) (format "%s" id))
+                   (or (cadr (assoc 'root-ids response)) nil))))))
 
 (defun skg-replace-buffer-with-new-content (_tcp-proc new-content
                                                       &optional

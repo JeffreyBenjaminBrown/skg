@@ -74,6 +74,7 @@ function M.install_connection_verification (_payload_text, response, tcp)
     state.connection_handshake_state = 'failed'
     error(server_session_id) end
   state.server_session_id = server_session_id
+  state.update_global_server_status(response)
   config.install_source_inventory(
     payload.field(response, 'source-inventory'))
   state.active_source_set_name =
@@ -89,8 +90,10 @@ function M.install_connection_verification (_payload_text, response, tcp)
     census_required = payload.field_text(response, 'census-required'),
   }
   config.store_state = {
-    graph_generation = payload.field(response, 'graph-generation'),
-    manifest_revision = payload.field(response, 'manifest-revision'),
+    graph_generation = payload.field(response, 'current-graph-generation')
+      or payload.field(response, 'graph-generation'),
+    manifest_revision = payload.field(response, 'current-manifest-revision')
+      or payload.field(response, 'manifest-revision'),
     typedb_health = payload.field(response, 'typedb-health'),
     tantivy_health = payload.field(response, 'tantivy-health'),
   }
@@ -110,7 +113,8 @@ function M.install_connection_verification (_payload_text, response, tcp)
   M.submit_buffer_census(tcp or state.tcp)
 end
 
-function M.submit_buffer_census (tcp, maintenance_incident_id, maintenance_epoch)
+function M.submit_buffer_census (
+    tcp, maintenance_incident_id, maintenance_epoch, buffer_ids)
   local registry = require('skg.buffer_registry')
   local request_text = maintenance_epoch
     and string.format(
@@ -124,7 +128,7 @@ function M.submit_buffer_census (tcp, maintenance_incident_id, maintenance_epoch
           tcp, response, maintenance_incident_id, maintenance_epoch) end,
       one_shot = true,
     },
-  }, registry.census_payload(), maintenance_incident_id)
+    }, registry.census_payload(buffer_ids), maintenance_incident_id)
 end
 
 local function complete_buffer_census (maintenance_incident_id, maintenance_epoch)

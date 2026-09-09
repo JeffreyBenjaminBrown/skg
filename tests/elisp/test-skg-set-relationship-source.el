@@ -598,6 +598,16 @@ does neither."
     (when (get-buffer "*skg-relationship-kinds*")
       (kill-buffer "*skg-relationship-kinds*"))))
 
+(ert-deftest test-relationship-kind-menu-refuses-before-construction-when-closed ()
+  (let ((skg--client-constructor-admission 'closed)
+        called)
+    (cl-letf (((symbol-function 'skg-acquire-generated-buffer)
+               (lambda (&rest _) (setq called t))))
+      (should-error
+       (skg--select-relationship-kind #'ignore)
+       :type 'user-error))
+    (should-not called)))
+
 (ert-deftest test-set-relationship-source-recursive-end-to-end ()
   "The full command: menu choice, source prompt, walk. Point and
 window plumbing are stubbed as in the other handler tests."

@@ -15,9 +15,6 @@
   "Latest unsolicited valid disk candidate offered by the server.")
 (defvar skg--maintenance-origin-operation-handlers nil
   "Origin labels mapped to their post-archive client adapters.")
-(defvar skg--maintenance-enrollment-census-scheduled nil
-  "Non-nil while one constructor-triggered incident census is queued.")
-
 (defun skg-register-maintenance-origin-handler (origin handler)
   "Register HANDLER for maintenance ORIGIN.
 HANDLER receives the durable server phase and parsed response, and returns
@@ -80,7 +77,7 @@ will give the more precise server explanation."
           (dolist (buffer (skg-registered-buffers))
             (skg-unlock-buffer-after-maintenance buffer local-epoch)))
         (setq skg--maintenance-client-incident nil
-              skg--maintenance-enrollment-census-scheduled nil)
+              skg--client-constructor-admission 'open)
         (unless (and explicitly-abandoned-incident
                      (equal (format "%s" incident)
                             (format "%s" explicitly-abandoned-incident)))
@@ -115,7 +112,11 @@ verification response already carries the server's more precise warning."
                          (plist-get skg--maintenance-client-incident :epoch))))
           (error "Maintenance handshake changed the active client epoch"))
         (dolist (buffer (skg-registered-buffers))
-          (skg-lock-buffer-for-maintenance buffer server-epoch)))
+          (with-current-buffer buffer
+            (when (eq (skg--buffer-record-view-write-authority
+                       skg--buffer-record)
+                      'editable)
+              (skg-lock-buffer-for-maintenance buffer server-epoch)))))
        ((and skg--maintenance-client-incident
              (member server-state '("idle" "observing" "pending")))
         (skg--maintenance-release-obsolete-local-incident
@@ -154,40 +155,17 @@ verification response already carries the server's more precise warning."
           (skg--maintenance-send-locked-census)
         (skg-maintenance-status t)))))
 
-(defun skg-maintenance-enroll-new-buffer (buffer-id)
-  "Queue one priority census when BUFFER-ID was born in active maintenance."
-  (let ((state skg--maintenance-client-incident))
-    (when (and state
-               (not (member buffer-id
-                            (plist-get state :registered-buffer-ids)))
-               (not skg--maintenance-enrollment-census-scheduled))
-      (setq skg--maintenance-enrollment-census-scheduled t)
-      (run-at-time
-       0 nil
-       (lambda (incident-id epoch)
-         (setq skg--maintenance-enrollment-census-scheduled nil)
-         (when (and skg--maintenance-client-incident
-                    (equal incident-id
-                           (plist-get skg--maintenance-client-incident
-                                      :incident-id))
-                    (equal epoch
-                           (plist-get skg--maintenance-client-incident :epoch)))
-           (skg--submit-buffer-census
-            (skg-tcp-connect-to-rust) incident-id epoch)))
-       (plist-get state :incident-id)
-       (plist-get state :epoch)))))
-
 (defun skg--maintenance-refresh-presentation-buffer-ids (response)
-  "Install RESPONSE's monotonically growing presentation buffer inventory."
+  "Install RESPONSE's presentation inventory without changing the frozen census."
   (when (assoc 'presentation-buffer-ids response)
-    (let* ((state skg--maintenance-client-incident)
-           (old (mapcar (lambda (id) (format "%s" id))
-                        (or (plist-get state :registered-buffer-ids) nil)))
-           (new (skg--maintenance-string-list
-                 response 'presentation-buffer-ids)))
-      (unless (cl-every (lambda (id) (member id new)) old)
-        (error "Maintenance presentation census lost a registered buffer"))
-      (setf (plist-get state :registered-buffer-ids) new))))
+    (let ((new (skg--maintenance-string-list
+                response 'presentation-buffer-ids)))
+      ;; Use the global plist as the setf place.  A local alias does not
+      ;; update the incident when this key was absent from the original
+      ;; plist, which is exactly the shape used by early status responses.
+      (setf (plist-get skg--maintenance-client-incident
+                       :presentation-buffer-ids)
+            new))))
 
 (defun skg--maintenance-send-locked-census ()
   "Ask the server to freeze the just-completed epoch-locked census."
@@ -200,7 +178,9 @@ verification response already carries the server's more precise warning."
      (concat
       (prin1-to-string
        `((request . "maintenance locked census")
-         (maintenance-epoch . ,epoch)))
+         (incident-id . ,incident-id)
+         (maintenance-epoch . ,epoch)
+         (client-constructor-admission . closed)))
       "\n")
      `((maintenance-offer ,#'skg--maintenance-handle-bootstrap . t)
        (error
@@ -225,7 +205,13 @@ verification response already carries the server's more precise warning."
   (sort (mapcar (lambda (buffer)
                   (with-current-buffer buffer
                     (skg--buffer-record-id skg--buffer-record)))
-                (skg-registered-buffers))
+                (cl-remove-if-not
+                 (lambda (buffer)
+                   (with-current-buffer buffer
+                     (eq (skg--buffer-record-view-write-authority
+                          skg--buffer-record)
+                         'editable)))
+                 (skg-registered-buffers)))
         #'string<))
 
 (defun skg--maintenance-modified-raw-file-buffers ()
@@ -286,7 +272,9 @@ verification response already carries the server's more precise warning."
     (unless (equal claimed-sha actual-sha)
       (error "Maintenance census checksum does not match"))
     (dolist (buffer (skg-registered-buffers))
-      (skg-lock-buffer-for-maintenance buffer epoch))
+      (when (member (with-current-buffer buffer
+                      (skg--buffer-record-id skg--buffer-record)) actual)
+        (skg-lock-buffer-for-maintenance buffer epoch)))
     actual-sha))
 
 (defun skg--maintenance-publish-initial ()
@@ -1188,9 +1176,9 @@ verification response already carries the server's more precise warning."
                  (equal (sort (copy-sequence unlock-ids) #'string<)
                         (sort (copy-sequence expected-ids) #'string<)))
       (error "Maintenance terminal instruction changed its exact authority"))
-    (dolist (buffer-id unlock-ids)
-      (when-let ((buffer (skg-find-buffer-by-id buffer-id)))
-        (skg-unlock-buffer-after-maintenance buffer epoch)))
+    ;; A terminal frame names the frozen census for identity checking. Each
+    ;; buffer is released only by its own settlement acknowledgement; the
+    ;; terminal frame never bypasses a delayed per-buffer restriction.
     (setf (plist-get skg--maintenance-client-incident :phase)
           'terminal-received
           (plist-get skg--maintenance-client-incident :terminal) response)
@@ -1224,26 +1212,38 @@ verification response already carries the server's more precise warning."
      (concat
       (prin1-to-string
        `((request . "acknowledge terminal maintenance")
+         (incident-id . ,incident-id)
          (maintenance-epoch . ,epoch)))
       "\n")
      nil incident-id)))
 
 (defun skg--maintenance-handle-terminal-ack (_tcp-proc payload)
-  (let ((response (read payload)))
-    (unless (equal (skg--maintenance-text response 'status) "idle")
-      (error "Server did not enter idle after terminal maintenance ACK"))
+  (let* ((response (read payload))
+         (state skg--maintenance-client-incident))
+    (unless (and state
+                 (equal (skg--maintenance-text response 'status)
+                        "terminal-acknowledged")
+                 (equal (skg--maintenance-text response 'incident-id)
+                        (plist-get state :incident-id))
+                 (= (skg--maintenance-field response 'maintenance-epoch)
+                    (plist-get state :epoch)))
+      (error "Terminal maintenance ACK changed its exact identity"))
+    ;; The ACK carries global graph/admission metadata.  Consume that
+    ;; metadata directly; terminal acknowledgement does not imply a global
+    ;; idle state or release any still-unsettled buffer.
+    (skg-update-global-server-status response)
     (skg--maintenance-finish-idle)))
 
 (defun skg--maintenance-finish-idle ()
-  "Forget a terminal incident only after the server durably reaches idle."
+  "Forget a terminal incident after its exact terminal ACK is durable."
   (let* ((state skg--maintenance-client-incident)
          (final (and state (plist-get state :final-archive)))
          (path (and final (plist-get final :path))))
     (unless (and state (eq (plist-get state :phase) 'terminal-received))
       (error "Server became idle before the client received terminal authority"))
-    (skg--maintenance-set-handshake-summary 'idle (plist-get state :epoch))
     (setq skg--maintenance-client-incident nil
-          skg--pending-maintenance-offer nil)
+          skg--pending-maintenance-offer nil
+          skg--client-constructor-admission 'open)
     (message "Skg maintenance complete; recovery archive: %s" path)))
 
 (defun skg--maintenance-inspect-retained-incident (response require-final)
@@ -1579,6 +1579,7 @@ checksummed final marker."
                    :server-evidence-sha256 nil
                    :scalar-challenge nil
                    :settlements nil
+                   :presentation-buffer-ids nil
                    :pending-settlements nil
                    :acknowledged-settlements nil
                    :locally-applied nil
@@ -1590,11 +1591,24 @@ checksummed final marker."
                    :origin-context origin-context
                    :terminal-callback terminal-callback
                    :terminal-callback-fired nil))
+       ;; Freeze constructor admission before taking the exact census.  Views
+       ;; requested after this point may be read-only presentation results,
+       ;; but cannot become members of this incident's write census.
+       (setq skg--client-constructor-admission 'closed)
+       (setf (plist-get skg--maintenance-client-incident
+                        :registered-buffer-ids)
+             (skg--maintenance-registered-ids))
        (skg--maintenance-set-handshake-summary 'active epoch)
        (dolist (buffer (skg-registered-buffers))
-         (skg-lock-buffer-for-maintenance buffer epoch))
+         (when (member (with-current-buffer buffer
+                         (skg--buffer-record-id skg--buffer-record))
+                       (plist-get skg--maintenance-client-incident
+                                  :registered-buffer-ids))
+           (skg-lock-buffer-for-maintenance buffer epoch)))
        (skg--submit-buffer-census
-        (skg-tcp-connect-to-rust) incident-id epoch))
+        (skg-tcp-connect-to-rust) incident-id epoch
+        (plist-get skg--maintenance-client-incident
+                   :registered-buffer-ids)))
       ("locked-census-accepted-publish-initial-archive"
        (skg--maintenance-require-client-incident incident-id epoch)
        (unless (and (equal offer
@@ -1636,6 +1650,15 @@ ORIGIN-CONTEXT is opaque client state retained across the origin adapter.
 ORIGIN-FIELDS are adapter-specific fields included in the bootstrap request."
   (skg--maintenance-refuse-modified-raw-files)
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
+    ;; Stop admitting new editable constructors before the bootstrap request
+    ;; enters the wire. Already serialized editable requests may drain while
+    ;; this remains `closing'; bootstrap advances it to `closed' before the
+    ;; exact census is frozen.
+    (setq skg--client-constructor-admission 'closing)
+    (skg-set-request-failure-handler
+     (lambda (_reason)
+       (unless skg--maintenance-client-incident
+         (setq skg--client-constructor-admission 'open))))
     (skg-register-response-handler
      'maintenance-offer
      (lambda (tcp payload)
@@ -1744,7 +1767,8 @@ ORIGIN-FIELDS are adapter-specific fields included in the bootstrap request."
                                response 'unlock-maintenance-epoch)))
            (dolist (buffer (skg-registered-buffers))
              (skg-unlock-buffer-after-maintenance buffer unlock-epoch))
-           (setq skg--maintenance-client-incident nil)
+           (setq skg--maintenance-client-incident nil
+                 skg--client-constructor-admission 'open)
            (message "Skg maintenance cancelled before archive publication.")))
        t)
       (skg-submit-request

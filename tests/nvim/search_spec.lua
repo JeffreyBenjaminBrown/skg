@@ -66,7 +66,8 @@ describe('skg.search', function ()
         seen = line
         respond(helpers.framed(
           '((response-type search-results) (content "* new search")'
-          .. ' (view-uri "' .. fresh_uri .. '") (warnings ()))'))
+          .. ' (view-uri "' .. fresh_uri .. '") (warnings ())'
+          .. ' (view-write-authority editable))'))
       end
     end)
     search.request_text_search('dog', true, false, true, nil, fresh_uri)
@@ -94,7 +95,8 @@ describe('skg.search', function ()
         respond(helpers.framed(
           '((response-type search-results)'
           .. ' (content "* (skg (node (id r1))) first result'
-          .. '\\n* (skg (node (id r2))) second result"))'))
+          .. '\\n* (skg (node (id r2))) second result")'
+          .. ' (view-write-authority editable))'))
         -- Immediately ask for the snapshot, as the server does.
         respond(helpers.framed(
           '((response-type request-snapshot)'
@@ -153,7 +155,8 @@ describe('skg.search', function ()
         respond(helpers.framed(
           '((response-type search-results)'
           .. ' (content "* (skg (node (id pick-me)))'
-          .. ' chosen [[id:inner][with link]] title"))'))
+          .. ' chosen [[id:inner][with link]] title")'
+          .. ' (view-write-authority editable))'))
       end
     end)
     local source = buffer.open_org_buffer_from_text(
@@ -193,7 +196,8 @@ describe('skg.search', function ()
       if line:find('"text search"', 1, true) then
         respond(helpers.framed(
           '((response-type search-results)'
-          .. ' (content "* (skg (node (id r1))) result"))'))
+          .. ' (content "* (skg (node (id r1))) result")'
+          .. ' (view-write-authority editable))'))
       end
     end)
     search.search('plain')

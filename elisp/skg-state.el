@@ -40,6 +40,18 @@ The value is nil, `sent', `census', `census-texts', `verified',
 (defvar skg--rebuilding nil
   "Non-nil exactly while server metadata says a graph/search pair is rebuilding.")
 
+(defvar skg--graph-write-admission nil
+  "Current server admission for new editable views: `open', `closed', or nil.")
+
+(defvar skg--graph-transition-status nil
+  "Current server graph transition status, independent of incident reports.")
+
+(defvar skg--pending-incidents nil
+  "Compact server-reported maintenance incident summaries.")
+
+(defvar skg--client-constructor-admission 'open
+  "Whether new editable client view constructors may join maintenance census.")
+
 (defun skg-update-rebuilding-status (response)
   "Update the rebuilding flag when RESPONSE explicitly carries that status.
 An omitted field preserves the last authoritative value."
@@ -58,6 +70,72 @@ An omitted field preserves the last authoritative value."
         (error "Invalid rebuilding status %S" value))))
     (force-mode-line-update t))
   skg--rebuilding)
+
+(defun skg-update-global-server-status (response)
+  "Install explicit process-wide graph status from current-session RESPONSE.
+Report-local selected-* fields never update the current graph identity."
+  (when (cl-some (lambda (key) (assoc key response))
+                 '(current-graph-generation current-manifest-revision
+                   graph-write-admission graph-transition-status rebuilding
+                   pending-incidents))
+    (when (cl-some (lambda (key) (assoc key response))
+                   '(current-graph-generation current-manifest-revision
+                     graph-write-admission graph-transition-status
+                     pending-incidents))
+      (skg-require-current-server-session response))
+    (when-let ((entry (assoc 'graph-write-admission response)))
+      (let ((value (intern (format "%s" (cadr entry)))))
+        (unless (memq value '(open closed))
+          (error "Invalid graph write admission %S" (cadr entry)))
+        (setq skg--graph-write-admission value)
+        ;; A published open graph reopens fresh editable views after a
+        ;; census barrier. The pre-census `closing' state still lets already
+        ;; serialized requests drain without admitting new constructors.
+        (when (and (eq value 'open)
+                   (eq skg--client-constructor-admission 'closed))
+          (setq skg--client-constructor-admission 'open))))
+    (when-let ((entry (assoc 'graph-transition-status response)))
+      (setq skg--graph-transition-status (cadr entry)))
+    (when-let ((entry (assoc 'pending-incidents response)))
+      (setq skg--pending-incidents (cadr entry)))
+    (when-let ((entry (assoc 'current-graph-generation response)))
+      (unless (natnump (cadr entry))
+        (error "Invalid current graph generation %S" (cadr entry)))
+      (setf (alist-get 'graph-generation skg--server-store-state)
+            (cadr entry)))
+    (when-let ((entry (assoc 'current-manifest-revision response)))
+      (unless (natnump (cadr entry))
+        (error "Invalid current manifest revision %S" (cadr entry)))
+      (setf (alist-get 'manifest-revision skg--server-store-state)
+            (cadr entry)))
+    (skg-update-rebuilding-status response)))
+
+(defun skg-requested-view-write-authority ()
+  "Return the authority a new view request may ask the server to grant."
+  (pcase skg--graph-write-admission
+    ('open (if (eq skg--client-constructor-admission 'open)
+               'editable
+             'read-only))
+    ('closed 'read-only)
+    ('closing 'read-only)
+    (_ (error "Skg view admission is unavailable before verification"))))
+
+(defun skg-require-client-constructor-admission ()
+  "Refuse a new interactive constructor outside the writable boundary."
+  (unless (eq skg--client-constructor-admission 'open)
+    (user-error "Skg client constructor admission is closed")))
+
+(defun skg-view-write-authority-from-response (response)
+  "Return RESPONSE's mandatory view authority, rejecting obsolete grants."
+  (let* ((entry (assoc 'view-write-authority response))
+         (authority (and entry (intern (format "%s" (cadr entry))))))
+    (unless (memq authority '(editable read-only))
+      (error "Skg response omitted valid view-write-authority"))
+    (when (and (eq authority 'editable)
+               (or (eq skg--graph-write-admission 'closed)
+                   (eq skg--client-constructor-admission 'closed)))
+      (error "Skg refused editable view authority while admission is closed"))
+    authority))
 
 (cl-defstruct skg--request-record
   id incident-id handlers terminal-handler failure-handler finalizer finalized-p)

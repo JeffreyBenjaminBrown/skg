@@ -8,7 +8,8 @@
 (require 'skg-request-save) ; For message formatting/display helpers
 
 (defun skg--single-root-view-request-string
-    (clean-id view-uri bypass-override &optional approved-pids fresh-view-p)
+    (clean-id view-uri bypass-override &optional approved-pids fresh-view-p
+              requested-authority)
   "The request sexp string for a single root content view of CLEAN-ID.
 When BYPASS-OVERRIDE is non-nil, the request carries
 \(override-choice . \"bypass\")."
@@ -16,7 +17,9 @@ When BYPASS-OVERRIDE is non-nil, the request carries
            (append
             `((request . "single root content view")
               (id . ,clean-id)
-              (view-uri . ,view-uri))
+              (view-uri . ,view-uri)
+              (requested-view-write-authority
+               . ,(or requested-authority 'editable)))
             (when bypass-override
               '((override-choice . "bypass")))
             (when approved-pids
@@ -39,13 +42,18 @@ STALE-URI-RETRY-P is an internal guard that prevents repeated recovery.
 FRESH-VIEW-P asks the server not to redirect to an already-open root."
   (interactive "sNode ID: ")
   (let* ((tcp-proc (or tcp-proc (skg-tcp-connect-to-rust)))
+         (_verified
+          (unless (skg-connection-handshake-ensure)
+            (error "Cannot request a view before server verification completes")))
+         (requested-authority (skg-requested-view-write-authority))
          (view-uri (or view-uri (org-id-uuid)))
          (clean-id (if (stringp node-id)
                        (substring-no-properties node-id)
                      node-id))
          (request-s-exp
           (skg--single-root-view-request-string
-           clean-id view-uri bypass-override approved-pids fresh-view-p)))
+           clean-id view-uri bypass-override approved-pids fresh-view-p
+           requested-authority)))
     ;; Register handler in dispatch map (one-shot)
     (skg-register-response-handler
      'content-view

@@ -154,6 +154,7 @@ This inspects the public package header without enabling any package mode."
              (signal (car err) (cdr err)))))
          (content (cadr (assoc 'content response))))
     (setq skg--server-session-id server-session-id)
+    (skg-update-global-server-status response)
     (skg-install-source-inventory response)
     (setq skg--active-source-set-name
           (format "%s" (cadr (assoc 'active-source-set response)))
@@ -167,9 +168,11 @@ This inspects the public package header without enabling any package mode."
             (census-required . ,(cadr (assoc 'census-required response))))
           skg--server-store-state
           `((graph-generation
-             . ,(cadr (assoc 'graph-generation response)))
+             . ,(or (cadr (assoc 'current-graph-generation response))
+                    (cadr (assoc 'graph-generation response))))
             (manifest-revision
-             . ,(cadr (assoc 'manifest-revision response)))
+             . ,(or (cadr (assoc 'current-manifest-revision response))
+                    (cadr (assoc 'manifest-revision response))))
             (typedb-health
              . ,(cadr (assoc 'typedb-health response)))
             (tantivy-health
@@ -193,7 +196,7 @@ This inspects the public package header without enabling any package mode."
     (skg--submit-buffer-census tcp-proc)))
 
 (defun skg--submit-buffer-census
-    (tcp-proc &optional maintenance-incident-id maintenance-epoch)
+    (tcp-proc &optional maintenance-incident-id maintenance-epoch buffer-ids)
   "Send compact descriptors without embedding any complete view text.
 When MAINTENANCE-INCIDENT-ID is non-nil, bind the census to its locked
 MAINTENANCE-EPOCH instead of treating it only as connection reconciliation."
@@ -213,7 +216,18 @@ MAINTENANCE-EPOCH instead of treating it only as connection reconciliation."
       . t)
      ,@(unless maintenance-incident-id
          `((error ,#'skg--record-connection-handshake-error . t))))
-   (prin1-to-string (skg-buffer-census))
+   (if (and maintenance-incident-id (null buffer-ids))
+       "()"
+     (prin1-to-string
+      (if buffer-ids
+          (skg-buffer-census
+           (cl-remove-if-not
+            (lambda (buffer)
+              (member (with-current-buffer buffer
+                        (skg--buffer-record-id skg--buffer-record))
+                      buffer-ids))
+            (skg-registered-buffers)))
+        (skg-buffer-census))))
    maintenance-incident-id))
 
 (defun skg--handle-buffer-census-response

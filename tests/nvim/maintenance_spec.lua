@@ -158,6 +158,80 @@ describe('skg Neovim maintenance handshake', function ()
       maintenance.validate_settlements({ one }, { 'one', 'two' }) end)
   end)
 
+  it('keeps frozen writable census membership when a readonly result arrives',
+     function ()
+    state.maintenance_client_incident = {
+      registered_buffer_ids = { 'writable' },
+    }
+    maintenance.refresh_presentation_buffer_ids({
+      f('presentation-buffer-ids', { 'writable', 'readonly-result' }),
+    })
+    assert.are.same({ 'writable' },
+      state.maintenance_client_incident.registered_buffer_ids)
+    assert.are.same({ 'writable', 'readonly-result' },
+      state.maintenance_client_incident.presentation_buffer_ids)
+  end)
+
+  it('does not enroll post-publication constructors in an old incident',
+     function ()
+    local old_summary = state.maintenance_state
+    local old_incident = state.maintenance_client_incident
+    local old_graph = state.graph_write_admission
+    local old_constructor = state.client_constructor_admission
+    local editable = vim.api.nvim_create_buf(false, true)
+    local readonly = vim.api.nvim_create_buf(false, true)
+    local ok, err = pcall(function ()
+      state.maintenance_state = { epoch = 9, state = 'active' }
+      state.maintenance_client_incident = {
+        incident_id = incident_id, epoch = 9,
+        registered_buffer_ids = { 'frozen-buffer' },
+      }
+      state.graph_write_admission = 'open'
+      state.client_constructor_admission = 'open'
+      vim.api.nvim_buf_set_lines(editable, 0, -1, false,
+                                 { '* Fresh editable view' })
+      registry.register(editable, 'content-view', {
+        lifecycle = 'live-view', disposable = false,
+        view_uri = 'fresh', view_write_authority = 'editable',
+      })
+      vim.api.nvim_buf_set_lines(readonly, 0, -1, false,
+                                 { '* Late readonly result' })
+      registry.register(readonly, 'content-view', {
+        lifecycle = 'live-view', disposable = false,
+        view_uri = 'late', view_write_authority = 'read-only',
+      })
+      assert.is_nil(registry.record(editable).maintenance_epoch)
+      assert.is_true(vim.bo[editable].modifiable)
+      assert.is_nil(registry.record(readonly).maintenance_epoch)
+    end)
+    state.maintenance_state = old_summary
+    state.maintenance_client_incident = old_incident
+    state.graph_write_admission = old_graph
+    state.client_constructor_admission = old_constructor
+    pcall(vim.api.nvim_buf_delete, editable, { force = true })
+    pcall(vim.api.nvim_buf_delete, readonly, { force = true })
+    assert.is_true(ok, err)
+  end)
+
+  it('defaults an unbound constructor to readonly while admission is closed',
+     function ()
+    local old_constructor = state.client_constructor_admission
+    local buf = vim.api.nvim_create_buf(false, true)
+    local ok, err = pcall(function ()
+      state.client_constructor_admission = 'closed'
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, { '* Late view' })
+      registry.register(buf, 'content-view', {
+        lifecycle = 'live-view', disposable = false, view_uri = 'late',
+      })
+      assert.are.equal('read-only',
+        registry.record(buf).view_write_authority)
+      assert.is_nil(registry.record(buf).maintenance_epoch)
+    end)
+    state.client_constructor_admission = old_constructor
+    pcall(vim.api.nvim_buf_delete, buf, { force = true })
+    assert.is_true(ok, err)
+  end)
+
   it('sends exact explicit targets and starts the server-owned origin worker',
      function ()
     local client_module = require('skg.client')
@@ -293,6 +367,9 @@ describe('skg Neovim maintenance handshake', function ()
     assert.are.equal('tcp', priority[1])
     assert.matches('maintenance locked census', priority[2], 1, true)
     assert.matches('maintenance%-epoch', priority[2])
+    assert.matches('incident%-id', priority[2])
+    assert.matches('client%-constructor%-admission', priority[2])
+    assert.matches('closed', priority[2])
     assert.are.equal(incident_id, priority[5])
 
     local real_publish = maintenance.publish_initial
@@ -309,7 +386,7 @@ describe('skg Neovim maintenance handshake', function ()
       state.maintenance_client_incident.lock_census_sha256)
   end)
 
-  it('registers buffers born during maintenance under the active lock',
+  it('leaves post-census buffers outside the active lock',
      function ()
     state.maintenance_state = { epoch = 9, state = 'active' }
     local buf = vim.api.nvim_create_buf(false, true)
@@ -318,8 +395,8 @@ describe('skg Neovim maintenance handshake', function ()
       lifecycle = 'live-view', disposable = false,
       last_fetched = '* New view\n',
     })
-    assert.are.equal(9, registry.record(buf).maintenance_epoch)
-    assert.is_false(vim.bo[buf].modifiable)
+    assert.is_nil(registry.record(buf).maintenance_epoch)
+    assert.is_true(vim.bo[buf].modifiable)
   end)
 
   it('dispatches reconnect phases through the registered origin adapter',
@@ -700,7 +777,7 @@ describe('skg Neovim maintenance handshake', function ()
     })
     scheduled()
     maintenance.send_terminal_ack = real_terminal_ack
-    assert.is_nil(registry.record(buf).maintenance_epoch)
+    assert.are.equal(9, registry.record(buf).maintenance_epoch)
     assert.are.equal('terminal-received',
       state.maintenance_client_incident.phase)
     assert.are.equal('terminal', state.maintenance_state.state)
@@ -763,9 +840,19 @@ describe('skg Neovim maintenance handshake', function ()
     assert.matches('acknowledge terminal maintenance', requests[3].wire,
       1, true)
 
-    maintenance.handle_terminal_ack(nil, { f('status', 'idle') })
+    state.server_session_id = 'server-session'
+    maintenance.handle_terminal_ack(nil, {
+      f('status', 'terminal-acknowledged'),
+      f('incident-id', incident_id), f('maintenance-epoch', 9),
+      f('server-session-id', 'server-session'),
+      f('current-graph-generation', 2),
+      f('current-manifest-revision', 6),
+      f('graph-write-admission', 'open'),
+      f('graph-transition-status', 'idle'), f('rebuilding', 'nil'),
+      f('pending-incidents', {}),
+    })
     assert.is_nil(state.maintenance_client_incident)
-    assert.are.equal('idle', state.maintenance_state.state)
+    assert.are.equal('terminal', state.maintenance_state.state)
   end)
 
   it('does not detach active settlement debt during reconnect census',

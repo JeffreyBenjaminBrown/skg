@@ -21,7 +21,10 @@
      (maintenance-epoch 0) (maintenance-state idle)
      (census-required true) (graph-generation 7)
      (manifest-revision 9) (typedb-health healthy)
-     (tantivy-health healthy) (content connected))))
+     (tantivy-health healthy) (content connected)
+     (current-graph-generation 7) (current-manifest-revision 9)
+     (graph-write-admission open) (graph-transition-status idle)
+     (rebuilding nil) (pending-incidents ()))))
 
 (ert-deftest test-skg-protocol-v2-handshake-is-explicit ()
   (let ((request (read (skg--connection-handshake-request))))
@@ -35,6 +38,24 @@
              (regexp-quote
               (concat "(server-session-id . \"" skg-test-session-new "\")"))
              stamped))))
+
+(ert-deftest test-skg-client-constructor-gate-reopens-on-authoritative-publication ()
+  (let ((skg--server-session-id skg-test-session-new)
+        (skg--graph-write-admission 'open)
+        (skg--client-constructor-admission 'closed)
+        (skg--server-store-state nil))
+    (should (eq 'read-only (skg-requested-view-write-authority)))
+    (should-error
+     (skg-view-write-authority-from-response
+      '((server-session-id "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")
+        (view-write-authority editable))))
+    (skg-update-global-server-status
+     '((server-session-id "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")
+       (current-graph-generation 8) (current-manifest-revision 10)
+       (graph-write-admission open) (graph-transition-status idle)
+       (rebuilding nil) (pending-incidents ())))
+    (should (eq 'open skg--client-constructor-admission))
+    (should (eq 'editable (skg-requested-view-write-authority)))))
 
 (ert-deftest test-skg-protocol-mismatch-preserves-text-and-undo ()
   (let ((buffer (generate-new-buffer " *skg-protocol-mismatch*"))

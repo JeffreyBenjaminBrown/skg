@@ -12,7 +12,8 @@
 
 (defun skg-test-stamped-response (fields)
   (prin1-to-string
-   (append fields `((server-session-id ,skg-test-server-session-id)))))
+   (append fields `((server-session-id ,skg-test-server-session-id)
+                    (view-write-authority editable)))))
 
 (ert-deftest test-emacs-handshake-names-missing-native-undo-clearly ()
   (cl-letf (((symbol-function 'skg--installed-undo-fu-session-version)

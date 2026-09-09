@@ -214,6 +214,7 @@ function M.register (buf, kind, options)
   local state = require('skg.state')
   local current = M.raw_text(buf)
   local last_fetched = options.last_fetched or current
+  local existing = vim.b[buf].skg_buffer_id ~= nil
   local old_origin_id = vim.b[buf].skg_origin_buffer_id
   local origin_record = nil
   if options.origin_buffer then
@@ -240,6 +241,16 @@ function M.register (buf, kind, options)
     or vim.b[buf].skg_server_session_id
     or (origin_record and origin_record.server_session_id)
     or state.server_session_id
+  local authority = options.view_write_authority
+    or vim.b[buf].skg_view_write_authority
+    or (origin_record and origin_record.view_write_authority)
+    or 'editable'
+  if not existing
+     and options.view_write_authority == nil
+     and state.client_constructor_admission ~= 'open' then
+    authority = 'read-only'
+  end
+  vim.b[buf].skg_view_write_authority = authority
   local store_state = require('skg.config').store_state or {}
   local initial_graph_generation =
     options.graph_generation or store_state.graph_generation
@@ -259,17 +270,6 @@ function M.register (buf, kind, options)
   vim.b[buf].skg_presentation_stale = false
   vim.b[buf].skg_search_stale = false
   vim.b[buf].skg_herald_bearing = last_fetched:find('(heralds', 1, true) ~= nil
-  local maintenance = state.maintenance_state
-  if maintenance and maintenance.state == 'active' then
-    local epoch = maintenance.epoch
-    if type(epoch) ~= 'number' or epoch < 0 or epoch ~= math.floor(epoch) then
-      error('Active maintenance has no valid epoch') end
-    M.lock_for_maintenance(buf, epoch)
-    local buffer_id = vim.b[buf].skg_buffer_id
-    vim.schedule(function ()
-      require('skg.maintenance').enroll_new_buffer(buffer_id)
-    end)
-  end
   if not vim.b[buf].skg_registry_cleanup_installed then
     vim.b[buf].skg_registry_cleanup_installed = true
     vim.api.nvim_create_autocmd('BufWipeout', {
@@ -304,6 +304,7 @@ function M.record (buf)
     root_ids = vim.b[buf].skg_root_ids,
     source_set = vim.b[buf].skg_record_source_set,
     server_session_id = vim.b[buf].skg_server_session_id,
+    view_write_authority = vim.b[buf].skg_view_write_authority,
     graph_generation = vim.b[buf].skg_graph_generation,
     presentation_generation = vim.b[buf].skg_presentation_generation,
     server_revision = vim.b[buf].skg_server_revision,
@@ -576,13 +577,19 @@ function M.unlock_after_maintenance (buf, epoch)
   end
 end
 
-function M.census ()
+function M.census (buffer_ids)
+  local wanted
+  if buffer_ids then
+    wanted = {}
+    for _, id in ipairs(buffer_ids) do wanted[id] = true end
+  end
   local result = {}
   for _, buf in ipairs(M.buffers()) do
     local record = M.record(buf)
-    local current = M.raw_text(buf)
-    local undo_tree = vim.api.nvim_buf_call(buf, vim.fn.undotree)
-    table.insert(result, {
+    if not wanted or wanted[record.id] then
+      local current = M.raw_text(buf)
+      local undo_tree = vim.api.nvim_buf_call(buf, vim.fn.undotree)
+      table.insert(result, {
       buffer_id = record.id,
       kind = record.kind,
       lifecycle = record.lifecycle,
@@ -597,6 +604,7 @@ function M.census ()
       root_ids = normalized_strings(record.root_ids),
       source_set = record.source_set or 'all',
       server_session_id = record.server_session_id or 'nil',
+      view_write_authority = record.view_write_authority,
       graph_generation = record.graph_generation or 0,
       presentation_generation = record.presentation_generation or 0,
       server_revision = record.server_revision or 0,
@@ -611,7 +619,8 @@ function M.census ()
       herald_bearing = vim.b[buf].skg_herald_bearing == true,
       last_fetched_sha256 = record.last_fetched_sha256,
       current_sha256 = digest(current),
-    })
+      })
+    end
   end
   return result
 end
@@ -620,10 +629,10 @@ local function atom_pair (sexpr, key, value)
   return sexpr.pair(sexpr.symbol(key), tostring(value))
 end
 
-function M.census_payload ()
+function M.census_payload (buffer_ids)
   local sexpr = require('skg.sexpr.parse')
   local records = {}
-  for _, descriptor in ipairs(M.census()) do
+  for _, descriptor in ipairs(M.census(buffer_ids)) do
     table.insert(records, {
       atom_pair(sexpr, 'buffer-id', descriptor.buffer_id),
       atom_pair(sexpr, 'kind', descriptor.kind),
@@ -645,6 +654,8 @@ function M.census_payload ()
       { sexpr.symbol('root-ids'), descriptor.root_ids },
       atom_pair(sexpr, 'source-set', descriptor.source_set),
       atom_pair(sexpr, 'server-session-id', descriptor.server_session_id),
+      atom_pair(sexpr, 'view-write-authority',
+                descriptor.view_write_authority),
       atom_pair(sexpr, 'graph-generation', descriptor.graph_generation),
       atom_pair(sexpr, 'presentation-generation',
                 descriptor.presentation_generation),
@@ -767,6 +778,9 @@ function M.status_messages (buf)
      and state.server_session_id ~= record.server_session_id then
     table.insert(messages,
       'This buffer belongs to an earlier server session; reopen it before saving') end
+  if record.view_write_authority ~= 'editable' then
+    table.insert(messages,
+      'This result is read-only; reopen it explicitly to gain save authority') end
   if vim.b[buf].skg_raw_externally_stale == true then
     table.insert(messages,
       'This raw .skg file changed on disk; revert or reconcile before saving') end
@@ -786,6 +800,8 @@ function M.known_save_restriction (buf)
   if state.server_session_id and record
      and state.server_session_id ~= record.server_session_id then
     return 'this buffer belongs to an earlier server session; reopen it' end
+  if record and record.view_write_authority ~= 'editable' then
+    return 'this view has read-only result authority; reopen it explicitly' end
   return nil
 end
 

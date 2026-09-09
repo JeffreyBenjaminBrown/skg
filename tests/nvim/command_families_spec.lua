@@ -336,13 +336,53 @@ describe('skg.org_ancestry and view_new_empty', function ()
       require('skg.sexpr.parse').read('(skg (node (id)))'))
     local picker = require('skg.picker')
     local original = picker.prompt_for_owned_source
+    local client = require('skg.client')
+    local misc = require('skg.misc_requests')
+    local original_connect = client.connect
+    local original_ensure = misc.ensure_connection_handshake
+    client.connect = function () return nil end
+    misc.ensure_connection_handshake = function () return true end
+    require('skg.state').graph_write_admission = 'open'
     picker.prompt_for_owned_source = function () return 'public' end
     require('skg.view_new_empty').view_new_empty()
     picker.prompt_for_owned_source = original
+    client.connect = original_connect
+    misc.ensure_connection_handshake = original_ensure
     assert.is_truthy(buffer_text():find(
       '* (skg (node (source public) indef)) life, the universe'
       .. ' and everything', 1, true))
     assert.is_truthy(vim.b[vim.api.nvim_get_current_buf()]
                      .skg_view_uri)
+  end)
+
+  it('view_new_empty refuses before prompting across the constructor barrier',
+     function ()
+    local state = require('skg.state')
+    local client = require('skg.client')
+    local misc = require('skg.misc_requests')
+    local picker = require('skg.picker')
+    local original_connect = client.connect
+    local original_ensure = misc.ensure_connection_handshake
+    local original_prompt = picker.prompt_for_owned_source
+    local prompted = false
+    client.connect = function () return nil end
+    misc.ensure_connection_handshake = function () return true end
+    picker.prompt_for_owned_source = function ()
+      prompted = true
+      return 'public'
+    end
+    local old_graph = state.graph_write_admission
+    local old_constructor = state.client_constructor_admission
+    state.graph_write_admission = 'open'
+    state.client_constructor_admission = 'closed'
+    local ok, err = pcall(require('skg.view_new_empty').view_new_empty)
+    state.graph_write_admission = old_graph
+    state.client_constructor_admission = old_constructor
+    client.connect = original_connect
+    misc.ensure_connection_handshake = original_ensure
+    picker.prompt_for_owned_source = original_prompt
+    assert.is_false(ok)
+    assert.is_truthy(tostring(err):find('admission is closed', 1, true))
+    assert.is_false(prompted)
   end)
 end)

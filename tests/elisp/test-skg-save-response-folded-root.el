@@ -229,6 +229,7 @@ headline and not back on the focused headline."
               '((content "* root\n")
                 (errors ())
                 (warnings ("audit warning"))
+                (view-write-authority editable)
                 (server-session-id "11111111-2222-4333-8444-555555555555"))))
             (should (string= (buffer-string) "* root\n"))
             (should (equal (car shown) "*SKG Save Warnings*"))
@@ -260,6 +261,7 @@ headline and not back on the focused headline."
                 (errors ()) (warnings ()) (root-ids (root))
                 (graph-generation 2) (presentation-generation 0)
                 (server-revision 1) (client-application-token 2)
+                (view-write-authority editable)
                 (server-session-id "11111111-2222-4333-8444-555555555555")))))
           (should (= 2 (alist-get 'graph-generation
                                   skg--server-store-state)))
@@ -312,6 +314,7 @@ headline and not back on the focused headline."
  (view-base-graph-generation 2)\
  (view-base-presentation-generation 0)\
  (expected-client-application-token 2)\
+ (view-write-authority editable)\
  (resulting-client-application-token 3)\
  (view-base-source-set all) (resulting-source-set all)\
  (server-session-id \"11111111-2222-4333-8444-555555555555\"))"))
@@ -359,6 +362,7 @@ headline and not back on the focused headline."
  (view-base-graph-generation 2)\
  (view-base-presentation-generation 0)\
  (expected-client-application-token 2)\
+ (view-write-authority editable)\
  (resulting-client-application-token 3)\
  (view-base-source-set all) (resulting-source-set all)\
  (server-session-id \"11111111-2222-4333-8444-555555555555\"))"
@@ -391,6 +395,7 @@ headline and not back on the focused headline."
               '((content nil)
                 (errors ("fatal save error"))
                 (warnings ("audit warning"))
+                (view-write-authority editable)
                 (server-session-id "11111111-2222-4333-8444-555555555555"))))
             (should-not replaced)
             (should (equal (car shown) "*SKG Save Errors and Warnings*"))

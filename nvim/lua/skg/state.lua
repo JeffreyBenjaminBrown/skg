@@ -20,6 +20,10 @@ M.maintenance_archive_folder = nil
 M.maintenance_archive_identity = nil
 M.maintenance_state = nil
 M.rebuilding = M.rebuilding or false
+M.graph_write_admission = nil
+M.client_constructor_admission = 'open'
+M.graph_transition_status = nil
+M.pending_incidents = {}
 M.maintenance_client_incident = M.maintenance_client_incident or nil
 M.pending_maintenance_offer = M.pending_maintenance_offer or nil
 M.pending_recovery_incidents = M.pending_recovery_incidents or {}
@@ -34,6 +38,93 @@ function M.update_rebuilding_status (value)
   else error('Invalid rebuilding status ' .. tostring(value)) end
   vim.cmd('redrawstatus')
   return M.rebuilding
+end
+
+---Install explicit process-wide graph status from a current-session response.
+---Report-local selected-* fields never update the current graph identity.
+---@param response any
+function M.update_global_server_status (response)
+  local payload = require('skg.payload')
+  local fields = {
+    'current-graph-generation', 'current-manifest-revision',
+    'graph-write-admission', 'graph-transition-status', 'rebuilding',
+    'pending-incidents',
+  }
+  local present = false
+  for _, key in ipairs(fields) do
+    if payload.field(response, key) ~= nil then present = true break end
+  end
+  if not present then return end
+  if payload.field(response, 'current-graph-generation') ~= nil
+     or payload.field(response, 'current-manifest-revision') ~= nil
+     or payload.field(response, 'graph-write-admission') ~= nil
+     or payload.field(response, 'graph-transition-status') ~= nil
+     or payload.field(response, 'pending-incidents') ~= nil then
+    M.require_current_server_session(response)
+  end
+  local admission = payload.field_text(response, 'graph-write-admission')
+  if admission then
+    if admission ~= 'open' and admission ~= 'closed' then
+      error('Invalid graph write admission ' .. admission) end
+    M.graph_write_admission = admission
+    if admission == 'open' and M.client_constructor_admission == 'closed' then
+      -- Publication reopens fresh editable views even while old incident
+      -- reports remain visible; per-buffer restrictions stay local.
+      M.client_constructor_admission = 'open'
+    end
+  end
+  local transition = payload.field_text(response, 'graph-transition-status')
+  if transition then M.graph_transition_status = transition end
+  local incidents = payload.field(response, 'pending-incidents')
+  if incidents ~= nil then M.pending_incidents = incidents end
+  local config = require('skg.config')
+  config.store_state = config.store_state or {}
+  local graph = payload.field(response, 'current-graph-generation')
+  if graph ~= nil then
+    if type(graph) ~= 'number' or graph < 0 or graph ~= math.floor(graph) then
+      error('Invalid current graph generation') end
+    config.store_state.graph_generation = graph
+  end
+  local revision = payload.field(response, 'current-manifest-revision')
+  if revision ~= nil then
+    if type(revision) ~= 'number' or revision < 0
+       or revision ~= math.floor(revision) then
+      error('Invalid current manifest revision') end
+    config.store_state.manifest_revision = revision
+  end
+  M.update_rebuilding_status(payload.field_text(response, 'rebuilding'))
+end
+
+---Return the authority a new view request may ask the server to grant.
+---@return string
+function M.requested_view_write_authority ()
+  if M.graph_write_admission == 'open' then
+    if M.client_constructor_admission == 'open' then return 'editable' end
+    return 'read-only'
+  end
+  if M.graph_write_admission == 'closed' then return 'read-only' end
+  if M.graph_write_admission == 'closing' then return 'read-only' end
+  error('Skg view admission is unavailable before verification')
+end
+
+function M.require_client_constructor_admission ()
+  if M.client_constructor_admission ~= 'open' then
+    error('Skg client constructor admission is closed') end
+end
+
+---Return RESPONSE's mandatory view authority, rejecting obsolete grants.
+---@param response any
+---@return string
+function M.view_write_authority_from_response (response)
+  local payload = require('skg.payload')
+  local authority = payload.field_text(response, 'view-write-authority')
+  if authority ~= 'editable' and authority ~= 'read-only' then
+    error('Skg response omitted valid view-write-authority') end
+  if authority == 'editable'
+     and (M.graph_write_admission == 'closed'
+          or M.client_constructor_admission == 'closed') then
+    error('Skg refused editable view authority while admission is closed') end
+  return authority
 end
 
 ---Require RESPONSE to carry authority from the active server instance.

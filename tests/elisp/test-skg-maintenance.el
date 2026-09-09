@@ -30,7 +30,8 @@
   (declare (indent 1))
   `(let ((buffer (generate-new-buffer " *skg-maintenance-test*"))
          (skg--buffer-registry (make-hash-table :test #'equal))
-         (skg--server-store-state '((graph-generation . 1))))
+         (skg--server-store-state '((graph-generation . 1)))
+         (skg--client-constructor-admission 'open))
      (unwind-protect
          (with-current-buffer buffer
            (org-mode)
@@ -72,14 +73,12 @@
     (let ((skg--maintenance-client-incident
            '(:incident-id "old-incident" :epoch 9 :phase waiting-for-server))
           (skg--maintenance-state '((epoch . 10) (state . idle)))
-          (skg--maintenance-enrollment-census-scheduled t)
           shown)
       (cl-letf (((symbol-function 'display-warning)
                  (lambda (type message level &rest _)
                    (setq shown (list type message level)))))
         (skg-maintenance-adopt-handshake-epoch))
       (should-not skg--maintenance-client-incident)
-      (should-not skg--maintenance-enrollment-census-scheduled)
       (should-not (skg--buffer-record-maintenance-epoch skg--buffer-record))
       (should-not skg--maintenance-lock-overlay)
       (should (eq (car shown) 'skg))
@@ -114,7 +113,7 @@
       (should (= 10 (plist-get skg--maintenance-client-incident :epoch)))
       (should (= 10 (skg--buffer-record-maintenance-epoch
                      skg--buffer-record)))
-      (should (equal submitted '(tcp "new-incident" 10)))
+      (should (equal (butlast submitted) '(tcp "new-incident" 10)))
       (should (string-match-p "old-incident" shown)))))
 
 (ert-deftest test-skg-every-maintenance-origin-refuses-dirty-raw-files-first ()
@@ -167,7 +166,8 @@
          nil (concat "((status install-maintenance-epoch-and-submit-locked-census)"
                      base " (registered-buffer-ids ()))")
          #'ignore 'origin-context)
-        (should (equal census-arguments '(tcp "incident" 9)))
+      (should (equal (butlast census-arguments)
+                     '(tcp "incident" 9)))
         (should (eq (plist-get skg--maintenance-client-incident :phase)
                     'awaiting-locked-census))
         (should (= 9 (skg--buffer-record-maintenance-epoch
@@ -211,7 +211,7 @@
       (should (string-match-p "dirty undo cannot be archived" warning))
       (should (equal scheduled '(skg-cancel-maintenance "incident" 9))))))
 
-(ert-deftest test-skg-buffer-born-during-maintenance-inherits-epoch ()
+(ert-deftest test-skg-buffer-born-during-maintenance-is-outside-frozen-census ()
   (let ((buffer (generate-new-buffer " *skg-born-locked-test*"))
         (skg--buffer-registry (make-hash-table :test #'equal))
         (skg--server-store-state '((graph-generation . 1)))
@@ -223,9 +223,9 @@
           (skg-register-buffer
            buffer 'content-view :lifecycle 'live-view :disposable nil
            :view-uri "new-view")
-          (should (= 12 (skg--buffer-record-maintenance-epoch
-                         skg--buffer-record)))
-          (should (overlayp skg--maintenance-lock-overlay)))
+          (should-not (skg--buffer-record-maintenance-epoch
+                       skg--buffer-record))
+          (should-not skg--maintenance-lock-overlay))
       (when (buffer-live-p buffer) (kill-buffer buffer)))))
 
 (ert-deftest test-skg-buffer-census-emits-complete-normalized-descriptor ()
@@ -267,7 +267,11 @@
             (should
              (equal (cdr (assq 'recipe descriptor))
                     "((body \"nil\") (kind \"search\") (operators \"true\") (regex \"true\") (terms \"dog\"))"))
-            (should (natnump (cdr (assq 'modification-tick descriptor))))))
+            (should (natnump (cdr (assq 'modification-tick descriptor))))
+            ;; An explicit empty census is a frozen empty membership, not a
+            ;; request to enumerate the live registry again.
+            (should-not (skg-buffer-census nil))
+            (should (= 1 (length (skg-buffer-census))))))
       (when (buffer-live-p buffer) (kill-buffer buffer)))))
 
 (ert-deftest test-skg-attached-workflow-carries-origin-and-dirties-parent ()
@@ -418,6 +422,58 @@
       (skg--submit-buffer-census 'tcp "incident" 9))
     (should (equal (nth 4 submitted) "incident"))
     (should (string-match-p "maintenance-epoch \\. 9" (nth 1 submitted)))))
+
+(ert-deftest test-skg-maintenance-locked-census-serializes-only-frozen-ids ()
+  (skg-test-maintenance--with-buffer 'content-view
+    (let* ((id (skg--buffer-record-id skg--buffer-record))
+           (readonly (generate-new-buffer " *skg-late-readonly-result*"))
+           submitted)
+      (unwind-protect
+          (progn
+            (with-current-buffer readonly
+              (org-mode)
+              (insert "* Late presentation\n")
+              (skg-register-buffer
+               readonly 'content-view :lifecycle 'live-view :disposable nil
+               :view-uri "late" :view-write-authority 'read-only))
+            (cl-letf (((symbol-function 'skg-submit-priority-request)
+                       (lambda (&rest arguments) (setq submitted arguments))))
+              (skg--submit-buffer-census
+               'tcp "incident" 9 (list id "missing-former-member")))
+            (let* ((serialized (nth 3 submitted))
+                   (census (read serialized)))
+              (should (= 1 (length census)))
+              (should (equal id (cdr (assq 'buffer-id (car census)))))
+              (should (equal 9
+                             (cdr (assq 'maintenance-epoch (car census)))))
+              (should (equal "editable"
+                             (cdr (assq 'view-write-authority
+                                        (car census)))))))
+        (when (buffer-live-p readonly) (kill-buffer readonly))))))
+
+(ert-deftest test-skg-maintenance-presentation-results-do-not-grow-frozen-census ()
+  (let ((skg--maintenance-client-incident
+         '(:registered-buffer-ids ("writable"))))
+    (skg--maintenance-refresh-presentation-buffer-ids
+     '((presentation-buffer-ids ("writable" "readonly-result"))))
+    (should (equal '("writable")
+                   (plist-get skg--maintenance-client-incident
+                              :registered-buffer-ids)))
+    (should (equal '("writable" "readonly-result")
+                   (plist-get skg--maintenance-client-incident
+                              :presentation-buffer-ids)))))
+
+(ert-deftest test-skg-maintenance-locked-census-closes-constructor-admission ()
+  (let ((skg--maintenance-client-incident
+         '(:incident-id "incident" :epoch 9)) request)
+    (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
+               (lambda () 'tcp))
+              ((symbol-function 'skg-submit-priority-request)
+               (lambda (_tcp wire &rest _args) (setq request (read wire)))))
+      (skg--maintenance-send-locked-census))
+    (should (equal "incident" (cdr (assoc 'incident-id request))))
+    (should (equal 'closed
+                   (cdr (assoc 'client-constructor-admission request))))))
 
 (ert-deftest test-skg-archive-ready-schedules-explicit-origin-worker ()
   (let ((skg--maintenance-client-incident
@@ -954,7 +1010,7 @@
                      (skg--maintenance-text
                       record 'settlement-resolution))))))
 
-(ert-deftest test-skg-maintenance-terminal-unlocks-exact-census ()
+(ert-deftest test-skg-maintenance-terminal-keeps-unsettled-census-locked ()
   (skg-test-maintenance--with-buffer 'content-view
     (let* ((id (skg--buffer-record-id skg--buffer-record))
            (manifest (make-string 64 ?a))
@@ -987,7 +1043,8 @@
                  (lambda (_seconds _repeat function &rest _args)
                    (setq scheduled function))))
         (skg--maintenance-handle-terminal nil payload))
-      (should-not (skg--buffer-record-maintenance-epoch skg--buffer-record))
+      (should (= 9 (skg--buffer-record-maintenance-epoch
+                    skg--buffer-record)))
       (should (eq scheduled #'skg--maintenance-send-terminal-ack))
       (should (= callback-count 1))
       (should (plist-get skg--maintenance-client-incident

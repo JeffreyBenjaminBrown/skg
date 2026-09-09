@@ -426,6 +426,7 @@ end
 ---at point, prompting for an owned source (no prompt when only one).
 ---@return string|nil the chosen source
 function M.populate_minimal_node_metadata ()
+  require('skg.state').require_client_constructor_admission()
   local source = picker.prompt_for_owned_source()
   if not source then return nil end
   M.edit_metadata_at_point(

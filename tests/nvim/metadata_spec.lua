@@ -7,6 +7,7 @@ local compare = require('skg.sexpr.compare')
 local metadata = require('skg.metadata')
 local picker = require('skg.picker')
 local sexpr = require('skg.sexpr.parse')
+local state = require('skg.state')
 
 local function buffer_with (text)
   local buf = vim.api.nvim_create_buf(true, false)
@@ -92,6 +93,26 @@ describe('skg.metadata commands', function ()
     metadata.set_indefinitive()
     assert.is_true(subtree_p(first_metadata_sexp(),
                              '(skg (node indef))'))
+  end)
+
+  it('refuses metadata continuation before prompting when admission is closed',
+     function ()
+    buffer_with('* plain title')
+    local original = picker.prompt_for_owned_source
+    local prompted = false
+    picker.prompt_for_owned_source = function ()
+      prompted = true
+      return 'private'
+    end
+    local old_constructor = state.client_constructor_admission
+    state.client_constructor_admission = 'closed'
+    local ok, err = pcall(metadata.populate_minimal_node_metadata)
+    state.client_constructor_admission = old_constructor
+    picker.prompt_for_owned_source = original
+    assert.is_false(ok)
+    assert.is_truthy(tostring(err):find('constructor admission is closed',
+                                        1, true))
+    assert.is_false(prompted)
   end)
 
   it('delete marks the node for deletion', function ()

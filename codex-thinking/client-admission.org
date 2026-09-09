@@ -1,0 +1,19 @@
+#+title: Client admission census boundary
+
+The maintenance bootstrap closes client constructor admission before taking a
+single writable buffer ID snapshot. Census payloads are filtered to that
+snapshot, including workflow, dirty, and native undo metadata. Views created
+after the boundary can be read-only presentation results and are tracked
+separately; they do not grow the incident's registered census.
+
+Terminal IDs are validated as frozen identity evidence. A terminal frame does
+not release a buffer whose own settlement is still pending. The terminal ACK
+is identified by incident ID and epoch and installs the server's global graph
+and admission fields without assuming that the global state is idle.
+
+Constructor admission has a short `closing` drain state. Requests serialized
+before the barrier may finish there, while new view requests ask for
+read-only authority. The exact census changes the gate to `closed`; a delayed
+editable response is then rejected before buffer text or undo can be touched.
+Once an authoritative graph publication is open, the client gate reopens for
+fresh editable views even if an older incident report remains visible.

@@ -66,8 +66,7 @@ function M.dispatch_frame (payload, artifact_bytes)
       if handler then
         local handler_ok, handler_error =
           pcall(function ()
-            state.update_rebuilding_status(
-              M.field_atom(response, 'rebuilding'))
+            state.update_global_server_status(response)
             handler(payload, response, artifact_bytes)
           end)
         if not handler_ok then
@@ -96,7 +95,10 @@ function M.dispatch_frame (payload, artifact_bytes)
   local entry = record.handlers[frame_kind]
   state.dispatching_request_id = request_id
   local handler_ok, handler_error = pcall(function ()
-    state.update_rebuilding_status(M.field_atom(response, 'rebuilding'))
+    -- Verification installs the new server session inside its handler;
+    -- consume its current-session fields there, after binding that ID.
+    if frame_kind ~= 'verify-connection' then
+      state.update_global_server_status(response) end
     if entry then
       entry.handler(payload, response, artifact_bytes)
     elseif frame_kind == 'error' then

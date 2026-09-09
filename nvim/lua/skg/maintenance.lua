@@ -8,8 +8,6 @@ local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
 local M = {}
-local enrollment_census_scheduled = false
-
 M.defer = function (callback) vim.schedule(callback) end
 M.origin_operation_handlers = {}
 
@@ -79,7 +77,10 @@ end
 local function registered_ids ()
   local result = {}
   for _, buf in ipairs(registry.buffers()) do
-    table.insert(result, registry.record(buf).id) end
+    local record = registry.record(buf)
+    if record.view_write_authority == 'editable' then
+      table.insert(result, record.id) end
+  end
   return sorted_copy(result)
 end
 
@@ -185,7 +186,9 @@ function M.adopt_handshake_epoch ()
   if incident and incident.epoch ~= epoch then
     error('Maintenance handshake changed the active client epoch') end
   for _, buf in ipairs(registry.buffers()) do
-    registry.lock_for_maintenance(buf, epoch) end
+    if registry.record(buf).view_write_authority == 'editable' then
+      registry.lock_for_maintenance(buf, epoch) end
+  end
 end
 
 function M.handle_census_stale (buffer_ids)
@@ -225,35 +228,19 @@ function M.resume_after_census (maintenance_incident_id, maintenance_epoch)
   end
 end
 
-function M.enroll_new_buffer (buffer_id)
-  local incident = state.maintenance_client_incident
-  if not incident or not buffer_id
-     or vim.tbl_contains(incident.registered_buffer_ids or {}, buffer_id)
-     or enrollment_census_scheduled then return end
-  enrollment_census_scheduled = true
-  vim.schedule(function ()
-    enrollment_census_scheduled = false
-    local current = state.maintenance_client_incident
-    if not current or current.incident_id ~= incident.incident_id
-       or current.epoch ~= incident.epoch then return end
-    require('skg.misc_requests').submit_buffer_census(
-      require('skg.client').connect(), current.incident_id, current.epoch)
-  end)
-end
-
 local function refresh_presentation_buffer_ids (response)
   if not field_present(response, 'presentation-buffer-ids') then return end
   local incident = assert(state.maintenance_client_incident,
     'Presentation census arrived without client state')
   local new = payload.string_list(payload.field(
     response, 'presentation-buffer-ids'))
-  local present = {}
-  for _, id in ipairs(new) do present[id] = true end
-  for _, id in ipairs(incident.registered_buffer_ids or {}) do
-    if not present[id] then
-      error('Maintenance presentation census lost a registered buffer') end
-  end
-  incident.registered_buffer_ids = new
+  incident.presentation_buffer_ids = new
+end
+
+-- Keep the frozen writable census separate from post-barrier presentation
+-- results. Exposed for reconnect/maintenance tests and status consumers.
+function M.refresh_presentation_buffer_ids (response)
+  refresh_presentation_buffer_ids(response)
 end
 
 function M.record_selection (response)
@@ -908,10 +895,8 @@ function M.handle_terminal (_payload_text, response)
      or not equal_lists(sorted_copy(unlock_ids),
        sorted_copy(incident.registered_buffer_ids)) then
     error('Maintenance terminal instruction changed its exact authority') end
-  for _, buffer_id in ipairs(unlock_ids) do
-    local buf = registry.find_by_id(buffer_id)
-    if buf then registry.unlock_after_maintenance(buf, incident.epoch) end
-  end
+  -- Terminal census IDs are identity evidence. Each buffer stays restricted
+  -- until its own settlement has been applied and acknowledged.
   incident.phase = 'terminal-received'
   incident.terminal = response
   M.set_handshake_summary('terminal', incident.epoch)
@@ -936,13 +921,19 @@ function M.send_terminal_ack ()
   state.set_request_failure_handler(fail_request(
     'terminal-received', 'Terminal maintenance ACK was not delivered'))
   client.submit_request(request('acknowledge terminal maintenance', {
+    { 'incident-id', incident.incident_id },
     { 'maintenance-epoch', incident.epoch },
   }), nil, incident.incident_id)
 end
 
 function M.handle_terminal_ack (_payload_text, response)
-  if payload.field_text(response, 'status') ~= 'idle' then
-    error('Server did not enter idle after terminal maintenance ACK') end
+  local incident = assert(state.maintenance_client_incident,
+    'Terminal maintenance ACK arrived without client state')
+  if payload.field_text(response, 'status') ~= 'terminal-acknowledged'
+     or payload.field_text(response, 'incident-id') ~= incident.incident_id
+     or nat(response, 'maintenance-epoch') ~= incident.epoch then
+    error('Terminal maintenance ACK changed its exact identity') end
+  state.update_global_server_status(response)
   M.finish_idle()
 end
 
@@ -953,9 +944,9 @@ function M.finish_idle ()
     error('Server became idle before the client received terminal authority')
   end
   local path = incident.final_archive and incident.final_archive.path or '?'
-  M.set_handshake_summary('idle', incident.epoch)
   state.maintenance_client_incident = nil
   state.pending_maintenance_offer = nil
+  state.client_constructor_admission = 'open'
   vim.notify('Skg maintenance complete; recovery archive: ' .. path)
 end
 
@@ -1112,8 +1103,12 @@ function M.resume_active (response)
         error('Maintenance census checksum does not match') end
       incident.registered_buffer_ids = offered_ids
       incident.lock_census_sha256 = checksum
+      local wanted = {}
+      for _, id in ipairs(actual_ids) do wanted[id] = true end
       for _, buf in ipairs(registry.buffers()) do
-        registry.lock_for_maintenance(buf, epoch) end
+        if wanted[registry.record(buf).id] then
+          registry.lock_for_maintenance(buf, epoch) end
+      end
     end
     incident.phase = 'preparing-archive'
     if incident.archive then submit_later(M.send_archive_ready)
@@ -1253,8 +1248,12 @@ local function lock_offer (response)
   if checksum ~= payload.field_text(response, 'lock-census-sha256') then
     error('Maintenance census checksum does not match') end
   local epoch = nat(response, 'maintenance-epoch')
+  local wanted = {}
+  for _, id in ipairs(actual_ids) do wanted[id] = true end
   for _, buf in ipairs(registry.buffers()) do
-    registry.lock_for_maintenance(buf, epoch) end
+    if wanted[registry.record(buf).id] then
+      registry.lock_for_maintenance(buf, epoch) end
+  end
   return checksum
 end
 
@@ -1279,17 +1278,23 @@ local function handle_bootstrap (
       origin_context = origin_context,
       terminal_callback = terminal_callback,
       terminal_callback_fired = false,
-      registered_buffer_ids = {},
+      registered_buffer_ids = registered_ids(),
+      presentation_buffer_ids = {},
       undo_waivers = {},
       locally_applied = {},
       offer = offer,
     }
     state.maintenance_client_incident = incident
     M.set_handshake_summary('active', epoch)
+    local wanted = {}
+    for _, id in ipairs(incident.registered_buffer_ids) do wanted[id] = true end
     for _, buf in ipairs(registry.buffers()) do
-      registry.lock_for_maintenance(buf, epoch) end
+      if wanted[registry.record(buf).id] then
+        registry.lock_for_maintenance(buf, epoch) end
+    end
+    state.client_constructor_admission = 'closed'
     require('skg.misc_requests').submit_buffer_census(
-      client.connect(), incident_id, epoch)
+      client.connect(), incident_id, epoch, incident.registered_buffer_ids)
   elseif status == 'locked-census-accepted-publish-initial-archive' then
     local incident = require_client_incident(incident_id, epoch)
     if not vim.deep_equal(offer, incident.offer)
@@ -1321,7 +1326,9 @@ function M.send_locked_census ()
     'Locked maintenance census has no client state')
   local tcp = client.connect()
   client.submit_priority_request(tcp, request('maintenance locked census', {
+    { 'incident-id', incident.incident_id },
     { 'maintenance-epoch', incident.epoch },
+    { 'client-constructor-admission', 'closed' },
   }), {
     ['maintenance-offer'] = {
       handler = function (payload_text, response)
@@ -1338,6 +1345,14 @@ function M.begin (
     origin, candidate_id, paths, ids, terminal_callback, origin_context,
     origin_fields)
   refuse_modified_raw_files()
+  -- Close constructor admission before the bootstrap request is serialized.
+  -- Already serialized editable requests may drain while `closing'; the
+  -- bootstrap handler advances to `closed' before freezing the census.
+  state.client_constructor_admission = 'closing'
+  state.set_request_failure_handler(function (_reason)
+    if not state.maintenance_client_incident then
+      state.client_constructor_admission = 'open' end
+  end)
   state.register_response_handler('maintenance-offer',
     function (payload_text, response)
       handle_bootstrap(
@@ -1479,6 +1494,7 @@ function M.cancel ()
       for _, buf in ipairs(registry.buffers()) do
         registry.unlock_after_maintenance(buf, epoch) end
       state.maintenance_client_incident = nil
+      state.client_constructor_admission = 'open'
       vim.notify('Skg maintenance cancelled before archive publication.')
     end, true)
   state.set_request_failure_handler(fail_request(

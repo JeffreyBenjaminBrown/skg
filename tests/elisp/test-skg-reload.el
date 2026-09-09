@@ -257,7 +257,7 @@
             (set-buffer-modified-p t))
           (cl-letf (((symbol-function 'heralds-minor-mode) #'ignore))
             (skg--display-search-phase1
-             "((content \"* incoming\\n\") (view-uri \"search:new\") (warnings ()) (server-session-id \"11111111-2222-4333-8444-555555555555\"))"
+             "((content \"* incoming\\n\") (view-uri \"search:new\") (warnings ()) (view-write-authority editable) (server-session-id \"11111111-2222-4333-8444-555555555555\"))"
              "dog" nil nil nil nil))
           (setq opened (current-buffer))
           (should-not (eq existing opened))

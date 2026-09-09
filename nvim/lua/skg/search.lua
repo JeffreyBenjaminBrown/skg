@@ -83,13 +83,18 @@ end
 ---@param operators boolean
 function M.request_text_search (search_terms, regex, body, operators,
                                 ugly_choice, view_uri)
+  client.connect()
+  if not require('skg.misc_requests').ensure_connection_handshake() then
+    error('Cannot search before server verification completes') end
   local request_form = {
     sexpr.pair(sexpr.symbol('request'), 'text search'),
     sexpr.pair(sexpr.symbol('terms'), search_terms),
     sexpr.pair(sexpr.symbol('regex'), M.bool_to_string(regex)),
     sexpr.pair(sexpr.symbol('body'), M.bool_to_string(body)),
     sexpr.pair(sexpr.symbol('operators'),
-               M.bool_to_string(operators)) }
+               M.bool_to_string(operators)),
+    sexpr.pair(sexpr.symbol('requested-view-write-authority'),
+               state.requested_view_write_authority()) }
   if ugly_choice then
     table.insert(request_form,
       sexpr.pair(sexpr.symbol('ugly-telescopes'), ugly_choice)) end
@@ -138,6 +143,8 @@ end
 function M.display_search_phase1 (response, search_terms, regex, body,
                                   operators, ugly_choice, requested_view_uri)
   local server_session_id = state.require_current_server_session(response)
+  -- The authority is mandatory even for an empty/error search result.
+  local view_authority = state.view_write_authority_from_response(response)
   local content = payload.field_text(response, 'content')
   if not content then return end
   local view_uri = payload.field_text(response, 'view-uri')
@@ -156,6 +163,7 @@ function M.display_search_phase1 (response, search_terms, regex, body,
       },
       root_ids = root_ids_value and payload.string_list(root_ids_value) or nil,
       server_session_id = server_session_id,
+      view_write_authority = view_authority,
       graph_generation = tonumber(
         payload.field_text(response, 'graph-generation')),
       presentation_generation = tonumber(
@@ -166,6 +174,9 @@ function M.display_search_phase1 (response, search_terms, regex, body,
         payload.field_text(response, 'client-application-token')),
     })
   vim.bo[buf].modified = false
+  -- A read-only result stays read-only through the enrichment round trip;
+  -- only an editable authority may reopen its UI for user edits.
+  vim.bo[buf].modifiable = view_authority == 'editable'
   for _, hook in ipairs(M.search_buffer_setup_hooks) do
     pcall(hook)
   end
@@ -232,7 +243,9 @@ function M.display_search_enrichment (response)
         source_set = result_source_set,
         require_clean = true,
       })
-    vim.bo[buf].modifiable = true
+    local record = registry.record(buf)
+    vim.bo[buf].modifiable = record
+      and record.view_write_authority == 'editable' or false
     if ok then
       applied = true
       client_token = vim.b[buf].skg_application_token or 0

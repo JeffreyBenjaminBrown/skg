@@ -16,32 +16,39 @@ describe('skg.content_view request strings', function ()
   it('carries id and view-uri', function ()
     assert.are.equal(
       '((request . "single root content view") (id . "abc")'
-      .. ' (view-uri . "uri-1"))\n',
-      content_view.request_string('abc', 'uri-1', nil))
+      .. ' (view-uri . "uri-1")'
+      .. ' (requested-view-write-authority . "editable"))\n',
+      content_view.request_string('abc', 'uri-1', nil, nil, nil, 'editable'))
   end)
 
   it('adds override-choice bypass only when asked', function ()
     -- Mirrors test-skg-override-bypass.el's request-shape cases.
     assert.are.equal(
       '((request . "single root content view") (id . "abc")'
-      .. ' (view-uri . "uri-1") (override-choice . "bypass"))\n',
-      content_view.request_string('abc', 'uri-1', true))
+      .. ' (view-uri . "uri-1")'
+      .. ' (requested-view-write-authority . "editable")'
+      .. ' (override-choice . "bypass"))\n',
+      content_view.request_string('abc', 'uri-1', true, nil, nil, 'editable'))
   end)
 
   it('carries only the ugly telescope pids approved on retry', function ()
     assert.are.equal(
       '((request . "single root content view") (id . "abc")'
       .. ' (view-uri . "uri-1")'
+      .. ' (requested-view-write-authority . "editable")'
       .. ' (allow-ugly-telescopes "pid-a" "pid-b"))\n',
       content_view.request_string(
-        'abc', 'uri-1', nil, { 'pid-a', 'pid-b' }))
+        'abc', 'uri-1', nil, { 'pid-a', 'pid-b' }, nil, 'editable'))
   end)
 
   it('marks a request which must open beside an existing view', function ()
     assert.are.equal(
       '((request . "single root content view") (id . "abc")'
-      .. ' (view-uri . "uri-fresh") (fresh-view . "true"))\n',
-      content_view.request_string('abc', 'uri-fresh', nil, nil, true))
+      .. ' (view-uri . "uri-fresh")'
+      .. ' (requested-view-write-authority . "editable")'
+      .. ' (fresh-view . "true"))\n',
+      content_view.request_string(
+        'abc', 'uri-fresh', nil, nil, true, 'editable'))
   end)
 end)
 
@@ -71,7 +78,7 @@ describe('skg.content_view responses', function ()
     serve_content(
       '((response-type content-view)'
       .. ' (content "* (skg (node (id abc))) served title\n** child")'
-      .. ' (errors ()) (warnings ()))')
+      .. ' (errors ()) (warnings ()) (view-write-authority editable))')
     content_view.request_single_root_content_view_from_id('abc')
     local opened = nil
     vim.wait(2000, function ()
@@ -96,7 +103,7 @@ describe('skg.content_view responses', function ()
       .. ' (view-uri "override-menu:abc")'
       .. ' (to-minibuffer "The requested node is overridden.'
       .. ' Choose a destination.")'
-      .. ' (errors ()) (warnings ()))')
+      .. ' (errors ()) (warnings ()) (view-write-authority read-only))')
     local notified = nil
     local original_notify = vim.notify
     vim.notify = function (msg) notified = msg end
@@ -119,7 +126,8 @@ describe('skg.content_view responses', function ()
     vim.api.nvim_set_current_buf(scratch)
     serve_content(
       '((response-type content-view)'
-      .. ' (switch-to-view "uri-existing"))')
+      .. ' (switch-to-view "uri-existing")'
+      .. ' (view-write-authority editable))')
     content_view.request_single_root_content_view_from_id('abc')
     vim.wait(2000, function ()
       return vim.api.nvim_get_current_buf() == existing
@@ -135,7 +143,7 @@ describe('skg.content_view responses', function ()
       })
     serve_content(
       '((response-type content-view) (content "* same title")'
-      .. ' (errors ()) (warnings ()))')
+      .. ' (errors ()) (warnings ()) (view-write-authority editable))')
     content_view.request_single_root_content_view_from_id(
       'abc', nil, nil, nil, true)
     vim.wait(2000, function ()
@@ -152,7 +160,7 @@ describe('skg.content_view responses', function ()
     serve_content(
       '((response-type content-view) (content "")'
       .. ' (errors ("boom one" "boom two"))'
-      .. ' (warnings ("careful")))')
+      .. ' (warnings ("careful")) (view-write-authority editable))')
     local notified = nil
     local original_notify = vim.notify
     vim.notify = function (msg) notified = msg end

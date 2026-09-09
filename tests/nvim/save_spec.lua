@@ -144,6 +144,21 @@ describe('skg.save pipeline', function ()
     assert.is_false(vim.bo[buf].modifiable)
   end)
 
+  it('refuses a read-only result before taking a save lock', function ()
+    local buf = buffer.open_org_buffer_from_text(
+      '* (skg (node (id root))) result', 'skg://readonly-result',
+      'uri-readonly-result', {
+        view_write_authority = 'read-only',
+      })
+    vim.api.nvim_set_current_buf(buf)
+    assert.is_false(vim.bo[buf].modifiable)
+    local ok, err = pcall(save.request_save_buffer)
+    assert.is_false(ok)
+    assert.is_truthy(tostring(err):find('read-only result authority', 1, true))
+    assert.is_falsy(vim.b[buf].skg_save_locked)
+    assert.is_nil(lock.stream_in_progress)
+  end)
+
   it('round-trips a save: markers out, redraw in, point restored',
      function ()
     local seen_request = nil
@@ -435,6 +450,20 @@ describe('skg.save fork confirmation', function ()
       { { 'orig-1', 'src-one' }, { 'orig-2', 'src-two' } },
       save.fork_sources_from_confirmation_buffer(buf))
     vim.api.nvim_buf_delete(buf, { force = true })
+  end)
+
+  it('refuses a delayed fork continuation before constructing or prompting',
+     function ()
+    local old_constructor = state.client_constructor_admission
+    local before = #registry.buffers()
+    state.client_constructor_admission = 'closed'
+    local ok, err = pcall(save.show_fork_confirmation,
+                          '* (skg (node (source PICK-A-SOURCE))) clone', nil)
+    state.client_constructor_admission = old_constructor
+    assert.is_false(ok)
+    assert.is_truthy(tostring(err):find('constructor admission is closed',
+                                        1, true))
+    assert.are.equal(before, #registry.buffers())
   end)
 
   it('shows the confirmation buffer, unlocked and navigable',

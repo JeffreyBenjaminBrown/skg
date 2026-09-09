@@ -937,6 +937,7 @@ end
 ---@param save_buf integer
 ---@return integer bufnr
 function M.show_fork_confirmation (content, save_buf)
+  state.require_client_constructor_admission()
   local name = 'skg://fork-confirmation'
   local buf = registry.acquire_generated_buffer(name, true, false)
   vim.bo[buf].modifiable = true

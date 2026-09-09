@@ -28,6 +28,10 @@ local function handshake (session_id, version)
     f('census-required', 'true'), f('graph-generation', 7),
     f('manifest-revision', 9), f('typedb-health', 'healthy'),
     f('tantivy-health', 'healthy'), f('content', 'connected'),
+    f('current-graph-generation', 7), f('current-manifest-revision', 9),
+    f('graph-write-admission', 'open'),
+    f('graph-transition-status', 'idle'), f('rebuilding', 'nil'),
+    f('pending-incidents', {}),
   }
 end
 
@@ -148,5 +152,28 @@ describe('skg protocol-v2 server sessions', function ()
       '(server-session-id . "' .. helpers.server_session_id .. '")',
       1, true))
     server.close()
+  end)
+
+  it('holds editable admission closed until authoritative publication reopens it',
+     function ()
+    state.server_session_id = new_session
+    state.graph_write_admission = 'open'
+    state.client_constructor_admission = 'closed'
+    assert.are.equal('read-only', state.requested_view_write_authority())
+    assert.has_error(function ()
+      state.view_write_authority_from_response({
+        f('view-write-authority', 'editable'),
+      })
+    end)
+    state.update_global_server_status({
+      f('server-session-id', new_session),
+      f('current-graph-generation', 8),
+      f('current-manifest-revision', 10),
+      f('graph-write-admission', 'open'),
+      f('graph-transition-status', 'idle'), f('rebuilding', 'nil'),
+      f('pending-incidents', {}),
+    })
+    assert.are.equal('open', state.client_constructor_admission)
+    assert.are.equal('editable', state.requested_view_write_authority())
   end)
 end)

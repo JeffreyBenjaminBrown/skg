@@ -205,6 +205,14 @@ ordinary-save refusal on C-x C-s."
             (kill-buffer buf)))
       (when (buffer-live-p origin) (kill-buffer origin)))))
 
+(ert-deftest test-show-fork-confirmation-refuses-before-construction-when-closed ()
+  (let ((skg--client-constructor-admission 'closed)
+        (before (length (skg-registered-buffers))))
+    (should-error
+     (skg--show-fork-confirmation "* delayed fork\n" nil)
+     :type 'user-error)
+    (should (= before (length (skg-registered-buffers))))))
+
 (ert-deftest test-fork-confirmation-does-not-mutate-shared-mode-map ()
   "The buffer-local key overrides must not leak into the shared
 skg-content-view-mode-map (which would break C-x C-s in real views)."

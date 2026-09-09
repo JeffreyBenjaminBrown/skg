@@ -35,6 +35,13 @@ function M.connect ()
   config.source_inventory = nil
   config.store_state = nil
   state.server_session_id = nil
+  state.graph_write_admission = nil
+  -- A reconnect during an active incident must keep the constructor barrier
+  -- closed until that incident's terminal acknowledgement settles.
+  state.client_constructor_admission = state.maintenance_client_incident
+    and 'closed'
+    or (state.client_constructor_admission == 'closing'
+        and 'closing' or 'open')
   if not M.port then
     if not config.config_file() then
       error('skg: not initialized; run :SkgInit <skgconfig.toml>') end
@@ -106,6 +113,9 @@ function M.handle_rust_response (chunk)
     state.run_connection_reset_hooks()
     state.connection_handshake_state = nil
     state.server_session_id = nil
+    state.graph_write_admission = nil
+    state.client_constructor_admission = state.maintenance_client_incident
+      and 'closed' or 'open'
     state.clear_request_coordinator()
     state.lp_reset()
   else
@@ -122,6 +132,9 @@ function M.sentinel (event)
   state.close_connection()
   state.connection_handshake_state = nil
   state.server_session_id = nil
+  state.graph_write_admission = nil
+  state.client_constructor_admission = state.maintenance_client_incident
+    and 'closed' or 'open'
   state.run_connection_reset_hooks()
   state.clear_request_coordinator()
   state.lp_reset()
@@ -225,6 +238,7 @@ function M.connection_end ()
   state.close_connection()
   state.connection_handshake_state = nil
   state.server_session_id = nil
+  state.graph_write_admission = nil
   state.run_connection_reset_hooks()
   state.clear_request_coordinator()
   state.lp_reset()

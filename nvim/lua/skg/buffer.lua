@@ -192,6 +192,7 @@ function M.open_org_buffer_from_text (org_text, buffer_name, view_uri, options)
     recipe = options.recipe,
     root_ids = options.root_ids,
     server_session_id = options.server_session_id,
+    view_write_authority = options.view_write_authority,
     last_fetched = org_text,
     server_revision = options.server_revision,
     graph_generation = options.graph_generation,
@@ -202,6 +203,7 @@ function M.open_org_buffer_from_text (org_text, buffer_name, view_uri, options)
   -- settling.  Publish the complete typed record before any such nested work.
   M.configure_view_buffer(buf, uri)
   vim.bo[buf].modified = false
+  vim.bo[buf].modifiable = options.view_write_authority ~= 'read-only'
   vim.api.nvim_set_current_buf(buf)
   vim.api.nvim_win_set_cursor(0, { 1, 0 })
   return buf

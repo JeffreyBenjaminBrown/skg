@@ -591,6 +591,7 @@ NOT save. Call `skg-request-save-buffer' afterward."
 RET on a settable role headline buries the menu and calls
 CONTINUATION with the role's kind symbol; RET on a read-only role
 explains the refusal; q aborts."
+  (skg-require-client-constructor-admission)
   (let ((origin-buffer (current-buffer))
         (origin-point (point))
         (menu-buffer
