@@ -8,19 +8,13 @@ use indoc::indoc;
 use std::error::Error;
 use std::net::TcpStream;
 
-use skg::dbs::in_rust_graph::{
-  InRustGraphHandle,
-  install_or_swap_global_handle };
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::assert_metadata_eq;
-use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config};
+use skg::test_utils::run_with_shared_test_graph;
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::misc::{SkgConfig, TantivyIndex};
 use skg::types::views_state::OpenViews;
-
-use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
-
 
 fn mk_test_tcp_stream ()
   -> TcpStream
@@ -35,43 +29,35 @@ fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str =
     "tests/definitive_view_cascade_and_budget/fixtures";
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-definitive-view-cascade-and-budget",
     |s| Box::pin ( async move {
       s . reset ("test_definitive_view_ample_budget", fixtures) . await ?;
-      s . install_graph_handle () ?;
       test_definitive_view_ample_budget (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_definitive_view_limit_5_or_6", fixtures) . await ?;
-      s . install_graph_handle () ?;
       test_definitive_view_limit_5_or_6 (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_definitive_view_limit_1_to_4", fixtures) . await ?;
-      s . install_graph_handle () ?;
       test_definitive_view_limit_1_to_4 (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_definitive_view_conflicting", fixtures) . await ?;
-      s . install_graph_handle () ?;
       test_definitive_view_conflicting (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_definitive_view_with_cycle",
                  "tests/definitive_view_cascade_and_budget/fixtures-cycle") . await ?;
-      s . install_graph_handle () ?;
       test_definitive_view_with_cycle (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_definitive_view_with_repeat", fixtures) . await ?;
-      s . install_graph_handle () ?;
       test_definitive_view_with_repeat (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_definitive_view_request_cleared", fixtures) . await ?;
-      s . install_graph_handle () ?;
       test_definitive_view_request_cleared (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_budget_aliascol_is_neutral",
                  "tests/definitive_view_cascade_and_budget/fixtures-aliases") . await ?;
-      s . install_graph_handle () ?;
       test_budget_aliascol_is_neutral (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 // ===================================================
@@ -82,7 +68,7 @@ fn all_tests
 // ===================================================
 async fn test_definitive_view_ample_budget (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  graph   : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
@@ -96,16 +82,13 @@ async fn test_definitive_view_ample_budget (
       let result = {
         let mut config = config . clone();
         config . initial_node_limit = 20;
-        let graph : InRustGraphHandle =
-          install_or_swap_global_handle (
-            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config, tantivy, &graph, false,
+          input_org_text, &config, tantivy, graph, false,
 
           &Err ( String::new () ), &mut views_state ) . await ?;
         response . saved_view };
@@ -151,7 +134,7 @@ async fn test_definitive_view_ample_budget (
 
 async fn test_definitive_view_limit_5_or_6 (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  graph   : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
@@ -165,32 +148,26 @@ async fn test_definitive_view_limit_5_or_6 (
       let result_5 = {
         let mut config5 = config . clone();
         config5 . initial_node_limit = 5;
-        let graph : InRustGraphHandle =
-          install_or_swap_global_handle (
-            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_5 = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config5, tantivy, &graph, false,
+          input_org_text, &config5, tantivy, graph, false,
 
           &Err ( String::new () ), &mut views_state ) . await ?;
         response_5 . saved_view };
       let result_6 = {
         let mut config6 = config . clone();
         config6 . initial_node_limit = 6;
-        let graph : InRustGraphHandle =
-          install_or_swap_global_handle (
-            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_6 = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config6, tantivy, &graph, false,
+          input_org_text, &config6, tantivy, graph, false,
 
           &Err ( String::new () ), &mut views_state ) . await ?;
         response_6 . saved_view };
@@ -255,7 +232,7 @@ async fn test_definitive_view_limit_5_or_6 (
 
 async fn test_definitive_view_limit_1_to_4 (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  graph   : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
@@ -269,31 +246,25 @@ async fn test_definitive_view_limit_1_to_4 (
       let result_1 = {
         let mut config1 = config . clone();
         config1 . initial_node_limit = 1;
-        let graph : InRustGraphHandle =
-          install_or_swap_global_handle (
-            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_1 = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config1, tantivy, &graph, false,
+          input_org_text, &config1, tantivy, graph, false,
           &Err ( String::new () ), &mut views_state ) . await ?;
         response_1 . saved_view };
       let result_4 = {
         let mut config4 = config . clone();
         config4 . initial_node_limit = 4;
-        let graph : InRustGraphHandle =
-          install_or_swap_global_handle (
-            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response_4 = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config4, tantivy, &graph, false,
+          input_org_text, &config4, tantivy, graph, false,
           &Err ( String::new () ), &mut views_state ) . await ?;
         response_4 . saved_view };
 
@@ -350,7 +321,7 @@ async fn test_definitive_view_limit_1_to_4 (
 
 async fn test_definitive_view_conflicting (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  graph   : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       // Node 12 appears twice:
@@ -366,16 +337,13 @@ async fn test_definitive_view_conflicting (
       let result = {
         let mut config = config . clone();
         config . initial_node_limit = 100;
-        let graph : InRustGraphHandle =
-          install_or_swap_global_handle (
-            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config, tantivy, &graph, false,
+          input_org_text, &config, tantivy, graph, false,
           &Err ( String::new () ), &mut views_state ) . await ?;
         response . saved_view };
 
@@ -408,7 +376,7 @@ async fn test_definitive_view_conflicting (
 
 async fn test_definitive_view_with_cycle (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  graph   : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       // Node a has definitive request
@@ -420,16 +388,13 @@ async fn test_definitive_view_with_cycle (
       let result = {
         let mut config = config . clone();
         config . initial_node_limit = 100;
-        let graph : InRustGraphHandle =
-          install_or_swap_global_handle (
-            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config, tantivy, &graph, false,
+          input_org_text, &config, tantivy, graph, false,
           &Err ( String::new () ), &mut views_state ) . await ?;
         response . saved_view };
 
@@ -457,7 +422,7 @@ async fn test_definitive_view_with_cycle (
 
 async fn test_definitive_view_with_repeat (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  graph   : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
@@ -468,16 +433,13 @@ async fn test_definitive_view_with_repeat (
       let result = {
         let mut config = config . clone();
         config . initial_node_limit = 100;
-        let graph : InRustGraphHandle =
-          install_or_swap_global_handle (
-            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config, tantivy, &graph, false,
+          input_org_text, &config, tantivy, graph, false,
           &Err ( String::new () ), &mut views_state ) . await ?;
         response . saved_view };
 
@@ -516,7 +478,7 @@ async fn test_definitive_view_with_repeat (
 
 async fn test_definitive_view_request_cleared (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  graph   : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
@@ -526,16 +488,13 @@ async fn test_definitive_view_request_cleared (
       let result = {
         let mut config = config . clone();
         config . initial_node_limit = 100;
-        let graph : InRustGraphHandle =
-          install_or_swap_global_handle (
-            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config, tantivy, &graph, false,
+          input_org_text, &config, tantivy, graph, false,
           &Err ( String::new () ), &mut views_state ) . await ?;
         response . saved_view };
 
@@ -568,7 +527,7 @@ async fn test_definitive_view_request_cleared (
 // this test pins.
 async fn test_budget_aliascol_is_neutral (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  graph   : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
@@ -579,16 +538,13 @@ async fn test_budget_aliascol_is_neutral (
       let result = {
         let mut config = config . clone();
         config . initial_node_limit = 3;
-        let graph : InRustGraphHandle =
-          install_or_swap_global_handle (
-            graph_handle_from_config (&config) ?);
         let mut views_state : ViewsState = ViewsState {
           diff_mode_enabled : false,
           open_views            : OpenViews::new (),};
         let mut stream : TcpStream = mk_test_tcp_stream ();
         let response = update_from_and_rerender_buffer (
           &mut stream,
-          input_org_text, driver, &config, tantivy, &graph, false,
+          input_org_text, &config, tantivy, graph, false,
           &Err ( String::new () ), &mut views_state ) . await ?;
         response . saved_view };
 

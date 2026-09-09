@@ -5,121 +5,94 @@ use std::error::Error;
 
 use skg::to_org::render::content_view::{multi_root_view, single_root_view};
 use skg::assert_metadata_eq;
-use skg::test_utils::run_with_shared_test_db;
-use skg::dbs::typedb::paths::path_containerward_to_first_nonlinearity;
+use skg::test_utils::run_with_shared_test_graph;
+use skg::dbs::graph_queries::paths::path_containerward_to_first_nonlinearity;
 use skg::types::misc::{ID, SkgConfig};
 
-use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-content-view",
     |s| Box::pin ( async move {
       s . reset ("run_path_and_root_tests (a mess of stuff)",
                  "tests/content_view/fixtures") . await ?;
-      s . install_graph_handle () ?;
       run_path_and_root_tests (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       s . reset ("test_multi_root_view_logic",
                  "tests/content_view/fixtures-2") . await ?;
-      s . install_graph_handle () ?;
       test_multi_root_view_logic (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       s . reset ("test_single_root_view_with_cycle",
-                 "tests/typedb/fixtures") . await ?;
-      s . install_graph_handle () ?;
+                 "tests/content_view/fixtures-graph") . await ?;
       test_single_root_view_with_cycle (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       s . reset ("test_multi_root_view_with_shared_nodes",
-                 "tests/typedb/fixtures") . await ?;
-      s . install_graph_handle () ?;
+                 "tests/content_view/fixtures-graph") . await ?;
       test_multi_root_view_with_shared_nodes (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       s . reset ("test_multi_root_view_with_node_limit",
-                 "tests/typedb/fixtures") . await ?;
-      s . install_graph_handle () ?;
+                 "tests/content_view/fixtures-graph") . await ?;
       test_multi_root_view_with_node_limit (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       s . reset ("test_limit_with_multiple_sibling_groups",
                  "tests/content_view/fixtures-3") . await ?;
-      s . install_graph_handle () ?;
       test_limit_with_multiple_sibling_groups (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       Ok (( )) } )) }
 
 async fn run_path_and_root_tests (
-  config : &SkgConfig,
-  driver : &typedb_driver::TypeDBDriver
+  _config : &SkgConfig,
+  graph : &skg::dbs::in_rust_graph::InRustGraphHandle
 ) -> Result<(), Box<dyn std::error::Error>> {
 
   // Test the path from node "4" to the root container
-  match path_containerward_to_first_nonlinearity (
-    & config . db_name,
-    & driver,
-    & ID("4" . to_string() )
-  ) . await {
-    Ok(r) => { assert_eq!(
+  { let r = path_containerward_to_first_nonlinearity (
+      &graph . load_full () . graph, &ID::from ("4"), None);
+    assert_eq!(
       r.path,
       vec![
         ID ( "2" . to_string() ),
         ID ( "1" . to_string() ) ],
-      "Unexpected path to root container from node '4'.");
-    }, Err (e) => {
-      panic!("Error finding path to root container: {}", e); } }
+      "Unexpected path to root container from node '4'."); }
 
-  match path_containerward_to_first_nonlinearity (
-    & config . db_name,
-    & driver,
-    & ID("4" . to_string() )
-  ) . await {
-    Ok(r) => { assert_eq!(
+  { let r = path_containerward_to_first_nonlinearity (
+      &graph . load_full () . graph, &ID::from ("4"), None);
+    assert_eq!(
       r.path . last () . cloned (),
       Some ( ID ( "1" . to_string() ) ),
-      "Root of node '4' should be 1." ) },
-    Err (e) => { panic!(
-      "Error finding root container from id {}", e); } }
+      "Root of node '4' should be 1." ); }
 
   // Test the path "to root" from node "cycle-3".
   // (1 contains 2 contains 3 contains 1.)
-  match path_containerward_to_first_nonlinearity (
-    & config . db_name,
-    & driver,
-    & ID("cycle-3" . to_string() )
-  ) . await {
-    Ok(r) => { assert_eq!(
+  { let r = path_containerward_to_first_nonlinearity (
+      &graph . load_full () . graph, &ID::from ("cycle-3"), None);
+    assert_eq!(
       r.path,
       vec![
         ID ( "cycle-2" . to_string() ),
         ID ( "cycle-1" . to_string() ) ],
-      "Unexpected path to \"root container\" from node 'cycle-3'.");
-    }, Err (e) => {
-      panic!("Error finding path to root container: {}", e); } }
+      "Unexpected path to \"root container\" from node 'cycle-3'."); }
 
   // Test the path "to root" from node "cycle-1".
   // (1 contains 2 contains 3 contains 1.)
-  match path_containerward_to_first_nonlinearity (
-    & config . db_name,
-    & driver,
-    & ID("cycle-1" . to_string() )
-  ) . await {
-    Ok(r) => { assert_eq!(
+  { let r = path_containerward_to_first_nonlinearity (
+      &graph . load_full () . graph, &ID::from ("cycle-1"), None);
+    assert_eq!(
       r.path,
       vec![
         ID ( "cycle-3" . to_string() ),
         ID ( "cycle-2" . to_string() ),
       ],
-      "Unexpected path to \"root container\" from node 'cycle-1'.");
-    }, Err (e) => {
-      panic!("Error finding path to root container: {}", e); } }
+      "Unexpected path to \"root container\" from node 'cycle-1'."); }
 
   Ok (( )) }
 
 async fn test_multi_root_view_logic (
   config : &SkgConfig,
-  driver : &std::sync::Arc<typedb_driver::TypeDBDriver>
+  _graph : &skg::dbs::in_rust_graph::InRustGraphHandle
 ) -> Result<(), Box<dyn std::error::Error>> {
 
   let focii : Vec<ID> = vec![
@@ -129,7 +102,7 @@ async fn test_multi_root_view_logic (
   ];
   let (result, _pids, _)
     : (String, Vec<ID>, _)
-    = multi_root_view ( driver, & config, None, & focii, false
+    = multi_root_view (config, None, & focii, false
                       ) . await ?;
 
   println!("Multi-root view result:\n{}", result);
@@ -149,13 +122,13 @@ async fn test_multi_root_view_logic (
 
 async fn test_single_root_view_with_cycle (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  _graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   {
       // Test with node "a" which has a cycle (a -> b -> c -> b)
       let (result, _pids, _)
         : (String, Vec<ID>, _)
-        = single_root_view ( driver, config, None,
+        = single_root_view (config, None,
                              &ID ( "a" . to_string () ),
                              false
                            ) . await ?;
@@ -175,7 +148,7 @@ async fn test_single_root_view_with_cycle (
 
 async fn test_multi_root_view_with_shared_nodes (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  _graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   {
       // Test with multiple roots that share a node
@@ -184,7 +157,7 @@ async fn test_multi_root_view_with_shared_nodes (
         ID ( "2" . to_string () )
       ];
       let (result, _pids, _) : (String, Vec<ID>, _) =
-        multi_root_view ( driver, config, None, & focii, false
+        multi_root_view (config, None, & focii, false
                         ) . await ?;
 
       println!("Multi root view with shared nodes result:\n{}", result);
@@ -229,7 +202,7 @@ async fn test_multi_root_view_with_shared_nodes (
 
 async fn test_multi_root_view_with_node_limit (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  _graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   {
       // Test with two roots that share a node, with node limit
@@ -244,7 +217,7 @@ async fn test_multi_root_view_with_node_limit (
         ID ( "2" . to_string () )
       ];
       let (result, _pids, _) : (String, Vec<ID>, _) =
-        multi_root_view ( driver, &test_config, None, & focii, false
+        multi_root_view (&test_config, None, & focii, false
                         ) . await ?;
 
       println!("Multi root view with limit=3 result:\n{}", result);
@@ -287,7 +260,7 @@ async fn test_multi_root_view_with_node_limit (
 
 async fn test_limit_with_multiple_sibling_groups (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  _graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   {
       // Test that truncation correctly stops at sibling group boundaries
@@ -310,7 +283,7 @@ async fn test_limit_with_multiple_sibling_groups (
       test_config . initial_node_limit = 4;
 
       let (result, _pids, _) : (String, Vec<ID>, _)
-      = single_root_view ( driver, &test_config, None,
+      = single_root_view (&test_config, None,
                            &ID ( "1" . to_string () ),
                            false
                          ) . await ?;

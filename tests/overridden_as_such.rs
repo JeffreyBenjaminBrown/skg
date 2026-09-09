@@ -11,42 +11,35 @@
 //   contains, raw G and raw H -- the user asked for the original.
 // The col members themselves (each E copy) always draw raw: cols
 // never substitute.
-//
-// PITFALL: marked buffers hit the tamper check, which reads the
-// process-global in-Rust graph; each sub-test installs its own
-// fixture graph via install_or_swap_global_handle.
 
 use std::error::Error;
 use std::net::TcpStream;
-use std::sync::Arc;
 
 use skg::serve::ViewsState;
-use skg::dbs::in_rust_graph::install_or_swap_global_handle;
-use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config};
+use skg::test_utils::{run_with_shared_test_graph, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::views_state::OpenViews;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use typedb_driver::TypeDBDriver;
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str = "tests/overridden_as_such/fixtures";
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-overridden-as-such",
     |s| Box::pin ( async move {
       s . reset ("subscribee_as_such_expansion_hides_and_substitutes", fixtures) . await ?;
       subscribee_as_such_expansion_hides_and_substitutes (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("overridden_as_such_expansion_is_raw_and_unhidden", fixtures) . await ?;
       overridden_as_such_expansion_is_raw_and_unhidden (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("col_members_never_substitute", fixtures) . await ?;
       col_members_never_substitute (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 /// The lines of 'buf', each tagged with its nearest ENCLOSING col
@@ -83,7 +76,7 @@ fn lines_by_enclosing_col (
 async fn save_and_rerender (
   buf     : &str,
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<String, Box<dyn Error>> {
   let graph : InRustGraphHandle =
@@ -98,7 +91,7 @@ async fn save_and_rerender (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    buf, driver, config, tantivy, &graph, false,
+    buf, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "save must not error; got: {:?}", response . errors );
@@ -109,12 +102,12 @@ async fn save_and_rerender (
 async fn expand_e_under (
   col     : &str,
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<String, Box<dyn Error>> {
   let (de_novo, _pids, _tree) =
     multi_root_view (
-      driver, config, Some (tantivy),
+      config, Some (tantivy),
       &[ ID::from ("R") ], false ) . await ?;
   let edited : String =
     { let mut out : Vec<String> = Vec::new ();
@@ -127,17 +120,15 @@ async fn expand_e_under (
       out . join ("\n") + "\n" };
   assert_ne! ( edited, de_novo,
     "the {} copy of E was found and given a request", col );
-  save_and_rerender (&edited, config, driver, tantivy) . await }
+  save_and_rerender (&edited, config, fixture_graph, tantivy) . await }
 
 async fn subscribee_as_such_expansion_hides_and_substitutes (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      install_or_swap_global_handle (
-        graph_handle_from_config (config) ? );
       let view : String =
-        expand_e_under ("subscribeeCol", config, driver, tantivy)
+        expand_e_under ("subscribeeCol", config, fixture_graph, tantivy)
         . await ?;
       let tagged : Vec<(&str, &str)> =
         lines_by_enclosing_col (&view);
@@ -160,13 +151,11 @@ async fn subscribee_as_such_expansion_hides_and_substitutes (
 
 async fn overridden_as_such_expansion_is_raw_and_unhidden (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      install_or_swap_global_handle (
-        graph_handle_from_config (config) ? );
       let view : String =
-        expand_e_under ("overriddenCol", config, driver, tantivy)
+        expand_e_under ("overriddenCol", config, fixture_graph, tantivy)
         . await ?;
       let tagged : Vec<(&str, &str)> =
         lines_by_enclosing_col (&view);
@@ -187,14 +176,12 @@ async fn overridden_as_such_expansion_is_raw_and_unhidden (
 
 async fn col_members_never_substitute (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      install_or_swap_global_handle (
-        graph_handle_from_config (config) ? );
       let (view, _pids, _tree) =
         multi_root_view (
-          driver, config, Some (tantivy),
+          config, Some (tantivy),
           &[ ID::from ("R") ], false ) . await ?;
       // R overrides E, yet both col copies of E draw raw: the
       // subscribeeCol shows the graph fact "R subscribes to E" and

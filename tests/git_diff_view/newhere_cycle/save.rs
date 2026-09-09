@@ -10,7 +10,6 @@ use super::common::*;
 fn test_newhere_cycle_survives_save()
   -> Result<(), Box<dyn Error>>
 {
-  let db_name = "skg-test-git-diff-view-newhere-cycle-save";
   let tantivy_folder = "/tmp/tantivy-test-git-diff-view-newhere-cycle-save";
 
   let temp_dir = TempDir::new()?;
@@ -18,30 +17,28 @@ fn test_newhere_cycle_survives_save()
   setup_git_repo_with_fixtures (repo_path)?;
 
   block_on(async {
-    let (config, driver, mut tantivy) =
-      setup_test_dbs(db_name, repo_path . to_str() . unwrap(), tantivy_folder) . await?;
+    let (config, graph, mut tantivy) =
+      setup_test_graph(repo_path . to_str() . unwrap(), tantivy_folder) . await?;
 
     // First render the initial view (view pipeline — known to work).
     let root_ids = vec![ID("1" . to_string())];
     let (initial_view, _pids, _) : (String, Vec<ID>, _) =
-      multi_root_view(&driver, &config, None, &root_ids, true) . await?;
+      multi_root_view(&config, None, &root_ids, true) . await?;
 
     // Round-trip through the save pipeline.
-    let graph : InRustGraphHandle =
-      graph_handle_from_config (&config) ?;
     let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
     let (mut stream, _) = mk_test_tcp_stream_pair ();
     let response = update_from_and_rerender_buffer(
       &mut stream,
-      &initial_view, &driver, &config, &mut tantivy, &graph, true,
+      &initial_view, &config, &mut tantivy, &graph, true,
       &Err ( String::new () ), &mut views_state ) . await?;
 
     assert_buffer_contains( &response . saved_view,
                             GIT_DIFF_VIEW);
 
-    cleanup_test_dbs(db_name, &driver, Some(Path::new (tantivy_folder))) . await?;
+    cleanup_test_graph(Path::new (tantivy_folder)) . await?;
     Ok(())
   })
 }
@@ -56,7 +53,6 @@ fn test_newhere_cycle_survives_save()
 fn test_newhere_cycle_survives_save_staged()
   -> Result<(), Box<dyn Error>>
 {
-  let db_name = "skg-test-git-diff-view-newhere-cycle-save-staged";
   let tantivy_folder = "/tmp/tantivy-test-git-diff-view-newhere-cycle-save-staged";
 
   let temp_dir = TempDir::new()?;
@@ -64,30 +60,28 @@ fn test_newhere_cycle_survives_save_staged()
   setup_git_repo_with_fixtures_staged (repo_path)?;
 
   block_on(async {
-    let (config, driver, mut tantivy) =
-      setup_test_dbs(db_name, repo_path . to_str() . unwrap(), tantivy_folder) . await?;
+    let (config, graph, mut tantivy) =
+      setup_test_graph(repo_path . to_str() . unwrap(), tantivy_folder) . await?;
 
     // First render the initial view (view pipeline — known to work).
     let root_ids = vec![ID("1" . to_string())];
     let (initial_view, _pids, _) : (String, Vec<ID>, _) =
-      multi_root_view(&driver, &config, None, &root_ids, true) . await?;
+      multi_root_view(&config, None, &root_ids, true) . await?;
 
     // Round-trip through the save pipeline.
-    let graph : InRustGraphHandle =
-      graph_handle_from_config (&config) ?;
     let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
     let (mut stream, _) = mk_test_tcp_stream_pair ();
     let response = update_from_and_rerender_buffer(
       &mut stream,
-      &initial_view, &driver, &config, &mut tantivy, &graph, true,
+      &initial_view, &config, &mut tantivy, &graph, true,
       &Err ( String::new () ), &mut views_state ) . await?;
 
     assert_buffer_contains( &response . saved_view,
                             GIT_DIFF_VIEW_STAGED);
 
-    cleanup_test_dbs(db_name, &driver, Some(Path::new (tantivy_folder))) . await?;
+    cleanup_test_graph(Path::new (tantivy_folder)) . await?;
     Ok(())
   })
 }

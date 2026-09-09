@@ -16,34 +16,34 @@ use indoc::indoc;
 use std::error::Error;
 use std::net::TcpStream;
 use std::path::Path;
-use std::sync::Arc;
 
 use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source;
-use skg::test_utils::{run_with_test_db, graph_handle_from_config, audit_inrustgraph_or_panic};
+use skg::test_utils::{run_with_test_graph, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::views_state::OpenViews;
 
-use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex, SourceName};
 
-use typedb_driver::TypeDBDriver;
+use skg::dbs::in_rust_graph::InRustGraphHandle;
+use skg::dbs::graph_queries::relations::find_related_nodes;
+use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 
 #[test]
 fn test_merge_container_into_content
   () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_test_graph (
     "skg-test-merge-container-into-content",
     "tests/merge/merge_container_into_content/fixtures",
     "/tmp/tantivy-test-merge-container-into-content",
-    |config, driver, tantivy| Box::pin ( async move {
+    |config, fixture_graph, tantivy| Box::pin ( async move {
       merge_container_into_content_impl(
-        config, driver, tantivy ) . await
+        config, fixture_graph, tantivy ) . await
     } )) }
 
 async fn merge_container_into_content_impl (
   config  : &SkgConfig,
-  driver: &Arc<TypeDBDriver>,
+  fixture_graph: &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // The input buffer: a content view of 'a',
@@ -68,7 +68,7 @@ async fn merge_container_into_content_impl (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    input_org_text, driver, config, tantivy, &graph, false,
+    input_org_text, config, tantivy, &graph, false,
 
     &Err ( String::new () ), &mut views_state ) . await ?;
 
@@ -147,16 +147,14 @@ async fn merge_container_into_content_impl (
       "aa contains itself on filesystem (self-containment after merge)"
       . to_string() ); }
 
-  // aa must not contain itself in TypeDB.
-  { let ( container_to_contents, _ ) =
-      skg::dbs::typedb::search::contains_from_pids::contains_from_pids (
-        &config . db_name, driver,
-        &[ID::from ("aa")] ) . await ?;
-    if let Some (aa_contents) = container_to_contents . get (&ID::from ("aa")) {
-      if aa_contents . contains (&ID::from ("aa")) {
-        failures . push (
-          "aa contains itself in TypeDB (self-containment after merge)"
-          . to_string() ); } } }
+  // aa must not contain itself in the selected graph.
+  { let selected = graph . load_full ();
+    let aa_contents = find_related_nodes (
+      &selected . graph, &[ID::from ("aa")],
+      RelationRole::CONTAINER, None );
+    if aa_contents . contains (&ID::from ("aa")) {
+      failures . push (
+        "aa contains itself in the graph after merge" . to_string() ); } }
 
   let view : &str = &response . saved_view;
 
@@ -237,5 +235,4 @@ async fn merge_container_into_content_impl (
       failures . join ("\n  - ") );
     panic!("{}", msg); }
 
-  audit_inrustgraph_or_panic (&graph, &config . db_name, driver) . await?;
   Ok (( )) }

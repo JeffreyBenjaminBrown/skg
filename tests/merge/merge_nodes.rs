@@ -3,7 +3,9 @@
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_viewforest;
 use skg::nodeMerge::merge_nodes;
-use skg::test_utils::{run_with_shared_test_db, all_pids_from_typedb, tantivy_contains_id, extra_ids_from_pid, graph_handle_from_config, audit_inrustgraph_or_panic};
+use skg::test_utils::{
+  run_with_shared_test_graph, all_pids_from_graph, tantivy_contains_id,
+  extra_ids_from_pid};
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SourceName};
 use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{EditRequest, ViewNode, ViewNodeKind, Vognode, ActiveNode, IndefOrDef, viewforest_root_viewnode, default_activeNode};
@@ -11,15 +13,13 @@ use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::NodeMerge;
 use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source;
 use skg::util::path_from_pid_and_source;
-use skg::dbs::typedb::search::contains_from_pids::contains_from_pids;
-use skg::dbs::typedb::search::{find_related_nodes, find_related_nodes_from_in_rust_graph};
+use skg::dbs::graph_queries::relations::{contains_from_pids, find_related_nodes};
+use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 
 use ego_tree::Tree;
 use std::collections::{HashSet, HashMap};
 use std::error::Error;
 use std::path::Path;
-use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
 
 fn mk_test_viewnode (
   title        : &str,
@@ -43,48 +43,44 @@ fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str =
     "tests/merge/merge_nodes/fixtures";
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-merge-nodes",
     |s| Box::pin ( async move {
       s . reset ("test_merge_2_into_1", fixtures) . await ?;
       test_merge_2_into_1 (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_merge_1_into_2", fixtures) . await ?;
       test_merge_1_into_2 (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_inrustgraph_queries_resolve_aliases_after_merge", fixtures) . await ?;
       test_inrustgraph_queries_resolve_aliases_after_merge (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 async fn test_merge_2_into_1 (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      test_merge_2_into_1_impl(config, driver, tantivy) . await?;
+      test_merge_2_into_1_impl(config, fixture_graph, tantivy) . await?;
       Ok(( ))
     }
 
 async fn test_merge_2_into_1_impl(
   config: &SkgConfig,
-  driver: &TypeDBDriver,
+  fixture_graph: &InRustGraphHandle,
   tantivy: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // Create viewnode viewforest with node 1 requesting to merge node 2
   let view_node_1 = mk_test_viewnode("1", "1", Some(EditRequest::NodeMerge(ID::from ("2"))));
   let mut viewforest: Tree<ViewNode> = Tree::new(viewforest_root_viewnode());
   viewforest . root_mut() . append (view_node_1);
-  let graph : InRustGraphHandle =
-    graph_handle_from_config (config) ?;
-
   // Generate NodeMerge from merge request
   let nodeMerge_instructions: Vec<NodeMerge> =
     nodeMerge_instructions_from_viewforest(
-      &graph . load_full () . graph,
+      &fixture_graph . load_full () . graph,
       &ViewForest::from_internal_tree (viewforest),
       config,
-      driver,
   ) . await?;
 
   // Expect 1 NodeMerge (containing 3 DefineNodes)
@@ -96,37 +92,34 @@ async fn test_merge_2_into_1_impl(
     &nodeMerge_instructions,
     config . clone(),
     tantivy,
-    driver,
-    &graph,
+    fixture_graph,
   ) . await?;
 
   // Verify results
-  verify_typedb_after_merge_2_into_1(
-    config, driver) . await?;
+  verify_graph_after_merge_2_into_1(
+    config, fixture_graph) . await?;
   verify_filesystem_after_merge_2_into_1(
     config, &nodeMerge_instructions)?;
   verify_tantivy_after_merge_2_into_1(
     tantivy, &nodeMerge_instructions )?;
-  audit_inrustgraph_or_panic (&graph, &config . db_name, driver) . await?;
   Ok(( )) }
 
-async fn verify_typedb_after_merge_2_into_1 (
-  config: &SkgConfig,
-  driver: &TypeDBDriver,
+async fn verify_graph_after_merge_2_into_1 (
+  _config: &SkgConfig,
+  graph_handle: &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
-  let db_name: &String = &config . db_name;
+  let snapshot = graph_handle . load_full ();
+  let graph = &snapshot . graph;
 
-  // Node 2 should be gone from TypeDB as primary node
+  // Node 2 should be gone as a primary node.
   let all_primary_node_ids: HashSet<ID> =
-    all_pids_from_typedb(
-      db_name, driver ) . await ?;
+    all_pids_from_graph (graph);
   assert!(!all_primary_node_ids . contains(&ID::from ("2")),
           "PID 2 should not exist. It was merged and deleted.");
 
   // Node 1 should have extra_ids: 2 and 2-extra-id
   let node_1_extra_ids: Vec<ID> =
-    extra_ids_from_pid(
-      db_name, driver, &ID::from ("1")) . await?;
+    extra_ids_from_pid (graph, &ID::from ("1"));
   assert!(node_1_extra_ids . contains(&ID::from ("2")),
           "Node 1 should have extra_id '2'");
   assert!(node_1_extra_ids . contains(&ID::from ("2-extra-id")),
@@ -134,12 +127,11 @@ async fn verify_typedb_after_merge_2_into_1 (
 
   // Node 1 should contain 7 things: [acquiree_text_preserver_id, 11, 12, overlap, 21, 22, hidden-from-subscriptions-of-1-but-in-content-of-2]
   // IMPORTANT: contains_from_pids only returns relationships where BOTH nodes are in the input list, so we must include all the child nodes we want to check for. We query with all nodes in the DB.
-  let all_node_ids: HashSet<ID> = all_pids_from_typedb(db_name, driver) . await?;
+  let all_node_ids: HashSet<ID> = all_pids_from_graph (graph);
   let input_pids: Vec<ID> = all_node_ids . into_iter() . collect();
   let (container_to_contents, _content_to_containers)
     : (HashMap<ID, HashSet<ID>>, HashMap<ID, HashSet<ID>>)
-    = contains_from_pids(
-      db_name, driver, &input_pids ) . await ?;
+    = contains_from_pids (graph, &input_pids, None);
 
   let node_1_contents: &HashSet<ID> =
     container_to_contents . get(
@@ -295,32 +287,28 @@ fn verify_tantivy_after_merge_2_into_1(
 
 async fn test_merge_1_into_2 (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      test_merge_1_into_2_impl(config, driver, tantivy) . await?;
+      test_merge_1_into_2_impl(config, fixture_graph, tantivy) . await?;
       Ok(( ))
     }
 
 async fn test_merge_1_into_2_impl(
   config: &SkgConfig,
-  driver: &TypeDBDriver,
+  fixture_graph: &InRustGraphHandle,
   tantivy: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // Create viewnode viewforest with node 2 requesting to merge node 1
   let view_node_2 = mk_test_viewnode("2", "2", Some(EditRequest::NodeMerge(ID::from ("1"))));
   let mut viewforest: Tree<ViewNode> = Tree::new(viewforest_root_viewnode());
   viewforest . root_mut() . append (view_node_2);
-  let graph : InRustGraphHandle =
-    graph_handle_from_config (config) ?;
-
   // Generate NodeMerge from merge request
   let nodeMerge_instructions: Vec<NodeMerge> =
     nodeMerge_instructions_from_viewforest(
-      &graph . load_full () . graph,
+      &fixture_graph . load_full () . graph,
       &ViewForest::from_internal_tree (viewforest),
       config,
-      driver,
   ) . await?;
 
   // Expect 1 NodeMerge (containing 3 DefineNodes)
@@ -332,37 +320,36 @@ async fn test_merge_1_into_2_impl(
     &nodeMerge_instructions,
     config . clone(),
     tantivy,
-    driver,
-    &graph,
+    fixture_graph,
   ) . await?;
 
   // Verify results
-  verify_typedb_after_merge_1_into_2(
-    config, driver, &nodeMerge_instructions) . await?;
+  verify_graph_after_merge_1_into_2(
+    config, fixture_graph, &nodeMerge_instructions) . await?;
   verify_filesystem_after_merge_1_into_2(
     config, &nodeMerge_instructions)?;
   verify_tantivy_after_merge_1_into_2(
     tantivy, &nodeMerge_instructions)?;
-  audit_inrustgraph_or_panic (&graph, &config . db_name, driver) . await?;
   Ok(( )) }
 
-async fn verify_typedb_after_merge_1_into_2 (
-  config: &SkgConfig,
-  driver: &TypeDBDriver,
+async fn verify_graph_after_merge_1_into_2 (
+  _config: &SkgConfig,
+  graph_handle: &InRustGraphHandle,
   nodeMerge_instructions: &[NodeMerge],
 ) -> Result<(), Box<dyn Error>> {
-  let db_name: &String = &config . db_name;
+  let snapshot = graph_handle . load_full ();
+  let graph = &snapshot . graph;
 
-  // Node 1 should be gone from TypeDB as primary node
+  // Node 1 should be gone as a primary node.
   let all_primary_node_ids: HashSet<ID> =
-    all_pids_from_typedb(db_name, driver) . await?;
+    all_pids_from_graph (graph);
   assert!(!all_primary_node_ids . contains(&ID::from ("1")),
           "PID 1 should NOT exist (it was merged and deleted)");
 
   // Node 2 should have new extra_id '1',
   // in addition to its preexisting extra id '2-extra-id'.
   let node_2_extra_ids: Vec<ID> =
-    extra_ids_from_pid(db_name, driver, &ID::from ("2")) . await?;
+    extra_ids_from_pid (graph, &ID::from ("2"));
   assert!(node_2_extra_ids . contains(&ID::from ("1")),
           "Node 2 should have extra_id '1'");
 
@@ -370,12 +357,11 @@ async fn verify_typedb_after_merge_1_into_2 (
   // relationships where BOTH nodes are in the input list,
   // so we query with all nodes in the DB.
   let all_node_ids: HashSet<ID> =
-    all_pids_from_typedb(db_name, driver) . await?;
+    all_pids_from_graph (graph);
   let input_pids: Vec<ID> = all_node_ids . into_iter() . collect();
   let (container_to_contents, _content_to_containers)
     : (HashMap<ID, HashSet<ID>>, HashMap<ID, HashSet<ID>>)
-    = contains_from_pids(
-      db_name, driver, &input_pids ) . await ?;
+    = contains_from_pids (graph, &input_pids, None);
   let node_2_contents: &HashSet<ID> =
     container_to_contents . get(&ID::from ("2"))
     . ok_or ("Node 2 should have contains relationships")?;
@@ -401,9 +387,8 @@ async fn verify_typedb_after_merge_1_into_2 (
     &nodeMerge_instructions[0] . targets_from_nodeMerge() . 0 . pid;
   let acquiree_text_preserver_textlink_dests: HashSet<ID> =
     find_related_nodes(
-      db_name, driver, & [ acquiree_text_preserver_id . clone () ],
-      "textlinks_to", "source", "dest"
-    ) . await ?;
+      graph, & [ acquiree_text_preserver_id . clone () ],
+      RelationRole::LINK_SOURCE, None );
   assert!(
     acquiree_text_preserver_textlink_dests . contains(&ID::from ("1-links-to")),
     "acquiree_text_preserver should textlink to 1-links-to");
@@ -411,8 +396,7 @@ async fn verify_typedb_after_merge_1_into_2 (
   // - Node 2 should NOT have the outbound textlink from node 1
   //   (the textlink is in the text, which went to acquiree_text_preserver)
   let node_2_textlink_dests: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from ("2") ],
-    "textlinks_to", "source", "dest" ) . await ?;
+    graph, & [ ID::from ("2") ], RelationRole::LINK_SOURCE, None );
   assert!(
     !node_2_textlink_dests . contains(&ID::from ("1-links-to")),
     "Node 2 should NOT textlink to 1-links-to");
@@ -420,8 +404,8 @@ async fn verify_typedb_after_merge_1_into_2 (
   // - The textlink from links-to-1 to 1 should now be from links-to-1 to 2
   //   (inbound textlinks target the acquirer because acquiree's ID becomes an extra_id)
   let links_to_1_dests: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from ("links-to-1") ],
-    "textlinks_to", "source", "dest" ) . await ?;
+    graph, & [ ID::from ("links-to-1") ],
+    RelationRole::LINK_SOURCE, None );
   assert!(links_to_1_dests . contains(&ID::from ("2")),
           "links-to-1 should textlink to 2 (rerouted from 1)");
   assert!(!links_to_1_dests . contains(&ID::from ("1")),
@@ -430,16 +414,15 @@ async fn verify_typedb_after_merge_1_into_2 (
   // Subscribes relationships should be rerouted
   // - Node 1's subscribes_to [1-subscribes-to] should transfer to node 2
   let node_2_subscribes_to: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from ("2") ],
-    "subscribes", "subscriber", "subscribee" ) . await ?;
+    graph, & [ ID::from ("2") ], RelationRole::SUBSCRIBER, None );
   assert!(node_2_subscribes_to . contains(&ID::from ("1-subscribes-to")),
           "Node 2 should subscribe to 1-subscribes-to");
 
   // - subscribes-to-1, which subscribed to [1],
   // should now subscribe to [2]
   let subscribes_to_1_targets: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from ("subscribes-to-1") ],
-    "subscribes", "subscriber", "subscribee" ) . await ?;
+    graph, & [ ID::from ("subscribes-to-1") ],
+    RelationRole::SUBSCRIBER, None );
   assert!(subscribes_to_1_targets . contains(&ID::from ("2")),
           "subscribes-to-1 should subscribe to 2 (rerouted from 1)");
   assert!(!subscribes_to_1_targets . contains(&ID::from ("1")),
@@ -450,20 +433,19 @@ async fn verify_typedb_after_merge_1_into_2 (
   // - After merge: Node 2 should hide [hidden-from-1s-subscriptions] but NOT [hidden-from-subscriptions-of-1-but-in-content-of-2]
   //   because hidden-from-subscriptions-of-1-but-in-content-of-2 IS in node 2's contents.
   let node_2_hides: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from ("2") ], "hides_from_its_subscriptions", "hider", "hidden"
-  ) . await?;
+    graph, & [ ID::from ("2") ], RelationRole::HIDER, None );
   assert!(node_2_hides . contains(&ID::from ("hidden-from-1s-subscriptions")),
           "Node 2 should hide hidden-from-1s-subscriptions (transferred from node 1)");
   assert!(!node_2_hides . contains(&ID::from ("hidden-from-subscriptions-of-1-but-in-content-of-2")),
           "Node 2 should NOT hide hidden-from-subscriptions-of-1-but-in-content-of-2");
 
   // - hides-1-from-subscriptions hid [1, 11] on disk.
-  //   Post-merge, TypeDB resolves the "1" reference through has_extra_id
+  //   Post-merge, the graph resolves the "1" reference through extra IDs
   //   to node 2 (the acquirer). So hides-1-from-subscriptions should
   //   hide [2, 11]. Node 1 itself no longer exists as a node entity.
   let hides_1_targets: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from ("hides-1-from-subscriptions") ], "hides_from_its_subscriptions", "hider", "hidden"
-  ) . await?;
+    graph, & [ ID::from ("hides-1-from-subscriptions") ],
+    RelationRole::HIDER, None );
   assert!(hides_1_targets . contains(&ID::from ("11")),
           "hides-1-from-subscriptions should still hide 11");
   assert!(hides_1_targets . contains(&ID::from ("2")),
@@ -474,16 +456,15 @@ async fn verify_typedb_after_merge_1_into_2 (
   // Overrides relationships should be processed correctly
   // - Node 1's overrides [overridden-by-1] should transfer to node 2
   let node_2_overrides: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from ("2") ], "overrides_view_of", "overrider", "overridden"
-  ) . await?;
+    graph, & [ ID::from ("2") ], RelationRole::OVERRIDER, None );
   assert!(node_2_overrides . contains(&ID::from ("overridden-by-1")),
           "Node 2 should override view of overridden-by-1 (transferred from node 1)");
 
   // - overrider-of-1 overrode [1] on disk. Post-merge, extra_id
   //   resolution redirects "1" to node 2, so it now overrides [2].
   let overrider_of_1_targets: HashSet<ID> = find_related_nodes(
-    db_name, driver, & [ ID::from ("overrider-of-1") ],
-    "overrides_view_of", "overrider", "overridden" ) . await ?;
+    graph, & [ ID::from ("overrider-of-1") ],
+    RelationRole::OVERRIDER, None );
   assert!(overrider_of_1_targets . contains(&ID::from ("2")),
           "overrider-of-1 should now override 2 (extra_id resolution of 1 → 2)");
   assert!(!overrider_of_1_targets . contains(&ID::from ("1")),
@@ -625,20 +606,18 @@ fn verify_tantivy_after_merge_1_into_2(
 // surface as canonical "2" when queried via the in-Rust graph path.
 // Before the canonical-keyed-inverse + forward-resolve-on-read
 // changes, inverse queries under-reported (raw-keyed) and forward
-// queries returned raw IDs; the same public function's TypeDB
-// fallback has always returned canonical pids. This test locks in
-// the in-Rust graph path's canonicalized behavior.
+// queries returned raw IDs. This test locks in canonicalized behavior.
 async fn test_inrustgraph_queries_resolve_aliases_after_merge (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
         test_inrustgraph_queries_resolve_aliases_after_merge_impl (
-          config, driver, tantivy ) . await }
+          config, fixture_graph, tantivy ) . await }
 
 async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   config  : &SkgConfig,
-  driver  : &TypeDBDriver,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // NodeMerge 1 into 2. Acquirer=2, acquiree=1.
@@ -647,50 +626,44 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
                       Some (EditRequest::NodeMerge (ID::from ("1"))));
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   viewforest . root_mut () . append (view_node_2);
-  let graph : InRustGraphHandle =
-    graph_handle_from_config (config) ?;
   let nodeMerge_instructions : Vec<NodeMerge> =
     nodeMerge_instructions_from_viewforest (
-      &graph . load_full () . graph,
+      &fixture_graph . load_full () . graph,
       &ViewForest::from_internal_tree (viewforest),
-      config, driver ) . await?;
+      config ) . await?;
   merge_nodes (
     &nodeMerge_instructions, config . clone (),
-    tantivy, driver, &graph ) . await?;
+    tantivy, fixture_graph ) . await?;
 
-  let snap = graph . load_full ();
+  let snap = fixture_graph . load_full ();
   let input_acquirer : Vec<ID> = vec![ID::from ("2")];
 
   // === Inverse queries: "who points at pid 2?" ===
 
   let subscribers : HashSet<ID> =
-    find_related_nodes_from_in_rust_graph (
-      &snap, &input_acquirer,
-      "subscribes", "subscribee", "subscriber" );
+    find_related_nodes (
+      &snap . graph, &input_acquirer, RelationRole::SUBSCRIBEE, None );
   assert!( subscribers . contains (&ID::from ("subscribes-to-1")),
            "inverse subscribes under pid 2 should include \
             subscribes-to-1 (its subscribes_to = [1], which aliases 2)" );
 
   let hiders : HashSet<ID> =
-    find_related_nodes_from_in_rust_graph (
-      &snap, &input_acquirer,
-      "hides_from_its_subscriptions", "hidden", "hider" );
+    find_related_nodes (
+      &snap . graph, &input_acquirer, RelationRole::HIDDEN, None );
   assert!( hiders . contains (&ID::from ("hides-1-from-subscriptions")),
            "inverse hides under pid 2 should include \
             hides-1-from-subscriptions" );
 
   let overriders : HashSet<ID> =
-    find_related_nodes_from_in_rust_graph (
-      &snap, &input_acquirer,
-      "overrides_view_of", "overridden", "overrider" );
+    find_related_nodes (
+      &snap . graph, &input_acquirer, RelationRole::OVERRIDDEN, None );
   assert!( overriders . contains (&ID::from ("overrider-of-1")),
            "inverse overrides_view_of under pid 2 should include \
             overrider-of-1" );
 
   let textlink_sources : HashSet<ID> =
-    find_related_nodes_from_in_rust_graph (
-      &snap, &input_acquirer,
-      "textlinks_to", "dest", "source" );
+    find_related_nodes (
+      &snap . graph, &input_acquirer, RelationRole::LINK_DEST, None );
   assert!( textlink_sources . contains (&ID::from ("links-to-1")),
            "inverse textlinks_to under pid 2 should include \
             links-to-1 (its body has a link to id 1, which aliases 2)" );
@@ -698,9 +671,9 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   // === Forward queries: neighbors' outbound should resolve 1 → 2 ===
 
   let subscribee_of_s2_1 : HashSet<ID> =
-    find_related_nodes_from_in_rust_graph (
-      &snap, &vec![ID::from ("subscribes-to-1")],
-      "subscribes", "subscriber", "subscribee" );
+    find_related_nodes (
+      &snap . graph, &vec![ID::from ("subscribes-to-1")],
+      RelationRole::SUBSCRIBER, None );
   assert!( subscribee_of_s2_1 . contains (&ID::from ("2")),
            "subscribes-to-1's forward subscribes should resolve to \
             canonical pid 2 (was raw 1 on disk)" );
@@ -708,9 +681,9 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
            "forward query should NOT return raw acquiree pid 1" );
 
   let hidden_by_h1 : HashSet<ID> =
-    find_related_nodes_from_in_rust_graph (
-      &snap, &vec![ID::from ("hides-1-from-subscriptions")],
-      "hides_from_its_subscriptions", "hider", "hidden" );
+    find_related_nodes (
+      &snap . graph, &vec![ID::from ("hides-1-from-subscriptions")],
+      RelationRole::HIDER, None );
   assert!( hidden_by_h1 . contains (&ID::from ("2")),
            "hides-1-from-subscriptions's forward hides should include \
             canonical pid 2" );
@@ -718,17 +691,17 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
            "hides-1-from-subscriptions also hides 11 (unchanged)" );
 
   let overridden_by_ov1 : HashSet<ID> =
-    find_related_nodes_from_in_rust_graph (
-      &snap, &vec![ID::from ("overrider-of-1")],
-      "overrides_view_of", "overrider", "overridden" );
+    find_related_nodes (
+      &snap . graph, &vec![ID::from ("overrider-of-1")],
+      RelationRole::OVERRIDER, None );
   assert!( overridden_by_ov1 . contains (&ID::from ("2")),
            "overrider-of-1's forward overrides should resolve \
             to canonical pid 2" );
 
   let destinations_of_l1 : HashSet<ID> =
-    find_related_nodes_from_in_rust_graph (
-      &snap, &vec![ID::from ("links-to-1")],
-      "textlinks_to", "source", "dest" );
+    find_related_nodes (
+      &snap . graph, &vec![ID::from ("links-to-1")],
+      RelationRole::LINK_SOURCE, None );
   assert!( destinations_of_l1 . contains (&ID::from ("2")),
            "links-to-1's forward textlinks should resolve to \
             canonical pid 2" );

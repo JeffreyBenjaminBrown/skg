@@ -2,14 +2,13 @@
 /// See fixtures/README.md for the test scenario.
 
 use super::common::*;
-use std::sync::Arc;
-use skg::test_utils::{run_with_shared_test_db, SharedDbSession};
+use skg::test_utils::{run_with_shared_test_graph, SharedGraphSession};
 use skg::types::misc::members_of;
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-git-diff-content-save",
     |s| Box::pin ( async move {
       test_delete_removed_node_respawns (s) . await ?;
@@ -26,24 +25,22 @@ fn all_tests
 /// Deleting a 'removed' node (deleted from disk) should be a no-op.
 /// The node respawns in the returned buffer.
 async fn test_delete_removed_node_respawns (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
-  run_save_test(s, "skg-test-save-del-removed", |config, driver, tantivy, repo_path| {
+  run_save_test(s, "skg-test-save-del-removed", |config, fixture_graph, tantivy, repo_path| {
     Box::pin(async move {
       // Scenario: User deletes the gets-removed line
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "gets-removed");
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
           &mut stream,
-          &input, driver, config, tantivy, &graph, true,
+          &input, config, tantivy, fixture_graph, true,
           &Err ( String::new () ), &mut views_state
         ) . await?;
 
@@ -67,24 +64,22 @@ async fn test_delete_removed_node_respawns (
 /// Deleting a 'removed-here' phantom node should be a no-op.
 /// The node respawns in the returned buffer.
 async fn test_delete_removed_here_node_respawns (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
-  run_save_test(s, "skg-test-save-del-removed-here", |config, driver, tantivy, repo_path| {
+  run_save_test(s, "skg-test-save-del-removed-here", |config, fixture_graph, tantivy, repo_path| {
     Box::pin(async move {
       // User deletes the removed-here node under 12 (called 'moves')
       let input =
         without_lines_containing(GIT_DIFF_VIEW, "(unstaged removedM)");
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, &graph, true,
+          &input, config, tantivy, fixture_graph, true,
         &Err ( String::new () ), &mut views_state
       ) . await?;
 
@@ -106,24 +101,22 @@ async fn test_delete_removed_here_node_respawns (
 /// Deleting a 'new-here' node should update the disk.
 /// The node disappears from its new location but remains as phantom in old location.
 async fn test_delete_new_here_updates_disk (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
-  run_save_test(s, "skg-test-save-del-new-here", |config, driver, tantivy, repo_path| {
+  run_save_test(s, "skg-test-save-del-new-here", |config, fixture_graph, tantivy, repo_path| {
     Box::pin(async move {
       // User deleted 'moves' under 11 (the new-here one)
       // The "moves under 11" line is the new-here phantom (membership added).
       let input = without_lines_containing(GIT_DIFF_VIEW, "(unstaged newM)");
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, &graph, true,
+          &input, config, tantivy, fixture_graph, true,
         &Err ( String::new () ), &mut views_state
       ) . await?;
 
@@ -149,10 +142,10 @@ async fn test_delete_new_here_updates_disk (
 
 /// Adding a new child should create it on disk.
 async fn test_add_new_child_creates_on_disk (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
-  run_save_test(s, "skg-test-save-add-child", |config, driver, tantivy, repo_path| {
+  run_save_test(s, "skg-test-save-add-child", |config, fixture_graph, tantivy, repo_path| {
     Box::pin(async move {
       // User added 'newer' as child of 12
       let input = insert_after(
@@ -160,15 +153,13 @@ async fn test_add_new_child_creates_on_disk (
         GIT_DIFF_VIEW, "(id 12)",
         "*** (skg (node (id newer))) newer");
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, &graph, true,
+          &input, config, tantivy, fixture_graph, true,
         &Err ( String::new () ), &mut views_state
       ) . await?;
 
@@ -199,14 +190,14 @@ async fn test_add_new_child_creates_on_disk (
 }
 
 async fn test_diff_mode_as_subscribee_regenerates_phantom_children (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test_with_setup(
     s,
     "skg-test-save-diff-as-subscribee-regenerates",
     setup_git_repo_with_subscribee_fixtures,
-    |config, driver, tantivy, _repo_path| { Box::pin(async move {
+    |config, fixture_graph, tantivy, _repo_path| { Box::pin(async move {
       let input = "\
 * (skg (node (id 1) (source main))) 1
 ** (skg subscribeeCol)
@@ -214,15 +205,13 @@ async fn test_diff_mode_as_subscribee_regenerates_phantom_children (
 **** (skg (node (id moves) (unstaged newM))) moves
 ";
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        input, driver, config, tantivy, &graph, true,
+        input, config, tantivy, fixture_graph, true,
         &Err ( String::new () ), &mut views_state
       ) . await?;
 
@@ -240,29 +229,27 @@ async fn test_diff_mode_as_subscribee_regenerates_phantom_children (
 /// build_child_data's net-removal fallback rather than phantom_axes(contains).
 /// Without the fix the phantom would carry NO membership marker.
 async fn test_diff_mode_removed_subscribee_shows_removedM (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test_with_setup(
     s,
     "skg-test-save-diff-removed-subscribee",
     setup_git_repo_with_removed_subscribee_fixtures,
-    |config, driver, tantivy, _repo_path| { Box::pin(async move {
+    |config, fixture_graph, tantivy, _repo_path| { Box::pin(async move {
       let input = "\
 * (skg (node (id 1) (source main))) 1
 ** (skg subscribeeCol)
 *** (skg (node (id 11) (source main))) 11
 ";
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views        : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        input, driver, config, tantivy, &graph, true,
+        input, config, tantivy, fixture_graph, true,
         &Err ( String::new () ), &mut views_state
       ) . await?;
 
@@ -276,29 +263,27 @@ async fn test_diff_mode_removed_subscribee_shows_removedM (
 /// (staged removedM), proving phantom_axes reads subscribes_to PER STAGE (not
 /// just the net unstaged fallback). Guards the per-stage sharing-relation diff.
 async fn test_diff_mode_removed_subscribee_staged_shows_stagedM (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test_with_setup(
     s,
     "skg-test-save-diff-removed-subscribee-staged",
     setup_git_repo_with_removed_subscribee_fixtures_staged,
-    |config, driver, tantivy, _repo_path| { Box::pin(async move {
+    |config, fixture_graph, tantivy, _repo_path| { Box::pin(async move {
       let input = "\
 * (skg (node (id 1) (source main))) 1
 ** (skg subscribeeCol)
 *** (skg (node (id 11) (source main))) 11
 ";
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views        : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        input, driver, config, tantivy, &graph, true,
+        input, config, tantivy, fixture_graph, true,
         &Err ( String::new () ), &mut views_state
       ) . await?;
 
@@ -312,14 +297,14 @@ async fn test_diff_mode_removed_subscribee_staged_shows_stagedM (
 /// to the subscriber's subscribes_to renders PRESENT with
 /// (unstaged newM), mirroring content's mark_membership rule.
 async fn test_diff_mode_added_subscribee_shows_newM (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test_with_setup(
     s,
     "skg-test-save-diff-added-subscribee",
     setup_git_repo_with_added_subscribee_fixtures,
-    |config, driver, tantivy, _repo_path| { Box::pin(async move {
+    |config, fixture_graph, tantivy, _repo_path| { Box::pin(async move {
       let input = "\
 * (skg (node (id 1) (source main))) 1
 ** (skg subscribeeCol)
@@ -327,15 +312,13 @@ async fn test_diff_mode_added_subscribee_shows_newM (
 *** (skg (node (id 22) (source main))) 22
 ";
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views        : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        input, driver, config, tantivy, &graph, true,
+        input, config, tantivy, fixture_graph, true,
         &Err ( String::new () ), &mut views_state
       ) . await?;
 
@@ -353,27 +336,25 @@ async fn test_diff_mode_added_subscribee_shows_newM (
 /// attribution on the save-rerender path, mirroring
 /// ids::save::test_delete_id_col_scaffold_respawns_staged.
 async fn test_delete_removed_node_respawns_staged (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test_with_setup(
     s,
     "skg-test-save-del-removed-staged",
     setup_git_repo_with_fixtures_staged,
-    |config, driver, tantivy, repo_path| { Box::pin(async move {
+    |config, fixture_graph, tantivy, repo_path| { Box::pin(async move {
       // Scenario: User deletes the gets-removed line
       let input = without_lines_containing(
         GIT_DIFF_VIEW_STAGED, "gets-removed");
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
           &mut stream,
-          &input, driver, config, tantivy, &graph, true,
+          &input, config, tantivy, fixture_graph, true,
           &Err ( String::new () ), &mut views_state
         ) . await?;
 
@@ -399,14 +380,14 @@ async fn test_delete_removed_node_respawns_staged (
 //
 
 async fn run_save_test<F>(
-  s: &mut SharedDbSession,
+  s: &mut SharedGraphSession,
   subtest_name: &str,
   test_fn: F,
 ) -> Result<(), Box<dyn Error>>
 where
   F: for<'a> FnOnce(
     &'a SkgConfig,
-    &'a Arc<TypeDBDriver>,
+    &'a InRustGraphHandle,
     &'a mut TantivyIndex,
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
@@ -416,7 +397,7 @@ where
 }
 
 async fn run_save_test_with_setup<S, F>(
-  s: &mut SharedDbSession,
+  s: &mut SharedGraphSession,
   subtest_name: &str,
   setup: S,
   test_fn: F,
@@ -425,7 +406,7 @@ where
   S: FnOnce(&Path) -> Result<Repository, Box<dyn Error>>,
   F: for<'a> FnOnce(
     &'a SkgConfig,
-    &'a Arc<TypeDBDriver>,
+    &'a InRustGraphHandle,
     &'a mut TantivyIndex,
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
@@ -435,5 +416,5 @@ where
   setup (repo_path)?;
   s . reset_with_source_path (subtest_name, repo_path) . await ?;
 
-  test_fn(&s . config, &s . driver, &mut s . tantivy, repo_path) . await
+  test_fn(&s . config, &s . graph, &mut s . tantivy, repo_path) . await
 }

@@ -17,7 +17,7 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use skg::dbs::typedb::search::all_graphnodestats::AllGraphNodeStats;
+use skg::dbs::graph_queries::all_graphnodestats::AllGraphNodeStats;
 use skg::serve::ViewsState;
 use skg::serve::handlers::collateral_scheduler::CollateralScheduler;
 use skg::serve::handlers::rerender_all_views::handle_git_diff_toggle_and_rerender;
@@ -27,28 +27,28 @@ use skg::source_sets::{
   ActiveSourceSet, SourceSetName};
 use skg::test_utils::{graph_handle_from_config, read_lp_message,
                       skg_env_from_parts};
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::run_with_shared_test_graph;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{SkgConfig, TantivyIndex};
 use skg::types::views_state::{OpenViews, ViewUri};
-use typedb_driver::TypeDBDriver;
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str = "tests/source_sets/fixtures";
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-diff-mode-refusals",
     |s| Box::pin ( async move {
       s . reset ("toggle_refused_under_restricted_set_and_allowed_at_all", fixtures) . await ?;
       toggle_refused_under_restricted_set_and_allowed_at_all (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("switch_refusals_take_the_unwinding_shape", fixtures) . await ?;
       switch_refusals_take_the_unwinding_shape (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("refusal_first_messages_parse_and_read_as_documented", fixtures) . await ?;
       refusal_first_messages_parse_and_read_as_documented (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 fn connected_tcp_stream_pair (
@@ -84,13 +84,13 @@ fn read_first_then_assert_empty_stream (
 
 async fn toggle_refused_under_restricted_set_and_allowed_at_all (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config)?;
       let env : SkgEnv =
         skg_env_from_parts (
-          config, Arc::clone (driver), tantivy, &graph );
+          config, tantivy, &graph );
       let mut views_state : ViewsState =
         ViewsState {
           diff_mode_enabled : false,
@@ -159,13 +159,13 @@ async fn toggle_refused_under_restricted_set_and_allowed_at_all (
 
 async fn switch_refusals_take_the_unwinding_shape (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config)?;
       let env : SkgEnv =
         skg_env_from_parts (
-          config, Arc::clone (driver), tantivy, &graph );
+          config, tantivy, &graph );
       let request_to = |name : &str| -> String {
         format! ( "((request . \"set active source set\") \
                     (name . \"{}\"))", name ) };
@@ -288,7 +288,7 @@ async fn switch_refusals_take_the_unwinding_shape (
 
 async fn refusal_first_messages_parse_and_read_as_documented (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // The quiet shape end to end, on a live reader rather than a
@@ -297,7 +297,7 @@ async fn refusal_first_messages_parse_and_read_as_documented (
       let graph = graph_handle_from_config (config)?;
       let env : SkgEnv =
         skg_env_from_parts (
-          config, Arc::clone (driver), tantivy, &graph );
+          config, tantivy, &graph );
       let mut views_state : ViewsState =
         ViewsState {
           diff_mode_enabled : false,

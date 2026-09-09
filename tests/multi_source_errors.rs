@@ -3,61 +3,21 @@
 use indoc::indoc;
 use regex::Regex;
 use skg::test_utils::{
-  strip_org_comments, cleanup_test_tantivy_and_typedb_dbs,
-  graph_handle_from_config};
-use skg::dbs::in_rust_graph::InRustGraphHandle;
+  strip_org_comments, run_with_test_graph_from_config};
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::from_text::buffer_to_viewnodes::add_missing_info::add_missing_info_to_viewforest;
 use skg::types::tree::forest::MpViewForest;
 use skg::types::errors::{BufferValidationError, SaveError};
-use skg::types::misc::SkgConfig;
-use skg::types::nodes::typedb::NodeTypedb;
-use skg::types::nodes::complete::NodeComplete;
-
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
-use skg::dbs::filesystem::not_nodes::load_config;
-use skg::dbs::typedb::nodes::create_all_nodes;
-use skg::dbs::typedb::relationships::create_all_relationships;
-use skg::dbs::typedb::sources::create_all_sources;
-use skg::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema};
 use std::error::Error;
-use std::path::PathBuf;
-use typedb_driver::{TypeDBDriver, Addresses, Credentials, DriverOptions, DriverTlsConfig};
-use futures::executor::block_on;
 
 #[test]
 fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
-  block_on(async {
-    // Load config from file and override db_name for this test
-    let mut config: SkgConfig =
-      load_config(
-        "tests/multi_source_errors/fixtures/skgconfig.toml")?;
-    config . db_name = "skg-test-multi-source-errors-1" . to_string();
-    config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-source-errors-1");
-
-    // Set up TypeDB driver
-    let driver: TypeDBDriver =
-      TypeDBDriver::new(
-        Addresses::try_from_address_str("127.0.0.1:1729")?,
-        Credentials::new("admin", "password"),
-        DriverOptions::new(DriverTlsConfig::disabled())
-      ) . await?;
-
-    // Load fixtures into database
-    let nodes: Vec<NodeComplete> =
-      read_all_skg_files_from_sources (&config)?;
-    let typedb_nodes : Vec<NodeTypedb> =
-      nodes . iter ()
-      . map (NodeTypedb::from_complete_parsing_textlinks)
-      . collect ();
-    overwrite_new_empty_typedb_db(&config . db_name, &driver) . await?;
-    read_and_use_schema(&config . db_name, &driver) . await?;
-    create_all_sources(&config . db_name, &driver, &config) . await?;
-    create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
-    create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
-    let graph : InRustGraphHandle = graph_handle_from_config (&config) ?;
+  run_with_test_graph_from_config (
+    "multi-source-errors-structure",
+    "tests/multi_source_errors/fixtures/skgconfig.toml",
+    |config, graph| Box::pin (async move {
 
     // Test buffer with multiple error conditions
     // Comments indicate the expected error for each line/group
@@ -74,12 +34,12 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       org_to_uninterpreted_viewforest (&buffer_text)?. 0;
     add_missing_info_to_viewforest(
       &graph . load_full () . graph,
-      &mut viewforest, &config . db_name, &driver
+      &mut viewforest
       ) . await?;
     let errors: Vec<BufferValidationError> =
       find_buffer_errors_for_saving(
         &graph . load_full () . graph,
-        &viewforest, &config, &driver) . await?;
+        &viewforest, config) . await?;
 
     { // Source validation errors: one for dub-1 (nonexistent source "dub")
       // and one for pub-1 (no source at all).
@@ -125,42 +85,15 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
     assert_eq!(errors . len(), 4,
                "Expected exactly 4 errors: 2 LocalStructureViolation (source errors), 1 Multiple_Defining_Viewnodes, 1 InconsistentSources");
 
-    cleanup_test_tantivy_and_typedb_dbs(
-      &config . db_name,
-      &driver,
-      Some(config . tantivy_folder . as_path())
-    ) . await?;
-    Ok(( )) } ) }
+    Ok(( )) } )) }
 
 #[test]
 fn test_foreign_node_modification_errors(
 ) -> Result<(), Box<dyn Error>> {
-  block_on(async {
-    let mut config: SkgConfig =
-      load_config(
-        "tests/multi_source_errors/fixtures/skgconfig.toml")?;
-    config . db_name = "skg-test-multi-source-errors-2" . to_string();
-    config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-source-errors-2");
-    let driver: TypeDBDriver =
-      TypeDBDriver::new(
-        Addresses::try_from_address_str("127.0.0.1:1729")?,
-        Credentials::new("admin", "password"),
-        DriverOptions::new(DriverTlsConfig::disabled())
-      ) . await?;
-
-    // Load fixtures into database
-    let nodes: Vec<NodeComplete> =
-      read_all_skg_files_from_sources (&config)?;
-    let typedb_nodes : Vec<NodeTypedb> =
-      nodes . iter ()
-      . map (NodeTypedb::from_complete_parsing_textlinks)
-      . collect ();
-    overwrite_new_empty_typedb_db(&config . db_name, &driver) . await?;
-    read_and_use_schema(&config . db_name, &driver) . await?;
-    create_all_sources(&config . db_name, &driver, &config) . await?;
-    create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
-    create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
-    let graph : InRustGraphHandle = graph_handle_from_config (&config) ?;
+  run_with_test_graph_from_config (
+    "multi-source-errors-foreign",
+    "tests/multi_source_errors/fixtures/skgconfig.toml",
+    |config, graph| Box::pin (async move {
 
     // Test 1: Foreign node modifications
     // (all other errors removed so initial validation passes)
@@ -185,8 +118,7 @@ fn test_foreign_node_modification_errors(
       let result = buffer_to_validated_saveplan(
         &graph . load_full () . graph,
         &buffer_text,
-        &config,
-        &driver,
+        config,
         None ) . await;
 
       assert!(result . is_err(), "Expected errors for foreign node modifications");
@@ -261,8 +193,7 @@ fn test_foreign_node_modification_errors(
       let result = buffer_to_validated_saveplan(
         &graph . load_full () . graph,
         &buffer_text,
-        &config,
-        &driver,
+        config,
         None ) . await;
 
       assert!(result . is_err(),
@@ -301,46 +232,16 @@ fn test_foreign_node_modification_errors(
       }
     }
 
-    // Cleanup
-    cleanup_test_tantivy_and_typedb_dbs(
-      &config . db_name,
-      &driver,
-      Some(config . tantivy_folder . as_path())
-    ) . await?;
-
     Ok(())
-  })
+  }))
 }
 
 #[test]
 fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
-  block_on(async {
-    // Load config from file and override db_name for this test
-    let mut config: SkgConfig = load_config(
-      "tests/multi_source_errors/fixtures/skgconfig.toml")?;
-    config . db_name = "skg-test-multi-source-errors-3" . to_string();
-    config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-source-errors-3");
-
-    // Set up TypeDB driver
-    let driver: TypeDBDriver = TypeDBDriver::new(
-      Addresses::try_from_address_str("127.0.0.1:1729")?,
-      Credentials::new("admin", "password"),
-      DriverOptions::new(DriverTlsConfig::disabled())
-    ) . await?;
-
-    // Load fixtures into database
-    let nodes: Vec<NodeComplete> =
-      read_all_skg_files_from_sources (&config)?;
-    let typedb_nodes : Vec<NodeTypedb> =
-      nodes . iter ()
-      . map (NodeTypedb::from_complete_parsing_textlinks)
-      . collect ();
-    overwrite_new_empty_typedb_db(&config . db_name, &driver) . await?;
-    read_and_use_schema(&config . db_name, &driver) . await?;
-    create_all_sources(&config . db_name, &driver, &config) . await?;
-    create_all_nodes(&config . db_name, &driver, &typedb_nodes) . await?;
-    create_all_relationships(&config . db_name, &driver, &typedb_nodes) . await?;
-    let graph : InRustGraphHandle = graph_handle_from_config (&config) ?;
+  run_with_test_graph_from_config (
+    "multi-source-errors-reconciliation",
+    "tests/multi_source_errors/fixtures/skgconfig.toml",
+    |config, graph| Box::pin (async move {
 
     // Test 1: Source move between owned sources is now allowed
     // priv-1 exists on disk in "private" source, but buffer specifies "public"
@@ -356,8 +257,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       let result = buffer_to_validated_saveplan(
         &graph . load_full () . graph,
         &buffer_text,
-        &config,
-        &driver,
+        config,
         None ) . await;
 
       assert!(result . is_ok(),
@@ -387,8 +287,7 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       let result = buffer_to_validated_saveplan(
         &graph . load_full () . graph,
         &buffer_text,
-        &config,
-        &driver,
+        config,
         None ) . await;
 
       println!("\n=== InconsistentSources test ===");
@@ -413,13 +312,6 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
       }
     }
 
-    // Cleanup
-    cleanup_test_tantivy_and_typedb_dbs(
-      &config . db_name,
-      &driver,
-      Some(config . tantivy_folder . as_path())
-    ) . await?;
-
     Ok(())
-  })
+  }))
 }

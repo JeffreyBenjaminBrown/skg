@@ -2,12 +2,12 @@
 /// See fixtures/ for the test scenario.
 
 use super::common::*;
-use skg::test_utils::{run_with_shared_test_db, SharedDbSession};
+use skg::test_utils::{run_with_shared_test_graph, SharedGraphSession};
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-git-diff-text-view",
     |s| Box::pin ( async move {
       test_title_diff_shows_text_changed_scaffolds (s) . await ?;
@@ -15,7 +15,7 @@ fn all_tests
       Ok (( )) } )) }
 
 async fn test_title_diff_shows_text_changed_scaffolds (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   let temp_dir = TempDir::new()?;
@@ -24,13 +24,13 @@ async fn test_title_diff_shows_text_changed_scaffolds (
   s . reset_with_source_path (
     "test_title_diff_shows_text_changed_scaffolds",
     repo_path ) . await ?;
-  let (config, driver, _tantivy)
-    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
-    = (&s . config, &s . driver, &mut s . tantivy);
+  let (config, _graph, _tantivy)
+    : (&SkgConfig, &InRustGraphHandle, &mut TantivyIndex)
+    = (&s . config, &s . graph, &mut s . tantivy);
 
   let root_ids = vec![ID("1" . to_string())];
   let (actual, _pids, _) : (String, Vec<ID>, _) =
-    multi_root_view(&driver, &config, None, &root_ids, true) . await?;
+    multi_root_view(&config, None, &root_ids, true) . await?;
 
   assert_buffer_contains(&actual, GIT_DIFF_VIEW);
 
@@ -43,7 +43,7 @@ async fn test_title_diff_shows_text_changed_scaffolds (
 /// 'git add' that matches what the save-rerender path would see
 /// when the worktree has been rewritten to match the index.
 async fn test_title_diff_staged_shows_staged_scaffolds (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   let temp_dir = TempDir::new()?;
@@ -52,13 +52,13 @@ async fn test_title_diff_staged_shows_staged_scaffolds (
   s . reset_with_source_path (
     "test_title_diff_staged_shows_staged_scaffolds",
     repo_path ) . await ?;
-  let (config, driver, _tantivy)
-    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
-    = (&s . config, &s . driver, &mut s . tantivy);
+  let (config, _graph, _tantivy)
+    : (&SkgConfig, &InRustGraphHandle, &mut TantivyIndex)
+    = (&s . config, &s . graph, &mut s . tantivy);
 
   let root_ids = vec![ID("1" . to_string())];
   let (actual, _pids, _) : (String, Vec<ID>, _) =
-    multi_root_view(&driver, &config, None, &root_ids, true) . await?;
+    multi_root_view(&config, None, &root_ids, true) . await?;
 
   assert_buffer_contains(&actual, GIT_DIFF_VIEW_STAGED);
 

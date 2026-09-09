@@ -2,7 +2,7 @@
 
 use indoc::indoc;
 use skg::from_text::buffer_to_validated_saveplan as buffer_to_validated_saveplan_with_graph;
-use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
+use skg::test_utils::{graph_handle_from_config, run_with_shared_test_graph};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::source_sets::ActiveSourceSet;
 use skg::types::errors::{SaveError, BufferValidationError};
@@ -11,74 +11,72 @@ use skg::types::misc::{SkgConfig, ID, SourceName};
 use skg::types::save::{DefineNode, SaveNode, DeleteNode, SavePlan};
 use skg::types::tree::forest::ViewForest;
 use std::error::Error;
-use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
 
 async fn buffer_to_validated_saveplan (
   buffer_text       : &str,
   config            : &SkgConfig,
-  driver            : &TypeDBDriver,
+  fixture_graph            : &InRustGraphHandle,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   let graph : InRustGraphHandle = graph_handle_from_config (config)
     . map_err (SaveError::DatabaseError) ?;
   buffer_to_validated_saveplan_with_graph (
     &graph . load_full () . graph,
-    buffer_text, config, driver, active_source_set ) . await }
+    buffer_text, config, active_source_set ) . await }
 
 const CONFIG_PATH: &str = "tests/save/validate_foreign_nodes/skgconfig.toml";
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-save-validate-foreign-nodes",
     |s| Box::pin ( async move {
       s . reset_from_config ("test_unmodified_foreign_node_allowed", CONFIG_PATH) . await ?;
       test_unmodified_foreign_node_allowed (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       s . reset_from_config ("test_modified_foreign_node_forks_with_default_source", CONFIG_PATH) . await ?;
       test_modified_foreign_node_forks_with_default_source (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       s . reset_from_config ("test_modified_foreign_node_body_forks_with_default_source", CONFIG_PATH) . await ?;
       test_modified_foreign_node_body_forks_with_default_source (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       s . reset_from_config ("test_indefinitive_foreign_node_filtered", CONFIG_PATH) . await ?;
       test_indefinitive_foreign_node_filtered (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       s . reset_from_config ("test_owned_node_unchanged_behavior", CONFIG_PATH) . await ?;
       test_owned_node_unchanged_behavior (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       s . reset_from_config ("test_delete_foreign_node_rejected", CONFIG_PATH) . await ?;
       test_delete_foreign_node_rejected (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       s . reset_from_config ("test_new_foreign_node_rejected", CONFIG_PATH) . await ?;
       test_new_foreign_node_rejected (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       s . reset_from_config ("test_mixed_owned_and_foreign_nodes", CONFIG_PATH) . await ?;
       test_mixed_owned_and_foreign_nodes (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       s . reset_from_config ("test_merge_with_foreign_acquirer_rejected", CONFIG_PATH) . await ?;
       test_merge_with_foreign_acquirer_rejected (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       s . reset_from_config ("test_merge_with_foreign_acquiree_rejected", CONFIG_PATH) . await ?;
       test_merge_with_foreign_acquiree_rejected (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       s . reset_from_config ("test_merge_with_both_owned_allowed", CONFIG_PATH) . await ?;
       test_merge_with_both_owned_allowed (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       Ok (( )) } )) }
 
 async fn test_unmodified_foreign_node_allowed (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
       let org_text: &str = indoc! {"
         * (skg (node (id foreign1) (source foreign))) Foreign node unchanged
         This is a foreign node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver , None) . await;
+        org_text, config, fixture_graph , None) . await;
       assert!(result . is_ok(), "Unmodified foreign node should be allowed");
       let ( _viewforest, save_plan, _warnings ) = result?;
       // Foreign nodes should be filtered out (no need to write)
@@ -89,7 +87,7 @@ async fn test_unmodified_foreign_node_allowed (
 
 async fn test_modified_foreign_node_forks_with_default_source (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
       // Editing a foreign node FORKS it. The foreign node is a ROOT with
       // no owned ancestor to infer a clone source from, so the clone's
@@ -102,7 +100,7 @@ async fn test_modified_foreign_node_forks_with_default_source (
       "};
       let ( _viewforest, save_plan, _warnings ) =
         buffer_to_validated_saveplan (
-          org_text, config, driver, None ) . await ?;
+          org_text, config, fixture_graph, None ) . await ?;
       assert_eq! ( save_plan . fork_specs . len (), 1,
         "editing the foreign node should produce one fork" );
       assert_eq! ( save_plan . fork_specs[0] . original_id, ID::from ("foreign2") );
@@ -118,7 +116,7 @@ async fn test_modified_foreign_node_forks_with_default_source (
 
 async fn test_modified_foreign_node_body_forks_with_default_source (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
       // Editing a foreign node's body forks it too; same no-owned-ancestor
       // situation -> the clone defaults to the first owned source.
@@ -128,7 +126,7 @@ async fn test_modified_foreign_node_body_forks_with_default_source (
       "};
       let ( _viewforest, save_plan, _warnings ) =
         buffer_to_validated_saveplan (
-          org_text, config, driver, None ) . await ?;
+          org_text, config, fixture_graph, None ) . await ?;
       assert_eq! ( save_plan . fork_specs . len (), 1,
         "editing the body should produce one fork" );
       assert_eq! ( save_plan . fork_specs[0] . clone . 0 . source,
@@ -139,14 +137,14 @@ async fn test_modified_foreign_node_body_forks_with_default_source (
 
 async fn test_indefinitive_foreign_node_filtered (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
       // Save buffer with indef foreign node
       let org_text: &str = indoc! {"
         * (skg (node (id foreign3) (source foreign) indef)) Foreign indef node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver, None) . await;
+        org_text, config, fixture_graph, None) . await;
       // Should succeed - indef foreign nodes are allowed but filtered
       assert!(result . is_ok(), "Indefinitive foreign node should be allowed");
       let ( _viewforest, save_plan, _warnings ) = result?;
@@ -158,7 +156,7 @@ async fn test_indefinitive_foreign_node_filtered (
 
 async fn test_owned_node_unchanged_behavior (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
       // Save buffer with owned node
       let org_text: &str = indoc! {"
@@ -167,7 +165,7 @@ async fn test_owned_node_unchanged_behavior (
         ** (skg (node (id child2) (source main))) _
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver , None) . await;
+        org_text, config, fixture_graph , None) . await;
       // Should succeed - owned nodes can be modified
       assert!(result . is_ok(), "Owned node modification should be allowed");
       let ( _viewforest, save_plan, _warnings ) = result?;
@@ -179,7 +177,7 @@ async fn test_owned_node_unchanged_behavior (
 
 async fn test_delete_foreign_node_rejected (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
       // Try to delete a foreign node
       let org_text: &str = indoc! {"
@@ -187,7 +185,7 @@ async fn test_delete_foreign_node_rejected (
         This is a foreign node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver , None) . await;
+        org_text, config, fixture_graph , None) . await;
       // Should fail with ModifiedForeignNode error
       assert!(result . is_err(), "Deleting foreign node should be rejected");
       match result . unwrap_err() {
@@ -201,7 +199,7 @@ async fn test_delete_foreign_node_rejected (
 
 async fn test_new_foreign_node_rejected (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
       // Try to create a new node in foreign source
       let org_text: &str = indoc! {"
@@ -209,7 +207,7 @@ async fn test_new_foreign_node_rejected (
         This should not be allowed
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver , None) . await;
+        org_text, config, fixture_graph , None) . await;
       // Should fail with CreatedForeignNode error
       assert!(result . is_err(), "Creating new foreign node should be rejected");
       match result . unwrap_err() {
@@ -223,7 +221,7 @@ async fn test_new_foreign_node_rejected (
 
 async fn test_mixed_owned_and_foreign_nodes (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
       // Save buffer with mix of owned and unmodified foreign nodes
       let org_text: &str = indoc! {"
@@ -234,7 +232,7 @@ async fn test_mixed_owned_and_foreign_nodes (
         This is a foreign node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver , None) . await;
+        org_text, config, fixture_graph , None) . await;
       // Should succeed
       assert!(result . is_ok(), "Mixed owned and unmodified foreign should be allowed");
       let ( _viewforest, save_plan, _warnings ) = result?;
@@ -253,7 +251,7 @@ async fn test_mixed_owned_and_foreign_nodes (
 
 async fn test_merge_with_foreign_acquirer_rejected (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
       // Try to merge where the acquirer is foreign
       // Format: (skg (node ... (editRequest (merge ID)))) - acquiree merges into acquirer
@@ -263,7 +261,7 @@ async fn test_merge_with_foreign_acquirer_rejected (
         This is a foreign node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver , None) . await;
+        org_text, config, fixture_graph , None) . await;
       // Should fail - can't merge into foreign node (would modify it)
       assert!(result . is_err(), "NodeMerge into foreign acquirer should be rejected");
       match result . unwrap_err() {
@@ -277,7 +275,7 @@ async fn test_merge_with_foreign_acquirer_rejected (
 
 async fn test_merge_with_foreign_acquiree_rejected (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
       // Try to merge where the acquiree is foreign
       let org_text: &str = indoc! {"
@@ -286,7 +284,7 @@ async fn test_merge_with_foreign_acquiree_rejected (
         * (skg (node (id node1) (source main))) Owned node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver , None) . await;
+        org_text, config, fixture_graph , None) . await;
       // Should fail - can't merge foreign node (would delete it)
       assert!(result . is_err(), "NodeMerge with foreign acquiree should be rejected");
       match result . unwrap_err() {
@@ -300,7 +298,7 @@ async fn test_merge_with_foreign_acquiree_rejected (
 
 async fn test_merge_with_both_owned_allowed (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
       // NodeMerge where both nodes are owned - should work
       let org_text: &str = indoc! {"
@@ -308,7 +306,7 @@ async fn test_merge_with_both_owned_allowed (
         * (skg (node (id child1) (source main))) Child node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
-        org_text, config, driver , None) . await;
+        org_text, config, fixture_graph , None) . await;
       // Should succeed - both nodes are owned
       assert!(result . is_ok(), "NodeMerge with both owned nodes should be allowed");
       Ok(())

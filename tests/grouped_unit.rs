@@ -3,13 +3,6 @@
 // server/ code, relinking all of them dominated the test cycle.
 // Cargo.toml sets autotests = false and declares a few [[test]]
 // targets; this one gathers the db-free unit-style files.
-//
-// PITFALL: graphnodestats_hiding belongs here and NOT in a group
-// with global-handle-installing tests: its TypeDB-path test relies
-// on the process-global in-Rust graph handle being uninstalled,
-// which under plain 'cargo test' only holds if no other test in the
-// same binary installs it. (Under nextest every test is its own
-// process, so this only matters for plain 'cargo test'.)
 
 #[path = "body_yaml_format.rs"]
 mod body_yaml_format;

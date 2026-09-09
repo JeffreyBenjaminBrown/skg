@@ -11,14 +11,12 @@
 
 use std::collections::HashSet;
 use std::error::Error;
-use std::sync::Arc;
 
 use ego_tree::{NodeId, NodeRef, Tree};
-use typedb_driver::TypeDBDriver;
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 
-use skg::dbs::in_rust_graph::{InRustGraph, snapshot_global};
-use skg::dbs::typedb::search::all_graphnodestats::{
-  AllGraphNodeStats, fetch_all_graphnodestats_with_source_set};
+use skg::dbs::graph_queries::all_graphnodestats::{
+  AllGraphNodeStats, fetch_all_graphnodestats};
 use skg::org_to_text::viewforest_to_string;
 use skg::serve::handlers::text_search::{
   MatchGroups, build_search_viewforest, suppressed_result_ids};
@@ -27,7 +25,7 @@ use skg::serve::handlers::text_search::render_enriched_search_buffer::{
   insert_override_ancestries_into_search_view};
 use skg::source_sets::{
   ActiveSourceSet, SourceSetName, apply_source_set_to_viewforest};
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::run_with_shared_test_graph;
 use skg::to_org::util::mark_view_roots_parent_absent;
 use skg::types::misc::{ID, SkgConfig, SourceName};
 use skg::types::tree::forest::ViewForest;
@@ -45,21 +43,22 @@ fn hit (
 
 #[test]
 fn all_tests () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-override-search-ancestry",
     |s| Box::pin ( async move {
       s . reset_from_config (
         "override_search_ancestry",
         "tests/override_search_ancestry/fixtures/skgconfig.toml"
         ) . await ?;
-      s . install_graph_handle () ?;
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           &s . config, SourceSetName::from ("all") ) ?;
-      suppression_anchors_at_user_owned ( &s . config, &active ) ?;
-      override_relatives_graft_as_descendants ( &active ) ?;
+      suppression_anchors_at_user_owned (
+        &s . config, &s . graph, &active ) ?;
+      override_relatives_graft_as_descendants (
+        &s . graph, &active ) ?;
       end_to_end_render_shows_suppressed_grafts_with_heralds (
-        &s . config, &s . driver, &active ) . await ?;
+        &s . config, &s . graph, &active ) . await ?;
       Ok (( )) } )) }
 
 /// End-to-end: replay production's phase-1 + phase-2 enrichment
@@ -73,11 +72,11 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
 /// ('collect_override_relative_ids').
 async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
   config : &SkgConfig,
-  driver : &TypeDBDriver,
+  graph_handle : &InRustGraphHandle,
   active : &ActiveSourceSet,
 ) -> Result<(), Box<dyn Error>> {
-  let graph : Arc<InRustGraph> =
-    snapshot_global () . expect ("graph handle installed above");
+  let graph_snapshot = graph_handle . load_full ();
+  let graph = &graph_snapshot . graph;
   let matches : MatchGroups = [
     hit ("U", "main",    "cooking the owned way"),
     hit ("F", "foreign", "cooking, forked once"),
@@ -101,8 +100,7 @@ async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
       collect_override_relative_ids ( &search_results, active, &graph ) );
     ids . into_iter () . collect () };
   let stats : AllGraphNodeStats =
-    fetch_all_graphnodestats_with_source_set (
-      &config . db_name, driver, &all_ids, Some (active) ) . await ?;
+    fetch_all_graphnodestats (graph, &all_ids, Some (active));
   // Phase 2: graft, then the same stats/herald/render passes as
   // handle_snapshot_response.
   insert_override_ancestries_into_search_view (
@@ -150,10 +148,11 @@ async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
 /// suppressed. A foreign overrider suppresses nothing.
 fn suppression_anchors_at_user_owned (
   config : &SkgConfig,
+  graph_handle : &InRustGraphHandle,
   active : &ActiveSourceSet,
 ) -> Result<(), Box<dyn Error>> {
-  let graph : Arc<InRustGraph> =
-    snapshot_global () . expect ("graph handle installed above");
+  let graph_snapshot = graph_handle . load_full ();
+  let graph = &graph_snapshot . graph;
   let matches : MatchGroups = [
     hit ("U",  "main",    "cooking the owned way"),
     hit ("F",  "foreign", "cooking, forked once"),
@@ -178,16 +177,18 @@ fn suppression_anchors_at_user_owned (
 /// U's overriddenward chain grafts beneath it as read-only descendants
 /// marked with the OVERRIDDEN backpath role: U -> F -> G.
 fn override_relatives_graft_as_descendants (
+  graph_handle : &InRustGraphHandle,
   active : &ActiveSourceSet,
 ) -> Result<(), Box<dyn Error>> {
+  let graph_snapshot = graph_handle . load_full ();
+  let graph = &graph_snapshot . graph;
   let matches : MatchGroups =
     [ hit ("U", "main", "cooking the owned way") ]
     . into_iter () . collect ();
   let (mut viewforest, results) =
     build_search_viewforest ( "cooking", &matches, &HashSet::new () );
   insert_override_ancestries_into_search_view (
-    &mut viewforest, &results, active,
-    &snapshot_global () . expect ("fixture graph installed above") );
+    &mut viewforest, &results, active, graph );
   let tree : Tree<ViewNode> = viewforest . into_internal_tree ();
   let u : NodeRef<ViewNode> =
     find_result_root ( &tree, "U" ) . expect ("U is a result root");

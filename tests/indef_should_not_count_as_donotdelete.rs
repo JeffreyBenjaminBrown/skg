@@ -25,31 +25,29 @@
 use indoc::indoc;
 use std::error::Error;
 use std::net::TcpStream;
-use std::sync::Arc;
 
-use skg::test_utils::{graph_handle_from_config, run_with_test_db};
+use skg::test_utils::{graph_handle_from_config, run_with_test_graph};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::views_state::OpenViews;
 use skg::types::misc::{SkgConfig, TantivyIndex};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use typedb_driver::TypeDBDriver;
 
 #[test]
 fn test_indef_should_not_count_as_donotdelete
   () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_test_graph (
     "skg-test-indef-not-donotdelete",
     "tests/indef_should_not_count_as_donotdelete/fixtures",
     "/tmp/tantivy-test-indef-not-donotdelete",
-    |config, driver, tantivy| Box::pin ( async move {
+    |config, fixture_graph, tantivy| Box::pin ( async move {
       indef_should_not_count_as_donotdelete_impl (
-        config, driver, tantivy ) . await
+        config, fixture_graph, tantivy ) . await
     } )) }
 
 async fn indef_should_not_count_as_donotdelete_impl (
   config  : &SkgConfig,
-  driver: &Arc<TypeDBDriver>,
+  fixture_graph: &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"
@@ -70,7 +68,7 @@ async fn indef_should_not_count_as_donotdelete_impl (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    input_org_text, driver, config, tantivy, &graph, false,
+    input_org_text, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state ) . await ?;
   if ! response . errors . is_empty () {
     panic! ("save returned errors: {:?}", response . errors); }

@@ -4,13 +4,12 @@ use std::error::Error;
 
 use skg::dbs::filesystem::one_node::optnodecomplete_from_id;
 use skg::from_text::supplement_from_disk::{ canonicalize_ids_from_disk, detect_source_move, supplement_unspecified_fields_from_disk, };
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::run_with_shared_test_graph;
 use skg::types::misc::{ID, MSV, SkgConfig, SourceName, TantivyIndex, members_msv, members_at_source_msv};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::save::SourceMove;
 
-use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 
 
 #[test]
@@ -18,31 +17,32 @@ fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str =
     "tests/save/none_node_fields_are_noops/fixtures";
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-save-none-node-fields-are-noops",
     |s| Box::pin ( async move {
       s . reset ("test_none_aliases_get_replaced_with_disk_aliases", fixtures) . await ?;
       test_none_aliases_get_replaced_with_disk_aliases (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_none_subscribes_to_get_replaced_with_disk_subscribes_to", fixtures) . await ?;
       test_none_subscribes_to_get_replaced_with_disk_subscribes_to (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides", fixtures) . await ?;
       test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_none_overrides_view_of_get_replaced_with_disk_overrides", fixtures) . await ?;
       test_none_overrides_view_of_get_replaced_with_disk_overrides (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 async fn supplement_from_disk_then_extract_nodecomplete (
   config    : &SkgConfig,
-  driver    : &typedb_driver::TypeDBDriver,
+  fixture_graph    : &skg::dbs::in_rust_graph::InRustGraphHandle,
   user_node : NodeComplete
 ) -> Result<NodeComplete, Box<dyn Error>> {
   let pid : ID = user_node . pid . clone();
+  let selected = fixture_graph . load_full ();
   let disk_node : NodeComplete =
-    optnodecomplete_from_id (config, driver, &pid) . await ?
+    optnodecomplete_from_id (&selected . graph, config, &pid) . await ?
       . ok_or ("Expected node on disk") ?;
   let canonicalized : NodeComplete =
     canonicalize_ids_from_disk (user_node, &disk_node) ?;
@@ -57,16 +57,16 @@ async fn supplement_from_disk_then_extract_nodecomplete (
 
 async fn test_none_aliases_get_replaced_with_disk_aliases (
   config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  fixture_graph   : &InRustGraphHandle,
   _tantivy : &mut TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
       test_none_aliases_get_replaced_with_disk_aliases_logic (
-        config, driver ) . await
+        config, fixture_graph ) . await
     }
 
 async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
   config : &SkgConfig,
-  driver : &typedb_driver::TypeDBDriver,
+  fixture_graph : &skg::dbs::in_rust_graph::InRustGraphHandle,
 ) -> Result < (), Box<dyn Error> > {
 
   { let mut user_node : NodeComplete = empty_node_complete ();
@@ -75,7 +75,7 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
       user_node . aliases = MSV::Unspecified; }
     let result : NodeComplete =
       supplement_from_disk_then_extract_nodecomplete (
-        &config, &driver, user_node ) . await ?;
+        &config, &fixture_graph, user_node ) . await ?;
     assert_eq! (
       members_msv (&result . aliases),
       MSV::Specified ( vec![ "alias 1 on disk" . to_string (),
@@ -88,7 +88,7 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
       user_node . aliases = MSV::Specified ( vec![] ); }
     let result : NodeComplete =
       supplement_from_disk_then_extract_nodecomplete (
-        &config, &driver, user_node ) . await ?;
+        &config, &fixture_graph, user_node ) . await ?;
     assert_eq! (
       result . aliases,
       MSV::Specified ( vec![] ),
@@ -102,7 +102,7 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
         MSV::Specified ( vec![ "new alias" . to_string () ] ) ); }
     let result : NodeComplete =
       supplement_from_disk_then_extract_nodecomplete (
-        &config, &driver, user_node ) . await ?;
+        &config, &fixture_graph, user_node ) . await ?;
     assert_eq! (
       members_msv (&result . aliases),
       MSV::Specified ( vec![ "new alias" . to_string () ] ),
@@ -112,16 +112,16 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
 
 async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to (
   config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  fixture_graph   : &InRustGraphHandle,
   _tantivy : &mut TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
       test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
-        config, driver ) . await
+        config, fixture_graph ) . await
     }
 
 async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
   config : &SkgConfig,
-  driver : &typedb_driver::TypeDBDriver,
+  fixture_graph : &skg::dbs::in_rust_graph::InRustGraphHandle,
 ) -> Result < (), Box<dyn Error> > {
 
   { let mut user_node : NodeComplete = empty_node_complete ();
@@ -130,7 +130,7 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
       user_node . subscribes_to = MSV::Unspecified; }
     let result : NodeComplete =
       supplement_from_disk_then_extract_nodecomplete (
-        &config, &driver, user_node ) . await ?;
+        &config, &fixture_graph, user_node ) . await ?;
     assert_eq! (
       members_msv (&result . subscribes_to),
       MSV::Specified ( vec![ ID::new ("sub_1_on_disk"),
@@ -143,7 +143,7 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
       user_node . subscribes_to = MSV::Specified ( vec![] ); }
     let result : NodeComplete =
       supplement_from_disk_then_extract_nodecomplete (
-        &config, &driver, user_node ) . await ?;
+        &config, &fixture_graph, user_node ) . await ?;
     assert_eq! (
       result . subscribes_to,
       MSV::Specified ( vec![] ),
@@ -157,7 +157,7 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
         MSV::Specified ( vec![ ID::new ("new_sub") ] ) ); }
     let result : NodeComplete =
       supplement_from_disk_then_extract_nodecomplete (
-        &config, &driver, user_node ) . await ?;
+        &config, &fixture_graph, user_node ) . await ?;
     assert_eq! (
       members_msv (&result . subscribes_to),
       MSV::Specified ( vec![ ID::new ("new_sub") ] ),
@@ -167,16 +167,16 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
 
 async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides (
   config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  fixture_graph   : &InRustGraphHandle,
   _tantivy : &mut TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
       test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_logic (
-        config, driver ) . await
+        config, fixture_graph ) . await
     }
 
 async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_logic (
   config : &SkgConfig,
-  driver : &typedb_driver::TypeDBDriver,
+  fixture_graph : &skg::dbs::in_rust_graph::InRustGraphHandle,
 ) -> Result < (), Box<dyn Error> > {
 
   { let mut user_node : NodeComplete = empty_node_complete ();
@@ -185,7 +185,7 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
       user_node . hides_from_its_subscriptions = MSV::Unspecified; }
     let result : NodeComplete =
       supplement_from_disk_then_extract_nodecomplete (
-        &config, &driver, user_node ) . await ?;
+        &config, &fixture_graph, user_node ) . await ?;
     assert_eq! (
       members_msv (&result . hides_from_its_subscriptions),
       MSV::Specified ( vec![ ID::new ("hide_1_on_disk") ]),
@@ -197,7 +197,7 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
       user_node . hides_from_its_subscriptions = MSV::Specified ( vec![] ); }
     let result : NodeComplete =
       supplement_from_disk_then_extract_nodecomplete (
-        &config, &driver, user_node ) . await ?;
+        &config, &fixture_graph, user_node ) . await ?;
     assert_eq! (
       result . hides_from_its_subscriptions,
       MSV::Specified ( vec![] ),
@@ -211,7 +211,7 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
         MSV::Specified ( vec![ ID::new ("new_hide") ] ) ); }
     let result : NodeComplete =
       supplement_from_disk_then_extract_nodecomplete (
-        &config, &driver, user_node ) . await ?;
+        &config, &fixture_graph, user_node ) . await ?;
     assert_eq! (
       members_msv (&result . hides_from_its_subscriptions),
       MSV::Specified ( vec![ ID::new ("new_hide") ] ),
@@ -221,16 +221,16 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
 
 async fn test_none_overrides_view_of_get_replaced_with_disk_overrides (
   config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  fixture_graph   : &InRustGraphHandle,
   _tantivy : &mut TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
       test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
-        config, driver ) . await
+        config, fixture_graph ) . await
     }
 
 async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
   config : &SkgConfig,
-  driver : &typedb_driver::TypeDBDriver,
+  fixture_graph : &skg::dbs::in_rust_graph::InRustGraphHandle,
 ) -> Result < (), Box<dyn Error> > {
 
   { let mut user_node : NodeComplete = empty_node_complete ();
@@ -239,7 +239,7 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
       user_node . overrides_view_of = MSV::Unspecified; }
     let result : NodeComplete =
       supplement_from_disk_then_extract_nodecomplete (
-        &config, &driver, user_node ) . await ?;
+        &config, &fixture_graph, user_node ) . await ?;
     assert_eq! (
       members_msv (&result . overrides_view_of),
       MSV::Specified ( vec![ ID::new ("override_1_on_disk"),
@@ -253,7 +253,7 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
       user_node . overrides_view_of = MSV::Specified ( vec![] ); }
     let result : NodeComplete =
       supplement_from_disk_then_extract_nodecomplete (
-        &config, &driver, user_node ) . await ?;
+        &config, &fixture_graph, user_node ) . await ?;
     assert_eq! (
       result . overrides_view_of,
       MSV::Specified ( vec![] ),
@@ -267,7 +267,7 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
         MSV::Specified ( vec![ ID::new ("new_override") ] ) ); }
     let result : NodeComplete =
       supplement_from_disk_then_extract_nodecomplete (
-        &config, &driver, user_node ) . await ?;
+        &config, &fixture_graph, user_node ) . await ?;
     assert_eq! (
       members_msv (&result . overrides_view_of),
       MSV::Specified ( vec![ ID::new ("new_override") ] ),

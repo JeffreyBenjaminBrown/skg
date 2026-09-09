@@ -10,15 +10,11 @@
 // RAW too -- NOT substituted by R1 -- because the user is looking at
 // the original. (Before this change, a raw title could sit over the
 // overrider's substituted children.)
-//
-// Its own target -- it installs the process-global graph handle
-// (substitution reads snapshot_global).
 
 use std::error::Error;
 
-use skg::dbs::in_rust_graph::{
-  InRustGraphHandle, install_or_swap_global_handle};
-use skg::test_utils::{run_with_test_db, graph_handle_from_config};
+use skg::dbs::in_rust_graph::InRustGraphHandle;
+use skg::test_utils::{run_with_test_graph, graph_handle_from_config};
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::ID;
 use ego_tree::Tree;
@@ -27,18 +23,17 @@ use skg::types::viewnode::ViewNode;
 #[test]
 fn raw_drawn_overridden_root_children_are_raw
   () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_test_graph (
     "skg-test-expand-raw-overridden-children",
     "tests/expand_partner_col_member/fixtures",
     "/tmp/tantivy-test-expand-raw-overridden-children",
-    |config, driver, tantivy| Box::pin ( async move {
+    |config, fixture_graph, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
-      install_or_swap_global_handle ( graph . clone () );
       let (x_view, _pids, _tree)
         : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view (
-          driver, config, Some (tantivy), &[ID::from ("X")], false )
+          config, Some (tantivy), &[ID::from ("X")], false )
         . await ?;
       // X is drawn raw (a view root).
       assert! ( x_view . lines () . any (

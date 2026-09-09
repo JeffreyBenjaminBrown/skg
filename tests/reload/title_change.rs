@@ -12,7 +12,7 @@ use skg::serve::handlers::reload_paths::{
 };
 use skg::test_utils::{
   graph_handle_from_config,
-  run_with_test_db,
+  run_with_test_graph,
   skg_env_from_parts,
 };
 use skg::types::env::SkgEnv;
@@ -39,14 +39,14 @@ fn title_in (graph : &InRustGraph, pid : &str) -> Option<String> {
 #[test]
 fn reload_reflects_an_edited_title (
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_test_graph (
     "skg-test-reload-title",
     "tests/reload/fixtures-title-change",
     "/tmp/tantivy-test-reload-title",
-    |config, driver, tantivy| Box::pin ( async move {
+    |config, fixture_graph, tantivy| Box::pin ( async move {
       let graph = graph_handle_from_config (config) ?;
       let mut env : SkgEnv =
-        skg_env_from_parts (config, driver . clone (), tantivy, &graph);
+        skg_env_from_parts (config, tantivy, &graph);
 
       assert_eq! ( title_in (& env . in_rust_graph . load_full (), "n1"),
                    Some ("n1 old" . to_string ()),
@@ -86,14 +86,14 @@ fn reload_reflects_an_edited_title (
 #[test]
 fn reload_removes_a_deleted_node (
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_test_graph (
     "skg-test-reload-delete",
     "tests/reload/fixtures-title-change",
     "/tmp/tantivy-test-reload-delete",
-    |config, driver, tantivy| Box::pin ( async move {
+    |config, fixture_graph, tantivy| Box::pin ( async move {
       let graph = graph_handle_from_config (config) ?;
       let mut env : SkgEnv =
-        skg_env_from_parts (config, driver . clone (), tantivy, &graph);
+        skg_env_from_parts (config, tantivy, &graph);
       assert! ( title_in (& env . in_rust_graph . load_full (), "n2")
                 . is_some (),
                 "precondition: n2 present" );
@@ -130,14 +130,14 @@ fn reload_removes_a_deleted_node (
 #[test]
 fn reload_rejects_a_new_extra_id_claimed_by_an_untouched_node (
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_test_graph (
     "skg-test-reload-id-conflict",
     "tests/reload/fixtures-title-change",
     "/tmp/tantivy-test-reload-id-conflict",
-    |config, driver, tantivy| Box::pin ( async move {
+    |config, fixture_graph, tantivy| Box::pin ( async move {
       let graph = graph_handle_from_config (config) ?;
       let mut env = skg_env_from_parts (
-        config, driver . clone (), tantivy, &graph);
+        config, tantivy, &graph);
       let n1_path = main_source_dir (config) . join ("n1.skg");
       let selected_before = env . in_rust_graph . load_full ();
       std::fs::write (
@@ -161,14 +161,14 @@ fn reload_rejects_a_new_extra_id_claimed_by_an_untouched_node (
 #[test]
 fn extra_id_full_fold_keeps_a_known_fatal_telescope_at_last_good (
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_test_graph (
     "skg-test-reload-extra-id-with-fatal",
     "tests/reload/fixtures-title-change",
     "/tmp/tantivy-test-reload-extra-id-with-fatal",
-    |config, driver, tantivy| Box::pin ( async move {
+    |config, fixture_graph, tantivy| Box::pin ( async move {
       let graph = graph_handle_from_config (config) ?;
       let mut env = skg_env_from_parts (
-        config, driver . clone (), tantivy, &graph);
+        config, tantivy, &graph);
       let source = main_source_dir (config);
       let n1_path = source . join ("n1.skg");
       let n2_path = source . join ("n2.skg");

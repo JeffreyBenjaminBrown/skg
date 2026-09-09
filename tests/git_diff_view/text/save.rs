@@ -2,13 +2,12 @@
 /// TextChanged scaffolds should be disregarded during save.
 
 use super::common::*;
-use std::sync::Arc;
-use skg::test_utils::{run_with_shared_test_db, SharedDbSession};
+use skg::test_utils::{run_with_shared_test_graph, SharedGraphSession};
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-git-diff-text-save",
     |s| Box::pin ( async move {
       test_delete_text_changed_scaffold_respawns (s) . await ?;
@@ -22,26 +21,24 @@ fn all_tests
 /// Deleting a textChanged scaffold should be a no-op.
 /// The scaffold respawns in the returned buffer.
 async fn test_delete_text_changed_scaffold_respawns (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test(
     s,
     "skg-test-save-del-textchanged",
-    |config, driver, tantivy, repo_path| { Box::pin(async move {
+    |config, graph, tantivy, repo_path| { Box::pin(async move {
       // User deletes the textChanged scaffold under node 1
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "textChanged");
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, &graph, true,
+        &input, config, tantivy, graph, true,
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: 1.skg should still have the new title
@@ -62,24 +59,22 @@ async fn test_delete_text_changed_scaffold_respawns (
 /// Editing a node with textChanged should update the disk normally.
 /// The scaffold should still appear since worktree differs from HEAD.
 async fn test_edit_text_changed_node_updates_disk (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
-  run_save_test(s, "skg-test-save-edit-textchanged", |config, driver, tantivy, repo_path| {
+  run_save_test(s, "skg-test-save-edit-textchanged", |config, graph, tantivy, repo_path| {
     Box::pin(async move {
       // User changes the title of node 1 again
       let input = GIT_DIFF_VIEW . replace(
         "1 has a new title.", "1 has an even newer title.");
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, &graph, true,
+        &input, config, tantivy, graph, true,
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: 1.skg should have the newest title
@@ -99,27 +94,25 @@ async fn test_edit_text_changed_node_updates_disk (
 /// Editing a textChanged scaffold itself should be a no-op.
 /// The scaffold respawns unchanged in the returned buffer.
 async fn test_edit_text_changed_scaffold_respawns (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test(
     s,
     "skg-test-save-edit-scaffold",
-    |config, driver, tantivy, repo_path| { Box::pin(async move {
+    |config, graph, tantivy, repo_path| { Box::pin(async move {
       // User tries to change the title of a textChanged scaffold
       let input = GIT_DIFF_VIEW . replace(
         "** (skg (textChanged unstaged))",
         "** (skg (textChanged unstaged)) User edited this scaffold.");
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, &graph, true,
+        &input, config, tantivy, graph, true,
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: No changes should occur
@@ -135,13 +128,13 @@ async fn test_edit_text_changed_scaffold_respawns (
 /// Moving a textChanged scaffold should be a no-op.
 /// The scaffold respawns in its original location.
 async fn test_move_text_changed_scaffold_respawns (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test(
     s,
     "skg-test-save-move-scaffold",
-    |config, driver, tantivy, repo_path| { Box::pin(async move {
+    |config, graph, tantivy, repo_path| { Box::pin(async move {
       // Below, user moves the textChanged scaffold
       // from first among its siblings to last.
       let input = "\
@@ -153,15 +146,13 @@ async fn test_move_text_changed_scaffold_respawns (
 ** (skg (textChanged unstaged))
 ";
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, &graph, true,
+        &input, config, tantivy, graph, true,
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: No changes should occur
@@ -178,27 +169,25 @@ async fn test_move_text_changed_scaffold_respawns (
 /// Moving a textChanged scaffold to an unedited node should be a no-op.
 /// The scaffold respawns where it belongs (under the edited node).
 async fn test_move_text_changed_to_unedited_node_respawns (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test(
     s,
     "skg-test-save-move-to-unedited",
-    |config, driver, tantivy, repo_path| { Box::pin(async move {
+    |config, graph, tantivy, repo_path| { Box::pin(async move {
       // User moves a textChanged scaffold to under node 12 (which wasn't edited)
       let input = without_lines_containing(GIT_DIFF_VIEW, "textChanged");
       let input = insert_after(&input, "(id 12)",
         "*** (skg (textChanged unstaged))");
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, &graph, true,
+        &input, config, tantivy, graph, true,
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: No changes should occur
@@ -223,26 +212,24 @@ async fn test_move_text_changed_to_unedited_node_respawns (
 /// per-stage attribution for text changes, mirroring
 /// ids::save::test_delete_id_col_scaffold_respawns_staged.
 async fn test_delete_text_changed_scaffold_respawns_staged (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test_staged(
     s,
     "skg-test-save-del-textchanged-staged",
-    |config, driver, tantivy, repo_path| { Box::pin(async move {
+    |config, graph, tantivy, repo_path| { Box::pin(async move {
       // User deletes the textChanged scaffold under node 1
       let input = without_lines_containing(
         GIT_DIFF_VIEW_STAGED, "textChanged");
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, &graph, true,
+        &input, config, tantivy, graph, true,
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: 1.skg should still have the new title
@@ -265,14 +252,14 @@ async fn test_delete_text_changed_scaffold_respawns_staged (
 //
 
 async fn run_save_test<F>(
-  s: &mut SharedDbSession,
+  s: &mut SharedGraphSession,
   subtest_name: &str,
   test_fn: F,
 ) -> Result<(), Box<dyn Error>>
 where
   F: for<'a> FnOnce(
     &'a SkgConfig,
-    &'a Arc<TypeDBDriver>,
+    &'a InRustGraphHandle,
     &'a mut TantivyIndex,
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
@@ -282,14 +269,14 @@ where
 }
 
 async fn run_save_test_staged<F>(
-  s: &mut SharedDbSession,
+  s: &mut SharedGraphSession,
   subtest_name: &str,
   test_fn: F,
 ) -> Result<(), Box<dyn Error>>
 where
   F: for<'a> FnOnce(
     &'a SkgConfig,
-    &'a Arc<TypeDBDriver>,
+    &'a InRustGraphHandle,
     &'a mut TantivyIndex,
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
@@ -299,7 +286,7 @@ where
 }
 
 async fn run_save_test_with_setup<S, F>(
-  s: &mut SharedDbSession,
+  s: &mut SharedGraphSession,
   subtest_name: &str,
   setup   : S,
   test_fn : F,
@@ -308,7 +295,7 @@ where
   S: FnOnce (&Path) -> Result<Repository, Box<dyn Error>>,
   F: for<'a> FnOnce(
     &'a SkgConfig,
-    &'a Arc<TypeDBDriver>,
+    &'a InRustGraphHandle,
     &'a mut TantivyIndex,
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
@@ -318,5 +305,5 @@ where
   setup (repo_path)?;
   s . reset_with_source_path (subtest_name, repo_path) . await ?;
 
-  test_fn(&s . config, &s . driver, &mut s . tantivy, repo_path) . await
+  test_fn(&s . config, &s . graph, &mut s . tantivy, repo_path) . await
 }

@@ -1,16 +1,15 @@
-// cargo test --test typedb -- typedb::paths
+// cargo test --test grouped_sources -- graph_queries::paths
 //
 // To understand the graph, see
-// tests/typedb/paths/fixtures/README.org
+// tests/graph_queries/paths/fixtures/README.org
 
-use skg::test_utils::graph_handle_from_config;
-use skg::dbs::typedb::paths::{
+use skg::dbs::graph_queries::paths::{
   path_containerward_to_first_nonlinearity,
   PathToFirstNonlinearity};
 use skg::to_org::expand::backpath::build_and_integrate_containerward_path;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::run_with_test_graph;
 use skg::assert_metadata_eq;
 use skg::types::misc::{ID, SkgConfig};
 use skg::types::viewnode::ViewNode;
@@ -21,22 +20,22 @@ use indoc::indoc;
 use ego_tree::Tree;
 use std::collections::HashSet;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 
 #[test]
 fn test_multi_cycle_fork(
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
+  run_with_test_graph(
     "skg-test-paths-multi-cycle-fork",
-    "tests/typedb/paths/fixtures",
+    "tests/graph_queries/paths/fixtures",
     "/tmp/tantivy-test-paths-multi-cycle-fork",
-    |config, driver, _tantivy| Box::pin(async move {
-      test_multi_cycle_fork_impl(config, driver) . await
+    |config, graph, _tantivy| Box::pin(async move {
+      test_multi_cycle_fork_impl(config, graph) . await
     } )) }
 
 async fn test_multi_cycle_fork_impl(
   config: &SkgConfig,
-  driver: &TypeDBDriver,
+  graph: &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   // Graph: b→a, b→e, c→b, d→e, d→c, e→d, f→e.
   // Containerward from a: a → b → c → d → e → fork {b, d, f}.
@@ -45,8 +44,7 @@ async fn test_multi_cycle_fork_impl(
   // Part 1: assert on PathToFirstNonlinearity struct.
   let result : PathToFirstNonlinearity =
     path_containerward_to_first_nonlinearity (
-      &config.db_name, driver, &ID::from("a")
-    ) . await ?;
+      &graph . load_full () . graph, &ID::from("a"), None);
   assert_eq!(
     result.path,
     vec![ ID::from("b"), ID::from("c"),
@@ -70,8 +68,8 @@ async fn test_multi_cycle_fork_impl(
     viewforest . root () . first_child () . unwrap () . id ();
 
   build_and_integrate_containerward_path (
-    &graph_handle_from_config (config) ? . load_full () . graph,
-    &mut viewforest, node_a_id, &config, driver
+    &graph . load_full () . graph,
+    &mut viewforest, node_a_id, config
   ) . await ?;
   // Sorted branches [b, d, f] are prepended in order,
   // so visual order is reversed: f, d, b.

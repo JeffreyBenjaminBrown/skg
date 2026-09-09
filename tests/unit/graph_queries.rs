@@ -43,7 +43,7 @@ fn all_relation_roles_resolve_extra_ids_and_follow_the_selected_direction () {
                 HashSet::from ([id ("member")]), "forward {}", relation);
     assert_eq! (find_related_nodes (&graph, &[id ("old-member")], backward, None),
                 HashSet::from ([id ("owner")]), "backward {}", relation);
-    assert_eq! (forward . relation . typeql_name (), *relation);
+    assert_eq! (forward . relation . relation_name (), *relation);
     assert_eq! (forward . opposite_role (), backward);
     assert! (input_role_from_names (relation, first, first) . is_none ()); }
   assert! (input_role_from_names ("unknown", "first", "second") . is_none ()); }

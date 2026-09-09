@@ -12,9 +12,8 @@
 
 use std::error::Error;
 use std::net::TcpStream;
-use std::sync::Arc;
 
-use skg::test_utils::{run_with_test_db, graph_handle_from_config};
+use skg::test_utils::{run_with_test_graph, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::multi_root_view;
 use skg::serve::ViewsState;
@@ -22,24 +21,23 @@ use skg::types::views_state::OpenViews;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use typedb_driver::TypeDBDriver;
 
 #[test]
 fn readonly_col_order_is_preserved
   () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_test_graph (
     "skg-test-partner-col-order",
     "tests/partner_col_order/fixtures",
     "/tmp/tantivy-test-partner-col-order",
-    |config, driver, tantivy| Box::pin ( async move {
+    |config, fixture_graph, tantivy| Box::pin ( async move {
       readonly_col_order_is_preserved_impl (
-        config, driver, tantivy ) . await
+        config, fixture_graph, tantivy ) . await
     } )) }
 
 async fn save_and_rerender (
   buf     : &str,
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<String, Box<dyn Error>> {
   let graph : InRustGraphHandle =
@@ -54,7 +52,7 @@ async fn save_and_rerender (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    buf, driver, config, tantivy, &graph, false,
+    buf, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "save must not error; got: {:?}", response . errors );
@@ -85,15 +83,13 @@ fn assert_member_order (
 
 async fn readonly_col_order_is_preserved_impl (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  skg::dbs::in_rust_graph::install_or_swap_global_handle (
-    graph_handle_from_config (config) ? );
   let (complete_buffer, _pids, _tree)
     : (String, Vec<ID>, _) =
     multi_root_view (
-      driver, config, Some (tantivy),
+      config, Some (tantivy),
       &[ ID ("n" . to_string ()) ], false ) . await ?;
   assert_member_order (
     &complete_buffer, "(id r)", "(id t)", "de novo (sorted)" );
@@ -106,11 +102,11 @@ async fn readonly_col_order_is_preserved_impl (
       . replace ( t_line, r_line )
       . replace ( "SWAP_PLACEHOLDER", t_line ) };
   let first_save : String =
-    save_and_rerender (&swapped, config, driver, tantivy) . await ?;
+    save_and_rerender (&swapped, config, fixture_graph, tantivy) . await ?;
   assert_member_order (
     &first_save, "(id t)", "(id r)", "after reorder + save" );
   let second_save : String =
-    save_and_rerender (&first_save, config, driver, tantivy) . await ?;
+    save_and_rerender (&first_save, config, fixture_graph, tantivy) . await ?;
   assert_member_order (
     &second_save, "(id t)", "(id r)", "after second (unchanged) save" );
   assert_eq! ( first_save, second_save,

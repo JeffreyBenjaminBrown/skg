@@ -3,10 +3,11 @@ use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::source_sets::ActiveSourceSet;
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
 use crate::to_org::complete::partner_col::goal_list::goal_list_for_hiddenoutsideof_subscribeecol;
-use crate::to_org::expand::backpath_graph::{
+use crate::dbs::graph_queries::paths::{
   PathToFirstNonlinearity, paths_to_first_nonlinearities};
 use crate::types::git::SourceDiff;
-use crate::types::misc::{MemberAtSource, SkgfileSource, SourceSetName};
+use crate::types::misc::{
+  MemberAtSource, SkgConfig, SkgfileSource, SourceSetName};
 use crate::types::nodes::complete::empty_node_complete;
 use crate::types::phantom::title_for_phantom;
 use crate::types::viewnode::{
@@ -22,14 +23,13 @@ use std::path::Path;
 #[test]
 fn absence_in_selected_graph_stays_absent_when_new_files_appear () {
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
-  let config : SkgConfig = config_at (dir . path ());
   let graph : InRustGraph = InRustGraph::from_nodecompletes (&[]);
   fs::write (dir . path () . join ("new.skg"),
              "pid: new\ntitle: newer disk title\n") . unwrap ();
   assert! (nodecomplete_from_in_rust_graph (&graph, &ID::from ("new"))
     . is_none ());
   assert! (nodecomplete_rustFirst_by_pid_and_source (
-    &graph, &config, &ID::from ("new"), &SourceName::from ("main"))
+    &graph, &ID::from ("new"), &SourceName::from ("main"))
     . is_err ()); }
 
 #[test]
@@ -47,7 +47,7 @@ fn retained_snapshot_resolves_extra_ids_titles_and_body_from_its_own_nodes () {
     mk_indefinitive_viewnode (
       ID::from ("old-id"), SourceName::from ("old-home"),
       "stale title" . to_string (), ParentIs::Absent)) . id ();
-  clobberIndefinitiveViewnode (&graph, &mut view, treeid, &config) . unwrap ();
+  clobberIndefinitiveViewnode (&graph, &mut view, treeid) . unwrap ();
   set_viewnodestats_in_viewforest (
     &graph, &mut view, &HashMap::new (), &HashMap::new (), &config, None);
   let ViewNodeKind::Vognode (Vognode::Active (rendered)) =
@@ -62,7 +62,6 @@ fn retained_snapshot_resolves_extra_ids_titles_and_body_from_its_own_nodes () {
 
 #[test]
 fn phantom_title_uses_named_deleted_evidence_then_selected_graph () {
-  let config : SkgConfig = config_at (Path::new ("/unused-selected-graph-test"));
   let selected : NodeComplete = node ("n", "selected title");
   let deleted : NodeComplete = node ("n", "recorded deleted title");
   let graph : InRustGraph = InRustGraph::from_nodecompletes (&[selected]);
@@ -74,9 +73,9 @@ fn phantom_title_uses_named_deleted_evidence_then_selected_graph () {
       staged : HashMap::new (), unstaged : HashMap::new (),
       added_nodes : HashMap::new (),
       deleted_nodes : HashMap::from ([(id . clone (), deleted)]), })]);
-  assert_eq! (title_for_phantom (&graph, &id, &source, Some (&diffs), &config),
+  assert_eq! (title_for_phantom (&graph, &id, &source, Some (&diffs)),
               "recorded deleted title");
-  assert_eq! (title_for_phantom (&graph, &id, &source, None, &config),
+  assert_eq! (title_for_phantom (&graph, &id, &source, None),
               "selected title"); }
 
 #[test]

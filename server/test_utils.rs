@@ -196,7 +196,7 @@ impl SharedGraphSession {
 
   /// Like 'reset', but loads a (possibly multi-source) config from a
   /// TOML file, reading fixtures in place -- the same convention as
-  /// 'run_with_test_db_from_config'.
+  /// 'run_with_test_graph_from_config'.
   pub async fn reset_from_config (
     &mut self,
     subtest_name : &str,

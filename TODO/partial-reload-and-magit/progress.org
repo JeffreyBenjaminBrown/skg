@@ -1784,3 +1784,20 @@ Continue the accepted plan. The user's budget preference survived compaction:
 use short, bounded briefs for simpler delegates, prefer Terra with high
 reasoning for suitable new coding tasks, and reuse existing context when that
 avoids redundant orientation. Retain stronger agents for cross-cutting work.
+
+* Simplify/cohere checkpoint: external fixtures no longer require TypeDB
+** what's done and went well
+All seven active external Rust target groups use explicit Rust-graph fixtures
+and pass serially: 399 tests. The library run passes 380 tests with one ignored.
+Active Rust tests and fixture helpers have no TypeDB driver, database-name, or
+process-global graph dependencies. Useful graph queries remain covered;
+TypeDB-specific history lives outside active test discovery.
+** Changes to the plan's envisioned order.
+Checkpoint the fixture migration before final aggregate editor/server gates.
+** what's imperfect about what's done
+The graph ancestry expectations now specify the documented breadth-first
+repeat placement. A restricted-save expectation permits an omitted no-op
+SaveNode and instead checks the effective graph state. Neither migration run
+establishes the remaining real-editor maintenance lifecycle schedules.
+** choices determining the future
+Continue the agreed integration and acceptance work without a new decision.

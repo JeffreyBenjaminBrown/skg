@@ -1,30 +1,19 @@
 // cargo nextest run --test grouped_overrides -E 'test(collateral_source_move::)'
 
 use futures::executor::block_on;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
-use skg::dbs::init::{
-  create_empty_tantivy_index,
-  overwrite_new_empty_typedb_db,
-  read_and_use_schema};
-use skg::dbs::in_rust_graph::{
-  InRustGraphHandle,
-  install_or_swap_global_handle};
-use skg::dbs::typedb::nodes::create_all_nodes;
-use skg::dbs::typedb::relationships::create_all_relationships;
-use skg::dbs::typedb::sources::create_all_sources;
+use skg::dbs::init::create_empty_tantivy_index;
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::test_utils::{
-  cleanup_test_tantivy_and_typedb_dbs,
+  cleanup_test_tantivy,
   extract_string_field_from_sexp,
   graph_handle_from_config,
   read_all_lp_messages,
   update_from_and_rerender_buffer_test as update_from_and_rerender_buffer};
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
-use skg::types::nodes::complete::NodeComplete;
-use skg::types::nodes::typedb::NodeTypedb;
 use skg::types::views_state::{OpenViews, ViewUri};
 use skg::types::viewnode::ViewNode;
 
@@ -34,15 +23,11 @@ use std::fs;
 use std::io::BufReader;
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use tempfile::TempDir;
-use typedb_driver::{Addresses, Credentials, DriverOptions, DriverTlsConfig, TypeDBDriver};
 
 #[test]
 fn test_source_move_updates_collateral_view_metadata (
 ) -> Result<(), Box<dyn Error>> {
-  let db_name : &str =
-    "skg-test-collateral-source-move";
   let temp_dir : TempDir =
     TempDir::new()?;
   copy_dir_all (
@@ -50,15 +35,11 @@ fn test_source_move_updates_collateral_view_metadata (
     temp_dir . path() )?;
   let tantivy_folder : PathBuf =
     temp_dir . path() . join ("tantivy");
-  let (config, driver, tantivy)
-    : (SkgConfig, Arc<TypeDBDriver>, TantivyIndex) =
-    block_on ( setup_test_dbs (
-      db_name,
+  let (config, graph, tantivy)
+    : (SkgConfig, InRustGraphHandle, TantivyIndex) =
+    setup_test_graph (
       temp_dir . path(),
-      &tantivy_folder ) ) ?;
-  let graph : InRustGraphHandle =
-    graph_handle_from_config (&config) ?;
-  install_or_swap_global_handle (graph . clone ());
+      &tantivy_folder ) ?;
 
   let (_save_response, collateral_buffer)
     : (SaveResponse, String) =
@@ -68,7 +49,7 @@ fn test_source_move_updates_collateral_view_metadata (
       let (initial_buffer, pids, viewforest)
         : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view (
-          &driver, &config, None, &root_ids, false ) . await?;
+          &config, None, &root_ids, false ) . await?;
       assert! (
         buffer_has_source_for_title (
           &initial_buffer, "b", "public" ),
@@ -99,7 +80,6 @@ fn test_source_move_updates_collateral_view_metadata (
         update_from_and_rerender_buffer (
           &mut stream,
           &save_input,
-          &driver,
           &config,
           &tantivy,
           &graph,
@@ -139,21 +119,18 @@ fn test_source_move_updates_collateral_view_metadata (
     "collateral view should show b's new source:\n{}",
     collateral_buffer );
 
-  block_on ( cleanup_test_tantivy_and_typedb_dbs (
-    db_name, &driver, Some (config . tantivy_folder . as_path()) ))?;
+  cleanup_test_tantivy (Some (config . tantivy_folder . as_path()))?;
   Ok (( )) }
 
-async fn setup_test_dbs (
-  db_name        : &str,
+fn setup_test_graph (
   fixtures_root  : &Path,
   tantivy_folder : &Path,
-) -> Result<(SkgConfig, Arc<TypeDBDriver>, TantivyIndex),
+) -> Result<(SkgConfig, InRustGraphHandle, TantivyIndex),
             Box<dyn Error>> {
   let config : SkgConfig =
     load_config_with_overrides (
       fixtures_root . join ("skgconfig.toml")
         . to_str() . unwrap(),
-      Some (db_name),
       &[ ("public",  fixtures_root . join ("owned/public")),
          ("private", fixtures_root . join ("owned/private")),
          ("foreign", fixtures_root . join ("foreign")) ] )?;
@@ -161,25 +138,10 @@ async fn setup_test_dbs (
     SkgConfig {
       tantivy_folder : tantivy_folder . to_path_buf(),
       .. config };
-  let driver : TypeDBDriver =
-    TypeDBDriver::new (
-      Addresses::try_from_address_str ("127.0.0.1:1729")?,
-      Credentials::new ("admin", "password"),
-      DriverOptions::new (DriverTlsConfig::disabled ()) ) . await?;
-  let nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources (&config)?;
-  let typedb_nodes : Vec<NodeTypedb> =
-    nodes . iter ()
-    . map (NodeTypedb::from_complete_parsing_textlinks)
-    . collect ();
-  overwrite_new_empty_typedb_db (db_name, &driver) . await?;
-  read_and_use_schema (db_name, &driver) . await?;
-  create_all_sources (db_name, &driver, &config) . await?;
-  create_all_nodes (db_name, &driver, &typedb_nodes) . await?;
-  create_all_relationships (db_name, &driver, &typedb_nodes) . await?;
+  let graph : InRustGraphHandle = graph_handle_from_config (&config)?;
   let tantivy_index : TantivyIndex =
     create_empty_tantivy_index (&config . tantivy_folder)?;
-  Ok ((config, Arc::new (driver), tantivy_index)) }
+  Ok ((config, graph, tantivy_index)) }
 
 fn copy_dir_all (
   src : &Path,

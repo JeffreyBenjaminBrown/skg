@@ -7,7 +7,7 @@ use std::error::Error;
 use skg::update_buffer::reconcile::aliascol::reconcile_alias_col_children;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
-use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
+use skg::test_utils::{graph_handle_from_config, run_with_shared_test_graph};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::types::viewnode::ViewNode;
 use skg::types::misc::SkgConfig;
@@ -16,35 +16,33 @@ use skg::types::misc::TantivyIndex;
 use skg::types::git::SourceDiff;
 
 use ego_tree::{Tree, NodeId};
-use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str = "tests/rebuild/complete_aliascol/fixtures";
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-rebuild-complete-aliascol",
     |s| Box::pin ( async move {
       s . reset ("test_reconcile_alias_col_children", fixtures) . await ?;
       test_reconcile_alias_col_children (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_reconcile_alias_col_children_duplicate_aliases_different_orders",
                  fixtures) . await ?;
       test_reconcile_alias_col_children_duplicate_aliases_different_orders (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 async fn test_reconcile_alias_col_children (
   config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  fixture_graph   : &InRustGraphHandle,
   _tantivy : &mut TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
-      test_reconcile_alias_col_children_logic ( config, driver ) . await }
+      test_reconcile_alias_col_children_logic ( config, fixture_graph ) . await }
 
 async fn test_reconcile_alias_col_children_logic (
   config : &SkgConfig,
-  _driver : &typedb_driver::TypeDBDriver,
+  _fixture_graph : &skg::dbs::in_rust_graph::InRustGraphHandle,
 ) -> Result < (), Box<dyn Error> > {
 
   let source_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
@@ -91,7 +89,7 @@ async fn test_reconcile_alias_col_children_logic (
   // Test 1: First AliasCol should have b and c (deduped, valid only, disk order)
   reconcile_alias_col_children (
     &graph . load_full () . graph,
-    &mut viewforest, aliascol_1_id, &source_diffs, config )?;
+    &mut viewforest, aliascol_1_id, &source_diffs )?;
 
   {
     let aliascol_1_ref =
@@ -121,7 +119,7 @@ async fn test_reconcile_alias_col_children_logic (
   // Test 2: Second AliasCol should have b and c, and gain focus
   reconcile_alias_col_children (
     &graph . load_full () . graph,
-    &mut viewforest, aliascol_2_id, &source_diffs, config )?;
+    &mut viewforest, aliascol_2_id, &source_diffs )?;
 
   {
     let aliascol_2_ref =
@@ -165,8 +163,7 @@ async fn test_reconcile_alias_col_children_logic (
       &graph . load_full () . graph,
       &mut viewforest,
       aliascol_3_id,
-      &source_diffs,
-      config
+      &source_diffs
     );
 
   assert! (
@@ -178,15 +175,15 @@ async fn test_reconcile_alias_col_children_logic (
 
 async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders (
   config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  fixture_graph   : &InRustGraphHandle,
   _tantivy : &mut TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
       test_reconcile_alias_col_children_duplicate_aliases_different_orders_logic (
-        config, driver ) . await }
+        config, fixture_graph ) . await }
 
 async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders_logic (
   config : &SkgConfig,
-  _driver : &typedb_driver::TypeDBDriver,
+  _fixture_graph : &skg::dbs::in_rust_graph::InRustGraphHandle,
 ) -> Result < (), Box<dyn Error> > {
 
   let source_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
@@ -229,8 +226,7 @@ async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders_lo
     &graph . load_full () . graph,
     &mut viewforest,
     first_aliascol_id,
-    &source_diffs,
-    config
+    &source_diffs
   )?;
 
   {
@@ -276,8 +272,7 @@ async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders_lo
     &graph . load_full () . graph,
     &mut viewforest,
     second_aliascol_id,
-    &source_diffs,
-    config
+    &source_diffs
   )?;
 
   {

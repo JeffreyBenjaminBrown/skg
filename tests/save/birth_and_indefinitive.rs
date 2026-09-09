@@ -3,8 +3,7 @@
 use skg::dbs::filesystem::one_node::nodecomplete_from_id;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::save::update_fs_from_saveinstructions;
-use skg::save::update_typedb_from_saveinstructions;
-use skg::test_utils::{graph_handle_from_config, run_with_test_db};
+use skg::test_utils::{graph_handle_from_config, run_with_test_graph};
 use skg::types::misc::{ID, members_of};
 use skg::types::nodes::complete::NodeComplete;
 
@@ -31,11 +30,11 @@ fn test_birth_and_indefinitive(
 
   // Run test with database
   let result : Result<(), Box<dyn Error>> =
-    run_with_test_db (
+    run_with_test_graph (
       "skg-test-parentIs",
       "tests/save/birth_and_indefinitive/fixtures",
       "/tmp/tantivy-test-parentIs",
-      |config, driver, _tantivy| Box::pin ( async move {
+      |config, fixture_graph, _tantivy| Box::pin ( async move {
         // Simulate user saving this org buffer:
         // Node 1 contains node 2 (which has parentIs=Independent and indef)
         // Node 2 contains node 3 (already) and should contain node 4 (new)
@@ -47,16 +46,10 @@ fn test_birth_and_indefinitive(
         "};
         let ( _viewforest, save_plan, _warnings ) =
           buffer_to_validated_saveplan(
-            &graph_handle_from_config (config) ? . load_full () . graph,
+            &fixture_graph . load_full () . graph,
             org_text,
             config,
-            driver, None ) . await?;
-        update_typedb_from_saveinstructions(
-          &config . db_name,
-          driver,
-          &save_plan . define_nodes,
-          &[],
-          None, ). await?;
+            None ) . await?;
         update_fs_from_saveinstructions(
           &save_plan . define_nodes,
           &[],
@@ -65,7 +58,8 @@ fn test_birth_and_indefinitive(
         { // verify indef is treated correctly
           let node2 : NodeComplete =
             nodecomplete_from_id(
-              config, driver, &ID("2" . to_string() ))
+              &fixture_graph . load_full () . graph,
+              config, &ID("2" . to_string() ))
             . await?;
         assert_eq!(
           members_of (&node2 . contains),
@@ -75,7 +69,8 @@ fn test_birth_and_indefinitive(
         { // verify parentIs=Independent is treated correctly
           let node1 : NodeComplete =
             nodecomplete_from_id(
-              config, driver, &ID("1" . to_string() ))
+              &fixture_graph . load_full () . graph,
+              config, &ID("1" . to_string() ))
             . await?;
         assert!(
           node1 . contains . is_empty(),

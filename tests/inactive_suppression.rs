@@ -18,7 +18,7 @@ use indoc::indoc;
 
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::source_sets::{ActiveSourceSet, SourceSetName, run_with_source_set_test_db};
+use skg::source_sets::{ActiveSourceSet, SourceSetName, run_with_source_set_test_graph};
 use skg::types::misc::{ID, members_of};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
@@ -46,14 +46,13 @@ fn saved_node_by_id<'a> (
 #[test]
 fn writes_to_inactive_nodes_are_suppressed_with_warning (
 ) -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
+  run_with_source_set_test_graph (
     "skg-test-inactive-suppression",
     "tests/source_sets/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-inactive-suppression",
-    |config, driver, _tantivy| Box::pin ( async move {
+    |config, fixture_graph, _tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         skg::test_utils::graph_handle_from_config (config) ?;
-      skg::dbs::in_rust_graph::try_init_global_handle (graph . clone ());
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           config, SourceSetName ("public" . to_string ())) ?;
@@ -67,7 +66,7 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
             &graph . load_full () . graph,
-            buffer, config, driver, Some (&active) ) . await ?;
+            buffer, config, Some (&active) ) . await ?;
         assert! (
           ! save_ids (&plan . define_nodes)
             . contains (&ID::from ("private-a")),
@@ -91,7 +90,7 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
             &graph . load_full () . graph,
-            buffer, config, driver, Some (&active) ) . await ?;
+            buffer, config, Some (&active) ) . await ?;
         assert! (
           ! save_ids (&plan . define_nodes)
             . contains (&ID::from ("private-a")),
@@ -110,7 +109,7 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
             &graph . load_full () . graph,
-            buffer, config, driver, Some (&active) ) . await ?;
+            buffer, config, Some (&active) ) . await ?;
         assert! (
           plan . source_moves . is_empty (),
           "a move into an inactive source must be suppressed" );

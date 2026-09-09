@@ -31,7 +31,7 @@ use skg::test_utils::graph_handle_from_config;
 use skg::to_org::expand::backpath::build_and_integrate_sourceward_path;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::run_with_test_graph;
 use skg::types::misc::SkgConfig;
 use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode, Birth};
 use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
@@ -39,7 +39,7 @@ use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 
 /// Collect (pid, parentIs) pairs for all ActiveNode children of a node.
 fn children_info (
@@ -73,17 +73,17 @@ fn find_child (
 #[test]
 fn test_sourceward_ancestry (
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_test_graph (
     "skg-test-sourceward-ancestry",
     "tests/rebuild/fixtures-sourceward-ancestry",
     "/tmp/tantivy-test-sourceward-ancestry",
-    |config, driver, _tantivy| Box::pin ( async move {
-      test_sourceward_ancestry_impl (config, driver) . await
+    |config, fixture_graph, _tantivy| Box::pin ( async move {
+      test_sourceward_ancestry_impl (config, fixture_graph) . await
     } )) }
 
 async fn test_sourceward_ancestry_impl (
   config : &SkgConfig,
-  driver : &TypeDBDriver,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   // Start with a minimal tree containing just node "a".
   let input : &str = indoc! {"
@@ -99,7 +99,7 @@ async fn test_sourceward_ancestry_impl (
   // Request sourceward expansion from "a".
   build_and_integrate_sourceward_path (
     &graph_handle_from_config (config) ? . load_full () . graph,
-    &mut viewforest, node_a, config, driver
+    &mut viewforest, node_a, config
   ) . await ?;
 
   // --- a should have exactly 2 LinkTarget children: b and d ---

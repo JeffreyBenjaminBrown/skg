@@ -8,7 +8,7 @@ use skg::from_text::buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest,
   absent_parentIs_under_visible_parent_becomes_isContainer};
 use skg::test_utils::{
-  run_with_shared_test_db, graph_handle_from_config,
+  run_with_shared_test_graph, graph_handle_from_config,
   compare_viewnode_trees_modulo_id, compare_viewnode_trees};
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, MpViewnodeKind, MpVognode};
@@ -22,26 +22,26 @@ use ego_tree::Tree;
 
 use std::error::Error;
 use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-new-add-missing-info",
     |s| Box::pin ( async move {
       s . reset ("test_add_missing_info_comprehensive",
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") . await ?;
       test_add_missing_info_comprehensive (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_source_inheritance_multi_level",
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") . await ?;
       test_source_inheritance_multi_level (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_sourceless_col_member_gets_graph_source",
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") . await ?;
       test_sourceless_col_member_gets_graph_source (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       Ok (( )) } )) }
 
 /// Regression for TODO/DONE/BUG_reciprocal-subscribe.org: a subscribee
@@ -53,7 +53,7 @@ fn all_tests
 /// with "ActiveNode must have a source that exists in the config".
 async fn test_sourceless_col_member_gets_graph_source (
   config : &SkgConfig,
-  driver : &TypeDBDriver,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   // 'root' is an extra_id of fixture node 'root-pid', whose source is
   // 'main'. The subscribee reference below carries neither source nor
@@ -69,7 +69,7 @@ async fn test_sourceless_col_member_gets_graph_source (
     org_to_uninterpreted_viewforest (input) . unwrap() . 0;
   add_missing_info_to_viewforest (
     &graph_handle_from_config (config) ? . load_full () . graph,
-    &mut viewforest, &config . db_name, driver ) . await ?;
+    &mut viewforest ) . await ?;
   let owner = viewforest . root() . first_child() . unwrap();
   let col   = owner . first_child() . unwrap();
   let member = col . first_child() . unwrap();
@@ -89,15 +89,15 @@ async fn test_sourceless_col_member_gets_graph_source (
 
 async fn test_add_missing_info_comprehensive (
   config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  fixture_graph   : &InRustGraphHandle,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      test_add_missing_info_logic ( config, driver ) . await ?;
+      test_add_missing_info_logic ( config, fixture_graph ) . await ?;
       Ok (( )) }
 
 async fn test_add_missing_info_logic (
   config : &SkgConfig,
-  driver : &TypeDBDriver
+  fixture_graph : &InRustGraphHandle
 ) -> Result<(), Box<dyn Error>> {
   // Applying 'add_missing_info_to_viewforest' should make
   // 'with_missing_info' equivalent to 'without_missing_info',
@@ -126,9 +126,7 @@ async fn test_add_missing_info_logic (
       with_missing_info) . unwrap() . 0;
   add_missing_info_to_viewforest(
     &graph_handle_from_config (config) ? . load_full () . graph,
-    &mut after_adding_missing_info,
-    &config . db_name,
-    driver ) . await ?;
+    &mut after_adding_missing_info ) . await ?;
   let expected_viewforest: Tree<MpViewnode> =
     org_to_uninterpreted_nodes(
       without_missing_info ) . unwrap() . 0;
@@ -186,15 +184,15 @@ fn test_absent_parentIs_under_visible_parent_becomes_isContainer () {
 
 async fn test_source_inheritance_multi_level (
   config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  fixture_graph   : &InRustGraphHandle,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      test_source_inheritance_logic ( config, driver ) . await ?;
+      test_source_inheritance_logic ( config, fixture_graph ) . await ?;
       Ok (( )) }
 
 async fn test_source_inheritance_logic (
   config : &SkgConfig,
-  driver : &TypeDBDriver
+  fixture_graph : &InRustGraphHandle
 ) -> Result<(), Box<dyn Error>> {
   // Tests source inheritance through multiple levels,
   // with explicit sources overriding inheritance at various depths.
@@ -226,9 +224,7 @@ async fn test_source_inheritance_logic (
     org_to_uninterpreted_viewforest (input) . unwrap() . 0;
   add_missing_info_to_viewforest(
     &graph_handle_from_config (config) ? . load_full () . graph,
-    &mut actual_viewforest,
-    &config . db_name,
-    driver ) . await ?;
+    &mut actual_viewforest ) . await ?;
   let expected_viewforest: Tree<MpViewnode> =
     org_to_uninterpreted_nodes (expected) . unwrap() . 0;
 

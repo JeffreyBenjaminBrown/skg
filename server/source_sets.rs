@@ -264,7 +264,7 @@ fn copy_dir_recursively (
   Ok (( )) }
 
 /// Public so source-set diff tests can replay this prep on a
-/// SharedDbSession's fixture copy (reset_with_fixture_prep).
+/// SharedGraphSession's fixture copy (reset_with_fixture_prep).
 pub fn prepare_git_diff_fixture (
   fixture_root : &Path,
 ) -> Result<(), Box<dyn Error>> {

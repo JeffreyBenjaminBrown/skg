@@ -16,42 +16,40 @@
 use indoc::indoc;
 use std::error::Error;
 use std::net::TcpStream;
-use std::sync::Arc;
 
 use skg::assert_metadata_eq;
 use skg::to_org::render::content_view::single_root_view;
-use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
+use skg::test_utils::{graph_handle_from_config, run_with_shared_test_graph};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::views_state::OpenViews;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use typedb_driver::TypeDBDriver;
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-dangling-reference-renders-unknown-node",
     |s| Box::pin ( async move {
       s . reset ("test_dangling_reference_renders_unknown_node",
                  "tests/dangling_reference_renders_unknown_node/fixtures") . await ?;
       test_dangling_reference_renders_unknown_node (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_buffer_with_unknownnode_child_saves_cleanly",
                  "tests/dangling_reference_renders_unknown_node/fixtures-save-roundtrip") . await ?;
       test_buffer_with_unknownnode_child_saves_cleanly (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 async fn test_dangling_reference_renders_unknown_node (
   config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  fixture_graph   : &InRustGraphHandle,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let (rendered, _pids, _) =
         single_root_view (
-          driver, config, None,
+          config, None,
           &ID ( "parent" . to_string () ),
           false ) . await ?;
       println!("Rendered:\n{}", rendered);
@@ -76,15 +74,15 @@ async fn test_dangling_reference_renders_unknown_node (
 // triggered LocalStructureViolation.
 async fn test_buffer_with_unknownnode_child_saves_cleanly (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       buffer_with_unknownnode_child_saves_cleanly_impl (
-        config, driver, tantivy ) . await }
+        config, fixture_graph, tantivy ) . await }
 
 async fn buffer_with_unknownnode_child_saves_cleanly_impl (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"
@@ -103,7 +101,7 @@ async fn buffer_with_unknownnode_child_saves_cleanly_impl (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    input_org_text, driver, config, tantivy, &graph, false,
+    input_org_text, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state ) . await ?;
   if ! response . errors . is_empty () {
     panic! ("save returned errors instead of completing: {:?}",

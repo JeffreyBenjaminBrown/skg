@@ -7,8 +7,9 @@ use skg::dbs::filesystem::one_node::nodecomplete_from_id;
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::from_text::buffer_to_validated_saveplan as buffer_to_validated_saveplan_with_graph;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
+use skg::dbs::graph_queries::nodes::pid_and_source_from_id;
 use skg::save::update_graph_minus_nodeMerges;
-use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config, audit_inrustgraph_or_panic};
+use skg::test_utils::{run_with_shared_test_graph, extra_ids_from_pid};
 use skg::types::errors::{SaveError, BufferValidationError};
 use skg::source_sets::ActiveSourceSet;
 
@@ -18,22 +19,18 @@ use skg::types::save::{DefineNode, SavePlan};
 use skg::types::tree::forest::ViewForest;
 use std::error::Error;
 use std::path::PathBuf;
-use std::sync::Arc;
 use tantivy::{DocAddress, TantivyDocument};
 use tantivy::schema::document::Value;
-use typedb_driver::TypeDBDriver;
 
 async fn buffer_to_validated_saveplan (
   buffer_text      : &str,
   config           : &SkgConfig,
-  driver           : &TypeDBDriver,
+  fixture_graph           : &InRustGraphHandle,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
-  let graph : InRustGraphHandle = graph_handle_from_config (config)
-    . map_err (SaveError::DatabaseError) ?;
   buffer_to_validated_saveplan_with_graph (
-    &graph . load_full () . graph,
-    buffer_text, config, driver, active_source_set ) . await }
+    &fixture_graph . load_full () . graph,
+    buffer_text, config, active_source_set ) . await }
 
 /// Query Tantivy for a node by title and return its source.
 fn tantivy_source_for_id (
@@ -69,41 +66,41 @@ fn tantivy_source_for_id (
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-move-source",
     |s| Box::pin ( async move {
       s . reset ("test_move_node_to_another_owned_source", "tests/move_source/fixtures") . await ?;
       test_move_node_to_another_owned_source (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_move_node_referenced_by_extra_id", "tests/move_source/fixtures") . await ?;
       test_move_node_referenced_by_extra_id (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_move_multiple_nodes", "tests/move_source/fixtures") . await ?;
       test_move_multiple_nodes (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_move_to_foreign_source_rejected", "tests/move_source/fixtures") . await ?;
       test_move_to_foreign_source_rejected (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_move_from_foreign_source_rejected", "tests/move_source/fixtures") . await ?;
       test_move_from_foreign_source_rejected (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_move_and_merge_simultaneously_rejected", "tests/move_source/fixtures") . await ?;
       test_move_and_merge_simultaneously_rejected (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_no_source_change_produces_no_moves", "tests/move_source/fixtures") . await ?;
       test_no_source_change_produces_no_moves (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_source_only_change_with_populated_pool", "tests/move_source/fixtures") . await ?;
       test_source_only_change_with_populated_pool (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 /// Basic move: change b's source from public to private.
 /// Verify FS (old file gone, new file present),
-/// TypeDB (has_source relation updated), and Tantivy (source field updated).
+/// the selected graph (source updated), and Tantivy (source field updated).
 async fn test_move_node_to_another_owned_source (
   config        : &SkgConfig,
-  driver        : &Arc<TypeDBDriver>,
+  fixture_graph        : &InRustGraphHandle,
   tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let temp_fixtures : &PathBuf = &config . data_root;
@@ -117,7 +114,7 @@ async fn test_move_node_to_another_owned_source (
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
-          org_text, &config, &driver
+          org_text, &config, &fixture_graph
           , None ) . await?;
     assert_eq!(save_plan . source_moves . len(), 1,
                "Expected exactly 1 source move");
@@ -125,13 +122,9 @@ async fn test_move_node_to_another_owned_source (
     assert_eq!(save_plan . source_moves[0] . old_source . as_str(), "public");
     assert_eq!(save_plan . source_moves[0] . new_source . as_str(), "private");
 
-    let graph : InRustGraphHandle =
-      graph_handle_from_config (&config) ?;
     let _outcome = update_graph_minus_nodeMerges (
         save_plan . define_nodes, &save_plan . source_moves,
-        config . clone(), &tantivy_index, &driver,
-        &graph ) . await?;
-    audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
+        config . clone(), &tantivy_index, fixture_graph ) . await?;
 
     { // FS: old file should be gone, new file should exist
       let old_path : PathBuf =
@@ -143,21 +136,22 @@ async fn test_move_node_to_another_owned_source (
       assert!( new_path . exists(),
                "b.skg should exist in private/"); }
 
-    { // FS: read NodeComplete back from disk via TypeDB lookup
+    { // Read NodeComplete back from disk via graph identity lookup.
       let node_b : NodeComplete =
-        nodecomplete_from_id (&config, &driver, &ID::new ("b"))
+        nodecomplete_from_id (
+          &fixture_graph . load_full () . graph, config, &ID::new ("b"))
         . await?;
       assert_eq!(node_b . source, SourceName::from ("private"),
                  "NodeComplete read from disk should have source=private"); }
 
-    { // TypeDB: source should be updated
+    { // The selected graph source should be updated.
       let (pid, source) : (ID, SourceName) =
-        skg::dbs::typedb::search::pid_and_source_from_id (
-          &config . db_name, &driver, &ID::new ("b") ) . await?
-        . expect ("b should exist in TypeDB");
+        pid_and_source_from_id (
+          &fixture_graph . load_full () . graph, &ID::new ("b") )
+        . expect ("b should exist in the graph");
       assert_eq!(pid . 0, "b");
       assert_eq!(source . as_str(), "private",
-                 "TypeDB should show source=private for b"); }
+                 "the graph should show source=private for b"); }
 
     { // Tantivy: source should be updated
       let source : Option<String> =
@@ -167,22 +161,26 @@ async fn test_move_node_to_another_owned_source (
 
     { // Other nodes unchanged
       let node_a : NodeComplete =
-        nodecomplete_from_id (&config, &driver, &ID::new ("a"))
+        nodecomplete_from_id (
+          &fixture_graph . load_full () . graph, config, &ID::new ("a"))
         . await?;
       assert_eq!(node_a . source, SourceName::from ("public"));
       let node_c : NodeComplete =
-        nodecomplete_from_id (&config, &driver, &ID::new ("c"))
+        nodecomplete_from_id (
+          &fixture_graph . load_full () . graph, config, &ID::new ("c"))
         . await?;
       assert_eq!(node_c . source, SourceName::from ("public")); }
 
     { // Containment relationships should be unchanged
       let node_a : NodeComplete =
-        nodecomplete_from_id (&config, &driver, &ID::new ("a"))
+        nodecomplete_from_id (
+          &fixture_graph . load_full () . graph, config, &ID::new ("a"))
         . await?;
       assert!(members_of ( &node_a . contains ) . contains (&ID::new ("b")),
               "a should still contain b after move");
       let node_b : NodeComplete =
-        nodecomplete_from_id (&config, &driver, &ID::new ("b"))
+        nodecomplete_from_id (
+          &fixture_graph . load_full () . graph, config, &ID::new ("b"))
         . await?;
       assert!(members_of ( &node_b . contains ) . contains (&ID::new ("c")),
               "b should still contain c after move"); }
@@ -194,7 +192,7 @@ async fn test_move_node_to_another_owned_source (
 /// and the move should still work correctly.
 async fn test_move_node_referenced_by_extra_id (
   config        : &SkgConfig,
-  driver        : &Arc<TypeDBDriver>,
+  fixture_graph        : &InRustGraphHandle,
   tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let temp_fixtures : &PathBuf = &config . data_root;
@@ -207,7 +205,7 @@ async fn test_move_node_referenced_by_extra_id (
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
-          org_text, &config, &driver , None ) . await?;
+          org_text, &config, &fixture_graph , None ) . await?;
 
     // source_moves should use the PID, not the extra_id
     assert_eq!(save_plan . source_moves . len(), 1,
@@ -215,13 +213,9 @@ async fn test_move_node_referenced_by_extra_id (
     assert_eq!(save_plan . source_moves[0] . pid . 0, "b",
                "SourceMove should use PID, not extra_id");
 
-    let graph : InRustGraphHandle =
-      graph_handle_from_config (&config) ?;
     let _outcome = update_graph_minus_nodeMerges (
         save_plan . define_nodes, &save_plan . source_moves,
-        config . clone(), &tantivy_index, &driver,
-        &graph ) . await?;
-    audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
+        config . clone(), &tantivy_index, fixture_graph ) . await?;
 
     { // FS: old file gone, new file present
       let old_path : PathBuf =
@@ -233,16 +227,16 @@ async fn test_move_node_referenced_by_extra_id (
       assert!( new_path . exists(),
                "b.skg should exist in private/"); }
 
-    { // TypeDB: source updated, extra_ids preserved
+    { // Graph source updated, extra IDs preserved.
       let (pid, source) : (ID, SourceName) =
-        skg::dbs::typedb::search::pid_and_source_from_id (
-          &config . db_name, &driver, &ID::new ("b") ) . await?
-        . expect ("b should exist in TypeDB");
+        pid_and_source_from_id (
+          &fixture_graph . load_full () . graph, &ID::new ("b") )
+        . expect ("b should exist in the graph");
       assert_eq!(pid . 0, "b");
       assert_eq!(source . as_str(), "private");
       let extra_ids : Vec<ID> =
-        skg::test_utils::extra_ids_from_pid (
-          &config . db_name, &driver, &ID::new ("b") ) . await?;
+        extra_ids_from_pid (
+          &fixture_graph . load_full () . graph, &ID::new ("b") );
       assert!(extra_ids . contains (&ID::new ("b-alias")),
               "extra_id b-alias should be preserved after move"); }
 
@@ -256,7 +250,7 @@ async fn test_move_node_referenced_by_extra_id (
 /// Move two nodes in the same save.
 async fn test_move_multiple_nodes (
   config         : &SkgConfig,
-  driver         : &Arc<TypeDBDriver>,
+  fixture_graph         : &InRustGraphHandle,
   _tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let temp_fixtures : &PathBuf = &config . data_root;
@@ -269,7 +263,7 @@ async fn test_move_multiple_nodes (
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
-          org_text, &config, &driver
+          org_text, &config, &fixture_graph
           , None ) . await?;
     assert_eq!(save_plan . source_moves . len(), 2,
                "Expected 2 source moves");
@@ -280,13 +274,9 @@ async fn test_move_multiple_nodes (
     assert!(move_pids . contains (&"b"), "Should move b");
     assert!(move_pids . contains (&"c"), "Should move c");
 
-    let graph : InRustGraphHandle =
-      graph_handle_from_config (&config) ?;
     let _outcome = update_graph_minus_nodeMerges (
         save_plan . define_nodes, &save_plan . source_moves,
-        config . clone(), &_tantivy_index, &driver,
-        &graph ) . await?;
-    audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
+        config . clone(), &_tantivy_index, fixture_graph ) . await?;
 
     { // FS
       assert!( ! temp_fixtures . join ("owned/public/b.skg") . exists() );
@@ -296,14 +286,14 @@ async fn test_move_multiple_nodes (
       // a stays in public
       assert!( temp_fixtures . join ("owned/public/a.skg") . exists() ); }
 
-    { // TypeDB
+    { // Selected graph.
       let (_, source_b) =
-        skg::dbs::typedb::search::pid_and_source_from_id (
-          &config . db_name, &driver, &ID::new ("b") ) . await?
+        pid_and_source_from_id (
+          &fixture_graph . load_full () . graph, &ID::new ("b") )
         . expect ("b should exist");
       let (_, source_c) =
-        skg::dbs::typedb::search::pid_and_source_from_id (
-          &config . db_name, &driver, &ID::new ("c") ) . await?
+        pid_and_source_from_id (
+          &fixture_graph . load_full () . graph, &ID::new ("c") )
         . expect ("c should exist");
       assert_eq!(source_b . as_str(), "private");
       assert_eq!(source_c . as_str(), "private"); }
@@ -313,7 +303,7 @@ async fn test_move_multiple_nodes (
 /// Moving to a foreign source should be rejected.
 async fn test_move_to_foreign_source_rejected (
   config         : &SkgConfig,
-  driver         : &Arc<TypeDBDriver>,
+  fixture_graph         : &InRustGraphHandle,
   _tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let temp_fixtures : &PathBuf = &config . data_root;
@@ -326,7 +316,7 @@ async fn test_move_to_foreign_source_rejected (
     "};
     let result =
       buffer_to_validated_saveplan (
-        org_text, &config, &driver
+        org_text, &config, &fixture_graph
         , None ) . await;
     assert!(result . is_err(),
             "Moving to foreign source should be rejected");
@@ -349,7 +339,7 @@ async fn test_move_to_foreign_source_rejected (
 /// Moving from a foreign source should be rejected.
 async fn test_move_from_foreign_source_rejected (
   config         : &SkgConfig,
-  driver         : &Arc<TypeDBDriver>,
+  fixture_graph         : &InRustGraphHandle,
   _tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let temp_fixtures : &PathBuf = &config . data_root;
@@ -360,7 +350,7 @@ async fn test_move_from_foreign_source_rejected (
     "};
     let result =
       buffer_to_validated_saveplan (
-        org_text, &config, &driver
+        org_text, &config, &fixture_graph
         , None ) . await;
     assert!(result . is_err(),
             "Moving from foreign source should be rejected");
@@ -374,7 +364,7 @@ async fn test_move_from_foreign_source_rejected (
 /// Moving and merging the same node simultaneously should be rejected.
 async fn test_move_and_merge_simultaneously_rejected (
   config         : &SkgConfig,
-  driver         : &Arc<TypeDBDriver>,
+  fixture_graph         : &InRustGraphHandle,
   _tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     // Move b to private AND merge b into stay.
@@ -386,7 +376,7 @@ async fn test_move_and_merge_simultaneously_rejected (
     "};
     let result =
       buffer_to_validated_saveplan (
-        org_text, &config, &driver
+        org_text, &config, &fixture_graph
         , None ) . await;
     assert!(result . is_err(),
             "Moving and merging same node should be rejected");
@@ -406,7 +396,7 @@ async fn test_move_and_merge_simultaneously_rejected (
 /// No source change: no SourceMove should be produced.
 async fn test_no_source_change_produces_no_moves (
   config         : &SkgConfig,
-  driver         : &Arc<TypeDBDriver>,
+  fixture_graph         : &InRustGraphHandle,
   _tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     // Save with same sources as on disk.
@@ -417,7 +407,7 @@ async fn test_no_source_change_produces_no_moves (
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
-          org_text, &config, &driver
+          org_text, &config, &fixture_graph
           , None ) . await?;
     assert_eq!(save_plan . source_moves . len(), 0,
                "No source changes => no source moves");
@@ -429,7 +419,7 @@ async fn test_no_source_change_produces_no_moves (
 /// by filter_wouldbe_noop_defineNodes (which didn't compare source).
 async fn test_source_only_change_with_populated_pool (
   config        : &SkgConfig,
-  driver        : &Arc<TypeDBDriver>,
+  fixture_graph        : &InRustGraphHandle,
   tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let temp_fixtures : &PathBuf = &config . data_root;
@@ -447,7 +437,7 @@ async fn test_source_only_change_with_populated_pool (
     "};
     let ( _viewforest, save_plan, _warnings )
       = buffer_to_validated_saveplan (
-          org_text, &config, &driver , None ) . await?;
+          org_text, &config, &fixture_graph , None ) . await?;
 
     // The source move must be detected even with populated pool.
     assert_eq!(save_plan . source_moves . len(), 1,
@@ -463,13 +453,9 @@ async fn test_source_only_change_with_populated_pool (
     assert!(b_in_instructions,
             "b's save instruction must survive filtering");
 
-    let graph : InRustGraphHandle =
-      graph_handle_from_config (&config) ?;
     let _outcome = update_graph_minus_nodeMerges (
         save_plan . define_nodes, &save_plan . source_moves,
-        config . clone(), &tantivy_index, &driver,
-        &graph ) . await?;
-    audit_inrustgraph_or_panic (&graph, &config . db_name, &driver) . await?;
+        config . clone(), &tantivy_index, fixture_graph ) . await?;
 
     { // FS: old file gone, new file present
       assert!( ! temp_fixtures . join ("owned/public/b.skg") . exists(),
@@ -477,11 +463,11 @@ async fn test_source_only_change_with_populated_pool (
       assert!( temp_fixtures . join ("owned/private/b.skg") . exists(),
                "b.skg should exist in private/"); }
 
-    { // TypeDB: source updated
+    { // Graph source updated.
       let (_, source) =
-        skg::dbs::typedb::search::pid_and_source_from_id (
-          &config . db_name, &driver, &ID::new ("b") ) . await?
-        . expect ("b should exist in TypeDB");
+        pid_and_source_from_id (
+          &fixture_graph . load_full () . graph, &ID::new ("b") )
+        . expect ("b should exist in the graph");
       assert_eq!(source . as_str(), "private"); }
 
     { // Tantivy: source updated

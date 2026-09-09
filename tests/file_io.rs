@@ -12,7 +12,7 @@ use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::misc::{ID, MSV, MemberAtSource, SkgConfig, SourceName, members_at_source_msv};
 use skg::test_utils::set_source_retagging_member_sources;
-use skg::test_utils::{run_with_test_db, nodecomplete_example};
+use skg::test_utils::{run_with_test_graph, nodecomplete_example};
 
 const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
 
@@ -27,7 +27,6 @@ fn test_node_io() {
   // Load config, overriding "output" to point to temp dir
   let config: SkgConfig = load_config_with_overrides(
     CONFIG_PATH,
-    None,
     &[("output", test_dir . clone())],
   ) . unwrap();
 
@@ -86,7 +85,6 @@ fn verify_body_not_needed() {
   // Load config, overriding "output" to point to temp dir
   let config: SkgConfig = load_config_with_overrides(
     CONFIG_PATH,
-    None,
     &[("output", PathBuf::from ("/tmp/file_io_test"))],
   ) . unwrap();
 
@@ -192,28 +190,30 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
 #[test]
 fn test_fetch_aliases_from_file(
 ) -> Result<(), Box<dyn std::error::Error>> {
-  run_with_test_db(
+  run_with_test_graph(
     "skg-test-fetch-aliases",
     "tests/file_io/fixtures",
     "/tmp/tantivy-test-fetch-aliases",
-    |config, driver, _tantivy| Box::pin(async move {
-      test_fetch_aliases_from_file_impl(config, driver) . await
+    |config, fixture_graph, _tantivy| Box::pin(async move {
+      test_fetch_aliases_from_file_impl(config, fixture_graph) . await
     } )) }
 
 async fn test_fetch_aliases_from_file_impl(
   config: &SkgConfig,
-  driver: &typedb_driver::TypeDBDriver,
+  fixture_graph: &skg::dbs::in_rust_graph::InRustGraphHandle,
 ) -> Result<(), Box<dyn std::error::Error>> {
   let aliases_result : Vec<String> =
     fetch_aliases_from_file (
-      &config, driver, ID::new ("node_with_aliases") ) . await;
+      &fixture_graph . load_full () . graph,
+      &config, ID::new ("node_with_aliases") ) . await;
   assert_eq! ( aliases_result,
                vec![ "first alias" . to_string (),
                      "second alias" . to_string () ],
                "Should return aliases when present" );
   let no_aliases_result =
     fetch_aliases_from_file (
-      &config, driver, ID::new ("node_without_aliases") ) . await;
+      &fixture_graph . load_full () . graph,
+      &config, ID::new ("node_without_aliases") ) . await;
   assert_eq! ( no_aliases_result, Vec::<String>::new(),
                "Should return empty Vec when no aliases" );
   Ok (( )) }

@@ -1,29 +1,27 @@
-// cargo test typedb::search::contains_from_pids
+// cargo test grouped_sources graph_queries::search::contains_from_pids
 
-use skg::test_utils::run_with_test_db;
-use skg::dbs::typedb::search::contains_from_pids::contains_from_pids;
-use skg::types::misc::{ID, SkgConfig};
+use skg::test_utils::run_with_test_graph;
+use skg::dbs::graph_queries::relations::contains_from_pids;
+use skg::types::misc::ID;
 
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 #[test]
 fn the_tests (
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
-    "skg-test-typedb-search-contains-from-pids",
-    "tests/typedb/search/contains_from_pids/fixtures",
-    "/tmp/tantivy-test-typedb-search-contains-from-pids",
-    |config, driver, _tantivy| Box::pin ( async move {
+  run_with_test_graph (
+    "skg-test-graph-search-contains-from-pids",
+    "tests/graph_queries/search/contains_from_pids/fixtures",
+    "/tmp/tantivy-test-graph-search-contains-from-pids",
+    |_config, graph, _tantivy| Box::pin ( async move {
       test_contains_from_pids (
-        config, driver ) . await ?;
+        &graph . load_full () . graph ) ?;
       Ok (( )) } )
   ) }
 
-async fn test_contains_from_pids (
-  config : &SkgConfig,
-  driver : &TypeDBDriver
+fn test_contains_from_pids (
+  graph : &skg::dbs::in_rust_graph::InRustGraph,
 ) -> Result<(), Box<dyn Error>> {
 
   let input_pids : Vec<ID> =
@@ -34,10 +32,7 @@ async fn test_contains_from_pids (
 
   let ( container_to_contents, content_to_containers )
     : ( HashMap < ID, HashSet < ID > >, HashMap < ID, HashSet < ID > > ) =
-    contains_from_pids (
-      & config . db_name,
-      & driver,
-      & input_pids ) . await ?;
+    contains_from_pids (graph, &input_pids, None);
 
   // Expected container_to_contents:
   //   1 -> {2, 3}

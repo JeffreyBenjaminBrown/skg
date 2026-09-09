@@ -15,27 +15,20 @@
 // visibility gates: FR (source "foreign", not user-owned) overrides
 // N1; R2 (source "other", user-owned) overrides N2; N3 lives in
 // "other" while P3 and its overrider R3 live in "main".
-//
-// PITFALL: marked buffers hit the tamper check, which reads the
-// process-global in-Rust graph; each sub-test installs its own
-// fixture graph via install_or_swap_global_handle, which keeps the
-// shared process's global consistent with the current fixtures.
 
 use indoc::indoc;
 use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
-use std::sync::Arc;
 
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::assert_metadata_eq;
 use skg::serve::ViewsState;
 use skg::serve::handlers::collateral_scheduler::CollateralScheduler;
 use skg::source_sets::{ActiveSourceSet, SourceSetName};
-use skg::dbs::in_rust_graph::install_or_swap_global_handle;
 use skg::test_utils::{
   apply_next_scheduled_view,
-  run_with_shared_test_db,
+  run_with_shared_test_graph,
   graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::{
@@ -47,38 +40,37 @@ use skg::types::save::{DefineNode, SaveNode};
 use skg::types::views_state::OpenViews;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use typedb_driver::TypeDBDriver;
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str = "tests/override_substitution/fixtures";
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-override-substitution",
     |s| Box::pin ( async move {
       s . reset ("de_novo_draws_the_overrider_marked", fixtures) . await ?;
       de_novo_draws_the_overrider_marked (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("save_roundtrips_to_original_and_is_idempotent", fixtures) . await ?;
       save_roundtrips_to_original_and_is_idempotent (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("extraction_honors_the_marker", fixtures) . await ?;
       extraction_honors_the_marker (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("diff_mode_disables_substitution", fixtures) . await ?;
       diff_mode_disables_substitution (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("marked_view_is_shape_stable_across_diff_toggle", fixtures) . await ?;
       marked_view_is_shape_stable_across_diff_toggle (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset_from_config ("ownership_and_visibility_gate_substitution",
                              "tests/override_substitution/fixtures-multi/skgconfig.toml") . await ?;
       ownership_and_visibility_gate_substitution (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       s . reset_from_config ("chain_half_visible_keeps_the_original",
                              "tests/override_substitution/fixtures-chain/skgconfig.toml") . await ?;
       chain_half_visible_keeps_the_original (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 fn marked_lines<'a> (
@@ -111,19 +103,19 @@ fn opt_saved_node_by_id<'a> (
 async fn define_nodes_from (
   buffer : &str,
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<Vec<DefineNode>, SaveError> {
   let graph : InRustGraphHandle = graph_handle_from_config (config)
     . map_err (SaveError::DatabaseError) ?;
   Ok ( buffer_to_validated_saveplan (
          &graph . load_full () . graph,
-         buffer, config, driver, None ) . await ?
+         buffer, config, None ) . await ?
        . 1 . define_nodes ) }
 
 async fn save_and_rerender (
   buf     : &str,
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<String, Box<dyn Error>> {
   let graph : InRustGraphHandle =
@@ -138,7 +130,7 @@ async fn save_and_rerender (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    buf, driver, config, tantivy, &graph, false,
+    buf, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "save must not error; got: {:?}", response . errors );
@@ -156,14 +148,12 @@ fn read_fixture_file (
 
 async fn de_novo_draws_the_overrider_marked (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      install_or_swap_global_handle (
-        graph_handle_from_config (config) ? );
       let (view, _pids, _tree) =
         multi_root_view (
-          driver, config, Some (tantivy),
+          config, Some (tantivy),
           &[ ID::from ("P") ], false ) . await ?;
       { let marked : Vec<&str> = marked_lines (&view, "N");
         assert_eq! ( marked . len (), 1,
@@ -181,17 +171,15 @@ async fn de_novo_draws_the_overrider_marked (
 
 async fn save_roundtrips_to_original_and_is_idempotent (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      install_or_swap_global_handle (
-        graph_handle_from_config (config) ? );
       let (de_novo, _pids, _tree) =
         multi_root_view (
-          driver, config, Some (tantivy),
+          config, Some (tantivy),
           &[ ID::from ("P") ], false ) . await ?;
       let saved : String =
-        save_and_rerender (&de_novo, config, driver, tantivy)
+        save_and_rerender (&de_novo, config, fixture_graph, tantivy)
         . await ?;
       { let p_file : String = read_fixture_file (config, "P");
         assert! ( p_file . contains ("- N"),
@@ -206,7 +194,7 @@ async fn save_roundtrips_to_original_and_is_idempotent (
         "the rerendered saved view still draws marked R:\n{}",
         saved );
       let saved_again : String =
-        save_and_rerender (&saved, config, driver, tantivy)
+        save_and_rerender (&saved, config, fixture_graph, tantivy)
         . await ?;
       assert_metadata_eq! ( saved, saved_again,
         "a second save is a noop (idempotence through the \
@@ -215,11 +203,9 @@ async fn save_roundtrips_to_original_and_is_idempotent (
 
 async fn extraction_honors_the_marker (
   config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  fixture_graph   : &InRustGraphHandle,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      install_or_swap_global_handle (
-        graph_handle_from_config (config) ? );
       { // A marked child collects its original: P's collected
         // contains equals disk ([N, M]), so the noop filter drops
         // P's instruction entirely -- the round-trip in its
@@ -231,7 +217,7 @@ async fn extraction_honors_the_marker (
         "};
         assert! (
           opt_saved_node_by_id (
-            & define_nodes_from (buffer, config, driver) . await ?,
+            & define_nodes_from (buffer, config, fixture_graph) . await ?,
             "P" ) . is_none (),
           "P's contains is unchanged (N, M), so no instruction \
            touches P" ); }
@@ -242,7 +228,7 @@ async fn extraction_honors_the_marker (
         "};
         assert_eq! (
           members_of ( & saved_node_by_id (
-            & define_nodes_from (buffer, config, driver) . await ?,
+            & define_nodes_from (buffer, config, fixture_graph) . await ?,
             "P" ) . contains ),
           vec![ ID::from ("M") ] ); }
       { // Reordering the drawn child positions the original.
@@ -253,7 +239,7 @@ async fn extraction_honors_the_marker (
         "};
         assert_eq! (
           members_of ( & saved_node_by_id (
-            & define_nodes_from (buffer, config, driver) . await ?,
+            & define_nodes_from (buffer, config, fixture_graph) . await ?,
             "P" ) . contains ),
           vec![ ID::from ("M"), ID::from ("N") ] ); }
       { // Moving the drawn child to another parent moves the original.
@@ -265,7 +251,7 @@ async fn extraction_honors_the_marker (
           *** (skg (node (id R) (source main) (viewStats (overridesHere N)) indef)) R
         "};
         let instructions : Vec<DefineNode> =
-          define_nodes_from (buffer, config, driver) . await ?;
+          define_nodes_from (buffer, config, fixture_graph) . await ?;
         assert_eq! (
           members_of ( & saved_node_by_id (&instructions, "P") . contains ),
           vec![ ID::from ("M") ] );
@@ -280,7 +266,7 @@ async fn extraction_honors_the_marker (
           ** (skg (node (id M) (source main) indef)) M
         "};
         let instructions : Vec<DefineNode> =
-          define_nodes_from (buffer, config, driver) . await ?;
+          define_nodes_from (buffer, config, fixture_graph) . await ?;
         assert_eq! (
           saved_node_by_id (&instructions, "R") . title,
           "R-edited" );
@@ -299,14 +285,14 @@ async fn extraction_honors_the_marker (
         "};
         assert! (
           opt_saved_node_by_id (
-            & define_nodes_from (buffer, config, driver) . await ?,
+            & define_nodes_from (buffer, config, fixture_graph) . await ?,
             "P" ) . is_none () ); }
       { // Tamper: a marker the server would not have drawn aborts.
         let buffer = indoc! {"
           * (skg (node (id P) (source main))) P
           ** (skg (node (id M) (source main) (viewStats (overridesHere W)) indef)) M
         "};
-        match define_nodes_from (buffer, config, driver) . await {
+        match define_nodes_from (buffer, config, fixture_graph) . await {
           Err (SaveError::BufferValidationErrors { errors, .. }) => {
             assert! ( errors . iter () . any ( |e| matches! (
               e, BufferValidationError::OverridesHere_Mismatch (..) )),
@@ -323,7 +309,7 @@ async fn extraction_honors_the_marker (
           **** (skg (node (id R) (source main) (viewStats (overridesHere N)) indef)) R
         "};
         let instructions : Vec<DefineNode> =
-          define_nodes_from (buffer, config, driver) . await ?;
+          define_nodes_from (buffer, config, fixture_graph) . await ?;
         if let Some (s_node) = opt_saved_node_by_id (&instructions, "S") {
           assert! (
             ! s_node . hides_from_its_subscriptions . or_default ()
@@ -333,14 +319,12 @@ async fn extraction_honors_the_marker (
 
 async fn diff_mode_disables_substitution (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      install_or_swap_global_handle (
-        graph_handle_from_config (config) ? );
       let (view, _pids, _tree) =
         multi_root_view (
-          driver, config, Some (tantivy),
+          config, Some (tantivy),
           &[ ID::from ("P") ], true ) . await ?; // diff mode
       assert! ( marked_lines (&view, "N") . is_empty (),
         "diff surfaces show raw graph facts; no substitution:\n{}",
@@ -358,11 +342,9 @@ async fn diff_mode_disables_substitution (
 /// (TODO/full-schema/12-2_diff-mode-policy_discussion.org).
 async fn marked_view_is_shape_stable_across_diff_toggle (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      install_or_swap_global_handle (
-        graph_handle_from_config (config) ? );
       { // git-init the temp fixture copy, so the toggle's diff is
         // real (and clean: HEAD == worktree).
         let source_path : &std::path::Path =
@@ -385,7 +367,7 @@ async fn marked_view_is_shape_stable_across_diff_toggle (
         graph_handle_from_config (config) ?;
       let env : skg::types::env::SkgEnv =
         skg::test_utils::skg_env_from_parts (
-          config, Arc::clone (driver), tantivy, &graph );
+          config, tantivy, &graph );
       let mut views_state : ViewsState =
         ViewsState {
           diff_mode_enabled : false,
@@ -393,7 +375,7 @@ async fn marked_view_is_shape_stable_across_diff_toggle (
       let before : String = {
         let (view, pids, tree) =
           multi_root_view (
-            driver, config, None,
+            config, None,
             &[ ID::from ("P") ], false ) . await ?;
         views_state . open_views . register_view (
           &graph . load_full () . graph,
@@ -463,14 +445,12 @@ async fn marked_view_is_shape_stable_across_diff_toggle (
 
 async fn ownership_and_visibility_gate_substitution (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
-      install_or_swap_global_handle (
-        graph_handle_from_config (config) ? );
       { // A foreign overrider never substitutes.
         let (view, _pids, _tree) =
           multi_root_view (
-            driver, config, None,
+            config, None,
             &[ ID::from ("P1") ], false ) . await ?;
         assert! ( marked_lines (&view, "N1") . is_empty (),
           "FR is foreign; N1 draws raw:\n{}", view );
@@ -481,7 +461,7 @@ async fn ownership_and_visibility_gate_substitution (
       { // An inactive owned overrider does not substitute.
         let (view, _pids, _tree) =
           multi_root_view_with_source_set (
-            driver, config, None,
+            config, None,
             &[ ID::from ("P2") ], false, &active ) . await ?;
         assert! ( marked_lines (&view, "N2") . is_empty (),
           "R2's source is inactive; N2 draws raw:\n{}", view );
@@ -489,7 +469,7 @@ async fn ownership_and_visibility_gate_substitution (
       { // The same overrider substitutes when its source is active.
         let (view, _pids, _tree) =
           multi_root_view (
-            driver, config, None,
+            config, None,
             &[ ID::from ("P2") ], false ) . await ?;
         let marked : Vec<&str> = marked_lines (&view, "N2");
         assert_eq! ( marked . len (), 1, "{}", view );
@@ -498,7 +478,7 @@ async fn ownership_and_visibility_gate_substitution (
         // overrider -> neither is drawn.
         let (view, _pids, _tree) =
           multi_root_view_with_source_set (
-            driver, config, None,
+            config, None,
             &[ ID::from ("P3") ], false, &active ) . await ?;
         assert! ( ! view . contains ("(id N3)"),
           "the inactive original is omitted:\n{}", view );
@@ -513,7 +493,7 @@ async fn ownership_and_visibility_gate_substitution (
 async fn save_under_set (
   buf     : &str,
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
   set     : &ActiveSourceSet,
 ) -> Result<String, Box<dyn Error>> {
@@ -521,7 +501,7 @@ async fn save_under_set (
     graph_handle_from_config (config) ?;
   let mut env : skg::types::env::SkgEnv =
     skg::test_utils::skg_env_from_parts (
-      config, Arc::clone (driver), tantivy, &graph );
+      config, tantivy, &graph );
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false,
     open_views        : OpenViews::new (), };
@@ -546,15 +526,13 @@ async fn save_under_set (
 /// and keeps N in P's contains; an off-chain marker is rejected.
 async fn chain_half_visible_keeps_the_original (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      install_or_swap_global_handle (
-        graph_handle_from_config (config) ? );
       { // Under 'all', the chain end D is drawn in N's place.
         let (view, _p, _t) =
           multi_root_view (
-            driver, config, Some (tantivy),
+            config, Some (tantivy),
             &[ ID::from ("P") ], false ) . await ?;
         let marked : Vec<&str> = marked_lines (&view, "N");
         assert_eq! ( marked . len (), 1,
@@ -569,7 +547,7 @@ async fn chain_half_visible_keeps_the_original (
         // C is drawn instead.
         let (view, _p, _t) =
           multi_root_view_with_source_set (
-            driver, config, Some (tantivy),
+            config, Some (tantivy),
             &[ ID::from ("P") ], false, &main_set ) . await ?;
         let marked : Vec<&str> = marked_lines (&view, "N");
         assert_eq! ( marked . len (), 1,
@@ -580,7 +558,7 @@ async fn chain_half_visible_keeps_the_original (
       { // Saving the half-visible view accepts the middle carrier and
         // keeps N (not C) in P's contains.
         let saved : String =
-          save_under_set (&view_main, config, driver, tantivy, &main_set)
+          save_under_set (&view_main, config, fixture_graph, tantivy, &main_set)
           . await ?;
         assert_eq! ( marked_lines (&saved, "N") . len (), 1,
           "the rerendered saved view still draws a marked substitute \
@@ -601,7 +579,7 @@ async fn chain_half_visible_keeps_the_original (
           * (skg (node (id P) (source main))) P
           ** (skg (node (id D) (source other) (viewStats (overridesHere P)) indef)) D
         "};
-        match define_nodes_from (buffer, config, driver) . await {
+        match define_nodes_from (buffer, config, fixture_graph) . await {
           Err (SaveError::BufferValidationErrors { errors, .. }) =>
             assert! ( errors . iter () . any ( |e| matches! (
               e, BufferValidationError::OverridesHere_Mismatch (..) )),

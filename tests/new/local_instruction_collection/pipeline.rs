@@ -16,7 +16,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::{
 use skg::from_text::local_instruction_collection::{
   extract_nonmergeSavePlan_locally, NonmergeSavePlan };
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
-use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
+use skg::test_utils::{graph_handle_from_config, run_with_shared_test_graph};
 use skg::types::errors::BufferValidationError;
 use skg::types::git::Sign;
 use skg::types::maybe_placed_viewnode::{
@@ -30,7 +30,7 @@ use skg::types::tree::forest::{MpViewForest, ViewForest};
 use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode};
 use std::error::Error;
 use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 
 const SUBSCRIBEE_EDIT_CONFIG : &str =
   "tests/hidden_from_subscriptions/fixtures-subscribee-edit/skgconfig.toml";
@@ -48,14 +48,14 @@ fn placed_forest_from_org (
 async fn placed_forest_from_org_with_disk (
   input  : &str,
   config : &SkgConfig,
-  driver : &TypeDBDriver,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<ViewForest, Box<dyn Error>> {
   let (mut maybePlaced_viewforest, _parsing_errors, _warnings)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>) =
     org_to_uninterpreted_viewforest (input) ?;
   add_missing_info_to_viewforest (
     &graph_handle_from_config (config) ? . load_full () . graph,
-    &mut maybePlaced_viewforest, &config . db_name, driver) . await?;
+    &mut maybePlaced_viewforest) . await?;
   Ok ( maybePlaced_to_placed_viewforest (maybePlaced_viewforest) ? ) }
 
 fn save_ids (
@@ -79,42 +79,42 @@ fn saved_node_by_id<'a> (
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-new-lic-pipeline",
     |s| Box::pin ( async move {
       s . reset ("pipeline_basic_mixed_tree",
                  "tests/merge/merge_nodes/fixtures") . await ?;
       pipeline_basic_mixed_tree (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset_from_config ("pipeline_subscribee_hiderels",
                              SUBSCRIBEE_EDIT_CONFIG) . await ?;
       pipeline_subscribee_hiderels (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       s . reset ("pipeline_readonly_col_member_edits",
                  "tests/merge/merge_nodes/fixtures") . await ?;
       pipeline_readonly_col_member_edits (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("pipeline_inactive_subtree",
                  "tests/merge/merge_nodes/fixtures") . await ?;
       pipeline_inactive_subtree (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("pipeline_phantom_subtree",
                  "tests/merge/merge_nodes/fixtures") . await ?;
       pipeline_phantom_subtree (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("pipeline_nodeMerge_requests",
                  "tests/merge/merge_nodes/fixtures") . await ?;
       pipeline_nodeMerge_requests (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset_from_config ("pipeline_rejects_text_claim_mismatch",
                              SUBSCRIBEE_EDIT_CONFIG) . await ?;
       pipeline_rejects_text_claim_mismatch (
-        &s . config, &s . driver ) . await ?;
+        &s . config, &s . graph ) . await ?;
       Ok (( )) } )) }
 
 async fn pipeline_basic_mixed_tree (
   config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  fixture_graph   : &InRustGraphHandle,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
@@ -141,7 +141,7 @@ async fn pipeline_basic_mixed_tree (
         : (NonmergeSavePlan, Vec<(ID, ID)>) =
         extract_nonmergeSavePlan_locally (
           &graph_handle_from_config (config) ? . load_full () . graph,
-          &placed_forest_from_org (input), config, driver, None) . await?;
+          &placed_forest_from_org (input), config, None) . await?;
       assert_eq!(
         save_ids (&plan . define_nodes),
         vec![ ID::from ("root"), ID::from ("child"),
@@ -179,7 +179,7 @@ async fn pipeline_basic_mixed_tree (
 
 async fn pipeline_subscribee_hiderels (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
@@ -190,11 +190,11 @@ async fn pipeline_subscribee_hiderels (
             "};
       let forest : ViewForest =
         placed_forest_from_org_with_disk (
-          input, config, driver) . await?;
+          input, config, fixture_graph) . await?;
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
           &graph_handle_from_config (config) ? . load_full () . graph,
-          &forest, config, driver, None) . await?;
+          &forest, config, None) . await?;
       assert_eq!(
         members_msv (&saved_node_by_id (&plan . define_nodes, "r")
           . hides_from_its_subscriptions),
@@ -207,7 +207,7 @@ async fn pipeline_subscribee_hiderels (
 
 async fn pipeline_readonly_col_member_edits (
   config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  fixture_graph   : &InRustGraphHandle,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // This tests the new recursion surface: definitive members of
@@ -224,7 +224,7 @@ async fn pipeline_readonly_col_member_edits (
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
           &graph_handle_from_config (config) ? . load_full () . graph,
-          &placed_forest_from_org (input), config, driver, None) . await?;
+          &placed_forest_from_org (input), config, None) . await?;
       assert_eq!(
         save_ids (&plan . define_nodes),
         vec![ ID::from ("owner"), ID::from ("intruder"),
@@ -239,7 +239,7 @@ async fn pipeline_readonly_col_member_edits (
 
 async fn pipeline_inactive_subtree (
   config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  fixture_graph   : &InRustGraphHandle,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
@@ -251,7 +251,7 @@ async fn pipeline_inactive_subtree (
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
           &graph_handle_from_config (config) ? . load_full () . graph,
-          &placed_forest_from_org (input), config, driver, None) . await?;
+          &placed_forest_from_org (input), config, None) . await?;
       assert_eq!(
         save_ids (&plan . define_nodes),
         // stowaway is on the new recursion surface.
@@ -266,7 +266,7 @@ async fn pipeline_inactive_subtree (
 
 async fn pipeline_phantom_subtree (
   config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  fixture_graph   : &InRustGraphHandle,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
@@ -298,7 +298,7 @@ async fn pipeline_phantom_subtree (
       let (plan, _) =
         extract_nonmergeSavePlan_locally (
           &graph_handle_from_config (config) ? . load_full () . graph,
-          &forest, config, driver, None) . await?;
+          &forest, config, None) . await?;
       assert_eq!(
         save_ids (&plan . define_nodes),
         // survivor is on the new recursion surface; the phantom
@@ -311,7 +311,7 @@ async fn pipeline_phantom_subtree (
 
 async fn pipeline_nodeMerge_requests (
   config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  fixture_graph   : &InRustGraphHandle,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
@@ -323,17 +323,17 @@ async fn pipeline_nodeMerge_requests (
             "};
       let forest : ViewForest =
         placed_forest_from_org_with_disk (
-          input, config, driver) . await?;
+          input, config, fixture_graph) . await?;
       let (_plan, nodeMerge_acquisitions) =
         extract_nonmergeSavePlan_locally (
           &graph_handle_from_config (config) ? . load_full () . graph,
-          &forest, config, driver, None) . await?;
+          &forest, config, None) . await?;
       assert_eq!( nodeMerge_acquisitions,
                   vec![ (ID::from ("1"), ID::from ("2")) ]);
       let nodeMerges : Vec<NodeMerge> =
         nodeMerge_instructions_from_pairs (
           &graph_handle_from_config (config) ? . load_full () . graph,
-          &nodeMerge_acquisitions, config, driver) . await?;
+          &nodeMerge_acquisitions, config) . await?;
       assert_eq!( nodeMerges . len(), 1 );
       assert_eq!( nodeMerges [0] . acquirer_id(), &ID::from ("1") );
       assert_eq!( nodeMerges [0] . acquiree_id(), &ID::from ("2") );
@@ -343,7 +343,7 @@ async fn pipeline_nodeMerge_requests (
 
 async fn pipeline_rejects_text_claim_mismatch (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
+  fixture_graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
@@ -354,11 +354,11 @@ async fn pipeline_rejects_text_claim_mismatch (
             "};
       let forest : ViewForest =
         placed_forest_from_org_with_disk (
-          input, config, driver) . await?;
+          input, config, fixture_graph) . await?;
       let error : String =
         extract_nonmergeSavePlan_locally (
           &graph_handle_from_config (config) ? . load_full () . graph,
-          &forest, config, driver , None) . await
+          &forest, config, None) . await
         . err() . expect ("the title edit should be rejected")
         . to_string();
       assert!( error . contains ("Cannot edit title/body") );

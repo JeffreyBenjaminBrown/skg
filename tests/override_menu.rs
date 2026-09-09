@@ -16,9 +16,6 @@
 use std::collections::HashSet;
 use std::error::Error;
 use std::net::{TcpListener, TcpStream};
-use std::sync::Arc;
-
-use skg::dbs::in_rust_graph::install_or_swap_global_handle;
 use skg::runtime::ServerRuntime;
 use skg::serve::ViewsState;
 use skg::serve::handlers::collateral_scheduler::CollateralScheduler;
@@ -29,7 +26,7 @@ use skg::test_utils::{apply_next_scheduled_view,
                       extract_string_field_from_sexp,
                       graph_handle_from_config, read_lp_message,
                       skg_env_from_parts};
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::run_with_shared_test_graph;
 use skg::to_org::render::override_menu::override_menu_view;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
@@ -37,36 +34,36 @@ use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{ParentIs, mk_indefinitive_viewnode};
 use skg::types::misc::SourceName;
 use skg::types::views_state::{OpenViews, ViewUri};
-use typedb_driver::TypeDBDriver;
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str = "tests/override_menu/fixtures-multi";
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-override-menu",
     |s| Box::pin ( async move {
       s . reset ("menu_shows_all_edges_with_override_ancestor_facts", fixtures) . await ?;
       menu_shows_all_edges_with_override_ancestor_facts (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("menu_appears_for_foreign_only_overriders", fixtures) . await ?;
       menu_appears_for_foreign_only_overriders (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("menu_stops_cycles_with_the_cycle_viewstat", fixtures) . await ?;
       menu_stops_cycles_with_the_cycle_viewstat (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("inactive_overriders_are_omitted_and_can_empty_the_menu", fixtures) . await ?;
       inactive_overriders_are_omitted_and_can_empty_the_menu (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("menu_still_offered_in_diff_mode", fixtures) . await ?;
       menu_still_offered_in_diff_mode (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("open_menu_survives_diff_mode_toggle", fixtures) . await ?;
       open_menu_survives_diff_mode_toggle (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("handler_precedence_and_menu_dedup", fixtures) . await ?;
       handler_precedence_and_menu_dedup (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 fn connected_tcp_stream_pair (
@@ -95,15 +92,13 @@ fn line_with_id<'a> (
 
 async fn menu_shows_all_edges_with_override_ancestor_facts (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config) ?;
-      install_or_swap_global_handle (
-        graph_handle_from_config (config) ? );
       let env : SkgEnv =
         skg_env_from_parts (
-          config, Arc::clone (driver), tantivy, &graph );
+          config, tantivy, &graph );
       let (menu, _pids, _tree) =
         override_menu_view ( &env, &ID::from ("Z"), None )
         . await ?
@@ -141,15 +136,13 @@ async fn menu_shows_all_edges_with_override_ancestor_facts (
 
 async fn menu_appears_for_foreign_only_overriders (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config) ?;
-      install_or_swap_global_handle (
-        graph_handle_from_config (config) ? );
       let env : SkgEnv =
         skg_env_from_parts (
-          config, Arc::clone (driver), tantivy, &graph );
+          config, tantivy, &graph );
       let (menu, _pids, _tree) =
         override_menu_view ( &env, &ID::from ("Z2"), None )
         . await ?
@@ -160,15 +153,13 @@ async fn menu_appears_for_foreign_only_overriders (
 
 async fn menu_stops_cycles_with_the_cycle_viewstat (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config) ?;
-      install_or_swap_global_handle (
-        graph_handle_from_config (config) ? );
       let env : SkgEnv =
         skg_env_from_parts (
-          config, Arc::clone (driver), tantivy, &graph );
+          config, tantivy, &graph );
       let (menu, _pids, _tree) =
         override_menu_view ( &env, &ID::from ("C1"), None )
         . await ?
@@ -187,15 +178,13 @@ async fn menu_stops_cycles_with_the_cycle_viewstat (
 
 async fn inactive_overriders_are_omitted_and_can_empty_the_menu (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config) ?;
-      install_or_swap_global_handle (
-        graph_handle_from_config (config) ? );
       let env : SkgEnv =
         skg_env_from_parts (
-          config, Arc::clone (driver), tantivy, &graph );
+          config, tantivy, &graph );
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           config, SourceSetName::from ("main")) ?;
@@ -237,15 +226,13 @@ fn shape_signature (
 /// diff_mode_enabled still yields the menu, not a content view.
 async fn menu_still_offered_in_diff_mode (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config) ?;
-      install_or_swap_global_handle (
-        graph_handle_from_config (config) ? );
       let env : SkgEnv =
         skg_env_from_parts (
-          config, Arc::clone (driver), tantivy, &graph );
+          config, tantivy, &graph );
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           config, SourceSetName::from ("all")) ?;
@@ -280,15 +267,13 @@ async fn menu_still_offered_in_diff_mode (
 /// change).
 async fn open_menu_survives_diff_mode_toggle (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config) ?;
-      install_or_swap_global_handle (
-        graph_handle_from_config (config) ? );
       let env : SkgEnv =
         skg_env_from_parts (
-          config, Arc::clone (driver), tantivy, &graph );
+          config, tantivy, &graph );
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           config, SourceSetName::from ("all")) ?;
@@ -356,15 +341,13 @@ async fn open_menu_survives_diff_mode_toggle (
 
 async fn handler_precedence_and_menu_dedup (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config) ?;
-      install_or_swap_global_handle (
-        graph_handle_from_config (config) ? );
       let env : SkgEnv =
         skg_env_from_parts (
-          config, Arc::clone (driver), tantivy, &graph );
+          config, tantivy, &graph );
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           config, SourceSetName::from ("all")) ?;

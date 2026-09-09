@@ -7,13 +7,12 @@
 /// and do not trip the check.
 
 use super::common::*;
-use std::sync::Arc;
-use skg::test_utils::{run_with_shared_test_db, SharedDbSession};
+use skg::test_utils::{run_with_shared_test_graph, SharedGraphSession};
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-git-diff-ids-save",
     |s| Box::pin ( async move {
       test_delete_id_col_scaffold_respawns (s) . await ?;
@@ -27,26 +26,24 @@ fn all_tests
 /// Deleting an idCol scaffold should be a no-op.
 /// The scaffold respawns in the returned buffer.
 async fn test_delete_id_col_scaffold_respawns (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test(
     s,
     "skg-test-save-del-idcol",
-    |config, driver, tantivy, repo_path| { Box::pin(async move {
+    |config, fixture_graph, tantivy, repo_path| { Box::pin(async move {
       // User deletes the entire idCol scaffold (and its children)
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "skg id");
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, &graph, true,
+        &input, config, tantivy, fixture_graph, true,
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: 1.skg should still have the worktree ids
@@ -69,26 +66,24 @@ async fn test_delete_id_col_scaffold_respawns (
 /// Deleting individual id scaffolds (keeping the idCol) aborts the
 /// save with an IDCol_Edited error, and the disk is untouched.
 async fn test_delete_id_scaffolds_aborts (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test(
     s,
     "skg-test-save-del-ids",
-    |config, driver, tantivy, repo_path| { Box::pin(async move {
+    |config, fixture_graph, tantivy, repo_path| { Box::pin(async move {
       // User deletes the id scaffolds but keeps the idCol
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "(skg id)");
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let result = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, &graph, true,
+        &input, config, tantivy, fixture_graph, true,
         &Err ( String::new () ), &mut views_state ) . await;
 
       let err : String =
@@ -108,26 +103,24 @@ async fn test_delete_id_scaffolds_aborts (
 /// Editing an id scaffold's text aborts the save with an
 /// IDCol_Edited error, and the disk is untouched.
 async fn test_edit_id_scaffold_aborts (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test(
     s,
     "skg-test-save-edit-id",
-    |config, driver, tantivy, repo_path| { Box::pin(async move {
+    |config, fixture_graph, tantivy, repo_path| { Box::pin(async move {
       // User tries to change an id value in the scaffold
       let input = GIT_DIFF_VIEW . replace(
         "(unstaged newM)) 2'", "(unstaged newM)) 2-modified");
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let result = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, &graph, true,
+        &input, config, tantivy, fixture_graph, true,
         &Err ( String::new () ), &mut views_state ) . await;
 
       let err : String =
@@ -149,28 +142,26 @@ async fn test_edit_id_scaffold_aborts (
 /// Reordering id scaffolds passes the membership check (multiset
 /// equality); the rerender re-sorts them anyway.
 async fn test_reorder_id_scaffolds_saves (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test(
     s,
     "skg-test-save-reorder-ids",
-    |config, driver, tantivy, _repo_path| { Box::pin(async move {
+    |config, fixture_graph, tantivy, _repo_path| { Box::pin(async move {
       let input = GIT_DIFF_VIEW
         // Swap the two plain id lines (1 and 3).
         . replace ("*** (skg id) 1", "*** (skg id) SWAP")
         . replace ("*** (skg id) 3", "*** (skg id) 1")
         . replace ("*** (skg id) SWAP", "*** (skg id) 3");
       assert_ne! (input, GIT_DIFF_VIEW);
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, &graph, true,
+        &input, config, tantivy, fixture_graph, true,
         &Err ( String::new () ), &mut views_state ) . await?;
       assert_buffer_contains(
         &response . saved_view, GIT_DIFF_VIEW);
@@ -180,13 +171,13 @@ async fn test_reorder_id_scaffolds_saves (
 /// Moving the idCol to another node aborts the save: the receiving
 /// node's real ID list does not match the moved idCol's claims.
 async fn test_move_id_scaffolds_to_child_aborts (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test(
     s,
     "skg-test-save-move-ids",
-    |config, driver, tantivy, repo_path| { Box::pin(async move {
+    |config, fixture_graph, tantivy, repo_path| { Box::pin(async move {
       // User moves id scaffolds to be children of 'child' node
       let input = "\
 * (skg (node (id 1) (source main))) 1
@@ -198,15 +189,13 @@ async fn test_move_id_scaffolds_to_child_aborts (
 **** (skg id) 3
 ";
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let result = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, &graph, true,
+        &input, config, tantivy, fixture_graph, true,
         &Err ( String::new () ), &mut views_state ) . await;
 
       let err : String =
@@ -237,25 +226,23 @@ async fn test_move_id_scaffolds_to_child_aborts (
 /// staged/unstaged distinction instead of merging stages and defaulting
 /// to unstaged.
 async fn test_delete_id_col_scaffold_respawns_staged (
-  s : &mut SharedDbSession,
+  s : &mut SharedGraphSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test_staged(
     s,
     "skg-test-save-del-idcol-staged",
-    |config, driver, tantivy, _repo_path| { Box::pin(async move {
+    |config, fixture_graph, tantivy, _repo_path| { Box::pin(async move {
       let input = without_lines_containing(
         GIT_DIFF_VIEW_STAGED, "skg id");
 
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views            : OpenViews::new (),};
       let (mut stream, _) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer(
         &mut stream,
-        &input, driver, config, tantivy, &graph, true,
+        &input, config, tantivy, fixture_graph, true,
         &Err ( String::new () ), &mut views_state ) . await?;
 
       assert_buffer_contains(
@@ -268,14 +255,14 @@ async fn test_delete_id_col_scaffold_respawns_staged (
 //
 
 async fn run_save_test<F>(
-  s: &mut SharedDbSession,
+  s: &mut SharedGraphSession,
   subtest_name: &str,
   test_fn: F,
 ) -> Result<(), Box<dyn Error>>
 where
   F: for<'a> FnOnce(
     &'a SkgConfig,
-    &'a Arc<TypeDBDriver>,
+    &'a InRustGraphHandle,
     &'a mut TantivyIndex,
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
@@ -285,14 +272,14 @@ where
 }
 
 async fn run_save_test_staged<F>(
-  s: &mut SharedDbSession,
+  s: &mut SharedGraphSession,
   subtest_name: &str,
   test_fn: F,
 ) -> Result<(), Box<dyn Error>>
 where
   F: for<'a> FnOnce(
     &'a SkgConfig,
-    &'a Arc<TypeDBDriver>,
+    &'a InRustGraphHandle,
     &'a mut TantivyIndex,
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
@@ -302,7 +289,7 @@ where
 }
 
 async fn run_save_test_with_setup<S, F>(
-  s: &mut SharedDbSession,
+  s: &mut SharedGraphSession,
   subtest_name: &str,
   setup   : S,
   test_fn : F,
@@ -311,7 +298,7 @@ where
   S: FnOnce (&Path) -> Result<Repository, Box<dyn Error>>,
   F: for<'a> FnOnce(
     &'a SkgConfig,
-    &'a Arc<TypeDBDriver>,
+    &'a InRustGraphHandle,
     &'a mut TantivyIndex,
     &'a Path
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
@@ -321,5 +308,5 @@ where
   setup (repo_path)?;
   s . reset_with_source_path (subtest_name, repo_path) . await ?;
 
-  test_fn(&s . config, &s . driver, &mut s . tantivy, repo_path) . await
+  test_fn(&s . config, &s . graph, &mut s . tantivy, repo_path) . await
 }

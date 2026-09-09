@@ -24,14 +24,12 @@ use indoc::indoc;
 use std::error::Error;
 use std::net::TcpStream;
 use std::path::Path;
-use std::sync::Arc;
 
 use skg::dbs::filesystem::one_node::{
   nodecomplete_from_pid_and_source,
   nodecomplete_from_pid_and_source as load_nc};
-use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::save::update_graph_minus_nodeMerges;
-use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config};
+use skg::test_utils::{run_with_shared_test_graph, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::views_state::OpenViews;
@@ -40,39 +38,39 @@ use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::util::path_from_pid_and_source;
 
-use typedb_driver::TypeDBDriver;
+use skg::dbs::in_rust_graph::InRustGraphHandle;
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_graph (
     "skg-test-delete-strips-references-from-neighbors",
     |s| Box::pin ( async move {
       s . reset ("test_delete_strips_references_from_neighbors",
                  "tests/delete_strips_references_from_neighbors/fixtures") . await ?;
       test_delete_strips_references_from_neighbors (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_strip_pass_amends_user_supplied_savenode",
                  "tests/delete_strips_references_from_neighbors/fixtures-with-existing-save") . await ?;
       test_strip_pass_amends_user_supplied_savenode (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       s . reset ("test_strip_pass_handles_extra_ids",
                  "tests/delete_strips_references_from_neighbors/fixtures-extra-ids") . await ?;
       test_strip_pass_handles_extra_ids (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &s . graph, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 async fn test_delete_strips_references_from_neighbors (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       delete_strips_references_impl (
-        config, driver, tantivy ) . await }
+        config, fixture_graph, tantivy ) . await }
 
 async fn delete_strips_references_impl (
   config  : &SkgConfig,
-  driver: &Arc<TypeDBDriver>,
+  fixture_graph: &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // Single-root content view of victim with editRequest delete.
@@ -92,7 +90,7 @@ async fn delete_strips_references_impl (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let _response = update_from_and_rerender_buffer (
     &mut stream,
-    input_org_text, driver, config, tantivy, &graph, false,
+    input_org_text, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state ) . await ?;
 
   let mut failures : Vec<String> = Vec::new ();
@@ -164,15 +162,15 @@ async fn delete_strips_references_impl (
 
 async fn test_strip_pass_amends_user_supplied_savenode (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       strip_pass_amends_user_supplied_savenode_impl (
-        config, driver, tantivy ) . await }
+        config, fixture_graph, tantivy ) . await }
 
 async fn strip_pass_amends_user_supplied_savenode_impl (
   config  : &SkgConfig,
-  driver: &Arc<TypeDBDriver>,
+  fixture_graph: &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let main : SourceName = SourceName::from ("main");
@@ -191,7 +189,7 @@ async fn strip_pass_amends_user_supplied_savenode_impl (
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   update_graph_minus_nodeMerges (
-    node_defs, &[], config . clone (), tantivy, driver, &graph
+    node_defs, &[], config . clone (), tantivy, fixture_graph
   ) . await ?;
   let container : NodeComplete =
     load_nc ( config, ID::from ("container"), &main ) ?;
@@ -221,15 +219,15 @@ async fn strip_pass_amends_user_supplied_savenode_impl (
 
 async fn test_strip_pass_handles_extra_ids (
   config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  fixture_graph  : &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       strip_pass_handles_extra_ids_impl (
-        config, driver, tantivy ) . await }
+        config, fixture_graph, tantivy ) . await }
 
 async fn strip_pass_handles_extra_ids_impl (
   config  : &SkgConfig,
-  driver: &Arc<TypeDBDriver>,
+  fixture_graph: &InRustGraphHandle,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"
@@ -247,7 +245,7 @@ async fn strip_pass_handles_extra_ids_impl (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let _response = update_from_and_rerender_buffer (
     &mut stream,
-    input_org_text, driver, config, tantivy, &graph, false,
+    input_org_text, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state ) . await ?;
   let main : SourceName = SourceName::from ("main");
   let referencer : NodeComplete =
