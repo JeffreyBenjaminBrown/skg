@@ -446,6 +446,8 @@ impl MaintenanceCoordinator {
       archive_owner_client_kind: client_kind,
       initial_archive_manifest_sha256: None,
       controller_session_id: String::new (),
+      server_session_id: None,
+      archive_root_identity: None,
       source_set,
       g0_graph_generation,
       g0_manifest_revision,
@@ -1683,6 +1685,12 @@ impl MaintenanceCoordinator {
       return Ok (terminal . clone ()); }
     let committed : bool = self . committed_incidents . contains_key (incident_id);
     let active : ActiveMaintenance = self . matching_incident_mut (incident_id, epoch)? . clone ();
+    if !committed && (!matches! (active . phase,
+        MaintenancePhase::AwaitingLockedCensus | MaintenancePhase::PreparingArchive)
+      || active . initial_archive_manifest_sha256 . is_some ()
+      || active . server_evidence . is_some ()
+      || active . external_mutation . is_some ()) {
+      return Err ("unresolved graph or external effects must remain in recoverable maintenance before terminal disposition" . into ()); }
     if disposition == TerminalDisposition::Completed
     && (!matches! (active . archive_status, ArchiveStatus::Finalized { .. })
         || !active . client_evidence_acknowledged
@@ -1728,6 +1736,9 @@ impl MaintenanceCoordinator {
           *acknowledged = true;
           Ok (changed) }
         _ => Err ("terminal acknowledgement names an unsettled incident or another epoch" . into ()), }; }
+    if matches! (&self . state, CoordinatorState::Terminal (_))
+      && !self . state . policy () . skg_saves_allowed {
+      return Err ("terminal acknowledgement cannot release unresolved graph or external effects" . into ()); }
     match &self . state {
       CoordinatorState::Terminal (terminal) => {
         if &terminal . incident_id != incident_id || terminal . epoch != epoch {
@@ -2483,6 +2494,37 @@ mod tests {
     assert_eq! (rebuilt . phase, MaintenancePhase::Presenting);
     assert_eq! (rebuilt . selected_store . as_ref () . unwrap ()
       . tantivy_outcome, "synchronous-full-rebuild");
+  }
+
+  #[test]
+  fn abort_cannot_release_unresolved_external_effects () {
+    for disposition in [TerminalDisposition::MaintenanceAborted,
+      TerminalDisposition::Dismissed, TerminalDisposition::FailedBeforeArchive,
+      TerminalDisposition::FailedAfterArchive] {
+      let mut coordinator : MaintenanceCoordinator = MaintenanceCoordinator::new ();
+      let active : ActiveMaintenance = coordinator . begin (MaintenanceOrigin::Pull, None) . unwrap ();
+      let CoordinatorState::Active (current) = &mut coordinator . state else { unreachable! (); };
+      current . phase = MaintenancePhase::RunningExternalMutation;
+      current . initial_archive_manifest_sha256 = Some ("a" . repeat (64));
+      let before : MaintenanceCoordinator = coordinator . clone ();
+      assert! (coordinator . finish (&active . incident_id, active . epoch, disposition)
+        . unwrap_err () . contains ("unresolved"));
+      assert_eq! (coordinator, before);
+      assert! (!coordinator . state . policy () . skg_saves_allowed);
+    }
+  }
+
+  #[test]
+  fn legacy_failed_after_archive_ack_cannot_reopen_admission () {
+    let mut coordinator : MaintenanceCoordinator = MaintenanceCoordinator::new ();
+    let active : ActiveMaintenance = coordinator . begin (MaintenanceOrigin::Pull, None) . unwrap ();
+    let mut terminal : TerminalMaintenance = coordinator . finish (
+      &active . incident_id, active . epoch, TerminalDisposition::FailedBeforeArchive) . unwrap ();
+    terminal . disposition = TerminalDisposition::FailedAfterArchive;
+    coordinator . state = CoordinatorState::Terminal (terminal);
+    assert! (coordinator . acknowledge_terminal (&active . incident_id, active . epoch)
+      . unwrap_err () . contains ("unresolved"));
+    assert! (!coordinator . state . policy () . skg_saves_allowed);
   }
 
   #[test]

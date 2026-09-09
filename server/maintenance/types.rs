@@ -656,6 +656,12 @@ pub struct ActiveMaintenance {
   /// producer.
   #[serde(default)]
   pub controller_session_id : String,
+  /// Report recovery never renews live authority issued by an earlier process.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub server_session_id : Option<String>,
+  /// The original archive remains addressable after configuration replacement.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub archive_root_identity : Option<PathBuf>,
   #[serde(default)]
   pub source_set        : String,
   #[serde(default = "initial_graph_generation")]

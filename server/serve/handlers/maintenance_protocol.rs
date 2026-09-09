@@ -222,8 +222,8 @@ fn begin_maintenance (
       return Err (format! ("candidate {} was superseded", candidate . id)); }
   }
 
-  let active = runtime . transition_maintenance (|coordinator|
-    coordinator . begin_epoch_with_archive_contract_and_targets (
+  let active = runtime . transition_maintenance (|coordinator| {
+    let mut active : crate::maintenance::ActiveMaintenance = coordinator . begin_epoch_with_archive_contract_and_targets (
       origin,
       candidate,
       client . session_id . clone (),
@@ -231,7 +231,13 @@ fn begin_maintenance (
       source_set,
       snapshot . selected . graph_generation,
       snapshot . selected . manifest_revision,
-      targets))?;
+      targets)?;
+    active . server_session_id = Some (runtime . server_session_id () . into ());
+    active . archive_root_identity = Some (
+      snapshot . env . config . maintenance_archive_identity . clone ());
+    coordinator . state = CoordinatorState::Active (active . clone ());
+    Ok (active)
+  })?;
   Ok (maintenance_offer_payload (
     "install-maintenance-epoch-and-submit-locked-census", &active,
     &snapshot . env . config . maintenance_archive_folder . to_string_lossy (),
