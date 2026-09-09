@@ -1601,3 +1601,25 @@ response work on ordinary requests. No automatic archive expiry is introduced.
 ** choices determining the future
 No architectural question. Integrate this journal with one combined save batch,
 startup recovery and durable client operation identities before early release.
+
+* Simplify/cohere checkpoint: durable nonmutating save outcomes
+** what's done and went well
+The save journal can now retire a staged or prepared request with a durable
+refusal/confirmation outcome, without authorizing its file mutations. Once
+effects are authorized, this shortcut is rejected: recovery or commit remains
+required. Duplicate authorization/application of a refused operation leaves
+source bytes unchanged, and startup recognizes its completed obligation.
+
+The current TypeDB-free library run passes 353 tests with one optional corpus
+skip, including the new refusal regression and owner reservation cases.
+Evidence: 'temp/simplify-cohere-baseline/typedb-free-library-fixed.log'. The first
+lib-test build's obsolete fixture signatures and missing test import are
+retained in 'typedb-free-library-first.log'.
+** Changes to the plan's envisioned order.
+This journal extension is committed separately while the larger TypeDB fixture
+migration continues, preserving regular reviewable durability checkpoints.
+** what's imperfect about what's done
+No new defect identified in this checkpoint.
+** choices determining the future
+No architectural question. Runtime response integration will distinguish a
+known refusal from a blocked request with unresolved authorized effects.

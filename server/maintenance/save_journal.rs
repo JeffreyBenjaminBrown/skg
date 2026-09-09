@@ -63,6 +63,10 @@ pub(crate) enum SaveOperationStatus {
     total_path_count   : usize,
   },
   AppliedAwaitingCommit,
+  Refused {
+    outcome               : DurableSaveOutcome,
+    delivery_acknowledged : bool,
+  },
   Committed {
     outcome               : DurableSaveOutcome,
     delivery_acknowledged : bool,
@@ -220,6 +224,10 @@ enum JournalState {
   Authorized {
     applied_path_indices : BTreeSet<usize>,
   },
+  Refused {
+    outcome               : JournalOutcome,
+    delivery_acknowledged : bool,
+  },
   Committed {
     outcome               : JournalOutcome,
     delivery_acknowledged : bool,
@@ -326,7 +334,8 @@ impl SaveJournalStore {
           reason: "destination staging has not completed" . into (),
         }),
       JournalState::PreparedUnAuthorized => {},
-      JournalState::Authorized { .. } | JournalState::Committed { .. } =>
+      JournalState::Authorized { .. } | JournalState::Committed { .. }
+      | JournalState::Refused { .. } =>
         return snapshot (&loaded),
     }
     let mutations : Vec<DurablePathMutation> =
@@ -380,7 +389,8 @@ impl SaveJournalStore {
       JournalState::Authorized { applied_path_indices } =>
         applied_path_indices . clone (),
       JournalState::StagingUnAuthorized
-      | JournalState::PreparedUnAuthorized => return Err (
+      | JournalState::PreparedUnAuthorized
+      | JournalState::Refused { .. } => return Err (
         SaveJournalError::WrongOperationState {
           operation_id: operation_id . into (),
           reason: "filesystem effects have not been authorized" . into (),
@@ -409,6 +419,47 @@ impl SaveJournalStore {
     snapshot (&loaded)
   }
 
+  /// Retire a prepared operation without granting file-effect authority.
+  /// An authorized batch must recover or commit, never become a refusal.
+  pub(crate) fn record_refused_outcome (
+    &self,
+    operation_id             : &str,
+    request_base_fingerprint : &str,
+    outcome                  : &DurableSaveOutcome,
+  ) -> Result<SaveOperationSnapshot, SaveJournalError> {
+    validate_fingerprint (
+      "resulting base fingerprint", &outcome . resulting_base_fingerprint)?;
+    let mut loaded : LoadedJournalRecord = self . load_operation_require_clean (
+      operation_id, request_base_fingerprint)?;
+    match &loaded . payload . state {
+      JournalState::StagingUnAuthorized | JournalState::PreparedUnAuthorized => {},
+      JournalState::Refused { .. } => {
+        let existing : SaveOperationSnapshot = snapshot (&loaded)?;
+        if matches! (&existing . status, SaveOperationStatus::Refused {
+          outcome: old, .. } if old == outcome) { return Ok (existing); }
+        return Err (SaveJournalError::OperationIdConflict {
+          operation_id: operation_id . into (),
+          reason: "a different refusal is already recorded" . into (),
+        }); },
+      JournalState::Authorized { .. } | JournalState::Committed { .. } =>
+        return Err (SaveJournalError::WrongOperationState {
+          operation_id: operation_id . into (),
+          reason: "authorized source effects cannot become a refusal" . into (),
+        }),
+    }
+    let client_result : BlobReference = write_or_repair_unpublished_blob (
+      &loaded . directory, "outcome.bin", &outcome . client_result)?;
+    loaded . payload . state = JournalState::Refused {
+      outcome: JournalOutcome {
+        resulting_base_fingerprint: outcome . resulting_base_fingerprint . clone (),
+        client_result,
+      },
+      delivery_acknowledged: false,
+    };
+    persist_record (&loaded . directory, &loaded . payload)?;
+    snapshot (&loaded)
+  }
+
   pub(crate) fn acknowledge_delivery (
     &self,
     operation_id             : &str,
@@ -417,7 +468,8 @@ impl SaveJournalStore {
     let mut loaded : LoadedJournalRecord = self . load_operation_require_clean (
       operation_id, request_base_fingerprint)?;
     match &mut loaded . payload . state {
-      JournalState::Committed { delivery_acknowledged, .. } => {
+      JournalState::Committed { delivery_acknowledged, .. }
+      | JournalState::Refused { delivery_acknowledged, .. } => {
         if !*delivery_acknowledged {
           *delivery_acknowledged = true;
           persist_record (&loaded . directory, &loaded . payload)?; }
@@ -486,7 +538,8 @@ impl SaveJournalStore {
       final_load . incomplete_publications . clone ();
     let operations : Vec<SaveOperationSnapshot> = final_load . require_clean ()?;
     let has_unresolved_operations : bool = operations . iter () . any (|operation|
-      !matches! (operation . status, SaveOperationStatus::Committed { .. }));
+      !matches! (operation . status, SaveOperationStatus::Committed { .. }
+        | SaveOperationStatus::Refused { .. }));
     Ok (StartupSaveRecoveryReport {
       operations,
       has_unresolved_operations,
@@ -513,7 +566,8 @@ impl SaveJournalStore {
   ) -> Result<SaveOperationSnapshot, SaveJournalError> {
     let mut loaded : LoadedJournalRecord = self . load_operation_require_clean (
       operation_id, request_base_fingerprint)?;
-    if matches! (loaded . payload . state, JournalState::Committed { .. }) {
+    if matches! (loaded . payload . state, JournalState::Committed { .. }
+        | JournalState::Refused { .. }) {
       return snapshot (&loaded); }
     if !matches! (loaded . payload . state, JournalState::Authorized { .. }) {
       return Err (SaveJournalError::WrongOperationState {
@@ -1187,16 +1241,20 @@ fn snapshot (
         applied_path_count: applied_path_indices . len (),
         total_path_count: loaded . payload . mutations . len (),
       },
-    JournalState::Committed { outcome, delivery_acknowledged } => {
+    JournalState::Committed { outcome, delivery_acknowledged }
+    | JournalState::Refused { outcome, delivery_acknowledged } => {
       let client_result : Vec<u8> = read_blob (
         &loaded . directory, &outcome . client_result)?;
-      SaveOperationStatus::Committed {
-        outcome: DurableSaveOutcome {
-          resulting_base_fingerprint:
-            outcome . resulting_base_fingerprint . clone (),
-          client_result,
-        },
-        delivery_acknowledged: *delivery_acknowledged,
+      let outcome : DurableSaveOutcome = DurableSaveOutcome {
+        resulting_base_fingerprint: outcome . resulting_base_fingerprint . clone (),
+        client_result,
+      };
+      if matches! (loaded . payload . state, JournalState::Committed { .. }) {
+        SaveOperationStatus::Committed {
+          outcome, delivery_acknowledged: *delivery_acknowledged }
+      } else {
+        SaveOperationStatus::Refused {
+          outcome, delivery_acknowledged: *delivery_acknowledged }
       }
     },
   };
@@ -1358,7 +1416,8 @@ fn validate_loaded_payload (
     if applied_path_indices . iter () . any (|index|
       *index >= payload . mutations . len ())
     { return Err ("journal has an out-of-range applied path index" . into ()); }}
-  if let JournalState::Committed { outcome, .. } = &payload . state {
+  if let JournalState::Committed { outcome, .. }
+    | JournalState::Refused { outcome, .. } = &payload . state {
     validate_fingerprint (
       "resulting base fingerprint", &outcome . resulting_base_fingerprint)
       . map_err (|error| error . to_string ())?;
@@ -1698,6 +1757,38 @@ mod tests {
       assert_eq! (fs::read (&self . last) . unwrap (), b"new-c");
     }
   }
+
+  #[test]
+  fn refusal_retires_unapproved_effects_but_cannot_cancel_authorized_effects () {
+    let fixture : Fixture = Fixture::new ();
+    let store : SaveJournalStore = fixture . store ();
+    let request : DurableSaveRequest = fixture . request ();
+    let outcome : DurableSaveOutcome = DurableSaveOutcome {
+      resulting_base_fingerprint: "unchanged" . into (),
+      client_result: b"confirmation required" . to_vec (),
+    };
+    store . prepare (&request) . unwrap ();
+    store . record_refused_outcome (
+      &request . operation_id, &request . request_base_fingerprint, &outcome)
+      . unwrap ();
+    store . authorize (&request . operation_id, &request . request_base_fingerprint)
+      . unwrap ();
+    store . apply_authorized (&request . operation_id, &request . request_base_fingerprint)
+      . unwrap ();
+    let recovered : StartupSaveRecoveryReport = store . recover_all_unfinished () . unwrap ();
+    assert! (!recovered . has_unresolved_operations);
+    assert! (matches! (&recovered . operations [0] . status,
+      SaveOperationStatus::Refused { outcome: recorded, .. } if recorded == &outcome));
+    fixture . assert_before_values ();
+    let mut authorized : DurableSaveRequest = request . clone ();
+    authorized . operation_id = "second-operation" . into ();
+    store . prepare (&authorized) . unwrap ();
+    store . authorize (&authorized . operation_id, &authorized . request_base_fingerprint)
+      . unwrap ();
+    assert! (store . record_refused_outcome (
+      &authorized . operation_id, &authorized . request_base_fingerprint, &outcome) . is_err ());
+    store . recover_all_unfinished () . unwrap ();
+    fixture . assert_after_values (); }
 
   #[test]
   fn complete_lifecycle_requires_authorization_and_a_distinct_commit () {
