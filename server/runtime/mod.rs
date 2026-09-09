@@ -134,7 +134,7 @@ impl ServerRuntime {
 
   pub(crate) fn publication (
     &self,
-  ) -> (Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator, Option<String>) {
+  ) -> (u64, Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator, Option<String>) {
     self . owner . publication ()
   }
 

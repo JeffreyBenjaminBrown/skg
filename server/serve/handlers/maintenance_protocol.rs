@@ -1546,11 +1546,12 @@ fn append_current_state_fields (
   fields . retain (|field| !matches! (field,
     Sexp::List (parts) if matches! (parts . first (),
       Some (Sexp::Atom (Atom::S (key))) if matches! (key . as_str (),
-        "current-graph-generation" | "current-manifest-revision"
+        "owner-publication-revision" | "current-graph-generation" | "current-manifest-revision"
         | "graph-write-admission" | "graph-transition-status"
         | "rebuilding" | "pending-incidents"))));
-  let (snapshot, coordinator, failure) = runtime . publication ();
+  let (revision, snapshot, coordinator, failure) = runtime . publication ();
   fields . extend ([
+    integer_field ("owner-publication-revision", revision),
     integer_field ("current-graph-generation", snapshot . selected . graph_generation . get ()),
     integer_field ("current-manifest-revision", snapshot . selected . manifest_revision . get ()),
     atom_field ("graph-write-admission", if coordinator . state . policy () . skg_saves_allowed

@@ -60,6 +60,7 @@ enum MutationKind {
 #[derive(Clone)]
 struct PublishedCoordinator {
   revision : u64,
+  publication_revision : u64,
   coordinator : MaintenanceCoordinator,
   failure : Option<String>,
   selected : Option<Arc<SelectedRuntimeSnapshot>>,
@@ -171,7 +172,8 @@ impl CoordinatorOwner {
         . expect ("the owner's initial selected snapshot requires a Searcher"));
     let published : Arc<ArcSwap<PublishedCoordinator>> =
       Arc::new (ArcSwap::from_pointee (PublishedCoordinator {
-        revision: 0, coordinator, failure: None, selected, reservation: None }));
+        revision: 0, publication_revision: 0,
+        coordinator, failure: None, selected, reservation: None }));
     let (sender, receiver) : (Sender<Message>, Receiver<Message>) = channel ();
     let (publisher, writes) :
       (Sender<MaintenanceCoordinator>, Receiver<MaintenanceCoordinator>) =
@@ -198,12 +200,13 @@ impl CoordinatorOwner {
 
   pub(crate) fn publication (
     &self,
-  ) -> (Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator, Option<String>) {
-    let published = self . published . load ();
+  ) -> (u64, Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator, Option<String>) {
+    let published : Arc<PublishedCoordinator> = self . published . load_full ();
     let failure : Option<String> = published . failure . clone () . or_else (||
       published . reservation . as_ref ()
         . and_then (|reservation| reservation . status . blocked_reason . clone ()));
-    (published . selected . clone () . expect ("live owner has a selected pair"),
+    (published . publication_revision,
+      published . selected . clone () . expect ("live owner has a selected pair"),
       published . coordinator . clone (), failure)
   }
 
@@ -385,29 +388,39 @@ fn run_owner (
           // require recovery before any subsequent authority-changing action.
           state . failure = Some (format! (
             "journal publication failed; recovery required: {}", reason)); }
-        published . store (Arc::new (state . clone ()));
+        publish_state (&published, &mut state);
         let _ : Result<(), _> = proposal . reply . send (result); }
       Message::Reserve (request) => {
         let result : Result<ReservationToken, String> =
           reserve (&mut state,
             pending . as_ref () . map (|proposal| &proposal . coordinator . state),
             &request);
-        if result . is_ok () { published . store (Arc::new (state . clone ())); }
+        if result . is_ok () { publish_state (&published, &mut state); }
         // A disconnected caller does not cancel an accepted reservation.
         let _ : Result<(), _> = request . reply . send (result); }
       Message::ClaimBlocked { expected, reply } => {
         let result : Result<ReservationToken, String> =
           claim_blocked (&mut state, pending . is_some (), &expected);
-        if result . is_ok () { published . store (Arc::new (state . clone ())); }
+        if result . is_ok () { publish_state (&published, &mut state); }
         let _ : Result<(), _> = reply . send (result); }
       Message::Mutate { token, action, reply } => {
         let result : Result<(), String> =
           apply_mutation (&mut state,
             pending . as_ref () . map (|proposal| &proposal . coordinator . state),
             &token, action);
-        if result . is_ok () { published . store (Arc::new (state . clone ())); }
+        if result . is_ok () { publish_state (&published, &mut state); }
         let _ : Result<(), _> = reply . send (result); }
       Message::Stop => break, } } }
+
+/// Client metadata must fence graph and admission changes, including failures
+/// and reservations which do not advance the durable coordinator revision.
+fn publish_state (
+  published : &ArcSwap<PublishedCoordinator>,
+  state : &mut PublishedCoordinator,
+) {
+  state . publication_revision = state . publication_revision . checked_add (1)
+    . expect ("owner publication revision exhausted");
+  published . store (Arc::new (state . clone ())); }
 
 fn admit_proposal (
   state : &PublishedCoordinator,
@@ -789,6 +802,38 @@ mod tests {
     owner . reserve_mutation (operation_id,
       snapshot . selected . graph_generation,
       snapshot . selected . manifest_revision) }
+
+  #[test]
+  fn publication_revision_orders_admission_graph_and_failure_without_conflating_them () {
+    let before : Arc<SelectedRuntimeSnapshot> = fixture_snapshot ();
+    let owner : CoordinatorOwner = fixture_owner (before . clone ());
+    assert_eq! (owner . publication () . 0, 0);
+    owner . transition (|coordinator| coordinator . set_pending_invalid (
+      PendingReason::InvalidDisk, vec!["outside change" . into ()])) . unwrap ();
+    let closed : (u64, Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator, Option<String>) =
+      owner . publication ();
+    owner . transition (|coordinator| coordinator . observation_equal ()) . unwrap ();
+    let open : (u64, Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator, Option<String>) =
+      owner . publication ();
+    assert! (open . 0 > closed . 0);
+    assert! (!closed . 2 . state . policy () . skg_saves_allowed);
+    assert! (open . 2 . state . policy () . skg_saves_allowed);
+    assert! (Arc::ptr_eq (&closed . 1, &open . 1));
+    let token : ReservationToken = reserve_current (&owner, "save") . unwrap ();
+    owner . authorize_mutation (&token) . unwrap ();
+    owner . publish_selected (&token, next_snapshot (&before)) . unwrap ();
+    let selected : (u64, Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator, Option<String>) =
+      owner . publication ();
+    assert! (selected . 0 > open . 0);
+    assert! (selected . 1 . selected . graph_generation > open . 1 . selected . graph_generation);
+    assert_eq! (selected . 2, open . 2);
+    owner . mutation_control (&token) . block ("unresolved delivery") . unwrap ();
+    let blocked : (u64, Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator, Option<String>) =
+      owner . publication ();
+    assert! (blocked . 0 > selected . 0);
+    assert_eq! (blocked . 3 . as_deref (), Some ("unresolved delivery"));
+    assert! (Arc::ptr_eq (&blocked . 1, &selected . 1));
+  }
 
   #[test]
   fn ordinary_mutations_obey_owner_policy_for_every_dispatch_name () {
