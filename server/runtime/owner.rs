@@ -398,8 +398,8 @@ fn run_owner (
   let mut publication_waiters : Vec<SyncSender<Result<(), String>>> = Vec::new ();
   while let Ok (message) = receiver . recv () {
     match message {
-      Message::Propose (proposal) => {
-        match admit_proposal (&state, pending . is_some (), &publisher, &proposal) {
+      Message::Propose (mut proposal) => {
+        match admit_proposal (&state, pending . is_some (), &publisher, &mut proposal) {
           Ok (( )) => { pending = Some (proposal); },
           Err (reason) => {
             let _ : Result<(), _> = proposal . reply . send (Err (reason)); } } }
@@ -460,7 +460,7 @@ fn admit_proposal (
   state : &PublishedCoordinator,
   journal_pending : bool,
   publisher : &Sender<MaintenanceCoordinator>,
-  proposal : &Proposal,
+  proposal : &mut Proposal,
 ) -> Result<(), String> {
   if let Some (reason) = &state . failure { return Err (reason . clone ()); }
   if journal_pending || proposal . base_revision != state . revision {
@@ -475,6 +475,8 @@ fn admit_proposal (
     if !completed_selection {
       admit_reserved_proposal (reservation, &proposal . coordinator . state)?; } }
   admit_proposal_base (state, &proposal . coordinator . state)?;
+  super::query_waits::resolve_wait_targets (
+    &mut proposal . coordinator, state . selected . as_deref ())?;
   publisher . send (proposal . coordinator . clone ())
     . map_err (|_| "journal publisher stopped; no durable success" . into ()) }
 
@@ -996,6 +998,27 @@ mod tests {
     assert_eq! (owner . snapshot () . state, CoordinatorState::Idle); }
 
   #[test]
+  fn query_wait_no_change_uses_the_named_outcome_without_a_generation_bump () {
+    let selected : Arc<SelectedRuntimeSnapshot> = fixture_snapshot ();
+    let mut coordinator : MaintenanceCoordinator = MaintenanceCoordinator::new ();
+    let incident : ActiveMaintenance = coordinator . begin (MaintenanceOrigin::FullRebuild, None) . unwrap ();
+    let wait : crate::maintenance::query_waits::QueryWaitRecord =
+      super::super::query_waits::tests::wait_for (&incident);
+    coordinator . register_query_wait (wait . clone ()) . unwrap ();
+    let CoordinatorState::Active (active) : &mut CoordinatorState = &mut coordinator . state else { unreachable! (); };
+    active . selected_store = Some (crate::maintenance::types::SelectedStoreRecord {
+      graph_generation: selected . selected . graph_generation,
+      manifest_revision: selected . selected . manifest_revision,
+      tantivy_generation: 1, tantivy_outcome: "unchanged" . into (), });
+    super::super::query_waits::resolve_wait_targets (&mut coordinator, Some (&selected)) . unwrap ();
+    let resolved : &crate::maintenance::query_waits::QueryWaitRecord = coordinator
+      . query_waits . get (&wait . operation_id) . unwrap ();
+    assert_eq! (resolved . state, crate::maintenance::query_waits::QueryWaitState::Executing);
+    assert_eq! (resolved . resolved_target . as_ref () . unwrap () . graph_generation,
+                selected . selected . graph_generation . get ());
+  }
+
+  #[test]
   fn incident_readiness_requires_the_published_pair_and_old_reports_cannot_reselect_it () {
     let before : Arc<SelectedRuntimeSnapshot> = fixture_snapshot ();
     let after : Arc<SelectedRuntimeSnapshot> = next_snapshot (&before);
@@ -1008,8 +1031,14 @@ mod tests {
         artifact_count: 1, total_file_bytes: 2, }) . unwrap ();
     coordinator . transition (&active . incident_id, active . epoch,
       MaintenancePhase::FullRebuildExclusive) . unwrap ();
+    let wait : crate::maintenance::query_waits::QueryWaitRecord =
+      super::super::query_waits::tests::wait_for (&active);
+    coordinator . register_query_wait (wait . clone ()) . unwrap ();
+    let journal : Arc<Mutex<Vec<MaintenanceCoordinator>>> = Arc::new (Mutex::new (Vec::new ()));
+    let journal_writer : Arc<Mutex<Vec<MaintenanceCoordinator>>> = journal . clone ();
     let owner : CoordinatorOwner = CoordinatorOwner::with_snapshot_publisher (
-      coordinator, Some (before), |_| Ok (( )));
+      coordinator, Some (before), move |next| {
+        journal_writer . lock () . unwrap () . push (next . clone ()); Ok (( )) });
     let mut proposal : MaintenanceCoordinator = owner . snapshot ();
     proposal . store_rebuilt (&active . incident_id, active . epoch,
       crate::maintenance::types::SelectedStoreRecord {
@@ -1028,6 +1057,15 @@ mod tests {
     assert! (owner . propose (0, wrong_manifest) . is_err ());
     owner . propose (0, proposal) . unwrap ();
     assert_eq! (owner . snapshot () . state, CoordinatorState::Idle);
+    let resolved : crate::maintenance::query_waits::QueryWaitRecord = owner . snapshot ()
+      . query_waits . get (&wait . operation_id) . unwrap () . clone ();
+    assert_eq! (resolved . state, crate::maintenance::query_waits::QueryWaitState::Executing);
+    assert_eq! (resolved . resolved_target . as_ref () . unwrap () . graph_generation,
+                after . selected . graph_generation . get ());
+    assert_eq! (journal . lock () . unwrap () [0] . query_waits . get (&wait . operation_id),
+                Some (&resolved));
+    assert! (super::super::query_waits::decode_config (
+      &resolved . resolved_target . as_ref () . unwrap () . config_snapshot) . unwrap () == after . env . config);
     assert! (reserve_current (&owner, "save") . is_err ());
     owner . finish_mutation (&token) . unwrap ();
     let save : ReservationToken = reserve_current (&owner, "save") . unwrap ();
@@ -1038,6 +1076,7 @@ mod tests {
     owner . transition (|coordinator| coordinator . record_view_settlements (
       &active . incident_id, active . epoch, Vec::new ())) . unwrap ();
     assert! (Arc::ptr_eq (&owner . selected_snapshot () . unwrap () . selected, &newer . selected));
+    assert_eq! (owner . snapshot () . query_waits . get (&wait . operation_id), Some (&resolved));
     assert_eq! (owner . snapshot () . incident (&active . incident_id, active . epoch)
       . unwrap () . selected_store . as_ref () . unwrap () . graph_generation,
       after . selected . graph_generation); }

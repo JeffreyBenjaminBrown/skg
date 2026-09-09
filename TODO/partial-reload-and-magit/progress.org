@@ -2101,3 +2101,33 @@ ordinary-save crash tests exercise interruption boundaries separately.
 ** choices determining the future
 Continue the bounded query wait integration from the recorded interfaces in
 [[file:../../codex-thinking/query-wait-server.org][the server note]].
+
+* Simplify/cohere checkpoint: query ledger and target publication
+** what's done and went well
+'0a30f1e7' commits the durable whitespace writer; 'be85bc78' supplies verified
+operation/session fields from both editors. Their focused command-wire tests
+pass in both editors. '1c9808c7' adds the private query ledger with exact target,
+recipe, destination and staged-result identities. Seven focused ledger tests
+pass, including retry after resolution and idle-journal retention.
+The owner now resolves accepted waits in the same durable proposal that records
+incident selection. A later ordinary save leaves that resolved target unchanged.
+No-change selection can resolve without a larger graph counter. Historical
+configurations retain ordered source ownership, configured/canonical paths and
+runtime roots. The 25 owner tests and three query outcome/config tests pass;
+logs are 'query-owner-final-tests.log' and 'query-owner-outcome-tests.log' under
+' /tmp/simplify-cohere-baseline' (without the leading space).
+** Changes to the plan's envisioned order.
+Keep the query work in small tested commits: durable ledger, then target facts,
+then execution and delivery. The first owner adapter check rejected two invalid
+Rust if-let type annotations; 'query-owner-first.log' preserves this local
+implementation failure. The corrected adapter compiles and passes its tests.
+** what's imperfect about what's done
+The new target adapter blocks explicitly when a resolved historical snapshot
+still needs recovery; it never substitutes a newer graph. Worker reconstruction
+and TCP delivery remain the next boundary, so these commits do not yet provide
+an end-to-end query wait.
+** choices determining the future
+Use the versioned private configuration wrapper recorded in
+[[file:../../codex-thinking/query-wait-server.org][the query server note]]. Ordinary SkgConfig deserialization reads user
+configuration and cannot itself restore skipped runtime identities or derived
+ownership. Pending waits retain no Searcher. No new question for Jeff.
