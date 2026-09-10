@@ -27,6 +27,13 @@ do -- the test server's port
   end
 end
 
+do -- the server's temporary config, for relative file-path responses
+  local config_file = os.getenv('SKG_CONFIG_FILE')
+  if config_file and config_file ~= '' then
+    require('skg.config').config_file_path = config_file
+  end
+end
+
 ---Fail the test after TIMEOUT_SECS (default 20) if it has not passed.
 ---@param timeout_secs number|nil
 function M.arm_timeout (timeout_secs)
