@@ -4,7 +4,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
 use crate::types::git::NodeChanges;
 use crate::types::list::Diff_Item;
-use crate::types::misc::{ID, MemberAtSource, SourceName, members_of};
+use crate::types::misc::{ID, MemberAtSource, RelationshipMemberKey, SourceName, members_of};
 use crate::types::nodes::rust::NodeRust;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -198,6 +198,47 @@ pub const PARTNER_ROLE_VOCAB
 ];
 
 impl InRustGraph {
+  /// Comparison identity for a relationship member without mutating its raw
+  /// stored spelling.  See `RelationshipMemberKey` for the two cases.
+  pub fn relationship_member_key (
+    &self,
+    raw_member : &ID,
+  ) -> RelationshipMemberKey {
+    match self . pid_of (raw_member) {
+      Some (pid) => RelationshipMemberKey::ResolvedPid (pid),
+      None => RelationshipMemberKey::UnresolvedRawId (raw_member . clone ()), } }
+
+  /// Stored outbound members for one relationship. Unlike the PID-oriented
+  /// accessors, this preserves an unresolved raw ID and its recording source.
+  /// Callers that require a current graph node should keep using the existing
+  /// canonical-PID accessors instead.
+  pub fn outbound_members_at_sources_for_relation_gated (
+    &self,
+    pid      : &ID,
+    relation : NodeRelation,
+    active   : Option<&crate::source_sets::ActiveSourceSet>,
+  ) -> Vec<MemberAtSource<ID>> {
+    let Some (node) = self . nodes . get (pid) else {
+      return Vec::new (); };
+    let members : Vec<MemberAtSource<ID>> = match relation {
+      NodeRelation::Contains =>
+        node . contains . clone (),
+      NodeRelation::Subscribes =>
+        node . subscribes_to . or_default () . to_vec (),
+      NodeRelation::HidesFromItsSubscriptions =>
+        node . hides_from_its_subscriptions . or_default () . to_vec (),
+      NodeRelation::OverridesViewOf =>
+        node . overrides_view_of . or_default () . to_vec (),
+      NodeRelation::TextlinksTo =>
+        return Vec::new (),
+    };
+    members . into_iter ()
+      . filter ( |member| match active {
+        None => true,
+        Some (set) => set . is_all ()
+          || set . contains_source (&member . source), } )
+      . collect () }
+
   /// The SOURCE of the edge from OWNER to TARGET under RELATION, read
   /// from the owner's outbound list (where every edge's source
   /// lives). None when no such edge exists. This is how INBOUND
@@ -233,6 +274,21 @@ impl InRustGraph {
                . as_ref () == Some (&target_key) )
       . map ( |m| m . source . clone () ) }
 
+  /// The recording source of one exact, stored outbound member ID.
+  /// Unlike 'edge_source', this deliberately does not canonicalize the
+  /// target: an unresolved raw ID has no PID, but is still a real stored
+  /// relationship member and can be edited from an Unknown placeholder.
+  pub fn edge_source_for_stored_member (
+    &self,
+    owner    : &ID,
+    relation : NodeRelation,
+    raw_member : &ID,
+  ) -> Option<SourceName> {
+    self . outbound_members_at_sources_for_relation_gated (
+      owner, relation, None ) . into_iter ()
+      . find ( |member| &member . member == raw_member )
+      . map ( |member| member . source ) }
+
   /// Outbound members whose EDGE source is in the active set: the
   /// visible fold of one relation. Pass None for the full fold.
   pub fn outbound_pids_for_relation_gated (
@@ -241,25 +297,11 @@ impl InRustGraph {
     relation : NodeRelation,
     active   : Option<&crate::source_sets::ActiveSourceSet>,
   ) -> Vec<ID> {
-    let Some (node) = self . nodes . get (pid) else {
-      return Vec::new (); };
-    let members_at_sources : Vec<MemberAtSource<ID>> = match relation {
-      NodeRelation::Contains =>
-        node . contains . clone (),
-      NodeRelation::Subscribes =>
-        node . subscribes_to . or_default () . to_vec (),
-      NodeRelation::HidesFromItsSubscriptions =>
-        node . hides_from_its_subscriptions . or_default () . to_vec (),
-      NodeRelation::OverridesViewOf =>
-        node . overrides_view_of . or_default () . to_vec (),
-      NodeRelation::TextlinksTo =>
-        return self . outbound_pids_for_relation (pid, relation), };
-    members_at_sources . iter ()
-      . filter ( |m| match active {
-        None => true,
-        Some (a) => a . is_all ()
-          || a . contains_source ( &m . source ) } )
-      . filter_map ( |m| self . pid_of ( &m . member ) )
+    if relation == NodeRelation::TextlinksTo {
+      return self . outbound_pids_for_relation (pid, relation); }
+    self . outbound_members_at_sources_for_relation_gated (
+      pid, relation, active ) . iter ()
+      . filter_map ( |member| self . pid_of (&member . member) )
       . collect () }
 
   /// Inbound partners whose EDGES to this node are visible at the

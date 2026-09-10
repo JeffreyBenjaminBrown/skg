@@ -4,7 +4,7 @@ use skg::dbs::in_rust_graph::relation_accessors::{
   NodeRelation,
   RelationRole,
 };
-use skg::types::misc::{ID, MSV, SourceName, members_at_source};
+use skg::types::misc::{ID, MSV, MemberAtSource, RelationshipMemberKey, SourceName, members_at_source};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
 fn node (
@@ -83,3 +83,47 @@ fn relation_accessors_return_both_membership_directions () {
       &ID::from ("owner"),
       RelationRole::new (NodeRelation::OverridesViewOf, BinaryRolePosition::Second)),
     vec![ID::from ("overrider")] ); }
+
+#[test]
+fn stored_outbound_accessor_retains_unresolved_raw_members () {
+  let mut owner : NodeComplete = node (
+    "owner", &[], &[], &[], &[]);
+  owner . contains = vec! [
+    MemberAtSource {
+      member : ID::from ("known-extra"),
+      source : SourceName::from ("main"), },
+    MemberAtSource {
+      member : ID::from ("absent-raw"),
+      source : SourceName::from ("main"), },
+  ];
+  let graph : InRustGraph = InRustGraph::from_nodecompletes (&[
+    owner,
+    node ("known", &["known-extra"], &[], &[], &[]),
+  ]);
+  assert_eq! (
+    graph . outbound_members_at_sources_for_relation_gated (
+      &ID::from ("owner"), NodeRelation::Contains, None ),
+    vec! [
+      MemberAtSource {
+        member : ID::from ("known-extra"),
+        source : SourceName::from ("main"), },
+      MemberAtSource {
+        member : ID::from ("absent-raw"),
+        source : SourceName::from ("main"), },
+    ] );
+  assert_eq! (
+    graph . outbound_pids_for_relation_gated (
+      &ID::from ("owner"), NodeRelation::Contains, None ),
+    vec![ID::from ("known")] ); }
+
+#[test]
+fn relationship_member_key_canonicalizes_only_resolved_ids () {
+  let graph : InRustGraph = InRustGraph::from_nodecompletes (&[
+    node ("known", &["known-extra"], &[], &[], &[]),
+  ]);
+  assert_eq! (
+    graph . relationship_member_key (&ID::from ("known-extra")),
+    RelationshipMemberKey::ResolvedPid (ID::from ("known")));
+  assert_eq! (
+    graph . relationship_member_key (&ID::from ("absent-raw")),
+    RelationshipMemberKey::UnresolvedRawId (ID::from ("absent-raw"))); }

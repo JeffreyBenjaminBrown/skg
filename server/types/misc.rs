@@ -56,6 +56,17 @@ pub enum MSV<T> {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct ID ( pub String );
 
+/// Comparison identity for a stored structured-relationship member.
+/// Resolvable IDs compare by their canonical PID (so primary and extra IDs
+/// remain one node); an unresolved raw ID compares byte-for-byte.  This key is
+/// never serialization data: callers keep the original `MemberAtSource.member`
+/// when an edge is retained or rewritten.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum RelationshipMemberKey {
+  ResolvedPid (ID),
+  UnresolvedRawId (ID),
+}
+
 #[derive(Serialize, Clone, PartialEq, Eq, Hash)]
 pub struct SkgfileSource {
   pub name         : SourceName,
