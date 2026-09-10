@@ -252,3 +252,18 @@
              intent))))
 
 (provide 'test-skg-server-session)
+
+(ert-deftest test-skg-handshake-preserves-explicit-empty-frozen-census ()
+  (let ((skg--server-session-id nil)
+        (skg--maintenance-state nil)
+        (skg--owner-publication-revision nil)
+        (response (read (skg-test-handshake-response skg-test-session-new))))
+    (cl-letf (((symbol-function 'skg--submit-buffer-census) #'ignore)
+              ((symbol-function 'skg-maintenance-adopt-handshake-epoch) #'ignore))
+      (skg--install-connection-verification
+       nil (prin1-to-string
+            (append response '((maintenance-incident-id a)
+                               (maintenance-census-buffer-ids ()))))))
+    (should (assq 'census-buffer-ids skg--maintenance-state))
+    (should-not (alist-get 'census-buffer-ids skg--maintenance-state))
+    (should (equal 'a (alist-get 'incident-id skg--maintenance-state)))))

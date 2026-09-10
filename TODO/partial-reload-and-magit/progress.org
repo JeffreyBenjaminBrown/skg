@@ -2711,3 +2711,26 @@ remaining fixed-census and entry-point audit. Full process acceptance remains.
 Current transaction ordering comes from the server epoch and pending inventory,
 not whichever local record happens to be foreground. Explicit abandonment must
 cross the handshake parser boundary rather than remain a helper-only capability.
+
+* Simplify/cohere checkpoint: reconnect uses the exact frozen census
+** what's done and went well
+Connection verification includes the active incident's ID and exact frozen buffer
+inventory. Both clients honor that membership when installing reconnect locks;
+a later buffer cannot acquire an obligation for a census it never joined. An
+explicit empty list is distinct from the omitted pre-freeze inventory. The
+server reads these fields from the existing coordinator snapshot.
+
+The focused server serialization test passes for populated, empty, unfrozen and
+idle cases. The 70 Emacs maintenance/session tests and 44 Neovim maintenance
+tests pass. Logs are '/tmp/frozen-handshake-server-final.log',
+'/tmp/frozen-handshake-elisp.log' and '/tmp/frozen-handshake-nvim.log'.
+** Changes to the plan's envisioned order.
+Close the active-handshake fallback noted in the preceding reconnect checkpoints
+before migrating the remaining external command guards.
+** what's imperfect about what's done
+Before census freeze, bootstrap still captures the initial editable inventory.
+Older peers without the new field can use a known local census; this does not
+claim completion of legacy protocol/epoch removal.
+** choices determining the future
+Treat omitted inventory and explicitly empty inventory as different authority.
+A compact active phase alone is insufficient to enroll every current buffer.

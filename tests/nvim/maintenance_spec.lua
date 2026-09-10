@@ -1216,10 +1216,12 @@ describe('skg Neovim maintenance handshake', function ()
   it('adopts the handshake epoch before submitting reconnect census',
      function ()
     local buf = new_buffer()
+    local outside = new_buffer()
+    registry.unlock_after_maintenance(outside, 9)
     registry.unlock_after_maintenance(buf, 9)
     state.maintenance_client_incident = {
       incident_id = incident_id, epoch = 9,
-      registered_buffer_ids = { registry.record(buf).id },
+      registered_buffer_ids = { registry.record(buf).id, registry.record(outside).id },
     }
     local misc = require('skg.misc_requests')
     local real_submit = misc.submit_buffer_census
@@ -1232,6 +1234,8 @@ describe('skg Neovim maintenance handshake', function ()
       f('maintenance-archive-folder', 'archive'),
       f('maintenance-archive-identity', '/archive'),
       f('maintenance-epoch', 9), f('maintenance-state', 'active'),
+      f('maintenance-incident-id', incident_id),
+      f('maintenance-census-buffer-ids', { registry.record(buf).id }),
       f('census-required', 'true'), f('graph-generation', 1),
       f('manifest-revision', 2), f('typedb-health', 'healthy'),
       f('tantivy-health', 'healthy'), f('content', 'connected'),
@@ -1241,6 +1245,12 @@ describe('skg Neovim maintenance handshake', function ()
     assert.are.equal('active', state.maintenance_state.state)
     assert.are.equal(9, registry.record(buf).maintenance_epoch)
     assert.is_false(vim.bo[buf].modifiable)
+    assert.is_nil(registry.record(outside).maintenance_epoch)
+    registry.unlock_after_maintenance(buf, 9, incident_id)
+    state.maintenance_state.census_buffer_ids = {}
+    maintenance.adopt_handshake_epoch()
+    assert.is_nil(registry.record(buf).maintenance_epoch)
+    assert.is_nil(registry.record(outside).maintenance_epoch)
   end)
 
   it('resumes maintenance only after a completed reconnect census',

@@ -235,6 +235,14 @@ fn verify_connection_response (
       &config . maintenance_archive_identity . to_string_lossy ())),
     field ("tantivy-health", health (&selected . tantivy_health)),
   ];
+  if let CoordinatorState::Active (active) = &maintenance . state {
+    if active . census_frozen {
+      fields . push (field ("maintenance-incident-id",
+        atom (active . incident_id . as_str ())));
+      fields . push (list_field ("maintenance-census-buffer-ids",
+        &active . registered_buffer_ids));
+    }
+  }
   if let Some ((incident, origin)) = abandoned_prearchive {
     fields . push (field (
       "abandoned-prearchive-incident", atom (incident . as_str ())));
@@ -1054,6 +1062,8 @@ fn send_result (stream : &mut TcpStream, result : Result<String, String>) {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::maintenance::{MaintenanceOrigin, MaintenanceTargets};
+  use crate::types::store_state::{GraphGeneration, ManifestRevision};
   use crate::types::misc::{SkgfileSource, SourceName};
   use std::collections::HashMap;
   use std::path::PathBuf;
@@ -1138,6 +1148,49 @@ mod tests {
       "(maintenance-state blocked-store-health)"), "{}", response);
     assert! (!response . contains ("SECRET-MAINTENANCE-PAYLOAD"),
       "{}", response);
+  }
+
+  #[test]
+  fn verification_exposes_frozen_maintenance_census_membership_only () {
+    let config : SkgConfig = SkgConfig::dummyFromSources (HashMap::new ());
+    let selected : SelectedStoreState = SelectedStoreState::initial (
+      crate::dbs::in_rust_graph::InRustGraph::new (),
+      crate::types::store_state::SelectedPathManifest::default ());
+    let response_for = |frozen : bool, ids : Vec<String>| -> String {
+      let mut maintenance : MaintenanceCoordinator = MaintenanceCoordinator::new ();
+      let _ : ActiveMaintenance = maintenance . begin_with_archive_contract_and_targets (
+        MaintenanceOrigin::ExplicitPartialReload, None, "session" . into (),
+        "emacs" . into (), "all" . into (), GraphGeneration::INITIAL,
+        ManifestRevision::INITIAL, Vec::new (), MaintenanceTargets {
+          ids: vec!["node" . into ()], ..MaintenanceTargets::default () })
+        . unwrap ();
+      let CoordinatorState::Active (active) : &mut CoordinatorState = &mut maintenance . state else {
+        unreachable! () };
+      active . census_frozen = frozen;
+      active . registered_buffer_ids = ids;
+      verify_connection_response (
+        &config, &[], &selected, "all", true, &maintenance, None,
+        "server-test-session")
+    };
+    let unfrozen : String = response_for (false, vec!["late" . into ()]);
+    assert! (! unfrozen . contains ("maintenance-incident-id"),
+      "{}", unfrozen);
+    assert! (! unfrozen . contains ("maintenance-census-buffer-ids"),
+      "{}", unfrozen);
+    let idle : String = verify_connection_response (
+      &config, &[], &selected, "all", true,
+      &MaintenanceCoordinator::new (), None, "server-test-session");
+    assert! (! idle . contains ("maintenance-incident-id"), "{}", idle);
+    assert! (! idle . contains ("maintenance-census-buffer-ids"), "{}", idle);
+    let empty : String = response_for (true, Vec::new ());
+    assert! (empty . contains ("(maintenance-census-buffer-ids ())"),
+      "{}", empty);
+    assert! (empty . contains ("maintenance-incident-id"), "{}", empty);
+    let populated : String = response_for (true,
+      vec!["buffer-1" . into (), "buffer-2" . into ()]);
+    assert! (populated . contains (
+      "(maintenance-census-buffer-ids (buffer-1 buffer-2))"),
+      "{}", populated);
   }
 
   #[test]

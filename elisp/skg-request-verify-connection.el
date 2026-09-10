@@ -188,6 +188,10 @@ This inspects the public package header without enabling any package mode."
        (cdr (assq 'graph-generation skg--server-store-state))
        skg--active-source-set-name
        server-session-id))
+    (when-let ((entry (assoc 'maintenance-census-buffer-ids response)))
+      (setf (alist-get 'census-buffer-ids skg--maintenance-state) (cadr entry)
+            (alist-get 'incident-id skg--maintenance-state)
+            (cadr (assoc 'maintenance-incident-id response))))
     (when (fboundp 'skg-maintenance-adopt-handshake-epoch)
       (skg-maintenance-adopt-handshake-epoch
        (cadr (assoc 'abandoned-prearchive-incident response))))

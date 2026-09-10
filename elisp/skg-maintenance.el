@@ -236,15 +236,26 @@ will give the more precise server explanation."
                                (plist-get skg--maintenance-client-incident :epoch))))
           ;; A newer transaction does not discharge an older report's debt.
           (skg--maintenance-clear-current-incident))
-        (let ((server-id
-               (cl-loop for entry in skg--pending-incidents
-                        when (equal server-epoch
-                                    (skg--maintenance-field entry 'maintenance-epoch))
-                        return (skg--maintenance-text entry 'incident-id))))
+        (let* ((server-id
+                (or (when-let ((id (alist-get 'incident-id skg--maintenance-state)))
+                      (format "%s" id))
+                    (cl-loop for entry in skg--pending-incidents
+                             when (equal server-epoch
+                                         (skg--maintenance-field entry 'maintenance-epoch))
+                             return (skg--maintenance-text entry 'incident-id))))
+               (local (if server-id (skg--maintenance-lookup-incident server-id)
+                        skg--maintenance-client-incident))
+               (census (assq 'census-buffer-ids skg--maintenance-state))
+               (known (or census (plist-member local :registered-buffer-ids)))
+               (ids (mapcar (lambda (id) (format "%s" id))
+                            (if census (cdr census)
+                              (plist-get local :registered-buffer-ids)))))
           (dolist (buffer (skg-registered-buffers))
             (with-current-buffer buffer
-              (when (eq (skg--buffer-record-view-write-authority skg--buffer-record)
-                        'editable)
+              (when (and (eq (skg--buffer-record-view-write-authority skg--buffer-record)
+                             'editable)
+                         (or (not known)
+                             (member (skg--buffer-record-id skg--buffer-record) ids)))
                 (skg-lock-buffer-for-maintenance buffer server-epoch server-id))))))
        ((and skg--maintenance-client-incident
              (member server-state '("idle" "observing" "pending"))

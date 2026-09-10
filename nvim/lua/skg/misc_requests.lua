@@ -91,6 +91,11 @@ function M.install_connection_verification (_payload_text, response, tcp)
     state = payload.field_text(response, 'maintenance-state'),
     census_required = payload.field_text(response, 'census-required'),
   }
+  local frozen_ids = payload.field(response, 'maintenance-census-buffer-ids')
+  if frozen_ids ~= nil then
+    state.maintenance_state.census_buffer_ids = payload.string_list(frozen_ids)
+    state.maintenance_state.incident_id = payload.field_text(response, 'maintenance-incident-id')
+  end
   config.store_state = {
     graph_generation = payload.field(response, 'current-graph-generation')
       or payload.field(response, 'graph-generation'),

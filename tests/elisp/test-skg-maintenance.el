@@ -1404,4 +1404,29 @@
       (skg-unlock-buffer-after-maintenance buffer 10 "b")
       (should-not (skg--buffer-record-maintenance-epoch skg--buffer-record)))))
 
+(ert-deftest test-skg-maintenance-frozen-handshake-does-not-lock-later-buffer ()
+  (skg-test-maintenance--with-buffer 'content-view
+    (let* ((id (skg--buffer-record-id skg--buffer-record))
+           (outside (generate-new-buffer " *skg-post-census*"))
+           (skg--maintenance-client-incident nil)
+           (skg--maintenance-client-incidents nil)
+           (skg--pending-incidents nil))
+      (unwind-protect
+          (progn
+            (with-current-buffer outside
+              (org-mode)
+              (skg-register-buffer outside 'content-view :view-uri "outside"
+                                   :lifecycle 'live-view :disposable nil
+                                   :view-write-authority 'editable))
+            (dolist (ids (list nil (list id)))
+              (skg-unlock-buffer-after-maintenance buffer 9)
+              (let ((skg--maintenance-state
+                     `((epoch . 9) (state . active) (incident-id . "a")
+                       (census-buffer-ids . ,ids))))
+                (skg-maintenance-adopt-handshake-epoch))
+              (should (equal (and ids 9)
+                             (skg--buffer-record-maintenance-epoch skg--buffer-record)))
+              (should-not (buffer-local-value 'skg--maintenance-restrictions outside))))
+        (when (buffer-live-p outside) (kill-buffer outside))))))
+
 (provide 'test-skg-maintenance)

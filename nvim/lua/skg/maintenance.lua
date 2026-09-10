@@ -255,15 +255,23 @@ function M.adopt_handshake_epoch (abandoned_id)
   if incident and incident.epoch ~= epoch then
     state.clear_current_maintenance_incident()
   end
-  local epoch_id
+  local epoch_id = summary.incident_id
   for _, entry in ipairs(state.pending_incidents or {}) do
     if payload.field(entry, 'maintenance-epoch') == epoch then
       epoch_id = payload.field_text(entry, 'incident-id')
       break
     end
   end
+  local current = epoch_id and state.lookup_maintenance_incident(epoch_id)
+    or state.maintenance_client_incident
+  local ids = summary.census_buffer_ids
+  if ids == nil and current then ids = current.registered_buffer_ids end
+  local wanted = {}
+  for _, id in ipairs(ids or {}) do wanted[tostring(id)] = true end
   for _, buf in ipairs(registry.buffers()) do
-    if registry.record(buf).view_write_authority == 'editable' then
+    local record = registry.record(buf)
+    if record.view_write_authority == 'editable'
+       and (ids == nil or wanted[tostring(record.id)]) then
       registry.lock_for_maintenance(buf, epoch, epoch_id) end
   end
 end

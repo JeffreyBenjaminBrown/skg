@@ -1131,6 +1131,13 @@ in `pending-incidents`. A newer active epoch preserves older restrictions, and
 an incident-qualified census continuation retains its original incident and
 epoch even if another workflow becomes current before the callback runs.
 
+An active transaction with a frozen census includes `maintenance-incident-id`
+and `maintenance-census-buffer-ids` in connection verification. An explicit
+empty list means the census contains no buffers. Clients install reconnect
+restrictions only on the named members; later buffers do not join that census.
+Before freeze these fields are omitted, so the bootstrap can finish capturing
+its initial inventory.
+
 ## Artifact-bundle frames and recovery archives
 
 An artifact bundle uses this header:
