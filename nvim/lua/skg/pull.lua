@@ -13,6 +13,13 @@ local state = require('skg.state')
 
 local M = {}
 
+local function with_incident (incident_id, callback, ...)
+  if not incident_id or not state.lookup_maintenance_incident(incident_id) then
+    return nil end
+  return state.with_current_maintenance_incident(
+    incident_id, callback, ...)
+end
+
 M.defer = function (callback) vim.schedule(callback) end
 M.confirm = function (prompt, choices, default)
   return vim.fn.confirm(prompt, choices, default)
@@ -299,52 +306,69 @@ local function require_response_incident (response)
   return incident
 end
 
-local function request_failure (phase, label)
+local function request_failure (incident_id, phase, label)
   return function (reason)
-    local incident = require('skg.state').maintenance_client_incident
-    if incident then incident.phase = phase end
+    with_incident(incident_id, function ()
+      state.maintenance_client_incident.phase = phase
+    end)
     vim.notify(label .. ': ' .. tostring(reason), vim.log.levels.WARN)
   end
+end
+
+local function with_response_incident (response, callback, expected_id)
+  local incident_id = expected_id or payload.field_text(response, 'incident-id')
+  if not incident_id then return callback() end
+  if not state.lookup_maintenance_incident(incident_id) then
+    error('Pull response names an unknown incident') end
+  return state.with_current_maintenance_incident(incident_id, callback)
 end
 
 function M.request_authorization ()
   local incident = assert(state.maintenance_client_incident,
     'No pull incident is ready for authorization')
   incident.phase = 'origin-operation-start-pending'
+  local incident_id = incident.incident_id
   state.register_response_handler(
-    'maintenance-status', M.handle_authorization, true)
-  state.set_request_failure_handler(request_failure(
+    'maintenance-status', function (text, response)
+      return M.handle_authorization(text, response, incident_id) end, true)
+  state.set_request_failure_handler(request_failure(incident_id,
     'origin-operation-start-pending', 'Pull authorization was not delivered'))
   client.submit_request(request('run maintenance origin', {
     { 'maintenance-epoch', incident.epoch },
-  }), nil, incident.incident_id)
+  }), nil, incident_id)
 end
 
-local function schedule_protected (label, callback)
+local function schedule_protected (incident_id, label, callback)
   M.defer(function ()
-    local ok, error_text = pcall(callback)
+    local ok, error_text = pcall(function ()
+      with_incident(incident_id, callback)
+    end)
     if not ok then
       vim.notify(label .. ': ' .. tostring(error_text), vim.log.levels.ERROR)
     end
   end)
 end
 
-function M.handle_authorization (_payload_text, response)
-  local incident = require_response_incident(response)
-  local context = M.context()
-  if payload.field_text(response, 'status') ~= 'external-mutation-authorized'
-     or payload.field_text(response, 'phase')
-        ~= 'running-external-mutation' then
-    error('Server did not authorize the client-owned pull') end
-  incident.phase = 'running-external-mutation'
-  if payload.field_text(response, 'replayed') == 'true' then
-    M.resume_running(
-      'authorization reply was replayed without a live owned Git child')
-  else
-    context.started = true
-    context.remaining = vim.deepcopy(context.repositories)
-    M.start_next()
-  end
+function M.handle_authorization (_payload_text, response, expected_id)
+  return with_response_incident(response, function ()
+    local incident = require_response_incident(response)
+    local context = M.context()
+    if payload.field_text(response, 'status')
+       ~= 'external-mutation-authorized'
+       or payload.field_text(response, 'phase')
+          ~= 'running-external-mutation' then
+      error('Server did not authorize the client-owned pull') end
+    incident.phase = 'running-external-mutation'
+    if payload.field_text(response, 'replayed') == 'true' then
+      M.resume_running(
+        'authorization reply was replayed without a live owned Git child',
+        incident.incident_id)
+    else
+      context.started = true
+      context.remaining = vim.deepcopy(context.repositories)
+      M.start_next()
+    end
+  end, expected_id)
 end
 
 local function repository_label (repository)
@@ -437,12 +461,13 @@ function M.schedule_next ()
 end
 
 function M.run_scheduled_next (incident_id)
-  local incident = state.maintenance_client_incident
-  if not incident or incident.incident_id ~= incident_id
-     or not incident.offer or incident.offer.origin ~= 'pull' then return end
-  local context = M.context()
-  context.advance_pending = false
-  M.start_next()
+  return with_incident(incident_id, function ()
+    local incident = state.maintenance_client_incident
+    if not incident.offer or incident.offer.origin ~= 'pull' then return end
+    local context = M.context()
+    context.advance_pending = false
+    M.start_next()
+  end)
 end
 
 function M.start_next ()
@@ -492,62 +517,72 @@ function M.start_next ()
 end
 
 function M.job_exited (incident_id, repository_key, job_id, exit_code, event)
-  local incident = state.maintenance_client_incident
-  if not incident or incident.incident_id ~= incident_id then return end
-  local context = M.context()
-  local current = context.current_job
-  if not current or current.id ~= job_id or current.key ~= repository_key then
-    return end
-  context.current_job = nil
-  if current.diagnostic_buffer
-     and vim.api.nvim_buf_is_valid(current.diagnostic_buffer) then
-    local name = current.diagnostic_name
-      or vim.b[current.diagnostic_buffer].skg_pull_diagnostic_name
-    if name then vim.api.nvim_buf_set_name(current.diagnostic_buffer, name) end
-  end
-  local event_label = type(event) == 'string' and vim.trim(event) or 'exit'
-  if event_label == '' then event_label = 'exit' end
-  local detail = string.format('%s: %s %s',
-    repository_label(current.repository), event_label, tostring(exit_code))
-  table.insert(context.details, detail)
-  if event_label ~= 'exit' or exit_code ~= 0 then
-    table.insert(context.failures, detail) end
-  M.schedule_next()
+  return with_incident(incident_id, function ()
+    local context = M.context()
+    local current = context.current_job
+    if not current or current.id ~= job_id or current.key ~= repository_key then
+      return end
+    context.current_job = nil
+    if current.diagnostic_buffer
+       and vim.api.nvim_buf_is_valid(current.diagnostic_buffer) then
+      local name = current.diagnostic_name
+        or vim.b[current.diagnostic_buffer].skg_pull_diagnostic_name
+      if name then vim.api.nvim_buf_set_name(current.diagnostic_buffer, name) end
+    end
+    local event_label = type(event) == 'string' and vim.trim(event) or 'exit'
+    if event_label == '' then event_label = 'exit' end
+    local detail = string.format('%s: %s %s',
+      repository_label(current.repository), event_label, tostring(exit_code))
+    table.insert(context.details, detail)
+    if event_label ~= 'exit' or exit_code ~= 0 then
+      table.insert(context.failures, detail) end
+    M.schedule_next()
+  end)
 end
 
-function M.finish_origin (outcome, details)
-  local incident = assert(state.maintenance_client_incident,
-    'No pull incident can report completion')
-  local context = M.context()
-  local record = { outcome = outcome, details = vim.deepcopy(details or {}) }
-  context.external_result = record
-  context.advance_pending = false
-  incident.phase = 'origin-completion-pending'
-  M.send_finish(record)
+function M.finish_origin (outcome, details, incident_id)
+  incident_id = incident_id or assert(state.maintenance_client_incident,
+    'No pull incident can report completion').incident_id
+  return with_incident(incident_id, function ()
+    local incident = state.maintenance_client_incident
+    local context = M.context()
+    local record = { outcome = outcome, details = vim.deepcopy(details or {}) }
+    context.external_result = record
+    context.advance_pending = false
+    incident.phase = 'origin-completion-pending'
+    M.send_finish(record, incident_id)
+  end)
 end
 
-function M.send_finish (record)
-  local incident = assert(state.maintenance_client_incident,
-    'No pull incident can send completion')
-  state.register_response_handler(
-    'maintenance-status', M.handle_finish, true)
-  state.set_request_failure_handler(request_failure(
-    'origin-completion-pending', 'Pull completion was not delivered'))
-  client.submit_request(request('finish maintenance origin', {
-    { 'maintenance-epoch', incident.epoch },
-    { 'external-outcome', record.outcome },
-  }, {
-    { 'external-details', record.details },
-  }), nil, incident.incident_id)
+function M.send_finish (record, incident_id)
+  incident_id = incident_id or assert(state.maintenance_client_incident,
+    'No pull incident can send completion').incident_id
+  return with_incident(incident_id, function ()
+    local incident = state.maintenance_client_incident
+    state.register_response_handler(
+      'maintenance-status', function (text, response)
+        return M.handle_finish(text, response, incident_id) end, true)
+    state.set_request_failure_handler(request_failure(incident_id,
+      'origin-completion-pending', 'Pull completion was not delivered'))
+    client.submit_request(request('finish maintenance origin', {
+      { 'maintenance-epoch', incident.epoch },
+      { 'external-outcome', record.outcome },
+    }, {
+      { 'external-details', record.details },
+    }), nil, incident_id)
+  end)
 end
 
-function M.handle_finish (_payload_text, response)
-  local incident = require_response_incident(response)
-  if payload.field_text(response, 'status') ~= 'origin-operation-finished'
-     or payload.field_text(response, 'phase') ~= 'final-observation' then
-    error('Server did not begin exact post-pull observation') end
-  incident.phase = 'waiting-for-origin-observation'
-  vim.notify('Skg is observing exact disk after pull')
+function M.handle_finish (_payload_text, response, expected_id)
+  return with_response_incident(response, function ()
+    local incident = require_response_incident(response)
+    if payload.field_text(response, 'status')
+       ~= 'origin-operation-finished'
+       or payload.field_text(response, 'phase') ~= 'final-observation' then
+      error('Server did not begin exact post-pull observation') end
+    incident.phase = 'waiting-for-origin-observation'
+    vim.notify('Skg is observing exact disk after pull')
+  end, expected_id)
 end
 
 local function atom_list (value, label)
@@ -643,54 +678,63 @@ function M.resume_archive_ready ()
   M.request_authorization()
 end
 
-function M.resume_running (lost_child_reason)
-  local context = M.context()
-  local current = context.current_job
-  if current then
-    local status = M.job_status(current.id)
-    if status == 'running' then return true end
-    if type(status) == 'number' and status >= 0 then
-      M.job_exited(state.maintenance_client_incident.incident_id,
-        current.key, current.id, status, 'exit')
-      return true
+function M.resume_running (lost_child_reason, incident_id)
+  incident_id = incident_id or assert(state.maintenance_client_incident,
+    'No pull incident can resume').incident_id
+  return with_incident(incident_id, function ()
+    local context = M.context()
+    local current = context.current_job
+    if current then
+      local status = M.job_status(current.id)
+      if status == 'running' then return true end
+      if type(status) == 'number' and status >= 0 then
+        M.job_exited(incident_id, current.key, current.id, status, 'exit')
+        return true
+      end
+      context.current_job = nil
     end
-    context.current_job = nil
-  end
-  if context.external_result then
-    schedule_protected('Pull result could not be resent', function ()
-      require('skg.pull').send_finish(context.external_result) end)
-  elseif context.advance_pending then
+    if context.external_result then
+      schedule_protected(incident_id, 'Pull result could not be resent',
+        function ()
+          require('skg.pull').send_finish(context.external_result, incident_id)
+        end)
+    elseif context.advance_pending then
+      return true
+    else
+      schedule_protected(incident_id,
+        'Indeterminate pull result could not be reported', function ()
+          require('skg.pull').finish_origin(
+            'indeterminate', { lost_child_reason }, incident_id)
+        end)
+    end
     return true
-  else
-    schedule_protected('Indeterminate pull result could not be reported',
-      function ()
-        require('skg.pull').finish_origin(
-          'indeterminate', { lost_child_reason })
-      end)
-  end
-  return true
+  end)
 end
 
-function M.origin_operation_handler (_incident, phase, response)
-  M.context()
-  M.install_server_repositories(response)
-  M.install_server_result(response)
-  if phase == 'archive-ready' then
-    schedule_protected('Pull remains archive-ready', function ()
-      require('skg.pull').resume_archive_ready() end)
-  elseif phase == 'running-external-mutation' then
-    M.resume_running(
-      'server awaited pull completion but no owned Git child survived')
-  elseif phase == 'final-observation' then
-    local record = M.context().external_result
-    if not record then
-      error('Final pull observation has no journaled external result') end
-    schedule_protected('Pull result could not be replayed', function ()
-      require('skg.pull').send_finish(record) end)
-  else
-    return false
-  end
-  return true
+function M.origin_operation_handler (incident, phase, response)
+  local incident_id = incident and incident.incident_id
+  return with_incident(incident_id, function ()
+    M.context()
+    M.install_server_repositories(response)
+    M.install_server_result(response)
+    if phase == 'archive-ready' then
+      schedule_protected(incident_id, 'Pull remains archive-ready', function ()
+        require('skg.pull').resume_archive_ready() end)
+    elseif phase == 'running-external-mutation' then
+      M.resume_running(
+        'server awaited pull completion but no owned Git child survived',
+        incident_id)
+    elseif phase == 'final-observation' then
+      local record = M.context().external_result
+      if not record then
+        error('Final pull observation has no journaled external result') end
+      schedule_protected(incident_id, 'Pull result could not be replayed',
+        function () require('skg.pull').send_finish(record, incident_id) end)
+    else
+      return false
+    end
+    return true
+  end) or false
 end
 
 function M.terminal (_response)

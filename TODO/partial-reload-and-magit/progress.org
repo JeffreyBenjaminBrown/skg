@@ -2814,3 +2814,29 @@ No additional behavior limitation was identified in this fix.
 ** choices determining the future
 The initiating request's explicit identity remains authoritative when operation
 payload fields are absent; it cannot fall back to another foreground record.
+
+* Simplify/cohere checkpoint: Neovim pull continuations retain their incident
+** what's done and went well
+Neovim pull failure/response handlers, queued origin work, repository continuations
+and job exits run against their retained incident. Registered response handlers
+also capture the initiating ID, so a conflicting response cannot redirect them.
+Unknown incident IDs cannot mutate the foreground record.
+
+All 20 focused Neovim pull tests pass in '/tmp/pull-scoping-nvim-final.log'. Tests
+execute the registered job exit callback and its queued hop with B current,
+validate failure delivery changes A, and reject a B response to A's request.
+The accumulated Rust checkpoint also passes 'cargo check --all-targets --jobs 2'
+and all 882 tests run by nextest; one skipped test remains to be accounted for.
+Logs are '/tmp/incident-client-checkpoint-all-targets.log' and
+'/tmp/incident-client-checkpoint-nextest.log'.
+** Changes to the plan's envisioned order.
+Completed the external origin adapters after the shared client continuation
+interface, then ran the accumulated Rust checkpoint.
+** what's imperfect about what's done
+Final process/editor lifecycle acceptance and remaining owner/writer/observation
+migration audits are still required. No production latency claim follows from
+these focused fixtures.
+** choices determining the future
+Request identity governs response delivery; payload identity is validated against
+it. Follow the completed entry-point map rather than repeating this investigation:
+[[../../codex-thinking/remaining-client-entry-points.org]].

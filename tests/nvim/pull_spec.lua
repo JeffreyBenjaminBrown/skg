@@ -305,6 +305,44 @@ describe('skg Neovim client-owned pull', function ()
     assert.matches('exit 1$', finished.details[2])
   end)
 
+  it('runs a retained A job callback while restoring foreground B',
+     function ()
+    local repository = {
+      key = string.rep('a', 64), root = '/repo', sources = { 'one' },
+    }
+    local context = pull.new_context({ repository })
+    context.remaining = { repository }
+    local incident_a = pull_incident(context)
+    local incident_b = {
+      incident_id = 'incident-b', epoch = 10,
+      offer = { origin = 'pull' }, origin_context = pull.new_context({}),
+    }
+    local options
+    local scheduled = {}
+    local old_schedule = vim.schedule
+    pull.jobstart = function (_, job_options)
+      options = job_options
+      return 17
+    end
+    pull.defer = function (callback) table.insert(scheduled, callback) end
+    state.replace_current_maintenance_incident(incident_a)
+    pull.start_next()
+    state.replace_current_maintenance_incident(incident_b)
+    pull.job_exited('unknown-incident', repository.key, 17, 0, 'exit')
+    assert.are.equal(incident_b, state.maintenance_client_incident)
+    vim.schedule = function (callback) callback() end
+    options.on_exit(17, 0, 'exit')
+    vim.schedule = old_schedule
+    assert.is_nil(context.current_job)
+    assert.are.equal(incident_b, state.maintenance_client_incident)
+    assert.are.equal(1, #scheduled)
+    local finished
+    pull.finish_origin = function () finished = state.maintenance_client_incident end
+    scheduled[1]()
+    assert.are.equal(incident_a, finished)
+    assert.are.equal(incident_b, state.maintenance_client_incident)
+  end)
+
   it('reports a replayed authorization without a live child as indeterminate',
      function ()
     local context = pull.new_context({})
@@ -324,6 +362,33 @@ describe('skg Neovim client-owned pull', function ()
     scheduled[1]()
     assert.are.equal('indeterminate', finished.outcome)
     assert.matches('without a live owned Git child', finished.details[1])
+  end)
+
+  it('routes a delayed request failure to its retained incident', function ()
+    local client = require('skg.client')
+    local incident_a = pull_incident(pull.new_context({}))
+    local incident_b = {
+      incident_id = 'incident-b', epoch = 10,
+      offer = { origin = 'pull' }, origin_context = pull.new_context({}),
+    }
+    local request_record
+    state.replace_current_maintenance_incident(incident_a)
+    client.submit_request = function ()
+      request_record = state.take_request_record()
+    end
+    pull.request_authorization()
+    incident_a.phase = 'waiting-for-reply'
+    state.replace_current_maintenance_incident(incident_b)
+    assert.has_error(function ()
+      request_record.handlers['maintenance-status'].handler('', {
+        f('incident-id', incident_b.incident_id), f('maintenance-epoch', incident_b.epoch),
+        f('status', 'external-mutation-authorized'), f('phase', 'running-external-mutation'),
+      })
+    end)
+    request_record.failure_handler('connection lost')
+    assert.are.equal('origin-operation-start-pending', incident_a.phase)
+    assert.are.equal(incident_b, state.maintenance_client_incident)
+    assert.is_nil(incident_b.phase)
   end)
 
   it('resends a known result when running maintenance reconnects', function ()
@@ -386,6 +451,34 @@ describe('skg Neovim client-owned pull', function ()
       outcome = 'failed',
       details = { 'repository failed', 'disk may differ' },
     }, sent)
+  end)
+
+  it('runs a retained A origin continuation while restoring foreground B',
+     function ()
+    local context = pull.new_context({})
+    context.external_result = {
+      outcome = 'failed', details = { 'repository failed' },
+    }
+    local incident_a = pull_incident(context)
+    local incident_b = {
+      incident_id = 'incident-b', epoch = 10,
+      offer = { origin = 'pull' }, origin_context = pull.new_context({}),
+    }
+    local scheduled = {}
+    local sent
+    pull.defer = function (callback) table.insert(scheduled, callback) end
+    pull.send_finish = function (record, incident_id)
+      sent = { record = record, incident_id = incident_id }
+    end
+    state.replace_current_maintenance_incident(incident_a)
+    assert.is_true(pull.origin_operation_handler(
+      incident_a, 'final-observation', {}))
+    state.replace_current_maintenance_incident(incident_b)
+    assert.are.equal(incident_b, state.maintenance_client_incident)
+    scheduled[1]()
+    assert.are.same({ record = context.external_result,
+      incident_id = incident_a.incident_id }, sent)
+    assert.are.equal(incident_b, state.maintenance_client_incident)
   end)
 
   it('refuses a server repository topology change', function ()

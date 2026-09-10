@@ -1,22 +1,22 @@
-* Remaining client entry points after incident retention
-** Command guards
+* Client entry-point audit and migration
+** Command guards completed
 'nvim/lua/skg/misc_requests.lua:rebuild_dbs', 'nvim/lua/skg/pull.lua:pull_all',
 'elisp/skg-request-rebuild-dbs.el:skg-rebuild-dbs' and
-'elisp/skg-pull.el:skg-pull-all' refuse any nonnil current incident. Replace that
-assumption with current graph admission; an older pending report is not a writer.
-Use the existing maintenance and pull specs for each client.
-** Origin callbacks
-Both pull adapters have failure handlers and scheduled origin continuations which
-consult the ambient current incident. Bind the original ID through the scoped
-maintenance helpers; dropping old callbacks would strand their work. Neovim's
-'schedule_next' and 'job_exited' already capture/check IDs, but 'request_failure',
-'resume_running' and 'origin_operation_handler' still need review. Emacs needs
-its schedule-next wrapper, sentinel, failure handlers and origin handler scoped.
-** Constructor consumers
-'nvim/lua/skg/client.lua' and 'elisp/skg-client.el' still close constructor
-admission whenever any current incident exists, including on reconnect. Their
-comments incorrectly tie this to terminal ACK. Inspect these exact consumers
-against the current graph publication after the command guard slice.
-** Audit limit
-These are read-only findings from a bounded audit outside the maintenance/state
-modules, not verification that the remaining entry-point migration is complete.
+'elisp/skg-pull.el:skg-pull-all' now permit a retained report when current graph
+admission is explicitly open. Commit '30476c1b' records the tested change.
+** Origin callbacks completed
+Both pull adapters bind failure handlers, response handlers, origin replay and
+process/job continuations to the initiating incident. An older owned child can
+finish without changing the foreground record. Process/job identity checks remain;
+unknown records cannot borrow another incident's context. The Emacs migration is
+in '37d56ee3'; the Neovim continuation checkpoint is recorded in
+[[file:../TODO/partial-reload-and-magit/progress.org][progress.org]].
+** Constructor consumers completed
+'nvim/lua/skg/client.lua' and 'elisp/skg-client.el' preserve the current constructor
+barrier across connection reset. They no longer close it merely because a report
+record remains. Bootstrap and current graph publications own transitions. Commit
+'c5232ce8' records tests for open, closing and closed states.
+** Verification boundary
+These exact consumers have focused coverage and the preceding guard/constructor
+checkpoint passed both full editor suites. Final process/editor lifecycle coverage
+still remains; this bounded audit is not a claim that plan 11 is complete.
