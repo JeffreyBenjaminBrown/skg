@@ -2589,3 +2589,25 @@ complete multi-incident management interface.
 Keep each incident's disposition independent and avoid deriving historical
 release identity solely from the currently active incident. See
 [[../../codex-thinking/overlapping-buffer-restrictions.org]].
+
+* Simplify/cohere checkpoint: retain client incident records by identity
+** what's done and went well
+Both clients index complete incident records by server identity. Replacing or
+clearing the current workflow preserves archive, census, application and settlement
+facts. Emacs lookup, listing and replacement account for changes to the head of
+an active plist. Neovim code reload preserves the retained index.
+
+Focused suites pass: 48 Emacs maintenance tests, 30 Neovim maintenance tests and
+six Neovim reload tests. Logs are '/tmp/client-retention-final-elisp.log',
+'/tmp/client-retention-final-nvim.log' and '/tmp/client-retention-reload-nvim.log'.
+** Changes to the plan's envisioned order.
+Introduce the retained-record adapter before migrating status and workflow routing.
+** what's imperfect about what's done
+The current workflow guards and public status selection remain singular in this
+checkpoint. Retention is session-local; server durable incident status remains the
+recovery source after editor restart.
+** choices determining the future
+Use the existing server incident selector and pending-incidents inventory. Keep
+historical records separate from global authority and bind subsequent workflow
+callbacks to an explicit incident. See
+[[../../codex-thinking/client-incident-retention.org]].

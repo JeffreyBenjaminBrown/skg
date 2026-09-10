@@ -70,7 +70,7 @@ local function new_buffer ()
 end
 
 local function reset ()
-  state.maintenance_client_incident = nil
+  state.clear_current_maintenance_incident(true)
   state.pending_maintenance_offer = nil
   state.maintenance_state = nil
   state.rebuilding = false
@@ -100,6 +100,32 @@ describe('skg Neovim maintenance handshake', function ()
   local original_client_priority_submit
   local original_client_connect
   local original_begin
+
+  it('retains replaced incident records and their mutable fields', function ()
+    state.clear_current_maintenance_incident(true)
+    local incident_a = {
+      incident_id = 'incident-a', phase = 'settling',
+      archive = { path = '/a' }, locally_applied = { 'buffer-a' },
+    }
+    local incident_b = {
+      incident_id = 'incident-b', phase = 'awaiting-census',
+    }
+    state.replace_current_maintenance_incident(incident_a)
+    state.replace_current_maintenance_incident(incident_b)
+    assert.are.same(incident_a,
+      state.lookup_maintenance_incident('incident-a'))
+    assert.are.equal(incident_b, state.maintenance_client_incident)
+    incident_b.settlements = { 'settlement-b' }
+    assert.are.same({ 'settlement-b' },
+      state.lookup_maintenance_incident('incident-b').settlements)
+    state.clear_current_maintenance_incident()
+    assert.is_nil(state.maintenance_client_incident)
+    assert.are.same(incident_a,
+      state.lookup_maintenance_incident('incident-a'))
+    assert.are.same(incident_b,
+      state.lookup_maintenance_incident('incident-b'))
+    assert.are.equal(2, #state.list_maintenance_incidents())
+  end)
 
   before_each(function ()
     reset()

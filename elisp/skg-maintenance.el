@@ -11,6 +11,54 @@
 
 (defvar skg--maintenance-client-incident nil
   "Client facts for the active server-owned maintenance incident.")
+(defvar skg--maintenance-client-incidents nil
+  "Session-local incident records keyed by their server incident ID.
+
+`skg--maintenance-client-incident' remains the active workflow pointer for
+compatibility.  Records retained here are deliberately the same mutable
+plists, so late settlement and archive fields remain attached to their ID.")
+
+(defun skg--maintenance-retain-incident (incident)
+  "Retain INCIDENT in the session-local incident index.
+Return INCIDENT so callers can use this as a small assignment adapter."
+  (let ((incident-id (and (listp incident)
+                          (plist-get incident :incident-id))))
+    (when incident-id
+      (let ((entry (assoc incident-id skg--maintenance-client-incidents)))
+        (if entry
+            (setcdr entry incident)
+          (push (cons incident-id incident)
+                skg--maintenance-client-incidents)))))
+  incident)
+
+(defun skg--maintenance-replace-current-incident (incident)
+  "Make INCIDENT current while retaining the previous record by its ID."
+  (skg--maintenance-retain-incident skg--maintenance-client-incident)
+  (setq skg--maintenance-client-incident incident)
+  (skg--maintenance-retain-incident incident))
+
+(defun skg--maintenance-lookup-incident (incident-id)
+  "Return the retained record for INCIDENT-ID, including current mutations."
+  (or (and skg--maintenance-client-incident
+           (equal incident-id
+                  (plist-get skg--maintenance-client-incident :incident-id))
+           skg--maintenance-client-incident)
+      (cdr (assoc incident-id skg--maintenance-client-incidents))))
+
+(defun skg--maintenance-list-incidents ()
+  "Return all session-local retained incident records."
+  (skg--maintenance-retain-incident skg--maintenance-client-incident)
+  (mapcar #'cdr skg--maintenance-client-incidents))
+
+(defun skg--maintenance-clear-current-incident (&optional clear-index)
+  "Clear the active pointer while preserving its retained record.
+When CLEAR-INDEX is non-nil, also discard all session-local records."
+  (when skg--maintenance-client-incident
+    (skg--maintenance-retain-incident skg--maintenance-client-incident))
+  (setq skg--maintenance-client-incident nil)
+  (when clear-index
+    (setq skg--maintenance-client-incidents nil)))
+
 (defvar skg--pending-maintenance-offer nil
   "Latest unsolicited valid disk candidate offered by the server.")
 (defvar skg--maintenance-origin-operation-handlers nil
@@ -76,8 +124,8 @@ will give the more precise server explanation."
         (when (natnump local-epoch)
           (dolist (buffer (skg-registered-buffers))
             (skg-unlock-buffer-after-maintenance buffer local-epoch)))
-        (setq skg--maintenance-client-incident nil
-              skg--client-constructor-admission 'open)
+        (skg--maintenance-clear-current-incident)
+        (setq skg--client-constructor-admission 'open)
         (unless (and explicitly-abandoned-incident
                      (equal (format "%s" incident)
                             (format "%s" explicitly-abandoned-incident)))
@@ -393,7 +441,7 @@ verification response already carries the server's more precise warning."
           skg--maintenance-archive-folder archive-folder
           skg--maintenance-archive-identity archive-identity)
     (setf (plist-get state :phase) 'presenting)
-    (setq skg--maintenance-client-incident state)
+    (skg--maintenance-replace-current-incident state)
     state))
 
 (defun skg--maintenance-handle-selection-response (_tcp-proc payload)
@@ -629,7 +677,7 @@ verification response already carries the server's more precise warning."
           (nreverse acknowledged)
           (plist-get state :in-flight-settlement) nil
           (plist-get state :phase) 'settling-views)
-    (setq skg--maintenance-client-incident state)
+    (skg--maintenance-replace-current-incident state)
     (run-at-time 0 nil #'skg--maintenance-settle-next)))
 
 (defun skg--maintenance-install-preselection-retirements (retirements)
@@ -675,7 +723,7 @@ verification response already carries the server's more precise warning."
           (nreverse acknowledged)
           (plist-get state :in-flight-preselection-retirement) nil
           (plist-get state :phase) 'settling-preselection-retirements)
-    (setq skg--maintenance-client-incident state)
+    (skg--maintenance-replace-current-incident state)
     (run-at-time 0 nil #'skg--maintenance-settle-next-preselection-retirement)))
 
 (defun skg--maintenance-settle-next-preselection-retirement ()
@@ -1241,8 +1289,8 @@ verification response already carries the server's more precise warning."
          (path (and final (plist-get final :path))))
     (unless (and state (eq (plist-get state :phase) 'terminal-received))
       (error "Server became idle before the client received terminal authority"))
-    (setq skg--maintenance-client-incident nil
-          skg--pending-maintenance-offer nil)
+    (skg--maintenance-clear-current-incident)
+    (setq skg--pending-maintenance-offer nil)
     (message "Skg maintenance complete; recovery archive: %s" path)))
 
 (defun skg--maintenance-inspect-retained-incident (response require-final)
@@ -1294,8 +1342,8 @@ checksummed final marker."
                         response 'archive-manifest-sha256)
                        (plist-get summary :final-manifest-sha256))))
         (error "Retained maintenance final checksum changed"))
-      (setq skg--maintenance-client-incident
-            (list
+      (skg--maintenance-replace-current-incident
+       (list
              :incident-id incident-id :epoch epoch
              :origin (skg--maintenance-text response 'origin)
              :requested-paths
@@ -1340,8 +1388,8 @@ checksummed final marker."
   "Reconstruct enough state to receive and ACK terminal RESPONSE."
   (unless skg--maintenance-client-incident
     (let ((summary (skg--maintenance-inspect-retained-incident response t)))
-      (setq skg--maintenance-client-incident
-            (list
+      (skg--maintenance-replace-current-incident
+       (list
              :incident-id (skg--maintenance-text response 'incident-id)
              :epoch (skg--maintenance-field response 'maintenance-epoch)
              :phase 'adopting-terminal
@@ -1453,7 +1501,7 @@ checksummed final marker."
         (setf (plist-get state :phase) 'server-blocked
               (plist-get state :server-phase) phase
               (plist-get state :blocking-reason) reason)
-        (setq skg--maintenance-client-incident state)
+        (skg--maintenance-replace-current-incident state)
         (display-warning
          'skg
          (format
@@ -1559,8 +1607,8 @@ checksummed final marker."
          ;; incident before its locked census.
          (skg--maintenance-release-obsolete-local-incident
           "The Skg server allocated a new maintenance incident"))
-       (setq skg--maintenance-client-incident
-             (list :incident-id incident-id
+       (skg--maintenance-replace-current-incident
+        (list :incident-id incident-id
                    :epoch epoch
                    :origin (skg--maintenance-text response 'origin)
                    :requested-paths
@@ -1766,8 +1814,8 @@ ORIGIN-FIELDS are adapter-specific fields included in the bootstrap request."
                                response 'unlock-maintenance-epoch)))
            (dolist (buffer (skg-registered-buffers))
              (skg-unlock-buffer-after-maintenance buffer unlock-epoch))
-           (setq skg--maintenance-client-incident nil
-                 skg--client-constructor-admission 'open)
+           (skg--maintenance-clear-current-incident)
+           (setq skg--client-constructor-admission 'open)
            (message "Skg maintenance cancelled before archive publication.")))
        t)
       (skg-submit-request

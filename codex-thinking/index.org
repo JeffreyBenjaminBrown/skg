@@ -19,3 +19,6 @@ Established progress belongs in [[file:../TODO/partial-reload-and-magit/progress
 
 * Overlapping buffer restrictions
 [[file:overlapping-buffer-restrictions.org][Independent disposition for each incident]]
+
+* Client incident retention
+[[file:client-incident-retention.org][Retained reports and explicit incident selection]]

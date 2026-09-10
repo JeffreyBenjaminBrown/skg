@@ -944,7 +944,7 @@ function M.finish_idle ()
     error('Server became idle before the client received terminal authority')
   end
   local path = incident.final_archive and incident.final_archive.path or '?'
-  state.maintenance_client_incident = nil
+  state.clear_current_maintenance_incident()
   state.pending_maintenance_offer = nil
   vim.notify('Skg maintenance complete; recovery archive: ' .. path)
 end
@@ -986,7 +986,7 @@ function M.adopt_active (response)
      and payload.field_text(response, 'archive-manifest-sha256')
        ~= summary.final_manifest_sha256 then
     error('Retained maintenance final checksum changed') end
-  state.maintenance_client_incident = {
+  state.replace_current_maintenance_incident({
     incident_id = incident_id, epoch = epoch,
     phase = 'adopting-retained-incident',
     requested_paths = payload.string_list(
@@ -1020,13 +1020,13 @@ function M.adopt_active (response)
     } or nil,
     adopted = true, terminal_callback = nil,
     terminal_callback_fired = false,
-  }
+  })
 end
 
 function M.adopt_terminal (response)
   if state.maintenance_client_incident then return end
   local summary = M.inspect_retained_incident(response, true)
-  state.maintenance_client_incident = {
+  state.replace_current_maintenance_incident({
     incident_id = payload.field_text(response, 'incident-id'),
     epoch = nat(response, 'maintenance-epoch'), phase = 'adopting-terminal',
     registered_buffer_ids = payload.string_list(
@@ -1041,7 +1041,7 @@ function M.adopt_terminal (response)
     },
     adopted = true, terminal_callback = nil,
     terminal_callback_fired = false,
-  }
+  })
 end
 
 function M.resume_active (response)
@@ -1283,7 +1283,7 @@ local function handle_bootstrap (
       locally_applied = {},
       offer = offer,
     }
-    state.maintenance_client_incident = incident
+    state.replace_current_maintenance_incident(incident)
     M.set_handshake_summary('active', epoch)
     local wanted = {}
     for _, id in ipairs(incident.registered_buffer_ids) do wanted[id] = true end
@@ -1492,7 +1492,7 @@ function M.cancel ()
       local epoch = nat(response, 'unlock-maintenance-epoch')
       for _, buf in ipairs(registry.buffers()) do
         registry.unlock_after_maintenance(buf, epoch) end
-      state.maintenance_client_incident = nil
+      state.clear_current_maintenance_incident()
       state.client_constructor_admission = 'open'
       vim.notify('Skg maintenance cancelled before archive publication.')
     end, true)

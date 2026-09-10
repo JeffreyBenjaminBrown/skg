@@ -69,6 +69,8 @@ describe('skg.reload', function ()
       archive = { manifest_sha256 = string.rep('a', 64) },
     }
     state.maintenance_client_incident = incident
+    local retained = { older = { incident_id = 'older', phase = 'settling' } }
+    state.maintenance_client_incidents = retained
     state.maintenance_state = { epoch = 9, state = 'active' }
     state.rebuilding = true
     state.pending_maintenance_offer = { candidate_id = 'candidate' }
@@ -96,6 +98,7 @@ describe('skg.reload', function ()
     local reloaded_config = require('skg.config')
     assert.are.equal(1, finalized)
     assert.are.equal(incident, reloaded_state.maintenance_client_incident)
+    assert.are.equal(retained, reloaded_state.maintenance_client_incidents)
     assert.are.equal('reconnect-required',
       reloaded_state.maintenance_client_incident.phase)
     assert.are.equal('active', reloaded_state.maintenance_state.state)
@@ -114,6 +117,7 @@ describe('skg.reload', function ()
       reloaded_state.server_push_handlers['maintenance-offer'])
 
     reloaded_state.maintenance_client_incident = nil
+    reloaded_state.maintenance_client_incidents = {}
     reloaded_state.maintenance_state = nil
     reloaded_state.rebuilding = false
     reloaded_state.pending_maintenance_offer = nil

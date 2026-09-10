@@ -36,6 +36,7 @@ local function capture_session ()
       maintenance_state = old_state.maintenance_state,
       rebuilding = old_state.rebuilding,
       maintenance_client_incident = old_state.maintenance_client_incident,
+      maintenance_client_incidents = old_state.maintenance_client_incidents,
       pending_maintenance_offer = old_state.pending_maintenance_offer,
       pending_recovery_incidents = old_state.pending_recovery_incidents,
       next_request_number = old_state.next_request_number,

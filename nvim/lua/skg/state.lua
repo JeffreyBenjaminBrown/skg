@@ -27,8 +27,54 @@ M.graph_transition_status = nil
 M.pending_incidents = {}
 M.pending_query_waits_raw = nil
 M.maintenance_client_incident = M.maintenance_client_incident or nil
+M.maintenance_client_incidents = M.maintenance_client_incidents or {}
 M.pending_maintenance_offer = M.pending_maintenance_offer or nil
 M.pending_recovery_incidents = M.pending_recovery_incidents or {}
+
+---Retain INCIDENT under its server ID for this client session.
+---@param incident table
+---@return table
+function M.retain_maintenance_incident (incident)
+  if incident and incident.incident_id then
+    M.maintenance_client_incidents[incident.incident_id] = incident end
+  return incident
+end
+
+---Make INCIDENT the active workflow while retaining the previous record.
+---@param incident table
+---@return table
+function M.replace_current_maintenance_incident (incident)
+  M.retain_maintenance_incident(M.maintenance_client_incident)
+  M.maintenance_client_incident = incident
+  return M.retain_maintenance_incident(incident)
+end
+
+---Find an incident, preferring the current object so added fields are visible.
+---@param incident_id string
+---@return table|nil
+function M.lookup_maintenance_incident (incident_id)
+  local current = M.maintenance_client_incident
+  if current and current.incident_id == incident_id then return current end
+  return M.maintenance_client_incidents[incident_id]
+end
+
+---Return all retained session-local incident records.
+---@return table[]
+function M.list_maintenance_incidents ()
+  M.retain_maintenance_incident(M.maintenance_client_incident)
+  local records = {}
+  for _, incident in pairs(M.maintenance_client_incidents) do
+    table.insert(records, incident) end
+  return records
+end
+
+---Clear the active pointer while preserving its retained record.
+---@param clear_index boolean|nil
+function M.clear_current_maintenance_incident (clear_index)
+  M.retain_maintenance_incident(M.maintenance_client_incident)
+  M.maintenance_client_incident = nil
+  if clear_index then M.maintenance_client_incidents = {} end
+end
 
 ---Update rebuilding only when VALUE is explicit server status metadata.
 ---An omitted field preserves the last authoritative value.

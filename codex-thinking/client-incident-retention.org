@@ -1,0 +1,15 @@
+* Client incident retention and status selection
+** Existing server interface
+'pending-incidents' supplies incident ID, maintenance epoch and phase for every
+incident whose terminal outcome is not acknowledged. 'maintenance status' accepts
+an explicit incident ID and epoch, returning its retained report independently
+of the currently active graph transition. No parallel server ledger is needed.
+** Next client boundary
+Retain incident-local recovery and report state when another incident becomes
+active. Keep the current active pointer as an adapter while adding explicit
+selection by incident identity. An older report is historical operation data;
+it must not overwrite versioned global current-state metadata or release another
+incident's buffer restrictions.
+** Counterexample
+Retain unsettled incident A, allocate B, and request A's status. A's archive,
+census and report state must remain available; B remains the active workflow.

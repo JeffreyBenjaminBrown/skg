@@ -47,6 +47,43 @@
            ,@body)
        (when (buffer-live-p buffer) (kill-buffer buffer)))))
 
+(ert-deftest test-skg-maintenance-retains-replaced-incident-records ()
+  (let ((skg--maintenance-client-incident nil)
+        (skg--maintenance-client-incidents nil)
+        (incident-a '(:incident-id "incident-a" :phase settling
+                      :archive (:path "/a") :locally-applied ("buffer-a")))
+        (incident-b '(:incident-id "incident-b" :phase awaiting-census)))
+    (skg--maintenance-replace-current-incident incident-a)
+    ;; Extending the active plist may change its head without updating the index.
+    (setq skg--maintenance-client-incident
+          (append '(:settlements ("settlement-a")) incident-a))
+    (should (equal '("settlement-a")
+                   (plist-get (skg--maintenance-lookup-incident "incident-a")
+                              :settlements)))
+    (skg--maintenance-replace-current-incident incident-b)
+    (should (equal '("settlement-a")
+                   (plist-get (skg--maintenance-lookup-incident "incident-a")
+                              :settlements)))
+    (should (eq incident-b skg--maintenance-client-incident))
+    ;; A later plist extension must be visible through current-ID lookup.
+    (setq skg--maintenance-client-incident
+          (append '(:settlements ("settlement-b")) incident-b))
+    (should (equal '("settlement-b")
+                   (plist-get (skg--maintenance-lookup-incident "incident-b")
+                              :settlements)))
+    (should (equal '("settlement-b")
+                   (plist-get (car (skg--maintenance-list-incidents))
+                              :settlements)))
+    (skg--maintenance-clear-current-incident)
+    (should-not skg--maintenance-client-incident)
+    (should (equal '("settlement-a")
+                   (plist-get (skg--maintenance-lookup-incident "incident-a")
+                              :settlements)))
+    (should (equal '("settlement-b")
+                   (plist-get (skg--maintenance-lookup-incident "incident-b")
+                              :settlements)))
+    (should (= 2 (length (skg--maintenance-list-incidents))))))
+
 (ert-deftest test-skg-begin-maintenance-sends-exact-explicit-targets ()
   (let (request registered-handler)
     (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
