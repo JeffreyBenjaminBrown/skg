@@ -197,6 +197,23 @@ impl CoordinatorOwner {
   pub(crate) fn snapshot (&self) -> MaintenanceCoordinator {
     self . published . load () . coordinator . clone () }
 
+  /// Cheap scan checkpoints must not clone the incident and query journals.
+  /// One publication supplies both the base fence and maintenance priority.
+  pub(crate) fn ordinary_observation_is_current (
+    &self,
+    base : &Arc<SelectedRuntimeSnapshot>,
+  ) -> bool {
+    let published = self . published . load ();
+    published . failure . is_none ()
+      && published . reservation . as_ref ()
+        . is_none_or (|reservation| reservation . status . blocked_reason . is_none ())
+      && matches! (published . coordinator . state,
+        CoordinatorState::Idle | CoordinatorState::Observing
+        | CoordinatorState::Pending (_))
+      && published . selected . as_ref ()
+        . is_some_and (|selected| Arc::ptr_eq (selected, base))
+  }
+
   pub(crate) fn subscribe_query_waits (
     &self,
     wake : SyncSender<()>,
@@ -811,8 +828,11 @@ mod tests {
   use crate::dbs::in_rust_graph::InRustGraph;
   use crate::dbs::init::empty_in_ram_tantivy_index;
   use crate::maintenance::types::{MaintenanceOrigin, PendingReason};
+  use crate::maintenance::candidate::observe_complete_disk_with_checkpoint;
+  use crate::maintenance::ObservationSequence;
   use crate::types::misc::{SkgConfig, TantivyIndex};
   use std::collections::HashMap;
+  use std::io;
   use std::path::PathBuf;
   use std::time::Duration;
   use tempfile::tempdir;
@@ -868,6 +888,55 @@ mod tests {
     owner . reserve_mutation (operation_id,
       snapshot . selected . graph_generation,
       snapshot . selected . manifest_revision) }
+
+  #[test]
+  fn ordinary_scan_yields_at_its_next_checkpoint_when_maintenance_begins () {
+    let snapshot : Arc<SelectedRuntimeSnapshot> = fixture_snapshot ();
+    let owner : Arc<CoordinatorOwner> = Arc::new (fixture_owner (snapshot));
+    let snapshot : Arc<SelectedRuntimeSnapshot> = owner . selected_snapshot () . unwrap ();
+    let worker_owner : Arc<CoordinatorOwner> = Arc::clone (&owner);
+    let worker_snapshot : Arc<SelectedRuntimeSnapshot> = Arc::clone (&snapshot);
+    let (entered_sender, entered_receiver) = sync_channel (0);
+    let (release_sender, release_receiver) = sync_channel (0);
+    assert! (owner . ordinary_observation_is_current (&snapshot));
+    let worker = thread::spawn (move || {
+      observe_complete_disk_with_checkpoint (
+        &worker_snapshot . env . config, &worker_snapshot . selected,
+        ObservationSequence::INITIAL, &mut || {
+          entered_sender . send (()) . unwrap ();
+          release_receiver . recv () . unwrap ();
+          if worker_owner . ordinary_observation_is_current (&worker_snapshot) {
+            Ok (( ))
+          } else {
+            Err (io::Error::new (io::ErrorKind::Interrupted, "maintenance began"))
+          }
+        }) . is_none ()
+    });
+    entered_receiver . recv_timeout (Duration::from_secs (2)) . unwrap ();
+    owner . transition (|coordinator|
+      coordinator . begin (MaintenanceOrigin::FullRebuild, None)) . unwrap ();
+    release_sender . send (()) . unwrap ();
+    assert! (worker . join () . unwrap ());
+    assert! (matches! (owner . snapshot () . state, CoordinatorState::Active (_)));
+    assert! (Arc::ptr_eq (&owner . selected_snapshot () . unwrap (), &snapshot));
+  }
+
+  #[test]
+  fn ordinary_scan_base_check_tracks_selection_but_not_report_metadata () {
+    let before : Arc<SelectedRuntimeSnapshot> = fixture_snapshot ();
+    let owner : CoordinatorOwner = fixture_owner (before);
+    let before : Arc<SelectedRuntimeSnapshot> = owner . selected_snapshot () . unwrap ();
+    owner . transition (|coordinator| coordinator . set_pending_invalid (
+      PendingReason::InvalidDisk, vec!["outside change" . into ()])) . unwrap ();
+    assert! (owner . ordinary_observation_is_current (&before));
+    owner . transition (|coordinator| coordinator . observation_equal ()) . unwrap ();
+    let token : ReservationToken = reserve_current (&owner, "save") . unwrap ();
+    owner . authorize_mutation (&token) . unwrap ();
+    owner . publish_selected (&token, next_snapshot (&before)) . unwrap ();
+    assert! (!owner . ordinary_observation_is_current (&before));
+    assert! (owner . ordinary_observation_is_current (
+      &owner . selected_snapshot () . unwrap ()));
+  }
 
   #[test]
   fn publication_revision_orders_admission_graph_and_failure_without_conflating_them () {

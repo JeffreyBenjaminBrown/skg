@@ -2884,3 +2884,35 @@ recorded in [[../../codex-thinking/observation-boundaries.org]].
 ** choices determining the future
 Cancellation must preserve pending observation work and must never report an
 unfinished scan as disk equality or invalidity.
+
+* Simplify/cohere checkpoint: ordinary scans yield to newer owner authority
+** what's done and went well
+Ordinary scans now check the owner's current publication between source entries,
+file reads, telescope folds, graph nodes, validation passes and evidence records.
+Maintenance taking over, a replacement selected snapshot or failed authority
+interrupts the scan. The worker retains a successor sweep without publishing an
+unfinished candidate, equality result or invalid-disk diagnosis. Checkpoints do
+not clone the coordinator journal.
+
+The filesystem adapter tests pass 17, graph checkpoint tests pass three, candidate
+tests pass eight, owner tests pass 28 and observer tests pass 11. The candidate
+regression interrupts every reached checkpoint in turn. The held-owner regression
+starts maintenance while an ordinary scan is paused and proves the next checkpoint
+returns without changing selection or the active incident.
+
+Logs are '/tmp/observation-checkpoint-filesystem.log',
+'/tmp/observation-checkpoint-graph.log',
+'/tmp/observation-candidate-cancellation-final.log',
+'/tmp/observation-owner-cancellation-final.log' and
+'/tmp/observation-worker-cancellation-final.log'.
+** Changes to the plan's envisioned order.
+Land compatible builder adapters separately from the observation integration.
+The first owner test failure was a fixture using the pre-pinning snapshot rather
+than the actual publication; see [[../../codex-thinking/observation-boundaries.org]].
+** what's imperfect about what's done
+Cancellation is cooperative between files/nodes; it cannot interrupt a single
+system read or one node's fold/diff. Ordinary path hints still request a full
+scan, and the known targeted alias fallback still needs its baseline correction.
+** choices determining the future
+A canceled scan has no disk outcome. Keep its work pending, and preserve ordinary
+observation when only coordinator/report metadata changes on the same selection.

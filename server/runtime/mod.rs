@@ -133,6 +133,13 @@ impl ServerRuntime {
   pub fn maintenance_snapshot (&self) -> MaintenanceCoordinator {
     self . owner . snapshot () }
 
+  pub(crate) fn ordinary_observation_is_current (
+    &self,
+    base : &Arc<SelectedRuntimeSnapshot>,
+  ) -> bool {
+    self . owner . ordinary_observation_is_current (base)
+  }
+
   pub(crate) fn publication (
     &self,
   ) -> (u64, Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator, Option<String>) {

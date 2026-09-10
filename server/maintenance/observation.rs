@@ -2,7 +2,7 @@
 
 use crate::maintenance::candidate::{
   DiskObservation,
-  observe_complete_disk,
+  observe_complete_disk_with_checkpoint,
   observe_complete_maintenance_disk,
   observe_targeted_disk,
 };
@@ -35,6 +35,7 @@ use notify::{
 use sexp::{Atom, Sexp};
 use std::collections::BTreeSet;
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Weak, mpsc};
 use std::thread;
@@ -695,16 +696,21 @@ fn run_observation (
     return;
   }
   let snapshot = runtime . selected_snapshot ();
-  let result = observe_complete_disk (
-    &snapshot . env . config, &snapshot . selected, sequence);
-  let latest = runtime . selected_snapshot ();
-  if latest . selected . graph_generation
-     != snapshot . selected . graph_generation
-  || latest . selected . manifest_revision
-     != snapshot . selected . manifest_revision
-  {
-    let _ = runtime . schedule_full_observation (
-      QueuedObservationReason::SelectedGenerationAdvanced);
+  let result = observe_complete_disk_with_checkpoint (
+    &snapshot . env . config, &snapshot . selected, sequence, &mut || {
+      if runtime . ordinary_observation_is_current (&snapshot) {
+        Ok (( ))
+      } else {
+        Err (io::Error::new (io::ErrorKind::Interrupted,
+          "ordinary observation yielded to newer owner authority"))
+      }
+    });
+  let Some (result) = result else {
+    retry_unpublished_observation (runtime);
+    return;
+  };
+  if !runtime . ordinary_observation_is_current (&snapshot) {
+    retry_unpublished_observation (runtime);
     return;
   }
   match result {

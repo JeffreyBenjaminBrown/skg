@@ -2,7 +2,8 @@
 
 use crate::dbs::filesystem::multiple_nodes::{
   distinct_id_claim_conflicts,
-  fold_grouped_sections,
+  distinct_id_claim_conflicts_with_checkpoint,
+  fold_grouped_sections_with_checkpoint,
 };
 use crate::dbs::filesystem::one_node::{
   parse_nodefs_bytes,
@@ -10,20 +11,25 @@ use crate::dbs::filesystem::one_node::{
 };
 use crate::dbs::filesystem::source_files::{
   SourceFile,
-  selected_direct_source_files,
+  selected_direct_source_files_with_checkpoint,
   selected_path_digest_manifest,
+  selected_path_digest_manifest_with_checkpoint,
   select_source_file_candidates_for_pid,
 };
 use crate::dbs::in_rust_graph::{
   InRustGraph,
-  override_invariants::error_unless_override_invariants_hold,
+  override_invariants::{
+    error_unless_override_invariants_hold,
+    format_override_invariant_violations,
+    validate_override_invariants_with_checkpoint,
+  },
 };
 use crate::maintenance::{
   CandidateId,
   CandidateSummary,
   ObservationSequence,
 };
-use crate::save::nodecompletes_from_graph;
+use crate::save::{nodecomplete_from_noderust, nodecompletes_from_graph};
 use crate::types::misc::{ID, MSV, MemberAtSource, SkgConfig, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::nodes::fs::NodeFS;
@@ -36,7 +42,7 @@ use crate::types::store_state::{
 use crate::telescope::fold::fold_telescope_collecting_warnings;
 use crate::telescope::invariants::{
   TelescopeViolation,
-  validate_all_telescopes,
+  validate_all_telescopes_with_checkpoint,
 };
 use crate::telescope::types::Telescope;
 
@@ -44,6 +50,7 @@ use serde::{Deserialize, Serialize};
 use similar::TextDiff;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
+use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -246,11 +253,11 @@ pub fn observe_complete_disk (
   covered_sequence  : ObservationSequence,
 ) -> DiskObservation {
   match observe_complete_disk_inner (
-      config, selected, covered_sequence, false)
+      config, selected, covered_sequence, false, &mut || Ok (() ))
   {
     Ok (result) => result,
     Err (error) => DiskObservation::Invalid {
-      details: vec![error],
+      details: vec![error . to_string ()],
     },
   }
 }
@@ -265,12 +272,31 @@ pub fn observe_complete_maintenance_disk (
   covered_sequence  : ObservationSequence,
 ) -> DiskObservation {
   match observe_complete_disk_inner (
-      config, selected, covered_sequence, true)
+      config, selected, covered_sequence, true, &mut || Ok (() ))
   {
     Ok (result) => result,
     Err (error) => DiskObservation::Invalid {
-      details: vec![error],
+      details: vec![error . to_string ()],
     },
+  }
+}
+
+/// An interrupted ordinary scan has no observation outcome. Its caller keeps
+/// the work pending and gives authorized maintenance the worker next.
+pub(crate) fn observe_complete_disk_with_checkpoint (
+  config           : &SkgConfig,
+  selected         : &SelectedStoreState,
+  covered_sequence : ObservationSequence,
+  checkpoint       : &mut dyn FnMut() -> io::Result<()>,
+) -> Option<DiskObservation> {
+  match observe_complete_disk_inner (
+    config, selected, covered_sequence, false, checkpoint)
+  {
+    Ok (result) => Some (result),
+    Err (error) if error . kind () == io::ErrorKind::Interrupted => None,
+    Err (error) => Some (DiskObservation::Invalid {
+      details: vec![error . to_string ()],
+    }),
   }
 }
 
@@ -279,41 +305,55 @@ fn observe_complete_disk_inner (
   selected          : &SelectedStoreState,
   covered_sequence  : ObservationSequence,
   retain_noop_candidate : bool,
-) -> Result<DiskObservation, String> {
-  let captured = capture_selected_corpus (config)?;
+  checkpoint : &mut dyn FnMut() -> io::Result<()>,
+) -> io::Result<DiskObservation> {
+  checkpoint ()?;
+  let captured = capture_selected_corpus (config, checkpoint)?;
+  checkpoint ()?;
   if captured . manifest == *selected . manifest && !retain_noop_candidate {
     return Ok (DiskObservation::ByteEquivalent); }
 
-  let (nodes, violations) = fold_grouped_sections (
+  let (nodes, violations) = fold_grouped_sections_with_checkpoint (
     captured . sections_by_pid,
     captured . pid_order,
-    config)
-    . map_err (|error| format! ("disk corpus does not fold: {}", error))?;
-  let conflicts = distinct_id_claim_conflicts (&nodes);
+    config, checkpoint) . map_err (|error| io::Error::new (
+      error . kind (), format! ("disk corpus does not fold: {}", error)))?;
+  let conflicts = distinct_id_claim_conflicts_with_checkpoint (&nodes, checkpoint)?;
   if !conflicts . is_empty () {
     return Ok (DiskObservation::Invalid { details: vec![format! (
       "disk corpus has IDs claimed by multiple nodes: {:?}", conflicts)] }); }
-  let graph = InRustGraph::from_nodecompletes (&nodes);
-  if let Err (error) = error_unless_override_invariants_hold (config, &graph) {
+  let graph = InRustGraph::from_nodecompletes_with_checkpoint (
+    &nodes, checkpoint)?;
+  let override_violations = validate_override_invariants_with_checkpoint (
+    config, &graph, checkpoint)?;
+  if !override_violations . is_empty () {
+    let error : String = format_override_invariant_violations (
+      &override_violations);
     return Ok (DiskObservation::Invalid { details: vec![format! (
       "disk corpus violates override invariants: {}", error)] }); }
 
-  let final_manifest = selected_path_digest_manifest (config)
-    . map_err (|error| format! ("final disk stability read failed: {}", error))?;
+  let final_manifest = selected_path_digest_manifest_with_checkpoint (
+    config, checkpoint) . map_err (|error| io::Error::new (
+      error . kind (), format! ("final disk stability read failed: {}", error)))?;
+  checkpoint ()?;
   if final_manifest != captured . manifest {
     return Ok (DiskObservation::Unstable { details: vec![
       "selected disk bytes changed while the candidate was being folded"
         . into (),
     ] }); }
 
-  let before_nodes = nodes_by_pid (nodecompletes_from_graph (&selected . graph));
-  let after_nodes = nodes_by_pid (nodes);
+  let before_nodes = observation_graph_nodes (&selected . graph, checkpoint)?;
+  let after_nodes : BTreeMap<ID, NodeComplete> = nodes . into_iter ()
+    . map (|node| {
+      checkpoint ()?;
+      Ok ((node . pid . clone (), node))
+    }) . collect::<io::Result<_>> ()?;
   if before_nodes == after_nodes {
     if retain_noop_candidate {
       return Ok (DiskObservation::Valid (complete_candidate (
         config, selected, covered_sequence,
         captured . manifest, captured . selected_bytes,
-        Arc::new (graph), violations))); }
+        Arc::new (graph), violations, checkpoint)?)); }
     return Ok (DiskObservation::SemanticallyEqual {
       manifest: captured . manifest,
       selected_bytes: captured . selected_bytes,
@@ -322,7 +362,7 @@ fn observe_complete_disk_inner (
   Ok (DiskObservation::Valid (complete_candidate (
     config, selected, covered_sequence,
     captured . manifest, captured . selected_bytes, Arc::new (graph),
-    violations)))
+    violations, checkpoint)?))
 }
 
 fn complete_candidate (
@@ -333,14 +373,17 @@ fn complete_candidate (
   selected_bytes   : BTreeMap<PathBuf, Vec<u8>>,
   graph            : Arc<InRustGraph>,
   load_violations  : Vec<(ID, TelescopeViolation)>,
-) -> Arc<ObservedDiskCandidate> {
-  let before_nodes = nodes_by_pid (nodecompletes_from_graph (&selected . graph));
-  let after_nodes = nodes_by_pid (nodecompletes_from_graph (&graph));
+  checkpoint       : &mut dyn FnMut() -> io::Result<()>,
+) -> io::Result<Arc<ObservedDiskCandidate>> {
+  let before_nodes = observation_graph_nodes (&selected . graph, checkpoint)?;
+  let after_nodes = observation_graph_nodes (&graph, checkpoint)?;
 
-  let changes = classify_changes (&before_nodes, &after_nodes);
+  let changes = classify_changes_with_checkpoint (
+    &before_nodes, &after_nodes, checkpoint)?;
   let changed_primary_ids : Vec<String> = changes . all () . into_iter ()
     . map (|pid| pid . to_string ()) . collect ();
   let evidence = changes . all () . into_iter () . map (|pid| {
+    checkpoint ()?;
     let before = before_nodes . get (&pid) . map (SemanticNodeEvidence::from);
     let after = after_nodes . get (&pid) . map (SemanticNodeEvidence::from);
     let before_yaml = semantic_yaml (before . as_ref ());
@@ -349,9 +392,10 @@ fn complete_candidate (
       . unified_diff () . context_radius (3)
       . header ("before.semantic.yaml", "after.semantic.yaml")
       . to_string ();
-    (pid, SemanticChangeEvidence { before, after, diff })
-  }) . collect ();
-  let definitions = graph_delta (&before_nodes, &after_nodes);
+    Ok ((pid, SemanticChangeEvidence { before, after, diff }))
+  }) . collect::<io::Result<BTreeMap<_, _>>> ()?;
+  let definitions = graph_delta_with_checkpoint (
+    &before_nodes, &after_nodes, checkpoint)?;
   let summary = CandidateSummary {
     id: CandidateId::new (),
     base_graph_generation: selected . graph_generation,
@@ -359,12 +403,14 @@ fn complete_candidate (
     covered_sequence,
     changed_primary_ids,
   };
-  let mut all_violations = validate_all_telescopes (config, &graph);
+  let mut all_violations = validate_all_telescopes_with_checkpoint (
+    config, &graph, checkpoint)?;
   all_violations . extend (load_violations . clone ());
   all_violations . sort_by (|left, right| left . 0 . cmp (&right . 0));
   let warnings = all_violations . iter () . map (|(pid, warning)|
     format! ("{}: {}", pid, warning)) . collect ();
-  Arc::new (ObservedDiskCandidate {
+  checkpoint ()?;
+  Ok (Arc::new (ObservedDiskCandidate {
     summary,
     config_identity: config_identity (config),
     config_file_blake3: config_file_blake3 (config),
@@ -382,7 +428,7 @@ fn complete_candidate (
     warnings,
     load_violations,
     disk_fence: CandidateDiskFence::Complete,
-  })
+  }))
 }
 
 /// Observe just the named primary telescopes while retaining every unrelated
@@ -469,7 +515,8 @@ fn observe_targeted_disk_inner (
     // corpus fallback instead of pretending an untouched normalized node is
     // enough to recompute every alias resolution.
     return observe_complete_disk_inner (
-      config, selected, covered_sequence, true);
+      config, selected, covered_sequence, true, &mut || Ok (() ))
+      . map_err (|error| error . to_string ());
   }
   let after_values : Vec<NodeComplete> =
     after_nodes . values () . cloned () . collect ();
@@ -683,22 +730,26 @@ struct CapturedCorpus {
 
 fn capture_selected_corpus (
   config : &SkgConfig,
-) -> Result<CapturedCorpus, String> {
-  let selected = selected_direct_source_files (config)
-    . map_err (|error| format! ("could not enumerate source corpus: {}", error))?;
+  checkpoint : &mut dyn FnMut() -> io::Result<()>,
+) -> io::Result<CapturedCorpus> {
+  let selected = selected_direct_source_files_with_checkpoint (
+    config, checkpoint) . map_err (|error| io::Error::new (
+      error . kind (), format! ("could not enumerate source corpus: {}", error)))?;
   let mut sections_by_pid = HashMap::new ();
   let mut manifest = SelectedPathManifest::new ();
   let mut selected_bytes = BTreeMap::new ();
   for pid in &selected . pid_order {
     for file in selected . by_pid . get (pid) . into_iter () . flatten () {
-      let bytes = fs::read (&file . path) . map_err (|error| format! (
-        "could not read {}: {}", file . path . display (), error))?;
+      checkpoint ()?;
+      let bytes = fs::read (&file . path) . map_err (|error| io::Error::new (
+        error . kind (), format! (
+          "could not read {}: {}", file . path . display (), error)))?;
       let node = parse_nodefs_bytes (&bytes, &file . path)
-        . map_err (|error| format! ("could not parse {}: {}",
-          file . path . display (), error))?;
+        . map_err (|error| io::Error::new (error . kind (), format! (
+          "could not parse {}: {}", file . path . display (), error)))?;
       validate_pid_matches_filename (&node, &file . path)
-        . map_err (|error| format! ("invalid {}: {}",
-          file . path . display (), error))?;
+        . map_err (|error| io::Error::new (error . kind (), format! (
+          "invalid {}: {}", file . path . display (), error)))?;
       manifest . insert (
         file . path . clone (), PathDigest::of_bytes (&bytes));
       selected_bytes . insert (file . path . clone (), bytes);
@@ -732,8 +783,18 @@ fn classify_changes (
   before : &BTreeMap<ID, NodeComplete>,
   after  : &BTreeMap<ID, NodeComplete>,
 ) -> ChangedNodes {
+  classify_changes_with_checkpoint (before, after, &mut || Ok (() ))
+    . expect ("infallible change classification")
+}
+
+fn classify_changes_with_checkpoint (
+  before : &BTreeMap<ID, NodeComplete>,
+  after  : &BTreeMap<ID, NodeComplete>,
+  checkpoint : &mut dyn FnMut() -> io::Result<()>,
+) -> io::Result<ChangedNodes> {
   let mut result = ChangedNodes::default ();
   for pid in before . keys () . chain (after . keys ()) {
+    checkpoint ()?;
     match (before . get (pid), after . get (pid)) {
       (None, Some (_)) => { result . added . insert (pid . clone ()); }
       (Some (_), None) => { result . deleted . insert (pid . clone ()); }
@@ -742,23 +803,44 @@ fn classify_changes (
       _ => {}
     }
   }
-  result
+  Ok (result)
 }
 
 fn graph_delta (
   before : &BTreeMap<ID, NodeComplete>,
   after  : &BTreeMap<ID, NodeComplete>,
 ) -> Vec<DefineNode> {
-  let changes = classify_changes (before, after);
-  changes . all () . into_iter () . filter_map (|pid|
-    match after . get (&pid) {
-      Some (node) => Some (DefineNode::Save (SaveNode (node . clone ()))),
-      None => before . get (&pid) . map (|node|
-        DefineNode::Delete (DeleteNode {
-          id: pid,
-          source: node . source . clone (),
-        })),
-    }) . collect ()
+  graph_delta_with_checkpoint (before, after, &mut || Ok (() ))
+    . expect ("infallible graph delta")
+}
+
+fn graph_delta_with_checkpoint (
+  before : &BTreeMap<ID, NodeComplete>,
+  after  : &BTreeMap<ID, NodeComplete>,
+  checkpoint : &mut dyn FnMut() -> io::Result<()>,
+) -> io::Result<Vec<DefineNode>> {
+  let changes = classify_changes_with_checkpoint (before, after, checkpoint)?;
+  changes . all () . into_iter () . map (|pid| {
+    checkpoint ()?;
+    Ok (match after . get (&pid) {
+      Some (node) => DefineNode::Save (SaveNode (node . clone ())),
+      None => DefineNode::Delete (DeleteNode {
+        id: pid . clone (),
+        source: before . get (&pid) . expect ("deleted node exists")
+          . source . clone (),
+      }),
+    })
+  }) . collect ()
+}
+
+fn observation_graph_nodes (
+  graph : &InRustGraph,
+  checkpoint : &mut dyn FnMut() -> io::Result<()>,
+) -> io::Result<BTreeMap<ID, NodeComplete>> {
+  graph . nodes . iter () . map (|(pid, node)| {
+    checkpoint ()?;
+    Ok ((pid . clone (), nodecomplete_from_noderust (node)))
+  }) . collect ()
 }
 
 fn nodes_by_pid (
@@ -823,6 +905,53 @@ mod tests {
   use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_with_manifest;
   use crate::types::misc::{SkgfileSource, SourceCatalog};
   use tempfile::tempdir;
+
+  #[test]
+  fn ordinary_scan_cancellation_never_returns_a_partial_observation () {
+    let temporary = tempdir () . unwrap ();
+    let source : SourceName = SourceName::from ("owned");
+    let config : SkgConfig = SkgConfig::dummyFromSources (HashMap::from ([
+      (source . clone (), SkgfileSource {
+        name: source, abbreviation: None,
+        path: temporary . path () . to_path_buf (), user_owns_it: true,
+      }),
+    ]));
+    fs::write (temporary . path () . join ("A.skg"),
+      "pid: A\ntitle: A\ncontains: [B]\n") . unwrap ();
+    fs::write (temporary . path () . join ("B.skg"),
+      "pid: B\ntitle: B\n") . unwrap ();
+    let selected : SelectedStoreState = SelectedStoreState::initial (
+      InRustGraph::new (), SelectedPathManifest::new ());
+    let mut checkpoints : usize = 0;
+    let complete = observe_complete_disk_with_checkpoint (
+      &config, &selected, ObservationSequence::INITIAL, &mut || {
+        checkpoints += 1;
+        Ok (( ))
+      });
+    let Some (DiskObservation::Valid (candidate)) = complete else {
+      panic! ("uninterrupted scan must produce the complete candidate"); };
+    assert_eq! (candidate . graph . len (), 2);
+    assert_eq! (candidate . manifest . len (), 2);
+    // Interrupt every reachable checkpoint in turn, including the late
+    // evidence/validation passes. No earlier successful stage may escape.
+    for interrupt_at in 1..=checkpoints {
+      let mut visited : usize = 0;
+      let interrupted = observe_complete_disk_with_checkpoint (
+        &config, &selected, ObservationSequence::INITIAL, &mut || {
+          visited += 1;
+          if visited == interrupt_at {
+            Err (io::Error::new (io::ErrorKind::Interrupted, "test cancellation"))
+          } else { Ok (( )) }
+        });
+      assert! (interrupted . is_none (), "checkpoint {}", interrupt_at);
+    }
+    assert! (selected . graph . nodes . is_empty ());
+    fs::write (temporary . path () . join ("A.skg"), "[invalid yaml")
+      . unwrap ();
+    assert! (matches! (observe_complete_disk_with_checkpoint (
+      &config, &selected, ObservationSequence::INITIAL, &mut || Ok (() )),
+      Some (DiskObservation::Invalid { .. })));
+  }
 
   #[test]
   fn targeted_candidate_changes_only_named_telescopes_and_fences_their_paths () {

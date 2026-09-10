@@ -10,6 +10,23 @@ job. Cancellation needs checkpoints in capture, fold and validation, and must
 retain the unconsumed hints. A canceled scan is neither equal nor invalid disk.
 Use a held capture test: authorize maintenance while the scan is held, release
 one checkpoint, then require the scan to yield without publishing its result.
+
+The ordinary scan now uses cooperative checkpoints through source enumeration,
+file capture, telescope folding, graph construction, invariant validation and
+evidence generation. Each checkpoint reads one owner publication without copying
+the journal. A changed selected snapshot, active maintenance or failed authority
+interrupts the scan; its caller schedules the successor sweep. Ordinary report
+metadata updates do not replace the selected snapshot or cancel a valid scan.
+
+The held-owner regression initially used the input fixture Arc as its base;
+the owner pins a fresh snapshot during initialization. Using the actual published
+base fixes this test-fixture mistake. The production caller already obtains that
+published base. First failure: '/tmp/observation-owner-cancellation.log'.
+
+Cancellation is cooperative between files/nodes and major stages. It cannot
+interrupt a single operating-system read or a single node's fold/diff computation.
+The remaining observation work is targeted ordinary hints and the alias fallback
+below; do not rediscover or repeat the completed cancellation adapters.
 ** Targeted alias changes
 'observe_targeted_disk_inner' falls back to live complete disk when a target's
 extra IDs change. That can import an unrelated changed B while reloading A.
