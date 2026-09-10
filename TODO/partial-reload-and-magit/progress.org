@@ -2758,6 +2758,29 @@ Current admission is a separate state variable; incident record existence is not
 a substitute. Remaining exact consumers are mapped in
 [[../../codex-thinking/remaining-client-entry-points.org]].
 
+* Simplify/cohere checkpoint: accumulated client and Rust validation
+** what's done and went well
+After pull callback scoping, the full Emacs suite passes 517 tests and Neovim
+passes 470. Logs are '/tmp/pull-scoping-emacs-checkpoint.log' and
+'/tmp/pull-scoping-nvim-checkpoint.log'. The preceding Rust all-target check
+and nextest run passed 882 tests.
+
+The one ignored nextest corpus benchmark was run explicitly against the
+available 'data/skgconfig.toml' and passed. Evidence publication took 878 ms,
+recovery loading 641 ms and client transfer 79 ms for 5455847 bytes. This is
+the available development data, not a claim about Jeff's production corpus.
+The log is '/tmp/evidence-real-corpus-checkpoint.log'. Rust doctests pass their
+one executable example; the other is deliberately an illustrative 'ignore'
+block in 'server/types/tree/generic.rs'. See '/tmp/incident-doc-checkpoint.log'.
+** Changes to the plan's envisioned order.
+Account for the skipped test before proceeding to observation scheduling.
+** what's imperfect about what's done
+This checkpoint does not establish the complete process lifecycle or timing
+acceptance matrix from document 11.
+** choices determining the future
+Continue with the bounded observation worker and preserve these logs instead
+of repeating the same broad checks during its implementation.
+
 * Simplify/cohere checkpoint: pending reports do not block pull or rebuild
 ** what's done and went well
 Both clients permit pull/rebuild bootstrap when the current server publication
