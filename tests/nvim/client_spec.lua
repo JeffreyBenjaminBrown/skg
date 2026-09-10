@@ -31,6 +31,19 @@ describe('skg.client', function ()
     config.config_file_path = nil
   end)
 
+  it('preserves constructor admission across connection reset with a retained report', function ()
+    for _, barrier in ipairs({ 'open', 'closing', 'closed' }) do
+      state.maintenance_client_incident = { incident_id = 'report', phase = 'finalizing-archive' }
+      state.client_constructor_admission = barrier
+      client.handle_rust_response('((busy-initializing . "still starting"))\n')
+      assert.are.equal(barrier, state.client_constructor_admission)
+      client.sentinel('closed')
+      assert.are.equal(barrier, state.client_constructor_admission)
+    end
+    state.client_constructor_admission = 'open'
+    state.maintenance_client_incident = nil
+  end)
+
   it('reports a helpful message when the server is unreachable',
      function ()
     -- Mirrors test-skg-connect-failure-points-to-startup-logs.

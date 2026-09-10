@@ -22,3 +22,6 @@ Established progress belongs in [[file:../TODO/partial-reload-and-magit/progress
 
 * Client incident retention
 [[file:client-incident-retention.org][Retained reports and explicit incident selection]]
+
+* Remaining client entry points
+[[file:remaining-client-entry-points.org][Command guards and external origin continuations]]

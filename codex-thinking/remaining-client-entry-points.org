@@ -1,0 +1,22 @@
+* Remaining client entry points after incident retention
+** Command guards
+'nvim/lua/skg/misc_requests.lua:rebuild_dbs', 'nvim/lua/skg/pull.lua:pull_all',
+'elisp/skg-request-rebuild-dbs.el:skg-rebuild-dbs' and
+'elisp/skg-pull.el:skg-pull-all' refuse any nonnil current incident. Replace that
+assumption with current graph admission; an older pending report is not a writer.
+Use the existing maintenance and pull specs for each client.
+** Origin callbacks
+Both pull adapters have failure handlers and scheduled origin continuations which
+consult the ambient current incident. Bind the original ID through the scoped
+maintenance helpers; dropping old callbacks would strand their work. Neovim's
+'schedule_next' and 'job_exited' already capture/check IDs, but 'request_failure',
+'resume_running' and 'origin_operation_handler' still need review. Emacs needs
+its schedule-next wrapper, sentinel, failure handlers and origin handler scoped.
+** Constructor consumers
+'nvim/lua/skg/client.lua' and 'elisp/skg-client.el' still close constructor
+admission whenever any current incident exists, including on reconnect. Their
+comments incorrectly tie this to terminal ACK. Inspect these exact consumers
+against the current graph publication after the command guard slice.
+** Audit limit
+These are read-only findings from a bounded audit outside the maintenance/state
+modules, not verification that the remaining entry-point migration is complete.

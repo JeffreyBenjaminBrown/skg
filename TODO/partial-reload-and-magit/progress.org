@@ -2734,3 +2734,26 @@ claim completion of legacy protocol/epoch removal.
 ** choices determining the future
 Treat omitted inventory and explicitly empty inventory as different authority.
 A compact active phase alone is insufficient to enroll every current buffer.
+
+* Simplify/cohere checkpoint: connection reset preserves the constructor barrier
+** what's done and went well
+Connection reset and reconnect in both clients preserve the existing constructor
+admission state instead of deriving a new barrier from a retained incident record.
+A report cannot close an already-open barrier; a real closing or closed bootstrap
+barrier is preserved. Fresh verification and current graph metadata still control
+session authority and readiness.
+
+The 16 Emacs client tests and seven Neovim client tests pass, including all three
+barrier states across busy-initializing and socket-close cleanup. Logs are
+'/tmp/report-constructor-reset-elisp.log' and
+'/tmp/report-constructor-reset-nvim.log'.
+** Changes to the plan's envisioned order.
+Fix the constructor consumer alongside the independently delegated pull/rebuild
+command guards, using disjoint files.
+** what's imperfect about what's done
+Pull/rebuild command guards and external-origin callback ownership still need their
+remaining slices. This checkpoint does not claim complete entry-point coverage.
+** choices determining the future
+Current admission is a separate state variable; incident record existence is not
+a substitute. Remaining exact consumers are mapped in
+[[../../codex-thinking/remaining-client-entry-points.org]].

@@ -92,18 +92,14 @@
       (delete-process skg-rust-tcp-proc))
     (skg-clear-request-coordinator)
     (skg-lp-reset)
+    ;; Bootstrap and current graph publications own the constructor barrier.
+    ;; Reconnect preserves its state independently of retained incident reports.
     (setq skg--connection-handshake-state nil
           skg--connection-handshake-error nil
           skg--connection-busy-message nil
           skg--server-session-id nil
           skg--owner-publication-revision nil
           skg--graph-write-admission nil
-          skg--client-constructor-admission
-          (cond
-           ((and (boundp 'skg--maintenance-client-incident)
-                 skg--maintenance-client-incident) 'closed)
-           ((eq skg--client-constructor-admission 'closing) 'closing)
-           (t 'open))
           skg--git-diff-mode-enabled
           ;; The server starts each connection with diff mode off.
           nil
@@ -200,10 +196,6 @@ the request record named by its request-id."
                 skg--server-session-id nil
                 skg--owner-publication-revision nil
                 skg--graph-write-admission nil
-                skg--client-constructor-admission
-                (if (and (boundp 'skg--maintenance-client-incident)
-                         skg--maintenance-client-incident)
-                    'closed 'open)
                 skg--connection-busy-message status)
           (skg-clear-request-coordinator)
           (skg-lp-reset))
@@ -223,11 +215,7 @@ the request record named by its request-id."
       (setq skg--connection-handshake-state nil))
     (setq skg--server-session-id nil
           skg--owner-publication-revision nil
-          skg--graph-write-admission nil
-          skg--client-constructor-admission
-          (if (and (boundp 'skg--maintenance-client-incident)
-                   skg--maintenance-client-incident)
-              'closed 'open))
+          skg--graph-write-admission nil)
     (skg-clear-request-coordinator)
     (skg-lp-reset)) )
 

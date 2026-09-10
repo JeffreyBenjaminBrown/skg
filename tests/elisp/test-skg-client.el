@@ -348,3 +348,19 @@
       (kill-buffer content))))
 
 (provide 'test-skg-client)
+
+(ert-deftest test-skg-connection-reset-preserves-constructor-barrier-independently-of-reports ()
+  (dolist (barrier '(open closing closed))
+    (let ((skg-rust-tcp-proc 'current-process)
+          (skg--maintenance-client-incident '(:incident-id "report" :phase finalizing-archive))
+          (skg--client-constructor-admission barrier)
+          (skg--connection-handshake-state 'verified)
+          (skg--server-session-id nil)
+          (skg--connection-handshake-error nil))
+      (cl-letf (((symbol-function 'skg-clear-request-coordinator) #'ignore)
+                ((symbol-function 'skg-lp-reset) #'ignore))
+        (skg-handle-rust-response
+         skg-rust-tcp-proc "((busy-initializing . \"still starting\"))\n")
+        (should (eq barrier skg--client-constructor-admission))
+        (skg--tcp-sentinel skg-rust-tcp-proc "closed\n")
+        (should (eq barrier skg--client-constructor-admission))))))
