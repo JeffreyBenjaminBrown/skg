@@ -29,3 +29,12 @@ The ordinary save dispatch error path still journals a refusal when its operatio
 has no staged record. A reservation collision with an in-flight command using
 the same operation UUID must not create a competing record before that command's
 preparation. Use the same no-journal collision response as durable commands.
+** Prepared rendering interface
+'prepare_save_view_update' now performs rendering and privacy checks against a
+read-only view snapshot. 'apply_save_view_update' performs the registry update
+and schedules collateral work against the current live registry. Existing
+synchronous adapters compose those phases. 'OpenViews::snapshot_view' retains
+only the initiating view, including its exact authority and semantic save base.
+** Remaining client prerequisite
+Check ordinary-save transient lock cleanup before enabling yield. Global cleanup
+on a refused competing save must not remove an earlier save's restrictions.

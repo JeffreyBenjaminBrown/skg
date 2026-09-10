@@ -38,6 +38,7 @@ pub struct OpenViews {
 /// Invariant: all viewforest mutations must go through register_view /
 /// update_view, which maintain pids in sync with the viewforest.
 /// Direct viewforest mutation would make pids stale.
+#[derive(Clone)]
 pub struct ViewState {
   /// Exact semantic and path base of the accepted text. Updating a display
   /// generation alone must not replace this older proof input.
@@ -129,6 +130,18 @@ impl OpenViews {
     OpenViews {
       views       : HashMap::new (),
       root_ids    : ManyToMany::new () }}
+
+  pub(crate) fn snapshot_view (
+    &self,
+    uri : &ViewUri,
+  ) -> OpenViews {
+    let mut snapshot : OpenViews = OpenViews::new ();
+    let Some (state) : Option<&ViewState> = self . views . get (uri)
+      else { return snapshot; };
+    snapshot . views . insert (uri . clone (), state . clone ());
+    for root_id in &state . root_ids {
+      snapshot . root_ids . insert (root_id . clone (), uri . clone ()); }
+    snapshot }
 
   pub fn clear (&mut self) {
     self . views       . clear ();
@@ -473,3 +486,88 @@ pub(crate) fn root_ids_from_viewforest (
             for extra_id in &node . extra_ids {
               ids . insert ( extra_id . clone () ); }}}}}}
   ids }
+
+#[cfg(test)]
+mod tests {
+  use super::{OpenViews, ViewSaveBase, ViewState, ViewUri};
+  use crate::maintenance::BufferKind;
+  use crate::types::misc::SkgConfig;
+  use crate::types::store_state::{
+    GraphGeneration, ManifestRevision, SelectedGraphBase};
+  use crate::types::tree::forest::ViewForest;
+  use crate::types::misc::ID;
+  use std::collections::{BTreeMap, HashMap, HashSet};
+  use std::sync::Arc;
+
+  fn save_base () -> ViewSaveBase {
+    let selected : SelectedGraphBase = SelectedGraphBase {
+      graph             : Arc::new (crate::dbs::in_rust_graph::InRustGraph::new ()),
+      graph_generation  : GraphGeneration::INITIAL,
+      manifest_revision : ManifestRevision::INITIAL,
+      manifest          : Arc::new (BTreeMap::new ()), };
+    ViewSaveBase {
+      selected,
+      config     : SkgConfig::dummyFromSources (HashMap::new ()),
+      source_set : "all" . into (), }
+  }
+
+  fn view_state (root_id : ID, revision : u64) -> ViewState {
+    let mut root_ids : HashSet<ID> = HashSet::new ();
+    root_ids . insert (root_id);
+    ViewState {
+      save_base                 : Some (save_base ()),
+      viewforest                : ViewForest::new (),
+      pids                      : HashSet::new (),
+      revision,
+      graph_generation          : 9,
+      presentation_generation   : 13,
+      client_application_token : 17,
+      client_buffer_id          : Some ("buffer" . into ()),
+      writes_admitted           : true,
+      kind                      : BufferKind::ContentView,
+      recipe                    : Some ("recipe" . into ()),
+      root_ids,
+      source_set                : "all" . into (),
+      presentation_stale        : false,
+      search_stale              : false, }
+  }
+
+  #[test]
+  fn snapshot_view_copies_one_independent_view_and_root_reverse_lookup () {
+    let uri : ViewUri = ViewUri::ContentView ("chosen" . into ());
+    let other_uri : ViewUri = ViewUri::ContentView ("other" . into ());
+    let root_id : ID = ID::from ("root");
+    let other_root_id : ID = ID::from ("other-root");
+    let mut open_views : OpenViews = OpenViews::new ();
+    open_views . views . insert (
+      uri . clone (), view_state (root_id . clone (), 23));
+    open_views . root_ids . insert (root_id . clone (), uri . clone ());
+    open_views . views . insert (
+      other_uri . clone (), view_state (other_root_id . clone (), 31));
+    open_views . root_ids . insert (
+      other_root_id . clone (), other_uri . clone ());
+
+    let mut snapshot : OpenViews = open_views . snapshot_view (&uri);
+    assert_eq! (snapshot . views . len (), 1);
+    let copied : &ViewState = snapshot . views . get (&uri) . unwrap ();
+    let original : &ViewState = open_views . views . get (&uri) . unwrap ();
+    assert_eq! (copied . revision, original . revision);
+    assert_eq! (
+      copied . client_application_token,
+      original . client_application_token);
+    assert_eq! (copied . save_base . as_ref () . unwrap () . source_set, "all");
+    assert_eq! (copied . viewforest, original . viewforest);
+    assert_eq! (
+      snapshot . content_view_uri_for_root_id (&root_id), Some (&uri));
+    assert! (snapshot . content_view_uri_for_root_id (&other_root_id) . is_none ());
+    let missing_uri : ViewUri = ViewUri::ContentView ("missing" . into ());
+    let missing : OpenViews = open_views . snapshot_view (&missing_uri);
+    assert! (missing . views . is_empty ());
+
+    snapshot . unregister_view (&uri);
+    assert! (snapshot . views . is_empty ());
+    assert! (open_views . views . contains_key (&uri));
+    assert_eq! (
+      open_views . content_view_uri_for_root_id (&root_id), Some (&uri));
+  }
+}

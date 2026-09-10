@@ -2436,3 +2436,28 @@ a cloned whole session would lose concurrent registrations and acknowledgements.
 The next boundary is recorded in
 [[../../codex-thinking/ordinary-save-responsiveness.org]]. Preserve the exact
 initiating view identity and merge only that view's checked settlement.
+
+* Simplify/cohere checkpoint: prepare save rendering before live settlement
+** what's done and went well
+Save rendering and privacy checks now produce a prepared value without mutating
+live views. A separate application step updates the registry and schedules
+collateral work against its current contents. Existing synchronous adapters
+compose the two phases with unchanged frame and privacy ordering.
+
+'OpenViews::snapshot_view' copies only the initiating view, retaining its exact
+authority, semantic save base and root reverse lookup. Its focused isolation
+regression passes. The 25 update-buffer tests and the actual save recovery test
+across authorized interruption boundaries also pass. Logs are
+'/tmp/update-buffer-prepared-tests.log' and
+'/tmp/save-prepared-view-socket-recovery.log'. Save result formatting is shared
+without changing its durable publication ordering.
+** Changes to the plan's envisioned order.
+Prepare the read-only rendering and exact view snapshot interfaces before
+changing ordinary save scheduling.
+** what's imperfect about what's done
+The ordinary save handler remains synchronous. Its worker must still check the
+initiating view's live authority before applying a prepared result. Client
+transient save-lock cleanup is being checked for overlapping requests.
+** choices determining the future
+A completed worker must preserve concurrently registered views and ACKs; it
+must never install a copied whole interactive session.

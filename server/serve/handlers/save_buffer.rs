@@ -136,7 +136,6 @@ pub(crate) fn handle_save_buffer_request (
   pre_parse_refusal : Option<&str>,
 ) {
   let view_uri : Result<ViewUri, String> = view_uri_from_request (request);
-  let point : Option<SavePointPosition> = save_point_position_from_request (request);
   let authority : Result<RequestedSaveAuthority, String> = requested_save_authority (request);
   if let Some (reason) = pre_parse_refusal {
     let response = save_refusal_response (reason, request);
@@ -160,7 +159,25 @@ pub(crate) fn handle_save_buffer_request (
     &fork_sources_from_request (request), &hoist_approved_pids_from_request (request),
     &scalar_approved_pids_from_request (request), Some (&authority),
     Some (collateral_scheduler), Some (operation)));
-  let (response, state) : (String, &str) = match result {
+  let (response, state) : (String, &str) = response_for_save_result (
+    result, request, &view_uri, &authority, env, views_state,
+    collateral_scheduler, runtime, operation);
+  finish_save_response (stream, runtime, env, operation, control, &response, state);
+}
+
+fn response_for_save_result (
+  result : Result<SaveResponse, Box<dyn Error>>,
+  request : &str,
+  view_uri : &Result<ViewUri, String>,
+  authority : &RequestedSaveAuthority,
+  env : &SkgEnv,
+  views_state : &mut ViewsState,
+  collateral_scheduler : &CollateralScheduler,
+  runtime : &ServerRuntime,
+  operation : &SaveOperation,
+) -> (String, &'static str) {
+  let point : Option<SavePointPosition> = save_point_position_from_request (request);
+  match result {
     Ok (mut saved) => {
       saved . save_point_position = point . clone ();
       match (&saved . hoist_confirmation, &saved . fork_confirmation,
@@ -173,7 +190,7 @@ pub(crate) fn handle_save_buffer_request (
             &format_fork_confirmation_response_sexp (&saved . saved_view, prompt)), "refused"),
         (None, None, Some (confirmation)) => (confirmation . clone (), "committed"),
         (None, None, None) => {
-          if let Ok (uri) = &view_uri {
+          if let Ok (uri) = view_uri {
             let _ = views_state . open_views . set_client_application_authority (
               uri, env . in_rust_graph . load_full () . graph_generation . get (),
               collateral_scheduler . presentation_generation (),
@@ -183,7 +200,7 @@ pub(crate) fn handle_save_buffer_request (
                 . expect ("successful save and its returned view share one base"); }
           }
           let mut payload : String = saved . to_sexp_string ();
-          if let Ok (uri) = &view_uri {
+          if let Ok (uri) = view_uri {
             if let Some (view) = views_state . open_views . views . get (uri) {
               payload = crate::serve::util::add_view_authority_to_response (&payload, view); }
           }
@@ -209,8 +226,7 @@ pub(crate) fn handle_save_buffer_request (
       (tag_sexp_response (TcpToClient::SaveResult,
         &empty_response_sexp (&details, &[], &point) . to_string ()), state)
     }
-  };
-  finish_save_response (stream, runtime, env, operation, control, &response, state);
+  }
 }
 
 pub(crate) fn save_refusal_response (reason : &str, request : &str) -> String {

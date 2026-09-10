@@ -199,6 +199,23 @@ struct RenderedCollateralView {
   viewforest : ViewForest,
 }
 
+pub(crate) enum PreparedSaveViewUpdate {
+  Confirmation (SaveResponse),
+  Rendered (RenderedSaveViewUpdate),
+}
+
+pub(crate) struct RenderedSaveViewUpdate {
+  graph_snap      : Arc<InRustGraph>,
+  define_nodes    : Vec<DefineNode>,
+  saved_uri       : Option<ViewUri>,
+  saved_view      : ViewForest,
+  saved_text      : String,
+  collateral_uris : Vec<ViewUri>,
+  collateral_views: Vec<RenderedCollateralView>,
+  errors          : Vec<String>,
+  warnings        : Vec<String>,
+}
+
 /// PURPOSE:
 /// Updates the rendered views and ViewsState
 /// for each view affected by the save.
@@ -235,8 +252,28 @@ pub(crate) async fn update_views_after_save_to_sink (
   views_state                 : &mut ViewsState,
   active_source_set           : Option<&ActiveSourceSet>,
   scalar_approved_pids        : &HashSet<ID>,
-  mut collateral_scheduler    : Option<&mut CollateralScheduler>,
+  collateral_scheduler         : Option<&mut CollateralScheduler>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
+  let prepared : PreparedSaveViewUpdate = prepare_save_view_update (
+    saved_view, define_nodes, diff_mode_enabled, env,
+    viewuri_from_request_result, views_state, active_source_set,
+    scalar_approved_pids, collateral_scheduler . is_some ()) . await ?;
+  Ok (apply_save_view_update (
+    sink, prepared, env, views_state, active_source_set,
+    scalar_approved_pids, collateral_scheduler))
+}
+
+pub(crate) async fn prepare_save_view_update (
+  saved_view                  : ViewForest,
+  define_nodes                : Vec<DefineNode>,
+  diff_mode_enabled           : bool,
+  env                         : &SkgEnv,
+  viewuri_from_request_result : &Result<ViewUri, String>,
+  views_state                 : &ViewsState,
+  active_source_set           : Option<&ActiveSourceSet>,
+  scalar_approved_pids        : &HashSet<ID>,
+  schedule_collateral         : bool,
+) -> Result<PreparedSaveViewUpdate, Box<dyn Error>> {
   let mut context : RerenderAfterSaveContext =
     // Snapshot the in-Rust graph once for this save's rerender pass.
     // Used both by rewriteInPlace_viewnodes_whose_id_is_newly_extra (swap acquiree pids
@@ -264,7 +301,7 @@ pub(crate) async fn update_views_after_save_to_sink (
   if let Some (active) = active_source_set {
     let mut input_candidates : Vec<ID> =
       active_ids_in_viewforest (&saved_view_mut);
-    if collateral_scheduler . is_none () {
+    if ! schedule_collateral {
       for uri in &collateral_uris {
         if let Some (viewforest) = views_state . open_views
             . viewuri_to_view (uri) {
@@ -274,7 +311,7 @@ pub(crate) async fn update_views_after_save_to_sink (
       "save-rerender", active, &input_candidates,
       &context . graph_snap, scalar_approved_pids );
     if matches! (release, ScalarReleaseDecision::Challenge { .. }) {
-      return Ok ( SaveResponse {
+      return Ok ( PreparedSaveViewUpdate::Confirmation (SaveResponse {
         saved_view          : String::new (),
         errors              : Vec::new (),
         warnings            : Vec::new (),
@@ -282,7 +319,7 @@ pub(crate) async fn update_views_after_save_to_sink (
         fork_confirmation   : None,
         hoist_confirmation  : None,
         scalar_release_confirmation : challenge_response (&release),
-      } ); }}
+      }) ); }}
   let mut repair_warnings : Vec<CompletionWarning> = Vec::new ();
   let saved_text : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -297,7 +334,7 @@ pub(crate) async fn update_views_after_save_to_sink (
     // the saved view, batched per (col, owner).
     render_completion_warnings (&repair_warnings) );
   let mut collateral_views : Vec<RenderedCollateralView> = Vec::new ();
-  if collateral_scheduler . is_none () {
+  if ! schedule_collateral {
     for curi in &collateral_uris {
       match rerender_collateral_view (
         curi . clone (), views_state, &mut context ) . await
@@ -317,7 +354,7 @@ pub(crate) async fn update_views_after_save_to_sink (
       &context . graph_snap, scalar_approved_pids );
     match release {
       decision @ ScalarReleaseDecision::Challenge { .. } => {
-        return Ok ( SaveResponse {
+        return Ok ( PreparedSaveViewUpdate::Confirmation (SaveResponse {
           saved_view          : String::new (),
           errors              : Vec::new (),
           warnings            : Vec::new (),
@@ -325,14 +362,43 @@ pub(crate) async fn update_views_after_save_to_sink (
           fork_confirmation   : None,
           hoist_confirmation  : None,
           scalar_release_confirmation : challenge_response (&decision),
-        } ); }
+        }) ); }
       ScalarReleaseDecision::AllowWithWarning { warning } =>
         context . warnings . push (warning),
       ScalarReleaseDecision::Allow => {}, }}
 
-  if let Ok (uri) = viewuri_from_request_result {
-    views_state . open_views . update_view (
-      &context . graph_snap,       uri, saved_view_mut);
+  Ok (PreparedSaveViewUpdate::Rendered (RenderedSaveViewUpdate {
+    graph_snap      : context . graph_snap,
+    define_nodes,
+    saved_uri       : viewuri_from_request_result . as_ref () . ok () . cloned (),
+    saved_view      : saved_view_mut,
+    saved_text,
+    collateral_uris,
+    collateral_views,
+    errors          : context . errors,
+    warnings        : context . warnings,
+  })) }
+
+pub(crate) fn apply_save_view_update (
+  sink                  : &mut dyn ResponseSink,
+  prepared              : PreparedSaveViewUpdate,
+  env                   : &SkgEnv,
+  views_state           : &mut ViewsState,
+  active_source_set     : Option<&ActiveSourceSet>,
+  scalar_approved_pids  : &HashSet<ID>,
+  mut collateral_scheduler : Option<&mut CollateralScheduler>,
+) -> SaveResponse {
+  let PreparedSaveViewUpdate::Rendered (prepared) = prepared else {
+    let PreparedSaveViewUpdate::Confirmation (response) = prepared
+      else { unreachable! (); };
+    return response;
+  };
+  let RenderedSaveViewUpdate {
+    graph_snap, define_nodes, saved_uri, saved_view, saved_text,
+    collateral_uris, collateral_views, errors, warnings,
+  } = prepared;
+  if let Some (uri) = &saved_uri {
+    views_state . open_views . update_view (&graph_snap, uri, saved_view);
     // TODO/DONE/local-view-update/plan_v2.org §8.1 step 3: relax the early (broad) lock to the EXACT collateral
     // set now that the SavePlan is known. Emacs keeps saved + these locked and
     // unlocks everything else it locked early, so the user can edit truly-
@@ -356,15 +422,14 @@ pub(crate) async fn update_views_after_save_to_sink (
           . collect::<Vec<_>> ()); }
     for rendered in collateral_views {
       views_state . open_views . update_view (
-      &context . graph_snap,         &rendered . uri, rendered . viewforest);
+        &graph_snap, &rendered . uri, rendered . viewforest);
       let _ = sink . emit (
         & tag_sexp_response (
           TcpToClient::CollateralView,
           & format_single_view_sexp (
             &rendered . uri, &rendered . text) )); }}
-  if let (Some (scheduler), Ok (saved_uri), Some (active)) = (
-      collateral_scheduler . as_deref_mut (),
-      viewuri_from_request_result,
+  if let (Some (scheduler), Some (saved_uri), Some (active)) = (
+      collateral_scheduler . as_deref_mut (), saved_uri . as_ref (),
       active_source_set)
   {
     let refresh = scheduler . replace_after_transition (
@@ -372,14 +437,16 @@ pub(crate) async fn update_views_after_save_to_sink (
       scalar_approved_pids);
     let _ = refresh . send_to (sink);
   }
-  Ok ( SaveResponse {
+  SaveResponse {
     saved_view          : saved_text,
-    errors              : context . errors,
-    warnings            : context . warnings,
+    errors,
+    warnings,
     save_point_position : None,
     fork_confirmation   : None,
     hoist_confirmation  : None,
-    scalar_release_confirmation : None, } ) }
+    scalar_release_confirmation : None,
+  }
+}
 
 pub(crate) fn active_ids_in_viewforest (
   viewforest : &ViewForest,
