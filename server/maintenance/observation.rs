@@ -275,10 +275,14 @@ fn collect_observation_batch_with_limits (
   let max_deadline : Instant = started + max_batch_age;
   let mut quiet_deadline : Instant = started + quiet_interval;
   let mut batch : ObservationBatch = ObservationBatch::default ();
+  let first_is_maintenance : bool = matches! (&first,
+    ObservationSignal::MaintenanceTargets (..)
+    | ObservationSignal::MaintenanceFinalDisk (..));
   absorb_signal (
     first, &mut batch . paths, &mut batch . reasons,
     &mut batch . maintenance_jobs, &mut batch . maintenance_final_jobs,
     &mut batch . observe_presentation);
+  if first_is_maintenance { return batch; }
   loop {
     let now : Instant = Instant::now ();
     let quiet_remaining : Duration = quiet_deadline
@@ -292,10 +296,14 @@ fn collect_observation_batch_with_limits (
       Err (mpsc::RecvTimeoutError::Timeout)
       | Err (mpsc::RecvTimeoutError::Disconnected) => break,
     };
+    let is_maintenance : bool = matches! (&signal,
+      ObservationSignal::MaintenanceTargets (..)
+      | ObservationSignal::MaintenanceFinalDisk (..));
     absorb_signal (
       signal, &mut batch . paths, &mut batch . reasons,
       &mut batch . maintenance_jobs, &mut batch . maintenance_final_jobs,
       &mut batch . observe_presentation);
+    if is_maintenance { break; }
     quiet_deadline = Instant::now () + quiet_interval;
   }
   batch
@@ -313,6 +321,12 @@ fn observation_worker (
       observe_presentation,
     } = batch;
     let Some (runtime) = runtime . upgrade () else { return; };
+    // These jobs have already passed admission. Do not put a coalesced
+    // ordinary corpus scan ahead of their final observation and selection.
+    for (incident, epoch) in maintenance_jobs {
+      run_target_observation (&runtime, incident, epoch); }
+    for (incident, epoch) in maintenance_final_jobs {
+      run_final_observation (&runtime, incident, epoch); }
     // A process-owned exact sweep is queued when the final bracket closes.
     // Events consumed inside the bracket therefore need no client-side
     // retention and, critically, may not publish a mid-batch candidate.
@@ -320,10 +334,6 @@ fn observation_worker (
        && !reload_batch_active ()
     {
       run_observation (&runtime, paths, reasons); }
-    for (incident, epoch) in maintenance_jobs {
-      run_target_observation (&runtime, incident, epoch); }
-    for (incident, epoch) in maintenance_final_jobs {
-      run_final_observation (&runtime, incident, epoch); }
     if observe_presentation {
       if let Err (error) = runtime . observe_git_presentation () {
         tracing::warn! (%error, "Git presentation observation failed"); }}
@@ -824,6 +834,7 @@ fn list_field (key : &str, values : &[String]) -> Sexp {
 #[cfg(test)]
 mod tests {
   use super::{
+    ObservationBatch,
     ObservationSignal,
     PresentationWatchTarget,
     configured_source_watcher,
@@ -866,6 +877,102 @@ mod tests {
     let signature = Signature::now ("test", "test@example.com") . unwrap ();
     repo . commit (Some ("HEAD"), &signature, &signature, "initial", &tree,
                    &[]) . unwrap ();
+  }
+
+  fn collect_with_long_quiet (
+    signals : Vec<ObservationSignal>,
+  ) -> (ObservationBatch, Vec<ObservationSignal>) {
+    let (sender, receiver) = mpsc::channel ();
+    for signal in signals { sender . send (signal) . unwrap (); }
+    let first = receiver . recv () . unwrap ();
+    let keepalive = sender . clone ();
+    drop (sender);
+    let (done_sender, done_receiver) = mpsc::channel ();
+    let worker = thread::spawn (move || {
+      let batch = collect_observation_batch_with_limits (
+        &receiver, first, Duration::from_secs (60), Duration::from_secs (60));
+      let remaining = receiver . try_iter () . collect ();
+      done_sender . send ((batch, remaining)) . unwrap ();
+    });
+    let result = done_receiver . recv_timeout (Duration::from_millis (250));
+    drop (keepalive);
+    match result {
+      Ok (result) => {
+        worker . join () . unwrap ();
+        result
+      }
+      Err (error) => {
+        worker . join () . unwrap ();
+        panic! ("maintenance signal did not interrupt long quiet timeout: {}",
+          error);
+      }
+    }
+  }
+
+  #[test]
+  fn maintenance_targets_interrupts_batch_on_first_signal () {
+    let incident = crate::maintenance::IncidentId::new ();
+    let (batch, remaining) = collect_with_long_quiet (vec![
+      ObservationSignal::MaintenanceTargets (
+        incident, crate::maintenance::MaintenanceEpoch::INITIAL),
+      ObservationSignal::Paths (
+        vec![PathBuf::from ("after-maintenance.skg")],
+        crate::maintenance::QueuedObservationReason::FilesystemEvent),
+    ]);
+    assert_eq! (batch . maintenance_jobs . len (), 1);
+    assert! (batch . paths . is_empty ());
+    assert_eq! (remaining . len (), 1);
+  }
+
+  #[test]
+  fn maintenance_targets_interrupts_batch_after_ordinary_hint () {
+    let incident = crate::maintenance::IncidentId::new ();
+    let (batch, remaining) = collect_with_long_quiet (vec![
+      ObservationSignal::Paths (
+        vec![PathBuf::from ("before-maintenance.skg")],
+        crate::maintenance::QueuedObservationReason::FilesystemEvent),
+      ObservationSignal::MaintenanceTargets (
+        incident, crate::maintenance::MaintenanceEpoch::INITIAL),
+      ObservationSignal::Paths (
+        vec![PathBuf::from ("after-maintenance.skg")],
+        crate::maintenance::QueuedObservationReason::FilesystemEvent),
+    ]);
+    assert_eq! (batch . maintenance_jobs . len (), 1);
+    assert_eq! (batch . paths, vec![PathBuf::from ("before-maintenance.skg")]);
+    assert_eq! (remaining . len (), 1);
+  }
+
+  #[test]
+  fn maintenance_final_disk_interrupts_batch_on_first_signal () {
+    let incident = crate::maintenance::IncidentId::new ();
+    let (batch, remaining) = collect_with_long_quiet (vec![
+      ObservationSignal::MaintenanceFinalDisk (
+        incident, crate::maintenance::MaintenanceEpoch::INITIAL),
+      ObservationSignal::Paths (
+        vec![PathBuf::from ("after-final.skg")],
+        crate::maintenance::QueuedObservationReason::FilesystemEvent),
+    ]);
+    assert_eq! (batch . maintenance_final_jobs . len (), 1);
+    assert! (batch . paths . is_empty ());
+    assert_eq! (remaining . len (), 1);
+  }
+
+  #[test]
+  fn maintenance_final_disk_interrupts_batch_after_ordinary_hint () {
+    let incident = crate::maintenance::IncidentId::new ();
+    let (batch, remaining) = collect_with_long_quiet (vec![
+      ObservationSignal::Paths (
+        vec![PathBuf::from ("before-final.skg")],
+        crate::maintenance::QueuedObservationReason::FilesystemEvent),
+      ObservationSignal::MaintenanceFinalDisk (
+        incident, crate::maintenance::MaintenanceEpoch::INITIAL),
+      ObservationSignal::Paths (
+        vec![PathBuf::from ("after-final.skg")],
+        crate::maintenance::QueuedObservationReason::FilesystemEvent),
+    ]);
+    assert_eq! (batch . maintenance_final_jobs . len (), 1);
+    assert_eq! (batch . paths, vec![PathBuf::from ("before-final.skg")]);
+    assert_eq! (remaining . len (), 1);
   }
 
   #[test]

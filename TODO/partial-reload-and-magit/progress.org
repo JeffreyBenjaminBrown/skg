@@ -2863,3 +2863,24 @@ these focused fixtures.
 Request identity governs response delivery; payload identity is validated against
 it. Follow the completed entry-point map rather than repeating this investigation:
 [[../../codex-thinking/remaining-client-entry-points.org]].
+
+* Simplify/cohere checkpoint: authorized observation bypasses debounce
+** what's done and went well
+An authorized target or final-disk observation ends batch collection immediately,
+whether it arrives first or after watcher hints. Earlier hints remain in the
+batch, later signals remain queued, and authorized work runs before ordinary
+observation in that batch.
+
+All 11 focused observer tests pass in
+'/tmp/observation-maintenance-priority-final.log'. New regressions keep the
+channel open with a 60-second quiet interval and require prompt completion for
+both maintenance signals at both arrival positions.
+** Changes to the plan's envisioned order.
+Land the bounded scheduling correction before introducing scan cancellation.
+** what's imperfect about what's done
+An already running scan can still delay a newly queued authorized job. The
+separate targeted alias fallback also needs correction; both boundaries are
+recorded in [[../../codex-thinking/observation-boundaries.org]].
+** choices determining the future
+Cancellation must preserve pending observation work and must never report an
+unfinished scan as disk equality or invalidity.
