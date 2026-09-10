@@ -104,6 +104,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-a") #'skg-beginning-of-line))
   (progn;; delete (prefix arg => recursive)
     (define-key map (kbd "C-c <backspace>") #'skg-delete))
+  (define-key map (kbd "C-c d a") #'skg-delete-references-to-absent-node)
   (progn;; text search
     (define-key map (kbd "C-c f RET") #'skg-search)
     (define-key map (kbd "C-c f i")   #'skg-search-interactive)

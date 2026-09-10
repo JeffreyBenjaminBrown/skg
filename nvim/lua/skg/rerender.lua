@@ -122,6 +122,9 @@ function M.register_rerender_stream_handlers ()
         vim.notify('skg: rerender-done handler error: '
                    .. tostring(err))
       end
+      local after_empty = M.after_empty_stream
+      M.after_empty_stream = nil
+      if after_empty then vim.schedule(after_empty) end
     end, true)
 end
 

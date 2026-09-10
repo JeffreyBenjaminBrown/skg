@@ -27,6 +27,9 @@ M.commands = {
              desc = 'Mark the node at point for deletion' },
   DeleteRecursive = { module = 'skg.metadata', fn = 'delete_recursive',
                       desc = 'Mark the node and its descendants for deletion' },
+  DeleteReferencesToAbsentNode = { module = 'skg.delete_absent_references',
+                                   fn = 'request',
+                                   desc = 'Remove owned references to the Unknown at point' },
   Search = { module = 'skg.search', fn = 'search',
              desc = 'Text search with conservative defaults' },
   SearchInteractive = { module = 'skg.search', fn = 'search_interactive',
@@ -196,6 +199,7 @@ end
 M.content_view_bindings = {
   { 'dd', 'Delete' },                    -- C-c <backspace>
   { 'dR', 'DeleteRecursive' },           -- C-u C-c <backspace>
+  { 'da', 'DeleteReferencesToAbsentNode' },
   { 'ff', 'Search' },                    -- C-c f RET
   { 'fi', 'SearchInteractive' },         -- C-c f i
   { 'fl', 'SearchMakeLink' },            -- C-c f l

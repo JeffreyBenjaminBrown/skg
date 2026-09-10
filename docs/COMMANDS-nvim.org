@@ -52,6 +52,11 @@ of the node at point. Descendent headlines that are not activeNodes
 Its own binding, not a prefix-arg variant -- nvim has no prefix-arg
 protocol to reuse here the way Emacs's C-u did. Call it directly as
 <localleader>dR, or as ':SkgDeleteRecursive'.
+*** <localleader>da : :SkgDeleteReferencesToAbsentNode
+On an Unknown placeholder, remove that exact raw ID from owned structured
+relationships throughout retained telescopes, then refresh every open view.
+The command refuses while a view is dirty.  Text links are reported but left
+unchanged, and require confirmation before the structural cleanup.
 ** <localleader>f : text search
 The 'f' is for 'find'.
 *** <localleader>ff : :SkgSearch
