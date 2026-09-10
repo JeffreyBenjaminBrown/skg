@@ -21,3 +21,10 @@ B alone is no evidence that A's report or restrictions have been discharged.
 Global handshake state and pending offers must not follow historical A status.
 The focused counterexample runs A's queued settlement and its continuation after
 B becomes current, then verifies both the resulting A facts and untouched B.
+** Reconnect consumer
+The compact handshake state describes the current graph transaction. An idle
+handshake can still list A in 'pending-incidents'; that is not abandonment of A.
+A new active epoch B must preserve A's restrictions and frozen census. After the
+connection census, resume named pending incidents independently. Census staleness
+must respect actual remaining per-buffer restrictions, including historical ones,
+rather than deriving protection solely from one global active phase.

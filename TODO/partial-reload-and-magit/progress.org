@@ -2661,3 +2661,28 @@ Historical operation fields cannot change global authority. However, current
 owner-publication metadata on any authenticated response must still pass through
 the revision fence, even when its attached incident is historical. Review removed
 a blanket historical-frame filter and added a regression for that distinction.
+
+* Simplify/cohere checkpoint: Emacs reconnect preserves pending incidents
+** what's done and went well
+An idle handshake no longer releases A while the server still lists A as pending.
+A newer active epoch retains older records and restrictions. Connection census
+completion resumes the current server incident first, then other named pending
+work; incident-specific census completion stays scoped to its original identity.
+Census stale handling protects actual remaining buffer restrictions independently
+of the compact handshake phase. Explicit abandonment releases only the named debt.
+
+The full Emacs suite passed 507 tests before the final explicit-abandonment
+regression; the final focused suite passes 57 tests. Logs are
+'/tmp/incident-reconnect-elisp-checkpoint.log' and
+'/tmp/incident-reconnect-elisp-focused.log'.
+** Changes to the plan's envisioned order.
+Migrate reconnect immediately after incident-scoped continuation, before the final
+external-origin and fixed-census audit.
+** what's imperfect about what's done
+The existing active-handshake locking fallback still covers current editable
+buffers. Its alignment with the server's frozen census remains to be checked in
+the final fixed-census audit; this slice does not claim that broader audit passed.
+** choices determining the future
+Use the server pending inventory to distinguish current graph state from durable
+report obligations. An idle graph is not evidence that retained report debt has
+been abandoned. See [[../../codex-thinking/client-incident-retention.org]].

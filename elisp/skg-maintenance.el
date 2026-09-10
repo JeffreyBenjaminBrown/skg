@@ -189,7 +189,8 @@ will give the more precise server explanation."
           (dolist (buffer (skg-registered-buffers))
             (skg-unlock-buffer-after-maintenance buffer local-epoch)))
         (skg--maintenance-clear-current-incident)
-        (setq skg--client-constructor-admission 'open)
+        (unless skg--maintenance-historical-status
+          (setq skg--client-constructor-admission 'open))
         (unless (and explicitly-abandoned-incident
                      (equal (format "%s" incident)
                             (format "%s" explicitly-abandoned-incident)))
@@ -202,70 +203,100 @@ will give the more precise server explanation."
             server-authority incident)
            :warning))))))
 
+(defun skg--maintenance-server-pending-incident-ids ()
+  "Return exact identities with outstanding server incident obligations."
+  (delq nil
+        (mapcar (lambda (entry)
+                  (skg--maintenance-text entry 'incident-id))
+                skg--pending-incidents)))
+
 (defun skg-maintenance-adopt-handshake-epoch
     (&optional explicitly-abandoned-incident)
-  "Reconcile local maintenance state with the authoritative handshake.
-Install an active epoch on every current registered buffer.  When the server
-has no incident but this Emacs still remembers one, release those obsolete
-local locks without changing any buffer text or undo history.
-EXPLICITLY-ABANDONED-INCIDENT suppresses the redundant local warning when the
-verification response already carries the server's more precise warning."
+  "Reconcile the current graph transaction while preserving pending reports."
+  (when explicitly-abandoned-incident
+    (setq explicitly-abandoned-incident
+          (format "%s" explicitly-abandoned-incident)))
+  (when (and explicitly-abandoned-incident
+             (skg--maintenance-lookup-incident explicitly-abandoned-incident))
+    (skg--maintenance-call-in-incident
+     explicitly-abandoned-incident
+     #'skg--maintenance-release-obsolete-local-incident
+     "The Skg server explicitly abandoned this incident"
+     explicitly-abandoned-incident))
   (when (listp skg--maintenance-state)
-    (let ((server-state
-           (format "%s" (cdr (assq 'state skg--maintenance-state))))
-          (server-epoch (cdr (assq 'epoch skg--maintenance-state))))
+    (let ((server-state (format "%s" (alist-get 'state skg--maintenance-state)))
+          (server-epoch (alist-get 'epoch skg--maintenance-state))
+          (pending (skg--maintenance-server-pending-incident-ids)))
       (cond
        ((equal server-state "active")
         (unless (natnump server-epoch)
           (error "Active maintenance handshake has no valid epoch"))
         (when (and skg--maintenance-client-incident
-                   (not (equal
-                         server-epoch
-                         (plist-get skg--maintenance-client-incident :epoch))))
-          (error "Maintenance handshake changed the active client epoch"))
-        (dolist (buffer (skg-registered-buffers))
-          (with-current-buffer buffer
-            (when (eq (skg--buffer-record-view-write-authority
-                       skg--buffer-record)
-                      'editable)
-              (skg-lock-buffer-for-maintenance buffer server-epoch)))))
+                   (not (equal server-epoch
+                               (plist-get skg--maintenance-client-incident :epoch))))
+          ;; A newer transaction does not discharge an older report's debt.
+          (skg--maintenance-clear-current-incident))
+        (let ((server-id
+               (cl-loop for entry in skg--pending-incidents
+                        when (equal server-epoch
+                                    (skg--maintenance-field entry 'maintenance-epoch))
+                        return (skg--maintenance-text entry 'incident-id))))
+          (dolist (buffer (skg-registered-buffers))
+            (with-current-buffer buffer
+              (when (eq (skg--buffer-record-view-write-authority skg--buffer-record)
+                        'editable)
+                (skg-lock-buffer-for-maintenance buffer server-epoch server-id))))))
        ((and skg--maintenance-client-incident
-             (member server-state '("idle" "observing" "pending")))
+             (member server-state '("idle" "observing" "pending"))
+             (not (member (plist-get skg--maintenance-client-incident :incident-id)
+                          pending)))
         (skg--maintenance-release-obsolete-local-incident
-         (format "The Skg server handshake reports %s" server-state)
+         (format "The Skg server handshake reports %s without this incident"
+                 server-state)
          explicitly-abandoned-incident))))))
 
 (defun skg-maintenance-handle-census-stale (buffer-ids)
-  "Detach genuinely stale BUFFER-IDS, preserving active settlement debt."
-  (let* ((active (and (listp skg--maintenance-state)
-                      (equal (format
-                              "%s"
-                              (cdr (assq 'state skg--maintenance-state)))
-                             "active")))
-         (protected (and active skg--maintenance-client-incident
-                         (plist-get skg--maintenance-client-incident
-                                    :registered-buffer-ids)))
-         ordinary)
+  "Detach stale BUFFER-IDS unless they still carry maintenance restrictions."
+  (let (ordinary)
     (dolist (buffer-id buffer-ids)
-      (unless (member (format "%s" buffer-id) protected)
-        (push buffer-id ordinary)))
+      (let ((buffer (skg-find-buffer-by-id (format "%s" buffer-id))))
+        (unless (and (buffer-live-p buffer)
+                     (buffer-local-value 'skg--maintenance-restrictions buffer))
+          (push buffer-id ordinary))))
     (skg-mark-census-buffers-stale (nreverse ordinary))))
 
 (defun skg-resume-maintenance-after-census
     (&optional maintenance-incident-id maintenance-epoch)
-  "Resume durable maintenance only after reconnect census completes."
-  (when maintenance-incident-id
-    (skg--maintenance-require-client-incident
-     maintenance-incident-id maintenance-epoch))
-  (let ((state (and (listp skg--maintenance-state)
-                    (format "%s"
-                            (cdr (assq 'state skg--maintenance-state))))))
-    (when (member state '("active" "terminal"))
-      (if (and skg--maintenance-client-incident
-               (eq (plist-get skg--maintenance-client-incident :phase)
-                   'awaiting-locked-census))
-          (skg--maintenance-send-locked-census)
-        (skg-maintenance-status t)))))
+  "Resume named durable work only after its reconnect census completes."
+  (if maintenance-incident-id
+      (skg--maintenance-call-in-incident
+       maintenance-incident-id
+       (lambda ()
+         (skg--maintenance-require-client-incident
+          maintenance-incident-id maintenance-epoch)
+         (if (eq (plist-get skg--maintenance-client-incident :phase)
+                 'awaiting-locked-census)
+             (skg--maintenance-send-locked-census)
+           (skg-maintenance-status t maintenance-incident-id))))
+    (let* ((phase (format "%s" (alist-get 'state skg--maintenance-state)))
+           (epoch (alist-get 'epoch skg--maintenance-state))
+           (pending (skg--maintenance-server-pending-incident-ids))
+           (current-id
+            (cl-loop for entry in skg--pending-incidents
+                     when (equal epoch (skg--maintenance-field entry 'maintenance-epoch))
+                     return (skg--maintenance-text entry 'incident-id))))
+      ;; Select the current transaction first when reconnecting without a record.
+      (when (member phase '("active" "terminal"))
+        (if (and skg--maintenance-client-incident
+                 (eq (plist-get skg--maintenance-client-incident :phase)
+                     'awaiting-locked-census))
+            (skg--maintenance-send-locked-census)
+          (skg-maintenance-status t current-id))
+        (setq pending (delete (or current-id
+                                  (plist-get skg--maintenance-client-incident :incident-id))
+                              pending)))
+      (dolist (incident-id pending)
+        (skg-maintenance-status t incident-id)))))
 
 (defun skg--maintenance-refresh-presentation-buffer-ids (response)
   "Install RESPONSE's presentation inventory without changing the frozen census."
