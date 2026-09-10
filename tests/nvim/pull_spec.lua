@@ -65,6 +65,7 @@ describe('skg Neovim client-owned pull', function ()
       source_paths = config.source_paths_from_toml,
     }
     state.maintenance_client_incident = nil
+    state.graph_write_admission = nil
     state.active_source_set_name = 'all'
     state.request_draft = nil
     config.source_inventory = nil
@@ -81,6 +82,7 @@ describe('skg Neovim client-owned pull', function ()
       else pull[name] = value end
     end
     state.maintenance_client_incident = nil
+    state.graph_write_admission = nil
     state.request_draft = nil
     config.source_inventory = nil
     clear_registered_buffers()
@@ -164,6 +166,31 @@ describe('skg Neovim client-owned pull', function ()
       payload.field_text(mapping[1], 'repository-key'))
     assert.are.same({ 'one' }, payload.string_list(
       payload.field(mapping[1], 'sources')))
+  end)
+
+  it('allows pull with a retained report after open publication', function ()
+    local repositories = {
+      {
+        key = pull.repository_key({ 'one' }),
+        root = '/client/repository',
+        sources = { 'one' },
+      },
+    }
+    state.maintenance_client_incident = {
+      incident_id = 'old-report', phase = 'terminal',
+    }
+    state.graph_write_admission = 'open'
+    pull.local_repositories = function () return repositories end
+    pull.dirty_buffers = function () return {} end
+    local arguments
+    maintenance.begin = function (...) arguments = { ... } end
+    assert.is_true(pull.pull_all())
+    assert.are.equal('pull', arguments[1])
+  end)
+
+  it('keeps refusing pull during an active incident', function ()
+    state.maintenance_client_incident = pull_incident(pull.new_context({}))
+    assert.has_error(pull.pull_all, 'Maintenance is already active')
   end)
 
   it('refuses a dirty raw file before maintenance', function ()

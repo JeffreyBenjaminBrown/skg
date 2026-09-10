@@ -19,7 +19,8 @@
 (defun skg-rebuild-dbs ()
   "Archive editor state and rebuild all selected stores from exact disk bytes."
   (interactive)
-  (when skg--maintenance-client-incident
+  (when (and skg--maintenance-client-incident
+             (not (eq skg--graph-write-admission 'open)))
     (user-error "Maintenance is already active"))
   (let* ((dirty (skg--rebuild-dirty-buffers))
          (dirty-raw (cl-remove-if-not #'skg--rebuild-raw-buffer-p dirty)))

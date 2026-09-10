@@ -387,6 +387,27 @@ describe('skg Neovim maintenance handshake', function ()
     assert.is_function(arguments[5])
   end)
 
+  it('allows full rebuild with a retained report after open publication',
+     function ()
+    local misc = require('skg.misc_requests')
+    local arguments
+    state.maintenance_client_incident = {
+      incident_id = 'old-report', phase = 'terminal',
+    }
+    state.graph_write_admission = 'open'
+    maintenance.begin = function (...) arguments = { ... } end
+    assert.is_true(misc.rebuild_dbs())
+    assert.are.equal('full-rebuild', arguments[1])
+  end)
+
+  it('keeps refusing full rebuild during an active incident', function ()
+    local misc = require('skg.misc_requests')
+    state.maintenance_client_incident = {
+      incident_id = 'active', phase = 'settling',
+    }
+    assert.has_error(misc.rebuild_dbs, 'Maintenance is already active')
+  end)
+
   it('carries opaque origin context and structured bootstrap fields',
      function ()
     local client_module = require('skg.client')

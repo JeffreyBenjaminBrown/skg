@@ -80,6 +80,30 @@
       `((pull-repositories
          (((repository-key . ,key) (sources ("one"))))))))))
 
+(ert-deftest test-skg-pull-allows-retained-report-after-open-publication ()
+  (let* ((key (skg--pull-repository-key '("one")))
+         (repositories `((:key ,key :root "/client/repository/"
+                               :sources ("one"))))
+         (skg--active-source-set-name "all")
+         (skg--maintenance-client-incident
+          '(:incident-id "old-report" :phase terminal))
+         (skg--graph-write-admission 'open)
+         submitted)
+    (cl-letf (((symbol-function 'skg--pull-local-repositories)
+               (lambda () repositories))
+              ((symbol-function 'skg--pull-dirty-buffers) (lambda () nil))
+              ((symbol-function 'skg-begin-maintenance)
+               (lambda (&rest arguments) (setq submitted arguments))))
+      (skg-pull-all))
+    (should (equal (car submitted) "pull"))))
+
+(ert-deftest test-skg-pull-refuses-during-an-active-incident ()
+  (let ((skg--active-source-set-name "all")
+        (skg--maintenance-client-incident
+         '(:incident-id "active" :phase settling))
+        (skg--graph-write-admission nil))
+    (should-error (skg-pull-all) :type 'user-error)))
+
 (ert-deftest test-skg-pull-bootstrap-sends-only-the-logical-repository-map ()
   (let* ((key (skg--pull-repository-key '("one")))
          (fields

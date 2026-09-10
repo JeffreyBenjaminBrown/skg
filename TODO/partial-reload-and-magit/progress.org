@@ -2757,3 +2757,26 @@ remaining slices. This checkpoint does not claim complete entry-point coverage.
 Current admission is a separate state variable; incident record existence is not
 a substitute. Remaining exact consumers are mapped in
 [[../../codex-thinking/remaining-client-entry-points.org]].
+
+* Simplify/cohere checkpoint: pending reports do not block pull or rebuild
+** what's done and went well
+Both clients permit pull/rebuild bootstrap when the current server publication
+explicitly opens graph-write admission, even if an older report record remains.
+Existing active-incident refusal remains when no open publication is known.
+Server admission remains authoritative for the requested operation.
+
+The full Emacs suite passes 515 tests and the full Neovim suite passes. Logs are
+'/tmp/report-admission-emacs-checkpoint-final.log' and
+'/tmp/report-admission-nvim-checkpoint.log'. Focused new-command regressions reach
+the actual bootstrap boundary with a retained report and verify busy refusal.
+** Changes to the plan's envisioned order.
+An aggregate Emacs run exposed source-set state leaking from the preceding frozen
+handshake parser test into an archive test. This was fixture isolation, not an
+archive behavior regression; the fixture now binds all parser-updated globals.
+The first failure is in '/tmp/report-admission-emacs-checkpoint.log'.
+** what's imperfect about what's done
+External pull timers and process callbacks still need incident ownership migration.
+The final entry-point and process acceptance audits remain unfinished.
+** choices determining the future
+A retained report is not a mutation reservation. Keep local command preflight
+aligned with current graph admission and let the server enforce the transaction.

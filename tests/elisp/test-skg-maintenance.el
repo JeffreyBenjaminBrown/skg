@@ -717,6 +717,23 @@
     (should (equal (car arguments) "full-rebuild"))
     (should (functionp (nth 4 arguments)))))
 
+(ert-deftest test-skg-rebuild-allows-retained-report-after-open-publication ()
+  (let ((skg--maintenance-client-incident
+         '(:incident-id "old-report" :phase terminal))
+        (skg--graph-write-admission 'open)
+        arguments)
+    (cl-letf (((symbol-function 'skg-registered-buffers) (lambda () nil))
+              ((symbol-function 'skg-begin-maintenance)
+               (lambda (&rest values) (setq arguments values))))
+      (skg-rebuild-dbs))
+    (should (equal (car arguments) "full-rebuild"))))
+
+(ert-deftest test-skg-rebuild-refuses-during-an-active-incident ()
+  (let ((skg--maintenance-client-incident
+         '(:incident-id "active" :phase settling))
+        (skg--graph-write-admission nil))
+    (should-error (skg-rebuild-dbs) :type 'user-error)))
+
 (ert-deftest test-skg-rebuild-refuses-a-dirty-raw-file-buffer ()
   (let ((buffer (generate-new-buffer " *skg-raw-rebuild-test*"))
         (skg--buffer-registry (make-hash-table :test #'equal))

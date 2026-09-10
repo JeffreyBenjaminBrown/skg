@@ -226,7 +226,8 @@ end
 ---Pull every configured repository through one maintenance incident.
 ---@return boolean started
 function M.pull_all ()
-  if state.maintenance_client_incident then
+  if state.maintenance_client_incident
+     and state.graph_write_admission ~= 'open' then
     error('Maintenance is already active') end
   if state.active_source_set_name ~= 'all' then
     error("Pull requires source-set 'all'; switch from '"

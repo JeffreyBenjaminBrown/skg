@@ -126,7 +126,8 @@
 (defun skg-pull-all ()
   "Pull every configured repository through one durable maintenance incident."
   (interactive)
-  (when skg--maintenance-client-incident
+  (when (and skg--maintenance-client-incident
+             (not (eq skg--graph-write-admission 'open)))
     (user-error "Maintenance is already active"))
   (unless (equal skg--active-source-set-name "all")
     (user-error

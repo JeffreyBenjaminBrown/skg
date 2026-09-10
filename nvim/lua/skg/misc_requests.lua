@@ -258,7 +258,8 @@ end
 ---Wipe and rebuild TypeDB and Tantivy from the .skg files on disk.
 ---Does not touch the filesystem -- only the derived databases.
 function M.rebuild_dbs ()
-  if state.maintenance_client_incident then
+  if state.maintenance_client_incident
+     and state.graph_write_admission ~= 'open' then
     error('Maintenance is already active') end
   local registry = require('skg.buffer_registry')
   local dirty = {}
