@@ -1,3 +1,24 @@
+* ONGOING BUG : Can't delete a node someone else has referred to.
+* TODO BUG : Can't change a public node's content-child's source from pers-i to public
+e.g. at [[id:7764443d-777d-481e-b6d1-4eb2ebd1b7b3][quantum feeling experiences]] (public),
+there's a pers-i child.
+I want to make the child public but can't.
+* TODO drop TypeDB
+It's a pain when coding. It's slow.
+And it can't know about dangling references
+(e.g. when one user's data loses a node
+that another user's data refers to),
+unless phantoms become TypeDB entities.
+* Magit is dangerous!
+One key command can stage all changes,
+effectively erasing the work of a careful review
+over which one had staged some changes.
+* TODO can I use this?
+https://github.com/typedb/typeql/issues/434#issuecomment-5553099146
+* I need code to import org and md into skg.
+This way I can really treat the public skg graph
+as the source of documentation truth.
+* TODO ? Is overrides unnecessary?
 * DONE [[./TODO/refer-to-ids-not-buffer-names/it.org][BUG : Can't visit my cooking node]]
 after subscribing back to (but not overriding) cheese-man's cooking node
 * ONGOING skg2 : partial rebuild

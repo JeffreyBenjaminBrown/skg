@@ -979,6 +979,16 @@
    intentionally never scrubbed (save.rs:363-369) and degrade to
    PhantomUnknown when followed; a contains pointer had no such fallback
    until the fix above.
+
+   Policy qualification found while researching
+   TODO/delete-shared-node.org (2026-09-10): a dangling structured
+   reference in a wholly foreign telescope must become an intentional
+   supported state when its target's owner deletes the target. Therefore
+   a future consistency check cannot classify every unresolved outbound
+   ID as corrupt or auto-repair it globally. At minimum it must preserve
+   the retained telescope's ownership distinction; warning about a
+   removable unresolved relationship is different from claiming the
+   filesystem is invalid.
 ** Root cause of THIS instance: a partial commit, not a save bug
    Recorded for completeness (not a code defect). The node 8c24623a
    ("earplugs") was a leaf whose only referrer was d40db175 ("backpack").
@@ -990,6 +1000,54 @@
    removed-member phantom for a node that exists nowhere. Data repair:
    commit the pending d40db175.skg (the worktree is already correct), or
    any commit that makes HEAD's d40db175 stop referencing 8c24623a.
+* Problems found while researching cross-owner deletion (2026-09-10)
+  Found while writing TODO/delete-shared-node.org.  The first is the
+  reported bug; the others are pre-existing gaps exposed by making
+  foreign dangling relationships an intentional state.
+** Delete propagation schedules unauthorized full-node saves
+   'apply_delete_propagation_cleanup' in server/save.rs uses global
+   inverse indexes to synthesize a full 'SaveNode' for every referencer
+   of a deleted PID. It does not check whether the referencer's retained
+   telescope is owned.
+   This happens after buffer foreign-write validation, so a foreign
+   referencer bypasses that classification and reaches filesystem
+   preflight. 'prepare_nodecomplete_telescope' then correctly refuses the
+   foreign-home write, aborting an otherwise authorized deletion before
+   any files change.
+
+   Load-time collision normalization guarantees that a retained
+   'NodeComplete' is either an all-owned telescope or a wholly foreign
+   one: if owned and non-owned raw files collide on a PID, all foreign
+   files are ignored with an 'IgnoredForeignPidCollision' warning.
+   Therefore the referencer's home ownership is the correct cleanup
+   boundary. Foreign referencers should not be synthesized; the ordinary
+   writer's foreign-telescope refusal should remain unchanged.
+** PhantomUnknown is rendered but silently omitted from content saves
+   Content reconciliation can render a raw unresolved 'contains' member
+   as '(skg (unknown (id ...)))'. Save traversal then ignores the phantom
+   and 'content_members()' collects only affected Active children. Thus
+   an unchanged definitive save can remove the dangling membership even
+   though the Unknown remains visibly present in the submitted buffer.
+
+   The existing test
+   tests/dangling_reference_renders_unknown_node.rs proves only that such
+   a buffer saves without an error; it never reloads the parent to check
+   whether the member survived. This needs an explicit round-trip
+   contract and a test of the resulting relationship, not merely the
+   response's error list.
+** Outbound PartnerCols discard unresolved raw members
+   The outbound accessors in
+   server/dbs/in_rust_graph/relation_accessors.rs enumerate relationship
+   members through 'filter_map(pid_of)'. A raw subscribe, override, or
+   hide member therefore disappears before PartnerCol rendering whenever
+   its target is unresolved. The initial renderer's nominal fallback
+   produces empty Active child data rather than 'Phantom::Unknown', and
+   the rerender path can instead fail because no member source exists.
+
+   Consequently the UI has no coherent representation from which an
+   owner could remove most non-content dangling relationships. These
+   paths need raw-ID-aware enumeration and a true Unknown case if the
+   deletion policy covers all four structured outbound fields.
 * Problems found while planning uniform heralds (2026-06-21)
   Found while researching TODO/uniform-heralds/vision.org to write
   TODO/uniform-heralds/discussion.org. None is required by that vision;

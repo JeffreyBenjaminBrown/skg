@@ -1,0 +1,2077 @@
+#+title: Delete shared node: implementation plan
+#+TODO: TODO ONGOING | DONE
+
+* Outcome
+
+Implement the decisions in '1_discussion.org' as one coherent feature:
+
+- A user can delete a node they own even when a foreign retained
+  telescope still refers to it.
+- Delete propagation cleans structured references only in retained
+  telescopes owned by the current user.  A foreign telescope is never
+  scheduled for a collateral write.
+- Each surviving unresolved member of 'contains', 'subscribes_to',
+  'hides_from_its_subscriptions', or 'overrides_view_of' can render as
+  'Phantom::Unknown'.  An unchanged Unknown preserves the exact raw
+  relationship member; removing the Unknown from an editable collection
+  removes that relationship.
+- An Unknown has the same collection-membership gestures as an Active member:
+  it can be reordered where the relationship is ordered, and it can be moved
+  or copied into another owned, definitive, editable structured collection.
+  A new destination relationship receives its source from that destination's
+  ordinary source rule; the copied 'referenceSource' is provenance, not the
+  requested source of the new edge.
+- 'HiddenOutsideOfSubscribeeCol' is an editable derived collection.  Its
+  additions and removals edit the subscriber's hides.  A newly added hide
+  that belongs inside a subscribee moves there after save and produces a
+  success warning.
+- 'skg-delete-references-to-absent-node' removes one unresolved raw ID from
+  all four structured relationship fields in every retained owned telescope,
+  including inactive owned sources.  It reports but never rewrites textual
+  Org links.
+- An already-open view converges immediately to Unknown wherever a surviving
+  raw relationship still backs the position.  'Phantom::Deleted' is reserved
+  for a last-seen occurrence with no surviving backing relationship.
+
+This is an execution plan, not another decision document.  The choices in
+'1_discussion.org' are settled and should not be reopened during
+implementation unless the existing code proves one of the stated invariants
+false.
+
+* Worktree and data guardrails
+
+- Do not read, edit, format, migrate, or test against 'data/'.  Use only test
+  fixtures and temporary test repositories.
+- Preserve every pre-existing worktree change.  In particular,
+  'server/types/viewnode.rs' already contains Jeff's edits to the
+  'Phantom::Deleted' and 'Phantom::Unknown' comments.
+- The comment changes in 'server/types/viewnode.rs' must be committed with the
+  same implementation commit as same-session Unknown reconciliation and its
+  tests.  Do not make a comments-only commit.
+- Before that commit, re-read the comments against the finished behavior.
+  Adjust them as needed for accuracy, while preserving the distinction
+  Jeff wrote.
+- Stage paths or hunks deliberately.  Do not accidentally stage the unrelated
+  dirty files currently present in the worktree.
+- 'TODO/problems.org' already contains three relevant problem reports.  Mark
+  only those exact entries resolved when their fixes land, and stage only
+  those hunks if the file still contains unrelated edits.
+- There is no '.skg' source-data schema change and no source-data migration.
+  Old buffers lack 'referenceSource'; a save of such a stale structured
+  Unknown must fail with a rerender-and-retry message rather than guess a
+  source or drop the member.  The vocabulary rename below does rename a
+  derived Tantivy field, so implementation must rebuild that disposable index.
+
+* Required title/body privacy vocabulary rename
+
+** Use 'text', never 'scalar', for title/body
+
+Before implementing the dangling-reference feature, rename the existing
+title/body privacy feature from /scalar release/ to /text release/.  This is a
+semantic rename, not a blind replacement of the word /scalar/.  Uses that mean
+YAML scalar, Unicode scalar value, TypeDB scalar subquery, or a genuinely
+single-valued schema fact remain unchanged.
+
+Rename 'server/serve/handlers/scalar_release.rs' to 'text_release.rs',
+'ScalarReleaseDecision' to 'TextReleaseDecision', and title/body-specific
+identifiers such as 'scalar_release_confirmation', 'scalar_approved_pids', and
+'ScalarAtSource' to their 'text' equivalents.  Replace prose such as
+“selected scalars,” “scalar publication,” and “scalar text” with the more
+specific “selected title/body text,” “title/body publication,” or “text,” as
+the sentence requires.
+
+** Use 'overPrivateText', never 'ugly', for this telescope condition
+
+The replacement adjective is exactly 'overPrivateText'.  An
+/overPrivateText telescope/ is one whose folded title or body was selected
+from below its home in the privacy ladder.  Rename the Rust field exactly from
+'ugly_telescope' to 'overPrivateText_telescope'.  Rust accepts that mixed
+snake/camel spelling; add narrowly scoped 'allow(non_snake_case)' attributes
+where required instead of normalizing away the adjective phrase.
+
+Apply the rename through server types, locals, helpers, protocol variants,
+clients, tests, docs, and the Tantivy schema.  The intended public/internal
+mappings include 'UglyTelescopeConfirmation' to
+'OverPrivateTextTelescopeConfirmation', 'SearchUglinessChoice' to
+'SearchOverPrivateTextChoice', 'ugly-telescope-confirmation' to
+'overPrivateText-telescope-confirmation', 'allow-ugly-telescopes' to
+'allow-overPrivateText-telescopes', 'ugly-telescopes' to
+'overPrivateText-telescopes', and '--include-ugly-telescopes' to
+'--include-overPrivateText-telescopes'.  Rename the Tantivy field from
+'ugly_telescope' to 'overPrivateText_telescope' and exercise the normal
+derived-index rebuild path.  Do not retain compatibility aliases containing
+the rejected vocabulary unless Jeff explicitly requests them later.
+
+** Update old planning records as well as live code
+
+The semantic audit must cover the entire repository except '.git/', 'target/',
+'tests/results/', and 'data/'.  In particular, update the title/body privacy
+vocabulary in 'TODO/dup-ids-maybe-bad/4_audit-list.org', '6_recap.org',
+'7_plan.org', and '8_progress.org', plus applicable completed problem/plan
+records found by the audit.  Update explanatory prose, code-symbol references,
+wire examples, CLI examples, headings, and test names.  Do not change unrelated
+uses such as YAML block scalars, Unicode scalar values, or an author merely
+calling some code ugly.
+
+Land the server, Emacs, Neovim, wire, CLI, Tantivy, tests, current docs, and old
+planning-record rename together so no committed revision teaches two names for
+the same feature.  This commit is vocabulary-only apart from the disposable
+Tantivy rebuild necessitated by its field-name change; behavior must remain the
+same.
+
+* Semantic contract
+
+** Ownership is decided at the retained-telescope boundary
+
+A retained 'NodeComplete'/'NodeRust' represents one telescope.  It may span
+multiple sources owned by the same user, but it does not mix owned and foreign
+sections.  Same-PID owned/foreign collisions are normalized during loading:
+the owned telescope wins and the foreign files are ignored with the existing
+'IgnoredForeignPidCollision' warning.  A normal fork has a fresh PID.
+
+Therefore:
+
+- Classify a referencer by its retained home, 'node.source'.
+- 'config.user_owns_source(&node.source)' is the authorization boundary for a
+  cleanup-generated 'SaveNode'.
+- Never add a foreign referencer to the pending write batch.
+- Defensively do not strip deleted IDs from a foreign 'SaveNode' if one reaches
+  delete propagation through a future call path.
+- Keep the ordinary filesystem writer's foreign-write refusal unchanged.  It
+  remains a last line of defense, not the primary filter.
+
+** Unknown is inert as a node and load-bearing as a relationship member
+
+'Phantom::Unknown' does not define, own, delete, rename, source, or save a
+node.  At a structured relationship position it does represent one exact raw
+member of an owner's collection.
+
+The round-trip is:
+
+- Rendering an unresolved raw member produces an Unknown at that member's
+  position.
+- The Unknown carries the raw ID and the source section that records the edge.
+- Saving it unchanged contributes that exact raw ID/source pair back to the
+  containing relationship, but emits no node definition.
+- Reordering it among visible peers has the same effect as reordering an Active
+  member: 'contains' and 'subscribes_to' retain the submitted order, while the
+  already-unordered hides and overrides relationships ignore textual reorder.
+- Placing a copy in another owned, definitive, editable relationship creates a
+  new relationship to the same raw ID without creating the missing node.  The
+  new relationship uses its destination's ordinary source derivation.  The
+  original relationship survives unless its occurrence is also omitted from
+  an editable definitive collection, in which case the gesture is a move.
+- Removing it from a writable relationship surface omits that pair and removes
+  the relationship.
+- If its ID becomes resolvable before removal, the next render produces the
+  real node.
+
+Do not canonicalize an unresolved ID.  It might be an extra ID of the deleted
+node, and the graph no longer contains the information needed to map it to the
+former primary PID.
+
+** Home source and reference source are different facts
+
+Use these terms consistently in types, comments, errors, tests, and docs:
+
+- /Home source/ is the home of the referenced node.  An Unknown has no known
+  home source.
+- /Reference source/ is the telescope section that records the relationship
+  member.  On the wire this is 'referenceSource'; in Rust it is
+  'reference_source'.
+- Existing 'relSource' metadata expresses a user's source-placement request for
+  a resolvable edge.  It is not interchangeable with 'referenceSource'.
+
+'referenceSource' is provenance and validation input.  In its rendered
+position it is the source of that relationship.  After the user copies or
+moves the occurrence elsewhere but before save, it still identifies the
+relationship from which the occurrence was rendered; it does not choose or
+authorize the new destination relationship's source.  It must be consumed
+without being displayed as the Unknown node's source herald.
+
+** Visibility and editability use different gates
+
+For a raw structured member recorded at edge source S:
+
+| Edge S active? | Node resolves? | Home source active? | Rendering                                     |
+|----------------+----------------+---------------------+-----------------------------------------------|
+| no             | either         | either              | preserve from disk; omit from the buffer      |
+| yes            | no             | n/a                 | render Unknown with 'referenceSource=S'       |
+| yes            | yes            | no                  | preserve from disk; omit target data          |
+| yes            | yes            | yes                 | render the existing Active/Diff/Inactive form |
+
+The edge source controls whether an unresolved relationship is visible.  The
+referenced node's home source cannot be consulted when there is no node.  This exposes no
+target title, body, or home; the raw ID and edge section are already facts of
+the visible relationship.
+
+Ownership separately controls writeability.  A foreign edge may be displayed
+in the deleting user's already-open view, but it remains inert there.  When the
+same telescope is viewed under its owner's config, its definitive owner makes
+the collection editable and the Unknown can be removed.  This separation is
+required to satisfy both same-session convergence and the ownership boundary.
+
+** Relationship surfaces
+
+| Stored field | Owning view node | Editable surface for dangling member |
+|--------------+------------------+--------------------------------------|
+| 'contains' | parent node | direct content child |
+| 'subscribes_to' | subscriber | member of 'SubscribeeCol' |
+| 'overrides_view_of' | overrider | member of 'OverriddenCol' |
+| 'hides_from_its_subscriptions' | subscriber | member of 'HiddenOutsideOfSubscribeeCol' when outside; membership can derive into 'HiddenInSubscribeeCol' after save |
+
+Inbound collections such as 'SubscriberCol', 'OverriderCol', 'HiderCol', and
+'HiddenCol' stay read-only.  'HiddenInSubscribeeCol' stays a read-only derived
+filter.  Textual Org links stay ordinary title/body text and are outside the
+structured round-trip.
+
+** Same-session precedence
+
+When a deletion and a surviving raw reference overlap, durable relationship
+state wins:
+
+- Surviving raw membership plus absent target becomes Unknown immediately.
+- No surviving raw membership permits the existing last-seen Active occurrence
+  to become 'Phantom::Deleted' and then follow the existing scaffold/pruning
+  rules.
+- A fresh render, post-save rerender, and post-restart render must agree.
+
+* Shared implementation vocabulary and data shapes
+
+Introduce explicit types rather than continuing to overload
+'(ID, Option<SourceName>)'.  Here an /intent/ is the save extractor's
+intermediate description of the relationship membership asserted by the
+buffer.  It has not yet been lowered into 'MemberAtSource' values or a
+'SaveNode'.  The exact module can follow local ownership, but the concepts must
+remain distinct:
+
+#+begin_example
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RelationshipSourceChoice {
+  Derive,
+  Explicit(SourceName),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum StructuredMemberIntent {
+  Node {
+    id: ID,
+    source_choice: RelationshipSourceChoice,
+  },
+  RenderedUnknownReference {
+    raw_id: ID,
+    reference_source: SourceName,
+  },
+}
+#+end_example
+
+The cases mean:
+
+- 'Node' represents an ordinary Active member.  'Derive' means it has no
+  'relSource', so the current sticky-else-default algorithm chooses the edge
+  source.  'Explicit' carries a user-authored 'relSource' and retains the
+  existing floor/config/ownership validation.
+- 'RenderedUnknownReference' represents an Unknown rendered from an existing
+  relationship.  Its raw ID/reference-source pair must exactly match at least
+  one retained raw outbound relationship in the current graph.  The source is
+  evidence for the rendered occurrence, not a source choice for its current
+  destination.  Reconciliation preserves the destination's existing exact
+  member when it already has the same relationship-member key; otherwise it
+  creates a new member with the destination's ordinary derived source.
+  Omitting the occurrence from its original editable definitive collection
+  removes that original relationship.
+
+Use a shared identity helper wherever resolved and unresolved relationship
+members are compared:
+
+#+begin_example
+enum RelationshipMemberKey {
+  ResolvedPid(ID),
+  UnresolvedRawId(ID),
+}
+#+end_example
+
+Construct 'ResolvedPid' when 'graph.pid_of(raw_id)' succeeds and
+'UnresolvedRawId' otherwise.  This provides PID equivalence for primary/extra
+IDs while targets exist, and exact raw-ID equality after they disappear.  Use
+it for deduplication, set difference, reconciliation matching, and the hide
+inside/outside partition.  Do not replace the raw ID stored in
+'MemberAtSource'; the key is for comparison only.
+
+Rendering also needs an explicit relationship-member reality rather than an
+empty Active fallback.  Extend the existing content and PartnerCol goal/child
+types, or introduce a shared equivalent, with at least:
+
+#+begin_example
+enum RelationshipMemberReality {
+  Real { pid: ID, home_source: SourceName, title: String },
+  // Keep the existing Diff/Inactive cases where that pipeline needs them.
+  Unknown { raw_id: ID, reference_source: SourceName },
+}
+#+end_example
+
+Every display goal must retain both the raw stored ID and its reference source,
+even when a resolved PID is also available.
+
+* Make delete propagation respect ownership
+
+** TODO Add the failing cross-owner regression first
+
+Extend 'tests/delete_strips_references_from_neighbors.rs' or add a focused
+integration test beside it with this fixture:
+
+- owned target N;
+- owned referencer O naming N in at least one structured field;
+- wholly foreign referencer Cheese naming N;
+- preferably one edge names an extra ID of N, to keep the raw-ID case covered;
+- N exists in the appropriate owned telescope sections before deletion.
+
+Capture the foreign file bytes before saving.  Assert:
+
+- deleting N succeeds;
+- N is removed only from owned sources;
+- O is rewritten and its matching owned relationship is removed;
+- Cheese's file is byte-for-byte unchanged;
+- Cheese's in-Rust 'NodeRust' still contains the raw member after the delete;
+- no foreign write/delete was prepared;
+- a forced preflight failure still leaves every file unchanged.
+
+Keep the existing all-owned test.  It proves that this fix does not disable
+normal cleanup.  If the collision premise is not already pinned adequately in
+'tests/multi_source_loading.rs', add the small assertion that an owned/foreign
+same-PID collision retains only the owned telescope.
+
+** TODO Thread config through delete propagation
+
+Change 'server/save.rs::apply_delete_propagation_cleanup' to accept
+'&SkgConfig'.  Update every call site, including:
+
+- 'update_graph_minus_nodeMerges_with_hoist_approval';
+- 'validate_override_invariants_after_save';
+- the pre-hoist invocation in
+  'server/serve/handlers/save_buffer.rs::update_from_and_rerender_buffer_with_approvals';
+- direct unit/integration callers.
+
+In its inverse-index discovery pass:
+
+- continue collecting referencer PIDs from 'contained_by', 'subscribers_of',
+  'hiders_of', and 'overriders_of';
+- load each retained referencer from the supplied graph snapshot;
+- retain it only when 'config.user_owns_source(&rust.source)' is true;
+- only then project it through 'nodecomplete_from_noderust' and append the
+  cleanup-generated 'SaveNode'.
+
+In its strip pass, remove deleted primary and extra IDs only from owned
+'SaveNode' values.  This defense applies to buffer-originated and
+cleanup-generated saves alike.  Do not silently delete a foreign save from the
+batch; leave later validation to report whatever introduced it.  The cleanup
+function's own responsibility is simply never to alter it.
+
+Rename the internal comments from numbered phases if touching them; describe
+them as /discover owned referencers/ and /strip deleted IDs from owned saves/.
+Update the function documentation to state explicitly that foreign raw
+references are intentionally durable.
+
+** Ownership checkpoint
+
+Run the focused deletion test before proceeding.  At this checkpoint, the
+reported delete must succeed even though the UI may not yet render or preserve
+all resulting Unknowns.
+
+* Carry Unknown reference provenance on the wire
+
+** TODO Extend the Unknown type and constructors
+
+In 'server/types/viewnode.rs':
+
+- add 'reference_source: Option<SourceName>' to 'PhantomUnknown';
+- keep 'ViewNode::pid_and_source'/'Phantom::pid_and_source' returning 'None'
+  for Unknown, because those functions mean target PID/home source;
+- keep 'mk_unknown_viewnode(id)' as the root/backpath constructor with
+  'reference_source=None';
+- add a clearly named relationship constructor such as
+  'mk_unknown_viewnode_at_reference(id, reference_source)' that always stores
+  'Some(reference_source)';
+- update exhaustive constructors and conversions in
+  'server/types/maybe_placed_viewnode.rs'.
+
+Do not put 'reference_source' in 'ViewNodeStats::rel_source'.  The latter is a
+user request about edge placement for resolvable nodes.
+
+** TODO Serialize and parse 'referenceSource'
+
+In 'server/org_to_text.rs', emit:
+
+#+begin_example
+(skg (unknown (id RAW-ID) (referenceSource EDGE-SOURCE)))
+#+end_example
+
+when the optional field is present.  A root/backpath Unknown remains:
+
+#+begin_example
+(skg (unknown (id RAW-ID)))
+#+end_example
+
+In 'server/serve/parse_metadata_sexp.rs':
+
+- add an optional parsed 'unknown_reference_source';
+- accept exactly one scalar value for 'referenceSource';
+- construct 'PhantomUnknown' with both fields;
+- report duplicate, empty, or malformed values through the existing metadata
+  parse-error path;
+- reject 'referenceSource' when there is no 'unknown' marker rather than
+  silently discarding it.
+
+Update the protocol/metadata grammar and examples in 'api-and-formats.md'.
+Add parser/serializer round-trip tests for Some and None, malformed cardinality,
+and escaping/source-name edge cases already supported by ordinary source
+metadata.
+
+** TODO Consume provenance without heralding it as a home source
+
+In 'server/heralds.rs':
+
+- change the Unknown herald text from 'Parent references unknown node.' to
+  'Reference to unknown node.';
+- add 'referenceSource' to the Unknown rule's consumed-but-invisible atoms with
+  the existing 'vac' mechanism;
+- add the atom to 'emittable_metadata_atoms';
+- keep Unknown out of the normal source-herald rule.
+
+Regenerate 'tests/elisp/herald-rules.sexp' with the repository's
+'emit-herald-rules' binary rather than hand-editing generated output.  Update
+Rust herald exhaustiveness tests and Emacs/Neovim metadata tests so an Unknown
+with provenance is accepted and its edge source is not presented as the
+missing node's home.
+
+* Preserve raw outbound members through graph access and rendering
+
+** TODO Add a source-set-gated outbound accessor that preserves stored IDs
+
+In 'server/dbs/in_rust_graph/relation_accessors.rs', add an accessor such as:
+
+#+begin_example
+pub fn outbound_members_for_relation_gated(
+  &self,
+  owner: &ID,
+  relation: NodeRelation,
+  active: Option<&ActiveSourceSet>,
+) -> Vec<MemberAtSource<ID>>
+#+end_example
+
+Its contract:
+
+- preserve stored IDs, edge sources, and stable relationship order;
+- gate on the 'MemberAtSource.source', not the referenced node's home source;
+- do not call 'pid_of' or 'filter_map' unresolved values away;
+- return no member from an inactive edge section;
+- leave the existing accessor that returns only current canonical PIDs intact
+  for consumers that genuinely require currently existing referenced nodes.
+
+Add pure tests covering a primary ID, a resolvable extra ID, an unresolved raw
+ID, active/inactive edge sources, and stable ordering.
+
+** TODO Refactor content goals to retain raw ID and edge source
+
+In 'server/update_buffer/reconcile/content.rs', stop reducing the parent's raw
+'contains' list to a bare 'Vec<ID>' before the display goal is built.  Carry:
+
+- the raw stored ID;
+- its reference source;
+- its comparison key/canonical PID when resolvable;
+- the target reality and home source when resolvable.
+
+For a resolvable, active target, preserve the current override, definitiveness,
+title/body, and source-set behavior.  For an unresolved target whose edge is
+active, create 'mk_unknown_viewnode_at_reference(raw_id, edge_source)'.  For an
+inactive edge, omit it.  For a resolved target whose home is inactive, retain
+it from disk during save but do not expose its title or body.
+
+Update content goal matching and 'complete_content_children' so an existing
+Unknown matches by unresolved raw ID.  Never manufacture an empty Active node
+as a lookup fallback.
+
+** TODO Refactor PartnerCol child data and goals
+
+'server/to_org/complete/partner_col/mod.rs' currently discards unresolved
+outbound values through resolved accessors and
+'build_initial_render_child_data' can manufacture an empty Active fallback.
+Replace that fallback with explicit member reality.
+
+In 'server/to_org/complete/partner_col/child_data.rs' and
+'goal_list.rs', carry raw ID/reference source through goals for:
+
+- 'SubscribeeCol';
+- 'OverriddenCol';
+- the subscriber's raw hide list used by
+  'HiddenOutsideOfSubscribeeCol' and 'HiddenInSubscribeeCol'.
+
+Update the matching/reconciliation code in:
+
+- 'server/update_buffer/reconcile/partner_col.rs';
+- 'server/update_buffer/reconcile/subscribee_col.rs';
+- 'server/update_buffer/reconcile/hiddenoutsideof_subscribeecol.rs';
+- 'server/update_buffer/reconcile/hiddeninsubscribee_col.rs'.
+
+Writable outbound surfaces create Unknown for an unresolved active-edge
+member.  Inbound collections continue to enumerate currently existing related
+nodes and do not invent a dangling inverse relationship after TypeDB drops the
+missing node's relationships.
+
+The hide partition is computed from raw relationship data, never from TypeDB:
+
+- Start with the subscriber's raw hides whose edge sources are active.
+- Build the union of raw content of its active subscribees, respecting edge
+  source gating.
+- A hide whose comparison key is in that union belongs in each applicable
+  'HiddenInSubscribeeCol'.
+- The remainder belongs in 'HiddenOutsideOfSubscribeeCol'.
+- Resolve to canonical PID for comparisons when possible; otherwise compare
+  exact raw IDs.
+
+An absent ID can still be classified inside if the same raw ID appears in an
+active subscribee's raw content.  In that case the HiddenIn row can be Unknown
+and stays read-only there.
+
+** TODO Normalize backed deletions before Active-to-Deleted conversion
+
+The current BFS can retain a formerly Active child for a raw membership, then
+later convert it to Deleted solely because its PID is in
+'deleted_by_this_save_pids'.  Fix the ordering at the relationship owner's
+reconciliation seam:
+
+- Before an existing child is visited as an ordinary Active node, compare it
+  with the post-save raw relationship goal.
+- If the target is absent but the exact backing relationship survives, mutate
+  the occurrence to Unknown with raw ID/reference source.
+- Preserve the view wrapper state needed for focus/folds and preserve any
+  descendant subtree as independent display context, but remove title/body
+  claims that Unknown cannot make.
+- Because the occurrence is no longer Active, the later
+  'mutate_activeNode_to_deletednode' pass must not turn it into Deleted.
+- If the relationship itself disappeared, do not create Unknown; allow the
+  existing Deleted/scaffold/pruning behavior.
+
+Use the same normalization helper for content and writable PartnerCols so the
+post-save and fresh-render paths cannot diverge.
+
+This implementation and its tests are the commit boundary that must include
+Jeff's already-edited comments in 'server/types/viewnode.rs'.
+
+* Validate and lower structured Unknown membership
+
+** TODO Make local shape validation admit Unknown only where meaningful
+
+In 'server/from_text/buffer_to_viewnodes/local.rs' and, where ancestry/graph
+facts are needed, 'server/from_text/buffer_to_viewnodes/validate_tree.rs':
+
+- allow an Unknown as a direct member of content, 'SubscribeeCol',
+  'OverriddenCol', 'HiddenOutsideOfSubscribeeCol', and the read-only
+  'HiddenInSubscribeeCol';
+- retain root/backpath Unknown with no 'referenceSource';
+- require 'referenceSource=Some' for every Unknown in a structured member
+  position;
+- reject 'referenceSource=Some' in a placement that cannot represent a
+  structured edge;
+- reject 'relSource' on Unknown;
+- reject user title/body text on an Unknown headline rather than discarding it;
+- include Unknown raw IDs in the appropriate direct-child distinctness checks;
+- keep Unknown itself ineligible for edit requests, source moves, forks, node
+  merges, or a node save.
+
+For each editable structured Unknown, validate against the current
+'InRustGraph':
+
+- identify the destination relationship owner and kind from ancestry;
+- require the raw-ID/'referenceSource' pair to occur exactly in at least one
+  retained raw outbound relationship in the current graph; the origin may be
+  a different owner, relation kind, or a foreign retained telescope;
+- require 'referenceSource' to exist in config and, under a restricted source
+  set, to be active, because otherwise this occurrence could not have been
+  rendered into the buffer being saved;
+- require the destination owner to be save-eligible and its retained telescope
+  to be owned before emitting write intent;
+- permit an owned writable destination even when the provenance relationship
+  is foreign; provenance never schedules a write to its owner or source;
+- report a clear stale/tampered-buffer error when the provenance pair exists
+  nowhere: rerender and retry.
+
+Perform every provenance lookup against the same pre-save retained-graph
+snapshot, before applying any collected relationship edits.  Otherwise a move
+could validate or fail according to traversal order when the origin is omitted
+and the destination is added in the same save.
+
+Do not require the provenance pair to belong to the destination relationship.
+If the destination already stores the same 'RelationshipMemberKey', preserve
+that destination's exact raw ID and source; this is an existing set member, not
+a source-move request.  If it does not, classify the occurrence as a new
+destination relationship.  Thus leaving the origin in place is a copy, while
+omitting it from an editable definitive origin is a move.  A foreign or
+read-only origin cannot be removed through this gesture, but its Unknown may
+still be copied into an owned writable destination.
+
+Do not require the target to remain absent.  If it becomes resolvable while an
+old Unknown buffer is open but the provenance pair still matches, saving the
+relationship is harmless; the next render replaces the Unknown with Active.
+
+** TODO Collect Unknowns without treating them as nodes
+
+Refactor 'server/from_text/local_instruction_collection/types.rs',
+'traverse.rs', 'lower.rs', and 'predicates.rs' to use
+'StructuredMemberIntent'/'RelationshipSourceChoice'.
+
+Collection rules:
+
+- A normal Active content/PartnerCol member emits 'StructuredMemberIntent::Node'
+  with 'Derive' or 'Explicit' according to its existing 'relSource'.
+- A direct structured Unknown emits 'RenderedUnknownReference' with its exact
+  raw ID and 'reference_source', regardless of whether it remains under its
+  rendered owner or was copied/moved under another writable owner.
+- An Unknown emits no 'SetTitleAndBody', 'Delete', source move, fork, or merge.
+- Traversal can continue past a phantom only as required to preserve existing
+  independent descendants; descendants do not become children of a fictitious
+  graph node.
+- Deleting the Unknown line causes no member intent for it.  The enclosing
+  definitive collection's set semantics then remove the relationship.
+
+Update 'content_members', 'partnerCol_members', and
+'subscribeeCol_members' through a shared collector so they cannot acquire
+different Unknown semantics later.
+
+** TODO Resolve source intent without canonicalizing Unknown
+
+In 'server/from_text/supplement_from_disk.rs::apply_sticky_sources':
+
+- for a 'Node' with 'Derive', keep source derivation unchanged;
+- for a 'Node' with 'Explicit', keep explicit-source and source-floor
+  validation unchanged;
+- for 'RenderedUnknownReference' whose destination already contains the same
+  relationship-member key, preserve that destination member's exact stored raw
+  ID and source, even if the occurrence's provenance source came from another
+  relationship;
+- for 'RenderedUnknownReference' that is new to the destination, retain its raw
+  ID but use the normal new-edge source path: for 'contains', 'subscribes_to',
+  and 'overrides_view_of', an unresolved target falls back to the destination
+  owner's home exactly as 'default_floor_for' already specifies; for a hide,
+  use 'hide_source' with the destination subscriber's post-edit subscriptions;
+- never put 'referenceSource' into 'ExplicitSources' or use it as the new
+  relationship's source; after successful rerender the occurrence receives a
+  new 'referenceSource' naming the source actually selected at its destination;
+- return a validation error if the rendered provenance pair exists nowhere in
+  the retained graph;
+- preserve the relationship field's existing 'MSV' specified/unspecified shape
+  on a no-op round-trip.
+
+Refactor 'preserve_invisible_members' so visibility is relationship-aware:
+
+- an inactive edge member is woven back from disk;
+- an active unresolved edge member was shown as Unknown and therefore follows
+  the submitted collection;
+- an active edge to a resolved target with inactive home is woven back;
+- a de-novo member whose target is inactive remains forbidden/omitted under the
+  existing source-set rules.
+
+Set-difference and weave predicates use 'RelationshipMemberKey'.  This is
+essential: the current target-source-only 'member_is_visible' makes a removed
+Unknown reappear, while a raw-ID-blind merge loses unresolved values.
+
+** TODO Add round-trip coverage for all structured fields
+
+Expand 'tests/dangling_reference_renders_unknown_node.rs',
+'tests/source_sets.rs', 'tests/partner_col_matrix.rs', and focused unit tests as
+appropriate.  For each of the four fields, prove:
+
+- fresh render includes Unknown with exact ID and 'referenceSource';
+- unchanged save retains the exact 'MemberAtSource';
+- deleting the writable Unknown removes only that relationship;
+- an extra-ID member is not rewritten to a former/canonical PID;
+- inactive edge source is omitted and preserved;
+- active edge source plus absent target is visible without target title/body;
+- reordering Unknown relative to visible peers persists for ordered
+  'contains' and 'subscribes_to', while hides and overrides retain their
+  existing order-insensitive behavior for both Active and Unknown members;
+- copying Unknown to a second owned writable container retains the origin and
+  creates the destination relationship; moving it removes the editable origin
+  and creates the destination relationship;
+- cross-relation copying works among content, 'SubscribeeCol',
+  'OverriddenCol', and editable 'HiddenOutsideOfSubscribeeCol'; copying into a
+  foreign or read-only destination fails without a write;
+- a foreign/read-only provenance relationship may authorize a copy into an
+  owned writable destination but is itself byte-for-byte unchanged;
+- a new non-hide destination uses the destination owner's normal new-edge
+  default, not the copied 'referenceSource'; a new hide uses 'hide_source';
+- the rerendered destination Unknown reports its newly selected relationship
+  source;
+- a fabricated Unknown whose exact raw-ID/provenance-source pair exists nowhere
+  fails validation;
+- a stale structured Unknown with no 'referenceSource' fails safely;
+- an Unknown root without 'referenceSource' still renders and remains inert;
+- same-session deletion produces the same Unknown representation as restart.
+
+For hides, the removal assertion belongs to the editable-outside work below;
+the HiddenIn case remains visible but read-only.
+
+* Make 'HiddenOutsideOfSubscribeeCol' an editable derived filter
+
+** TODO Express the policy in the type system and heralds
+
+In 'server/types/viewnode.rs', add 'ColPolicy::EditableFilter'.  Map only
+'HiddenOutsideOfSubscribeeCol' to it.  Keep:
+
+- 'WritableSet' for direct writable relation sets;
+- 'ReadOnlySet' for inverse sets;
+- 'ReadOnlyFilter' for 'HiddenInSubscribeeCol' and other derived read-only
+  filters.
+
+Update every exhaustive match and policy comment.  In 'server/heralds.rs', use
+the editable 'leaf' behavior for HiddenOutside, not 'leaf_ro'.  Regenerate the
+herald rules fixture.
+
+In 'elisp/skg-metadata.el', split the concept currently named
+'skg--set-relationship-source-readonly-col-atoms'.  HiddenOutside membership is
+now editable, but manually setting a hide edge's source from that row is still
+unsupported because hide sources use the existing subscription-derived floor.
+Keep the source-edit command's refusal, rename/comment the constant in terms of
+/relationship-source editing unsupported/ rather than /membership read-only/,
+and make the error text accurate.  Apply the equivalent conceptual update in
+the Neovim metadata editor if it has the same list.
+
+** TODO Extract an explicit outside-subset edit
+
+Add a typed collection signal, for example:
+
+#+begin_example
+struct HiddenOutsideEdit {
+  subscriber: ID,
+  members: Vec<StructuredMemberIntent>,
+}
+#+end_example
+
+The col is below the subscriber's 'SubscribeeCol', so traversal must locate the
+subscriber two ancestors above it.  Emit the signal only for a definitive,
+save-eligible, owned subscriber.  Treat the single allowed
+'HiddenOutsideOfSubscribeeCol' as an exclusive set intent so duplicated or
+conflicting copies are validation errors.
+
+Collect:
+
+- affected Active rows as 'Node' with 'Derive' (a new hide uses the normal
+  hide-source rule);
+- Unknown rows as 'RenderedUnknownReference';
+- no membership intent from Diff, Inactive, Deleted, or other scaffolds.
+
+An explicitly present empty outside col means the active visible outside subset
+is empty.  It is not the same as an omitted/inactive collection.
+
+** TODO Resolve the editable filter after ordinary visibility inference
+
+Apply 'HiddenOutsideEdit' in
+'server/from_text/local_instruction_collection/resolve_visibility.rs' after:
+
+- contains-removal hide inference; and
+- subscribee-as-such visibility signals.
+
+This last-writer ordering is required.  If a user adds a currently visible
+inside node to HiddenOutside, the explicit hide must win instead of the earlier
+visibility signal immediately unhiding it.
+
+For each edited subscriber:
+
+- start with the hides produced by all earlier inference;
+- compute the old active-source outside subset from current raw relationships;
+- remove only omitted members of that old visible outside subset;
+- preserve every hide from an inactive edge source;
+- preserve every hide represented inside a subscribee;
+- add every submitted Active or Unknown row;
+- preserve existing sources for exact retained members;
+- derive a new Active hide's source through the existing 'hide_source' floor;
+- validate an Unknown's provenance pair and then preserve an existing
+  destination hide or derive a new destination hide as described above;
+- use PID equivalence for resolvable comparisons and raw-ID equality otherwise;
+- retain the old 'MSV' form on a no-op, and use the repository's normal
+  specified-value form when an actual edit occurs.
+
+After save, rendering derives placement again.  Nothing guarantees that a
+submitted outside row remains outside.
+
+** TODO Produce a success-only moved-inside warning
+
+The existing 'CompletionWarning::ColRepair' says a read-only edit was repaired
+or ignored and is not appropriate.  Add a separate success-only channel.
+
+A practical design is:
+
+- During extraction, compare submitted rows to the pre-save visible outside
+  subset and record only newly added candidates as a typed field on 'SavePlan',
+  such as 'PostCommitNoticeCandidate::HiddenOutsideAdded'.
+- Carry those candidates through all confirmation paths without rendering them
+  yet.
+- After the graph mutation succeeds, inspect the final in-Rust graph and find
+  which candidates now occur in the raw content of one or more subscribees.
+- Convert only those to warnings and append them to the successful save
+  response/completion warnings.
+- Do not emit them on validation, preflight, database, or confirmation failure.
+
+The warning names the hidden node (title when resolvable, always ID) and every
+applicable subscribee (title/ID), and says explicitly that the hide was saved
+but its row moved to that subscribee's 'HiddenInSubscribeeCol'.  It must not say
+the edit was discarded or repaired.
+
+If extending 'SavePlan', update all constructors and destructuring sites
+explicitly; do not hide this information in a global side channel.
+
+** TODO Reverse and extend hide tests
+
+In 'tests/hidden_from_subscriptions.rs':
+
+- replace the test that says adding to HiddenOutside does not hide;
+- adding a genuinely outside live node creates a hide and leaves it outside;
+- removing an outside live node removes the hide;
+- adding a node contained by one subscribee creates the hide, moves it inside,
+  and returns the success warning;
+- the multiple-subscribee case names every destination;
+- removing/editing outside does not disturb existing hidden-inside members;
+- an outside Unknown is preserved unchanged and removable;
+- an Unknown copied into HiddenOutside creates a new hide with the
+  destination subscriber's 'hide_source' rule, without changing its provenance
+  relationship;
+- a raw Unknown classified inside remains in read-only HiddenIn;
+- inactive-source hides are preserved under a restricted source set;
+- a failed save emits no accepted-and-moved warning.
+
+Keep 'tests/partner_col_warnings.rs' coverage for actual read-only collections.
+An 'EditableFilter' membership edit must never produce 'ColRepair'.
+
+* Add 'skg-delete-references-to-absent-node'
+
+** Command contract
+
+The command is runnable only with point on an Unknown headline.  It operates on
+the full raw ID from metadata, never a readable/truncated display ID.
+
+It scans every retained owned telescope represented in the configured graph,
+regardless of the active source set and regardless of which views are open.  It
+removes the exact raw ID from:
+
+- 'contains';
+- 'subscribes_to';
+- 'hides_from_its_subscriptions';
+- 'overrides_view_of'.
+
+It does not remove a primary-ID equivalent, another extra ID, or a now-known
+canonical PID.  It does not edit foreign telescopes.  It does not rewrite
+titles or bodies.
+
+Before mutation, compute one deterministic preview containing:
+
+- every owned node/telescope that would be rewritten, with PID, title, home,
+  relationship kind, and each reference-source section involved;
+- every matching textual Org ID link in each owned node's effective title/body,
+  with PID, title, home, 'title' or 'body line N', link label, and occurrence
+  count/location sufficient to find it.
+
+Use 'types/textlinks.rs::textlinks_from_text' for semantic matching, with a
+small location-aware wrapper over the same syntax/regex so line numbers and
+labels agree with the established parser.  'NodeRust.textlinks_to' can cheaply
+identify candidates but is not enough for locations.
+
+If the preview contains textual links:
+
+- send/open an Org warnings buffer containing both the structural rewrite list
+  and textual-link list;
+- only after the buffer exists, ask whether to proceed;
+- decline performs no mutation;
+- approval retries with the opaque approved-preview value supplied by the
+  server.
+
+If there are no textual links, skip this warning buffer and confirmation.  Do
+not invent a general confirmation for this task.  The ordinary result still
+reports the structural changes.  A preview containing textual links but no
+structured rewrites still gets the warning/confirmation; approval then yields
+a successful structural no-op and leaves all text untouched.
+
+** TODO Implement a pure preview and rewrite core
+
+Put graph-independent domain code in a focused module such as
+'server/delete_references_to_absent_node.rs', with the TCP handler kept in
+'server/serve/handlers/delete_references_to_absent_node.rs'.  Define typed
+values rather than passing formatted strings through the mutation path:
+
+- 'StructuredRelationKind' for the four fields;
+- 'StructuredRewriteOccurrence' with owner PID/home/title, relation, raw ID,
+  and reference source;
+- 'TextLinkOccurrence' with owner/location/label;
+- 'DeleteReferencesPreview' containing sorted occurrences;
+- a formatter for the human Org warning/result buffer;
+- a deterministic opaque approval representation of the exact preview.
+
+The initial scan:
+
+- snapshots 'InRustGraph' once;
+- refuses if 'graph.pid_of(raw_id).is_some()' because the command applies only
+  to an absent node; tell the client to rerender;
+- iterates retained 'NodeRust' values and keeps only
+  'config.user_owns_source(&node.source)';
+- directly examines every 'MemberAtSource.member' for exact raw-ID equality;
+- does not use inverse indexes, because those are canonical-PID keyed and the
+  target is absent;
+- scans title and body separately for textual links;
+- sorts by owner PID, relationship kind, reference source, and text location so
+  previews/tests are stable.
+
+Build at most one fresh cleanup-generated 'SaveNode' per affected telescope by
+projecting its current 'NodeRust' and retaining everything except exact raw-ID
+members in the four fields.  Preserve member order, unrelated members,
+reference sources, and every 'MSV' specified/unspecified shape.  Never construct
+these saves from client data or a cached warning-buffer copy.
+
+Unit-test the scanner, deterministic formatter/approval representation, exact
+rewriter, duplicate occurrences in different source sections, and text-link
+location reporting before wiring TCP.
+
+** TODO Define the request/response protocol
+
+Add 'RequestType::DeleteReferencesToAbsentNode' and two response variants in
+'server/serve/protocol.rs', then document them in 'api-and-formats.md'.  Use the
+existing length-prefixed S-expression transport.
+
+Initial/approved request:
+
+#+begin_example
+((request . "delete references to absent node")
+ (id . "RAW-ID")
+ (approved-preview . "OPAQUE-CANONICAL-PREVIEW"))
+#+end_example
+
+'approved-preview' is omitted initially.  It is an opaque, deterministic,
+lossless serialization/fingerprint of the exact structured and textual
+preview, not a client authorization claim about arbitrary files.  The client
+must echo it unchanged.  Prefer a canonical serialized value over adding a
+hash dependency; the server always recomputes and compares the underlying
+preview.
+
+Confirmation response:
+
+#+begin_example
+((response-type "delete-references-confirmation")
+ (id . "RAW-ID")
+ (approved-preview . "OPAQUE-CANONICAL-PREVIEW")
+ (content . "ORG WARNING BUFFER")
+ (prompt . "Remove the structured references?"))
+#+end_example
+
+Success/no-op response:
+
+#+begin_example
+((response-type "delete-references-result")
+ (content . "ORG RESULT")
+ (changed-nodes . N)
+ (changed-memberships . N))
+#+end_example
+
+Follow either first response with the usual
+'rerender-lock' -> 'rerender-view'* -> 'rerender-done' stream.  Error/refusal
+and confirmation paths use 'stream_empty_rerender' so clients unwind their
+preemptive all-view locks.  Mutation success sends the result and then the real
+rerender stream.
+
+Update enum string conversions, dispatch exhaustiveness, protocol parser tests,
+and both clients' response-handler cleanup lists.
+
+** TODO Revalidate approval and commit as one batch
+
+In the handler:
+
+- recompute the full preview from a fresh graph snapshot on every request;
+- if an approved preview differs, discard approval and re-enter the current
+  preview's normal flow: confirm again if text links still exist, or proceed
+  without confirmation if none exist;
+- recheck that the raw ID is unresolved;
+- build rewrite 'SaveNode's from that same fresh snapshot;
+- pass them as one batch through the ordinary filesystem preflight and graph
+  update machinery, with no source moves or node merges;
+- do not bypass ownership checks or introduce a section-patching writer;
+- do not mutate anything if preflight fails.
+
+Calling 'update_graph_minus_nodeMerges' is acceptable: the batch contains no
+'DeleteNode', so delete propagation is a no-op.  If a lower existing primitive
+is selected instead, retain ordinary filesystem-first atomic preflight and the
+TypeDB/Tantivy recovery behavior.
+
+Do not solve unrelated cross-connection serialization in this task.  Match the
+fresh-snapshot/preflight guarantees of ordinary saves and never reuse node
+bytes captured before the approval prompt.
+
+After success, report:
+
+- owned telescopes/nodes changed;
+- total memberships removed;
+- per node, relationship kinds and reference sources changed;
+- a zero-structural-reference result as a successful no-op;
+- that textual links, if any, were deliberately left unchanged.
+
+** TODO Rerender all open views safely
+
+Both clients must refuse to start while any registered Skg view has unsaved
+edits; a global rerender would otherwise clobber them.  Then they preemptively
+lock all Skg views and install the ordinary rerender-stream handlers before
+sending the request.
+
+On successful mutation, prepare and stream every open view with the connection's
+current diff mode and active source set.  This operation only removes edges to
+an ID that was revalidated as absent:
+
+- removing 'contains', 'subscribes_to', or 'overrides_view_of' can only remove
+  an unresolved placement;
+- removing a hide of an absent target cannot expose real title/body text;
+- no target title/body exists to release.
+
+Therefore it cannot introduce new title/body text under a restricted source
+set.  Add a small specialized wrapper that calls 'prepare_rerender_views' and
+'stream_prepared_rerenders' without an overPrivateText-telescope challenge,
+and document this monotonic-release proof beside the bypass.  Do not call the generic
+'stream_rerender_views' in a way that can challenge after the graph has already
+mutated.
+
+Any render error belongs in 'rerender-done'; the graph mutation is already
+committed, as with ordinary post-save rendering.  Ensure every response path
+ends the stream guard and unlocks buffers.
+
+** TODO Implement the Emacs command
+
+Add a focused module such as
+'elisp/skg-request-delete-references-to-absent-node.el' and require it from
+'elisp/skg-client.el'.  Add the public interactive command with the exact name
+'skg-delete-references-to-absent-node', plus the project's normal discoverable
+key/menu exposure in 'elisp/skg-keymaps-and-aliases.el'.
+
+Client behavior:
+
+- require point on a headline with '(unknown (id ...))';
+- extract the full raw metadata ID and reject Active/Deleted/Diff/collection
+  positions;
+- reject a request if any registered Skg view buffer is modified;
+- lock all registered Skg views and install confirmation, result, error, and
+  rerender handlers before sending;
+- on 'delete-references-confirmation', create a read-only Org buffer (for
+  example '*skg delete references warning*'), insert 'content', display it, and
+  only then call 'yes-or-no-p' with the supplied prompt;
+- leave the warning buffer open after approval, decline, or 'C-g' so it remains
+  a guide for manual text-link editing;
+- on approval, remember a retry closure carrying the raw ID and exact opaque
+  preview, but invoke it only after the empty rerender stream has unwound the
+  first request's locks/handlers;
+- on decline/'C-g', schedule no retry and make no mutation;
+- on result, display the result content using existing message/report
+  conventions and let the following rerender stream refresh every view;
+- remove all one-shot handlers on every terminal/error path.
+
+Reuse the state-machine pattern in
+'elisp/skg-request-rerender-all-views.el' for /alternative response, empty
+rerender unwind, then retry/.  Do not resend directly from inside a process
+filter while the old rerender guard is active.
+
+** TODO Implement Neovim parity
+
+Expose ':SkgDeleteReferencesToAbsentNode' through 'nvim/plugin/skg.lua' and a
+Lua entry point in a focused module or 'nvim/lua/skg/modify_graph.lua'.  Add the
+normal localleader mapping in 'nvim/lua/skg/keymaps.lua'.
+
+Match the Emacs contract:
+
+- exact Unknown-at-cursor validation via parsed metadata;
+- refuse when any registered Skg view has 'modified=true';
+- pre-lock and register stream handlers;
+- show a scratch, read-only Org buffer such as
+  'skg://delete-references-confirmation' before prompting;
+- retain the warning buffer;
+- echo the opaque preview unchanged;
+- wait for 'rerender-done' before an approved retry;
+- clean handler/lock state on result, decline, error, disconnect, and render
+  failure.
+
+Document the Neovim command in 'docs/COMMANDS-nvim.org' if that file is the
+maintained parity index, while the required primary documentation goes in
+'docs/COMMANDS.org'.
+
+** TODO Test the command end to end
+
+Server tests must cover:
+
+- command refuses a raw ID that now resolves;
+- all four structured fields are removed in all owned retained telescopes,
+  including inactive owned reference sections;
+- foreign files and foreign in-Rust members remain unchanged;
+- exact raw-ID matching does not remove aliases/equivalents;
+- one affected telescope becomes one 'SaveNode';
+- no text links executes immediately without confirmation;
+- title and body links produce locations, labels, and confirmation;
+- text-link-only preview still confirms, then succeeds as a structural no-op;
+- unapproved confirmation changes no filesystem/graph state;
+- an unchanged approved preview applies;
+- a stale approved preview applies nothing and produces the appropriate new
+  confirmation/current flow;
+- preflight failure applies nothing;
+- result counts and deterministic ordering are correct;
+- success rerenders an Unknown out of every open view and always terminates the
+  rerender stream.
+
+ERT and Neovim tests must cover:
+
+- cursor/metadata preconditions and full raw-ID extraction;
+- dirty-view refusal before any request is sent;
+- warning buffer appears before the confirmation function is called;
+- decline and 'C-g' produce no retry;
+- approval retries only after 'rerender-done' and echoes the opaque preview;
+- no-link success handles result plus rerender stream;
+- warning buffer remains available for manual textual edits;
+- locks, stream guards, and response handlers are cleared on every terminal
+  path.
+
+Prefer pure client tests with synthetic protocol frames, plus one integration
+fixture exercising the server and each maintained client.  All fixtures live
+under 'tests/'; do not point either client at 'data/'.
+
+* Commit sequence
+
+Make dependency-ordered, reviewable commits.  Use these semantic boundaries;
+do not make numbered phase/history headings in code or documentation.
+
+** Commit: Rename title/body privacy vocabulary
+
+Complete the repository-wide /scalar/ to /text/ and /ugly/ to
+/'overPrivateText'/ semantic renames described above.  Include the server,
+derived Tantivy schema/rebuild handling, wire protocol, CLI, both clients,
+tests, current documentation, and old planning records in one behavior-neutral
+commit.  Run the existing text-release/privacy suite before and after the
+rename and verify the old feature-specific names are absent.  Do not replace
+unrelated technical uses of /scalar/ or ordinary prose uses of /ugly/.
+
+** Commit: Respect retained-telescope ownership during delete cleanup
+
+Include:
+
+- config threaded into 'apply_delete_propagation_cleanup';
+- owned discovery/strip gates;
+- cross-owner and all-owned regressions;
+- the exact corresponding 'TODO/problems.org' problem resolution, if cleanly
+  stageable.
+
+Do not include Unknown UI changes just to make this commit larger.
+
+** Commit: Round-trip dangling structured references as Unknown
+
+Include together:
+
+- 'PhantomUnknown.reference_source' and wire parsing/serialization;
+- raw gated accessors and comparison key;
+- content and PartnerCol Unknown rendering;
+- source-set preservation/extraction/validation;
+- same-session relationship-backed Active-to-Unknown normalization;
+- ordinary ordered reordering plus move/copy extraction, provenance
+  validation, and destination-source derivation;
+- herald wording/rules;
+- tests for the four fields and same-session/restart equivalence;
+- Jeff's pre-existing 'Phantom::Deleted'/'Phantom::Unknown' comment edits in
+  'server/types/viewnode.rs';
+- the exact corresponding 'TODO/problems.org' resolutions.
+
+This is deliberately one behavior-and-comments commit.  Before committing,
+verify the comments describe what the tests now prove.
+
+** Commit: Make HiddenOutside an editable hide filter
+
+Include:
+
+- 'ColPolicy::EditableFilter';
+- extraction and last-writer visibility resolution;
+- successful moved-inside warning;
+- client metadata wording/policy updates;
+- reversed and new hide tests;
+- generated herald fixture changes.
+
+** Commit: Add the absent-node reference cleanup command
+
+Include:
+
+- pure preview/rewriter core;
+- request/response protocol and handler;
+- approval revalidation and atomic batch application;
+- global rerender stream;
+- Emacs command and tests;
+- Neovim parity and tests;
+- 'api-and-formats.md', 'docs/COMMANDS.org', and applicable Neovim docs.
+
+If implementation reveals a genuinely independent prerequisite that deserves
+its own commit, keep it semantic and dependency-ordered.  Do not split generated
+fixtures from the code that generates them, tests from the behavior they prove,
+or Jeff's type comments from their implementation.
+
+* Verification strategy
+
+** Focused feedback while implementing
+
+Use the smallest relevant target after each edit.  Representative commands are:
+
+#+begin_src sh
+bash bash/nextest.sh -E 'test(delete_strips_references_from_neighbors)'
+bash bash/nextest.sh -E 'test(dangling_reference_renders_unknown_node)'
+bash bash/nextest.sh -E 'test(source_sets)'
+bash bash/nextest.sh -E 'test(hidden_from_subscriptions)'
+bash bash/emacs-tests.sh
+bash bash/nvim-tests.sh
+#+end_src
+
+Adjust nextest expressions to the grouped test-binary names shown by
+'cargo nextest list'; do not fall back to a broad plain 'cargo test' run merely
+to discover names, because nextest process isolation avoids the documented
+shared-database flake.
+
+Run 'cargo fmt --check' after Rust edits.  When regenerating herald rules, run
+the generator and then the herald/metadata tests so generated output is proven
+current.
+
+** Required final verification
+
+From a cleanly built test environment, with TypeDB available as described in
+'tests/USAGE.md', run:
+
+#+begin_src sh
+bash bash/all-tests.sh --no-sound
+#+end_src
+
+Inspect 'tests/results/ALL.org' and the referenced logs.  A passing command with
+stale or skipped relevant tests is not sufficient; confirm the new Rust, ERT,
+Neovim, and integration cases were discovered and ran.
+
+Also perform these non-test checks:
+
+- 'git diff --check';
+- 'git status --short' before every commit;
+- review the staged diff, not just the worktree diff;
+- verify no path under 'data/' appears in any diff or test command;
+- verify foreign fixture bytes are asserted rather than merely re-parsed;
+- verify generated 'herald-rules.sexp' matches the generator;
+- verify documentation uses the final command and wire names exactly;
+- semantically audit remaining /scalar/ and /ugly/ occurrences, and verify no
+  title/body privacy code, protocol atom, CLI option, test, current doc, or old
+  plan still uses the rejected names;
+- verify the current type comments are included with the behavior commit;
+- verify unrelated dirty files remain unstaged and unchanged.
+
+* Expected file inventory
+
+This inventory is a navigation aid, not permission to edit every file.  Touch a
+file only when its code actually requires the change.
+
+** Title/body privacy vocabulary
+
+- rename 'server/serve/handlers/scalar_release.rs' and every importing handler;
+- update 'NodeComplete', 'NodeRust', 'NodeTantivy', telescope fold/Hoist code,
+  graph projections, and constructors carrying the classification bit;
+- update Tantivy schema/build/search/write/context-update fields and arrange a
+  derived-index rebuild;
+- update request/response variants and atoms in 'server/serve/protocol.rs',
+  'api-and-formats.md', every Emacs request module, and the corresponding
+  Neovim modules;
+- update the export CLI option in 'server/main.rs' and both command manuals;
+- update Rust, ERT, and Neovim tests and their names/fixtures;
+- update the feature-specific old records under 'TODO/dup-ids-maybe-bad/' and
+  applicable completed problem/plan records found by the semantic audit.
+
+** Core ownership and graph mutation
+
+- 'server/save.rs'
+- 'server/serve/handlers/save_buffer.rs'
+- 'tests/delete_strips_references_from_neighbors.rs'
+- possibly 'tests/multi_source_loading.rs'
+
+** Unknown type, wire format, herald, and validation
+
+- 'server/types/viewnode.rs' (including Jeff's existing comment hunks)
+- 'server/types/maybe_placed_viewnode.rs'
+- 'server/org_to_text.rs'
+- 'server/serve/parse_metadata_sexp.rs'
+- 'server/heralds.rs'
+- 'server/from_text/buffer_to_viewnodes/local.rs'
+- 'server/from_text/buffer_to_viewnodes/validate_tree.rs'
+- 'server/types/errors.rs' if a dedicated validation error improves reporting
+- 'tests/elisp/herald-rules.sexp' (generated)
+- 'tests/unit/heralds.rs'
+- metadata/parser/serializer client tests
+
+** Stored-member rendering and save extraction
+
+- 'server/dbs/in_rust_graph/relation_accessors.rs'
+- 'server/update_buffer/reconcile/content.rs'
+- 'server/to_org/complete/partner_col/mod.rs'
+- 'server/to_org/complete/partner_col/child_data.rs'
+- 'server/to_org/complete/partner_col/goal_list.rs'
+- 'server/update_buffer/reconcile/partner_col.rs'
+- 'server/update_buffer/reconcile/subscribee_col.rs'
+- 'server/update_buffer/reconcile/hiddenoutsideof_subscribeecol.rs'
+- 'server/update_buffer/reconcile/hiddeninsubscribee_col.rs'
+- 'server/from_text/local_instruction_collection/types.rs'
+- 'server/from_text/local_instruction_collection/traverse.rs'
+- 'server/from_text/local_instruction_collection/lower.rs'
+- 'server/from_text/local_instruction_collection/predicates.rs'
+- 'server/from_text/local_instruction_collection/resolve_visibility.rs'
+- 'server/from_text/supplement_from_disk.rs'
+- 'server/from_text/weave.rs'
+- 'tests/dangling_reference_renders_unknown_node.rs'
+- 'tests/source_sets.rs'
+- 'tests/partner_col_matrix.rs'
+- 'tests/hidden_from_subscriptions.rs'
+- focused unit reconciliation/save-leveling tests
+
+** Editable HiddenOutside warning
+
+- 'server/types/save.rs'
+- 'server/update_buffer/warnings.rs' or a new post-commit warning module
+- 'server/serve/handlers/save_buffer.rs'
+- 'elisp/skg-metadata.el'
+- corresponding Neovim metadata module
+- 'tests/partner_col_warnings.rs'
+- 'tests/unit/completion_warnings.rs'
+
+** Global cleanup command
+
+- new 'server/delete_references_to_absent_node.rs' or equivalent pure module
+- new 'server/serve/handlers/delete_references_to_absent_node.rs'
+- 'server/serve/handlers/mod.rs'
+- 'server/serve/protocol.rs'
+- 'server/serve.rs'
+- 'server/types/textlinks.rs' only if sharing a location-aware parser is cleaner
+- new 'elisp/skg-request-delete-references-to-absent-node.el'
+- 'elisp/skg-client.el'
+- 'elisp/skg-keymaps-and-aliases.el'
+- a focused Neovim Lua module or 'nvim/lua/skg/modify_graph.lua'
+- 'nvim/lua/skg/keymaps.lua'
+- 'nvim/plugin/skg.lua'
+- Rust/ERT/Neovim/integration tests for the command
+- 'api-and-formats.md'
+- 'docs/COMMANDS.org'
+- 'docs/COMMANDS-nvim.org' if it is the maintained Neovim command index
+
+* Completion criteria
+
+The work is complete only when all of the following are true:
+
+- Title/body privacy uses /text release/ and /overPrivateText telescope/
+  consistently across live code, derived indexes, wire/CLI interfaces, both
+  clients, tests, current docs, and old plans; unrelated technical meanings of
+  /scalar/ remain intact.
+- The original deletion scenario succeeds without preparing a foreign write.
+- Foreign Cheese bytes survive unchanged and its raw reference survives.
+- A relationship-backed deleted target is Unknown immediately and after
+  restart, with the same exact raw ID/reference source.
+- Unchanged Unknowns round-trip and removed Unknowns remove their relationship
+  in every writable structured field.  Unknowns reorder wherever known members
+  reorder, and can be copied or moved among owned writable structured
+  collections; each new destination derives its own relationship source and
+  rerenders with that source as its new 'referenceSource'.
+- Restricted-source behavior follows edge visibility without leaking target
+  title/body text or losing invisible members.
+- HiddenOutside additions/removals edit hides, preserve hidden-inside and
+  inactive data, and issue the accepted-and-moved warning only after success.
+- The global command scans all owned retained telescopes independent of the
+  active source set, rewrites all four structured fields atomically, leaves
+  foreign data and Org text untouched, and revalidates an approved preview.
+- Both maintained clients handle confirmation, locks, retry, and rerender
+  cleanup without clobbering dirty buffers.
+- Documentation names 'skg-delete-references-to-absent-node' and explains the
+  text-link warning/non-rewrite behavior.
+- Jeff's comment edits are committed alongside the reconciliation behavior that
+  makes them true.
+- Focused tests and the full suite pass, and no file under 'data/' was touched.
+
+* decided after discussion
+
+** DONE Separate Unknown visibility from relationship editability
+
+The plan makes an unresolved relationship visible whenever its recording
+source is active, even if that source is foreign to the current user.  It then
+uses ownership of the retained relationship owner to decide whether saving may
+edit that membership.
+
+The alternative was to require both an active recording source and ownership
+before displaying Unknown.  That follows the literal conjunction in decision
+6, but conflicts with decision 5 when the deleting user's already-open view
+contains Cheese's foreign relationship: the surviving relationship could not
+converge to Unknown immediately.  I chose separate display and write gates
+because an Unknown reveals no missing-node title/body text, while the foreign raw ID
+and relationship were already visible.
+
+** DONE Scan effective node text rather than every raw telescope section for links
+
+The command plan scans each retained owned 'NodeRust' node's effective title
+and body for textual links.  It does not separately parse every raw owned
+telescope-section file whose lower-priority title/body text is currently shadowed
+by another section.
+
+The alternative is a filesystem-level scan of every retained owned section.
+That is more literally a search of all of the user's data and would find a
+link that is dormant now but could become effective after a later telescope
+change.  It also requires the preview to identify source section and file
+location, and it must honor the same collision-retention rules so ignored
+foreign collision files are not reported as the user's data.  I chose the
+effective-node scan because the in-Rust graph is the command's mutation
+authority and already represents each retained telescope, but this is the
+choice in the plan about which I have the least confidence.
+
+** DONE Refuse the command while any open Skg view is dirty
+
+The plan has both clients reject the command before sending it when any
+registered Skg view has unsaved edits.  The command rerenders every open view
+after its global mutation, so proceeding would otherwise overwrite unrelated
+buffer work.
+
+The alternatives were to rerender only views known to contain the raw ID, or
+to snapshot and merge every dirty buffer through save-like reconciliation.
+The former risks stale views because removing subscriptions and overrides can
+change reachability beyond the visible Unknown occurrence.  The latter is a
+substantial concurrent-edit design of its own.  I chose the conservative
+global refusal, accepting that users may need to save or discard unrelated
+view edits before running the command.
+
+** DONE Implement the command in both maintained clients
+
+The discussion named the Emacs command and required documentation in
+'docs/COMMANDS.org'.  The plan also requires Neovim command, keymap, protocol,
+confirmation, and test parity.
+
+The alternative was to land a server endpoint and Emacs client only, leaving
+Neovim unable to invoke the operation until later.  I chose parity because the
+repository treats both clients as maintained consumers of the same protocol.
+This enlarges the feature and test surface but avoids a deliberately
+client-specific graph capability.
+
+** DONE Use a dedicated request rather than an Unknown edit request
+
+The plan introduces a new
+'DeleteReferencesToAbsentNode' request/handler.  It does not extend the
+existing node 'editRequest delete' meaning and does not route the operation
+through ordinary save-buffer extraction.
+
+The alternative was a special edit request attached to
+'Phantom::Unknown'.  That would overload a request which currently means
+deleting the represented node, although this operation instead edits many
+owned relationship owners and never deletes the phantom or missing node.  I
+chose the dedicated endpoint so its global scan, preview, confirmation,
+preflight, and result are explicit protocol concepts.
+
+** DONE Make approved previews stateless and lossless on the wire
+
+The plan has the server return an opaque canonical serialization of the exact
+preview and requires the client to echo it as 'approved-preview'.  The server
+recomputes the preview and compares the values; it never trusts client-supplied
+rewrite data.
+
+The alternatives were a server-side pending-preview table keyed by a random
+token, or a cryptographic digest of canonical preview bytes.  Server state
+would need lifecycle, reconnect, and multiple-pending-request rules.  A digest
+would add or select hashing machinery and make failing comparisons less
+inspectable.  I chose the lossless stateless value because approval remains
+valid across a connection retry and equality is straightforward, at the cost
+of a potentially larger request header.
+
+** DONE Bypass text-release confirmation only for the post-command rerender
+
+The plan uses the normal rerender preparation and streaming machinery after a
+successful command, but deliberately does not run the restricted-source
+overPrivateText-telescope challenge after the graph mutation.  The justification is
+monotonic: the command removes only edges to an ID freshly verified absent, so
+it cannot introduce any real node's title or body.  In particular, removing a
+hide of an absent ID cannot expose real title/body text.
+
+The alternative was to construct a simulated post-command graph, prepare and
+authorize every rerender against it before touching disk, and then commit only
+after approval.  That preserves one uniform privacy gate but requires the
+rerender stack to accept an alternate graph snapshot and makes the operation's
+confirmation state substantially more complex.  I chose the documented narrow
+bypass; it must not be generalized to arbitrary mutations.
+
+*** DONE please define vocabulary
+**** text release
+/Text release/ is the privacy decision about allowing a node's title or body,
+in contrast to relationship-valued fields such as 'contains', to cross an
+output boundary.
+
+A telescope can have its home in one source while folding selects its title or
+body from a source below home in the privacy ladder.  Skg calls that telescope
+/overPrivateText/.  Holding the folded text inside the server is not a release.
+A /text release/ occurs when that selected title/body text, or information
+derived from it, is allowed to cross an output boundary: for example, when it
+is sent to a client in a view or title lookup, used to return search matches,
+or written by export.
+
+'server/serve/handlers/text_release.rs' implements the shared decision.  It
+canonicalizes candidate IDs to PIDs, checks whether their retained
+'NodeRust.overPrivateText_telescope' flag is true, and returns 'Allow',
+'AllowWithWarning', or 'Challenge'.  Source-set 'all' permits release with a
+warning.  A restricted source set requires request-local approval for the
+exact affected PIDs; search instead obtains an include/exclude choice before
+querying, because revealing which PIDs matched could itself reveal protected
+text.  Approval to release text is neither permission to rewrite a telescope
+nor permission to Hoist its title/body text to home.
+
+Thus “bypass text-release confirmation” in this section means bypassing the
+usual call that asks whether a prepared rerender may send overPrivateText title/body text
+to the client.  It does not mean bypassing source-set membership, filesystem
+authorization, or the textual-link confirmation belonging to this command.
+
+**** the restricted-source overPrivateText-telescope challenge
+The /restricted-source overPrivateText-telescope challenge/ is the protocol/UI
+form of a 'TextReleaseDecision::Challenge'.  It occurs when the active source
+set is not 'all', a proposed response involves at least one overPrivateText telescope, and the
+current request lacks the required release approval.
+
+The server sends an 'overPrivateText-telescope-confirmation' response containing the
+operation name, a prompt, and normally the canonical PIDs requiring approval,
+but none of their protected title/body text.  The client asks the user and, on
+approval, retries the operation with those exact PIDs in
+'allow-overPrivateText-telescopes'.  The approval belongs only to that retry.  For an
+ordinary prepared rerender, the server challenges before streaming any view
+text or changing the open-view registry.  Search is the special case: its
+challenge names no PIDs and asks include versus exclude before the query, so
+even the identity of a matching overPrivateText telescope is not disclosed prematurely.
+
+The concern raised here is ordering.  If the new cleanup command first commits
+its relationship removals and then calls the generic rerender authorization,
+the challenge can occur after disk and graph mutation.  Declining would leave
+the mutation committed while withholding the refreshed views.  The plan
+therefore proposes a narrow no-challenge rerender path for this command, based
+on the claim that removing edges to a freshly verified absent ID cannot reveal
+any new real node's title or body.  The architectural alternative described
+above is to prepare and authorize rerenders against a simulated post-command
+graph before committing.
+
+** DONE Carry moved-inside warnings as post-commit SavePlan facts
+
+The plan records newly added HiddenOutside candidates on 'SavePlan', then
+turns them into warnings only after a successful graph update and final
+inside/outside classification.
+
+The alternatives were to reuse 'CompletionWarning::ColRepair', or to infer the
+warning only during view reconciliation.  'ColRepair' would falsely imply that
+the accepted hide was discarded.  Reconciliation alone no longer knows
+reliably which rows were newly added and can run in contexts other than the
+successful saved view.  I chose typed post-commit facts so failure never emits
+a success claim and warning wording can reflect final graph state.
+
+** Add an outbound relationship accessor that preserves stored IDs
+
+The plan adds a gated accessor returning stored 'MemberAtSource<ID>' values and
+keeps the existing accessors that return only current canonical PIDs for
+callers that require currently existing referenced nodes.
+It likewise replaces ambiguous '(ID, Option<SourceName>)' relationship intents
+with an explicit distinction between a node member with a derived or explicit
+source choice and a rendered Unknown reference whose provenance source is not
+the destination source choice.
+
+The alternative was to change the existing graph accessors to return mixed
+stored and canonicalized values everywhere, then update every consumer.  I
+chose a separate stored-member accessor because inbound queries, search, and TypeDB-shaped
+logic often require currently existing nodes, whereas durable dangling
+membership is needed specifically by outbound rendering and saving.  The
+explicit intent type also prevents 'referenceSource' from being mistaken for
+permission to resource an edge.
+
+*** Jeff : please define vocabulary
+**** DONE raw-member access path
+Raw as opposed to what? Access to who? Path in what sense?
+
+***** Codex response
+
+/Raw/ meant the ID and source exactly as stored in an outbound relationship
+list, before the ID is mapped to a current node's canonical PID.  /Member/
+meant one 'MemberAtSource<ID>' entry in that list.  /Access/ meant a Rust
+accessor reading those entries from 'InRustGraph'.  /Path/ meant an alternate
+code path, not a filesystem path, graph path, or route to a user.
+
+That compression obscured nearly every useful noun.  I amended the plan to
+call this “an outbound relationship accessor that preserves stored IDs.”  Its
+caller supplies the relationship owner and relation kind; it returns the
+owner's stored member IDs with their recording sources, including an ID that
+does not name any current node.
+
+**** DONE to "resolve" an accessor
+
+***** Codex response
+
+An accessor is not resolved.  The old wording meant that the existing accessor
+/resolves each stored member ID/: it calls 'InRustGraph::pid_of', mapping a
+known primary or extra ID to the referenced node's current primary PID.  If no
+current node owns the ID, that accessor's 'filter_map' omits the member.
+
+I replaced “resolved-PID accessor” with “accessor that returns only current
+canonical PIDs.”  The new companion accessor does not perform that mapping; it
+returns the exact stored 'MemberAtSource<ID>'.
+
+**** DONE endpoint
+/Endpoint/ is graph terminology for either node joined by a relationship.  In
+this passage it meant the referenced node at the far end of an outbound
+relationship, and “real endpoint” meant that the stored ID still resolves to a
+currently existing node.
+
+Nothing in the plan needs that abstraction.  I replaced it with “currently
+existing referenced node” and, where TypeDB behavior is at issue, with “the
+missing node's relationships.”
+
+**** DONE Jeff : "derive, explicit-source, and retain-Unknown" intents
+/Intent/ here means an intermediate instruction produced while translating a
+view buffer into a save.  It says what a definitive relationship collection
+claims its membership should be, before that claim is combined with disk state,
+assigned recording sources, and lowered into a 'SaveNode'.  It does not imply
+that the user explicitly issued a command; leaving a rendered collection
+unchanged also produces intents.
+
+The phrase incorrectly made three things sound like parallel source choices.
+/Derived source/ and /explicit source/ are choices only for an ordinary Active
+node member.  With no 'relSource', the save applies its existing
+sticky-else-default rule to derive the recording source.  With 'relSource', the
+buffer explicitly requests that source, subject to the existing privacy-floor,
+configuration, and ownership checks.
+
+An Unknown is different.  Its 'referenceSource' reports where the relationship
+that produced the rendered occurrence is stored.  It must not be interpreted
+as a request to choose the source of a new destination relationship.  An
+unchanged Unknown tells the save to preserve the destination's exact stored raw
+member; deleting its line omits that membership and removes the relationship.
+If the user moves or copies the occurrence into another writable collection,
+the same atom proves that the occurrence came from a retained relationship,
+while the destination's ordinary new-edge rule chooses the new source.
+
+I amended the proposed types accordingly.  'RelationshipSourceChoice' contains
+only 'Derive' and 'Explicit'.  'StructuredMemberIntent' separately contains a
+'Node' case with one of those choices and a 'RenderedUnknownReference' case
+with the exact raw ID and 'reference_source'.  This makes an explicitly
+re-sourced Unknown unrepresentable without preventing the ordinary source
+derivation required when its raw ID is copied into a new relationship.
+
+** DONE Normalize a backed deletion at relationship reconciliation time
+
+The plan converts an existing Active occurrence to Unknown while reconciling
+the parent relationship goal, before the later generic
+'mutate_activeNode_to_deletednode' visit.  Content and writable PartnerCols
+share that relationship-aware normalization.
+
+The alternatives were to teach 'Phantom::Deleted' to carry and save a backing
+relationship, or to defer the correction until another full render.  The
+former creates a combined deleted-and-referenced state that cannot be
+reconstructed after restart without persistent tombstones.  The latter
+violates the agreed immediate convergence.  I chose the parent/collection seam
+because it has the surviving raw ID and reference source needed to distinguish
+Unknown from an unbacked last-seen Deleted occurrence.
+
+** DONE Let a rendered Unknown move or copy as a relationship member
+
+The first draft treated 'referenceSource' as proof that the Unknown occupied
+the same owner's same relationship on disk.  That made unchanged round-trip and
+deletion safe, but it also made moving or copying the line fail as a
+stale/tampered buffer.  This was not merely an omitted convenience: it was an
+architectural restriction in the validation contract.
+
+The amended plan instead validates that the exact raw-ID/reference-source pair
+backs some retained outbound relationship.  The current buffer ancestry is the
+requested destination.  If that destination already has the same member, its
+stored raw ID and source are preserved.  Otherwise an owned writable
+destination creates a new relationship using its ordinary source rule.  The
+origin is removed only when its own editable definitive collection omits the
+occurrence.  This permits copies from a foreign or read-only relationship
+without ever authorizing a write to it.
+
+The alternative was to add origin owner and relation metadata to every Unknown
+so validation could prove exactly which occurrence had been moved.  I rejected
+that extra wire state because it does not protect an authority boundary: the
+new relationship changes only the user's owned destination, and an exact
+retained raw-ID/source pair is enough to distinguish a copied rendered Unknown
+from an invented absent ID.  'referenceSource' never becomes the destination
+source request; ordinary derivation selects that source, and rerender reports
+the selected value.
+* Jeff : please amend the plan
+** DONE let's rename 'scalar' to 'text'
+wherever that's been used, if all it means is 'title or body'.
+Let's even dig up old plans to do the replacement there,
+because that is an atrocious name.
+
+*** Codex response
+
+Agreed.  I amended the plan to make this a prerequisite repository-wide
+semantic rename and changed this plan's own operative vocabulary to /text
+release/ and /title/body text/.  The implementation commit renames
+'scalar_release.rs' to 'text_release.rs', 'ScalarReleaseDecision' to
+'TextReleaseDecision', and every title/body-specific identifier, test, comment,
+wire explanation, and old planning reference that uses /scalar/ in that sense.
+
+The replacement is deliberately semantic rather than global.  YAML scalars,
+Unicode scalar values, TypeDB scalar subqueries, and genuinely single-valued
+schema facts keep the established technical word.  The repository audit
+explicitly includes the old audit, recap, plan, and progress documents under
+'TODO/dup-ids-maybe-bad/' and any applicable completed records it finds.
+
+** DONE let's rename 'ugly' to 'overPrivateText'
+and ugly_telescope to 'overPrivateText_telescope'.
+(Rust won't like the mixed snake-camel casing, but I need it,
+because otherwise a reader might not understand that overPrivateText
+is an adjective phrase.)
+
+*** Codex response
+
+Agreed, including the exact casing.  The amended plan defines an
+/overPrivateText telescope/ as one whose folded title or body was selected
+from below home, and requires the Rust field to be exactly
+'overPrivateText_telescope'.  The implementation should use narrowly scoped
+'allow(non_snake_case)' attributes rather than changing the spelling.
+
+I also made the rename explicitly cross every boundary where the old adjective
+escaped: Rust types and helpers, Tantivy's derived schema field, Emacs and
+Neovim handlers, S-expression request/response atoms, the export CLI option,
+tests, current documentation, and old planning records.  The plan supplies
+concrete replacements such as 'OverPrivateTextTelescopeConfirmation',
+'overPrivateText-telescope-confirmation',
+'allow-overPrivateText-telescopes', and
+'--include-overPrivateText-telescopes'.  It calls for rebuilding the disposable
+Tantivy index and for landing all consumers in the same vocabulary-only
+commit.  It deliberately does not preserve old-name aliases.
+* DONE Jeff : moving UnknownNodes
+The user should be able to change the position of an UnknownNode
+relative to its peers, or even copy it into other containers,
+just like they could a known Vognode.
+I believe this is the implicit default, because it would take work
+to make that illegal, and you didn't mention it;
+am I correct?
+
+** obsolete discussion
+*** Codex response
+
+Only partly.  Reordering was already the implicit result for an Unknown in an
+ordered relationship: once the collector admitted the Unknown as a member,
+the existing buffer-order machinery would treat it like an Active member.
+That means 'contains' and 'subscribes_to'.  Hides and
+'overrides_view_of' are already unordered, so changing their textual order is
+a no-op for known and Unknown members alike.
+
+Copying was not implicit in my draft.  I had required an Unknown's raw ID and
+'referenceSource' to match the same owner's same relationship.  Moving the
+line under another owner or another relationship kind would therefore have
+failed validation as a stale or tampered buffer.  That restriction took
+deliberate implementation work and contradicted the behavior you want; I
+should have called it out.
+
+I amended the plan so a relationship-backed Unknown can be moved or copied
+among the same owned, definitive, editable structured collections that accept
+a known member.  Its raw ID/'referenceSource' pair now proves that it was
+rendered from some retained relationship, which may be foreign or read-only.
+The buffer ancestry supplies the destination.  Leaving the origin occurrence
+in its editable definitive collection makes the gesture a copy; omitting it
+makes the gesture a move.  A foreign or read-only origin cannot be removed,
+but it can be copied from without modifying its owner's data.
+
+The copied 'referenceSource' does not dictate the destination edge's source.
+An existing destination member keeps its own stored raw ID and source.  A new
+destination member uses the ordinary new-edge rule: an unresolved target
+defaults to the destination owner's home for content, subscriptions, and
+overrides, while a hide uses the existing 'hide_source' rule.  Rerender then
+gives the destination Unknown its actual new 'referenceSource'.
+
+This applies to relationship-backed Unknowns, which have a
+'referenceSource'.  A root or backpath Unknown without one remains inert and
+cannot be dropped into a relationship: accepting that shape would be
+indistinguishable from silently accepting a stale pre-feature relationship
+buffer whose edge source is unknown.
+
+*** ONGOING Jeff : help me think about this
+Don't adjust the plan yet (even to undo the adjustments you just made);
+this question is still open.
+
+The plan would change the UknownNode type to carry a 'referrer' field
+(I forget the actual term used; please tell me)
+that indicates the node referring to the unknownnode.
+I had forgotten that, and it makes copying an UnknownNode
+to another container awkward. How would the referrer field be used?
+
+**** Codex response
+
+The term you are remembering is 'referenceSource' on the wire and
+'reference_source' in Rust.  The exact planned Rust addition is
+'PhantomUnknown.reference_source: Option<SourceName>'.  It does not identify
+the node doing the referring.
+
+The node doing the referring is called the /relationship owner/ in the plan.
+There is no planned relationship-owner field on 'PhantomUnknown'.  The save
+extractor recovers the owner and relation kind from the Unknown's position in
+the tree: its parent for content, the collection's parent for an ordinary
+PartnerCol, and the subscriber ancestor for HiddenOutside.  Thus the facts in
+the original proposal were distributed like this: the Unknown carried the raw
+member ID and relationship source, while its ancestry supplied the
+relationship owner and relation kind.
+
+***** How 'referenceSource' was supposed to be used
+
+Suppose Cheese's 'contains' has the raw member X in source S.  Rendering already
+has a 'MemberAtSource { member: X, source: S }'.  It would use S to decide
+whether that relationship is visible under the active source set, then render
+X as an Unknown carrying 'referenceSource=S'.
+
+On save, the first draft would combine the Unknown's ancestry with its two
+fields to reconstruct and validate the tuple “Cheese, contains, X, S.”  An
+unchanged line would preserve that exact stored member and source.  Omitting
+the line from Cheese's definitive content would remove that membership.  The
+atom would not be shown as the missing node's home source and would not
+authorize an edit to S by itself.
+
+The intended benefit was a narrow stale-buffer check.  If the tuple no longer
+existed when the buffer was saved, Skg could reject the Unknown rather than
+guess which relationship source the line represented.  It was also meant to
+make section-precise preservation explicit.
+
+***** Why copying exposes a real conceptual problem
+
+After copying that headline beneath Brie, its ancestry says “Brie contains X,”
+but 'referenceSource=S' still describes Cheese's old edge.  It cannot honestly
+describe Brie's edge, because Brie's edge does not exist yet and its source has
+not been derived.  A plain-text edit gives the server no separate “copy” event;
+it sees only the final tree.
+
+There is no stale /referrer field/ in this situation, because no referrer was
+stored.  The awkward datum is the edge source.  The just-amended proposal makes
+it travel as provenance for the old edge, while the new ancestry names the
+destination.  That works mechanically, but it gives 'referenceSource' two
+context-dependent meanings: normally it is the source of the relationship at
+this position; between copy and save it is the source of some relationship
+from which this line came.  Because it carries neither origin owner nor origin
+relation, an X/S pair also cannot identify which old occurrence was copied.
+
+***** Three coherent designs
+
+****** Keep 'referenceSource' destination-relative
+
+Under the strict original meaning, 'referenceSource' always names the edge at
+the Unknown's current position.  A copied line necessarily has a stale value,
+so the save must reject it unless some editor command rewrites or removes the
+atom while copying.  That is a poor fit for an Org buffer, where ordinary text
+movement is supposed to be the editing interface.  It does not meet the
+copy-like-a-known-Vognode requirement without special client behavior.
+
+****** Carry a complete origin relationship
+
+The Unknown could instead carry something like 'origin_owner',
+'origin_relation', and 'origin_reference_source'.  Together with the raw ID,
+those fields identify the exact old edge after the line moves.  The server
+would use them only to prove that the copied occurrence came from that edge;
+the new ancestry would still name the destination, and the destination's
+ordinary rule would still choose its source.  Rerender would replace the
+metadata with the new edge as origin.
+
+This is precise, but it adds substantial hidden wire state merely to prove the
+origin of a value the user is allowed to put in their own relationship.  It
+also makes a copy fail if the origin disappears concurrently, and it continues
+to distinguish relationship-backed Unknowns from root/backpath Unknowns even
+though both carry a usable raw ID.
+
+****** Do not serialize relationship provenance on Unknown
+
+'PhantomUnknown' can remain just '{ id }'.  At save, ancestry supplies the
+destination owner and relation.  The current retained graph then supplies all
+the source information actually needed.
+
+If the destination already contains that unresolved raw ID, its current
+'MemberAtSource' supplies the exact source to preserve.  If it does not, the
+line is a new destination member and the ordinary new-edge rule derives the
+source.  If the line was omitted from an editable origin collection, that
+origin's current raw list and edge sources tell the source-set-aware merge what
+to remove.  Inactive members can still be preserved because visibility is
+computed from each disk member's source, not from metadata on submitted
+headlines.
+
+This makes movement and copying exactly destination-relative, like the rest of
+the Org editing model.  It also permits a root/backpath Unknown to be copied
+into an owned relationship and permits a sufficiently knowledgeable user to
+write an Unknown headline for an arbitrary absent raw ID.  The latter changes
+only a relationship the user owns; it neither creates nor edits the absent
+node.
+
+The cost is losing the narrow optimistic-concurrency check: if an edge is
+deleted elsewhere while an old buffer still contains its Unknown, saving that
+buffer can recreate the edge at its normal derived source.  Known members can
+already be resurrected by stale definitive buffers, so solving that generally
+would call for a buffer/graph revision check rather than special provenance on
+Unknown alone.
+
+***** My recommendation
+
+I now recommend the third design: do not add 'referenceSource' to
+'PhantomUnknown' or the wire format.  The current graph already stores the
+reference source in 'MemberAtSource', and the Unknown's current ancestry already
+identifies the only relationship the save is being asked to edit.  Treating the
+Unknown as a raw relationship value makes copying natural and avoids turning a
+display occurrence into a partially specified edge handle.
+
+If you want proof that every structured Unknown was rendered from a particular
+existing relationship, I recommend the complete-origin design instead.  The
+one-field traveling-provenance compromise in the current amendment is the
+least crisp of the three: it neither keeps 'referenceSource' destination-local
+nor identifies the origin edge completely.
+
+***** Yes: if we carry the relationship source, it should be 'relSource'
+
+Yes, with one qualification: this means abandoning the proposed
+/provenance-proof/ role of 'referenceSource'.  It would reuse 'relSource' with
+the same read/write meaning it already has for a known Vognode occurrence.
+
+On render, 'relSource' reports an existing edge source only when that source is
+off the edge's normal default.  On save, its presence is an explicit request
+for the relationship at the headline's /current/ position to use that source;
+its absence means sticky source for an existing destination edge and derived
+source for a new one.  It never identifies an origin relationship.
+
+That behavior composes naturally with text copying.  If an Unknown is copied
+with no 'relSource', its new relationship derives a source.  If it carries an
+off-default 'relSource', the copy carries the same explicit source preference,
+which is then checked against the new destination's ownership and privacy
+floor.  That is what already happens when a known Vognode headline carrying
+'relSource' is copied.  The original relationship is independently retained or
+removed according to whether its original definitive collection still
+contains the line.
+
+For an unresolved target, the existing new-edge default is the relationship
+owner's home, so render can decide whether an edge is off-default without
+knowing a target home.  An unchanged destination edge with no atom still keeps
+its actual source through the sticky lookup in the current graph.  Therefore
+we do not need to emit 'relSource' merely to remember every edge's section.
+
+Hides remain the existing exception.  Skg does not support explicit
+'relSource' on a hide because 'hide_source' derives it from the subscriber and
+its explaining subscriptions.  An existing Unknown hide can still keep its
+source by current-graph lookup, and a copied/new Unknown hide can use
+'hide_source', exactly like a known hide.
+
+So my refined recommendation is: do not introduce 'referenceSource'; allow an
+optional ordinary 'relSource' on Unknown in precisely the relationship
+positions where known members already support it.  Keep only the Unknown's raw
+ID otherwise.  This sacrifices the special Unknown-only provenance check and
+allows an absent raw ID to be added to an owned relationship, as described
+above.  If that provenance check is a requirement, merely renaming the field
+would be wrong: we would need the complete origin relationship instead.
+
+** TODO our conclusion
+There are distinct branches of the metadata, I could swear,
+for requests and already-true facts.
+If someone asks to change a relSource,
+they put that somewhere in the requests sexp,
+and it presents something like 'request:~newSource'.
+If it doesn't, it should.
+(But don't rewrite the plan yet; we are still discussing.)
+
+There is some separate part of the metadata that indicates
+the source at which the relationship is stored.
+That ought to use the same 'relSource' token,
+because after all it's the same aspect we're talking about --
+it's just a display rather than a setter.
+
+It seems like an UnknownNode
+need not keep track of the source of the relationship it depicts
+unless that source differs from the parent's source.
+The rules for displaying and setting its relSource,
+I think, don't need to differ at all from the rules for an ordinary vognode.
+
+*** Codex response
+
+Yes.  That is the cleaner model, and it resolves the copying problem.
+
+Your memory matches the general metadata architecture, but not the current
+'relSource' implementation.  Today the server renders the already-true fact as
+'(node (viewStats (relSource S)))'.  The client command then edits that very
+same atom, the parser stores it in 'ViewNodeStats.rel_source', and save
+extraction interprets it as an explicit source request.  Its herald is simply
+'~S'.  There is currently no separate relationship-source request and no
+'request:~S' herald.
+
+'viewRequests' is presently reserved for requests to construct extra views
+such as cols, paths, and definitive views.  'editRequest' presently contains
+node deletion and node merge.  Thus Skg has request branches, as you remember,
+but relationship-source editing was implemented as an exception that makes a
+rendered fact double as a setter.
+
+**** The separation you describe
+
+The displayed fact should remain something like
+'(viewStats (relSource CURRENT))' and should produce '~CURRENT'.  It says only
+where the binding relationship at this position is currently stored.  Save
+extraction should not treat that display fact as an instruction.  If it is
+stale, deleted, edited by hand, or copied under another container, rerender can
+recompute it from the graph.
+
+A distinct request branch should carry '(relSource REQUESTED)' and produce a
+visibly prospective herald such as 'request:~REQUESTED'.  Only that occurrence
+of the token should feed the explicit-source side channel and its ownership and
+privacy-floor checks.  After a successful save, the request disappears and
+rerender recomputes the display fact.  Before save, current and requested
+sources can coexist, so the buffer can truthfully show both “~old” and
+“request:~new.”
+
+The same leaf token in two different parent forms is appropriate: both facts
+name the relationship-source aspect, while the parent form determines whether
+the value is observed or requested.  The exact request-container name remains
+a vocabulary choice.  I would not put it in 'viewRequests', whose established
+meaning is view construction.  A relationship-specific edit-request form is
+conceptually cleaner than making it another node edit, because the source
+belongs to the edge represented by this occurrence, not to the represented
+node.
+
+**** Consequence for copying
+
+Copying an ordinary or Unknown headline also copies its display
+'(viewStats (relSource OLD))', but that atom has no write force.  At the new
+position the destination relationship either keeps its current stored source
+or, if new, derives its default.  Rerender replaces or removes the copied
+display atom accordingly.
+
+If the headline also carries an explicit pending relationship-source request,
+copying it copies that request.  Applying the request at the new position is
+reasonable because it is visibly marked as prospective user intent, and it is
+validated against the new destination.  A normal copy with no pending request
+does not accidentally transplant the old edge's source.
+
+This is more coherent than either 'referenceSource' proposal.  No origin
+provenance is needed, and 'relSource' never has to mean “the source of some
+other edge from which this line may have come.”
+
+**** Unknown and ordinary Vognode parity
+
+Agreed: the rules should be the same.  A structured Unknown participates in
+the same relationship-position metadata as an ordinary Vognode.  It needs an
+optional displayed 'relSource' only when the current edge is off its applicable
+default, and it accepts a source-change request only in positions where an
+ordinary member accepts one.  A root, backpath, independent occurrence, or
+read-only relationship position has no settable binding edge.
+
+For an Unknown, the missing target has no known home, so the existing default
+rule falls back to the /relationship owner's home/.  For direct content that
+is the parent's home; for an outbound PartnerCol it is the col owner's home,
+not literally the scaffold headline.  Thus an Unknown edge stored at the
+owner's home needs no displayed atom, while an edge stored more privately does.
+An unchanged atom-free edge still preserves its actual source through the
+ordinary sticky lookup.
+
+Hides are not an Unknown exception.  Known and Unknown hides alike currently
+have no explicit 'relSource' setter because 'hide_source' derives their source
+from the subscriber and explaining subscriptions.  The HiddenOutside and
+HiddenIn positions should therefore follow that same existing rule.
+
+**** Scope revealed by this decision
+
+This is not merely a naming correction inside the dangling-reference work.  It
+requires splitting the existing 'relSource' fact-and-request mechanism for all
+ordinary Vognodes and aliases too, changing the setter commands, parser,
+heralds, save extraction, request cleanup, docs, and tests.  I agree that it
+should be done if this is the intended metadata invariant; otherwise Unknown
+would be forced to imitate an existing conflation that already makes copied
+known headlines carry accidental source-setting force.
+
+I have left the operative plan unchanged, as requested.  Once you close this
+discussion, the plan should replace 'referenceSource' with the shared displayed
+'relSource', add the distinct relationship-source request path, and apply that
+fact/request split uniformly to known nodes, Unknowns, and aliases wherever
+relationship-source editing is supported.

@@ -1,0 +1,778 @@
+#+title: Deleting a node referenced from someone else's data
+
+* Executive summary
+The requested behavior is compatible with the existing data model:
+
+- A user may delete a node they own.
+- The delete may clean references recorded in sources that user owns.
+- It must neither rewrite nor require a rewrite of references recorded in
+  sources they do not own.
+- A surviving raw reference to the deleted ID is a real, durable graph
+  state, not a failed transaction.
+
+The existing 'Phantom::Unknown' is already the right representation for
+that state.  It means precisely that a stored reference names an ID that
+cannot currently be resolved.  The phantom itself should remain inert;
+the relationship represented by its position should be editable when
+that relationship belongs to the current user.
+
+The main semantic decision is whether an unchanged Unknown line
+preserves its relationship until the user explicitly removes it.  I
+recommend that it does.  Otherwise an unrelated save silently destroys
+the dangling relationship and prevents it from reconnecting if the
+missing node later becomes available again.
+
+* Decisions requested
+Here are the decisions I need from Jeff.  My recommended answers are
+marked [recommended].
+
+** DONE 1. Reuse 'Phantom::Unknown', or add a new phantom variant?
+- [recommended] Reuse 'Phantom::Unknown'.
+- Add something like 'Phantom::DanglingReference'.
+
+Why I recommend Unknown:
+
+- 'Phantom::Unknown' is constructed today for exactly this condition: a
+  raw relationship member ID cannot be resolved to a graph node.
+- A fresh render already turns a dangling 'contains' member into
+  '(skg (unknown (id ...)))'.
+- After restart there is no reliable distinction between a node that was
+  deleted, a configured source that is temporarily absent, and an ID
+  that never existed.  'Unknown' makes only the claim the graph can
+  support.
+- The existing 'Phantom::Deleted' means something different.  It is a
+  transient, last-seen representation of an Active node deleted during
+  the current save, and it may retain title, body, source, and children.
+  Unknown carries only the unresolved ID.
+
+The user's ability to act need not be a property of the phantom.  The
+Unknown remains non-ownable and non-editable as a node; deleting its
+headline edits the owned relationship from its parent or collection.
+
+A new kind becomes useful only if we decide to persist tombstone facts,
+such as who deleted the node, when it was deleted, or a last-known title.
+No such facts exist in the current model.
+
+*** (Jeff) agreed
+
+** DONE 2. Does an unchanged Unknown preserve the relationship?
+- [recommended] Yes.  It remains until its relationship owner deletes
+  the Unknown line (or otherwise edits that collection).
+- No.  Any definitive save of the relationship owner silently drops all
+  visible Unknown members.
+
+The recommended round-trip contract is:
+
+1. Rendering a raw unresolved member produces an Unknown headline at the
+   member's position.
+2. Saving that headline unchanged contributes the exact raw ID back to
+   the owner's collection, but contributes no node definition.
+3. Deleting the headline removes that raw ID from the collection.
+4. If the ID becomes resolvable before it is removed, the next render
+   shows the real node again.
+
+This makes the Unknown load-bearing only as relationship membership.  It
+does not make the phantom itself saveable.
+
+Today the behavior is accidentally the second option for content:
+'traverse.rs' ignores every phantom, and 'content_members()' collects
+only affected Active children.  Consequently a buffer containing an
+Unknown can save without an error, but the containing node's next
+definitive save omits the dangling ID.  The existing round-trip test
+checks only that the save reports no error; it does not check whether the
+relationship survived.
+
+*** DONE I agree.
+*** DONE Never mind about the following.
+I (Jeff) wrote:
+
+```
+let's make sure that the source (e.g. 'other-user')
+is heralded for an Unknown viewnode.
+(Maybe it already is. I know it is heralded for normal vognodes;
+I'm not sure about all the other, stranger kinds of vognodes.)
+```
+
+I wanted to know the source in which it does not exist.
+Duh, that's impossible.
+
+**** Codex response
+Understood; I am dropping the visible source-herald requirement.  An
+Unknown must not claim to know the missing target's home source.
+
+The surviving relationship's recording source is still knowable and
+still matters internally: it controls authorization, restricted-source
+visibility (decision 6), and preservation of the exact telescope
+section on save.  That is relationship provenance, not evidence about
+where the unknown node does or did live, and it need not be presented as
+the Unknown's source herald.
+
+** DONE 3. Which reference-bearing fields get this behavior?
+- [recommended] All four structured outbound relationship fields:
+  'contains', 'subscribes_to', 'hides_from_its_subscriptions', and
+  'overrides_view_of'.
+- Initially support only 'contains', and treat the others as later work.
+
+The authorization rule should be uniform even if the UI work lands in
+stages.  A delete must never rewrite another user's recording of any of
+these relationships.  Each unresolved structured member should
+eventually have a removable representation in an owned, writable view.
+
+'textlinks_to' is intentionally different.  It is derived from Org text,
+not stored as a list for structural cleanup.  A dead text link remains
+text the user can edit, and following it may render an Unknown root.
+Deletion should continue not to rewrite bodies.
+
+There is a real scope difference behind this choice:
+
+- Content already renders unresolved members as Unknown.
+- 'subscribeeCol' and 'overriddenCol' are writable, but the graph
+  accessors currently discard unresolved outbound members before those
+  collections are rendered.
+- Hides have no straightforward writable dangling-member surface today.
+  'hiddenCol' is deliberately read-only, even though its anchor owns the
+  outbound hide edge; normal hide edits are routed through the
+  subscribee-as-such representation.
+
+*** DONE
+Those subscribeeCol and overriddenCol behaviors need changing:
+If there's an Unknown in one, it should really get written to disk.
+
+Wouldn't a dangling Hide be shown in a HiddenOutsideOfSubscribeeCol?
+Can nodes not be deleted from such a collection?
+If not, that's a problem; they should be deletable from that.
+
+**** Codex response
+Agreed about 'subscribeeCol' and 'overriddenCol'.  More precisely, an
+unchanged Unknown in either must write its exact raw ID back as a
+relationship member; it must not cause a node definition to be written.
+
+A dangling hide logically belongs in
+'HiddenOutsideOfSubscribeeCol'.  That collection is the subscriber's
+hides list minus the content of all its subscribees.  Because an
+unresolved ID cannot be found in any subscribee's content, it falls on
+the outside side of that partition.
+
+It does not work end to end today.  Initial construction asks the graph
+for resolved outbound PIDs and loses the dangling ID.  The later raw-list
+path can derive that it is outside, but source-set filtering and child
+construction still assume the target resolves.  Those stages must keep
+the raw ID and create an Unknown carrying the hide edge's recording
+source.
+
+And no, membership cannot currently be deleted from that collection.
+'HiddenOutsideOfSubscribeeCol' has 'ReadOnlyFilter' policy.  Save
+extraction ignores its membership, reconciliation regenerates removed
+rows, and an existing regression test specifically asserts that editing
+the derived hide collections does not unhide anything.  The code already
+contains a TODO calling the lack of an unhide gesture baroque.
+
+I take your response as deciding that deleting a row from
+'HiddenOutsideOfSubscribeeCol' must remove the corresponding raw ID from
+the owning subscriber's 'hides_from_its_subscriptions'.  This supersedes
+my narrower Unknown-only exception in question 4.  Unless you say
+otherwise, I would keep additions to this derived collection read-only:
+your decision gives deletion a clear meaning without also inventing an
+alternative hide-creation gesture.
+
+**** DONE no, let's treat all hiddenoutsideofsubscribeecol nodes the same
+The user can add and delete hide relationships there as they like.
+If they add a node that belongs in a HiddenInSubscribeeCol,
+it should be moved in the display to the HiddenInSubscribeeCol,
+and they should get a warning explaining that
+(so they don't think their edit was ignored).
+
+This should be simpler to implement,
+users might want it. and it creates no meaningful footgun.
+
+***** Codex response
+Agreed.  I now read the policy as follows:
+
+- Every row in 'HiddenOutsideOfSubscribeeCol', Active or Unknown, is an
+  editable hide relationship owned by the subscriber.
+- Removing a row removes that ID from the subscriber's
+  'hides_from_its_subscriptions'.
+- Adding a row adds that ID to the same field, using the ordinary source
+  rule for a new hide edge.
+- After the save, placement is derived again.  A target contained by one
+  or more subscribees appears in their 'HiddenInSubscribeeCol'
+  collection(s); otherwise it remains in
+  'HiddenOutsideOfSubscribeeCol'.
+- When an added row moves inside, the save warning says that the hide was
+  accepted and names the collection(s) to which its display moved.  It
+  must not sound like a repair that discarded the edit.
+
+This treats all submitted rows uniformly and removes the current
+add/delete asymmetry.  Internally it is not quite an ordinary
+'WritableSet': the outside collection shows only a derived subset of the
+subscriber's complete hides list.  Save extraction must replace the
+outside subset while preserving existing hides represented in
+'HiddenInSubscribeeCol'.  A dedicated editable-filter policy (or an
+equivalent specialized extractor) would state that more accurately than
+changing it to 'WritableSet'.
+
+The tests that currently require added outside rows to disappear and
+deleted derived rows to regenerate should be reversed or replaced with
+tests of the behavior above.
+
+** DONE 4. How should an owner remove a dangling hide?
+This decision is needed if decision 3 covers all structured fields.
+
+- [recommended] Allow removal of an unresolved Unknown member from
+  'hiddenCol' (and the applicable outside-hiding view) as a narrow
+  exception.  Keep live members and additions read-only there.
+- Add a general 'remove this dangling relationship' command/edit request
+  that works from any placement.
+- Make 'hiddenCol' generally writable again.
+- Leave dangling hides invisible and automatically prune them during a
+  later save.
+
+The first option is the smallest UI change and is authorization-safe:
+the anchor owns that outbound hide edge.  It does make the collection's
+policy member-sensitive, so the save validator and reconciliation code
+must distinguish removal of an unresolved raw ID from edits to live
+members.  A general command is cleaner if this exception feels too
+surprising, but needs a new wire-level operation.
+
+I do not recommend automatic pruning.  The target might be absent only
+because a repository or source is temporarily unavailable.
+
+*** DONE I think I solved this in (3), but also
+let's also add a general 'remove all links from my data to this Unknown',
+runnable from an Unknown.
+
+**** Codex response
+Yes.  Decision 3 supplies the placement-specific hide gesture, and the
+general operation is useful independently of which placement exposed the
+Unknown.
+
+This cannot be an ordinary '(editRequest delete)' on the phantom: that
+means deleting a real node and is deliberately rejected on phantoms.  I
+would add a command/request whose argument is the Unknown's raw ID.  The
+server should atomically scan every configured source section the user
+owns -- not merely the active source set or current view -- and remove
+that exact ID from 'contains', 'subscribes_to',
+'hides_from_its_subscriptions', and 'overrides_view_of'.  It must leave
+all non-owned sections byte-for-byte unchanged and report what it
+removed.  Because an Unknown cannot be canonicalized, the command can
+promise to remove the displayed raw ID, not undiscoverable alternate
+IDs.
+
+One scope question remains: does 'all links' include Org ID links in
+owned titles and bodies, or only the four structured relationships?  I
+recommend the latter and would name the command 'remove all references'
+to make that precise.  Automatic prose rewriting is much more invasive
+and can damage authored sentences; a companion search/report of textual
+links would be safer.  If you intend the command to rewrite textual
+links too, that needs to be an explicit additional decision.
+
+**** DONE agreed
+Let's call the command 'skg-delete-references-to-absent-node',
+and document it in docs/COMMANDS.org.
+It should not rewrite links,
+but it should report to the user if any exist,
+in a warnings buffer, before asking whether to proceed.
+That warning buffer should also list the nodes that it would rewrite.
+That way the user can use those nodes
+to figure out how to rewrite the links.
+
+If there are no links to the unknown node,
+this reason for warning them and asking them for confirmation
+does not need to happen. (Maybe some other one could; I don't remember.)
+
+***** Codex response
+Agreed.  The command is 'skg-delete-references-to-absent-node',
+and its user-facing
+contract belongs in 'docs/COMMANDS.org'.
+It removes the displayed raw ID from all four structured
+relationship fields in the user's owned source sections.
+
+Before mutation, the command should compute one preview containing:
+
+- every owned node/source section whose structured relationship data it
+  would rewrite, with the relationship kind(s) involved; and
+- every owned node containing a textual Org ID link to the raw ID, with
+  enough location information for the user to visit and edit it.
+
+Textual links are reported but never rewritten.  If at least one exists,
+the command opens that preview as a warnings buffer and asks whether to
+proceed.  Approval removes only the structured references.  Declining
+changes nothing.
+
+If no textual links exist, this link-specific warnings buffer and
+confirmation are skipped.  That does not decide whether some separate,
+general confirmation policy should apply; there is no need to invent one
+for this task.  The structural rewrite set should still be reported in
+the ordinary success result so the user knows what changed.
+
+The operation should preflight and commit its structured rewrites as one
+batch, and it should revalidate the preview before applying an approval
+so that files changed while the warnings buffer was open cannot be
+silently overwritten.
+
+** DONE 5. What should an already-open view show immediately after node deletion?
+*** the choice
+- [recommended] Show Unknown wherever a surviving stored relationship
+  still names the deleted ID.  Reserve Deleted for a last-seen on-screen
+  node position no longer backed by a surviving relationship.
+- Permit the same relationship to appear as Deleted until the view is
+  rebuilt, then as Unknown after a fresh render.
+
+The first answer gives the same durable meaning before and after a
+restart.  Current post-save completion initially turns materialized
+Active nodes in the deletion set into 'Phantom::Deleted'.  A childless
+Deleted is then pruned, so an open Cheese view can temporarily show
+something different from a newly opened Cheese view.  The completion
+logic should consult whether the raw parent relationship survived before
+choosing Deleted versus Unknown.
+
+*** some context
+The short distinction is epistemic:
+
+- Deleted says: this view contained a real, materialized node, and the
+  save that is being rerendered just deleted it.
+- Unknown says: this position asks for an ID, but the renderer can find
+  no current record for that ID and has no last-seen node to use.
+
+Both are absent from the current graph.  That is why 'No longer exists in
+the graph.' does not distinguish Deleted from Unknown.
+
+'Phantom::Deleted' is created under these particular conditions:
+
+1. The post-save rerender receives 'deleted_by_this_save_pids', built
+   directly from the 'DeleteNode' instructions in that completed save.
+   A deletion visible only in Git history uses 'Phantom::Diff', not
+   Deleted.
+2. A view occurrence with one of those PIDs already exists as a
+   definitive Active vognode when its breadth-first completion visit
+   begins.  'mutate_activeNode_to_deletednode' converts that existing
+   occurrence in place.
+3. Because the occurrence was real moments earlier, Deleted keeps its
+   ID, former node home source, last-rendered title and body, and existing
+   view children.  Its children can then be preserved as independent
+   branches.
+
+It is not the generic result of a failed lookup.  A fresh render has an
+empty 'deleted_by_this_save_pids' set and therefore never creates a
+Deleted merely because a file is absent.  Inactive placeholders are not
+converted, because doing so would leak that hidden data vanished.
+Indefinitive Active occurrences are clobbered before the conversion
+check, so the in-place conversion specifically preserves a definitive,
+materialized occurrence.  A Deleted can subsequently survive another
+buffer parse/rerender, but it emits no save instruction and contributes
+no parent membership.  A childless Deleted is pruned unless it is a view
+root; one with children remains to hold the saved view subtree.
+
+'Phantom::Unknown' is created under these particular conditions:
+
+1. Rendering or completing a requested position has a raw ID to draw.
+2. Lookup cannot resolve that ID to a current node/source in the in-Rust
+   graph, filesystem, or applicable fallback.
+3. There is no current-save transition carrying last-seen Active-node
+   data for that newly created position.
+
+Today those positions include a dangling content member, a requested
+root or backpath target that cannot be found, and an Unknown already
+parsed from a buffer.  Under the decisions in this document they will
+also include unresolved PartnerCol members.  Unknown carries only the
+raw ID: it does not claim that the target ever existed, why it is absent,
+where it lived, or what its text was.  Content reconciliation retains an
+Unknown while the raw parent relationship still names its ID; if that
+membership disappears, it becomes a dead scaffold and is pruned.  The
+new round-trip rule from decision 2 will make that retained Unknown
+load-bearing for the relationship, while it remains inert as a node.
+
+The reported case exposes an overlap rather than two naturally disjoint
+states.  Immediately after deleting node N:
+
+- an open Cheese view already has N as a materialized Active child;
+- Cheese's non-owned raw relationship to N survives; and
+- the post-save context knows that this save deleted N.
+
+Current ordering retains the existing child for the raw membership, then
+converts it to Deleted when the child is visited.  If it is a leaf, the
+prune pass may remove it altogether.  After a restart, there is no
+current-save deletion set or last-seen Active node, so the same surviving
+raw relationship produces Unknown.  Thus the present UI can show
+Deleted, nothing, and later Unknown for the same durable relationship.
+
+Decision 5 is really a precedence decision for that overlap:
+
+- If durable relationship state wins, a surviving raw membership is
+  shown as Unknown immediately.  Deleted is reserved for a last-seen
+  occurrence that has no surviving backing relationship.  This is my
+  recommendation because it makes the row immediately editable under
+  the Unknown rules and agrees with a fresh render.
+- If last-seen transition information wins, the open view may show the
+  richer Deleted temporarily and become Unknown only after a fresh
+  render.  Then Deleted must either become relationship-aware and
+  load-bearing, or the UI must accept that this temporary row cannot be
+  used to remove the surviving relationship.
+- A third option is to invent a combined Deleted-and-still-referenced
+  state, but that adds another phantom distinction and still cannot be
+  reconstructed after restart without persistent tombstones.
+
+Reminder: you want to edit the 'No longer exists in the graph.' comment
+on 'Phantom::Deleted' after deciding the precedence above.
+
+** DONE 6. Should Unknown relationship members appear in a restricted source view?
+- [recommended] Yes, when the relationship's recording source is active
+  and the viewer is allowed to edit that source.
+- No; show them only in an all-sources view because the target's source
+  is unknown.
+
+Current restricted-source logic asks for the target's source.  An
+unresolved target has none, so it is omitted and later restored from disk
+during save.  That makes the relationship impossible to remove from a
+restricted view.
+
+For an Unknown marker there is no target title, body, or source to leak.
+The raw ID is already present in the visible relationship section.
+Therefore visibility can safely be based on the edge's recording source,
+while keeping all target data absent.
+
+*** (Jeff) agreed
+
+* Confirmed cause of the failed deletion
+'apply_delete_propagation_cleanup' in 'server/save.rs' performs two
+passes:
+
+1. It uses the inverse indexes for contains, subscribes, hides, and
+   overrides to find every node that refers to a deleted PID.  It
+   synthesizes a full 'SaveNode' for each referencer not already in the
+   save.
+2. It removes the deleted node's primary and extra IDs from all four
+   outbound lists of every 'SaveNode'.
+
+That is why the current all-owned deletion test expects every neighbor
+to be rewritten.  The algorithm has no source-ownership boundary.
+
+The save handler runs normal buffer validation first, then adds these
+collateral saves.  The synthesized save of Cheese therefore did not go
+through the earlier foreign-edit/fork classification.  Later, the
+filesystem preflight correctly refuses to write a telescope whose home
+or proposed sections are non-owned.  The transaction fails before any
+files change.
+
+The preflight is doing the right thing.  The delete-propagation pass is
+asking it to do the wrong thing.
+
+* DONE Proposed authorization rule
+** it
+Deletion cleanup may mutate a referencer only when its retained
+telescope is owned by the current user.  References in wholly foreign
+telescopes survive byte-for-byte.
+
+The loader makes this a node-level decision.  When raw owned and
+non-owned files collide on one PID, it retains the complete owned
+telescope and ignores every non-owned same-PID file before folding.  A
+retained 'NodeComplete' is therefore all-owned or wholly foreign; it
+cannot mix relationship members recorded in the current user's sections
+with members recorded in another user's sections.  Its home source
+reliably classifies which case it is.
+
+The implementation wrinkle is consequently smaller than first reported:
+the global inverse indexes contain both owned and wholly foreign
+referencers, while 'apply_delete_propagation_cleanup' currently turns all
+of them into synthetic ordinary 'SaveNode' values.  It should synthesize
+and strip only owned referencers.  The normal writer's refusal to write a
+foreign telescope remains unchanged.
+
+The deletion itself can remain as it is: filesystem deletion already
+iterates configured sources and removes files only from owned sources.
+
+** elaboration on the wrinkle
+*** it
+A 'NodeComplete' is the folded, effective view of one retained privacy
+telescope.  One user's telescope may span that user's public and private
+repositories, and its relationship members retain those per-edge
+recording sources.  It may therefore contain, for example:
+
+#+begin_example
+contains = [A recorded at my-public, B recorded at my-private]
+#+end_example
+
+It may not combine 'my-source' with 'other-user'.  If configured raw sources
+contain both an owned and non-owned file with the same PID,
+'retain_owned_sections_when_pid_collides' keeps all owned sections,
+discards all non-owned sections from semantic loading, and reports
+'IgnoredForeignPidCollision'.  A normal fork likewise has a new PID and
+does not extend the foreign node's telescope.
+
+The cross-owner wrinkle is in discovery, not telescope writing.
+The in-Rust inverse indexes cover every retained node in the config,
+including Cheese's wholly foreign node.  When an owned target is deleted,
+the current cleanup sees Cheese among the referencers and creates a full
+synthetic 'SaveNode' for it.  Phase 2 removes the target ID from that
+pending folded value.  Only afterward does filesystem preflight observe
+that the entire telescope is foreign and refuse it.
+
+The intended fix does not need a new section-patching writer.  Before
+synthesizing a cleanup save, classify the referencer by its retained
+home/source and skip it unless 'config.user_owns_source' is true.  Keep
+phase 2's deleted-ID stripping for owned synthetic saves and owned saves
+already supplied by the user's buffer.  A defensive ownership check at
+that phase boundary can ensure a future caller cannot reintroduce the
+same bug.
+
+Tests should pin the premise as well as the outcome: an owned telescope
+may span several owned sources; an owned/non-owned same-PID collision
+loads only the owned telescope and warns; a wholly foreign referencer is
+not scheduled for cleanup; and the owned target deletion succeeds while
+the foreign bytes and raw reference remain unchanged.
+
+*** DONE please define/elaborate
+**** current cleanup
+'Current cleanup' means 'apply_delete_propagation_cleanup' in
+'server/save.rs'.  It receives the pending 'DefineNode' batch and an
+in-Rust graph snapshot after the user's buffer has already passed normal
+save validation but before filesystem preflight.
+
+It has two phases.  First it collects every deleted primary PID, expands
+that set with the deleted nodes' known extra IDs, and consults the four
+inverse indexes to find nodes that contain, subscribe to, hide, or
+override a deleted PID.  For every referencer not already saved or itself
+deleted, it copies the referencer's current 'NodeRust' into a complete
+synthetic 'SaveNode'.  Before this task, that copy is intended as a
+no-op; its purpose is to put otherwise-unmentioned neighbors into the
+pending write batch.
+
+Second, it walks every 'SaveNode' in the batch -- both those synthesized
+neighbors and saves originating from the buffer -- and strips deleted
+IDs from the four outbound relationship fields.  The resulting batch
+then goes through ordinary telescope preflight and writing.
+
+The bug is entirely in the first phase's missing ownership filter.  Its
+inverse scan finds Cheese correctly, but Cheese should never have been
+turned into a save instruction.
+
+**** removes IDs from that folded value
+The 'folded value' is the in-memory 'NodeComplete' inside a pending
+'SaveNode', not a raw '.skg' section and not the graph already being
+mutated.  It represents the effective result of folding the retained
+telescope.  Its list elements are 'MemberAtSource' values, so each member
+still says which one of that telescope's source sections records it.
+
+For 'contains', cleanup calls 'retain' and drops every element whose raw
+'member' is in the deleted-ID set.  The helper for the other three fields
+does the equivalent while preserving their 'MSV' specified/unspecified
+shape.  This removes both the ID and its recording-source tag from the
+prospective complete value.  The ordinary writer later unfolds that
+value into the telescope's per-source files.
+
+For an owned referencer this is the desired collateral rewrite.  For
+Cheese it constructs a prospective foreign rewrite, which preflight
+properly rejects.  Skipping the foreign synthetic 'SaveNode' leaves
+Cheese's folded graph value and raw files untouched, so its reference can
+become Unknown after the target disappears.
+
+**** synthetic saves
+In this document, a *synthetic cleanup save* is a 'SaveNode' that the
+server adds to the current pending save batch even though the user's
+buffer expressed no edit to that node.  'Synthetic' describes the
+instruction's origin, not its durability or validity.
+
+For delete propagation, the server finds an otherwise-unmentioned
+referencer in an inverse index, copies its current 'NodeRust' into a
+'NodeComplete', wraps that in 'DefineNode::Save', and appends it to the
+batch.  At the moment it is created, the instruction describes the node
+unchanged.  Phase 2 then removes the deleted IDs from its outbound lists,
+turning it into the collateral rewrite that cleans the referencer.
+
+It is not:
+
+- a second user-visible save operation;
+- a dry run or hypothetical value;
+- a special filesystem write path; or
+- any arbitrary server-generated 'SaveNode', such as a fork clone or a
+  merge preservation node.
+
+Once added, it goes through the same batch preflight and ordinary
+telescope writer as a buffer-originated 'SaveNode'.  That last fact is
+why synthesizing one for Cheese causes the observed failure.
+
+In the actual plan I will prefer the unambiguous phrase
+'cleanup-generated SaveNode', while recognizing 'synthetic cleanup save'
+as the shorter term used in this discussion.
+
+*** DONE Can "contains = [A recorded at mine, B recorded at foreign]" happen?
+I thought it was a contract violation for the same PID
+to appear in distinct users' repos.
+My telescope can cross my repos, not yours.
+You can fork my node, but when you do,
+your fork has a new, separate ID.
+
+**** Codex response
+You are right; my example was wrong for a retained 'NodeComplete'.  The
+identity contract is one node, one PID, one telescope.  That telescope
+may cross several sources owned by the same user.  Forking a foreign node
+creates a separate owned node with a fresh PID, plus the subscription and
+override relationships; it does not add an owned section to the foreign
+PID.
+
+Same-PID files can still physically appear in distinct users' raw
+repositories through a collision, hand edit, or bad import, so the loader
+has an explicit recovery rule.  If any section for the PID is owned, it
+retains the complete owned telescope and ignores every same-PID
+non-owned file, emitting an 'IgnoredForeignPidCollision' warning.  Those
+ignored files never contribute members to the 'NodeComplete'.  If no
+section is owned, the telescope is wholly foreign.
+
+The config records only 'owned by this user' versus 'non-owned'; it does
+not encode identities for several different foreign owners.  Thus two
+foreign sources from different people that accidentally reuse a PID
+cannot be distinguished by ownership metadata alone.  That is a
+collision/error case, not a state produced by sharing or forking, and it
+does not make the mixed 'mine'/'other-user' example valid.
+
+This correction removes the section-aware writer proposal from the
+pre-plan.  Retained-telescope ownership is uniform, so checking the
+referencer's home with 'config.user_owns_source' is the appropriate
+cleanup boundary.
+* Existing machinery that can be reused
+** Content rendering
+'server/update_buffer/reconcile/content.rs' retains raw 'contains' IDs.
+When resolution fails it builds 'ContentReality::Unknown' and then
+'mk_unknown_viewnode'.  It also knows that an Unknown occupying a current
+content position is a member placeholder.
+
+** In-Rust graph
+Deleting a node removes that node and its own outgoing inverse entries,
+but it does not rewrite the raw outbound lists of other 'NodeRust'
+values.  Thus a foreign raw relationship can remain available to the
+renderer after deletion.
+
+** TypeDB
+TypeDB deletes relation instances whose endpoint disappears.  It should
+not be made authoritative for preservation of dangling membership; the
+raw filesystem/In-Rust lists are the durable source for this state.
+
+This also means that code which enumerates only resolved TypeDB edges or
+only 'pid_of' successes will not see a dangling member and needs a raw-ID
+path.
+
+* Missing machinery
+** Unknown save extraction
+An Unknown at an editable relationship position needs to contribute its
+exact stored member ID to the owning collection without producing a node
+save.  Removing the line must omit that ID.  This needs to work for
+content and writable PartnerCols.
+
+The exact stored ID matters: a referencer may name an extra ID rather
+than the deleted primary PID.  Once the target is gone, canonicalization
+is unavailable and unnecessary.
+
+** PartnerCol rendering and reconciliation
+The outbound relation accessors use 'filter_map(pid_of)', so unresolved
+subscribe, override, and hide members vanish before PartnerCol rendering.
+The initial PartnerCol fallback also constructs empty Active child data,
+despite a nearby comment describing Unknown behavior, and rerender can
+error when it cannot find the member source.  This path needs explicit
+raw unresolved-member support rather than an Active-node fallback.
+
+** Relationship provenance for editing
+An Unknown has only an ID today.  Its placement often supplies the owner
+and relation, but source-set visibility and section-precise removal also
+need the raw relationship's recording source.  That provenance may stay
+in server-side reconciliation state; it need not imply that the phantom
+has a node source.
+
+*** DONE yes, and
+let's call that field 'referenceSource' to avoid confusion.
+
+**** Codex response
+Agreed.  The wire metadata field is 'referenceSource'; the Rust field can
+follow the local naming convention as 'reference_source'.  Its value is
+the source section recording the relationship represented by this
+Unknown occurrence, never the missing target's home.
+
+It should be load-bearing and validated when an Unknown round-trips a
+structured relationship, because it determines which section is
+preserved or edited.  It can be optional for an Unknown root or another
+placement that has no structured relationship provenance.  Per the
+withdrawn source-herald request above, merely carrying
+'referenceSource' does not present it as the Unknown node's source.
+
+** Herald wording
+The current Unknown herald says 'Parent references unknown node.'  That
+fits content but not an Unknown root reached through a text link or a
+PartnerCol member.  A safe generic label is 'Reference to unknown node.'
+Relationship-aware wording is possible if provenance is deliberately
+exposed to the herald layer.
+
+* Required commit scope for the eventual plan
+Jeff has already edited the 'Phantom::Deleted' and 'Phantom::Unknown'
+comments in 'server/types/viewnode.rs' to describe the accepted decision
+5 behavior: a recently deleted node normally has the last-seen Deleted
+representation, but a surviving foreign relationship renders Unknown so
+the view agrees with later sessions.
+
+Those worktree edits intentionally describe behavior that the code does
+not implement yet.  The actual implementation plan must:
+
+- preserve those user-authored comment changes in its file inventory;
+- include committing them in the same implementation commit that changes
+  post-save reconciliation and adds the tests that make the comments
+  true;
+- not propose or make a separate comments-only commit; and
+- re-read the comments against the finished behavior before that commit,
+  adjusting them only if necessary for accuracy while preserving Jeff's
+  distinction.
+
+No commit of those comments belongs to this pre-plan/research step.
+
+* Suggested implementation order
+1. Change delete propagation so wholly foreign referencers are never
+   scheduled for rewrite.  Add the cross-owner deletion regression first;
+   this fixes the blocking bug independently of UI completeness.
+2. Make content Unknown membership sticky on unchanged save and removable
+   by deleting the Unknown line.
+3. Make same-session reconciliation choose Unknown for a surviving raw
+   membership.
+4. Add raw unresolved-member enumeration, rendering, and save extraction
+   for subscribes and overrides.
+5. Implement the chosen dangling-hide interaction.
+6. Make restricted-source visibility use relationship provenance and
+   generalize the herald text.
+
+If staged delivery is desired, steps 1--3 cover the reported content
+case.  Decision 3 determines whether steps 4--5 are part of the same
+task or follow-up work.
+
+* Acceptance tests
+** Authorization and atomicity
+- Deleting an owned target succeeds when both an owned node and a
+  non-owned Cheese node refer to it.
+- The owned relationship is removed.
+- Cheese's file is byte-for-byte unchanged and still contains the raw ID.
+- The target is removed only from owned sources.
+- No foreign file is prepared, written, or deleted.
+- A failure in preflight still changes nothing.
+
+** Unknown lifecycle
+- A fresh view of Cheese renders the surviving raw ID as
+  'Phantom::Unknown'.
+- An already-open Cheese view converges to the same result after delete.
+- Saving Cheese's relationship owner with the Unknown untouched
+  preserves the exact raw ID.
+- Deleting the Unknown line and saving removes only that relationship.
+- If the target becomes resolvable again before removal, the relationship
+  resolves to the real node.
+- A dangling extra ID follows the same rules without being rewritten to
+  a primary ID.
+
+** Relationship coverage
+- Repeat preservation/render/removal tests for contains, subscribes,
+  overrides, and hides, according to decision 3.
+- A text link remains untouched by target deletion and editable as body
+  text.
+- Restricted-source tests show an Unknown only when its relationship
+  section is active and writable, according to decision 6.
+
+** Regression coverage
+- Existing all-owned deletion tests continue to prove that owned
+  neighbors are cleaned.
+- A normal unresolved marker never invents a title, body, home source, or
+  Active node.
+- TypeDB's absence of the endpoint relationship does not erase the raw
+  dangling member from filesystem/In-Rust state.
