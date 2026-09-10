@@ -441,6 +441,22 @@ So far there are these endpoints:
     fails closed before writing unless the flag is present; under `all`
     (and on an approved restricted run) it prints the warning.
 
+## Delete references to an absent node
+
+  - Initial request: `((request . "delete references to absent node")
+    (id . "RAW-ID"))`. `RAW-ID` must still be absent.
+  - If owned title/body links point at the ID, response type
+    `delete-references-confirmation` carries `(id ...)`, an opaque
+    `(approved-preview ...)`, `(content "ORG WARNING")`, and a prompt,
+    followed by an empty rerender stream.  A retry echoes the exact preview.
+  - Success response type `delete-references-result` carries Org `content`,
+    `changed-nodes`, and `changed-memberships`, followed by rerender-lock,
+    rerender-view*, and rerender-done for every open view.
+  - The mutation removes only exact raw-ID matches in owned `contains`,
+    `subscribes_to`, `hides_from_its_subscriptions`, and
+    `overrides_view_of` lists.  It leaves text links and foreign telescopes
+    untouched.
+
 ## Rerender all views
   - Request: `((request . "rerender all views")
     (allow-ugly-telescopes "PID" ...))`.

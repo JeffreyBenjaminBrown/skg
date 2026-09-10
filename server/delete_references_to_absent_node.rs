@@ -216,3 +216,77 @@ fn remove_exact (
       members . iter () . filter (|m| &m . member != raw_id)
         . cloned () . collect ()), }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::types::misc::{SkgfileSource};
+  use crate::types::nodes::complete::{empty_node_complete, NodeComplete};
+  use std::collections::HashMap;
+  use std::path::PathBuf;
+
+  fn id (text : &str) -> ID { ID::from (text) }
+  fn member (source : &str, raw : &str) -> MemberAtSource<ID> {
+    MemberAtSource::at_source (SourceName::from (source), id (raw)) }
+
+  fn config () -> SkgConfig {
+    let source = |name : &str, owned : bool| SkgfileSource {
+      name: SourceName::from (name), abbreviation: None,
+      path: PathBuf::from (if owned { "owned/main" } else { "foreign/other" }),
+      user_owns_it: owned };
+    SkgConfig::dummyFromSources (HashMap::from ([
+      (SourceName::from ("main"), source ("main", true)),
+      (SourceName::from ("foreign"), source ("foreign", false)),
+    ]))
+  }
+
+  fn node (pid : &str, source : &str) -> NodeComplete {
+    let mut node : NodeComplete = empty_node_complete ();
+    node . pid = id (pid);
+    node . source = SourceName::from (source);
+    node . title = format! ("{} [[id:gone][title label]]", pid);
+    node . body = Some ("line one\n[[id:gone][body label]]" . to_string ());
+    node
+  }
+
+  #[test]
+  fn scans_owned_exact_members_and_leaves_everything_else_verbatim () {
+    let mut owned = node ("owned", "main");
+    owned . contains = vec! [member ("main", "gone"), member ("main", "keep")];
+    owned . subscribes_to = MSV::Specified (vec! [member ("main", "gone")]);
+    owned . hides_from_its_subscriptions =
+      MSV::Specified (vec! [member ("private", "gone")]);
+    owned . overrides_view_of = MSV::Specified (vec! [member ("main", "gone")]);
+    let mut foreign = node ("foreign", "foreign");
+    foreign . contains = vec! [member ("foreign", "gone")];
+    let graph = InRustGraph::from_nodecompletes (&[owned, foreign]);
+
+    let scanned = preview (&graph, &config (), &id ("gone")) . unwrap ();
+    assert_eq! (scanned . structural . len (), 4);
+    assert_eq! (scanned . text_links . len (), 2);
+    assert! (scanned . structural . iter ()
+              . all (|occurrence| occurrence . owner_pid == id ("owned")));
+    assert_eq! (scanned . text_links [1] . line, 2);
+    let approval = scanned . opaque_approval ();
+    assert_eq! (approval, preview (&graph, &config (), &id ("gone"))
+                . unwrap () . opaque_approval ());
+
+    let rewrites = rewrite (&graph, &config (), &scanned) . unwrap ();
+    assert_eq! (rewrites . len (), 1, "one SaveNode per affected owner");
+    let DefineNode::Save (SaveNode (rewritten)) = &rewrites [0] else {
+      panic! ("cleanup must produce a SaveNode"); };
+    assert_eq! (rewritten . contains, vec! [member ("main", "keep")]);
+    assert_eq! (rewritten . subscribes_to, MSV::Specified (Vec::new ()));
+    assert_eq! (rewritten . hides_from_its_subscriptions,
+                MSV::Specified (Vec::new ()));
+    assert_eq! (rewritten . overrides_view_of, MSV::Specified (Vec::new ()));
+    assert_eq! (graph . get (&id ("foreign")) . unwrap () . contains,
+                vec! [member ("foreign", "gone")]);
+  }
+
+  #[test]
+  fn rejects_a_raw_id_that_currently_resolves () {
+    let graph = InRustGraph::from_nodecompletes (&[node ("gone", "main")]);
+    assert! (preview (&graph, &config (), &id ("gone")) . is_err ());
+  }
+}
