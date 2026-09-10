@@ -173,15 +173,29 @@ pub fn nodecomplete_from_telescope_on_disk (
 /// fold complaint comes back as a violation for the caller to
 /// report.
 pub(crate) fn fold_grouped_sections (
+  sections_by_pid : HashMap<ID, Vec<(SourceName, NodeFS)>>,
+  pid_order           : Vec<ID>,
+  config              : &SkgConfig,
+) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
+  let mut checkpoint = || Ok (());
+  fold_grouped_sections_with_checkpoint (
+    sections_by_pid, pid_order, config, &mut checkpoint)
+}
+
+pub(crate) fn fold_grouped_sections_with_checkpoint (
   mut sections_by_pid : HashMap<ID, Vec<(SourceName, NodeFS)>>,
   pid_order           : Vec<ID>,
   config              : &SkgConfig,
+  checkpoint          : &mut dyn FnMut () -> io::Result<()>,
 ) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
   let pid_of : HashMap<ID, ID> = {
     let mut m : HashMap<ID, ID> = HashMap::new ();
     for (pid, sections) in sections_by_pid . iter () {
+      checkpoint () ?;
       for (_, node_fs) in sections {
+        checkpoint () ?;
         for extra in &node_fs . extra_ids {
+          checkpoint () ?;
           m . insert ( extra . clone (), pid . clone () ); }} }
     m };
   let resolve = |id : &ID| -> ID {
@@ -190,6 +204,7 @@ pub(crate) fn fold_grouped_sections (
   let mut all_nodes : Vec<NodeComplete> = Vec::new ();
   let mut all_violations : Vec<(ID, TelescopeViolation)> = Vec::new ();
   for pid in pid_order {
+    checkpoint () ?;
     let telescope : Telescope = Telescope::try_new (
       pid . clone (),
       sections_by_pid . remove (&pid)
@@ -259,13 +274,111 @@ pub fn error_unless_each_id_names_one_node (
 pub fn distinct_id_claim_conflicts (
   nodes : &[NodeComplete],
 ) -> BTreeMap<ID, BTreeSet<ID>> {
+  let mut checkpoint = || Ok (());
+  distinct_id_claim_conflicts_with_checkpoint (nodes, &mut checkpoint)
+    . expect ("no-op filesystem checkpoint cannot fail")
+}
+
+pub(crate) fn distinct_id_claim_conflicts_with_checkpoint (
+  nodes : &[NodeComplete],
+  checkpoint : &mut dyn FnMut () -> io::Result<()>,
+) -> io::Result<BTreeMap<ID, BTreeSet<ID>>> {
   let mut claims : BTreeMap<ID, BTreeSet<ID>> = BTreeMap::new ();
   for node in nodes {
+    checkpoint () ?;
     for id in node . all_ids () {
+      checkpoint () ?;
       claims . entry (id . clone ()) . or_default ()
         . insert (node . pid . clone ()); }}
   claims . retain ( |_, pids| pids . len () > 1);
-  claims
+  Ok (claims)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::types::misc::SkgfileSource;
+  use crate::types::nodes::complete::empty_node_complete;
+  use std::collections::HashMap;
+  use std::path::PathBuf;
+
+  fn config () -> SkgConfig {
+    let source = SourceName::from ("source");
+    SkgConfig::dummyFromSources (HashMap::from ([(source . clone (),
+      SkgfileSource {
+        name: source,
+        abbreviation: None,
+        path: PathBuf::from ("source"),
+        user_owns_it: true,
+      })]))
+  }
+
+  fn node_fs (pid : &str) -> NodeFS {
+    NodeFS {
+      title: Some ("title" . into ()),
+      aliases: Vec::new (),
+      pid: ID::from (pid),
+      extra_ids: Vec::new (),
+      body: None,
+      contains: Vec::new (),
+      subscribes_to: Vec::new (),
+      hides_from_its_subscriptions: Vec::new (),
+      overrides_view_of: Vec::new (),
+      misc: Vec::new (),
+    }
+  }
+
+  fn interrupted () -> io::Error {
+    io::Error::new (io::ErrorKind::Interrupted, "checkpoint stopped")
+  }
+
+  #[test]
+  fn checkpointed_fold_and_claim_scan_propagate_interruption () {
+    let pid = ID::from ("node");
+    let sections = HashMap::from ([(pid . clone (), vec![
+      (SourceName::from ("source"), node_fs ("node"))])]);
+    let mut stop = || Err (interrupted ());
+    let error = fold_grouped_sections_with_checkpoint (
+      sections, vec![pid], &config (), &mut stop) . unwrap_err ();
+    assert_eq! (error . kind (), io::ErrorKind::Interrupted);
+
+    let mut one = empty_node_complete ();
+    one . pid = ID::from ("one");
+    one . extra_ids = vec![ID::from ("shared")];
+    let mut two = empty_node_complete ();
+    two . pid = ID::from ("two");
+    two . extra_ids = vec![ID::from ("shared")];
+    let mut stop = || Err (interrupted ());
+    let error = distinct_id_claim_conflicts_with_checkpoint (
+      &[one, two], &mut stop) . unwrap_err ();
+    assert_eq! (error . kind (), io::ErrorKind::Interrupted);
+  }
+
+  #[test]
+  fn checkpointed_fold_and_claim_scan_match_legacy_results () {
+    let pid = ID::from ("node");
+    let sections = HashMap::from ([(pid . clone (), vec![
+      (SourceName::from ("source"), node_fs ("node"))])]);
+    let legacy = fold_grouped_sections (
+      sections . clone (), vec![pid . clone ()], &config ()) . unwrap ();
+    let mut checkpoint = || Ok (());
+    let checked = fold_grouped_sections_with_checkpoint (
+      sections, vec![pid], &config (), &mut checkpoint) . unwrap ();
+    assert_eq! (checked, legacy);
+
+    let mut one = empty_node_complete ();
+    one . pid = ID::from ("one");
+    one . extra_ids = vec![ID::from ("shared")];
+    let mut two = empty_node_complete ();
+    two . pid = ID::from ("two");
+    two . extra_ids = vec![ID::from ("shared")];
+    let nodes = vec![one, two];
+    let legacy = distinct_id_claim_conflicts (&nodes);
+    let mut checkpoint = || Ok (());
+    let checked = distinct_id_claim_conflicts_with_checkpoint (
+      &nodes, &mut checkpoint) . unwrap ();
+    assert_eq! (checked, legacy);
+  }
 }
 
 pub fn read_skg_sections_from_folder (

@@ -3,6 +3,7 @@ use crate::dbs::in_rust_graph::override_resolution::resolve_override;
 use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
 
 use std::collections::{HashMap, HashSet};
+use std::io;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OverrideInvariantViolation {
@@ -39,6 +40,16 @@ pub fn validate_override_invariants (
   config : &SkgConfig,
   graph  : &InRustGraph,
 ) -> Vec<OverrideInvariantViolation> {
+  let mut checkpoint : fn () -> io::Result<()> = || Ok (());
+  validate_override_invariants_with_checkpoint (
+    config, graph, &mut checkpoint ) . expect (
+      "infallible override invariant validation") }
+
+pub(crate) fn validate_override_invariants_with_checkpoint (
+  config     : &SkgConfig,
+  graph      : &InRustGraph,
+  checkpoint : &mut dyn FnMut () -> io::Result<()>,
+) -> io::Result<Vec<OverrideInvariantViolation>> {
   let mut violations : Vec<OverrideInvariantViolation> = Vec::new ();
 
   // First pass: collect automatic replacement candidates by the
@@ -50,12 +61,14 @@ pub fn validate_override_invariants (
       HashMap::new ();
 
   for (pid, node) in graph . nodes . iter () {
+    checkpoint () ?;
     let Some (user_owns_node) = user_owns_node (
       // A missing source means we cannot know whether this node's override edges should be automatic. We record such an offense in 'violations' rather than guessing "foreign".
       config, pid, &node . source, &mut violations )
     else { continue; };
     if ! user_owns_node { continue; }
     for target in members_of ( node . overrides_view_of . or_default () ) {
+      checkpoint () ?;
       // Override targets can be written as primary IDs or extra IDs. Validate against the effective primary PID, matching how graph relationship accessors resolve edges.
       let overridden : ID =
         graph . pid_of (&target)
@@ -66,6 +79,7 @@ pub fn validate_override_invariants (
         . push (pid . clone ()); }}
 
   for (overridden, overriders) in user_owned_overriders_by_overridden {
+    checkpoint () ?;
     // Monogamy constraint. Sorting keeps the error stable.
     if overriders . len () > 1 {
       let mut overriders : Vec<ID> = overriders;
@@ -82,6 +96,7 @@ pub fn validate_override_invariants (
     // rotations of one trail, so canonicalizing collapses them.
     let mut seen_cycles : HashSet<Vec<ID>> = HashSet::new ();
     for (pid, node) in graph . nodes . iter () {
+      checkpoint () ?;
       let user_owned : bool =
         config . sources . get (&node . source)
         . map ( |sc| sc . user_owns_it )
@@ -95,7 +110,7 @@ pub fn validate_override_invariants (
           violations . push (
             OverrideInvariantViolation::UserOwnedOverrideCycle {
               cycle : canonical } ); }}}}
-  dedup_violations (violations) }
+  Ok ( dedup_violations (violations) ) }
 
 /// Rotate a cycle's nodes so the minimum pid leads, preserving cycle
 /// order. The same directed cycle reached from different entry points
@@ -276,3 +291,37 @@ pub fn format_override_invariant_violations (
           "* user-owned override cycle: {}", arrow ));
       }}}
   lines . join ("\n") }
+
+#[cfg(test)]
+mod checkpoint_tests {
+  use super::*;
+
+  #[test]
+  fn override_checkpoint_interrupts_and_success_matches () {
+    let config : SkgConfig = SkgConfig::dummyFromSources (
+      HashMap::from ([(
+        SourceName::from ("owned"),
+        crate::types::misc::SkgfileSource {
+          name         : SourceName::from ("owned"),
+          abbreviation : None,
+          path         : std::path::PathBuf::from ("owned"),
+          user_owns_it : true, })]));
+    let mut node : crate::types::nodes::complete::NodeComplete =
+      crate::types::nodes::complete::empty_node_complete ();
+    node . pid = ID::from ("node");
+    node . source = SourceName::from ("owned");
+    let graph : InRustGraph = InRustGraph::from_nodecompletes (&[node]);
+    let mut checkpoint = || -> io::Result<()> {
+      Err ( io::Error::new (
+        io::ErrorKind::Interrupted, "test interruption" )) };
+    let interrupted = validate_override_invariants_with_checkpoint (
+      &config, &graph, &mut checkpoint );
+    assert_eq! (
+      interrupted . unwrap_err () . kind (), io::ErrorKind::Interrupted );
+
+    let mut success_checkpoint = || -> io::Result<()> { Ok (( )) };
+    let checked : Vec<OverrideInvariantViolation> =
+      validate_override_invariants_with_checkpoint (
+        &config, &graph, &mut success_checkpoint ) . unwrap ();
+    assert_eq! ( checked, validate_override_invariants (&config, &graph) ); }
+}

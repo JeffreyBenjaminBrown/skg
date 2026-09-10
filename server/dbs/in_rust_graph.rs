@@ -13,6 +13,7 @@ pub mod relation_accessors;
 
 use arc_swap::ArcSwap;
 use std::sync::Arc;
+use std::io;
 
 use crate::types::misc::{ID, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
@@ -69,16 +70,27 @@ impl InRustGraph {
   /// 'extra_id_to_pid' only; second pass inserts nodes and builds
   /// inverse entries with full lookup available.
   pub fn from_nodecompletes (completes: &[NodeComplete]) -> Self {
+    let mut checkpoint : fn () -> io::Result<()> = || Ok (());
+    Self::from_nodecompletes_with_checkpoint (completes, &mut checkpoint)
+      . expect ("infallible graph construction") }
+
+  pub(crate) fn from_nodecompletes_with_checkpoint (
+    completes  : &[NodeComplete],
+    checkpoint : &mut dyn FnMut () -> io::Result<()>,
+  ) -> io::Result<Self> {
     let mut g : InRustGraph = InRustGraph::new ();
     for c in completes {
+      checkpoint () ?;
       for extraid in &c . extra_ids {
+        checkpoint () ?;
         g . extra_id_to_pid . insert (
           extraid . clone (), c . pid . clone () ); } }
     for c in completes {
+      checkpoint () ?;
       let rust : NodeRust = NodeRust::from (c);
       g . nodes . insert ( rust . pid . clone (), rust . clone () );
       add_to_inverse_indexes (&mut g, &rust); }
-    g }
+    Ok (g) }
 
   pub fn get (&self, pid: &ID) -> Option<&NodeRust> {
     self . nodes . get (pid) }
@@ -336,3 +348,41 @@ pub fn new_handle_with_manifest (
 ) -> InRustGraphHandle {
   Arc::new ( ArcSwap::from ( Arc::new (
     SelectedStoreState::initial (graph, manifest)) )) }
+
+#[cfg(test)]
+mod checkpoint_tests {
+  use super::*;
+
+  #[test]
+  fn graph_checkpoint_interrupts_and_success_matches () {
+    let mut node : NodeComplete =
+      crate::types::nodes::complete::empty_node_complete ();
+    node . pid = ID::from ("node");
+    node . extra_ids = vec! [ ID::from ("alias") ];
+    let nodes : Vec<NodeComplete> = vec! [ node ];
+    let mut interrupted_at : usize = 0;
+    let mut checkpoint = || -> std::io::Result<()> {
+      interrupted_at += 1;
+      if interrupted_at == 2 {
+        Err ( std::io::Error::new (
+          std::io::ErrorKind::Interrupted, "test interruption" ))
+      } else { Ok (( )) } };
+    let interrupted = InRustGraph::from_nodecompletes_with_checkpoint (
+      &nodes, &mut checkpoint );
+    assert_eq! (
+      interrupted . unwrap_err () . kind (),
+      std::io::ErrorKind::Interrupted );
+
+    let mut success_checkpoint = || -> std::io::Result<()> { Ok (( )) };
+    let checked : InRustGraph =
+      InRustGraph::from_nodecompletes_with_checkpoint (
+        &nodes, &mut success_checkpoint ) . unwrap ();
+    let ordinary : InRustGraph = InRustGraph::from_nodecompletes (&nodes);
+    assert_eq! ( checked . nodes, ordinary . nodes );
+    assert_eq! ( checked . extra_id_to_pid, ordinary . extra_id_to_pid );
+    assert_eq! ( checked . contained_by, ordinary . contained_by );
+    assert_eq! ( checked . subscribers_of, ordinary . subscribers_of );
+    assert_eq! ( checked . hiders_of, ordinary . hiders_of );
+    assert_eq! ( checked . overriders_of, ordinary . overriders_of );
+    assert_eq! ( checked . textlinks_in, ordinary . textlinks_in ); }
+}

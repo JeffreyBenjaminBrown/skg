@@ -39,12 +39,22 @@ pub struct SelectedSourceFiles {
 pub fn selected_direct_source_files (
   config : &SkgConfig,
 ) -> io::Result<SelectedSourceFiles> {
+  let mut checkpoint = || Ok (());
+  selected_direct_source_files_with_checkpoint (config, &mut checkpoint)
+}
+
+pub(crate) fn selected_direct_source_files_with_checkpoint (
+  config : &SkgConfig,
+  checkpoint : &mut dyn FnMut () -> io::Result<()>,
+) -> io::Result<SelectedSourceFiles> {
   let mut candidates : Vec<(ID, SourceFile)> = Vec::new ();
   for source_name in config . ordered_sources () {
+    checkpoint () ?;
     let source = config . sources . get (&source_name)
       . expect ("ordered source exists");
     let mut paths : Vec<PathBuf> = Vec::new ();
     for entry in fs::read_dir (&source . path) ? {
+      checkpoint () ?;
       let entry = entry ?;
       if ! entry . file_type () ? . is_file () { continue; }
       let path : PathBuf = entry . path ();
@@ -54,11 +64,12 @@ pub fn selected_direct_source_files (
       paths . push (path); }
     paths . sort ();
     for path in paths {
+      checkpoint () ?;
       let pid : ID = pid_from_path (&path) ?;
       candidates . push ((pid, SourceFile {
         source: source_name . clone (), path })); }
   }
-  Ok (select_source_file_candidates (config, candidates))
+  select_source_file_candidates_with_checkpoint (config, candidates, checkpoint)
 }
 
 /// Hash the exact currently selected corpus without parsing YAML.  Used only
@@ -66,11 +77,21 @@ pub fn selected_direct_source_files (
 pub fn selected_path_digest_manifest (
   config : &SkgConfig,
 ) -> io::Result<SelectedPathManifest> {
-  let selected = selected_direct_source_files (config) ?;
+  let mut checkpoint = || Ok (());
+  selected_path_digest_manifest_with_checkpoint (config, &mut checkpoint)
+}
+
+pub(crate) fn selected_path_digest_manifest_with_checkpoint (
+  config : &SkgConfig,
+  checkpoint : &mut dyn FnMut () -> io::Result<()>,
+) -> io::Result<SelectedPathManifest> {
+  let selected = selected_direct_source_files_with_checkpoint (
+    config, checkpoint) ?;
   let mut manifest = SelectedPathManifest::new ();
   for pid in selected . pid_order {
     for file in selected . by_pid . get (&pid)
       . into_iter () . flatten () {
+      checkpoint () ?;
       let bytes = fs::read (&file . path) ?;
       manifest . insert (
         file . path . clone (), PathDigest::of_bytes (&bytes)); }}
@@ -104,10 +125,22 @@ pub fn select_source_file_candidates (
   config     : &SkgConfig,
   candidates : Vec<(ID, SourceFile)>,
 ) -> SelectedSourceFiles {
+  let mut checkpoint = || Ok (());
+  select_source_file_candidates_with_checkpoint (
+    config, candidates, &mut checkpoint)
+    . expect ("no-op filesystem checkpoint cannot fail")
+}
+
+pub(crate) fn select_source_file_candidates_with_checkpoint (
+  config     : &SkgConfig,
+  candidates : Vec<(ID, SourceFile)>,
+  checkpoint : &mut dyn FnMut () -> io::Result<()>,
+) -> io::Result<SelectedSourceFiles> {
   let mut candidates_by_pid : HashMap<ID, Vec<SourceFile>> = HashMap::new ();
   let mut pid_order : Vec<ID> = Vec::new ();
   let mut seen : HashSet<ID> = HashSet::new ();
   for (pid, candidate) in candidates {
+    checkpoint () ?;
     if seen . insert (pid . clone ()) {
       pid_order . push (pid . clone ()); }
     candidates_by_pid . entry (pid) . or_default () . push (candidate);
@@ -115,6 +148,7 @@ pub fn select_source_file_candidates (
   let mut by_pid : HashMap<ID, Vec<SourceFile>> = HashMap::new ();
   let mut collisions : Vec<IgnoredForeignPathCollision> = Vec::new ();
   for pid in &pid_order {
+    checkpoint () ?;
     let candidates : Vec<SourceFile> =
       candidates_by_pid . remove (pid) . unwrap_or_default ();
     let (selected, collision) =
@@ -123,7 +157,7 @@ pub fn select_source_file_candidates (
     if let Some (collision) = collision {
       collisions . push (collision); }
   }
-  SelectedSourceFiles { pid_order, by_pid, collisions }
+  Ok (SelectedSourceFiles { pid_order, by_pid, collisions })
 }
 
 pub fn select_source_file_candidates_for_pid (
@@ -158,4 +192,76 @@ fn pid_from_path (path : &Path) -> io::Result<ID> {
       io::ErrorKind::InvalidData,
       format! ("Empty .skg filename stem at {:?}", path) )); }
   Ok (ID::from (stem))
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::collections::HashMap;
+  use std::fs;
+  use tempfile::TempDir;
+
+  fn config (directory : &TempDir) -> SkgConfig {
+    let name = SourceName::from ("source");
+    SkgConfig::dummyFromSources (HashMap::from ([(name . clone (),
+      crate::types::misc::SkgfileSource {
+        name, abbreviation: None,
+        path: directory . path () . to_path_buf (),
+        user_owns_it: true,
+      })]))
+  }
+
+  fn interrupted () -> io::Error {
+    io::Error::new (io::ErrorKind::Interrupted, "checkpoint stopped")
+  }
+
+  #[test]
+  fn checkpointed_source_selection_propagates_interruption () {
+    let directory = TempDir::new () . unwrap ();
+    fs::write (directory . path () . join ("node.skg"), "node") . unwrap ();
+    let config = config (&directory);
+    let mut stop = || Err (interrupted ());
+    let error = selected_direct_source_files_with_checkpoint (
+      &config, &mut stop) . unwrap_err ();
+    assert_eq! (error . kind (), io::ErrorKind::Interrupted);
+    let candidates = vec![(
+      ID::from ("node"), SourceFile {
+        source: SourceName::from ("source"),
+        path: directory . path () . join ("node.skg"), })];
+    let mut stop = || Err (interrupted ());
+    let error = select_source_file_candidates_with_checkpoint (
+      &config, candidates, &mut stop) . unwrap_err ();
+    assert_eq! (error . kind (), io::ErrorKind::Interrupted);
+    let mut stop = || Err (interrupted ());
+    let error = selected_path_digest_manifest_with_checkpoint (
+      &config, &mut stop) . unwrap_err ();
+    assert_eq! (error . kind (), io::ErrorKind::Interrupted);
+  }
+
+  #[test]
+  fn checkpointed_source_selection_matches_legacy_results () {
+    let directory = TempDir::new () . unwrap ();
+    fs::write (directory . path () . join ("node.skg"), "node") . unwrap ();
+    let config = config (&directory);
+    let legacy_selected = selected_direct_source_files (&config) . unwrap ();
+    let mut checkpoint = || Ok (());
+    let checked_selected = selected_direct_source_files_with_checkpoint (
+      &config, &mut checkpoint) . unwrap ();
+    assert_eq! (checked_selected, legacy_selected);
+    let legacy_manifest = selected_path_digest_manifest (&config) . unwrap ();
+    let mut checkpoint = || Ok (());
+    let checked_manifest = selected_path_digest_manifest_with_checkpoint (
+      &config, &mut checkpoint) . unwrap ();
+    assert_eq! (checked_manifest, legacy_manifest);
+    let candidates = vec![(
+      ID::from ("node"), SourceFile {
+        source: SourceName::from ("source"),
+        path: directory . path () . join ("node.skg"), })];
+    let legacy_candidates = select_source_file_candidates (
+      &config, candidates . clone ());
+    let mut checkpoint = || Ok (());
+    let checked_candidates = select_source_file_candidates_with_checkpoint (
+      &config, candidates, &mut checkpoint) . unwrap ();
+    assert_eq! (checked_candidates, legacy_candidates);
+  }
 }

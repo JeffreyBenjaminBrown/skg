@@ -144,12 +144,23 @@ pub fn validate_all_telescopes (
   config : &SkgConfig,
   graph  : &InRustGraph,
 ) -> Vec<(ID, TelescopeViolation)> {
+  let mut checkpoint : fn () -> io::Result<()> = || Ok (());
+  validate_all_telescopes_with_checkpoint (
+    config, graph, &mut checkpoint ) . expect (
+      "infallible telescope validation") }
+
+pub(crate) fn validate_all_telescopes_with_checkpoint (
+  config     : &SkgConfig,
+  graph      : &InRustGraph,
+  checkpoint : &mut dyn FnMut () -> io::Result<()>,
+) -> io::Result<Vec<(ID, TelescopeViolation)>> {
   let mut all : Vec<(ID, TelescopeViolation)> = Vec::new ();
   for pid in graph . nodes . keys () {
+    checkpoint () ?;
     for v in telescope_violations_of (config, graph, pid) {
       all . push (( pid . clone (), v )); }}
   all . sort_by ( |a, b| a . 0 . cmp ( &b . 0 ));
-  all }
+  Ok (all) }
 
 /// The whole init/rebuild report: what the graph shows
 /// ('validate_all_telescopes') plus what the LOAD saw that the
@@ -214,3 +225,38 @@ pub fn report_telescope_violations (
 #[cfg(test)]
 #[path = "../../tests/unit/telescope_invariants.rs"]
 mod tests;
+
+#[cfg(test)]
+mod checkpoint_tests {
+  use super::*;
+  use crate::types::nodes::complete::NodeComplete;
+
+  #[test]
+  fn telescope_checkpoint_interrupts_and_success_matches () {
+    let config : SkgConfig = SkgConfig::dummyFromSources (
+      std::collections::HashMap::from ([(
+        SourceName::from ("owned"),
+        crate::types::misc::SkgfileSource {
+          name         : SourceName::from ("owned"),
+          abbreviation : None,
+          path         : std::path::PathBuf::from ("owned"),
+          user_owns_it : true, })]));
+    let mut node : NodeComplete =
+      crate::types::nodes::complete::empty_node_complete ();
+    node . pid = ID::from ("node");
+    node . source = SourceName::from ("owned");
+    let graph : InRustGraph = InRustGraph::from_nodecompletes (&[node]);
+    let mut checkpoint = || -> io::Result<()> {
+      Err ( io::Error::new (
+        io::ErrorKind::Interrupted, "test interruption" )) };
+    let interrupted = validate_all_telescopes_with_checkpoint (
+      &config, &graph, &mut checkpoint );
+    assert_eq! (
+      interrupted . unwrap_err () . kind (), io::ErrorKind::Interrupted );
+
+    let mut success_checkpoint = || -> io::Result<()> { Ok (( )) };
+    let checked : Vec<(ID, TelescopeViolation)> =
+      validate_all_telescopes_with_checkpoint (
+        &config, &graph, &mut success_checkpoint ) . unwrap ();
+    assert_eq! ( checked, validate_all_telescopes (&config, &graph) ); }
+}
