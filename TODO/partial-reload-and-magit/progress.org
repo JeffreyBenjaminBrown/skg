@@ -2364,3 +2364,44 @@ saves and other writers retain their previous lifecycle.
 ** choices determining the future
 Yield changes transport scheduling only. Durable operation identity and journal
 outcomes retain their existing authority.
+
+* Simplify/cohere checkpoint: durable commands keep their connection responsive
+** what's done and went well
+Whitespace normalization and cyclic-root recomputation now reserve mutation
+authority on the connection thread and execute on a worker. A nonterminal
+'request-yield' releases foreground transport scheduling. Completed responses
+return through a per-connection channel; only the connection thread writes the
+socket, using the original request identity. Dropped transport does not cancel
+the worker or release its reservation.
+
+Admission collisions create no journal record, so an in-flight duplicate cannot
+poison the original worker before preparation. Effectless worker refusals are
+recorded before reservation release; unresolved effects retain the block.
+
+Two actual TCP tests pass, covering both commands, status and read-only query
+progress while held, closed/open admission, competing writes, duplicate replay,
+and durable completion after disconnect. Six existing command regressions pass.
+The socket fixture needed its writer environment seeded from the selected G2
+snapshot; the unseeded fixture correctly refused regressing publication. The
+disconnect test also waits for reservation release after observing the earlier
+durable commit, avoiding a test race between those ordered events.
+
+'cargo check --all-targets --jobs 2' passed. The client checkpoint passed all
+490 Emacs tests and all Neovim suites. Focused logs are
+'/tmp/command-responsiveness-final.log' and
+'/tmp/command-async-handler-regressions.log'; checkpoint logs are
+'/tmp/command-async-all-targets.log',
+'/tmp/command-yield-emacs-checkpoint.log' and
+'/tmp/command-yield-nvim-checkpoint.log'. The protocol documentation describes
+the new lifecycle. The reasoning boundary is recorded in
+[[../../codex-thinking/command-responsiveness.org]].
+** Changes to the plan's envisioned order.
+The two durable commands establish asynchronous transport scheduling before
+ordinary save continuations are migrated.
+** what's imperfect about what's done
+Ordinary saves, other writer entry points and the interactive-session ownership
+adapter still need migration. This checkpoint does not claim the full plan's
+performance, client report or startup acceptance matrix is complete.
+** choices determining the future
+Reuse detached routing and the sole socket writer for further asynchronous
+operations. Preserve durable outcome ordering independently of delivery.

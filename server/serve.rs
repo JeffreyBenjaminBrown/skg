@@ -9,6 +9,8 @@
 pub mod handlers;
 #[cfg(test)]
 mod query_wait_tests;
+#[cfg(test)]
+mod command_responsiveness_tests;
 mod maintenance_connection;
 pub mod parse_metadata_sexp;
 pub mod protocol;
@@ -38,7 +40,7 @@ use crate::serve::handlers::maintenance_protocol::{
 };
 use crate::serve::handlers::observation_hint::handle_observation_hint_request;
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
-use crate::serve::handlers::recompute_cyclic_roots::handle_recompute_cyclic_roots_request;
+use crate::serve::handlers::recompute_cyclic_roots::recompute_cyclic_roots_with_operation;
 use crate::serve::handlers::reload_batch::{
   handle_begin_reload_batch_request,
   handle_end_reload_batch_request,
@@ -56,7 +58,7 @@ use crate::serve::handlers::scalar_release::{
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::source_sets::handle_source_set_request;
 use crate::serve::handlers::stage_moves::handle_stage_moves_request;
-use crate::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
+use crate::serve::handlers::strip_body_whitespace::strip_body_whitespace_with_operation;
 use crate::serve::handlers::text_search::render_enriched_search_buffer::{
   insert_containerward_ancestries_from_snapshot,
   insert_override_ancestries_from_graph,
@@ -96,6 +98,7 @@ use std::net::TcpListener;
 use std::net::TcpStream; // handles two-way communication
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::time::Duration;
 use sexp::{Atom, Sexp};
@@ -218,6 +221,7 @@ fn handle_connection (
   let mut snapshot_requested : bool = false;
   let mut owned_reload_batch_tokens : HashSet<String> = HashSet::new ();
   let mut query_deliveries : handlers::query_wait::QueryDeliveries = Default::default ();
+  let (command_sender, command_receiver) : (Sender<String>, Receiver<String>) = mpsc::channel ();
   let mut role : Option<ConnectionRole> = None;
   let mut seen_reconciliation_generation =
     current_reconciliation_generation ();
@@ -315,10 +319,12 @@ fn handle_connection (
           &search_cancelled,
           &mut snapshot_requested,
           &mut owned_reload_batch_tokens,
-          &mut query_deliveries);
+          &mut query_deliveries,
+          &command_sender);
         if request_type != RequestType::TextSearch {
           let _ = ensure_request_has_terminal_response (
             &mut stream, request_type); }
+        drain_command_completions (&mut stream, &command_receiver);
         if let Some (error) = take_send_failure () {
           tracing::warn! (%error,
             "response transport failed; abandoning connection-owned work");
@@ -327,7 +333,9 @@ fn handle_connection (
       Err (ref e)
         if e . kind () == std::io::ErrorKind::WouldBlock
         || e . kind () == std::io::ErrorKind::TimedOut =>
-      { // Idle timeout — if enrichment is ready, ask Emacs
+      {
+        drain_command_completions (&mut stream, &command_receiver);
+        // Idle timeout — if enrichment is ready, ask Emacs
         // for a snapshot of the search buffer so we can integrate
         // ancestry without losing user edits.
         if ! snapshot_requested {
@@ -381,9 +389,20 @@ fn handle_connection (
     &mut owned_reload_batch_tokens);
   tracing::info!(peer = %peer, "Skg socket disconnected"); }
 
+fn drain_command_completions (
+  stream : &mut TcpStream,
+  completions : &Receiver<String>,
+) {
+  // Search continuations retain their foreground context between requests.
+  if util::request_context_active () { return; }
+  while let Ok (response) = completions . try_recv () {
+    if send_response_with_length_prefix (stream, &response) . is_err () { break; }
+  }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn dispatch_request (
-  runtime           : &ServerRuntime,
+  runtime           : &Arc<ServerRuntime>,
   reader            : &mut BufReader<TcpStream>,
   stream            : &mut TcpStream,
   request           : &str,
@@ -393,6 +412,7 @@ fn dispatch_request (
   snapshot_requested : &mut bool,
   owned_reload_batch_tokens : &mut HashSet<String>,
   query_deliveries : &mut handlers::query_wait::QueryDeliveries,
+  command_sender : &Sender<String>,
 ) {
   match request_type {
     RequestType::QueryWait | RequestType::QueryWaitStatus
@@ -570,7 +590,9 @@ fn dispatch_request (
     RequestType::RebuildDbs => {
       handle_rebuild_dbs_request (stream, runtime); }
     RequestType::StripBodyWhitespace =>
-      handle_strip_body_whitespace_request (stream, request, runtime),
+      handlers::durable_command::dispatch_command_request (
+        stream, request, runtime, TcpToClient::StripBodyWhitespace,
+        strip_body_whitespace_with_operation, command_sender),
     RequestType::RerenderAllViews => {
       if let Err (error) = with_query_session (runtime, |env, interactive| {
         let InteractiveSession {
@@ -591,7 +613,9 @@ fn dispatch_request (
       handle_end_reload_batch_request (
         stream, request, runtime, owned_reload_batch_tokens),
     RequestType::RecomputeCyclicRoots =>
-      handle_recompute_cyclic_roots_request (stream, request, runtime),
+      handlers::durable_command::dispatch_command_request (
+        stream, request, runtime, TcpToClient::RecomputeCyclicRoots,
+        recompute_cyclic_roots_with_operation, command_sender),
     RequestType::ApplyCollateral => {
       let mut interactive = runtime . interactive . lock () . unwrap ();
       let InteractiveSession { views, collateral_scheduler, .. } =

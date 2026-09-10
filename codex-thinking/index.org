@@ -12,3 +12,4 @@ Established progress belongs in [[file:../TODO/partial-reload-and-magit/progress
 * Process observations
 ** [[file:note-taking.org][What has helped about externalizing uncertain reasoning]]
 ** [[file:token-discipline.org][Preventing repeated exploration and status polling]]
+** [[file:command-responsiveness.org][Command scheduling and retained request identity]]

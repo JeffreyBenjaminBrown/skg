@@ -31,7 +31,7 @@ pub(crate) fn handle_recompute_cyclic_roots_request (
     recompute_cyclic_roots_with_operation);
 }
 
-fn recompute_cyclic_roots_with_operation (
+pub(crate) fn recompute_cyclic_roots_with_operation (
   env : &mut SkgEnv,
   operation : &SaveOperation,
 ) -> Result<String, String> {

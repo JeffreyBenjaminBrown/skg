@@ -1,0 +1,33 @@
+* Same-connection command responsiveness
+** Required behavior
+A long whitespace or ranking command must leave the socket reader available
+for coherent reads and status. Its owner reservation must exist before worker
+dispatch. Completion keeps the original request identity and durable outcome;
+a disconnect cannot cancel authorized effects or free their reservation.
+** Chosen interface
+A nonterminal 'request-yield' frame lets the editor dispatch another request
+while retaining the first request's handlers and finalizer. It does not claim
+durable acceptance or completion. Final command frames retain their original
+request ID. The connection thread alone writes socket frames; workers send
+completed response strings through its local completion channel. Dropped
+connections lose delivery, while journaled operation outcomes remain available.
+** Necessary checks
+Capture request routing before releasing the foreground request context. Drain
+worker completions only when another synchronous handler is not active. Retain
+strict session and incident checks for yield frames and late terminal replies.
+Duplicate in-flight command IDs must not create a refused journal record that
+supersedes the first worker's unfinished preparation.
+** Admission metadata
+Expose mutation reservation state from the same owner publication as the
+revision and selected pair, using a compatibility adapter for existing readers.
+An active reservation closes write admission until its outcome settles.
+** Falsifying test
+Hold a command worker before its effect boundary, then send status and an
+explicit read-only query on that same socket. Both must complete before worker
+release; a competing writer must refuse. Release the worker and verify one
+terminal result under the original request ID, then verify duplicate replay.
+** Refusal ordering
+An effectless worker refusal must be journaled before its reservation is
+released. Otherwise a duplicate can reserve the same operation between release
+and refusal, racing its preparation against the first worker's terminal record.
+Admission refusal while another reservation exists creates no journal record.

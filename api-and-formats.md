@@ -27,6 +27,21 @@ the one continuation: it repeats the still-active search request ID instead
 of allocating a new operation. An authorization retry is a new request and
 therefore receives a new ID.
 
+Long-running commands may first emit a nonterminal `request-yield` frame.
+That frame releases the connection's foreground queue slot while retaining
+the original request handler and finalizer; the original request ID,
+incident ID, and server-session identity remain bound to the eventual
+terminal response. Only a yield from the currently active request with
+matching valid identity releases the slot. A yield does not promise durable
+acceptance or completion. The command worker continues after a client
+disconnect; if the connection remains available, it later receives the
+terminal response, otherwise the outcome remains available through the
+durable operation record.
+Whitespace normalization and cyclic-root recomputation are currently the
+only commands using this asynchronous request lifecycle. The design details
+are recorded in
+[`codex-thinking/command-responsiveness.org`](codex-thinking/command-responsiveness.org).
+
 Reconciliation work may additionally carry `(incident-id . "UUID")`.
 The server echoes it on every frame.  A request ID owns one wire exchange;
 an incident ID owns the longer disk/store/presentation episode and is reused
