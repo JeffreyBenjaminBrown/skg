@@ -11,6 +11,8 @@ pub mod handlers;
 mod query_wait_tests;
 #[cfg(test)]
 mod command_responsiveness_tests;
+#[cfg(test)]
+mod save_responsiveness_tests;
 mod maintenance_connection;
 pub mod parse_metadata_sexp;
 pub mod protocol;
@@ -37,7 +39,6 @@ use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_sou
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
 use crate::serve::handlers::maintenance_protocol::{
   handle_maintenance_protocol_request,
-  skg_save_policy_refusal,
 };
 use crate::serve::handlers::observation_hint::handle_observation_hint_request;
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
@@ -51,7 +52,6 @@ use crate::serve::handlers::reload_recovery::{
   load_recovery_journals,
 };
 use crate::serve::handlers::rerender_all_views::{ handle_git_diff_toggle_and_rerender, handle_rerender_all_views_request};
-use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::scalar_release::{
   ScalarReleaseDecision,
   decide as decide_scalar_release,
@@ -437,74 +437,9 @@ fn dispatch_request (
           return;
         }
       };
-      let snapshot = runtime . selected_snapshot ();
-      let active = runtime . interactive . lock () . unwrap () . active_source_set . clone ();
-      let operation = match crate::runtime::save_operations::SaveOperation::from_request (
-          request, &content, &snapshot . env . config, &active) {
-        Ok (operation) => operation,
-        Err (reason) => {
-          let response = crate::serve::handlers::save_buffer::save_refusal_response (&reason, request);
-          let _ = send_response_with_length_prefix (stream, &response);
-          return;
-        }
-      };
-      match operation . recorded_response () {
-        Ok (Some (response)) => {
-          let _ = send_response_with_length_prefix (stream, &response);
-          return;
-        }
-        Err (reason) => {
-          let response = operation . tag_response (
-            &crate::serve::handlers::save_buffer::save_refusal_response (&reason, request), "blocked");
-          let _ = send_response_with_length_prefix (stream, &response);
-          return;
-        }
-        Ok (None) => {}
-      }
-      let mut started : bool = false;
-      let result = runtime . with_store_transition (
-        operation . operation_id . clone (), |env, interactive, control| {
-          started = true;
-          let maintenance = runtime . maintenance_snapshot ();
-          let refusal = runtime . authority_failure ()
-            . or_else (|| runtime . validate_session_authority (request) . err ())
-            . or_else (|| skg_save_policy_refusal (&maintenance . state));
-          let operation = operation . clone () . with_control (control . clone ());
-          let InteractiveSession { views, active_source_set, collateral_scheduler, .. } = interactive;
-          handle_save_buffer_request (stream, request, &content, env, views,
-            active_source_set, collateral_scheduler, runtime, &operation, control,
-            refusal . as_deref ());
-        });
-      if let Err (reason) = result {
-        // A dispatched handler owns its terminal result and recovery block.
-        if !started {
-          let same_operation_reserved : bool = runtime . publication_with_mutation () . 4
-            . is_some_and (|mutation| mutation . operation_id == operation . operation_id);
-          let response : String = if same_operation_reserved {
-            // This UUID may be computing before staging its durable intent.
-            operation . tag_response (
-              &handlers::save_buffer::save_refusal_response (&reason, request), "blocked")
-          } else {
-            match operation . recorded_response () {
-              Ok (Some (response)) => response,
-              Err (error) => operation . tag_response (
-                &handlers::save_buffer::save_refusal_response (&error, request), "blocked"),
-              Ok (None) => {
-                let response : String = operation . tag_response (
-                  &handlers::save_buffer::save_refusal_response (&reason, request), "refused");
-                match operation . refuse (&response) {
-                  Ok (()) => response,
-                  Err (error) => operation . tag_response (
-                    &handlers::save_buffer::save_refusal_response (&error, request), "blocked"),
-                }
-              }
-            }
-          };
-          let _ = send_response_with_length_prefix (stream, &response);
-        }
-      }
+      handlers::save_buffer::worker::dispatch_save_request (
+        stream, request, &content, runtime, command_sender);
     }
-
     RequestType::SaveOperationStatus | RequestType::AcknowledgeSaveResult => {
       crate::runtime::save_operations::handle_save_operation_request (
         stream, request, runtime, request_type == RequestType::AcknowledgeSaveResult);

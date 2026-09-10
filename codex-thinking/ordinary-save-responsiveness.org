@@ -38,3 +38,28 @@ only the initiating view, including its exact authority and semantic save base.
 ** Remaining client prerequisite
 Check ordinary-save transient lock cleanup before enabling yield. Global cleanup
 on a refused competing save must not remove an earlier save's restrictions.
+** Worker ordering selected for implementation
+Capture only the initiating view and its authority under the interactive lock,
+then release that lock before validation, source effects, indexing and rendering.
+After successful rendering, publish the matching selected pair. Under a brief
+interactive lock, compare the initiating view's identity/base with its captured
+state, apply only its prepared update, and schedule collateral work from the
+current registry. Format the response, release the lock, and record the durable
+outcome before releasing the reservation or delivering the terminal frame.
+
+If the initiating view closed or changed its authority while work ran, retain
+the committed file outcome without replacing that live view or granting it a
+new base. Return an empty result with 'requires-fresh-view true'. Source or
+render failures after authorization retain the existing blocked recovery path.
+** Client cleanup finding
+Per-request finalizer registration was insufficient: the callback still invoked
+global save-lock cleanup. Focused reproductions in both editors showed a second
+save finalizer removing the first save's restriction and stream marker. Cleanup
+must use the unique transport request identity, since duplicate requests can
+share one durable operation UUID. Explicit connection-reset cleanup remains global.
+** View incarnation finding
+A revision/token/base comparison alone permits close-and-reopen reuse to look
+unchanged. Give each new server view entry a fresh runtime incarnation, retain
+it in the worker snapshot, and compare it before applying a prepared result.
+Validated new-empty targets receive an entry before dispatch so a concurrent
+close has a concrete identity to remove.

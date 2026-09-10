@@ -37,8 +37,11 @@ acceptance or completion. The command worker continues after a client
 disconnect; if the connection remains available, it later receives the
 terminal response, otherwise the outcome remains available through the
 durable operation record.
-Whitespace normalization and cyclic-root recomputation are currently the
-only commands using this asynchronous request lifecycle. The design details
+Ordinary saves, whitespace normalization, and cyclic-root recomputation use
+this asynchronous request lifecycle. Save locks belong to the transport request,
+so a second request cannot clear an earlier save's restrictions. A save whose
+initiating view changed or closed can commit its files while returning
+`requires-fresh-view true` without restoring that view. The design details
 are recorded in
 [`codex-thinking/command-responsiveness.org`](codex-thinking/command-responsiveness.org).
 

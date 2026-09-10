@@ -180,7 +180,7 @@ fn override_substitute_across_source_switch_anonymizes_and_keeps_original (
         ViewUri::SearchView ("ovr-sub" . to_string ());
       views_state . open_views . views . insert (
         uri . clone (),
-        ViewState { save_base: None, viewforest : tree_all . into (),
+        ViewState { incarnation: uuid::Uuid::new_v4 (), save_base: None, viewforest : tree_all . into (),
                     pids       : HashSet::new (),
                     root_ids   : HashSet::new (),
                     revision   : 0,
@@ -389,6 +389,7 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
       views_state . open_views . views . insert (
         uri . clone (),
         ViewState {
+          incarnation: uuid::Uuid::new_v4 (),
           save_base: None,
           viewforest : Tree::new (viewforest_root_viewnode ()) . into (),
           pids       : HashSet::from ([ID::from ("active-search-hit")]),

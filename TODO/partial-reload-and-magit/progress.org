@@ -2500,3 +2500,42 @@ sets and multi-incident report interface remain separate unfinished work.
 ** choices determining the future
 Transport request identity owns transient cleanup. Durable operation identity
 owns journal outcome and retry identity.
+
+* Simplify/cohere checkpoint: ordinary saves yield without holding live views
+** what's done and went well
+Ordinary saves now reserve mutation authority before worker dispatch, retain
+only the initiating view's inputs, and release the interactive lock during
+validation, source effects, indexing and rendering. The connection remains the
+sole socket writer; responses keep the original request identity. Publication
+precedes checked live view settlement, and durable outcome recording precedes
+reservation release and terminal delivery.
+
+Each server view entry has a runtime incarnation retained by snapshots. A
+close/reopen cannot masquerade as the old entry merely by reusing its revision,
+token and graph base. Validated new-empty targets receive an identity before
+dispatch, and existing targets bind the initiating client-buffer ID. A changed
+or closed target receives a committed, empty, 'requires-fresh-view' result;
+concurrent views remain registered and collateral work uses the current registry.
+
+Two actual save TCP tests cover normal completion, status and readonly query
+progress during a held save, preservation of the new query view, and closure of
+both new-empty and previously registered initiating views. The command TCP
+regressions and actual save crash-recovery test also pass. The two focused view
+incarnation/snapshot tests pass, and 'cargo check --test grouped_sources' checks
+the affected external fixtures. Logs are
+'/tmp/save-responsiveness-final-normal-and-close.log',
+'/tmp/save-worker-command-regression.log',
+'/tmp/ordinary-save-target-recovery.log' and
+'/tmp/view-incarnation-source-fixtures.log'.
+** Changes to the plan's envisioned order.
+The asynchronous save slice required request-owned client cleanup and a server
+view incarnation before it could safely expose concurrent view changes.
+** what's imperfect about what's done
+Interactive view settlement still uses the compatibility mutex; exclusive owner
+migration, other writer entry points, multi-incident client reports and the full
+final acceptance matrix remain unfinished. No production-size latency claim is
+made from these deterministic held-worker fixtures.
+** choices determining the future
+Continue from the remaining boundaries in plan 11 rather than retracing this
+slice. The implementation and rejected identity assumptions are mapped in
+[[../../codex-thinking/ordinary-save-responsiveness.org]].

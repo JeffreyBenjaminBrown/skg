@@ -1216,6 +1216,7 @@ mod tests {
       . unwrap () . remove (0);
     let kind = validate_live_descriptor (&descriptor) . unwrap ();
     let state = ViewState {
+      incarnation: uuid::Uuid::new_v4 (),
       save_base: None,
       viewforest: crate::types::tree::forest::ViewForest::new (),
       pids: Default::default (),

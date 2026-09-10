@@ -216,6 +216,17 @@ pub(crate) struct RenderedSaveViewUpdate {
   warnings        : Vec<String>,
 }
 
+impl PreparedSaveViewUpdate {
+  pub(crate) fn prepend_warnings (&mut self, mut warnings : Vec<String>) {
+    let current : &mut Vec<String> = match self {
+      Self::Confirmation (response) => &mut response . warnings,
+      Self::Rendered (rendered) => &mut rendered . warnings,
+    };
+    warnings . append (current);
+    *current = warnings;
+  }
+}
+
 /// PURPOSE:
 /// Updates the rendered views and ViewsState
 /// for each view affected by the save.

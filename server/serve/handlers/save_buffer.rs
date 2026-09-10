@@ -1,3 +1,5 @@
+pub(crate) mod worker;
+
 use crate::dbs::in_rust_graph::in_rust_graph_coherent_with_save_instructions;
 use crate::from_text::buffer_to_validated_saveplan_with_fork_sources;
 use crate::serve::handlers::save_dependencies::validate_save_dependencies;

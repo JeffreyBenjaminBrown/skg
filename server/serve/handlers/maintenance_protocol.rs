@@ -2901,6 +2901,7 @@ mod tests {
       acknowledged: false,
     };
     let state = ViewState {
+      incarnation: uuid::Uuid::new_v4 (),
       save_base: None,
       writes_admitted: true,
       viewforest: ViewForest::new (), pids: Default::default (), revision: 4,

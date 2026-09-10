@@ -9,6 +9,7 @@ use super::misc::{ID, SkgConfig};
 
 use sexp::{Atom, Sexp};
 use std::collections::{HashMap, HashSet};
+use uuid::Uuid;
 
 //
 // Type declarations
@@ -40,6 +41,7 @@ pub struct OpenViews {
 /// Direct viewforest mutation would make pids stale.
 #[derive(Clone)]
 pub struct ViewState {
+  pub incarnation : Uuid,
   /// Exact semantic and path base of the accepted text. Updating a display
   /// generation alone must not replace this older proof input.
   pub save_base : Option<ViewSaveBase>,
@@ -192,6 +194,9 @@ impl OpenViews {
       let revision = self . views . get (&uri)
         . map (|state| state . revision . saturating_add (1))
         . unwrap_or (0);
+      let incarnation : Uuid = self . views . get (&uri)
+        . map (|state| state . incarnation)
+        . unwrap_or_else (Uuid::new_v4);
       let (graph_generation, presentation_generation,
            client_application_token, client_buffer_id, kind, recipe,
            source_set, presentation_stale, search_stale, writes_admitted) =
@@ -210,6 +215,7 @@ impl OpenViews {
           1, 0, 1, None, default_kind_for_uri (&uri), None,
           "all" . into (), false, false, true));
       let state : ViewState = ViewState {
+        incarnation,
         save_base: self . views . get (&uri) . and_then (|state| state . save_base . clone ()),
         viewforest, pids, revision, root_ids: rids,
         graph_generation,
@@ -273,6 +279,7 @@ impl OpenViews {
       else { self . views . insert (
                uri . clone (),
                ViewState { viewforest : new_viewforest,
+                           incarnation: Uuid::new_v4 (),
                            save_base: None,
                            pids,
                            root_ids: rids,
@@ -490,6 +497,7 @@ pub(crate) fn root_ids_from_viewforest (
 #[cfg(test)]
 mod tests {
   use super::{OpenViews, ViewSaveBase, ViewState, ViewUri};
+  use crate::dbs::in_rust_graph::InRustGraph;
   use crate::maintenance::BufferKind;
   use crate::types::misc::SkgConfig;
   use crate::types::store_state::{
@@ -498,6 +506,7 @@ mod tests {
   use crate::types::misc::ID;
   use std::collections::{BTreeMap, HashMap, HashSet};
   use std::sync::Arc;
+  use uuid::Uuid;
 
   fn save_base () -> ViewSaveBase {
     let selected : SelectedGraphBase = SelectedGraphBase {
@@ -515,6 +524,7 @@ mod tests {
     let mut root_ids : HashSet<ID> = HashSet::new ();
     root_ids . insert (root_id);
     ViewState {
+      incarnation                : Uuid::new_v4 (),
       save_base                 : Some (save_base ()),
       viewforest                : ViewForest::new (),
       pids                      : HashSet::new (),
@@ -569,5 +579,24 @@ mod tests {
     assert! (open_views . views . contains_key (&uri));
     assert_eq! (
       open_views . content_view_uri_for_root_id (&root_id), Some (&uri));
+  }
+
+  #[test]
+  fn view_incarnation_survives_snapshot_and_changes_after_reopen () {
+    let graph : InRustGraph = InRustGraph::new ();
+    let uri : ViewUri = ViewUri::ContentView ("incarnation" . into ());
+    let mut open_views : OpenViews = OpenViews::new ();
+    open_views . register_view (
+      &graph, uri . clone (), ViewForest::new (), &[]);
+    let first : Uuid = open_views . views . get (&uri) . unwrap () . incarnation;
+    let snapshot : OpenViews = open_views . snapshot_view (&uri);
+    assert_eq! (
+      snapshot . views . get (&uri) . unwrap () . incarnation, first);
+    open_views . unregister_view (&uri);
+    open_views . register_view (&graph, uri . clone (), ViewForest::new (), &[]);
+    let reopened : &ViewState = open_views . views . get (&uri) . unwrap ();
+    assert_ne! (reopened . incarnation, first);
+    assert_eq! (reopened . revision, 0);
+    assert_eq! (reopened . graph_generation, 1);
   }
 }
