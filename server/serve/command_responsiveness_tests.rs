@@ -12,6 +12,7 @@ use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::thread::{self, JoinHandle};
+use sha2::{Digest, Sha256};
 
 #[test]
 fn tcp_durable_command_yields_for_status_query_and_duplicate_replay () {
@@ -70,6 +71,21 @@ fn tcp_durable_command_yields_for_status_query_and_duplicate_replay () {
   let duplicate_before_prepare : Sexp = terminal (&mut client);
   assert_eq! (get (&duplicate_before_prepare, "save-operation-state"),
     "blocked", "{}", duplicate_before_prepare);
+
+  // A different endpoint using the same UUID must be refused without
+  // creating a save journal entry that could poison the command in flight.
+  let save_body : String = "* (skg (node (id collision) (source main))) save\n".into ();
+  let (save_request, save_operation) = save_collision_request (
+    &operation, &runtime, &save_body);
+  client . send (&save_request, Some (&save_body));
+  let save_collision : Sexp = terminal (&mut client);
+  assert_eq! (get (&save_collision, "response-type"), "save-result",
+    "{}", save_collision);
+  assert_eq! (get (&save_collision, "save-operation-state"), "blocked",
+    "{}", save_collision);
+  assert! (save_collision . to_string () . contains ("already reserved"),
+    "{}", save_collision);
+  assert! (save_operation . status () . unwrap () . is_none ());
 
   release_sender . send (()) . unwrap ();
   holder . join () . unwrap ();
@@ -208,6 +224,30 @@ fn hold_writer (runtime : &Arc<ServerRuntime>) -> (SyncSender<()>, JoinHandle<()
 fn maintenance_status (client : &mut Client) -> Sexp {
   client . send ("((request . \"maintenance status\"))", None);
   terminal (client)
+}
+
+fn save_collision_request (
+  operation_id : &str,
+  runtime      : &Arc<ServerRuntime>,
+  body         : &str,
+) -> (String, SaveOperation) {
+  let selected : Arc<SelectedRuntimeSnapshot> = runtime . selected_snapshot ();
+  let session : &str = runtime . server_session_id ();
+  let intent : String = format! (
+    "((request . \"save buffer\") (view-uri . \"collision-view\") (client-buffer-id . \"collision-buffer\") (view-kind . \"new-empty-content-view\") (graph-generation . {}) (server-revision . 0) (client-application-token . 1) (server-session-id . \"{}\") (operation-id . \"{}\"))",
+    selected . selected . graph_generation . get (), session, operation_id);
+  let mut digest : Sha256 = Sha256::new ();
+  digest . update (intent . as_bytes ());
+  digest . update ([0]);
+  digest . update (body . as_bytes ());
+  let fingerprint : String = format! ("{:x}", digest . finalize ());
+  let request : String = format! ("{} (request-base-fingerprint . \"{}\"))",
+    &intent [..intent . len () - 1], fingerprint);
+  let active : ActiveSourceSet = runtime . interactive . lock () . unwrap ()
+    . active_source_set . clone ();
+  let operation : SaveOperation = SaveOperation::from_request (
+    &request, body, &selected . env . config, &active) . unwrap ();
+  (request, operation)
 }
 
 fn get (response : &Sexp, key : &str) -> String {

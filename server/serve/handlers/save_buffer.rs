@@ -42,6 +42,7 @@ use crate::types::save::{DefineNode, SavePlan, format_save_error_as_org};
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::{ViewUri, ViewSaveBase};
 use crate::types::store_state::SelectedStoreState;
+use crate::runtime::save_operations::SaveOperation;
 use crate::update_buffer::update_views_after_save;
 
 use futures::executor::block_on;
@@ -110,6 +111,15 @@ impl SaveResponse {
     { push_save_point_position_to_sexp_items (
         items, point_position ); }
     response . to_string () }}
+
+pub(crate) enum SaveExecution {
+  Confirmation (SaveResponse),
+  Applied {
+    viewforest     : ViewForest,
+    define_nodes   : Vec<DefineNode>,
+    parse_warnings : Vec<String>,
+  },
+}
 
 /// Execute one admitted save with its durable identity and owner reservation.
 pub(crate) fn handle_save_buffer_request (
@@ -513,8 +523,53 @@ pub(crate) async fn update_from_and_rerender_buffer_with_approvals_with_operatio
   scalar_approved_pids        : &HashSet<ID>,
   requested_authority         : Option<&RequestedSaveAuthority>,
   mut collateral_scheduler    : Option<&mut CollateralScheduler>,
-  operation : Option<&crate::runtime::save_operations::SaveOperation>,
+  operation                   : Option<&SaveOperation>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
+  let execution : SaveExecution =
+    apply_save_from_buffer_with_approvals (
+      org_buffer_text, env, diff_mode_enabled, viewuri_from_request_result,
+      views_state, active_source_set, fork_approved, fork_sources,
+      hoist_approved_pids, requested_authority, operation ) . await ?;
+  match execution {
+    SaveExecution::Confirmation (response) => Ok (response),
+    SaveExecution::Applied {
+      viewforest, define_nodes, parse_warnings } => {
+      let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "update_views_after_save" ). entered();
+      let mut response : SaveResponse =
+        update_views_after_save (
+          stream,
+          viewforest,
+          define_nodes,
+          diff_mode_enabled,
+          env,
+          viewuri_from_request_result,
+          views_state,
+          active_source_set,
+          scalar_approved_pids,
+          collateral_scheduler . as_deref_mut () ) . await ?;
+      { // Nonfatal parse warnings (e.g. discarded col headline text)
+        // precede the completion-repair warnings.
+        let mut warnings : Vec<String> = parse_warnings;
+        warnings . extend ( response . warnings );
+        response . warnings = warnings; }
+      Ok (response) }
+  }
+}
+
+pub(crate) async fn apply_save_from_buffer_with_approvals (
+  org_buffer_text             : &str,
+  env                         : &mut SkgEnv,
+  diff_mode_enabled           : bool,
+  viewuri_from_request_result : &Result<ViewUri, String>,
+  views_state                 : &ViewsState,
+  active_source_set           : Option<&ActiveSourceSet>,
+  fork_approved               : bool,
+  fork_sources                : &HashMap<ID, SourceName>,
+  hoist_approved_pids         : &HashSet<ID>,
+  requested_authority         : Option<&RequestedSaveAuthority>,
+  operation                   : Option<&SaveOperation>,
+) -> Result<SaveExecution, Box<dyn Error>> {
   let planning_selected : Arc<SelectedStoreState> = env . in_rust_graph . load_full ();
   if let Some (authority) = requested_authority {
     validate_save_authority (
@@ -597,7 +652,7 @@ pub(crate) async fn update_from_and_rerender_buffer_with_approvals_with_operatio
   }
   if hoist_needs_confirmation (
       &hoist_candidates, hoist_approved_pids ) {
-    return Ok ( SaveResponse {
+    return Ok ( SaveExecution::Confirmation ( SaveResponse {
       saved_view          : String::new (),
       errors              : Vec::new (),
       warnings            : parse_warnings,
@@ -605,14 +660,14 @@ pub(crate) async fn update_from_and_rerender_buffer_with_approvals_with_operatio
       fork_confirmation   : None,
       hoist_confirmation  : Some (hoist_candidates),
       scalar_release_confirmation : None,
-    } ); }
+    } )); }
   if ! fork_specs . is_empty () && ! fork_approved {
     // A save that found forks but was not pre-approved commits NOTHING.
     // Return a read-only fork-confirmation buffer; the client shows it,
     // and on approval re-issues the save with (fork-approved . "true").
     // (Monogamy and source validation already ran in
     // buffer_to_validated_saveplan, so every fork here is admissible.)
-    return Ok ( SaveResponse {
+    return Ok ( SaveExecution::Confirmation ( SaveResponse {
       saved_view          : build_fork_confirmation_buffer (&fork_specs),
       errors              : Vec::new (),
       warnings            : parse_warnings,
@@ -622,7 +677,7 @@ pub(crate) async fn update_from_and_rerender_buffer_with_approvals_with_operatio
                    or kill this buffer to decline.",
                   fork_specs . len () )),
       hoist_confirmation  : None,
-      scalar_release_confirmation : None, } ); }
+      scalar_release_confirmation : None, } )); }
   preflight_fs_from_saveinstructions_with_hoist_approval (
     &all_filesystem_outputs, &source_moves, &env . config,
     hoist_approved_pids, &planning_selected)?;
@@ -659,26 +714,10 @@ pub(crate) async fn update_from_and_rerender_buffer_with_approvals_with_operatio
         ) . is_ok (),
       "update_views_after_save: in-Rust graph not coherent with define_nodes" ); }
 
-  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "update_views_after_save" ). entered();
-    let mut response : SaveResponse =
-      update_views_after_save (
-        stream,
-        viewforest,
-        define_nodes,
-        diff_mode_enabled,
-        env,
-        viewuri_from_request_result,
-        views_state,
-        active_source_set,
-        scalar_approved_pids,
-        collateral_scheduler . as_deref_mut () ) . await ?;
-    { // Nonfatal parse warnings (e.g. discarded col headline text)
-      // precede the completion-repair warnings.
-      let mut warnings : Vec<String> = parse_warnings;
-      warnings . extend ( response . warnings );
-      response . warnings = warnings; }
-    Ok (response) } }
+  Ok ( SaveExecution::Applied {
+    viewforest,
+    define_nodes,
+    parse_warnings }) }
 
 /// Check if any source's HEAD is a merge commit.
 /// Returns an error message if so,

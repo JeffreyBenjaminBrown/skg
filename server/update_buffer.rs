@@ -23,7 +23,8 @@ use crate::serve::handlers::scalar_release::{
   ScalarReleaseDecision, challenge_response, decide,
 };
 use crate::serve::protocol::TcpToClient;
-use crate::serve::util::{ format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
+use crate::serve::util::{ format_lock_views_sexp, format_single_view_sexp, tag_sexp_response};
+use crate::serve::response_sink::ResponseSink;
 use crate::source_sets::{ActiveSourceSet, apply_source_set_to_viewforest};
 use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids_with_source_set;
 use crate::to_org::util::DefinitiveMap;
@@ -216,6 +217,24 @@ pub async fn update_views_after_save (
   views_state                 : &mut ViewsState,
   active_source_set           : Option<&ActiveSourceSet>,
   scalar_approved_pids        : &HashSet<ID>,
+  collateral_scheduler    : Option<&mut CollateralScheduler>,
+) -> Result<SaveResponse, Box<dyn Error>> {
+  update_views_after_save_to_sink (
+    stream, saved_view, define_nodes, diff_mode_enabled, env,
+    viewuri_from_request_result, views_state, active_source_set,
+    scalar_approved_pids, collateral_scheduler) . await
+}
+
+pub(crate) async fn update_views_after_save_to_sink (
+  sink                        : &mut dyn ResponseSink,
+  saved_view                  : ViewForest,
+  define_nodes                : Vec<DefineNode>,
+  diff_mode_enabled           : bool,
+  env                         : &SkgEnv,
+  viewuri_from_request_result : &Result<ViewUri, String>,
+  views_state                 : &mut ViewsState,
+  active_source_set           : Option<&ActiveSourceSet>,
+  scalar_approved_pids        : &HashSet<ID>,
   mut collateral_scheduler    : Option<&mut CollateralScheduler>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut context : RerenderAfterSaveContext =
@@ -322,8 +341,7 @@ pub async fn update_views_after_save (
     let still_locked : &[ViewUri] = if collateral_scheduler . is_some () {
       &[]
     } else { &collateral_uris };
-    let _ = send_response_with_length_prefix (
-      stream,
+    let _ = sink . emit (
       & tag_sexp_response (
         TcpToClient::SaveRelaxLock,
         & format_lock_views_sexp (still_locked)));
@@ -339,8 +357,7 @@ pub async fn update_views_after_save (
     for rendered in collateral_views {
       views_state . open_views . update_view (
       &context . graph_snap,         &rendered . uri, rendered . viewforest);
-      let _ = send_response_with_length_prefix (
-        stream,
+      let _ = sink . emit (
         & tag_sexp_response (
           TcpToClient::CollateralView,
           & format_single_view_sexp (
@@ -353,7 +370,7 @@ pub async fn update_views_after_save (
     let refresh = scheduler . replace_after_transition (
       Some (saved_uri), views_state, env, &define_nodes, active,
       scalar_approved_pids);
-    let _ = refresh . send (stream);
+    let _ = refresh . send_to (sink);
   }
   Ok ( SaveResponse {
     saved_view          : saved_text,

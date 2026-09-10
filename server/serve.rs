@@ -14,6 +14,7 @@ mod command_responsiveness_tests;
 mod maintenance_connection;
 pub mod parse_metadata_sexp;
 pub mod protocol;
+pub(crate) mod response_sink;
 pub mod util;
 
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
@@ -460,8 +461,10 @@ fn dispatch_request (
         }
         Ok (None) => {}
       }
+      let mut started : bool = false;
       let result = runtime . with_store_transition (
         operation . operation_id . clone (), |env, interactive, control| {
+          started = true;
           let maintenance = runtime . maintenance_snapshot ();
           let refusal = runtime . authority_failure ()
             . or_else (|| runtime . validate_session_authority (request) . err ())
@@ -473,18 +476,17 @@ fn dispatch_request (
             refusal . as_deref ());
         });
       if let Err (reason) = result {
-        // A refused reservation has no effects. An already dispatched worker
-        // records its own blocked outcome and retains its recovery obligation.
-        if matches! (operation . status (), Ok (None)) {
-          let response = operation . tag_response (
-            &crate::serve::handlers::save_buffer::save_refusal_response (&reason, request), "refused");
-          match operation . refuse (&response) {
-            Ok (( )) => { let _ = send_response_with_length_prefix (stream, &response); }
-            Err (error) => send_runtime_error (stream, &error),
-          }
+        // An admission collision must not create a journal record: another
+        // command with this UUID may still be preparing its durable intent.
+        // A dispatched handler owns its terminal result and recovery block.
+        if !started {
+          let response : String = operation . tag_response (
+            &crate::serve::handlers::save_buffer::save_refusal_response (&reason, request), "blocked");
+          let _ = send_response_with_length_prefix (stream, &response);
         }
       }
     }
+
     RequestType::SaveOperationStatus | RequestType::AcknowledgeSaveResult => {
       crate::runtime::save_operations::handle_save_operation_request (
         stream, request, runtime, request_type == RequestType::AcknowledgeSaveResult);

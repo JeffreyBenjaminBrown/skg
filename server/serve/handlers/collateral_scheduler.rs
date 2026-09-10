@@ -15,6 +15,7 @@ use crate::serve::handlers::scalar_release::{
   ScalarReleaseDecision, decide,
 };
 use crate::serve::protocol::TcpToClient;
+use crate::serve::response_sink::ResponseSink;
 use crate::serve::util::{
   send_response_with_length_prefix,
   tag_server_push_sexp_response,
@@ -140,8 +141,15 @@ impl QueuedRefresh {
   }
 
   pub fn send (&self, stream : &mut TcpStream) -> std::io::Result<()> {
+    self . send_to (stream)
+  }
+
+  pub(crate) fn send_to (
+    &self,
+    sink : &mut dyn ResponseSink,
+  ) -> std::io::Result<()> {
     if self . view_uris . is_empty () { return Ok (( )); }
-    send_response_with_length_prefix (stream,
+    sink . emit (
       &tag_server_push_sexp_response (
         TcpToClient::RefreshQueued, &self . operation_id (),
         &self . payload ()))

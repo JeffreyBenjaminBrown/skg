@@ -1,0 +1,31 @@
+* Ordinary save responsiveness
+** Boundary still to establish
+The save handler holds 'InteractiveSession' across parsing, filesystem staging,
+indexing and rendering. It also emits intermediate socket frames. Moving that
+handler unchanged to a thread would still block status and queries on the
+interactive mutex and would introduce competing socket writers.
+** Required invariants
+Reserve the selected graph mutation before dispatch. Validate the submitted
+buffer's exact authority without letting later query registration or close-view
+state be overwritten by a stale worker snapshot. Keep durable publication and
+terminal outcome ordered independently of transport delivery.
+** Immediate questions
+Identify the smallest split between immutable save planning/effects and view
+settlement. Identify the payload sink needed to retain existing frame order
+without giving a worker a socket. Avoid cloning and replacing the entire
+interactive session: concurrent buffer registrations and acknowledgements must
+survive.
+** Falsifying test
+Hold the save before its source effects. On the same connection complete status,
+a read-only query and its acknowledgement, then finish the save without losing
+the newly registered view or granting stale buffer authority.
+** Chosen first extraction
+Separate socket-free validation and store effects from view rendering, returning
+an explicit confirmation or applied-save value. Preserve the synchronous caller
+as an adapter. Separately give rendering a payload sink, preserving its TCP
+adapter and frame order. These extractions do not yet enable asynchronous saves.
+** Admission collision to close before enabling workers
+The ordinary save dispatch error path still journals a refusal when its operation
+has no staged record. A reservation collision with an in-flight command using
+the same operation UUID must not create a competing record before that command's
+preparation. Use the same no-journal collision response as durable commands.

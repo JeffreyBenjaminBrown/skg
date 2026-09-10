@@ -2405,3 +2405,34 @@ performance, client report or startup acceptance matrix is complete.
 ** choices determining the future
 Reuse detached routing and the sole socket writer for further asynchronous
 operations. Preserve durable outcome ordering independently of delivery.
+
+* Simplify/cohere checkpoint: separate ordinary save effects from transport
+** what's done and went well
+Ordinary save planning, validation and filesystem/index effects now return a
+'SaveExecution' confirmation or applied value without requiring a socket.
+Rendering accepts a tagged-payload sink; existing TCP callers remain adapters,
+and an in-memory sink can retain frames for the connection's sole writer.
+Confirmation ordering, privacy gates and warning order remain unchanged.
+
+Ordinary save admission collisions now return blocked without creating a
+journal record. A new cross-endpoint TCP regression submits a save with the
+UUID of a held recompute command, proves the save created no record, and then
+observes the original command commit and replay successfully.
+
+The 25 update-buffer regressions, six durable-command regressions, both command
+TCP tests and the actual save crash-recovery test across authorized boundaries
+pass. Logs are '/tmp/update-buffer-regressions.log',
+'/tmp/save-extraction-command-regressions.log',
+'/tmp/command-responsiveness-server-test-v7.log' and
+'/tmp/save-extraction-socket-recovery.log'.
+** Changes to the plan's envisioned order.
+The ordinary-save migration first extracts socket-free effects and payload
+capture while retaining the synchronous public adapters.
+** what's imperfect about what's done
+Ordinary saves still hold the live interactive state during execution. Rendering
+must next separate preparation from applying a checked view update; replacing
+a cloned whole session would lose concurrent registrations and acknowledgements.
+** choices determining the future
+The next boundary is recorded in
+[[../../codex-thinking/ordinary-save-responsiveness.org]]. Preserve the exact
+initiating view identity and merge only that view's checked settlement.
