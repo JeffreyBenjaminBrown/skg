@@ -15,7 +15,10 @@ use crate::maintenance::selection::{
   rebuild_archived_candidate,
   select_archived_candidate,
 };
-use crate::maintenance::coordinator::VIEW_ENROLLMENT_PENDING;
+use crate::maintenance::coordinator::{
+  MaintenanceCoordinator,
+  VIEW_ENROLLMENT_PENDING,
+};
 use crate::maintenance::pull::validate_repository_mapping;
 use crate::maintenance::view_impact::plan_incident_view_settlements;
 use crate::maintenance::{
@@ -42,7 +45,11 @@ use crate::maintenance::{
 };
 use crate::from_text::buffer_to_viewnodes::uninterpreted::
   org_to_uninterpreted_viewforest;
-use crate::runtime::ServerRuntime;
+use crate::runtime::{
+  MutationStatus,
+  SelectedRuntimeSnapshot,
+  ServerRuntime,
+};
 use crate::runtime::interactive_session::{AttachedClient, CensusDescriptor};
 use crate::serve::handlers::client_census::source_inventory_field;
 use crate::serve::handlers::scalar_release::{
@@ -1552,7 +1559,10 @@ fn append_current_state_fields (
         "owner-publication-revision" | "current-graph-generation" | "current-manifest-revision"
         | "graph-write-admission" | "graph-transition-status"
         | "rebuilding" | "pending-incidents" | "pending-query-waits"))));
-  let (revision, snapshot, coordinator, failure) = runtime . publication ();
+  let (revision, snapshot, coordinator, failure, mutation) :
+    (u64, Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator,
+     Option<String>, Option<MutationStatus>) =
+    runtime . publication_with_mutation ();
   fields . push (Sexp::List (vec![Sexp::Atom (Atom::S ("pending-query-waits" . into ())),
     Sexp::List (coordinator . query_waits . waits . values () . filter (|wait| matches! (
       wait . state, crate::maintenance::query_waits::QueryWaitState::Pending
@@ -1566,7 +1576,7 @@ fn append_current_state_fields (
     integer_field ("current-graph-generation", snapshot . selected . graph_generation . get ()),
     integer_field ("current-manifest-revision", snapshot . selected . manifest_revision . get ()),
     atom_field ("graph-write-admission", if coordinator . state . policy () . skg_saves_allowed
-      && failure . is_none () { "open" } else { "closed" }),
+      && failure . is_none () && mutation . is_none () { "open" } else { "closed" }),
     atom_field ("graph-transition-status", coordinator . state . label ()),
     atom_field ("rebuilding", if matches! (&coordinator . state,
       CoordinatorState::Active (active) if matches! (active . phase,
@@ -3128,5 +3138,24 @@ mod tests {
     assert! (Arc::ptr_eq (&save_base . selected . graph, &selected . graph));
     assert_eq! (save_base . selected . manifest, selected . manifest);
     assert_eq! (state . graph_generation, 1);
+    let before_publication : Arc<SelectedRuntimeSnapshot> =
+      runtime . selected_snapshot ();
+    let before_fields : String =
+      with_current_state_fields (&runtime, "(status ready)") . unwrap ();
+    assert! (before_fields . contains ("(graph-write-admission open)"));
+    let control = runtime . reserve_mutation (
+      "metadata-test", before_publication . selected . graph_generation,
+      before_publication . selected . manifest_revision) . unwrap ();
+    let during_publication : Arc<SelectedRuntimeSnapshot> =
+      runtime . selected_snapshot ();
+    let during_fields : String =
+      with_current_state_fields (&runtime, "(status reserved)") . unwrap ();
+    assert! (during_fields . contains ("(graph-write-admission closed)"));
+    assert! (Arc::ptr_eq (&before_publication . selected,
+      &during_publication . selected));
+    control . finish () . unwrap ();
+    let after_fields : String =
+      with_current_state_fields (&runtime, "(status finished)") . unwrap ();
+    assert! (after_fields . contains ("(graph-write-admission open)"));
   }
 }

@@ -19,8 +19,8 @@ use crate::maintenance::candidate::ObservedDiskCandidate;
 use crate::maintenance::archive::VerifiedInitialArchive;
 use crate::maintenance::observation::ObservationService;
 use crate::runtime::interactive_session::InteractiveSession;
-use crate::runtime::owner::{CoordinatorOwner, MutationStage, MutationStatus};
-pub(crate) use owner::MutationControl;
+use crate::runtime::owner::{CoordinatorOwner, MutationStage};
+pub(crate) use owner::{MutationControl, MutationStatus};
 use crate::types::env::{GraphReadSnapshot, SkgEnv};
 use crate::types::store_state::{SelectedStoreState, GraphGeneration, ManifestRevision};
 
@@ -146,6 +146,12 @@ impl ServerRuntime {
   pub fn query_lease (&self) -> Result<RuntimeQueryLease, String> {
     Ok (RuntimeQueryLease { snapshot: self . selected_snapshot () }) }
 
+  pub(crate) fn publication_with_mutation (
+    &self,
+  ) -> (u64, Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator, Option<String>, Option<MutationStatus>) {
+    self . owner . publication_with_mutation ()
+  }
+
   pub(crate) fn reserve_mutation (
     &self,
     operation_id : impl Into<String>,
@@ -200,6 +206,16 @@ impl ServerRuntime {
     let before : Arc<SelectedRuntimeSnapshot> = self . selected_snapshot ();
     let control : MutationControl = self . reserve_mutation (operation_id,
       before . selected . graph_generation, before . selected . manifest_revision)?;
+    self . with_reserved_writer_transition (before, control, function)
+  }
+
+  /// Continue a reservation acquired before dispatching asynchronous work.
+  pub(crate) fn with_reserved_writer_transition<T> (
+    &self,
+    before : Arc<SelectedRuntimeSnapshot>,
+    control : MutationControl,
+    function : impl FnOnce (&mut SkgEnv, &MutationControl) -> T,
+  ) -> Result<T, String> {
     let mut env : MutexGuard<'_, SkgEnv> = match self . writer_env . lock () {
       Ok (env) => env,
       Err (_) => {

@@ -17,7 +17,7 @@ thread_local! {
     const { RefCell::new (None) };
   /// The one foreground operation owned by this serial connection thread.
   /// Search keeps it across idle-loop snapshot/enrichment continuations.
-  static CURRENT_REQUEST_CONTEXT : RefCell<Option<RequestContext>> =
+  static CURRENT_REQUEST_CONTEXT : RefCell<Option<DetachedRequestContext>> =
     const { RefCell::new (None) };
   static LAST_SEND_FAILURE : RefCell<Option<String>> =
     const { RefCell::new (None) };
@@ -29,9 +29,10 @@ pub(crate) fn set_connection_server_session (session : &str) {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct RequestContext {
-  request_id  : String,
-  incident_id : Option<String>, }
+pub(crate) struct DetachedRequestContext {
+  request_id        : String,
+  incident_id       : Option<String>,
+  server_session_id : Option<String>, }
 
 pub fn begin_request_context (request : &str) -> Result<String, String> {
   let sexp = sexp::parse (request)
@@ -40,6 +41,8 @@ pub fn begin_request_context (request : &str) -> Result<String, String> {
     .map_err ( |_| "Request envelope has no request-id" . to_string ())?;
   let incident_id = extract_v_from_kv_pair_in_sexp (&sexp, "incident-id")
     . ok ();
+  let server_session_id : Option<String> = CONNECTION_SERVER_SESSION . with (
+    |slot| slot . borrow () . clone ());
   CURRENT_REQUEST_CONTEXT . with ( |slot| {
     let mut current = slot . borrow_mut ();
     match current . as_ref () {
@@ -49,9 +52,22 @@ pub fn begin_request_context (request : &str) -> Result<String, String> {
       Some (active) if active . incident_id != incident_id => Err (format! (
         "Continuation {} changed incident identity", request_id)),
       _ => {
-        *current = Some (RequestContext {
-          request_id: request_id . clone (), incident_id });
+        *current = Some (DetachedRequestContext {
+          request_id: request_id . clone (), incident_id, server_session_id });
         Ok (request_id) }}})
+}
+
+pub(crate) fn take_request_context () -> Option<DetachedRequestContext> {
+  CURRENT_REQUEST_CONTEXT . with (|slot| slot . borrow_mut () . take ())
+}
+
+impl DetachedRequestContext {
+  pub(crate) fn decorate_response (&self, response : &str) -> String {
+    let response : String = self . server_session_id . as_deref ()
+      . map (|session| add_server_session_to_response (response, session))
+      . unwrap_or_else (|| response . to_string ());
+    decorate_response_fields (&response, self)
+  }
 }
 
 fn clear_request_context () {
@@ -186,6 +202,13 @@ fn envelope_response (response : &str) -> String {
   let Some (context) = CURRENT_REQUEST_CONTEXT . with (
     |slot| slot . borrow () . clone ())
   else { return response; };
+  context . decorate_response (&response)
+}
+
+fn decorate_response_fields (
+  response : &str,
+  context : &DetachedRequestContext,
+) -> String {
   let Ok (Sexp::List (mut fields)) = sexp::parse (&response)
   else { return response . to_string (); };
   if field_atom (&fields, "server-push") . as_deref () == Some ("true") {
@@ -244,7 +267,7 @@ fn inferred_terminal_status (response_type : &str) -> Option<&'static str> {
     "save-lock" | "save-relax-lock" | "collateral-view"
     | "search-results" | "request-snapshot"
     | "rerender-lock"
-    | "git-diff-mode" | "active-source-set" => None,
+    | "git-diff-mode" | "active-source-set" | "request-yield" => None,
     "fork-confirmation" | "telescope-hoist-confirmation"
     | "ugly-telescope-confirmation" => Some ("needs-authorization"),
     "error" => Some ("failed"),
@@ -475,6 +498,49 @@ fn format_string_list_sexp (
       values . iter ()
         . map ( |value| Sexp::Atom ( Atom::S ( value . clone () )) )
         . collect () ) ] ) }
+
+#[cfg(test)]
+mod detached_request_context_tests {
+  use super::*;
+
+  #[test]
+  fn detached_context_clears_foreground_and_preserves_original_session () {
+    clear_request_context ();
+    set_connection_server_session ("session-original");
+    begin_request_context (
+      "((request . \"long command\") (request-id . \"request-42\") \
+        (incident-id . \"incident-7\"))") . unwrap ();
+    let detached : DetachedRequestContext = take_request_context ()
+      . expect ("request context should detach");
+    assert! (! request_context_active ());
+    assert! (take_request_context () . is_none ());
+
+    set_connection_server_session ("session-new");
+    let decorated : String = detached . decorate_response (
+      "((response-type command-result) (content \"done\"))");
+    assert! (decorated . contains ("(request-id request-42)"));
+    assert! (decorated . contains ("(incident-id incident-7)"));
+    assert! (decorated . contains ("(server-session-id session-original)"));
+    assert! (! decorated . contains ("session-new"));
+    assert! (decorated . contains ("(terminal-status complete)"));
+  }
+
+  #[test]
+  fn request_yield_keeps_foreground_context_until_explicit_detach () {
+    clear_request_context ();
+    set_connection_server_session ("session-yield");
+    begin_request_context (
+      "((request . \"long command\") (request-id . \"request-yield-1\"))")
+      . unwrap ();
+    let yielded : String = envelope_response (
+      "((response-type request-yield) (frame-kind request-yield))");
+    assert! (yielded . contains ("(request-id request-yield-1)"));
+    assert! (! yielded . contains ("(terminal-status"));
+    assert! (request_context_active ());
+    let detached : Option<DetachedRequestContext> = take_request_context ();
+    assert! (detached . is_some ());
+  }
+}
 
 
 /// Reads length-prefixed content from the stream.

@@ -214,13 +214,26 @@ impl CoordinatorOwner {
   pub(crate) fn publication (
     &self,
   ) -> (u64, Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator, Option<String>) {
+    let (revision, selected, coordinator, failure, _mutation) :
+      (u64, Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator,
+       Option<String>, Option<MutationStatus>) =
+      self . publication_with_mutation ();
+    (revision, selected, coordinator, failure)
+  }
+
+  pub(crate) fn publication_with_mutation (
+    &self,
+  ) -> (u64, Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator,
+        Option<String>, Option<MutationStatus>) {
     let published : Arc<PublishedCoordinator> = self . published . load_full ();
     let failure : Option<String> = published . failure . clone () . or_else (||
       published . reservation . as_ref ()
         . and_then (|reservation| reservation . status . blocked_reason . clone ()));
+    let mutation : Option<MutationStatus> = published . reservation . as_ref ()
+      . map (|reservation| reservation . status . clone ());
     (published . publication_revision,
       published . selected . clone () . expect ("live owner has a selected pair"),
-      published . coordinator . clone (), failure)
+      published . coordinator . clone (), failure, mutation)
   }
 
   pub(crate) fn failure (&self) -> Option<String> {
@@ -886,6 +899,33 @@ mod tests {
     assert! (blocked . 0 > selected . 0);
     assert_eq! (blocked . 3 . as_deref (), Some ("unresolved delivery"));
     assert! (Arc::ptr_eq (&blocked . 1, &selected . 1));
+  }
+
+  #[test]
+  fn publication_with_mutation_closes_admission_until_finish () {
+    let before : Arc<SelectedRuntimeSnapshot> = fixture_snapshot ();
+    let owner : CoordinatorOwner = fixture_owner (before . clone ());
+    let initial :
+      (u64, Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator,
+       Option<String>, Option<MutationStatus>) =
+      owner . publication_with_mutation ();
+    assert! (initial . 4 . is_none ());
+    let token : ReservationToken = reserve_current (&owner, "save") . unwrap ();
+    let reserved :
+      (u64, Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator,
+       Option<String>, Option<MutationStatus>) =
+      owner . publication_with_mutation ();
+    assert! (reserved . 0 > initial . 0);
+    assert! (reserved . 4 . is_some ());
+    assert! (Arc::ptr_eq (&reserved . 1 . selected, &initial . 1 . selected));
+    owner . finish_mutation (&token) . unwrap ();
+    let finished :
+      (u64, Arc<SelectedRuntimeSnapshot>, MaintenanceCoordinator,
+       Option<String>, Option<MutationStatus>) =
+      owner . publication_with_mutation ();
+    assert! (finished . 0 > reserved . 0);
+    assert! (finished . 4 . is_none ());
+    assert! (Arc::ptr_eq (&finished . 1 . selected, &reserved . 1 . selected));
   }
 
   #[test]

@@ -2318,3 +2318,26 @@ The connection thread still executes the command synchronously. Same-connection
 status and read responsiveness needs request scheduling and client queue work,
 with original request identities retained through terminal delivery. Continue
 from [[file:../../codex-thinking/owner-responsiveness.org][the responsiveness boundary note]]. No question for Jeff.
+
+* Simplify/cohere checkpoint: asynchronous command support boundaries
+** what's done and went well
+Owner publication can now return mutation status together with its revision,
+selected pair, coordinator and failure from one atomic snapshot. Current-state
+metadata closes graph-write admission while a reservation exists. A reserved
+writer transition can continue a reservation acquired before worker dispatch.
+Transport contexts can detach from the foreground and decorate an eventual
+response with its original request, incident and issuing session. 'request-yield'
+is explicitly nonterminal.
+
+The focused owner publication and maintenance metadata tests passed, as did all
+13 transport utility tests. 'cargo check --lib --jobs 2' passed. The transport
+log is '/tmp/serve-util-context.log'.
+** Changes to the plan's envisioned order.
+These support boundaries precede the connection-loop migration so they remain
+small, reviewable commits.
+** what's imperfect about what's done
+Production asynchronous command dispatch and client yield handling are still
+being integrated and tested in the next commit.
+** choices determining the future
+Workers return completed responses through the connection thread. They never
+write the socket or borrow another request's foreground context.
