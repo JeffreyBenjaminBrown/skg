@@ -39,10 +39,8 @@
      (lambda (_tcp payload)
        ;; The confirmation replaces the result response for this request.
        ;; Balance its one-shot registration before the empty-stream retry.
-       (when (assoc 'delete-references-result skg-response-handler-map)
-         (setq skg-response-handler-map
-               (assoc-delete-all 'delete-references-result skg-response-handler-map)
-               skg-lp--pending-count (max 0 (1- skg-lp--pending-count))))
+       (skg--delete-absent-remove-unfired-handlers
+        '(delete-references-result error))
        (let* ((response (read payload))
               (content (format "%s" (cadr (assoc 'content response))))
               (approval (format "%s" (cadr (assoc 'approved-preview response))))
@@ -62,8 +60,20 @@
      (lambda (_tcp payload)
        (let* ((response (read payload))
               (content (format "%s" (cadr (assoc 'content response)))))
+         (skg--delete-absent-remove-unfired-handlers '(error))
          (skg-big-nonfatal-message "*skg absent-reference cleanup*"
                                    "Absent-reference cleanup complete" content)))
+    t)
+    (skg-register-response-handler
+     'error
+     (lambda (_tcp payload)
+       (let* ((response (read payload))
+              (content (format "%s" (cadr (assoc 'content response)))))
+         ;; The dispatcher removes `error' itself.  Remove only its mutually
+         ;; exclusive terminal handlers, balancing their pending counts.
+         (skg--delete-absent-remove-unfired-handlers
+          '(delete-references-confirmation delete-references-result))
+         (message "skg absent-reference cleanup: %s" content)))
      t)
     (skg-lp-reset)
     (process-send-string
@@ -74,6 +84,14 @@
                       (when approved-preview
                         `((approved-preview . ,approved-preview)))))
              "\n"))))
+
+(defun skg--delete-absent-remove-unfired-handlers (types)
+  "Remove unfired one-shot response TYPES and balance their pending count."
+  (dolist (type types)
+    (when (assoc type skg-response-handler-map)
+      (setq skg-response-handler-map
+            (assoc-delete-all type skg-response-handler-map)
+            skg-lp--pending-count (max 0 (1- skg-lp--pending-count))))))
 
 (defun skg--delete-absent-wrap-rerender-done ()
   "Run a pending cleanup retry after rerender's empty-stream cleanup.

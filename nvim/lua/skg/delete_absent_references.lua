@@ -8,6 +8,15 @@ local state = require('skg.state')
 
 local M = {}
 
+local function remove_unfired (types)
+  for _, response_type in ipairs(types) do
+    if state.response_handler_map[response_type] then
+      state.response_handler_map[response_type] = nil
+      state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
+    end
+  end
+end
+
 local function unknown_id_at_point ()
   local split = metadata.split_as_stars_metadata_title(metadata.get_current_headline_text())
   if not split or split.metadata == '' then return nil end
@@ -35,9 +44,7 @@ local function send (id, approved_preview)
   rerender.register_rerender_stream_handlers()
   state.register_response_handler('delete-references-confirmation',
     function (_text, response)
-      if state.response_handler_map['delete-references-result'] then
-        state.response_handler_map['delete-references-result'] = nil
-        state.lp_pending_count = math.max(0, state.lp_pending_count - 1) end
+      remove_unfired({ 'delete-references-result', 'error' })
       local content = payload.field_text(response, 'content') or ''
       local approval = payload.field_text(response, 'approved-preview') or ''
       local buf = vim.api.nvim_create_buf(false, true)
@@ -51,8 +58,19 @@ local function send (id, approved_preview)
     end, true)
   state.register_response_handler('delete-references-result',
     function (_text, response)
+      remove_unfired({ 'error' })
       vim.notify(payload.field_text(response, 'content') or
                  'Absent-reference cleanup complete')
+    end, true)
+  state.register_response_handler('error',
+    function (_text, response)
+      -- The dispatcher removes `error' itself.  Remove only terminal
+      -- alternatives that can no longer arrive.
+      remove_unfired({ 'delete-references-confirmation',
+                       'delete-references-result' })
+      vim.notify('skg absent-reference cleanup: ' ..
+                 (payload.field_text(response, 'content') or 'server error'),
+                 vim.log.levels.ERROR)
     end, true)
   state.lp_reset()
   local request = { sexpr.pair(sexpr.symbol('request'), 'delete references to absent node'),
