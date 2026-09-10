@@ -233,9 +233,9 @@
          (epoch (plist-get state :epoch))
          (tcp-proc (skg-tcp-connect-to-rust)))
     (setf (plist-get state :phase) 'origin-operation-start-pending)
-    (skg-register-response-handler
+    (skg--maintenance-register-response-handler
      'maintenance-status #'skg--pull-handle-authorization t)
-    (skg-set-request-failure-handler
+    (skg--maintenance-set-request-failure-handler
      (lambda (reason)
        (when skg--maintenance-client-incident
          (setf (plist-get skg--maintenance-client-incident :phase)
@@ -284,7 +284,9 @@
   (let ((context (skg--pull-context)))
     (unless (plist-get context :advance-timer)
       (setf (plist-get context :advance-timer)
-            (run-at-time 0 nil #'skg--pull-run-scheduled-next)))))
+            (skg--maintenance-defer
+             (plist-get skg--maintenance-client-incident :incident-id)
+             #'skg--pull-run-scheduled-next)))))
 
 (defun skg--pull-start-next ()
   "Start the next repository process, or report the complete chain."
@@ -311,7 +313,12 @@
                     :coding 'utf-8-unix
                     :noquery nil
                     :filter #'skg--pull-process-filter
-                    :sentinel #'skg--pull-process-sentinel)))
+                    :sentinel
+                    (let ((incident-id
+                           (plist-get skg--maintenance-client-incident :incident-id)))
+                      (lambda (process event)
+                        (skg--maintenance-call-in-incident
+                         incident-id #'skg--pull-process-sentinel process event))))))
               (process-put process 'skg-pull-root root)
               (process-put process 'skg-pull-key key)
               (setf (plist-get context :current-process) process)
@@ -328,6 +335,7 @@
 (defun skg--pull-process-sentinel (process event)
   "Advance the serial pull chain after PROCESS reaches a terminal EVENT."
   (when (and (memq (process-status process) '(exit signal failed))
+             (eq process (plist-get (skg--pull-context) :current-process))
              (not (process-get process 'skg-pull-finalized)))
     (process-put process 'skg-pull-finalized t)
     (let* ((context (skg--pull-context))
@@ -360,9 +368,9 @@
          (incident (plist-get state :incident-id))
          (epoch (plist-get state :epoch))
          (tcp-proc (skg-tcp-connect-to-rust)))
-    (skg-register-response-handler
+    (skg--maintenance-register-response-handler
      'maintenance-status #'skg--pull-handle-finish t)
-    (skg-set-request-failure-handler
+    (skg--maintenance-set-request-failure-handler
      (lambda (reason)
        (when skg--maintenance-client-incident
          (setf (plist-get skg--maintenance-client-incident :phase)
@@ -421,11 +429,14 @@
     (cond
      ((skg--pull-process-live-p process) t)
      (record
-      (run-at-time 0 nil #'skg--pull-send-finish record))
+      (skg--maintenance-defer
+       (plist-get skg--maintenance-client-incident :incident-id)
+       #'skg--pull-send-finish record))
      ((plist-get context :advance-timer) t)
      (t
-      (run-at-time
-       0 nil #'skg--pull-finish-origin "indeterminate"
+      (skg--maintenance-defer
+       (plist-get skg--maintenance-client-incident :incident-id)
+       #'skg--pull-finish-origin "indeterminate"
        (list lost-child-reason))))))
 
 (defun skg--pull-response-repositories (response)
@@ -495,14 +506,18 @@
   (skg--pull-install-server-result response)
   (pcase phase
     ("archive-ready"
-     (run-at-time 0 nil #'skg--pull-resume-archive-ready))
+     (skg--maintenance-defer
+      (plist-get skg--maintenance-client-incident :incident-id)
+      #'skg--pull-resume-archive-ready))
     ("running-external-mutation"
      (skg--pull-resume-running
       "server awaited pull completion but no owned Git child survived"))
     ("final-observation"
      (when-let ((record
                  (plist-get (skg--pull-context) :external-result)))
-       (run-at-time 0 nil #'skg--pull-send-finish record)))
+       (skg--maintenance-defer
+        (plist-get skg--maintenance-client-incident :incident-id)
+        #'skg--pull-send-finish record)))
     (_ (cl-return-from skg--pull-origin-handler nil)))
   t)
 

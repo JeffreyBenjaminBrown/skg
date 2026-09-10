@@ -2780,3 +2780,23 @@ The final entry-point and process acceptance audits remain unfinished.
 ** choices determining the future
 A retained report is not a mutation reservation. Keep local command preflight
 aligned with current graph admission and let the server enforce the transaction.
+
+* Simplify/cohere checkpoint: Emacs pull continuations retain their incident
+** what's done and went well
+Pull authorization/completion handlers, failure handlers, origin replay timers and
+process-chain continuations now use incident-scoped maintenance callbacks. The
+installed process sentinel captures its incident ID and checks that the exiting
+process is still that incident's owned child before advancing its chain.
+
+All 18 focused Emacs pull tests pass in '/tmp/pull-scoping-emacs-final.log'. The
+new regressions execute a registered completion/failure callback and the actual
+installed sentinel, then its queued completion, with B current throughout.
+** Changes to the plan's envisioned order.
+Reuse the tested maintenance continuation adapter for the external origin after
+removing report-dependent command guards.
+** what's imperfect about what's done
+Neovim pull callback migration and final cross-editor lifecycle acceptance remain.
+** choices determining the future
+An older owned child can still finish useful work. Bind it to its original record
+and retain its own process checks instead of discarding it because the foreground
+incident changed.
