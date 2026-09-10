@@ -1,4 +1,5 @@
 pub mod close_view;
+pub mod delete_references_to_absent_node;
 pub mod diff_analysis;
 pub mod edge_source_info;
 pub mod export_to_org;

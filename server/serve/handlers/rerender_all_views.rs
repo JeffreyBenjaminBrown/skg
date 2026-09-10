@@ -72,8 +72,23 @@ pub fn stream_rerender_views (
   stream_prepared_rerenders (stream, views_state, prepared);
 }
 
+/// The absent-reference command only removes edges to an ID freshly proven to
+/// have no node.  It cannot introduce title/body text into any view, so this
+/// narrowly scoped post-commit rerender bypasses the text-release challenge.
+pub fn stream_rerender_views_after_absent_reference_cleanup (
+  stream     : &mut TcpStream,
+  env        : &SkgEnv,
+  views_state : &mut ViewsState,
+  active_source_set : &ActiveSourceSet,
+) {
+  let prepared = prepare_rerender_views (
+    env, views_state, views_state . diff_mode_enabled,
+    Some (active_source_set), None, false );
+  stream_prepared_rerenders (stream, views_state, prepared);
+}
+
 /// Complete every rerender in memory. Nothing is sent and no registered
-/// view is changed, so the scalar-release decision can precede the lock and
+/// view is changed, so the text-release decision can precede the lock and
 /// the first externally visible mutation.
 pub(crate) fn prepare_rerender_views (
   env                 : &SkgEnv,

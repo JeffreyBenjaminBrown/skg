@@ -1,6 +1,7 @@
 pub mod telescope;
 pub mod consts;
 pub mod context;
+pub mod delete_references_to_absent_node;
 pub mod dbs;
 pub mod diff_analysis;
 pub mod export_org;

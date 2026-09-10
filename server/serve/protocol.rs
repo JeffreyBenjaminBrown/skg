@@ -26,6 +26,7 @@ pub enum RequestType {
   ActiveSourceSet,
   SetActiveSourceSet,
   ExportToOrg,
+  DeleteReferencesToAbsentNode,
 }
 
 impl RequestType {
@@ -54,6 +55,7 @@ impl RequestType {
       "active source set"        => Ok (RequestType::ActiveSourceSet),
       "set active source set"    => Ok (RequestType::SetActiveSourceSet),
       "export to org"            => Ok (RequestType::ExportToOrg),
+      "delete references to absent node" => Ok (RequestType::DeleteReferencesToAbsentNode),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
 /// IN DETAIL: See api-and-formats.md
@@ -93,6 +95,8 @@ pub enum TcpToClient {
   SourceSets,
   ActiveSourceSet,
   ExportToOrg,
+  DeleteReferencesConfirmation,
+  DeleteReferencesResult,
   Error,
 }
 
@@ -132,4 +136,6 @@ impl TcpToClient {
       TcpToClient::SourceSets       => "source-sets",
       TcpToClient::ActiveSourceSet  => "active-source-set",
       TcpToClient::ExportToOrg      => "export-to-org",
+      TcpToClient::DeleteReferencesConfirmation => "delete-references-confirmation",
+      TcpToClient::DeleteReferencesResult => "delete-references-result",
       TcpToClient::Error            => "error", }} }

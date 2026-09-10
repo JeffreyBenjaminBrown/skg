@@ -468,7 +468,7 @@ pub(crate) fn apply_delete_propagation_cleanup (
 /// Project a NodeRust back into a NodeComplete verbatim. Stripping
 /// of deleted ids happens later, in 'apply_delete_propagation_cleanup'
 /// phase 2, and applies uniformly to all Saves.
-fn nodecomplete_from_noderust (
+pub(crate) fn nodecomplete_from_noderust (
   rust : &NodeRust,
 ) -> NodeComplete {
   NodeComplete {

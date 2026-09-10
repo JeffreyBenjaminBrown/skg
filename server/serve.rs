@@ -16,6 +16,7 @@ use crate::dbs::typedb::util::delete_database;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
+use crate::serve::handlers::delete_references_to_absent_node::handle_delete_references_to_absent_node_request;
 use crate::serve::handlers::diff_analysis::handle_diff_analysis_request_with_source_set;
 use crate::serve::handlers::edge_source_info::handle_edge_source_info_request;
 use crate::serve::handlers::export_to_org::handle_export_to_org_request;
@@ -156,6 +157,10 @@ fn handle_emacs (
               &mut stream,
               &request_header,
               &mut views_state ),
+          Ok (RequestType::DeleteReferencesToAbsentNode) =>
+            handle_delete_references_to_absent_node_request (
+              &mut stream, &request_header, &mut env, &mut views_state,
+              &active_source_set ),
           Ok (RequestType::SnapshotResponse) => {
             snapshot_requested = false;
             handle_snapshot_response (
