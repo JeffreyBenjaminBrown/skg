@@ -623,6 +623,10 @@ describe('skg Neovim maintenance handshake', function ()
       assert.has_error(function () handler('', {
         f('status', 'active'), f('active-incident-id', 'incident-b'),
       }) end)
+      b.phase = 'terminal-received'
+      handler('', { f('status', 'idle') })
+      assert.are.equal(b, state.maintenance_client_incident)
+      assert.is_nil(state.lookup_maintenance_incident('incident-a'))
       handler('', { f('status', 'active'), f('active-incident-id', 'incident-a') })
       assert.are.equal(b, state.maintenance_client_incident)
       assert.are.equal('resumed', state.lookup_maintenance_incident('incident-a').phase)

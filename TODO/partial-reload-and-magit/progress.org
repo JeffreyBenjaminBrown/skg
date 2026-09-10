@@ -2800,3 +2800,17 @@ Neovim pull callback migration and final cross-editor lifecycle acceptance remai
 An older owned child can still finish useful work. Bind it to its original record
 and retain its own process checks instead of discarding it because the foreground
 incident changed.
+
+* Simplify/cohere checkpoint: explicit status identity survives empty replies
+** what's done and went well
+Neovim retains the selected incident ID as callback scope even when an idle status
+reply omits incident fields. Querying unknown A cannot clear terminal-received B.
+The strengthened status regression and all 46 maintenance tests pass in
+'/tmp/incident-status-empty-reply-nvim.log'.
+** Changes to the plan's envisioned order.
+Close this bounded status-review edge while Rust checkpoint tests run.
+** what's imperfect about what's done
+No additional behavior limitation was identified in this fix.
+** choices determining the future
+The initiating request's explicit identity remains authoritative when operation
+payload fields are absent; it cannot fall back to another foreground record.

@@ -1259,8 +1259,8 @@ local function response_incident_id (response)
     or payload.field_text(response, 'active-incident-id')
 end
 
-local function with_response_incident (response, callback)
-  local incident_id = response_incident_id(response)
+local function with_response_incident (response, callback, selected_id)
+  local incident_id = selected_id or response_incident_id(response)
   if not incident_id then return callback() end
   local target = state.lookup_maintenance_incident(incident_id)
   if target then
@@ -1310,7 +1310,7 @@ function M.handle_status (payload_text, response, selected_id)
     end
   end
   return with_response_incident(response, function ()
-    return handle_status_current(payload_text, response) end)
+    return handle_status_current(payload_text, response) end, selected_id)
 end
 
 local function approve_undo_waiver (incident, buffer_key, reason)
