@@ -156,7 +156,8 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
                                     save-authority operation-id
                                     request-base-fingerprint))
                                   "\n"))
-           pending-record)
+           pending-record
+           request-owner)
       (progn ;; Rust needs these markers, but the user doesn't.
         (skg-remove-focused-marker)
         (skg-remove-folded-markers))
@@ -183,8 +184,13 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
              :content buffer-contents
              :buffer-id (skg--buffer-record-id save-authority)))
 
-      (skg--begin-stream "save")
-      (skg--register-stream-request-cleanup "save")
+      ;; Cleanup belongs to this transport request record, not the durable
+      ;; operation UUID.  A redelivered duplicate may reuse the latter while
+      ;; the original request still owns the client locks.
+      (setq request-owner
+            (skg--request-record-id (skg--ensure-request-draft)))
+      (skg--begin-stream "save" request-owner)
+      (skg--register-stream-request-cleanup "save" request-owner)
       (skg-set-request-failure-handler
        (lambda (reason)
          (condition-case err
@@ -199,13 +205,13 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
       ;; Lock ALL skg content-view buffers immediately, before sending.
       ;; This eliminates the race window between the send and the
       ;; server's early response.
-      (skg--lock-all-skg-buffers)
+      (skg--lock-all-skg-buffers request-owner)
 
       ;; Register handlers in this request's dispatch record.
       (skg-register-response-handler
        'save-lock
        (lambda (_tcp-proc payload)
-         (skg--save-lock-handler saved-uri payload))
+         (skg--save-lock-handler saved-uri payload request-owner))
        t)
       ;; save-relax-lock: same shape/handling as save-lock, but with the
       ;; EXACT collateral view set (post-SavePlan), so buffers locked early that
@@ -219,19 +225,19 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
       (skg-register-response-handler
        'save-relax-lock
        (lambda (_tcp-proc payload)
-         (skg--save-lock-handler saved-uri payload))
+         (skg--save-lock-handler saved-uri payload request-owner))
        nil)
       (skg-register-response-handler
        'collateral-view
        (lambda (_tcp-proc payload)
-         (skg--collateral-view-handler payload))
+         (skg--collateral-view-handler payload request-owner))
        nil) ;; non-one-shot: fires for each streamed collateral view
       (skg-register-response-handler
        'save-result
        (lambda (response-proc payload)
          (when (eq (skg--persist-save-response pending-record payload)
                    'committed)
-           (skg--save-result-handler save-buffer payload)
+           (skg--save-result-handler save-buffer payload request-owner)
            (skg--schedule-save-result-acknowledgement
             response-proc pending-record)))
        t)
@@ -246,7 +252,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
        (lambda (_tcp-proc payload)
          (when (eq (skg--persist-save-response pending-record payload)
                    'refused)
-           (skg--fork-confirmation-handler save-buffer payload)))
+           (skg--fork-confirmation-handler save-buffer payload request-owner)))
        nil)
       ;; The other alternative terminal. It carries no scalar text; after
       ;; approval, retry this same save with the exact listed PIDs.
@@ -257,7 +263,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
                    'refused)
            (skg--telescope-hoist-confirmation-handler
             save-buffer payload fork-approved fork-sources
-            scalar-approved-pids)))
+            scalar-approved-pids request-owner)))
        nil)
       (skg-register-response-handler
        'ugly-telescope-confirmation
@@ -266,7 +272,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
            ('committed
             (skg--save-scalar-release-confirmation-handler
              save-buffer payload fork-approved fork-sources
-             hoist-approved-pids)
+             hoist-approved-pids request-owner)
             (skg--schedule-save-result-acknowledgement
              response-proc pending-record))))
        nil)
@@ -482,33 +488,35 @@ field (fork-sources ((N . SOURCE) ...))."
          (material (skg-pending-save-retry-material record))
          (operation-id (skg-pending-save--field record 'operation-id))
          (tcp-proc (skg-tcp-connect-to-rust)))
-    (skg--begin-stream "pending-save retry")
-    (skg--register-stream-request-cleanup "pending-save retry")
-    (skg-set-request-failure-handler
-     (lambda (reason)
-       (skg-pending-save-mark-uncertain record)
-       (message "Save retry interrupted: %s; operation %s retained"
-                reason operation-id)))
-    (skg-register-response-handler 'save-lock (lambda (&rest _) nil) t)
-    (dolist (frame-kind
-             '(save-relax-lock collateral-view fork-confirmation
-               telescope-hoist-confirmation ugly-telescope-confirmation
-               error))
+    (let ((request-owner
+           (skg--request-record-id (skg--ensure-request-draft))))
+      (skg--begin-stream "pending-save retry" request-owner)
+      (skg--register-stream-request-cleanup "pending-save retry" request-owner)
+      (skg-set-request-failure-handler
+       (lambda (reason)
+         (skg-pending-save-mark-uncertain record)
+         (message "Save retry interrupted: %s; operation %s retained"
+                  reason operation-id)))
+      (skg-register-response-handler 'save-lock (lambda (&rest _) nil) t)
+      (dolist (frame-kind
+               '(save-relax-lock collateral-view fork-confirmation
+                 telescope-hoist-confirmation ugly-telescope-confirmation
+                 error))
+        (skg-register-response-handler
+         frame-kind
+         (lambda (_proc payload)
+           (skg--persist-save-response record payload)
+           (message "Save operation %s returned; inspect the retained outcome"
+                    operation-id))
+         nil))
       (skg-register-response-handler
-       frame-kind
+       'save-result
        (lambda (_proc payload)
          (skg--persist-save-response record payload)
          (message "Save operation %s returned; inspect the retained outcome"
                   operation-id))
-       nil))
-    (skg-register-response-handler
-     'save-result
-     (lambda (_proc payload)
-       (skg--persist-save-response record payload)
-       (message "Save operation %s returned; inspect the retained outcome"
-                operation-id))
-     t)
-    (skg-submit-request tcp-proc (car material) (cadr material))))
+       t)
+      (skg-submit-request tcp-proc (car material) (cadr material)))))
 
 (defun skg--current-save-point-position ()
   "WHAT IT DOES: Return point position data that should survive the save redraw:
@@ -543,7 +551,7 @@ before the add/remove cycle."
     (when (looking-at "\\(\\*+ \\)(skg) ")
       (replace-match "\\1"))))
 
-(defun skg--save-lock-handler (saved-uri payload)
+(defun skg--save-lock-handler (saved-uri payload &optional owner)
   "Handle the save-lock LP message (tagged with response-type).
 Unlocks non-collateral buffers."
   (condition-case err
@@ -552,15 +560,16 @@ Unlocks non-collateral buffers."
         (when lock-entry
           (let ((collateral-uris (cadr lock-entry)))
             (skg--unlock-non-collateral-buffers
-             saved-uri collateral-uris))))
+             saved-uri collateral-uris owner))))
     (error
      ;; Keep the saved buffer locked until save-result (unlocking everything
      ;; here would let the user edit it during the rest of the pipeline, and the
      ;; subsequent erase+insert would silently drop those edits); free the rest.
-     (skg--unlock-non-collateral-buffers saved-uri nil)
+     (skg--unlock-non-collateral-buffers saved-uri nil owner)
      (skg-log 'error 'save "save-lock handler error: %S" err)) ))
 
-(defun skg--apply-streamed-view-update (payload log-category handler-name)
+(defun skg--apply-streamed-view-update (payload log-category handler-name
+                                               &optional owner)
   "Apply one streamed view update from PAYLOAD: unlock and replace the buffer for
 its view URI.  Retained only for the legacy in-request save stream;
 LOG-CATEGORY and HANDLER-NAME label any error."
@@ -574,7 +583,7 @@ LOG-CATEGORY and HANDLER-NAME label any error."
             (let ((session
                    (skg-require-current-server-session
                     response skg--buffer-record)))
-              (skg--unlock-after-save)
+              (skg--unlock-after-save owner)
               (if (buffer-modified-p)
                   (progn
                     (skg-mark-disk-client-conflict
@@ -589,12 +598,12 @@ LOG-CATEGORY and HANDLER-NAME label any error."
     (error (skg-log 'error log-category
                     "%s handler error: %S" handler-name err))))
 
-(defun skg--collateral-view-handler (payload)
+(defun skg--collateral-view-handler (payload &optional owner)
   "Handle one streamed collateral-view update.
 Unlocks and updates the buffer for the given view URI."
-  (skg--apply-streamed-view-update payload 'save "collateral-view"))
+  (skg--apply-streamed-view-update payload 'save "collateral-view" owner))
 
-(defun skg--save-result-handler (save-buffer payload)
+(defun skg--save-result-handler (save-buffer payload &optional owner)
   "Handle the full save-result LP message (tagged with response-type).
 Removes the collateral-view handler, unlocks all save-locked buffers,
 then processes the save response.
@@ -605,13 +614,13 @@ which would trigger overlay modification-hooks if still present."
            '(collateral-view save-relax-lock fork-confirmation
              telescope-hoist-confirmation ugly-telescope-confirmation))
     (skg-remove-response-handler frame-kind))
-  (skg--end-stream)
+  (skg--end-stream owner)
   (unwind-protect
       (progn
-        (skg--unlock-all-save-locked)
+        (skg--unlock-all-save-locked owner)
         (with-current-buffer save-buffer
           (skg-handle-save-sexp payload)))
-    (skg--unlock-all-save-locked)) )
+    (skg--unlock-all-save-locked owner)) )
 
 (defconst skg-fork-source-placeholder "PICK-A-SOURCE"
   "Sentinel source the server pre-fills for a clone-to-be whose source
@@ -644,7 +653,7 @@ idempotent, so a redundant call after a decline is a harmless no-op."
       (with-current-buffer skg--fork-origin-buffer
         (skg-strip-fork-requests-in-buffer)))))
 
-(defun skg--fork-confirmation-handler (save-buffer payload)
+(defun skg--fork-confirmation-handler (save-buffer payload &optional owner)
   "Handle a `fork-confirmation' LP message: the save edited foreign
 node(s) and was not pre-approved, so NOTHING was committed. Show the
 confirmation buffer (which lists the nodes that would be forked) and,
@@ -659,8 +668,8 @@ it), end the stream, and unlock."
              telescope-hoist-confirmation ugly-telescope-confirmation
              save-result))
     (skg-remove-response-handler frame-kind))
-  (skg--end-stream)
-  (skg--unlock-all-save-locked)
+  (skg--end-stream owner)
+  (skg--unlock-all-save-locked owner)
   (let ((confirm-buf
          ;; The condition-case guards only response parsing/display.
          ;; The interactive flow below runs OUTSIDE it: a refusal
@@ -692,7 +701,7 @@ it), end the stream, and unlock."
 
 (defun skg--telescope-hoist-confirmation-handler
     (save-buffer payload fork-approved fork-sources
-                 &optional scalar-approved-pids)
+                 &optional scalar-approved-pids owner)
   "Handle the text-free terminal Hoist challenge for SAVE-BUFFER.
 The server has committed nothing.  On approval, reissue the same save with
 the exact candidate PIDs; on Abort, leave the buffer and every .skg file
@@ -703,8 +712,8 @@ on a retry that had already received fork authority."
              telescope-hoist-confirmation ugly-telescope-confirmation
              save-result))
     (skg-remove-response-handler frame-kind))
-  (skg--end-stream)
-  (skg--unlock-all-save-locked)
+  (skg--end-stream owner)
+  (skg--unlock-all-save-locked owner)
   (condition-case err
       (let* ((response (read payload))
              (telescopes (cadr (assoc 'telescopes response)))
@@ -729,7 +738,8 @@ on a retry that had already received fork authority."
               "telescope-hoist-confirmation handler error: %S" err))))
 
 (defun skg--save-scalar-release-confirmation-handler
-    (save-buffer payload fork-approved fork-sources hoist-approved-pids)
+    (save-buffer payload fork-approved fork-sources hoist-approved-pids
+                 &optional owner)
   "Handle a save-rerender scalar release challenge.
 The filesystem save has succeeded, but the server has not released the
 staged saved/collateral text or changed its open-view registry.  Approval
@@ -740,8 +750,8 @@ unchanged."
              telescope-hoist-confirmation ugly-telescope-confirmation
              save-result))
     (skg-remove-response-handler response-type))
-  (skg--end-stream)
-  (skg--unlock-all-save-locked)
+  (skg--end-stream owner)
+  (skg--unlock-all-save-locked owner)
   (condition-case err
       (let* ((response (read payload))
              (approved-pids

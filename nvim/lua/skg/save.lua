@@ -141,8 +141,9 @@ function M.request_save_buffer (fork_approved, fork_sources,
     content = buffer_contents,
     buffer_id = save_authority.id,
   })
-  lock.begin_stream('save')
-  lock.register_stream_request_cleanup('save')
+  local request_owner = state.ensure_request_draft().id
+  lock.begin_stream('save', request_owner)
+  lock.register_stream_request_cleanup('save', request_owner)
   state.set_request_failure_handler(function (reason)
     local ok, err = pcall(pending_save.mark_uncertain, pending_record)
     if not ok then
@@ -154,10 +155,10 @@ function M.request_save_buffer (fork_approved, fork_sources,
   end)
   -- Lock ALL skg view buffers before sending, eliminating the race
   -- window between the send and the server's early response.
-  lock.lock_all_skg_buffers()
+  lock.lock_all_skg_buffers(request_owner)
   state.register_response_handler('save-lock',
     function (_payload_text, response)
-      M.save_lock_handler(saved_uri, response)
+      M.save_lock_handler(saved_uri, response, request_owner)
     end, true)
   -- save-relax-lock: same handling, but with the EXACT collateral set
   -- (post-SavePlan). Registered NON-one-shot so it does not add to
@@ -166,18 +167,18 @@ function M.request_save_buffer (fork_approved, fork_sources,
   -- save-result removes it.
   state.register_response_handler('save-relax-lock',
     function (_payload_text, response)
-      M.save_lock_handler(saved_uri, response)
+      M.save_lock_handler(saved_uri, response, request_owner)
     end, false)
   state.register_response_handler('collateral-view',
     function (payload_text, response)
       M.apply_streamed_view_update(payload_text, response,
-                                   'save', 'collateral-view')
+                                   'save', 'collateral-view', request_owner)
     end, false)
   state.register_response_handler('save-result',
     function (payload_text, response)
       if M.persist_save_response(pending_record, payload_text, response)
            == 'committed' then
-        M.save_result_handler(save_buf, response)
+        M.save_result_handler(save_buf, response, request_owner)
         M.schedule_save_result_acknowledgement(pending_record) end
     end, true)
   -- fork-confirmation: the ALTERNATIVE terminal message. The server
@@ -188,7 +189,7 @@ function M.request_save_buffer (fork_approved, fork_sources,
     function (payload_text, response)
       if M.persist_save_response(pending_record, payload_text, response)
            == 'refused' then
-        M.fork_confirmation_handler(save_buf, response) end
+        M.fork_confirmation_handler(save_buf, response, request_owner) end
     end, false)
   state.register_response_handler('telescope-hoist-confirmation',
     function (payload_text, response)
@@ -196,7 +197,7 @@ function M.request_save_buffer (fork_approved, fork_sources,
            == 'refused' then
         M.telescope_hoist_confirmation_handler(
           save_buf, response, fork_approved, fork_sources,
-          scalar_approved_pids) end
+          scalar_approved_pids, request_owner) end
     end, false)
   state.register_response_handler('ugly-telescope-confirmation',
     function (payload_text, response)
@@ -204,7 +205,7 @@ function M.request_save_buffer (fork_approved, fork_sources,
            == 'committed' then
         M.save_scalar_release_confirmation_handler(
           save_buf, response, fork_approved, fork_sources,
-          hoist_approved_pids)
+          hoist_approved_pids, request_owner)
         M.schedule_save_result_acknowledgement(pending_record) end
     end, false)
   state.register_response_handler('error',
@@ -402,8 +403,9 @@ function M.retry_pending_save ()
   local record = choose_pending_save()
   local request, content = pending_save.retry_material(record)
   local operation_id = pending_save.field_text(record, 'operation-id')
-  lock.begin_stream('pending-save retry')
-  lock.register_stream_request_cleanup('pending-save retry')
+  local request_owner = state.ensure_request_draft().id
+  lock.begin_stream('pending-save retry', request_owner)
+  lock.register_stream_request_cleanup('pending-save retry', request_owner)
   state.set_request_failure_handler(function (reason)
     pending_save.mark_uncertain(record)
     vim.notify('Save retry interrupted: ' .. reason .. '; operation '
@@ -461,16 +463,16 @@ end
 ---collateral set (the saved buffer stays locked until save-result).
 ---@param saved_uri string
 ---@param response any
-function M.save_lock_handler (saved_uri, response)
+function M.save_lock_handler (saved_uri, response, owner)
   local ok, err = pcall(function ()
     local lock_views = payload.field(response, 'lock-views')
     if lock_views ~= nil then
       lock.unlock_non_collateral_buffers(
-        saved_uri, payload.string_list(lock_views)) end
+        saved_uri, payload.string_list(lock_views), owner) end
   end)
   if not ok then
     -- Keep the saved buffer locked until save-result; free the rest.
-    lock.unlock_non_collateral_buffers(saved_uri, nil)
+    lock.unlock_non_collateral_buffers(saved_uri, nil, owner)
     log.log('error', 'save', 'save-lock handler error: %s',
             tostring(err))
   end
@@ -483,14 +485,14 @@ end
 ---@param log_category string
 ---@param handler_name string
 function M.apply_streamed_view_update (_payload_text, response,
-                                       log_category, handler_name)
+                                       log_category, handler_name, owner)
   local ok, err = pcall(function ()
     local session_id = state.require_current_server_session(response)
     local uri = payload.field_text(response, 'view-uri')
     local content = payload.field(response, 'content')
     local buf = uri and buffer.find_buffer_by_uri(uri) or nil
     if buf and content ~= nil and not sexpr.is_list(content) then
-      lock.unlock_after_save(buf)
+      lock.unlock_after_save(buf, owner)
       M.replace_buffer_with_new_content(
         buf, sexpr.atom_text(content), nil,
         { server_session_id = session_id })
@@ -507,15 +509,15 @@ end
 ---everything, and apply the saved buffer's final content.
 ---@param save_buf integer
 ---@param response any
-function M.save_result_handler (save_buf, response)
+function M.save_result_handler (save_buf, response, owner)
   for _, frame_kind in ipairs({
       'collateral-view', 'save-relax-lock', 'fork-confirmation',
       'telescope-hoist-confirmation', 'ugly-telescope-confirmation' }) do
     state.remove_response_handler(frame_kind) end
-  lock.end_stream()
-  lock.unlock_all_save_locked()
+  lock.end_stream(owner)
+  lock.unlock_all_save_locked(owner)
   local ok, err = pcall(M.handle_save_response, save_buf, response)
-  lock.unlock_all_save_locked()
+  lock.unlock_all_save_locked(owner)
   if not ok then
     log.log('error', 'save', 'parsing save response: %s',
             tostring(err))
@@ -755,14 +757,14 @@ end
 ---count), ends the stream, unlocks.
 ---@param save_buf integer
 ---@param response any
-function M.fork_confirmation_handler (save_buf, response)
+function M.fork_confirmation_handler (save_buf, response, owner)
   for _, frame_kind in ipairs({
       'collateral-view', 'save-relax-lock', 'fork-confirmation',
       'telescope-hoist-confirmation', 'ugly-telescope-confirmation',
       'save-result' }) do
     state.remove_response_handler(frame_kind) end
-  lock.end_stream()
-  lock.unlock_all_save_locked()
+  lock.end_stream(owner)
+  lock.unlock_all_save_locked(owner)
   local confirm_buf = nil
   local ok, err = pcall(function ()
     -- The pcall guards only response parsing/display. The interactive
@@ -804,14 +806,14 @@ end
 ---@param fork_sources table[]|nil
 function M.telescope_hoist_confirmation_handler (
     save_buf, response, fork_approved, fork_sources,
-    scalar_approved_pids)
+    scalar_approved_pids, owner)
   for _, frame_kind in ipairs({
       'collateral-view', 'save-relax-lock', 'fork-confirmation',
       'telescope-hoist-confirmation', 'ugly-telescope-confirmation',
       'save-result' }) do
     state.remove_response_handler(frame_kind) end
-  lock.end_stream()
-  lock.unlock_all_save_locked()
+  lock.end_stream(owner)
+  lock.unlock_all_save_locked(owner)
   local ok, err = pcall(function ()
     local approved_pids = {}
     local telescopes = payload.field(response, 'telescopes') or {}
@@ -855,14 +857,14 @@ end
 ---@param hoist_approved_pids string[]|nil
 function M.save_scalar_release_confirmation_handler (
     save_buf, response, fork_approved, fork_sources,
-    hoist_approved_pids)
+    hoist_approved_pids, owner)
   for _, response_type in ipairs({
       'collateral-view', 'save-relax-lock', 'fork-confirmation',
       'telescope-hoist-confirmation', 'ugly-telescope-confirmation',
       'save-result' }) do
     state.remove_response_handler(response_type) end
-  lock.end_stream()
-  lock.unlock_all_save_locked()
+  lock.end_stream(owner)
+  lock.unlock_all_save_locked(owner)
   local approved_pids =
     payload.string_list(payload.field(response, 'pids'))
   local prompt = payload.field_text(response, 'prompt')

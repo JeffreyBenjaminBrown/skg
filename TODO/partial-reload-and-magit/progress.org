@@ -2478,3 +2478,25 @@ admission collision. Asynchronous ordinary save execution remains pending.
 ** choices determining the future
 A genuinely new refusal is terminal and durable; a duplicate of unresolved
 work must preserve that existing operation's record.
+
+* Simplify/cohere checkpoint: save cleanup belongs to its transport request
+** what's done and went well
+Both clients scope ordinary-save overlays, editability restrictions and stream
+cleanup to the unique request-record ID. A duplicate delivery can share the
+operation UUID without gaining permission to clear the first request's locks.
+Owner-specific cleanup preserves unrelated legacy streams; explicit reset
+cleanup remains global.
+
+Focused client checks pass: 11 Emacs pending-save tests and 24 Neovim save tests.
+The regressions cover a second save finalizer, readonly query completion,
+duplicate operation IDs and legacy stream ownership. Logs are
+'/tmp/owner-aware-save-elisp-request-owner.log' and
+'/tmp/owner-aware-save-nvim-request-owner.log'.
+** Changes to the plan's envisioned order.
+Fix transient cleanup ownership before enabling yielded ordinary saves.
+** what's imperfect about what's done
+This scopes ordinary-save restrictions; the broader maintenance restriction
+sets and multi-incident report interface remain separate unfinished work.
+** choices determining the future
+Transport request identity owns transient cleanup. Durable operation identity
+owns journal outcome and retry identity.

@@ -360,6 +360,77 @@ describe('skg.save pipeline', function ()
                      or message:find('is unresolved'))
   end)
 
+  it('keeps the first save lock when a refused second record settles',
+     function ()
+    local buf = vim.api.nvim_create_buf(true, false)
+    vim.b[buf].skg_view_uri = 'skg://owned-save-lock'
+    vim.bo[buf].modifiable = true
+    lock.begin_stream('save', 'first-save')
+    lock.lock_for_save(buf, 'first-save')
+    state.set_request_finalizer(function ()
+      lock.end_stream('first-save')
+      lock.unlock_all_save_locked('first-save')
+    end)
+    local first = state.take_request_record()
+    state.set_request_finalizer(function ()
+      lock.end_stream('second-save')
+      lock.unlock_all_save_locked('second-save')
+    end)
+    local second = state.take_request_record()
+
+    local original_handler = save.handle_save_response
+    save.handle_save_response = function () end
+    save.save_result_handler(buf, {}, 'second-save')
+    save.handle_save_response = original_handler
+    state.finish_request(second.id, 'complete')
+    assert.is_true(vim.b[buf].skg_save_locked)
+    assert.are.equal('save', lock.stream_in_progress)
+
+    state.finish_request(first.id, 'complete')
+    assert.is_falsy(vim.b[buf].skg_save_locked)
+    assert.is_nil(lock.stream_in_progress)
+    vim.api.nvim_buf_delete(buf, { force = true })
+  end)
+
+  it('keeps the first save lock for a duplicate operation with a new request owner',
+     function ()
+    local buf = vim.api.nvim_create_buf(true, false)
+    vim.b[buf].skg_view_uri = 'skg://duplicate-save-lock'
+    vim.bo[buf].modifiable = true
+    local operation_id = 'same-durable-operation'
+    lock.begin_stream('save', 'first-request')
+    lock.lock_for_save(buf, 'first-request')
+    state.set_request_finalizer(function ()
+      lock.end_stream('first-request')
+      lock.unlock_all_save_locked('first-request')
+    end)
+    local first = state.take_request_record()
+    state.set_request_finalizer(function ()
+      lock.end_stream('second-request')
+      lock.unlock_all_save_locked('second-request')
+    end)
+    local second = state.take_request_record()
+
+    assert.are.equal('same-durable-operation', operation_id)
+    state.finish_request(second.id, 'refused')
+    assert.is_true(vim.b[buf].skg_save_locked)
+    assert.are.equal('first-request', lock.stream_owner)
+
+    state.finish_request(first.id, 'complete')
+    assert.is_falsy(vim.b[buf].skg_save_locked)
+    assert.is_nil(lock.stream_in_progress)
+    vim.api.nvim_buf_delete(buf, { force = true })
+  end)
+
+  it('does not let an owner-specific cleanup clear legacy state', function ()
+    lock.stream_in_progress = 'legacy save'
+    lock.stream_owner = nil
+    lock.end_stream('new-request')
+    assert.are.equal('legacy save', lock.stream_in_progress)
+    lock.end_stream()
+    assert.is_nil(lock.stream_in_progress)
+  end)
+
   it('refuses to save a buffer with no view uri', function ()
     local buf = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_set_current_buf(buf)
