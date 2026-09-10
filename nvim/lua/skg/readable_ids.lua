@@ -119,7 +119,7 @@ function M.request_titles (ids, generation, buf, approved_pids)
       sexpr.pair(sexpr.symbol('request'), 'titles by ids'),
       ids_form }
     if approved_pids and #approved_pids > 0 then
-      local approval = { sexpr.symbol('allow-ugly-telescopes') }
+      local approval = { sexpr.symbol('allow-overPrivateText-telescopes') }
       for _, pid in ipairs(approved_pids) do
         table.insert(approval, pid) end
       table.insert(request_form, approval) end
@@ -147,7 +147,7 @@ function M.ensure_title_response_handler ()
       state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
       M.handle_response(response, entry[1], entry[2])
     end, false)
-  state.register_response_handler('ugly-telescope-confirmation',
+  state.register_response_handler('overPrivateText-telescope-confirmation',
     function (_payload_text, response)
       local entry = table.remove(M.pending_title_requests, 1)
       if not entry then

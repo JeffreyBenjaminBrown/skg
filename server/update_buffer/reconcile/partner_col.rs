@@ -3,7 +3,7 @@ use crate::to_org::complete::partner_col::child_data::{
   build_child_data,
   ChildData,
   apply_membership_axes_to_col_members,
-  reconcile_partnerCol_children_against_goal_list,
+  reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids,
 };
 use crate::to_org::complete::partner_col::goal_list::{
   goal_list_for_outbound_col,
@@ -12,7 +12,7 @@ use crate::to_org::complete::partner_col::goal_list::{
 use crate::to_org::complete::partner_col::inverse_scan::inverse_scan_for_inbound_col;
 use crate::types::env::SkgEnv;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, MemberAtSource, SourceName};
 use crate::source_sets::ActiveSourceSet;
 use crate::types::phantom::{phantom_axes, home_from_disk};
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
@@ -40,6 +40,7 @@ pub fn reconcile_partnerCol_children (
   env          : &SkgEnv,
   graph_snap   : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   active_source_set : Option<&ActiveSourceSet>,
   warning_sink : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
@@ -62,6 +63,13 @@ pub fn reconcile_partnerCol_children (
       . or_else ( || home_from_disk (id, &env . config) ) };
   let outbound : bool = // the col shows a list in the OWNER's file
     owner_role . is_first_role ();
+  let raw_outbound_members : Vec<MemberAtSource<ID>> = if outbound {
+    // Preserve an unresolved ID through this outbound surface.  The old
+    // canonical-PID accessor is still right for inverse/read-only cols, but
+    // would erase an Unknown from the writable OverriddenCol.
+    graph_snap . outbound_members_at_sources_for_relation_gated (
+      &owner_pid, member_role . relation, active_source_set )
+  } else { Vec::new () };
   let inbound_scan : HashMap<ID, MembershipAxes> =
     // Inbound cols' edges live in the MEMBERS' files; the inverse
     // scan reads those files' diffs (Modified relation diffs,
@@ -78,8 +86,13 @@ pub fn reconcile_partnerCol_children (
       // inactive members, with no retention (a stale InactiveNode
       // child gets the reconciler's delete-leaf / deaden-branch rule).
       omit_inactive_members (
-        graph_snap . other_member_pids_gated (
-          &owner_pid, owner_role, active_source_set ),
+        if outbound {
+          raw_outbound_members . iter ()
+            . map ( |member| graph_snap . pid_of (&member . member)
+                   . unwrap_or_else ( || member . member . clone () ) )
+            . collect ()
+        } else { graph_snap . other_member_pids_gated (
+          &owner_pid, owner_role, active_source_set ) },
         active_source_set,
         source_resolver );
     if outbound && source_diffs . is_some () {
@@ -111,6 +124,10 @@ pub fn reconcile_partnerCol_children (
         ColPolicy::ReadOnlyFilter =>
           // Unreachable: the let-else above already returned,
           // because the filter cols have no relation member role.
+          graph_members,
+        ColPolicy::EditableFilter =>
+          // Likewise unreachable here: HiddenOutside has its own
+          // hide-derived reconciler, rather than a relation role.
           graph_members, };
       let removed : HashSet<ID> = {
         // Inbound phantom tail: members the inverse scan says are
@@ -162,17 +179,25 @@ pub fn reconcile_partnerCol_children (
   // vognode already spent its budget unit when it expanded, so drawing all the
   // relation members here costs nothing and never truncates the group. (The
   // budget bounds how many vognodes EXPAND, not how big one group is.)
+  let relationship_sources : HashMap<ID, SourceName> =
+    raw_outbound_members . iter ()
+      . filter (|member| graph_snap . pid_of (&member . member) . is_none ())
+      . filter (|member| member . source != owner_source)
+      . map (|member| (member . member . clone (), member . source . clone ()))
+      . collect ();
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
       tree, node,
       &goal_list, &removed_ids, axes_for_removed,
-      source_diffs, deleted_since_head_pid_src_map, env ) ?;
+      source_diffs, deleted_since_head_pid_src_map,
+      &relationship_sources, env ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §6.0/§16: the reconciler deletes a stale member that is a view-leaf and
   // demotes one that is a branch, so a read-only PartnerCol
   // drops a stale leaf member instead of preserving it.
   let summary : RepairSummary<ID> =
-    reconcile_partnerCol_children_against_goal_list (
-      tree, node, kind, &goal_list, &child_data ) ?;
+    reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids (
+      tree, node, kind, &goal_list, &child_data,
+      deleted_by_this_save_extra_ids ) ?;
   if source_diffs . is_some () {
     // Present members whose edge is New in some stage get that
     // stage's 'newM'; removed members are the phantoms above.

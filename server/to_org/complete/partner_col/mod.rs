@@ -65,22 +65,23 @@ async fn build_initial_render_child_data (
   for id in ids {
     let lookup : Option<(NodeComplete, ViewNode)> =
       nodecomplete_and_viewnode_from_id (config, driver, id) . await ?;
-    let (primary_pid, source, title) : (ID, SourceName, String) = match lookup {
+    let (primary_pid, source, title, unknown) : (ID, SourceName, String, bool) = match lookup {
       Some ((nc, _vn)) =>
         ( nc . pid . clone (),
           nc . source . clone (),
-          nc . title . clone () ),
+          nc . title . clone (), false ),
       None => // No record anywhere; 'reconcile' will still need an
               // entry, but downstream rendering would treat this as
               // an PhantomUnknown case. We pass the raw id through with
               // a sentinel source/title so the reconcile call can
               // still run.
-        ( id . clone (), SourceName::from (""), String::new () ), };
+        ( id . clone (), SourceName::from (""), String::new (), true ), };
     if resolved . contains_key (&primary_pid) { continue; }
     goal . push (primary_pid . clone ());
     resolved . insert (
       primary_pid,
-      ChildData { source, title, phantom : None } ); }
+      ChildData { source, title, phantom : None, unknown,
+                  rel_source : None } ); }
   Ok ((goal, resolved)) }
 
 /// Check if a node's type and parent type are consistent with being a Subscribee.

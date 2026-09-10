@@ -1,6 +1,6 @@
 use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
-use crate::to_org::complete::partner_col::child_data::{ChildData, apply_membership_axes_to_col_members, build_child_data, reconcile_partnerCol_children_against_goal_list};
+use crate::to_org::complete::partner_col::child_data::{ChildData, apply_membership_axes_to_col_members, build_child_data, reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids};
 use crate::to_org::complete::partner_col::goal_list::goal_list_for_hiddenoutsideof_subscribeecol;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
 use crate::types::misc::{ID, SourceName};
@@ -21,6 +21,7 @@ struct HiddenOutsideContext {
   subscriber_pid      : ID,
   subscriber_source   : SourceName,
   subscriber_hides    : Vec<ID>,
+  relationship_sources : HashMap<ID, SourceName>,
   subscribees         : Vec<ID>,
 }
 
@@ -42,6 +43,7 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   active_source_set              : Option<&ActiveSourceSet>,
   warning_sink                   : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
@@ -86,14 +88,15 @@ pub fn reconcile_hiddenoutside_subscribee_col_children (
     build_child_data (
       tree, node,
       &goal_list, &removed_ids, &axes_for_removed,
-      source_diffs, deleted_since_head_pid_src_map, env ) ?;
+      source_diffs, deleted_since_head_pid_src_map,
+      &context . relationship_sources, env ) ?;
   let summary =
-    reconcile_partnerCol_children_against_goal_list(
+    reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids (
       // TODO/DONE/local-view-update/plan_v2.org §6.0: a stale member of this read-only col is removed when a view-leaf
       // (the common case) and demoted to Independent only if it has a user
       // subtree. Handled uniformly by the reconciler.
       tree, node, kind,
-      &goal_list, &child_data ) ?;
+      &goal_list, &child_data, deleted_by_this_save_extra_ids ) ?;
   if source_diffs . is_some () {
     // Present members newly derived-in in some stage get that
     // stage's 'newM'; removed members are the phantoms above.
@@ -129,11 +132,17 @@ fn read_hiddenoutside_context (
   let source_active = |source : &SourceName| match active_source_set {
     None      => true,
     Some (a)  => a . is_all () || a . contains_source (source) };
-  let wt_subscriber_hides : Vec<ID> =
+  let wt_subscriber_hide_members =
     wt_subscriber_nodecomplete . hides_from_its_subscriptions
     . or_default () . iter ()
     . filter ( |m| source_active (& m . source) )
-    . map ( |m| m . member . clone () )
+    . collect::<Vec<_>> ();
+  let wt_subscriber_hides : Vec<ID> = wt_subscriber_hide_members . iter ()
+    . map ( |m| m . member . clone () ) . collect ();
+  let relationship_sources : HashMap<ID, SourceName> =
+    wt_subscriber_hide_members . iter ()
+    . filter ( |m| m . source != subscriber_source )
+    . map ( |m| (m . member . clone (), m . source . clone ()) )
     . collect ();
   let wt_subscribees : Vec<ID> =
     wt_subscriber_nodecomplete . subscribes_to
@@ -145,4 +154,5 @@ fn read_hiddenoutside_context (
     subscriber_pid,
     subscriber_source,
     subscriber_hides : wt_subscriber_hides,
+    relationship_sources,
     subscribees      : wt_subscribees }) }

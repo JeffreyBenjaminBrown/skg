@@ -19,4 +19,4 @@ fn partnerCol_policy_mapping () {
   assert_eq! ( PartnerCol::HiddenInSubscribee . policy (),
                ColPolicy::ReadOnlyFilter );
   assert_eq! ( PartnerCol::HiddenOutsideOfSubscribee . policy (),
-               ColPolicy::ReadOnlyFilter ); }
+               ColPolicy::EditableFilter ); }

@@ -123,7 +123,7 @@ pub fn unfold_node (
                                        { note ( &m . source ); }
     for m in input . overrides_view_of { note ( &m . source ); }
     for m in input . aliases           { note ( &m . source ); }}
-  { // scalars live in the home section
+  { // title/body text live in the home section
     let home : &mut SectionSlices =
       sections . get_mut ( input . home )
       . expect ("home section was just noted");

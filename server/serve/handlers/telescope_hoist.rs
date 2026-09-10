@@ -1,8 +1,8 @@
-//! Save-time publication gate for malformed scalar placement.
+//! Save-time publication gate for malformed title/body-text placement.
 //!
 //! A buffer-authored NodeComplete has already lost the provenance of its
 //! title and body. Before writing it, reread the current disk telescope and
-//! fold the scalars with the load path. If either selected scalar lives below
+//! fold the title/body text with the load path. If either selected title/body text lives below
 //! home, the save must carry an exact PID approval obtained from the typed
 //! confirmation response.
 
@@ -22,7 +22,7 @@ pub struct HoistCandidate {
   pub home : SourceName,
 }
 
-/// Exact approvals have their own field because permission to release ugly
+/// Exact approvals have their own field because permission to release overPrivateText
 /// text from the server is not permission to publish it on disk.
 pub fn approved_pids_from_request (
   request : &str,
@@ -81,17 +81,17 @@ pub fn candidates_from_disk (
           pid, home ))); }
     let (node, _warnings) = fold_telescope_collecting_warnings (
       telescope, & |id : &ID| id . clone () ) ?;
-    if node . ugly_telescope {
+    if node . overPrivateText_telescope {
       candidates . push ( HoistCandidate { pid, home } ); }}
   Ok (candidates)
 }
 
-/// Some operations consume an ugly telescope without writing that same PID.
+/// Some operations consume an overPrivateText telescope without writing that same PID.
 /// NodeMerge is the important case: it copies the acquiree's text to a fresh
 /// preservation node and deletes the acquiree. Add a disk-folded Save first so
 /// the approved interactive pipeline genuinely Hoists and verifies that input
 /// before the operation consumes it. Existing buffer-authored Saves win; their
-/// edits, rather than the pre-save disk scalar, must land at home.
+/// edits, rather than the pre-save disk title/body text, must land at home.
 pub fn repair_saves_for_unwritten_candidates (
   candidates   : &[HoistCandidate],
   define_nodes : &[DefineNode],
@@ -110,7 +110,7 @@ pub fn repair_saves_for_unwritten_candidates (
         config, &candidate . pid) ? else { continue; };
     let (mut node, _warnings) = fold_telescope_collecting_warnings (
       telescope, & |id : &ID| id . clone () ) ?;
-    node . ugly_telescope = false;
+    node . overPrivateText_telescope = false;
     repairs . push ( DefineNode::Save (SaveNode (node)) ); }
   Ok (repairs)
 }
@@ -136,7 +136,7 @@ pub fn confirmation_response (
     .collect ();
   let count : usize = candidates . len ();
   let prompt : String = format! (
-    "Saving would publish title or body text selected below home for {} telescope{}. Hoist writes the selected text at home and removes lower scalar copies while preserving lower relationships and aliases. Abort writes nothing; manual repair requires editing the .skg files. Hoist?",
+    "Saving would publish title or body text selected below home for {} telescope{}. Hoist writes the selected text at home and removes lower title/body copies while preserving lower relationships and aliases. Abort writes nothing; manual repair requires editing the .skg files. Hoist?",
     count, if count == 1 { "" } else { "s" } );
   Sexp::List ( vec! [
     Sexp::List ( vec! [
@@ -194,9 +194,9 @@ mod tests {
   ) -> DefineNode {
     let mut node = nodecomplete_from_pid_and_source (
       config, ID::from (pid), &SourceName::from ("public") ) . unwrap ();
-    // Buffer-authored nodes carry no disk ugliness authority. The save gate
+    // Buffer-authored nodes carry no disk overPrivateTextness authority. The save gate
     // has just rederived that fact from disk.
-    node . ugly_telescope = false;
+    node . overPrivateText_telescope = false;
     DefineNode::Save (SaveNode (node))
   }
 
@@ -212,7 +212,7 @@ mod tests {
   }
 
   #[test]
-  fn confirmation_contains_structure_but_no_scalar_text () {
+  fn confirmation_contains_structure_but_no_text () {
     let response : String = confirmation_response (&[
       HoistCandidate {
         pid  : ID::from ("P"),
@@ -226,7 +226,7 @@ mod tests {
   }
 
   #[test]
-  fn approved_hoist_moves_independent_scalars_and_preserves_lower_data () {
+  fn approved_hoist_moves_independent_text_and_preserves_lower_data () {
     let (_temp, config, paths) = config_and_paths ();
     fs::write (
       paths ["public"] . join ("P.skg"),
@@ -262,7 +262,7 @@ mod tests {
       &define_nodes, &[], config . clone (), &approved ) . unwrap ();
     let reread = nodecomplete_from_pid_and_source (
       &config, ID::from ("P"), &SourceName::from ("public") ) . unwrap ();
-    assert! (! reread . ugly_telescope);
+    assert! (! reread . overPrivateText_telescope);
     assert_eq! (reread . title, "lower title");
     assert_eq! (reread . body . as_deref (), Some ("lower body"));
 
@@ -283,7 +283,7 @@ mod tests {
     for pid in ["T", "B"] {
       assert! (! nodecomplete_from_pid_and_source (
         &config, ID::from (pid), &SourceName::from ("public") )
-        .unwrap () . ugly_telescope); }
+        .unwrap () . overPrivateText_telescope); }
   }
 
   #[test]

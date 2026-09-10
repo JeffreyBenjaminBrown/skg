@@ -25,7 +25,7 @@ use crate::types::misc::{ID, SourceName};
 use crate::types::phantom::title_for_phantom;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Vognode, ParentIs, PartnerCol, mk_indefinitive_viewnode, mk_phantom_viewnode};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Vognode, ParentIs, PartnerCol, mk_indefinitive_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
 
@@ -43,6 +43,11 @@ pub struct ChildData {
   pub source  : SourceName,
   pub title   : String,
   pub phantom : Option<(ExistenceAxes, MembershipAxes)>,
+  /// True when the exact stored relationship member has no current
+  /// node.  It is rendered as an Unknown, never as a title-less active
+  /// fallback.
+  pub unknown : bool,
+  pub rel_source : Option<SourceName>,
 }
 
 /// Build a map from child ID to ChildData for the create-child
@@ -66,6 +71,7 @@ pub fn build_child_data (
                                      -> (ExistenceAxes, MembershipAxes),
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  relationship_sources           : &HashMap<ID, SourceName>,
   env                            : &SkgEnv,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
   let existing_children : HashMap<ID, (SourceName, String)> = {
@@ -98,24 +104,31 @@ pub fn build_child_data (
       result . insert ( child_skgid . clone (),
                         ChildData { source  : child_src,
                                     title   : child_title,
-                                    phantom : Some (axes) } );
-    } else if let Some ( (s, t) ) = existing_children . get (child_skgid) {
-      result . insert ( child_skgid . clone (),
-                        ChildData { source  : s . clone (),
-                                    title   : t . clone (),
-                                    phantom : None } );
+                                    phantom : Some (axes),
+                                    unknown : false,
+                                    rel_source : None } );
     } else {
-      let child_src : SourceName =
-        env . find_source (child_skgid, deleted_since_head_pid_src_map)
-        . ok_or_else ( || -> Box<dyn Error> { format! (
-          "build_child_data: no source found for {}", child_skgid . 0
-        ) . into () } ) ?;
-      let skg : NodeComplete = nodecomplete_rustFirst_by_pid_and_source (
-        &env . config, child_skgid, &child_src ) ?;
-      result . insert ( child_skgid . clone (),
-                        ChildData { source  : skg . source . clone (),
-                                    title   : skg . title . clone (),
-                                    phantom : None } ); }}
+      match env . find_source (child_skgid, deleted_since_head_pid_src_map) {
+        None => { result . insert ( child_skgid . clone (),
+          ChildData { source: SourceName::not_found (), title: String::new (),
+                      phantom: None, unknown: true,
+                      rel_source: relationship_sources . get (child_skgid) . cloned () } ); },
+        Some (child_src) => if let Some ( (s, t) ) = existing_children . get (child_skgid) {
+          result . insert ( child_skgid . clone (),
+                            ChildData { source  : s . clone (),
+                                        title   : t . clone (),
+                                        phantom : None,
+                                        unknown : false,
+                                        rel_source : None } );
+        } else {
+          let skg : NodeComplete = nodecomplete_rustFirst_by_pid_and_source (
+            &env . config, child_skgid, &child_src ) ?;
+          result . insert ( child_skgid . clone (),
+                            ChildData { source  : skg . source . clone (),
+                                        title   : skg . title . clone (),
+                                        phantom : None,
+                                        unknown : false,
+                                        rel_source : None } ); } }; }}
   Ok (result) }
 
 /// Reconcile a PartnerCol's children against a goal list.
@@ -135,7 +148,23 @@ pub fn reconcile_partnerCol_children_against_goal_list (
   goal_list     : &[ID],
   child_data    : &HashMap<ID, ChildData>,
 ) -> Result<RepairSummary<ID>, Box<dyn Error>> {
+  reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids (
+    tree, col_node, kind, goal_list, child_data, &HashMap::new () )
+}
+
+/// As above, with the raw aliases captured for nodes deleted by the current
+/// save.  Only the immediate post-save rerender has this information.
+pub fn reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids (
+  tree          : &mut Tree<ViewNode>,
+  col_node      : NodeId,
+  kind          : PartnerCol,
+  goal_list     : &[ID],
+  child_data    : &HashMap<ID, ChildData>,
+  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
+) -> Result<RepairSummary<ID>, Box<dyn Error>> {
   let label : &'static str = kind . caller_label ();
+  normalize_relationship_backed_partner_unknowns (
+    tree, col_node, child_data, deleted_by_this_save_extra_ids ) ?;
   let summary : RepairSummary<ID> =
     complete_relevant_children_in_viewnodetree (
     tree, col_node,
@@ -147,10 +176,14 @@ pub fn reconcile_partnerCol_children_against_goal_list (
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Active (t))
         => t . parentIs == ParentIs::Affected,
+      ViewNodeKind::Phantom (crate::types::viewnode::Phantom::Unknown (_))
+        => true,
       _ => false },
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Active (t))
         => Ok ( t . id . clone () ),
+      ViewNodeKind::Phantom (crate::types::viewnode::Phantom::Unknown (u))
+        => Ok ( u . id . clone () ),
       _ => Err ( format! (
         "{}: relevant child not a normal graph node", label )) },
     goal_list,
@@ -159,18 +192,69 @@ pub fn reconcile_partnerCol_children_against_goal_list (
         child_data . get (id) . ok_or_else (
           || format! ( "{}: child data not pre-fetched for {}",
                        label, id . 0 )) ?;
-      Ok ( match d . phantom {
-        None => mk_indefinitive_viewnode ( id . clone (),
-                                           d . source . clone (),
-                                           d . title . clone (),
-                                           ParentIs::Affected ),
-        Some ((ex, mem)) =>
-          mk_phantom_viewnode (
-            id . clone (), d . source . clone (),
-            d . title . clone (), ex, mem ) } ) } ) ?;
+      Ok (
+        if d . unknown {
+          let mut unknown : ViewNode = mk_unknown_viewnode (id . clone ());
+          if let ViewNodeKind::Phantom (
+            crate::types::viewnode::Phantom::Unknown (u)) = &mut unknown . kind
+          { u . rel_source = d . rel_source . clone (); }
+          unknown
+        } else { match d . phantom {
+          None => mk_indefinitive_viewnode ( id . clone (),
+                                             d . source . clone (),
+                                             d . title . clone (),
+                                             ParentIs::Affected ),
+          Some ((ex, mem)) =>
+            mk_phantom_viewnode (
+              id . clone (), d . source . clone (),
+              d . title . clone (), ex, mem ) } } ) },
+  ) ?;
   mark_goal_children_as_collectionBranch_members (
     tree, col_node, goal_list) ?;
   Ok (summary) }
+
+/// An already-open PartnerCol can still hold an Active occurrence after its
+/// graph node was deleted.  When the rebuilt raw goal retains that membership,
+/// turn it into Unknown before the generic deletion pass.  Replacing only the
+/// kind keeps focus/folding state but removes title, body, home, and node edits.
+fn normalize_relationship_backed_partner_unknowns (
+  tree       : &mut Tree<ViewNode>,
+  col_node   : NodeId,
+  child_data : &HashMap<ID, ChildData>,
+  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
+) -> Result<(), Box<dyn Error>> {
+  treat_certain_children (
+    tree, col_node,
+    |vn : &ViewNode| match &vn . kind {
+      ViewNodeKind::Vognode (Vognode::Active (active)) =>
+        active . parentIs == ParentIs::Affected
+        && (child_data . get (&active . id)
+            . is_some_and (|data| data . unknown)
+            || deleted_by_this_save_extra_ids . get (&active . id)
+               . is_some_and (|extra_ids| extra_ids . iter () . any (
+                 |raw_id| child_data . get (raw_id)
+                   . is_some_and (|data| data . unknown)))),
+      _ => false },
+    |vn : &mut ViewNode| {
+      let active_id : ID = match &vn . kind {
+        ViewNodeKind::Vognode (Vognode::Active (active)) => active . id . clone (),
+        _ => unreachable! (), };
+      let id : ID = if child_data . get (&active_id)
+        . is_some_and (|data| data . unknown) { active_id . clone () }
+      else { deleted_by_this_save_extra_ids . get (&active_id)
+        . and_then (|extra_ids| extra_ids . iter () . find (
+          |raw_id| child_data . get (*raw_id)
+            . is_some_and (|data| data . unknown)))
+        . expect ("normalization predicate found an unknown raw member")
+        . clone () };
+      let rel_source : Option<SourceName> = child_data . get (&id)
+        . and_then (|data| data . rel_source . clone ());
+      vn . kind = ViewNodeKind::Phantom (
+        crate::types::viewnode::Phantom::Unknown (
+          crate::types::viewnode::PhantomUnknown {
+            id, rel_source, rel_source_request: None })); })
+    . map_err ( |e| -> Box<dyn Error> { e . into () } )
+}
 
 /// Stamp per-stage membership signs onto a col's existing Active
 /// members, from a per-member axes map (an outbound col reads the
@@ -210,6 +294,50 @@ pub fn apply_membership_axes_to_col_members (
     } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (( )) }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::types::viewnode::{mk_indefinitive_viewnode, Phantom};
+
+  fn id (text : &str) -> ID { ID::from (text) }
+  fn source (text : &str) -> SourceName { SourceName::from (text) }
+
+  #[test]
+  fn deleted_primary_with_surviving_extra_member_becomes_unknown () {
+    let primary : ID = id ("deleted-primary");
+    let raw_extra : ID = id ("surviving-extra");
+    let mut tree : Tree<ViewNode> = Tree::new (
+      ViewNode { focused: false, folded: false, body_folded: false,
+                 kind: ViewNodeKind::PartnerCol (PartnerCol::Subscribee) });
+    let col : NodeId = tree . root () . id ();
+    let mut child : ViewNode = mk_indefinitive_viewnode (
+      primary . clone (), source ("main"), "last seen" . to_string (),
+      ParentIs::Affected );
+    child . focused = true;
+    let child_nid : NodeId = tree . root_mut () . append (child) . id ();
+    let mut child_data : HashMap<ID, ChildData> = HashMap::new ();
+    child_data . insert ( raw_extra . clone (), ChildData {
+      source: SourceName::not_found (), title: String::new (), phantom: None,
+      unknown: true, rel_source: Some (source ("foreign")) } );
+    let mut deleted_extra_ids : HashMap<ID, HashSet<ID>> = HashMap::new ();
+    deleted_extra_ids . insert (
+      primary, [raw_extra . clone ()] . into_iter () . collect ());
+
+    reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids (
+      &mut tree, col, PartnerCol::Subscribee, &[raw_extra . clone ()],
+      &child_data, &deleted_extra_ids ) . unwrap ();
+
+    let rendered = tree . get (child_nid) . unwrap () . value ();
+    assert! (rendered . focused,
+      "normalization must preserve the existing view wrapper state");
+    match &rendered . kind {
+      ViewNodeKind::Phantom (Phantom::Unknown (unknown)) => {
+        assert_eq! (unknown . id, raw_extra);
+        assert_eq! (unknown . rel_source, Some (source ("foreign"))); },
+      other => panic! ("expected raw extra member as Unknown, got {other:?}"), }
+  }
+}
 
 /// See this module's header for definition of "goal child".
 ///

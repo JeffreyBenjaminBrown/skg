@@ -18,8 +18,8 @@ use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{ SaveResponse, compute_diff_for_every_source, deleted_ids_to_source};
-use crate::serve::handlers::scalar_release::{
-  ScalarReleaseDecision, challenge_response, decide,
+use crate::serve::handlers::text_release::{
+  TextReleaseDecision, challenge_response, decide,
 };
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
@@ -56,6 +56,10 @@ pub struct RerenderAfterSaveContext<'a> {
   pub deleted_since_head_pid_src_map : HashMap<ID, SourceName>,
   /// Pids deleted by this save; not necessarily a subset of git deletes.
   pub deleted_by_this_save_pids      : HashSet<ID>,
+  /// Raw extra IDs that belonged to each pid deleted by this save, captured
+  /// before graph mutation.  A still-stored relationship can name one of
+  /// these IDs after the pid itself has disappeared.
+  pub deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
   pub active_source_set              : Option<&'a ActiveSourceSet>,
 }
 
@@ -64,6 +68,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
     env               : &'a SkgEnv,
     diff_mode_enabled : bool,
     define_nodes      : &[DefineNode],
+    deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
     active_source_set : Option<&'a ActiveSourceSet>,
   ) -> RerenderAfterSaveContext<'a> {
     let source_diffs
@@ -91,6 +96,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
       warnings : Vec::new (),
       deleted_since_head_pid_src_map,
       deleted_by_this_save_pids,
+      deleted_by_this_save_extra_ids,
       active_source_set,
     }}
 
@@ -100,7 +106,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
     active_source_set : Option<&'a ActiveSourceSet>,
   ) -> RerenderAfterSaveContext<'a> {
     RerenderAfterSaveContext::for_save (
-      env, diff_mode_enabled, &[], active_source_set ) }
+      env, diff_mode_enabled, &[], HashMap::new (), active_source_set ) }
 }
 
 struct RenderedCollateralView {
@@ -126,7 +132,8 @@ pub async fn update_views_after_save (
   viewuri_from_request_result : &Result<ViewUri, String>,
   views_state                 : &mut ViewsState,
   active_source_set           : Option<&ActiveSourceSet>,
-  scalar_approved_pids        : &HashSet<ID>,
+  deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
+  text_approved_pids        : &HashSet<ID>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut context : RerenderAfterSaveContext =
     // Snapshot the in-Rust graph once for this save's rerender pass.
@@ -137,7 +144,8 @@ pub async fn update_views_after_save (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "RerenderAfterSaveContext::for_save" ). entered();
       RerenderAfterSaveContext::for_save (
-        env, diff_mode_enabled, &define_nodes, active_source_set ) };
+        env, diff_mode_enabled, &define_nodes,
+        deleted_by_this_save_extra_ids, active_source_set ) };
   let mut saved_view_mut : ViewForest = saved_view;
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "rewriteInPlace_viewnodes_whose_id_is_newly_extra" ). entered();
@@ -148,7 +156,7 @@ pub async fn update_views_after_save (
       find_collateral_view_uris (uri, &define_nodes, views_state)
     } else { Vec::new () };
   // Gate the forests' existing active nodes before rendering, so even a
-  // rendering error cannot echo protected scalar text. A second decision
+  // rendering error cannot echo protected title/body text. A second decision
   // below covers nodes introduced by completion/expansion.
   if let Some (active) = active_source_set {
     let mut input_candidates : Vec<ID> =
@@ -158,10 +166,10 @@ pub async fn update_views_after_save (
           . viewuri_to_view (uri) {
         input_candidates . extend (
           active_ids_in_viewforest (viewforest) ); }}
-    let release : ScalarReleaseDecision = decide (
+    let release : TextReleaseDecision = decide (
       "save-rerender", active, &input_candidates,
-      &context . graph_snap, scalar_approved_pids );
-    if matches! (release, ScalarReleaseDecision::Challenge { .. }) {
+      &context . graph_snap, text_approved_pids );
+    if matches! (release, TextReleaseDecision::Challenge { .. }) {
       return Ok ( SaveResponse {
         saved_view          : String::new (),
         errors              : Vec::new (),
@@ -169,7 +177,7 @@ pub async fn update_views_after_save (
         save_point_position : None,
         fork_confirmation   : None,
         hoist_confirmation  : None,
-        scalar_release_confirmation : challenge_response (&release),
+        text_release_confirmation : challenge_response (&release),
       } ); }}
   let mut repair_warnings : Vec<CompletionWarning> = Vec::new ();
   let saved_text : String =
@@ -199,11 +207,11 @@ pub async fn update_views_after_save (
     release_candidates . extend (
       active_ids_in_viewforest (&collateral . viewforest) ); }
   if let Some (active) = active_source_set {
-    let release : ScalarReleaseDecision = decide (
+    let release : TextReleaseDecision = decide (
       "save-rerender", active, &release_candidates,
-      &context . graph_snap, scalar_approved_pids );
+      &context . graph_snap, text_approved_pids );
     match release {
-      decision @ ScalarReleaseDecision::Challenge { .. } => {
+      decision @ TextReleaseDecision::Challenge { .. } => {
         return Ok ( SaveResponse {
           saved_view          : String::new (),
           errors              : Vec::new (),
@@ -211,11 +219,11 @@ pub async fn update_views_after_save (
           save_point_position : None,
           fork_confirmation   : None,
           hoist_confirmation  : None,
-          scalar_release_confirmation : challenge_response (&decision),
+          text_release_confirmation : challenge_response (&decision),
         } ); }
-      ScalarReleaseDecision::AllowWithWarning { warning } =>
+      TextReleaseDecision::AllowWithWarning { warning } =>
         context . warnings . push (warning),
-      ScalarReleaseDecision::Allow => {}, }}
+      TextReleaseDecision::Allow => {}, }}
 
   if let Ok (uri) = viewuri_from_request_result {
     views_state . open_views . update_view (
@@ -257,7 +265,7 @@ pub async fn update_views_after_save (
     save_point_position : None,
     fork_confirmation   : None,
     hoist_confirmation  : None,
-    scalar_release_confirmation : None, } ) }
+    text_release_confirmation : None, } ) }
 
 fn active_ids_in_viewforest (
   viewforest : &ViewForest,
@@ -396,6 +404,7 @@ pub async fn render_initial_view (
     errors                         : &mut errors,
     deleted_since_head_pid_src_map : &deleted_src,
     deleted_by_this_save_pids      : &empty_deleted_pids,
+    deleted_by_this_save_extra_ids : &HashMap::new (),
     active_source_set              : active,
     node_budget                    : env . config . initial_node_limit,
     create_partnerCols_for_fresh_nodes : true,
@@ -434,6 +443,7 @@ pub async fn rerender_view (
       errors                         : &mut context . errors,
       deleted_since_head_pid_src_map : &context . deleted_since_head_pid_src_map,
       deleted_by_this_save_pids      : &context . deleted_by_this_save_pids,
+      deleted_by_this_save_extra_ids : &context . deleted_by_this_save_extra_ids,
       active_source_set              : context . active_source_set,
       node_budget                    : context . env . config . initial_node_limit,
       // Post-save (and rerender-all) reuse the saved buffer's PartnerCols and

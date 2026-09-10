@@ -92,7 +92,7 @@ fn current_is_none_for_an_unrecorded_edge (
 }
 
 #[test]
-fn unknown_endpoints_are_errors (
+fn unknown_owner_is_an_error_but_unknown_member_uses_owner_home (
 ) {
   let config : SkgConfig =
     config_with_order ( & ["public"] );
@@ -104,11 +104,26 @@ fn unknown_endpoints_are_errors (
     & ID::new ("ghost"), & ID::new ("owner"),
     NodeRelation::Contains ) . is_err (),
     "unknown owner" );
-  assert! ( edge_source_info (
+  let (default, current) = edge_source_info (
     &graph, &config,
     & ID::new ("owner"), & ID::new ("ghost"),
-    NodeRelation::Contains ) . is_err (),
-    "unknown member: the client falls back to the full ladder" );
+    NodeRelation::Contains ) . unwrap ();
+  assert_eq! (default, SourceName::from ("public"));
+  assert_eq! (current, None);
+}
+
+#[test]
+fn raw_unresolved_member_keeps_its_exact_recording_source (
+) {
+  let config : SkgConfig = config_with_order ( & ["public", "private"] );
+  let mut owner : NodeComplete = node_at ("owner", "public");
+  owner . contains = vec! [ pm ("private", "absent-raw") ];
+  let graph : InRustGraph = InRustGraph::from_nodecompletes ( & [owner] );
+  let (default, current) = edge_source_info (
+    &graph, &config, &ID::new ("owner"), &ID::new ("absent-raw"),
+    NodeRelation::Contains ) . unwrap ();
+  assert_eq! (default, SourceName::from ("public"));
+  assert_eq! (current, Some (SourceName::from ("private")));
 }
 
 #[test]

@@ -215,13 +215,13 @@ clears the cache and asks again."
        (skg-lp--dispatch-by-type
         nil
         (format
-         "((response-type ugly-telescope-confirmation) \
+         "((response-type overPrivateText-telescope-confirmation) \
            (operation titles-by-ids) (pids (%S)) \
            (prompt \"Include lower text?\"))"
          test-skg-readable-ids--id-c)))
      (should (= 2 (length sent)))
      (let ((retry (car sent)))
-       (should (string-match-p "allow-ugly-telescopes" retry))
+       (should (string-match-p "allow-overPrivateText-telescopes" retry))
        (should (string-match-p test-skg-readable-ids--id-c retry)))
      (should-not (gethash test-skg-readable-ids--id-c
                           skg-readable-ids--title-cache)))))

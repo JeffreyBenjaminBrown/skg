@@ -58,7 +58,7 @@ pub(crate) async fn merge_nodes_with_hoist_approval (
   if nodeMerge_instructions . is_empty () {
     return Ok (None); }
   // A direct/noninteractive merge gets the empty approval set from the public
-  // wrapper above. Refuse if it would copy text out of an ugly acquiree. The
+  // wrapper above. Refuse if it would copy text out of an overPrivateText acquiree. The
   // interactive save path first inserts and verifies an acquiree Hoist repair,
   // so a fresh reread here finds no remaining candidate.
   let candidates =

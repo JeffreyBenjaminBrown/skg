@@ -7,7 +7,7 @@
 ///     - No node can be an acquirer and an acquiree.
 ///     - No node can be involved in more than one merge.
 
-use crate::types::viewnode::EditRequest;
+use crate::types::viewnode::NodeEditRequest;
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpActiveNode};
 use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::misc::{ID, SkgConfig};
@@ -45,7 +45,7 @@ pub async fn validate_nodeMerge_requests(
       None => { errors . push(format!(
                   "Acquirer node '{}' must have an ID", t . title));
                 continue; }};
-    if let Some(EditRequest::NodeMerge (acquiree_id))
+    if let Some(NodeEditRequest::NodeMerge (acquiree_id))
       = t . edit_request ()
     { let pair_errors : Vec<String> = validate_nodeMerge_pair(
         config, driver, acquirer_id, acquiree_id,
@@ -75,9 +75,9 @@ fn collect_nodeMerge_validation_data<'a>(
         = &viewnode . kind
       { if let Some (id) = &t . id {
           if matches!(t . edit_request (),
-                      Some (EditRequest::Delete)) {
+                      Some (NodeEditRequest::Delete)) {
             to_delete_ids . insert(id . clone()); } // mutate!
-          if let Some(EditRequest::NodeMerge (acquiree_id))
+          if let Some(NodeEditRequest::NodeMerge (acquiree_id))
           = t . edit_request ()
           { acquirer_viewnodes . push (viewnode); // mutate!
             acquirer_to_acquirees // mutate!

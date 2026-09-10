@@ -376,10 +376,10 @@ fn all_tests
       s . install_graph_handle () ?;
       test_hidden_without_but_none_within (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("test_adding_to_hiddenoutside_col_does_not_hide",
+      s . reset ("test_adding_to_hiddenoutside_col_hides_and_moves_inside",
         "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within") . await ?;
       s . install_graph_handle () ?;
-      test_adding_to_hiddenoutside_col_does_not_hide (
+      test_adding_to_hiddenoutside_col_hides_and_moves_inside (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_overlapping_hidden_within",
         "tests/hidden_from_subscriptions/fixtures-overlapping-hidden-within/skgconfig.toml") . await ?;
@@ -446,10 +446,11 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
       ) . await?;
     let edited : String =
       expanded_subscribee_edit_view (&expanded, "delete");
-    let rerendered : String =
-      save_buffer_for_hidden_subscriptions_test (
-        &edited, &driver, &config, tantivy, &graph, &mut views_state
-      ) . await?;
+    let mut stream : TcpStream = mk_test_tcp_stream ();
+    let response = update_from_and_rerender_buffer (
+      &mut stream, &edited, driver, config, tantivy, &graph, false,
+      &Err (String::new ()), &mut views_state ) . await ?;
+    let rerendered : String = response . saved_view;
 
     assert_hides_e1_in_subscribee_col (&rerendered);
     let r_skg : NodeComplete =
@@ -1180,7 +1181,7 @@ async fn test_hidden_without_but_none_within (
 
     Ok (( )) }
 
-async fn test_adding_to_hiddenoutside_col_does_not_hide (
+async fn test_adding_to_hiddenoutside_col_hides_and_moves_inside (
   config  : &SkgConfig,
   driver  : &Arc<TypeDBDriver>,
   tantivy : &mut TantivyIndex,
@@ -1200,10 +1201,11 @@ async fn test_adding_to_hiddenoutside_col_does_not_hide (
           false ) . await?;
     let edited : String =
       add_e11_to_hiddenoutside_col (&initial_view);
-    let rerendered : String =
-      save_buffer_for_hidden_subscriptions_test (
-        &edited, &driver, &config, tantivy, &graph, &mut views_state
-      ) . await?;
+    let mut stream : TcpStream = mk_test_tcp_stream ();
+    let response = update_from_and_rerender_buffer (
+      &mut stream, &edited, driver, config, tantivy, &graph, false,
+      &Err (String::new ()), &mut views_state ) . await ?;
+    let rerendered : String = response . saved_view;
 
     assert! (
       rerendered . lines () . any ( |line|
@@ -1211,10 +1213,33 @@ async fn test_adding_to_hiddenoutside_col_does_not_hide (
       "Expected original hidden-outside row H to remain:\n{}",
       rerendered );
     assert! (
-      ! rerendered . lines () . any ( |line|
+      rerendered . lines () . any ( |line|
         line . contains ("(id E11)") ),
-      "Expected adding to HiddenOutsideOfSubscribeeCol not to persist E11:\n{}",
+      "Expected added E11 to remain rendered after its hide is saved:\n{}",
       rerendered );
+    let subscriber : NodeComplete = node_from_disk (config, "R") ?;
+    assert! (
+      members_of (subscriber . hides_from_its_subscriptions . or_default ())
+        . contains (&ID::from ("E11")),
+      "Expected adding E11 to HiddenOutsideOfSubscribeeCol to save a hide." );
+    assert! (
+      response . warnings . iter () . any ( |warning|
+        warning . contains ("Saved hide for")
+        && warning . contains ("HiddenInSubscribeeCol") ),
+      "Expected the post-commit moved-inside warning: {:?}",
+      response . warnings );
+    let without_h : String = rerendered . lines ()
+      . filter (|line| ! line . contains ("(id H)"))
+      . collect::<Vec<_>> () . join ("\n") + "\n";
+    let _ : String = save_buffer_for_hidden_subscriptions_test (
+      &without_h, &driver, &config, tantivy, &graph, &mut views_state
+    ) . await ?;
+    let subscriber_after_removal : NodeComplete = node_from_disk (config, "R") ?;
+    assert! (
+      ! members_of (
+          subscriber_after_removal . hides_from_its_subscriptions . or_default ())
+        . contains (&ID::from ("H")),
+      "Removing H from HiddenOutsideOfSubscribeeCol must remove its hide." );
 
     Ok (( )) }
 

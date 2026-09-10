@@ -198,7 +198,7 @@ async fn switch_refusals_take_the_unwinding_shape (
           search_results : vec![],
           ancestry_by_id : HashMap::new (),
           graphnodestats : AllGraphNodeStats::empty (),
-          include_ugly_telescopes : true, })));
+          include_overPrivateText_telescopes : true, })));
       let search_cancelled : Arc<AtomicBool> =
         Arc::new (AtomicBool::new (false));
       { // Switching to a restricted set while diff mode is on is

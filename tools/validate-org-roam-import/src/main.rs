@@ -368,7 +368,7 @@ fn compare_expected_node_to_actual_id(
             return;
         }
     };
-    compare_scalar_field(
+    compare_text_field(
         "title",
         &node.title,
         &actual.title,
@@ -462,7 +462,7 @@ fn mark_actual_subtree_visited(
     }
 }
 
-fn compare_scalar_field(
+fn compare_text_field(
     field: &str,
     expected: &str,
     actual: &str,

@@ -20,7 +20,7 @@ When BYPASS-OVERRIDE is non-nil, the request carries
             (when bypass-override
               '((override-choice . "bypass")))
             (when approved-pids
-              `((allow-ugly-telescopes ,@approved-pids)))))
+              `((allow-overPrivateText-telescopes ,@approved-pids)))))
           "\n"))
 
 (defun skg-request-single-root-content-view-from-id
@@ -33,7 +33,7 @@ When BYPASS-OVERRIDE is non-nil, the request carries
 \(override-choice . \"bypass\"): if NODE-ID is overridden, the
 server opens the node itself instead of the override-choice menu.
 \(Recursive content beneath the root still substitutes.)
-APPROVED-PIDS and VIEW-URI preserve an ugly-telescope approval retry.
+APPROVED-PIDS and VIEW-URI preserve an overPrivateText-telescope approval retry.
 STALE-URI-RETRY-P is an internal guard that prevents repeated recovery."
   (interactive "sNode ID: ")
   (let* ((tcp-proc (or tcp-proc (skg-tcp-connect-to-rust)))
@@ -49,7 +49,7 @@ STALE-URI-RETRY-P is an internal guard that prevents repeated recovery."
      'content-view
      (lambda (tcp-proc payload)
        (setq skg-response-handler-map
-             (assoc-delete-all 'ugly-telescope-confirmation
+             (assoc-delete-all 'overPrivateText-telescope-confirmation
                                skg-response-handler-map))
        (skg-handle-content-view-sexp
         tcp-proc payload view-uri clean-id bypass-override approved-pids
@@ -58,10 +58,10 @@ STALE-URI-RETRY-P is an internal guard that prevents repeated recovery."
     ;; Alternative to content-view. Keep it non-one-shot so only the
     ;; content-view branch contributes to the pending-response count.
     (skg-register-response-handler
-     'ugly-telescope-confirmation
+     'overPrivateText-telescope-confirmation
      (lambda (tcp-proc payload)
        (setq skg-response-handler-map
-             (assoc-delete-all 'ugly-telescope-confirmation
+             (assoc-delete-all 'overPrivateText-telescope-confirmation
                                skg-response-handler-map))
        (when (assoc 'content-view skg-response-handler-map)
          (setq skg-response-handler-map

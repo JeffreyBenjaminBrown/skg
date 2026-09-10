@@ -1,8 +1,8 @@
-use crate::diff_analysis::diff_analysis_report_with_ugly_pids;
+use crate::diff_analysis::diff_analysis_report_with_overPrivateText_pids;
 use crate::diff_analysis::types::DiffSelection;
 use crate::serve::protocol::TcpToClient;
-use crate::serve::handlers::scalar_release::{
-  ScalarReleaseDecision, decide_for_ugly_pids};
+use crate::serve::handlers::text_release::{
+  TextReleaseDecision, decide_for_overPrivateText_pids};
 use crate::serve::util::{
   format_buffer_response_sexp,
   send_response_with_length_prefix,
@@ -37,11 +37,11 @@ pub fn handle_diff_analysis_request_with_source_set (
     if active . is_all () {
       parse_selection (request)
       . and_then ( |selection|
-        diff_analysis_report_with_ugly_pids (config, selection) )
-      . map ( |(report, ugly_pids)| {
-        let warnings = match decide_for_ugly_pids (
-          "diff-analysis", active, ugly_pids, &HashSet::new () ) {
-          ScalarReleaseDecision::AllowWithWarning { warning } =>
+        diff_analysis_report_with_overPrivateText_pids (config, selection) )
+      . map ( |(report, overPrivateText_pids)| {
+        let warnings = match decide_for_overPrivateText_pids (
+          "diff-analysis", active, overPrivateText_pids, &HashSet::new () ) {
+          TextReleaseDecision::AllowWithWarning { warning } =>
             vec! [warning],
           _ => Vec::new (), };
         (report, warnings) } )

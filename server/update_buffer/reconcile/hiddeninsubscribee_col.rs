@@ -1,6 +1,6 @@
 use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
-use crate::to_org::complete::partner_col::child_data::{ChildData, apply_membership_axes_to_col_members, build_child_data, reconcile_partnerCol_children_against_goal_list};
+use crate::to_org::complete::partner_col::child_data::{ChildData, apply_membership_axes_to_col_members, build_child_data, reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids};
 use crate::to_org::complete::partner_col::goal_list::goal_list_for_hiddeninsubscribee_col;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
 use crate::types::misc::{ID, SourceName};
@@ -24,6 +24,7 @@ struct HiddenInContext {
   subscribee_source   : SourceName,
   subscribee_contains : Vec<ID>,
   subscriber_hides    : Vec<ID>,
+  relationship_sources : HashMap<ID, SourceName>,
 }
 
 /// HiddenInSubscribeeCol completion (called at this col's own BFS visit).
@@ -44,6 +45,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   active_source_set              : Option<&ActiveSourceSet>,
   warning_sink                   : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
@@ -85,16 +87,17 @@ pub fn reconcile_hiddenin_subscribee_col_children (
     build_child_data (
       tree, node,
       &goal_list, &removed_ids, &axes_for_removed,
-      source_diffs, deleted_since_head_pid_src_map, env ) ?;
+      source_diffs, deleted_since_head_pid_src_map,
+      &context . relationship_sources, env ) ?;
   let summary =
-    reconcile_partnerCol_children_against_goal_list(
+    reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids (
       // TODO/DONE/local-view-update/plan_v2.org §6.0: a HiddenInSubscribeeCol child that becomes stale (e.g. the user
       // moved it into the subscribee-as-such, 'unhiding' it) is removed when it
       // is a view-leaf -- the common case for hidden members -- and demoted to
       // Independent only if it has a user subtree to preserve. The reconciler
       // applies this uniformly.
       tree, node, kind,
-      &goal_list, &child_data ) ?;
+      &goal_list, &child_data, deleted_by_this_save_extra_ids ) ?;
   if source_diffs . is_some () {
     // Present members newly derived-in in some stage get that
     // stage's 'newM'; removed members are the phantoms above.
@@ -144,19 +147,23 @@ fn read_hiddenin_context (
       . filter ( |m| source_active (& m . source) )
       . map ( |m| m . member . clone () )
       . collect () };
-  let subscriber_hides : Vec<ID> = {
+  let (subscriber_hides, relationship_sources) : (Vec<ID>, HashMap<ID, SourceName>) = {
     let subscriber_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
         &env . config, &subscriber_pid, &subscriber_source ) ?;
-    subscriber_nodecomplete . hides_from_its_subscriptions
+    let members = subscriber_nodecomplete . hides_from_its_subscriptions
       . or_default () . iter ()
       . filter ( |m| source_active (& m . source) )
-      . map ( |m| m . member . clone () )
-      . collect () };
+      . collect::<Vec<_>> ();
+    ( members . iter () . map ( |m| m . member . clone () ) . collect (),
+      members . iter () . filter ( |m| m . source != subscriber_source )
+        . map ( |m| (m . member . clone (), m . source . clone ()) )
+        . collect () ) };
   Ok (HiddenInContext {
     subscriber_pid,
     subscriber_source,
     subscribee_pid,
     subscribee_source,
     subscribee_contains,
-    subscriber_hides }) }
+    subscriber_hides,
+    relationship_sources }) }

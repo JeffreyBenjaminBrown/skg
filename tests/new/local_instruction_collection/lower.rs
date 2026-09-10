@@ -41,7 +41,7 @@ fn lowering_produces_ordered_definenodes_and_signals () {
       **** (skg (node (id visible) (source main))) visible
       * (skg (node (id doomed) (source main) (editRequest delete))) doomed
       "} );
-  let LoweringOutput { intents, visibility } =
+  let LoweringOutput { intents, visibility, .. } =
     lower_collected_intents (collected) . unwrap();
   { // There is one visibility pair, aimed at the subscriber.
     assert_eq!( visibility . len(), 1 );

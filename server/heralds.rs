@@ -205,12 +205,19 @@ pub fn herald_rule_table () -> HeraldRule {
       vac ("bodyFolded"),
       leaf (Green, QualCol::Alias . repr_in_client (), "aliases"),
       leaf (Green, "alias", "alias"), // Qual::Alias
+      // An alias's stored relationship source is a display fact.  A
+      // requested replacement lives under editRequest below, so the
+      // two values can be rendered side by side without conflation.
+      crule (Red, "relSource", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
+      rule ("editRequest", vec! [
+        crule (Red, "relSource", vec! [
+          any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]),
       // The six READ-ONLY col scaffolds carry ☮ ("cannot be changed
       // from here"); the writable cols (subscribeeCol, overriddenCol,
       // aliasCol) do not.
       leaf_ro! (Green, PartnerCol::HiddenInSubscribee . repr_in_client (),
             "It contains these, but the subscribing ancestor hides them."),
-      leaf_ro! (Green, PartnerCol::HiddenOutsideOfSubscribee . repr_in_client (),
+      leaf (Green, PartnerCol::HiddenOutsideOfSubscribee . repr_in_client (),
             "The subscriber ancestor hides these, but subscribes to nothing that contains them."),
       leaf (Green, PartnerCol::Subscribee . repr_in_client (),
             "It subscribes to these."),
@@ -237,8 +244,14 @@ pub fn herald_rule_table () -> HeraldRule {
         vac ("id"),
         vac ("source") ]),
       crule (Orange, "unknown", vec! [
-        s ("Parent references unknown node."),
-        vac ("id") ]),
+        s ("Reference to unknown node."),
+        vac ("id"),
+        crule (Blue, "viewStats", vec! [
+          crule (Red, "relSource", vec! [
+            any (vec! [ s ("~"), RuleChild::It ]) ]) ]),
+        rule ("editRequest", vec! [
+          crule (Red, "relSource", vec! [
+            any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ]),
       // An inactive placeholder is anonymous and dataless: the bare
       // atom 'inactiveNode' (see InactiveNode), like the other dataless
       // scaffold markers. Its id/source would leak hidden content, so
@@ -280,8 +293,8 @@ pub fn herald_rule_table () -> HeraldRule {
           // (frontloaded in viewnodestats.rs), not here. The atom's
           // ID payload is load-bearing save metadata, never displayed.
           vac ("overridesHere"),
-          // relSource is ALSO load-bearing (see ViewNodeStats::rel_source),
-          // but unlike overridesHere it echoes its own value directly:
+          // relSource is a display fact, not a save request.  It
+          // echoes its own value directly:
           // "~" + the source name, red, immediately before the ⌂
           // sourceHerald below (table ORDER is presentation order,
           // per the module doc, so placing this rule first guarantees
@@ -291,7 +304,9 @@ pub fn herald_rule_table () -> HeraldRule {
         rule ("editRequest", vec! [
           leaf (Red, "delete", "delete"),
           crule (Red, "merge", vec! [
-            any ( vec! [ s ("merge:"), RuleChild::It ] ) ]) ]),
+            any ( vec! [ s ("merge:"), RuleChild::It ] ) ]),
+          crule (Red, "relSource", vec! [
+            any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]),
         crule (Green, "viewRequests", vec! [
           rule ("col",  vec! [ any (vec! [ s ("req:col:"),  RuleChild::It ]) ]),
           rule ("path", vec! [ any (vec! [ s ("req:path:"), RuleChild::It ]) ]),
@@ -420,7 +435,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     "rels",
     "viewStats", "editRequest", "viewRequests",
     "staged", "unstaged",
-    // EditRequest atoms:
+    // NodeEditRequest atoms:
     "delete", "merge",
   ];
   atoms . extend ( graphstats_atoms () );
@@ -458,7 +473,7 @@ fn viewstats_atoms () -> Vec<&'static str> {
       rel_heralds : _,      // -> the node-level rels atom (semantic sexp)
       overridesHere : _,    // keyed form (a viewStats sub-form)
       hidden_body : _,      // -> the node-level hiddenBody atom
-      rel_source : _,       // -> the relSource atom (keyed, load-bearing AND its own herald)
+      rel_source : _,       // -> the relSource display-fact atom and herald
     } = v; }
   let _ = guard;
   vec! [ "cycle", "sourceHerald", "overridesHere", "relSource" ] }

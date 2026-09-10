@@ -22,6 +22,7 @@
 
 use indoc::indoc;
 use std::error::Error;
+use std::fs;
 use std::net::TcpStream;
 use std::path::Path;
 use std::sync::Arc;
@@ -60,7 +61,58 @@ fn all_tests
                  "tests/delete_strips_references_from_neighbors/fixtures-extra-ids") . await ?;
       test_strip_pass_handles_extra_ids (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("delete_preserves_foreign_referencer",
+                 "tests/delete_strips_references_from_neighbors/fixtures-cross-owner") . await ?;
+      delete_preserves_foreign_referencer (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
+
+async fn delete_preserves_foreign_referencer (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let owned : SourceName = SourceName::from ("owned");
+  let foreign : SourceName = SourceName::from ("foreign");
+  let foreign_path : String = path_from_pid_and_source (
+    config, &foreign, ID::from ("cheese") ) ?;
+  let foreign_before : Vec<u8> = fs::read (&foreign_path) ?;
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : false,
+    open_views        : OpenViews::new (),
+  };
+  let listener : std::net::TcpListener =
+    std::net::TcpListener::bind ("127.0.0.1:0") ?;
+  let mut stream : TcpStream = TcpStream::connect (
+    listener . local_addr () ? ) ?;
+  let input_org_text : &str = indoc! {"
+    * (skg (node (id cheese) (source foreign))) cheese
+    ** (skg (node (id victim) (source owned) (editRequest delete))) victim
+  "};
+  let response = update_from_and_rerender_buffer (
+    &mut stream, input_org_text, driver, config, tantivy, &graph, false,
+    &Err ( String::new () ), &mut views_state ) . await ?;
+  assert! (response . saved_view . contains (
+    "(unknown (id victim-alt))"),
+    "the already-open foreign relationship must immediately retain its raw \
+     extra ID as Unknown after deleting the owned primary (with no redundant \
+     default-source fact): {}",
+    response . saved_view );
+  assert_eq! ( fs::read (&foreign_path) ?, foreign_before,
+    "deleting an owned target must not rewrite foreign data" );
+  let owned_referencer : NodeComplete = nodecomplete_from_pid_and_source (
+    config, ID::from ("owned-referencer"), &owned ) ?;
+  assert! ( ! members_of (&owned_referencer . contains)
+            . contains (&ID::from ("victim-alt")),
+    "owned cleanup must remove an extra ID of the deleted node" );
+  let graph_after = graph . load_full ();
+  let cheese = graph_after . get (&ID::from ("cheese"))
+    . expect ("foreign referencer remains in the retained graph");
+  assert! ( members_of (&cheese . contains)
+            . contains (&ID::from ("victim-alt")),
+    "foreign raw membership must survive deletion" );
+  Ok (( )) }
 
 async fn test_delete_strips_references_from_neighbors (
   config  : &SkgConfig,

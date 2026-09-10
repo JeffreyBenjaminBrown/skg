@@ -1,11 +1,11 @@
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::export_org::{
   export_candidate_pids, export_to_org, ExportReport};
-use crate::serve::handlers::scalar_release::{
-  ScalarReleaseDecision,
+use crate::serve::handlers::text_release::{
+  TextReleaseDecision,
   approved_pids_from_request,
   challenge_response,
-  decide_for_ugly_pids};
+  decide_for_overPrivateText_pids};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   format_buffer_response_sexp,
@@ -61,19 +61,19 @@ pub fn handle_export_to_org_request (
       send_export_result (stream, Err (error));
       return; }};
   let candidate_pids = export_candidate_pids (&active, &nodes);
-  let ugly_pids = candidate_pids . into_iter ()
+  let overPrivateText_pids = candidate_pids . into_iter ()
     . filter ( |pid| nodes . iter () . any (
-      |node| node . pid == *pid && node . ugly_telescope ) )
+      |node| node . pid == *pid && node . overPrivateText_telescope ) )
     . collect ();
-  let release = decide_for_ugly_pids (
-    "export-to-org", &active, ugly_pids,
+  let release = decide_for_overPrivateText_pids (
+    "export-to-org", &active, overPrivateText_pids,
     &approved_pids_from_request (request) );
-  if matches! (release, ScalarReleaseDecision::Challenge { .. }) {
+  if matches! (release, TextReleaseDecision::Challenge { .. }) {
     send_response_with_length_prefix (
       stream, &challenge_response (&release) . unwrap () );
     return; }
   let release_warning : Option<String> = match release {
-    ScalarReleaseDecision::AllowWithWarning { warning } => Some (warning),
+    TextReleaseDecision::AllowWithWarning { warning } => Some (warning),
     _ => None, };
   let result : Result<(String, Vec<String>), String> =
     export_to_org (&active, &nodes, &output_base)

@@ -25,10 +25,10 @@ use crate::serve::handlers::herald_rules::handle_herald_rules_request;
 use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
 use crate::serve::handlers::rerender_all_views::{ handle_git_diff_toggle_and_rerender, handle_rerender_all_views_request};
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
-use crate::serve::handlers::scalar_release::{
-  ScalarReleaseDecision,
-  decide as decide_scalar_release,
-  exclude_ugly_nodes_from_viewforest};
+use crate::serve::handlers::text_release::{
+  TextReleaseDecision,
+  decide as decide_text_release,
+  exclude_overPrivateText_nodes_from_viewforest};
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::source_sets::handle_source_set_request;
 use crate::serve::handlers::stage_moves::handle_stage_moves_request;
@@ -358,8 +358,8 @@ fn handle_snapshot_response (
   apply_source_set_to_viewforest (
     &mut viewforest,
     active_source_set );
-  if ! payload . include_ugly_telescopes {
-    exclude_ugly_nodes_from_viewforest (
+  if ! payload . include_overPrivateText_telescopes {
+    exclude_overPrivateText_nodes_from_viewforest (
       &mut viewforest, &env . in_rust_graph_snapshot () ); }
   let rendered_pids : Vec<_> =
     viewforest . root () . descendants ()
@@ -370,20 +370,20 @@ fn handle_snapshot_response (
       _ => None, } )
     . collect ();
   let approved : std::collections::HashSet<_> =
-    if payload . include_ugly_telescopes {
+    if payload . include_overPrivateText_telescopes {
       rendered_pids . iter () . cloned () . collect ()
     } else { std::collections::HashSet::new () };
-  let release = decide_scalar_release (
+  let release = decide_text_release (
     "search-enrichment", active_source_set, &rendered_pids,
     &env . in_rust_graph_snapshot (), &approved );
-  if matches! (release, ScalarReleaseDecision::Challenge { .. }) {
+  if matches! (release, TextReleaseDecision::Challenge { .. }) {
     // Preflight and the load-bearing payload should make this unreachable.
     // Fail closed rather than serialize if a future change violates either.
     tracing::error! (
       "search enrichment reached the release boundary without approval" );
     return; }
   let release_warnings : Vec<String> = match release {
-    ScalarReleaseDecision::AllowWithWarning { warning } => vec! [warning],
+    TextReleaseDecision::AllowWithWarning { warning } => vec! [warning],
     _ => Vec::new (), };
   let enriched : String =
     viewforest_to_string ( &viewforest, &env . config )

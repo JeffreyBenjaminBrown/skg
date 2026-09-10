@@ -1,10 +1,10 @@
 use crate::git_ops::read_repo::open_repo;
 use crate::serve::ViewsState;
-use crate::serve::handlers::scalar_release::{
-  ScalarReleaseDecision,
+use crate::serve::handlers::text_release::{
+  TextReleaseDecision,
   approved_pids_from_request,
   challenge_response,
-  decide as decide_scalar_release};
+  decide as decide_text_release};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_errors_warnings_sexp, format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response, tag_text_response};
 use crate::source_sets::ActiveSourceSet;
@@ -159,19 +159,19 @@ pub(crate) fn authorize_prepared_rerenders (
     . flat_map ( |view|
       pids_from_viewforest (&view . viewforest) . into_iter () )
     . collect ();
-  let release = decide_scalar_release (
+  let release = decide_text_release (
     operation, active, &candidates,
     &env . in_rust_graph_snapshot (), approved_pids );
   match release {
-    ScalarReleaseDecision::Challenge { .. } => {
+    TextReleaseDecision::Challenge { .. } => {
       send_response_with_length_prefix (
         stream, &challenge_response (&release) . unwrap () );
       stream_empty_rerender (stream);
       false },
-    ScalarReleaseDecision::AllowWithWarning { warning } => {
+    TextReleaseDecision::AllowWithWarning { warning } => {
       prepared . warnings . push (warning);
       true },
-    ScalarReleaseDecision::Allow => true,
+    TextReleaseDecision::Allow => true,
   }
 }
 

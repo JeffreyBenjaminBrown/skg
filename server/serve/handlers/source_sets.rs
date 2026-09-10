@@ -4,7 +4,7 @@ use crate::serve::handlers::rerender_all_views::{
   prepare_rerender_views,
   stream_empty_rerender,
   stream_prepared_rerenders};
-use crate::serve::handlers::scalar_release::approved_pids_from_request;
+use crate::serve::handlers::text_release::approved_pids_from_request;
 use crate::serve::handlers::text_search::SearchEnrichmentPayload;
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{

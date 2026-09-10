@@ -25,7 +25,7 @@ use std::collections::HashMap;
 use std::io;
 
 /// The fold of one node's sections, as effective lists of members at sources plus
-/// scalars. Field names mirror 'NodeComplete'.
+/// title/body text. Field names mirror 'NodeComplete'.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FoldedNode {
   pub title                        : Option<String>,
@@ -95,7 +95,7 @@ pub fn nodecomplete_from_fold (
   folded    : FoldedNode,
 ) -> Option<NodeComplete> {
   let home : SourceName = folded . home ?;
-  let ugly_telescope : bool =
+  let overPrivateText_telescope : bool =
     folded . title_source . as_ref () != Some (&home)
     || folded . body_source . as_ref ()
        .map ( |source| source != &home )
@@ -107,7 +107,7 @@ pub fn nodecomplete_from_fold (
       Some (v) => MSV::Specified (v), }};
   Some ( NodeComplete {
     title                        : folded . title ?,
-    ugly_telescope,
+    overPrivateText_telescope,
     aliases                      : match folded . aliases {
       None     => MSV::Unspecified,
       Some (v) => MSV::Specified (v), },
@@ -132,7 +132,7 @@ pub fn fold_sections (
 ) -> (FoldedNode, Vec<FoldWarning>) {
   let mut warnings : Vec<FoldWarning> = Vec::new ();
   let mut folded : FoldedNode = FoldedNode::default ();
-  { // Scalars select independently: the first title and first body
+  { // Title/body text select independently: the first title and first body
     // in privacy order win. The home remains the first section,
     // whether or not it carries either scalar.
     folded . home = sections . first ()

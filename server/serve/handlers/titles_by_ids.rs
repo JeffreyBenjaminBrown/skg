@@ -1,10 +1,10 @@
 use crate::dbs::tantivy::titles_by_ids;
 use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
-use crate::serve::handlers::scalar_release::{
-  ScalarReleaseDecision,
+use crate::serve::handlers::text_release::{
+  TextReleaseDecision,
   approved_pids_from_request,
   challenge_response,
-  decide_for_ugly_pids};
+  decide_for_overPrivateText_pids};
 use crate::serve::handlers::save_buffer::compute_diff_for_every_source;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::send_response_with_length_prefix;
@@ -107,28 +107,28 @@ pub fn handle_titles_by_ids_request_with_source_set (
       . map ( |source| active . contains_source (&source) )
       . unwrap_or (false) } } );
   let requested : HashSet<ID> = ids . iter () . cloned () . collect ();
-  let mut ugly_pids : Vec<ID> = ids . iter ()
+  let mut overPrivateText_pids : Vec<ID> = ids . iter ()
     . filter_map ( |id| graph . pid_of (id) )
     . filter ( |pid| graph . get (pid)
-      . map ( |node| node . ugly_telescope )
+      . map ( |node| node . overPrivateText_telescope )
       . unwrap_or (false) )
     . collect ();
   if let Some (source_diffs) = &source_diffs {
     for source_diff in source_diffs . values () {
       for node in source_diff . added_nodes . values ()
         . chain (source_diff . deleted_nodes . values ()) {
-        if node . ugly_telescope
+        if node . overPrivateText_telescope
            && node . all_ids () . any ( |id| requested . contains (id) ) {
-          ugly_pids . push (node . pid . clone ()); }}}}
-  let release = decide_for_ugly_pids (
-    "titles-by-ids", active, ugly_pids,
+          overPrivateText_pids . push (node . pid . clone ()); }}}}
+  let release = decide_for_overPrivateText_pids (
+    "titles-by-ids", active, overPrivateText_pids,
     &approved_pids_from_request (request) );
-  if matches! (release, ScalarReleaseDecision::Challenge { .. }) {
+  if matches! (release, TextReleaseDecision::Challenge { .. }) {
     send_response_with_length_prefix (
       stream, &challenge_response (&release) . unwrap () );
     return; }
   let warnings : Vec<String> = match release {
-    ScalarReleaseDecision::AllowWithWarning { warning } => vec! [warning],
+    TextReleaseDecision::AllowWithWarning { warning } => vec! [warning],
     _ => Vec::new (), };
   let content_pairs : Vec<String> =
     title_map . iter ()

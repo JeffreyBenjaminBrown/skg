@@ -236,7 +236,9 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
           define_nodes,
           nodeMerge_instructions,
           source_moves : nonmerge_plan . source_moves,
-          fork_specs },
+          fork_specs,
+          post_commit_notice_candidates :
+            nonmerge_plan . post_commit_notice_candidates },
         warnings )) }
 
 /// One nonfatal warning per DEAD textlink this save writes: a

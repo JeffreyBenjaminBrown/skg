@@ -1,13 +1,13 @@
 use crate::source_sets::ActiveSourceSet;
 use crate::types::env::SkgEnv;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::to_org::complete::partner_col::child_data::{ChildData, build_child_data, apply_membership_axes_to_col_members, reconcile_partnerCol_children_against_goal_list};
+use crate::to_org::complete::partner_col::child_data::{ChildData, build_child_data, apply_membership_axes_to_col_members, reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids};
 use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::to_org::complete::partner_col::goal_list::{goal_list_for_outbound_col, outbound_member_axes};
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::phantom::phantom_axes;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, MemberAtSource, SourceName};
 use crate::types::tree::generic::{read_at_node_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child_of_viewnode, insert_scaffold_as_child};
 use crate::update_buffer::ancestry::required_ancestor;
@@ -23,6 +23,7 @@ struct SubscribeeColContext {
   parent_pid             : ID,
   parent_source          : SourceName,
   worktree_subscribees   : Vec<ID>,
+  relationship_sources   : HashMap<ID, SourceName>,
 }
 
 /// SubscribeeCol completion. Called at this col's own visit in the level-order
@@ -41,6 +42,7 @@ pub async fn reconcile_subscribee_col_children (
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   env                            : &SkgEnv,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   active_source_set              : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   let kind : PartnerCol = PartnerCol::Subscribee;
@@ -97,10 +99,11 @@ pub async fn reconcile_subscribee_col_children (
       build_child_data (
         tree, node,
         &goal_list, &removed_ids, &axes_for_removed,
-        source_diffs, deleted_since_head_pid_src_map, env ) ?;
-    reconcile_partnerCol_children_against_goal_list(
+        source_diffs, deleted_since_head_pid_src_map,
+        &context . relationship_sources, env ) ?;
+    reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids (
       tree, node, kind,
-      &goal_list, &child_data ) ?;
+      &goal_list, &child_data, deleted_by_this_save_extra_ids ) ?;
     if source_diffs . is_some () {
       // Present members whose edge is New in some stage get that
       // stage's 'newM'; removed members are the phantoms above.
@@ -136,7 +139,7 @@ fn read_subscribee_col_context (
         _ => None } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
     . ok_or ("reconcile_subscribee_col_children: parent is not an ActiveNode") ?;
-  let worktree_subscribees : Vec<ID> =
+  let worktree_members : Vec<MemberAtSource<ID>> =
     // Edge-source gating (render-and-gating, 5_plan.org): this is the
     // OWNER's own outbound list (like 'contains' in
     // reconcile/content.rs), so a subscription recorded at an
@@ -150,13 +153,23 @@ fn read_subscribee_col_context (
                   None      => true,
                   Some (a)  => a . is_all ()
                     || a . contains_source (& m . source) } )
-              . map ( |m| m . member . clone () )
+              . cloned ()
               . collect () )
       . unwrap_or_default ();
+  let worktree_subscribees : Vec<ID> =
+    worktree_members . iter () . map ( |m| m . member . clone () ) . collect ();
+  let relationship_sources : HashMap<ID, SourceName> =
+    worktree_members . into_iter ()
+      // An unresolved destination has no home of its own, so the
+      // relationship default is the subscriber's home.  Only retain an
+      // off-default fact for the Unknown's display metadata.
+      . filter ( |m| m . source != parent_source )
+      . map ( |m| (m . member, m . source) ) . collect ();
   Ok (SubscribeeColContext {
     parent_pid,
     parent_source,
-    worktree_subscribees }) }
+    worktree_subscribees,
+    relationship_sources }) }
 
 fn ensure_hiddenoutsideofsubscribeecol_is_last (
   tree : &mut Tree<ViewNode>,

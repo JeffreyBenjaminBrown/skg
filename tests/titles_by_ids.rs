@@ -92,10 +92,10 @@ fn restricted_title_lookup_challenges_without_releasing_text (
 ) -> Result<(), Box<dyn Error>> {
   let source : SourceName = SourceName::from ("main");
   let mut node : NodeComplete = empty_node_complete ();
-  node . pid = ID::new ("ugly-title-id");
+  node . pid = ID::new ("overPrivateText-title-id");
   node . source = source . clone ();
   node . title = "UNIQUE TITLE SECRET" . to_string ();
-  node . ugly_telescope = true;
+  node . overPrivateText_telescope = true;
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes (&[node . clone ()]);
   let (index, _) = wipe_then_init_tantivy_db (
@@ -122,12 +122,12 @@ fn restricted_title_lookup_challenges_without_releasing_text (
     Ok (read_lp_message (&mut std::io::BufReader::new (client))?)
   };
   let challenged : String = respond (
-    "((request . \"titles by ids\") (ids \"ugly-title-id\"))" )?;
-  assert! ( challenged . contains ("ugly-telescope-confirmation") );
+    "((request . \"titles by ids\") (ids \"overPrivateText-title-id\"))" )?;
+  assert! ( challenged . contains ("overPrivateText-telescope-confirmation") );
   assert! ( ! challenged . contains ("UNIQUE TITLE SECRET") );
   let approved : String = respond (
-    "((request . \"titles by ids\") (ids \"ugly-title-id\") \
-      (allow-ugly-telescopes \"ugly-title-id\"))" )?;
+    "((request . \"titles by ids\") (ids \"overPrivateText-title-id\") \
+      (allow-overPrivateText-telescopes \"overPrivateText-title-id\"))" )?;
   assert! ( approved . contains ("UNIQUE TITLE SECRET") );
   assert! ( approved . contains ("selected below") );
   Ok (( ))

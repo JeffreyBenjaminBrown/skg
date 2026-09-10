@@ -3,10 +3,10 @@
 /// see (TODO/full-schema/9-2_source-set-safety.org).
 ///
 /// VOCABULARY (shared by both functions):
-/// - A disk member is VISIBLE iff its source is in the active
-///   source-set.  Unresolvable members (dangling references) count
-///   as invisible, hence are preserved: the user could not have
-///   seen them, so they cannot have deliberately deleted them.
+/// - A disk member is VISIBLE iff its relationship source is active
+///   and, when it resolves, its node home is active too.  An
+///   unresolvable raw member has no home, so an active relationship
+///   source makes it visible as an Unknown and lets the user delete it.
 /// - A disk member is POSITIONED iff it appears in the buffer list.
 ///   Only visible members ever do: save extraction never puts an
 ///   inactive (invisible) member into a container's list (see
@@ -20,7 +20,7 @@
 
 use crate::dbs::in_rust_graph::snapshot_global;
 use crate::source_sets::ActiveSourceSet;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, MemberAtSource, SkgConfig, SourceName};
 use crate::types::phantom::home_from_disk;
 
 use std::collections::{HashMap, HashSet};
@@ -43,6 +43,23 @@ pub fn member_is_visible (
   match source {
     Some (src) => active . contains_source (&src),
     None       => false, }}
+
+/// Visibility of a structured relationship occurrence.  Its recording source
+/// gates first.  A resolved member also needs an active home; an unresolved
+/// raw member has no home and is deliberately visible whenever its relationship
+/// source is active, so the user can retain or remove the Unknown occurrence.
+pub fn relationship_member_is_visible (
+  member : &MemberAtSource<ID>,
+  config : &SkgConfig,
+  active : &ActiveSourceSet,
+) -> bool {
+  if ! active . contains_source (&member . source) { return false; }
+  let home : Option<SourceName> = snapshot_global ()
+    . and_then (|snap| snap . pid_and_source (&member . member)
+               . map (|(_pid, source)| source))
+    . or_else (|| home_from_disk (&member . member, config));
+  home . map_or (true, |source| active . contains_source (&source))
+}
 
 /// The anchored weave, for order-meaningful lists ('contains',
 /// 'subscribes_to').  Invisible disk members cling to the visible

@@ -35,7 +35,7 @@ function M.toggle (approved_pids)
         vim.notify(content or 'toggled') end
     end, true)
   rerender.register_rerender_stream_handlers()
-  rerender.register_ugly_confirmation(function (pids)
+  rerender.register_overPrivateText_confirmation(function (pids)
     M.toggle(pids)
   end, 'git-diff-mode')
   state.lp_reset()
@@ -43,7 +43,7 @@ function M.toggle (approved_pids)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'git diff mode toggle') }
   if approved_pids and #approved_pids > 0 then
-    local approval = { sexpr.symbol('allow-ugly-telescopes') }
+    local approval = { sexpr.symbol('allow-overPrivateText-telescopes') }
     for _, pid in ipairs(approved_pids) do table.insert(approval, pid) end
     table.insert(request, approval) end
   client.send_string(sexpr.to_string(request) .. '\n')

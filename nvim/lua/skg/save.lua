@@ -70,10 +70,10 @@ end
 ---@param fork_approved boolean|nil
 ---@param fork_sources table[]|nil {{id, source}, ...}
 ---@param hoist_approved_pids string[]|nil
----@param scalar_approved_pids string[]|nil
+---@param text_approved_pids string[]|nil
 function M.request_save_buffer (fork_approved, fork_sources,
                                 hoist_approved_pids,
-                                scalar_approved_pids)
+                                text_approved_pids)
   local save_buf = vim.api.nvim_get_current_buf()
   M.confirm_save_despite_other_unsaved(save_buf)
   local saved_uri = vim.b[save_buf].skg_view_uri
@@ -95,7 +95,7 @@ function M.request_save_buffer (fork_approved, fork_sources,
     M.save_request_string(saved_uri, save_point_position,
                           fork_approved, fork_sources,
                           hoist_approved_pids,
-                          scalar_approved_pids)
+                          text_approved_pids)
   do -- The server needs these markers, but the user doesn't.
     focus.remove_focused_marker()
     folds.remove_folded_markers()
@@ -140,11 +140,11 @@ function M.request_save_buffer (fork_approved, fork_sources,
     function (_payload_text, response)
       M.telescope_hoist_confirmation_handler(
         save_buf, response, fork_approved, fork_sources,
-        scalar_approved_pids)
+        text_approved_pids)
     end, false)
-  state.register_response_handler('ugly-telescope-confirmation',
+  state.register_response_handler('overPrivateText-telescope-confirmation',
     function (_payload_text, response)
-      M.save_scalar_release_confirmation_handler(
+      M.save_text_release_confirmation_handler(
         save_buf, response, fork_approved, fork_sources,
         hoist_approved_pids)
     end, false)
@@ -161,11 +161,11 @@ end
 ---@param fork_approved boolean|nil
 ---@param fork_sources table[]|nil
 ---@param hoist_approved_pids string[]|nil
----@param scalar_approved_pids string[]|nil
+---@param text_approved_pids string[]|nil
 ---@return string
 function M.save_request_string (view_uri, position, fork_approved,
                                 fork_sources, hoist_approved_pids,
-                                scalar_approved_pids)
+                                text_approved_pids)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'save buffer'),
     sexpr.pair(sexpr.symbol('view-uri'), view_uri),
@@ -189,9 +189,9 @@ function M.save_request_string (view_uri, position, fork_approved,
     for _, pid in ipairs(hoist_approved_pids) do
       table.insert(field, pid) end
     table.insert(request, field) end
-  if scalar_approved_pids then
-    local field = { sexpr.symbol('allow-ugly-telescopes') }
-    for _, pid in ipairs(scalar_approved_pids) do
+  if text_approved_pids then
+    local field = { sexpr.symbol('allow-overPrivateText-telescopes') }
+    for _, pid in ipairs(text_approved_pids) do
       table.insert(field, pid) end
     table.insert(request, field) end
   return sexpr.to_string(request) .. '\n'
@@ -278,7 +278,7 @@ function M.save_result_handler (save_buf, response)
   state.response_handler_map['save-relax-lock'] = nil
   state.response_handler_map['fork-confirmation'] = nil
   state.response_handler_map['telescope-hoist-confirmation'] = nil
-  state.response_handler_map['ugly-telescope-confirmation'] = nil
+  state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
   lock.end_stream()
   lock.unlock_all_save_locked()
   local ok, err = pcall(M.handle_save_response, save_buf, response)
@@ -455,7 +455,7 @@ function M.fork_confirmation_handler (save_buf, response)
   state.response_handler_map['save-relax-lock'] = nil
   state.response_handler_map['fork-confirmation'] = nil
   state.response_handler_map['telescope-hoist-confirmation'] = nil
-  state.response_handler_map['ugly-telescope-confirmation'] = nil
+  state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
   if state.response_handler_map['save-result'] then
     state.response_handler_map['save-result'] = nil
     state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
@@ -503,12 +503,12 @@ end
 ---@param fork_sources table[]|nil
 function M.telescope_hoist_confirmation_handler (
     save_buf, response, fork_approved, fork_sources,
-    scalar_approved_pids)
+    text_approved_pids)
   state.response_handler_map['collateral-view'] = nil
   state.response_handler_map['save-relax-lock'] = nil
   state.response_handler_map['fork-confirmation'] = nil
   state.response_handler_map['telescope-hoist-confirmation'] = nil
-  state.response_handler_map['ugly-telescope-confirmation'] = nil
+  state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
   if state.response_handler_map['save-result'] then
     state.response_handler_map['save-result'] = nil
     state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
@@ -535,7 +535,7 @@ function M.telescope_hoist_confirmation_handler (
       vim.api.nvim_set_current_buf(save_buf)
       M.request_save_buffer(
         fork_approved, fork_sources, approved_pids,
-        scalar_approved_pids)
+        text_approved_pids)
     else
       vim.notify('Hoist aborted; nothing was saved. Repair the .skg'
                  .. ' sections manually.')
@@ -556,12 +556,12 @@ end
 ---@param fork_approved boolean|nil
 ---@param fork_sources table[]|nil
 ---@param hoist_approved_pids string[]|nil
-function M.save_scalar_release_confirmation_handler (
+function M.save_text_release_confirmation_handler (
     save_buf, response, fork_approved, fork_sources,
     hoist_approved_pids)
   for _, response_type in ipairs({
       'collateral-view', 'save-relax-lock', 'fork-confirmation',
-      'telescope-hoist-confirmation', 'ugly-telescope-confirmation' }) do
+      'telescope-hoist-confirmation', 'overPrivateText-telescope-confirmation' }) do
     state.response_handler_map[response_type] = nil
   end
   if state.response_handler_map['save-result'] then
@@ -573,7 +573,7 @@ function M.save_scalar_release_confirmation_handler (
   local approved_pids =
     payload.string_list(payload.field(response, 'pids'))
   local prompt = payload.field_text(response, 'prompt')
-    or 'Display staged text from ugly telescopes?'
+    or 'Display staged text from overPrivateText telescopes?'
   if #vim.api.nvim_list_uis() == 0 then
     vim.notify('Saved, but protected rerender text was withheld for '
                .. table.concat(approved_pids, ', '))

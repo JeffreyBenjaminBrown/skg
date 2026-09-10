@@ -347,7 +347,7 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
           search_results : vec![ID::from ("active-search-hit")],
           ancestry_by_id : HashMap::new (),
           graphnodestats : AllGraphNodeStats::empty (),
-          include_ugly_telescopes : false, })));
+          include_overPrivateText_telescopes : false, })));
       let search_cancelled : Arc<AtomicBool> =
         Arc::new (AtomicBool::new (false));
       let (mut server_stream, _client_stream) =

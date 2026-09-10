@@ -13,7 +13,7 @@ use crate::consts::SEARCH_DISPLAY_LIMIT;
 use crate::context::ContextOriginType;
 use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
 use crate::dbs::tantivy::search::{
-  SearchOptions, has_ugly_telescope, search_index};
+  SearchOptions, has_overPrivateText_telescope, search_index};
 use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
@@ -24,10 +24,10 @@ use crate::types::env::SkgEnv;
 use crate::org_to_text::viewforest_to_string;
 use crate::update_buffer::set_viewnodestats_in_viewforest;
 use crate::serve::ViewsState;
-use crate::serve::handlers::scalar_release::{
-  ScalarReleaseDecision,
-  SearchUglinessChoice,
-  decide as decide_scalar_release,
+use crate::serve::handlers::text_release::{
+  TextReleaseDecision,
+  SearchOverPrivateTextChoice,
+  decide as decide_text_release,
   search_challenge_response,
   search_choice_from_request};
 use crate::serve::protocol::TcpToClient;
@@ -115,8 +115,8 @@ pub struct SearchEnrichmentPayload {
   pub ancestry_by_id : HashMap<ID, AncestryTree>,
   pub graphnodestats : AllGraphNodeStats,
   /// Load-bearing across the asynchronous snapshot exchange: enrichment
-  /// must not broaden a preflight decision to exclude ugly telescopes.
-  pub include_ugly_telescopes : bool,
+  /// must not broaden a preflight decision to exclude overPrivateText telescopes.
+  pub include_overPrivateText_telescopes : bool,
 }
 
 /// Provides two responses, one fast and one slow.
@@ -147,7 +147,7 @@ pub fn handle_text_search_request (
       return; } };
   let search_terms : Result < String, String > =
     extract_v_from_kv_pair_in_sexp ( &sexp, "terms" );
-  let search_choice : Option<SearchUglinessChoice> =
+  let search_choice : Option<SearchOverPrivateTextChoice> =
     match search_choice_from_request (&sexp) {
       Ok (choice) => choice,
       Err (error) => {
@@ -160,9 +160,9 @@ pub fn handle_text_search_request (
       // Wait for any in-flight background save-index writes to commit, so
       // the search reflects every save issued so far (read-your-writes).
       wait_for_tantivy_writes_idle ();
-      let index_has_ugly : bool =
-        match has_ugly_telescope (&env . tantivy_index) {
-          Ok (has_ugly) => has_ugly,
+      let index_has_overPrivateText : bool =
+        match has_overPrivateText_telescope (&env . tantivy_index) {
+          Ok (has_overPrivateText) => has_overPrivateText,
           Err (error) => {
             send_response_with_length_prefix (
               stream,
@@ -171,19 +171,19 @@ pub fn handle_text_search_request (
                 &format! ("Error checking search privacy: {}", error) ) );
             return; }};
       if ! active . is_all ()
-         && index_has_ugly
+         && index_has_overPrivateText
          && search_choice . is_none () {
         send_response_with_length_prefix (
           stream, &search_challenge_response () );
         return; }
-      let include_ugly_telescopes : bool =
+      let include_overPrivateText_telescopes : bool =
         active . is_all ()
-        || search_choice == Some (SearchUglinessChoice::Include);
+        || search_choice == Some (SearchOverPrivateTextChoice::Include);
       let search_opts : SearchOptions = SearchOptions {
         regex     : bool_key ( &sexp, "regex" ),
         body      : bool_key ( &sexp, "body" ),
         operators : bool_key ( &sexp, "operators" ),
-        exclude_ugly_telescope : ! include_ugly_telescopes,
+        exclude_overPrivateText_telescope : ! include_overPrivateText_telescopes,
       };
       // --- Phase 1: immediate results without paths ---
       match search_index ( &env . tantivy_index,
@@ -226,19 +226,19 @@ pub fn handle_text_search_request (
               &matches_by_id,
               &suppressed );
           let approved : HashSet<ID> =
-            if include_ugly_telescopes {
+            if include_overPrivateText_telescopes {
               search_results . iter () . cloned () . collect ()
             } else { HashSet::new () };
-          let release = decide_scalar_release (
+          let release = decide_text_release (
             "text-search", active, &search_results,
             &env . in_rust_graph_snapshot (), &approved );
           if matches! (
-            release, ScalarReleaseDecision::Challenge { .. } ) {
+            release, TextReleaseDecision::Challenge { .. } ) {
             send_response_with_length_prefix (
               stream, &search_challenge_response () );
             return; }
           let warnings : Vec<String> = match release {
-            ScalarReleaseDecision::AllowWithWarning { warning } =>
+            TextReleaseDecision::AllowWithWarning { warning } =>
               vec! [warning],
             _ => Vec::new (), };
           let rendered : String =
@@ -261,7 +261,7 @@ pub fn handle_text_search_request (
             enrichment_slot, search_cancelled,
             &env . driver, &env . config,
             &search_terms, &search_results, active,
-            include_ugly_telescopes ); },
+            include_overPrivateText_telescopes ); },
         Err (e) => {
           send_response_with_length_prefix (
             stream,
@@ -311,7 +311,7 @@ fn spawn_enrichment_thread (
   search_terms     : &str,
   search_results   : &[ID],
   active           : &ActiveSourceSet,
-  include_ugly_telescopes : bool,
+  include_overPrivateText_telescopes : bool,
 ) {
   { // Clear stale enrichment before spawning.
     // todo ? Instead, permit multiple enrichments for different search result buffers to coexist.
@@ -377,7 +377,7 @@ fn spawn_enrichment_thread (
       search_results : ids_clone,
       ancestry_by_id,
       graphnodestats,
-      include_ugly_telescopes } ); } ); }
+      include_overPrivateText_telescopes } ); } ); }
 
 fn collect_ids_from_ancestry_node(
   node   : &AncestryTree,
@@ -650,5 +650,6 @@ pub fn build_search_viewforest (
             kind        : ViewNodeKind::Qual (Qual::Alias {
                 text       : title . clone (),
                 rel_source : None,
+                rel_source_request : None,
                 membership : MembershipAxes::default () } ) } ); }} }
   (viewforest, search_results) }

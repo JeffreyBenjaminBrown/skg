@@ -12,10 +12,10 @@
 (require 'skg-buffer)       ; for skg-find-buffer-by-uri
 (require 'skg-lock-buffers)
 
-(defvar skg--rerender-ugly-retry nil
+(defvar skg--rerender-overPrivateText-retry nil
   "Function to run after a challenged rerender's empty unwind completes.")
 
-(defvar skg--rerender-ugly-challenged nil
+(defvar skg--rerender-overPrivateText-challenged nil
   "Non-nil while consuming the empty unwind after a privacy challenge.")
 
 (defun skg-request-rerender-all-views (&optional approved-pids)
@@ -26,7 +26,7 @@ streaming protocol: rerender-lock, rerender-view*, rerender-done."
     (skg--begin-stream "rerender")
     (skg--lock-all-skg-buffers)
     (skg--register-rerender-stream-handlers)
-    (skg--register-rerender-ugly-confirmation
+    (skg--register-rerender-overPrivateText-confirmation
      (lambda (pids) (skg-request-rerender-all-views pids)))
     (skg-lp-reset)
     (process-send-string
@@ -35,21 +35,21 @@ streaming protocol: rerender-lock, rerender-view*, rerender-done."
               (append
                '((request . "rerender all views"))
                (when approved-pids
-                 `((allow-ugly-telescopes ,@approved-pids)))))
+                 `((allow-overPrivateText-telescopes ,@approved-pids)))))
              "\n"))))
 
-(defun skg--register-rerender-ugly-confirmation
+(defun skg--register-rerender-overPrivateText-confirmation
     (retry &optional unfired-response-type)
   "Retry after the challenge unwind, approving its PIDs.
 UNFIRED-RESPONSE-TYPE is the one-shot acknowledgement the challenged
 request replaced; remove it and balance its pending count."
-  (setq skg--rerender-ugly-retry nil
-        skg--rerender-ugly-challenged nil)
+  (setq skg--rerender-overPrivateText-retry nil
+        skg--rerender-overPrivateText-challenged nil)
   (skg-register-response-handler
-   'ugly-telescope-confirmation
+   'overPrivateText-telescope-confirmation
    (lambda (_tcp-proc payload)
      (setq skg-response-handler-map
-           (assoc-delete-all 'ugly-telescope-confirmation
+           (assoc-delete-all 'overPrivateText-telescope-confirmation
                              skg-response-handler-map))
      (when (and unfired-response-type
                 (assoc unfired-response-type skg-response-handler-map))
@@ -62,9 +62,9 @@ request replaced; remove it and balance its pending count."
             (prompt (format "%s" (cadr (assoc 'prompt response))))
             (pids (mapcar (lambda (pid) (format "%s" pid))
                           (cadr (assoc 'pids response)))))
-       (setq skg--rerender-ugly-challenged t)
+       (setq skg--rerender-overPrivateText-challenged t)
        (when (y-or-n-p (concat prompt " "))
-         (setq skg--rerender-ugly-retry
+         (setq skg--rerender-overPrivateText-retry
                (lambda () (funcall retry pids))))))
    nil))
 
@@ -75,9 +75,9 @@ Shared by 'skg-request-rerender-all-views' and 'skg-view-diff-mode'."
    ;; 1. Lock message: unlock buffers not in the URI list.
    'rerender-lock
    (lambda (_tcp-proc payload)
-     (unless skg--rerender-ugly-challenged
+     (unless skg--rerender-overPrivateText-challenged
        (setq skg-response-handler-map
-             (assoc-delete-all 'ugly-telescope-confirmation
+             (assoc-delete-all 'overPrivateText-telescope-confirmation
                                skg-response-handler-map)))
      (condition-case err
          (let* ((response (read payload))
@@ -123,10 +123,10 @@ Shared by 'skg-request-rerender-all-views' and 'skg-view-diff-mode'."
                errors-list warnings-list))))
        (error
         (message "skg: rerender-done handler error: %S" err)))
-     (let ((retry (and skg--rerender-ugly-challenged
-                       skg--rerender-ugly-retry)))
-       (setq skg--rerender-ugly-retry nil
-             skg--rerender-ugly-challenged nil)
+     (let ((retry (and skg--rerender-overPrivateText-challenged
+                       skg--rerender-overPrivateText-retry)))
+       (setq skg--rerender-overPrivateText-retry nil
+             skg--rerender-overPrivateText-challenged nil)
        ;; The dispatcher removes this one-shot handler after return. A
        ;; zero-delay timer starts the retry after that removal, so the new
        ;; rerender-done handler is not accidentally deleted with the old one.

@@ -6,7 +6,7 @@
 //! sources the save's default floor can accept, instead of the whole
 //! ladder. The reply is advisory: the save-time floor check in
 //! 'apply_sticky_sources' stays load-bearing, since buffers go stale
-//! and the '(relSource ...)' atom is plain text anyone can type.
+//! and the '(editRequest (relSource ...))' request is plain text anyone can type.
 
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::serve::protocol::TcpToClient;
@@ -60,8 +60,9 @@ fn edge_source_info_response_body (
 
 /// One edge's (default source, current source). Between owned nodes,
 /// the default is the more private endpoint home. From an owned
-/// owner to a foreign member, it is the owner's home. The current
-/// source is None when the graph records no such edge.
+/// owner to a foreign or unresolved member, it is the owner's home.
+/// The current source is None when the graph records no such exact raw
+/// member.  This lets an Unknown placeholder edit a stored dangling edge.
 pub fn edge_source_info (
   graph    : &crate::dbs::in_rust_graph::InRustGraph,
   config   : &crate::types::misc::SkgConfig,
@@ -73,19 +74,20 @@ pub fn edge_source_info (
     graph . pid_and_source (owner)
     . ok_or_else ( || format! (
       "owner '{}' is not in the graph", owner )) ?;
-  let member_home : SourceName =
-    graph . pid_and_source (member)
+  let member_home : SourceName = graph . pid_and_source (member)
     . map ( |(_pid, src)| src )
-    . ok_or_else ( || format! (
-      "member '{}' is not in the graph", member )) ?;
+    // An unresolved destination has no home to make this edge more
+    // private, so its writable relationship defaults to the owner's home.
+    . unwrap_or_else ( || owner_home . clone () );
   let default : SourceName = config . relationship_default_source (
     &owner_home, &member_home );
   let current : Option<SourceName> =
-    graph . edge_source ( &owner_pid, relation, member );
+    graph . edge_source_for_stored_member ( &owner_pid, relation, member );
   Ok (( default, current )) }
 
-/// The three relations an explicit '(relSource ...)' atom can name
-/// (matching 'ExplicitSources'). Hides and textlinks have no
+/// The three relations an explicit '(editRequest (relSource ...))'
+/// request can name
+/// (matching 'RequestedRelationshipSources'). Hides and textlinks have no
 /// explicit-source path, so asking about them is an error.
 fn relation_from_client_string (
   s : &str,

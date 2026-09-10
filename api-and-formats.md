@@ -7,15 +7,15 @@ After initialization, every server response is length-prefixed as
 UTF-8 bytes in `PAYLOAD`. The exceptional busy-initializing signal is
 described below.
 
-The shared ugly-telescope release warning is
+The shared overPrivateText-telescope release warning is
 `OPERATION includes title or body text selected below its node's home
 source for PID P.` (or `PIDs P1, P2, ...`). A restricted request that
 needs approval instead receives
-`((response-type ugly-telescope-confirmation) (operation OPERATION)
+`((response-type overPrivateText-telescope-confirmation) (operation OPERATION)
 (pids ("P" ...)) (prompt "..."))`; the response itself contains no
 protected title or body. Except for search's include/exclude choice,
 approval is always the exact request-local list
-`(allow-ugly-telescopes "P" ...)` and is never cached.
+`(allow-overPrivateText-telescopes "P" ...)` and is never cached.
 
 Note: Port 1729 is used for Rust-TypeDB communication (the TypeDB server), not Rust-Emacs communication.
 
@@ -28,8 +28,8 @@ So far there are these endpoints:
 ## Text search
   - Request: `((request . "text search") (terms . "SEARCH_TERMS")
     (regex . "BOOL") (body . "BOOL") (operators . "BOOL"))`, plus
-    optional `(ugly-telescopes . "include")` or
-    `(ugly-telescopes . "exclude")`.
+    optional `(overPrivateText-telescopes . "include")` or
+    `(overPrivateText-telescopes . "exclude")`.
     - Search always returns every match. "Rooty" nodes (literal roots, cycle-roots, link dests, and things that had an ID when imported) are ranked higher, via their context-origin multiplier.
     - `regex`, `body`, `operators` are optional; each defaults to "false".
       - "regex=true": interpret the query as a per-token regex; a RegexQuery is built directly and the QueryParser is bypassed.
@@ -39,18 +39,18 @@ So far there are these endpoints:
       alias/title selection, and display truncation. Inactive-source
       documents do not influence result order or which title/alias is
       shown for an active result.
-    - `ugly-telescopes` is normally absent on the first request. Under
+    - `overPrivateText-telescopes` is normally absent on the first request. Under
       a restricted source-set, if the index contains any telescope
       whose selected title or body lies below home, the server does no
       query and responds with LP
-      `((response-type ugly-telescope-confirmation)
+      `((response-type overPrivateText-telescope-confirmation)
       (operation text-search) (pids ()) (prompt "..."))`. The empty PID
       list is deliberate: a pre-query decision must not disclose which
-      ugly node might match. The retry uses `"include"` or `"exclude"`.
+      overPrivateText node might match. The retry uses `"include"` or `"exclude"`.
       Exclusion is applied inside the Tantivy query, before matching,
       and remains in force through asynchronous enrichment. The choice
       is request-scoped. Source-set `all` needs no choice and returns a
-      warning if the results include ugly telescopes.
+      warning if the results include overPrivateText telescopes.
 
   - Phase 1, immediate: Server sends LP `((response-type
     search-results) (content "ORG") (warnings ("..." ...)))`.
@@ -70,17 +70,17 @@ So far there are these endpoints:
   - Request: `((request . "single root content view")
     (id . "NODE_ID") (view-uri . "URI")
     (override-choice . "CHOICE")
-    (allow-ugly-telescopes "PID" ...))`
+    (allow-overPrivateText-telescopes "PID" ...))`
     - `override-choice` is optional; values are "menu" (the default)
       and "bypass". See "the override-choice menu" below.
   - Response: LP `((response-type content-view) (content "...")
     (errors ("..." ...)) (warnings ("..." ...)))`. The document
     structure is detailed below, under `Single root content tree view`.
-    Under a restricted source-set, a response involving an ugly
-    telescope instead returns LP `ugly-telescope-confirmation` with
+    Under a restricted source-set, a response involving an overPrivateText
+    telescope instead returns LP `overPrivateText-telescope-confirmation` with
     `(operation single-root-view)` or `(operation override-menu)`, the
     exact PIDs, and a text-free prompt. An approved retry carries those
-    exact PIDs in `allow-ugly-telescopes`; approval is not cached.
+    exact PIDs in `allow-overPrivateText-telescopes`; approval is not cached.
     Source-set `all` returns the ordinary response with a warning.
   - If `NODE_ID` resolves to an inactive source, the server refuses the
     request with a human-readable message and does not open a buffer.
@@ -122,12 +122,12 @@ So far there are these endpoints:
       an ordinary save.
     - `(hoist-approved-pids "PID" ...)` is present only on a retry
       after `telescope-hoist-confirmation`. It is the exact list the
-      user approved for scalar publication; it is not a boolean and
+      user approved for text publication; it is not a boolean and
       does not authorize any other PID or bypass ordinary save
       validation.
-    - `(allow-ugly-telescopes "PID" ...)` is the shared scalar-release
+    - `(allow-overPrivateText-telescopes "PID" ...)` is the shared text-release
       approval field. On save it appears only when retrying a
-      `save-rerender` `ugly-telescope-confirmation`, and authorizes
+      `save-rerender` `overPrivateText-telescope-confirmation`, and authorizes
       those exact PIDs for that response attempt. It is independent of
       Hoist authority: viewing text and publishing it on disk are
       different decisions.
@@ -154,8 +154,8 @@ So far there are these endpoints:
     `((response-type telescope-hoist-confirmation) (telescopes
     (((pid "P") (home "SOURCE")) ...)) (prompt "..."))`.
     This response contains no title or body. The prompt explains that
-    Hoist publishes the selected scalars at home and removes lower
-    scalar copies while retaining lower relationships and aliases;
+    Hoist publishes the selected title/body text at home and removes lower
+    title/body copies while retaining lower relationships and aliases;
     Abort writes nothing and requires manual `.skg` repair. Hoist
     re-issues the SAME save with `(hoist-approved-pids "P" ...)`.
     The server rereads and reclassifies on that retry, so newly dirty
@@ -180,20 +180,20 @@ So far there are these endpoints:
   - The third ALTERNATIVE terminal message protects the saved and
     collateral rerenders. After a valid save has updated disk and the
     derived stores, the server renders every affected view in memory.
-    Under a restricted source-set, if the staged forests contain ugly
-    telescopes without exact scalar-release approval, it changes no
+    Under a restricted source-set, if the staged forests contain overPrivateText
+    telescopes without exact text-release approval, it changes no
     open-view registry entry, streams no content, and sends
-    `((response-type ugly-telescope-confirmation)
+    `((response-type overPrivateText-telescope-confirmation)
     (operation save-rerender) (pids ("P" ...)) (prompt "..."))`.
     The save itself has succeeded; only its updated text is withheld.
     The client may retry the SAME save with
-    `(allow-ugly-telescopes "P" ...)`. Under source-set `all`, or on an
-    approved retry, the ordinary save-result carries the shared ugly-
+    `(allow-overPrivateText-telescopes "P" ...)`. Under source-set `all`, or on an
+    approved retry, the ordinary save-result carries the shared overPrivateText-
     telescope warning. Declining leaves current client buffers and the
     server's open-view registry unchanged.
   - Exactly one of `save-result`, `telescope-hoist-confirmation`,
     `fork-confirmation`, and the save-rerender
-    `ugly-telescope-confirmation` is sent as the terminal response to
+    `overPrivateText-telescope-confirmation` is sent as the terminal response to
     one save attempt.
   - If the server errors before sending the early lock message (e.g. malformed request), only one message is sent: the error response in the save-result format.
 
@@ -234,11 +234,11 @@ So far there are these endpoints:
     preemptive buffer locks and stream guard unwind. Nothing else
     changes. Disabling diff mode is always allowed.
   - Before changing mode or streaming view text, a restricted request
-    that would rerender an ugly telescope instead receives LP
-    `ugly-telescope-confirmation` with
+    that would rerender an overPrivateText telescope instead receives LP
+    `overPrivateText-telescope-confirmation` with
     `(operation diff-mode-rerender)` and
     the exact PIDs, followed by the same EMPTY rerender stream. A retry
-    adds `(allow-ugly-telescopes "PID" ...)`; declining leaves the mode
+    adds `(allow-overPrivateText-telescopes "PID" ...)`; declining leaves the mode
     and open-view registry unchanged.
 
 ## Herald rules
@@ -265,7 +265,7 @@ So far there are these endpoints:
     - Both false is rejected.
   - Response: LP response-type "diff-analysis" with `((content "ORG") (errors ("..." ...)) (warnings ("..." ...)))`.
   - Behavior: Builds a semantic org report of affected nodes across all sources,
-    including scalar node fields, aliases, extra IDs, all five schema relations
+    including title/body node fields, aliases, extra IDs, all five schema relations
     in both role directions, text diffs for title/body, and
     root/new/deleted/modified buckets. Nodes are compared as whole
     telescopes: each endpoint's section files are grouped by pid and
@@ -280,8 +280,8 @@ So far there are these endpoints:
     or contains an unreadable `.skg` blob in the selected snapshots.
   - Refuses to run unless the active source-set is `all`; restricted
     source-set diff reports are not defined yet.
-  - Because it runs only under `all`, a report involving an ugly
-    telescope is returned with the shared scalar-release warning; this
+  - Because it runs only under `all`, a report involving an overPrivateText
+    telescope is returned with the shared text-release warning; this
     endpoint has no approval retry.
 
 ## Stage moves
@@ -359,12 +359,14 @@ So far there are these endpoints:
   - Request: ((request . "edge source info") (owner . "ID")
     (member . "ID") (relation . "contains")) — relation is one of
     `contains`, `subscribes_to`, `overrides_view_of`: the three
-    relations an explicit `(relSource ...)` atom can name.
+    relations an explicit `(editRequest (relSource ...))` request can name.
   - Response: LP response-type "edge-source-info" with
     `((default "NAME") (current "NAME"))`. `(current ...)` is absent
-    when the graph records no such edge (e.g. one typed into a
-    buffer and not yet saved). On failure, `((error "..."))` — e.g.
-    an endpoint the graph does not know.
+    when the graph records no such exact raw edge (e.g. one typed into a
+    buffer and not yet saved). An unresolved member is valid: it uses
+    the owner's home as its default and may still report an exact raw
+    stored edge source. On failure, `((error "..."))` — e.g. an owner
+    the graph does not know.
   - Behavior: between owned endpoints, `default` is the more-private
     home. From an owned owner to a foreign member, `default` is the
     owner's home regardless of privacy order; this deliberately
@@ -374,7 +376,7 @@ So far there are these endpoints:
     `skg-set-relationship-source` uses the reply to offer only
     sources the save can accept. Advisory: the save-time floor check
     in `apply_sticky_sources` stays load-bearing, since buffers go
-    stale and the atom is plain text.
+    stale and the request is plain text.
 
 ## Strip body whitespace
   - Request: ((request . "strip body whitespace"))
@@ -395,7 +397,7 @@ So far there are these endpoints:
 
 ## Export to org
   - Request: `((request . "export to org") (source-set . "NAME")
-    (output-dir . "PATH") (allow-ugly-telescopes "PID" ...))`.
+    (output-dir . "PATH") (allow-overPrivateText-telescopes "PID" ...))`.
     - Both fields are required; a missing or blank `output-dir` is an
       error (the server applies no default -- the client supplies the
       user a default but always sends a value). `output-dir` is
@@ -418,10 +420,10 @@ So far there are these endpoints:
     `[[id:..][label]]` links rewritten to relative org links.
     Existing files are overwritten; others are left untouched. Needs
     neither TypeDB nor Tantivy.
-    Before writing anything, a restricted export involving ugly
-    telescopes returns LP `ugly-telescope-confirmation` with
+    Before writing anything, a restricted export involving overPrivateText
+    telescopes returns LP `overPrivateText-telescope-confirmation` with
     `(operation export-to-org)` and the exact PIDs. An approved retry
-    carries those PIDs in `allow-ugly-telescopes`. An `all` export, or
+    carries those PIDs in `allow-overPrivateText-telescopes`. An `all` export, or
     an approved restricted export, returns the ordinary export response
     with the shared warning.
   - An **export root** is a node one of whose `contains` children has
@@ -437,7 +439,7 @@ So far there are these endpoints:
     to plain label text.
   - The same export is available as a CLI subcommand (no TypeDB):
     `cargo run --bin skg -- export-org [config-path] [source-set]
-    [output-dir] [--include-ugly-telescopes]`. Under a restricted set it
+    [output-dir] [--include-overPrivateText-telescopes]`. Under a restricted set it
     fails closed before writing unless the flag is present; under `all`
     (and on an approved restricted run) it prints the warning.
 
@@ -459,7 +461,7 @@ So far there are these endpoints:
 
 ## Rerender all views
   - Request: `((request . "rerender all views")
-    (allow-ugly-telescopes "PID" ...))`.
+    (allow-overPrivateText-telescopes "PID" ...))`.
   - Response: Multiple length-prefixed messages, sent sequentially:
     1. Lock message:
        `Content-Length: N\r\n\r\n((response-type rerender-lock) (lock-views ("URI1" "URI2" ...)))`
@@ -475,13 +477,13 @@ So far there are these endpoints:
     Does not save or modify the graph. Used after toggling
     git diff mode to refresh all views without requiring a save.
   - All view text is prepared in memory before the release decision.
-    Under a restricted set, ugly content without exact approval returns
-    LP `ugly-telescope-confirmation` with
+    Under a restricted set, overPrivateText content without exact approval returns
+    LP `overPrivateText-telescope-confirmation` with
     `(operation rerender-all-views)` and
     the exact PIDs, followed by an EMPTY rerender stream
     (`rerender-lock` with no URIs, then clean `rerender-done`). No view
     text is sent and no open-view registry entry changes. A retry adds
-    `allow-ugly-telescopes`; `all` instead adds the shared warning to
+    `allow-overPrivateText-telescopes`; `all` instead adds the shared warning to
     `rerender-done`.
 
 ## Source sets
@@ -498,7 +500,7 @@ So far there are these endpoints:
   - Response: LP response-type "active-source-set" with
     `((active "NAME"))`.
   - Request: `((request . "set active source set") (name . "NAME")
-    (allow-ugly-telescopes "PID" ...))`.
+    (allow-overPrivateText-telescopes "PID" ...))`.
   - Response: Multiple length-prefixed messages, sent sequentially:
     1. Source-set response:
        `Content-Length: N\r\n\r\n(("response-type" "active-source-set") ("active" "NAME") ("content" "Active source-set: NAME"))`
@@ -527,15 +529,15 @@ So far there are these endpoints:
     per-connection invariant: diff mode on implies active source-set
     `all`.
   - Rerender authorization precedes both the set change and release of
-    view text. If the proposed set would render an ugly telescope, the
-    first reply is LP `ugly-telescope-confirmation` with
+    view text. If the proposed set would render an overPrivateText telescope, the
+    first reply is LP `overPrivateText-telescope-confirmation` with
     `(operation source-set-switch-rerender)` and exact PIDs, followed by an EMPTY
-    rerender stream. A retry adds `allow-ugly-telescopes`; declining
+    rerender stream. A retry adds `allow-overPrivateText-telescopes`; declining
     leaves the active set and open-view registry unchanged.
 
 ## Titles by ids
   - Request: `((request . "titles by ids") (ids "uuid1" "uuid2" ...)
-    (allow-ugly-telescopes "PID" ...))`.
+    (allow-overPrivateText-telescopes "PID" ...))`.
   - Response: LP `((response-type titles-by-ids)
     (content (("uuid1" . "title1") ("uuid2" . "title2") ...))
     (warnings ("..." ...)))`.
@@ -547,10 +549,10 @@ So far there are these endpoints:
     shorten UUIDs uniformly, but it must not title-annotate inactive
     IDs.
   - Used by `skg-readable-ids-mode` to annotate UUIDs in magit buffers with their titles.
-  - Under a restricted source-set, requested titles involving ugly
-    telescopes instead return LP `ugly-telescope-confirmation` with
+  - Under a restricted source-set, requested titles involving overPrivateText
+    telescopes instead return LP `overPrivateText-telescope-confirmation` with
     `(operation titles-by-ids)` and the exact PIDs. An approved retry
-    carries those PIDs in `allow-ugly-telescopes`; `all` returns the
+    carries those PIDs in `allow-overPrivateText-telescopes`; `all` returns the
     ordinary map with the shared warning.
 
 ## Shutdown server
@@ -710,15 +712,21 @@ under different parents):
   the ⌂ source herald; the recording source of the RELATIONSHIP this
   headline represents (the `contains` edge to a content child, or
   the col's relation for a PartnerCol member), when its privacy was
-  deliberately raised above the edge's default. Emitted by render;
-  written by `skg-set-relationship-source` (C-c s r); consumed at
-  save, where the server enforces the floor (an offered source more
+  deliberately raised above the edge's default. This is an observed,
+  recomputed display fact: save never consumes it as an instruction.
+- `(editRequest (relSource NAME))` — herald red "request:~NAME".
+  This is the sole explicit relationship-source request, written by
+  `skg-set-relationship-source` (C-c s r) and consumed at save, where
+  the server enforces the floor (an offered source more
   public than the edge's default is a save error; a source at the
   default or more private is honored, which is how a stuck edge's
   privacy is lowered; a legacy or hand-authored edge whose DISK
   source already sits more public than the default may be held or
   made more private, never made still more public). Absent means the
-  edge sits at its default source.
+  edge sits at its default source. Alias and Unknown headlines likewise
+  expose a flat/nested display `relSource` fact and put write intent only
+  under `editRequest`; copying a fact is harmless while copying a request
+  deliberately requests it at the destination.
 - `(overridesHere N)` — herald red "Oh"; the load-bearing
   substitution marker, documented in the next subsection.
 

@@ -148,7 +148,7 @@ GENERATION and BUF are captured for the response handler."
                    `((request . "titles by ids")
                      (ids ,@ids))
                    (when approved-pids
-                     `((allow-ugly-telescopes ,@approved-pids)))))
+                     `((allow-overPrivateText-telescopes ,@approved-pids)))))
                  "\n")))
           (setq skg-readable-ids--pending-title-requests
                 (append skg-readable-ids--pending-title-requests
@@ -168,7 +168,7 @@ GENERATION and BUF are captured for the response handler."
      (skg-readable-ids--handle-next-response payload))
    nil)
   (skg-register-response-handler
-   'ugly-telescope-confirmation
+   'overPrivateText-telescope-confirmation
    (lambda (_tcp-proc payload)
      (skg-readable-ids--handle-title-confirmation payload))
    nil))

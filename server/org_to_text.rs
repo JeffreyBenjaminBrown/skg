@@ -4,7 +4,7 @@ use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   ViewNode, ViewNodeKind, Vognode, Phantom, Qual, QualCol, ActiveNode, PhantomDiff,
-  PhantomDeleted, PhantomUnknown, EditRequest, GraphNodeStats,
+  PhantomDeleted, PhantomUnknown, NodeEditRequest, GraphNodeStats,
   ParentIs,
 };
 
@@ -210,10 +210,13 @@ fn qual_metadata_to_string (
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   match qual {
-    Qual::Alias { rel_source, membership, .. } => {
+    Qual::Alias { rel_source, rel_source_request, membership, .. } => {
       parts . push ( "alias" . to_string () );
       if let Some (source) = rel_source {
         parts . push ( format! ("(relSource {})", source) ); }
+      if let Some (source) = rel_source_request {
+        parts . push ( format! (
+          "(editRequest (relSource {}))", source) ); }
       append_membership_stage_forms (&mut parts, membership); }
     Qual::TextChanged { staged, unstaged } => {
       let mut tags : Vec<&'static str> = Vec::new ();
@@ -281,10 +284,13 @@ fn activeNode_metadata_to_string (
                "(viewStats {})", parts . join (" ") )) }}
     fn edit_request ( activeNode : & ActiveNode
                     ) -> Option < String > {
+      if let Some (source) = &activeNode . rel_source_request {
+        return Some ( format! (
+          "(editRequest (relSource {}))", source) ); }
       activeNode . edit_request () . map ( | edit_req | {
         let edit_str : String = match edit_req {
-          EditRequest::NodeMerge (id) => format! ( "(merge {})", id . 0 ),
-          EditRequest::Delete => "delete" . to_string () };
+          NodeEditRequest::NodeMerge (id) => format! ( "(merge {})", id . 0 ),
+          NodeEditRequest::Delete => "delete" . to_string () };
         format! ( "(editRequest {})", edit_str ) } ) }
     fn view_requests ( activeNode : & ActiveNode
                      ) -> Option < String > {
@@ -437,8 +443,15 @@ fn phantomUnknown_metadata_to_string (
   if focused     { parts . push ( "focused"    . to_string () ); }
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  parts . push ( format! ( "(unknown (id {}))",
-                            unknown_node . id . 0 ));
+  let mut unknown_parts : Vec<String> = vec! [
+    format! ("(id {})", unknown_node . id . 0) ];
+  if let Some (source) = &unknown_node . rel_source {
+    unknown_parts . push ( format! (
+      "(viewStats (relSource {}))", source) ); }
+  if let Some (source) = &unknown_node . rel_source_request {
+    unknown_parts . push ( format! (
+      "(editRequest (relSource {}))", source) ); }
+  parts . push ( format! ( "(unknown {})", unknown_parts . join (" ") ) );
   parts . join (" ") }
 
 /// Render an inactive placeholder as the bare atom 'inactiveNode',

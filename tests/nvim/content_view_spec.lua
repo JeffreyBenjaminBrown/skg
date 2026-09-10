@@ -28,11 +28,11 @@ describe('skg.content_view request strings', function ()
       content_view.request_string('abc', 'uri-1', true))
   end)
 
-  it('carries only the ugly telescope pids approved on retry', function ()
+  it('carries only the overPrivateText telescope pids approved on retry', function ()
     assert.are.equal(
       '((request . "single root content view") (id . "abc")'
       .. ' (view-uri . "uri-1")'
-      .. ' (allow-ugly-telescopes "pid-a" "pid-b"))\n',
+      .. ' (allow-overPrivateText-telescopes "pid-a" "pid-b"))\n',
       content_view.request_string(
         'abc', 'uri-1', nil, { 'pid-a', 'pid-b' }))
   end)

@@ -142,6 +142,7 @@ fn make_alias_if_appropriate(
       org . kind = MpViewnodeKind::Qual (
         Qual::Alias { text: t . title . clone(),
                       rel_source: t . viewStats . rel_source . clone (),
+                      rel_source_request: t . rel_source_request . clone (),
                       membership: MembershipAxes::default () } ); }}
   Ok (( )) }
 

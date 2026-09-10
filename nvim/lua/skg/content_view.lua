@@ -31,7 +31,7 @@ function M.request_string (node_id, view_uri, bypass_override,
     table.insert(request,
       sexpr.pair(sexpr.symbol('override-choice'), 'bypass')) end
   if approved_pids and #approved_pids > 0 then
-    local approval = { sexpr.symbol('allow-ugly-telescopes') }
+    local approval = { sexpr.symbol('allow-overPrivateText-telescopes') }
     for _, pid in ipairs(approved_pids) do
       table.insert(approval, pid) end
     table.insert(request, approval) end
@@ -51,14 +51,14 @@ function M.request_single_root_content_view_from_id (node_id,
   local view_uri = existing_view_uri or buffer.generate_uuid()
   state.register_response_handler('content-view',
     function (payload_text, response)
-      state.response_handler_map['ugly-telescope-confirmation'] = nil
+      state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
       M.handle_content_view(payload_text, response, view_uri)
     end, true)
   -- Alternative to content-view. It is non-one-shot so the pending
   -- response count represents only the one terminal reply.
-  state.register_response_handler('ugly-telescope-confirmation',
+  state.register_response_handler('overPrivateText-telescope-confirmation',
     function (_payload_text, response)
-      state.response_handler_map['ugly-telescope-confirmation'] = nil
+      state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
       if state.response_handler_map['content-view'] then
         state.response_handler_map['content-view'] = nil
         state.lp_pending_count = math.max(0, state.lp_pending_count - 1)

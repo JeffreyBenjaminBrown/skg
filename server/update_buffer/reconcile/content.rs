@@ -42,6 +42,11 @@ struct ChildData {
   source : SourceName,
   body   : Option<String>,
   kind   : ContentReality,
+  /// The exact stored source of an unresolved relationship member.
+  /// Known children derive their display facts from their graph node;
+  /// an Unknown has no home, so only this retained edge fact can draw
+  /// its optional relSource herald.
+  relationship_source : Option<SourceName>,
   /// Some(R) = override substitution applies: draw R, marked
   /// '(overridesHere goal-id)', in place of the goal member. The
   /// title/source/body above are then R's. Only ContentReality::Real
@@ -71,6 +76,7 @@ pub fn expand_true_content_at_activeNode (
   graph_snap                     : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   deleted_by_this_save_pids      : &HashSet<ID>,
+  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   active_source_set              : Option<&ActiveSourceSet>,
   settled                        : bool,
   cascade                        : bool,
@@ -127,6 +133,7 @@ pub fn expand_true_content_at_activeNode (
   reconcile_content_children (
     tree, node, &nodecomplete, config, graph_snap,
     deleted_since_head_pid_src_map,
+    deleted_by_this_save_extra_ids,
     active_source_set,
     substitution_enabled ) ?;
   if cascade {
@@ -203,6 +210,7 @@ fn reconcile_content_children (
   config                         : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   active_source_set              : Option<&ActiveSourceSet>,
   substitution_enabled           : bool,
 ) -> Result<(), Box<dyn Error>> {
@@ -214,8 +222,7 @@ fn reconcile_content_children (
   // subtree, even though the parent's containment logically points
   // at the acquirer. (Fresh views already got this for free from
   // 'pid_and_source_from_id'; this makes the rerender consistent.)
-  let content_ids : Vec<ID> =
-    nodecomplete . contains . iter ()
+  let content_members = nodecomplete . contains . iter ()
     . filter ( |m| match active_source_set {
       // Edge-source gating (render-and-gating, 5_plan.org): a
       // membership whose SOURCE is inactive is invisible here even
@@ -225,8 +232,15 @@ fn reconcile_content_children (
       None => true,
       Some (a) => a . is_all ()
         || a . contains_source ( &m . source ) } )
+    . collect::<Vec<_>> ();
+  let content_ids : Vec<ID> = content_members . iter ()
     . map ( |m| graph_snap . pid_of ( &m . member )
                  . unwrap_or_else ( || m . member . clone () ))
+    . collect ();
+  let relationship_sources : HashMap<ID, SourceName> = content_members . iter ()
+    .map ( |m| ( graph_snap . pid_of ( &m . member )
+                  . unwrap_or_else ( || m . member . clone () ),
+                  m . source . clone () ))
     . collect ();
   let is_sub : bool = is_subscribee (tree, node) ?;
   // TODO/DONE/local-view-update/plan_v2.org §6.1: a definitive subscribee-as-such regenerates its content as
@@ -268,8 +282,10 @@ fn reconcile_content_children (
     substitution_enabled
     && ! is_overridden_drawn_raw (tree, node, config, graph_snap) ?;
   complete_content_children(
-    tree, node, &apparent_content_ids, config, graph_snap,
-    deleted_since_head_pid_src_map, active_source_set,
+    tree, node, &apparent_content_ids, &relationship_sources,
+    &nodecomplete . source, config, graph_snap,
+    deleted_since_head_pid_src_map, deleted_by_this_save_extra_ids,
+    active_source_set,
     substitution_for_children ) ?;
   mark_erroneous_content_children_as_indep(
     tree, node, &apparent_content_ids ) ?;
@@ -474,17 +490,23 @@ fn complete_content_children (
   tree               : &mut Tree<ViewNode>,
   node               : NodeId,
   goal_list          : &[ID],
+  relationship_sources : &HashMap<ID, SourceName>,
+  owner_home         : &SourceName,
   config             : &SkgConfig,
   graph_snap         : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   active_source_set  : Option<&ActiveSourceSet>,
   substitution_enabled : bool,
 ) -> Result<(), Box<dyn Error>> {
   let child_data : HashMap<ID, ChildData> =
     build_child_creation_data(
-      tree, node, goal_list, config, graph_snap,
+      tree, node, goal_list, relationship_sources, config, graph_snap,
       deleted_since_head_pid_src_map, active_source_set,
       substitution_enabled ) ?;
+  normalize_relationship_backed_content_unknowns (
+    tree, node, goal_list, relationship_sources, owner_home, graph_snap,
+    deleted_by_this_save_extra_ids ) ?;
   // The RepairSummary is dropped: content is not a generated
   // collection, so its reconciliation is not a "repair" to warn about.
   complete_relevant_children_in_viewnodetree(
@@ -495,6 +517,11 @@ fn complete_content_children (
       ViewNodeKind::Phantom (Phantom::Diff (_))
         // Existing phantoms are reordered or replaced, not duplicated.
         => true,
+      ViewNodeKind::Phantom (Phantom::Unknown (_))
+        // An Unknown is a real raw relationship member.  Match it by
+        // its raw ID so a rerender retains one placeholder rather than
+        // appending another one for the same dangling edge.
+        => true,
       // An InactiveNode is IRRELEVANT: never matched against the goal
       // list, so it is preserved as-is (a retained placeholder hosting
       // already-drawn active descendants) and needs no id. The goal
@@ -502,8 +529,7 @@ fn complete_content_children (
       // never created here either.
       _ => false },
     |vn : &ViewNode| match &vn . kind {
-      // Only Active and Diff-phantom children participate (the
-      // 'relevant' predicate above excludes everything else). COLLECTED
+      // Active, Diff-phantom, and Unknown children participate. COLLECTED
       // ids (the overridesHere original when present), so goal lists
       // stay in original IDs, an existing drawn substitute satisfies
       // its original goal member, and only genuinely missing members
@@ -512,6 +538,8 @@ fn complete_content_children (
         => Ok ( t . collected_id () ),
       ViewNodeKind::Phantom (Phantom::Diff (p))
         => Ok ( p . id . clone() ),
+      ViewNodeKind::Phantom (Phantom::Unknown (u))
+        => Ok ( u . id . clone() ),
       _ => Err(
         "complete_content_children: relevant child had no content ID"
         . to_string() ) },
@@ -541,9 +569,62 @@ fn complete_content_children (
               vn }},
         ContentReality::Inactive =>
           mk_inactive_viewnode (),
-        ContentReality::Unknown =>
-          mk_unknown_viewnode ( id . clone() ) } ) },
-  ) . map ( |_summary| () ) }
+        ContentReality::Unknown => {
+          let mut unknown : ViewNode = mk_unknown_viewnode ( id . clone() );
+          if let ViewNodeKind::Phantom (Phantom::Unknown (u)) =
+            &mut unknown . kind
+          { u . rel_source = d . relationship_source . clone ()
+              . filter ( |source| source != owner_home ); }
+          unknown } } ) },
+  ) . map ( |_summary| () ) ?;
+  Ok (())
+}
+
+/// An open view can still hold an Active occurrence when this save deletes its
+/// graph node but leaves the parent's exact raw membership in place.  Replace
+/// that occurrence before its later BFS visit reaches generic deletion handling:
+/// the surviving relationship is the authoritative fact, so it is Unknown,
+/// not a last-seen Deleted node.  Assigning only `kind` deliberately preserves
+/// the wrapper's focus and fold state.
+fn normalize_relationship_backed_content_unknowns (
+  tree                 : &mut Tree<ViewNode>,
+  node                 : NodeId,
+  goal_list            : &[ID],
+  relationship_sources : &HashMap<ID, SourceName>,
+  owner_home           : &SourceName,
+  graph_snap           : &Arc<InRustGraph>,
+  deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
+) -> Result<(), Box<dyn Error>> {
+  treat_certain_children (
+    tree, node,
+    |vn : &ViewNode| match &vn . kind {
+      ViewNodeKind::Vognode (Vognode::Active (active)) =>
+        active . parentIs == ParentIs::Affected
+        && graph_snap . pid_of (&active . collected_id ()) . is_none ()
+        && goal_list . iter () . any (|raw_member|
+          raw_member == &active . collected_id ()
+          || deleted_by_this_save_extra_ids
+             . get (&active . collected_id ())
+             . is_some_and (|extra_ids| extra_ids . contains (raw_member))),
+      _ => false },
+    |vn : &mut ViewNode| {
+      let active_id : ID = match &vn . kind {
+        ViewNodeKind::Vognode (Vognode::Active (active)) =>
+          active . collected_id (),
+        _ => unreachable! (), };
+      let id : ID = goal_list . iter () . find (|raw_member|
+        *raw_member == &active_id
+        || deleted_by_this_save_extra_ids . get (&active_id)
+           . is_some_and (|extra_ids| extra_ids . contains (*raw_member)))
+        . expect ("normalization predicate found a raw member") . clone ();
+      vn . kind = ViewNodeKind::Phantom (Phantom::Unknown (
+        crate::types::viewnode::PhantomUnknown {
+          rel_source: relationship_sources . get (&id) . cloned ()
+            . filter (|source| source != owner_home),
+          rel_source_request: None,
+          id })); })
+    . map_err ( |e| -> Box<dyn Error> { e . into () } )
+}
 
 /// 'erroneous content children' are children that look like content,
 /// but are not actually content.
@@ -630,6 +711,7 @@ fn build_child_creation_data (
   tree               : &Tree<ViewNode>,
   node               : NodeId,
   goal_list          : &[ID],
+  relationship_sources : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
   graph_snap         : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
@@ -687,6 +769,8 @@ fn build_child_creation_data (
                         source : SourceName::not_found (),
                         body   : None,
                         kind   : ContentReality::Unknown,
+                        relationship_source:
+                          relationship_sources . get (id) . cloned (),
                         drawn_id : None } );
           continue; } };
     if active_source_set
@@ -700,6 +784,7 @@ fn build_child_creation_data (
                                  source: child_source,
                                  body: None,
                                  kind: ContentReality::Inactive,
+                                 relationship_source: None,
                                  drawn_id : None } );
       continue; }
     let drawn_id : Option<ID> =
@@ -733,6 +818,7 @@ fn build_child_creation_data (
                                source: skg . source . clone(),
                                body: skg . body . clone(),
                                kind: ContentReality::Real,
+                               relationship_source: None,
                                drawn_id } ); }
   Ok (result) }
 

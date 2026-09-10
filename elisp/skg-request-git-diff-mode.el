@@ -46,7 +46,7 @@ rerender-done."
            (message "%s" (or content "toggled")))))
      t)
     (skg--register-rerender-stream-handlers)
-    (skg--register-rerender-ugly-confirmation
+    (skg--register-rerender-overPrivateText-confirmation
      (lambda (pids) (skg-view-diff-mode pids))
      'git-diff-mode)
     (skg-lp-reset)
@@ -56,7 +56,7 @@ rerender-done."
               (append
                '((request . "git diff mode toggle"))
                (when approved-pids
-                 `((allow-ugly-telescopes ,@approved-pids)))))
+                 `((allow-overPrivateText-telescopes ,@approved-pids)))))
              "\n"))))
 
 (provide 'skg-request-git-diff-mode)

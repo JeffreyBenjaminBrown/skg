@@ -46,15 +46,15 @@ untouched."
      'export-to-org
      (lambda (tcp-proc payload)
        (setq skg-response-handler-map
-             (assoc-delete-all 'ugly-telescope-confirmation
+             (assoc-delete-all 'overPrivateText-telescope-confirmation
                                skg-response-handler-map))
        (skg--export-to-org-handler tcp-proc payload))
      t)
     (skg-register-response-handler
-     'ugly-telescope-confirmation
+     'overPrivateText-telescope-confirmation
      (lambda (_tcp-proc payload)
        (setq skg-response-handler-map
-             (assoc-delete-all 'ugly-telescope-confirmation
+             (assoc-delete-all 'overPrivateText-telescope-confirmation
                                skg-response-handler-map))
        (when (assoc 'export-to-org skg-response-handler-map)
          (setq skg-response-handler-map
@@ -79,7 +79,7 @@ untouched."
           (source-set . ,source-set)
           (output-dir . ,output-dir))
         (when approved-pids
-          `((allow-ugly-telescopes ,@approved-pids)))))
+          `((allow-overPrivateText-telescopes ,@approved-pids)))))
       "\n"))))
 
 (defun skg--export-to-org-handler (_tcp-proc payload)

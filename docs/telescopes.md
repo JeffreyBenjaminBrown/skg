@@ -30,11 +30,11 @@ most public section. Data that breaks the rule — a title or body
 selected below the home section — still loads, but the fold reports
 it. An interactive save offers Abort or Hoist before changing
 anything. Hoist explicitly publishes the selected title and body at
-home, removes lower scalar copies, preserves lower relationships and
+home, removes lower title/body copies, preserves lower relationships and
 aliases, then rereads the files and requires the telescope to be
 clean before updating the in-memory graph or derived databases.
 Abort leaves every file alone; manual repair requires making the same
-scalar-only edits in the `.skg` sections. Noninteractive and
+title/body-only edits in the `.skg` sections. Noninteractive and
 maintenance writers have no implicit Hoist answer and refuse. Every
 relationship edge (a `contains`
 membership, a subscription, a hide, an override) carries its own
@@ -60,12 +60,12 @@ edits those files; their contents are visible only by inspecting the raw
 foreign repository. A wholly foreign telescope is retained normally.
 
 If folding has to select a title or body below home, Skg marks the
-whole telescope **ugly**. Source-set `all` displays that text with a
+whole telescope **overPrivateText**. Source-set `all` displays that text with a
 warning. A restricted source-set asks before releasing it, using an
 approval scoped to the exact PIDs and the single request; search asks
-whether to include or exclude ugly telescopes before it matches. This
+whether to include or exclude overPrivateText telescopes before it matches. This
 release approval does not authorize Hoist. Conversely, approving
-Hoist does not become a standing permission to display unrelated ugly
+Hoist does not become a standing permission to display unrelated overPrivateText
 text. Saved and collateral views are rendered in memory and checked
 before their text is streamed or their open-view registry entries are
 changed.
@@ -73,7 +73,7 @@ changed.
 ## Where new relationships land: the sticky-else-default rule
 
 When you save, each relationship edge keeps the source it already had
-on disk (**sticky**), unless a `(relSource ...)` atom explicitly
+on disk (**sticky**), unless an `(editRequest (relSource ...))` request explicitly
 names another source at least as private as the edge's default. A NEW
 edge between owned nodes defaults to the more-private endpoint home —
 the most public source that leaks neither endpoint. A new edge from
@@ -81,7 +81,7 @@ an owned owner to a foreign member instead defaults to the owner's
 home, regardless of the foreign home: Skg never proposes writing the
 foreign source. This deliberately exposes the foreign node's ID and
 the relationship to readers of the owned source. An explicit
-`relSource` may select any configured, owned source at least as private
+An explicit request may select any configured, owned source at least as private
 as that owner home. Every recording source is clamped to be no more
 public than the owner's home (a section more public than the home
 would imply a title-less public face). Hides floor higher:
@@ -97,8 +97,8 @@ relationship the headline at point represents. It asks the server
 for the edge's default and current sources (the "edge source info"
 endpoint, see `api-and-formats.md`) and offers the sources at least
 as private as the default. An edge sitting more private than its default is
-marked with a red `~NAME` herald and a `(relSource NAME)` metadata
-atom; the server re-checks at save that any offered source is no
+marked with a red `~NAME` herald and a display `(relSource NAME)` fact;
+the pending write is `(editRequest (relSource NAME))`. The server re-checks at save that any offered source is no
 more public than the edge's default. The canonical use: your public
 reading-list node contains a book you would rather not advertise —
 privatize the *membership* and the book stays public, the list

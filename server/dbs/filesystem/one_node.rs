@@ -192,7 +192,7 @@ impl PreparedTelescopeWrite {
     let reread : NodeComplete =
       nodecomplete_from_pid_and_source (
         config, self . pid . clone (), &self . home ) ?;
-    if reread . ugly_telescope {
+    if reread . overPrivateText_telescope {
       return Err ( io::Error::new (
         io::ErrorKind::InvalidData,
         format! (
@@ -314,27 +314,27 @@ fn error_unless_home_is_writable (
       format! (
         "Refusing to write '{}': its home is '{}', which you do not own. Foreign sections are never written, so this node cannot be saved from here. See the foreign-overlay entry in telescope-warnings.org.",
         nodecomplete . pid, home ))); }
-  // SCALAR HOIST. Fold the current disk telescope with the same title/body
+  // TEXT HOIST. Fold the current disk telescope with the same title/body
   // selection used by load. Looking only for a titleless home misses the
   // equally sensitive shape "title at home, body below home".
-  let disk_is_ugly : bool =
+  let disk_is_overPrivateText : bool =
     match telescope_from_disk (config, &nodecomplete . pid) ? {
       None => false,
       Some (telescope) => match
         fold_telescope ( telescope, & |id : &ID| id . clone () ) {
-          Ok (disk_node) => disk_node . ugly_telescope,
+          Ok (disk_node) => disk_node . overPrivateText_telescope,
           Err (error) => return Err ( io::Error::new (
             io::ErrorKind::InvalidData,
             format! (
               "Refusing to write '{}': its current disk telescope cannot select a title ({}), so writing the buffer's text at home '{}' would publish it without a verifiable Hoist candidate. Repair the .skg sections by hand. See telescope-warnings.org.",
               nodecomplete . pid, error, home ))), }, };
-  if disk_is_ugly && ! allow_hoist {
+  if disk_is_overPrivateText && ! allow_hoist {
       return Err ( io::Error::new (
         io::ErrorKind::InvalidData,
         format! (
           "Refusing to write '{}': its current disk telescope selects title or body below home '{}', so this write would publish it. An interactive save must obtain explicit Hoist approval for this PID; otherwise repair the .skg sections by hand. See telescope-warnings.org.",
           nodecomplete . pid, home ))); }
-  Ok (disk_is_ugly) }
+  Ok (disk_is_overPrivateText) }
 
 /// Checks that a node's primary ID matches the filename stem.
 /// This property is assumed by `path_from_pid_and_source` and

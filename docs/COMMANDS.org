@@ -21,7 +21,7 @@ and maintenance writers have no prompt and refuse this repair.
 
 That disk-publication choice is separate from displaying the result. If
 a successful save under a restricted source-set would rerender text from
-an ugly telescope, Skg asks for a second, request-scoped approval. Decline
+an overPrivateText telescope, Skg asks for a second, request-scoped approval. Decline
 leaves the save committed but sends no new view text and changes no
 open-view registry entry.
 ** C-c <backspace> : deletion
@@ -55,9 +55,9 @@ Prompts for search terms. All search axes take their conservative
 defaults: no per-token regex, titles only (no body), no Tantivy
 phrase and operator syntax.
 
-Under a restricted source-set, if the search index contains any ugly
+Under a restricted source-set, if the search index contains any overPrivateText
 telescope (one whose selected title or body lies below home), Skg asks
-whether to include or exclude ugly telescopes before running the query.
+whether to include or exclude overPrivateText telescopes before running the query.
 Exclude filters them in Tantivy before matching; Include is permission
 for this search only. Under source-set =all= they are included without a
 prompt and the result carries a warning.
@@ -397,9 +397,9 @@ Two safeguards, shared with the recursive form below:
   more-private sources (the sticky rule never moves an edge's
   privacy without an explicit gesture), the command says so and
   offers to publicize them in the same go, by writing the same
-  =(relSource ...)= atoms 'skg-set-relationship-source' would.
+  =(editRequest (relSource ...))= requests 'skg-set-relationship-source' would.
   Declining leaves them and notes that =C-c s R= can publicize them
-  later. Edges already carrying an explicit =(relSource ...)= atom
+  later. Edges already carrying an explicit source request
   already have a deliberate recording source and are never touched.
 - An indefinitive instance is NOT changed -- the save would
   silently ignore its source edit -- and produces a loud WARNING,
@@ -426,7 +426,9 @@ Save the view afterward to apply the merge.
 Sets the recording source of the relationship instance the headline at
 point represents -- =contains= for a content child, the col's
 relation for a writable PartnerCol member, or the alias membership
-for an alias headline. (Formerly
+for an alias headline. An Unknown placeholder in one of those writable
+positions is supported too: it carries only its raw relationship member ID,
+never a node edit. (Formerly
 =skg-privatize-relationship=; renamed because the gesture now moves
 privacy in both directions, see
 =BUG-and-fix_make-edge-more-public.org=.)
@@ -438,8 +440,8 @@ tab-completion and S-left/S-right cycling, like the other source
 dialogs -- over the sources at least as private as the default (more
 public ones could leak an endpoint's ID and would be rejected at
 save), plus a no-override choice. The minibuffer starts pre-filled
-with the current source when it is offerable, else the default, so
-RET keeps the status quo. If the server cannot resolve the edge
+with a pending request when it is offerable, else the current source
+or default, so RET keeps the most specific available choice. If the server cannot resolve the edge
 (e.g. a node not yet saved), every source is offered and the save's
 floor check backstops. For an alias, its default is its owner's home
 and the current source is read directly from the alias metadata, so
@@ -450,15 +452,16 @@ the owner's home regardless of privacy order. That choice deliberately
 shares the foreign ID and relationship with readers of the owned
 source; Skg never offers the foreign source as a write destination.
 
-Choosing a source writes a =(relSource SOURCE)= metadata atom. This
+Choosing a source writes an =(editRequest (relSource SOURCE))= metadata
+request. This
 both raises privacy above the default and lowers it back down to
 (never below) the default -- the way to publicize an edge stuck at
 an old, more private source after its endpoint's home moved. An edge
 sitting more private than its default is marked with a red =~NAME= herald
 immediately before the ⌂ source herald; once saved at its default,
-atom and herald disappear.
+request and display herald disappear.
 
-The no-override choice removes the atom, which means "no opinion":
+The no-override choice removes the request, which means "no opinion":
 a saved edge keeps its saved source (sticky). It does NOT reset the
 edge to its default -- to reach the default, choose it.
 
@@ -499,8 +502,8 @@ independent source; hide sources are derived at save). RET picks a
 role; q aborts.
 
 It then prompts for a source over the whole ladder, plus the
-no-override choice, which instead REMOVES existing =(relSource ...)=
-atoms throughout the subtree. Unlike the single-edge command, no
+no-override choice, which instead REMOVES existing source requests
+throughout the subtree. Unlike the single-edge command, no
 per-edge default is fetched -- the subtree's edges have different
 defaults -- so every source is offered and the save's floor check
 validates each edge (an offered source more public than some edge's
@@ -608,7 +611,7 @@ If you use git to manage your data,
 enable this view to see what you've changed since your last commit,
 i.e. how your worktree differs from HEAD.
 
-If toggling the mode would rerender ugly telescope text under a
+If toggling the mode would rerender overPrivateText telescope text under a
 restricted source-set, Skg asks before changing the mode or any view.
 Declining leaves the mode and buffers unchanged; the protocol still sends
 an empty rerender stream so preemptive client locks are released.
@@ -637,7 +640,7 @@ then re-renders open Skg buffers after confirmation, and tells the
 server to use that source-set for subsequent requests. Choose =all=
 (the whole ladder) to remove the limit.
 
-If the proposed set would rerender ugly telescope text, Skg asks before
+If the proposed set would rerender overPrivateText telescope text, Skg asks before
 changing the active set or any view. Declining leaves both unchanged and
 an empty rerender stream releases the client's preemptive locks.
 *** C-c v r : skg-readable-ids-mode
@@ -745,12 +748,12 @@ It asks two things:
   this prompt has no tab completion. An absolute path is used
   as-is.
 
-If a restricted export would include ugly telescope text, Skg asks for
+If a restricted export would include overPrivateText telescope text, Skg asks for
 request-scoped approval before writing any file. Source-set =all= exports
 it with a warning. The noninteractive form fails closed unless passed
-=--include-ugly-telescopes=:
+=--include-overPrivateText-telescopes=:
 
-: cargo run --bin skg -- export-org [config-path] [source-set] [output-dir] [--include-ugly-telescopes]
+: cargo run --bin skg -- export-org [config-path] [source-set] [output-dir] [--include-overPrivateText-telescopes]
 
 A node is exported when one of its children's title links to the
 export-instruction node and that child's body gives a

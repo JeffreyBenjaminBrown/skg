@@ -59,14 +59,14 @@ describe('skg.save request strings', function ()
     assert.is_falsy(line:find('hoist-approved . "true"', 1, true))
   end)
 
-  it('adds exact scalar-release pids when given', function ()
+  it('adds exact text-release pids when given', function ()
     local line = save.save_request_string('uri-1', {
       lines_below_focused_headline = 0,
       column = 0,
       screen_lines_below_window_start = 0 },
-      nil, nil, nil, { 'ugly-a', 'ugly-b' })
+      nil, nil, nil, { 'overPrivateText-a', 'overPrivateText-b' })
     assert.is_truthy(line:find(
-      '(allow-ugly-telescopes "ugly-a" "ugly-b")', 1, true))
+      '(allow-overPrivateText-telescopes "overPrivateText-a" "overPrivateText-b")', 1, true))
   end)
 end)
 

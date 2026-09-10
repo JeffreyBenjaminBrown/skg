@@ -91,7 +91,7 @@
     (should (= skg-lp--pending-count 0))
     (should-not (assoc 'save-result skg-response-handler-map))))
 
-(ert-deftest test-save-request-sexp-carries-scalar-release-pids ()
+(ert-deftest test-save-request-sexp-carries-text-release-pids ()
   "Saved/collateral rerender authority uses the shared release field."
   (let* ((sexp (skg--save-request-sexp
                 "uri-1"
@@ -99,17 +99,17 @@
                   :point-column 0
                   :point-screen-lines-below-window-start 0)
                 nil nil nil '("U1" "U2")))
-         (entry (assoc 'allow-ugly-telescopes sexp)))
-    (should (equal entry '(allow-ugly-telescopes "U1" "U2")))))
+         (entry (assoc 'allow-overPrivateText-telescopes sexp)))
+    (should (equal entry '(allow-overPrivateText-telescopes "U1" "U2")))))
 
-(ert-deftest test-save-scalar-release-balances-and-retries-exact-pids ()
+(ert-deftest test-save-text-release-balances-and-retries-exact-pids ()
   "The save is committed, but no staged text is adopted before approval."
   (let ((origin (generate-new-buffer "*save-release-origin*"))
         (skg-response-handler-map
          '((save-result ignore . t)
            (collateral-view ignore)
            (save-relax-lock ignore)
-           (ugly-telescope-confirmation ignore)))
+           (overPrivateText-telescope-confirmation ignore)))
         (skg-lp--pending-count 1)
         called)
     (unwind-protect
@@ -119,9 +119,9 @@
                   ((symbol-function 'skg-request-save-buffer)
                    (lambda (&rest args) (setq called args))))
           (let ((noninteractive nil))
-            (skg--save-scalar-release-confirmation-handler
+            (skg--save-text-release-confirmation-handler
              origin
-             "((response-type ugly-telescope-confirmation) (operation save-rerender) (pids (U1 U2)) (prompt \"Include?\"))"
+             "((response-type overPrivateText-telescope-confirmation) (operation save-rerender) (pids (U1 U2)) (prompt \"Include?\"))"
              t '(("N" . "owned")) '("H"))))
       (kill-buffer origin))
     (should (equal called

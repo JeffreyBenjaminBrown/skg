@@ -4,11 +4,11 @@ use crate::serve::ViewsState;
 use crate::to_org::render::content_view::multi_root_view_via_env;
 use crate::to_org::render::override_menu::override_menu_view;
 use crate::serve::protocol::TcpToClient;
-use crate::serve::handlers::scalar_release::{
-  ScalarReleaseDecision,
+use crate::serve::handlers::text_release::{
+  TextReleaseDecision,
   approved_pids_from_request,
   challenge_response,
-  decide as decide_scalar_release};
+  decide as decide_text_release};
 use crate::serve::util::{
   view_uri_from_request,
   value_from_request_sexp,
@@ -138,7 +138,7 @@ pub fn handle_single_root_view_request (
             & tag_sexp_response (
               TcpToClient::ContentView, &switch_sexp ));
           return; }
-      let approved_ugly_pids =
+      let approved_overPrivateText_pids =
         approved_pids_from_request (request);
       let response : String =
       { let _span : tracing::span::EnteredSpan =
@@ -154,21 +154,21 @@ pub fn handle_single_root_view_request (
                            env, &pid,
                            Some (active_source_set) ) . await }
             { Ok ( Some ((menu_content, menu_pids, menu_forest)) ) => {
-                let release = decide_scalar_release (
+                let release = decide_text_release (
                   "override-menu",
                   active_source_set,
                   &menu_pids,
                   &env . in_rust_graph_snapshot (),
-                  &approved_ugly_pids );
+                  &approved_overPrivateText_pids );
                 if matches! (
-                  release, ScalarReleaseDecision::Challenge { .. } ) {
+                  release, TextReleaseDecision::Challenge { .. } ) {
                   return challenge_response (&release) . unwrap (); }
                 views_state . open_views . register_view (
                   menu_uri . clone (),
                   menu_forest,
                   &menu_pids );
                 let mut warnings : Vec<String> = Vec::new ();
-                if let ScalarReleaseDecision::AllowWithWarning {
+                if let TextReleaseDecision::AllowWithWarning {
                   warning,
                 } = release {
                   warnings . push (warning); }
@@ -197,14 +197,14 @@ pub fn handle_single_root_view_request (
               Some (active_source_set),
               &mut render_warnings ) . await
             { Ok ( (buffer_content, pids, viewforest) ) => {
-                let release = decide_scalar_release (
+                let release = decide_text_release (
                   "single-root-view",
                   active_source_set,
                   &pids,
                   &env . in_rust_graph_snapshot (),
-                  &approved_ugly_pids );
+                  &approved_overPrivateText_pids );
                 if matches! (
-                  release, ScalarReleaseDecision::Challenge { .. } ) {
+                  release, TextReleaseDecision::Challenge { .. } ) {
                   return challenge_response (&release) . unwrap (); }
                 if let Ok (view_uri) = &view_uri_result {
                   views_state . open_views . register_view (
@@ -214,7 +214,7 @@ pub fn handle_single_root_view_request (
                 let warnings : Vec<String> =
                   { let mut warnings : Vec<String> =
                       render_warnings;
-                    if let ScalarReleaseDecision::AllowWithWarning {
+                    if let TextReleaseDecision::AllowWithWarning {
                       warning,
                     } = release {
                       warnings . push (warning); }

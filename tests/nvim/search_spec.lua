@@ -40,7 +40,7 @@ describe('skg.search', function ()
       .. ' (operators . "true"))', seen)
   end)
 
-  it('serializes the explicit ugly telescope search choice', function ()
+  it('serializes the explicit overPrivateText telescope search choice', function ()
     local seen = nil
     server = helpers.connect_to_fake_server(function (line)
       if line:find('text search', 1, true) then seen = line end
@@ -49,7 +49,7 @@ describe('skg.search', function ()
       'dog cat', false, false, false, 'exclude')
     vim.wait(2000, function () return seen ~= nil end, 10)
     assert.is_truthy(seen:find(
-      '(ugly-telescopes . "exclude")', 1, true))
+      '(overPrivateText-telescopes . "exclude")', 1, true))
   end)
 
   it('opens results, snapshots on request, and applies enrichment',

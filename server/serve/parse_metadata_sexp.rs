@@ -21,7 +21,7 @@ use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::viewnode::{
-  GraphNodeStats, ViewNodeStats, EditRequest, ViewRequest, ColRelation,
+  GraphNodeStats, ViewNodeStats, NodeEditRequest, ViewRequest, ColRelation,
   Qual, QualCol, PartnerCol, PhantomDeleted, InactiveNode, PhantomUnknown,
   Birth, IndefOrDef, ParentIs,
 };
@@ -54,13 +54,15 @@ pub struct ViewnodeMetadata {
   pub indefinitive: bool,
   pub graphStats: GraphNodeStats,
   pub viewStats: ViewNodeStats,
-  pub edit_request: Option<EditRequest>,
+  pub edit_request: Option<NodeEditRequest>,
+  pub rel_source_request: Option<SourceName>,
   pub view_requests: HashSet<ViewRequest>,
   pub activeNode_existence  : ExistenceAxes,
   pub activeNode_membership : MembershipAxes,
   pub activeNode_not_in_git : bool,
   pub scaffold_membership : MembershipAxes,
   pub scaffold_rel_source : Option<SourceName>,
+  pub scaffold_rel_source_request : Option<SourceName>,
   pub textchanged_staged   : bool,
   pub textchanged_unstaged : bool,
   // When true, this is a PhantomDeleted (id and source are used).
@@ -70,6 +72,8 @@ pub struct ViewnodeMetadata {
   // When Some, this is an PhantomUnknown (a placeholder for a missing
   // referent). Carries only the id; no source/title/body apply.
   pub unknown_node_id: Option<ID>,
+  pub unknown_rel_source : Option<SourceName>,
+  pub unknown_rel_source_request : Option<SourceName>,
   // When true, this is an inactive-source placeholder: an anonymous,
   // dataless marker (see InactiveNode). It carries no id/source/etc.
   pub is_inactive_node : bool,
@@ -94,17 +98,21 @@ pub fn default_metadata() -> ViewnodeMetadata {
     graphStats: GraphNodeStats::default(),
     viewStats: ViewNodeStats::default(),
     edit_request: None,
+    rel_source_request: None,
     view_requests: HashSet::new(),
     activeNode_existence  : ExistenceAxes::default(),
     activeNode_membership : MembershipAxes::default(),
     activeNode_not_in_git : false,
     scaffold_membership : MembershipAxes::default(),
     scaffold_rel_source : None,
+    scaffold_rel_source_request : None,
     textchanged_staged   : false,
     textchanged_unstaged : false,
     is_deleted_node: false,
     is_dead_scaffold: false,
     unknown_node_id: None,
+    unknown_rel_source: None,
+    unknown_rel_source_request: None,
     is_inactive_node: false,
     is_diff_phantom: false, }}
 
@@ -127,7 +135,16 @@ pub fn viewnode_from_metadata (
     = if let Some (ref uid) = metadata . unknown_node_id {
         ( MpViewnodeKind::Phantom (
             MpPhantom::Unknown (
-              PhantomUnknown { id: uid . clone () } ) ), None, None )
+              PhantomUnknown {
+                id                 : uid . clone (),
+                rel_source         : metadata . unknown_rel_source . clone (),
+                rel_source_request : metadata . unknown_rel_source_request . clone (),
+              } ) ),
+          if body . is_some () || ! title . is_empty () {
+            Some ( BufferValidationError::Other (
+              "Unknown placeholder content cannot be edited" . to_string () ))
+          } else { None },
+          None )
       } else if metadata . is_inactive_node {
         let error : Option<BufferValidationError> =
           if body . is_some ()
@@ -175,6 +192,8 @@ pub fn viewnode_from_metadata (
                               text: title . clone (),
                               rel_source:
                                 metadata . scaffold_rel_source . clone (),
+                              rel_source_request:
+                                metadata . scaffold_rel_source_request . clone (),
                               membership: metadata . scaffold_membership }),
           MpViewnodeKind::Qual (Qual::ID { .. }) =>
             MpViewnodeKind::Qual (Qual::ID {
@@ -207,6 +226,11 @@ pub fn viewnode_from_metadata (
               && metadata . edit_request . is_some ()
           { metadata . id . clone ()
             . map ( BufferValidationError::EditRequestOnIndefinitive ) }
+          else if metadata . indefinitive
+               && metadata . rel_source_request . is_some ()
+          { Some ( BufferValidationError::Other (
+              "Relationship-source request on an indefinitive node"
+              . to_string () )) }
           else { None };
         let t : MpActiveNode = MpActiveNode {
             title,
@@ -216,6 +240,7 @@ pub fn viewnode_from_metadata (
             birth            : metadata . birth,
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
+            rel_source_request : metadata . rel_source_request . clone (),
             view_requests    : metadata . view_requests . clone (),
             existence        : metadata . activeNode_existence,
             membership       : metadata . activeNode_membership,
@@ -332,8 +357,23 @@ pub fn parse_metadata_to_viewnodemd (
               return Err (
                 "relSource requires exactly one source name"
                 . to_string () ); }
+            if result . scaffold_rel_source . is_some () {
+              return Err ( "Alias relSource may appear only once"
+                           . to_string () ); }
             result . scaffold_rel_source = Some ( SourceName::from (
               atom_to_string (&items [1]) ? )); },
+          "editRequest" => {
+            let mut request_metadata : ViewnodeMetadata = default_metadata ();
+            parse_editrequest_sexp (
+              &items[1..], &mut request_metadata ) ?;
+            if request_metadata . edit_request . is_some () {
+              return Err ( "Only Alias may carry a top-level editRequest relSource"
+                           . to_string () ); }
+            if result . scaffold_rel_source_request . is_some () {
+              return Err ( "Alias editRequest may appear only once"
+                           . to_string () ); }
+            result . scaffold_rel_source_request =
+              request_metadata . rel_source_request; },
           "textChanged" => {
             // (textChanged STAGE_TAGS) for the TextChanged qual.
             result . non_vognode = Some (
@@ -376,7 +416,7 @@ pub fn parse_metadata_to_viewnodemd (
           // above so a stale buffer round-trips.
           "inactiveNode" => result . is_inactive_node = true,
           // Scaffold kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
-          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::Alias { text: String::new(), rel_source: None, membership: MembershipAxes::default() } ) ),
+          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::Alias { text: String::new(), rel_source: None, rel_source_request: None, membership: MembershipAxes::default() } ) ),
           "aliasCol" => result . non_vognode = Some (MpViewnodeKind::QualCol (QualCol::Alias)),
           "forestRoot" => result . non_vognode = Some (MpViewnodeKind::BufferRoot),
           "hiddenInSubscribeeCol" =>
@@ -411,6 +451,12 @@ pub fn parse_metadata_to_viewnodemd (
       _ => { return Err ( format! (
         "Unexpected element in metadata sexp: {}",
         sexp_str )); }} }
+  if ( result . scaffold_rel_source . is_some ()
+       || result . scaffold_rel_source_request . is_some () )
+     && ! matches! ( result . non_vognode,
+                     Some (MpViewnodeKind::Qual (Qual::Alias { .. })) )
+  { return Err ( "relSource and its editRequest are valid only on Alias scaffolds"
+                 . to_string () ); }
   Ok (result) }
 
 
@@ -445,6 +491,10 @@ fn parse_node_sexp (
           "viewStats" => {
             parse_viewstats_sexp ( &subitems[1..], &mut metadata . viewStats ) ?; },
           "editRequest" => {
+            if metadata . edit_request . is_some ()
+               || metadata . rel_source_request . is_some () {
+              return Err ( "node editRequest may appear only once"
+                           . to_string () ); }
             parse_editrequest_sexp ( &subitems[1..], metadata ) ?; },
           "viewRequests" => {
             parse_viewrequests_sexp (
@@ -548,15 +598,41 @@ fn parse_unknownnode_sexp (
 ) -> Result<(), String> {
   for element in items {
     match element {
-      Sexp::List (subitems) if subitems . len () == 2 => {
+      Sexp::List (subitems) if ! subitems . is_empty () => {
         let key : String =
           atom_to_string ( &subitems[0] ) ?;
         match key . as_str () {
           "id" => {
+            if subitems . len () != 2 {
+              return Err ( "unknown id requires exactly one value" . to_string () ); }
+            if metadata . unknown_node_id . is_some () {
+              return Err ( "unknown id may appear only once" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
             metadata . unknown_node_id =
               Some ( ID::from (value)); },
+          "viewStats" => {
+            if metadata . unknown_rel_source . is_some () {
+              return Err ( "unknown viewStats may appear only once" . to_string () ); }
+            let mut stats : ViewNodeStats = ViewNodeStats::default ();
+            parse_viewstats_sexp ( &subitems[1..], &mut stats ) ?;
+            if stats . rel_source . is_none ()
+               || stats . cycle || stats . overridesHere . is_some () {
+              return Err ( "Unknown viewStats supports only relSource"
+                           . to_string () ); }
+            metadata . unknown_rel_source = stats . rel_source; },
+          "editRequest" => {
+            if metadata . unknown_rel_source_request . is_some () {
+              return Err ( "unknown editRequest may appear only once"
+                           . to_string () ); }
+            let mut request_metadata : ViewnodeMetadata = default_metadata ();
+            parse_editrequest_sexp (
+              &subitems[1..], &mut request_metadata ) ?;
+            if request_metadata . edit_request . is_some () {
+              return Err ( "Unknown supports only an editRequest relSource"
+                           . to_string () ); }
+            metadata . unknown_rel_source_request =
+              request_metadata . rel_source_request; },
           _ => { return Err ( format! (
             "Unknown 'unknown' key: {}", key )); }} },
       _ => { return Err ( "Unexpected element in unknown sexp"
@@ -636,12 +712,8 @@ fn parse_viewstats_sexp (
               atom_to_string ( &kv_pair[1] ) ?;
             stats . overridesHere = Some ( ID::from (value)); },
           "relSource" => {
-            // LOAD-BEARING (see ViewNodeStats::rel_source): the
-            // buffer's explicit recording source for this position's
-            // binding edge, round-tripped from
-            // skg-set-relationship-source into save extraction,
-            // which feeds save-leveling's sticky-else-default
-            // resolution, floored at the edge's default.
+            // Display-only source fact.  A save request must instead
+            // appear as (editRequest (relSource SOURCE)).
             let value : String =
               atom_to_string ( &kv_pair[1] ) ?;
             stats . rel_source = Some ( SourceName::from (value)); },
@@ -657,6 +729,8 @@ fn parse_editrequest_sexp (
   items : &[Sexp],
   metadata : &mut ViewnodeMetadata
 ) -> Result<(), String> {
+  if items . len () != 1 {
+    return Err ( "editRequest requires exactly one request" . to_string () ); }
   for element in items {
     match element {
       Sexp::List (subitems) if subitems . len () == 2 => {
@@ -666,7 +740,11 @@ fn parse_editrequest_sexp (
           let id_str : String =
             atom_to_string ( &subitems[1] ) ?;
           metadata . edit_request = Some (
-            EditRequest::NodeMerge ( ID::from (id_str)));
+            NodeEditRequest::NodeMerge ( ID::from (id_str)));
+        } else if key == "relSource" {
+          let source : String = atom_to_string ( &subitems[1] ) ?;
+          metadata . rel_source_request =
+            Some ( SourceName::from (source) );
         } else {
           return Err ( format! ( "Unknown editRequest key: {}", key )); }
       },
@@ -674,7 +752,7 @@ fn parse_editrequest_sexp (
         let bare_value : String =
           atom_to_string (element) ?;
         match bare_value . as_str () {
-          "delete" => metadata . edit_request = Some (EditRequest::Delete),
+          "delete" => metadata . edit_request = Some (NodeEditRequest::Delete),
           _ => {
             return Err ( format! ( "Unknown editRequest value: {}",
                                     bare_value )); }} },

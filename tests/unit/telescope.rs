@@ -144,7 +144,7 @@ proptest! {
       folded_from_lists (&home, contains, subs, hides);
     let (refolded, warnings) = unfold_then_fold (&folded);
     // The one asymmetry: fold cannot learn a home the unfold did not
-    // write scalars into; everything else must round-trip exactly.
+    // write title/body text into; everything else must round-trip exactly.
     prop_assert_eq! ( &refolded . contains, &folded . contains );
     prop_assert_eq! ( &refolded . subscribes_to,
                       &folded . subscribes_to );
@@ -394,31 +394,31 @@ fn a_titled_most_public_section_raises_no_title_warning (
             warnings );
 }
 
-fn scalar_node (
+fn text_node (
   sections : Vec<(SourceName, SectionSlices)>,
 ) -> (crate::types::nodes::complete::NodeComplete, Vec<FoldWarning>) {
   let (folded, warnings) = fold_sections (&sections, &identity_resolve);
   let node = nodecomplete_from_fold (
-    ID::new ("scalar-node"), Vec::new (), Vec::new (), folded )
+    ID::new ("text-node"), Vec::new (), Vec::new (), folded )
     .expect ("test cases carry a title");
   (node, warnings) }
 
 #[test]
-fn title_and_body_select_independently_and_mark_ugliness (
+fn title_and_body_select_independently_and_mark_overPrivateTextness (
 ) {
   let public = SourceName::from ("public");
   let private = SourceName::from ("private");
 
-  let (clean, _) = scalar_node (vec! [
+  let (clean, _) = text_node (vec! [
     ( public . clone (), SectionSlices {
         title : Some ("home title" . to_string ()),
         body  : Some ("home body" . to_string ()),
         .. SectionSlices::default () } ) ]);
   assert_eq! (clean . title, "home title");
   assert_eq! (clean . body . as_deref (), Some ("home body"));
-  assert! (!clean . ugly_telescope);
+  assert! (!clean . overPrivateText_telescope);
 
-  let (lower_title, warnings) = scalar_node (vec! [
+  let (lower_title, warnings) = text_node (vec! [
     ( public . clone (), SectionSlices {
         body : Some ("home body" . to_string ()),
         .. SectionSlices::default () } ),
@@ -427,12 +427,12 @@ fn title_and_body_select_independently_and_mark_ugliness (
         .. SectionSlices::default () } ) ]);
   assert_eq! (lower_title . title, "lower title");
   assert_eq! (lower_title . body . as_deref (), Some ("home body"));
-  assert! (lower_title . ugly_telescope);
+  assert! (lower_title . overPrivateText_telescope);
   assert! (warnings . iter () . any ( |warning| matches! (
     warning, FoldWarning::TitleBelowHome { title_at, .. }
       if title_at == &private )));
 
-  let (lower_body, warnings) = scalar_node (vec! [
+  let (lower_body, warnings) = text_node (vec! [
     ( public . clone (), SectionSlices {
         title : Some ("home title" . to_string ()),
         .. SectionSlices::default () } ),
@@ -441,12 +441,12 @@ fn title_and_body_select_independently_and_mark_ugliness (
         .. SectionSlices::default () } ) ]);
   assert_eq! (lower_body . title, "home title");
   assert_eq! (lower_body . body . as_deref (), Some ("lower body"));
-  assert! (lower_body . ugly_telescope);
+  assert! (lower_body . overPrivateText_telescope);
   assert! (warnings . iter () . any ( |warning| matches! (
     warning, FoldWarning::BodyBelowHome { body_at, .. }
       if body_at == &private )));
 
-  let (both_lower, _) = scalar_node (vec! [
+  let (both_lower, _) = text_node (vec! [
     ( public, SectionSlices::default () ),
     ( private, SectionSlices {
         title : Some ("lower title" . to_string ()),
@@ -454,15 +454,15 @@ fn title_and_body_select_independently_and_mark_ugliness (
         .. SectionSlices::default () } ) ]);
   assert_eq! (both_lower . title, "lower title");
   assert_eq! (both_lower . body . as_deref (), Some ("lower body"));
-  assert! (both_lower . ugly_telescope);
+  assert! (both_lower . overPrivateText_telescope);
 }
 
 #[test]
-fn later_scalars_report_the_source_that_actually_won (
+fn later_text_reports_the_source_that_actually_won (
 ) {
   let public = SourceName::from ("public");
   let private = SourceName::from ("private");
-  let (_node, warnings) = scalar_node (vec! [
+  let (_node, warnings) = text_node (vec! [
     ( public . clone (), SectionSlices {
         title : Some ("winner" . to_string ()),
         body  : Some ("winner body" . to_string ()),

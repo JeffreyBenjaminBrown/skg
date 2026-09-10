@@ -84,8 +84,9 @@ pub enum Vognode {
 #[derive( Debug, Clone, PartialEq )]
 pub enum Phantom {
   Diff    (PhantomDiff), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim PhantomDiff, not an ActiveNode -- a phantom is always indefinitive/bodyless and its parentIs is never read or rendered, so it needs none of ActiveNode's parentIs/birth/viewStats/view_requests/indef_or_def. See PhantomDiff_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
-  Deleted (PhantomDeleted), // No longer exists in the graph.
-  Unknown (PhantomUnknown), // If it *ever* existed in the graph, Skg didn't find it.
+  Deleted (PhantomDeleted), // Epistemically: No longer exists in the graph. Procedurally: Skg just watched the user delete this node (maybe from a different view), but for some reason (e.g. its view-descendents are interesting, or it is a root) had to retain an image of it here.
+  // PITFALL: There is an exception. If Skg watches a user delete a node, while that user has a view of a foreign node that refers to the deleted node, that "foreigner's view" will show it as Unknown rather than Deleted. This is to maintain consistency with how that relationship to a nonexistent node will appear when viewed in later sessions.
+  Unknown (PhantomUnknown), // Skg can't find it (and, unlike Deleted, does not know why). Can result from bad data, or from a reference to another user's node that has since been deleted.
 }
 
 /// A placeholder ("phantom") for a node whose .skg file a save just
@@ -149,7 +150,11 @@ pub struct PhantomDeleted {
 /// the information: a reference exists, but we have no record of its target.
 #[derive( Debug, Clone, PartialEq )]
 pub struct PhantomUnknown {
-  pub id : ID,
+  pub id                 : ID,
+  /// Display-only fact about this occurrence's binding relationship.
+  pub rel_source         : Option<SourceName>,
+  /// A pending relationship-source change, consumed only by save.
+  pub rel_source_request : Option<SourceName>,
 }
 
 /// An anonymous "something from an inactive source is/was here"
@@ -190,6 +195,9 @@ pub struct ActiveNode_Generic < Id, Src > {
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
   pub graphStats    : GraphNodeStats,
   pub viewStats     : ViewNodeStats,
+  /// A requested source for this occurrence's binding relationship. Unlike
+  /// `viewStats.rel_source`, this is save intent.
+  pub rel_source_request : Option<SourceName>,
 
   pub view_requests : HashSet < ViewRequest >,
   /// Per-stage diff state for the node's '.skg' file existence.
@@ -291,7 +299,7 @@ impl < Id, Src > PhantomDiff_Generic < Id, Src > {
 pub enum IndefOrDef {
   Definitive {
     body         : Option < String >,
-    edit_request : Option < EditRequest >, },
+    edit_request : Option < NodeEditRequest >, },
   Indefinitive, }
 
 /// Containerward path statistics: how a node relates to the
@@ -383,12 +391,9 @@ pub struct ViewNodeStats {
   /// compound filter cols (HiddenInSubscribee /
   /// HiddenOutsideOfSubscribee), which have no single
   /// 'relation_member_role' to read a source from.
-  /// LOAD-BEARING, unlike the other view stats (like
-  /// 'overridesHere'): 'skg-set-relationship-source' sets this
-  /// value client-side, and save extraction reads it back as the
-  /// user's explicit source, feeding save-leveling's
-  /// sticky-else-default resolution, floored at the edge's default
-  /// ('server/from_text/supplement_from_disk.rs' 'apply_sticky_sources').
+  /// This is a display fact, unlike a requested replacement stored in
+  /// 'ActiveNode_Generic::rel_source_request'.  Save extraction never
+  /// treats this value as an instruction.
   /// Herald: red "~NAME" immediately before the ⌂ sourceHerald
   /// (server/heralds.rs).
   pub rel_source            : Option<SourceName>,
@@ -404,6 +409,7 @@ pub enum QualCol {
 pub enum Qual {
   Alias { text: String, // an alias for the node's grandparent
           rel_source: Option<SourceName>,
+          rel_source_request: Option<SourceName>,
           membership: MembershipAxes },
   ID { id: ID, // an ID of grandparent (the parent being an IDCol)
        membership: MembershipAxes },
@@ -419,8 +425,7 @@ pub enum PartnerCol {
   Hider, // Collects nodes that hide its parent. Read-only (editable from the other side of the relationship).
   Hidden, // Collects nodes its parent hides. Read-only (but these relationships are editable from this side of the relationhip, within the parent's SubscribeeCol).
   HiddenInSubscribee, // Child of a subscribee-as-such. Collects children of the subscribee that the subscriber hides. Read-only (but these relationships are editable by modifying the listed contents of the subscribee-as-such).
-  HiddenOutsideOfSubscribee, // Child of a SubscribeeCol. Collects things unnecessarily hidden by the SubscribeeCol's parent, because they are not contained by anything it subscribes to. Read-only. Shown after all Subscribees, under the same SubscribeeCol.
-  // TODO | PITFALL: HiddenOutsideOfSubscribee should be editable. Currently the client offers no easy way for a user to unhide things unnecessarily hidden. (It is technically possible, by creating a node you own, subscribing to it, and then modifying a subscribee-as-such representative of the new node. But that's baroque.)
+  HiddenOutsideOfSubscribee, // Child of a SubscribeeCol. Collects things hidden by the SubscribeeCol's parent but absent from every subscribee's content. This derived filter is editable as an exclusive visible-outside subset; its hide sources remain derived. Shown after all Subscribees, under the same SubscribeeCol.
 }
 
 /// How a PartnerCol's membership relates to user edits.
@@ -436,17 +441,18 @@ pub enum PartnerCol {
 /// with children is demoted to parentIs=Independent, whatever the
 /// policy. The policies differ in:
 /// - whether buffer membership is read at save extraction
-///   (only 'WritableSet'),
+///   ('WritableSet' and 'EditableFilter'),
 /// - where the goal list comes from ('WritableSet' and 'ReadOnlySet'
-///   from 'relation_member_role'; 'ReadOnlyFilter' from hide state),
+///   from 'relation_member_role'; both filter policies from hide state),
 /// - goal-list order ('WritableSet': graph/disk order, which the
 ///   user's own save defines; 'ReadOnlySet': the view's current
-///   member order, then missing members appended; 'ReadOnlyFilter':
+///   member order, then missing members appended; filter cols are
 ///   derived),
 /// - whether repairs warn (the read-only policies, in the saved view).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ColPolicy {
   WritableSet,    // Membership edits are graph edits. An absent col means no opinion; a present-but-empty col means an explicit empty set (see 'MSV').
+  EditableFilter, // A visible derived subset is an explicit edit of that subset; source requests remain unsupported.
   ReadOnlySet,    // Membership is generated from the graph. User order is respected view-locally; membership edits are repaired, with a warning.
   ReadOnlyFilter, // Membership is derived from hide state rather than from a relation role. Repaired, with a warning.
 }
@@ -454,7 +460,7 @@ pub enum ColPolicy {
 /// Requests for editing operations on a node.
 /// Only one edit request is allowed per node.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum EditRequest {
+pub enum NodeEditRequest {
   NodeMerge (ID), // The node with this request is the acquirer. The node with the ID that this request specifies is the acquiree.
   Delete, // request to delete this node
 }
@@ -556,7 +562,7 @@ impl < Id, Src > ActiveNode_Generic < Id, Src > {
         body . as_ref(),
       IndefOrDef::Indefinitive => None, }}
 
-  pub fn edit_request (&self) -> Option < &EditRequest > {
+  pub fn edit_request (&self) -> Option < &NodeEditRequest > {
     match &self . indef_or_def {
       IndefOrDef::Definitive { edit_request, .. } =>
         edit_request . as_ref(),
@@ -596,8 +602,9 @@ impl PartnerCol {
         | PartnerCol::Hidden
         => ColPolicy::ReadOnlySet,
       PartnerCol::HiddenInSubscribee
-        | PartnerCol::HiddenOutsideOfSubscribee
         => ColPolicy::ReadOnlyFilter,
+      PartnerCol::HiddenOutsideOfSubscribee
+        => ColPolicy::EditableFilter,
     } }
 
   pub fn repr_in_client (self) -> &'static str {
@@ -785,30 +792,30 @@ impl ViewNode {
     }}
 }
 
-impl fmt::Display for EditRequest {
+impl fmt::Display for NodeEditRequest {
   fn fmt (
     &self,
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
     match self {
-      EditRequest::NodeMerge (id) => write!(f, "(merge {})", id . 0),
-      EditRequest::Delete    => write!(f, "toDelete"),
+      NodeEditRequest::NodeMerge (id) => write!(f, "(merge {})", id . 0),
+      NodeEditRequest::Delete    => write!(f, "toDelete"),
     }} }
 
-impl FromStr for EditRequest {
+impl FromStr for NodeEditRequest {
   type Err = String;
 
   fn from_str (
     s : &str
   ) -> Result<Self, Self::Err> {
     match s {
-      "toDelete" => Ok (EditRequest::Delete),
+      "toDelete" => Ok (NodeEditRequest::Delete),
       _ => {
         // Try to parse as "merge <id>"
         if let Some (id_str) = s . strip_prefix ("merge ") {
-          Ok ( EditRequest::NodeMerge ( ID::from (id_str) ) )
+          Ok ( NodeEditRequest::NodeMerge ( ID::from (id_str) ) )
         } else {
-          Err ( format! ( "Unknown EditRequest value: {}", s ))
+          Err ( format! ( "Unknown NodeEditRequest value: {}", s ))
         }} }} }
 
 impl fmt::Display for ViewRequest {
@@ -864,6 +871,7 @@ pub fn default_activeNode (
     birth          : Birth::Unremarkable,
     graphStats     : GraphNodeStats::default(),
     viewStats      : ViewNodeStats::default(),
+    rel_source_request : None,
     view_requests  : HashSet::new(),
     existence      : ExistenceAxes::default(),
     membership     : MembershipAxes::default(),
@@ -924,7 +932,11 @@ pub fn mk_unknown_viewnode (
     folded      : false,
     body_folded : false,
     kind        : ViewNodeKind::Phantom (
-      Phantom::Unknown ( PhantomUnknown { id } ) ),
+      Phantom::Unknown ( PhantomUnknown {
+        id,
+        rel_source         : None,
+        rel_source_request : None,
+      } ) ),
   }}
 
 pub fn mk_inactive_viewnode (

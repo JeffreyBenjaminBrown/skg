@@ -68,9 +68,9 @@ pub fn update_context_origin_types (
           . get_first ( tantivy_index . source_field )
           . and_then ( |v| v . as_str () )
           . unwrap_or ("") . into ();
-      let ugly_telescope : String =
+      let overPrivateText_telescope : String =
         retrieved_doc
-          . get_first ( tantivy_index . ugly_telescope_field )
+          . get_first ( tantivy_index . overPrivateText_telescope_field )
           . and_then ( |v| v . as_str () )
           . unwrap_or ("false") . to_string ();
       let is_title : String =
@@ -95,8 +95,8 @@ pub fn update_context_origin_types (
           title_or_alias . as_str (),
         tantivy_index . raw_title_field =>
           raw_title . as_str (),
-        tantivy_index . ugly_telescope_field =>
-          ugly_telescope . as_str (),
+        tantivy_index . overPrivateText_telescope_field =>
+          overPrivateText_telescope . as_str (),
         tantivy_index . source_field =>
           source . as_str (),
         tantivy_index . context_origin_type_field =>

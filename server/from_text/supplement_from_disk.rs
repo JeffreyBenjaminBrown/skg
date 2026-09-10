@@ -10,12 +10,12 @@
 
 use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::from_text::local_instruction_collection::lower::{
-  ExplicitSources, NodeIntent, NodeSaveIntent };
-use crate::from_text::weave::{member_is_visible, set_difference_merge, weave};
+  RequestedRelationshipSources, NodeIntent, NodeSaveIntent };
+use crate::from_text::weave::{relationship_member_is_visible, set_difference_merge, weave};
 use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
 use crate::dbs::in_rust_graph::snapshot_global;
-use crate::types::misc::{ID, MSV, MemberAtSource, SkgConfig, SourceName, members_of, members_at_source};
+use crate::types::misc::{ID, MSV, MemberAtSource, RelationshipMemberKey, SkgConfig, SourceName, members_of, members_at_source};
 use crate::types::phantom::home_from_disk;
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
@@ -104,13 +104,14 @@ async fn supplement_saveintent_from_disk (
   match from_disk {
     None => {
       // A brand-new node has no sticky sources (no disk edges to be
-      // sticky about), but an explicit '(relSource ...)' atom must
+      // sticky about), but an explicit '(editRequest (relSource ...))'
+      // request must
       // still be validated against the DEFAULT floor -- an empty
       // disk stand-in reuses 'apply_sticky_sources' unchanged (its
       // sticky lookups simply find nothing, falling through to
       // default every time).
-      let explicit_sources : ExplicitSources =
-        from_buffer . explicit_sources ();
+      let requested_relationship_sources : RequestedRelationshipSources =
+        from_buffer . requested_relationship_sources ();
       let supplemented : NodeComplete =
         from_buffer . into_nodecomplete ();
       let empty_disk : NodeComplete = NodeComplete {
@@ -119,7 +120,7 @@ async fn supplement_saveintent_from_disk (
         .. empty_node_complete () };
       let supplemented : NodeComplete =
         apply_sticky_sources (
-          supplemented, &empty_disk, &explicit_sources, config )
+          supplemented, &empty_disk, &requested_relationship_sources, config )
         . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
       Ok (Definenode_with_Opt_Sourcemove {
         instruction : DefineNode::Save (SaveNode (supplemented)),
@@ -129,8 +130,8 @@ async fn supplement_saveintent_from_disk (
       let mut from_buffer : NodeSaveIntent = from_buffer;
       from_buffer . fill_unspecified_contains (
         &members_of (&disk_node . contains));
-      let explicit_sources : ExplicitSources =
-        from_buffer . explicit_sources ();
+      let requested_relationship_sources : RequestedRelationshipSources =
+        from_buffer . requested_relationship_sources ();
       let from_buffer : NodeComplete =
         from_buffer . into_nodecomplete();
       let canonicalized : NodeComplete =
@@ -149,7 +150,7 @@ async fn supplement_saveintent_from_disk (
             Some (active) => preserve_invisible_members (
               supplemented, &disk_node, config, active ) };
         apply_sticky_sources (
-          supplemented, &disk_node, &explicit_sources, config )
+          supplemented, &disk_node, &requested_relationship_sources, config )
           . map_err ( |e| -> Box<dyn Error> { e . into () } ) ? };
       Ok (Definenode_with_Opt_Sourcemove {
         instruction : DefineNode::Save (SaveNode (supplemented)),
@@ -171,34 +172,70 @@ fn preserve_invisible_members (
   config           : &SkgConfig,
   active           : &ActiveSourceSet,
 ) -> NodeComplete {
-  let is_visible = |id : &ID| -> bool {
-    member_is_visible (id, config, active) };
+  let member_key = |id : &ID| -> RelationshipMemberKey {
+    snapshot_global ()
+      . map (|snap| snap . relationship_member_key (id))
+      . unwrap_or_else (|| RelationshipMemberKey::UnresolvedRawId (id . clone ())) };
+  let contains_visible = |id : &ID| -> bool {
+    disk_node . contains . iter ()
+      . find (|member| &member . member == id)
+      . is_some_and (|member| relationship_member_is_visible (
+        member, config, active)) };
+  let subscribes_visible = |id : &ID| -> bool {
+    disk_node . subscribes_to . or_default () . iter ()
+      .find (|member| &member . member == id)
+      .is_some_and (|member| relationship_member_is_visible (
+        member, config, active)) };
+  let overrides_visible = |id : &ID| -> bool {
+    disk_node . overrides_view_of . or_default () . iter ()
+      .find (|member| &member . member == id)
+      .is_some_and (|member| relationship_member_is_visible (
+        member, config, active)) };
+  // Rendering may canonicalize a resolvable extra ID to its primary PID.  The
+  // comparison key says that is the same relationship, but the disk spelling
+  // is load-bearing: restore it before the weave so an untouched round trip
+  // cannot rewrite an edge merely because its target was displayed by PID.
+  let normalize_to_disk_raw = |buffer : &[ID], disk : &[MemberAtSource<ID>]| {
+    buffer . iter () . map (|id| {
+      let key : RelationshipMemberKey = member_key (id);
+      disk . iter ()
+        . find (|member| member_key (&member . member) == key)
+        . map (|member| member . member . clone ())
+        . unwrap_or_else (|| id . clone ())
+    }) . collect::<Vec<ID>>() };
   let owner_source : SourceName = supplemented . source . clone ();
   { let disk_contains : Vec<ID> = members_of (&disk_node . contains);
-    let buffer_contains : Vec<ID> = members_of (&supplemented . contains);
+    let buffer_contains : Vec<ID> = normalize_to_disk_raw (
+      &members_of (&supplemented . contains), &disk_node . contains);
     let merged : Vec<ID> = weave (
-      &disk_contains, &is_visible,
+      &disk_contains, &contains_visible,
       &buffer_contains );
     supplemented . contains =
       members_at_source (&owner_source, merged); }
   { let disk_subscribes : Vec<ID> =
       members_of (disk_node . subscribes_to . or_default ());
-    let buffer_subscribes : Vec<ID> =
+    let submitted_subscribes : Vec<ID> =
       members_of (supplemented . subscribes_to . or_default ());
+    let buffer_subscribes : Vec<ID> = normalize_to_disk_raw (
+      &submitted_subscribes,
+      disk_node . subscribes_to . or_default ());
     let merged : Vec<ID> = weave (
-      &disk_subscribes, &is_visible,
+      &disk_subscribes, &subscribes_visible,
       &buffer_subscribes );
-    if merged != buffer_subscribes {
+    if merged != submitted_subscribes {
       supplemented . subscribes_to =
         MSV::Specified (members_at_source (&owner_source, merged)); }}
   { let disk_overrides : Vec<ID> =
       members_of (disk_node . overrides_view_of . or_default ());
-    let buffer_overrides : Vec<ID> =
+    let submitted_overrides : Vec<ID> =
       members_of (supplemented . overrides_view_of . or_default ());
+    let buffer_overrides : Vec<ID> = normalize_to_disk_raw (
+      &submitted_overrides,
+      disk_node . overrides_view_of . or_default ());
     let merged : Vec<ID> = set_difference_merge (
-      &disk_overrides, &is_visible,
+      &disk_overrides, &overrides_visible,
       &buffer_overrides );
-    if merged != buffer_overrides {
+    if merged != submitted_overrides {
       supplemented . overrides_view_of =
         MSV::Specified (members_at_source (&owner_source, merged)); }}
   supplemented }
@@ -261,7 +298,7 @@ pub fn refuse_delete_with_inactive_sections (
 pub(crate) fn apply_sticky_sources (
   mut supplemented : NodeComplete,
   disk_node        : &NodeComplete,
-  explicit         : &ExplicitSources,
+  explicit         : &RequestedRelationshipSources,
   config           : &SkgConfig,
 ) -> Result<NodeComplete, String> {
   let owner_pid  : ID         = supplemented . pid    . clone ();
@@ -270,6 +307,10 @@ pub(crate) fn apply_sticky_sources (
     snapshot_global ()
       . and_then ( |snap| snap . pid_of (id) )
       . unwrap_or_else ( || id . clone () ) };
+  let member_key = |id : &ID| -> RelationshipMemberKey {
+    snapshot_global ()
+      . map (|snap| snap . relationship_member_key (id))
+      . unwrap_or_else (|| RelationshipMemberKey::UnresolvedRawId (id . clone ())) };
   let home_of = |id : &ID| -> Option<SourceName> {
     snapshot_global ()
       . and_then ( |snap| snap . pid_and_source (id)
@@ -290,10 +331,10 @@ pub(crate) fn apply_sticky_sources (
   let sticky_source_for = |disk_list : &[MemberAtSource<ID>],
                             member    : &ID|
   -> SourceName {
-    let key : ID = resolve (member);
+    let key : RelationshipMemberKey = member_key (member);
     let unclamped : SourceName = 'unclamped : {
       for d in disk_list { // sticky
-        if resolve ( &d . member ) == key {
+        if member_key ( &d . member ) == key {
           break 'unclamped d . source . clone (); }}
       default_floor_for (member) };
     // Clamp: no section may be more public than the home (the
@@ -302,6 +343,12 @@ pub(crate) fn apply_sticky_sources (
     // converse move leaves old, more-private sources in place:
     // publicizing memberships takes the explicit gesture.)
     config . more_private_of (unclamped, owner_home . clone ()) };
+  let raw_disk_member = |disk_list : &[MemberAtSource<ID>], member : &ID| {
+    let key : RelationshipMemberKey = member_key (member);
+    disk_list . iter ()
+      . find (|disk| member_key (&disk . member) == key)
+      . map (|disk| disk . member . clone ())
+      . unwrap_or_else (|| member . clone ()) };
   // EXPLICIT wins when at least as private as its floor: the more PUBLIC of the
   // DEFAULT floor and the sticky source. Flooring at the default
   // (not at sticky) is what lets an atom LOWER a stuck edge's
@@ -352,22 +399,28 @@ pub(crate) fn apply_sticky_sources (
       None => Ok ( sticky_source_for (disk_list, member) ), }};
   { let disk : &[MemberAtSource<ID>] = &disk_node . contains;
     for m in supplemented . contains . iter_mut () {
+      let submitted : ID = m . member . clone ();
       m . source = resolve_source (
-        disk, &m . member, &explicit . contains, "contains") ?; }}
+        disk, &submitted, &explicit . contains, "contains") ?;
+      m . member = raw_disk_member (disk, &submitted); }}
   { let disk : &[MemberAtSource<ID>] =
       disk_node . subscribes_to . or_default ();
     if let MSV::Specified (v) = &mut supplemented . subscribes_to {
       for m in v . iter_mut () {
+        let submitted : ID = m . member . clone ();
         m . source = resolve_source (
-          disk, &m . member, &explicit . subscribes_to,
-          "subscribes_to") ?; }} }
+          disk, &submitted, &explicit . subscribes_to,
+          "subscribes_to") ?;
+        m . member = raw_disk_member (disk, &submitted); }} }
   { let disk : &[MemberAtSource<ID>] =
       disk_node . overrides_view_of . or_default ();
     if let MSV::Specified (v) = &mut supplemented . overrides_view_of {
       for m in v . iter_mut () {
+        let submitted : ID = m . member . clone ();
         m . source = resolve_source (
-          disk, &m . member, &explicit . overrides_view_of,
-          "overrides_view_of") ?; }} }
+          disk, &submitted, &explicit . overrides_view_of,
+          "overrides_view_of") ?;
+        m . member = raw_disk_member (disk, &submitted); }} }
   { let disk : &[MemberAtSource<ID>] =
       disk_node . hides_from_its_subscriptions . or_default ();
     let subscribes : Vec<MemberAtSource<ID>> =
@@ -375,10 +428,11 @@ pub(crate) fn apply_sticky_sources (
     if let MSV::Specified (v) =
       &mut supplemented . hides_from_its_subscriptions {
       for m in v . iter_mut () {
-        let key : ID = resolve ( &m . member );
+        let submitted : ID = m . member . clone ();
+        let key : RelationshipMemberKey = member_key ( &submitted );
         let sticky : Option<SourceName> =
           disk . iter ()
-          . find ( |d| resolve ( &d . member ) == key )
+          . find ( |d| member_key ( &d . member ) == key )
           . map ( |d| d . source . clone () );
         let unclamped : SourceName = match sticky {
           Some (source) => source,
@@ -386,7 +440,8 @@ pub(crate) fn apply_sticky_sources (
             config, &owner_home, &m . member, &subscribes,
             &resolve ), };
         m . source = config . more_private_of (
-          unclamped, owner_home . clone () ); }} }
+          unclamped, owner_home . clone () );
+        m . member = raw_disk_member (disk, &submitted); }} }
   { // Aliases are members at sources too: explicit request, then
     // sticky source by alias text, then the owner's home. Their
     // floor is always the owner home because aliases have no target.

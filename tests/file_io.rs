@@ -138,7 +138,7 @@ pub fn reverse_some_of_node(node: &NodeComplete) -> NodeComplete {
     subscribes_to     : reversed_subscribes_to,
 
     title             : node . title             . clone(),
-    ugly_telescope    : node . ugly_telescope,
+    overPrivateText_telescope    : node . overPrivateText_telescope,
     aliases           : node . aliases           . clone(),
     source            : node . source            . clone(),
     pid               : node . pid               . clone(),

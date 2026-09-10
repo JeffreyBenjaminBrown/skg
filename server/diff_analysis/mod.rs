@@ -17,44 +17,44 @@ pub fn diff_analysis_report (
   config    : &SkgConfig,
   selection : DiffSelection,
 ) -> Result<String, String> {
-  diff_analysis_report_with_ugly_pids (config, selection)
+  diff_analysis_report_with_overPrivateText_pids (config, selection)
     . map ( |(report, _)| report )
 }
 
-/// Build the report and retain the telescope-coarse ugly PIDs from both
+/// Build the report and retain the telescope-coarse overPrivateText PIDs from both
 /// compared snapshots so the transport can attach a release warning.
-pub fn diff_analysis_report_with_ugly_pids (
+pub fn diff_analysis_report_with_overPrivateText_pids (
   config    : &SkgConfig,
   selection : DiffSelection,
 ) -> Result<(String, Vec<crate::types::misc::ID>), String> {
-  let (mut report, after, mut ugly_pids)
+  let (mut report, after, mut overPrivateText_pids)
     : (DiffReport, GraphSnapshot, Vec<crate::types::misc::ID>) =
     match read_changed_snapshot_pair (config, selection) ? {
       Some (changed) => {
-        let ugly = ugly_pids_in_pair (&changed . pair);
+        let overPrivateText = overPrivateText_pids_in_pair (&changed . pair);
         ( report_from_changed_snapshot_pair (&changed),
           changed . pair . after,
-          ugly ) },
+          overPrivateText ) },
       None => {
         let pair : SnapshotPair =
           read_snapshot_pair (config, selection) ?;
         let report : DiffReport = diff_snapshots (&pair);
-        let ugly = ugly_pids_in_pair (&pair);
-        (report, pair . after, ugly) }, };
-  ugly_pids . sort ();
-  ugly_pids . dedup ();
+        let overPrivateText = overPrivateText_pids_in_pair (&pair);
+        (report, pair . after, overPrivateText) }, };
+  overPrivateText_pids . sort ();
+  overPrivateText_pids . dedup ();
   report . vanished =
     investigate_vanished_ids (
       config, & dangling_ids_in_snapshot (&after) );
-  Ok (( render_report (&report), ugly_pids ))
+  Ok (( render_report (&report), overPrivateText_pids ))
 }
 
-fn ugly_pids_in_pair (
+fn overPrivateText_pids_in_pair (
   pair : &SnapshotPair,
 ) -> Vec<crate::types::misc::ID> {
   pair . before . nodes . values ()
     . chain (pair . after . nodes . values ())
-    . filter ( |node| node . ugly_telescope )
+    . filter ( |node| node . overPrivateText_telescope )
     . map ( |node| node . pid . clone () )
     . collect ()
 }

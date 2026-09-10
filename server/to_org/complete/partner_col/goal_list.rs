@@ -10,12 +10,18 @@ use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::types::git::{GitDiffStatus, MembershipAxes, NodeChanges, NodeCompleteDiff, Sign, SourceDiff, axes_from_per_stage_diffs, net_diff_from_per_stage, per_stage_node_changes_for_activeNode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
+use crate::types::misc::{ID, RelationshipMemberKey, SkgConfig, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::phantom::home_from_disk;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+
+fn relationship_member_key (id : &ID) -> RelationshipMemberKey {
+  snapshot_global () . as_deref ()
+    . map (|graph| graph . relationship_member_key (id))
+    . unwrap_or_else (|| RelationshipMemberKey::UnresolvedRawId (id . clone ()))
+}
 
 /// Goal list for an OUTBOUND col -- one whose membership is a
 /// relation list stored in the owner's own file (subscribeeCol,
@@ -201,10 +207,10 @@ pub fn goal_list_for_hiddeninsubscribee_col (
 ) -> (Vec<ID>, HashSet<ID>, HashMap<ID, MembershipAxes>) {
   let derived = | hides : &[ID], contains : &[ID] | -> Vec<ID> {
     // Intersection, preserving order from the hides list.
-    let contains_set : HashSet<&ID> =
-      contains . iter () . collect ();
+    let contains_set : HashSet<RelationshipMemberKey> =
+      contains . iter () . map (relationship_member_key) . collect ();
     hides . iter ()
-      . filter ( |id| contains_set . contains (id) )
+      . filter ( |id| contains_set . contains (&relationship_member_key (id)) )
       . cloned () . collect () };
   if source_diffs . is_none () {
     return ( derived (subscriber_hides, subscribee_contains),
@@ -250,9 +256,10 @@ pub fn goal_list_for_hiddenoutsideof_subscribeecol (
   config               : &SkgConfig,
 ) -> (Vec<ID>, HashSet<ID>, HashMap<ID, MembershipAxes>) {
   let derived = | hides : &[ID],
-                  all_subscribee_content : &HashSet<ID> | -> Vec<ID> {
+                  all_subscribee_content : &HashSet<RelationshipMemberKey> | -> Vec<ID> {
     hides . iter ()
-      . filter ( |id| ! all_subscribee_content . contains (id) )
+      . filter ( |id| ! all_subscribee_content
+                . contains (&relationship_member_key (id)) )
       . cloned () . collect () };
   let wt_subscribee_content_of = | pid : &ID | -> Vec<ID> {
     match snapshot_global_source (pid, config) {
@@ -263,9 +270,10 @@ pub fn goal_list_for_hiddenoutsideof_subscribeecol (
           . unwrap_or_default (),
       None => Vec::new () } };
   if source_diffs . is_none () {
-    let wt_all_subscribee_content : HashSet<ID> =
+    let wt_all_subscribee_content : HashSet<RelationshipMemberKey> =
       wt_subscribees . iter ()
         . flat_map ( |pid| wt_subscribee_content_of (pid) )
+        . map (|id| relationship_member_key (&id))
         . collect ();
     return ( derived (wt_subscriber_hides, &wt_all_subscribee_content),
              HashSet::new (), HashMap::new () ); }
@@ -304,12 +312,13 @@ pub fn goal_list_for_hiddenoutsideof_subscribeecol (
       . collect () };
   let derived3 : [Vec<ID>; 3] =
     [0, 1, 2] . map ( |k| {
-      let all_subscribee_content : HashSet<ID> =
+      let all_subscribee_content : HashSet<RelationshipMemberKey> =
         subscribees3 [k] . iter ()
           . flat_map ( |pid|
               content3_by_subscribee . get (pid)
                 . map ( |snaps| snaps [k] . clone () )
                 . unwrap_or_default () )
+          . map (|id| relationship_member_key (&id))
           . collect ();
       derived ( &hides3 [k], &all_subscribee_content ) } );
   let axes : HashMap<ID, MembershipAxes> =

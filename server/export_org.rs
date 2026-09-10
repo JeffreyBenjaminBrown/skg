@@ -185,7 +185,7 @@ pub fn export_to_org (
   report . files_written . sort ();
   Ok (report) }
 
-/// PIDs whose scalar data can affect an export: every rendered event and
+/// PIDs whose title/body text can affect an export: every rendered event and
 /// every marker whose title/body can determine whether a root exists and
 /// where its file is written. This performs discovery only; it writes no
 /// files and is therefore safe to use at the release preflight.

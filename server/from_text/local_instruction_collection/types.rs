@@ -25,6 +25,9 @@ pub enum LocalContext {
   SubscribeeAsSuchPosition { // The node is a direct child of a SubscribeeCol.
     subscriber               : ID,
     subscriber_is_definitive : bool, },
+  HiddenOutsidePosition { // The one derived-but-editable filter under a SubscribeeCol.
+    subscriber       : ID,
+    is_saveEligible  : bool, },
   UnderReadOnlyCol, // The node is inside one of the six read-only RoleCols, an IDCol, or a Qual.
 }
 
@@ -54,9 +57,9 @@ pub struct DefiningColOwner {
 /// .
 /// 'SetContains' / 'SetSubscribesTo' / 'SetOverrides' pair each
 /// member with an Option<SourceName>: Some when the position's
-/// headline carried an explicit '(relSource NAME)' atom (the
-/// 'skg-set-relationship-source' gesture -- see
-/// 'ViewNodeStats::rel_source'), None meaning "derive" (the usual
+/// headline carried an explicit '(editRequest (relSource NAME))'
+/// request (the 'skg-set-relationship-source' gesture), None meaning
+/// "derive" (the usual
 /// sticky-else-default rule). 'server/from_text/supplement_from_disk.rs'
 /// validates the explicit sources against each edge's DEFAULT floor
 /// at save time (render-and-gating, 5_plan.org;
@@ -75,6 +78,7 @@ pub enum NodeIntent_Local {
   NodeMerge       { acquiree : ID },
   // The remaining kinds are combineable.
   SubscribeeVisibility (SubscribeeVisibility),
+  HiddenOutsideEdit  (HiddenOutsideEdit),
   SubscribeeTextClaim  (SubscribeeTextClaim),
 }
 
@@ -87,6 +91,14 @@ pub enum NodeIntent_Local {
 pub struct SubscribeeVisibility {
   pub subscribee : ID,
   pub visible    : Vec<ID>, // These are the nodes *not* to hide.
+}
+
+/// The explicitly submitted visible-outside subset for one subscriber.
+/// Unlike direct relationship sets it carries no source request: hide
+/// sources are derived after subscriptions and visibility are resolved.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HiddenOutsideEdit {
+  pub members : Vec<ID>,
 }
 
 /// This is a validation-only signal: the buffer claims this title
@@ -116,6 +128,7 @@ pub struct IntentsForOneId {
   pub delete         : bool,
   pub node_merge     : Option<ID>, // This holds the acquiree.
   pub visibility     : Vec<SubscribeeVisibility>,  // This slot is combineable.
+  pub hidden_outside : Vec<HiddenOutsideEdit>,     // This slot is combineable.
   pub text_claims    : Vec<SubscribeeTextClaim>,   // This slot is combineable, and is consumed only by validation.
 }
 
@@ -175,6 +188,9 @@ impl CollectedIntents {
       NodeIntent_Local::SubscribeeVisibility (v) => {
         entry . visibility . push (v);
         Ok (( )) },
+      NodeIntent_Local::HiddenOutsideEdit (edit) => {
+        entry . hidden_outside . push (edit);
+        Ok (( )) },
       NodeIntent_Local::SubscribeeTextClaim (c) => {
         entry . text_claims . push (c);
         Ok (( )) },
@@ -226,6 +242,7 @@ impl CollectedIntents {
               "nodeMerge acquiree", &target),
           NodeIntent_Local::Delete { .. }
             | NodeIntent_Local::SubscribeeVisibility (_)
+            | NodeIntent_Local::HiddenOutsideEdit (_)
             | NodeIntent_Local::SubscribeeTextClaim (_) =>
             unreachable! ("handled by the outer match"), }}}}
 }

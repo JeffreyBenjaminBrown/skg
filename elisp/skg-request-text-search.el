@@ -66,7 +66,7 @@ headline documenting `skg-search-interactive'."
   (if b "true" "false"))
 
 (defun skg--request-text-search (search-terms regex body operators
-                                              &optional ugly-choice)
+                                              &optional overPrivateText-choice)
   "Request a text search from the Rust server.
 REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
@@ -81,15 +81,15 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
                       (regex     . ,(skg--bool-to-string regex))
                       (body      . ,(skg--bool-to-string body))
                       (operators . ,(skg--bool-to-string operators)))
-                    (when ugly-choice
-                      `((ugly-telescopes . ,ugly-choice)))))
+                    (when overPrivateText-choice
+                      `((overPrivateText-telescopes . ,overPrivateText-choice)))))
                   "\n")))
     (skg-register-response-handler
      ;; Register phase 1 handler (one-shot)
      'search-results
      (lambda (_tcp-proc payload)
        (setq skg-response-handler-map
-             (assoc-delete-all 'ugly-telescope-confirmation
+             (assoc-delete-all 'overPrivateText-telescope-confirmation
                                skg-response-handler-map))
        (skg--display-search-phase1 payload clean-terms))
      t)
@@ -107,10 +107,10 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
        (skg--handle-snapshot-request tcp-proc payload))
      nil) ;; persistent, not one-shot
     (skg-register-response-handler
-     'ugly-telescope-confirmation
+     'overPrivateText-telescope-confirmation
      (lambda (_tcp-proc payload)
        (setq skg-response-handler-map
-             (assoc-delete-all 'ugly-telescope-confirmation
+             (assoc-delete-all 'overPrivateText-telescope-confirmation
                                skg-response-handler-map))
        (dolist (response-type '(search-results search-enrichment))
          (when (assoc response-type skg-response-handler-map)

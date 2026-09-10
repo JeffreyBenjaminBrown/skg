@@ -46,12 +46,12 @@ use crate::from_text::local_instruction_collection::predicates::{
   member_counts_for_partnerCol };
 use crate::from_text::local_instruction_collection::types::{
   CollectedIntents, DefiningColOwner, LocalContext, NodeIntent_Local,
-  SubscribeeTextClaim, SubscribeeVisibility };
+  HiddenOutsideEdit, SubscribeeTextClaim, SubscribeeVisibility };
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  EditRequest, ParentIs, Qual, QualCol, PartnerCol, ActiveNode, ViewNode,
-  ViewNodeKind, Vognode };
+  NodeEditRequest, ParentIs, Qual, QualCol, PartnerCol, ActiveNode, ViewNode,
+  ViewNodeKind, Vognode, Phantom };
 
 use ego_tree::NodeRef;
 use std::collections::HashSet;
@@ -107,6 +107,8 @@ fn visit (
     // added, 'PartnerCol::policy' says which group it joins.
     ViewNodeKind::PartnerCol (PartnerCol::Subscribee) =>
       visit_subscribeecol (node_ref, context, collected),
+    ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) =>
+      visit_hiddenoutsidecol (node_ref, context, collected),
     ViewNodeKind::PartnerCol (PartnerCol::Overridden) =>
       visit_overriddencol (node_ref, context, collected),
     ViewNodeKind::QualCol (QualCol::ID)
@@ -135,7 +137,7 @@ fn visit_active_vognode (
     ! t . is_indefinitive();
   let has_delete_request : bool =
     matches!( t . edit_request(),
-              Some (&EditRequest::Delete));
+              Some (&NodeEditRequest::Delete));
   let is_saveEligible : bool =
     is_definitive
     && ! has_delete_request
@@ -187,7 +189,7 @@ fn visit_active_vognode (
             // node's content is always Specified.
             NodeIntent_Local::SetContains (
               content_members (node_ref) )) ?;
-          if let Some (EditRequest::NodeMerge (acquiree)) =
+          if let Some (NodeEditRequest::NodeMerge (acquiree)) =
             t . edit_request()
           { collected . instructionMerge_intent (
               t . id . clone(),
@@ -260,11 +262,11 @@ fn visit_aliascol (
         let mut seen : HashSet<String> = HashSet::new ();
         for child in node_ref . children() {
           if let ViewNodeKind::Qual (Qual::Alias {
-            text, rel_source, .. })
+            text, rel_source_request, .. })
             = &child . value() . kind
           { if seen . insert (text . clone ()) {
               aliases . push (( text . clone (),
-                                rel_source . clone () )); }} }
+                                rel_source_request . clone () )); }} }
         aliases };
       // The MSV semantics are: an absent col emits no intent, which
       // lowers to Unspecified, while a present-but-empty col emits
@@ -287,16 +289,22 @@ fn visit_subscribeecol (
           owner . id . clone(),
           NodeIntent_Local::SetSubscribesTo (
             subscribeeCol_members (node_ref) )) ?; }
-      recurse_with_uniform_context (
-        node_ref,
-        // The subscriber's identity is passed even when the owner is
-        // not save-eligible, because text claims outlive the
-        // visibility guard. (Children that are cols themselves
-        // ignore this context.)
-        &LocalContext::SubscribeeAsSuchPosition {
-          subscriber               : owner . id . clone(),
-          subscriber_is_definitive : owner . is_definitive },
-        collected) },
+      for child in node_ref . children() {
+        let child_context : LocalContext =
+          match &child . value() . kind {
+            ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) =>
+              LocalContext::HiddenOutsidePosition {
+                subscriber      : owner . id . clone(),
+                is_saveEligible : owner . is_saveEligible },
+            _ =>
+              // The subscriber's identity is passed even when the owner is
+              // not save-eligible, because text claims outlive the
+              // visibility guard.
+              LocalContext::SubscribeeAsSuchPosition {
+                subscriber               : owner . id . clone(),
+                subscriber_is_definitive : owner . is_definitive }, };
+        visit (child, &child_context, collected) ?; }
+      Ok (( )) },
     _ =>
       // The col has no identifiable owner. Validation precludes this
       // shape; the traversal stays total and silent.
@@ -304,6 +312,38 @@ fn visit_subscribeecol (
         node_ref,
         &LocalContext::UnderVognode { parent_if_writeable : None },
         collected), }}
+
+/// Collect the explicitly submitted visible-outside subset.  This col is a
+/// derived filter rather than a direct relationship set, so its meaning is
+/// resolved only after ordinary subscribee visibility inference has run.
+fn visit_hiddenoutsidecol (
+  node_ref  : NodeRef<ViewNode>,
+  context   : &LocalContext,
+  collected : &mut CollectedIntents,
+) -> Result<(), String> {
+  if let LocalContext::HiddenOutsidePosition {
+    subscriber, is_saveEligible } = context
+  {
+    if *is_saveEligible {
+      let mut members : Vec<ID> = Vec::new ();
+      for child in node_ref . children() {
+        match &child . value() . kind {
+          ViewNodeKind::Vognode (Vognode::Active (t))
+            if member_counts_for_partnerCol (t) => {
+              if t . rel_source_request . is_some () {
+                return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relationship sources are derived." . to_string ()); }
+              members . push (t . id . clone ()); },
+          ViewNodeKind::Phantom (Phantom::Unknown (unknown)) => {
+            if unknown . rel_source_request . is_some () {
+              return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relationship sources are derived." . to_string ()); }
+            members . push (unknown . id . clone ()); },
+          _ => {}, }}
+      collected . instructionMerge_intent (
+        subscriber . clone(),
+        NodeIntent_Local::HiddenOutsideEdit (HiddenOutsideEdit { members }) ) ?; }}
+  recurse_with_uniform_context (
+    node_ref, &LocalContext::UnderReadOnlyCol, collected)
+}
 
 fn visit_overriddencol (
   node_ref  : NodeRef<ViewNode>,
@@ -325,7 +365,7 @@ fn visit_overriddencol (
 
 /// As 'dedup_vector', but dedups members carrying sources by ID ALONE
 /// (first occurrence wins) rather than by the full (ID, source) pair: a
-/// duplicate ID with a DIFFERENT '(relSource ...)' atom must still
+/// duplicate ID with a DIFFERENT source request must still
 /// be silently dropped, matching the existing defining-col dedup
 /// policy ("duplicate defining-col members are silently deduped").
 fn dedup_members_by_id (
@@ -342,8 +382,8 @@ fn dedup_members_by_id (
 /// children that pass the PartnerCol membership predicate, silently
 /// deduplicated (by ID; see 'dedup_members_by_id'), preserving
 /// first-occurrence order. Each member is paired with its headline's
-/// explicit '(relSource NAME)' source, if any (see
-/// 'ViewNodeStats::rel_source' and 'NodeIntent_Local').  (Inactive
+/// explicit '(editRequest (relSource NAME))' request, if any (see
+/// 'NodeIntent_Local').  (Inactive
 /// children are NOT members here: the overriddenCol omits inactive
 /// members from display, and the set-difference merge preserves
 /// them at save.  TODO/full-schema/9-2_source-set-safety.org.)
@@ -352,11 +392,15 @@ fn partnerCol_members (
 ) -> Vec<(ID, Option<SourceName>)> {
   let mut members : Vec<(ID, Option<SourceName>)> = Vec::new();
   for child in node_ref . children() {
-    if let ViewNodeKind::Vognode (Vognode::Active (t))
-      = &child . value() . kind
-    { if member_counts_for_partnerCol (t) {
-        members . push (
-          (t . id . clone(), t . viewStats . rel_source . clone()) ); }}}
+    match &child . value() . kind {
+      ViewNodeKind::Vognode (Vognode::Active (t))
+        if member_counts_for_partnerCol (t) =>
+          members . push ((t . id . clone(),
+                           t . rel_source_request . clone())),
+      ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
+          members . push ((unknown . id . clone(),
+                           unknown . rel_source_request . clone())),
+      _ => {}, }}
   dedup_members_by_id (members) }
 
 /// This returns the members of a SubscribeeCol: its Active children
@@ -367,26 +411,30 @@ fn partnerCol_members (
 /// already restores invisible subscribees at their disk position, so
 /// a buffer-present inactive placeholder must not feed this list.
 /// Each member is paired with its headline's explicit
-/// '(relSource NAME)' source, if any.
+/// '(editRequest (relSource NAME))' request, if any.
 #[allow(non_snake_case)]
 fn subscribeeCol_members (
   node_ref : NodeRef<ViewNode>,
 ) -> Vec<(ID, Option<SourceName>)> {
   let mut members : Vec<(ID, Option<SourceName>)> = Vec::new();
   for child in node_ref . children() {
-    if let ViewNodeKind::Vognode (Vognode::Active (t))
-      = &child . value() . kind
-    { if member_counts_for_partnerCol (t) {
-        members . push (
-          (t . id . clone(), t . viewStats . rel_source . clone()) ); }}}
+    match &child . value() . kind {
+      ViewNodeKind::Vognode (Vognode::Active (t))
+        if member_counts_for_partnerCol (t) =>
+          members . push ((t . id . clone(),
+                           t . rel_source_request . clone())),
+      ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
+          members . push ((unknown . id . clone(),
+                           unknown . rel_source_request . clone())),
+      _ => {}, }}
   dedup_members_by_id (members) }
 
 /// This returns the content of a definitive vognode: its Active
 /// children that pass the contains predicate. It does not dedup,
 /// because validation ('nonignored_children_have_distinct_ids')
 /// already guarantees distinctness. Each member is paired with its
-/// headline's explicit '(relSource NAME)' source, if any (see
-/// 'ViewNodeStats::rel_source' and 'NodeIntent_Local').
+/// headline's explicit '(editRequest (relSource NAME))' request, if any (see
+/// 'NodeIntent_Local').
 ///
 /// Inactive children contribute NOTHING here: an inactive node emits
 /// no save intention for its container. Its membership in the
@@ -403,14 +451,21 @@ fn content_members (
 ) -> Vec<(ID, Option<SourceName>)> {
   let mut contents : Vec<(ID, Option<SourceName>)> = Vec::new();
   for child in node_ref . children() {
-    if let ViewNodeKind::Vognode (Vognode::Active (t))
-      = &child . value() . kind
-    { if active_child_counts_as_content (t) {
-        contents . push ((
-          // collected_id, not id: a drawn overrider stands for
-          // the original member it was drawn in place of.
-          t . collected_id (),
-          t . viewStats . rel_source . clone() )); }}}
+    match &child . value() . kind {
+      ViewNodeKind::Vognode (Vognode::Active (t)) => {
+        if active_child_counts_as_content (t) {
+          contents . push ((
+            // collected_id, not id: a drawn overrider stands for
+            // the original member it was drawn in place of.
+            t . collected_id (),
+            t . rel_source_request . clone() )); }},
+      ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
+        // An Unknown is inert as a node, but its raw ID is load-bearing
+        // membership data at a structured relationship position. `None` asks
+        // disk supplementation to keep an existing destination source sticky.
+        contents . push (( unknown . id . clone(),
+                           unknown . rel_source_request . clone() )),
+      _ => {}, }}
   contents }
 
 /// This returns the children that the buffer presents as visible
@@ -423,11 +478,14 @@ fn visible_content_members (
 ) -> Vec<ID> {
   let mut visible : Vec<ID> = Vec::new();
   for child in node_ref . children() {
-    if let ViewNodeKind::Vognode (Vognode::Active (t))
-      = &child . value() . kind
-    { if active_child_counts_as_visible_content (t) {
+    match &child . value () . kind {
+      ViewNodeKind::Vognode (Vognode::Active (t))
+        if active_child_counts_as_visible_content (t) => {
         visible . push (
           // collected_id: a drawn overrider presents the original,
           // so hide/unhide inference must speak of the original.
-          t . collected_id ()); }}}
+          t . collected_id ()); },
+      ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
+        visible . push (unknown . id . clone ()),
+      _ => {}, }}
   visible }

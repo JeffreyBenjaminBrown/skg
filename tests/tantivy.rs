@@ -11,7 +11,7 @@ use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::dbs::tantivy::title_and_source_by_id;
 use skg::dbs::tantivy::escape::{escape_tantivy_intra_word, escape_tantivy_literal};
 use skg::dbs::tantivy::search::{
-  SearchOptions, has_ugly_telescope, search_index};
+  SearchOptions, has_overPrivateText_telescope, search_index};
 use skg::dbs::tantivy::write::update_index_with_nodes;
 use skg::types::misc::{ID, MSV, SourceName, TantivyIndex, members_at_source_msv};
 use skg::types::nodes::tantivy::NodeTantivy;
@@ -416,24 +416,24 @@ fn test_search_body_axis (
   Ok (( )) }
 
 #[test]
-fn ugly_telescope_filter_runs_inside_the_search_query (
+fn overPrivateText_telescope_filter_runs_inside_the_search_query (
 ) -> Result<(), Box<dyn std::error::Error>> {
   let empty : NodeComplete = empty_node_complete ();
   let mut clean : NodeComplete = empty . clone ();
   clean . pid = ID::new ("clean");
   clean . title = "shared privacy term" . to_string ();
-  let mut ugly : NodeComplete = empty . clone ();
-  ugly . pid = ID::new ("ugly");
-  ugly . title = "shared privacy term" . to_string ();
-  ugly . ugly_telescope = true;
-  ugly . aliases = members_at_source_msv (
+  let mut overPrivateText : NodeComplete = empty . clone ();
+  overPrivateText . pid = ID::new ("overPrivateText");
+  overPrivateText . title = "shared privacy term" . to_string ();
+  overPrivateText . overPrivateText_telescope = true;
+  overPrivateText . aliases = members_at_source_msv (
     &SourceName::from ("main"),
     MSV::Specified (vec! ["dirty alias secret" . to_string ()]) );
   let (index, _) = wipe_then_init_tantivy_db (
-    &[clean, ugly], Path::new ("/tmp/tantivy-test-ugly-filter") ) ?;
-  assert! ( has_ugly_telescope (&index) ? );
+    &[clean, overPrivateText], Path::new ("/tmp/tantivy-test-overPrivateText-filter") ) ?;
+  assert! ( has_overPrivateText_telescope (&index) ? );
   let opts : SearchOptions = SearchOptions {
-    exclude_ugly_telescope : true,
+    exclude_overPrivateText_telescope : true,
     .. SearchOptions::default () };
   for terms in ["shared privacy term", "dirty alias secret"] {
     let (matches, searcher) = search_index (&index, terms, &opts) ?;
@@ -443,8 +443,8 @@ fn ugly_telescope_filter_runs_inside_the_search_query (
         . get_first (index . id_field) . unwrap ()
         . as_str () . unwrap () . to_string () )
       . collect ();
-    assert! ( ! ids . contains (&"ugly" . to_string ()),
-      "ugly title and alias docs are excluded before TopDocs: {:?}", ids );
+    assert! ( ! ids . contains (&"overPrivateText" . to_string ()),
+      "overPrivateText title and alias docs are excluded before TopDocs: {:?}", ids );
   }
   Ok (( ))
 }
@@ -728,25 +728,25 @@ fn test_title_by_id_returns_title_not_alias (
   Ok (( )) }
 
 #[test]
-fn ugly_telescope_flag_survives_index_build_and_update (
+fn overPrivateText_telescope_flag_survives_index_build_and_update (
 ) -> Result<(), Box<dyn std::error::Error>> {
   let mut node : NodeComplete = empty_node_complete ();
-  node . pid = ID::new ("ugly-indexed");
-  node . title = "uniquely ugly indexed title" . to_string ();
-  node . ugly_telescope = true;
+  node . pid = ID::new ("overPrivateText-indexed");
+  node . title = "uniquely overPrivateText indexed title" . to_string ();
+  node . overPrivateText_telescope = true;
   let (tantivy_index, _) = wipe_then_init_tantivy_db (
-    &[node . clone ()], Path::new ("/tmp/tantivy-test-ugly-flag") )?;
+    &[node . clone ()], Path::new ("/tmp/tantivy-test-overPrivateText-flag") )?;
   let stored_flag = |index : &TantivyIndex| -> Result<String, Box<dyn std::error::Error>> {
     let (matches, searcher) = search_index (
-      index, "uniquely ugly indexed title", &SearchOptions::default ())?;
+      index, "uniquely overPrivateText indexed title", &SearchOptions::default ())?;
     let (_, address) = matches . first ()
       .ok_or ("expected the indexed title")?;
     let document : TantivyDocument = searcher . doc (*address)?;
-    Ok ( document . get_first (index . ugly_telescope_field)
+    Ok ( document . get_first (index . overPrivateText_telescope_field)
       .and_then ( |value| value . as_str ())
       .unwrap_or ("") . to_string () ) };
   assert_eq! (stored_flag (&tantivy_index)?, "true");
-  node . ugly_telescope = false;
+  node . overPrivateText_telescope = false;
   update_index_with_nodes (
     &[NodeTantivy::from (&node)], &tantivy_index )?;
   assert_eq! (stored_flag (&tantivy_index)?, "false");

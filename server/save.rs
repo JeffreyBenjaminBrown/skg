@@ -76,8 +76,8 @@ async fn update_graph_minus_nodeMerges_with_hoist_approval (
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "apply_delete_propagation_cleanup" ). entered();
     let graph_snap : Arc<InRustGraph> = graph . load_full ();
-    apply_delete_propagation_cleanup (&mut node_defs,
-                                      &graph_snap); }
+    apply_delete_propagation_cleanup (
+      &mut node_defs, &graph_snap, &config ); }
   apply_define_nodes_to_stores ( node_defs,
                                  source_moves,
                                  config,
@@ -243,7 +243,8 @@ pub fn validate_override_invariants_after_save (
     (*graph_snap) . clone ();
   let mut nonmerge : Vec<DefineNode> =
     save_instructions . to_vec ();
-  apply_delete_propagation_cleanup (&mut nonmerge, &graph_snap);
+  apply_delete_propagation_cleanup (
+    &mut nonmerge, &graph_snap, config );
   apply_definenodes_to_inRustGraph (&mut simulated, &nonmerge);
   let nodeMerge_definenodes : Vec<DefineNode> =
     nodeMerge_instructions . iter ()
@@ -378,7 +379,10 @@ pub async fn update_typedb_from_saveinstructions (
 /// Two-phase cleanup so deletes don't leave dangling references on
 /// disk:
 ///
-/// Phase 1 (cleanup-SaveNode generation): for any node N still on
+/// Foreign raw references deliberately survive: delete propagation never
+/// manufactures or modifies a foreign telescope write.
+///
+/// Phase 1 (cleanup-SaveNode generation): for any owned node N still on
 /// disk that references a being-deleted pid in any of its out bound
 /// list fields, *maybe* append a verbatim Save(N) to NODE_DEFS
 /// so that phase 2 will rewrite N. But *don't* do that for:
@@ -408,6 +412,7 @@ pub async fn update_typedb_from_saveinstructions (
 pub(crate) fn apply_delete_propagation_cleanup (
   node_defs  : &mut Vec<DefineNode>,
   graph_snap : &Arc<InRustGraph>,
+  config     : &SkgConfig,
 ) {
   let deleted_primary_pids : HashSet<ID> = node_defs . iter ()
     . filter_map ( |d| match d {
@@ -441,8 +446,11 @@ pub(crate) fn apply_delete_propagation_cleanup (
           for pid in set {
             referencer_pids . insert ( pid . clone () ); }} } }
     referencer_pids . retain ( |p|
-      ! user_save_pids . contains (p)
-        && ! deleted_primary_pids . contains (p) );
+      graph_snap . get (p)
+      . map ( |node| config . user_owns_source (&node . source) )
+      . unwrap_or (false)
+      && ! user_save_pids . contains (p)
+      && ! deleted_primary_pids . contains (p) );
     let cleanup_count : usize = referencer_pids . len ();
     for pid in referencer_pids {
       let Some (rust) = graph_snap . get (&pid) else { continue; };
@@ -453,9 +461,11 @@ pub(crate) fn apply_delete_propagation_cleanup (
         "Adding {} cleanup save(s) to remove references to deleted nodes.",
         cleanup_count); } }
 
-  { // Phase 2: strip every deleted id from every Save's outbound list fields, regardless of the Save's origin (Phase 1 or the save itself)
+  { // Strip deleted IDs only from owned saves. A foreign buffer instruction
+    // remains intact so ordinary validation/preflight can reject the write.
     for nd in node_defs . iter_mut () {
       if let DefineNode::Save ( SaveNode (nc) ) = nd {
+        if ! config . user_owns_source (&nc . source) { continue; }
         nc . contains . retain ( |id|
           ! deleted_id_set . contains (& id . member) );
         nc . subscribes_to = remove_from_msv (
@@ -476,7 +486,7 @@ pub(crate) fn nodecomplete_from_noderust (
     source                       : rust . source . clone (),
     extra_ids                    : rust . extra_ids . clone (),
     title                        : rust . title . clone (),
-    ugly_telescope               : rust . ugly_telescope,
+    overPrivateText_telescope               : rust . overPrivateText_telescope,
     aliases                      : rust . aliases . clone (),
     body                         : rust . body . clone (),
     contains                     : rust . contains . clone (),
@@ -511,7 +521,7 @@ pub fn update_fs_from_saveinstructions (
 /// prepared before the first filesystem mutation. The approval set is an
 /// explicit capability supplied only by the interactive Hoist retry; all
 /// ordinary callers use 'update_fs_from_saveinstructions' above and fail
-/// closed on ugly disk telescopes.
+/// closed on overPrivateText disk telescopes.
 pub(crate) fn update_fs_from_saveinstructions_with_hoist_approval (
   node_defs             : &[DefineNode],
   source_moves          : &[SourceMove],

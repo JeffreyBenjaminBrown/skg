@@ -1,4 +1,6 @@
-use crate::dbs::in_rust_graph::in_rust_graph_coherent_with_save_instructions;
+use crate::dbs::in_rust_graph::{
+  in_rust_graph_coherent_with_save_instructions, snapshot_global };
+use crate::dbs::node_lookup::nodecomplete_from_in_rust_graph;
 use crate::from_text::buffer_to_validated_saveplan_with_fork_sources;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
@@ -18,8 +20,8 @@ use crate::serve::handlers::telescope_hoist::{
   needs_confirmation as hoist_needs_confirmation,
   repair_saves_for_unwritten_candidates,
 };
-use crate::serve::handlers::scalar_release::{
-  approved_pids_from_request as scalar_approved_pids_from_request,
+use crate::serve::handlers::text_release::{
+  approved_pids_from_request as text_approved_pids_from_request,
 };
 use crate::serve::util::{
   view_uri_from_request,
@@ -35,7 +37,8 @@ use crate::types::env::SkgEnv;
 use crate::types::errors::SaveError;
 use crate::types::git::{SourceDiff, GitDiffStatus};
 use crate::types::misc::{ID, SourceName, SkgConfig};
-use crate::types::save::{DefineNode, SavePlan, format_save_error_as_org};
+use crate::types::save::{
+  DefineNode, PostCommitNoticeCandidate, SavePlan, format_save_error_as_org };
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::ViewUri;
 use crate::update_buffer::update_views_after_save;
@@ -49,7 +52,7 @@ use std::net::TcpStream;
 use std::path::Path;
 
 /// The ordinary terminal message in the save protocol. Hoist, fork, and
-/// scalar-release confirmations are alternative terminal messages.
+/// text-release confirmations are alternative terminal messages.
 /// Contains the re-rendered saved buffer and any warnings/errors when sent.
 /// See <api-and-formats.md § Save buffer> for the full sequence:
 ///   save-lock → save-relax-lock → collateral-view* → save-result.
@@ -64,13 +67,13 @@ pub struct SaveResponse {
   /// prompt. The handler then sends a 'fork-confirmation' message rather
   /// than 'save-result'. None for an ordinary save.
   pub fork_confirmation   : Option<String>,
-  /// Some when this save found an ugly current disk telescope without an
+  /// Some when this save found an overPrivateText current disk telescope without an
   /// exact publication approval. This is checked before fork confirmation;
-  /// nothing was committed and the response contains no scalar text.
+  /// nothing was committed and the response contains no title/body text.
   pub hoist_confirmation  : Option<Vec<HoistCandidate>>,
-  /// Fully tagged ugly-telescope-confirmation response produced after the
+  /// Fully tagged overPrivateText-telescope-confirmation response produced after the
   /// save's rerenders have been staged but before text or view-state release.
-  pub scalar_release_confirmation : Option<String>,
+  pub text_release_confirmation : Option<String>,
 }
 
 #[derive(Clone)]
@@ -128,8 +131,8 @@ pub fn handle_save_buffer_request (
     fork_sources_from_request (request);
   let hoist_approved_pids : HashSet<ID> =
     hoist_approved_pids_from_request (request);
-  let scalar_approved_pids : HashSet<ID> =
-    scalar_approved_pids_from_request (request);
+  let text_approved_pids : HashSet<ID> =
+    text_approved_pids_from_request (request);
   { // Send the early broad lock BEFORE reading the buffer, so the client's
     // one-shot save-lock handler always fires exactly once and balances its
     // pending-count -- even when the read below fails (otherwise only
@@ -160,13 +163,13 @@ pub fn handle_save_buffer_request (
             fork_approved,
             &fork_sources,
             &hoist_approved_pids,
-            &scalar_approved_pids ))
+            &text_approved_pids ))
         { Ok (mut save_response) => {
             save_response . save_point_position =
               save_point_position . clone ();
             match (&save_response . hoist_confirmation,
                    &save_response . fork_confirmation,
-                   &save_response . scalar_release_confirmation) {
+                   &save_response . text_release_confirmation) {
               (Some (candidates), _, _) =>
                 send_response_with_length_prefix (
                   stream,
@@ -435,7 +438,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   fork_approved                : bool,
   fork_sources                 : &HashMap<ID, SourceName>,
   hoist_approved_pids         : &HashSet<ID>,
-  scalar_approved_pids        : &HashSet<ID>,
+  text_approved_pids        : &HashSet<ID>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   if diff_mode_enabled { // diff mode is undefined for merge commits
     let sources : Vec<SourceName> =
@@ -460,14 +463,15 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     define_nodes       : mut nonmerge_defineNodes,
     nodeMerge_instructions : nodeMerges,
     source_moves,
-    fork_specs }
+    fork_specs,
+    post_commit_notice_candidates }
     = save_plan;
   { // Delete propagation adds collateral writes. Derive them before the
     // disk Hoist classification so "touched pids" means every telescope
     // this save will actually rewrite, not only what appeared in the buffer.
     let graph_snap = env . in_rust_graph . load_full ();
     apply_delete_propagation_cleanup (
-      &mut nonmerge_defineNodes, &graph_snap ); }
+      &mut nonmerge_defineNodes, &graph_snap, &env . config ); }
   let hoist_candidates : Vec<HoistCandidate> =
     hoist_candidates_from_disk (
       &nonmerge_defineNodes, &nodeMerges, &env . config ) ?;
@@ -480,7 +484,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       save_point_position : None,
       fork_confirmation   : None,
       hoist_confirmation  : Some (hoist_candidates),
-      scalar_release_confirmation : None,
+      text_release_confirmation : None,
     } ); }
   // In particular, make a dirty nodeMerge acquiree clean before the merge
   // copies its text into a fresh preservation node and deletes it.
@@ -503,7 +507,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
                    or kill this buffer to decline.",
                   fork_specs . len () )),
       hoist_confirmation  : None,
-      scalar_release_confirmation : None, } ); }
+      text_release_confirmation : None, } ); }
   // Forks detected this save (approved, or none): editing a foreign node
   // N is a request to clone it. The clone C commits with the rest of the
   // save -- its 'overrides_view_of = [N]' edge rides in the same
@@ -529,6 +533,25 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       &env . config,
       hoist_approved_pids ) ?; }
 
+  let define_nodes : Vec<DefineNode> = // includes the nodeMerges
+    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+        "define_nodes_build" ). entered();
+      nonmerge_defineNodes . iter () . cloned ()
+      . chain ( nodeMerges . iter ()
+                . flat_map ( |nodeMerge| nodeMerge . to_vec () ))
+      . collect () };
+  // The post-save graph cannot answer which raw extra IDs belonged to a
+  // deleted pid.  Preserve just that fact for the immediate rerender, so an
+  // open view whose Active child uses the pid can retain a surviving raw
+  // relationship member as Unknown rather than turning it into Deleted.
+  let deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>> = {
+    let graph_before_save = env . in_rust_graph . load_full ();
+    define_nodes . iter () . filter_map ( |instruction| match instruction {
+      DefineNode::Delete (delete) => graph_before_save . nodes . get (&delete . id)
+        . map (|node| (delete . id . clone (),
+                       node . extra_ids . iter () . cloned () . collect ())),
+      _ => None }) . collect () };
+
   { // update the graph. Context origin types (for search ranking) are
     // computed from the post-save in-Rust graph and written inside the
     // single Tantivy index pass, so there is no separate context pass.
@@ -547,14 +570,6 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     // failure (e.g. the override-invariant check) back-fills the
     // save's parse-time warnings, which the error itself did not see.
     . map_err ( |e| backfill_parse_warnings (e, &parse_warnings) ) ?; }
-
-  let define_nodes : Vec<DefineNode> = // includes the nodeMerges
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "define_nodes_build" ). entered();
-      nonmerge_defineNodes . iter () . cloned ()
-      . chain ( nodeMerges . iter ()
-                . flat_map ( |nodeMerge| nodeMerge . to_vec () ))
-      . collect () };
 
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "coherence_debug_assert" ). entered();
@@ -578,13 +593,54 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         viewuri_from_request_result,
         views_state,
         active_source_set,
-        scalar_approved_pids ) . await ?;
+        deleted_by_this_save_extra_ids,
+        text_approved_pids ) . await ?;
     { // Nonfatal parse warnings (e.g. discarded col headline text)
       // precede the completion-repair warnings.
       let mut warnings : Vec<String> = parse_warnings;
       warnings . extend ( response . warnings );
+      warnings . extend (
+        post_commit_hiddenoutside_warnings (
+          &post_commit_notice_candidates ) );
       response . warnings = warnings; }
     Ok (response) } }
+
+/// Turn a successfully committed HiddenOutside addition into a message only
+/// when the final graph classifies it as hidden *inside* a subscribee.  This is
+/// intentionally downstream of graph/filesystem mutation: failure and every
+/// confirmation return leave the candidate silent.
+fn post_commit_hiddenoutside_warnings (
+  candidates : &[PostCommitNoticeCandidate],
+) -> Vec<String> {
+  let key = |id : &ID| -> ID {
+    snapshot_global ()
+      . and_then (|graph| graph . pid_of (id))
+      . unwrap_or_else (|| id . clone ()) };
+  let label = |id : &ID| -> String {
+    match nodecomplete_from_in_rust_graph (id) {
+      Some (node) => format! ("{} ({})", node . title, node . pid),
+      None => id . to_string (), } };
+  let mut warnings : Vec<String> = Vec::new ();
+  for candidate in candidates {
+    let PostCommitNoticeCandidate::HiddenOutsideAdded {
+      subscriber, member } = candidate;
+    let Some (subscriber_node) =
+      nodecomplete_from_in_rust_graph (subscriber)
+    else { continue; };
+    let mut containing_subscribees : Vec<String> = Vec::new ();
+    for subscribee in subscriber_node . subscribes_to . or_default () {
+      let Some (subscribee_node) =
+        nodecomplete_from_in_rust_graph (&subscribee . member)
+      else { continue; };
+      if subscribee_node . contains . iter ()
+        . any (|content| key (&content . member) == key (member))
+      { containing_subscribees . push (label (&subscribee_node . pid)); }}
+    if ! containing_subscribees . is_empty () {
+      warnings . push (format! (
+        "Saved hide for {}; its display moved to HiddenInSubscribeeCol under {}.",
+        label (member), containing_subscribees . join (", ") )); }}
+  warnings
+}
 
 /// Check if any source's HEAD is a merge commit.
 /// Returns an error message if so,

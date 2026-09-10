@@ -28,7 +28,8 @@ use crate::from_text::validate::{buffernode_differs_from_disknode, suppress_writ
 use crate::from_text::weave::member_is_visible;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::save::{DefineNode, SaveNode, SourceMove};
+use crate::types::save::{
+  DefineNode, PostCommitNoticeCandidate, SaveNode, SourceMove };
 use crate::types::tree::forest::ViewForest;
 use lower::{lower_collected_intents, nodeMerge_pairs, LoweringOutput};
 use resolve_visibility::resolve_visibility;
@@ -43,6 +44,7 @@ pub struct NonmergeSavePlan {
   pub define_nodes : Vec<DefineNode>,
   pub source_moves : Vec<SourceMove>,
   pub warnings     : Vec<String>, // nonfatal, destined for SaveResponse.warnings (e.g. inactive-node rewrite suppression)
+  pub post_commit_notice_candidates : Vec<PostCommitNoticeCandidate>,
 }
 
 /// This is the whole non-nodeMerge half of save extraction, done via
@@ -63,12 +65,13 @@ pub async fn extract_nonmergeSavePlan_locally (
   validate_text_claims (&collected, config, driver) . await ?;
   let nodeMerge_acquisitions : Vec<(ID, ID)> =
     nodeMerge_pairs (&collected);
-  let resolved : lower::LoweredIntents = {
-    let LoweringOutput { intents, visibility } =
+  let (resolved, post_commit_notice_candidates)
+    : (lower::LoweredIntents, Vec<PostCommitNoticeCandidate>) = {
+    let LoweringOutput { intents, visibility, hidden_outside } =
       lower_collected_intents (collected)
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     resolve_visibility (
-      intents, &visibility, config, driver,
+      intents, &visibility, &hidden_outside, config, driver,
       restricted_source_set ) . await ? };
   let with_disk : Definenodes_with_Sourcemoves =
     build_diskSupplemented_defineNodes (
@@ -106,7 +109,8 @@ pub async fn extract_nonmergeSavePlan_locally (
   Ok (( NonmergeSavePlan {
           define_nodes,
           source_moves,
-          warnings },
+          warnings,
+          post_commit_notice_candidates },
         nodeMerge_acquisitions )) }
 
 /// Filters out Save instructions that would be no-ops,

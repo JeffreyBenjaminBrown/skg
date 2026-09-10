@@ -143,8 +143,8 @@ When the move would leave content relationships stuck at their old,
 more private sources (the sticky rule never lowers an edge's privacy
 without an explicit gesture; see
 TODO/MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org),
-offers to publicize them in the same go by writing `(relSource ...)'
-atoms; declining leaves them and mentions that
+offers to publicize them in the same go by writing
+`(editRequest (relSource ...))' requests; declining leaves them and mentions that
 `skg-set-relationship-source-recursive' (C-c s R) can publicize them
 later.
 
@@ -282,12 +282,13 @@ children's edges are examined."
   "The source to which the content edge at point (from its view-parent
 to the headline at point) should be publicized after a source move,
 or nil when the move does not strand it: nil when the edge carries
-an explicit `(relSource ...)' atom (deliberately sourced), when a
+an explicit `(editRequest (relSource ...))' request (deliberately
+sourced), when a
 default cannot be computed (a source unknown to the config -- the
 save validates anyway), or when the edge's default does not become
 more public. The four arguments are the endpoints' sources before
 and after the move."
-  (unless (skg--relationship-source-current-value)
+  (unless (skg--relationship-source-requested-value)
     (let ((old-default (skg--more-private-of-sources
                         parent-eff-old child-eff-old))
           (new-default (skg--more-private-of-sources
@@ -298,8 +299,8 @@ and after the move."
         new-default))))
 
 (defun skg--apply-stuck-edge-sources (stuck)
-  "Write a `(relSource SOURCE)' atom at each (MARKER . SOURCE) in
-STUCK, then free the markers. Returns the number of atoms written."
+  "Write a relationship-source request at each (MARKER . SOURCE) in
+STUCK, then free the markers. Returns the number of requests written."
   (save-excursion
     (dolist (entry stuck)
       (goto-char (car entry))
@@ -338,14 +339,13 @@ or nil when SOURCE is nil or names no configured source."
   (and source
        (seq-position (skg--source-names) source #'string=)))
 
-(defconst skg--set-relationship-source-readonly-col-atoms
+(defconst skg--relationship-source-unsupported-col-atoms
   '(subscriberCol overriderCol hiderCol hiddenCol
     hiddenInSubscribeeCol hiddenOutsideOfSubscribeeCol)
-  "The PartnerCol scaffold atoms whose membership is READ-ONLY from
-this side of the relationship (ColPolicy::ReadOnlySet /
-ReadOnlyFilter; see server/types/viewnode.rs PartnerCol::policy and
-the matching read-only detection in
-server/from_text/local_instruction_collection/traverse.rs).
+  "The PartnerCol scaffold atoms where an explicit relationship-source
+request is unsupported from this side.  HiddenOutside membership is
+editable as a derived filter, but hide sources are still derived and
+cannot carry this request.
 `skg-set-relationship-source' refuses on a member of one of these:
 the edge belongs to the other end, so setting its source here would
 be meaningless.")
@@ -365,15 +365,16 @@ Returns a plist (:owner OWNER-ID :member MEMBER-ID :relation NAME):
 for a content child, the org-parent contains the node at point; for
 a writable-col member, the col's anchor (the col's org-parent) owns
 the col's relation toward the node at point. Signals `user-error'
-when point represents no writable edge: not on an activeNode
+when point represents no writable edge: not on an activeNode or Unknown
 headline, on a root headline (no org-parent, so no edge), on a
 member of a read-only col, or with an ID missing."
   (unless (org-at-heading-p)
     (user-error "Not on a headline"))
   (let ((member-sexp (skg--metadata-sexp-at-point-or-nil)))
-    (unless (skg--activeNode-sexp-p member-sexp)
-      (user-error "Not on an activeNode headline"))
-    (let ((member-id (skg--node-id member-sexp))
+    (unless (or (skg--activeNode-sexp-p member-sexp)
+                (skg--unknown-headline-p member-sexp))
+      (user-error "Not on an activeNode or Unknown headline"))
+    (let ((member-id (skg--relationship-member-id member-sexp))
           (parent-sexp (save-excursion
                          (and (org-up-heading-safe)
                               (skg--metadata-sexp-at-point-or-nil)))))
@@ -386,10 +387,10 @@ member of a read-only col, or with an ID missing."
              (and (consp parent-sexp)
                   (seq-find (lambda (atom)
                               (memq atom (cdr parent-sexp)))
-                            skg--set-relationship-source-readonly-col-atoms))))
+                            skg--relationship-source-unsupported-col-atoms))))
         (when readonly-atom
           (user-error
-           "Cannot set the relationship's source: this is a member of a read-only %s -- the relationship belongs to the other end"
+           "Cannot set the relationship's source from this read-only %s position"
            readonly-atom)))
       (let ((writable-col
              (and (consp parent-sexp)
@@ -420,17 +421,39 @@ member of a read-only col, or with an ID missing."
              "The parent headline is neither a node nor a writable col")))))))
 
 (defun skg--relationship-source-current-value ()
-  "Return the current `(relSource NAME)' value (a string) for the
-headline at point, or nil when no such atom is present."
+  "Return the displayed `(relSource NAME)' fact at point, if any."
   (let* ((metadata (or (skg--metadata-sexp-at-point-or-nil) '(skg)))
          (alias-p (memq 'alias (cdr metadata)))
+         (unknown-p (skg--unknown-headline-p metadata))
          (values (skg-sexp-cdr-at-path
                   metadata
-                  (if alias-p
-                      '(skg relSource)
-                    '(skg node viewStats relSource)))))
+                  (cond (alias-p '(skg relSource))
+                        (unknown-p '(skg unknown viewStats relSource))
+                        (t '(skg node viewStats relSource))))))
     (when values
       (format "%s" (car values)))))
+
+(defun skg--relationship-source-requested-value ()
+  "Return the pending `(editRequest (relSource NAME))' value at point."
+  (let* ((metadata (or (skg--metadata-sexp-at-point-or-nil) '(skg)))
+         (alias-p (memq 'alias (cdr metadata)))
+         (unknown-p (skg--unknown-headline-p metadata))
+         (values (skg-sexp-cdr-at-path
+                  metadata
+                  (cond (alias-p '(skg editRequest relSource))
+                        (unknown-p '(skg unknown editRequest relSource))
+                        (t '(skg node editRequest relSource))))))
+    (when values
+      (format "%s" (car values)))))
+
+(defun skg--node-edit-request-at-point-p ()
+  "Whether the Active headline at point already requests delete or merge."
+  (let ((values (skg-sexp-cdr-at-path
+                 (or (skg--metadata-sexp-at-point-or-nil) '(skg))
+                 '(skg node editRequest))))
+    (and values
+         (not (and (consp (car values))
+                   (eq (caar values) 'relSource))))))
 
 (defun skg--alias-headline-p ()
   "Return non-nil when point is on an alias scaffold headline."
@@ -449,7 +472,7 @@ server's save-time floor check backstops any stale offer)."
 
 (defconst skg--relationship-source-no-override
   "(no override: follow sticky-else-default)"
-  "The menu entry that REMOVES the `(relSource ...)' atom instead of
+  "The menu entry that REMOVES the pending `(editRequest (relSource ...))' request instead of
 setting one. For an edge already on disk this means the SAVED source
 survives (sticky); it does NOT mean \"reset to the default\". To
 lower an edge's privacy to its default, choose the default source
@@ -460,26 +483,39 @@ explicitly.")
 `skg--relationship-source-no-override' -- to the headline at point.
 Edits only the buffer; returns a message string describing what the
 next save will do with the edge."
+  (when (skg--node-edit-request-at-point-p)
+    (user-error "Cannot request a relationship source where delete or merge is pending"))
   (if (equal choice skg--relationship-source-no-override)
-      (if (skg--relationship-source-current-value)
+      (if (skg--relationship-source-requested-value)
           (progn
-            (if (skg--alias-headline-p)
-                (skg-edit-metadata-at-point
-                 '(skg (DELETE (relSource))))
-              ;; An edge relSource atom lives under viewStats.
+            (cond
+             ((skg--alias-headline-p)
               (skg-edit-metadata-at-point
-               '(skg (node (viewStats (DELETE (relSource)))))))
+               '(skg (DELETE (editRequest)))))
+             ((skg--unknown-headline-p
+               (skg--metadata-sexp-at-point-or-nil))
+              (skg-edit-metadata-at-point
+               '(skg (unknown (DELETE (editRequest))))))
+             (t
+              ;; The display fact stays under viewStats; only the request goes.
+              (skg-edit-metadata-at-point
+               '(skg (node (DELETE (editRequest)))))))
             "Override removed: on save the member keeps its saved (sticky) source, or its default if new. Save to apply.")
         "No override present; nothing to remove.")
     (progn
-      (if (skg--alias-headline-p)
-          (skg-edit-metadata-at-point
-           `(skg (ENSURE (relSource ,(intern choice)))))
-        ;; Two-step dance (mirrors `skg--change-source-at-point'):
-        ;; create viewStats before recursing into it.
-        (skg-edit-metadata-at-point '(skg (node (viewStats))))
+      (cond
+       ((skg--alias-headline-p)
         (skg-edit-metadata-at-point
-         `(skg (node (viewStats (ENSURE (relSource ,(intern choice))))))))
+         `(skg (ENSURE (editRequest (relSource ,(intern choice)))))))
+        ((skg--unknown-headline-p
+         (skg--metadata-sexp-at-point-or-nil))
+        (skg-edit-metadata-at-point
+         `(skg (unknown (ENSURE (editRequest (relSource ,(intern choice))))))))
+       (t
+        ;; The display fact remains under viewStats; source intent is separate.
+        (skg-edit-metadata-at-point '(skg (node (editRequest))))
+        (skg-edit-metadata-at-point
+         `(skg (node (editRequest (ENSURE (relSource ,(intern choice)))))))))
       (format "Relationship source set to '%s'. Save to apply."
               choice))))
 
@@ -651,13 +687,31 @@ nodes and subscribee-as-such members, prunes non-affected
 (parentIs=independent) nodes -- except the walk's root, which the
 user chose deliberately -- and prunes scaffolds other than the two
 writable cols. Returns the number of edges affected."
+  (let ((targets (skg--relationship-source-recursive-targets kind)))
+    ;; Do not let a late conflict leave earlier targets edited.  This
+    ;; preflight is deliberately before the first metadata rewrite.
+    (dolist (marker targets)
+      (save-excursion
+        (goto-char marker)
+        (when (skg--node-edit-request-at-point-p)
+          (user-error "Cannot request a relationship source where delete or merge is pending"))))
+    (dolist (marker targets)
+      (save-excursion
+        (goto-char marker)
+        (skg--apply-relationship-source-choice choice))
+      (set-marker marker nil))
+    (length targets)))
+
+(defun skg--relationship-source-recursive-targets (kind)
+  "Return markers for the writable relationship targets below point.
+The traversal mirrors the extraction-aware walk used by the recursive
+command, but does not edit anything."
   (save-excursion
-    (let ((count 0)
+    (let ((targets nil)
           (start-level (org-outline-level))
           (root-meta (skg--metadata-sexp-at-point-or-nil)))
       (when (skg--relationship-kind-matches-p kind)
-        (skg--apply-relationship-source-choice choice)
-        (setq count (1+ count)))
+        (push (copy-marker (line-beginning-position)) targets))
       (when (or (and (skg--activeNode-sexp-p root-meta)
                      (not (skg--relSource-prune-below-p root-meta)))
                 (skg--writable-col-sexp-p root-meta))
@@ -670,29 +724,33 @@ writable cols. Returns the number of edges affected."
               (if (not (skg--node-parentIs-content-of-p meta))
                   (skg--goto-next-heading-after-subtree)
                 (when (skg--relationship-kind-matches-p kind)
-                  (skg--apply-relationship-source-choice choice)
-                  (setq count (1+ count)))
+                  (push (copy-marker (line-beginning-position)) targets))
                 (if (skg--relSource-prune-below-p meta)
                     (skg--goto-next-heading-after-subtree)
                   (outline-next-heading))))
+             ((skg--unknown-headline-p meta)
+              (when (skg--relationship-kind-matches-p kind)
+                (push (copy-marker (line-beginning-position)) targets))
+              (outline-next-heading))
              ((skg--writable-col-sexp-p meta)
               (outline-next-heading))
-             (t ;; read-only cols, alias/ID cols, phantoms, etc.
+             (t ;; read-only cols, alias/ID cols, and other phantoms.
               (skg--goto-next-heading-after-subtree))))))
-      count)))
+      (nreverse targets))))
 
 (defun skg--relationship-kind-matches-p (kind)
-  "Non-nil iff the headline at point is an affected activeNode whose
+  "Non-nil iff the headline at point is an affected activeNode or Unknown whose
 relationship to its view-parent is of KIND, writable-and-collected
 from this position: for `contained', the view-parent must be a
 definitive activeNode not in subscribee-as-such position (an
 indefinitive or subscribee-as-such parent's contains is not
-collected at save, so a `(relSource ...)' atom under one would be
+collected at save, so a relationship-source request under one would be
 inert); for `subscribee' and `overridden', the view-parent must be
 the matching writable col with a definitive anchor."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
-    (and (skg--activeNode-sexp-p meta)
-         (skg--node-parentIs-content-of-p meta)
+    (and (or (and (skg--activeNode-sexp-p meta)
+                  (skg--node-parentIs-content-of-p meta))
+             (skg--unknown-headline-p meta))
          (save-excursion
            (and (org-up-heading-safe)
                 (let ((parent-sexp (skg--metadata-sexp-at-point-or-nil)))
@@ -878,6 +936,19 @@ their source edits take effect even under an indefinitive parent."
                                          '(skg node id))))
     (when id-values
       (format "%s" (car id-values)))))
+
+(defun skg--unknown-headline-p (metadata-sexp)
+  "Return non-nil when METADATA-SEXP is an Unknown placeholder."
+  (and metadata-sexp
+       (skg-sexp-subtree-p metadata-sexp '(skg (unknown)))))
+
+(defun skg--relationship-member-id (metadata-sexp)
+  "Return the raw member ID for an ActiveNode or Unknown headline."
+  (or (skg--node-id metadata-sexp)
+      (let ((id-values (skg-sexp-cdr-at-path metadata-sexp
+                                              '(skg unknown id))))
+        (when id-values
+          (format "%s" (car id-values))))))
 
 (defun skg--node-indefinitive-p (metadata-sexp)
   "Return non-nil if METADATA-SEXP has the bare ActiveNode indef marker."

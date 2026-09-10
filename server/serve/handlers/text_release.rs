@@ -1,4 +1,4 @@
-//! The single release policy for textual data from ugly telescopes.
+//! The single release policy for textual data from overPrivateText telescopes.
 //!
 //! Folding may select a title or body below the node's home source. That is
 //! safe to hold internally, but a restricted source-set must not release it
@@ -18,7 +18,7 @@ use sexp::{Atom, Sexp};
 use std::collections::HashSet;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ScalarReleaseDecision {
+pub enum TextReleaseDecision {
   Allow,
   AllowWithWarning {
     warning : String,
@@ -31,14 +31,14 @@ pub enum ScalarReleaseDecision {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SearchUglinessChoice {
+pub enum SearchOverPrivateTextChoice {
   Include,
   Exclude,
 }
 
 /// Parse the optional per-request approval list.
 ///
-/// Its wire shape is '(allow-ugly-telescopes "PID" ...)'. Absence means no
+/// Its wire shape is '(allow-overPrivateText-telescopes "PID" ...)'. Absence means no
 /// approval. A malformed list is also treated as no approval: malformed
 /// authority must fail closed, and the resulting challenge is actionable.
 pub fn approved_pids_from_request (
@@ -47,7 +47,7 @@ pub fn approved_pids_from_request (
   sexp::parse (request) . ok ()
     . and_then ( |parsed|
       extract_string_list_from_sexp (
-        &parsed, "allow-ugly-telescopes" ) . ok () )
+        &parsed, "allow-overPrivateText-telescopes" ) . ok () )
     . unwrap_or_default ()
     . into_iter ()
     . map (ID)
@@ -56,26 +56,26 @@ pub fn approved_pids_from_request (
 
 pub fn search_choice_from_request (
   parsed : &Sexp,
-) -> Result<Option<SearchUglinessChoice>, String> {
+) -> Result<Option<SearchOverPrivateTextChoice>, String> {
   use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
-  match extract_v_from_kv_pair_in_sexp (parsed, "ugly-telescopes") {
+  match extract_v_from_kv_pair_in_sexp (parsed, "overPrivateText-telescopes") {
     Ok (choice) => match choice . as_str () {
-      "include" => Ok (Some (SearchUglinessChoice::Include)),
-      "exclude" => Ok (Some (SearchUglinessChoice::Exclude)),
+      "include" => Ok (Some (SearchOverPrivateTextChoice::Include)),
+      "exclude" => Ok (Some (SearchOverPrivateTextChoice::Exclude)),
       other => Err (format! (
-        "Unknown ugly-telescopes choice: {} (expected include or exclude)",
+        "Unknown overPrivateText-telescopes choice: {} (expected include or exclude)",
         other )), },
     Err (_) => Ok (None), }
 }
 
 /// A search challenge intentionally has no PIDs: even the identity of a
-/// matching ugly telescope is part of what the search has not been allowed
+/// matching overPrivateText telescope is part of what the search has not been allowed
 /// to reveal. The retry must choose inclusion or exclusion before querying.
 pub fn search_challenge_response () -> String {
   Sexp::List ( vec! [
     pair (
       "response-type",
-      TcpToClient::UglyTelescopeConfirmation . repr_in_client () ),
+      TcpToClient::OverPrivateTextTelescopeConfirmation . repr_in_client () ),
     pair ("operation", "text-search"),
     Sexp::List ( vec! [ atom ("pids"), Sexp::List (Vec::new ()) ] ),
     pair (
@@ -85,7 +85,7 @@ pub fn search_challenge_response () -> String {
 }
 
 /// Decide whether a response involving 'candidate_pids' may cross the
-/// release boundary. IDs are canonicalized before checking ugliness so an
+/// release boundary. IDs are canonicalized before checking overPrivateTextness so an
 /// extra ID cannot evade the telescope-coarse policy.
 pub fn decide (
   operation      : &str,
@@ -93,50 +93,50 @@ pub fn decide (
   candidate_pids : &[ID],
   graph          : &InRustGraph,
   approved_pids  : &HashSet<ID>,
-) -> ScalarReleaseDecision {
-  let ugly_pids : Vec<ID> =
-    canonical_ugly_pids (candidate_pids, graph);
-  decide_for_ugly_pids (
-    operation, active, ugly_pids, approved_pids )
+) -> TextReleaseDecision {
+  let overPrivateText_pids : Vec<ID> =
+    canonical_overPrivateText_pids (candidate_pids, graph);
+  decide_for_overPrivateText_pids (
+    operation, active, overPrivateText_pids, approved_pids )
 }
 
-/// Apply the shared policy when a caller has classified ugliness from a
+/// Apply the shared policy when a caller has classified overPrivateTextness from a
 /// source other than the live graph, such as deleted-node diff data.
-pub fn decide_for_ugly_pids (
+pub fn decide_for_overPrivateText_pids (
   operation     : &str,
   active        : &ActiveSourceSet,
-  mut ugly_pids : Vec<ID>,
+  mut overPrivateText_pids : Vec<ID>,
   approved_pids : &HashSet<ID>,
-) -> ScalarReleaseDecision {
-  ugly_pids . sort_by ( |a, b| a . as_str () . cmp (b . as_str ()) );
-  ugly_pids . dedup ();
-  if ugly_pids . is_empty () {
-    return ScalarReleaseDecision::Allow; }
-  let warning : String = warning_for (operation, &ugly_pids);
+) -> TextReleaseDecision {
+  overPrivateText_pids . sort_by ( |a, b| a . as_str () . cmp (b . as_str ()) );
+  overPrivateText_pids . dedup ();
+  if overPrivateText_pids . is_empty () {
+    return TextReleaseDecision::Allow; }
+  let warning : String = warning_for (operation, &overPrivateText_pids);
   if active . is_all ()
-     || ugly_pids . iter () . all (
+     || overPrivateText_pids . iter () . all (
           |pid| approved_pids . contains (pid) ) {
-    return ScalarReleaseDecision::AllowWithWarning { warning }; }
-  ScalarReleaseDecision::Challenge {
+    return TextReleaseDecision::AllowWithWarning { warning }; }
+  TextReleaseDecision::Challenge {
     operation : operation . to_string (),
-    pids      : ugly_pids . clone (),
+    pids      : overPrivateText_pids . clone (),
     prompt    : format! (
       "{} would reveal title or body text selected below its node's home source for {}. Include that text?",
-      operation_label (operation), pid_phrase (&ugly_pids) ),
+      operation_label (operation), pid_phrase (&overPrivateText_pids) ),
   }
 }
 
 /// Serialize the deliberately text-free challenge response.
 pub fn challenge_response (
-  decision : &ScalarReleaseDecision,
+  decision : &TextReleaseDecision,
 ) -> Option<String> {
-  let ScalarReleaseDecision::Challenge {
+  let TextReleaseDecision::Challenge {
     operation, pids, prompt,
   } = decision else { return None; };
   Some ( Sexp::List ( vec! [
     pair (
       "response-type",
-      TcpToClient::UglyTelescopeConfirmation . repr_in_client () ),
+      TcpToClient::OverPrivateTextTelescopeConfirmation . repr_in_client () ),
     pair ("operation", operation),
     Sexp::List ( vec! [
       atom ("pids"),
@@ -148,10 +148,10 @@ pub fn challenge_response (
   ] ) . to_string () )
 }
 
-/// Replace ugly active nodes with text-free inactive placeholders. Search
+/// Replace overPrivateText active nodes with text-free inactive placeholders. Search
 /// exclusion uses this after enrichment so ancestry and override grafting
 /// cannot broaden the choice made before the Tantivy query.
-pub fn exclude_ugly_nodes_from_viewforest (
+pub fn exclude_overPrivateText_nodes_from_viewforest (
   viewforest : &mut Tree<ViewNode>,
   graph      : &InRustGraph,
 ) {
@@ -167,7 +167,7 @@ pub fn exclude_ugly_nodes_from_viewforest (
           graph . pid_of (&active_node . id),
         _ => None, } )
       . and_then ( |pid| graph . get (&pid) )
-      . map ( |node| node . ugly_telescope )
+      . map ( |node| node . overPrivateText_telescope )
       . unwrap_or (false);
     if should_convert {
       let mut node : NodeMut<crate::types::viewnode::ViewNode> =
@@ -175,22 +175,22 @@ pub fn exclude_ugly_nodes_from_viewforest (
       node . value () . kind = mk_inactive_viewnode () . kind; }}
 }
 
-fn canonical_ugly_pids (
+fn canonical_overPrivateText_pids (
   candidates : &[ID],
   graph      : &InRustGraph,
 ) -> Vec<ID> {
   let mut seen : HashSet<ID> = HashSet::new ();
-  let mut ugly : Vec<ID> = Vec::new ();
+  let mut overPrivateText : Vec<ID> = Vec::new ();
   for candidate in candidates {
     let Some (pid) = graph . pid_of (candidate) else { continue; };
-    let is_ugly : bool =
+    let is_overPrivateText : bool =
       graph . get (&pid)
-      . map ( |node| node . ugly_telescope )
+      . map ( |node| node . overPrivateText_telescope )
       . unwrap_or (false);
-    if is_ugly && seen . insert (pid . clone ()) {
-      ugly . push (pid); }}
-  ugly . sort_by ( |a, b| a . as_str () . cmp (b . as_str ()) );
-  ugly
+    if is_overPrivateText && seen . insert (pid . clone ()) {
+      overPrivateText . push (pid); }}
+  overPrivateText . sort_by ( |a, b| a . as_str () . cmp (b . as_str ()) );
+  overPrivateText
 }
 
 fn warning_for (
@@ -243,13 +243,13 @@ mod tests {
   use crate::types::nodes::complete::{
     NodeComplete, empty_node_complete};
 
-  fn graph_with_ugly_node () -> InRustGraph {
+  fn graph_with_overPrivateText_node () -> InRustGraph {
     let mut node : NodeComplete = empty_node_complete ();
-    node . pid = ID::from ("ugly-pid");
+    node . pid = ID::from ("overPrivateText-pid");
     node . source = SourceName::from ("home");
     node . title = "SECRET title" . to_string ();
     node . extra_ids = vec! [ID::from ("extra-id")];
-    node . ugly_telescope = true;
+    node . overPrivateText_telescope = true;
     InRustGraph::from_nodecompletes (&[node])
   }
 
@@ -262,38 +262,38 @@ mod tests {
   }
 
   #[test]
-  fn restricted_challenge_contains_no_scalar_text () {
-    let graph : InRustGraph = graph_with_ugly_node ();
-    let decision : ScalarReleaseDecision = decide (
+  fn restricted_challenge_contains_no_text () {
+    let graph : InRustGraph = graph_with_overPrivateText_node ();
+    let decision : TextReleaseDecision = decide (
       "single-root-view", &restricted (),
       &[ID::from ("extra-id")], &graph, &HashSet::new () );
     let response : String = challenge_response (&decision) . unwrap ();
-    assert! ( response . contains ("ugly-telescope-confirmation") );
-    assert! ( response . contains ("ugly-pid") );
+    assert! ( response . contains ("overPrivateText-telescope-confirmation") );
+    assert! ( response . contains ("overPrivateText-pid") );
     assert! ( ! response . contains ("SECRET") );
   }
 
   #[test]
   fn exact_canonical_pid_approval_allows_with_warning () {
-    let graph : InRustGraph = graph_with_ugly_node ();
+    let graph : InRustGraph = graph_with_overPrivateText_node ();
     let approved : HashSet<ID> =
-      [ID::from ("ugly-pid")] . into_iter () . collect ();
+      [ID::from ("overPrivateText-pid")] . into_iter () . collect ();
     assert! ( matches! (
       decide (
         "single-root-view", &restricted (),
         &[ID::from ("extra-id")], &graph, &approved ),
-      ScalarReleaseDecision::AllowWithWarning { .. } ));
+      TextReleaseDecision::AllowWithWarning { .. } ));
   }
 
   #[test]
   fn unrelated_pid_approval_fails_closed () {
-    let graph : InRustGraph = graph_with_ugly_node ();
+    let graph : InRustGraph = graph_with_overPrivateText_node ();
     let approved : HashSet<ID> =
       [ID::from ("someone-else")] . into_iter () . collect ();
     assert! ( matches! (
       decide (
         "single-root-view", &restricted (),
-        &[ID::from ("ugly-pid")], &graph, &approved ),
-      ScalarReleaseDecision::Challenge { .. } ));
+        &[ID::from ("overPrivateText-pid")], &graph, &approved ),
+      TextReleaseDecision::Challenge { .. } ));
   }
 }

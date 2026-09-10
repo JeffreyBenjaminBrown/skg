@@ -74,7 +74,7 @@ rerender stream (rerender-lock, rerender-view*, rerender-done)."
       (skg--begin-stream "rerender")
       (skg--lock-all-skg-buffers)
       (skg--register-rerender-stream-handlers)
-      (skg--register-rerender-ugly-confirmation
+      (skg--register-rerender-overPrivateText-confirmation
        (lambda (pids) (skg-set-active-source-set name pids))
        'active-source-set)
       (skg-lp-reset)
@@ -85,7 +85,7 @@ rerender stream (rerender-lock, rerender-view*, rerender-done)."
                  `((request . "set active source set")
                    (name . ,name))
                  (when approved-pids
-                   `((allow-ugly-telescopes ,@approved-pids)))))
+                   `((allow-overPrivateText-telescopes ,@approved-pids)))))
                "\n")))))
 
 (provide 'skg-request-source-sets)

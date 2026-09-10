@@ -24,6 +24,25 @@ fn sdm (disk : &[&str], buffer : &[&str]) -> Vec<&'static str> {
   set_difference_merge ( &disk, vis, &buffer ) }
 
 #[test]
+fn active_relationship_source_makes_an_unknown_member_visible () {
+  use crate::source_sets::{ActiveSourceSet, SourceSetName};
+  use crate::types::misc::{ID, MemberAtSource, SkgConfig, SourceName};
+  use std::collections::{BTreeSet, HashMap};
+  let active = ActiveSourceSet {
+    name: SourceSetName::from ("main"),
+    sources: BTreeSet::from ([SourceName::from ("main")]) };
+  let config = SkgConfig::dummyFromSources (HashMap::new ());
+  let unknown_at_main = MemberAtSource::at_source (
+    SourceName::from ("main"), ID::from ("absent"));
+  let unknown_at_private = MemberAtSource::at_source (
+    SourceName::from ("private"), ID::from ("absent"));
+  assert! (relationship_member_is_visible (
+    &unknown_at_main, &config, &active));
+  assert! (! relationship_member_is_visible (
+    &unknown_at_private, &config, &active));
+}
+
+#[test]
 fn weave_identity_when_all_visible () {
   assert_eq! ( w (&["a","b","c"], &["a","b","c"]),
                vec! ["a","b","c"] );

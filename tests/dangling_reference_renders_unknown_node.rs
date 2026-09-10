@@ -108,4 +108,9 @@ async fn buffer_with_unknownnode_child_saves_cleanly_impl (
   if ! response . errors . is_empty () {
     panic! ("save returned errors instead of completing: {:?}",
             response . errors); }
+  let (rerendered, _, _) = single_root_view (
+    driver, config, None, &ID::from ("parent"), false ) . await ?;
+  assert! ( rerendered . contains ("(unknown (id ghost))"),
+    "an unchanged Unknown must preserve its raw relationship member: {}",
+    rerendered );
   Ok (( )) }

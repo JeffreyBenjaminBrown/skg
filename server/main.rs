@@ -356,17 +356,17 @@ fn run_import (
 /// 'skg-export-some-to-org' (the "export to org" TCP endpoint); this
 /// subcommand runs the same core for scripting and testing.
 ///
-/// USAGE: cargo run --bin skg -- export-org [config-path] [source-set] [output-dir] [--include-ugly-telescopes]
+/// USAGE: cargo run --bin skg -- export-org [config-path] [source-set] [output-dir] [--include-overPrivateText-telescopes]
 /// (source-set defaults to "all", output-dir to "org-exports").
 /// output-dir is resolved against the current working directory; an
 /// absolute path is used as-is.
 fn run_export_org (
   args : &[String],
 ) -> Result<(), Box<dyn Error>> {
-  let include_ugly_telescopes : bool =
-    args . iter () . any ( |arg| arg == "--include-ugly-telescopes" );
+  let include_overPrivateText_telescopes : bool =
+    args . iter () . any ( |arg| arg == "--include-overPrivateText-telescopes" );
   let positional : Vec<&String> = args . iter () . skip (2)
-    . filter ( |arg| arg . as_str () != "--include-ugly-telescopes" )
+    . filter ( |arg| arg . as_str () != "--include-overPrivateText-telescopes" )
     . collect ();
   let config_path : String =
     if ! positional . is_empty () { positional[0] . clone () }
@@ -386,19 +386,19 @@ fn run_export_org (
     read_all_skg_files_from_sources (&config) ?;
   let candidates : HashSet<ID> =
     export_candidate_pids (&active, &nodes) . into_iter () . collect ();
-  let mut ugly_pids : Vec<ID> = nodes . iter ()
-    . filter ( |node| node . ugly_telescope
+  let mut overPrivateText_pids : Vec<ID> = nodes . iter ()
+    . filter ( |node| node . overPrivateText_telescope
       && candidates . contains (&node . pid) )
     . map ( |node| node . pid . clone () )
     . collect ();
-  ugly_pids . sort ();
-  if ! ugly_pids . is_empty () {
-    let pids : String = ugly_pids . iter ()
+  overPrivateText_pids . sort ();
+  if ! overPrivateText_pids . is_empty () {
+    let pids : String = overPrivateText_pids . iter ()
       . map ( |pid| pid . as_str () )
       . collect::<Vec<&str>> () . join (", ");
-    if ! active . is_all () && ! include_ugly_telescopes {
+    if ! active . is_all () && ! include_overPrivateText_telescopes {
       return Err (format! (
-        "export-org would release title or body selected below home for PIDs {} under source-set {}; rerun with --include-ugly-telescopes to approve",
+        "export-org would release title or body selected below home for PIDs {} under source-set {}; rerun with --include-overPrivateText-telescopes to approve",
         pids, active . name ) . into ()); }
     eprintln! (
       "Warning: export-org includes title or body selected below home for PIDs {}.",

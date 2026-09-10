@@ -313,7 +313,7 @@ fn nodecomplete_from_section_tree (
     members_at_source (&source, contained_ids);
   NodeComplete {
     title    : tree . section . headline . clone(),
-    ugly_telescope : false,
+    overPrivateText_telescope : false,
     aliases,
     source,
     pid      : ID::new (id_str),

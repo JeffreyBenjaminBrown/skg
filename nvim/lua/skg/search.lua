@@ -81,7 +81,7 @@ end
 ---@param body boolean
 ---@param operators boolean
 function M.request_text_search (search_terms, regex, body, operators,
-                                ugly_choice)
+                                overPrivateText_choice)
   local request_form = {
     sexpr.pair(sexpr.symbol('request'), 'text search'),
     sexpr.pair(sexpr.symbol('terms'), search_terms),
@@ -89,13 +89,13 @@ function M.request_text_search (search_terms, regex, body, operators,
     sexpr.pair(sexpr.symbol('body'), M.bool_to_string(body)),
     sexpr.pair(sexpr.symbol('operators'),
                M.bool_to_string(operators)) }
-  if ugly_choice then
+  if overPrivateText_choice then
     table.insert(request_form,
-      sexpr.pair(sexpr.symbol('ugly-telescopes'), ugly_choice)) end
+      sexpr.pair(sexpr.symbol('overPrivateText-telescopes'), overPrivateText_choice)) end
   local request = sexpr.to_string(request_form) .. '\n'
   state.register_response_handler('search-results',
     function (_payload_text, response)
-      state.response_handler_map['ugly-telescope-confirmation'] = nil
+      state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
       M.display_search_phase1(response, search_terms)
     end, true)
   state.register_response_handler('search-enrichment',
@@ -108,9 +108,9 @@ function M.request_text_search (search_terms, regex, body, operators,
       -- can integrate ancestry without losing user edits.
       M.handle_snapshot_request(response)
     end, false) -- persistent, not one-shot
-  state.register_response_handler('ugly-telescope-confirmation',
+  state.register_response_handler('overPrivateText-telescope-confirmation',
     function (_payload_text, response)
-      state.response_handler_map['ugly-telescope-confirmation'] = nil
+      state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
       for _, response_type in ipairs(
           { 'search-results', 'search-enrichment' }) do
         if state.response_handler_map[response_type] then
@@ -120,7 +120,7 @@ function M.request_text_search (search_terms, regex, body, operators,
       end
       state.response_handler_map['request-snapshot'] = nil
       local prompt = payload.field_text(response, 'prompt') or
-        'Include ugly telescopes in this search?'
+        'Include overPrivateText telescopes in this search?'
       local choice = vim.fn.confirm(
         prompt, '&Include\n&Exclude', 2) == 1 and 'include' or 'exclude'
       M.request_text_search(

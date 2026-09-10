@@ -21,14 +21,17 @@
 /// and the subscriber's own post-save contains -- a finished entry
 /// elsewhere in the same map.
 
+use crate::dbs::in_rust_graph::snapshot_global;
 use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::from_text::local_instruction_collection::lower::LoweredIntents;
-use crate::from_text::local_instruction_collection::types::SubscribeeVisibility;
+use crate::from_text::local_instruction_collection::types::{
+  HiddenOutsideEdit, SubscribeeVisibility };
 use crate::from_text::weave::member_is_visible;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, members_of};
 use crate::types::nodes::complete::NodeComplete;
+use crate::types::save::PostCommitNoticeCandidate;
 
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -39,10 +42,11 @@ use typedb_driver::TypeDBDriver;
 pub async fn resolve_visibility (
   mut lowered : LoweredIntents,
   visibility  : &[(ID, SubscribeeVisibility)],
+  hidden_outside : &[(ID, HiddenOutsideEdit)],
   config      : &SkgConfig,
   driver      : &TypeDBDriver,
   restricted_source_set : Option<&ActiveSourceSet>, // None means no restriction; callers normalize 'all' to None.
-) -> Result<LoweredIntents, Box<dyn Error>> {
+) -> Result<(LoweredIntents, Vec<PostCommitNoticeCandidate>), Box<dyn Error>> {
   validate_no_overlapping_subscribee_hiderel_conflicts (
     visibility, config, driver ) . await ?;
   infer_hides_from_contains_removals (
@@ -89,7 +93,88 @@ pub async fn resolve_visibility (
       subscriber_from_disk,
       &inferred_hides,
       &inferred_unhides ); }
-  Ok (lowered) }
+  let post_commit_notice_candidates = apply_hiddenoutside_edits (
+    &mut lowered, hidden_outside, config, driver,
+    restricted_source_set ) . await ?;
+  Ok ((lowered, post_commit_notice_candidates)) }
+
+/// Applies the submitted visible-outside subset after all ordinary hide
+/// inference.  Only the old *visible outside* rows are replaceable: inactive
+/// relationship members and rows classified inside a subscribee remain owned
+/// by the graph and survive an edit of this derived filter.
+async fn apply_hiddenoutside_edits (
+  lowered : &mut LoweredIntents,
+  edits   : &[(ID, HiddenOutsideEdit)],
+  config  : &SkgConfig,
+  driver  : &TypeDBDriver,
+  restricted_source_set : Option<&ActiveSourceSet>,
+) -> Result<Vec<PostCommitNoticeCandidate>, Box<dyn Error>> {
+  let mut seen : HashSet<ID> = HashSet::new ();
+  let mut candidates : Vec<PostCommitNoticeCandidate> = Vec::new ();
+  for (subscriber, edit) in edits {
+    if ! seen . insert (subscriber . clone ()) {
+      return Err (Box::new (BufferValidationError::Other (
+        format! ("More than one HiddenOutsideOfSubscribee edit was submitted for subscriber {}", subscriber) ))); }
+    let Some (subscriber_from_disk) =
+      optNodeComplete_rustFIrst_by_id (config, driver, subscriber) . await ?
+    else { continue; };
+    if ! config . user_owns_source (&subscriber_from_disk . source) {
+      continue; }
+
+    let key = |id : &ID| -> ID {
+      snapshot_global ()
+        . and_then (|graph| graph . pid_of (id))
+        . unwrap_or_else (|| id . clone ()) };
+    let subscribee_ids : Vec<ID> =
+      lowered . subscriber_subscribes_after_save (&subscriber_from_disk);
+    let mut inside : HashSet<ID> = HashSet::new ();
+    for subscribee_id in subscribee_ids {
+      let Some (subscribee) =
+        optNodeComplete_rustFIrst_by_id (config, driver, &subscribee_id) . await ?
+      else { continue; };
+      for member in &subscribee . contains {
+        if restricted_source_set . map_or (
+          true, |active| active . contains_source (&member . source))
+        { inside . insert (key (&member . member)); }} }
+
+    // The replacement domain is intentionally built from disk, rather than
+    // from newly inferred hides: preceding user actions in this save retain
+    // their ordinary inference semantics.
+    let replaceable_outside : HashSet<ID> =
+      subscriber_from_disk . hides_from_its_subscriptions . or_default ()
+      . iter ()
+      . filter (|member| restricted_source_set . map_or (
+        true, |active| active . contains_source (&member . source)))
+      .map (|member| key (&member . member))
+      .filter (|member_key| ! inside . contains (member_key))
+      .collect ();
+    let submitted : HashSet<ID> =
+      edit . members . iter () . map (|id| key (id)) . collect ();
+    let disk_hide_keys : HashSet<ID> =
+      subscriber_from_disk . hides_from_its_subscriptions . or_default ()
+      . iter () . map (|member| key (&member . member)) . collect ();
+    for member in &edit . members {
+      if ! disk_hide_keys . contains (&key (member)) {
+        candidates . push (
+          PostCommitNoticeCandidate::HiddenOutsideAdded {
+            subscriber : subscriber . clone (), member : member . clone () }); }}
+    let current_hides : Vec<ID> =
+      lowered . subscriber_hides_after_resolution (&subscriber_from_disk);
+    let inferred_unhides : Vec<ID> = current_hides . iter ()
+      . filter (|id| {
+        let member_key : ID = key (id);
+        replaceable_outside . contains (&member_key)
+          && ! submitted . contains (&member_key) })
+      . cloned () . collect ();
+    let current_keys : HashSet<ID> =
+      current_hides . iter () . map (|id| key (id)) . collect ();
+    let inferred_hides : Vec<ID> = edit . members . iter ()
+      . filter (|id| ! current_keys . contains (&key (id)))
+      . cloned () . collect ();
+    if ! inferred_hides . is_empty () || ! inferred_unhides . is_empty () {
+      lowered . apply_hiderel_delta_to_subscriber (
+        subscriber_from_disk, &inferred_hides, &inferred_unhides); }}
+  Ok (candidates) }
 
 /// Deleting (or moving away) a child of an owned subscriber F, where
 /// that child is disk-content of a node F subscribes to, HIDES the

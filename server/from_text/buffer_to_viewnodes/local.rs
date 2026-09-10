@@ -4,7 +4,7 @@
 
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpActiveNode, MpPhantomDiff};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
-use crate::types::viewnode::{EditRequest, IndefOrDef, ParentIs, PartnerCol, Qual, QualCol};
+use crate::types::viewnode::{NodeEditRequest, IndefOrDef, ParentIs, PartnerCol, Qual, QualCol};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::viewnode_nodecomplete::{
   generation_includes_only,
@@ -138,9 +138,11 @@ fn validate_hidden_in_subscribee_col (
         . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
-    |node| node . is_active_or_diff_phantom ())
+    |node| node . is_active_or_diff_phantom ()
+           || matches! ( &node . kind,
+                         MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) ))
     { errors . push(
-        "HiddenInSubscribeeCol's children can only be ActiveNodes (to hide)."
+        "HiddenInSubscribeeCol's children can only be ActiveNodes or Unknown placeholders (to hide)."
         . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
@@ -148,6 +150,8 @@ fn validate_hidden_in_subscribee_col (
       MpViewnodeKind::Vognode (MpVognode::Active (t))
         => t . parentIs == ParentIs::Affected,
       MpViewnodeKind::Phantom (MpPhantom::Diff (_))
+        => true,
+      MpViewnodeKind::Phantom (MpPhantom::Unknown (_))
         => true,
       _ => false, } )
     { errors . push(
@@ -181,14 +185,18 @@ fn validate_hidden_outside_of_subscribee_col (
         . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
-    |node| node . is_active_or_diff_phantom ())
-    { errors . push("HiddenOutsideOfSubscribeeCol's children must include only ActiveNodes." . to_string()); }
+    |node| node . is_active_or_diff_phantom ()
+           || matches! ( &node . kind,
+                         MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) ))
+    { errors . push("HiddenOutsideOfSubscribeeCol's children must include only ActiveNodes or Unknown placeholders." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t))
         => t . parentIs == ParentIs::Affected,
       MpViewnodeKind::Phantom (MpPhantom::Diff (_))
+        => true,
+      MpViewnodeKind::Phantom (MpPhantom::Unknown (_))
         => true,
       _ => false, } )
     { errors . push(
@@ -222,9 +230,10 @@ fn validate_subscribeecol (
     |node| node . is_active_or_diff_phantom ()
            || matches!(&node . kind,
                     MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive subscribee may sit here as an inert display placeholder; it emits no subscribes_to membership (TODO/full-schema/9-2_source-set-safety.org)
+                      | MpViewnodeKind::Phantom (MpPhantom::Unknown (_))
                       | MpViewnodeKind::PartnerCol (
                           PartnerCol::HiddenOutsideOfSubscribee) ))
-    { errors . push( "SubscribeeCol's children must include only ActiveNodes, inactive placeholders or HiddenOutsideOfSubscribeeCol." . to_string()); }
+    { errors . push( "SubscribeeCol's children must include only ActiveNodes, Unknown or inactive placeholders, or HiddenOutsideOfSubscribeeCol." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
@@ -233,6 +242,8 @@ fn validate_subscribeecol (
       MpViewnodeKind::Vognode (MpVognode::Inactive (_)) =>
         true,
       MpViewnodeKind::Phantom (MpPhantom::Diff (_)) =>
+        true,
+      MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) =>
         true,
       MpViewnodeKind::PartnerCol (
         PartnerCol::HiddenOutsideOfSubscribee)
@@ -262,9 +273,12 @@ fn validate_relation_col (
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| node . is_active_or_diff_phantom ()
+           || ( partnerCol == PartnerCol::Overridden
+                && matches! ( &node . kind,
+                              MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) ))
            || matches!(&node . kind,
                        MpViewnodeKind::Vognode (MpVognode::Inactive (_)))) // tolerated from stale buffers; the rerender removes it (TODO/full-schema/9-2_source-set-safety.org)
-    { errors . push(format!("{}'s children must include only ActiveNodes or inactive placeholders.", label)); }
+    { errors . push(format!("{}'s children must include only ActiveNodes, inactive placeholders, or (for OverriddenCol) Unknown placeholders.", label)); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
@@ -274,6 +288,8 @@ fn validate_relation_col (
         => true,
       MpViewnodeKind::Phantom (MpPhantom::Diff (_))
         => true,
+      MpViewnodeKind::Phantom (MpPhantom::Unknown (_))
+        if partnerCol == PartnerCol::Overridden => true,
       _ => false, } )
     { errors . push(format!(
         "{} ActiveNode children must have parentIs=affected.", label)); }
@@ -472,7 +488,7 @@ fn has_empty_title ( t : &MpActiveNode ) -> bool {
     matches! ( &t . indef_or_def, IndefOrDef::Definitive { .. } );
   let is_delete : bool =
     matches! ( t . edit_request (),
-               Some (&EditRequest::Delete) );
+               Some (&NodeEditRequest::Delete) );
   is_definitive && !is_delete && t . title . trim () . is_empty () }
 
 /// Check that all non-ignored, non-phantom content children
@@ -498,6 +514,8 @@ pub fn nonignored_children_have_distinct_ids (
         MpViewnodeKind::Vognode (MpVognode::Active (t))
           if t . parentIs == ParentIs::Affected
           => t . collected_id (),
+        MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
+          Some (u . id . clone()),
         // An inactive placeholder is not a content member (its
         // membership is owned by the disk weave), so it does not
         // participate in content-id distinctness.
@@ -519,6 +537,8 @@ fn partnerCol_children_have_distinct_ids (
       (match &child . value() . kind {
         MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
           t . id . clone(),
+        MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
+          Some (u . id . clone()),
         _ => None,
       })
     else { continue; };

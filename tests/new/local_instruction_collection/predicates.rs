@@ -10,7 +10,7 @@ use skg::from_text::local_instruction_collection::predicates::{
 use skg::types::git::Sign;
 use skg::types::misc::{ID, SourceName};
 use skg::types::viewnode::{
-  default_activeNode, EditRequest, IndefOrDef, ParentIs,
+  default_activeNode, NodeEditRequest, IndefOrDef, ParentIs,
   ActiveNode };
 
 fn base_activeNode (
@@ -21,7 +21,7 @@ fn base_activeNode (
     "n" . to_string() ) }
 
 fn with_edit_request (
-  edit_request : EditRequest,
+  edit_request : NodeEditRequest,
 ) -> ActiveNode {
   let mut t : ActiveNode =
     base_activeNode ();
@@ -56,9 +56,9 @@ fn relation_collection_membership_conditions () {
     assert!( member_counts_for_partnerCol (&t) ); }
   // A Delete edit request excludes; a NodeMerge edit request does not.
   assert!( ! member_counts_for_partnerCol (
-    &with_edit_request (EditRequest::Delete) ));
+    &with_edit_request (NodeEditRequest::Delete) ));
   assert!( member_counts_for_partnerCol (
-    &with_edit_request (EditRequest::NodeMerge (ID::from ("other"))) )); }
+    &with_edit_request (NodeEditRequest::NodeMerge (ID::from ("other"))) )); }
 
 #[test]
 fn content_membership_coincides_with_relation_collection_membership () {
@@ -67,8 +67,8 @@ fn content_membership_coincides_with_relation_collection_membership () {
   let cases : Vec<ActiveNode> = {
     let mut cases : Vec<ActiveNode> =
       vec![ base_activeNode (),
-            with_edit_request (EditRequest::Delete),
-            with_edit_request (EditRequest::NodeMerge (ID::from ("other"))) ];
+            with_edit_request (NodeEditRequest::Delete),
+            with_edit_request (NodeEditRequest::NodeMerge (ID::from ("other"))) ];
     { let mut t : ActiveNode = base_activeNode ();
       t . parentIs = ParentIs::Independent;
       cases . push (t); }
@@ -93,9 +93,9 @@ fn visible_content_membership_conditions () {
     assert!( ! active_child_counts_as_visible_content (&t) ); }
   // A Delete edit request excludes; a NodeMerge edit request does not.
   assert!( ! active_child_counts_as_visible_content (
-    &with_edit_request (EditRequest::Delete) ));
+    &with_edit_request (NodeEditRequest::Delete) ));
   assert!( active_child_counts_as_visible_content (
-    &with_edit_request (EditRequest::NodeMerge (ID::from ("other"))) ));
+    &with_edit_request (NodeEditRequest::NodeMerge (ID::from ("other"))) ));
   { // This pins an asymmetry: negative diff axes do NOT exclude
     // here, unlike in the contains and PartnerCol
     // predicates.

@@ -1,4 +1,4 @@
-use crate::types::viewnode::EditRequest;
+use crate::types::viewnode::NodeEditRequest;
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::misc::{ID, SourceName};
@@ -87,7 +87,7 @@ fn collect_instructions(
         if ! t . is_indefinitive () { // indef nodes contribute no instructions
           let delete_instruction : WhetherToDelete =
             if matches!(t . edit_request (),
-                        Some (&EditRequest::Delete)) {
+                        Some (&NodeEditRequest::Delete)) {
               WhetherToDelete::Delete
             } else { WhetherToDelete::DoNotDelete };
           id_toDelete_instructions // record delete_instruction

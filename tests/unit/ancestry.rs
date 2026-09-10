@@ -29,6 +29,7 @@ fn alias_qual (text : &str) -> ViewNode {
     kind : ViewNodeKind::Qual (Qual::Alias {
       text : text . to_string (),
       rel_source : None,
+      rel_source_request : None,
       membership : MembershipAxes::default () }) } }
 
 fn child (

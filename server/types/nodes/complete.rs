@@ -31,9 +31,9 @@ pub struct NodeComplete {
 
   pub title: String,
   /// True when the selected title or body came from below the home.
-  /// Precise scalar sources remain a fold/save-time fact; runtime
+  /// Precise title/body-text sources remain a fold/save-time fact; runtime
   /// release decisions intentionally use this coarse flag.
-  pub ugly_telescope: bool,
+  pub overPrivateText_telescope: bool,
   pub aliases: MSV<MemberAtSource<String>>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.) Each alias carries the source of the telescope section that records it.
   pub source: SourceName, // source name, inferred from file location and SkgConfig
   pub pid: ID, // Primary ID. Determines filename, TypeDB identity, Tantivy key, map key. Never changes.
@@ -84,7 +84,7 @@ pub fn normalize_body (
 pub fn empty_node_complete () -> NodeComplete {
   NodeComplete {
     title                        : String::new (),
-    ugly_telescope               : false,
+    overPrivateText_telescope               : false,
     aliases                      : MSV::Unspecified,
     source                       : SourceName::from ("main"),
     pid                          : ID::new (""),

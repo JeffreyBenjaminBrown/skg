@@ -190,18 +190,20 @@ is offered; the server's save-time floor check backstops."
                              (test--buffer-line 1))))))
 
 (ert-deftest test-apply-relationship-source-removes-override ()
-  "The no-override choice removes an existing (relSource ...) atom,
-and its message says the SAVED source survives (sticky), not that
-anything resets to the default."
+  "The no-override choice removes only a pending request, preserving
+the displayed relSource fact; its message says the SAVED source survives
+(sticky), not that anything resets to the default."
   (test--with-skg-content-view
-   "* (skg (node (id x) (source public) (viewStats (relSource private)))) x\n"
+   "* (skg (node (id x) (source public) (viewStats (relSource private)) (editRequest (relSource trusted)))) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
      (let ((msg (skg--apply-relationship-source-choice
                  skg--relationship-source-no-override)))
        (should (string-match-p "sticky" msg))
-       (should-not (string-match-p "relSource" (test--buffer-line 1)))))))
+       (should-not (string-match-p "editRequest" (test--buffer-line 1)))
+       (should (string-match-p "(viewStats (relSource private))"
+                               (test--buffer-line 1)))))))
 
 (ert-deftest test-apply-relationship-source-remove-without-atom-is-noop ()
   "The no-override choice without an atom changes nothing."
@@ -217,7 +219,7 @@ anything resets to the default."
        (should (equal (test--buffer-line 1) before))))))
 
 (ert-deftest test-apply-relationship-source-on-alias-uses-flat-metadata ()
-  "Alias relSource is a flat scaffold atom, not fake node viewStats."
+  "Alias source intent is a flat scaffold editRequest, not node viewStats."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (source public))) owner\n"
@@ -229,14 +231,48 @@ anything resets to the default."
      (forward-line 2)
      (skg--apply-relationship-source-choice "trusted")
      (should (string-match-p
-              "(skg alias (relSource trusted))"
+              "(skg alias (editRequest (relSource trusted)))"
               (test--buffer-line 3)))
      (should-not (string-match-p "viewStats" (test--buffer-line 3)))
-     (should (equal (skg--relationship-source-current-value) "trusted"))
+     (should (equal (skg--relationship-source-requested-value) "trusted"))
      (skg--apply-relationship-source-choice
       skg--relationship-source-no-override)
      (should (equal (test--buffer-line 3)
                     "*** (skg alias) nickname")))))
+
+(ert-deftest test-apply-relationship-source-on-unknown-keeps-fact-separate ()
+  "An Unknown content member stores intent under its own editRequest."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id owner) (source public))) owner\n"
+    "** (skg (unknown (id absent) (viewStats (relSource private))))\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (forward-line 1)
+     (skg--apply-relationship-source-choice "trusted")
+     (should (string-match-p
+              "(unknown (id absent) (viewStats (relSource private)) (editRequest (relSource trusted)))"
+              (test--buffer-line 2)))
+     (skg--apply-relationship-source-choice
+      skg--relationship-source-no-override)
+     (should (string-match-p "(viewStats (relSource private))"
+                             (test--buffer-line 2)))
+     (should-not (string-match-p "editRequest" (test--buffer-line 2))))))
+
+(ert-deftest test-recursive-relationship-source-preflights-edit-conflicts ()
+  "A delete/merge target aborts the recursive operation before any write."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id owner) (source public))) owner\n"
+    "** (skg (node (id a) (source public))) a\n"
+    "** (skg (node (id b) (source public) (editRequest delete))) b\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (should-error
+      (skg--set-relationship-source-recursive-walk 'contained "trusted"))
+     (should-not (string-match-p "relSource" (test--buffer-line 2))))))
 
 (ert-deftest test-alias-command-derives-default-locally ()
   "The alias gesture uses its owning node's home without an edge-info request."
@@ -516,20 +552,20 @@ anchor (pruned below the indefinitive node) or at the col itself
                                    (test--line-of-id "g")))))))
 
 (ert-deftest test-recursive-walk-removes-overrides ()
-  "The no-override choice removes existing (relSource ...) atoms
-throughout the subtree."
+  "The no-override choice removes pending source requests throughout
+the subtree, while preserving display facts."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id r) (source public))) r\n"
-    "** (skg (node (id a) (source public) (viewStats (relSource trusted)))) a\n"
-    "*** (skg (node (id b) (source public) (viewStats (relSource private)))) b\n")
+    "** (skg (node (id a) (source public) (viewStats (relSource trusted)) (editRequest (relSource trusted)))) a\n"
+    "*** (skg (node (id b) (source public) (viewStats (relSource private)) (editRequest (relSource private)))) b\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
      (should (= 2 (skg--set-relationship-source-recursive-walk
                    'contained skg--relationship-source-no-override)))
      (dolist (id '("a" "b"))
-       (should-not (string-match-p "relSource"
+       (should-not (string-match-p "editRequest"
                                    (test--line-of-id id)))))))
 
 ;; --- The kind menu: skg--select-relationship-kind ---

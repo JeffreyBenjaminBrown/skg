@@ -39,7 +39,7 @@ would need the slow SavePlan we don't have yet)."
 
 (defun skg-request-save-buffer (&optional fork-approved fork-sources
                                           hoist-approved-pids
-                                          scalar-approved-pids)
+                                          text-approved-pids)
   "Send the current buffer contents to Rust for processing.
 Before sending, adds 'folded' markers to folded headlines and 'focused' marker to current headline.
 The server sends three LP messages around the save:
@@ -81,7 +81,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
                                     fork-approved
                                     fork-sources
                                     hoist-approved-pids
-                                    scalar-approved-pids))
+                                    text-approved-pids))
                                   "\n"))
            (content-bytes (encode-coding-string buffer-contents 'utf-8))
            (content-length (length content-bytes))
@@ -149,19 +149,19 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
        (lambda (_tcp-proc payload)
          (skg--fork-confirmation-handler save-buffer payload))
        nil)
-      ;; The other alternative terminal. It carries no scalar text; after
+      ;; The other alternative terminal. It carries no title/body text; after
       ;; approval, retry this same save with the exact listed PIDs.
       (skg-register-response-handler
        'telescope-hoist-confirmation
        (lambda (_tcp-proc payload)
          (skg--telescope-hoist-confirmation-handler
           save-buffer payload fork-approved fork-sources
-          scalar-approved-pids))
+          text-approved-pids))
        nil)
       (skg-register-response-handler
-       'ugly-telescope-confirmation
+       'overPrivateText-telescope-confirmation
        (lambda (_tcp-proc payload)
-         (skg--save-scalar-release-confirmation-handler
+         (skg--save-text-release-confirmation-handler
           save-buffer payload fork-approved fork-sources
           hoist-approved-pids))
        nil)
@@ -178,7 +178,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
 (defun skg--save-request-sexp (view-uri save-point-position
                                         &optional fork-approved fork-sources
                                         hoist-approved-pids
-                                        scalar-approved-pids)
+                                        text-approved-pids)
   "Build the save-buffer request sexp. When FORK-APPROVED is non-nil,
 include (fork-approved . \"true\") so the server commits any forks it
 finds instead of returning a fork-confirmation. FORK-SOURCES, when
@@ -206,8 +206,8 @@ field (fork-sources ((N . SOURCE) ...))."
      (list (list 'fork-sources fork-sources)))
    (when hoist-approved-pids
      `((hoist-approved-pids ,@hoist-approved-pids)))
-   (when scalar-approved-pids
-     `((allow-ugly-telescopes ,@scalar-approved-pids)))))
+   (when text-approved-pids
+     `((allow-overPrivateText-telescopes ,@text-approved-pids)))))
 
 (defun skg--current-save-point-position ()
   "WHAT IT DOES: Return point position data that should survive the save redraw:
@@ -299,7 +299,7 @@ which would trigger overlay modification-hooks if still present."
         (assoc-delete-all 'telescope-hoist-confirmation
                           skg-response-handler-map))
   (setq skg-response-handler-map
-        (assoc-delete-all 'ugly-telescope-confirmation
+        (assoc-delete-all 'overPrivateText-telescope-confirmation
                           skg-response-handler-map))
   (skg--end-stream)
   (unwind-protect
@@ -360,7 +360,7 @@ it), end the stream, and unlock."
         (assoc-delete-all 'telescope-hoist-confirmation
                           skg-response-handler-map))
   (setq skg-response-handler-map
-        (assoc-delete-all 'ugly-telescope-confirmation
+        (assoc-delete-all 'overPrivateText-telescope-confirmation
                           skg-response-handler-map))
   (when (assoc 'save-result skg-response-handler-map)
     ;; save-result was registered one-shot but will never fire; remove it
@@ -401,7 +401,7 @@ it), end the stream, and unlock."
 
 (defun skg--telescope-hoist-confirmation-handler
     (save-buffer payload fork-approved fork-sources
-                 &optional scalar-approved-pids)
+                 &optional text-approved-pids)
   "Handle the text-free terminal Hoist challenge for SAVE-BUFFER.
 The server has committed nothing.  On approval, reissue the same save with
 the exact candidate PIDs; on Abort, leave the buffer and every .skg file
@@ -417,7 +417,7 @@ on a retry that had already received fork authority."
         (assoc-delete-all 'telescope-hoist-confirmation
                           skg-response-handler-map))
   (setq skg-response-handler-map
-        (assoc-delete-all 'ugly-telescope-confirmation
+        (assoc-delete-all 'overPrivateText-telescope-confirmation
                           skg-response-handler-map))
   (when (assoc 'save-result skg-response-handler-map)
     (setq skg-response-handler-map
@@ -441,23 +441,23 @@ on a retry that had already received fork authority."
               (with-current-buffer save-buffer
                 (skg-request-save-buffer
                  fork-approved fork-sources approved-pids
-                 scalar-approved-pids))
+                 text-approved-pids))
             (message
              "Hoist aborted; nothing was saved. Repair the .skg sections manually."))))
     (error
      (skg-log 'error 'save
               "telescope-hoist-confirmation handler error: %S" err))))
 
-(defun skg--save-scalar-release-confirmation-handler
+(defun skg--save-text-release-confirmation-handler
     (save-buffer payload fork-approved fork-sources hoist-approved-pids)
-  "Handle a save-rerender scalar release challenge.
+  "Handle a save-rerender text release challenge.
 The filesystem save has succeeded, but the server has not released the
 staged saved/collateral text or changed its open-view registry.  Approval
 reissues the save with the exact PIDs; declining leaves the current buffers
 unchanged."
   (dolist (response-type
            '(collateral-view save-relax-lock fork-confirmation
-             telescope-hoist-confirmation ugly-telescope-confirmation))
+             telescope-hoist-confirmation overPrivateText-telescope-confirmation))
     (setq skg-response-handler-map
           (assoc-delete-all response-type skg-response-handler-map)))
   (when (assoc 'save-result skg-response-handler-map)
@@ -472,7 +472,7 @@ unchanged."
               (mapcar (lambda (pid) (format "%s" pid))
                       (cadr (assoc 'pids response))))
              (prompt (or (cadr (assoc 'prompt response))
-                         "Display staged text from ugly telescopes? ")))
+                         "Display staged text from overPrivateText telescopes? ")))
         (if noninteractive
             (message "Saved, but protected rerender text was withheld for %s"
                      (mapconcat #'identity approved-pids ", "))
@@ -485,7 +485,7 @@ unchanged."
              "Save succeeded; protected rerender text remains withheld and buffers are unchanged."))))
     (error
      (skg-log 'error 'save
-              "save scalar-release confirmation handler error: %S" err))))
+              "save text-release confirmation handler error: %S" err))))
 
 (defun skg--fork-suggested-source-above-point ()
   "Return the suggested source named by the comment directly above the

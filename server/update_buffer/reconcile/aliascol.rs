@@ -97,6 +97,7 @@ pub fn reconcile_alias_col_children (
                                                  . and_then ( |source|
                                                    if source == &parent_nodecomplete . source { None }
                                                    else { Some (source . clone ()) } ),
+                                               rel_source_request : None,
                                                membership } ), })};
   complete_relevant_children_in_viewnodetree(
     tree,

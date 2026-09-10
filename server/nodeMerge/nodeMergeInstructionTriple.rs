@@ -301,7 +301,7 @@ async fn ids_shown_through_subscriptions (
 fn create_acquiree_text_preserver(acquiree: &NodeComplete) -> NodeComplete {
   NodeComplete {
     title: format!("MERGED: {}", acquiree . title),
-    ugly_telescope: false,
+    overPrivateText_telescope: false,
     aliases: MSV::Unspecified,
     source: acquiree . source . clone(),
     pid: ID(uuid::Uuid::new_v4() . to_string()),

@@ -313,7 +313,7 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
       // title. Behaviour should be analogous to the literal case.
       let regex_opts : SearchOptions = SearchOptions {
         regex: true, body: false, operators: false,
-        exclude_ugly_telescope : false };
+        exclude_overPrivateText_telescope : false };
       let ( best_matches_re, searcher_re ) =
         search_index ( &tantivy_index, "axiom thesis lemma",
                        &regex_opts ) ?;

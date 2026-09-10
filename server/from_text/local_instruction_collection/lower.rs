@@ -18,7 +18,7 @@
 ///   before lowering consumes the map.)
 
 use crate::from_text::local_instruction_collection::types::{
-  CollectedIntents, IntentsForOneId, SubscribeeVisibility };
+  CollectedIntents, HiddenOutsideEdit, IntentsForOneId, SubscribeeVisibility };
 use crate::types::misc::{
   ID, MSV, MemberAtSource, SourceName, members_msv, members_of,
   members_at_source, members_at_source_msv };
@@ -43,9 +43,9 @@ pub struct NodeSaveIntent {
   pub body              : Option<String>,
   // contains / subscribes_to / overrides_view_of pair each member
   // with an Option<SourceName>: Some when the buffer's headline
-  // carried an explicit '(relSource NAME)' atom (see
-  // 'ViewNodeStats::rel_source', 'NodeIntent_Local'); None means
-  // "derive" (sticky-else-default). 'explicit_sources' extracts the
+  // carried an '(editRequest (relSource NAME))' request (see
+  // 'ActiveNode_Generic::rel_source_request', 'NodeIntent_Local'); None means
+  // "derive" (sticky-else-default). 'requested_relationship_sources' extracts the
   // Some entries into a side-channel BEFORE 'into_nodecomplete'
   // discards them, for 'apply_sticky_sources' to validate against
   // each edge's floor.
@@ -58,8 +58,8 @@ pub struct NodeSaveIntent {
   pub misc              : Vec<FileProperty>,
 }
 
-/// Sources the buffer explicitly requested via '(relSource NAME)'
-/// (server/heralds.rs; 'ViewNodeStats::rel_source'), keyed by member
+/// Sources the buffer explicitly requested via '(editRequest
+/// (relSource NAME))', keyed by member
 /// ID, one map per relation that carries per-member sources (hides is
 /// absent: it is inferred, and the col that shows it is read-only --
 /// the set-relationship-source gesture refuses there). Threaded
@@ -72,7 +72,7 @@ pub struct NodeSaveIntent {
 /// floor, rather than deriving normally (render-and-gating,
 /// TODO/user-owned_autofork_chain/5_plan.org).
 #[derive(Clone, Debug, Default)]
-pub struct ExplicitSources {
+pub struct RequestedRelationshipSources {
   pub contains          : HashMap<ID, SourceName>,
   pub aliases           : HashMap<String, SourceName>,
   pub subscribes_to     : HashMap<ID, SourceName>,
@@ -197,10 +197,10 @@ impl NodeSaveIntent {
 
   /// The sources the buffer explicitly requested (its headlines'
   /// '(relSource NAME)' atoms), read out BEFORE 'into_nodecomplete'
-  /// discards the Option<SourceName> payload. See 'ExplicitSources'.
-  pub fn explicit_sources (
+  /// discards the Option<SourceName> payload. See 'RequestedRelationshipSources'.
+  pub fn requested_relationship_sources (
     &self,
-  ) -> ExplicitSources {
+  ) -> RequestedRelationshipSources {
     fn collect (
       list : &[(ID, Option<SourceName>)],
     ) -> HashMap<ID, SourceName> {
@@ -208,7 +208,7 @@ impl NodeSaveIntent {
         . filter_map ( |(id, source)| source . clone ()
                        . map ( |s| (id . clone (), s) ) )
         . collect () }
-    ExplicitSources {
+    RequestedRelationshipSources {
       contains          : collect (self . contains . or_default ()),
       aliases           : self . aliases . or_default () . iter ()
         . filter_map ( |(text, source)| source . clone ()
@@ -224,7 +224,7 @@ impl NodeSaveIntent {
     let source : SourceName = self . source . clone();
     NodeComplete {
       title                        : self . title,
-      ugly_telescope               : false,
+      overPrivateText_telescope               : false,
       aliases                      :
         members_at_source_msv (
           &source,
@@ -278,8 +278,9 @@ pub struct LoweredIntents {
 }
 
 pub struct LoweringOutput {
-  pub intents    : LoweredIntents,
-  pub visibility : Vec<(ID, SubscribeeVisibility)>, // Each pair is (subscriber, signal); the list is in subscriber first-emission order.
+  pub intents        : LoweredIntents,
+  pub visibility     : Vec<(ID, SubscribeeVisibility)>, // Each pair is (subscriber, signal); the list is in subscriber first-emission order.
+  pub hidden_outside : Vec<(ID, HiddenOutsideEdit)>,
 }
 
 /// This returns the (acquirer, acquiree) pair of every nodeMerge
@@ -315,6 +316,14 @@ pub fn lower_collected_intents (
       for signal in &entry . visibility {
         visibility . push (( pid . clone(), signal . clone() )); }}
     visibility };
+  let hidden_outside : Vec<(ID, HiddenOutsideEdit)> = {
+    let mut edits : Vec<(ID, HiddenOutsideEdit)> = Vec::new ();
+    for pid in &order {
+      let entry : &IntentsForOneId = by_pid . get (pid)
+        . ok_or ( "lower_collected_intents: order names a PID missing from the map" . to_string () ) ?;
+      for edit in &entry . hidden_outside {
+        edits . push ((pid . clone (), edit . clone ())); }}
+    edits };
   let mut intents : LoweredIntents =
     LoweredIntents {
       order  : Vec::with_capacity (lowerable_order . len()),
@@ -340,7 +349,7 @@ pub fn lower_collected_intents (
     { return Err ( format!(
         "lower_collected_intents: entry for {} has field intents but no title/body",
         pid )); }}
-  Ok (LoweringOutput { intents, visibility }) }
+  Ok (LoweringOutput { intents, visibility, hidden_outside }) }
 
 /// This ASSUMES the entry is lowerable: it holds a delete or a
 /// title/body, having been named by 'lowerable_order'.
@@ -432,6 +441,37 @@ impl LoweredIntents {
       _ =>
         members_of (&subscriber_from_disk . contains)
         . into_iter() . collect(),
+    }}
+
+  /// As 'subscriber_contains_after_save', but for the post-save list of
+  /// subscribees.  Filter edits must classify hides against this list, not
+  /// against a stale disk subscription that the same buffer removed.
+  pub fn subscriber_subscribes_after_save (
+    &self,
+    subscriber_from_disk : &NodeComplete,
+  ) -> Vec<ID> {
+    match self . by_pid . get (&subscriber_from_disk . pid) {
+      Some (NodeIntent::Save (intent))
+        if ! intent . subscribes_to . is_unspecified () =>
+          ids_only (intent . subscribes_to . or_default ()),
+      _ =>
+        members_of (
+          subscriber_from_disk . subscribes_to . or_default () ),
+    }}
+
+  /// The hide IDs after the preceding inference stages.  Filter edits run
+  /// last, so they calculate their delta against this intermediate state.
+  pub fn subscriber_hides_after_resolution (
+    &self,
+    subscriber_from_disk : &NodeComplete,
+  ) -> Vec<ID> {
+    match self . by_pid . get (&subscriber_from_disk . pid) {
+      Some (NodeIntent::Save (intent))
+        if ! intent . hides_from_its_subscriptions . is_unspecified () =>
+          intent . hides_from_its_subscriptions . or_default () . to_vec (),
+      _ =>
+        members_of (
+          subscriber_from_disk . hides_from_its_subscriptions . or_default () ),
     }}
 
   /// This applies inferred hides/unhides to the subscriber's

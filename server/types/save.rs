@@ -63,6 +63,15 @@ pub struct SavePlan {
   /// clones commit only on approval (see ForkSpec, the save handler's
   /// fork-confirmation stage). Empty for an ordinary save.
   pub fork_specs         : Vec<ForkSpec>,
+  /// Facts collected while interpreting a derived editable filter.  They are
+  /// deliberately not warnings yet: the save handler turns them into user
+  /// messages only after filesystem and graph mutation succeeds.
+  pub post_commit_notice_candidates : Vec<PostCommitNoticeCandidate>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PostCommitNoticeCandidate {
+  HiddenOutsideAdded { subscriber : ID, member : ID },
 }
 
 /// One fork: the user made a foreign node N (read-only, in a source

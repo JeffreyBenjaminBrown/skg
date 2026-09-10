@@ -8,7 +8,7 @@ pub mod herald_rules;
 pub mod rebuild_dbs;
 pub mod rerender_all_views;
 pub mod save_buffer;
-pub mod scalar_release;
+pub mod text_release;
 pub mod single_root_view;
 pub mod source_sets;
 pub mod stage_moves;

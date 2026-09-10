@@ -34,12 +34,12 @@ function M.export_some_to_org (source_set, output_dir, approved_pids)
   end
   state.register_response_handler('export-to-org',
     function (_payload_text, response)
-      state.response_handler_map['ugly-telescope-confirmation'] = nil
+      state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
       M.export_to_org_handler(response)
     end, true)
-  state.register_response_handler('ugly-telescope-confirmation',
+  state.register_response_handler('overPrivateText-telescope-confirmation',
     function (_payload_text, response)
-      state.response_handler_map['ugly-telescope-confirmation'] = nil
+      state.response_handler_map['overPrivateText-telescope-confirmation'] = nil
       if state.response_handler_map['export-to-org'] then
         state.response_handler_map['export-to-org'] = nil
         state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
@@ -56,7 +56,7 @@ function M.export_some_to_org (source_set, output_dir, approved_pids)
     sexpr.pair(sexpr.symbol('source-set'), source_set),
     sexpr.pair(sexpr.symbol('output-dir'), output_dir) }
   if approved_pids and #approved_pids > 0 then
-    local approval = { sexpr.symbol('allow-ugly-telescopes') }
+    local approval = { sexpr.symbol('allow-overPrivateText-telescopes') }
     for _, pid in ipairs(approved_pids) do table.insert(approval, pid) end
     table.insert(request, approval) end
   client.send_string(sexpr.to_string(request) .. '\n')

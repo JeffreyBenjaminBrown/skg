@@ -46,6 +46,7 @@ pub(super) struct CompletionContext<'a> {
   pub(super) errors                         : &'a mut Vec<String>,
   pub(super) deleted_since_head_pid_src_map : &'a HashMap<ID, SourceName>,
   pub(super) deleted_by_this_save_pids      : &'a HashSet<ID>,
+  pub(super) deleted_by_this_save_extra_ids : &'a HashMap<ID, HashSet<ID>>,
   pub(super) active_source_set              : Option<&'a ActiveSourceSet>,
   /// TODO/DONE/local-view-update/plan_v2.org §5.5 per-buffer node limit: the remaining budget of *new* ViewNodes
   /// the ordinary update pass may create. Initialized once per rerender to
@@ -151,17 +152,20 @@ async fn dispatch_node_update (
       reconcile_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
         context . deleted_since_head_pid_src_map,
+        context . deleted_by_this_save_extra_ids,
         context . active_source_set ) . await ?,
     ViewNodeKind::PartnerCol (PartnerCol::HiddenInSubscribee) =>
       reconcile_hiddenin_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
         context . deleted_since_head_pid_src_map,
+        context . deleted_by_this_save_extra_ids,
         context . active_source_set,
         context . warning_sink . as_deref_mut () ) ?,
     ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutside_subscribee_col_children (
         treeid, tree, context . source_diffs, context . env,
         context . deleted_since_head_pid_src_map,
+        context . deleted_by_this_save_extra_ids,
         context . active_source_set,
         context . warning_sink . as_deref_mut () ) ?,
     ViewNodeKind::PartnerCol (role)
@@ -174,6 +178,7 @@ async fn dispatch_node_update (
         treeid, tree, *role, context . source_diffs,
         context . env, context . graph_snap,
         context . deleted_since_head_pid_src_map,
+        context . deleted_by_this_save_extra_ids,
         context . active_source_set,
         context . warning_sink . as_deref_mut () ) ?,
     // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the IDCol/AliasCol diff scaffolds are created inline by
@@ -249,6 +254,7 @@ async fn visit_normal_node (
     &context . env . config, context . graph_snap,
     context . deleted_since_head_pid_src_map,
     context . deleted_by_this_save_pids,
+    context . deleted_by_this_save_extra_ids,
     context . active_source_set,
     settled, cascade, &mut context . node_budget,
     context . source_diffs . is_none () ) ?; // substitution is off in diff mode: diff surfaces show raw graph facts

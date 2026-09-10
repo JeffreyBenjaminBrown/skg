@@ -56,7 +56,7 @@ function M.set_active_source_set (name, approved_pids)
   lock.begin_stream('rerender')
   lock.lock_all_skg_buffers()
   rerender.register_rerender_stream_handlers()
-  rerender.register_ugly_confirmation(function (pids)
+  rerender.register_overPrivateText_confirmation(function (pids)
     M.set_active_source_set(name, pids)
   end, 'active-source-set')
   state.lp_reset()
@@ -64,7 +64,7 @@ function M.set_active_source_set (name, approved_pids)
     sexpr.pair(sexpr.symbol('request'), 'set active source set'),
     sexpr.pair(sexpr.symbol('name'), name) }
   if approved_pids and #approved_pids > 0 then
-    local approval = { sexpr.symbol('allow-ugly-telescopes') }
+    local approval = { sexpr.symbol('allow-overPrivateText-telescopes') }
     for _, pid in ipairs(approved_pids) do table.insert(approval, pid) end
     table.insert(request, approval) end
   client.send_string(sexpr.to_string(request) .. '\n')

@@ -73,6 +73,7 @@ pub async fn build_and_integrate_aliases (
                         .and_then ( |home|
                           if &alias . source == home { None }
                           else { Some (alias . source . clone ()) } ),
+                      rel_source_request: None,
                       membership: MembershipAxes::default () } ),
       false ) ?; }
   Ok (( )) }
