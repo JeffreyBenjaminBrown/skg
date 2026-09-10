@@ -84,6 +84,76 @@
                               :settlements)))
     (should (= 2 (length (skg--maintenance-list-incidents))))))
 
+(ert-deftest test-skg-maintenance-scopes-retained-callback-and-follow-on ()
+  (let* ((incident-a (list :incident-id "incident-a" :phase 'waiting))
+         (incident-b (list :incident-id "incident-b" :phase 'foreground))
+         (scheduled-function nil)
+         (scheduled-args nil)
+         (skg--maintenance-client-incident nil)
+         (skg--maintenance-client-incidents nil))
+    (skg--maintenance-replace-current-incident incident-a)
+    (skg--maintenance-replace-current-incident incident-b)
+    (cl-letf (((symbol-function 'run-at-time)
+               (lambda (_seconds _repeat function &rest args)
+                 (setq scheduled-function function
+                       scheduled-args args)))
+              ((symbol-function 'skg--maintenance-resume-active)
+               (lambda (_response)
+                 (setf (plist-get skg--maintenance-client-incident :phase)
+                       'resumed)
+                 (skg--maintenance-defer
+                  "incident-a"
+                  (lambda ()
+                    (setf (plist-get skg--maintenance-client-incident
+                                     :follow-on)
+                          'ran))))))
+      (skg--maintenance-handle-status
+       nil "((status active) (active-incident-id incident-a)
+              (maintenance-epoch 1))")
+      (should (eq skg--maintenance-client-incident incident-b))
+      (should (eq (plist-get incident-a :phase) 'resumed))
+      (apply scheduled-function scheduled-args)
+      (should (eq (plist-get (skg--maintenance-lookup-incident "incident-a")
+                             :follow-on)
+                 'ran))
+      (should (eq skg--maintenance-client-incident incident-b)))))
+
+(ert-deftest test-skg-maintenance-restores-foreground-after-historical-error ()
+  (let ((incident-a '(:incident-id "incident-a" :phase waiting))
+        (incident-b '(:incident-id "incident-b" :phase foreground))
+        (skg--maintenance-client-incident nil)
+        (skg--maintenance-client-incidents nil))
+    (skg--maintenance-replace-current-incident incident-a)
+    (skg--maintenance-replace-current-incident incident-b)
+    (cl-letf (((symbol-function 'skg--maintenance-resume-active)
+               (lambda (_response)
+                 (setf (plist-get skg--maintenance-client-incident :phase)
+                       'failed)
+                 (error "historical callback failed"))))
+      (should-error
+       (skg--maintenance-handle-status
+        nil "((status active) (active-incident-id incident-a))")))
+    (should (eq skg--maintenance-client-incident incident-b))
+    (should (eq (plist-get (skg--maintenance-lookup-incident "incident-a")
+                           :phase)
+                'failed))))
+
+(ert-deftest test-skg-maintenance-historical-status-preserves-foreground-state ()
+  (let ((incident-a '(:incident-id "incident-a" :phase terminal-received
+                      :final-archive (:path "/a")))
+        (incident-b '(:incident-id "incident-b" :phase foreground))
+        (skg--maintenance-client-incident nil)
+        (skg--maintenance-client-incidents nil)
+        (skg--pending-maintenance-offer '(:candidate-id "newer")))
+    (skg--maintenance-replace-current-incident incident-a)
+    (skg--maintenance-replace-current-incident incident-b)
+    (skg--maintenance-handle-status
+     nil "((status idle) (incident-id incident-a))")
+    (should (eq skg--maintenance-client-incident incident-b))
+    (should (equal "newer"
+                   (plist-get skg--pending-maintenance-offer :candidate-id)))
+    (should (eq (plist-get incident-b :phase) 'foreground))))
+
 (ert-deftest test-skg-begin-maintenance-sends-exact-explicit-targets ()
   (let (request registered-handler)
     (cl-letf (((symbol-function 'skg-tcp-connect-to-rust)
@@ -175,7 +245,7 @@
       (should (string-match-p "old-incident" (cadr shown)))
       (should (eq (nth 2 shown) :warning)))))
 
-(ert-deftest test-skg-new-allocation-replaces-obsolete-local-incident ()
+(ert-deftest test-skg-new-allocation-retains-older-incident-and-restriction ()
   (skg-test-maintenance--with-buffer 'content-view
     (let ((skg--maintenance-client-incident
            '(:incident-id "old-incident" :epoch 9 :phase waiting-for-server))
@@ -204,7 +274,10 @@
       (should (= 10 (skg--buffer-record-maintenance-epoch
                      skg--buffer-record)))
       (should (equal (butlast submitted) '(tcp "new-incident" 10)))
-      (should (string-match-p "old-incident" shown)))))
+      (should-not shown)
+      (should (skg--maintenance-lookup-incident "old-incident"))
+      (skg-unlock-buffer-after-maintenance buffer 10 "new-incident")
+      (should (= 9 (skg--buffer-record-maintenance-epoch skg--buffer-record))))))
 
 (ert-deftest test-skg-every-maintenance-origin-refuses-dirty-raw-files-first ()
   (let ((buffer (generate-new-buffer "raw-maintenance-preflight.skg"))
@@ -299,7 +372,9 @@
       (should (eq (plist-get skg--maintenance-client-incident :phase)
                   'cancelling-after-locked-census-refusal))
       (should (string-match-p "dirty undo cannot be archived" warning))
-      (should (equal scheduled '(skg-cancel-maintenance "incident" 9))))))
+      (should (equal scheduled
+                     '(skg--maintenance-run-deferred "incident"
+                       skg-cancel-maintenance ("incident" 9)))))))
 
 (ert-deftest test-skg-buffer-born-during-maintenance-is-outside-frozen-census ()
   (let ((buffer (generate-new-buffer " *skg-born-locked-test*"))
@@ -574,7 +649,7 @@
                  (setq scheduled (cons function arguments)))))
       (skg--maintenance-handle-selection-response
        nil "((status archive-ready))"))
-    (should (eq (car scheduled) #'skg--maintenance-run-explicit-origin))
+    (should (eq (nth 2 scheduled) #'skg--maintenance-run-explicit-origin))
     (should (eq (plist-get skg--maintenance-client-incident :phase)
                 'origin-operation-required))))
 
@@ -587,7 +662,7 @@
                  (setq scheduled (cons function arguments)))))
       (skg--maintenance-handle-selection-response
        nil "((status archive-ready))"))
-    (should (eq (car scheduled) #'skg--maintenance-run-explicit-origin))
+    (should (eq (nth 2 scheduled) #'skg--maintenance-run-explicit-origin))
     (should (eq (plist-get skg--maintenance-client-incident :phase)
                 'origin-operation-required))))
 
@@ -744,15 +819,15 @@
             :locally-applied nil))
          scheduled applied sent)
     (cl-letf (((symbol-function 'run-at-time)
-               (lambda (_seconds _repeat function &rest _arguments)
-                 (setq scheduled function)))
+               (lambda (_seconds _repeat function &rest arguments)
+                 (setq scheduled (cons function arguments))))
               ((symbol-function 'skg--maintenance-apply-settlement)
                (lambda (record) (setq applied record)))
               ((symbol-function
                 'skg--maintenance-send-preselection-retirement-ack)
                (lambda (record) (setq sent record))))
       (skg--maintenance-install-preselection-retirements (list retirement))
-      (funcall scheduled)
+      (apply (car scheduled) (cdr scheduled))
       (should (eq retirement applied))
       (should (eq retirement sent))
       (should (equal '("dirty")
@@ -771,7 +846,7 @@
                (car (plist-get skg--maintenance-client-incident
                                :preselection-retirements))
                'settlement-resolution)))
-      (funcall scheduled))
+      (apply (car scheduled) (cdr scheduled)))
     (should (eq (plist-get skg--maintenance-client-incident :phase)
                 'server-blocked))
     (should-not (plist-get skg--maintenance-client-incident
@@ -969,7 +1044,7 @@
                (lambda (_seconds _repeat function &rest _args)
                  (setq scheduled function))))
       (skg--maintenance-install-settlements (list one two)))
-    (should (eq scheduled #'skg--maintenance-settle-next))
+    (should (eq scheduled #'skg--maintenance-run-deferred))
     (should (equal '("one")
                    (mapcar (lambda (record)
                              (skg--maintenance-text record 'buffer-id))
@@ -1037,7 +1112,7 @@
                (lambda (_seconds _repeat function &rest _args)
                  (setq scheduled function))))
       (skg--maintenance-install-settlements (list resolved)))
-    (should (eq scheduled #'skg--maintenance-settle-next))
+    (should (eq scheduled #'skg--maintenance-run-deferred))
     (should (equal
              '("gone")
              (mapcar (lambda (record)
@@ -1091,7 +1166,7 @@
       (skg--maintenance-handle-settlement-ack
        nil
        "((status all-views-settled) (buffer-id one) (required-ack release-ack))"))
-    (should (eq scheduled #'skg--maintenance-settle-next))
+    (should (eq scheduled #'skg--maintenance-run-deferred))
     (let ((record (car (plist-get skg--maintenance-client-incident
                                   :settlements))))
       (should (equal "true"
@@ -1135,7 +1210,7 @@
         (skg--maintenance-handle-terminal nil payload))
       (should (= 9 (skg--buffer-record-maintenance-epoch
                     skg--buffer-record)))
-      (should (eq scheduled #'skg--maintenance-send-terminal-ack))
+      (should (eq scheduled #'skg--maintenance-run-deferred))
       (should (= callback-count 1))
       (should (plist-get skg--maintenance-client-incident
                          :terminal-callback-fired))
@@ -1184,5 +1259,76 @@
       (should (equal "view" (skg--buffer-record-view-uri
                              skg--buffer-record)))
       (should (equal "view" skg-view-uri)))))
+
+(ert-deftest test-skg-maintenance-late-terminal-and-ack-keep-newer-workflow ()
+  (let* ((manifest (make-string 64 ?a))
+         (skg--maintenance-client-incident nil)
+         (skg--maintenance-client-incidents nil)
+         (skg--owner-publication-revision 20)
+         (skg--server-store-state '((graph-generation . 20) (manifest-revision . 30)))
+         (skg--maintenance-state '((epoch . 10) (state . active)))
+         (skg--pending-maintenance-offer '(:candidate-id "newer"))
+         (skg--client-constructor-admission 'closed)
+         (incident-a (list :incident-id "a" :epoch 9 :phase 'completing
+                           :registered-buffer-ids nil :g1-graph-generation 2
+                           :g1-manifest-revision 6
+                           :final-archive (list :manifest-sha256 manifest :path "/a")))
+         (incident-b (list :incident-id "b" :epoch 10 :phase 'preparing-archive))
+         handler scheduled submitted-id)
+    (cl-letf (((symbol-function 'skg-tcp-connect-to-rust) (lambda () 'tcp))
+              ((symbol-function 'skg-register-response-handler)
+               (lambda (_kind callback &rest _) (setq handler callback)))
+              ((symbol-function 'skg-set-request-failure-handler) #'ignore)
+              ((symbol-function 'skg-submit-request)
+               (lambda (_tcp _request _handlers id) (setq submitted-id id)))
+              ((symbol-function 'run-at-time)
+               (lambda (_seconds _repeat function &rest args)
+                 (setq scheduled (cons function args)))))
+      (skg--maintenance-replace-current-incident incident-a)
+      (skg--maintenance-send-complete)
+      (skg--maintenance-replace-current-incident incident-b)
+      (funcall handler nil
+               (prin1-to-string
+                `((status terminal) (incident-id a) (maintenance-epoch 9)
+                  (disposition completed) (manifest-sha256 ,manifest)
+                  (unlock-buffer-ids ()) (selected-graph-generation 2)
+                  (selected-manifest-revision 6))))
+      (should (eq incident-b skg--maintenance-client-incident))
+      (should (= 20 (alist-get 'graph-generation skg--server-store-state)))
+      (apply (car scheduled) (cdr scheduled))
+      (should (equal submitted-id "a"))
+      (funcall handler nil
+               "((status terminal-acknowledged) (incident-id a) (maintenance-epoch 9))")
+      (should (eq incident-b skg--maintenance-client-incident))
+      (should (eq 'preparing-archive (plist-get incident-b :phase)))
+      (should (plist-get (skg--maintenance-lookup-incident "a") :terminal-acknowledged))
+      (should (eq 'closed skg--client-constructor-admission))
+      (should (equal "newer" (plist-get skg--pending-maintenance-offer :candidate-id)))
+      (should (= 10 (alist-get 'epoch skg--maintenance-state))))))
+
+(ert-deftest test-skg-maintenance-status-selects-server-retained-incident ()
+  (let* ((incident-b (list :incident-id "b" :epoch 10))
+         (skg--maintenance-client-incident incident-b)
+         (skg--maintenance-client-incidents nil)
+         handler sent-id sent-request)
+    (cl-letf (((symbol-function 'skg-tcp-connect-to-rust) (lambda () 'tcp))
+              ((symbol-function 'skg-register-response-handler)
+               (lambda (_kind callback &rest _) (setq handler callback)))
+              ((symbol-function 'skg-submit-request)
+               (lambda (_tcp request _handlers id)
+                 (setq sent-id id sent-request (read request))))
+              ((symbol-function 'skg--maintenance-resume-active)
+               (lambda (response)
+                 (should-not skg--maintenance-client-incident)
+                 (skg--maintenance-replace-current-incident
+                  (list :incident-id (skg--maintenance-text response 'active-incident-id)
+                        :phase 'resumed)))))
+      (skg-maintenance-status nil "a")
+      (should (equal sent-id "a"))
+      (should (equal (alist-get 'incident-id sent-request) "a"))
+      (should-error (funcall handler nil "((status active) (active-incident-id b))"))
+      (funcall handler nil "((status active) (active-incident-id a))")
+      (should (eq incident-b skg--maintenance-client-incident))
+      (should (eq 'resumed (plist-get (skg--maintenance-lookup-incident "a") :phase))))))
 
 (provide 'test-skg-maintenance)

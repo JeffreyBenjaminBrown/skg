@@ -2611,3 +2611,30 @@ Use the existing server incident selector and pending-incidents inventory. Keep
 historical records separate from global authority and bind subsequent workflow
 callbacks to an explicit incident. See
 [[../../codex-thinking/client-incident-retention.org]].
+
+* Simplify/cohere checkpoint: Emacs incident-scoped continuation
+** what's done and went well
+Emacs status can select a retained incident, including an incident known only
+from the server inventory. Deferred work, response handlers, failure handlers and
+unsolicited incident pushes preserve the original incident identity. An older
+terminal response and its subsequent ACK leave newer workflow and publication
+state intact. New allocation retains older restrictions and records.
+
+All 53 focused maintenance tests and all 504 Emacs tests pass. Logs are
+'/tmp/incident-scoping-elisp-final.log' and
+'/tmp/incident-scoping-emacs-checkpoint.log'. The regression executes the actual
+registered terminal handler, scheduled ACK request and registered ACK handler
+for A after B becomes current. Exact ACK receipt is retained on A's record.
+** Changes to the plan's envisioned order.
+Review split the client migration after repeated Emacs parse failures. Root
+used 'check-parens' with the line and point printed to locate the missing close,
+repaired callback arguments and completed Emacs while the delegate finished Neovim.
+** what's imperfect about what's done
+Reconnect consumers and external origin adapters remain to be checked against
+the retained-record interface. The complete both-editor acceptance matrix is
+still pending; this checkpoint makes no production latency claim.
+** choices determining the future
+Keep global current-state metadata distinct from historical operation fields.
+Selected graph/manifest fields in a terminal report cannot overwrite a newer
+versioned owner publication. Preserve the bounded callback interface described
+in [[../../codex-thinking/client-incident-retention.org]].

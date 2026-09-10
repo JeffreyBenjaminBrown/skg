@@ -13,3 +13,11 @@ incident's buffer restrictions.
 ** Counterexample
 Retain unsettled incident A, allocate B, and request A's status. A's archive,
 census and report state must remain available; B remains the active workflow.
+** Deferred workflow boundary
+A callback retains its incident identity when scheduled, including callbacks it
+schedules in turn. Running A while B is current uses a temporary incident scope,
+retains A's latest record on exit and restores B even after an error. Allocating
+B alone is no evidence that A's report or restrictions have been discharged.
+Global handshake state and pending offers must not follow historical A status.
+The focused counterexample runs A's queued settlement and its continuation after
+B becomes current, then verifies both the resulting A facts and untouched B.

@@ -17,6 +17,8 @@
 `skg--maintenance-client-incident' remains the active workflow pointer for
 compatibility.  Records retained here are deliberately the same mutable
 plists, so late settlement and archive fields remain attached to their ID.")
+(defvar skg--maintenance-historical-status nil
+  "Non-nil while handling a retained incident behind another foreground one.")
 
 (defun skg--maintenance-retain-incident (incident)
   "Retain INCIDENT in the session-local incident index.
@@ -58,6 +60,68 @@ When CLEAR-INDEX is non-nil, also discard all session-local records."
   (setq skg--maintenance-client-incident nil)
   (when clear-index
     (setq skg--maintenance-client-incidents nil)))
+
+(defun skg--maintenance-call-in-incident (incident-id function &rest args)
+  "Call FUNCTION with INCIDENT-ID foreground, restoring any newer foreground.
+The retained record is updated even when FUNCTION signals.  Calls already
+running for the foreground incident preserve normal pointer changes."
+  (let* ((incident (skg--maintenance-lookup-incident incident-id))
+         (previous skg--maintenance-client-incident))
+    (unless incident
+      (error "Unknown client maintenance incident %s" incident-id))
+    (let ((skg--maintenance-historical-status
+           (or skg--maintenance-historical-status
+               (not (eq incident previous))))
+          (same-foreground (eq incident previous)))
+      (if same-foreground
+          (unwind-protect (apply function args)
+            (skg--maintenance-retain-incident skg--maintenance-client-incident))
+        (skg--maintenance-retain-incident previous)
+        (setq skg--maintenance-client-incident incident)
+        (unwind-protect
+            (apply function args)
+          (skg--maintenance-retain-incident skg--maintenance-client-incident)
+          (setq skg--maintenance-client-incident
+                (and previous
+                     (skg--maintenance-lookup-incident
+                      (plist-get previous :incident-id)))))))))
+
+(defun skg--maintenance-run-deferred (incident-id function args)
+  "Run deferred FUNCTION with its incident record foreground."
+  (apply #'skg--maintenance-call-in-incident
+         incident-id function args))
+
+(defun skg--maintenance-defer (incident-id function &rest args)
+  "Schedule FUNCTION and bind its deferred callback to INCIDENT-ID."
+  (run-at-time 0 nil #'skg--maintenance-run-deferred
+               incident-id function args))
+
+(defun skg--maintenance-register-response-handler
+    (kind handler &optional one-shot)
+  "Register HANDLER bound to the incident foreground at registration time."
+  (let ((incident-id
+         (and skg--maintenance-client-incident
+              (plist-get skg--maintenance-client-incident :incident-id))))
+    (if incident-id
+        (skg-register-response-handler
+         kind
+         (lambda (&rest args)
+           (apply #'skg--maintenance-call-in-incident
+                  incident-id handler args))
+         one-shot)
+      (skg-register-response-handler kind handler one-shot))))
+
+(defun skg--maintenance-set-request-failure-handler (handler)
+  "Install HANDLER bound to the incident foreground at registration time."
+  (let ((incident-id
+         (and skg--maintenance-client-incident
+              (plist-get skg--maintenance-client-incident :incident-id))))
+    (if incident-id
+        (skg-set-request-failure-handler
+         (lambda (&rest args)
+           (apply #'skg--maintenance-call-in-incident
+                  incident-id handler args)))
+      (skg-set-request-failure-handler handler))))
 
 (defvar skg--pending-maintenance-offer nil
   "Latest unsolicited valid disk candidate offered by the server.")
@@ -230,22 +294,30 @@ verification response already carries the server's more precise warning."
          (maintenance-epoch . ,epoch)
          (client-constructor-admission . closed)))
       "\n")
-     `((maintenance-offer ,#'skg--maintenance-handle-bootstrap . t)
+     `((maintenance-offer
+        ,(lambda (tcp payload)
+           (skg--maintenance-call-in-incident
+            incident-id #'skg--maintenance-handle-bootstrap tcp payload)) . t)
        (error
         ,(lambda (_tcp payload)
-           (let ((reason (skg--connection-handshake-error-content payload)))
-             (when skg--maintenance-client-incident
-               (setf (plist-get skg--maintenance-client-incident :phase)
-                     'cancelling-after-locked-census-refusal))
-             (display-warning
-              'skg
-              (format
-               (concat "Maintenance stopped before archive publication: %s. "
-                       "The safe pre-archive incident is being cancelled.")
-               reason)
-              :error)
-             (run-at-time
-              0 nil #'skg-cancel-maintenance incident-id epoch)))
+           (skg--maintenance-call-in-incident
+            incident-id
+            (lambda ()
+              (let ((reason
+                     (skg--connection-handshake-error-content payload)))
+                (when skg--maintenance-client-incident
+                  (setf (plist-get skg--maintenance-client-incident :phase)
+                        'cancelling-after-locked-census-refusal))
+                (display-warning
+                 'skg
+                 (format
+                  (concat "Maintenance stopped before archive publication: %s. "
+                          "The safe pre-archive incident is being cancelled.")
+                  reason)
+                 :error)
+                (skg--maintenance-defer incident-id
+                                         #'skg-cancel-maintenance
+                                         incident-id epoch)))))
         . t))
      nil incident-id)))
 
@@ -338,8 +410,8 @@ verification response already carries the server's more precise warning."
                 (skg-recovery--offer-value offer 'archive-folder)
                 :undo-waivers (plist-get state :undo-waivers))))
           (setf (plist-get skg--maintenance-client-incident :archive) result)
-          (run-at-time
-           0 nil #'skg--maintenance-send-archive-ready
+          (skg--maintenance-defer
+           incident-id #'skg--maintenance-send-archive-ready
            incident-id
            (plist-get state :epoch)
            (plist-get state :lock-census-sha256)
@@ -347,8 +419,8 @@ verification response already carries the server's more precise warning."
       (skg-recovery-native-undo-error
        (let ((buffer-key (nth 2 error-data))
              (reason (nth 3 error-data)))
-         (run-at-time
-          0 nil #'skg--maintenance-send-undo-failure
+         (skg--maintenance-defer
+          incident-id #'skg--maintenance-send-undo-failure
           incident-id (plist-get state :epoch) buffer-key reason)))
       (error
        (display-warning
@@ -356,17 +428,17 @@ verification response already carries the server's more precise warning."
         (format "Initial recovery archive failed before risky work: %s\nIncomplete staging data was retained."
                 (error-message-string error-data))
         :error)
-       (run-at-time 0 nil #'skg-cancel-maintenance incident-id
-                    (plist-get state :epoch))))))
+       (skg--maintenance-defer incident-id #'skg-cancel-maintenance
+                               incident-id (plist-get state :epoch))))))
 
 (defun skg--maintenance-send-archive-ready
     (incident-id epoch lock-sha manifest-sha)
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
-    (skg-register-response-handler
+    (skg--maintenance-register-response-handler
      'maintenance-status
      #'skg--maintenance-handle-selection-response
      t)
-    (skg-set-request-failure-handler
+    (skg--maintenance-set-request-failure-handler
      (lambda (reason)
        (when skg--maintenance-client-incident
          (setf (plist-get skg--maintenance-client-incident :phase)
@@ -433,13 +505,14 @@ verification response already carries the server's more precise warning."
       (when (and prior (not (equal prior source-set)))
         (error "Maintenance selection changed its source-set authority"))
       (setf (plist-get state :selected-source-set) source-set))
-    (skg-install-source-inventory response)
-    (unless (equal skg--active-source-set-name source-set)
-      (message "Skg full rebuild changed source-set from %s to %s"
-               skg--active-source-set-name source-set))
-    (setq skg--active-source-set-name source-set
-          skg--maintenance-archive-folder archive-folder
-          skg--maintenance-archive-identity archive-identity)
+    (unless skg--maintenance-historical-status
+      (skg-install-source-inventory response)
+      (unless (equal skg--active-source-set-name source-set)
+        (message "Skg full rebuild changed source-set from %s to %s"
+                 skg--active-source-set-name source-set))
+      (setq skg--active-source-set-name source-set
+            skg--maintenance-archive-folder archive-folder
+            skg--maintenance-archive-identity archive-identity))
     (setf (plist-get state :phase) 'presenting)
     (skg--maintenance-replace-current-incident state)
     state))
@@ -463,7 +536,9 @@ verification response already carries the server's more precise warning."
        (let ((challenge (skg--maintenance-status-challenge response)))
          (setf (plist-get state :phase) 'awaiting-scalar-authorization
                (plist-get state :scalar-challenge) challenge)
-         (run-at-time 0 nil #'skg--maintenance-prompt-scalar challenge)))
+         (skg--maintenance-defer
+          (plist-get state :incident-id)
+          #'skg--maintenance-prompt-scalar challenge)))
       ("candidate-selected"
        (setf (plist-get state :scalar-challenge) nil)
        (skg--maintenance-install-settlements
@@ -489,9 +564,9 @@ verification response already carries the server's more precise warning."
       (error "No server-owned maintenance origin is ready to run"))
     (setf (plist-get state :phase) 'origin-operation-start-pending)
     (let ((tcp-proc (skg-tcp-connect-to-rust)))
-      (skg-register-response-handler
+      (skg--maintenance-register-response-handler
        'maintenance-status #'skg--maintenance-handle-origin-started t)
-      (skg-set-request-failure-handler
+      (skg--maintenance-set-request-failure-handler
        (lambda (reason)
          (when skg--maintenance-client-incident
            (setf (plist-get skg--maintenance-client-incident :phase)
@@ -527,7 +602,9 @@ verification response already carries the server's more precise warning."
 (defun skg--maintenance-explicit-origin-handler (phase _response)
   "Resume the explicit target observer in an appropriate durable PHASE."
   (when (member phase '("archive-ready" "final-observation"))
-    (run-at-time 0 nil #'skg--maintenance-run-explicit-origin)
+    (skg--maintenance-defer
+     (plist-get skg--maintenance-client-incident :incident-id)
+     #'skg--maintenance-run-explicit-origin)
     t))
 
 (skg-register-maintenance-origin-handler
@@ -553,9 +630,9 @@ verification response already carries the server's more precise warning."
     (unless (and state challenge incident-id epoch pids)
       (user-error "Skg has no client-known maintenance scalar challenge"))
     (let ((tcp-proc (skg-tcp-connect-to-rust)))
-      (skg-register-response-handler
+      (skg--maintenance-register-response-handler
        'maintenance-status #'skg--maintenance-handle-selection-response t)
-      (skg-set-request-failure-handler
+      (skg--maintenance-set-request-failure-handler
        (lambda (reason)
          (setf (plist-get skg--maintenance-client-incident :phase)
                'awaiting-scalar-authorization)
@@ -678,7 +755,8 @@ verification response already carries the server's more precise warning."
           (plist-get state :in-flight-settlement) nil
           (plist-get state :phase) 'settling-views)
     (skg--maintenance-replace-current-incident state)
-    (run-at-time 0 nil #'skg--maintenance-settle-next)))
+    (skg--maintenance-defer
+     (plist-get state :incident-id) #'skg--maintenance-settle-next)))
 
 (defun skg--maintenance-install-preselection-retirements (retirements)
   "Install exact dirty-buffer RETIREMENTS for invalid post-mutation disk."
@@ -724,7 +802,9 @@ verification response already carries the server's more precise warning."
           (plist-get state :in-flight-preselection-retirement) nil
           (plist-get state :phase) 'settling-preselection-retirements)
     (skg--maintenance-replace-current-incident state)
-    (run-at-time 0 nil #'skg--maintenance-settle-next-preselection-retirement)))
+    (skg--maintenance-defer
+     (plist-get state :incident-id)
+     #'skg--maintenance-settle-next-preselection-retirement)))
 
 (defun skg--maintenance-settle-next-preselection-retirement ()
   (let* ((state skg--maintenance-client-incident)
@@ -759,10 +839,10 @@ verification response already carries the server's more precise warning."
 (defun skg--maintenance-send-preselection-retirement-ack (retirement)
   (let* ((state skg--maintenance-client-incident)
          (tcp-proc (skg-tcp-connect-to-rust)))
-    (skg-register-response-handler
+    (skg--maintenance-register-response-handler
      'maintenance-status
      #'skg--maintenance-handle-preselection-retirement-ack t)
-    (skg-set-request-failure-handler
+    (skg--maintenance-set-request-failure-handler
      (lambda (reason)
        (when skg--maintenance-client-incident
          (setf (plist-get skg--maintenance-client-incident :phase)
@@ -813,7 +893,9 @@ verification response already carries the server's more precise warning."
           (cdr (plist-get state :pending-preselection-retirements))
           (plist-get state :in-flight-preselection-retirement) nil
           (plist-get state :phase) 'settling-preselection-retirements)
-    (run-at-time 0 nil #'skg--maintenance-settle-next-preselection-retirement)))
+    (skg--maintenance-defer
+     (plist-get state :incident-id)
+     #'skg--maintenance-settle-next-preselection-retirement)))
 
 (defun skg--maintenance-application (settlement)
   (let ((application (skg--maintenance-field settlement 'application)))
@@ -1003,9 +1085,9 @@ verification response already carries the server's more precise warning."
          (incident-id (plist-get state :incident-id))
          (epoch (plist-get state :epoch))
          (tcp-proc (skg-tcp-connect-to-rust)))
-    (skg-register-response-handler
+    (skg--maintenance-register-response-handler
      'maintenance-status #'skg--maintenance-handle-settlement-ack t)
-    (skg-set-request-failure-handler
+    (skg--maintenance-set-request-failure-handler
      (lambda (reason)
        (when skg--maintenance-client-incident
          (setf (plist-get skg--maintenance-client-incident :phase)
@@ -1052,7 +1134,8 @@ verification response already carries the server's more precise warning."
           (cdr (plist-get state :pending-settlements))
           (plist-get state :in-flight-settlement) nil
           (plist-get state :phase) 'settling-views)
-    (run-at-time 0 nil #'skg--maintenance-settle-next)))
+    (skg--maintenance-defer
+     (plist-get state :incident-id) #'skg--maintenance-settle-next)))
 
 (defun skg--maintenance-request-evidence ()
   (let* ((state skg--maintenance-client-incident)
@@ -1065,9 +1148,9 @@ verification response already carries the server's more precise warning."
     (setf (plist-get skg--maintenance-client-incident :phase)
           'requesting-evidence)
     (let ((tcp-proc (skg-tcp-connect-to-rust)))
-      (skg-register-response-handler
+      (skg--maintenance-register-response-handler
        'maintenance-evidence #'skg--maintenance-handle-evidence t)
-      (skg-set-request-failure-handler
+      (skg--maintenance-set-request-failure-handler
        (lambda (reason)
          (when skg--maintenance-client-incident
            (setf (plist-get skg--maintenance-client-incident :phase)
@@ -1109,7 +1192,9 @@ verification response already carries the server's more precise warning."
                 final
                 (plist-get skg--maintenance-client-incident :phase)
                 'archive-finalized-locally)
-          (run-at-time 0 nil #'skg--maintenance-send-final-archive-ack))
+          (skg--maintenance-defer
+           (plist-get state :incident-id)
+           #'skg--maintenance-send-final-archive-ack))
       (error
        (setf (plist-get skg--maintenance-client-incident :phase)
              'archive-finalization-failed)
@@ -1127,9 +1212,9 @@ verification response already carries the server's more precise warning."
          (final (plist-get state :final-archive))
          (tcp-proc (skg-tcp-connect-to-rust)))
     (unless final (error "Maintenance has no finalized client archive"))
-    (skg-register-response-handler
+    (skg--maintenance-register-response-handler
      'maintenance-status #'skg--maintenance-handle-final-archive-ack t)
-    (skg-set-request-failure-handler
+    (skg--maintenance-set-request-failure-handler
      (lambda (reason)
        (when skg--maintenance-client-incident
          (setf (plist-get skg--maintenance-client-incident :phase)
@@ -1167,7 +1252,8 @@ verification response already carries the server's more precise warning."
       (error "Server did not acknowledge the exact final archive"))
     (setf (plist-get skg--maintenance-client-incident :phase)
           'completing)
-    (run-at-time 0 nil #'skg--maintenance-send-complete)))
+    (skg--maintenance-defer
+     (plist-get state :incident-id) #'skg--maintenance-send-complete)))
 
 (defun skg--maintenance-send-complete ()
   (let* ((state skg--maintenance-client-incident)
@@ -1176,9 +1262,9 @@ verification response already carries the server's more precise warning."
          (manifest-sha (plist-get (plist-get state :final-archive)
                                   :manifest-sha256))
          (tcp-proc (skg-tcp-connect-to-rust)))
-    (skg-register-response-handler
+    (skg--maintenance-register-response-handler
      'maintenance-status #'skg--maintenance-handle-terminal t)
-    (skg-set-request-failure-handler
+    (skg--maintenance-set-request-failure-handler
      (lambda (reason)
        (when skg--maintenance-client-incident
          (setf (plist-get skg--maintenance-client-incident :phase)
@@ -1230,27 +1316,31 @@ verification response already carries the server's more precise warning."
     (setf (plist-get skg--maintenance-client-incident :phase)
           'terminal-received
           (plist-get skg--maintenance-client-incident :terminal) response)
-    (skg--maintenance-set-handshake-summary 'terminal epoch)
-    (when-let ((graph (skg--maintenance-field
-                       response 'selected-graph-generation)))
-      (setf (alist-get 'graph-generation skg--server-store-state) graph))
-    (when-let ((revision (skg--maintenance-field
-                          response 'selected-manifest-revision)))
-      (setf (alist-get 'manifest-revision skg--server-store-state) revision))
+    (unless skg--maintenance-historical-status
+      (skg--maintenance-set-handshake-summary 'terminal epoch))
+    (when (and (not skg--maintenance-historical-status)
+               (null skg--owner-publication-revision))
+      (when-let ((graph (skg--maintenance-field
+                         response 'selected-graph-generation)))
+        (setf (alist-get 'graph-generation skg--server-store-state) graph))
+      (when-let ((revision (skg--maintenance-field
+                            response 'selected-manifest-revision)))
+        (setf (alist-get 'manifest-revision skg--server-store-state) revision)))
     (when-let ((callback (plist-get state :terminal-callback)))
       (unless (plist-get state :terminal-callback-fired)
         (funcall callback response)
         (setf (plist-get state :terminal-callback-fired) t)))
-    (run-at-time 0 nil #'skg--maintenance-send-terminal-ack)))
+    (skg--maintenance-defer
+     (plist-get state :incident-id) #'skg--maintenance-send-terminal-ack)))
 
 (defun skg--maintenance-send-terminal-ack ()
   (let* ((state skg--maintenance-client-incident)
          (incident-id (plist-get state :incident-id))
          (epoch (plist-get state :epoch))
          (tcp-proc (skg-tcp-connect-to-rust)))
-    (skg-register-response-handler
+    (skg--maintenance-register-response-handler
      'maintenance-status #'skg--maintenance-handle-terminal-ack t)
-    (skg-set-request-failure-handler
+    (skg--maintenance-set-request-failure-handler
      (lambda (reason)
        (display-warning
         'skg (format "Terminal maintenance ACK was not delivered: %s" reason)
@@ -1280,6 +1370,7 @@ verification response already carries the server's more precise warning."
     ;; metadata directly; terminal acknowledgement does not imply a global
     ;; idle state or release any still-unsettled buffer.
     (skg-update-global-server-status response)
+    (setf (plist-get skg--maintenance-client-incident :terminal-acknowledged) t)
     (skg--maintenance-finish-idle)))
 
 (defun skg--maintenance-finish-idle ()
@@ -1290,7 +1381,8 @@ verification response already carries the server's more precise warning."
     (unless (and state (eq (plist-get state :phase) 'terminal-received))
       (error "Server became idle before the client received terminal authority"))
     (skg--maintenance-clear-current-incident)
-    (setq skg--pending-maintenance-offer nil)
+    (unless skg--maintenance-historical-status
+      (setq skg--pending-maintenance-offer nil))
     (message "Skg maintenance complete; recovery archive: %s" path)))
 
 (defun skg--maintenance-inspect-retained-incident (response require-final)
@@ -1446,7 +1538,8 @@ checksummed final marker."
     (setf (plist-get state :origin) origin
           (plist-get state :requested-paths) paths
           (plist-get state :requested-ids) ids)
-    (skg--maintenance-set-handshake-summary 'active epoch)
+    (unless skg--maintenance-historical-status
+      (skg--maintenance-set-handshake-summary 'active epoch))
     (when (skg--maintenance-field response 'g1-graph-generation)
       (skg--maintenance-record-selection response))
     (cond
@@ -1457,20 +1550,24 @@ checksummed final marker."
       (let ((challenge (skg--maintenance-status-challenge response)))
         (setf (plist-get state :phase) 'awaiting-scalar-authorization
               (plist-get state :scalar-challenge) challenge)
-        (run-at-time 0 nil #'skg--maintenance-prompt-scalar challenge)))
+        (skg--maintenance-defer incident-id
+                                 #'skg--maintenance-prompt-scalar challenge)))
      ((and has-scalar
            (skg--maintenance-true-p response 'scalar-approved)
            (equal phase "presenting"))
       (setf (plist-get state :scalar-challenge)
             (skg--maintenance-status-challenge response)
             (plist-get state :phase) 'resuming-approved-scalar)
-      (run-at-time 0 nil #'skg-approve-maintenance-scalar-release))
+      (skg--maintenance-defer incident-id
+                               #'skg-approve-maintenance-scalar-release))
      ((equal phase "finalizing-archive")
       (setf (plist-get state :phase) 'finalizing-archive)
-      (run-at-time 0 nil #'skg--maintenance-resume-finalization))
+      (skg--maintenance-defer incident-id
+                               #'skg--maintenance-resume-finalization))
      ((equal phase "awaiting-locked-census")
       (setf (plist-get state :phase) 'awaiting-locked-census)
-      (run-at-time 0 nil #'skg--maintenance-send-locked-census))
+      (skg--maintenance-defer incident-id
+                               #'skg--maintenance-send-locked-census))
      ((equal phase "preparing-archive")
       (unless (plist-get state :lock-census-sha256)
         (setf (plist-get state :registered-buffer-ids)
@@ -1479,12 +1576,13 @@ checksummed final marker."
               (skg--maintenance-lock-offer response)))
       (setf (plist-get state :phase) 'preparing-archive)
       (if-let ((archive (plist-get state :archive)))
-          (run-at-time
-           0 nil #'skg--maintenance-send-archive-ready
+          (skg--maintenance-defer
+           incident-id #'skg--maintenance-send-archive-ready
            incident-id epoch
            (plist-get state :lock-census-sha256)
            (plist-get archive :manifest-sha256))
-        (run-at-time 0 nil #'skg--maintenance-publish-initial)))
+        (skg--maintenance-defer incident-id
+                                 #'skg--maintenance-publish-initial)))
      ((member phase '("archive-ready" "running-external-mutation"
                       "final-observation"))
       (setf (plist-get state :phase)
@@ -1519,10 +1617,9 @@ checksummed final marker."
       (message "Skg maintenance %s is in server phase %s"
                incident-id phase)))))
 
-(defun skg--maintenance-handle-status (_tcp-proc payload)
-  "Resume or report the exact durable state in a status PAYLOAD."
-  (let* ((response (read payload))
-         (status (skg--maintenance-text response 'status)))
+(defun skg--maintenance-handle-status-current
+    (_tcp-proc payload response status)
+  "Handle a parsed status RESPONSE for the selected foreground incident."
     (pcase status
       ("active" (skg--maintenance-resume-active response))
       ("terminal"
@@ -1531,9 +1628,44 @@ checksummed final marker."
       ("idle"
        (if skg--maintenance-client-incident
            (skg--maintenance-finish-idle)
-         (skg--maintenance-set-handshake-summary 'idle)
-         (message "Skg maintenance is idle")))
-      (_ (message "Skg maintenance: %s" payload)))))
+         (progn
+           (unless skg--maintenance-historical-status
+             (skg--maintenance-set-handshake-summary 'idle))
+           (message "Skg maintenance is idle"))))
+      (_ (message "Skg maintenance: %s" payload))))
+
+(defun skg--maintenance-handle-status (_tcp-proc payload &optional selected-id)
+  "Resume or report the exact durable state in a status PAYLOAD.
+SELECTED-ID targets a retained incident while leaving another foreground
+workflow untouched.  Unsolicited responses use their explicit identity."
+  (let* ((response (read payload))
+         (status (skg--maintenance-text response 'status))
+         (response-id
+          (or selected-id
+              (skg--maintenance-text response 'incident-id)
+              (skg--maintenance-text response 'active-incident-id)))
+         (target (and response-id
+                      (skg--maintenance-lookup-incident response-id)))
+         (current skg--maintenance-client-incident))
+    (when (and selected-id
+               (let ((claimed (or (skg--maintenance-text response 'incident-id)
+                                  (skg--maintenance-text response 'active-incident-id))))
+                 (and claimed (not (equal selected-id claimed)))))
+      (error "Maintenance status changed its requested incident identity"))
+    (if target
+        (skg--maintenance-call-in-incident
+         response-id #'skg--maintenance-handle-status-current
+         _tcp-proc payload response status)
+      (if (and response-id current)
+          (let ((skg--maintenance-client-incident nil)
+                (skg--maintenance-historical-status t))
+            (unwind-protect
+                (skg--maintenance-handle-status-current
+                 _tcp-proc payload response status)
+              (skg--maintenance-retain-incident
+               skg--maintenance-client-incident)))
+        (skg--maintenance-handle-status-current
+         _tcp-proc payload response status)))))
 
 (defun skg--maintenance-send-undo-failure
     (incident-id epoch buffer-key reason)
@@ -1541,15 +1673,14 @@ checksummed final marker."
     (setf (plist-get skg--maintenance-client-incident :undo-failure)
           (list :buffer-key buffer-key :reason reason)))
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
-    (skg-register-response-handler
+    (skg--maintenance-register-response-handler
      'maintenance-status
      (lambda (_tcp payload)
        (let* ((response (read payload))
               (key (skg--maintenance-text response 'buffer-key))
               (exact-reason (skg--maintenance-text response 'reason)))
-         (run-at-time
-          0 nil
-          (lambda ()
+         (skg--maintenance-defer
+          incident-id (lambda ()
             (if (yes-or-no-p
                  (format
                   (concat "Native undo could not be archived for %s:\n%s\n"
@@ -1573,12 +1704,13 @@ checksummed final marker."
 (defun skg--maintenance-approve-undo-waiver
     (incident-id epoch buffer-key reason)
   (let ((tcp-proc (skg-tcp-connect-to-rust)))
-    (skg-register-response-handler
+    (skg--maintenance-register-response-handler
      'maintenance-status
      (lambda (_tcp _payload)
        (push (cons buffer-key reason)
              (plist-get skg--maintenance-client-incident :undo-waivers))
-       (run-at-time 0 nil #'skg--maintenance-publish-initial))
+       (skg--maintenance-defer
+        incident-id #'skg--maintenance-publish-initial))
      t)
     (skg-submit-request
      tcp-proc
@@ -1601,12 +1733,6 @@ checksummed final marker."
          (offer (skg--maintenance-offer-for-writer response)))
     (pcase status
       ("install-maintenance-epoch-and-submit-locked-census"
-       (when skg--maintenance-client-incident
-         ;; Successful allocation proves that the coordinator no longer owns
-         ;; the older client record.  Keeping it would strand the new server
-         ;; incident before its locked census.
-         (skg--maintenance-release-obsolete-local-incident
-          "The Skg server allocated a new maintenance incident"))
        (skg--maintenance-replace-current-incident
         (list :incident-id incident-id
                    :epoch epoch
@@ -1683,7 +1809,8 @@ checksummed final marker."
              (skg--maintenance-publish-initial))
          (error
           (display-warning 'skg (error-message-string error-data) :error)
-          (run-at-time 0 nil #'skg-cancel-maintenance incident-id epoch))))
+          (skg--maintenance-defer incident-id #'skg-cancel-maintenance
+                                   incident-id epoch))))
       (_ (error "Unexpected maintenance bootstrap status %S" status)))))
 
 (defun skg-begin-maintenance
@@ -1755,6 +1882,20 @@ ORIGIN-FIELDS are adapter-specific fields included in the bootstrap request."
          (skg-begin-maintenance "pending-reconciliation" candidate))))))
 
 (defun skg--maintenance-server-status (tcp-proc payload)
+  "Dispatch a push under its explicit incident identity when known."
+  (let* ((response (read payload))
+         (incident-id (or (skg--maintenance-text response 'incident-id)
+                          (skg--maintenance-text response 'active-incident-id))))
+    (if (and incident-id (skg--maintenance-lookup-incident incident-id))
+        (skg--maintenance-call-in-incident
+         incident-id #'skg--maintenance-server-status-current tcp-proc payload)
+      (when (and incident-id skg--maintenance-client-incident
+                 (not (member (skg--maintenance-text response 'status)
+                              '("active" "terminal" "idle"))))
+        (error "Maintenance push names unknown incident %s" incident-id))
+      (skg--maintenance-server-status-current tcp-proc payload))))
+
+(defun skg--maintenance-server-status-current (tcp-proc payload)
   "Dispatch one unsolicited durable maintenance status PAYLOAD."
   (let* ((response (read payload))
          (status (skg--maintenance-text response 'status)))
@@ -1806,7 +1947,7 @@ ORIGIN-FIELDS are adapter-specific fields included in the bootstrap request."
     (unless (and incident-id epoch)
       (user-error "No client-known maintenance incident to cancel"))
     (let ((tcp-proc (skg-tcp-connect-to-rust)))
-      (skg-register-response-handler
+      (skg--maintenance-register-response-handler
        'maintenance-status
        (lambda (_tcp payload)
          (let* ((response (read payload))
@@ -1815,7 +1956,8 @@ ORIGIN-FIELDS are adapter-specific fields included in the bootstrap request."
            (dolist (buffer (skg-registered-buffers))
              (skg-unlock-buffer-after-maintenance buffer unlock-epoch))
            (skg--maintenance-clear-current-incident)
-           (setq skg--client-constructor-admission 'open)
+           (unless skg--maintenance-historical-status
+             (setq skg--client-constructor-admission 'open))
            (message "Skg maintenance cancelled before archive publication.")))
        t)
       (skg-submit-request
@@ -1857,9 +1999,9 @@ repeats the incident's external origin operation."
       (user-error "Skg has no client-known blocked maintenance incident"))
     (setf (plist-get state :phase) 'maintenance-retry-pending)
     (let ((tcp-proc (skg-tcp-connect-to-rust)))
-      (skg-register-response-handler
+      (skg--maintenance-register-response-handler
        'maintenance-status #'skg--maintenance-handle-retry t)
-      (skg-set-request-failure-handler
+      (skg--maintenance-set-request-failure-handler
        (lambda (reason)
          (when skg--maintenance-client-incident
            (setf (plist-get skg--maintenance-client-incident :phase)
@@ -1876,12 +2018,37 @@ repeats the incident's external origin operation."
         "\n")
        nil incident-id))))
 
-(defun skg-maintenance-status (&optional quiet)
-  "Ask the server for its current durable maintenance state."
-  (interactive)
-  (let ((tcp-proc (skg-tcp-connect-to-rust)))
+(defun skg--maintenance-known-incident-ids ()
+  "Return retained and server-reported incident IDs for status selection."
+  (delete-dups
+   (append
+    (mapcar (lambda (incident)
+              (format "%s" (plist-get incident :incident-id)))
+            (skg--maintenance-list-incidents))
+    (mapcar (lambda (entry)
+              (format "%s" (cadr (assq 'incident-id entry))))
+            skg--pending-incidents))))
+
+(defun skg-maintenance-status (&optional quiet incident-id)
+  "Ask the server for durable maintenance state.
+With INCIDENT-ID, report that retained incident while leaving the current
+foreground workflow untouched.  QUIET retains its existing failure behavior."
+  (interactive
+   (list current-prefix-arg
+         (when current-prefix-arg
+           (completing-read "Maintenance incident: "
+                            (skg--maintenance-known-incident-ids)
+                            nil t))))
+  (let ((tcp-proc (skg-tcp-connect-to-rust))
+        (incident-id (or incident-id
+                         (plist-get skg--maintenance-client-incident :incident-id))))
     (skg-register-response-handler
-     'maintenance-status #'skg--maintenance-handle-status t)
+     'maintenance-status
+     (if incident-id
+         (lambda (tcp payload)
+           (skg--maintenance-handle-status tcp payload incident-id))
+       #'skg--maintenance-handle-status)
+     t)
     (when quiet
       (skg-set-request-failure-handler
        (lambda (reason)
@@ -1890,9 +2057,14 @@ repeats the incident's external origin operation."
                        reason)
           :warning))))
     (skg-submit-request
-     tcp-proc "((request . \"maintenance status\"))\n" nil
-     (and skg--maintenance-client-incident
-          (plist-get skg--maintenance-client-incident :incident-id)))))
+     tcp-proc
+     (concat
+      (prin1-to-string
+       (append '((request . "maintenance status"))
+               (when incident-id
+                 `((incident-id . ,incident-id)))))
+      "\n")
+     nil incident-id)))
 
 (skg-register-server-push-handler
  'maintenance-offer #'skg--maintenance-server-offer)
