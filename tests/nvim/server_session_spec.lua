@@ -233,4 +233,31 @@ describe('skg protocol-v2 server sessions', function ()
     assert.are.equal('open', state.graph_write_admission)
     assert.is_false(state.rebuilding)
   end)
+
+  it('does not let an unversioned frame downgrade current global status',
+     function ()
+    state.server_session_id = new_session
+    state.owner_publication_revision = 3
+    state.graph_write_admission = 'open'
+    state.graph_transition_status = 'idle'
+    state.rebuilding = false
+    state.pending_incidents = {}
+    local config = require('skg.config')
+    config.store_state = { graph_generation = 8, manifest_revision = 10 }
+    state.update_global_server_status({
+      f('server-session-id', new_session),
+      f('current-graph-generation', 2), f('current-manifest-revision', 4),
+      f('graph-write-admission', 'closed'),
+      f('graph-transition-status', 'transitioning'),
+      f('rebuilding', 'true'),
+      f('pending-incidents', { f('incident-id', 'stale') }),
+    })
+    assert.are.equal(3, state.owner_publication_revision)
+    assert.are.equal('open', state.graph_write_admission)
+    assert.are.equal('idle', state.graph_transition_status)
+    assert.is_false(state.rebuilding)
+    assert.are.same({}, state.pending_incidents)
+    assert.are.equal(8, config.store_state.graph_generation)
+    assert.are.equal(10, config.store_state.manifest_revision)
+  end)
 end)

@@ -2539,3 +2539,22 @@ made from these deterministic held-worker fixtures.
 Continue from the remaining boundaries in plan 11 rather than retracing this
 slice. The implementation and rejected identity assumptions are mapped in
 [[../../codex-thinking/ordinary-save-responsiveness.org]].
+
+* Simplify/cohere checkpoint: versioned global status rejects downgrade
+** what's done and went well
+Both clients ignore unversioned global current-state updates once they have
+accepted an owner publication revision in the authenticated server session.
+Historical operation frames still reach their request handlers. Pre-versioned
+compatibility remains, and a new authenticated session resets the revision fence.
+
+Focused server-session tests pass: 11 Emacs tests and nine Neovim tests. Logs
+are '/tmp/global-revision-fence-elisp.log' and
+'/tmp/global-revision-fence-nvim.log'. The protocol description records the rule.
+** Changes to the plan's envisioned order.
+Close this small metadata downgrade gap after asynchronous save scheduling.
+** what's imperfect about what's done
+This does not retire the remaining legacy generation and maintenance-epoch
+fields or complete the multi-incident client interface.
+** choices determining the future
+Keep operation outcomes separate from current live authority, and preserve
+publication ordering independently of response arrival order.

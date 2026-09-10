@@ -96,9 +96,13 @@ Report-local selected-* fields never update the current graph identity."
       (when revision-entry
         (unless (natnump revision)
           (error "Invalid owner publication revision %S" revision)))
-      (unless (and revision-entry
-                   skg--owner-publication-revision
-                   (< revision skg--owner-publication-revision))
+      ;; Once a versioned publication has been accepted, a legacy response
+      ;; without the fence cannot carry current global authority.  It may
+      ;; still be delivered to its operation-specific response handler.
+      (when (or (null skg--owner-publication-revision)
+                (and revision-entry
+                     (or (null skg--owner-publication-revision)
+                         (>= revision skg--owner-publication-revision))))
         (when revision-entry
           (setq skg--owner-publication-revision revision))
         (when-let ((entry (assoc 'graph-write-admission response)))

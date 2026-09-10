@@ -24,3 +24,10 @@ next necessary action. The pinned entry at the start of
 [[file:../coding-advice/ORIENTATION.org][ORIENTATION.org]] makes this agreement discoverable without relying on
 conversation memory. This note records a working agreement, not a guarantee
 that future agents will follow it without checking their own behavior.
+** September 10 budget constraint
+Jeff reported 12 percent remaining and explicitly requested continued execution,
+not a pause. Keep the existing task active while reducing duplicated reading and
+review rounds. For a claimed concurrency property, ask for a small counterexample
+test before accepting an inference from where a callback is registered: a
+per-request callback can still perform global cleanup. Use completed interfaces
+and focused logs across handoffs rather than rediscovering their prerequisites.

@@ -51,6 +51,13 @@ an incident ID owns the longer disk/store/presentation episode and is reused
 by retries.  A client rejects a response whose incident identity does not
 match its request record.
 
+Global current-state metadata is ordered by `owner-publication-revision` within
+the authenticated server session. After accepting a versioned publication, a
+client ignores unversioned global status updates; they cannot replace its current
+graph/manifest, admission, rebuilding, or pending-work state. Historical operation
+outcomes remain deliverable under their own identity. Their delivery does not
+replace current live status or grant a new buffer save base.
+
 The related identities are deliberately not interchangeable:
 
 | Identity | Owner and lifetime |

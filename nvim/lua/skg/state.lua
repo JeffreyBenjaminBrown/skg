@@ -74,6 +74,13 @@ function M.update_global_server_status (response)
     if M.owner_publication_revision ~= nil
        and owner_revision < M.owner_publication_revision then
       return end
+  elseif M.owner_publication_revision ~= nil then
+    -- A legacy frame cannot overwrite current global authority after a
+    -- versioned publication. Its operation-specific outcome is still
+    -- handled by the ordinary response dispatcher.
+    return
+  end
+  if owner_revision ~= nil then
     M.owner_publication_revision = owner_revision
   end
   local admission = payload.field_text(response, 'graph-write-admission')
