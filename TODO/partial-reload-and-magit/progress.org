@@ -2558,3 +2558,34 @@ fields or complete the multi-incident client interface.
 ** choices determining the future
 Keep operation outcomes separate from current live authority, and preserve
 publication ordering independently of response arrival order.
+
+* Simplify/cohere checkpoint: overlapping buffer restrictions settle independently
+** what's done and went well
+Both clients retain independent maintenance obligations per buffer. Repeated
+locks are idempotent; settling A or B preserves the other restriction. The last
+release restores original editability while respecting remaining save locks.
+Incident identity is the preferred key, with the existing scalar epoch retained
+as a compatibility view of outstanding obligations.
+
+Epoch-only callers can release a uniquely matching older obligation after the
+active incident changes. Legacy epoch keys migrate when incident identity becomes
+available; explicit incident releases remain strict. Review strengthened the
+migration test to assert the new key and release it explicitly.
+
+The focused Emacs maintenance suite passes 47 tests; the Neovim buffer registry
+suite passes 19. Logs are '/tmp/maintenance-restrictions-final-elisp.log' and
+'/tmp/maintenance-restrictions-final-nvim-direct.log'. The exact focused runners
+are 'emacs -Q --batch -l tests/elisp/test-skg-maintenance.el -f ert-run-tests-batch-and-exit'
+and 'nvim --headless -u tests/nvim/minimal_init.lua -c "lua require(\"plenary.busted\").run(\"tests/nvim/buffer_registry_spec.lua\")" -c qa'.
+'PlenaryBustedFile' spawned a child without the required load path; direct
+'plenary.busted.run' with the minimal init avoids that harness-only failure.
+** Changes to the plan's envisioned order.
+Repair per-buffer overlap before replacing the singleton incident report UI.
+** what's imperfect about what's done
+The global incident workflow and report interface are still singular. This
+checkpoint preserves restrictions across episodes but does not yet expose a
+complete multi-incident management interface.
+** choices determining the future
+Keep each incident's disposition independent and avoid deriving historical
+release identity solely from the currently active incident. See
+[[../../codex-thinking/overlapping-buffer-restrictions.org]].

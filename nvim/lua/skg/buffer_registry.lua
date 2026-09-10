@@ -314,6 +314,7 @@ function M.record (buf)
     logical_dirty = vim.b[buf].skg_logical_dirty == true
       or (vim.b[buf].skg_attached_workflow_count or 0) > 0,
     maintenance_epoch = vim.b[buf].skg_maintenance_epoch,
+    maintenance_restrictions = vim.b[buf].skg_maintenance_restrictions,
     presentation_stale = vim.b[buf].skg_presentation_stale == true,
     search_stale = vim.b[buf].skg_search_stale == true,
   }
@@ -531,10 +532,46 @@ function M.apply_maintenance_rendered_view (
   return installed
 end
 
-function M.lock_for_maintenance (buf, epoch)
+local function maintenance_incident_id (incident_id)
+  if incident_id == nil then
+    local state = require('skg.state')
+    local incident = state.maintenance_client_incident
+    incident_id = incident and incident.incident_id or nil
+  end
+  return incident_id
+end
+
+local function maintenance_restriction_key (epoch, incident_id)
+  incident_id = maintenance_incident_id(incident_id)
+  if incident_id ~= nil then return 'incident:' .. tostring(incident_id) end
+  return 'epoch:' .. tostring(epoch)
+end
+
+local function maintenance_restriction_epoch (restrictions)
+  local latest = nil
+  for _, value in pairs(restrictions or {}) do
+    if latest == nil or value > latest then latest = value end
+  end
+  return latest
+end
+
+function M.lock_for_maintenance (buf, epoch, incident_id)
   local record = M.record(buf)
   if not record then return end
-  vim.b[buf].skg_maintenance_epoch = epoch
+  local restrictions = vim.b[buf].skg_maintenance_restrictions or {}
+  if next(restrictions) == nil and vim.b[buf].skg_maintenance_epoch ~= nil then
+    local old_epoch = vim.b[buf].skg_maintenance_epoch
+    restrictions['epoch:' .. tostring(old_epoch)] = old_epoch
+  end
+  local key = maintenance_restriction_key(epoch, incident_id)
+  local effective_incident = maintenance_incident_id(incident_id)
+  local legacy_key = 'epoch:' .. tostring(epoch)
+  if effective_incident ~= nil and restrictions[legacy_key] == epoch then
+    restrictions[legacy_key] = nil
+  end
+  restrictions[key] = epoch
+  vim.b[buf].skg_maintenance_restrictions = restrictions
+  vim.b[buf].skg_maintenance_epoch = maintenance_restriction_epoch(restrictions)
   if record.lifecycle == 'live-view'
      or record.lifecycle == 'attached-workflow'
      or record.lifecycle == 'maintenance-control'
@@ -550,14 +587,35 @@ function M.lock_for_maintenance (buf, epoch)
   end
 end
 
-function M.unlock_after_maintenance (buf, epoch)
-  if not M.record(buf) or vim.b[buf].skg_maintenance_epoch ~= epoch then
-    return end
+function M.unlock_after_maintenance (buf, epoch, incident_id)
+  if not M.record(buf) then return end
+  local restrictions = vim.b[buf].skg_maintenance_restrictions or {}
+  if next(restrictions) == nil and vim.b[buf].skg_maintenance_epoch ~= nil then
+    local old_epoch = vim.b[buf].skg_maintenance_epoch
+    restrictions['epoch:' .. tostring(old_epoch)] = old_epoch
+  end
+  local key = maintenance_restriction_key(epoch, incident_id)
+  if incident_id == nil then
+    local matching_key = nil
+    local matches = 0
+    for candidate, value in pairs(restrictions) do
+      if value == epoch then
+        matching_key = candidate
+        matches = matches + 1
+      end
+    end
+    if matches ~= 1 then return end
+    key = matching_key
+  end
+  if restrictions[key] ~= epoch then return end
+  restrictions[key] = nil
+  vim.b[buf].skg_maintenance_restrictions = restrictions
+  vim.b[buf].skg_maintenance_epoch = maintenance_restriction_epoch(restrictions)
+  if next(restrictions) ~= nil then return end
   local raw_file = package.loaded['skg.raw_file']
   if vim.b[buf].skg_buffer_kind == 'raw-skg-file'
      and raw_file and raw_file.refresh_staleness then
     raw_file.refresh_staleness(buf) end
-  vim.b[buf].skg_maintenance_epoch = nil
   if vim.b[buf].skg_lifecycle == 'detached-recovery'
      and vim.b[buf].skg_origin_buffer_id then
     local origin_id = vim.b[buf].skg_origin_buffer_id

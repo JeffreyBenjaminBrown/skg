@@ -307,6 +307,73 @@ describe('skg maintenance buffer transitions', function ()
     assert.is_true(vim.bo[buf].modifiable)
   end)
 
+  it('retains independent maintenance restrictions in either release order',
+     function ()
+    local buf = make_buffer('content-view')
+    registry.lock_for_maintenance(buf, 9, 'incident-a')
+    registry.lock_for_maintenance(buf, 10, 'incident-b')
+    registry.lock_for_maintenance(buf, 10, 'incident-b')
+    assert.are.equal(2, vim.tbl_count(
+      vim.b[buf].skg_maintenance_restrictions))
+    registry.unlock_after_maintenance(buf, 10, 'incident-b')
+    assert.are.equal(9, registry.record(buf).maintenance_epoch)
+    assert.is_false(vim.bo[buf].modifiable)
+    registry.unlock_after_maintenance(buf, 9, 'incident-a')
+    assert.is_nil(registry.record(buf).maintenance_epoch)
+    assert.is_true(vim.bo[buf].modifiable)
+
+    registry.lock_for_maintenance(buf, 9, 'incident-a')
+    registry.lock_for_maintenance(buf, 10, 'incident-b')
+    registry.unlock_after_maintenance(buf, 9, 'incident-a')
+    assert.are.equal(10, registry.record(buf).maintenance_epoch)
+    assert.is_false(vim.bo[buf].modifiable)
+    registry.unlock_after_maintenance(buf, 10, 'incident-b')
+    assert.is_true(vim.bo[buf].modifiable)
+  end)
+
+  it('restores an originally read-only buffer after its restriction settles',
+     function ()
+    local buf = make_buffer('content-view')
+    vim.bo[buf].modifiable = false
+    registry.lock_for_maintenance(buf, 9, 'incident-read-only')
+    registry.unlock_after_maintenance(buf, 9, 'incident-read-only')
+    assert.is_false(vim.bo[buf].modifiable)
+    assert.is_nil(registry.record(buf).maintenance_epoch)
+  end)
+
+  it('finds a unique obligation by epoch through the old API', function ()
+    local state = require('skg.state')
+    local old_incident = state.maintenance_client_incident
+    state.maintenance_client_incident = nil
+    local buf = make_buffer('content-view')
+    registry.lock_for_maintenance(buf, 9, 'incident-a')
+    registry.lock_for_maintenance(buf, 10, 'incident-b')
+    state.maintenance_client_incident = { incident_id = 'incident-b' }
+    registry.unlock_after_maintenance(buf, 9)
+    assert.are.equal(10, registry.record(buf).maintenance_epoch)
+    registry.unlock_after_maintenance(buf, 10, 'incident-b')
+    assert.is_nil(registry.record(buf).maintenance_epoch)
+    state.maintenance_client_incident = old_incident
+  end)
+
+  it('migrates a legacy epoch obligation when identity becomes available',
+     function ()
+    local state = require('skg.state')
+    local old_incident = state.maintenance_client_incident
+    state.maintenance_client_incident = nil
+    local buf = make_buffer('content-view')
+    registry.lock_for_maintenance(buf, 11)
+    state.maintenance_client_incident = { incident_id = 'incident-a' }
+    registry.lock_for_maintenance(buf, 11)
+    assert.are.equal(1, vim.tbl_count(
+      vim.b[buf].skg_maintenance_restrictions))
+    assert.are.equal(11,
+      vim.b[buf].skg_maintenance_restrictions['incident:incident-a'])
+    registry.unlock_after_maintenance(buf, 11, 'incident-a')
+    assert.is_nil(registry.record(buf).maintenance_epoch)
+    state.maintenance_client_incident = old_incident
+  end)
+
   it('repeats pending, maintenance and stale warnings on buffer entry',
      function ()
     local buf = make_buffer('search-view')

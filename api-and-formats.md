@@ -976,7 +976,11 @@ failed` records the exact buffer key and reason and returns
 `undo-waiver-required`.  `approve undo waiver` must repeat that exact tuple;
 it authorizes a text-only retry for that buffer, not a general weakening.
 `cancel maintenance` is valid only before `ARCHIVE-READY` and returns the exact
-epoch whose locks can be removed.
+epoch whose own restrictions can be removed. A buffer retains independent
+restrictions for overlapping incidents. Settling one incident leaves every
+other unresolved restriction in place; original editability returns only when
+all maintenance restrictions are resolved and no save restriction remains.
+Removing these restrictions does not itself grant a fresh semantic save base.
 
 ### Origin work and store selection
 

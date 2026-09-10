@@ -68,6 +68,59 @@
       (should (equal (cdr (assoc 'ids parsed)) '("alias" "B"))))
     (should (functionp registered-handler))))
 
+(ert-deftest test-skg-maintenance-retains-independent-buffer-restrictions ()
+  (skg-test-maintenance--with-buffer 'content-view
+    (skg-unlock-buffer-after-maintenance buffer 9)
+    (skg-lock-buffer-for-maintenance buffer 9 "incident-a")
+    (skg-lock-buffer-for-maintenance buffer 10 "incident-b")
+    (skg-lock-buffer-for-maintenance buffer 10 "incident-b")
+    (should (= 2 (length skg--maintenance-restrictions)))
+    (skg-unlock-buffer-after-maintenance buffer 10 "incident-b")
+    (should (= 9 (skg--buffer-record-maintenance-epoch skg--buffer-record)))
+    (should skg--maintenance-lock-overlay)
+    (skg-unlock-buffer-after-maintenance buffer 9 "incident-a")
+    (should-not (skg--buffer-record-maintenance-epoch skg--buffer-record))
+    (should-not skg--maintenance-lock-overlay)
+    (skg-lock-buffer-for-maintenance buffer 9 "incident-a")
+    (skg-lock-buffer-for-maintenance buffer 10 "incident-b")
+    (skg-unlock-buffer-after-maintenance buffer 9 "incident-a")
+    (should (= 10 (skg--buffer-record-maintenance-epoch skg--buffer-record)))
+    (skg-unlock-buffer-after-maintenance buffer 10 "incident-b")
+    (should-not skg--maintenance-lock-overlay)))
+
+(ert-deftest test-skg-maintenance-preserves-original-read-only-state ()
+  (skg-test-maintenance--with-buffer 'content-view
+    (setq buffer-read-only t)
+    (skg-unlock-buffer-after-maintenance buffer 9)
+    (skg-lock-buffer-for-maintenance buffer 9 "incident-read-only")
+    (skg-unlock-buffer-after-maintenance buffer 9 "incident-read-only")
+    (should buffer-read-only)
+    (should-not skg--maintenance-lock-overlay)))
+
+(ert-deftest test-skg-maintenance-old-api-finds-unique-epoch-obligation ()
+  (skg-test-maintenance--with-buffer 'content-view
+    (skg-unlock-buffer-after-maintenance buffer 9)
+    (skg-lock-buffer-for-maintenance buffer 9 "incident-a")
+    (skg-lock-buffer-for-maintenance buffer 10 "incident-b")
+    ;; The old API supplies only an epoch while the current incident is B.
+    (let ((skg--maintenance-client-incident '(:incident-id "incident-b")))
+      (skg-unlock-buffer-after-maintenance buffer 9)
+      (should (= 10 (skg--buffer-record-maintenance-epoch
+                     skg--buffer-record))))
+    (skg-unlock-buffer-after-maintenance buffer 10 "incident-b")
+    (should-not skg--maintenance-lock-overlay)))
+
+(ert-deftest test-skg-maintenance-migrates-legacy-epoch-key-on-relock ()
+  (skg-test-maintenance--with-buffer 'content-view
+    (skg-unlock-buffer-after-maintenance buffer 9)
+    (skg-lock-buffer-for-maintenance buffer 11)
+    (let ((skg--maintenance-client-incident '(:incident-id "incident-a")))
+      (skg-lock-buffer-for-maintenance buffer 11)
+      (should (= 1 (length skg--maintenance-restrictions)))
+      (should (assoc '(incident "incident-a") skg--maintenance-restrictions))
+      (skg-unlock-buffer-after-maintenance buffer 11 "incident-a")
+      (should-not skg--maintenance-lock-overlay))))
+
 (ert-deftest test-skg-idle-handshake-releases-obsolete-local-incident ()
   (skg-test-maintenance--with-buffer 'content-view
     (let ((skg--maintenance-client-incident

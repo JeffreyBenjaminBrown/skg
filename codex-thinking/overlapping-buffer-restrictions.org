@@ -1,0 +1,17 @@
+* Overlapping incident restrictions on one buffer
+** Contract
+[[file:../TODO/partial-reload-and-magit/11_plan_simplify-cohere.org::*Settle buffers after publication with exact base checks][Plan 11]] requires one disposition per buffer per incident. Successive
+incidents may name the same buffer. Settling a newer incident must not remove
+an older incident's unresolved restriction, and removing a restriction does not
+itself grant a fresh semantic save base.
+** Counterexample under test
+Restrict one buffer for incident A, then for B. Settle B and verify the buffer
+remains restricted by A. Settle A and verify the original editability returns.
+Keep this slice separate from the multi-incident report interface and server
+publication changes.
+** Reproduced failure
+Both public client lock APIs retain only one epoch. Lock A=9, then B=10;
+settling B clears the overlay or restores modifiability even though A remains
+unresolved. Settling A afterward has no effect. The fix must retain outstanding
+obligations independently, with the scalar epoch field serving only existing
+callers until that compatibility interface is retired.

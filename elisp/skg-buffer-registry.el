@@ -14,6 +14,7 @@
   application-token last-fetched last-fetched-sha256 logical-dirty
   origin-buffer-id origin-view-uri origin-application-token origin-location
   attached-workflow-count transient-lock-reasons maintenance-epoch
+  maintenance-restrictions
   presentation-stale search-stale herald-bearing)
 
 (defvar skg--buffer-registry (make-hash-table :test #'equal)
@@ -26,6 +27,10 @@
 
 (defvar-local skg--maintenance-lock-overlay nil)
 (put 'skg--maintenance-lock-overlay 'permanent-local t)
+
+(defvar-local skg--maintenance-restrictions nil
+  "Outstanding maintenance obligations as (KEY . EPOCH) entries.")
+(put 'skg--maintenance-restrictions 'permanent-local t)
 
 (defface skg-rebuilding-face
   '((t :foreground "orange"))
@@ -182,7 +187,14 @@
                               existing))
                         0)
                     :transient-lock-reasons nil
-                    :maintenance-epoch nil
+                    :maintenance-epoch
+                    (and existing
+                         (skg--buffer-record-maintenance-epoch existing))
+                    :maintenance-restrictions
+                    (or skg--maintenance-restrictions
+                        (and existing
+                             (skg--buffer-record-maintenance-restrictions
+                              existing)))
                     :presentation-stale nil
                     :search-stale nil
                     :herald-bearing (string-match-p "(heralds\\_>" text))))
@@ -421,7 +433,7 @@ Reload selectors hold only transient command input, never authored state."
                           (skg--buffer-record-id skg--buffer-record)
                           0 (min 8 (length
                                     (skg--buffer-record-id
-                                     skg--buffer-record)))))
+                                    skg--buffer-record)))))
            (desired (format "%s [recovery %s/%s]"
                             (buffer-name) short-incident short-buffer)))
       (unless (equal desired (buffer-name))
@@ -489,10 +501,65 @@ Reload selectors hold only transient command input, never authored state."
                      skg--buffer-record))))
     (error "skg: buffer locked for maintenance epoch %s" epoch)))
 
-(defun skg-lock-buffer-for-maintenance (buffer epoch)
+(defun skg--maintenance-incident-id (&optional incident-id)
+  (or incident-id
+      (and (boundp 'skg--maintenance-client-incident)
+           skg--maintenance-client-incident
+           (plist-get skg--maintenance-client-incident :incident-id))))
+
+(defun skg--maintenance-restriction-key (epoch &optional incident-id)
+  (let ((incident-id (skg--maintenance-incident-id incident-id)))
+    (if incident-id
+        (list 'incident (format "%s" incident-id))
+      (list 'epoch epoch))))
+
+(defun skg--maintenance-install-restrictions (restrictions)
+  (setf (skg--buffer-record-maintenance-restrictions skg--buffer-record)
+        restrictions
+        (skg--buffer-record-maintenance-epoch skg--buffer-record)
+        (and restrictions
+             (cl-loop for entry in restrictions
+                      maximize (cdr entry)))))
+
+(defun skg--maintenance-unique-epoch-entry (restrictions epoch)
+  "Return the sole RESTRICTIONS entry at EPOCH, or nil if ambiguous."
+  (let (found ambiguous)
+    (dolist (entry restrictions)
+      (when (equal epoch (cdr entry))
+        (if found
+            (setq ambiguous t)
+          (setq found entry))))
+    (unless ambiguous found)))
+
+(defun skg-lock-buffer-for-maintenance (buffer epoch &optional incident-id)
   (with-current-buffer buffer
     (when skg--buffer-record
-      (setf (skg--buffer-record-maintenance-epoch skg--buffer-record) epoch)
+      (let* ((key (skg--maintenance-restriction-key epoch incident-id))
+             (restrictions (or skg--maintenance-restrictions
+                               (skg--buffer-record-maintenance-restrictions
+                                skg--buffer-record)))
+             (_ (when (and (null restrictions)
+                           (skg--buffer-record-maintenance-epoch
+                            skg--buffer-record))
+                  (setq restrictions
+                        (list (cons (list 'epoch
+                                          (skg--buffer-record-maintenance-epoch
+                                           skg--buffer-record))
+                                    (skg--buffer-record-maintenance-epoch
+                                     skg--buffer-record))))))
+             (legacy-entry (and (skg--maintenance-incident-id incident-id)
+                                (assoc (list 'epoch epoch) restrictions)))
+             (entry (assoc key restrictions)))
+        (when legacy-entry
+          (if entry
+              (setq restrictions (delq legacy-entry restrictions))
+            (setcar legacy-entry key)
+            (setq entry legacy-entry)))
+        (if entry
+            (setcdr entry epoch)
+          (push (cons key epoch) restrictions))
+        (setq skg--maintenance-restrictions restrictions)
+        (skg--maintenance-install-restrictions restrictions))
       (when (and (memq (skg--buffer-record-lifecycle skg--buffer-record)
                        '(live-view attached-workflow maintenance-control
                          ordinary-file))
@@ -506,11 +573,34 @@ Reload selectors hold only transient command input, never authored state."
         (overlay-put skg--maintenance-lock-overlay 'insert-behind-hooks
                      '(skg--maintenance-lock-signal))))))
 
-(defun skg-unlock-buffer-after-maintenance (buffer epoch)
+(defun skg-unlock-buffer-after-maintenance (buffer epoch &optional incident-id)
   (with-current-buffer buffer
-    (when (and skg--buffer-record
-               (equal epoch (skg--buffer-record-maintenance-epoch
-                             skg--buffer-record)))
+    (when skg--buffer-record
+      (let* ((key (skg--maintenance-restriction-key epoch incident-id))
+             (restrictions (or skg--maintenance-restrictions
+                               (skg--buffer-record-maintenance-restrictions
+                                skg--buffer-record)))
+             (_ (when (and (null restrictions)
+                           (skg--buffer-record-maintenance-epoch
+                            skg--buffer-record))
+                  (setq restrictions
+                        (list (cons (list 'epoch
+                                          (skg--buffer-record-maintenance-epoch
+                                           skg--buffer-record))
+                                    (skg--buffer-record-maintenance-epoch
+                                     skg--buffer-record))))))
+             (entry (if incident-id
+                        (assoc key restrictions)
+                      (skg--maintenance-unique-epoch-entry
+                       restrictions epoch)))
+             (matched (and entry (equal epoch (cdr entry)))))
+        ;; A stale epoch for an incident whose epoch advanced must not settle
+        ;; its newer obligation.  The identity remains the stable key.
+        (when matched
+          (setq restrictions (delete entry restrictions)
+                skg--maintenance-restrictions restrictions)
+          (skg--maintenance-install-restrictions restrictions))
+        (when (and matched (null restrictions))
       (when skg--maintenance-lock-overlay
         (delete-overlay skg--maintenance-lock-overlay)
         (setq skg--maintenance-lock-overlay nil))
@@ -531,7 +621,7 @@ Reload selectors hold only transient command input, never authored state."
                  skg--buffer-record)
                 nil
                 (skg--buffer-record-origin-location skg--buffer-record) nil)
-          (skg--refresh-attached-workflow-count origin-id))))))
+          (skg--refresh-attached-workflow-count origin-id))))))))
 
 (defun skg-buffer-status-indicator ()
   (when skg--buffer-record
