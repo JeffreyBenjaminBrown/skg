@@ -476,12 +476,30 @@ fn dispatch_request (
             refusal . as_deref ());
         });
       if let Err (reason) = result {
-        // An admission collision must not create a journal record: another
-        // command with this UUID may still be preparing its durable intent.
         // A dispatched handler owns its terminal result and recovery block.
         if !started {
-          let response : String = operation . tag_response (
-            &crate::serve::handlers::save_buffer::save_refusal_response (&reason, request), "blocked");
+          let same_operation_reserved : bool = runtime . publication_with_mutation () . 4
+            . is_some_and (|mutation| mutation . operation_id == operation . operation_id);
+          let response : String = if same_operation_reserved {
+            // This UUID may be computing before staging its durable intent.
+            operation . tag_response (
+              &handlers::save_buffer::save_refusal_response (&reason, request), "blocked")
+          } else {
+            match operation . recorded_response () {
+              Ok (Some (response)) => response,
+              Err (error) => operation . tag_response (
+                &handlers::save_buffer::save_refusal_response (&error, request), "blocked"),
+              Ok (None) => {
+                let response : String = operation . tag_response (
+                  &handlers::save_buffer::save_refusal_response (&reason, request), "refused");
+                match operation . refuse (&response) {
+                  Ok (()) => response,
+                  Err (error) => operation . tag_response (
+                    &handlers::save_buffer::save_refusal_response (&error, request), "blocked"),
+                }
+              }
+            }
+          };
           let _ = send_response_with_length_prefix (stream, &response);
         }
       }

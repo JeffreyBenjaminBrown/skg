@@ -75,7 +75,7 @@ fn tcp_durable_command_yields_for_status_query_and_duplicate_replay () {
   // A different endpoint using the same UUID must be refused without
   // creating a save journal entry that could poison the command in flight.
   let save_body : String = "* (skg (node (id collision) (source main))) save\n".into ();
-  let (save_request, save_operation) = save_collision_request (
+  let (save_request, save_operation) : (String, SaveOperation) = save_collision_request (
     &operation, &runtime, &save_body);
   client . send (&save_request, Some (&save_body));
   let save_collision : Sexp = terminal (&mut client);
@@ -86,6 +86,26 @@ fn tcp_durable_command_yields_for_status_query_and_duplicate_replay () {
   assert! (save_collision . to_string () . contains ("already reserved"),
     "{}", save_collision);
   assert! (save_operation . status () . unwrap () . is_none ());
+
+  let distinct_operation_id : String = uuid::Uuid::new_v4 () . to_string ();
+  let distinct_body : String =
+    "* (skg (node (id distinct-collision) (source main))) save\n" . into ();
+  let (distinct_request, distinct_operation) : (String, SaveOperation) =
+    save_collision_request (&distinct_operation_id, &runtime, &distinct_body);
+  client . send (&distinct_request, Some (&distinct_body));
+  let distinct_refused : Sexp = terminal (&mut client);
+  assert_eq! (get (&distinct_refused, "response-type"), "save-result",
+    "{}", distinct_refused);
+  assert_eq! (get (&distinct_refused, "save-operation-state"), "refused",
+    "{}", distinct_refused);
+  let recorded_response : String = distinct_operation . recorded_response ()
+    . unwrap () . expect ("distinct refusal should be durably recorded");
+  let recorded : Sexp = sexp::parse (&recorded_response) . unwrap ();
+  assert_eq! (get (&recorded, "save-operation-state"), "refused", "{}", recorded);
+  assert_eq! (get (&recorded, "operation-id"), distinct_operation_id, "{}", recorded);
+  assert_eq! (get (&recorded, "request-base-fingerprint"),
+    get (&distinct_refused, "request-base-fingerprint"), "{}", recorded);
+  assert_eq! (get (&recorded, "content"), get (&distinct_refused, "content"), "{}", recorded);
 
   release_sender . send (()) . unwrap ();
   holder . join () . unwrap ();

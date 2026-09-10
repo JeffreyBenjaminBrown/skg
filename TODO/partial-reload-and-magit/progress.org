@@ -2461,3 +2461,20 @@ transient save-lock cleanup is being checked for overlapping requests.
 ** choices determining the future
 A completed worker must preserve concurrently registered views and ACKs; it
 must never install a copied whole interactive session.
+
+* Simplify/cohere checkpoint: distinguish new save refusal from UUID collision
+** what's done and went well
+A save refused while a different operation holds admission now receives a
+durable refused outcome, allowing the client to settle its pending-save record.
+Reusing the in-flight operation's own UUID remains blocked without creating a
+competing journal entry. The two TCP command regressions pass with both cases;
+the new assertion checks the recorded refusal, operation identity, fingerprint
+and returned content. Log: '/tmp/command-responsiveness-save-collision.log'.
+** Changes to the plan's envisioned order.
+Refine the collision guard before ordinary saves begin yielding the connection.
+** what's imperfect about what's done
+This corrects the earlier overly broad no-journal blocked response for every
+admission collision. Asynchronous ordinary save execution remains pending.
+** choices determining the future
+A genuinely new refusal is terminal and durable; a duplicate of unresolved
+work must preserve that existing operation's record.
