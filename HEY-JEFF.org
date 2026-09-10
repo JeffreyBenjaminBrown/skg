@@ -6,85 +6,126 @@ with links to concrete examples, including suggestions for useful handoffs.
 The implementation questions themselves start at
 [[file:codex-thinking/index.org][the codex-thinking index]].
 
-* Estimated progress through 11_plan_simplify-cohere.org
+* Estimated progress through [[file:TODO/partial-reload-and-magit/11_plan_simplify-cohere.org][11_plan_simplify-cohere.org]]
 
-As of 2026-09-09, using the plan and the latest progress checkpoint (including
-the reported revisions bdfb976e, 8b2a7401, and 7fc04ca3), implementation plus
-required acceptance verification is estimated at 56% overall. Each of the 15
-implementation-sequence sections below has equal weight (1/15); the point
-estimates sum to 845, and 845 / 15 = 56.3%, rounded to 56%.
+As of 2026-09-10, this is a rough implementation-plus-acceptance estimate
+based on committed evidence in [[file:TODO/partial-reload-and-magit/progress.org][progress.org]]. Mass is relative work size in
+points; progress is the estimated completed fraction of that item's work.
+The 15 pairs are point estimates, and the total is the weighted mean
+sum(progress times mass) / sum(mass).
 
-** Execution checkpoints and starting points: 80%
+** Execution checkpoints and starting points: mass 60, progress 75%
 
-Baseline tracing and the working-path checkpoints are established; final
-acceptance evidence is still pending.
+Baseline, tracing, model tests, and several working-path checkpoints are
+recorded. Final acceptance remains, so this foundation is substantial but not
+complete. Its mass is moderate because it establishes shared checkpoints and
+verification accounting rather than most product behavior.
 
-** Establish identities and build the executable state model: 65%
+** Establish identities and build the executable state model: mass 70, progress 70%
 
-Identity and incident models are exercised, but the complete obsolete-worker,
-crash, and restart matrix is unfinished.
+Identity, incident, operation, census, settlement, and restart cases are
+modeled and tested. The full live integration and failure matrix remains. Its
+mass is high because these identities and invariants constrain nearly every
+later protocol path.
 
-** Make state ownership and journal publication exclusive: 60%
+** Make state ownership and journal publication exclusive: mass 80, progress 65%
 
-Owner and journal paths are substantially migrated and tested; the full owner
-migration and normalized durable writer path remain incomplete.
+The owner and ordered journal publication have committed focused coverage,
+including failure handling. Interactive authority and every writer entry point
+still need convergence. Its mass is high because exclusive ownership and
+durable ordering cross coordinator, workers, and journal recovery.
 
-** Build the immutable publication boundary on every read path: 60%
+** Build the immutable publication boundary on every read path: mass 75, progress 65%
 
-Selected graph/manifest publication and several read guards work; remaining
-ordinary-read dependency guards and integration are still gated.
+Pinned graph and manifest bases, selected publication, and later-save proof
+are committed. Ordinary read fallback guards and complete integration remain.
+Its mass is high because one coherent graph/search publication must be adopted
+by every read and write boundary.
 
-** Remove TypeDB and adapt its behavioral tests: 85%
+** Remove TypeDB and adapt its behavioral tests: mass 55, progress 90%
 
-Active fixtures and setup are TypeDB-free with broad passing suites; final
-product and aggregate acceptance checks remain.
+Active fixtures, setup, documentation, and service cleanup are TypeDB-free
+with broad passing Rust coverage. Aggregate and platform acceptance still
+remain. Its mass is lower because this is a bounded dependency and fixture
+migration with limited remaining product design.
 
-** Bound observation and preserve targeted reload semantics: 55%
+** Bound observation and preserve targeted reload semantics: mass 45, progress 60%
 
-Maximum-age debounce is implemented and reload brackets are tested, while
-targeted/bounded cancellable ordinary observation remains incomplete.
+Debounce, maximum-age observation, and reload bracketing are evidenced. The
+complete targeted and cancellable observation path is unfinished. Its mass is
+smaller because observation is a focused subsystem, though correctness depends
+on cancellation and reconciliation edges.
 
-** Make ordinary saves durable before enabling early release: 50%
+** Make ordinary saves durable before enabling early release: mass 85, progress 75%
 
-Crash slices and completion markers pass, but retained save bases and the pure
-dependency validator are uncommitted and integration remains gated.
+Async saves, crash recovery, completion markers, retained bases, and
+dependency proof have committed evidence. Integration with every release and
+recovery boundary remains. Its mass is very high because recoverable writes
+span preparation, source effects, publication, restart, and authority release.
 
-** Preserve archive, raw-file, privacy, and undo gates: 65%
+** Preserve archive, raw-file, privacy, and undo gates: mass 60, progress 75%
 
-Archive, dirty-view, privacy, and undo protections have focused coverage; the
-repeated archive ACK/proposal issue still needs resolution.
+Archive, privacy, raw-file, dirty-view, and native undo checks are covered in
+focused suites. Cross-incident ACK and final lifecycle combinations remain.
+Its mass is moderate because these are several independent safety gates with
+established interfaces and focused coverage.
 
-** Close admission, drain constructors, and publish the fixed census: 65%
+** Close admission, drain constructors, and publish the fixed census: mass 70, progress 75%
 
-Fixed-census and read-only admission behavior is proven in focused and TCP
-checks; both-editor lifecycle acceptance is outstanding.
+Fixed census, constructor admission, owner revision, and read-only behavior
+have focused and TCP evidence. Full both-editor lifecycle acceptance is
+pending. Its mass is high because the barrier coordinates admission,
+constructors, census data, and publication across both editors.
 
-** Implement refusal, status, and durable query waits in both clients: 40%
+** Implement refusal, status, and durable query waits in both clients: mass 90, progress 70%
 
-Refusal/status adapters exist in both clients, but durable query waits and
-client multiple-incident/per-buffer restriction maps are not complete.
+Both clients have request-owned cleanup, status/refusal handling, per-buffer
+restrictions, indexed incident retention, and committed durable query waits.
+The waits are tested through actual editor maintenance-rebuild behavior.
+Scoped incident callbacks remain incomplete. Its mass is very high because
+protocol outcomes, durable recipes, status rendering, and two client
+implementations must agree.
 
-** Settle buffers after publication with exact base checks: 45%
+** Settle buffers after publication with exact base checks: mass 75, progress 65%
 
-Exact-base and scalar-gated settlement pieces work; cross-generation proposal
-validation and the full restriction lifecycle remain.
+Incarnation checks, retained semantic bases, exact census acknowledgments, and
+independent restrictions are committed. The complete cross-generation and
+callback settlement lifecycle remains. Its mass is high because safe release
+depends on exact bases, identities, restrictions, and acknowledgments at
+several boundaries.
 
-** Route every maintenance entry through the same transition: 50%
+** Route every maintenance entry through the same transition: mass 70, progress 55%
 
-Several entry paths use the owner and publication contract, but integration of
-all source-changing commands and the common final boundary is unfinished.
+Coordinator publication and several command paths use the new boundary. Git,
+reload, rebuild, save, and report entry integration still needs one common
+final transition. Its mass is high because every maintenance entry point must
+share the same transition and failure semantics.
 
-** Restore authority before exposing startup and reconnect: 55%
+** Restore authority before exposing startup and reconnect: mass 65, progress 70%
 
-Restart report reconstruction and fresh-session authority have focused checks;
-the complete editor/process crash acceptance matrix is not run.
+Fresh session authority and interrupted save/incident reconstruction have
+committed TCP evidence. The complete editor and process crash matrix remains.
+Its mass is substantial because restart recovery combines durable records,
+session identity, editor state, and fresh authority.
 
-** Finish evidence and reports independently of new graph work: 40%
+** Finish evidence and reports independently of new graph work: mass 80, progress 55%
 
-Independent report/evidence records have meaningful coverage, while durable
-query waits, remaining ACK behavior, and final delivery recovery continue.
+The committed incident ledger, retained records, census facts, evidence
+foundations, and durable query waits are in place. Scoped callbacks, ACK
+delivery, and report recovery remain incomplete. Its mass is high because
+independent reports and evidence require durable delivery, recovery, and
+cross-incident coordination.
 
-** Verify behavior, then remove superseded paths and update documentation: 30%
+** Verify behavior, then remove superseded paths and update documentation: mass 80, progress 35%
 
-Many focused suites pass, but final all-tests acceptance for both editors and
-superseded-path removal have not completed.
+Many focused suites and TypeDB-free checks pass, with useful TCP schedules.
+Final aggregate acceptance, obsolete-path removal, and documentation
+completion are still substantial work. Its mass is high because final
+verification must cover both clients and removal must preserve the settled
+contract.
+
+** Weighted total
+
+The masses sum to 1060 points and the weighted completed work is 70025 point-
+percent. Therefore the total is 70025 / 1060 = 66.0613207547%, reported as 66%
+overall.
