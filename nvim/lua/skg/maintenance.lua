@@ -139,12 +139,42 @@ local function request (name, fields, raw_fields)
   return sexpr.to_string(result) .. '\n'
 end
 
-local function submit_later (callback)
+local function submit_later (callback, incident_id)
+  incident_id = incident_id
+    or (state.maintenance_client_incident
+      and state.maintenance_client_incident.incident_id)
   M.defer(function ()
-    local ok, error_text = pcall(callback)
+    local ok, error_text = pcall(function ()
+      if incident_id then
+        return state.with_current_maintenance_incident(incident_id, callback)
+      end
+      return callback()
+    end)
     if not ok then
       vim.notify('Skg maintenance failed: ' .. tostring(error_text),
                  vim.log.levels.ERROR) end
+  end)
+end
+
+local function register_response_handler (kind, handler, one_shot,
+                                           incident_id)
+  incident_id = incident_id
+    or (state.maintenance_client_incident
+      and state.maintenance_client_incident.incident_id)
+  if not incident_id then
+    return state.register_response_handler(kind, handler, one_shot) end
+  state.register_response_handler(kind, function (...)
+    return state.with_current_maintenance_incident(incident_id, handler, ...)
+  end, one_shot)
+end
+
+local function set_request_failure_handler (handler, incident_id)
+  incident_id = incident_id
+    or (state.maintenance_client_incident
+      and state.maintenance_client_incident.incident_id)
+  if not incident_id then return state.set_request_failure_handler(handler) end
+  state.set_request_failure_handler(function (...)
+    return state.with_current_maintenance_incident(incident_id, handler, ...)
   end)
 end
 
@@ -273,16 +303,18 @@ function M.record_selection (response)
      and incident.selected_source_set ~= selected_source_set then
     error('Maintenance selection changed its source-set authority') end
   incident.selected_source_set = selected_source_set
-  require('skg.config').install_source_inventory(source_inventory)
-  if state.active_source_set_name ~= selected_source_set then
-    vim.notify('Skg full rebuild changed source-set from '
-      .. tostring(state.active_source_set_name) .. ' to '
-      .. selected_source_set)
+  if not state.maintenance_historical_status then
+    require('skg.config').install_source_inventory(source_inventory)
+    if state.active_source_set_name ~= selected_source_set then
+      vim.notify('Skg full rebuild changed source-set from '
+        .. tostring(state.active_source_set_name) .. ' to '
+        .. selected_source_set)
+    end
+    state.active_source_set_name = selected_source_set
+    vim.g.skg_active_source_set_name = selected_source_set
+    state.maintenance_archive_folder = archive_folder
+    state.maintenance_archive_identity = archive_identity
   end
-  state.active_source_set_name = selected_source_set
-  vim.g.skg_active_source_set_name = selected_source_set
-  state.maintenance_archive_folder = archive_folder
-  state.maintenance_archive_identity = archive_identity
   incident.phase = 'presenting'
   return incident
 end
@@ -364,9 +396,9 @@ function M.run_explicit_origin (incident)
      or not incident.incident_id or incident.epoch == nil then
     error('No server-owned maintenance origin is ready to run') end
   incident.phase = 'origin-operation-start-pending'
-  state.register_response_handler(
+  register_response_handler(
     'maintenance-status', M.handle_origin_started, true)
-  state.set_request_failure_handler(fail_request(
+  set_request_failure_handler(fail_request(
     'origin-operation-start-pending',
     incident.offer.origin .. ' worker was not started'))
   client.submit_request(request('run maintenance origin', {
@@ -390,9 +422,9 @@ function M.send_archive_ready ()
   local incident = assert(state.maintenance_client_incident,
     'no client-known maintenance incident')
   if not incident.archive then error('Maintenance has no initial archive') end
-  state.register_response_handler(
+  register_response_handler(
     'maintenance-status', M.handle_selection_response, true)
-  state.set_request_failure_handler(fail_request(
+  set_request_failure_handler(fail_request(
     'archive-ready-ack-pending', 'Initial archive ACK was not delivered'))
   client.submit_request(request('maintenance archive ready', {
     { 'maintenance-epoch', incident.epoch },
@@ -408,9 +440,9 @@ function M.approve_scalar_release ()
   if not challenge or not incident.incident_id or not incident.epoch
      or not challenge.pids or #challenge.pids == 0 then
     error('Skg has no client-known maintenance scalar challenge') end
-  state.register_response_handler(
+  register_response_handler(
     'maintenance-status', M.handle_selection_response, true)
-  state.set_request_failure_handler(fail_request(
+  set_request_failure_handler(fail_request(
     'awaiting-scalar-authorization',
     'Maintenance scalar approval was not acknowledged'))
   client.submit_request(request('approve maintenance scalar release', {
@@ -617,9 +649,9 @@ end
 function M.send_preselection_retirement_ack (retirement)
   local incident = assert(state.maintenance_client_incident,
     'Dirty-buffer retirement ACK has no client state')
-  state.register_response_handler('maintenance-status',
+  register_response_handler('maintenance-status',
     M.handle_preselection_retirement_ack, true)
-  state.set_request_failure_handler(fail_request(
+  set_request_failure_handler(fail_request(
     'preselection-retirement-ack-pending',
     'Dirty-buffer retirement ACK was not delivered'))
   client.submit_request(request('maintenance view settled',
@@ -747,9 +779,9 @@ end
 function M.send_settlement_ack (settlement)
   local incident = assert(state.maintenance_client_incident,
     'Maintenance settlement ACK has no client state')
-  state.register_response_handler(
+  register_response_handler(
     'maintenance-status', M.handle_settlement_ack, true)
-  state.set_request_failure_handler(fail_request(
+  set_request_failure_handler(fail_request(
     'view-settlement-ack-pending',
     'Maintenance settlement ACK was not delivered'))
   client.submit_request(request('maintenance view settled',
@@ -795,9 +827,9 @@ function M.request_evidence ()
      or not sha256_valid(incident.server_evidence_sha256) then
     error('Maintenance selection has no valid server evidence identity') end
   incident.phase = 'requesting-evidence'
-  state.register_response_handler(
+  register_response_handler(
     'maintenance-evidence', M.handle_evidence, true)
-  state.set_request_failure_handler(fail_request(
+  set_request_failure_handler(fail_request(
     'evidence-request-pending', 'Maintenance evidence was not delivered'))
   client.submit_request(request('maintenance evidence', {
     { 'maintenance-epoch', incident.epoch },
@@ -831,9 +863,9 @@ function M.send_final_archive_ack ()
     'Maintenance final archive ACK has no client state')
   local final = assert(incident.final_archive,
     'Maintenance has no finalized client archive')
-  state.register_response_handler(
+  register_response_handler(
     'maintenance-status', M.handle_final_archive_ack, true)
-  state.set_request_failure_handler(fail_request(
+  set_request_failure_handler(fail_request(
     'archive-final-ack-pending', 'Final archive ACK was not delivered'))
   client.submit_request(request('maintenance archive finalized', {
     { 'maintenance-epoch', incident.epoch },
@@ -865,9 +897,9 @@ function M.send_complete ()
     'Maintenance completion has no client state')
   local final = assert(incident.final_archive,
     'Maintenance completion has no final archive')
-  state.register_response_handler(
+  register_response_handler(
     'maintenance-status', M.handle_terminal, true)
-  state.set_request_failure_handler(fail_request(
+  set_request_failure_handler(fail_request(
     'completion-pending', 'Maintenance completion reply was lost'))
   client.submit_request(request('complete maintenance', {
     { 'maintenance-epoch', incident.epoch },
@@ -899,13 +931,17 @@ function M.handle_terminal (_payload_text, response)
   -- until its own settlement has been applied and acknowledged.
   incident.phase = 'terminal-received'
   incident.terminal = response
-  M.set_handshake_summary('terminal', incident.epoch)
-  local config = require('skg.config')
-  config.store_state = config.store_state or {}
-  config.store_state.graph_generation = nat(
-    response, 'selected-graph-generation')
-  config.store_state.manifest_revision = nat(
-    response, 'selected-manifest-revision')
+  if not state.maintenance_historical_status then
+    M.set_handshake_summary('terminal', incident.epoch) end
+  if not state.maintenance_historical_status
+     and state.owner_publication_revision == nil then
+    local config = require('skg.config')
+    config.store_state = config.store_state or {}
+    config.store_state.graph_generation = nat(
+      response, 'selected-graph-generation')
+    config.store_state.manifest_revision = nat(
+      response, 'selected-manifest-revision')
+  end
   if incident.terminal_callback and not incident.terminal_callback_fired then
     incident.terminal_callback(response)
     incident.terminal_callback_fired = true
@@ -916,9 +952,9 @@ end
 function M.send_terminal_ack ()
   local incident = assert(state.maintenance_client_incident,
     'Terminal maintenance ACK has no client state')
-  state.register_response_handler(
+  register_response_handler(
     'maintenance-status', M.handle_terminal_ack, true)
-  state.set_request_failure_handler(fail_request(
+  set_request_failure_handler(fail_request(
     'terminal-received', 'Terminal maintenance ACK was not delivered'))
   client.submit_request(request('acknowledge terminal maintenance', {
     { 'incident-id', incident.incident_id },
@@ -933,6 +969,7 @@ function M.handle_terminal_ack (_payload_text, response)
      or payload.field_text(response, 'incident-id') ~= incident.incident_id
      or nat(response, 'maintenance-epoch') ~= incident.epoch then
     error('Terminal maintenance ACK changed its exact identity') end
+  incident.terminal_acknowledged = true
   state.update_global_server_status(response)
   M.finish_idle()
 end
@@ -945,7 +982,8 @@ function M.finish_idle ()
   end
   local path = incident.final_archive and incident.final_archive.path or '?'
   state.clear_current_maintenance_incident()
-  state.pending_maintenance_offer = nil
+  if not state.maintenance_historical_status then
+    state.pending_maintenance_offer = nil end
   vim.notify('Skg maintenance complete; recovery archive: ' .. path)
 end
 
@@ -1067,7 +1105,8 @@ function M.resume_active (response)
   incident.requested_ids = ids
   incident.offer = incident.offer or {}
   incident.offer.origin = origin
-  M.set_handshake_summary('active', epoch)
+  if not state.maintenance_historical_status then
+    M.set_handshake_summary('active', epoch) end
   if field_present(response, 'g1-graph-generation') then
     M.record_selection(response) end
   local settlements = payload.field(response, 'view-settlements')
@@ -1141,7 +1180,32 @@ function M.resume_active (response)
   end
 end
 
-function M.handle_status (payload_text, response)
+local function response_incident_id (response)
+  return payload.field_text(response, 'incident-id')
+    or payload.field_text(response, 'active-incident-id')
+end
+
+local function with_response_incident (response, callback)
+  local incident_id = response_incident_id(response)
+  if not incident_id then return callback() end
+  local target = state.lookup_maintenance_incident(incident_id)
+  if target then
+    return state.with_current_maintenance_incident(incident_id, callback)
+  end
+  local previous = state.maintenance_client_incident
+  if not previous then return callback() end
+  local previous_historical = state.maintenance_historical_status
+  state.maintenance_historical_status = true
+  state.maintenance_client_incident = nil
+  local ok, result = xpcall(callback, debug.traceback)
+  state.retain_maintenance_incident(state.maintenance_client_incident)
+  state.maintenance_client_incident = previous
+  state.maintenance_historical_status = previous_historical
+  if not ok then error(result) end
+  return result
+end
+
+local function handle_status_current (payload_text, response)
   local status = payload.field_text(response, 'status')
   if status == 'active' then
     M.resume_active(response)
@@ -1151,7 +1215,8 @@ function M.handle_status (payload_text, response)
   elseif status == 'idle' then
     if state.maintenance_client_incident then M.finish_idle()
     else
-      M.set_handshake_summary('idle')
+      if not state.maintenance_historical_status then
+        M.set_handshake_summary('idle') end
       vim.notify('Skg maintenance is idle')
     end
   else
@@ -1159,8 +1224,23 @@ function M.handle_status (payload_text, response)
   end
 end
 
+function M.handle_status (payload_text, response, selected_id)
+  if selected_id then
+    local actual = response_incident_id(response)
+    if actual and actual ~= selected_id then
+      error('Maintenance status response changed its incident identity') end
+    local incident = state.lookup_maintenance_incident(selected_id)
+    if incident then
+      return state.with_current_maintenance_incident(selected_id, function ()
+        return handle_status_current(payload_text, response) end)
+    end
+  end
+  return with_response_incident(response, function ()
+    return handle_status_current(payload_text, response) end)
+end
+
 local function approve_undo_waiver (incident, buffer_key, reason)
-  state.register_response_handler('maintenance-status', function ()
+  register_response_handler('maintenance-status', function ()
     incident.undo_waivers[buffer_key] = reason
     submit_later(M.publish_initial)
   end, true)
@@ -1175,7 +1255,7 @@ local function send_undo_failure (incident, failure)
   incident.undo_failure = {
     buffer_key = failure.buffer_key, reason = failure.reason,
   }
-  state.register_response_handler('maintenance-status',
+  register_response_handler('maintenance-status',
     function (_payload_text, response)
       local buffer_key = payload.field_text(response, 'buffer-key')
       local reason = payload.field_text(response, 'reason')
@@ -1264,8 +1344,6 @@ local function handle_bootstrap (
   local epoch = nat(response, 'maintenance-epoch')
   local offer = offer_for_writer(response)
   if status == 'install-maintenance-epoch-and-submit-locked-census' then
-    if state.maintenance_client_incident then
-      error('Another client-known maintenance incident is active') end
     local incident = {
       incident_id = incident_id,
       epoch = epoch,
@@ -1291,7 +1369,8 @@ local function handle_bootstrap (
       if wanted[registry.record(buf).id] then
         registry.lock_for_maintenance(buf, epoch) end
     end
-    state.client_constructor_admission = 'closed'
+    if not state.maintenance_historical_status then
+      state.client_constructor_admission = 'closed' end
     require('skg.misc_requests').submit_buffer_census(
       client.connect(), incident_id, epoch, incident.registered_buffer_ids)
   elseif status == 'locked-census-accepted-publish-initial-archive' then
@@ -1323,6 +1402,7 @@ end
 function M.send_locked_census ()
   local incident = assert(state.maintenance_client_incident,
     'Locked maintenance census has no client state')
+  local incident_id = incident.incident_id
   local tcp = client.connect()
   client.submit_priority_request(tcp, request('maintenance locked census', {
     { 'incident-id', incident.incident_id },
@@ -1331,7 +1411,8 @@ function M.send_locked_census ()
   }), {
     ['maintenance-offer'] = {
       handler = function (payload_text, response)
-        handle_bootstrap(payload_text, response) end,
+        return state.with_current_maintenance_incident(incident_id,
+          function () handle_bootstrap(payload_text, response) end) end,
       one_shot = true,
     },
   }, nil, incident.incident_id)
@@ -1458,23 +1539,28 @@ function M.server_status_handler (payload_text, response)
     if not field_present(response, 'incident-id')
        or not field_present(response, 'maintenance-epoch') then
       error('Asynchronous maintenance selection has no exact envelope') end
-    M.handle_selection_response(payload_text, response)
+    with_response_incident(response, function ()
+      M.handle_selection_response(payload_text, response) end)
   elseif status == 'origin-operation-failed' then
-    local incident = require_client_incident(
-      payload.field_text(response, 'incident-id'),
-      nat(response, 'maintenance-epoch'))
-    incident.phase = 'server-blocked'
-    incident.server_phase = payload.field_text(response, 'phase')
-    incident.blocking_reason =
-      payload.field_text(response, 'error') or 'unknown error'
-    vim.notify(string.format(
-      'Maintenance remains locked in server phase %s: %s. Repair the '
-        .. 'reported problem, then run :SkgRetryMaintenance.',
-      incident.server_phase or '?', incident.blocking_reason),
-      vim.log.levels.ERROR)
-    local retirements = payload.field(response, 'preselection-retirements')
-    if retirements ~= nil then
-      M.install_preselection_retirements(retirements) end
+    with_response_incident(response, function ()
+      local incident = assert(state.maintenance_client_incident,
+        'Maintenance origin failure arrived without client state')
+      require_client_incident(
+        payload.field_text(response, 'incident-id'),
+        nat(response, 'maintenance-epoch'))
+      incident.phase = 'server-blocked'
+      incident.server_phase = payload.field_text(response, 'phase')
+      incident.blocking_reason =
+        payload.field_text(response, 'error') or 'unknown error'
+      vim.notify(string.format(
+        'Maintenance remains locked in server phase %s: %s. Repair the '
+          .. 'reported problem, then run :SkgRetryMaintenance.',
+        incident.server_phase or '?', incident.blocking_reason),
+        vim.log.levels.ERROR)
+      local retirements = payload.field(response, 'preselection-retirements')
+      if retirements ~= nil then
+        M.install_preselection_retirements(retirements) end
+    end)
   elseif status == 'active' or status == 'terminal' or status == 'idle' then
     M.handle_status(payload_text, response)
   else
@@ -1487,16 +1573,17 @@ end
 function M.cancel ()
   local incident = assert(state.maintenance_client_incident,
     'no client-known maintenance incident to cancel')
-  state.register_response_handler('maintenance-status',
+  register_response_handler('maintenance-status',
     function (_payload_text, response)
       local epoch = nat(response, 'unlock-maintenance-epoch')
       for _, buf in ipairs(registry.buffers()) do
         registry.unlock_after_maintenance(buf, epoch) end
       state.clear_current_maintenance_incident()
-      state.client_constructor_admission = 'open'
+      if not state.maintenance_historical_status then
+        state.client_constructor_admission = 'open' end
       vim.notify('Skg maintenance cancelled before archive publication.')
     end, true)
-  state.set_request_failure_handler(fail_request(
+  set_request_failure_handler(fail_request(
     'cancellation-pending', 'Maintenance cancellation was not acknowledged'))
   client.submit_request(request('cancel maintenance', {
     { 'maintenance-epoch', incident.epoch },
@@ -1524,9 +1611,9 @@ function M.retry ()
   if incident.phase ~= 'server-blocked' then
     error('no client-known blocked maintenance incident') end
   incident.phase = 'maintenance-retry-pending'
-  state.register_response_handler(
+  register_response_handler(
     'maintenance-status', M.handle_retry, true)
-  state.set_request_failure_handler(function (reason)
+  set_request_failure_handler(function (reason)
     local current = state.maintenance_client_incident
     if current and current.incident_id == incident.incident_id
        and current.epoch == incident.epoch then
@@ -1538,15 +1625,21 @@ function M.retry ()
   }), nil, incident.incident_id)
 end
 
-function M.status (silent)
-  state.register_response_handler(
-    'maintenance-status', M.handle_status, true)
+function M.status (silent, incident_id)
+  incident_id = incident_id or (state.maintenance_client_incident
+    and state.maintenance_client_incident.incident_id)
+  -- Status may adopt a server-retained incident not yet in the local index.
+  state.register_response_handler('maintenance-status', function (text, response)
+    return M.handle_status(text, response, incident_id)
+  end, true)
   if not silent then
     state.set_request_failure_handler(function (reason)
       warn('Maintenance status was not delivered: ' .. tostring(reason))
     end)
   end
-  client.submit_request(request('maintenance status'))
+  client.submit_request(request('maintenance status', incident_id and {
+    { 'incident-id', incident_id },
+  } or nil), nil, incident_id)
 end
 
 return M

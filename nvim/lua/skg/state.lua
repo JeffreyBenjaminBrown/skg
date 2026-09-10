@@ -28,6 +28,7 @@ M.pending_incidents = {}
 M.pending_query_waits_raw = nil
 M.maintenance_client_incident = M.maintenance_client_incident or nil
 M.maintenance_client_incidents = M.maintenance_client_incidents or {}
+M.maintenance_historical_status = nil
 M.pending_maintenance_offer = M.pending_maintenance_offer or nil
 M.pending_recovery_incidents = M.pending_recovery_incidents or {}
 
@@ -74,6 +75,30 @@ function M.clear_current_maintenance_incident (clear_index)
   M.retain_maintenance_incident(M.maintenance_client_incident)
   M.maintenance_client_incident = nil
   if clear_index then M.maintenance_client_incidents = {} end
+end
+
+---Run CALLBACK against a retained incident and restore the foreground record.
+---A callback already running for the foreground record keeps ordinary pointer
+---changes, while a historical callback cannot strand that foreground record.
+---@param incident_id string
+---@param callback function
+---@return any
+function M.with_current_maintenance_incident (incident_id, callback, ...)
+  local incident = M.lookup_maintenance_incident(incident_id)
+  if not incident then error('Unknown client maintenance incident ' .. tostring(incident_id)) end
+  local previous = M.maintenance_client_incident
+  local foreground = previous == incident
+  local previous_historical = M.maintenance_historical_status
+  M.maintenance_historical_status = previous_historical or not foreground
+  M.maintenance_client_incident = incident
+  local args, count = { ... }, select('#', ...)
+  local ok, result = xpcall(function ()
+    return callback(unpack(args, 1, count)) end, debug.traceback)
+  M.retain_maintenance_incident(M.maintenance_client_incident)
+  if not foreground then M.maintenance_client_incident = previous end
+  M.maintenance_historical_status = previous_historical
+  if not ok then error(result) end
+  return result
 end
 
 ---Update rebuilding only when VALUE is explicit server status metadata.

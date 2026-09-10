@@ -859,6 +859,10 @@ buffer and archive when reporting or repairing a failure.
 Requests the server's durable status.  Use it after a transport interruption
 or failure to resume the exact incident; reconnect never manufactures a new
 one or unlocks views merely because the socket ended.
+
+With a prefix argument, choose an incident ID from the locally retained and
+server-pending incidents. This resumes that incident's outstanding work while
+preserving the current incident and its buffer restrictions.
 *** skg-retry-maintenance
 Retries the exact active incident after you have repaired a reported
 invalid-disk or store-health problem.  The request repeats the incident ID and

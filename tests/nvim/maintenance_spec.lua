@@ -127,6 +127,63 @@ describe('skg Neovim maintenance handshake', function ()
     assert.are.equal(2, #state.list_maintenance_incidents())
   end)
 
+  it('routes retained status callbacks to A and restores foreground B', function ()
+    local a = { incident_id = 'incident-a', epoch = 1, phase = 'waiting' }
+    local b = { incident_id = 'incident-b', epoch = 2, phase = 'foreground' }
+    state.replace_current_maintenance_incident(a)
+    state.replace_current_maintenance_incident(b)
+    local seen
+    local original_resume = maintenance.resume_active
+    maintenance.resume_active = function ()
+      seen = state.maintenance_client_incident
+      seen.phase = 'resumed'
+    end
+    maintenance.handle_status('status', {
+      f('status', 'active'), f('active-incident-id', 'incident-a'),
+      f('maintenance-epoch', 1),
+    })
+    maintenance.resume_active = original_resume
+    assert.are.equal(a, seen)
+    assert.are.equal('resumed', a.phase)
+    assert.are.equal(b, state.maintenance_client_incident)
+  end)
+
+  it('restores foreground B when a retained A callback fails', function ()
+    local a = { incident_id = 'incident-a', epoch = 1, phase = 'waiting' }
+    local b = { incident_id = 'incident-b', epoch = 2, phase = 'foreground' }
+    state.replace_current_maintenance_incident(a)
+    state.replace_current_maintenance_incident(b)
+    local original_resume = maintenance.resume_active
+    maintenance.resume_active = function ()
+      state.maintenance_client_incident.phase = 'failed'
+      error('historical callback failed')
+    end
+    local ok = pcall(function ()
+      maintenance.handle_status('status', {
+        f('status', 'active'), f('active-incident-id', 'incident-a'),
+      })
+    end)
+    maintenance.resume_active = original_resume
+    assert.is_false(ok)
+    assert.are.equal('failed', a.phase)
+    assert.are.equal(b, state.maintenance_client_incident)
+  end)
+
+  it('historical idle status preserves a newer pending offer', function ()
+    local a = {
+      incident_id = 'incident-a', epoch = 1,
+      phase = 'terminal-received', final_archive = { path = '/a' },
+    }
+    local b = { incident_id = 'incident-b', epoch = 2, phase = 'foreground' }
+    state.replace_current_maintenance_incident(a)
+    state.replace_current_maintenance_incident(b)
+    state.pending_maintenance_offer = { candidate_id = 'newer' }
+    maintenance.handle_status('status', { f('status', 'idle'),
+      f('incident-id', 'incident-a') })
+    assert.are.equal(b, state.maintenance_client_incident)
+    assert.are.equal('newer', state.pending_maintenance_offer.candidate_id)
+  end)
+
   before_each(function ()
     reset()
     original_defer = maintenance.defer
@@ -523,6 +580,164 @@ describe('skg Neovim maintenance handshake', function ()
     end)
   end)
 
+  it('requests and adopts a server-retained incident without changing B', function ()
+    local client_module = require('skg.client')
+    local original_submit, original_resume = client_module.submit_request,
+      maintenance.resume_active
+    local b = { incident_id = 'incident-b', epoch = 10 }
+    state.replace_current_maintenance_incident(b)
+    local sent_id
+    client_module.submit_request = function (_request, _handlers, id) sent_id = id end
+    maintenance.resume_active = function (response)
+      assert.is_nil(state.maintenance_client_incident)
+      state.replace_current_maintenance_incident({
+        incident_id = payload.field_text(response, 'active-incident-id'),
+        phase = 'resumed',
+      })
+    end
+    local ok, reason = pcall(function ()
+      maintenance.status(true, 'incident-a')
+      assert.are.equal('incident-a', sent_id)
+      local handler = state.request_draft.handlers['maintenance-status'].handler
+      assert.has_error(function () handler('', {
+        f('status', 'active'), f('active-incident-id', 'incident-b'),
+      }) end)
+      handler('', { f('status', 'active'), f('active-incident-id', 'incident-a') })
+      assert.are.equal(b, state.maintenance_client_incident)
+      assert.are.equal('resumed', state.lookup_maintenance_incident('incident-a').phase)
+    end)
+    client_module.submit_request, maintenance.resume_active = original_submit, original_resume
+    assert.is_true(ok, tostring(reason))
+  end)
+
+  it('accepts newer global owner metadata on a historical incident frame', function ()
+    state.server_session_id = incident_id
+    state.owner_publication_revision = 10
+    state.replace_current_maintenance_incident({ incident_id = 'incident-a' })
+    local b = { incident_id = 'incident-b' }
+    state.replace_current_maintenance_incident(b)
+    state.with_current_maintenance_incident('incident-a', function ()
+      state.update_global_server_status({
+        f('server-session-id', incident_id), f('incident-id', 'incident-a'),
+        f('owner-publication-revision', 11), f('graph-write-admission', 'open'),
+        f('current-graph-generation', 20),
+      })
+    end)
+    assert.are.equal(b, state.maintenance_client_incident)
+    assert.are.equal(11, state.owner_publication_revision)
+    assert.are.equal('open', state.graph_write_admission)
+    assert.are.equal(20, config.store_state.graph_generation)
+  end)
+
+  it('rejects an unknown selection without synthesizing incomplete recovery state',
+     function ()
+    state.active_source_set_name = 'main'
+    vim.g.skg_active_source_set_name = 'main'
+    local b = { incident_id = 'incident-b', epoch = 10, phase = 'foreground' }
+    state.replace_current_maintenance_incident(b)
+    maintenance.defer = function () end
+    assert.has_error(function () maintenance.server_status_handler('', {
+      f('status', 'candidate-selected'), f('incident-id', 'incident-a'),
+      f('maintenance-epoch', 9), f('g1-graph-generation', 2),
+      f('g1-manifest-revision', 6), f('tantivy-generation', 4),
+      f('server-evidence-sha256', string.rep('d', 64)),
+      f('source-set', 'historical'), f('maintenance-archive-folder', '/a'),
+      f('maintenance-archive-identity', '/server/a'),
+      f('source-inventory', {}), f('view-settlements', {}),
+    }) end)
+    assert.are.equal(b, state.maintenance_client_incident)
+    assert.is_nil(state.lookup_maintenance_incident('incident-a'))
+    assert.are.equal('main', state.active_source_set_name)
+  end)
+
+  it('routes a retained historical origin failure to A', function ()
+    local b = { incident_id = 'incident-b', epoch = 10, phase = 'foreground' }
+    state.replace_current_maintenance_incident({ incident_id = 'incident-a', epoch = 9 })
+    state.replace_current_maintenance_incident(b)
+    maintenance.server_status_handler('', {
+      f('status', 'origin-operation-failed'), f('incident-id', 'incident-a'),
+      f('maintenance-epoch', 9), f('phase', 'blocked-store-health'),
+      f('error', 'worker failed'),
+    })
+    assert.are.equal(b, state.maintenance_client_incident)
+    local a = state.lookup_maintenance_incident('incident-a')
+    assert.are.equal('server-blocked', a.phase)
+    assert.are.equal('worker failed', a.blocking_reason)
+  end)
+
+  it('retains A restriction when a new B bootstrap is allocated', function ()
+    local client_module = require('skg.client')
+    local misc = require('skg.misc_requests')
+    local old_submit, old_connect, old_census = client_module.submit_request,
+      client_module.connect, misc.submit_buffer_census
+    local buf
+    local ok, err = pcall(function ()
+      client_module.submit_request = function () end
+      client_module.connect = function () return 'tcp' end
+      misc.submit_buffer_census = function () end
+      state.maintenance_client_incident = {
+        incident_id = 'incident-a', epoch = 9, phase = 'waiting',
+      }
+      buf = new_buffer()
+      local buffer_id = registry.record(buf).id
+      local handler
+      maintenance.begin('pull')
+      handler = state.request_draft.handlers['maintenance-offer'].handler
+      local response = bootstrap_response(
+        'install-maintenance-epoch-and-submit-locked-census', { buffer_id })
+      replace_field(response, 'allocated-incident-id', 'incident-b')
+      replace_field(response, 'maintenance-epoch', 10)
+      handler(nil, response)
+      assert.are.equal('incident-b',
+        state.maintenance_client_incident.incident_id)
+      assert.is_not_nil(state.lookup_maintenance_incident('incident-a'))
+      local restrictions = vim.b[buf].skg_maintenance_restrictions
+      assert.are.equal(9, restrictions['incident:incident-a'])
+      assert.are.equal(10, restrictions['incident:incident-b'])
+    end)
+    client_module.submit_request, client_module.connect,
+      misc.submit_buffer_census = old_submit, old_connect, old_census
+    if buf then pcall(vim.api.nvim_buf_delete, buf, { force = true }) end
+    assert.is_true(ok, err)
+  end)
+
+  it('runs a late registered A ACK and follow-on without changing B',
+     function ()
+    local client_module = require('skg.client')
+    local old_submit, old_settle = client_module.submit_request,
+      maintenance.settle_next
+    local queued
+    client_module.submit_request = function () end
+    maintenance.defer = function (callback) queued = callback end
+    local a = { incident_id = 'incident-a', epoch = 1,
+      phase = 'settling-views', pending_settlements = {},
+      acknowledged_settlements = {}, settlements = {} }
+    local b = { incident_id = 'incident-b', epoch = 2, phase = 'foreground' }
+    local item = settlement('buffer-a', 'release-ack', false)
+    a.settlements = { item }
+    a.pending_settlements = { item }
+    a.in_flight_settlement = item
+    state.replace_current_maintenance_incident(a)
+    state.replace_current_maintenance_incident(b)
+    state.maintenance_client_incident = a
+    maintenance.send_settlement_ack(item)
+    local handler = state.request_draft.handlers['maintenance-status'].handler
+    state.maintenance_client_incident = b
+    maintenance.settle_next = function ()
+      assert.are.equal(a, state.maintenance_client_incident) end
+    handler('', {
+      f('status', 'all-views-settled'), f('incident-id', 'incident-a'),
+      f('maintenance-epoch', 1), f('buffer-id', 'buffer-a'),
+      f('required-ack', 'release-ack'),
+    })
+    assert.are.equal(b, state.maintenance_client_incident)
+    assert.are.equal('settling-views', a.phase)
+    assert.is_not_nil(queued)
+    queued()
+    state.request_draft = nil
+    client_module.submit_request, maintenance.settle_next = old_submit, old_settle
+  end)
+
   it('defers selection while a new view awaits census enrollment', function ()
     state.maintenance_client_incident = {
       incident_id = incident_id, epoch = 9, phase = 'waiting-for-server',
@@ -887,6 +1102,8 @@ describe('skg Neovim maintenance handshake', function ()
       f('pending-incidents', {}),
     })
     assert.is_nil(state.maintenance_client_incident)
+    assert.is_true(state.lookup_maintenance_incident(incident_id)
+      .terminal_acknowledged)
     assert.are.equal('terminal', state.maintenance_state.state)
     assert.are.equal(2, state.owner_publication_revision)
     assert.are.equal('open', state.graph_write_admission)

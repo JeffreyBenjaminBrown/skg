@@ -1103,10 +1103,11 @@ are refused even on retry.
 `complete maintenance` repeats the final-manifest checksum and yields a
 durable `terminal` response containing incident, epoch, disposition, exact
 unlock census, selected generations, and per-ID outcomes.  The client unlocks
-only that census, then sends `acknowledge terminal maintenance`.  Only this
-last exact ACK returns the coordinator to idle and compacts its transaction
-journal, then queues the exact post-maintenance successor sweep.  Lost replies
-at the view, evidence, finalization, completion, or
+only that incident's remaining census restrictions, then sends
+`acknowledge terminal maintenance`. The exact ACK settles its delivery obligation;
+acknowledging a retained older incident leaves the current transaction unchanged.
+Journal compaction must preserve all remaining replay and recovery obligations.
+Lost replies at the view, evidence, finalization, completion, or
 terminal boundary can be replayed without applying the local action twice.
 
 `maintenance status` is the reconnect/resume endpoint.  An active response
@@ -1115,6 +1116,14 @@ blocking reason, next action, preselection retirements and final settlements,
 including which ACKs are already durable.  A terminal response replays the
 exact unlock instruction.  Connection loss never converts an active incident
 into idle and never unlocks views merely because a socket ended.
+
+An explicit `incident-id` selects a retained incident independently of the
+current graph transition; an optional `maintenance-epoch` checks that identity.
+Global `pending-incidents` lists incidents with an outstanding terminal ACK.
+Clients retain each incident's archive, census, application and settlement facts
+under its ID. Selecting an older status report does not replace the current
+workflow or discharge another incident's buffer restrictions. Delayed callbacks
+and their continuations retain the incident identity which scheduled them.
 
 ## Artifact-bundle frames and recovery archives
 

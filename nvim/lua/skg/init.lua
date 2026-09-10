@@ -57,8 +57,23 @@ function M.install_session_surface ()
     function () require('skg.maintenance').reconcile_pending() end,
     { force = true })
   vim.api.nvim_create_user_command('SkgMaintenanceStatus',
-    function () require('skg.maintenance').status() end,
-    { force = true })
+    function (options)
+      require('skg.maintenance').status(false, options.fargs[1]) end,
+    { nargs = '?', force = true, complete = function (prefix)
+      local ids, seen = {}, {}
+      local function include (id)
+        if id and not seen[id] and id:sub(1, #prefix) == prefix then
+          seen[id] = true
+          table.insert(ids, id) end
+      end
+      for _, incident in ipairs(state.list_maintenance_incidents()) do
+        include(incident.incident_id) end
+      local payload = require('skg.payload')
+      for _, incident in ipairs(state.pending_incidents or {}) do
+        include(payload.field_text(incident, 'incident-id')) end
+      table.sort(ids)
+      return ids
+    end })
   vim.api.nvim_create_user_command('SkgCancelMaintenance',
     function () require('skg.maintenance').cancel() end,
     { force = true })

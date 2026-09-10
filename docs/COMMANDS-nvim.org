@@ -758,10 +758,14 @@ child.  Authentication prompts and output appear in an incident-specific
 terminal buffer.  Cancellation, child loss, merge conflict, or nonzero exit
 is recorded per repository; Skg still observes and reconciles final disk.
 Preserve that buffer and the archive when repairing or reporting a failure.
-*** :SkgMaintenanceStatus
+*** :SkgMaintenanceStatus [INCIDENT-ID]
 Requests the server's durable status.  Use it after a transport interruption
 or failure to resume the exact incident; reconnect does not create a second
 incident or unlock views merely because the socket ended.
+
+An optional incident ID resumes that incident's outstanding work while preserving
+the current incident and its buffer restrictions. Tab completion offers locally
+retained and server-pending incident IDs.
 *** :SkgRetryMaintenance
 Retries the exact active incident after you have repaired a reported
 invalid-disk or store-health problem.  The request repeats the incident ID and

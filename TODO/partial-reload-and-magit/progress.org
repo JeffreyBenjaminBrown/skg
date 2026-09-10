@@ -2638,3 +2638,26 @@ Keep global current-state metadata distinct from historical operation fields.
 Selected graph/manifest fields in a terminal report cannot overwrite a newer
 versioned owner publication. Preserve the bounded callback interface described
 in [[../../codex-thinking/client-incident-retention.org]].
+
+* Simplify/cohere checkpoint: Neovim incident-scoped continuation and status selection
+** what's done and went well
+Neovim deferred work, request callbacks and incident pushes retain their owning
+incident. Explicit status selection can adopt a server-retained incident while
+preserving the foreground workflow. Unknown selection pushes cannot manufacture
+incomplete recovery records. New allocation preserves older buffer restrictions.
+
+The 39 focused maintenance tests and full Neovim suite pass, logged in
+'/tmp/incident-scoping-nvim-final.log' and
+'/tmp/incident-scoping-nvim-checkpoint.log'. Command argument and completion smoke
+checks pass in '/tmp/maintenance-command-smoke.log'. Both command references and
+the protocol describe explicit historical status selection.
+** Changes to the plan's envisioned order.
+Completed the two clients in separate commits after the shared retention adapter.
+** what's imperfect about what's done
+Reconnect integration remains the next consumer. External origin adapters and
+full process/editor lifecycle acceptance remain to be checked.
+** choices determining the future
+Historical operation fields cannot change global authority. However, current
+owner-publication metadata on any authenticated response must still pass through
+the revision fence, even when its attached incident is historical. Review removed
+a blanket historical-frame filter and added a regression for that distinction.
