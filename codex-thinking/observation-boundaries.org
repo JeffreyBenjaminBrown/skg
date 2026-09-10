@@ -1,0 +1,27 @@
+* Questions at the observation boundary
+** Scheduling
+'collect_observation_batch_with_limits' debounces authorized jobs alongside
+watcher hints. The current bounded fix ends that collection immediately when
+an authorized job arrives. 'observation_worker' also runs ordinary scans before
+authorized work in the same batch; that order should favor authorized work.
+
+An ordinary full scan already running on the sole worker can still delay a new
+job. Cancellation needs checkpoints in capture, fold and validation, and must
+retain the unconsumed hints. A canceled scan is neither equal nor invalid disk.
+Use a held capture test: authorize maintenance while the scan is held, release
+one checkpoint, then require the scan to yield without publishing its result.
+** Targeted alias changes
+'observe_targeted_disk_inner' falls back to live complete disk when a target's
+extra IDs change. That can import an unrelated changed B while reloading A.
+The fallback must instead fold selected baseline inputs plus A's replacements.
+The selected manifest retains hashes; it cannot itself reconstruct original
+authored relationship anchors. Before changing the representation, establish
+where selected raw sections or equivalent unresolved anchors survive today.
+
+Counterexample: selected B references alias x of A; change A's alias assignment
+and B's title on disk, reload only A. The title must remain selected B's, while
+references must reflect folding the baseline plus the authorized replacements.
+
+Links: [[file:../server/maintenance/observation.rs][worker]],
+[[file:../server/maintenance/candidate.rs][candidate]],
+[[file:../TODO/partial-reload-and-magit/11_plan_simplify-cohere.org][plan 11]].

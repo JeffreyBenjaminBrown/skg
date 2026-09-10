@@ -8,6 +8,15 @@
   no new runtime crash reproductions or integration runs were performed.
   See [[file:partial-reload-and-magit/10_architecture-review.org][the architecture review]] for context and alternatives.
 
+** Targeted alias reload can import unrelated disk changes
+   'observe_targeted_disk_inner' in
+   [[file:../server/maintenance/candidate.rs][candidate.rs]] switches to a complete live-disk fold when target extra
+   IDs change. This discards the baseline-plus-target boundary required by
+   document 11. A regression must retain unrelated selected B while applying
+   A's alias change and refolding dependent authored anchors. The unresolved
+   representation question is in
+   [[file:../codex-thinking/observation-boundaries.org][the observation boundary note]].
+
 
 ** Active maintenance restart does not restore its recorded selected generation
    [[file:../server/main.rs::150][Startup]] initializes stores from current disk before constructing the
