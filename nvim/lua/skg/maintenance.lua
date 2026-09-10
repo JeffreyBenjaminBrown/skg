@@ -206,29 +206,75 @@ function M.set_handshake_summary (maintenance_state, epoch)
   }
 end
 
-function M.adopt_handshake_epoch ()
+local function pending_incident (incident_id)
+  for _, entry in ipairs(state.pending_incidents or {}) do
+    if payload.field_text(entry, 'incident-id') == incident_id then
+      return entry end
+  end
+end
+
+local function pending_incident_ids ()
+  local ids, seen = {}, {}
+  for _, entry in ipairs(state.pending_incidents or {}) do
+    local incident_id = payload.field_text(entry, 'incident-id')
+    if incident_id and not seen[incident_id] then
+      seen[incident_id] = true
+      table.insert(ids, incident_id) end
+  end
+  return ids
+end
+
+local function release_incident_restrictions (incident)
+  if not incident or incident.epoch == nil then return end
+  for _, buf in ipairs(registry.buffers()) do
+    registry.unlock_after_maintenance(buf, incident.epoch) end
+end
+
+function M.adopt_handshake_epoch (abandoned_id)
+  if abandoned_id and state.lookup_maintenance_incident(abandoned_id) then
+    state.with_current_maintenance_incident(abandoned_id, function ()
+      release_incident_restrictions(state.maintenance_client_incident)
+      state.clear_current_maintenance_incident()
+    end)
+  end
   local summary = state.maintenance_state
-  if not summary or summary.state ~= 'active' then return end
+  if not summary then return end
   local epoch = summary.epoch
+  local incident = state.maintenance_client_incident
+  if summary.state ~= 'active' then
+    if (summary.state == 'idle' or summary.state == 'observing'
+        or summary.state == 'pending') and incident
+       and not pending_incident(incident.incident_id) then
+      release_incident_restrictions(incident)
+      state.clear_current_maintenance_incident()
+    end
+    return
+  end
   if type(epoch) ~= 'number' or epoch < 0 or epoch ~= math.floor(epoch) then
     error('Active maintenance handshake has no valid epoch') end
-  local incident = state.maintenance_client_incident
   if incident and incident.epoch ~= epoch then
-    error('Maintenance handshake changed the active client epoch') end
+    state.clear_current_maintenance_incident()
+  end
+  local epoch_id
+  for _, entry in ipairs(state.pending_incidents or {}) do
+    if payload.field(entry, 'maintenance-epoch') == epoch then
+      epoch_id = payload.field_text(entry, 'incident-id')
+      break
+    end
+  end
   for _, buf in ipairs(registry.buffers()) do
     if registry.record(buf).view_write_authority == 'editable' then
-      registry.lock_for_maintenance(buf, epoch) end
+      registry.lock_for_maintenance(buf, epoch, epoch_id) end
   end
 end
 
 function M.handle_census_stale (buffer_ids)
-  local summary = state.maintenance_state
-  local incident = state.maintenance_client_incident
   local protected = {}
-  if summary and (summary.state == 'active' or summary.state == 'terminal')
-     and incident then
-    for _, buffer_id in ipairs(incident.registered_buffer_ids or {}) do
-      protected[tostring(buffer_id)] = true end
+  for _, buf in ipairs(registry.buffers()) do
+    local record = registry.record(buf)
+    if record and record.maintenance_restrictions
+       and next(record.maintenance_restrictions) ~= nil then
+      protected[tostring(record.id)] = true end
   end
   local ordinary = {}
   for _, buffer_id in ipairs(buffer_ids or {}) do
@@ -248,14 +294,33 @@ end
 
 function M.resume_after_census (maintenance_incident_id, maintenance_epoch)
   if maintenance_incident_id then
-    require_client_incident(maintenance_incident_id, maintenance_epoch) end
-  local summary = state.maintenance_state
-  if summary and (summary.state == 'active' or summary.state == 'terminal') then
-    local incident = state.maintenance_client_incident
-    if incident and incident.phase == 'awaiting-locked-census' then
-      M.send_locked_census()
-    else M.status(true) end
+    return state.with_current_maintenance_incident(maintenance_incident_id,
+      function ()
+        local incident = require_client_incident(maintenance_incident_id, maintenance_epoch)
+        if incident.phase == 'awaiting-locked-census' then
+          M.send_locked_census()
+        else M.status(true, maintenance_incident_id) end
+      end)
   end
+  local summary = state.maintenance_state or {}
+  local ids = pending_incident_ids()
+  local current_id
+  for _, entry in ipairs(state.pending_incidents or {}) do
+    if payload.field(entry, 'maintenance-epoch') == summary.epoch then
+      current_id = payload.field_text(entry, 'incident-id')
+      break
+    end
+  end
+  if summary.state == 'active' or summary.state == 'terminal' then
+    local current = state.maintenance_client_incident
+    if current and current.phase == 'awaiting-locked-census' then
+      M.send_locked_census()
+    else M.status(true, current_id) end
+    current_id = current_id or (current and current.incident_id)
+    for i = #ids, 1, -1 do
+      if ids[i] == current_id then table.remove(ids, i) end end
+  end
+  for _, incident_id in ipairs(ids) do M.status(true, incident_id) end
 end
 
 local function refresh_presentation_buffer_ids (response)
@@ -269,6 +334,7 @@ end
 
 -- Keep the frozen writable census separate from post-barrier presentation
 -- results. Exposed for reconnect/maintenance tests and status consumers.
+
 function M.refresh_presentation_buffer_ids (response)
   refresh_presentation_buffer_ids(response)
 end

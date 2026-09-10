@@ -2686,3 +2686,28 @@ the final fixed-census audit; this slice does not claim that broader audit passe
 Use the server pending inventory to distinguish current graph state from durable
 report obligations. An idle graph is not evidence that retained report debt has
 been abandoned. See [[../../codex-thinking/client-incident-retention.org]].
+
+* Simplify/cohere checkpoint: Neovim reconnect preserves pending incidents
+** what's done and went well
+Neovim preserves pending A through idle reconnect, retains A's restriction when
+B is active, resumes the current server epoch before older pending work, and
+keeps incident-specific census continuation bound to its original record.
+Handshake parsing now passes the exact explicit abandonment ID; only that
+incident's debt is released. Restricted historical buffers survive census stale
+handling independently of the global maintenance phase.
+
+The 44 focused maintenance tests and full Neovim suite pass. Logs are
+'/tmp/incident-reconnect-nvim-final.log' and
+'/tmp/incident-reconnect-nvim-checkpoint.log'. Review made the idle-resume test
+exercise idle directly, and strengthened the B-first ordering case with A first
+in the server pending inventory. The protocol records reconnect semantics.
+** Changes to the plan's envisioned order.
+Mirror the tested Emacs reconnect boundary, then check independent Neovim parsing
+and pending-order behavior.
+** what's imperfect about what's done
+The active-handshake locking fallback and external origin guards still need the
+remaining fixed-census and entry-point audit. Full process acceptance remains.
+** choices determining the future
+Current transaction ordering comes from the server epoch and pending inventory,
+not whichever local record happens to be foreground. Explicit abandonment must
+cross the handshake parser boundary rather than remain a helper-only capability.

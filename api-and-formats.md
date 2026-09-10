@@ -1125,6 +1125,12 @@ under its ID. Selecting an older status report does not replace the current
 workflow or discharge another incident's buffer restrictions. Delayed callbacks
 and their continuations retain the incident identity which scheduled them.
 
+Reconnect reconciles the connection census before resuming pending incidents
+individually. An idle current graph does not discharge an incident still listed
+in `pending-incidents`. A newer active epoch preserves older restrictions, and
+an incident-qualified census continuation retains its original incident and
+epoch even if another workflow becomes current before the callback runs.
+
 ## Artifact-bundle frames and recovery archives
 
 An artifact bundle uses this header:

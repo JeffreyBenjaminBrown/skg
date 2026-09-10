@@ -1122,6 +1122,97 @@ describe('skg Neovim maintenance handshake', function ()
     assert.are.equal('view', registry.record(buf).view_uri)
   end)
 
+  it('preserves A on an idle handshake while the server still lists A',
+     function ()
+    local a = { incident_id = 'incident-a', epoch = 9, phase = 'waiting' }
+    state.replace_current_maintenance_incident(a)
+    local buf = new_buffer()
+    local id = registry.record(buf).id
+    state.maintenance_state = { epoch = 9, state = 'idle' }
+    state.pending_incidents = { { f('incident-id', 'incident-a') } }
+    maintenance.adopt_handshake_epoch()
+    assert.are.equal(a, state.maintenance_client_incident)
+    assert.are.equal(9,
+      vim.b[buf].skg_maintenance_restrictions['incident:incident-a'])
+    local old_status = maintenance.status
+    local requested
+    maintenance.status = function (_silent, incident_id) requested = incident_id end
+    maintenance.resume_after_census()
+    maintenance.status = old_status
+    assert.are.equal('incident-a', requested)
+    assert.are.equal(id, registry.record(buf).id)
+  end)
+
+  it('retains A restrictions while active handshake adopts pending B',
+     function ()
+    local a = { incident_id = 'incident-a', epoch = 9, phase = 'waiting' }
+    state.replace_current_maintenance_incident(a)
+    local buf = new_buffer()
+    state.maintenance_state = { epoch = 10, state = 'active' }
+    state.pending_incidents = {
+      { f('incident-id', 'incident-a'), f('maintenance-epoch', 9) },
+      { f('incident-id', 'incident-b'), f('maintenance-epoch', 10) },
+    }
+    maintenance.adopt_handshake_epoch()
+    assert.is_nil(state.maintenance_client_incident)
+    local restrictions = vim.b[buf].skg_maintenance_restrictions
+    assert.are.equal(9, restrictions['incident:incident-a'])
+    assert.are.equal(10, restrictions['incident:incident-b'])
+    local old_status, requested = maintenance.status, {}
+    maintenance.status = function (_silent, incident_id)
+      table.insert(requested, incident_id) end
+    maintenance.resume_after_census()
+    maintenance.status = old_status
+    assert.are.same({ 'incident-b', 'incident-a' }, requested)
+  end)
+
+  it('scopes an incident census completion to A while B is foreground',
+     function ()
+    local a = { incident_id = 'incident-a', epoch = 9,
+      phase = 'awaiting-locked-census' }
+    local b = { incident_id = 'incident-b', epoch = 10, phase = 'foreground' }
+    state.replace_current_maintenance_incident(a)
+    state.replace_current_maintenance_incident(b)
+    local old_send = maintenance.send_locked_census
+    local sent
+    maintenance.send_locked_census = function ()
+      sent = state.maintenance_client_incident end
+    maintenance.resume_after_census('incident-a', 9)
+    maintenance.send_locked_census = old_send
+    assert.are.equal(a, sent)
+    assert.are.equal(b, state.maintenance_client_incident)
+  end)
+
+  it('releases only explicit abandoned A debt while B remains active', function ()
+    state.replace_current_maintenance_incident({ incident_id = 'incident-a', epoch = 9 })
+    local buf = new_buffer()
+    local b = { incident_id = 'incident-b', epoch = 10 }
+    state.replace_current_maintenance_incident(b)
+    registry.lock_for_maintenance(buf, 10, 'incident-b')
+    state.maintenance_state = { epoch = 10, state = 'active' }
+    state.pending_incidents = {
+      { f('incident-id', 'incident-b'), f('maintenance-epoch', 10) },
+    }
+    maintenance.adopt_handshake_epoch('incident-a')
+    assert.are.equal(b, state.maintenance_client_incident)
+    local restrictions = vim.b[buf].skg_maintenance_restrictions
+    assert.is_nil(restrictions['incident:incident-a'])
+    assert.are.equal(10, restrictions['incident:incident-b'])
+    registry.unlock_after_maintenance(buf, 10, 'incident-b')
+    assert.is_nil(registry.record(buf).maintenance_epoch)
+  end)
+
+  it('protects older restricted buffers from census stale detachment', function ()
+    local a = { incident_id = 'incident-a', epoch = 9, phase = 'waiting' }
+    state.replace_current_maintenance_incident(a)
+    local buf = new_buffer()
+    local id = registry.record(buf).id
+    state.replace_current_maintenance_incident({
+      incident_id = 'incident-b', epoch = 10, phase = 'foreground' })
+    maintenance.handle_census_stale({ id })
+    assert.are.equal('view', registry.record(buf).view_uri)
+  end)
+
   it('adopts the handshake epoch before submitting reconnect census',
      function ()
     local buf = new_buffer()

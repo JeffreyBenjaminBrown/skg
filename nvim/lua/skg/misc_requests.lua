@@ -103,7 +103,8 @@ function M.install_connection_verification (_payload_text, response, tcp)
     config.store_state.graph_generation, state.active_source_set_name,
     server_session_id)
   state.connection_handshake_state = 'census'
-  require('skg.maintenance').adopt_handshake_epoch()
+  require('skg.maintenance').adopt_handshake_epoch(
+    payload.field_text(response, 'abandoned-prearchive-incident'))
   M.show_handshake_telescope_warnings(response)
   M.show_pending_recovery_incidents(response)
   local content = payload.field(response, 'content')
