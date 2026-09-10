@@ -2341,3 +2341,26 @@ being integrated and tested in the next commit.
 ** choices determining the future
 Workers return completed responses through the connection thread. They never
 write the socket or borrow another request's foreground context.
+
+* Simplify/cohere checkpoint: clients retain yielded command requests
+** what's done and went well
+Both editors recognize nonterminal 'request-yield' frames, release only the
+matching foreground slot, and dispatch queued work while retaining the original
+handlers and finalizer. A late terminal response cannot retire the newer active
+request. Stale-session, mismatched-incident and terminal-status yields leave the
+active request intact.
+
+Focused length-prefix tests passed: 15 Emacs ERT tests and 25 Neovim tests.
+Logs are '/tmp/elisp-length-prefix.log' and '/tmp/nvim-length-prefix.log'. Review
+found that Neovim's generic terminal cleanup and both clients' generic incident
+failure branches needed to exclude malformed yields; the added regressions
+cover those boundaries.
+** Changes to the plan's envisioned order.
+Client transport support is committed before enabling worker dispatch on the
+server connection loop.
+** what's imperfect about what's done
+The actual same-connection command test is still being completed. Ordinary
+saves and other writers retain their previous lifecycle.
+** choices determining the future
+Yield changes transport scheduling only. Durable operation identity and journal
+outcomes retain their existing authority.

@@ -190,6 +190,115 @@ describe('skg.length_prefix dispatch', function ()
     assert.is_nil(state.request_records[record.id])
   end)
 
+  it('yields only the active slot while retaining the original record',
+     function ()
+    local sent, calls, finalized = {}, {}, 0
+    local send = function (wire) table.insert(sent, wire) end
+    state.server_session_id = '11111111-2222-4333-8444-555555555555'
+    state.register_response_handler('first-response',
+      function () table.insert(calls, 'first') end, true)
+    state.set_request_finalizer(function () finalized = finalized + 1 end)
+    local first = state.take_request_record()
+    state.enqueue_request(first, 'first-wire', send)
+    state.register_response_handler('second-response',
+      function () table.insert(calls, 'second') end, true)
+    local second = state.take_request_record()
+    state.enqueue_request(second, 'second-wire', send)
+    assert.are.equal(1, #sent)
+
+    length_prefix.dispatch_frame(string.format(
+      '((response-type request-yield) (request-id %q)'
+      .. ' (frame-kind request-yield) (server-session-id %q))',
+      first.id, state.server_session_id))
+    assert.are.equal(2, #sent)
+    assert.are.equal(second.id, state.active_request_id)
+    assert.is_not_nil(state.request_records[first.id].handlers['first-response'])
+
+    length_prefix.dispatch_frame(string.format(
+      '((response-type first-response) (request-id %q)'
+      .. ' (frame-kind first-response) (terminal-status complete))', first.id))
+    assert.are.same({ 'first' }, calls)
+    assert.are.equal(1, finalized)
+    assert.are.equal(second.id, state.active_request_id)
+    length_prefix.dispatch_frame(string.format(
+      '((response-type second-response) (request-id %q)'
+      .. ' (frame-kind second-response) (terminal-status complete))', second.id))
+    assert.are.same({ 'first', 'second' }, calls)
+    assert.is_nil(state.active_request_id)
+  end)
+
+  it('ignores a stale request-yield without releasing the active slot',
+     function ()
+    local sent = {}
+    state.server_session_id = '11111111-2222-4333-8444-555555555555'
+    state.register_response_handler('first-response', function () end, true)
+    local first = state.take_request_record()
+    state.enqueue_request(first, 'first-wire', function (wire)
+      table.insert(sent, wire) end)
+    length_prefix.dispatch_frame(string.format(
+      '((response-type request-yield) (request-id stale-request)'
+      .. ' (frame-kind request-yield) (server-session-id %q))',
+      state.server_session_id))
+    assert.are.equal(first.id, state.active_request_id)
+    assert.are.equal(1, #sent)
+  end)
+
+  it('rejects a wrong-session request-yield before releasing the slot',
+     function ()
+    local sent = {}
+    state.server_session_id = '11111111-2222-4333-8444-555555555555'
+    state.register_response_handler('first-response', function () end, true)
+    local first = state.take_request_record()
+    state.enqueue_request(first, 'first-wire', function (wire)
+      table.insert(sent, wire) end)
+    state.register_response_handler('second-response', function () end, true)
+    local second = state.take_request_record()
+    state.enqueue_request(second, 'second-wire', function (wire)
+      table.insert(sent, wire) end)
+    length_prefix.dispatch_frame(string.format(
+      '((response-type request-yield) (request-id %q)'
+      .. ' (frame-kind request-yield) (server-session-id stale-session))',
+      first.id))
+    assert.are.equal(1, #sent)
+    assert.are.equal(first.id, state.active_request_id)
+    assert.is_not_nil(state.request_records[first.id])
+    assert.is_not_nil(state.request_records[second.id])
+  end)
+
+  it('rejects a terminal request-yield without retiring the request',
+     function ()
+    local sent = {}
+    state.server_session_id = '11111111-2222-4333-8444-555555555555'
+    state.register_response_handler('first-response', function () end, true)
+    local first = state.take_request_record()
+    state.enqueue_request(first, 'first-wire', function (wire)
+      table.insert(sent, wire) end)
+    length_prefix.dispatch_frame(string.format(
+      '((response-type request-yield) (request-id %q)'
+      .. ' (frame-kind request-yield) (server-session-id %q)'
+      .. ' (terminal-status complete))', first.id, state.server_session_id))
+    assert.are.equal(1, #sent)
+    assert.are.equal(first.id, state.active_request_id)
+    assert.is_not_nil(state.request_records[first.id])
+  end)
+
+  it('rejects an incident-mismatched request-yield without retiring it',
+     function ()
+    local sent = {}
+    state.server_session_id = '11111111-2222-4333-8444-555555555555'
+    state.register_response_handler('first-response', function () end, true)
+    local first = state.take_request_record()
+    state.enqueue_request(first, 'first-wire', function (wire)
+      table.insert(sent, wire) end)
+    length_prefix.dispatch_frame(string.format(
+      '((response-type request-yield) (request-id %q)'
+      .. ' (frame-kind request-yield) (incident-id other-incident)'
+      .. ' (server-session-id %q))', first.id, state.server_session_id))
+    assert.are.equal(1, #sent)
+    assert.are.equal(first.id, state.active_request_id)
+    assert.is_not_nil(state.request_records[first.id])
+  end)
+
   it('dispatches a server push without a request ID', function ()
     local seen = nil
     state.register_server_push_handler('collateral-view',

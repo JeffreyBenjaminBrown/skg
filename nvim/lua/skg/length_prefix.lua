@@ -89,16 +89,37 @@ function M.dispatch_frame (payload, artifact_bytes)
   -- server response supplies that target and the query handler binds it.
   local cold_query_status = frame_kind == 'query-wait-status'
     and record.incident_id == nil
-  if incident_id ~= record.incident_id and not cold_query_status then
+  local incident_mismatch = incident_id ~= record.incident_id
+    and not cold_query_status
+  if incident_mismatch and frame_kind ~= 'request-yield' then
     vim.notify('SKG protocol failure: incident identity changed',
                vim.log.levels.ERROR)
     if record.failure_handler then
       pcall(record.failure_handler, 'incident identity mismatch') end
     state.finish_request(request_id, 'protocol-failed')
     return end
+  if incident_mismatch and frame_kind == 'request-yield' then
+    vim.notify('SKG protocol failure: request-yield incident changed',
+               vim.log.levels.ERROR)
+    return end
   local entry = record.handlers[frame_kind]
   state.dispatching_request_id = request_id
   local handler_ok, handler_error = pcall(function ()
+    if frame_kind == 'request-yield' then
+      -- Validate identity before releasing the foreground slot.  The yielded
+      -- record stays registered until its eventual terminal response.
+      state.require_current_server_session(response)
+      if terminal_status then
+        error('SKG request-yield frame must be nonterminal') end
+      if state.active_request_id == request_id then
+        state.active_request_id = nil
+        state.dispatch_next_request()
+      else
+        log.log('warn', 'dispatch',
+                'ignoring stale request-yield for request %s', request_id)
+      end
+      return
+    end
     -- Verification installs the new server session inside its handler;
     -- consume its current-session fields there, after binding that ID.
     if frame_kind ~= 'verify-connection' then
@@ -115,17 +136,23 @@ function M.dispatch_frame (payload, artifact_bytes)
               tostring(frame_kind), request_id) end
   end)
   state.dispatching_request_id = nil
-  if entry and entry.one_shot then
+  if frame_kind ~= 'request-yield' and entry and entry.one_shot then
     record.handlers[frame_kind] = nil
     state.lp_pending_count = math.max(0, state.lp_pending_count - 1) end
-  if terminal_status then
+  if terminal_status and frame_kind ~= 'request-yield' then
     state.finish_request(request_id, terminal_status)
-  elseif not handler_ok then
+  elseif not handler_ok and frame_kind ~= 'request-yield' then
     if record.failure_handler then
       pcall(record.failure_handler, tostring(handler_error)) end
     state.finish_request(request_id, 'handler-failed')
   end
-  if not handler_ok then
+  if not handler_ok and frame_kind == 'request-yield' then
+    -- Identity failures reject the control frame without retiring the
+    -- yielded record or releasing another request.
+    log.log('error', 'dispatch',
+            'request-yield rejected for %s: %s', request_id,
+            tostring(handler_error))
+  elseif not handler_ok then
     log.log('error', 'dispatch', 'dispatch error: %s for payload: %s',
             tostring(handler_error), payload:sub(1, 80)) end
 end

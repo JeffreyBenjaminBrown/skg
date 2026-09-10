@@ -89,7 +89,8 @@ If there is buffered data and a handler matched, continues the loop."
                    (substring payload 0 (min 80 (length payload)))))
          ((not record)
           (skg-log 'warn 'dispatch "unknown/stale request-id: %s" request-id))
-         ((and (not (equal (and incident-id (format "%s" incident-id))
+         ((and (not (eq frame-kind 'request-yield))
+               (not (equal (and incident-id (format "%s" incident-id))
                            (skg--request-record-incident-id record)))
                (not (and (eq frame-kind 'query-wait-status)
                          (null (skg--request-record-incident-id record)))))
@@ -101,6 +102,41 @@ If there is buffered data and a handler matched, continues the loop."
             (funcall failure "incident identity mismatch"))
           (skg--finish-request (format "%s" request-id)
                                'protocol-failed))
+         ((and (eq frame-kind 'request-yield)
+               (not (equal (and incident-id (format "%s" incident-id))
+                           (skg--request-record-incident-id record))))
+          ;; A mismatched yield is rejected without retiring the request or
+          ;; releasing the foreground slot; its terminal reply still belongs
+          ;; to the original incident.
+          (ding)
+          (skg-log 'error 'dispatch
+                   "incident-id mismatch on request-yield %s" request-id))
+         ((eq frame-kind 'request-yield)
+          ;; A yield is a nonterminal control frame.  Validate its connection
+          ;; identity before releasing the foreground slot; the yielded record
+          ;; remains in the table so its handlers/finalizer await its terminal
+          ;; response.
+          (condition-case err
+              (progn
+                (skg-require-current-server-session response)
+                (if terminal-status
+                    (skg-log 'warn 'dispatch
+                             "ignoring terminal request-yield for request %s"
+                             request-id)
+                  (if (equal (format "%s" request-id)
+                             skg--active-request-id)
+                      (progn
+                        (setq skg--active-request-id nil)
+                        (skg--dispatch-next-request))
+                    (skg-log 'warn 'dispatch
+                             "ignoring stale request-yield for request %s"
+                             request-id))))
+            (error
+             ;; An identity failure rejects this control frame without
+             ;; retiring the yielded record or releasing another request.
+             (skg-log 'error 'dispatch
+                      "request-yield rejected for %s: %s"
+                      request-id (error-message-string err)))))
          (t
           (setq request-id (format "%s" request-id))
           ;; Verification binds the new server session in its handler;

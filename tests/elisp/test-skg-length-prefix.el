@@ -159,6 +159,134 @@
         (should seen)
         (should-not (gethash request-id skg--request-records))))))
 
+(ert-deftest test-skg-request-yield-releases-only-slot-and-retains-record ()
+  (let ((skg--request-records (make-hash-table :test #'equal))
+        (skg--request-draft nil)
+        (skg--request-queue nil)
+        (skg--active-request-id nil)
+        (skg--dispatching-request-id nil)
+        (skg--connection-handshake-state 'verified)
+        (skg--server-session-id "11111111-2222-4333-8444-555555555555")
+        (skg-lp--pending-count 0)
+        sent calls
+        (finalized 0))
+    (cl-letf (((symbol-function 'process-send-string)
+               (lambda (_proc wire) (push wire sent))))
+      (skg-register-response-handler
+       'first-response (lambda (&rest _) (push 'first calls)) t)
+      (skg-set-request-finalizer (lambda (_reason) (setq finalized (1+ finalized))))
+      (let ((first-id (skg-submit-request 'proc "((request . \"first\"))\n")))
+        (skg-register-response-handler
+         'second-response (lambda (&rest _) (push 'second calls)) t)
+        (let ((second-id
+               (skg-submit-request 'proc "((request . \"second\"))\n")))
+          (should (= 1 (length sent)))
+          (skg-lp--dispatch-frame
+           nil
+           (format
+            "((response-type request-yield) (request-id %S) (frame-kind request-yield) (server-session-id %S))"
+            first-id skg--server-session-id))
+          (should (= 2 (length sent)))
+          (should (equal second-id skg--active-request-id))
+          (let ((first-record (gethash first-id skg--request-records)))
+            (should first-record)
+            (should (assoc 'first-response
+                           (skg--request-record-handlers first-record))))
+          (skg-lp--dispatch-frame
+           nil
+           (format
+            "((response-type first-response) (request-id %S) (frame-kind first-response) (terminal-status complete))"
+            first-id))
+          (should (equal '(first) calls))
+          (should (= 1 finalized))
+          (should (equal second-id skg--active-request-id))
+          (skg-lp--dispatch-frame
+           nil
+           (format
+            "((response-type second-response) (request-id %S) (frame-kind second-response) (terminal-status complete))"
+            second-id))
+          (should (equal '(first second) (nreverse calls)))
+          (should-not skg--active-request-id))))))
+
+(ert-deftest test-skg-request-yield-rejects-a-stale-session-before-release ()
+  (let ((skg--request-records (make-hash-table :test #'equal))
+        (skg--request-draft nil)
+        (skg--request-queue nil)
+        (skg--active-request-id nil)
+        (skg--dispatching-request-id nil)
+        (skg--connection-handshake-state 'verified)
+        (skg--server-session-id "11111111-2222-4333-8444-555555555555")
+        (skg-lp--pending-count 0)
+        sent)
+    (cl-letf (((symbol-function 'process-send-string)
+               (lambda (_proc wire) (push wire sent))))
+      (skg-register-response-handler
+       'first-response (lambda (&rest _) nil) t)
+      (let ((first-id
+             (skg-submit-request 'proc "((request . \"first\"))\n")))
+        (skg-register-response-handler
+         'second-response (lambda (&rest _) nil) t)
+        (skg-submit-request 'proc "((request . \"second\"))\n")
+        (should (= 1 (length sent)))
+        (skg-lp--dispatch-frame
+         nil
+         (format
+          "((response-type request-yield) (request-id %S) (frame-kind request-yield) (server-session-id stale-session))"
+          first-id))
+        (should (= 1 (length sent)))
+        (should (equal first-id skg--active-request-id))
+        (should (gethash first-id skg--request-records))))))
+
+(ert-deftest test-skg-request-yield-with-terminal-status-retains-request ()
+  (let ((skg--request-records (make-hash-table :test #'equal))
+        (skg--request-draft nil)
+        (skg--request-queue nil)
+        (skg--active-request-id nil)
+        (skg--dispatching-request-id nil)
+        (skg--connection-handshake-state 'verified)
+        (skg--server-session-id "11111111-2222-4333-8444-555555555555")
+        (skg-lp--pending-count 0)
+        sent)
+    (cl-letf (((symbol-function 'process-send-string)
+               (lambda (_proc wire) (push wire sent))))
+      (skg-register-response-handler
+       'first-response (lambda (&rest _) nil) t)
+      (let ((first-id
+             (skg-submit-request 'proc "((request . \"first\"))\n")))
+         (skg-lp--dispatch-frame
+         nil
+         (format
+          "((response-type request-yield) (request-id %S) (frame-kind request-yield) (server-session-id %S) (terminal-status complete))"
+          first-id skg--server-session-id))
+        (should (= 1 (length sent)))
+        (should (equal first-id skg--active-request-id))
+        (should (gethash first-id skg--request-records))))))
+
+(ert-deftest test-skg-request-yield-with-mismatched-incident-retains-request ()
+  (let ((skg--request-records (make-hash-table :test #'equal))
+        (skg--request-draft nil)
+        (skg--request-queue nil)
+        (skg--active-request-id nil)
+        (skg--dispatching-request-id nil)
+        (skg--connection-handshake-state 'verified)
+        (skg--server-session-id "11111111-2222-4333-8444-555555555555")
+        (skg-lp--pending-count 0)
+        sent)
+    (cl-letf (((symbol-function 'process-send-string)
+               (lambda (_proc wire) (push wire sent))))
+      (skg-register-response-handler
+       'first-response (lambda (&rest _) nil) t)
+      (let ((first-id
+             (skg-submit-request 'proc "((request . \"first\"))\n")))
+        (skg-lp--dispatch-frame
+         nil
+         (format
+          "((response-type request-yield) (request-id %S) (frame-kind request-yield) (incident-id other-incident) (server-session-id %S))"
+          first-id skg--server-session-id))
+        (should (= 1 (length sent)))
+        (should (equal first-id skg--active-request-id))
+        (should (gethash first-id skg--request-records))))))
+
 (ert-deftest test-skg-authoritative-frame-updates-explicit-rebuilding-status ()
   (let ((skg--request-records (make-hash-table :test #'equal))
         (skg--request-draft nil)
