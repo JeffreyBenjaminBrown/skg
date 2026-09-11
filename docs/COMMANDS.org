@@ -41,8 +41,11 @@ On an Unknown placeholder, removes that exact raw ID from every owned
 structured relationship in every retained telescope.  It never edits
 foreign telescopes or text links.  If owned title/body text links point at
 the same absent ID, Skg shows a retained warning buffer and asks before the
-structural cleanup; otherwise it runs immediately.  Save or revert every
-open skg view first, because the command refreshes all of them.
+structural cleanup; otherwise it runs immediately.  The confirmation is
+bound to the scanned relationships and text links: if they change before
+confirmation, Skg refuses the stale approval and requires a rescan.  Before
+running, save or revert every open skg view.  Afterward, Skg refreshes only
+views which show a changed owner or the exact absent raw ID.
 ** C-c f : text search
 The 'f' is for 'find'.
 *** C-c f RET : skg-search

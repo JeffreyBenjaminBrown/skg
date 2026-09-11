@@ -160,8 +160,29 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
     &confirmation [0], "approved-preview")
     . expect ("confirmation carries an opaque approval token");
 
-  let completed : Vec<String> = invoke (
+  // Change a previewed field through the normal save path.  The old token must
+  // not authorize a rewrite against this new graph snapshot.
+  let mut changed_owner : NodeComplete = nodecomplete_from_pid_and_source (
+    config, ID::from ("owner"), &SourceName::from ("main")) ?;
+  changed_owner . title . push_str (" changed after preview");
+  update_graph_minus_nodeMerges (
+    vec![DefineNode::Save (SaveNode (changed_owner))], &[], config . clone (),
+    &env . tantivy_index, driver, &env . in_rust_graph ) . await ?;
+  let stale : Vec<String> = invoke (
     &request (Some (&approval)), &mut env, &mut views_state) ?;
+  assert! (stale [0] . contains ("Cleanup preview is stale"), "{:?}", stale);
+  let unchanged : NodeComplete = nodecomplete_from_pid_and_source (
+    config, ID::from ("owner"), &SourceName::from ("main")) ?;
+  assert_eq! (members_of (&unchanged . contains), vec![ID::from ("gone"), ID::from ("kept")],
+              "a stale approval must not partially rewrite the owner");
+  let renewed_confirmation : Vec<String> = invoke (
+    &request (None), &mut env, &mut views_state) ?;
+  let renewed_approval : String = extract_string_field_from_sexp (
+    &renewed_confirmation [0], "approved-preview")
+    . expect ("rescan carries a replacement approval token");
+
+  let completed : Vec<String> = invoke (
+    &request (Some (&renewed_approval)), &mut env, &mut views_state) ?;
   assert_eq! (completed . len (), 4, "{:?}", completed);
   assert! (completed [0] . contains ("delete-references-result"),
             "{:?}", completed);

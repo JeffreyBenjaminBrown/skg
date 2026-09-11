@@ -54,9 +54,12 @@ protocol to reuse here the way Emacs's C-u did. Call it directly as
 <localleader>dR, or as ':SkgDeleteRecursive'.
 *** <localleader>da : :SkgDeleteReferencesToAbsentNode
 On an Unknown placeholder, remove that exact raw ID from owned structured
-relationships throughout retained telescopes, then refresh every open view.
+relationships throughout retained telescopes, then refresh only views which
+show a changed owner or that exact raw ID.
 The command refuses while a view is dirty.  Text links are reported but left
-unchanged, and require confirmation before the structural cleanup.
+unchanged, and require confirmation before the structural cleanup.  If the
+scan changes before confirmation, the command refuses the stale approval;
+run it again to rescan.
 ** <localleader>f : text search
 The 'f' is for 'find'.
 *** <localleader>ff : :SkgSearch
