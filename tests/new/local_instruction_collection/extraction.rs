@@ -94,6 +94,44 @@ fn visibility_pairs_from_org (
   visibility_pairs_from_tree (
     checked_viewforest_from_org (input) ) }
 
+fn hiddenoutside_edits_from_tree (
+  viewforest : Tree<ViewNode>,
+) -> Vec<(ID, skg::from_text::local_instruction_collection::types::HiddenOutsideEdit)> {
+  let forest : ViewForest = ViewForest::from_internal_tree (viewforest);
+  lower_collected_intents (
+    collect_instructions_locally (&forest) . unwrap () ) . unwrap ()
+    . hidden_outside
+}
+
+#[test]
+fn unknown_members_write_their_editable_relationship_owners_only () {
+  let input = indoc! {"
+    * (skg (node (id owner) (source main))) owner
+    ** (skg (unknown (id content-unknown)))
+    ** (skg subscribeeCol)
+    *** (skg (unknown (id subscribee-unknown)))
+    *** (skg hiddenOutsideOfSubscribeeCol)
+    **** (skg (unknown (id hiddenoutside-unknown)))
+    ** (skg overriddenCol)
+    *** (skg (unknown (id overridden-unknown)))
+  "};
+  let instructions = definenodes_from_tree (checked_viewforest_from_org (input))
+    . expect ("Unknown relationship members are valid save input");
+  assert_eq! (save_ids (&instructions), vec! [ID::from ("owner")],
+              "an Unknown must not create a node save, delete, merge, or fork instruction");
+  let owner = saved_node_by_id (&instructions, "owner");
+  assert_eq! (members_of (&owner . contains), vec! [ID::from ("content-unknown")]);
+  assert_eq! (members_msv (&owner . subscribes_to),
+              MSV::Specified (vec! [ID::from ("subscribee-unknown")]));
+  assert_eq! (members_msv (&owner . overrides_view_of),
+              MSV::Specified (vec! [ID::from ("overridden-unknown")]));
+  assert_eq! (hiddenoutside_edits_from_tree (checked_viewforest_from_org (input)),
+              vec! [(ID::from ("owner"),
+                    skg::from_text::local_instruction_collection::types::HiddenOutsideEdit {
+                      members: vec! [ID::from ("hiddenoutside-unknown")] })],
+              "HiddenOutside passes the raw Unknown ID to its hide resolver");
+}
+
 fn set_membership_unstaged_minus (
   tree : &mut Tree<ViewNode>,
   id   : &str,
