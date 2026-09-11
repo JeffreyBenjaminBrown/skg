@@ -80,10 +80,14 @@ pub fn stream_rerender_views_after_absent_reference_cleanup (
   env        : &SkgEnv,
   views_state : &mut ViewsState,
   active_source_set : &ActiveSourceSet,
+  raw_id     : &crate::types::misc::ID,
+  affected_owner_pids : &HashSet<crate::types::misc::ID>,
 ) {
-  let prepared = prepare_rerender_views (
+  let prepared = prepare_rerender_views_where (
     env, views_state, views_state . diff_mode_enabled,
-    Some (active_source_set), None, false );
+    Some (active_source_set), None, false,
+    |viewforest| view_can_display_absent_reference_change (
+      viewforest, raw_id, affected_owner_pids ));
   stream_prepared_rerenders (stream, views_state, prepared);
 }
 
@@ -98,8 +102,26 @@ pub(crate) fn prepare_rerender_views (
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
   create_partnerCols  : bool,
 ) -> PreparedRerenders {
-  let uris : Vec<ViewUri> =
-    views_state . open_views . views . keys () . cloned () . collect ();
+  prepare_rerender_views_where (
+    env, views_state, diff_mode_enabled, active_source_set, prepass,
+    create_partnerCols, |_| true )
+}
+
+/// Prepare only open views selected from their already-held ViewForest.
+/// The selector is deliberately evaluated before cloning or rerendering, so a
+/// command can leave unrelated clean *and dirty* buffers entirely untouched.
+fn prepare_rerender_views_where (
+  env                 : &SkgEnv,
+  views_state         : &ViewsState,
+  diff_mode_enabled   : bool,
+  active_source_set   : Option<&ActiveSourceSet>,
+  prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
+  create_partnerCols  : bool,
+  include             : impl Fn (&ViewForest) -> bool,
+) -> PreparedRerenders {
+  let uris : Vec<ViewUri> = views_state . open_views . views . iter ()
+    .filter (|(_, state)| include (&state . viewforest))
+    .map (|(uri, _)| uri . clone ()) . collect ();
   let mut context : RerenderAfterSaveContext =
     RerenderAfterSaveContext::without_save (
       env, diff_mode_enabled, active_source_set );
@@ -143,6 +165,24 @@ pub(crate) fn prepare_rerender_views (
     errors   : context . errors,
     warnings : context . warnings,
   }
+}
+
+/// A cleanup changes an open view only when it currently displays the exact
+/// dangling member, or when it displays a graph-backed owner whose relationship
+/// list was rewritten.  `pids_from_viewforest` intentionally excludes Unknown,
+/// so inspect both representations rather than introducing a new view index.
+fn view_can_display_absent_reference_change (
+  viewforest          : &ViewForest,
+  raw_id              : &crate::types::misc::ID,
+  affected_owner_pids : &HashSet<crate::types::misc::ID>,
+) -> bool {
+  pids_from_viewforest (viewforest) . iter ()
+    .any (|pid| affected_owner_pids . contains (pid))
+  || viewforest . nodes () . any (|node| matches! (
+       &node . value () . kind,
+       crate::types::viewnode::ViewNodeKind::Phantom (
+         crate::types::viewnode::Phantom::Unknown (unknown))
+       if unknown . id == *raw_id ))
 }
 
 pub(crate) fn authorize_prepared_rerenders (
@@ -307,3 +347,42 @@ fn sources_not_tracked_in_git (
           warnings . push ( format! (
             "{}: git repo has no commits yet", source_name )); } } } }
   warnings }
+
+#[cfg(test)]
+mod tests {
+  use super::view_can_display_absent_reference_change;
+  use crate::types::misc::{ID, SourceName};
+  use crate::types::tree::forest::ViewForest;
+  use crate::types::viewnode::{mk_definitive_viewnode, mk_unknown_viewnode};
+  use std::collections::HashSet;
+
+  fn id (text : &str) -> ID { ID::from (text) }
+
+  fn active_view (pid : &str) -> ViewForest {
+    let mut view : ViewForest = ViewForest::new ();
+    view . append_root (mk_definitive_viewnode (
+      id (pid), SourceName::from ("main"), pid . to_string (), None ));
+    view
+  }
+
+  fn view_with_unknown (raw_id : &str) -> ViewForest {
+    let mut view : ViewForest = active_view ("unrelated-owner");
+    let root = view . first_root () . unwrap () . id ();
+    view . get_mut (root) . unwrap () . append (mk_unknown_viewnode (id (raw_id)));
+    view
+  }
+
+  #[test]
+  fn absent_reference_cleanup_selects_only_affected_owner_or_raw_unknown () {
+    let owners : HashSet<ID> = HashSet::from ([id ("changed-owner")]);
+    assert! (view_can_display_absent_reference_change (
+      &active_view ("changed-owner"), &id ("gone"), &owners),
+      "an open owner can display its rewritten relationship" );
+    assert! (view_can_display_absent_reference_change (
+      &view_with_unknown ("gone"), &id ("gone"), &owners),
+      "Unknowns are absent from the PID index but still need removal" );
+    assert! (! view_can_display_absent_reference_change (
+      &active_view ("unrelated-owner"), &id ("gone"), &owners),
+      "an unrelated view must receive neither a lock nor a replacement" );
+  }
+}
