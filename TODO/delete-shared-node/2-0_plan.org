@@ -72,33 +72,33 @@ semantic rename, not a blind replacement of the word /scalar/.  Uses that mean
 YAML scalar, Unicode scalar value, TypeDB scalar subquery, or a genuinely
 single-valued schema fact remain unchanged.
 
-Rename 'server/serve/handlers/scalar_release.rs' to 'text_release.rs',
-'ScalarReleaseDecision' to 'TextReleaseDecision', and title/body-specific
-identifiers such as 'scalar_release_confirmation', 'scalar_approved_pids', and
-'ScalarAtSource' to their 'text' equivalents.  Replace prose such as
+Rename 'server/serve/handlers/text_release.rs' to 'text_release.rs',
+'TextReleaseDecision' to 'TextReleaseDecision', and title/body-specific
+identifiers such as 'text_release_confirmation', 'text_approved_pids', and
+'TextAtSource' to their 'text' equivalents.  Replace prose such as
 “selected scalars,” “scalar publication,” and “scalar text” with the more
 specific “selected title/body text,” “title/body publication,” or “text,” as
 the sentence requires.
 
-** Use 'overPrivateText', never 'ugly', for this telescope condition
+** Use 'overPrivateText', never 'overPrivateText', for this telescope condition
 
 The replacement adjective is exactly 'overPrivateText'.  An
 /overPrivateText telescope/ is one whose folded title or body was selected
 from below its home in the privacy ladder.  Rename the Rust field exactly from
-'ugly_telescope' to 'overPrivateText_telescope'.  Rust accepts that mixed
+'overPrivateText_telescope' to 'overPrivateText_telescope'.  Rust accepts that mixed
 snake/camel spelling; add narrowly scoped 'allow(non_snake_case)' attributes
 where required instead of normalizing away the adjective phrase.
 
 Apply the rename through server types, locals, helpers, protocol variants,
 clients, tests, docs, and the Tantivy schema.  The intended public/internal
-mappings include 'UglyTelescopeConfirmation' to
-'OverPrivateTextTelescopeConfirmation', 'SearchUglinessChoice' to
-'SearchOverPrivateTextChoice', 'ugly-telescope-confirmation' to
-'overPrivateText-telescope-confirmation', 'allow-ugly-telescopes' to
-'allow-overPrivateText-telescopes', 'ugly-telescopes' to
-'overPrivateText-telescopes', and '--include-ugly-telescopes' to
+mappings include 'OverPrivateTextTelescopeConfirmation' to
+'OverPrivateTextTelescopeConfirmation', 'SearchOverPrivateTextChoice' to
+'SearchOverPrivateTextChoice', 'overPrivateText-telescope-confirmation' to
+'overPrivateText-telescope-confirmation', 'allow-overPrivateText-telescopes' to
+'allow-overPrivateText-telescopes', 'overPrivateText-telescopes' to
+'overPrivateText-telescopes', and '--include-overPrivateText-telescopes' to
 '--include-overPrivateText-telescopes'.  Rename the Tantivy field from
-'ugly_telescope' to 'overPrivateText_telescope' and exercise the normal
+'overPrivateText_telescope' to 'overPrivateText_telescope' and exercise the normal
 derived-index rebuild path.  Do not retain compatibility aliases containing
 the rejected vocabulary unless Jeff explicitly requests them later.
 
@@ -111,7 +111,7 @@ vocabulary in 'TODO/dup-ids-maybe-bad/4_audit-list.org', '6_recap.org',
 records found by the audit.  Update explanatory prose, code-symbol references,
 wire examples, CLI examples, headings, and test names.  Do not change unrelated
 uses such as YAML block scalars, Unicode scalar values, or an author merely
-calling some code ugly.
+calling some code overPrivateText.
 
 Land the server, Emacs, Neovim, wire, CLI, Tantivy, tests, current docs, and old
 planning-record rename together so no committed revision teaches two names for
@@ -1139,13 +1139,13 @@ do not make numbered phase/history headings in code or documentation.
 
 ** Commit: Rename title/body privacy vocabulary
 
-Complete the repository-wide /scalar/ to /text/ and /ugly/ to
+Complete the repository-wide /scalar/ to /text/ and /overPrivateText/ to
 /'overPrivateText'/ semantic renames described above.  Include the server,
 derived Tantivy schema/rebuild handling, wire protocol, CLI, both clients,
 tests, current documentation, and old planning records in one behavior-neutral
 commit.  Run the existing text-release/privacy suite before and after the
 rename and verify the old feature-specific names are absent.  Do not replace
-unrelated technical uses of /scalar/ or ordinary prose uses of /ugly/.
+unrelated technical uses of /scalar/ or ordinary prose uses of /overPrivateText/.
 
 ** Commit: Respect retained-telescope ownership during delete cleanup
 
@@ -1253,7 +1253,7 @@ Also perform these non-test checks:
 - verify foreign fixture bytes are asserted rather than merely re-parsed;
 - verify generated 'herald-rules.sexp' matches the generator;
 - verify documentation uses the final command and wire names exactly;
-- semantically audit remaining /scalar/ and /ugly/ occurrences, and verify no
+- semantically audit remaining /scalar/ and /overPrivateText/ occurrences, and verify no
   title/body privacy code, protocol atom, CLI option, test, current doc, or old
   plan still uses the rejected names;
 - verify the current type comments are included with the behavior commit;
@@ -1266,7 +1266,7 @@ file only when its code actually requires the change.
 
 ** Title/body privacy vocabulary
 
-- rename 'server/serve/handlers/scalar_release.rs' and every importing handler;
+- rename 'server/serve/handlers/text_release.rs' and every importing handler;
 - update 'NodeComplete', 'NodeRust', 'NodeTantivy', telescope fold/Hoist code,
   graph projections, and constructors carrying the classification bit;
 - update Tantivy schema/build/search/write/context-update fields and arrange a
@@ -1700,7 +1700,7 @@ because that is an atrocious name.
 Agreed.  I amended the plan to make this a prerequisite repository-wide
 semantic rename and changed this plan's own operative vocabulary to /text
 release/ and /title/body text/.  The implementation commit renames
-'scalar_release.rs' to 'text_release.rs', 'ScalarReleaseDecision' to
+'text_release.rs' to 'text_release.rs', 'TextReleaseDecision' to
 'TextReleaseDecision', and every title/body-specific identifier, test, comment,
 wire explanation, and old planning reference that uses /scalar/ in that sense.
 
@@ -1710,8 +1710,8 @@ schema facts keep the established technical word.  The repository audit
 explicitly includes the old audit, recap, plan, and progress documents under
 'TODO/dup-ids-maybe-bad/' and any applicable completed records it finds.
 
-** DONE let's rename 'ugly' to 'overPrivateText'
-and ugly_telescope to 'overPrivateText_telescope'.
+** DONE let's rename 'overPrivateText' to 'overPrivateText'
+and overPrivateText_telescope to 'overPrivateText_telescope'.
 (Rust won't like the mixed snake-camel casing, but I need it,
 because otherwise a reader might not understand that overPrivateText
 is an adjective phrase.)

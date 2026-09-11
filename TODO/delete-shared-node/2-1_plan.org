@@ -36,8 +36,8 @@ The completed feature has these user-visible results:
   known nodes, Unknowns, and aliases.  Copying a rendered fact cannot
   accidentally resource an edge.
 
-This is an execution plan for an implementation agent.  The semantic choices
-are settled.  Stop and return to Jeff only if live code disproves a relied-on
+The semantic choices are settled.
+Stop and return to Jeff only if live code disproves a relied-on
 architectural invariant or exposes a comparably substantial new choice under
 'coding-advice/when-to-stop.org'.  Choose and document small, local, reversible
 details rather than interrupting the work.
@@ -92,6 +92,15 @@ because they are still the display fact, but they cease to have request
 semantics.  Do not invent an old-form heuristic to recover an unsaved source
 request from a stale pre-change buffer.
 
+** Persist per [[../../coding-advice/when-to-stop.org]]
+You have ignored this instruction twice,
+instead stopping right before compaction.
+Don't do that.
+** Make incremental commits.
+Divide them however seems natural.
+** Test conservatively (for token usage).
+The test suite is verbose. Don't run the full suite a lot.
+Stick to focused testing.
 * Required vocabulary cleanup
 
 This cleanup is a behavior-neutral prerequisite and should land before the
@@ -105,17 +114,17 @@ This is a semantic audit, not a global string replacement.  Retain established
 technical uses such as YAML scalar, Unicode scalar value, TypeDB scalar
 subquery, and genuinely single-valued schema data.
 
-Rename 'server/serve/handlers/scalar_release.rs' to 'text_release.rs',
-'ScalarReleaseDecision' to 'TextReleaseDecision', and title/body-specific
-identifiers such as 'scalar_release_confirmation', 'scalar_approved_pids', and
-'ScalarAtSource' to corresponding text names.  Rewrite prose as /title/body
+Rename 'server/serve/handlers/text_release.rs' to 'text_release.rs',
+'TextReleaseDecision' to 'TextReleaseDecision', and title/body-specific
+identifiers such as 'text_release_confirmation', 'text_approved_pids', and
+'TextAtSource' to corresponding text names.  Rewrite prose as /title/body
 text/, /text release/, or /text publication/ according to meaning.
 
-** Rename ugly to the exact adjective overPrivateText
+** Rename overPrivateText to the exact adjective overPrivateText
 
 An /overPrivateText telescope/ is a telescope whose folded title or body was
 selected from below its home in the privacy ladder.  Rename
-'ugly_telescope' exactly to 'overPrivateText_telescope', including this mixed
+'overPrivateText_telescope' exactly to 'overPrivateText_telescope', including this mixed
 snake/camel spelling.  Use narrowly scoped 'allow(non_snake_case)' attributes
 where Rust requires them instead of changing the spelling.
 
@@ -123,16 +132,16 @@ Carry the rename across Rust types and helpers, protocol variants and atoms,
 Emacs and Neovim code, the export CLI, tests, current documentation, old
 planning records, and the Tantivy schema.  The intended replacements include:
 
-- 'UglyTelescopeConfirmation' to
+- 'OverPrivateTextTelescopeConfirmation' to
   'OverPrivateTextTelescopeConfirmation';
-- 'SearchUglinessChoice' to 'SearchOverPrivateTextChoice';
-- 'ugly-telescope-confirmation' to
+- 'SearchOverPrivateTextChoice' to 'SearchOverPrivateTextChoice';
+- 'overPrivateText-telescope-confirmation' to
   'overPrivateText-telescope-confirmation';
-- 'allow-ugly-telescopes' to 'allow-overPrivateText-telescopes';
-- 'ugly-telescopes' to 'overPrivateText-telescopes';
-- '--include-ugly-telescopes' to
+- 'allow-overPrivateText-telescopes' to 'allow-overPrivateText-telescopes';
+- 'overPrivateText-telescopes' to 'overPrivateText-telescopes';
+- '--include-overPrivateText-telescopes' to
   '--include-overPrivateText-telescopes'; and
-- the Tantivy field 'ugly_telescope' to
+- the Tantivy field 'overPrivateText_telescope' to
   'overPrivateText_telescope'.
 
 Exercise the normal disposable-index rebuild path for the Tantivy field
@@ -1420,7 +1429,7 @@ live code and touch a file only when the implementation requires it.
 
 ** Privacy vocabulary
 
-- 'server/serve/handlers/scalar_release.rs' and its importers;
+- 'server/serve/handlers/text_release.rs' and its importers;
 - 'NodeComplete', 'NodeRust', 'NodeTantivy', fold/Hoist, graph projections, and
   constructors carrying the classification;
 - Tantivy schema/build/search/write/context-update code;

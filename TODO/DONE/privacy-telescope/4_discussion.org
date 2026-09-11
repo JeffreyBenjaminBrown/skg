@@ -210,7 +210,7 @@ the fold well-defined and the visible-prefix rendering coherent.
 
 * Unmade decisions
 ** DONE Which file is the node's home, and what may non-home files contain?
-Title and body are scalars — they cannot fold as lists do.
+Title and body are title/body text — they cannot fold as lists do.
 Presumably they live in exactly one part (the most public one: the
 node's *home*), and that home's source is "the node's source" for
 every purpose that wants a single answer (Tantivy's source field,

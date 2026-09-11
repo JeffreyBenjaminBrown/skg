@@ -1,9 +1,79 @@
 * ONGOING BUG : Can't delete a node someone else has referred to.
-* TODO BUG : Can't change a public node's content-child's source from pers-i to public
+* next
+** language changes
+*** Introduce the term 'folder viewnode' instead of 'col'.
+*** "indefinitive" is user-facing and confusing
+"at peace"?
+and what's the similar term for independent of parent?
+*** Does make-content delete well?
+If the link it replaces with content has no other relationships
+beyond the one just removed from its parent --
+that is, if the link becomes an island --
+it should be deleted.
+But not if it retains other relationships, in or out,
+including non-content relationships.
+** behavior changes
+*** Don't show overriddenCol etc. by default.
+**** request for Claude
+The default view of a node should include
+nonempty alias and subscribee subfolder nodes,
+but not the more exotic subfolder types;
+those need to be asked for.
+
+The treatment of a subscribee-as-such is not the default:
+its org-content includes a hiddenHere viewnode,
+and ought to include (if it would be nonempty) a subscribees viewnode.
+The first part of that is already implemented;
+the latter might not be.
+
+Any other -as-such nodes should receive the default treatment.
+*** making a link into content
+**** should rewrite edges, including text links, that pointed to the node with the link
+That is, suppose node C (container)
+contains node L (link)
+which is just a link to node T (target),
+and node S (source) links to L.
+Replacing L with a contains relationship from C to T
+orphans the link that went from S to L.
+
+This is probably true of other relationships to L, too.
+**** should offer to delete it
+*** warn user if part of their saved changes would be discarded
+because indefinitive
+*** Each save should incrementally update the magit map from id to title
+*** TODO the content herald for a subscribee should count unintegated content, not all of it
+or both somehow
+*** matching all words should be much more highly valued
+In fact maybe they should all require presence,
+barring an OR statement.
+*** when creating a fork, immediately replace with the overerider
+*** staging should refresh views
+be it via magit, or via C-c t (a|A)
+*** sort backpaths most-public first
+** bugs
+*** mouse into buffers triggers errors
+*** bug in export to org-roam
+The 'exporter' node, the one that defines where to write the org file
+derived from its parent, might have multiple parents.
+*** Can't change a public node's content-child's source from pers-i to public
 e.g. at [[id:7764443d-777d-481e-b6d1-4eb2ebd1b7b3][quantum feeling experiences]] (public),
 there's a pers-i child.
 I want to make the child public but can't.
-* TODO drop TypeDB
+** for video
+*** TODO/command-name-echo.org
+A config option, for recording videos.
+Could put a second minibuffer line,
+that reads if anything (key sequence -> command),
+leaving a trail for five seconds or until interrupted.
+*** navigate point through herald (overlay)
+walk point through the herald string normally
+treat it as one character
+Shortcut to jump tokens treats it as one from outside,
+but divides it at spaces if point is interior to it.
+*** [[id:eb73db7a-acf4-4463-9398-f09279000337][org-mode : fold body and not children]]
+** work through TODO/problems.org
+** try neovim
+** drop TypeDB
 It's a pain when coding. It's slow.
 And it can't know about dangling references
 (e.g. when one user's data loses a node
@@ -21,8 +91,6 @@ as the source of documentation truth.
 * TODO ? Is overrides unnecessary?
 * DONE [[./TODO/refer-to-ids-not-buffer-names/it.org][BUG : Can't visit my cooking node]]
 after subscribing back to (but not overriding) cheese-man's cooking node
-* ONGOING skg2 : partial rebuild
-for git discard hunk to work
 * TODO BUG cycling TODO | DONE etc. hides text
 e.g. go to c02b9d3d-8857-4cf0-84b2-244b127160fc
 and try toggling that for one of its intermediate children
@@ -35,8 +103,6 @@ If one does, the resulting metadata is invalid
 * TODO BUG skg-goto should not change both buffers if the window is split
 * TODO BUG ? Shouldn't skg-rebuild sound the choir when it completes?
 Did my audio app steal it?
-* TODO the content herald for a subscribee should count unintegated content, not all of it
-or both somehow
 * BUG: org import of aliases with quotation marks
   * AWS AMI ("Amazon Machine Image")
   **
@@ -50,95 +116,20 @@ or both somehow
 ../elisp/skg-worktree-guard.el: Warning: ‘when-let’ is an obsolete macro (as of 31.1); use ‘when-let*’ or ‘and-let*’ instead. [2 times]
 ../elisp/skg-request-reload-paths.el: Warning: ‘if-let’ is an obsolete macro (as of 31.1); use ‘if-let*’ instead.
 ../elisp/skg-request-reload-paths.el: Warning: ‘when-let’ is an obsolete macro (as of 31.1); use ‘when-let*’ or ‘and-let*’ instead. [3 times]
-* When I make a link into a containment
-worry about links into the old link.
-(There will usually be none.)
 * rename
 ** apply_define_nodes_to_stores
 -> apply_defineNodes_to_stores
-** TODO the term 'scalar' is bad; just say 'text'
 * Should I have made Skg reactive?
 * document telescoping privacy's representation in .skg files with an illustration
 * BUG : it reports heralds will not render at startup, and yet they do
-* TODO : if changing a link to a content rel orphans the link node, ask whether to delete it
-* TODO Each save should update the magit map from id to title
 * TODO the warning about two modified buffers
 should not come upon save, but upon modifying the second
-* TODO there's no way to delete stale hides relationships
-They should be deletable from 'it hides these for no reason',
-or maybe deleted automatically when that is discovered to be nonempty.
-* BUG in export to org-roam
-The 'exporter' node, the one that defines where to write the org file
-derived from its parent, might have multiple parents.
-* BUG : mouse into buffers triggers errors
-* TODO warn user if part of their saved changes would be discarded
-because indefinitive
-* "indefinitive" is user-facing and confusing
-"actual"?
-* matching all words should be much more highly valued
-In fact maybe they should all require presence,
-barring an OR statement.
-* easy & important
-** for video
-*** TODO/command-name-echo.org
-A config option, for recording videos.
-Could put a second minibuffer line,
-that reads if anything (key sequence -> command),
-leaving a trail for five seconds or until interrupted.
-*** navigate point through herald (overlay)
-walk point through the herald string normally
-treat it as one character
-Shortcut to jump tokens treats it as one from outside,
-but divides it at spaces if point is interior to it.
-*** [[id:eb73db7a-acf4-4463-9398-f09279000337][org-mode : fold body and not children]]
-** work through TODO/problems.org
-** when creating a fork, immediately replace with the overerider
-** try neovim
-** staging should refresh views
-be it via magit, or via C-c t (a|A)
-** sort backpaths most-public first
-* BUG : making private content public
-Asks about publicizing the edge;
-I say do it;
-then it can't save.
-Trying to do it to some content of
-8c9108c0-ebc6-4820-945e-a7e7bce3d153
-* does make-content delete well?
-If the link it replaces with content has no other relationships
-beyond the one just removed from its parent --
-that is, if the link becomes an island --
-it should be deleted.
-But not if it retains other relationships, in or out,
-including non-content relationships.
-* Don't show overriddenCol etc. by default.
-** request for Claude
-The default view of a node should include
-nonempty alias and subscribee subfolder nodes,
-but not the more exotic subfolder types;
-those need to be asked for.
-
-The treatment of a subscribee-as-such is not the default:
-its org-content includes a hiddenHere viewnode,
-and ought to include (if it would be nonempty) a subscribees viewnode.
-The first part of that is already implemented;
-the latter might not be.
-
-Any other -as-such nodes should receive the default treatment.
-* Introduce the term 'subfolder viewnode'.
 * backpaths are no longer packpaths; they're just non-contentward trees
 C-c M-t _
 It would be principled if C-c M-t c
 switched a node to definitive.
 * a way to exclude org-ancestry when inserting a forest at a viewnode
 probably a non-conetnt forest
-* BUG : the actual title is none of what the search results present
-This is a complete top-level branch from search results for 'writing':
-
-  * (skg (node (id 9e45ccd9-d6e0-4870-8f13-cc11135334d0) (source public) (parentIs absent) indef (rels (contains (out 44)) (textlinksTo (in 9 (surprising 3) (withContent 1))) (aliases 7)) (viewStats (sourceHerald ⌂:public)))) using reading and writing
-  ** (skg folded aliasCol)
-  *** (skg alias) reading and writing, how
-  *** (skg alias) writing and reading, how
-  *** (skg alias) use knowledge graph writing, how
 * I might like the neovim client better.
 Unable to not show body if present
 resembles the hode text-explains-all-nodelists model.

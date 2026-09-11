@@ -1004,7 +1004,7 @@
   Found while writing TODO/delete-shared-node.org.  The first is the
   reported bug; the others are pre-existing gaps exposed by making
   foreign dangling relationships an intentional state.
-** Delete propagation schedules unauthorized full-node saves
+** DONE Delete propagation schedules unauthorized full-node saves
    'apply_delete_propagation_cleanup' in server/save.rs uses global
    inverse indexes to synthesize a full 'SaveNode' for every referencer
    of a deleted PID. It does not check whether the referencer's retained
@@ -1022,6 +1022,11 @@
    Therefore the referencer's home ownership is the correct cleanup
    boundary. Foreign referencers should not be synthesized; the ordinary
    writer's foreign-telescope refusal should remain unchanged.
+
+   Resolved 2026-09-10: cleanup now receives the configuration, synthesizes
+   collateral saves only for retained owned telescopes, and strips IDs only
+   from owned saves. The focused regression proves byte-for-byte preservation
+   of a foreign referencer while an owned extra-ID reference is cleaned.
 ** PhantomUnknown is rendered but silently omitted from content saves
    Content reconciliation can render a raw unresolved 'contains' member
    as '(skg (unknown (id ...)))'. Save traversal then ignores the phantom

@@ -271,7 +271,7 @@ discussion, flattened
    warning rather than brick the server, so it still needs safe rendering.
 
    The fix needs a policy: omit/quarantine such a node below 'title_at',
-   retain the title/body's provenance and build a genuine visible scalar
+   retain the title/body's provenance and build a genuine visible title/body text
    fold, or strengthen this particular violation into a load refusal. A
    source-set regression test must accompany it.
 
@@ -301,7 +301,7 @@ section with the private title/body, and source-set filtering gates the
 result only by the public home. Thus a public-only view can currently see
 the private text despite the warning. We need a safe policy and a
 regression test for malformed on-disk input -- probably omit or quarantine
-the node below the level containing its title, retain scalar provenance so
+the node below the level containing its title, retain title/body-text provenance so
 we can make a genuinely source-filtered fold, or refuse this particular
 node at load time. That read-side repair is needed even if save-time REFUSE
 remains the permanent policy.
@@ -313,7 +313,7 @@ or from invalid .skg files?
 *** (C to J)
 
 Invalid '.skg' files. More exactly, this is protection from a telescope
-whose files disagree about where its scalar text lives: a titleless
+whose files disagree about where its title/body text lives: a titleless
 most-public section exists on disk, while a more-private section contains
 the title/body. A buffer cannot directly express that split because it
 contains one folded title/body and one node source, not a separate title
@@ -325,12 +325,12 @@ Okay. If the telescope has a title below home, let's ingest it into
 TypeDB etc. normally, but warn the user.
 Then, if they ask for a view that would include that node,
 we ask them before presenting the view:
-"The text of the node with ID <ID> is defined in a .skg file that is more private than its home. (That is ugly data, which Skg itself cannot create, but Skg can handle it.) Rrender the node nonetheless?"
-And if they then save such a node, similarly explain that it was loaded from "ugly" data with a telescope with title under home, and offer to abort. if they proceed, clobber the bad telescope with a good one ("hoisting" the text).
+"The text of the node with ID <ID> is defined in a .skg file that is more private than its home. (That is overPrivateText data, which Skg itself cannot create, but Skg can handle it.) Rrender the node nonetheless?"
+And if they then save such a node, similarly explain that it was loaded from "overPrivateText" data with a telescope with title under home, and offer to abort. if they proceed, clobber the bad telescope with a good one ("hoisting" the text).
 
 Note that it's not just the title that could be above home.
 The title *and* the body both could be.
-If either of them is below home, that's ugly data.
+If either of them is below home, that's overPrivateText data.
 
 If you see problems with what I'm asking for,
 please append a sibling to this node explaining them.
@@ -345,21 +345,21 @@ requirements rather than a reason to reject it.
 'fold_sections' returns the folded text and a 'TitleBelowHome' warning;
 initialization writes the warning to 'telescope-warnings.org', then builds
 'NodeRust' values containing only home, title, and body. TypeDB, Tantivy,
-and the live graph therefore cannot later distinguish an ugly node from a
-normal one. We need to retain scalar provenance at runtime -- at least
+and the live graph therefore cannot later distinguish an overPrivateText node from a
+normal one. We need to retain title/body-text provenance at runtime -- at least
 'title_at' and 'body_at', or an equivalent per-pid record -- rather than
 treating the load warning as report-only information.
 ***** ONGOING J to C
-How about keeping an 'ugly telescope' boolean field?
+How about keeping an 'overPrivateText telescope' boolean field?
 If we need to see where things came from, we can look at the .skg files again.
 ***** TODO (C to J)
 
 Yes, a boolean is enough if the runtime policy is deliberately coarse:
 
-- 'ugly_telescope = false': render normally;
-- 'ugly_telescope = true' under 'all': warn but render, per your decision
+- 'overPrivateText_telescope = false': render normally;
+- 'overPrivateText_telescope = true' under 'all': warn but render, per your decision
   below;
-- 'ugly_telescope = true' under any restricted source set: require
+- 'overPrivateText_telescope = true' under any restricted source set: require
   confirmation before releasing its text.
 
 That policy does not need to know whether the title came from R and the
@@ -376,16 +376,16 @@ loaded graph, and in the Tantivy document or equivalent search-side filter,
 so every request judges the same snapshot it is querying.
 
 One consequence is intentional overprotection: a restricted source set
-that actually includes the lower scalar source still prompts, because the
+that actually includes the lower title/body-text source still prompts, because the
 boolean cannot prove that. If "the active set suggests the user doesn't
 care" specifically means the special 'all' set, the boolean is sufficient.
-If it means any set containing the real scalar origins, we need to retain
+If it means any set containing the real title/body-text origins, we need to retain
 those origins after all.
 
 Search also needs a slightly different confirmation flow from a direct
-view. Under a restricted set it must exclude ugly documents before
+view. Under a restricted set it must exclude overPrivateText documents before
 matching; prompting afterward would reveal that the private query text
-matched. The user can opt into "search ugly telescopes too" before the
+matched. The user can opt into "search overPrivateText telescopes too" before the
 query is run. Direct views, title lookups, and exports already know their
 candidate IDs independently of the hidden text and can challenge for those
 specific IDs.
@@ -397,8 +397,8 @@ when that body accompanies the selected title. But if the home has the
 title and a lower section alone has the body, that lower body is not folded
 into the node or reliably represented as "body below home". To implement
 your rule, the fold should select the most-public title and most-public
-body independently, retain each source, and classify the telescope as ugly
-when either present scalar's source differs from home. Extra titles or
+body independently, retain each source, and classify the telescope as overPrivateText
+when either present title/body text's source differs from home. Extra titles or
 bodies below the selected ones remain separate duplicate/stray warnings.
 
 **** Third, the confirmation must guard every way text leaves the server,
@@ -407,18 +407,18 @@ exports, and any API that returns node text all need the same decision
 point. Search is the subtle case: if Tantivy matches a private body word
 and only then returns a challenge naming the matching ID, the fact that
 the query matched has already leaked. We therefore need one centralized
-scalar-visibility rule and search behavior that does not reveal a match
+title/body-text visibility rule and search behavior that does not reveal a match
 before authorization. A good protocol shape is:
 
-1. The server returns a typed "ugly telescope requires confirmation"
-   response containing the pid and scalar source(s), but no title/body.
+1. The server returns a typed "overPrivateText telescope requires confirmation"
+   response containing the pid and title/body-text source(s), but no title/body.
 2. Emacs presents your explanation and retries the request with an
    explicit per-request allowlist of confirmed pids.
 3. Batch views prompt once for all affected pids. Noninteractive callers
    such as export must either supply the same explicit override or fail
    closed.
 ***** TODO J to C : Let's do it.
-**** We should decide whether to prompt for every view of ugly data,
+**** We should decide whether to prompt for every view of overPrivateText data,
 as your
 wording says, or only when the active source set excludes 'title_at' or
 'body_at'. The latter is the privacy-critical case; the former also makes
@@ -432,10 +432,10 @@ let's warn but display without asking for confirmation.
 **** Fourth, confirmed hoisting can make an all-owned telescope well formed,
 but it cannot always "clobber" a telescope containing foreign sections.
 The save flow should first preflight every affected section. If home and
-all scalar-bearing sections to repair are owned, it can ask the user,
+all title/body-text-bearing sections to repair are owned, it can ask the user,
 write both title and body to home, remove their lower owned copies while
 preserving those sections' relationships/aliases, and then verify the
-result. If home or a lower scalar-bearing section is foreign, Skg must not
+result. If home or a lower title/body-text-bearing section is foreign, Skg must not
 overwrite or delete it. Hoisting into an owned home could leave the
 foreign duplicate behind, so it would not actually produce a clean
 telescope; that case still needs manual/source-owner repair and a refusal.
@@ -451,7 +451,7 @@ It should just explain at load that non-owned fiels use the same PID
 as one of my files, list the offending PID(s), and explain that it ignored them.
 That foreign data is thereafter unreachable within Skg.
 I can look at the raw .skg files if I need to know.
-**** On an ordinary all-owned ugly telescope, the save choice can now be just
+**** On an ordinary all-owned overPrivateText telescope, the save choice can now be just
 what you requested: explain that saving will publish the lower text at
 home; offer Abort (with manual '.skg' repair instructions) or Hoist; and,
 after explicit confirmation, perform the complete preflighted rewrite.

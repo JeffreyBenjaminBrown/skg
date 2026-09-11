@@ -35,7 +35,7 @@
    home in 'source' and the private section's text in 'title' / 'body'.
 
    Source-set filtering gated the node by 'source', not by the level from
-   which its scalar text came. The pure helper
+   which its title/body text came. The pure helper
    'titles_for_source_set_for_test' demonstrated the path directly:
    it called 'read_all_skg_files_from_sources', accepted the node because
    its home was active, and returned the folded title. Production Tantivy
@@ -44,8 +44,8 @@
    by ids, and org export could therefore reveal the private text.
 
    FIXED: title and body now carry their independently folded source levels
-   and scalar ugliness is recorded in the node. Every textual release path
-   checks the exact ugly pids before returning text: direct views, search,
+   and scalar overPrivateTextness is recorded in the node. Every textual release path
+   checks the exact overPrivateText pids before returning text: direct views, search,
    title lookup, org export, ordinary rerenders, source-set/diff rerenders,
    and save collateral rerenders. The user may approve only the reported
    pids and retry. Regression coverage includes the titleless-public,

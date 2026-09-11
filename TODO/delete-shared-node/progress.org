@@ -1,0 +1,61 @@
+* Progress
+
+** what's done and went well
+
+- Renamed the title/body privacy vocabulary to /text/ and
+  /overPrivateText/ across the active protocol, clients, server, and
+  current documentation.
+- Delete propagation now discovers and strips only user-owned retained
+  telescopes; the cross-owner focused integration test passes.
+- Added the exact stored outbound-member accessor and kept raw dangling
+  direct-content members through save and rerender.
+- Began the relationship-source fact/request split: display facts stay
+  in =relSource= while the only write instruction is
+  =editRequest.relSource=.  Parser, serializer, herald rules, focused
+  client editing, and exact-raw source-info support are in place.
+- Unknown placeholders now retain a direct-content edge's off-default
+  source as a display fact during reconciliation, while their pending
+  request remains separate and save-extractable.
+- PartnerCol child construction now represents unresolved raw members
+  as Unknown instead of an empty Active fallback.
+- HiddenOutside now has its own =EditableFilter= policy, typed
+  extraction signal, last-writer hide resolution, and post-commit
+  moved-inside warning.  Its focused save test covers adding an inside
+  member and removing an outside member.
+- Same-session content, SubscribeeCol, hide-derived, and ordinary PartnerCol
+  reconciliation now converts an already-open Active relationship member to
+  Unknown when its raw membership survives deletion.  The pre-save graph
+  snapshot retains deleted primary-to-extra-ID evidence only for the immediate
+  rerender, so a surviving extra spelling becomes the Unknown's exact ID.
+  Focused content and shared-PartnerCol tests verify wrapper preservation and
+  off-default relationship-source facts.
+- Added the explicit =RelationshipMemberKey= comparison type and began using
+  it for sticky-source matching, so resolvable extra IDs remain equivalent
+  while absent raw IDs remain exact.
+- Restricted-source weaving now treats an absent member as visible when its
+  relationship source is active; this lets a displayed Unknown be deleted
+  instead of silently weaving it back.  The focused weave and hide-filter
+  targets pass.
+
+** Changes to the plan's envisioned order
+
+The independently testable ownership and raw-member groundwork was
+implemented alongside the fact/request split, before its whole-client
+checkpoint.  This was necessary to establish lossless dangling-member
+handling while the new request representation was threaded through
+extraction.  No design stumper has been found; continue through the
+remaining Unknown rendering, filter-policy, and cleanup-command work.
+
+** what's imperfect about what's done
+
+The prior run stopped before the plan was complete, despite the persistence
+instruction.  That was process failure, not a technical blocker.  The partial
+Unknown work still needs the full cross-surface save/copy/move and end-to-end
+same-session regression coverage before its behavior commit can be considered
+finished.
+
+** choices determining the future
+
+Continue from the remaining Unknown relationship rendering/extraction work,
+then implement the absent-reference cleanup command.
+No architectural stumper has been found.

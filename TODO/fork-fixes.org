@@ -151,7 +151,7 @@ using 'git diff --ignore-all-space'.
   upstreams.)
 - Each line's tail is stripped, and so are the body's trailing blank
   lines, because the canonical YAML writer (strip-chomping block
-  scalars) cannot represent them -- keeping one would make the
+  title/body text) cannot represent them -- keeping one would make the
   refreshed caches disagree with the file just written.
   A body that strips to nothing is dropped from its file.
 - Only files whose body changes are rewritten; a clean file stays

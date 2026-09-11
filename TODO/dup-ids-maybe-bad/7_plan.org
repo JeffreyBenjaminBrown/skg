@@ -25,20 +25,20 @@
     disk but is absent from Skg's graph, indexes, diffs, exports, and disk
     fallback lookups.
   - The title and body are folded independently. A node is marked
-    'ugly_telescope' when either selected scalar came from below home.
-    The exact source of each scalar is needed while folding and while
+    'overPrivateText_telescope' when either selected title/body text came from below home.
+    The exact source of each title/body text is needed while folding and while
     preparing a save, but is not retained in the live databases.
   - Ugly data still loads into the in-Rust graph, TypeDB, and Tantivy.
     With source-set 'all', Skg warns and releases the text without asking.
-    With any restricted source-set, no title or body from an ugly
+    With any restricted source-set, no title or body from an overPrivateText
     telescope crosses the server boundary without explicit approval for
     that request.
-  - Restricted text search decides whether ugly documents are eligible
+  - Restricted text search decides whether overPrivateText documents are eligible
     BEFORE matching. A declined or absent opt-in cannot reveal that a
     private title/body matched the query.
-  - Saving an all-owned ugly telescope offers Abort or Hoist. Hoist means
+  - Saving an all-owned overPrivateText telescope offers Abort or Hoist. Hoist means
     an explicit, warned publication of the selected title and body into
-    home, followed by removal of lower owned scalar copies while retaining
+    home, followed by removal of lower owned title/body copies while retaining
     relationships and aliases in those sections. No ordinary save,
     background cleanup, or batch command hoists silently.
   - The filesystem writer proves that every proposed output section is
@@ -58,15 +58,15 @@
 
 * Settled policy, made precise
 
-** Home and ugly scalars
+** Home and overPrivateText title/body text
 
    Home remains definitionally the most-public retained section, whether
    or not that section has text. In well-formed data, both title and body
    are in home.
 
    Folding selects the most-public title and the most-public body
-   independently. A present scalar is below home if its selected source is
-   not home. Either condition makes the node ugly. In particular, all of
+   independently. A present title/body text is below home if its selected source is
+   not home. Either condition makes the node overPrivateText. In particular, all of
    these load:
 
    - title below home, body beside it;
@@ -80,57 +80,57 @@
 
 ** Coarse runtime state
 
-   Persist only 'ugly_telescope: bool' in the loaded snapshot. Do not keep
+   Persist only 'overPrivateText_telescope: bool' in the loaded snapshot. Do not keep
    'title_at' or 'body_at' in TypeDB, the in-Rust graph, or the view model.
    This deliberately overprotects: every restricted source-set challenges
-   for an ugly node even if that set happens to include the actual lower
-   scalar source.
+   for an overPrivateText node even if that set happens to include the actual lower
+   title/body-text source.
 
-   Reread the checked telescope when a save needs precise scalar sources.
+   Reread the checked telescope when a save needs precise title/body-text sources.
    Do not reread files on ordinary view, title, or search requests: the
    authorization decision must describe the same loaded snapshot whose
    text is about to be returned.
 
 ** Release decisions
 
-   Give the server one shared scalar-release decision with these results:
+   Give the server one shared text-release decision with these results:
 
    - normal telescope: allow;
-   - ugly telescope under 'all': allow and attach a warning;
-   - ugly telescope under a restricted set and named in this request's
+   - overPrivateText telescope under 'all': allow and attach a warning;
+   - overPrivateText telescope under a restricted set and named in this request's
      explicit approval: allow and attach a warning;
-   - ugly telescope under a restricted set without that approval: return
+   - overPrivateText telescope under a restricted set without that approval: return
      a typed confirmation response containing pid(s) and explanation, but
      no title, body, alias, search match, or rendered buffer text.
 
    Approval is per request. Do not cache it in 'ViewsState', in Emacs, or
    in Neovim: a rebuild, pull, save, or source-set change can replace the
    loaded snapshot. A batch request challenges once for its complete set
-   of ugly pids and retries with an explicit allowlist.
+   of overPrivateText pids and retries with an explicit allowlist.
 
    The warning should use Jeff's language, corrected and shortened for a
    batch when necessary:
 
    #+begin_example
    The text of node <ID> is defined in a .skg file more private than
-   its home. This is ugly data: Skg cannot create it through an
+   its home. This is overPrivateText data: Skg cannot create it through an
    ordinary save, but it can display it. Render the node nonetheless?
    #+end_example
 
 ** Search is authorized before matching
 
-   Search cannot first match and then name the ugly result in a challenge;
+   Search cannot first match and then name the overPrivateText result in a challenge;
    even the fact of a match is a leak. Under a restricted set, the initial
-   request therefore performs only an ugliness preflight if the request
+   request therefore performs only an overPrivateTextness preflight if the request
    lacks an explicit choice. It does not parse or execute the user's query.
    The client then retries with one of:
 
-   - exclude ugly telescopes; Tantivy adds a MUST-NOT ugly clause before
+   - exclude overPrivateText telescopes; Tantivy adds a MUST-NOT overPrivateText clause before
      executing the query;
-   - include ugly telescopes; Tantivy may match them and the response warns.
+   - include overPrivateText telescopes; Tantivy may match them and the response warns.
 
-   If the loaded index contains no ugly telescope, the server can execute
-   immediately without bothering the user. Under 'all', it includes ugly
+   If the loaded index contains no overPrivateText telescope, the server can execute
+   immediately without bothering the user. Under 'all', it includes overPrivateText
    documents automatically and warns if one appears in the returned view.
    Search enrichment inherits the initial request's decision and snapshot;
    it must not create a second, less-protected path.
@@ -159,13 +159,13 @@
 ** Save-time hoist
 
    A save rereads every touched pid before any graph, database, or
-   filesystem mutation. If the current selected telescope is ugly, the
+   filesystem mutation. If the current selected telescope is overPrivateText, the
    first attempt returns a typed save confirmation. Its choices are:
 
    - Abort. Make no changes and explain that manual repair means moving the
      selected title/body to home and removing their lower copies, without
      disturbing the lower sections' lists.
-   - Hoist. Explicitly approve publication of both selected scalars at
+   - Hoist. Explicitly approve publication of both selected title/body text at
      home for the listed pids.
 
    On the approved retry, repeat the disk read and every preflight. Never
@@ -392,22 +392,22 @@
    alias defaults home, explicit more-private move, more-public refusal,
    foreign-source refusal, Emacs gesture, and a full save/reload round trip.
 
-** Fold title and body independently and carry ugliness
+** Fold title and body independently and carry overPrivateTextness
 
-   Refactor the scalar part of [[../../server/telescope/fold.rs]] without
+   Refactor the title/body-text part of [[../../server/telescope/fold.rs]] without
    changing list folding.
 
-   - Use a small fold-local 'ScalarAtSource<T>' or equivalent for the
+   - Use a small fold-local 'TextAtSource<T>' or equivalent for the
      selected title and body. Pick the first present value of each
      independently.
-   - Set 'ugly_telescope' if either selected source differs from home.
+   - Set 'overPrivateText_telescope' if either selected source differs from home.
      Preserve precise sources only long enough to produce warnings and the
      boolean.
    - Keep 'TitleBelowHome' and add a corresponding 'BodyBelowHome'. Rewrite
-     the later-title/body warnings so they say whether a more-public scalar
-     won; do not claim "home's won" when the selected scalar was itself
+     the later-title/body warnings so they say whether a more-public title/body text
+     won; do not claim "home's won" when the selected title/body text was itself
      below home.
-   - Add 'ugly_telescope' to 'NodeComplete', 'NodeRust', and 'NodeTantivy'.
+   - Add 'overPrivateText_telescope' to 'NodeComplete', 'NodeRust', and 'NodeTantivy'.
      New/buffer-authored nodes default false. 'NodeTypedb' deliberately
      omits the flag while receiving the same folded title, body, and graph
      data as today.
@@ -419,23 +419,23 @@
      titleless placeholder retry. The placeholder must not erase a body-
      below-home fact.
 
-   Test all four title/body placements listed under "Home and ugly
-   scalars", plus normal home text, duplicate later scalars, no title, and
+   Test all four title/body placements listed under "Home and overPrivateText
+   title/body text", plus normal home text, duplicate later title/body text, no title, and
    Tantivy save/rebuild preservation. Add a public-source-set regression
    that proves the flag is true before adding the release gate; do not add
    a temporary code path that releases the text.
 
-** Put the scalar-release gate in front of every textual response
+** Put the text-release gate in front of every textual response
 
    Introduce one policy module used by handlers before serialization. The
-   module takes the active source-set, candidate pids, the loaded ugliness
+   module takes the active source-set, candidate pids, the loaded overPrivateTextness
    lookup, and the request's approval; it returns allow, allow-with-warning,
    or challenge. Callers should not construct their own wording or decide
    that one endpoint is harmless.
 
-   Add a tagged 'ugly-telescope-confirmation' response. It carries the
+   Add a tagged 'overPrivateText-telescope-confirmation' response. It carries the
    operation, pid list when known, and explanatory prompt, but no data text.
-   Retried direct/batch requests carry an 'allow-ugly-telescopes' pid list.
+   Retried direct/batch requests carry an 'allow-overPrivateText-telescopes' pid list.
    Search uses an explicit include/exclude choice because its matching pids
    must not be learned before authorization. No legacy untagged fallback.
 
@@ -456,7 +456,7 @@
      'TcpToClient' response or output file.
 
    Pure path, source-set, source-list, connection, and relationship-source
-   responses contain no scalar text and need no gate. Record this negative
+   responses contain no title/body text and need no gate. Record this negative
    audit in the implementation progress document so a later reviewer can
    see why each request type was included or excluded.
 
@@ -477,18 +477,18 @@
 
    Search implementation:
 
-   - Add the Tantivy ugliness filter to the query itself, not to the returned
+   - Add the Tantivy overPrivateTextness filter to the query itself, not to the returned
      'TopDocs'. Filtering afterward both leaks match existence internally to
      later ranking code and can let excluded hits consume the result limit.
    - Store the include/exclude decision in 'SearchEnrichmentPayload' so the
      snapshot/enrichment exchange cannot broaden it.
-   - When excluded, aliases of an ugly node are excluded too even if an
+   - When excluded, aliases of an overPrivateText node are excluded too even if an
      alias itself sits at home; the chosen policy is telescope-coarse.
 
    Noninteractive behavior:
 
    - A restricted CLI export fails closed unless given an explicit
-     '--include-ugly-telescopes' option. 'all' exports and warns.
+     '--include-overPrivateText-telescopes' option. 'all' exports and warns.
    - Library/batch callers without a confirmation channel return a typed
      error naming the operation and pid(s); they never assume yes.
 
@@ -505,23 +505,23 @@
 
    - Before graph/database/filesystem mutation, derive the save's touched
      pids and reread each selected telescope from disk. Select title and body
-     independently with the same helper as load; do not infer ugliness from
+     independently with the same helper as load; do not infer overPrivateTextness from
      "home has no title" alone.
-   - If any is ugly and lacks this retry's explicit approval, return one
+   - If any is overPrivateText and lacks this retry's explicit approval, return one
      typed 'telescope-hoist-confirmation' containing every pid and home.
      Nothing is committed. The response explains that Hoist publishes the
      lower text at home and Abort requires manual '.skg' repair.
    - The approved retry carries the exact approved pids. Reread and
-     reclassify; newly ugly or changed candidates challenge again.
+     reclassify; newly overPrivateText or changed candidates challenge again.
    - Run the normal buffer validation, foreign-node validation,
      member-at-source validation, full unfolded-output ownership check,
      and serialization preflight before the first write. Confirmation is
      permission for publication, not permission to bypass another rule.
    - Write the selected title and selected body into home. Rewriting the
-     lower owned sections removes their scalar keys but preserves their
+     lower owned sections removes their title/body keys but preserves their
      aliases, relationships, anchors, extra section data, and byte-stable
      representations wherever unchanged.
-   - Reread the result and require 'ugly_telescope == false' before updating
+   - Reread the result and require 'overPrivateText_telescope == false' before updating
      the in-Rust graph and derived databases. If verification fails, report
      the failure loudly; do not mark the in-memory node clean.
    - Keep ordinary noninteractive writers fail-closed. In particular,
@@ -538,10 +538,10 @@
    Required save tests:
 
    - Abort leaves every file byte-for-byte unchanged;
-   - title-only, body-only, and both-scalar hoists become clean;
+   - title-only, body-only, and both-title/body-text hoists become clean;
    - title and body from different lower sources both land at home;
    - lower relationships and aliases survive;
-   - several ugly pids produce one batch confirmation;
+   - several overPrivateText pids produce one batch confirmation;
    - a disk change between attempts triggers a fresh decision;
    - a separate invalid/foreign output prevents every write despite Hoist
      approval;
@@ -558,7 +558,7 @@
    RETAINED source. Include an owned/foreign collision case so the new
    selection policy, not raw iteration order, determines the answer.
 
-   This can be a small independent commit; do not bury it in the scalar
+   This can be a small independent commit; do not bury it in the title/body-text change
    gate or hoist changes.
 
 ** Repair the two real-data warnings
@@ -591,7 +591,7 @@
      [[../../api-and-formats.md]], [[../../docs/COMMANDS.org]], and comments
      in [[../../schema.tql]] must agree that home is the most-public retained
      section and title/body at home is an invariant.
-   - Document the owned-pid collision rule, ugly-data warning/confirmation,
+   - Document the owned-pid collision rule, overPrivateText-data warning/confirmation,
      search opt-in, Hoist consequences, owned-to-foreign relationship
      default, alias 'relSource', and the final source vocabulary.
    - Describe every new/renamed wire request and response exactly, including
@@ -607,7 +607,7 @@
      to this plan if navigation needs it; do not mechanically rewrite Jeff
      and Codex's historical dialogue.
    - After the fixes and their tests pass, move the three recap findings
-     (read-time scalar release, foreign non-home write, and unchecked
+     (read-time text release, foreign non-home write, and unchecked
      'Telescope') from [[../problems.org]] to
      [[../DONE/problems.org]] under that file's normal protocol.
 
@@ -626,7 +626,7 @@
   - save-leveling, writer refusal/atomic-preflight, edge-source info, alias
     extraction, and filesystem round-trip tests after save changes;
   - source-set, Tantivy, search, titles-by-ids, export, diff analysis, and
-    raw-protocol tests after the scalar gate;
+    raw-protocol tests after the text-release gate;
   - Emacs and Neovim response/gesture tests for confirmations and alias
     metadata;
   - integration tests for restricted direct view, search exclusion and
@@ -637,7 +637,7 @@
   - Start exactly one TypeDB server and one Skg server as required by
     [[../../tests/USAGE.md]].
   - Rebuild Tantivy rather than reusing a schema created before the
-    'ugly_telescope' field.
+    'overPrivateText_telescope' field.
   - Resolve or explicitly re-bless the pre-existing
     'override_menu::all_tests' expectation in a separate, clearly unrelated
     commit. Do not call the Rust suite green while it is still red.
@@ -685,9 +685,9 @@
   - foreign same-pid sections are reported and absent from every semantic
     read path;
   - the writer's no-foreign-write rule is proven before all writes;
-  - title/body independence and 'ugly_telescope' survive load, save, index,
+  - title/body independence and 'overPrivateText_telescope' survive load, save, index,
     and diff paths;
-  - every scalar-output request is audited, with restricted leakage tests;
+  - every text-output request is audited, with restricted leakage tests;
   - search excludes before matching unless explicitly included;
   - Abort is byte-stable and Hoist is explicit, complete, and verified;
   - alias 'relSource' and the owned-to-foreign default round-trip;
@@ -731,33 +731,33 @@
    architecture I chose to realize them, and are the places to challenge
    before implementation begins.
 ** a list of them
-*** Where the ugly boolean lives
+*** Where the overPrivateText boolean lives
 
-   Settled beforehand: retain a coarse 'ugly telescope' boolean in the
+   Settled beforehand: retain a coarse 'overPrivateText telescope' boolean in the
    loaded snapshot, use the same snapshot for release decisions, and put
-   enough information in Tantivy to exclude ugly documents before search.
+   enough information in Tantivy to exclude overPrivateText documents before search.
 
-   Supplied here: put 'ugly_telescope' directly on 'NodeComplete',
+   Supplied here: put 'overPrivateText_telescope' directly on 'NodeComplete',
    'NodeRust', and 'NodeTantivy'; add one indexed and stored field to every
    Tantivy title/alias document; omit it from 'NodeTypedb'. That makes the
    classifier travel with the existing projections instead of creating a
-   separate pid-to-ugliness registry or a TypeDB attribute.
+   separate pid-to-overPrivateTextness registry or a TypeDB attribute.
 
    This is substantive because it changes the Tantivy schema and makes
-   ugliness part of equality/conversion for three core Rust node types. A
+   overPrivateTextness part of equality/conversion for three core Rust node types. A
    separate immutable registry would be a plausible alternative, but every
    save/rebuild and request would then have to keep that registry coherent
    with the graph and index.
 
-*** One centralized scalar-release boundary
+*** One centralized text-release boundary
 
-   Settled beforehand: challenge before releasing ugly text under a
+   Settled beforehand: challenge before releasing overPrivateText text under a
    restricted set, batch affected pids, fail closed for callers that cannot
    ask, and do not reveal a search match before authorization.
 
    Supplied here: one server policy module returns 'allow',
    'allow-with-warning', or 'challenge' for all textual handlers; a common
-   'ugly-telescope-confirmation' response carries no scalar data; approved
+   'overPrivateText-telescope-confirmation' response carries no title/body text; approved
    retries carry a pid allowlist. I also chose REQUEST-SCOPED approval with
    no cache in 'ViewsState' or either client.
 
@@ -770,22 +770,22 @@
 
 *** The restricted-search handshake
 
-   Settled beforehand: an ugly document must be excluded before matching
+   Settled beforehand: an overPrivateText document must be excluded before matching
    unless the user opts in before the query runs.
 
    Supplied here: when a restricted search request has no explicit choice
-   and the loaded index contains any ugly document, the server performs an
-   ugliness preflight but does not execute the text query. The client then
+   and the loaded index contains any overPrivateText document, the server performs an
+   overPrivateTextness preflight but does not execute the text query. The client then
    retries with either include or exclude; exclude adds a Tantivy MUST-NOT
-   clause to the query itself. If the index has no ugly documents, the
+   clause to the query itself. If the index has no overPrivateText documents, the
    server proceeds without prompting.
 
-   Other viable designs were to make restricted search always exclude ugly
+   Other viable designs were to make restricted search always exclude overPrivateText
    documents, to add a connection-wide setting, or to have the client ask
    before every restricted search without consulting the server. The plan's
    handshake avoids needless prompts when the corpus is clean and avoids a
    persistent authorization state, at the price of an extra round trip
-   while ugly data exists.
+   while overPrivateText data exists.
 
 *** Foreign-pid handling as input normalization
 
@@ -898,8 +898,8 @@ But for this command we need to broaden the definition to
 
    Supplied here: include the request string, response tag, handler/file
    names, and tests in that break; require both Emacs and Neovim to handle
-   new ugliness confirmations; and make noninteractive restricted export
-   require an explicit '--include-ugly-telescopes' option.
+   new overPrivateTextness confirmations; and make noninteractive restricted export
+   require an explicit '--include-overPrivateText-telescopes' option.
 
    The wire rename follows the project's no-legacy rule, but the scope of
    client parity and the exact CLI opt-in were not individually discussed.
@@ -915,9 +915,9 @@ But for this command we need to broaden the definition to
    Supplied here: explicitly include diff analysis and git-snapshot title/
    body fallbacks, source-set-switch streams, saved/collateral rerenders,
    readable-ID title responses, and maintenance/batch paths that can emit or
-   rewrite scalar text. Challenge before registering a view or beginning a
+   rewrite title/body text. Challenge before registering a view or beginning a
    rerender stream; leave path/source/connection/relationship-source
-   responses outside because they contain no scalar.
+   responses outside because they contain no title/body text.
 
    Much of this follows necessarily from the privacy invariant, but the
    placement at the final server serialization boundary is architectural.
@@ -942,6 +942,6 @@ But for this command we need to broaden the definition to
    not discussed. I put Hoist first because it authorizes publication of
    existing disk text and should be settled before the save considers
    cloning foreign nodes. I required verification because updating the live
-   snapshot to 'ugly_telescope = false' merely on the strength of intended
+   snapshot to 'overPrivateText_telescope = false' merely on the strength of intended
    output would recreate a disk/snapshot disagreement if the rewrite did
    not actually produce a clean telescope.

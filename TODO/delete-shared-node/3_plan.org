@@ -1,0 +1,181 @@
+#+title: Delete shared node: completion and regression plan
+#+TODO: TODO ONGOING | DONE
+
+* Purpose
+
+The preceding implementation added the main pieces of shared-node deletion:
+owned-only delete cleanup, raw unresolved relationship members rendered as
+=Unknown=, relationship-source facts and requests, editable
+=HiddenOutsideOfSubscribeeCol=, and the absent-reference cleanup command.
+
+This follow-up plan closes the gap between “the focused cases work” and “the
+feature is proved across every supported relationship surface.”  It should
+also correct any implementation defect that those tests reveal.  Do not call
+the feature complete merely because the existing broad test wrapper is green:
+the missing scenarios below must be represented by named tests.
+
+* Guardrails
+
+- Do not read, edit, format, migrate, or test against =data/=.
+- Preserve Jeff’s unrelated dirty =README.org=, =TODO.org=, =TODO/problems.org=,
+  plan-record, and untracked-file changes.  Stage paths and hunks deliberately.
+- Make incremental semantic commits.  A test belongs with the behavior it
+  proves; do not make a comments-only or tests-only feature commit.
+- Continue according to =coding-advice/when-to-stop.org=.  A failing focused
+  test normally identifies a local implementation task, not a reason to stop.
+- Use focused tests while editing.  Run the full wrapper only after the new
+  named coverage is in place.
+
+* Establish an honest starting inventory
+
+Before changing behavior, list the existing tests for:
+
+- dangling relationship rendering;
+- save extraction and relationship-source requests;
+- source-set filtering;
+- subscribee, overridden, HiddenIn, and HiddenOutside collections;
+- delete propagation; and
+- the absent-reference cleanup command.
+
+For each required scenario below, either point to a test which already proves
+it exactly, or add a new focused test.  Do not count a generic green test as
+proof when it does not construct the relevant relationship surface.
+
+* Prove Unknown behavior on every structured relationship
+
+The structured fields are =contains=, =subscribes_to=,
+=hides_from_its_subscriptions=, and =overrides_view_of=.  Their visible
+surfaces include ordinary content, SubscribeeCol, HiddenInSubscribeeCol,
+HiddenOutsideOfSubscribeeCol, and OverriddenCol as applicable.
+
+For each operation on each applicable surface, add focused coverage for
+saving, ordering, copying, and moving.  “Editable relationship surface” means content
+(=contains=), SubscribeeCol (=subscribes_to=), OverriddenCol
+(=overrides_view_of=), or editable HiddenOutside
+(=hides_from_its_subscriptions=), not a first/second/third list position.
+
+=PhantomUnknown= deliberately cannot represent a title, body, home, or node
+statistics.  Direct tests for edits to those fields do not belong here; the
+relationship tests must instead prove that no node-edit request is produced
+for the unresolved ID.
+
+- Saving it unchanged preserves its exact raw ID,
+  its stored relationship source, and its order among its siblings.
+- Removing it removes only that relationship from an owned destination.
+- A hand-authored Unknown in one of those editable destinations creates a
+  relationship to its exact raw ID, without attempting a node save, node
+  delete, merge, fork, title edit, or node-source edit for that raw ID.
+- An UnknownNode with ParentIs=Independent,
+  copied into another container, has no effect on that container either.
+- Contains and subscribes preserve user order when Unknowns and known members
+  are interleaved and reordered.
+- Moving removes an editable owned origin only because it is omitted there,
+  and adds the destination edge.
+- Cover cross-surface copies among content, SubscribeeCol, OverriddenCol, and
+  editable HiddenOutside.
+
+The relationship-source fact is display data only.  A copied fact must not
+select the source at the destination; an explicit copied
+=editRequest.relSource= must select it after normal validation.  Also verify
+the default for a new unresolved non-hide member is the relationship owner’s
+home, while a new hide follows the existing =hide_source= rule.
+
+* Prove same-session deletion precedence
+
+There are two meanings after a deletion:
+
+- If a displayed occurrence has no surviving backing relationship, it is
+  =Deleted= (or is pruned according to its existing scaffold rules).
+- If its parent’s raw relationship still exists, it is =Unknown= immediately,
+  using the relationship’s exact raw ID.  It is not a =Deleted= rendering of
+  the former node.
+
+Add end-to-end save-and-rerender tests, not only pure reconciler tests, for
+the following cases (see children of this org headline).
+
+Each test should compare the immediate rerender with a fresh render/restart.
+It should assert focus/fold preservation where an existing view child is
+converted, and assert that the conversion removes node facts.
+
+Only adjust the =Phantom::Deleted= and =Phantom::Unknown= comments if these
+tests show their current wording is inaccurate.  Keep such edits in the same
+behavior commit as the matching implementation and tests.
+
+** cases
+*** a foreign retained referencer in content
+
+Delete a primary node while an unowned referencer retains the relationship.
+The active view must show =Unknown= for the referencer's exact raw ID, both
+immediately and after a fresh render.
+
+*** an extra-ID edge where the old view holds the deleted primary ID but disk holds the extra spelling
+
+Use a relationship whose stored edge uses an extra ID.  After deletion, the
+rerender must use that extra ID, rather than the deleted node's primary ID.
+
+*** each remaining writable relation surface
+
+Repeat the retained-relationship case for SubscribeeCol, OverriddenCol, and
+editable HiddenOutside.  Include a hide-derived rendering, since it exercises
+the special hide source/scaffold path.
+
+* Complete absent-reference cleanup command coverage
+
+The pure core has coverage, but the command needs end-to-end proof.
+
+- Add a handler/protocol integration test which sends the initial request,
+  receives a text-link warning and opaque approval token, then retries with
+  that exact token.
+- Confirm only owned structured edges are rewritten, all four fields are
+  covered, list order and relationship sources are preserved, and text links
+  are reported but unchanged.
+- Confirm a changed graph between preview and approval is rejected as stale
+  without partial writes.
+- Select only open views whose current tree can display a changed relationship:
+  one containing the raw absent ID, or one containing an owner PID named by
+  the cleanup preview.  Verify that those, and only those, views are locked
+  for the rerender, and unlocked after they have been rerendered.
+  For this test include two unrelated views, one clean and one dirty,
+  and verify that neither is affected.
+- Add maintained-client tests for both Emacs and Neovim: command availability
+  only on an Unknown, refusal with dirty views, request shape, confirmation
+  retry, error handling, and result display.
+
+* Re-audit fact/request separation
+
+After the new copy/move tests exist, search live code and current docs (not
+historical discussion) to verify:
+
+- no =referenceSource= or =reference_source= implementation remains;
+- displayed =viewStats.relSource= and alias =relSource= never populate a
+  source request; and
+- only =editRequest.relSource= enters requested-source maps.
+
+Regenerate herald rules using the repository’s generator, then verify the
+generated output and both client renderers show display facts and pending
+requests distinctly.
+
+* Documentation and progress record
+
+Update current command/API documentation to describe the final command
+confirmation flow and the exact distinction between a relationship-source fact
+and a request.  Do not rewrite historical discussion to hide its superseded
+ideas.
+
+Replace =progress.org=’s “unfinished” prose only after the named tests above
+exist and pass.  The final note should say what was proved, name any deliberate
+limits, and not imply more coverage than exists.
+
+* Completion criteria
+
+This plan is complete only when:
+
+- every scenario in “Prove Unknown behavior” and “Prove same-session deletion
+  precedence” has a focused, discoverable test;
+- cleanup command server, Emacs, and Neovim flows have end-to-end coverage;
+- all fixes and their tests are in coherent incremental commits;
+- =git diff --check= passes;
+- no path under =data/= was used or changed;
+- the fact/request audits and herald regeneration are clean; and
+- the repository’s full =bash bash/all-tests.sh --no-sound= run is green, with
+  its summary and relevant logs inspected.

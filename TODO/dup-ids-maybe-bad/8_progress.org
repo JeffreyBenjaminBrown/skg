@@ -2,7 +2,7 @@
 
   The plan is implemented and its completion gate is green. The branch now
   treats privacy telescopes as checked values on both sides of the fold,
-  prevents ugly scalar text from crossing a restricted release boundary,
+  prevents overPrivateText title/body text from crossing a restricted release boundary,
   offers an explicit save-time Hoist, and applies one owned-source rule to
   new relationships and aliases. The two warnings in Jeff's live data were
   repaired through the normal UI and a rebuild left no telescope-warning
@@ -25,12 +25,12 @@
    decision, and deletion before the first filesystem mutation. It cannot
    write a foreign non-home section after partially writing earlier levels.
 
-** Independent scalar folding and release control
+** Independent title/body-text folding and release control
 
    Commit '41e82de8' folds title and body independently, records their
-   source levels, and persists the resulting coarse 'ugly_telescope' bit in
+   source levels, and persists the resulting coarse 'overPrivateText_telescope' bit in
    'NodeComplete', 'NodeRust', and 'NodeTantivy'. Tantivy stores and indexes
-   the bit so restricted search can exclude ugly documents before matching.
+   the bit so restricted search can exclude overPrivateText documents before matching.
 
    Four commits put one release policy in front of all textual outputs:
 
@@ -45,7 +45,7 @@
    search is deliberately different: its prequery choice is include or
    exclude, because identifying matching pids before authorization would
    itself disclose the result. Noninteractive export fails closed unless
-   '--include-ugly-telescopes' is explicit.
+   '--include-overPrivateText-telescopes' is explicit.
 
 ** Save-time Hoist
 
@@ -79,7 +79,7 @@
 
    Commit '4c0c8243' reconciled the API, telescope, glossary, Emacs, and
    Neovim documentation and appended the August disk-reader and
-   scalar-response audit to '4_audit-list.org'. This included the minor
+   text-response audit to '4_audit-list.org'. This included the minor
    terminology note Jeff left in the plan: the existing
    'skg-set-relationship-source' name is broader in practice when it acts
    on an alias.
@@ -105,8 +105,8 @@
   - Relationship defaults belong in 'SkgConfig', not separately in save
     resolution and the UI advice handler. The centralized method is now
     the rule for 'contains', 'subscribes_to', and 'overrides_view_of'.
-  - A save may commit graph data successfully and then encounter an ugly
-    collateral view under a restricted source-set. The scalar gate is
+  - A save may commit graph data successfully and then encounter an overPrivateText
+    collateral view under a restricted source-set. The text-release gate is
     therefore after the successful save but before registering or sending
     that view's text; it withholds presentation, not the already-authorized
     graph mutation.
@@ -171,7 +171,7 @@
    The completion environment had exactly one TypeDB CE 3.12.0 server
    listening on port 1729 and one live Skg server using
    'data/skgconfig.toml' on port 1732. Tantivy was rebuilt after adding the
-   'ugly_telescope' field. Tool versions were:
+   'overPrivateText_telescope' field. Tool versions were:
 
    - rustc 1.95.0 (2026-04-14);
    - cargo-nextest 0.9.137;
