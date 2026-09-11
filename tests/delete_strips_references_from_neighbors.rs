@@ -23,6 +23,7 @@
 use indoc::indoc;
 use std::error::Error;
 use std::fs;
+use std::io::BufReader;
 use std::net::TcpStream;
 use std::path::Path;
 use std::sync::Arc;
@@ -32,10 +33,17 @@ use skg::dbs::filesystem::one_node::{
   nodecomplete_from_pid_and_source as load_nc};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::save::update_graph_minus_nodeMerges;
-use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config};
+use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config,
+                      read_lp_message, extract_string_field_from_sexp,
+                      skg_env_from_parts};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
-use skg::types::views_state::OpenViews;
+use skg::serve::handlers::delete_references_to_absent_node::
+  handle_delete_references_to_absent_node_request;
+use skg::source_sets::ActiveSourceSet;
+use skg::to_org::render::content_view::single_root_view;
+use skg::types::env::SkgEnv;
+use skg::types::views_state::{OpenViews, ViewUri};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex, SourceName, members_of, members_msv};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
@@ -65,7 +73,105 @@ fn all_tests
                  "tests/delete_strips_references_from_neighbors/fixtures-cross-owner") . await ?;
       delete_preserves_foreign_referencer (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("absent_reference_cleanup_handler_confirms_then_rewrites",
+                 "tests/delete_strips_references_from_neighbors/fixtures-absent-reference-command") . await ?;
+      absent_reference_cleanup_handler_confirms_then_rewrites (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
+
+/// The command is a two-step protocol when text links would be left alone:
+/// preview the exact structural edits, receive an opaque token, then retry
+/// with that same token.  This verifies the handler rather than only its
+/// pure scanner, including its narrowly-targeted rerender stream.
+async fn absent_reference_cleanup_handler_confirms_then_rewrites (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let mut env : SkgEnv = skg_env_from_parts (
+    config, Arc::clone (driver), tantivy, &graph );
+  let active : ActiveSourceSet = ActiveSourceSet::default_from_config (config) ?;
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : false, open_views : OpenViews::new (), };
+  for (uri, root) in [("affected", "owner"),
+                      ("clean-unrelated", "unrelated"),
+                      ("dirty-unrelated", "unrelated-dirty")] {
+    let (_text, pids, tree) = single_root_view (
+      driver, config, Some (tantivy), &ID::from (root), false ) . await ?;
+    views_state . open_views . register_view (
+      ViewUri::ContentView (uri . to_string ()), tree, &pids ); }
+
+  let request = |approval : Option<&str>| {
+    let mut request = "((request . \"delete references to absent node\") (id . \"gone\"))" . to_string ();
+    if let Some (approval) = approval {
+      request = format! (
+        "((request . \"delete references to absent node\") (id . \"gone\") \
+          (approved-preview . \"{}\"))", approval . replace ('\\', "\\\\")
+          . replace ('\"', "\\\"") . replace ('\n', "\\n")); }
+    request };
+  let invoke = |request : &str,
+                env : &mut SkgEnv,
+                views_state : &mut ViewsState|
+   -> Result<Vec<String>, Box<dyn Error>> {
+    let listener : std::net::TcpListener =
+      std::net::TcpListener::bind ("127.0.0.1:0") ?;
+    let client : TcpStream = TcpStream::connect (listener . local_addr () ?) ?;
+    let (mut server, _) = listener . accept () ?;
+    // The handler synchronously rerenders via `block_on`; run it outside this
+    // async test's executor, as production does on its connection thread.
+    std::thread::scope (|scope| {
+      scope . spawn (|| handle_delete_references_to_absent_node_request (
+        &mut server, request, env, views_state, &active )); });
+    drop (server);
+    let mut reader : BufReader<TcpStream> = BufReader::new (client);
+    let mut messages : Vec<String> = Vec::new ();
+    while let Ok (message) = read_lp_message (&mut reader) {
+      messages . push (message); }
+    Ok (messages) };
+
+  let owner_path : String = path_from_pid_and_source (
+    config, &SourceName::from ("main"), ID::from ("owner")) ?;
+  let owner_before : Vec<u8> = fs::read (&owner_path) ?;
+  let confirmation : Vec<String> = invoke (&request (None), &mut env, &mut views_state) ?;
+  assert_eq! (confirmation . len (), 3, "{:?}", confirmation);
+  assert! (confirmation [0] . contains ("delete-references-confirmation"),
+            "{:?}", confirmation);
+  assert! (confirmation [0] . contains ("Text links left unchanged"),
+            "{:?}", confirmation);
+  assert! (confirmation [1] . contains ("(lock-views ())"),
+            "the preview stream must unlock every preemptively locked client view: {:?}", confirmation);
+  assert! (confirmation [2] . contains ("rerender-done"), "{:?}", confirmation);
+  assert_eq! (fs::read (&owner_path) ?, owner_before,
+              "preview must not write before approval");
+  let approval : String = extract_string_field_from_sexp (
+    &confirmation [0], "approved-preview")
+    . expect ("confirmation carries an opaque approval token");
+
+  let completed : Vec<String> = invoke (
+    &request (Some (&approval)), &mut env, &mut views_state) ?;
+  assert_eq! (completed . len (), 4, "{:?}", completed);
+  assert! (completed [0] . contains ("delete-references-result"),
+            "{:?}", completed);
+  assert! (completed [1] . contains ("rerender-lock"), "{:?}", completed);
+  assert! (completed [1] . contains ("affected"), "{:?}", completed);
+  assert! (! completed [1] . contains ("clean-unrelated")
+            && ! completed [1] . contains ("dirty-unrelated"),
+            "only the affected view is locked: {:?}", completed);
+  assert! (completed [2] . contains ("rerender-view")
+            && completed [2] . contains ("affected"), "{:?}", completed);
+  assert! (completed [3] . contains ("rerender-done"), "{:?}", completed);
+
+  let owner : NodeComplete = nodecomplete_from_pid_and_source (
+    config, ID::from ("owner"), &SourceName::from ("main")) ?;
+  assert_eq! (members_of (&owner . contains), vec! [ID::from ("kept")]);
+  assert! (owner . subscribes_to . or_default () . is_empty ());
+  assert! (owner . hides_from_its_subscriptions . or_default () . is_empty ());
+  assert! (owner . overrides_view_of . or_default () . is_empty ());
+  assert! (owner . title . contains ("[[id:gone][text link left alone]]"),
+            "cleanup reports text links but does not rewrite them" );
+  Ok (( ))
+}
 
 async fn delete_preserves_foreign_referencer (
   config  : &SkgConfig,

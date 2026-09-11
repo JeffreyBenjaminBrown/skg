@@ -78,7 +78,11 @@ impl Preview {
       rows . push (format! ("T{}{}{:?}:{}{}",
         encode (&o . owner_pid . 0), encode (&o . owner_source . 0),
         o . field, o . line, encode (&o . label))); }
-    rows . join ("\n")
+    // Rows are self-delimiting: their leading kind and length-prefixed fields
+    // make a separator unnecessary.  In particular, an actual newline would
+    // be escaped by the S-expression transport and would no longer compare
+    // equal after a client echoed this opaque token.
+    rows . concat ()
   }
 }
 

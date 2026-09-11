@@ -1,0 +1,11 @@
+pid: owner
+title: owner [[id:gone][text link left alone]]
+contains:
+- gone
+- kept
+subscribes_to:
+- gone
+hides_from_its_subscriptions:
+- gone
+overrides_view_of:
+- gone
