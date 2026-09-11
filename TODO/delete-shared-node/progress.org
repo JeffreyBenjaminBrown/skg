@@ -46,16 +46,23 @@ handling while the new request representation was threaded through
 extraction.  No design stumper has been found; continue through the
 remaining Unknown rendering, filter-policy, and cleanup-command work.
 
+The follow-up plan's “UnknownNode with ParentIs=Independent” case cannot be
+implemented literally: =ParentIs= is an =ActiveNode= field, while an Unknown
+is a =PhantomUnknown=.  The implemented tests instead cover the representable
+Unknown relationship/copy behavior without assigning it nonexistent node
+metadata.
+
 ** what's imperfect about what's done
 
-The prior run stopped before the plan was complete, despite the persistence
-instruction.  That was process failure, not a technical blocker.  The partial
-Unknown work still needs the full cross-surface save/copy/move and end-to-end
-same-session regression coverage before its behavior commit can be considered
-finished.
+The content, SubscribeeCol, and hide-derived surfaces have an ordinary fresh
+render path.  OverriddenCol is deliberately on-demand, so its corresponding
+regression reopens the serialized view against a newly loaded graph rather
+than claiming that a content-only root render would materialize that col.
+That checks the relevant restart behavior without changing the view-request
+policy.
 
 ** choices determining the future
 
-Continue from the remaining Unknown relationship rendering/extraction work,
-then implement the absent-reference cleanup command.
-No architectural stumper has been found.
+The named Unknown extraction, same-session deletion, cleanup-command,
+fact/request, and maintained-client checks now pass.  No architectural
+stumper was found.
