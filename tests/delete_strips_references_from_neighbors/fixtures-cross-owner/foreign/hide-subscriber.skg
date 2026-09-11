@@ -1,0 +1,6 @@
+pid: hide-subscriber
+title: foreign hide subscriber
+subscribes_to:
+- hide-subscribee
+hides_from_its_subscriptions:
+- victim-alt

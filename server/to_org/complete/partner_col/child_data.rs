@@ -24,7 +24,6 @@ use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff};
 use crate::types::misc::{ID, SourceName};
 use crate::types::phantom::title_for_phantom;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, Vognode, ParentIs, PartnerCol, mk_indefinitive_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
@@ -32,6 +31,7 @@ use crate::update_buffer::util::treat_certain_children;
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
+use std::io;
 
 /// Per-child information needed to build a viewnode for a sharing
 /// col's child (subscribee, hidden-in-subscribee, or
@@ -113,22 +113,40 @@ pub fn build_child_data (
           ChildData { source: SourceName::not_found (), title: String::new (),
                       phantom: None, unknown: true,
                       rel_source: relationship_sources . get (child_skgid) . cloned () } ); },
-        Some (child_src) => if let Some ( (s, t) ) = existing_children . get (child_skgid) {
-          result . insert ( child_skgid . clone (),
-                            ChildData { source  : s . clone (),
-                                        title   : t . clone (),
-                                        phantom : None,
-                                        unknown : false,
-                                        rel_source : None } );
-        } else {
-          let skg : NodeComplete = nodecomplete_rustFirst_by_pid_and_source (
-            &env . config, child_skgid, &child_src ) ?;
-          result . insert ( child_skgid . clone (),
-                            ChildData { source  : skg . source . clone (),
-                                        title   : skg . title . clone (),
-                                        phantom : None,
-                                        unknown : false,
-                                        rel_source : None } ); } }; }}
+        Some (child_src) => {
+          // `find_source` deliberately falls back through Tantivy.  During a
+          // same-save rerender that index can still name a just-deleted node;
+          // do not let that stale hint turn a retained raw relationship member
+          // into a failed disk read.  An unreadable, formerly indexed file
+          // means precisely an Unknown relationship member.
+          match nodecomplete_rustFirst_by_pid_and_source (
+            &env . config, child_skgid, &child_src ) {
+            Ok (skg) => if let Some ( (s, t) ) = existing_children . get (child_skgid) {
+              result . insert ( child_skgid . clone (),
+                                ChildData { source  : s . clone (),
+                                            title   : t . clone (),
+                                            phantom : None,
+                                            unknown : false,
+                                            rel_source : None } );
+            } else {
+              result . insert ( child_skgid . clone (),
+                                ChildData { source  : skg . source . clone (),
+                                            title   : skg . title . clone (),
+                                            phantom : None,
+                                            unknown : false,
+                                            rel_source : None } ); },
+            Err (e) if e . downcast_ref::<io::Error> ()
+              . is_some_and (|io_error| io_error . kind () == io::ErrorKind::NotFound) => {
+              result . insert ( child_skgid . clone (),
+                ChildData { source: SourceName::not_found (), title: String::new (),
+                            phantom: None, unknown: true,
+                            rel_source: relationship_sources . get (child_skgid) . cloned () } ); },
+            Err (e) => return Err (e),
+          }
+        }
+      }
+    }
+  }
   Ok (result) }
 
 /// Reconcile a PartnerCol's children against a goal list.

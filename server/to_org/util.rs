@@ -80,9 +80,16 @@ pub async fn nodecomplete_and_viewnode_from_id (
   match resolved {
     None => Ok (None),
     Some ((pid_resolved, source)) =>
-      Ok ( Some (
-        nodecomplete_and_viewnode_from_pid_and_source (
-          config, &pid_resolved, &source ) ? )) } }
+      match nodecomplete_and_viewnode_from_pid_and_source (
+        config, &pid_resolved, &source ) {
+        Ok (node) => Ok ( Some (node) ),
+        // TypeDB can briefly retain an ID after the save that removed its
+        // file and graph record.  This is a dangling relationship member,
+        // not a render failure: callers turn `None` into Unknown.
+        Err (e) if e . downcast_ref::<io::Error> ()
+          . is_some_and (|io_error| io_error . kind () == io::ErrorKind::NotFound)
+          => Ok (None),
+        Err (e) => Err (e), } } }
 
 /// Fetch a NodeComplete from the in-Rust graph or disk given PID and source.
 /// Makes an ViewNode with validated title. Returns both.

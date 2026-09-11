@@ -1,0 +1,4 @@
+pid: overrider
+title: foreign overrider
+overrides_view_of:
+- victim-alt

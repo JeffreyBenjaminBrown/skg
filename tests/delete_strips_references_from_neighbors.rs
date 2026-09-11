@@ -73,6 +73,18 @@ fn all_tests
                  "tests/delete_strips_references_from_neighbors/fixtures-cross-owner") . await ?;
       delete_preserves_foreign_referencer (
         &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("delete_in_foreign_subscribee_rerenders_as_unknown",
+                 "tests/delete_strips_references_from_neighbors/fixtures-cross-owner") . await ?;
+      delete_in_foreign_subscribee_rerenders_as_unknown (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("delete_in_foreign_overridden_rerenders_as_unknown",
+                 "tests/delete_strips_references_from_neighbors/fixtures-cross-owner") . await ?;
+      delete_in_foreign_overridden_rerenders_as_unknown (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+      s . reset ("delete_in_foreign_hiddenoutside_rerenders_as_unknown",
+                 "tests/delete_strips_references_from_neighbors/fixtures-cross-owner") . await ?;
+      delete_in_foreign_hiddenoutside_rerenders_as_unknown (
+        &s . config, &s . driver, &mut s . tantivy ) . await ?;
       s . reset ("absent_reference_cleanup_handler_confirms_then_rewrites",
                  "tests/delete_strips_references_from_neighbors/fixtures-absent-reference-command") . await ?;
       absent_reference_cleanup_handler_confirms_then_rewrites (
@@ -218,7 +230,107 @@ async fn delete_preserves_foreign_referencer (
   assert! ( members_of (&cheese . contains)
             . contains (&ID::from ("victim-alt")),
     "foreign raw membership must survive deletion" );
+  let (fresh_view, _, _) = single_root_view (
+    driver, config, Some (tantivy), &ID::from ("cheese"), false ) . await ?;
+  assert! (fresh_view . contains ("(unknown (id victim-alt))"),
+    "the immediate Unknown must agree with a fresh render: {}", fresh_view);
   Ok (( )) }
+
+async fn delete_in_foreign_subscribee_rerenders_as_unknown (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : false, open_views : OpenViews::new (), };
+  let listener = std::net::TcpListener::bind ("127.0.0.1:0") ?;
+  let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
+  let response = update_from_and_rerender_buffer (
+    &mut stream, indoc! {"
+      * (skg (node (id subscriber) (source foreign))) foreign subscriber
+      ** (skg subscribeeCol)
+      *** (skg (node (id victim) (source owned) (editRequest delete))) victim
+    "}, driver, config, tantivy, &graph, false,
+    &Err (String::new ()), &mut views_state ) . await ?;
+  assert! (response . errors . is_empty (), "{:?}", response . errors);
+  assert! (response . saved_view . contains ("(unknown (id victim-alt))"),
+    "a retained foreign subscribee must become its raw extra ID immediately: {}",
+    response . saved_view);
+  let (fresh, _, _) = single_root_view (
+    driver, config, Some (tantivy), &ID::from ("subscriber"), false ) . await ?;
+  assert! (fresh . contains ("(unknown (id victim-alt))"),
+    "immediate subscribee rerender must match a fresh render: {}", fresh);
+  Ok (( ))
+}
+
+async fn delete_in_foreign_overridden_rerenders_as_unknown (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : false, open_views : OpenViews::new (), };
+  let listener = std::net::TcpListener::bind ("127.0.0.1:0") ?;
+  let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
+  let response = update_from_and_rerender_buffer (
+    &mut stream, indoc! {"
+      * (skg (node (id overrider) (source foreign))) foreign overrider
+      ** (skg overriddenCol)
+      *** (skg (node (id victim) (source owned) (editRequest delete))) victim
+    "}, driver, config, tantivy, &graph, false,
+    &Err (String::new ()), &mut views_state ) . await ?;
+  assert! (response . errors . is_empty (), "{:?}", response . errors);
+  assert! (response . saved_view . contains ("(unknown (id victim-alt))"),
+    "a retained foreign override must become its raw extra ID immediately: {}",
+    response . saved_view);
+  // Reopen the serialized view with a new graph handle, which exercises the
+  // restart path without relying on the content-only default to request this
+  // on-demand collection.
+  let fresh_graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let mut restarted_views : ViewsState = ViewsState {
+    diff_mode_enabled : false, open_views : OpenViews::new (), };
+  let restart_listener = std::net::TcpListener::bind ("127.0.0.1:0") ?;
+  let mut restart_stream = TcpStream::connect (restart_listener . local_addr () ?) ?;
+  let restarted = update_from_and_rerender_buffer (
+    &mut restart_stream, &response . saved_view, driver, config, tantivy,
+    &fresh_graph, false, &Err (String::new ()), &mut restarted_views ) . await ?;
+  assert! (restarted . saved_view . contains ("(unknown (id victim-alt))"),
+    "the restarted overridden view must retain the raw Unknown: {}",
+    restarted . saved_view);
+  Ok (( ))
+}
+
+async fn delete_in_foreign_hiddenoutside_rerenders_as_unknown (
+  config  : &SkgConfig,
+  driver  : &Arc<TypeDBDriver>,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : false, open_views : OpenViews::new (), };
+  let listener = std::net::TcpListener::bind ("127.0.0.1:0") ?;
+  let mut stream = TcpStream::connect (listener . local_addr () ?) ?;
+  let response = update_from_and_rerender_buffer (
+    &mut stream, indoc! {"
+      * (skg (node (id hide-subscriber) (source foreign))) foreign hide subscriber
+      ** (skg subscribeeCol)
+      *** (skg (node (id hide-subscribee) (source foreign))) foreign hide subscribee
+      *** (skg hiddenOutsideOfSubscribeeCol)
+      **** (skg (node (id victim) (source owned) (editRequest delete))) victim
+    "}, driver, config, tantivy, &graph, false,
+    &Err (String::new ()), &mut views_state ) . await ?;
+  assert! (response . errors . is_empty (), "{:?}", response . errors);
+  assert! (response . saved_view . contains ("(unknown (id victim-alt))"),
+    "a retained foreign hide must become its raw extra ID immediately: {}",
+    response . saved_view);
+  let (fresh, _, _) = single_root_view (
+    driver, config, Some (tantivy), &ID::from ("hide-subscriber"), false ) . await ?;
+  assert! (fresh . contains ("(unknown (id victim-alt))"),
+    "immediate hidden-outside rerender must match a fresh render: {}", fresh);
+  Ok (( ))
+}
 
 async fn test_delete_strips_references_from_neighbors (
   config  : &SkgConfig,

@@ -1,0 +1,4 @@
+pid: subscriber
+title: foreign subscriber
+subscribes_to:
+- victim-alt
