@@ -293,4 +293,17 @@ mod tests {
     let graph = InRustGraph::from_nodecompletes (&[node ("gone", "main")]);
     assert! (preview (&graph, &config (), &id ("gone")) . is_err ());
   }
+
+  #[test]
+  fn stale_preview_produces_no_rewrite_instructions () {
+    let mut owned = node ("owned", "main");
+    owned . contains = vec! [member ("main", "gone")];
+    let graph = InRustGraph::from_nodecompletes (&[owned]);
+    let scanned = preview (&graph, &config (), &id ("gone")) . unwrap ();
+    let mut changed = graph . clone ();
+    changed . nodes . get_mut (&id ("owned")) . unwrap () . title =
+      "changed after preview" . to_string ();
+    assert_eq! (rewrite (&changed, &config (), &scanned),
+                Err ("Cleanup preview is stale; rescan before rewriting." . to_string ()));
+  }
 }
