@@ -4,7 +4,7 @@
 //! config -- foreign sources are read-only, and stripping them would
 //! make them diverge from their upstreams (Jeff settled on owned
 //! only) -- rewriting only the .skg files whose bodies changed. Bodies also live in two derived stores, the in-Rust graph
-//! and the Tantivy index; both are refreshed here. TypeDB is
+//! and the Tantivy index; both are refreshed here. The graph is
 //! untouched: it stores no body text, and the textlinks it derives
 //! from bodies cannot be changed by stripping trailing whitespace.
 
@@ -46,22 +46,26 @@ pub fn handle_strip_body_whitespace_request (
 fn strip_body_whitespace_and_refresh_caches (
   env : &mut SkgEnv,
 ) -> Result<String, String> {
+  let mutation_gate = env . mutation_gate ();
+  let _mutation_guard = futures::executor::block_on (mutation_gate . lock ());
+  let runtime = env . runtime_snapshot ();
   let (all_nodes, changed) : (Vec<NodeComplete>, Vec<NodeComplete>) =
-    strip_body_whitespace_on_disk (& env . config) ?;
+    strip_body_whitespace_on_disk (&runtime . config) ?;
   let owned_checked : usize =
     all_nodes . iter ()
-    . filter ( |n| env . config . user_owns_source (& n . source) )
+    . filter ( |n| runtime . config . user_owns_source (& n . source) )
     . count ();
   if changed . is_empty () {
     return Ok ( format! (
       "No body has trailing whitespace ({} files checked, in owned sources).",
       owned_checked )); }
-  env . in_rust_graph . store (
-    Arc::new ( InRustGraph::from_nodecompletes (&all_nodes) ));
+  let new_graph = Arc::new (InRustGraph::from_nodecompletes (&all_nodes));
   { let tantivy_nodes : Vec<NodeTantivy> =
       changed . iter () . map (NodeTantivy::from) . collect ();
-    update_index_with_nodes (&tantivy_nodes, & env . tantivy_index)
+    update_index_with_nodes (&tantivy_nodes, &runtime . tantivy_index)
       . map_err ( |e| format! ("Tantivy update failed: {}", e) ) ?; }
+  env . runtime . publish (
+    runtime . config . clone (), new_graph, runtime . tantivy_index . clone ());
   let breakdown : String = {
     // BTreeMap so the report lists sources in a stable order.
     let mut counts : BTreeMap<SourceName, usize> = BTreeMap::new ();

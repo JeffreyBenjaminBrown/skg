@@ -6,7 +6,7 @@ use skg::to_org::expand::backpath::{
   build_and_integrate_containerward_path};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode, Birth};
 use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
@@ -17,42 +17,38 @@ use skg::assert_metadata_eq;
 use ego_tree::{NodeId,Tree};
 use std::collections::HashSet;
 use std::error::Error;
-use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str = "tests/rebuild/fixtures";
-  run_with_shared_test_db (
+  run_with_shared_test_stores (
     "skg-test-rebuild-integrate-backpath",
     |s| Box::pin ( async move {
-      s . reset ("test_path_with_cycle", fixtures) . await ?;
+      s . reset ("test_path_with_cycle", fixtures) ?;
       test_path_with_cycle (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("test_path_with_branches_no_cycle", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_path_with_branches_no_cycle", fixtures) ?;
       test_path_with_branches_no_cycle (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("test_path_with_branches_with_cycle", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_path_with_branches_with_cycle", fixtures) ?;
       test_path_with_branches_with_cycle (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_fork_expansion_at_origin",
-                 "tests/rebuild/fixtures-fork-expansion") . await ?;
+                 "tests/rebuild/fixtures-fork-expansion") ?;
       test_fork_expansion_at_origin (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 async fn test_path_with_cycle (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      test_path_with_cycle_impl(config, driver) . await
+      test_path_with_cycle_impl(config) . await
 }
 
 async fn test_path_with_cycle_impl(
-  config: &SkgConfig,
-  driver: &TypeDBDriver,
+  config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   // Create the initial tree
   let input: &str = indoc! {"
@@ -83,8 +79,9 @@ async fn test_path_with_cycle_impl(
 
   integrate_path_that_might_fork_or_cycle(
     &mut viewforest, root_id, path, branches,
-    cycle_nodes, &config, driver, Birth::Backpath (RelationRole::CONTAINER)
-  ). await?;
+    cycle_nodes, &graph_handle_from_config (config)? . load_full (),
+    &config, Birth::Backpath (RelationRole::CONTAINER)
+  )?;
 
   let expected: &str = indoc! {"
     * (skg (node (id 1) (source main))) 1
@@ -109,15 +106,13 @@ async fn test_path_with_cycle_impl(
 }
 
 async fn test_path_with_branches_no_cycle (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      test_path_with_branches_no_cycle_impl(config, driver) . await }
+      test_path_with_branches_no_cycle_impl(config) . await }
 
 async fn test_path_with_branches_no_cycle_impl(
-  config: &SkgConfig,
-  driver: &TypeDBDriver,
+  config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   // Create the initial tree
   let input: &str = indoc! {"
@@ -160,8 +155,9 @@ async fn test_path_with_branches_no_cycle_impl(
 
   integrate_path_that_might_fork_or_cycle(
     &mut viewforest, node_1_id, path, branches,
-    cycle_nodes, &config, driver, Birth::Backpath (RelationRole::CONTAINER)
-  ). await?;
+    cycle_nodes, &graph_handle_from_config (config)? . load_full (),
+    &config, Birth::Backpath (RelationRole::CONTAINER)
+  )?;
 
   let expected: &str = indoc! {"
     * (skg (node (id 0) (source main))) 0
@@ -188,15 +184,13 @@ async fn test_path_with_branches_no_cycle_impl(
 }
 
 async fn test_path_with_branches_with_cycle (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      test_path_with_branches_with_cycle_impl(config, driver) . await }
+      test_path_with_branches_with_cycle_impl(config) . await }
 
 async fn test_path_with_branches_with_cycle_impl(
-  config: &SkgConfig,
-  driver: &TypeDBDriver,
+  config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   // Create the initial tree
   let input: &str = indoc! {"
@@ -240,8 +234,9 @@ async fn test_path_with_branches_with_cycle_impl(
 
   integrate_path_that_might_fork_or_cycle(
     &mut viewforest, node_1_id, path, branches,
-    cycle_nodes, &config, driver, Birth::Backpath (RelationRole::CONTAINER)
-  ). await?;
+    cycle_nodes, &graph_handle_from_config (config)? . load_full (),
+    &config, Birth::Backpath (RelationRole::CONTAINER)
+  )?;
 
   let expected: &str = indoc! {"
     * (skg (node (id 0) (source main))) 0
@@ -268,15 +263,13 @@ async fn test_path_with_branches_with_cycle_impl(
 }
 
 async fn test_fork_expansion_at_origin (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      test_fork_expansion_at_origin_impl(config, driver) . await }
+      test_fork_expansion_at_origin_impl(config) . await }
 
 async fn test_fork_expansion_at_origin_impl(
-  config: &SkgConfig,
-  driver: &TypeDBDriver,
+  config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   // a11 has containers {a1, a2} — immediate fork.
   // a1 has containers {a, a1} — fork+cycle.
@@ -291,8 +284,9 @@ async fn test_fork_expansion_at_origin_impl(
     viewforest . root () . first_child () . unwrap () . id ();
 
   build_and_integrate_containerward_path (
-    &mut viewforest, node_a11_id, &config, driver
-  ) . await ?;
+    &mut viewforest, node_a11_id,
+    &graph_handle_from_config (config)? . load_full (), &config
+  ) ?;
   // Expected: a11 gets two children (a1 and a2).
   // Under a1: branches {a, a1} (sorted: a first, then a1).
   // Under a2: branches {a, b} (sorted: a first, then b).

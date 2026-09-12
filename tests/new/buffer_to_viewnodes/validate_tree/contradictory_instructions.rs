@@ -7,7 +7,7 @@ use skg::types::errors::BufferValidationError;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use skg::from_text::buffer_to_viewnodes::validate_tree::contradictory_instructions::find_inconsistent_instructions;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::run_with_test_stores;
 use std::error::Error;
 
 #[test]
@@ -68,11 +68,11 @@ fn test_find_inconsistent_toDelete_instructions() {
 
 #[test]
 fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
+  run_with_test_stores(
     "skg-test-validate-multiple-def",
     "tests/merge/merge_nodes/fixtures",
     "/tmp/tantivy-test-validate-multiple-def",
-    |config, driver, _tantivy| Box::pin(async move {
+    |config, _tantivy| Box::pin(async move {
       // Test input with multiple nodes having the same ID and indefinitive=false
       let input_with_multiple_defining_containers: &str =
         indoc! {"
@@ -91,7 +91,7 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
       let viewforest: MpViewForest =
         org_to_uninterpreted_viewforest (input_with_multiple_defining_containers) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
+        find_buffer_errors_for_saving(&viewforest, config)?;
 
       let multiple_defining_errors: Vec<&BufferValidationError> = errors . iter()
         . filter(|e| matches!(e, BufferValidationError::Multiple_Defining_Viewnodes (_)))

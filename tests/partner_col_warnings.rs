@@ -14,10 +14,8 @@
 
 use std::error::Error;
 use std::net::TcpStream;
-use std::sync::Arc;
 
-use skg::dbs::in_rust_graph::install_or_swap_global_handle;
-use skg::test_utils::{run_with_shared_test_db, graph_handle_from_config};
+use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::multi_root_view;
 use skg::serve::ViewsState;
@@ -27,29 +25,27 @@ use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::errors::{SaveError, BufferValidationError};
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use typedb_driver::TypeDBDriver;
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str = "tests/partner_col_warnings/fixtures";
-  run_with_shared_test_db (
+  run_with_shared_test_stores (
     "skg-test-partner-col-warnings",
     |s| Box::pin ( async move {
-      s . reset ("readonly_col_repairs_warn", fixtures) . await ?;
+      s . reset ("readonly_col_repairs_warn", fixtures) ?;
       readonly_col_repairs_warn_impl (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("failed_save_carries_warnings_with_errors", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("failed_save_carries_warnings_with_errors", fixtures) ?;
       failed_save_carries_warnings_with_errors (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 async fn save_buffer (
   buf     : &str,
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
-  graph   : &InRustGraphHandle, // must be the process-global handle, or the save's coherence debug-assert reads a stale graph
+  graph   : &InRustGraphHandle, // must be the explicit handle, or the save's coherence debug-assert reads a stale graph
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false,
@@ -61,7 +57,7 @@ async fn save_buffer (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   update_from_and_rerender_buffer (
     &mut stream,
-    buf, driver, config, tantivy, graph, false,
+    buf, config, tantivy, graph, false,
     &Err ( String::new () ), &mut views_state ) . await }
 
 fn line_containing<'a> (
@@ -74,18 +70,17 @@ fn line_containing<'a> (
       || panic! ( "no line contains {:?} in:\n{}", fragment, buf )) }
 
 async fn readonly_col_repairs_warn_impl (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
-    install_or_swap_global_handle (
+    (
       graph_handle_from_config (config) ? );
   let (complete_buffer, _pids, _tree)
     : (String, Vec<ID>, _) =
     multi_root_view (
-      driver, config, Some (tantivy),
-      &[ ID ("n" . to_string ()) ], false ) . await ?;
+      config, Some (tantivy),
+      &[ ID ("n" . to_string ()) ], false ) ?;
   let edited : String = {
     let r_line : String =
       line_containing (&complete_buffer, "(id r)") . to_string ();
@@ -115,7 +110,7 @@ async fn readonly_col_repairs_warn_impl (
       . replace ( &col_line,                      // edit the col headline text
                   &format! ("{} HELLO", col_line) ) };
   let response : SaveResponse =
-    save_buffer (&edited, config, driver, tantivy, &graph) . await ?;
+    save_buffer (&edited, config, tantivy, &graph) . await ?;
   assert! ( response . errors . is_empty (),
     "save must succeed; got errors: {:?}", response . errors );
   let warning : &String =
@@ -151,14 +146,13 @@ async fn readonly_col_repairs_warn_impl (
       saved . replace ( &col_line,
                         &format! ("{}\nan illegal body", col_line) );
     let result =
-      save_buffer (&with_body, config, driver, tantivy, &graph) . await;
+      save_buffer (&with_body, config, tantivy, &graph) . await;
     assert! ( result . is_err (),
       "a body on a col scaffold must still abort the save" ); }
   Ok (( )) }
 
 async fn failed_save_carries_warnings_with_errors (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // Decided 2026-06-12 (option b): a failed save's response carries
@@ -166,7 +160,7 @@ async fn failed_save_carries_warnings_with_errors (
   // a parse-time warning (leftover text on a subscriberCol headline)
   // and a validation error (an idCol claiming an id node n lacks).
       let graph : InRustGraphHandle =
-        install_or_swap_global_handle (
+        (
           graph_handle_from_config (config) ? );
       let buffer : &str = "\
 * (skg (node (id n) (source main))) n
@@ -177,7 +171,7 @@ async fn failed_save_carries_warnings_with_errors (
 *** (skg id) bogus-id
 ";
       let result : Result<SaveResponse, Box<dyn Error>> =
-        save_buffer (buffer, config, driver, tantivy, &graph) . await;
+        save_buffer (buffer, config, tantivy, &graph) . await;
       let err : Box<dyn Error> = match result {
         Ok (_)  => panic! ("save should fail (idCol edited)"),
         Err (e) => e, };

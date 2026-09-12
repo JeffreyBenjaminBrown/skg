@@ -5,12 +5,11 @@
 // clone C lives in an owned source, copies N's edited title/body/
 // contains, subscribes to N and overrides N; N itself is untouched.
 //
-// Installs the process-global graph handle (override substitution and
+// Installs the explicit graph handle (override substitution and
 // subscribeeCol content read it), so it belongs among the
 // grouped_overrides installers.
 
 use std::error::Error;
-use std::sync::Arc;
 
 use indoc::indoc;
 
@@ -18,12 +17,12 @@ use std::collections::{BTreeSet, HashMap};
 
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::in_rust_graph::{
-  InRustGraphHandle, install_or_swap_global_handle};
+  InRustGraphHandle};
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::from_text::buffer_to_validated_saveplan_with_fork_sources;
 use skg::serve::ViewsState;
 use skg::source_sets::{ActiveSourceSet, SourceSetName};
-use skg::test_utils::{graph_handle_from_config, run_with_shared_test_db};
+use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_approval_test;
 use skg::test_utils::update_from_and_rerender_buffer_with_fork_sources_test;
@@ -33,7 +32,6 @@ use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex, members_of};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, ForkSpec, SaveNode};
 use skg::types::views_state::OpenViews;
-use typedb_driver::TypeDBDriver;
 
 /// A foreign node N (title "N-original", contains [N1, N2]) lives under
 /// an OWNED container P. The buffer makes N definitive and edits its
@@ -112,10 +110,9 @@ fn mk_test_tcp_stream () -> std::net::TcpStream {
 async fn fork_specs_from (
   buffer : &str,
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<Vec<ForkSpec>, Box<dyn Error>> {
-  Ok ( buffer_to_validated_saveplan ( buffer, config, driver, None )
-       . await ? . 1 . fork_specs ) }
+  Ok ( buffer_to_validated_saveplan ( buffer, config, None )
+        ? . 1 . fork_specs ) }
 
 fn node_from_disk (
   config : &SkgConfig,
@@ -144,64 +141,64 @@ fn clone_on_disk (
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str = "tests/fork/fixtures-multi";
-  run_with_shared_test_db (
+  run_with_shared_test_stores (
     "skg-test-fork",
     |s| Box::pin ( async move {
-      s . reset ("fork_save_instruction", fixtures) . await ?;
+      s . reset ("fork_save_instruction", fixtures) ?;
       fork_save_instruction (
-        &s . config, &s . driver ) . await ?;
-      s . reset ("fork_fixture_files", fixtures) . await ?;
+        &s . config ) . await ?;
+      s . reset ("fork_fixture_files", fixtures) ?;
       fork_fixture_files (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("fork_round_trip", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("fork_round_trip", fixtures) ?;
       fork_round_trip (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("fork_monogamy", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("fork_monogamy", fixtures) ?;
       fork_monogamy (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("fork_source_inactive", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("fork_source_inactive", fixtures) ?;
       fork_source_inactive (
-        &s . config, &s . driver ) . await ?;
-      s . reset ("fork_confirmation_gates_commit", fixtures) . await ?;
+        &s . config ) . await ?;
+      s . reset ("fork_confirmation_gates_commit", fixtures) ?;
       fork_confirmation_gates_commit (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("fork_from_bare_new_child_plan", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("fork_from_bare_new_child_plan", fixtures) ?;
       fork_from_bare_new_child_plan (
-        &s . config, &s . driver ) . await ?;
-      s . reset ("fork_from_bare_new_child_commits", fixtures) . await ?;
+        &s . config ) . await ?;
+      s . reset ("fork_from_bare_new_child_commits", fixtures) ?;
       fork_from_bare_new_child_commits (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("explicitly_foreign_new_child_still_rejected", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("explicitly_foreign_new_child_still_rejected", fixtures) ?;
       explicitly_foreign_new_child_still_rejected (
-        &s . config, &s . driver ) . await ?;
+        &s . config ) . await ?;
       let two_owned : &str = "tests/fork/fixtures-two-owned";
-      s . reset ("fork_no_owned_ancestor_defaults", two_owned) . await ?;
+      s . reset ("fork_no_owned_ancestor_defaults", two_owned) ?;
       fork_no_owned_ancestor_defaults (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("fork_user_set_source_overrides", two_owned) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("fork_user_set_source_overrides", two_owned) ?;
       fork_user_set_source_overrides (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("fork_default_prefers_active_owned_source", two_owned) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("fork_default_prefers_active_owned_source", two_owned) ?;
       fork_default_prefers_active_owned_source (
-        &s . config, &s . driver ) . await ?;
-      s . reset ("fork_user_set_source_not_owned_rejected", two_owned) . await ?;
+        &s . config ) . await ?;
+      s . reset ("fork_user_set_source_not_owned_rejected", two_owned) ?;
       fork_user_set_source_not_owned_rejected (
-        &s . config, &s . driver ) . await ?;
-      s . reset ("explicit_new_child_source_confirms_clone_source", two_owned) . await ?;
+        &s . config ) . await ?;
+      s . reset ("explicit_new_child_source_confirms_clone_source", two_owned) ?;
       explicit_new_child_source_confirms_clone_source (
-        &s . config, &s . driver ) . await ?;
-      s . reset ("disagreeing_new_child_sources_leave_clone_source_unconfirmed", two_owned) . await ?;
+        &s . config ) . await ?;
+      s . reset ("disagreeing_new_child_sources_leave_clone_source_unconfirmed", two_owned) ?;
       disagreeing_new_child_sources_leave_clone_source_unconfirmed (
-        &s . config, &s . driver ) . await ?;
-      s . reset ("explicit_fork_save_instruction", fixtures) . await ?;
+        &s . config ) . await ?;
+      s . reset ("explicit_fork_save_instruction", fixtures) ?;
       explicit_fork_save_instruction (
-        &s . config, &s . driver ) . await ?;
-      s . reset ("explicit_fork_on_unknown_node_errors", fixtures) . await ?;
+        &s . config ) . await ?;
+      s . reset ("explicit_fork_on_unknown_node_errors", fixtures) ?;
       explicit_fork_on_unknown_node_errors (
-        &s . config, &s . driver ) . await ?;
-      s . reset ("explicit_fork_round_trip_and_monogamy", fixtures) . await ?;
+        &s . config ) . await ?;
+      s . reset ("explicit_fork_round_trip_and_monogamy", fixtures) ?;
       explicit_fork_round_trip_and_monogamy (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 /// The explicit fork of an OWNED node P: the SavePlan carries one
@@ -211,12 +208,9 @@ fn all_tests
 /// a foreign fork's original.
 async fn explicit_fork_save_instruction (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  let _ : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let fork_specs : Vec<ForkSpec> =
-    fork_specs_from (EXPLICIT_FORK_BUFFER, config, driver) . await ?;
+    fork_specs_from (EXPLICIT_FORK_BUFFER, config) . await ?;
   assert_eq! ( fork_specs . len (), 1,
     "exactly one explicit fork (of P): {:?}", fork_specs );
   let spec : &ForkSpec = &fork_specs[0];
@@ -242,12 +236,9 @@ async fn explicit_fork_save_instruction (
 /// 'ForkRequestOnUnknownNode' -- you can only fork a saved node.
 async fn explicit_fork_on_unknown_node_errors (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  let _ : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let result = buffer_to_validated_saveplan (
-    EXPLICIT_FORK_UNKNOWN_BUFFER, config, driver, None ) . await;
+    EXPLICIT_FORK_UNKNOWN_BUFFER, config, None ) ;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
@@ -261,17 +252,16 @@ async fn explicit_fork_on_unknown_node_errors (
 /// substitution then draws it in P's place), and a SECOND explicit fork
 /// of the now-overridden P is rejected with 'ForkAlreadyExists'.
 async fn explicit_fork_round_trip_and_monogamy (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+    ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false, open_views : OpenViews::new () };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer_with_fork_approval_test (
-    &mut stream, EXPLICIT_FORK_BUFFER, driver, config, tantivy, &graph,
+    &mut stream, EXPLICIT_FORK_BUFFER, config, tantivy, &graph,
     false, &Err ( String::new () ), &mut views_state,
     /* fork_approved = */ true ) . await ?;
   assert! ( response . errors . is_empty (),
@@ -287,10 +277,8 @@ async fn explicit_fork_round_trip_and_monogamy (
     "P keeps its own contains; the explicit fork does not rewrite it" );
 
   // Forking P again is rejected: it now has a user-owned overrider.
-  let _ : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let result = buffer_to_validated_saveplan (
-    EXPLICIT_FORK_BUFFER, config, driver, None ) . await;
+    EXPLICIT_FORK_BUFFER, config, None ) ;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
@@ -310,16 +298,13 @@ async fn explicit_fork_round_trip_and_monogamy (
 /// confirmation stage, not dead-end on ForkSourceInactive.
 async fn fork_default_prefers_active_owned_source (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  let _ : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let active : ActiveSourceSet = ActiveSourceSet {
     name    : SourceSetName ("only-owned2" . to_string ()),
     sources : BTreeSet::from ([ SourceName::from ("owned2"),
                                SourceName::from ("foreign") ]), };
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
-    FORK_ROOT_BUFFER, config, driver, Some (&active) ) . await ?;
+    FORK_ROOT_BUFFER, config, Some (&active) )  ?;
   assert_eq! ( save_plan . fork_specs . len (), 1,
     "the fork must resolve, not dead-end on an inactive default source" );
   assert_eq! ( save_plan . fork_specs[0] . clone . 0 . source,
@@ -333,14 +318,11 @@ async fn fork_default_prefers_active_owned_source (
 /// rejected with ForkSourceNotOwned.
 async fn fork_user_set_source_not_owned_rejected (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  let _ : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let fork_sources : HashMap<ID, SourceName> =
     HashMap::from ([ ( ID::from ("N"), SourceName::from ("foreign") ) ]);
   let result = buffer_to_validated_saveplan_with_fork_sources (
-    FORK_BUFFER, config, driver, None, &fork_sources ) . await;
+    FORK_BUFFER, config, None, &fork_sources ) ;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
@@ -358,17 +340,16 @@ async fn fork_user_set_source_not_owned_rejected (
 /// user's first owned source (alphabetically "owned", here). No more
 /// 'ForkSourceUnresolved' hard-fail.
 async fn fork_no_owned_ancestor_defaults (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+    ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false, open_views : OpenViews::new () };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer (
-    &mut stream, FORK_ROOT_BUFFER, driver, config, tantivy, &graph, false,
+    &mut stream, FORK_ROOT_BUFFER, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "a fork with no owned ancestor must complete: {:?}", response . errors );
@@ -382,19 +363,18 @@ async fn fork_no_owned_ancestor_defaults (
 /// the inferred one. FORK_BUFFER infers "owned" from the owned ancestor
 /// P; passing N -> "owned2" lands the clone in "owned2" instead.
 async fn fork_user_set_source_overrides (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+    ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false, open_views : OpenViews::new () };
   let fork_sources : HashMap<ID, SourceName> =
     HashMap::from ([ ( ID::from ("N"), SourceName::from ("owned2") ) ]);
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer_with_fork_sources_test (
-    &mut stream, FORK_BUFFER, driver, config, tantivy, &graph, false,
+    &mut stream, FORK_BUFFER, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state,
     /* fork_approved = */ true, &fork_sources ) . await ?;
   assert! ( response . errors . is_empty (),
@@ -411,10 +391,7 @@ async fn fork_user_set_source_overrides (
 /// show it as settled -- no PICK-A-SOURCE, no suggestion comment.
 async fn explicit_new_child_source_confirms_clone_source (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  let _ : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let buffer : &str = indoc! {"
     * (skg (node (id N) (source foreign))) N-original
     ** (skg (node (id N1) (source foreign) indef)) N1
@@ -422,7 +399,7 @@ async fn explicit_new_child_source_confirms_clone_source (
     ** (skg (node (source owned2))) Can I add to this?
     "};
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
-    buffer, config, driver, None ) . await ?;
+    buffer, config, None )  ?;
   assert_eq! ( save_plan . fork_specs . len (), 1 );
   let spec : &ForkSpec = & save_plan . fork_specs[0];
   assert_eq! ( spec . clone . 0 . source, SourceName::from ("owned2"),
@@ -447,17 +424,14 @@ async fn explicit_new_child_source_confirms_clone_source (
 /// the flow asks.
 async fn disagreeing_new_child_sources_leave_clone_source_unconfirmed (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  let _ : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let buffer : &str = indoc! {"
     * (skg (node (id N) (source foreign))) N-original
     ** (skg (node (source owned))) New thing one
     ** (skg (node (source owned2))) New thing two
     "};
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
-    buffer, config, driver, None ) . await ?;
+    buffer, config, None )  ?;
   assert_eq! ( save_plan . fork_specs . len (), 1 );
   assert! ( ! save_plan . fork_specs[0] . source_confirmed,
     "disagreeing explicit child sources must not confirm a clone source" );
@@ -467,19 +441,18 @@ async fn disagreeing_new_child_sources_leave_clone_source_unconfirmed (
 /// returns a fork-confirmation buffer and commits NOTHING; re-issuing
 /// the save approved then commits.
 async fn fork_confirmation_gates_commit (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+    ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false, open_views : OpenViews::new () };
 
   // Unapproved save -> fork-confirmation, nothing committed.
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer_with_fork_approval_test (
-    &mut stream, FORK_BUFFER, driver, config, tantivy, &graph, false,
+    &mut stream, FORK_BUFFER, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state,
     /* fork_approved = */ false ) . await ?;
   assert! ( response . fork_confirmation . is_some (),
@@ -495,7 +468,7 @@ async fn fork_confirmation_gates_commit (
   // Approved re-issue -> commits the clone.
   let mut stream2 : std::net::TcpStream = mk_test_tcp_stream ();
   let response2 = update_from_and_rerender_buffer_with_fork_approval_test (
-    &mut stream2, FORK_BUFFER, driver, config, tantivy, &graph, false,
+    &mut stream2, FORK_BUFFER, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state,
     /* fork_approved = */ true ) . await ?;
   assert! ( response2 . fork_confirmation . is_none (),
@@ -512,12 +485,9 @@ async fn fork_confirmation_gates_commit (
 /// new node REWRITTEN into the clone's source.
 async fn fork_from_bare_new_child_plan (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  let _ : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let ( _vf, save_plan, _warnings ) = buffer_to_validated_saveplan (
-    FORK_WITH_BARE_NEW_CHILD_BUFFER, config, driver, None ) . await ?;
+    FORK_WITH_BARE_NEW_CHILD_BUFFER, config, None )  ?;
   assert_eq! ( save_plan . fork_specs . len (), 1,
     "appending a bare new child must fork N: {:?}",
     save_plan . fork_specs );
@@ -545,17 +515,16 @@ async fn fork_from_bare_new_child_plan (
 /// the clone AND the new node, both in the owned source; N's foreign
 /// .skg is untouched.
 async fn fork_from_bare_new_child_commits (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+    ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false, open_views : OpenViews::new () };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer_with_fork_approval_test (
-    &mut stream, FORK_WITH_BARE_NEW_CHILD_BUFFER, driver, config, tantivy,
+    &mut stream, FORK_WITH_BARE_NEW_CHILD_BUFFER, config, tantivy,
     &graph, false, &Err ( String::new () ), &mut views_state,
     /* fork_approved = */ true ) . await ?;
   assert! ( response . errors . is_empty (),
@@ -581,13 +550,10 @@ async fn fork_from_bare_new_child_commits (
 /// inherited (guessed) foreign source rides the fork.
 async fn explicitly_foreign_new_child_still_rejected (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  let _ : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
   let result = buffer_to_validated_saveplan (
-    FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER, config, driver, None )
-    . await;
+    FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER, config, None )
+    ;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
@@ -603,26 +569,22 @@ async fn explicitly_foreign_new_child_still_rejected (
 /// 'ForkAlreadyExists' naming the existing clone -- not the raw
 /// MultipleUserOwnedOverriders crash.
 async fn fork_monogamy (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+    ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false, open_views : OpenViews::new () };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   update_from_and_rerender_buffer (
-    &mut stream, FORK_BUFFER, driver, config, tantivy, &graph, false,
+    &mut stream, FORK_BUFFER, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state ) . await ?;
   let c1 : ID = clone_on_disk (config) ? . pid;
 
-  // Refresh the global graph so the monogamy pre-check sees the new
-  // clone, then try to fork the same N again.
-  let _ : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  // Save planning reloads the fixture graph and therefore sees the new clone.
   let result = buffer_to_validated_saveplan (
-    FORK_BUFFER, config, driver, None ) . await;
+    FORK_BUFFER, config, None ) ;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
@@ -639,18 +601,13 @@ async fn fork_monogamy (
 /// {foreign} only, so the clone's inferred source "owned" is inactive.
 async fn fork_source_inactive (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
-  // Refresh the process-global graph from the freshly-reset fixtures so
-  // the monogamy pre-check does not see a prior sub-test's clone (reset
-  // wipes disk/DB but not the global handle).
-  let _ : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+  // Save planning reloads the freshly reset fixture graph.
   let active : ActiveSourceSet = ActiveSourceSet {
     name    : SourceSetName ("only-foreign" . to_string ()),
     sources : BTreeSet::from ([ SourceName::from ("foreign") ]), };
   let result = buffer_to_validated_saveplan (
-    FORK_BUFFER, config, driver, Some (&active) ) . await;
+    FORK_BUFFER, config, Some (&active) ) ;
   match result {
     Err ( SaveError::BufferValidationErrors { errors, .. } ) => {
       assert! ( errors . iter () . any ( |e| matches! ( e,
@@ -668,10 +625,9 @@ async fn fork_source_inactive (
 /// hides; in an OWNED source inferred from the owned ancestor P.
 async fn fork_save_instruction (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
   let fork_specs : Vec<ForkSpec> =
-    fork_specs_from (FORK_BUFFER, config, driver) . await ?;
+    fork_specs_from (FORK_BUFFER, config) . await ?;
   assert_eq! ( fork_specs . len (), 1,
     "exactly one fork (of N): {:?}", fork_specs );
   let spec : &ForkSpec = &fork_specs[0];
@@ -698,8 +654,7 @@ async fn fork_save_instruction (
 /// After saving the fork: a clone .skg appears in the OWNED source with
 /// the four fields, and N's foreign .skg is byte-unchanged.
 async fn fork_fixture_files (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let n_path : std::path::PathBuf =
@@ -707,18 +662,14 @@ async fn fork_fixture_files (
     . path . join ("N.skg");
   let n_before : String = std::fs::read_to_string (&n_path) ?;
 
-  // Use the RETURNED handle: when this process already has a global
-  // handle (a prior sub-test set it), install_or_swap stores our graph
-  // into the existing global ArcSwap and hands back THAT handle, so the
-  // save's in-place updates stay visible to snapshot_global (the
-  // coherence check reads it).
+  // The save and its coherence check share this fixture-local handle.
   let graph : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+    ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false, open_views : OpenViews::new () };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer (
-    &mut stream, FORK_BUFFER, driver, config, tantivy, &graph, false,
+    &mut stream, FORK_BUFFER, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "fork save must not error: {:?}", response . errors );
@@ -746,17 +697,16 @@ async fn fork_fixture_files (
 /// exercised in hidden_from_subscriptions; here C.contains ==
 /// N.contains == [N1,N2] gives it nothing to show.)
 async fn fork_round_trip (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let graph : InRustGraphHandle =
-    install_or_swap_global_handle ( graph_handle_from_config (config) ? );
+    ( graph_handle_from_config (config) ? );
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false, open_views : OpenViews::new () };
   let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
   update_from_and_rerender_buffer (
-    &mut stream, FORK_BUFFER, driver, config, tantivy, &graph, false,
+    &mut stream, FORK_BUFFER, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state ) . await ?;
 
   let clone_id : ID = clone_on_disk (config) ? . pid;
@@ -765,7 +715,7 @@ async fn fork_round_trip (
   // clone in its place with (overridesHere N).
   let (p_view, _pids, _) =
     single_root_view (
-      driver, config, Some (tantivy), &ID::from ("P"), false ) . await ?;
+      config, Some (tantivy), &ID::from ("P"), false ) ?;
   assert! ( p_view . contains ("(overridesHere N)"),
     "the clone must be drawn in N's place with (overridesHere N):\n{}",
     p_view );

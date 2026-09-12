@@ -72,17 +72,14 @@ but divides it at spaces if point is interior to it.
 *** [[id:eb73db7a-acf4-4463-9398-f09279000337][org-mode : fold body and not children]]
 ** work through TODO/problems.org
 ** try neovim
-** drop TypeDB
-It's a pain when coding. It's slow.
-And it can't know about dangling references
-(e.g. when one user's data loses a node
-that another user's data refers to),
-unless phantoms become TypeDB entities.
+** DONE drop TypeDB
+Implemented by [[./TODO/ditch-typedb/2_plan.org][the graph-only refactor]]. The =.skg= files are authoritative;
+the Rust graph represents dangling references directly.
 * Magit is dangerous!
 One key command can stage all changes,
 effectively erasing the work of a careful review
 over which one had staged some changes.
-* TODO can I use this?
+* DONE obsolete with TypeDB removal : can I use this?
 https://github.com/typedb/typeql/issues/434#issuecomment-5553099146
 * I need code to import org and md into skg.
 This way I can really treat the public skg graph
@@ -296,7 +293,7 @@ and check it against the report.
 and return those results; then, backgrounded, update those results.
 If the user kills the search buffer before the update,
 abort the more exhaustive search.
-*** TypeDB polls too much, burns 16% of a CPU.
+*** DONE removed with TypeDB
 claude --resume a2d5b32b-876e-4236-997e-3a0a8582b1f1
   in skg (not skg2, not skg3)
 Simple upstream fix would be to make the poll frequency configurable,

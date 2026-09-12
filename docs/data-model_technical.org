@@ -1,0 +1,129 @@
+#+TITLE: Skg data model: technical reference
+
+This document describes the complete runtime graph model.  The =.skg= files
+and =skgconfig.toml= are authoritative.  At startup and explicit rebuild, the
+server folds all file sections into =NodeComplete= values, validates the whole
+set, builds an immutable =InRustGraph= snapshot, and builds Tantivy from the
+same values.  Tantivy is a derived text index; it is not graph authority.
+
+For a gentler introduction, see [[./data-model_friendly.org][the friendly data-model guide]].  For
+privacy-section folding and unfolding, see [[./telescopes.md][telescopes]].
+
+* Node fields
+
+The full folded representation is =NodeComplete= in
+=server/types/nodes/complete.rs=.  =NodeRust= is its graph projection and adds
+derived text links.
+
+| Field | Type | Meaning and storage |
+|-------+------+---------------------|
+| =pid= | =ID= | Immutable primary identity.  It determines the home filename and is the key in =InRustGraph.nodes= and Tantivy. |
+| =extra_ids= | =Vec<ID>= | Former identities acquired by node merge.  Any primary or extra ID resolves to the node's =pid=. |
+| =source= | =SourceName= | The node's home: the most public source with a retained telescope section.  It is inferred from file location and never serialized inside YAML. |
+| =title= | =String= | Folded node title. |
+| =body= | =Option<String>= | Folded body text.  Leading and trailing whitespace-only lines are normalized away; a body with no remaining content is =None=. |
+| =overPrivateText_telescope= | =bool= | True when the selected title or body came from a section below the home source.  Release decisions use this conservative folded fact. |
+| =aliases= | =MSV<MemberAtSource<String>>= | Search aliases and the source at which each is recorded. |
+| =contains= | =Vec<MemberAtSource<ID>>= | Ordered content children and each edge's recording source. |
+| =subscribes_to= | =MSV<MemberAtSource<ID>>= | Nodes whose content this node follows, with edge sources. |
+| =hides_from_its_subscriptions= | =MSV<MemberAtSource<ID>>= | Nodes suppressed when reached through this node's subscriptions, with edge sources. |
+| =overrides_view_of= | =MSV<MemberAtSource<ID>>= | Nodes for which this node may substitute during recursive rendering, with edge sources. |
+| =misc= | =Vec<FileProperty>= | Import provenance: currently =Had_ID_Before_Import= and =Was_Overloaded=. |
+| =textlinks_to= | =Vec<ID>= on =NodeRust= | Outbound Org =id:= links parsed from title/body text.  Derived rather than serialized as a graph field. |
+
+=MSV<T>= means “maybe specified vector.”  =Unspecified= says a file or edit
+has no opinion about the field; =Specified([])= explicitly supplies an empty
+value.  This distinction is load-bearing while telescope sections and partial
+save instructions are reconciled.  =MemberAtSource<T>= attaches the privacy
+source where an alias or edge is recorded.  The order of list-valued fields is
+preserved.
+
+* Relationships
+
+All stored relationships are directed from the owning node to a member ID.
+Member IDs may be primary IDs or extra IDs; graph indexes canonicalize known
+extra IDs to the corresponding primary ID.  A dangling member is retained so
+that hand-authored or temporarily incomplete graphs remain representable.
+
+| Relationship | First role | Second role | Semantics |
+|--------------+------------+-------------+-----------|
+| =contains= | container | contained | Ordered document/content nesting. |
+| =subscribes_to= | subscriber | subscribee | The subscriber incorporates later content from the subscribee.  A fork initially creates both a subscription and an override edge to the original. |
+| =hides_from_its_subscriptions= | hider | hidden | Suppresses the hidden node only when it would be reached through the hider's subscriptions. |
+| =overrides_view_of= | overrider | overridden | Replaces the overridden node in recursive content rendering when the eligible owned override chain resolves to it. |
+| =textlinks_to= | source | destination | Plain Org ID links derived from text. |
+
+Home source and extra-ID ownership are node properties, not separate runtime
+relationship entities.  Edge recording source remains part of every stored
+=MemberAtSource= and participates in source-set/privacy gating.
+
+* Hard validation constraints
+
+=validate_complete_graph= runs before startup/rebuild publication and the
+equivalent candidate validation runs before save mutation.  A candidate is
+rejected when any of these conditions holds:
+
+1. A primary ID identifies more than one folded node.
+2. An extra ID belongs to more than one node.
+3. An ID is both a primary ID and an extra ID.
+4. A node's home source is absent from the current configuration.
+5. User-owned override edges give one target more than one user-owned
+   overrider (override monogamy).
+6. User-owned override edges contain a cycle.  Linear override chains are
+   allowed; foreign override facts are display-only and do not substitute.
+7. Any stored derived graph index differs from an independently recomputed
+   index.
+
+Relationship roles are enforced by distinct Rust fields.  A node has exactly
+one home =source= in its folded representation.  Telescope validation also
+checks privacy/provenance rules.  Telescope violations are deterministic
+warnings rather than hard graph-construction errors; callers surface them for
+repair while retaining readable data.
+
+Save validation constructs the complete proposed node set in memory and
+checks these constraints before changing files.  The shared mutation gate
+serializes candidate construction, filesystem mutation, graph publication,
+and Tantivy enqueue so two writers cannot validate against the same stale
+snapshot.
+
+* Graph indexes
+
+=InRustGraph= stores =NodeRust= values in a persistent =im::HashMap=.  Its
+derived indexes are:
+
+| Index | Key -> value | Purpose |
+|-------+--------------+---------|
+| =contained_by= | contained pid -> container pids | Inverse =contains= traversal. |
+| =subscribers_of= | subscribee pid -> subscriber pids | Inverse subscription traversal. |
+| =hiders_of= | hidden pid -> hider pids | Inverse hiding lookup. |
+| =overriders_of= | overridden pid -> overrider pids | Override lookup and validation. |
+| =textlinks_in= | destination pid -> linking pids | Incoming text-link traversal. |
+| =extra_id_to_pid= | extra ID -> primary ID | Canonical identity resolution. |
+
+Construction is two-pass: first collect every extra-ID mapping, then insert
+nodes and build inverse indexes.  This makes results independent of file read
+order.  Incremental updates remove a node's old contributions, migrate inverse
+entries when a merge introduces new extra IDs, insert the replacement node,
+and add its new contributions.  Writers clone the persistent graph and publish
+one new =Arc= atomically; readers retain the immutable generation they captured
+at operation start.
+
+The current mutation model supports monotonic acquisition of extra IDs during
+node merge.  Arbitrary extra-ID revocation is not a supported user operation;
+it would require a symmetric migration of raw neighbor references and inverse
+keys.
+
+* Runtime generations and rebuilding
+
+An =SkgEnv= family shares one atomic =RuntimeGeneration= publication point and
+one mutation gate.  A generation contains an =Arc<SkgConfig>=, an
+=Arc<InRustGraph>=, the matching =TantivyIndex=, and a monotonically increasing
+generation number.  Each request captures exactly one generation and threads
+its graph through graph-dependent helpers.  There is no process-global graph
+fallback.
+
+Startup and “rebuild ephemeral data stores” both read the filesystem once,
+validate the candidate graph, and build graph plus Tantivy from that same node
+vector.  A live rebuild publishes only after the complete candidate succeeds;
+failure leaves the prior generation visible.  The operation never rewrites
+authoritative =.skg= files.

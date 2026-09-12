@@ -9,7 +9,6 @@ git -C "$HOST_DATA_ROOT/public" init
 git -C "$HOST_DATA_ROOT/private" init
 
 cat > "$HOST_DATA_ROOT/skgconfig.toml" <<EOF
-db_name = "skg-win-test-$SKG_TEST_PORT"
 tantivy_folder = ".index.tantivy"
 port = $SKG_TEST_PORT
 beep_when_server_becomes_available = false

@@ -10,11 +10,5 @@ docker run --rm --platform linux/amd64 "$IMAGE_NAME" bash -lc '
   echo
   echo "=== skg ==="
   command -v skg || ls -l /usr/local/bin/skg
-  echo
-  echo "=== typedb ==="
-  command -v typedb
-  typedb server --help | head -20
-  echo
-  echo "=== schema ==="
-  ls -l /opt/skg/schema.tql
+  skg --help
 '

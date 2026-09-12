@@ -1,5 +1,5 @@
 use crate::source_sets::ActiveSourceSet;
-use crate::types::env::SkgEnv;
+use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::to_org::complete::partner_col::child_data::{ChildData, build_child_data, apply_membership_axes_to_col_members, reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids};
 use crate::update_buffer::reconcile::omit_inactive_members;
@@ -36,11 +36,11 @@ struct SubscribeeColContext {
 /// - If no subscribees: transfer focus if needed, then delete.
 /// - Reconcile the subscribee children from the graph.
 /// - Ensure HiddenOutsideOfSubscribeeCol exists and is last.
-pub async fn reconcile_subscribee_col_children (
+pub fn reconcile_subscribee_col_children (
   node                           : NodeId,
   tree                           : &mut Tree<ViewNode>,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
-  env                            : &SkgEnv,
+  runtime                        : &RuntimeGeneration,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   active_source_set              : Option<&ActiveSourceSet>,
@@ -49,7 +49,8 @@ pub async fn reconcile_subscribee_col_children (
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   let context : SubscribeeColContext =
-    read_subscribee_col_context (tree, node, env, active_source_set) ?;
+    read_subscribee_col_context (
+      tree, node, runtime, active_source_set) ?;
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
     goal_list_for_outbound_col (
       &context . parent_pid, &context . parent_source,
@@ -62,7 +63,8 @@ pub async fn reconcile_subscribee_col_children (
     // -- the col reconciler treats it as irrelevant, not goal-matched.
     omit_inactive_members (
       goal_list, active_source_set,
-      |id : &ID| env . find_source (id, deleted_since_head_pid_src_map) );
+      |id : &ID| SkgEnv::find_source_in_generation (
+        runtime, id, deleted_since_head_pid_src_map) );
 
   // TODO/DONE/local-view-update/plan_v2.org §3.4/§6.7 exception: an *empty* SubscribeeCol is PRESERVED, not
   // self-deleted. It is the editable interface onto the origin's outgoing
@@ -100,7 +102,7 @@ pub async fn reconcile_subscribee_col_children (
         tree, node,
         &goal_list, &removed_ids, &axes_for_removed,
         source_diffs, deleted_since_head_pid_src_map,
-        &context . relationship_sources, env ) ?;
+        &context . relationship_sources, runtime ) ?;
     reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids (
       tree, node, kind,
       &goal_list, &child_data, deleted_by_this_save_extra_ids ) ?;
@@ -119,7 +121,7 @@ pub async fn reconcile_subscribee_col_children (
 fn read_subscribee_col_context (
   tree               : &Tree<ViewNode>,
   node               : NodeId,
-  env                : &SkgEnv,
+  runtime            : &RuntimeGeneration,
   active_source_set  : Option<&ActiveSourceSet>,
 ) -> Result<SubscribeeColContext, Box<dyn Error>> {
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the subscriber Active vognode through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
@@ -146,7 +148,7 @@ fn read_subscribee_col_context (
     // inactive level must not appear here even though the
     // subscribee node itself may be active.
     nodecomplete_rustFirst_by_pid_and_source (
-      &env . config, &parent_pid, &parent_source )
+      &runtime . graph, &runtime . config, &parent_pid, &parent_source )
       . ok ()
       . map ( |skg| skg . subscribes_to . or_default () . iter ()
               . filter ( |m| match active_source_set {

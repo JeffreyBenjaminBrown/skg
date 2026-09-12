@@ -33,9 +33,8 @@
 use indoc::indoc;
 use std::error::Error;
 use std::net::TcpStream;
-use std::sync::Arc;
 
-use skg::test_utils::{run_with_test_db, graph_handle_from_config, audit_inrustgraph_or_panic};
+use skg::test_utils::{run_with_test_stores, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::views_state::OpenViews;
@@ -43,23 +42,21 @@ use skg::types::views_state::OpenViews;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::types::misc::{SkgConfig, TantivyIndex};
 
-use typedb_driver::TypeDBDriver;
 
 #[test]
 fn test_merge_acquiree_as_independent_root
   () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_test_stores (
     "skg-test-merge-acquiree-as-independent-root",
     "tests/merge/merge_acquiree_as_independent_root/fixtures",
     "/tmp/tantivy-test-merge-acquiree-as-independent-root",
-    |config, driver, tantivy| Box::pin ( async move {
+    |config, tantivy| Box::pin ( async move {
       merge_acquiree_as_independent_root_impl(
-        config, driver, tantivy ) . await
+        config, tantivy ) . await
     } )) }
 
 async fn merge_acquiree_as_independent_root_impl (
-  config  : &SkgConfig,
-  driver: &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   let input_org_text : &str = indoc! {"
@@ -79,7 +76,7 @@ async fn merge_acquiree_as_independent_root_impl (
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    input_org_text, driver, config, tantivy, &graph, false,
+    input_org_text, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state ) . await ?;
 
   println!("Rendered buffer after merge:\n{}", response . saved_view);
@@ -138,5 +135,5 @@ async fn merge_acquiree_as_independent_root_impl (
       failures . join ("\n  - ") );
     panic!("{}", msg); }
 
-  audit_inrustgraph_or_panic (&graph, &config . db_name, driver) . await?;
+  audit_inrustgraph_or_panic (&graph)?;
   Ok (( )) }

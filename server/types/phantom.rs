@@ -3,6 +3,7 @@
 
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
+use crate::dbs::in_rust_graph::InRustGraph;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -14,6 +15,7 @@ use super::misc::{ID, SkgConfig, SkgfileSource, SourceName};
 /// Unified title lookup for phantom nodes.
 /// Lookup order: source_diffs deleted_nodes → in-Rust graph/disk → fallback.
 pub fn title_for_phantom (
+  graph        : &InRustGraph,
   id           : &ID,
   source       : &SourceName,
   source_diffs : Option<&HashMap<SourceName, SourceDiff>>,
@@ -24,7 +26,7 @@ pub fn title_for_phantom (
     . and_then( |sd| sd . deleted_nodes . get (id) )
     . map( |n| n . title . clone() )
     . or_else( || nodecomplete_rustFirst_by_pid_and_source (
-                    config, id, source )
+                    graph, config, id, source )
                   . ok() . map( |n| n . title ) )
     . unwrap_or_else( || format!( "TITLE NOT FOUND for ID {}", id . 0 )) }
 

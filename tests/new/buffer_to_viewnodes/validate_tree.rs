@@ -8,12 +8,10 @@ use skg::types::tree::forest::MpViewForest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use skg::from_text::buffer_to_viewnodes::local::validate_local_structure;
 use skg::from_text::buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::run_with_shared_test_stores;
 use std::error::Error;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
 use skg::types::maybe_placed_viewnode::{MpVognode, MpViewnodeKind};
 
 #[test]
@@ -21,53 +19,52 @@ fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str =
     "tests/merge/merge_nodes/fixtures";
-  run_with_shared_test_db (
+  run_with_shared_test_stores (
     "skg-test-new-validate-tree",
     |s| Box::pin ( async move {
-      s . reset ("test_find_buffer_errors_for_saving", fixtures) . await ?;
+      s . reset ("test_find_buffer_errors_for_saving", fixtures) ?;
       test_find_buffer_errors_for_saving (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("test_find_buffer_errors_for_saving_valid_input", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_find_buffer_errors_for_saving_valid_input", fixtures) ?;
       test_find_buffer_errors_for_saving_valid_input (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("test_find_buffer_errors_for_saving_empty_input", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_find_buffer_errors_for_saving_empty_input", fixtures) ?;
       test_find_buffer_errors_for_saving_empty_input (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("test_multiple_aliascols_in_children", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_multiple_aliascols_in_children", fixtures) ?;
       test_multiple_aliascols_in_children (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("test_duplicated_content_error", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_duplicated_content_error", fixtures) ?;
       test_duplicated_content_error (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("test_no_duplicated_content_error_when_different_ids", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_no_duplicated_content_error_when_different_ids", fixtures) ?;
       test_no_duplicated_content_error_when_different_ids (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("test_no_duplicated_content_error_for_phantom_siblings", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_no_duplicated_content_error_for_phantom_siblings", fixtures) ?;
       test_no_duplicated_content_error_for_phantom_siblings (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("test_root_without_source_validation", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_root_without_source_validation", fixtures) ?;
       test_root_without_source_validation (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("test_nonexistent_source_validation", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_nonexistent_source_validation", fixtures) ?;
       test_nonexistent_source_validation (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("test_empty_title_rejected_for_definitive_node", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_empty_title_rejected_for_definitive_node", fixtures) ?;
       test_empty_title_rejected_for_definitive_node (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("test_empty_title_allowed_for_indefinitive_and_delete", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_empty_title_allowed_for_indefinitive_and_delete", fixtures) ?;
       test_empty_title_allowed_for_indefinitive_and_delete (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("test_definitive_request_with_only_non_content_children_is_allowed", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_definitive_request_with_only_non_content_children_is_allowed", fixtures) ?;
       test_definitive_request_with_only_non_content_children_is_allowed (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("test_definitive_request_with_content_child_is_rejected", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_definitive_request_with_content_child_is_rejected", fixtures) ?;
       test_definitive_request_with_content_child_is_rejected (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 async fn test_find_buffer_errors_for_saving (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       // Test input with various validation errors
@@ -91,7 +88,7 @@ async fn test_find_buffer_errors_for_saving (
         = org_to_uninterpreted_viewforest(
             input_with_errors) . unwrap();
       let validation_errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
+        find_buffer_errors_for_saving(&viewforest, config)?;
 
       // Combine parsing errors with validation errors
       let mut errors: Vec<BufferValidationError> = parsing_errors;
@@ -215,8 +212,7 @@ async fn test_find_buffer_errors_for_saving (
       Ok (( )) }
 
 async fn test_find_buffer_errors_for_saving_valid_input (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       // Test input with no validation errors
@@ -233,7 +229,7 @@ async fn test_find_buffer_errors_for_saving_valid_input (
       let (viewforest, parsing_errors, _warnings)
         : (MpViewForest, Vec<BufferValidationError>, Vec<String>) =
         org_to_uninterpreted_viewforest (valid_input) . unwrap();
-      let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
+      let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&viewforest, config)?;
 
       assert_eq!(parsing_errors . len(), 0, "Should find no parsing errors in valid input");
       assert_eq!(errors . len(), 0, "Should find no validation errors in valid input");
@@ -241,21 +237,19 @@ async fn test_find_buffer_errors_for_saving_valid_input (
 }
 
 async fn test_find_buffer_errors_for_saving_empty_input (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       // Test empty input (viewforest with just BufferRoot, no tree roots)
       let empty_viewforest: MpViewForest = MpViewForest::new();
-      let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&empty_viewforest, config, driver) . await?;
+      let errors: Vec<BufferValidationError> = find_buffer_errors_for_saving(&empty_viewforest, config)?;
 
       assert_eq!(errors . len(), 0, "Should find no errors in empty input");
       Ok(())
 }
 
 async fn test_multiple_aliascols_in_children (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       // Test input with multiple AliasCol children
@@ -271,7 +265,7 @@ async fn test_multiple_aliascols_in_children (
       let viewforest: MpViewForest =
         org_to_uninterpreted_viewforest (input_with_multiple_aliascols) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
+        find_buffer_errors_for_saving(&viewforest, config)?;
 
       // "AliasCol must be unique among its siblings"
       // Both AliasCol siblings report the error (each has a sibling AliasCol)
@@ -287,8 +281,7 @@ async fn test_multiple_aliascols_in_children (
 }
 
 async fn test_duplicated_content_error (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       // Test input with duplicated Content children (same ID)
@@ -302,7 +295,7 @@ async fn test_duplicated_content_error (
       let viewforest: MpViewForest =
         org_to_uninterpreted_viewforest (input_with_duplicated_content) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
+        find_buffer_errors_for_saving(&viewforest, config)?;
 
       let dup_children_re =
         Regex::new(r"(?i)non-ignored.*children.*must.*unique") . unwrap();
@@ -322,8 +315,7 @@ async fn test_duplicated_content_error (
 }
 
 async fn test_no_duplicated_content_error_when_different_ids (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       // Test input with different Content children IDs (should be valid)
@@ -337,7 +329,7 @@ async fn test_no_duplicated_content_error_when_different_ids (
       let viewforest: MpViewForest =
         org_to_uninterpreted_viewforest (input_without_duplicated_content) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
+        find_buffer_errors_for_saving(&viewforest, config)?;
 
       let duplicated_content_errors: Vec<&BufferValidationError> = errors . iter()
         . filter(|e| matches!(e, BufferValidationError::DuplicatedContent (_)))
@@ -349,8 +341,7 @@ async fn test_no_duplicated_content_error_when_different_ids (
 }
 
 async fn test_no_duplicated_content_error_for_phantom_siblings (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       // A phantom sibling (a diffPhantom carrying unstaged removedX
@@ -368,7 +359,7 @@ async fn test_no_duplicated_content_error_for_phantom_siblings (
       let viewforest: MpViewForest =
         org_to_uninterpreted_viewforest (input) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
+        find_buffer_errors_for_saving(&viewforest, config)?;
 
       let dup_children_re =
         Regex::new(r"(?i)non-ignored.*children.*must.*unique") . unwrap();
@@ -383,8 +374,7 @@ async fn test_no_duplicated_content_error_for_phantom_siblings (
 }
 
 async fn test_root_without_source_validation (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       // root without source should be rejected
@@ -397,7 +387,7 @@ async fn test_root_without_source_validation (
       let viewforest: MpViewForest =
         org_to_uninterpreted_viewforest (input) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
+        find_buffer_errors_for_saving(&viewforest, config)?;
 
       let source_re = Regex::new(r"(?i)must.*source") . unwrap();
       let source_errors: Vec<&BufferValidationError> = errors . iter()
@@ -416,8 +406,7 @@ async fn test_root_without_source_validation (
       Ok(( )) }
 
 async fn test_nonexistent_source_validation (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       { // Node with nonexistent source should be rejected
@@ -430,7 +419,7 @@ async fn test_nonexistent_source_validation (
         let viewforest: MpViewForest =
           org_to_uninterpreted_viewforest (input) . unwrap() . 0;
         let errors: Vec<BufferValidationError> =
-          find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
+          find_buffer_errors_for_saving(&viewforest, config)?;
 
         let source_re = Regex::new(r"(?i)must.*source") . unwrap();
         let nonexistent_source_errors: Vec<&BufferValidationError> =
@@ -462,8 +451,7 @@ async fn test_nonexistent_source_validation (
       Ok(( )) }
 
 async fn test_empty_title_rejected_for_definitive_node (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input: &str =
@@ -474,7 +462,7 @@ async fn test_empty_title_rejected_for_definitive_node (
       let viewforest: MpViewForest =
         org_to_uninterpreted_viewforest (input) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
+        find_buffer_errors_for_saving(&viewforest, config)?;
 
       let empty_title_re =
         Regex::new(r"(?i)empty.*title") . unwrap();
@@ -494,8 +482,7 @@ async fn test_empty_title_rejected_for_definitive_node (
       Ok(( )) }
 
 async fn test_empty_title_allowed_for_indefinitive_and_delete (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input: &str =
@@ -506,7 +493,7 @@ async fn test_empty_title_allowed_for_indefinitive_and_delete (
       let viewforest: MpViewForest =
         org_to_uninterpreted_viewforest (input) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
-        find_buffer_errors_for_saving(&viewforest, config, driver) . await?;
+        find_buffer_errors_for_saving(&viewforest, config)?;
 
       let empty_title_re =
         Regex::new(r"(?i)empty.*title") . unwrap();
@@ -522,8 +509,7 @@ async fn test_empty_title_allowed_for_indefinitive_and_delete (
       Ok(( )) }
 
 async fn test_definitive_request_with_only_non_content_children_is_allowed (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // A definitive view request on an indefinitive node whose children
@@ -540,7 +526,7 @@ async fn test_definitive_request_with_only_non_content_children_is_allowed (
         org_to_uninterpreted_viewforest (input) . unwrap () . 0;
       let errors : Vec<BufferValidationError> =
         find_buffer_errors_for_saving (
-          &viewforest, config, driver ) . await ?;
+          &viewforest, config ) ?;
       let hits : Vec<&BufferValidationError> = errors . iter ()
         . filter ( |e| matches! (
           e, BufferValidationError::DefinitiveRequestOnNodeWithContentChildren (_) ))
@@ -552,8 +538,7 @@ async fn test_definitive_request_with_only_non_content_children_is_allowed (
       Ok (( )) }
 
 async fn test_definitive_request_with_content_child_is_rejected (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // Flip side: a Container child (the default when 'parentIs' is absent)
@@ -567,7 +552,7 @@ async fn test_definitive_request_with_content_child_is_rejected (
         org_to_uninterpreted_viewforest (input) . unwrap () . 0;
       let errors : Vec<BufferValidationError> =
         find_buffer_errors_for_saving (
-          &viewforest, config, driver ) . await ?;
+          &viewforest, config ) ?;
       let hits : Vec<&BufferValidationError> = errors . iter ()
         . filter ( |e| matches! (
           e, BufferValidationError::DefinitiveRequestOnNodeWithContentChildren (id)

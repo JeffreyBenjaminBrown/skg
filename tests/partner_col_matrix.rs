@@ -11,15 +11,9 @@
 // test fails once at the end, so one broken col does not mask the
 // rest.
 //
-// DEVIATION from the plan (recorded in progress.org): the plan
-// envisioned before.org/after.org file pairs and claimed the target
-// "should not need the global graph handle". In fact the PartnerCol
-// scaffolds are created from snapshot_global(), so de-novo rendering
-// of subscriberCol / overriderCol / hiderCol / hiddenCol / and even
-// the outbound overriddenCol shows NOTHING without the installed
-// global handle. This target therefore installs it (in the matrix
-// function only -- the monogamy function below does not, so the two
-// never double-install under plain `cargo test`). And rather than
+// DEVIATION from the plan (recorded in progress.org): instead of
+// before.org/after.org file pairs, each scenario uses a fixture-local graph
+// to render de novo. Rather than
 // hand-author expected buffers, each scenario renders de novo, edits
 // the real rendered text, saves, and asserts on the saved view, its
 // warnings, and (for writable cols) the would-be disk lists -- the
@@ -28,7 +22,6 @@
 
 use std::error::Error;
 use std::net::TcpStream;
-use std::sync::Arc;
 
 use skg::source_sets::{
   ActiveSourceSet, SourceSetName, run_with_source_set_test_db};
@@ -43,13 +36,12 @@ use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, members_of, members_msv
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::dbs::node_lookup::nodeComplete_rustFIrst_by_id;
+use skg::dbs::node_lookup::nodecomplete_by_id;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::types::errors::{SaveError, BufferValidationError};
 use skg::types::viewnode::ViewNode;
 use ego_tree::Tree;
 use indoc::indoc;
-use typedb_driver::TypeDBDriver;
 
 //////////////////////////////////////////////////////////////
 // Accumulating-failure harness
@@ -107,18 +99,16 @@ fn line_containing<'a> ( buf : &'a str, fragment : &str ) -> &'a str {
 
 async fn render (
   root    : &str,
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
 ) -> Result<String, Box<dyn Error>> {
   let (buf, _pids, _tree) : (String, Vec<ID>, Tree<ViewNode>) =
     multi_root_view (
-      driver, config, None, &[ ID::from (root) ], false ) . await ?;
+      config, None, &[ ID::from (root) ], false ) ?;
   Ok (buf) }
 
 async fn save (
   buf     : &str,
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
   graph   : &InRustGraphHandle,
 ) -> Result<SaveResponse, Box<dyn Error>> {
@@ -130,7 +120,7 @@ async fn save (
   let mut stream : TcpStream =
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   update_from_and_rerender_buffer (
-    &mut stream, buf, driver, config, tantivy, graph, false,
+    &mut stream, buf, config, tantivy, graph, false,
     &Err ( String::new () ), &mut views_state ) . await }
 
 /// Swap the two whole lines that carry these metadata fragments.
@@ -188,17 +178,17 @@ const READONLY_COLS : [ColSpec; 4] = [
 
 async fn readonly_reorder (
   fails : &mut Fails, spec : &ColSpec,
-  config : &SkgConfig, driver : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   let scenario : String = format! ("{}/reorder", spec . atom);
-  let buf : String = render (spec . owner, config, driver) . await ?;
+  let buf : String = render (spec . owner, config) . await ?;
   let swapped : String = swap_lines (
     &buf,
     &format! ("(id {})", spec . member_a),
     &format! ("(id {})", spec . member_b) );
   let resp : SaveResponse = match save (
-    &swapped, config, driver, tantivy, graph) . await {
+    &swapped, config, tantivy, graph) . await {
     Ok (r) => r,
     Err (e) => { fails . record (&scenario, format! (
       "save errored: {}", e)); return Ok (( )); } };
@@ -219,11 +209,11 @@ async fn readonly_reorder (
 
 async fn readonly_insert (
   fails : &mut Fails, spec : &ColSpec,
-  config : &SkgConfig, driver : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   let scenario : String = format! ("{}/insert", spec . atom);
-  let buf : String = render (spec . owner, config, driver) . await ?;
+  let buf : String = render (spec . owner, config) . await ?;
   let member_b_line : String =
     line_containing (&buf, &format! ("(id {})", spec . member_b))
     . to_string ();
@@ -233,7 +223,7 @@ async fn readonly_insert (
     &member_b_line,
     &format! ("{}\n{}\n{}", member_b_line, intruder_line, child_line) );
   let resp : SaveResponse = match save (
-    &edited, config, driver, tantivy, graph) . await {
+    &edited, config, tantivy, graph) . await {
     Ok (r) => r,
     Err (e) => { fails . record (&scenario, format! (
       "save errored: {}", e)); return Ok (( )); } };
@@ -259,18 +249,18 @@ async fn readonly_insert (
 
 async fn readonly_delete (
   fails : &mut Fails, spec : &ColSpec,
-  config : &SkgConfig, driver : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   let scenario : String = format! ("{}/delete", spec . atom);
-  let buf : String = render (spec . owner, config, driver) . await ?;
+  let buf : String = render (spec . owner, config) . await ?;
   let member_a_line : String =
     line_containing (&buf, &format! ("(id {})", spec . member_a))
     . to_string ();
   let edited : String =
     buf . replace ( &format! ("{}\n", member_a_line), "" );
   let resp : SaveResponse = match save (
-    &edited, config, driver, tantivy, graph) . await {
+    &edited, config, tantivy, graph) . await {
     Ok (r) => r,
     Err (e) => { fails . record (&scenario, format! (
       "save errored: {}", e)); return Ok (( )); } };
@@ -297,10 +287,10 @@ async fn readonly_delete (
 
 async fn denovo_readonly_render (
   fails : &mut Fails,
-  config : &SkgConfig, driver : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let s : &str = "denovo/read-only-cols";
-  let buf : String = render ("dn-owner", config, driver) . await ?;
+  let buf : String = render ("dn-owner", config) . await ?;
   for atom in ["subscriberCol", "overriderCol",
                "hiderCol", "hiddenCol"] {
     fails . want_contains (s, &buf, &format! ("(skg {})", atom)); }
@@ -329,33 +319,29 @@ fn relationship_matrix
     "skg-test-partner-col-matrix",
     "tests/partner_col_matrix/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-partner-col-matrix",
-    |config, driver, tantivy| Box::pin ( async move {
-      // PartnerCol scaffolds are created from snapshot_global(); install
-      // it (this is the only installer in the target).
+    |config, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
-      skg::dbs::in_rust_graph::install_or_swap_global_handle (
-        graph . clone () );
       let mut fails : Fails = Fails::new ();
 
-      denovo_readonly_render (&mut fails, config, driver) . await ?;
+      denovo_readonly_render (&mut fails, config) . await ?;
       for spec in &READONLY_COLS {
         readonly_reorder (
-          &mut fails, spec, config, driver, tantivy, &graph) . await ?;
+          &mut fails, spec, config, tantivy, &graph) . await ?;
         readonly_insert (
-          &mut fails, spec, config, driver, tantivy, &graph) . await ?;
+          &mut fails, spec, config, tantivy, &graph) . await ?;
         readonly_delete (
-          &mut fails, spec, config, driver, tantivy, &graph) . await ?;
+          &mut fails, spec, config, tantivy, &graph) . await ?;
       }
-      writable_subscribeeCol (&mut fails, config, driver) . await ?;
-      writable_overriddenCol (&mut fails, config, driver) . await ?;
+      writable_subscribeeCol (&mut fails, config) . await ?;
+      writable_overriddenCol (&mut fails, config) . await ?;
       hiddenCol_delete_does_not_unhide (
-        &mut fails, config, driver) . await ?;
-      omission_scenarios (&mut fails, config, driver) . await ?;
+        &mut fails, config) . await ?;
+      omission_scenarios (&mut fails, config) . await ?;
       col_request_scenarios (
-        &mut fails, config, driver, tantivy, &graph) . await ?;
+        &mut fails, config, tantivy, &graph) . await ?;
       path_request_scenarios (
-        &mut fails, config, driver, tantivy, &graph) . await ?;
+        &mut fails, config, tantivy, &graph) . await ?;
 
       fails . finish () } )) }
 
@@ -371,7 +357,7 @@ fn relationship_matrix
 
 async fn path_request_scenarios (
   fails : &mut Fails,
-  config : &SkgConfig, driver : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   let req = | owner : &str, role : &str, title : &str | -> String {
@@ -405,7 +391,7 @@ async fn path_request_scenarios (
     let _ = role;
     let resp : SaveResponse = save (
       &req (owner, role, owner), // title == owner (matches its disk title)
-      config, driver, tantivy, graph) . await ?;
+      config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view,
@@ -425,7 +411,7 @@ async fn path_request_scenarios (
     let s : &str = "path/linkDest";
     let resp : SaveResponse = save (
       &req ("pathLink-src", "linkDest", "[[id:pathLink-dst][to dst]]"),
-      config, driver, tantivy, graph) . await ?;
+      config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(id pathLink-dst)");
@@ -441,7 +427,7 @@ async fn path_request_scenarios (
     let s : &str = "path/self-referential-no-special-case";
     let resp : SaveResponse = save (
       &req ("pathSelf", "linkDest", "[[id:pathSelf][to self]]"),
-      config, driver, tantivy, graph) . await ?;
+      config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(id pathSelf)"); }
@@ -458,7 +444,7 @@ async fn path_request_scenarios (
 
 async fn col_request_scenarios (
   fails : &mut Fails,
-  config : &SkgConfig, driver : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   let request_buf = | owner : &str, rel : &str | -> String {
@@ -472,7 +458,7 @@ async fn col_request_scenarios (
     let s : &str = "col-request/overrides-empty";
     let resp : SaveResponse = save (
       &request_buf ("wSub-owner", "overrides"),
-      config, driver, tantivy, graph) . await ?;
+      config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(skg overriddenCol)");
@@ -482,7 +468,7 @@ async fn col_request_scenarios (
     let s : &str = "col-request/overrides-populated";
     let resp : SaveResponse = save (
       &request_buf ("wOvr-owner", "overrides"),
-      config, driver, tantivy, graph) . await ?;
+      config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(skg overriddenCol)");
@@ -492,7 +478,7 @@ async fn col_request_scenarios (
     let s : &str = "col-request/subscribes-populated";
     let resp : SaveResponse = save (
       &request_buf ("wSub-owner", "subscribes"),
-      config, driver, tantivy, graph) . await ?;
+      config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(skg subscribeeCol)");
@@ -502,7 +488,7 @@ async fn col_request_scenarios (
     let s : &str = "col-request/hides-empty";
     let resp : SaveResponse = save (
       &request_buf ("wSub-owner", "hides"),
-      config, driver, tantivy, graph) . await ?;
+      config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_absent (s, &resp . saved_view, "hiderCol");
@@ -519,11 +505,10 @@ async fn col_request_scenarios (
 async fn saveplan_nodes (
   buf    : &str,
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
   active : Option<&ActiveSourceSet>,
 ) -> Result<Vec<DefineNode>, Box<dyn Error>> {
   let (_vf, plan, _warnings) =
-    buffer_to_validated_saveplan (buf, config, driver, active) . await ?;
+    buffer_to_validated_saveplan (buf, config, active)  ?;
   Ok (plan . define_nodes) }
 
 /// A fresh indefinitive public member line at the given indentation.
@@ -537,16 +522,16 @@ fn col_member_stars ( buf : &str, any_member_fragment : &str ) -> usize {
 
 async fn writable_subscribeeCol (
   fails : &mut Fails,
-  config : &SkgConfig, driver : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  let buf : String = render ("wSub-owner", config, driver) . await ?;
+  let buf : String = render ("wSub-owner", config) . await ?;
   let stars : usize = col_member_stars (&buf, "(id wSub-a)");
   { // reorder: [a,b,c] -> swap a,c -> [c,b,a]
     let s : &str = "subscribeeCol/reorder";
     let reordered : String =
       swap_lines (&buf, "(id wSub-a)", "(id wSub-c)");
     let nodes : Vec<DefineNode> =
-      saveplan_nodes (&reordered, config, driver, None) . await ?;
+      saveplan_nodes (&reordered, config, None) . await ?;
     match saved_node_by_id (&nodes, "wSub-owner") {
       Some (n) => if members_msv (&n . subscribes_to) != MSV::Specified (vec![
           ID::from ("wSub-c"), ID::from ("wSub-b"), ID::from ("wSub-a")]) {
@@ -559,7 +544,7 @@ async fn writable_subscribeeCol (
       line_containing (&buf, "(id wSub-b)") . to_string ();
     let edited : String = buf . replace (&format! ("{}\n", b_line), "");
     let nodes : Vec<DefineNode> =
-      saveplan_nodes (&edited, config, driver, None) . await ?;
+      saveplan_nodes (&edited, config, None) . await ?;
     match saved_node_by_id (&nodes, "wSub-owner") {
       Some (n) => if members_msv (&n . subscribes_to) != MSV::Specified (vec![
           ID::from ("wSub-a"), ID::from ("wSub-c")]) {
@@ -573,7 +558,7 @@ async fn writable_subscribeeCol (
     let edited : String = buf . replace (
       &c_line, &format! ("{}\n{}", c_line, member_line (stars, "wSub-d")) );
     let nodes : Vec<DefineNode> =
-      saveplan_nodes (&edited, config, driver, None) . await ?;
+      saveplan_nodes (&edited, config, None) . await ?;
     match saved_node_by_id (&nodes, "wSub-owner") {
       Some (n) => if members_msv (&n . subscribes_to) != MSV::Specified (vec![
           ID::from ("wSub-a"), ID::from ("wSub-b"),
@@ -590,16 +575,16 @@ fn override_set ( n : &NodeComplete ) -> Vec<ID> {
 
 async fn writable_overriddenCol (
   fails : &mut Fails,
-  config : &SkgConfig, driver : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  let buf : String = render ("wOvr-owner", config, driver) . await ?;
+  let buf : String = render ("wOvr-owner", config) . await ?;
   let stars : usize = col_member_stars (&buf, "(id wOvr-a)");
   { // reorder is harmless: order-free set unchanged
     let s : &str = "overriddenCol/reorder";
     let reordered : String =
       swap_lines (&buf, "(id wOvr-a)", "(id wOvr-b)");
     let nodes : Vec<DefineNode> =
-      saveplan_nodes (&reordered, config, driver, None) . await ?;
+      saveplan_nodes (&reordered, config, None) . await ?;
     match saved_node_by_id (&nodes, "wOvr-owner") {
       Some (n) => if override_set (n) != vec![
           ID::from ("wOvr-a"), ID::from ("wOvr-b")] {
@@ -612,7 +597,7 @@ async fn writable_overriddenCol (
       line_containing (&buf, "(id wOvr-a)") . to_string ();
     let edited : String = buf . replace (&format! ("{}\n", a_line), "");
     let nodes : Vec<DefineNode> =
-      saveplan_nodes (&edited, config, driver, None) . await ?;
+      saveplan_nodes (&edited, config, None) . await ?;
     match saved_node_by_id (&nodes, "wOvr-owner") {
       Some (n) => if override_set (n) != vec![ID::from ("wOvr-b")] {
         fails . record (s, format! (
@@ -625,7 +610,7 @@ async fn writable_overriddenCol (
     let edited : String = buf . replace (
       &b_line, &format! ("{}\n{}", b_line, member_line (stars, "wOvr-c")) );
     let nodes : Vec<DefineNode> =
-      saveplan_nodes (&edited, config, driver, None) . await ?;
+      saveplan_nodes (&edited, config, None) . await ?;
     match saved_node_by_id (&nodes, "wOvr-owner") {
       Some (n) => if override_set (n) != vec![
           ID::from ("wOvr-a"), ID::from ("wOvr-b"), ID::from ("wOvr-c")] {
@@ -641,15 +626,15 @@ async fn writable_overriddenCol (
 /// readonly_delete; the extraction-seam twin is in commit 1.)
 async fn hiddenCol_delete_does_not_unhide (
   fails : &mut Fails,
-  config : &SkgConfig, driver : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let s : &str = "hiddenCol/no-unhide-on-disk";
-  let buf : String = render ("roHidden-owner", config, driver) . await ?;
+  let buf : String = render ("roHidden-owner", config) . await ?;
   let a_line : String =
     line_containing (&buf, "(id roHidden-a)") . to_string ();
   let edited : String = buf . replace (&format! ("{}\n", a_line), "");
   let nodes : Vec<DefineNode> =
-    saveplan_nodes (&edited, config, driver, None) . await ?;
+    saveplan_nodes (&edited, config, None) . await ?;
   // Either the owner is a no-op (absent from the plan), or its SaveNode
   // still hides roHidden-a; in no case is roHidden-a unhidden.
   if let Some (n) = saved_node_by_id (&nodes, "roHidden-owner") {
@@ -669,7 +654,7 @@ async fn hiddenCol_delete_does_not_unhide (
 
 async fn omission_scenarios (
   fails : &mut Fails,
-  config : &SkgConfig, driver : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let active : ActiveSourceSet =
     ActiveSourceSet::named (config, SourceSetName::from ("public")) ?;
@@ -677,8 +662,8 @@ async fn omission_scenarios (
     let s : &str = "subscriberCol/omission";
     let (buf, _p, _t) : (String, Vec<ID>, Tree<ViewNode>) =
       multi_root_view_with_source_set (
-        driver, config, None, &[ID::from ("omSub-owner")],
-        false, &active ) . await ?;
+        config, None, &[ID::from ("omSub-owner")],
+        false, &active ) ?;
     fails . want_contains (s, &buf, "(id omSub-active)");
     fails . want_absent (s, &buf, "omSub-inactive"); }
   { // writable subscribeeCol: inactive omitted from render, but the
@@ -686,8 +671,8 @@ async fn omission_scenarios (
     let s : &str = "subscribeeCol/omission";
     let (buf, _p, _t) : (String, Vec<ID>, Tree<ViewNode>) =
       multi_root_view_with_source_set (
-        driver, config, None, &[ID::from ("omWsub-owner")],
-        false, &active ) . await ?;
+        config, None, &[ID::from ("omWsub-owner")],
+        false, &active ) ?;
     fails . want_contains (s, &buf, "(id omWsub-active)");
     fails . want_absent (s, &buf, "omWsub-inactive");
     // Delete the only VISIBLE subscribee and save under the restricted
@@ -699,7 +684,7 @@ async fn omission_scenarios (
     let edited : String =
       buf . replace (&format! ("{}\n", active_line), "");
     let nodes : Vec<DefineNode> =
-      saveplan_nodes (&edited, config, driver, Some (&active)) . await ?;
+      saveplan_nodes (&edited, config, Some (&active)) . await ?;
     match saved_node_by_id (&nodes, "omWsub-owner") {
       Some (n) => { let subs : Vec<ID> = match &n . subscribes_to {
           MSV::Specified (ids) => members_of (ids),
@@ -722,9 +707,7 @@ async fn omission_scenarios (
 // already-overridden target via an overriddenCol; the save is
 // rejected with the monogamy error and disk is unchanged.
 //
-// This function does NOT install the global graph handle (so it never
-// double-installs with relationship_matrix under plain `cargo test`):
-// the override-invariant check reads the save's own graph handle, and
+// The override-invariant check reads the save's own graph handle, and
 // the buffer is hand-written rather than rendered.
 //////////////////////////////////////////////////////////////
 
@@ -735,7 +718,7 @@ fn buffer_save_rejects_second_user_owned_overrider
     "skg-test-partner-col-matrix-monogamy",
     "tests/partner_col_matrix/fixtures-monogamy/skgconfig.toml",
     "/tmp/tantivy-test-partner-col-matrix-monogamy",
-    |config, driver, tantivy| Box::pin ( async move {
+    |config, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
       // mono-r1 already overrides mono-target on disk; this buffer
@@ -746,7 +729,7 @@ fn buffer_save_rejects_second_user_owned_overrider
         *** (skg (node (id mono-target) (source public) indef)) mono-target
       "};
       let result : Result<SaveResponse, Box<dyn Error>> =
-        save (buffer, config, driver, tantivy, &graph) . await;
+        save (buffer, config, tantivy, &graph) . await;
       let err : Box<dyn Error> = match result {
         Ok (_)  => panic! (
           "save must be rejected by monogamy, but it succeeded"),
@@ -765,8 +748,9 @@ fn buffer_save_rejects_second_user_owned_overrider
       // Disk unchanged: the override-invariant check runs before the
       // filesystem write, so mono-r2 still overrides nothing.
       let r2 : NodeComplete =
-        nodeComplete_rustFIrst_by_id (
-          config, driver, &ID::from ("mono-r2") ) . await ?;
+        nodecomplete_by_id (
+          &skg::test_utils::graph_handle_from_config (config)? . load_full (),
+          config, &ID::from ("mono-r2") ) ?;
       let overrides_empty : bool = match &r2 . overrides_view_of {
         MSV::Unspecified       => true,
         MSV::Specified (ids)   => ids . is_empty (), };

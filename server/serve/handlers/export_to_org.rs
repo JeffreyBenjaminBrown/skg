@@ -29,7 +29,7 @@ use std::path::PathBuf;
 /// client supplies the user a default but always sends a value, so
 /// a missing or blank `output-dir` is an error here, not a silent
 /// "org-exports". Reads .skg files fresh from disk, so the export
-/// reflects current on-disk state. Needs neither TypeDB nor Tantivy.
+/// reflects current on-disk state. Needs neither the live graph nor Tantivy.
 pub fn handle_export_to_org_request (
   stream  : &mut TcpStream,
   config  : &SkgConfig,

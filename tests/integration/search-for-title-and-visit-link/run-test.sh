@@ -2,7 +2,6 @@
 
 # Integration test for skg title-matches functionality
 # This script:
-# - Verifies TypeDB server is running
 # - Starts an independent cargo run process with test config
 # - Uses Emacs to send title-matches request for "apples"
 # - Tests that Emacs receives search results and can visit links
@@ -24,7 +23,6 @@ cleanup_tantivy_index "$TEST_DIR/data/.index.tantivy"
 
 trap cleanup EXIT
 
-check_typedb_server
 
 # Find available port and create dynamic config
 AVAILABLE_PORT=$(find_available_port)
@@ -33,13 +31,10 @@ echo "Using port $AVAILABLE_PORT for test server..."
 
 # Create a dynamic config with the available port
 TEMP_CONFIG=$(mktemp "$TEST_DIR/data/skgconfig-tmp-XXXXXX.toml") # inside data/ so the data root (the config-file dir) contains the owned/ folder
-DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
-db_name = "$DB_NAME"
 tantivy_folder = "$TEST_DIR/data/.index.tantivy"
 port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
-delete_on_quit = true
 
 [[sources]]
 name = "main"

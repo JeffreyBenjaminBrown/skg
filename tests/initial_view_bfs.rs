@@ -5,42 +5,35 @@ use std::error::Error;
 
 use skg::to_org::render::content_view::multi_root_view;
 use skg::assert_metadata_eq;
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::run_with_shared_test_stores;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 
-use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
 
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str = "tests/initial_view_bfs/fixtures";
-  run_with_shared_test_db (
+  run_with_shared_test_stores (
     "skg-test-initial-view-bfs",
     |s| Box::pin ( async move {
-      s . reset ("test_bfs_limit_across_multiple_trees", fixtures) . await ?;
-      s . install_graph_handle () ?;
+      s . reset ("test_bfs_limit_across_multiple_trees", fixtures) ?;
       test_bfs_limit_across_multiple_trees (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("test_bfs_limit_9_three_branches", fixtures) . await ?;
-      s . install_graph_handle () ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_bfs_limit_9_three_branches", fixtures) ?;
       test_bfs_limit_9_three_branches (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("test_bfs_limit_8_two_branches", fixtures) . await ?;
-      s . install_graph_handle () ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("test_bfs_limit_8_two_branches", fixtures) ?;
       test_bfs_limit_8_two_branches (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_budget_content_beats_subscribers",
-                 "tests/initial_view_bfs/fixtures-content-vs-subscribers") . await ?;
-      s . install_graph_handle () ?;
+                 "tests/initial_view_bfs/fixtures-content-vs-subscribers") ?;
       test_budget_content_beats_subscribers (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 async fn test_bfs_limit_across_multiple_trees (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       // Tree structure across 3 roots:
@@ -85,8 +78,8 @@ async fn test_bfs_limit_across_multiple_trees (
       ];
 
       let (result, _pids, _) : (String, Vec<ID>, _) =
-        multi_root_view ( driver, &test_config, None, & focii, false
-                        ) . await ?;
+        multi_root_view ( &test_config, None, & focii, false
+                        ) ?;
 
       println!("BFS multi-tree limit result:\n{}", result);
 
@@ -112,8 +105,7 @@ async fn test_bfs_limit_across_multiple_trees (
       Ok (( )) }
 
 async fn test_bfs_limit_9_three_branches (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       // §5.5 node budget, limit=9 (cost 1 per expansion): expansions are
@@ -132,8 +124,8 @@ async fn test_bfs_limit_9_three_branches (
       ];
 
       let (result, _pids, _) : (String, Vec<ID>, _) =
-        multi_root_view ( driver, &test_config, None, & focii, false
-                        ) . await ?;
+        multi_root_view ( &test_config, None, & focii, false
+                        ) ?;
 
       println!("BFS limit=9 three branches result:\n{}", result);
 
@@ -162,8 +154,7 @@ async fn test_bfs_limit_9_three_branches (
       Ok (( )) }
 
 async fn test_bfs_limit_8_two_branches (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       // §5.5 node budget, limit=8, roots [1,2] (cost 1 per expansion): expansions
@@ -181,8 +172,8 @@ async fn test_bfs_limit_8_two_branches (
       ];
 
       let (result, _pids, _) : (String, Vec<ID>, _) =
-        multi_root_view ( driver, &test_config, None, & focii, false
-                        ) . await ?;
+        multi_root_view ( &test_config, None, & focii, false
+                        ) ?;
 
       println!("BFS limit=8 two branches result:\n{}", result);
 
@@ -216,8 +207,7 @@ async fn test_bfs_limit_8_two_branches (
 // also sit one level deeper than content (r -> SubscribeeCol -> subscriber vs
 // r -> c1), so BFS-by-depth reaches content first regardless.
 async fn test_budget_content_beats_subscribers (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let mut test_config = config . clone();
@@ -225,8 +215,8 @@ async fn test_budget_content_beats_subscribers (
 
       let focii = vec![ ID ( "r" . to_string () ) ];
       let (result, _pids, _) : (String, Vec<ID>, _) =
-        multi_root_view ( driver, &test_config, None, & focii, false
-                        ) . await ?;
+        multi_root_view ( &test_config, None, & focii, false
+                        ) ?;
 
       println!("content-vs-subscribers (budget 3):\n{}", result);
 

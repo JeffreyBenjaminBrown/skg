@@ -6,7 +6,7 @@
  *   default config: data/skgconfig.toml
  *   default top-n: 20
  *
- * Simpler than a recursive TypeQL query: we read .skg files once,
+ * Reads .skg files once,
  * build the 'contains' adjacency map, then do one BFS per node.
  * O(nodes * avg_descendants) — a few seconds on 29k nodes.
  */

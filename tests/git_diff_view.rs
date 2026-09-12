@@ -30,10 +30,5 @@ mod filter_cols;
 #[path = "git_diff_view/roundtrip/mod.rs"]
 mod roundtrip;
 
-// The outbound-col diff tests (git_diff_view/overrides/) live in
-// their own target, tests/git_diff_view_partner_cols.rs: their de
-// novo renders install the process-global graph handle, which must
-// not leak into this target's save tests (or the coherence
-// debug_assert in save_buffer.rs) under plain 'cargo test', where
-// one process hosts a whole target. The inbound tests save without
-// the global handle, so they live here.
+// The outbound-col diff tests live in their own focused target,
+// tests/git_diff_view_partner_cols.rs. The inbound tests remain here.

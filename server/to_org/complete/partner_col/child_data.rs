@@ -19,7 +19,7 @@
 ///   needed to create any missing goal child without querying while
 ///   the tree is being mutated.
 
-use crate::types::env::SkgEnv;
+use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff};
 use crate::types::misc::{ID, SourceName};
 use crate::types::phantom::title_for_phantom;
@@ -72,7 +72,7 @@ pub fn build_child_data (
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   relationship_sources           : &HashMap<ID, SourceName>,
-  env                            : &SkgEnv,
+  runtime                        : &RuntimeGeneration,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
   let existing_children : HashMap<ID, (SourceName, String)> = {
     let node_ref : NodeRef<ViewNode> =
@@ -94,13 +94,14 @@ pub fn build_child_data (
       // source can't be determined, fall back to the NOT_FOUND sentinel
       // rather than aborting the whole render (TODO/DONE/local-view-update/plan_v2.org §7.6).
       let child_src : SourceName =
-        env . find_source (child_skgid, deleted_since_head_pid_src_map)
+        SkgEnv::find_source_in_generation (
+          runtime, child_skgid, deleted_since_head_pid_src_map)
         . unwrap_or_else ( SourceName::not_found );
       let axes : (ExistenceAxes, MembershipAxes) =
         axes_for_removed ( child_skgid, &child_src );
       let child_title : String =
-        title_for_phantom ( child_skgid, &child_src,
-                            source_diffs . as_ref (), &env . config );
+        title_for_phantom ( &runtime . graph, child_skgid, &child_src,
+                            source_diffs . as_ref (), &runtime . config );
       result . insert ( child_skgid . clone (),
                         ChildData { source  : child_src,
                                     title   : child_title,
@@ -108,7 +109,8 @@ pub fn build_child_data (
                                     unknown : false,
                                     rel_source : None } );
     } else {
-      match env . find_source (child_skgid, deleted_since_head_pid_src_map) {
+      match SkgEnv::find_source_in_generation (
+        runtime, child_skgid, deleted_since_head_pid_src_map) {
         None => { result . insert ( child_skgid . clone (),
           ChildData { source: SourceName::not_found (), title: String::new (),
                       phantom: None, unknown: true,
@@ -120,7 +122,7 @@ pub fn build_child_data (
           // into a failed disk read.  An unreadable, formerly indexed file
           // means precisely an Unknown relationship member.
           match nodecomplete_rustFirst_by_pid_and_source (
-            &env . config, child_skgid, &child_src ) {
+            &runtime . graph, &runtime . config, child_skgid, &child_src ) {
             Ok (skg) => if let Some ( (s, t) ) = existing_children . get (child_skgid) {
               result . insert ( child_skgid . clone (),
                                 ChildData { source  : s . clone (),

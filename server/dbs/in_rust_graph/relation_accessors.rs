@@ -1,11 +1,20 @@
 use std::collections::HashSet;
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
 use crate::types::git::NodeChanges;
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, MemberAtSource, RelationshipMemberKey, SourceName, members_of};
 use crate::types::nodes::rust::NodeRust;
+
+/// The five stored outbound relationship types and their endpoint roles.
+/// This is domain vocabulary; storage adapters consume it rather than own it.
+pub const OUTBOUND_RELATIONSHIP_TYPES : &[(&str, &str, &str)] = &[
+  ("contains",                      "container",  "contained"),
+  ("textlinks_to",                  "source",     "dest"),
+  ("subscribes",                    "subscriber", "subscribee"),
+  ("hides_from_its_subscriptions",  "hider",      "hidden"),
+  ("overrides_view_of",             "overrider",  "overridden"),
+];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NodeRelation {
@@ -17,7 +26,7 @@ pub enum NodeRelation {
 }
 
 impl NodeRelation {
-  pub fn typeql_name (self) -> &'static str {
+  pub fn relation_name (self) -> &'static str {
     match self {
       Self::Contains =>
         "contains",
@@ -55,7 +64,7 @@ impl NodeRelation {
         None, } }
 
   pub fn roles (self) -> (&'static str, &'static str) {
-    let relation_name : &'static str = self . typeql_name ();
+    let relation_name : &'static str = self . relation_name ();
     OUTBOUND_RELATIONSHIP_TYPES . iter ()
       . find ( |(candidate, _, _)| *candidate == relation_name )
       . map ( |(_, first, second)| (*first, *second) )
@@ -173,7 +182,7 @@ impl RelationRole {
   ) -> (&'static str, &'static str, &'static str) {
     let (first, second) : (&'static str, &'static str) =
       self . relation . roles ();
-    let relation : &'static str = self . relation . typeql_name ();
+    let relation : &'static str = self . relation . relation_name ();
     match self . position {
       BinaryRolePosition::First  => (relation, second, first),
       BinaryRolePosition::Second => (relation, first, second), } }

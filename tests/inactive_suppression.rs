@@ -10,7 +10,7 @@
 // silently.
 //
 // This lives in its own test target because the silent-untouched
-// case needs the process-global in-Rust graph installed (the noop
+// case needs the explicit in-Rust graph installed (the noop
 // filter reads it), and installing it inside a shared-process
 // target would couple unrelated tests.
 
@@ -49,8 +49,8 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
     "skg-test-inactive-suppression",
     "tests/source_sets/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-inactive-suppression",
-    |config, driver, _tantivy| Box::pin ( async move {
-      skg::dbs::in_rust_graph::try_init_global_handle (
+    |config, _tantivy| Box::pin ( async move {
+      (
         skg::test_utils::graph_handle_from_config (config) ? );
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
@@ -64,7 +64,7 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
         "};
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
-            buffer, config, driver, Some (&active) ) . await ?;
+            buffer, config, Some (&active) )  ?;
         assert! (
           ! save_ids (&plan . define_nodes)
             . contains (&ID::from ("private-a")),
@@ -87,7 +87,7 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
         "};
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
-            buffer, config, driver, Some (&active) ) . await ?;
+            buffer, config, Some (&active) )  ?;
         assert! (
           ! save_ids (&plan . define_nodes)
             . contains (&ID::from ("private-a")),
@@ -105,7 +105,7 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
         "};
         let (_viewforest, plan, warnings) =
           buffer_to_validated_saveplan (
-            buffer, config, driver, Some (&active) ) . await ?;
+            buffer, config, Some (&active) )  ?;
         assert! (
           plan . source_moves . is_empty (),
           "a move into an inactive source must be suppressed" );

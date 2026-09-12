@@ -5,11 +5,11 @@ Skg is free software, without a ghost of a path to making money.
 This is just enough for a programmer to see how to get it working.
 Please ask an AI for help setting it up.
 ** build the Docker container
-   https://github.com/JeffreyBenjaminBrown/docker-typedb-rust
+   See the image and mounts documented in =../bash/docker.sh=.
 ** start the Docker container
    See ../bash/docker.sh
 ** within the Docker container
-*** start TypeDB server
+*** start the Skg server
     See ../bash/start-servers.sh
 *** optional : import data from org-roam
     cargo run --bin skg -- import-org-roam [source] [target] [nickname]

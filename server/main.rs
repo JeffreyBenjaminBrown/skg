@@ -14,9 +14,6 @@ use skg::export_org::{
   export_candidate_pids, export_to_org, ExportReport};
 use skg::source_sets::{ActiveSourceSet, SourceSetName};
 use skg::dbs::init::{InitContextHandoff, initialize_dbs};
-use skg::dbs::in_rust_graph::init_global_handle_for_first_time_or_panic;
-use skg::dbs::in_rust_graph::scheduled_audit::schedule_daemon;
-use skg::dbs::typedb::util::{connect_to_typedb, delete_database};
 use skg::types::env::SkgEnv;
 use skg::import_org_roam::{ImportStats, import_org_roam_directory};
 use skg::serve::serve;
@@ -34,7 +31,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use typedb_driver::TypeDBDriver;
 
 fn main() -> Result<(), Box<dyn Error>> {
   let args: Vec<String> = env::args() . collect();
@@ -60,7 +56,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // 'load_config' the server runs at startup (TOML parse +
     // source-set/path validation) and exit 0/1, reporting a bad config
     // exactly the way the real startup does (via 'die_bad_config'). No
-    // tracing, no TypeDB, no file walk.
+    // tracing and no file walk.
     let config_path: String =
       if args . len() > 2 { args[2] . clone() }
       else { "data/skgconfig.toml" . to_string() };
@@ -139,21 +135,9 @@ fn main() -> Result<(), Box<dyn Error>> {
       initialize_dbs (&config) };
   drop (nodes); // 'initialize_dbs' checked and used them; nothing here needs them.
 
-  // Hand the live driver to the signal handler. From here on,
-  // a Ctrl-C reuses this connection instead of opening a new one.
-  *SHUTDOWN_DRIVER . lock () . unwrap () =
-    Some ( Arc::clone (&env . driver) );
-
-  // Install the process-global handle to the in-Rust graph so that
-  // hot read paths (e.g. 'pid_and_source_from_id') can bypass TypeDB
-  // without every caller threading a '&Graph' parameter.
-  init_global_handle_for_first_time_or_panic ( env . in_rust_graph . clone () );
-
-  schedule_daemon (
-    &config, Arc::clone (&env . driver), env . in_rust_graph . clone () );
-
+  let runtime = env . runtime_snapshot ();
   compute_context_rankings (
-    &env . tantivy_index, had_id_set, all_node_ids,
+    &runtime . tantivy_index, had_id_set, all_node_ids,
     link_dests, map_to_content, map_to_containers );
 
   init_done . store (true, Ordering::Release);
@@ -256,18 +240,6 @@ fn play_ready_sound_in_background (
         "Ready sound playback failed" ); } } );
 }
 
-/// Installed BEFORE initialize_dbs,
-/// so that a kill during init still cleans up the database.
-/// During init the shared driver slot (SHUTDOWN_DRIVER) is empty,
-/// so the handler opens its own (slow) connection. After init,
-/// main() populates the slot, making the delete near-instant
-/// and avoiding the force-kill race in test cleanup.
-static SHUTDOWN_DRIVER : std::sync::Mutex<Option<Arc<TypeDBDriver>>> =
-  std::sync::Mutex::new (None);
-
-/// WEAKNESS: SIGKILL cannot be intercepted by any handler,
-///   so it still leaks the db.
-/// PURPOSE: Delete the db before ending.
 /// Safely ends upon receiving any SIGINT:
 ///  -Ctrl-C
 ///  -`kill
@@ -278,28 +250,10 @@ static SHUTDOWN_DRIVER : std::sync::Mutex<Option<Arc<TypeDBDriver>>> =
 /// SIGTERM and SIGHUP coverage;
 /// without it, only SIGINT would be caught.
 fn install_shutdown_signal_handler (
-  config : &SkgConfig,
+  _config : &SkgConfig,
 ) {
-  let db_name_for_signal : String = config . db_name . clone ();
-  let delete_on_quit : bool = config . delete_on_quit;
   ctrlc::set_handler ( move || {
     tracing::info! ("Received shutdown signal...");
-    if delete_on_quit {
-      tracing::info! (
-        db_name = %db_name_for_signal,
-        "Deleting database before shutdown" );
-      let driver : Arc<TypeDBDriver> =
-        // If the SIGINT arrived after initialization completed,   then the SHUTDOWN_DRIVER slot has already been populated,  and the handler reuses the driver that main holds.
-        // If the SIGINT arrived during initialization,  then the slot is still empty,  and the handler opens a fresh TypeDB connection solely to issue the delete.
-        SHUTDOWN_DRIVER . lock () . unwrap () . clone ()
-        . unwrap_or_else ( || Arc::new ( connect_to_typedb () ));
-      futures::executor::block_on ( async {
-        if let Err (e) =
-          delete_database (&driver, &db_name_for_signal)
-          . await {
-            tracing::error! (
-              error = %e,
-              "Failed to delete database" ); }} ); }
     tracing::info! ("Shutdown complete.");
     std::process::exit (0);
   } ) . expect ("Error setting Ctrl+C handler"); }
@@ -351,7 +305,7 @@ fn run_import (
     output_dir );
   Ok (( )) }
 
-/// Secondary, TypeDB-free entry point for the org export. The
+/// Server-free entry point for the org export. The
 /// primary, documented path is the Emacs command
 /// 'skg-export-some-to-org' (the "export to org" TCP endpoint); this
 /// subcommand runs the same core for scripting and testing.

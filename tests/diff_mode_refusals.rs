@@ -17,7 +17,7 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use skg::dbs::typedb::search::all_graphnodestats::AllGraphNodeStats;
+use skg::dbs::in_rust_graph::stats::AllGraphNodeStats;
 use skg::serve::ViewsState;
 use skg::serve::handlers::rerender_all_views::handle_git_diff_toggle_and_rerender;
 use skg::serve::handlers::source_sets::handle_source_set_request;
@@ -26,28 +26,27 @@ use skg::source_sets::{
   ActiveSourceSet, SourceSetName};
 use skg::test_utils::{graph_handle_from_config, read_lp_message,
                       skg_env_from_parts};
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::run_with_shared_test_stores;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{SkgConfig, TantivyIndex};
 use skg::types::views_state::OpenViews;
-use typedb_driver::TypeDBDriver;
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str = "tests/source_sets/fixtures";
-  run_with_shared_test_db (
+  run_with_shared_test_stores (
     "skg-test-diff-mode-refusals",
     |s| Box::pin ( async move {
-      s . reset ("toggle_refused_under_restricted_set_and_allowed_at_all", fixtures) . await ?;
+      s . reset ("toggle_refused_under_restricted_set_and_allowed_at_all", fixtures) ?;
       toggle_refused_under_restricted_set_and_allowed_at_all (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("switch_refusals_take_the_unwinding_shape", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("switch_refusals_take_the_unwinding_shape", fixtures) ?;
       switch_refusals_take_the_unwinding_shape (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("refusal_first_messages_parse_and_read_as_documented", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("refusal_first_messages_parse_and_read_as_documented", fixtures) ?;
       refusal_first_messages_parse_and_read_as_documented (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 fn connected_tcp_stream_pair (
@@ -82,14 +81,13 @@ fn read_first_then_assert_empty_stream (
   Ok (first) }
 
 async fn toggle_refused_under_restricted_set_and_allowed_at_all (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config)?;
       let env : SkgEnv =
         skg_env_from_parts (
-          config, Arc::clone (driver), tantivy, &graph );
+          config, tantivy, &graph );
       let mut views_state : ViewsState =
         ViewsState {
           diff_mode_enabled : false,
@@ -155,14 +153,13 @@ async fn toggle_refused_under_restricted_set_and_allowed_at_all (
       Ok (( )) }
 
 async fn switch_refusals_take_the_unwinding_shape (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let graph = graph_handle_from_config (config)?;
       let env : SkgEnv =
         skg_env_from_parts (
-          config, Arc::clone (driver), tantivy, &graph );
+          config, tantivy, &graph );
       let request_to = |name : &str| -> String {
         format! ( "((request . \"set active source set\") \
                     (name . \"{}\"))", name ) };
@@ -194,6 +191,7 @@ async fn switch_refusals_take_the_unwinding_shape (
           config, SourceSetName::from ("all"))?;
       let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
         Arc::new (Mutex::new (Some (SearchEnrichmentPayload {
+          runtime        : env . runtime_snapshot (),
           terms          : "untouched by a refusal" . to_string (),
           search_results : vec![],
           ancestry_by_id : HashMap::new (),
@@ -273,8 +271,7 @@ async fn switch_refusals_take_the_unwinding_shape (
       Ok (( )) }
 
 async fn refusal_first_messages_parse_and_read_as_documented (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // The quiet shape end to end, on a live reader rather than a
@@ -283,7 +280,7 @@ async fn refusal_first_messages_parse_and_read_as_documented (
       let graph = graph_handle_from_config (config)?;
       let env : SkgEnv =
         skg_env_from_parts (
-          config, Arc::clone (driver), tantivy, &graph );
+          config, tantivy, &graph );
       let mut views_state : ViewsState =
         ViewsState {
           diff_mode_enabled : false,

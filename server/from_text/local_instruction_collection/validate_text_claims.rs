@@ -5,18 +5,18 @@
 /// match the node's disk state. Claims for nodes absent from disk
 /// are ignored.
 
-use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
+use crate::dbs::node_lookup::opt_nodecomplete_by_id;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::from_text::local_instruction_collection::types::CollectedIntents;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::SkgConfig;
 
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
-pub async fn validate_text_claims (
+pub fn validate_text_claims (
   collected : &CollectedIntents,
+  graph     : &InRustGraph,
   config    : &SkgConfig,
-  driver    : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
   for pid in &collected . order {
     let Some (entry) = collected . by_pid . get (pid)
@@ -24,7 +24,7 @@ pub async fn validate_text_claims (
     if entry . text_claims . is_empty() {
       continue; }
     let Some (from_disk) =
-      optNodeComplete_rustFIrst_by_id (config, driver, pid) . await ?
+      opt_nodecomplete_by_id (graph, config, pid) ?
       else { continue; };
     for claim in &entry . text_claims {
       if claim . title != from_disk . title

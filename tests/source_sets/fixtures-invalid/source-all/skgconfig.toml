@@ -1,4 +1,3 @@
-db_name = "placeholder"
 tantivy_folder = "/tmp/placeholder"
 default_source_set = "all"
 

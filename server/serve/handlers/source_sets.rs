@@ -1,7 +1,7 @@
 use crate::serve::ViewsState;
 use crate::serve::handlers::rerender_all_views::{
   authorize_prepared_rerenders,
-  prepare_rerender_views,
+  prepare_rerender_views_with_runtime,
   stream_empty_rerender,
   stream_prepared_rerenders};
 use crate::serve::handlers::text_release::approved_pids_from_request;
@@ -12,7 +12,7 @@ use crate::serve::util::{
   send_response_with_length_prefix,
   value_from_request_sexp};
 use crate::source_sets::ActiveSourceSet;
-use crate::types::env::SkgEnv;
+use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SourceSetName;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
@@ -31,14 +31,15 @@ pub fn handle_source_set_request (
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
 ) {
+  let runtime = env . runtime_snapshot ();
   match request_type_from_request (request) {
     Ok (RequestType::ListSourceSets) =>
-      send_source_sets_response (stream, &env . config, active_source_set),
+      send_source_sets_response (stream, &runtime . config, active_source_set),
     Ok (RequestType::ActiveSourceSet) =>
       send_active_source_set_response (stream, active_source_set),
     Ok (RequestType::SetActiveSourceSet) =>
       set_active_source_set (
-        stream, request, env, views_state,
+        stream, request, env, runtime, views_state,
         active_source_set, enrichment_slot, search_cancelled ),
     Ok (_) =>
       // Reachable only from malformed requests no current client
@@ -63,6 +64,7 @@ fn set_active_source_set (
   stream           : &mut TcpStream,
   request          : &str,
   env              : &SkgEnv,
+  runtime          : Arc<RuntimeGeneration>,
   views_state      : &mut ViewsState,
   active_source_set : &mut ActiveSourceSet,
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
@@ -75,7 +77,7 @@ fn set_active_source_set (
         refuse_unwinding (stream, active_source_set, &e);
         return; }};
   let active : ActiveSourceSet =
-    match ActiveSourceSet::named (&env . config, name) {
+    match ActiveSourceSet::named (&runtime . config, name) {
       Ok (active) => active,
       Err (e) => {
         refuse_unwinding (
@@ -99,11 +101,11 @@ fn set_active_source_set (
       -> Result<(), Box<dyn std::error::Error>> {
       convert_and_prune_for_source_switch (
         viewforest . as_internal_tree_mut (), &target ) };
-    prepare_rerender_views (
-      env, views_state, views_state . diff_mode_enabled,
+    prepare_rerender_views_with_runtime (
+      env, runtime, views_state, views_state . diff_mode_enabled,
       Some (&target), Some (&prepass), true ) };
   if ! authorize_prepared_rerenders (
-    stream, env, &mut prepared, Some (&active),
+    stream, &mut prepared, Some (&active),
     "source-set-switch-rerender",
     &approved_pids_from_request (request) ) {
     return; }

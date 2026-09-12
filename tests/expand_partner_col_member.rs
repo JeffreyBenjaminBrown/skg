@@ -6,17 +6,13 @@
 // indefinitive node -- the member line stays a raw member, its own
 // content appears, and NO subscription-hides apply (those are scoped
 // to subscribees-as-such, the other direction).
-//
-// Its own target because it installs the process-global graph handle
-// (the inbound subscriberCol is created from snapshot_global).
 
 use std::error::Error;
 use std::net::TcpStream;
-use std::sync::Arc;
 
 use skg::dbs::in_rust_graph::{
-  InRustGraphHandle, install_or_swap_global_handle};
-use skg::test_utils::{run_with_test_db, graph_handle_from_config};
+  InRustGraphHandle};
+use skg::test_utils::{run_with_test_stores, graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::multi_root_view;
 use skg::serve::ViewsState;
@@ -25,12 +21,10 @@ use skg::types::views_state::OpenViews;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use ego_tree::Tree;
 use skg::types::viewnode::ViewNode;
-use typedb_driver::TypeDBDriver;
 
 async fn save (
   buf     : &str,
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
   graph   : &InRustGraphHandle,
 ) -> Result<SaveResponse, Box<dyn Error>> {
@@ -42,7 +36,7 @@ async fn save (
   let mut stream : TcpStream =
     TcpStream::connect (listener . local_addr () . unwrap ()) . unwrap ();
   update_from_and_rerender_buffer (
-    &mut stream, buf, driver, config, tantivy, graph, false,
+    &mut stream, buf, config, tantivy, graph, false,
     &Err ( String::new () ), &mut views_state ) . await }
 
 /// Line in 'buf' that mentions 'fragment'.
@@ -55,19 +49,18 @@ fn line_containing<'a> ( buf : &'a str, fragment : &str ) -> &'a str {
 #[test]
 fn expanding_subscriberCol_member_is_plain_expansion
   () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_test_stores (
     "skg-test-expand-partner-col-member",
     "tests/expand_partner_col_member/fixtures",
     "/tmp/tantivy-test-expand-partner-col-member",
-    |config, driver, tantivy| Box::pin ( async move {
+    |config, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
-      install_or_swap_global_handle ( graph . clone () );
       let (n_view, _pids, _tree)
         : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view (
-          driver, config, Some (tantivy), &[ID::from ("N")], false )
-        . await ?;
+          config, Some (tantivy), &[ID::from ("N")], false )
+ ?;
       assert! ( n_view . contains ("subscriberCol")
                 && line_containing (&n_view, "(id S)") . contains (" indef"),
         "N's view should show S as an indefinitive subscriberCol \
@@ -84,7 +77,7 @@ fn expanding_subscriberCol_member_is_plain_expansion
       let expanded_request : String =
         n_view . replace (&s_line, &s_line_expanded);
       let saved : String =
-        save (&expanded_request, config, driver, tantivy, &graph)
+        save (&expanded_request, config, tantivy, &graph)
         . await ? . saved_view;
       // S stays a raw subscriberCol member, now definitive...
       assert! ( saved . contains ("subscriberCol"),

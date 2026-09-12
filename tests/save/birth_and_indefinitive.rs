@@ -3,8 +3,7 @@
 use skg::dbs::filesystem::one_node::nodecomplete_from_id;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::save::update_fs_from_saveinstructions;
-use skg::save::update_typedb_from_saveinstructions;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::run_with_test_stores;
 use skg::types::misc::{ID, members_of};
 use skg::types::nodes::complete::NodeComplete;
 
@@ -31,11 +30,11 @@ fn test_birth_and_indefinitive(
 
   // Run test with database
   let result : Result<(), Box<dyn Error>> =
-    run_with_test_db (
+    run_with_test_stores (
       "skg-test-parentIs",
       "tests/save/birth_and_indefinitive/fixtures",
       "/tmp/tantivy-test-parentIs",
-      |config, driver, _tantivy| Box::pin ( async move {
+      |config, _tantivy| Box::pin ( async move {
         // Simulate user saving this org buffer:
         // Node 1 contains node 2 (which has parentIs=Independent and indef)
         // Node 2 contains node 3 (already) and should contain node 4 (new)
@@ -48,14 +47,7 @@ fn test_birth_and_indefinitive(
         let ( _viewforest, save_plan, _warnings ) =
           buffer_to_validated_saveplan(
             org_text,
-            config,
-            driver, None ) . await?;
-        update_typedb_from_saveinstructions(
-          &config . db_name,
-          driver,
-          &save_plan . define_nodes,
-          &[],
-          None, ). await?;
+            config, None ) ?;
         update_fs_from_saveinstructions(
           &save_plan . define_nodes,
           &[],
@@ -64,8 +56,8 @@ fn test_birth_and_indefinitive(
         { // verify indef is treated correctly
           let node2 : NodeComplete =
             nodecomplete_from_id(
-              config, driver, &ID("2" . to_string() ))
-            . await?;
+              config, &ID("2" . to_string() ))
+?;
         assert_eq!(
           members_of (&node2 . contains),
           vec![ ID("3" . to_string()) ],
@@ -74,8 +66,8 @@ fn test_birth_and_indefinitive(
         { // verify parentIs=Independent is treated correctly
           let node1 : NodeComplete =
             nodecomplete_from_id(
-              config, driver, &ID("1" . to_string() ))
-            . await?;
+              config, &ID("1" . to_string() ))
+?;
         assert!(
           node1 . contains . is_empty(),
           "Node 1 should have empty contents (empty when read from disk), because its child 2 has parentIs=Independent in its metadata." ); }

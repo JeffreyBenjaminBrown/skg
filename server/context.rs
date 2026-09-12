@@ -74,9 +74,8 @@ pub type MapToContainers = HashMap<ID, Vec<ID>>;
 /// Compute context origin types for all nodes and update Tantivy.
 /// Returns the map from node ID to context origin type label.
 ///
-/// Fully in-Rust-graph: all data is pre-computed from NodeCompletes at init.
-/// No TypeDB queries, no async. On a 28k-node dataset this is
-/// near-instantaneous (sub-second).
+/// All data is precomputed from NodeCompletes at init. This is synchronous and
+/// near-instantaneous (sub-second on a 28k-node dataset).
 pub fn compute_and_store_context_types (
   tantivy_index : &TantivyIndex,
   had_id_set    : &HashSet<ID>,
@@ -118,9 +117,9 @@ pub fn compute_and_store_context_types (
             updated);
   Ok (context_types_by_id) }
 
-/// Context origin types (used to rank search results) for the nodes a
-/// save touched, read straight from the post-save in-Rust graph — no
-/// TypeDB round-trips. Returns a pid -> origin-type-label map that the
+/// Context origin types (used to rank search results) for the nodes a save
+/// touched, read straight from the post-save graph. Returns a pid ->
+/// origin-type-label map that the
 /// save's single Tantivy index pass writes directly into each document,
 /// so no second writer/commit is needed.
 ///
@@ -195,7 +194,7 @@ fn node_is_in_containerward_cycle (
 // Step 1: identify origins (using the in-Rust graph)
 //
 
-/// Build origin_types map from in-Rust-graph data + one TypeDB query result.
+/// Build the origin-types map from graph data and imported file properties.
 /// We impose priority order: If something is a Root,
 /// it doesn't matter that it's a Dest, etc.
 /// Therefore higher-priority origin types are processed later.
@@ -375,7 +374,7 @@ fn climb_containerward_to_cycle (
 
 /// Build (map-to-content, map-to-containers) maps
 /// from loaded NodeCompletes.
-/// This avoids a ~22s TypeDB query on 28k-node datasets.
+/// This is a single linear pass over the already-loaded nodes.
 pub fn content_maps_from_nodes (
   nodes : &[NodeComplete],
 ) -> (MapToContent, MapToContainers) {
@@ -393,8 +392,7 @@ pub fn content_maps_from_nodes (
   ( to_content, to_containers ) }
 
 /// Collect all link dest IDs from titles and bodies.
-/// (The previous implementation, which queried TypeDB,
-/// took ~2.5 seconds for 28k nodes.)
+/// This is a single linear pass over the already-loaded nodes.
 pub fn link_dests_from_nodes (
   nodes : &[NodeComplete],
 ) -> HashSet<ID> {

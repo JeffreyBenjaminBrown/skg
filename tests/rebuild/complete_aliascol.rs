@@ -7,7 +7,7 @@ use std::error::Error;
 use skg::update_buffer::reconcile::aliascol::reconcile_alias_col_children;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::types::viewnode::ViewNode;
 use skg::types::misc::SkgConfig;
 use skg::types::misc::SourceName;
@@ -15,38 +15,36 @@ use skg::types::misc::TantivyIndex;
 use skg::types::git::SourceDiff;
 
 use ego_tree::{Tree, NodeId};
-use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str = "tests/rebuild/complete_aliascol/fixtures";
-  run_with_shared_test_db (
+  run_with_shared_test_stores (
     "skg-test-rebuild-complete-aliascol",
     |s| Box::pin ( async move {
-      s . reset ("test_reconcile_alias_col_children", fixtures) . await ?;
+      s . reset ("test_reconcile_alias_col_children", fixtures) ?;
       test_reconcile_alias_col_children (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_reconcile_alias_col_children_duplicate_aliases_different_orders",
-                 fixtures) . await ?;
+                 fixtures) ?;
       test_reconcile_alias_col_children_duplicate_aliases_different_orders (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 async fn test_reconcile_alias_col_children (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
-      test_reconcile_alias_col_children_logic ( config, driver ) . await }
+      test_reconcile_alias_col_children_logic ( config ) . await }
 
 async fn test_reconcile_alias_col_children_logic (
   config : &SkgConfig,
-  _driver : &typedb_driver::TypeDBDriver,
+
 ) -> Result < (), Box<dyn Error> > {
 
   let source_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
+  let graph = graph_handle_from_config (config)? . load_full ();
 
   // Create org text with three AliasCol scenarios
   let org_text : &str =
@@ -87,7 +85,8 @@ async fn test_reconcile_alias_col_children_logic (
   };
 
   // Test 1: First AliasCol should have b and c (deduped, valid only, disk order)
-  reconcile_alias_col_children ( &mut viewforest, aliascol_1_id, &source_diffs, config )?;
+  reconcile_alias_col_children (
+    &mut viewforest, aliascol_1_id, &graph, &source_diffs, config )?;
 
   {
     let aliascol_1_ref =
@@ -115,7 +114,8 @@ async fn test_reconcile_alias_col_children_logic (
   }
 
   // Test 2: Second AliasCol should have b and c, and gain focus
-  reconcile_alias_col_children ( &mut viewforest, aliascol_2_id, &source_diffs, config )?;
+  reconcile_alias_col_children (
+    &mut viewforest, aliascol_2_id, &graph, &source_diffs, config )?;
 
   {
     let aliascol_2_ref =
@@ -158,6 +158,7 @@ async fn test_reconcile_alias_col_children_logic (
     reconcile_alias_col_children (
       &mut viewforest,
       aliascol_3_id,
+      &graph,
       &source_diffs,
       config
     );
@@ -170,19 +171,19 @@ async fn test_reconcile_alias_col_children_logic (
   Ok (( )) }
 
 async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
       test_reconcile_alias_col_children_duplicate_aliases_different_orders_logic (
-        config, driver ) . await }
+        config ) . await }
 
 async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders_logic (
   config : &SkgConfig,
-  _driver : &typedb_driver::TypeDBDriver,
+
 ) -> Result < (), Box<dyn Error> > {
 
   let source_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
+  let graph = graph_handle_from_config (config)? . load_full ();
 
   let org_text : &str =
     indoc! { "
@@ -220,6 +221,7 @@ async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders_lo
   reconcile_alias_col_children (
     &mut viewforest,
     first_aliascol_id,
+    &graph,
     &source_diffs,
     config
   )?;
@@ -266,6 +268,7 @@ async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders_lo
   reconcile_alias_col_children (
     &mut viewforest,
     second_aliascol_id,
+    &graph,
     &source_diffs,
     config
   )?;

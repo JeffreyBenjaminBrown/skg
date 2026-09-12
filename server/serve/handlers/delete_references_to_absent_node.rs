@@ -1,8 +1,9 @@
 use crate::delete_references_to_absent_node::{
   preview, preview_warning_org, result_org, rewrite };
+use crate::dbs::in_rust_graph::new_handle;
 use crate::save::{
   preflight_fs_from_saveinstructions_with_hoist_approval,
-  update_graph_minus_nodeMerges };
+  update_graph_minus_nodeMerges_with_hoist_approval };
 use crate::serve::handlers::rerender_all_views::{
   stream_empty_rerender, stream_rerender_views_after_absent_reference_cleanup };
 use crate::serve::protocol::TcpToClient;
@@ -28,8 +29,15 @@ pub fn handle_delete_references_to_absent_node_request (
   let raw_id = match value_from_request_sexp ("id", request) {
     Ok (id) => ID::from (id),
     Err (e) => return refuse (stream, &e), };
-  let graph = env . in_rust_graph_snapshot ();
-  let current = match preview (&graph, &env . config, &raw_id) {
+  // Preview validation and the resulting rewrite are one mutation.  Taking
+  // the gate before the preview prevents an approved token from becoming
+  // stale again between its check and the filesystem/graph publication.
+  let mutation_gate = env . mutation_gate ();
+  let _mutation_guard = block_on (mutation_gate . lock ());
+  let runtime = env . runtime_snapshot ();
+  let working_graph = new_handle ((*runtime . graph) . clone ());
+  let graph = working_graph . load_full ();
+  let current = match preview (&graph, &runtime . config, &raw_id) {
     Ok (preview) => preview,
     Err (e) => return refuse (stream, &e), };
   let approved = value_from_request_sexp ("approved-preview", request) . ok ();
@@ -46,17 +54,21 @@ pub fn handle_delete_references_to_absent_node_request (
         TcpToClient::DeleteReferencesConfirmation, &response));
     stream_empty_rerender (stream);
     return; }
-  let writes = match rewrite (&graph, &env . config, &current) {
+  let writes = match rewrite (&graph, &runtime . config, &current) {
     Ok (writes) => writes,
     Err (e) => return refuse (stream, &e), };
   if ! writes . is_empty () {
     if let Err (e) = preflight_fs_from_saveinstructions_with_hoist_approval (
-      &writes, &[], &env . config, &HashSet::new ())
+      &writes, &[], &runtime . config, &HashSet::new ())
     { return refuse (stream, &e . to_string ()); }
-    if let Err (e) = block_on (update_graph_minus_nodeMerges (
-      writes, &[], env . config . clone (), &env . tantivy_index,
-      &env . driver, &env . in_rust_graph ))
-    { return refuse (stream, &e . to_string ()); }}
+    if let Err (e) = update_graph_minus_nodeMerges_with_hoist_approval (
+      writes, &[], (*runtime . config) . clone (), &runtime . tantivy_index,
+      &working_graph, &HashSet::new () )
+    { return refuse (stream, &e . to_string ()); }
+    env . runtime . publish (
+      runtime . config . clone (), working_graph . load_full (),
+      runtime . tantivy_index . clone ()); }
+  drop (_mutation_guard);
   let result = result_org (&current);
   let response = format! (
     "((content \"{}\") (changed-nodes {}) (changed-memberships {}))",

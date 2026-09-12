@@ -1,4 +1,3 @@
-db_name = "skg-test-foreign-validation"
 tantivy_folder = "/tmp/tantivy-test-foreign-validation"
 port = 3047
 beep_when_server_becomes_available = false

@@ -1,4 +1,5 @@
-use crate::dbs::filesystem::one_node::optnodecomplete_from_id;
+use crate::dbs::node_lookup::nodecomplete_from_graph;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
 use crate::types::git::MembershipAxes;
 use crate::types::misc::{ID, MemberAtSource, SkgConfig, SourceName};
@@ -10,18 +11,17 @@ use crate::types::tree::viewnode_nodecomplete::{
 
 use ego_tree::Tree;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
-pub async fn build_and_integrate_aliases_view_then_drop_request (
+pub fn build_and_integrate_aliases_view_then_drop_request (
   tree          : &mut Tree<ViewNode>,
   node_id       : ego_tree::NodeId,
+  graph         : &InRustGraph,
   config        : &SkgConfig,
-  typedb_driver : &TypeDBDriver,
   errors        : &mut Vec < String >,
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
     build_and_integrate_aliases (
-      tree, node_id, config, typedb_driver ) . await;
+      tree, node_id, graph, config );
   remove_completed_view_request (
     tree, node_id,
     ViewRequest::Col (ColRelation::Aliases),
@@ -40,11 +40,11 @@ pub async fn build_and_integrate_aliases_view_then_drop_request (
 /// (for reasons explained in that function's header comment),
 /// so any newly-created empty AliasCol
 /// would not be visited in the same save cycle.
-pub async fn build_and_integrate_aliases (
+pub fn build_and_integrate_aliases (
   tree      : &mut Tree<ViewNode>,
   node_id   : ego_tree::NodeId,
-  config    : &SkgConfig,
-  driver    : &TypeDBDriver,
+  graph     : &InRustGraph,
+  _config    : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   let node_id_val : ID =
     get_id_from_treenode ( tree, node_id ) ?;
@@ -55,7 +55,7 @@ pub async fn build_and_integrate_aliases (
     // then reconcile_alias_col_children (in update_buffer) already handled it.
     return Ok (( )); }
   let node : Option<NodeComplete> =
-    optnodecomplete_from_id (config, driver, &node_id_val) . await ?;
+    nodecomplete_from_graph (graph, &node_id_val);
   let home : Option<SourceName> =
     node . as_ref () . map ( |node| node . source . clone () );
   let aliases : Vec<MemberAtSource<String>> = node

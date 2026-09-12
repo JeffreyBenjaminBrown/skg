@@ -25,6 +25,8 @@ cp docs/merging.org "$OUT/docs/"
 cp docs/moving-nodes-across-repos.org "$OUT/docs/"
 cp docs/hyperlinks.md "$OUT/docs/"
 cp docs/forks.md "$OUT/docs/"
+cp docs/data-model_friendly.org "$OUT/docs/"
+cp docs/data-model_technical.org "$OUT/docs/"
 cp -R windows/docs/. "$OUT/docs/"
 
 cat > "$OUT/WINDOWS.org" <<'EOF'

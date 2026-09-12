@@ -83,9 +83,16 @@ Each buffer is a forest of "viewnodes".
 
 ## "child" and "parent"
 
-The TypeDB graph contains a number of relationships -- 'contains', 'textlinks to', etc. Where in this code the terms "child" or "parent" are used, it refers to none of those TypeDB relations, but rather the relationship between headlines in an Emacs org mode buffer. (I have tried to stick to the more precise "org-child" and "org-parent".)
+The Skg graph contains a number of relationships -- `contains`,
+`textlinks_to`, etc. Where the code says "child" or "parent", it means the
+relationship between headlines in an Org buffer, not automatically one of
+those graph relations. (The more precise terms are "org-child" and
+"org-parent".)
 
-The reason for this is that the map from the child-parent relationship in an Emacs buffer to the corresponding relationship, if any, in TypeDB depends on context. Usually, if an org headline P has a child headline C, they will correspond to a TypeDB node Outer that 'contains' a TypeDB node Inner, where Outer corresponds to P and Inner to C. But that does not always hold: see, for instance, the discussion of alias nodes in [the architecture documentation](coding-advice/architecture.md).
+The mapping from an Org child-parent relationship to a graph relationship, if
+any, depends on context. Usually a headline P with child C represents a graph
+node Outer that `contains` node Inner, but that does not always hold; see the
+discussion of alias nodes in [the architecture documentation](coding-advice/architecture.md).
 
 ## "col" is short for "collection"
 
@@ -197,7 +204,8 @@ See `docs/forks.md` and `docs/sharing-model.md`.
 
 ## hiderel = "hides" relationship
 
-See schema.tql for what a "hides" relationship is.
+See [the technical data model](docs/data-model_technical.org) for the hiding
+relationship.
 
 ## interp = interpretation
 
@@ -293,7 +301,7 @@ skips the menu and opens the requested node itself.
 ## "subscribee as such"
 
 In Skg some nodes are "subscribers", which "subscribe" to "subscribees".
-(See [the schema](./schema.tql).)
+(See [the technical data model](docs/data-model_technical.org).)
 A node that plays the 'subscribee' role can be viewed as an ordinary node,
 or *as* a subscribee. In the latter case it appears
 underneath the relevant subscriber, in a 'subscribeeCol':

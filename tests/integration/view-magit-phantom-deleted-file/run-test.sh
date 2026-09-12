@@ -93,22 +93,18 @@ trap enhanced_cleanup EXIT
 
 backup_and_reset_test_data
 
-check_typedb_server
 
 AVAILABLE_PORT=$(find_available_port)
 echo "Using port $AVAILABLE_PORT for test server..."
 
-DB_NAME=$(generate_db_name)
 # NOTE: source path is relative ("skg-data"), and the config itself
 # lives one directory below $TEST_DIR so that a relative-config-path
 # launch yields config.data_root = "data" (also relative) -- the
 # scenario this test is designed to exercise.
 cat > "$TEMP_CONFIG" << EOF
-db_name = "$DB_NAME"
 tantivy_folder = "$TEST_DIR/data/.index.tantivy"
 port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
-delete_on_quit = true
 
 [[sources]]
 name = "main"
@@ -118,7 +114,7 @@ EOF
 echo ""
 echo "Starting skg server with a relative config path from $PROJECT_ROOT..."
 # Launching from $PROJECT_ROOT is required so the server can read
-# schema.tql (which it loads from CWD). The config path is passed
+# project resources loaded from CWD. The config path is passed
 # relative to $PROJECT_ROOT, which is what makes config.data_root
 # relative -- the condition under which the path-duplication bug
 # manifests.

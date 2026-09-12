@@ -37,8 +37,10 @@ fn active_relationship_source_makes_an_unknown_member_visible () {
   let unknown_at_private = MemberAtSource::at_source (
     SourceName::from ("private"), ID::from ("absent"));
   assert! (relationship_member_is_visible (
+    &crate::dbs::in_rust_graph::InRustGraph::new (),
     &unknown_at_main, &config, &active));
   assert! (! relationship_member_is_visible (
+    &crate::dbs::in_rust_graph::InRustGraph::new (),
     &unknown_at_private, &config, &active));
 }
 

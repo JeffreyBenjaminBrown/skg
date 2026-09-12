@@ -21,8 +21,8 @@
 /// and the subscriber's own post-save contains -- a finished entry
 /// elsewhere in the same map.
 
-use crate::dbs::in_rust_graph::snapshot_global;
-use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
+use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::node_lookup::opt_nodecomplete_by_id;
 use crate::from_text::local_instruction_collection::lower::LoweredIntents;
 use crate::from_text::local_instruction_collection::types::{
   HiddenOutsideEdit, SubscribeeVisibility };
@@ -35,33 +35,32 @@ use crate::types::save::PostCommitNoticeCandidate;
 
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 /// The 'visibility' pairs are (subscriber, signal), as
 /// 'lower_collected_intents' extracted them from the map.
-pub async fn resolve_visibility (
+pub fn resolve_visibility (
   mut lowered : LoweredIntents,
   visibility  : &[(ID, SubscribeeVisibility)],
   hidden_outside : &[(ID, HiddenOutsideEdit)],
+  graph       : &InRustGraph,
   config      : &SkgConfig,
-  driver      : &TypeDBDriver,
   restricted_source_set : Option<&ActiveSourceSet>, // None means no restriction; callers normalize 'all' to None.
 ) -> Result<(LoweredIntents, Vec<PostCommitNoticeCandidate>), Box<dyn Error>> {
   validate_no_overlapping_subscribee_hiderel_conflicts (
-    visibility, config, driver ) . await ?;
+    visibility, graph, config ) ?;
   infer_hides_from_contains_removals (
     // Before the signal loop below, so that an explicit
     // subscribee-as-such gesture about the same child wins.
-    &mut lowered, visibility, config, driver,
-    restricted_source_set ) . await ?;
+    &mut lowered, visibility, graph, config,
+    restricted_source_set ) ?;
   for (subscriber, signal) in visibility {
     let Some (subscribee_from_disk) =
-      optNodeComplete_rustFIrst_by_id (
-        config, driver, &signal . subscribee ) . await ?
+      opt_nodecomplete_by_id (
+        graph, config, &signal . subscribee ) ?
     else { continue; };
     let Some (subscriber_from_disk) =
-      optNodeComplete_rustFIrst_by_id (
-        config, driver, subscriber ) . await ?
+      opt_nodecomplete_by_id (
+        graph, config, subscriber ) ?
     else { continue; };
     if ! config . user_owns_source (&subscriber_from_disk . source) {
       continue; }
@@ -94,19 +93,19 @@ pub async fn resolve_visibility (
       &inferred_hides,
       &inferred_unhides ); }
   let post_commit_notice_candidates = apply_hiddenoutside_edits (
-    &mut lowered, hidden_outside, config, driver,
-    restricted_source_set ) . await ?;
+    &mut lowered, hidden_outside, graph, config,
+    restricted_source_set ) ?;
   Ok ((lowered, post_commit_notice_candidates)) }
 
 /// Applies the submitted visible-outside subset after all ordinary hide
 /// inference.  Only the old *visible outside* rows are replaceable: inactive
 /// relationship members and rows classified inside a subscribee remain owned
 /// by the graph and survive an edit of this derived filter.
-async fn apply_hiddenoutside_edits (
+fn apply_hiddenoutside_edits (
   lowered : &mut LoweredIntents,
   edits   : &[(ID, HiddenOutsideEdit)],
+  graph   : &InRustGraph,
   config  : &SkgConfig,
-  driver  : &TypeDBDriver,
   restricted_source_set : Option<&ActiveSourceSet>,
 ) -> Result<Vec<PostCommitNoticeCandidate>, Box<dyn Error>> {
   let mut seen : HashSet<ID> = HashSet::new ();
@@ -116,21 +115,19 @@ async fn apply_hiddenoutside_edits (
       return Err (Box::new (BufferValidationError::Other (
         format! ("More than one HiddenOutsideOfSubscribee edit was submitted for subscriber {}", subscriber) ))); }
     let Some (subscriber_from_disk) =
-      optNodeComplete_rustFIrst_by_id (config, driver, subscriber) . await ?
+      opt_nodecomplete_by_id (graph, config, subscriber) ?
     else { continue; };
     if ! config . user_owns_source (&subscriber_from_disk . source) {
       continue; }
 
     let key = |id : &ID| -> ID {
-      snapshot_global ()
-        . and_then (|graph| graph . pid_of (id))
-        . unwrap_or_else (|| id . clone ()) };
+      graph . pid_of (id) . unwrap_or_else (|| id . clone ()) };
     let subscribee_ids : Vec<ID> =
       lowered . subscriber_subscribes_after_save (&subscriber_from_disk);
     let mut inside : HashSet<ID> = HashSet::new ();
     for subscribee_id in subscribee_ids {
       let Some (subscribee) =
-        optNodeComplete_rustFIrst_by_id (config, driver, &subscribee_id) . await ?
+        opt_nodecomplete_by_id (graph, config, &subscribee_id) ?
       else { continue; };
       for member in &subscribee . contains {
         if restricted_source_set . map_or (
@@ -191,19 +188,19 @@ async fn apply_hiddenoutside_edits (
 ///   the signal loop, so signal deltas also land last.
 /// - A node with no disk entry removes nothing (a fork clone's
 ///   creation-time hides are computed in 'build_fork_clone').
-async fn infer_hides_from_contains_removals (
+fn infer_hides_from_contains_removals (
   lowered    : &mut LoweredIntents,
   visibility : &[(ID, SubscribeeVisibility)],
+  graph      : &InRustGraph,
   config     : &SkgConfig,
-  driver     : &TypeDBDriver,
   restricted_source_set : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   for (subscriber_pid, source, new_contains, subscribes_msv)
     in lowered . save_intents_with_specified_contains () {
     if ! config . user_owns_source (&source) { continue; }
     let Some (subscriber_from_disk) =
-      optNodeComplete_rustFIrst_by_id (
-        config, driver, &subscriber_pid ) . await ?
+      opt_nodecomplete_by_id (
+        graph, config, &subscriber_pid ) ?
     else { continue; };
     let subscriber_contains : Vec<ID> =
       members_of (&subscriber_from_disk . contains);
@@ -219,7 +216,7 @@ async fn infer_hides_from_contains_removals (
         . filter ( |id| ! new_contains_set . contains (id) )
         . filter ( |id| ! signal_visible . contains (id) )
         . filter ( |id| restricted_source_set . map_or (
-            true, |active| member_is_visible (id, config, active) ))
+            true, |active| member_is_visible (graph, id, config, active) ))
         . cloned () . collect () };
     let inferred_unhides : Vec<ID> = {
       let disk_contains : HashSet<&ID> =
@@ -246,8 +243,8 @@ async fn infer_hides_from_contains_removals (
           let mut content : HashSet<ID> = HashSet::new ();
           for subscribee in &subscribes {
             if let Some (subscribee_from_disk) =
-              optNodeComplete_rustFIrst_by_id (
-                config, driver, subscribee ) . await ?
+              opt_nodecomplete_by_id (
+                graph, config, subscribee ) ?
             { content . extend (
                 members_of (& subscribee_from_disk . contains) ); }}
           content };
@@ -264,10 +261,10 @@ async fn infer_hides_from_contains_removals (
 /// against all subscribee branches under the subscriber.
 /// Rejects the save if one subscribee says "hide it"
 /// and another says "show it".
-async fn validate_no_overlapping_subscribee_hiderel_conflicts (
+fn validate_no_overlapping_subscribee_hiderel_conflicts (
   visibility : &[(ID, SubscribeeVisibility)],
+  graph      : &InRustGraph,
   config     : &SkgConfig,
-  driver     : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
   // This needs the visibility signals plus disk contains lists,
   // because the conflict is per subscriber/subscribee-content pair,
@@ -275,8 +272,8 @@ async fn validate_no_overlapping_subscribee_hiderel_conflicts (
   let mut seen : HashMap<(ID, ID), bool> = HashMap::new();
   for (subscriber, signal) in visibility {
     let subscribee_from_disk : NodeComplete =
-      match optNodeComplete_rustFIrst_by_id (
-        config, driver, &signal . subscribee ) . await ?
+      match opt_nodecomplete_by_id (
+        graph, config, &signal . subscribee ) ?
       { Some (subscribee_from_disk) => subscribee_from_disk,
         None                        => continue, };
     let visible_content : HashSet<ID> =

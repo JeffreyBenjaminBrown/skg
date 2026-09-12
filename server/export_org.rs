@@ -9,7 +9,7 @@
 //! with `[[id:..][label]]` links rewritten to relative org links.
 //!
 //! The core (`export_to_org`) takes nodes + an ActiveSourceSet + an
-//! output base, so it needs neither TypeDB nor Tantivy and is
+//! output base, so it needs neither the live graph nor Tantivy and is
 //! unit-testable. The server handler and the `export-org`
 //! subcommand both call it.
 
@@ -118,7 +118,7 @@ struct Ev {
 //
 
 /// Render and write every export root reachable in `nodes` under
-/// `active`, into `output_base`. Pure of TypeDB/Tantivy; does
+/// `active`, into `output_base`. Independent of the live graph and Tantivy; does
 /// filesystem writes only under `output_base`.
 pub fn export_to_org (
   active      : &ActiveSourceSet,

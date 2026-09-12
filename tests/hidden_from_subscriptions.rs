@@ -12,23 +12,21 @@ use skg::test_utils::{
   extract_string_field_from_sexp,
   graph_handle_from_config,
   read_all_lp_messages,
-  run_with_shared_test_db,
+  run_with_shared_test_stores,
   update_from_and_rerender_buffer_test as update_from_and_rerender_buffer };
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID, TantivyIndex, members_of};
 use skg::types::nodes::complete::NodeComplete;
-use std::sync::Arc;
 
 use skg::serve::ViewsState;
 use skg::types::views_state::{OpenViews, ViewUri};
 use skg::dbs::in_rust_graph::{
   InRustGraphHandle,
-  install_or_swap_global_handle };
+  };
 
 use std::error::Error;
 use std::io::BufReader;
 use std::net::TcpStream;
-use typedb_driver::TypeDBDriver;
 
 fn mk_test_tcp_stream ()
   -> TcpStream
@@ -86,7 +84,7 @@ fn add_definitive_view_request_to_subscribees (
 
 async fn save_buffer_for_hidden_subscriptions_test (
   buffer      : &str,
-  driver      : &Arc<TypeDBDriver>,
+
   config      : &SkgConfig,
   tantivy     : &mut TantivyIndex,
   graph       : &InRustGraphHandle,
@@ -95,7 +93,7 @@ async fn save_buffer_for_hidden_subscriptions_test (
   let mut stream : TcpStream = mk_test_tcp_stream ();
   let response = update_from_and_rerender_buffer (
     &mut stream,
-    buffer, driver, config, tantivy, graph, false,
+    buffer, config, tantivy, graph, false,
 
     &Err ( String::new () ), views_state
   ) . await ?;
@@ -104,7 +102,7 @@ async fn save_buffer_for_hidden_subscriptions_test (
 async fn save_buffer_and_read_collateral_views (
   buffer      : &str,
   uri         : &ViewUri,
-  driver      : &Arc<TypeDBDriver>,
+
   config      : &SkgConfig,
   tantivy     : &mut TantivyIndex,
   graph       : &InRustGraphHandle,
@@ -115,7 +113,7 @@ async fn save_buffer_and_read_collateral_views (
   let response =
     update_from_and_rerender_buffer (
       &mut stream,
-      buffer, driver, config, tantivy, graph, false,
+      buffer, config, tantivy, graph, false,
       &Ok (uri . clone ()), views_state
     ) . await ?;
   drop (stream);
@@ -298,103 +296,85 @@ fn node_from_disk (
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_stores (
     "skg-test-hidden-from-subscriptions",
     |s| Box::pin ( async move {
       s . reset ("test_deleting_foreign_subscribee_content_preserves_branch_edit",
-        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") . await ?;
-      s . install_graph_handle () ?;
+        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
       test_deleting_foreign_subscribee_content_preserves_branch_edit (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_deleting_foreign_subscribee_content_infers_hide",
-        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") . await ?;
-      s . install_graph_handle () ?;
+        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
       test_deleting_foreign_subscribee_content_infers_hide (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_removing_subscribee_content_from_subscriber_contains_infers_hide",
-        "tests/hidden_from_subscriptions/fixtures-clone-edit") . await ?;
-      s . install_graph_handle () ?;
+        "tests/hidden_from_subscriptions/fixtures-clone-edit") ?;
       test_removing_subscribee_content_from_subscriber_contains_infers_hide (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_readding_subscribee_content_to_subscriber_contains_unhides",
-        "tests/hidden_from_subscriptions/fixtures-clone-edit") . await ?;
-      s . install_graph_handle () ?;
+        "tests/hidden_from_subscriptions/fixtures-clone-edit") ?;
       test_readding_subscribee_content_to_subscriber_contains_unhides (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_collateral_view_reflects_newly_hidden_subscribee_content",
-        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") . await ?;
-      s . install_graph_handle () ?;
+        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
       test_collateral_view_reflects_newly_hidden_subscribee_content (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_moving_foreign_subscribee_content_to_subscriber_does_not_hide",
-        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") . await ?;
-      s . install_graph_handle () ?;
+        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
       test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_moving_foreign_subscribee_content_elsewhere_still_hides",
-        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") . await ?;
-      s . install_graph_handle () ?;
+        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
       test_moving_foreign_subscribee_content_elsewhere_still_hides (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_extra_view_child_under_foreign_subscribee_is_deleted",
-        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") . await ?;
-      s . install_graph_handle () ?;
+        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
       test_extra_view_child_under_foreign_subscribee_is_deleted (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_extra_view_child_under_owned_subscribee_is_deleted",
-        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") . await ?;
-      s . install_graph_handle () ?;
+        "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
       test_extra_view_child_under_owned_subscribee_is_deleted (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_subscribee_and_filter_cols",
-        "tests/hidden_from_subscriptions/fixtures-every-kind-of-col/skgconfig.toml") . await ?;
-      s . install_graph_handle () ?;
+        "tests/hidden_from_subscriptions/fixtures-every-kind-of-col/skgconfig.toml") ?;
       test_subscribee_and_filter_cols (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_hidden_within_but_none_without",
-        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml") . await ?;
-      s . install_graph_handle () ?;
+        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml") ?;
       test_hidden_within_but_none_without (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide",
-        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without") . await ?;
-      s . install_graph_handle () ?;
+        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without") ?;
       test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_collateral_view_reflects_newly_unhidden_subscribee_content",
-        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without") . await ?;
-      s . install_graph_handle () ?;
+        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without") ?;
       test_collateral_view_reflects_newly_unhidden_subscribee_content (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_deleting_from_hiddenin_col_does_not_unhide",
-        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without") . await ?;
-      s . install_graph_handle () ?;
+        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without") ?;
       test_deleting_from_hiddenin_col_does_not_unhide (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_hidden_without_but_none_within",
-        "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within/skgconfig.toml") . await ?;
-      s . install_graph_handle () ?;
+        "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within/skgconfig.toml") ?;
       test_hidden_without_but_none_within (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_adding_to_hiddenoutside_col_hides_and_moves_inside",
-        "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within") . await ?;
-      s . install_graph_handle () ?;
+        "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within") ?;
       test_adding_to_hiddenoutside_col_hides_and_moves_inside (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_overlapping_hidden_within",
-        "tests/hidden_from_subscriptions/fixtures-overlapping-hidden-within/skgconfig.toml") . await ?;
-      s . install_graph_handle () ?;
+        "tests/hidden_from_subscriptions/fixtures-overlapping-hidden-within/skgconfig.toml") ?;
       test_overlapping_hidden_within (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 async fn test_deleting_foreign_subscribee_content_preserves_branch_edit (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      install_or_swap_global_handle (
+      (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
@@ -403,31 +383,30 @@ async fn test_deleting_foreign_subscribee_content_preserves_branch_edit (
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
       = single_root_view(
-          &driver, &config, None,
+          &config, None,
           &ID ("r" . to_string()),
-          false ) . await?;
+          false )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_definitive_view_request_to_subscribees (&initial_view),
-        &driver, &config, tantivy, &graph, &mut views_state
+        &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
       expanded_subscribee_edit_view (&expanded, "delete");
     let rerendered : String =
       save_buffer_for_hidden_subscriptions_test (
-        &edited, &driver, &config, tantivy, &graph, &mut views_state
+        &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
     assert_e1_removed_from_visible_subscribee_branch (&rerendered);
     Ok (( )) }
 
 async fn test_deleting_foreign_subscribee_content_infers_hide (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      install_or_swap_global_handle (
+      (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
@@ -436,19 +415,19 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
       = single_root_view(
-          &driver, &config, None,
+          &config, None,
           &ID ("r" . to_string()),
-          false ) . await?;
+          false )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_definitive_view_request_to_subscribees (&initial_view),
-        &driver, &config, tantivy, &graph, &mut views_state
+        &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
       expanded_subscribee_edit_view (&expanded, "delete");
     let mut stream : TcpStream = mk_test_tcp_stream ();
     let response = update_from_and_rerender_buffer (
-      &mut stream, &edited, driver, config, tantivy, &graph, false,
+      &mut stream, &edited, config, tantivy, &graph, false,
       &Err (String::new ()), &mut views_state ) . await ?;
     let rerendered : String = response . saved_view;
 
@@ -469,12 +448,11 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
 /// subscribed content), and must NOT hide x (no subscribee contains
 /// it -- deleting it is an ordinary contains edit).
 async fn test_removing_subscribee_content_from_subscriber_contains_infers_hide (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      install_or_swap_global_handle (
+      (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
@@ -483,7 +461,7 @@ async fn test_removing_subscribee_content_from_subscriber_contains_infers_hide (
       * (skg (node (id f) (source owned))) f
       "};
     save_buffer_for_hidden_subscriptions_test (
-      buffer, &driver, &config, tantivy, &graph, &mut views_state
+      buffer, &config, tantivy, &graph, &mut views_state
     ) . await ?;
     let f_skg : NodeComplete =
       node_from_disk (&config, "f") ?;
@@ -502,12 +480,11 @@ async fn test_removing_subscribee_content_from_subscriber_contains_infers_hide (
 /// must drop the now-stale hide -- c is integrated, so g should no
 /// longer appear among c's hiders.
 async fn test_readding_subscribee_content_to_subscriber_contains_unhides (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      install_or_swap_global_handle (
+      (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
@@ -517,7 +494,7 @@ async fn test_readding_subscribee_content_to_subscriber_contains_unhides (
       ** (skg (node (id c) (source foreign) indef)) c
       "};
     save_buffer_for_hidden_subscriptions_test (
-      buffer, &driver, &config, tantivy, &graph, &mut views_state
+      buffer, &config, tantivy, &graph, &mut views_state
     ) . await ?;
     let g_skg : NodeComplete =
       node_from_disk (&config, "g") ?;
@@ -530,12 +507,11 @@ async fn test_readding_subscribee_content_to_subscriber_contains_unhides (
     Ok (( )) }
 
 async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      install_or_swap_global_handle (
+      (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
@@ -549,16 +525,16 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
 
     let (initial_view, pids, viewforest) =
       single_root_view(
-        &driver, &config, None,
+        &config, None,
         &ID ("r" . to_string()),
-        false ) . await?;
+        false )?;
     views_state . open_views . register_view (
-      saved_uri . clone(), viewforest, &pids);
+      &graph . load_full (), saved_uri . clone(), viewforest, &pids);
 
     let (expanded, collateral_views) =
       save_buffer_and_read_collateral_views (
         &add_definitive_view_request_to_subscribees (&initial_view),
-        &saved_uri, &driver, &config, tantivy, &graph,
+        &saved_uri, &config, tantivy, &graph,
         &mut views_state ) . await?;
     assert!(
       collateral_views . is_empty(),
@@ -572,13 +548,13 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
     let expanded_pids : Vec<ID> =
       views_state . open_views . viewuri_to_pids (&saved_uri);
     views_state . open_views . register_view (
-      collateral_uri, expanded_viewforest, &expanded_pids);
+      &graph . load_full (), collateral_uri, expanded_viewforest, &expanded_pids);
 
     let edited : String =
       expanded_subscribee_edit_view (&expanded, "delete");
     let (_saved_view, collateral_views) =
       save_buffer_and_read_collateral_views (
-        &edited, &saved_uri, &driver, &config, tantivy, &graph,
+        &edited, &saved_uri, &config, tantivy, &graph,
         &mut views_state ) . await?;
 
     assert_eq!(
@@ -606,12 +582,11 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
     Ok (( )) }
 
 async fn test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      install_or_swap_global_handle (
+      (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
@@ -620,19 +595,19 @@ async fn test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
       = single_root_view(
-          &driver, &config, None,
+          &config, None,
           &ID ("r" . to_string()),
-          false ) . await?;
+          false )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_definitive_view_request_to_subscribees (&initial_view),
-        &driver, &config, tantivy, &graph, &mut views_state
+        &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
       expanded_subscribee_edit_view (&expanded, "move_to_r");
     let rerendered : String =
       save_buffer_for_hidden_subscriptions_test (
-        &edited, &driver, &config, tantivy, &graph, &mut views_state
+        &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
     assert_does_not_hide_e1 (&rerendered);
@@ -649,12 +624,11 @@ async fn test_moving_foreign_subscribee_content_to_subscriber_does_not_hide (
     Ok (( )) }
 
 async fn test_moving_foreign_subscribee_content_elsewhere_still_hides (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      install_or_swap_global_handle (
+      (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
@@ -663,19 +637,19 @@ async fn test_moving_foreign_subscribee_content_elsewhere_still_hides (
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
       = single_root_view(
-          &driver, &config, None,
+          &config, None,
           &ID ("r" . to_string()),
-          false ) . await?;
+          false )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_definitive_view_request_to_subscribees (&initial_view),
-        &driver, &config, tantivy, &graph, &mut views_state
+        &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
       expanded_subscribee_edit_view (&expanded, "move_to_a");
     let rerendered : String =
       save_buffer_for_hidden_subscriptions_test (
-        &edited, &driver, &config, tantivy, &graph, &mut views_state
+        &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
     assert_hides_e1_in_subscribee_col (&rerendered);
@@ -687,12 +661,11 @@ async fn test_moving_foreign_subscribee_content_elsewhere_still_hides (
     Ok (( )) }
 
 async fn test_extra_view_child_under_foreign_subscribee_is_deleted (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      install_or_swap_global_handle (
+      (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
@@ -701,13 +674,13 @@ async fn test_extra_view_child_under_foreign_subscribee_is_deleted (
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
       = single_root_view(
-          &driver, &config, None,
+          &config, None,
           &ID ("r" . to_string()),
-          false ) . await?;
+          false )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_definitive_view_request_to_subscribees (&initial_view),
-        &driver, &config, tantivy, &graph, &mut views_state
+        &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
       insert_after_line_containing (
@@ -718,7 +691,7 @@ async fn test_extra_view_child_under_foreign_subscribee_is_deleted (
          **** (skg (node (id e1) (source foreign) indef)) e1" );
     let rerendered : String =
       save_buffer_for_hidden_subscriptions_test (
-        &edited, &driver, &config, tantivy, &graph, &mut views_state
+        &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
     // §6.0: the extra view-child 'a' is a stale leaf (not in e's contains,
@@ -740,12 +713,11 @@ async fn test_extra_view_child_under_foreign_subscribee_is_deleted (
     Ok (( )) }
 
 async fn test_extra_view_child_under_owned_subscribee_is_deleted (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      install_or_swap_global_handle (
+      (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
@@ -761,7 +733,7 @@ async fn test_extra_view_child_under_owned_subscribee_is_deleted (
               "} . to_string();
     let rerendered : String =
       save_buffer_for_hidden_subscriptions_test (
-        &edited, &driver, &config, tantivy, &graph, &mut views_state
+        &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
     // §6.0: the extra view-child 'e' is a stale leaf (not in r's contains,
@@ -799,17 +771,16 @@ async fn test_extra_view_child_under_owned_subscribee_is_deleted (
 /// Also tests ordering rule: HiddenInSubscribeeCol precedes content regardless of .skg order.
 /// E2's .skg has [E21, hidden-in-E2] but view shows HiddenInSubscribeeCol before E21.
 async fn test_subscribee_and_filter_cols (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
 
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
       = single_root_view(
-          &driver, &config, None,
+          &config, None,
           &ID("R" . to_string()), // Initial view from R ("subscribeR")
-          false ) . await?;
+          false )?;
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
@@ -833,7 +804,7 @@ async fn test_subscribee_and_filter_cols (
         add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let graph : InRustGraphHandle =
-        install_or_swap_global_handle (
+        (
           graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
@@ -841,7 +812,7 @@ async fn test_subscribee_and_filter_cols (
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
           &mut stream,
-          &modified_view, &driver, &config, tantivy, &graph, false,
+          &modified_view, &config, tantivy, &graph, false,
 
           &Err ( String::new () ), &mut views_state
         ) . await ?;
@@ -883,15 +854,14 @@ async fn test_subscribee_and_filter_cols (
 ///
 /// No HiddenOutsideOfSubscribeeCol in either state (H is in E1's content).
 async fn test_hidden_within_but_none_without (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
-      = single_root_view( &driver, &config, None,
+      = single_root_view( &config, None,
                           &ID("R" . to_string()), // the root
-                          false ) . await?;
+                          false )?;
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
@@ -910,7 +880,7 @@ async fn test_hidden_within_but_none_without (
         add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let graph : InRustGraphHandle =
-        install_or_swap_global_handle (
+        (
           graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
@@ -918,7 +888,7 @@ async fn test_hidden_within_but_none_without (
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
           &mut stream,
-          &modified_view, &driver, &config, tantivy, &graph, false,
+          &modified_view, &config, tantivy, &graph, false,
 
           &Err ( String::new () ), &mut views_state
         ) . await ?;
@@ -945,12 +915,11 @@ async fn test_hidden_within_but_none_without (
     Ok (( )) }
 
 async fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      install_or_swap_global_handle (
+      (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
@@ -959,20 +928,20 @@ async fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
       = single_root_view(
-          &driver, &config, None,
+          &config, None,
           &ID ("R" . to_string()),
-          false ) . await?;
+          false )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_definitive_view_request_to_subscribees (&initial_view),
-        &driver, &config, tantivy, &graph, &mut views_state
+        &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
       move_h_from_hiddenin_col_to_visible_subscribee_content (
         &expanded );
     let rerendered : String =
       save_buffer_for_hidden_subscriptions_test (
-        &edited, &driver, &config, tantivy, &graph, &mut views_state
+        &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
     assert! (
@@ -996,12 +965,11 @@ async fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
     Ok (( )) }
 
 async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      install_or_swap_global_handle (
+      (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
@@ -1015,16 +983,16 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
 
     let (initial_view, pids, viewforest) =
       single_root_view(
-        &driver, &config, None,
+        &config, None,
         &ID ("R" . to_string()),
-        false ) . await?;
+        false )?;
     views_state . open_views . register_view (
-      saved_uri . clone(), viewforest, &pids);
+      &graph . load_full (), saved_uri . clone(), viewforest, &pids);
 
     let (expanded, collateral_views) =
       save_buffer_and_read_collateral_views (
         &add_definitive_view_request_to_subscribees (&initial_view),
-        &saved_uri, &driver, &config, tantivy, &graph,
+        &saved_uri, &config, tantivy, &graph,
         &mut views_state ) . await?;
     assert!(
       collateral_views . is_empty(),
@@ -1038,14 +1006,14 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
     let expanded_pids : Vec<ID> =
       views_state . open_views . viewuri_to_pids (&saved_uri);
     views_state . open_views . register_view (
-      collateral_uri, expanded_viewforest, &expanded_pids);
+      &graph . load_full (), collateral_uri, expanded_viewforest, &expanded_pids);
 
     let edited : String =
       move_h_from_hiddenin_col_to_visible_subscribee_content (
         &expanded );
     let (_saved_view, collateral_views) =
       save_buffer_and_read_collateral_views (
-        &edited, &saved_uri, &driver, &config, tantivy, &graph,
+        &edited, &saved_uri, &config, tantivy, &graph,
         &mut views_state ) . await?;
 
     assert_eq!(
@@ -1065,12 +1033,11 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
     Ok (( )) }
 
 async fn test_deleting_from_hiddenin_col_does_not_unhide (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      install_or_swap_global_handle (
+      (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
@@ -1079,19 +1046,19 @@ async fn test_deleting_from_hiddenin_col_does_not_unhide (
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
       = single_root_view(
-          &driver, &config, None,
+          &config, None,
           &ID ("R" . to_string()),
-          false ) . await?;
+          false )?;
     let expanded : String =
       save_buffer_for_hidden_subscriptions_test (
         &add_definitive_view_request_to_subscribees (&initial_view),
-        &driver, &config, tantivy, &graph, &mut views_state
+        &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
       remove_hiddenin_branch (&expanded);
     let rerendered : String =
       save_buffer_for_hidden_subscriptions_test (
-        &edited, &driver, &config, tantivy, &graph, &mut views_state
+        &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
     assert! (
@@ -1120,15 +1087,14 @@ async fn test_deleting_from_hiddenin_col_does_not_unhide (
 ///
 /// No HiddenInSubscribeeCol in either state (H is not in any subscribee's content).
 async fn test_hidden_without_but_none_within (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
-      = single_root_view( &driver, &config, None,
+      = single_root_view( &config, None,
                           &ID("R" . to_string()), // origin of the view
-                          false ) . await?;
+                          false )?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (parentIs absent) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
@@ -1148,7 +1114,7 @@ async fn test_hidden_without_but_none_within (
         add_definitive_view_request_to_subscribees (&initial_view);
       println!("Modified view (with definitive requests):\n{}", modified_view);
       let graph : InRustGraphHandle =
-        install_or_swap_global_handle (
+        (
           graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
@@ -1156,7 +1122,7 @@ async fn test_hidden_without_but_none_within (
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
         &mut stream,
-        &modified_view, &driver, &config, tantivy, &graph, false,
+        &modified_view, &config, tantivy, &graph, false,
 
         &Err ( String::new () ), &mut views_state ) . await ?;
       response . saved_view };
@@ -1182,12 +1148,11 @@ async fn test_hidden_without_but_none_within (
     Ok (( )) }
 
 async fn test_adding_to_hiddenoutside_col_hides_and_moves_inside (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let graph : InRustGraphHandle =
-      install_or_swap_global_handle (
+      (
         graph_handle_from_config (config) ?);
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : false,
@@ -1196,14 +1161,14 @@ async fn test_adding_to_hiddenoutside_col_hides_and_moves_inside (
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
       = single_root_view(
-          &driver, &config, None,
+          &config, None,
           &ID ("R" . to_string()),
-          false ) . await?;
+          false )?;
     let edited : String =
       add_e11_to_hiddenoutside_col (&initial_view);
     let mut stream : TcpStream = mk_test_tcp_stream ();
     let response = update_from_and_rerender_buffer (
-      &mut stream, &edited, driver, config, tantivy, &graph, false,
+      &mut stream, &edited, config, tantivy, &graph, false,
       &Err (String::new ()), &mut views_state ) . await ?;
     let rerendered : String = response . saved_view;
 
@@ -1232,7 +1197,7 @@ async fn test_adding_to_hiddenoutside_col_hides_and_moves_inside (
       . filter (|line| ! line . contains ("(id H)"))
       . collect::<Vec<_>> () . join ("\n") + "\n";
     let _ : String = save_buffer_for_hidden_subscriptions_test (
-      &without_h, &driver, &config, tantivy, &graph, &mut views_state
+      &without_h, &config, tantivy, &graph, &mut views_state
     ) . await ?;
     let subscriber_after_removal : NodeComplete = node_from_disk (config, "R") ?;
     assert! (
@@ -1254,15 +1219,14 @@ async fn test_adding_to_hiddenoutside_col_hides_and_moves_inside (
 ///
 /// No HiddenOutsideOfSubscribeeCol in either state (H is in subscribees' content).
 async fn test_overlapping_hidden_within (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let (initial_view, _pids, _)
       : (String, Vec<ID>, _)
-      = single_root_view( &driver, &config, None,
+      = single_root_view( &config, None,
                           &ID("R" . to_string()), // root of the view
-                          false ) . await?;
+                          false )?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (parentIs absent) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
@@ -1281,7 +1245,7 @@ async fn test_overlapping_hidden_within (
       println!("Modified view (with definitive requests):\n{}",
                modified_view);
       let graph : InRustGraphHandle =
-        install_or_swap_global_handle (
+        (
           graph_handle_from_config (config) ?);
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
@@ -1289,7 +1253,7 @@ async fn test_overlapping_hidden_within (
       let mut stream : TcpStream = mk_test_tcp_stream ();
       let response = update_from_and_rerender_buffer (
         &mut stream,
-        &modified_view, &driver, &config, tantivy, &graph, false,
+        &modified_view, &config, tantivy, &graph, false,
 
         &Err ( String::new () ), &mut views_state ) . await ?;
       response . saved_view };

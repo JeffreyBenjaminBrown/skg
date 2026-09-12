@@ -1,0 +1,9 @@
+pid: '2'
+extra_ids:
+- '22'
+title: title 2
+body: |-
+  this one string could span pages
+subscribes_to:
+- '4'
+- '5'

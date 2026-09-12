@@ -1,7 +1,0 @@
-pid: '1'
-title: 1
-body: |-
-  Node 1 content
-contains:
-- '2'
-- '3'

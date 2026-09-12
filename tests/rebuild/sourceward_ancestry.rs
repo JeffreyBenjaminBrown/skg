@@ -30,7 +30,7 @@ use indoc::indoc;
 use skg::to_org::expand::backpath::build_and_integrate_sourceward_path;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::{graph_handle_from_config, run_with_test_stores};
 use skg::types::misc::SkgConfig;
 use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode, Birth};
 use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
@@ -38,7 +38,6 @@ use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 /// Collect (pid, parentIs) pairs for all ActiveNode children of a node.
 fn children_info (
@@ -72,17 +71,16 @@ fn find_child (
 #[test]
 fn test_sourceward_ancestry (
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_test_stores (
     "skg-test-sourceward-ancestry",
     "tests/rebuild/fixtures-sourceward-ancestry",
     "/tmp/tantivy-test-sourceward-ancestry",
-    |config, driver, _tantivy| Box::pin ( async move {
-      test_sourceward_ancestry_impl (config, driver) . await
+    |config, _tantivy| Box::pin ( async move {
+      test_sourceward_ancestry_impl (config) . await
     } )) }
 
 async fn test_sourceward_ancestry_impl (
   config : &SkgConfig,
-  driver : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
   // Start with a minimal tree containing just node "a".
   let input : &str = indoc! {"
@@ -97,8 +95,9 @@ async fn test_sourceward_ancestry_impl (
 
   // Request sourceward expansion from "a".
   build_and_integrate_sourceward_path (
-    &mut viewforest, node_a, config, driver
-  ) . await ?;
+    &mut viewforest, node_a,
+    &graph_handle_from_config (config)? . load_full (), config
+  ) ?;
 
   // --- a should have exactly 2 LinkTarget children: b and d ---
   let a_children = children_info (&viewforest, node_a);

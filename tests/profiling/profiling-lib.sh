@@ -39,20 +39,15 @@ run_profiling_test() {
 
   trap benchmark_cleanup EXIT
 
-  check_typedb_server
-
   AVAILABLE_PORT=$(find_available_port)
   echo ""
   echo "Using port $AVAILABLE_PORT for benchmark server..."
 
   TEMP_CONFIG=$(mktemp)
-  DB_NAME=$(generate_db_name)
   cat > "$TEMP_CONFIG" << EOF
-db_name = "$DB_NAME"
 tantivy_folder = "$TANTIVY_DIR"
 port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
-delete_on_quit = true
 initial_node_limit = 5000
 timing_log = true
 

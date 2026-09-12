@@ -1,10 +1,10 @@
 pub mod contradictory_instructions;
 
-use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::{
   carrier_on_user_owned_chain, resolve_override};
 use crate::dbs::in_rust_graph::override_invariants::existing_user_owned_overrider_of;
-use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
+use crate::dbs::node_lookup::opt_nodecomplete_by_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{ParentIs, Qual, QualCol, ViewRequest};
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
@@ -18,7 +18,6 @@ use super::local;
 use ego_tree::iter::Edge;
 use ego_tree::NodeId;
 use std::collections::HashSet;
-use typedb_driver::TypeDBDriver;
 
 /// PURPOSE: Look for invalid structure in the org buffer
 /// when a user asks to save it.
@@ -38,10 +37,10 @@ use typedb_driver::TypeDBDriver;
 /// This is the maybePlaced tree validation stage: metadata is complete,
 /// but role classification, save-intent extraction, and disk
 /// supplementation have not happened yet.
-pub async fn find_buffer_errors_for_saving (
+pub fn find_buffer_errors_for_saving_in_graph (
   viewforest: &MpViewForest,
+  graph: &InRustGraph,
   config: &SkgConfig,
-  driver: &TypeDBDriver,
 ) -> Result<Vec<BufferValidationError>,
             Box<dyn std::error::Error>>
 { // Two phases: instruction validation and structure validation.
@@ -70,18 +69,18 @@ pub async fn find_buffer_errors_for_saving (
   { // merge validation
     for error_msg in {
       let nodeMerge_errors: Vec<String> =
-        validate_nodeMerge_requests(viewforest, config, driver) . await?;
+        validate_nodeMerge_requests(viewforest, graph)?;
       nodeMerge_errors }
     { errors . push(
         BufferValidationError::Other (error_msg)); }}
   validate_definitive_view_requests(
     viewforest, &mut errors);
   validate_fork_view_requests(
-    viewforest, config, &mut errors);
+    viewforest, graph, config, &mut errors);
   idCol_membership_errors (
-    viewforest, config, driver, &mut errors ) . await ?;
+    viewforest, graph, config, &mut errors ) ?;
   overridesHere_marker_errors (
-    viewforest, config, &mut errors );
+    viewforest, graph, config, &mut errors );
   validate_view_roots (
       viewforest, &mut errors);
   { // local structure validation
@@ -99,6 +98,17 @@ pub async fn find_buffer_errors_for_saving (
           Ok(( )) }); }}
   Ok (errors) }
 
+/// Transitional compatibility for direct validator tests.
+pub fn find_buffer_errors_for_saving (
+  viewforest : &MpViewForest,
+  config     : &SkgConfig,
+) -> Result<Vec<BufferValidationError>, Box<dyn std::error::Error>> {
+  let nodes = crate::dbs::filesystem::multiple_nodes
+    ::read_all_skg_files_from_sources (config)?;
+  let graph = InRustGraph::from_nodecompletes (&nodes);
+  find_buffer_errors_for_saving_in_graph (
+    viewforest, &graph, config ) }
+
 /// Edits to an idCol's membership abort the save (decision from
 /// vision.org, via metaplan_2.org and
 /// TODO/full-schema/8_readonly-set-ergonomics.org): for each present
@@ -114,10 +124,10 @@ pub async fn find_buffer_errors_for_saving (
 /// without an ActiveNode parent, a parent without an ID) are skipped
 /// here rather than double-reported.
 #[allow(non_snake_case)]
-async fn idCol_membership_errors (
+fn idCol_membership_errors (
   viewforest : &MpViewForest,
+  graph      : &InRustGraph,
   config     : &SkgConfig,
-  driver     : &TypeDBDriver,
   errors     : &mut Vec<BufferValidationError>,
 ) -> Result<(), Box<dyn std::error::Error>> {
   for edge in viewforest . root () . traverse () {
@@ -144,8 +154,8 @@ async fn idCol_membership_errors (
           _ => None } )
       . collect ();
     let real_ids : Option<Vec<ID>> =
-      optNodeComplete_rustFIrst_by_id (config, driver, &owner)
-      . await ?
+      opt_nodecomplete_by_id (graph, config, &owner)
+ ?
       . map ( |nc| nc . all_ids () . cloned () . collect () );
     match real_ids {
       None =>
@@ -173,17 +183,15 @@ async fn idCol_membership_errors (
 /// be a MIDDLE link (when a later link's source is hidden), so the
 /// check accepts any honest carrier and rejects only an off-chain
 /// marker. Markers on retained InactiveNodes are checked identically.
-/// If the global graph handle is unavailable (some test harnesses), a
-/// present marker is an error too: fail closed, since the marker
-/// cannot be verified.
+/// The explicit graph is required, so every present marker is checked against
+/// the same snapshot used by the rest of save planning.
 #[allow(non_snake_case)]
 fn overridesHere_marker_errors (
   viewforest : &MpViewForest,
+  graph      : &InRustGraph,
   config     : &SkgConfig,
   errors     : &mut Vec<BufferValidationError>,
 ) {
-  let graph : Option<std::sync::Arc<InRustGraph>> =
-    snapshot_global ();
   for edge in viewforest . root () . traverse () {
     let Edge::Open (node_ref) = edge else { continue; };
     let (carrier, original) : (Option<ID>, ID) =
@@ -198,18 +206,15 @@ fn overridesHere_marker_errors (
         MpViewnodeKind::Vognode (MpVognode::Inactive (_)) => continue,
         _ => continue };
     let chain_ok : bool =
-      match (&graph, &carrier) {
-        (Some (g), Some (c)) =>
-          carrier_on_user_owned_chain (config, g, &original, c),
-        // Fail closed: no graph handle to verify against, or a marker
-        // on an id-less node (never a node the server legitimately
-        // drew as a substitute).
+      match &carrier {
+        Some (c) =>
+          carrier_on_user_owned_chain (config, graph, &original, c),
+        // An id-less carrier is never a node the server legitimately drew as
+        // a substitute, so fail closed.
         _ => false };
     if ! chain_ok {
       let effective : Option<ID> = // the chain end, for the message
-        graph . as_ref () . map ( |g|
-          resolve_override (config, g, None, &original)
-          . effective );
+        Some (resolve_override (config, graph, None, &original) . effective);
       errors . push (
         BufferValidationError::OverridesHere_Mismatch (
           carrier, original, effective )); }}}
@@ -223,17 +228,15 @@ fn overridesHere_marker_errors (
 /// - if the node already has a user-owned overrider, fail early with
 ///   'ForkAlreadyExists' (the helpful message) rather than a later
 ///   monogamy abort at commit.
-/// The graph-dependent checks are skipped when the process-global graph
-/// handle is unavailable (some test harnesses); the commit-time
-/// invariant check is then the backstop.
+/// These checks use the explicit save-planning graph; the commit-time
+/// invariant check remains a defense in depth.
 #[allow(non_snake_case)]
 fn validate_fork_view_requests (
   viewforest : &MpViewForest,
+  graph      : &InRustGraph,
   config     : &SkgConfig,
   errors     : &mut Vec<BufferValidationError>,
 ) {
-  let graph : Option<std::sync::Arc<InRustGraph>> =
-    snapshot_global ();
   let mut ids_with_requests : HashSet<ID> = HashSet::new ();
   for edge in viewforest . root () . traverse () {
     let Edge::Open (node_ref) = edge else { continue; };
@@ -245,8 +248,7 @@ fn validate_fork_view_requests (
       errors . push (
         BufferValidationError::ForkRequestMultiple (id . clone ()) );
       continue; }
-    if let Some (graph) = graph . as_deref () {
-      if graph . pid_of (id) . is_none () {
+    if graph . pid_of (id) . is_none () {
         // Not in the graph: an unsaved headline cannot be forked.
         errors . push (
           BufferValidationError::ForkRequestOnUnknownNode (id . clone ()) );
@@ -255,7 +257,7 @@ fn validate_fork_view_requests (
         existing_user_owned_overrider_of (config, graph, id) {
         errors . push (
           BufferValidationError::ForkAlreadyExists (
-            id . clone (), existing )); }}}}
+            id . clone (), existing )); }} }
 
 fn validate_view_roots (
   viewforest : &MpViewForest,

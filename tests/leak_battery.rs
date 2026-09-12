@@ -24,7 +24,7 @@ use std::error::Error;
 
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationRole};
-use skg::dbs::in_rust_graph::{InRustGraph, install_or_swap_global_handle};
+use skg::dbs::in_rust_graph::{InRustGraph};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::org_to_text::viewforest_to_string;
 use skg::source_sets::{ActiveSourceSet, SourceSetName, run_with_source_set_test_db};
@@ -71,7 +71,7 @@ fn content_view_of_N_gates_privately_contained_C (
     "skg-test-leak-battery-content",
     "tests/leak_battery/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-leak-battery-content",
-    |config, driver, tantivy| Box::pin ( async move {
+    |config, tantivy| Box::pin ( async move {
       let public : ActiveSourceSet =
         ActiveSourceSet::named (config, SourceSetName::from ("public"))?;
       let all : ActiveSourceSet =
@@ -82,8 +82,8 @@ fn content_view_of_N_gates_privately_contained_C (
       // fully public, individually-visible node.
       let (at_public, _pids, _tree) : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view_with_source_set (
-          driver, config, Some (tantivy),
-          &[ ID::from ("N") ], false, &public ) . await ?;
+          config, Some (tantivy),
+          &[ ID::from ("N") ], false, &public ) ?;
       assert! (
         ! at_public . contains ("leak-battery-C"),
         "a privately-contained public member must not leak by \
@@ -95,8 +95,8 @@ fn content_view_of_N_gates_privately_contained_C (
       // At "all": the private membership is visible.
       let (at_all, _pids, _tree) : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view_with_source_set (
-          driver, config, Some (tantivy),
-          &[ ID::from ("N") ], false, &all ) . await ?;
+          config, Some (tantivy),
+          &[ ID::from ("N") ], false, &all ) ?;
       assert! (
         at_all . contains ("leak-battery-C"),
         "under 'all' the private containment is visible: {}", at_all );
@@ -109,7 +109,7 @@ fn inbound_containerward_data_hides_N_at_public (
     "skg-test-leak-battery-inbound",
     "tests/leak_battery/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-leak-battery-inbound",
-    |config, driver, _tantivy| Box::pin ( async move {
+    |config, _tantivy| Box::pin ( async move {
       let public : ActiveSourceSet =
         ActiveSourceSet::named (config, SourceSetName::from ("public"))?;
       let all : ActiveSourceSet =
@@ -140,15 +140,16 @@ fn inbound_containerward_data_hides_N_at_public (
 
       // Rendered backpath: C's containerward path must truncate
       // before N at "public" (N is grafted at "all").
-      install_or_swap_global_handle (
+      let graph_handle = (
         graph_handle_from_config (config)? );
+      let graph = graph_handle . load_full ();
       {
         let mut viewforest : Tree<ViewNode> =
           viewforest_from_org (
             "* (skg (node (id C) (source public))) leak-battery-C\n" )?;
         let c_id : NodeId = first_child_id (&viewforest);
         build_and_integrate_containerward_path_with_source_set (
-          &mut viewforest, c_id, config, driver, Some (&public) ) . await ?;
+          &mut viewforest, c_id, &graph, config, Some (&public) ) ?;
         let ancestors : BTreeSet<ID> = true_child_ids (&viewforest, c_id);
         assert! (
           ! ancestors . contains (&ID::from ("N")),
@@ -166,7 +167,7 @@ fn inbound_containerward_data_hides_N_at_public (
             "* (skg (node (id C) (source public))) leak-battery-C\n" )?;
         let c_id : NodeId = first_child_id (&viewforest);
         build_and_integrate_containerward_path_with_source_set (
-          &mut viewforest, c_id, config, driver, Some (&all) ) . await ?;
+          &mut viewforest, c_id, &graph, config, Some (&all) ) ?;
         let ancestors : BTreeSet<ID> = true_child_ids (&viewforest, c_id);
         assert! (
           ancestors . contains (&ID::from ("N")),
@@ -182,7 +183,7 @@ fn subscriberCol_style_inbound_gates_privately_recorded_subscription (
     "skg-test-leak-battery-subscriber",
     "tests/leak_battery/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-leak-battery-subscriber",
-    |config, _driver, _tantivy| Box::pin ( async move {
+    |config, _tantivy| Box::pin ( async move {
       let public : ActiveSourceSet =
         ActiveSourceSet::named (config, SourceSetName::from ("public"))?;
       let all : ActiveSourceSet =
@@ -221,13 +222,14 @@ fn ancestor_heralds_gate_privately_recorded_relations (
     "skg-test-leak-battery-heralds",
     "tests/leak_battery/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-leak-battery-heralds",
-    |config, _driver, _tantivy| Box::pin ( async move {
+    |config, _tantivy| Box::pin ( async move {
       let public : ActiveSourceSet =
         ActiveSourceSet::named (config, SourceSetName::from ("public"))?;
       let all : ActiveSourceSet =
         ActiveSourceSet::named (config, SourceSetName::from ("all"))?;
-      install_or_swap_global_handle (
+      let graph_handle = (
         graph_handle_from_config (config)? );
+      let graph = graph_handle . load_full ();
       // Buffer: C with child S. S subscribes to C, but that edge is
       // recorded only in S's PRIVATE section, so the ancestor-flag
       // pass must not tint S's herald with the 'S' token at public.
@@ -249,6 +251,7 @@ fn ancestor_heralds_gate_privately_recorded_relations (
               Some ( RelationCounts::default () ); }}
         set_viewnodestats_in_viewforest (
           &mut viewforest,
+          &graph,
           & HashMap::new (),
           & HashMap::new (),
           config,

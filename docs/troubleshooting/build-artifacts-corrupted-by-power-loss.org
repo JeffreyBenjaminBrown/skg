@@ -23,13 +23,12 @@ python3 docs/troubleshooting/check-rlibs.py
 Fix -- pass every package the script names:
 
 #+begin_src bash
-cargo clean -p skg -p tantivy -p typedb-driver   # e.g.; use YOUR script output
+cargo clean -p skg -p tantivy   # e.g.; use YOUR script output
 cargo build --bin skg
 ./bash/start-servers.sh
 #+end_src
 
-TypeDB is *not* the problem here, so nothing in
-=typedb-will-not-start.org= will help. Do not delete any data.
+This is a build-artifact failure. Do not delete any data.
 
 * Why this is so confusing
 
@@ -45,7 +44,7 @@ Three things conspire to make this look like a mystery:
    file is a good one, hands it to the linker, and fails the same way
    every single time. The failure is permanent, not flaky. Re-running
    the build does not help, which is exactly what makes people assume
-   the problem must lie elsewhere (TypeDB, the config, the data).
+   the problem must lie elsewhere (the config or the data).
 
 3. *The error is buried.* =start-servers.sh= runs the build inside
    =preflight_check_config=, and on failure prints "ERROR: skg failed
@@ -68,7 +67,6 @@ files written in the final 15 seconds of the machine's life were:
 
 | artifact          |     size | boundary       |
 |-------------------+----------+----------------|
-| libtypedb_driver  | 58720256 | 56 MiB exactly |
 | libtantivy        | 50331648 | 48 MiB exactly |
 | libskg            | 50331648 | 48 MiB exactly |
 
@@ -107,11 +105,11 @@ python3 docs/troubleshooting/check-rlibs.py
 fingerprints, forcing a genuine rebuild of exactly that package. Use
 it on every package the checker named. Translate the *file* name to
 the *package* name by dropping =lib=/=-<hash>.rlib= and turning
-underscores back into hyphens (=libtypedb_driver-370a4...rlib= ->
-=typedb-driver=).
+underscores back into hyphens (=libsome_package-370a4...rlib= ->
+=some-package=).
 
 #+begin_src bash
-cargo clean -p skg -p tantivy -p typedb-driver
+cargo clean -p skg -p tantivy
 cargo build --bin skg
 #+end_src
 
@@ -120,7 +118,7 @@ dependency artifacts were sound and were reused.
 
 Prefer this to a bare =cargo clean=, which throws away all ~8.5 GiB of
 =target/= and forces a full cold rebuild of every dependency
-(libgit2, ring, openssl, tantivy, typedb-driver...) -- many minutes,
+(libgit2, ring, openssl, tantivy...) -- many minutes,
 to fix three files. A full =cargo clean= is a correct fix, just a
 needlessly expensive one. Reach for it only if =check-rlibs.py=
 reports damage so widespread that enumerating packages is pointless.
@@ -144,11 +142,9 @@ INFO context_computation:   60794 nodes, 56232 edges, 5979 link dests.
 INFO Server ready.
 #+end_example
 
-and check both ports are listening -- 1729 (TypeDB gRPC) and 1730 (the
-skg <-> Emacs API):
+and check the configured Skg API port is listening (1730 here):
 
 #+begin_src bash
-(exec 3<>/dev/tcp/127.0.0.1/1729) && echo "TypeDB up"
 (exec 3<>/dev/tcp/127.0.0.1/1730) && echo "skg up"
 #+end_src
 
@@ -157,7 +153,6 @@ skg <-> Emacs API):
 In the 2026-07-14 incident the power loss damaged *only* build
 artifacts. Specifically intact were:
 
-- The TypeDB database (=skg-real=). TypeDB 3.12.0 started clean.
 - The Tantivy index (=data/.index.tantivy=). Incremental init
   succeeded; no reindex was needed.
 - The git working tree and the source.

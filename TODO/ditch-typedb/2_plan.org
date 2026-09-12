@@ -22,18 +22,20 @@ Update this small block whenever the active task changes, before likely
 compaction, and before ending a work session.  Detailed evidence belongs in
 =TODO/ditch-typedb/progress.org=; this is only the resume pointer.
 
-- Overall state: TODO
-- Current phase: none; implementation has not begun
+- Overall state: DONE
+- Current phase: Complete
 - Current task: none
-- Next task: Phase 0.1, create the progress ledger
-- Last green checkpoint: none recorded for this initiative
-- Current checkpoint fingerprint: none
-- Known baseline failure: =override_menu::all_tests= was recorded as an
-  existing problem on 2026-08-24; Phase 0 must confirm whether it is still
-  present before treating it as an exemption.
-- TypeDB cutover checkpoint: not reached
-- Driver-free checkpoint: not reached
-- Synchronous-cleanup checkpoint: not reached
+- Next task: optional external image cleanup in =3_external-cleanup.org=
+- Last green checkpoint: closed-port complete suite (68 seconds)
+- Current checkpoint fingerprint: see
+  =target/test-logs/graph-only/20260912T065508Z-graph-only-final-suite-stable-fingerprint-274549.meta=
+  (TypeDB-refactor source/test/documentation scopes)
+- Known baseline failure: none.  The fresh full suite passed, including the
+  override-menu integration coverage.
+- TypeDB cutover checkpoint: DONE; operational start/rebuild/restart passed
+- Driver-free checkpoint: DONE; dependency tree and closed-port suite passed
+- Synchronous-cleanup checkpoint: DONE; retained async is limited to real
+  mutation/I/O boundaries
 
 * Resume protocol after a compaction or handoff
 
@@ -70,7 +72,7 @@ The decisions below came from =1_discussion.org=.  Reopen them only if
 implementation evidence reveals a genuine contradiction or a material new
 risk.  Routine implementation choices do not require another user round.
 
-* TODO Complete the TypeDB-removal initiative
+* DONE Complete the TypeDB-removal initiative
 
 Completion means the server, tests, clients, scripts, current documentation,
 and dependency graph no longer require or assume TypeDB; the in-Rust graph is
@@ -484,12 +486,12 @@ items are satisfied at the recorded fingerprint.  A later change to the same
 dependency surface invalidates that evidence and reopens the smallest relevant
 gate.
 
-* TODO Phase 0: establish resumable execution and a trustworthy baseline
+* DONE Phase 0: establish resumable execution and a trustworthy baseline
 
 Goal: make every later test result compact, attributable, and reproducible
 before architectural edits begin.
 
-** TODO 0.1 Create and initialize the progress ledger
+** DONE 0.1 Create and initialize the progress ledger
 
 Create =TODO/ditch-typedb/progress.org= with:
 
@@ -507,7 +509,7 @@ Define the fingerprint so it covers HEAD, tracked diffs, and contents/names of
 untracked files inside this initiative's scope.  It may ignore unrelated
 untracked material, but must say what it ignored.
 
-** TODO 0.2 Add the quiet arbitrary-command test wrapper
+** DONE 0.2 Add the quiet arbitrary-command test wrapper
 
 Add a small script under =bash/= that:
 
@@ -526,7 +528,7 @@ Add a small script under =bash/= that:
 Do not replace =bash/all-tests.sh='s final result reporting; this wrapper is for
 arbitrary narrow/checkpoint commands and may invoke the existing scripts.
 
-** TODO 0.3 Record the pre-refactor baseline
+** DONE 0.3 Record the pre-refactor baseline
 
 Record:
 
@@ -549,7 +551,7 @@ Record:
 Do not bless a baseline failure merely because it was mentioned in an old TODO.
 Confirm it or remove it from the dashboard.
 
-** TODO 0.4 Freeze the replacement inventory and constraint matrix
+** DONE 0.4 Freeze the replacement inventory and constraint matrix
 
 Use targeted =rg= and the local introspection tools to record in the ledger:
 
@@ -564,7 +566,7 @@ Use targeted =rg= and the local introspection tools to record in the ledger:
 
 Save bounded file lists rather than raw giant search output.
 
-** TODO 0.5 Pass the Phase 0 gate
+** DONE 0.5 Pass the Phase 0 gate
 
 Acceptance:
 
@@ -575,12 +577,12 @@ Acceptance:
 - the test matrix contains verified filters/commands; and
 - dashboard Next task points to 1.1.
 
-* TODO Phase 1: protect the sole-authority mutation path and graph integrity
+* DONE Phase 1: protect the sole-authority mutation path and graph integrity
 
 Goal: close the existing lost-update window and strengthen graph validation
 while TypeDB still exists as a comparison/reference implementation.
 
-** TODO 1.1 Introduce one shared mutation gate
+** DONE 1.1 Introduce one shared mutation gate
 
 Add an environment-owned shared mutex used by all authoritative mutations:
 save, delete, merge, source move, filesystem-rewriting migrations, and manual
@@ -595,7 +597,7 @@ Split outer locking entry points from inner “gate already held” helpers so a
 migration that finishes by rebuilding does not recursively acquire the same
 non-reentrant gate.
 
-** TODO 1.2 Add deterministic concurrent-writer regressions
+** DONE 1.2 Add deterministic concurrent-writer regressions
 
 Tests must force the old bad interleaving with barriers rather than depending
 on timing.  Cover at least:
@@ -609,7 +611,7 @@ on timing.  Cover at least:
 Assert disk, graph forward data, all inverse indexes, and search-visible state
 where relevant.  Tests must not rely on the discarded partial-reload branch.
 
-** TODO 1.3 Extract pure graph internal-index validation
+** DONE 1.3 Extract pure graph internal-index validation
 
 Create a graph-owned validator that recomputes expected inverse maps from node
 forward data and reports exact mismatches for =contained_by=,
@@ -621,7 +623,7 @@ scheduler.
 Cover construction, incremental =DefineNode= updates, delete, extra-ID change,
 dangling members, and every relationship role.
 
-** TODO 1.4 Establish the Rust constraint validator matrix
+** DONE 1.4 Establish the Rust constraint validator matrix
 
 Implement or locate one canonical validation entry point for a complete
 candidate node set/graph.  Fill the Phase 0 schema matrix.  Explicitly test:
@@ -637,7 +639,7 @@ candidate node set/graph.  Fill the Phase 0 schema matrix.  Explicitly test:
 Prefer data types for structural impossibilities, validators for cross-node
 facts, and warnings for intentionally tolerated privacy/source anomalies.
 
-** TODO 1.5 Pass the Phase 1 gate
+** DONE 1.5 Pass the Phase 1 gate
 
 Acceptance:
 
@@ -648,12 +650,12 @@ Acceptance:
 - affected save/source/override groups plus =cargo check --all-targets= are
   green at the recorded fingerprint.
 
-* TODO Phase 2: publish coherent runtime generations and require explicit snapshots
+* DONE Phase 2: publish coherent runtime generations and require explicit snapshots
 
 Goal: remove per-connection copied runtime state and hidden graph access before
 converting the database facade.
 
-** TODO 2.1 Introduce the shared runtime-generation abstraction
+** DONE 2.1 Introduce the shared runtime-generation abstraction
 
 Refactor =SkgEnv= toward the target architecture above.  Initially the
 generation may still carry the TypeDB driver outside or alongside the derived
@@ -663,7 +665,7 @@ must already be shared/published coherently across connection clones.
 Add a monotonically increasing generation ID for diagnostics/tests.  Ensure
 capturing a generation is one cheap =ArcSwap::load_full= and no reader lock.
 
-** TODO 2.2 Thread one snapshot through every operation
+** DONE 2.2 Thread one snapshot through every operation
 
 At each request/task boundary, capture once.  Pass =\&RuntimeGeneration= or
 =\&InRustGraph= down the call chain rather than reloading.  Convert:
@@ -679,7 +681,7 @@ Do not hide parameter soup with another singleton.  A small read-context
 struct is acceptable if it owns/references the captured generation and makes
 active-source-set inputs explicit.
 
-** TODO 2.3 Remove production global graph access
+** DONE 2.3 Remove production global graph access
 
 Delete free helpers that call =snapshot_global= and change their callers to
 use explicit snapshots.  Remove =GLOBAL_HANDLE= and install/swap/reset helpers
@@ -687,7 +689,7 @@ once tests no longer need them.  If test conversion must lag briefly, keep the
 test-only compatibility under =#[cfg(test)]= and record its deletion task in
 Phase 4; production must be free of it at this gate.
 
-** TODO 2.4 Prove cross-connection and mixed-generation behavior
+** DONE 2.4 Prove cross-connection and mixed-generation behavior
 
 Add tests with two cloned environments/connections showing:
 
@@ -698,7 +700,7 @@ Add tests with two cloned environments/connections showing:
 - a failed candidate publication leaves all clients on the old generation;
 - generation IDs in logs make stale work identifiable.
 
-** TODO 2.5 Pass the Phase 2 gate
+** DONE 2.5 Pass the Phase 2 gate
 
 Acceptance:
 
@@ -708,12 +710,12 @@ Acceptance:
 - cloned environments see coherent publications; and
 - affected grouped tests and =cargo check --all-targets= are green.
 
-* TODO Phase 3: replace TypeDB reads with graph-native domain operations
+* DONE Phase 3: replace TypeDB reads with graph-native domain operations
 
 Goal: make all production graph queries use the captured Rust graph while
 temporarily preserving async public signatures to limit the cutover surface.
 
-** TODO 3.1 Move domain vocabulary out of the TypeDB namespace
+** DONE 3.1 Move domain vocabulary out of the TypeDB namespace
 
 Create graph/domain-owned homes for relationship role enums/constants/glyphs,
 =AncestryTree=, =PathToFirstNonlinearity=, and other return types that describe
@@ -725,7 +727,7 @@ Move graph-node statistics out of
 driver/database parameters.  Keep compatibility wrappers only until their
 callers move in this phase; do not preserve a permanent =typedb= namespace.
 
-** TODO 3.2 Implement graph-native identity and relationship lookup
+** DONE 3.2 Implement graph-native identity and relationship lookup
 
 Replace TypeDB lookup functions with pure operations over one captured graph:
 
@@ -741,7 +743,7 @@ Remove Tantivy and disk fallbacks for facts the complete graph must know at
 runtime.  Retain explicit deletion-map handling only where diff mode genuinely
 addresses files absent from the current graph, and document that boundary.
 
-** TODO 3.3 Implement source-gated ancestry and path traversal
+** DONE 3.3 Implement source-gated ancestry and path traversal
 
 Port TypeDB ancestry/path behavior to graph algorithms.  Cover every prior
 contract, including depth/budget limits, cycles, diamonds, repeated nodes,
@@ -757,7 +759,7 @@ The existing five leak-battery cases passing at render time are not sufficient:
 add cases in which a hidden edge would change distance, ancestry shape,
 first-fork selection, or subscription/context stats if traversal saw it.
 
-** TODO 3.4 Convert every production reader and preserve async shapes
+** DONE 3.4 Convert every production reader and preserve async shapes
 
 Move =serve= handlers, =to_org=, views, source sets, from-text, update-buffer,
 save preflight, and context/stat consumers to the graph-native functions.
@@ -766,7 +768,7 @@ their bodies are now immediately-ready graph work.  Remove driver/database
 arguments where doing so does not force the separate sync cleanup; temporary
 async wrappers are acceptable and must be inventoried for Phase 8.
 
-** TODO 3.5 Differentially verify graph results before removing TypeDB
+** DONE 3.5 Differentially verify graph results before removing TypeDB
 
 While the old implementation still compiles, use fixed fixtures/property
 fixtures to compare old TypeDB results with graph-native results for supported
@@ -777,7 +779,7 @@ rather than copying a TypeDB leak.
 Delete the differential harness at driver removal unless it remains useful as
 a pure graph oracle test.
 
-** TODO 3.6 Pass the Phase 3 gate
+** DONE 3.6 Pass the Phase 3 gate
 
 Acceptance:
 
@@ -788,11 +790,11 @@ Acceptance:
 - =grouped_unit=, =grouped_sources=, =grouped_views=, relevant override tests,
   and =cargo check --all-targets= are green.
 
-* TODO Phase 4: replace the TypeDB test harness and port behavioral coverage
+* DONE Phase 4: replace the TypeDB test harness and port behavioral coverage
 
 Goal: make the proof suite service-free before deleting the driver.
 
-** TODO 4.1 Build service-free fixture constructors
+** DONE 4.1 Build service-free fixture constructors
 
 Replace driver/database-name setup with small builders for:
 
@@ -806,7 +808,7 @@ Use the existing =tempfile= dependency.  Each fixture owns its state; avoid a
 process-global graph, database cleanup, and a suite-wide mutex unless a truly
 unrelated global resource still requires serialization.
 
-** TODO 4.2 Port behavior tests and delete storage-mechanism tests
+** DONE 4.2 Port behavior tests and delete storage-mechanism tests
 
 For =tests/typedb.rs= and its subtree:
 
@@ -821,7 +823,7 @@ For =tests/typedb.rs= and its subtree:
 
 Record each deletion/port against the Phase 0 classification.
 
-** TODO 4.3 Remove test-only global and database lifecycle coupling
+** DONE 4.3 Remove test-only global and database lifecycle coupling
 
 Delete global graph install/swap/reset helpers, TypeDB database guards,
 random database naming, cleanup calls, =SKG_TYPEDB_CONCURRENT_TRANSACTIONS=,
@@ -831,7 +833,7 @@ currently explain global-handle or database grouping hazards.
 Do not regroup the large test binaries merely because one reason disappeared;
 that is optional follow-up work unless a group can no longer compile cleanly.
 
-** TODO 4.4 Pass the Phase 4 gate with TypeDB tests disabled
+** DONE 4.4 Pass the Phase 4 gate with TypeDB tests disabled
 
 Acceptance:
 
@@ -843,11 +845,11 @@ Acceptance:
   service dependency.  TypeDB may remain available only for production startup
   or differential tests not yet removed.
 
-* TODO Phase 5: remove foreground TypeDB mutation and recovery logic
+* DONE Phase 5: remove foreground TypeDB mutation and recovery logic
 
 Goal: make disk, graph publication, and Tantivy the complete mutation pipeline.
 
-** TODO 5.1 Simplify save publication to the authority order
+** DONE 5.1 Simplify save publication to the authority order
 
 In =server/save.rs= and submodules:
 
@@ -862,7 +864,7 @@ In =server/save.rs= and submodules:
 - keep background Tantivy failure recoverable through the renamed rebuild
   command.
 
-** TODO 5.2 Remove TypeDB-shaped merge/delete neighbor repairs
+** DONE 5.2 Remove TypeDB-shaped merge/delete neighbor repairs
 
 Audit =nodeMerge=, delete propagation, and save-instruction expansion.  Delete
 synthetic neighbor rewrites whose sole purpose was keeping TypeDB inverse
@@ -873,14 +875,14 @@ Use disk/graph assertions to prove dangling-reference behavior, delete
 semantics, extra-ID replacement, override collateral effects, and merge
 idempotence.
 
-** TODO 5.3 Convert source moves and filesystem migrations
+** DONE 5.3 Convert source moves and filesystem migrations
 
 Run source moves and every file-rewriting migration under the shared mutation
 gate.  Validate the full candidate config/nodes/graph before committing where
 possible.  Publish one coherent new generation and enqueue/rebuild Tantivy in
 the specified order.  Eliminate TypeDB source creation/update/count APIs.
 
-** TODO 5.4 Pass the Phase 5 gate
+** DONE 5.4 Pass the Phase 5 gate
 
 Acceptance:
 
@@ -890,12 +892,12 @@ Acceptance:
 - =grouped_saves=, =grouped_sources=, affected override tests, and
   =cargo check --all-targets= are green.
 
-* TODO Phase 6: replace startup and live rebuild, migrate config and protocol
+* DONE Phase 6: replace startup and live rebuild, migrate config and protocol
 
 Goal: make the server operational with TypeDB unavailable before deleting the
 dependency.
 
-** TODO 6.1 Make startup one full read and two derived builds
+** DONE 6.1 Make startup one full read and two derived builds
 
 Refactor =initialize_dbs= to:
 
@@ -916,7 +918,7 @@ Startup failure must not leave a marker or half-trusted generation.  Clean
 abandoned Tantivy rebuild/generation directories from prior crashed runs only
 when no live process can be using them.
 
-** TODO 6.2 Implement atomic live rebuild of ephemeral data stores
+** DONE 6.2 Implement atomic live rebuild of ephemeral data stores
 
 Under the shared mutation gate:
 
@@ -935,7 +937,7 @@ Under the shared mutation gate:
 Test failure at each fallible stage and a reader spanning publication.  A
 rebuild and normal save must serialize into a fully before-or-after outcome.
 
-** TODO 6.3 Rename the protocol and both client commands
+** DONE 6.3 Rename the protocol and both client commands
 
 Use the canonical phrase =rebuild ephemeral data stores= everywhere current:
 
@@ -950,7 +952,7 @@ Do not retain =rebuild dbs= aliases unless Jeff explicitly revisits the
 project's no-compatibility policy.  Response text must say which ephemeral
 stores rebuilt and that =.skg= files remained authoritative.
 
-** TODO 6.4 Reject retired config keys clearly
+** DONE 6.4 Reject retired config keys clearly
 
 Remove =db_name=, =delete_on_quit=, and =auto_audit_daily= from runtime config.
 Before normal TOML deserialization silently ignores them, inspect the parsed
@@ -962,7 +964,7 @@ Update repository configs and all fixtures in the same checkpoint so the
 server/test suite remains startable.  Remove delete-on-quit behavior rather
 than translating it.
 
-** TODO 6.5 Measure the chosen Tantivy startup policy
+** DONE 6.5 Measure the chosen Tantivy startup policy
 
 With TypeDB stopped, run at least three cold-enough representative startups on
 Jeff's current non-production garden.  Record node/document counts, full file
@@ -971,7 +973,7 @@ the 2.10/2.18/2.45-second Tantivy observations and old ~46-second/~34.9-second
 server/TypeDB numbers.  Treat large regressions as a diagnosis trigger, not as
 a reason to restore incremental TypeDB-era startup automatically.
 
-** TODO 6.6 Pass the Phase 6 operational gate
+** DONE 6.6 Pass the Phase 6 operational gate
 
 Acceptance:
 
@@ -984,12 +986,12 @@ Acceptance:
 - startup/rebuild/Tantivy/save/client focused tests are green; and
 - restart timings and logs are in the ledger.
 
-* TODO Phase 7: excise TypeDB and reach the first full green checkpoint
+* DONE Phase 7: excise TypeDB and reach the first full green checkpoint
 
 Goal: delete the entire backend, dependency, scheduled audit, and service test
 lifecycle while retaining the still-async graph API surface.
 
-** TODO 7.1 Delete the TypeDB modules and detach remaining imports
+** DONE 7.1 Delete the TypeDB modules and detach remaining imports
 
 Delete =server/dbs/typedb/= after moving all domain types/behavior.  Remove its
 module exports, =typedb_driver= imports, driver fields/parameters, connection
@@ -1000,7 +1002,7 @@ Use compiler errors as a bounded caller list, but search again afterward for
 feature-gated, tool, test, and documentation references that compilation can
 miss.
 
-** TODO 7.2 Delete scheduled audit machinery while retaining pure checks
+** DONE 7.2 Delete scheduled audit machinery while retaining pure checks
 
 Delete audit comparison/store/scheduler modules, startup hooks, warning
 piggybacking, dates/state files, audit commands/tools, and scheduler tests.
@@ -1011,7 +1013,7 @@ Delete =bench-audit= and =probe-audit=.  Evaluate =bench-context= by imports:
 retarget it to pure graph context if useful, otherwise delete it and its Cargo
 entry.
 
-** TODO 7.3 Delete TypeDB-only tools and shell lifecycle
+** DONE 7.3 Delete TypeDB-only tools and shell lifecycle
 
 Delete =cleanup-test-dbs= and =delete-one-db= plus their Cargo entries.  Remove
 cleanup calls, database retry logic, TypeDB fanout environment variables, and
@@ -1022,7 +1024,7 @@ behavior and test-log behavior.
 Do not perform the external image rebuild here.  Touch =bash/docker.sh= only
 where required and preserve Jeff's pre-existing edits.
 
-** TODO 7.4 Remove the driver dependency and schema
+** DONE 7.4 Remove the driver dependency and schema
 
 Remove =typedb-driver= from =Cargo.toml= and update =Cargo.lock=.  First confirm
 every enduring =schema.tql= rule is represented in the constraint matrix,
@@ -1032,7 +1034,7 @@ Verify =cargo tree= has no TypeDB package and no transitive dependency was
 retained only for deleted TypeDB code.  Do not opportunistically prune
 unrelated dependencies.
 
-** TODO 7.5 Run the driver-free, async-preserving checkpoint
+** DONE 7.5 Run the driver-free, async-preserving checkpoint
 
 This is the first mandated full green checkpoint.  With TypeDB stopped and
 port 1729 confirmed closed:
@@ -1059,12 +1061,12 @@ Static acceptance:
 Record this fingerprint prominently and do not begin Phase 8 until it is green
 or a confirmed baseline exception is explicitly documented.
 
-* TODO Phase 8: make graph-only call chains synchronous
+* DONE Phase 8: make graph-only call chains synchronous
 
 Goal: complete the settled second checkpoint without mixing it into diagnosis
 of driver removal.
 
-** TODO 8.1 Convert pure graph APIs to synchronous functions
+** DONE 8.1 Convert pure graph APIs to synchronous functions
 
 Work from the Phase 3 async-facade inventory.  Remove =async= and =await= from
 identity/source lookup, relationship search, ancestry, paths, stats, and pure
@@ -1076,7 +1078,7 @@ Delete =block_on= calls and boxed futures that existed only for TypeDB.  Do not
 turn actual filesystem, Git, or other independent async work synchronous as a
 side effect.
 
-** TODO 8.2 Simplify types, errors, and dependencies exposed by sync cleanup
+** DONE 8.2 Simplify types, errors, and dependencies exposed by sync cleanup
 
 Replace backend-shaped =Result= layers with direct values only where graph
 lookup truly cannot fail.  Preserve semantic absence as =Option= and preserve
@@ -1086,7 +1088,7 @@ imports revealed by the signature change.
 Check whether =tokio=, =async-std=, or =futures= are still used elsewhere;
 remove only dependencies made wholly dead by this initiative.
 
-** TODO 8.3 Pass the synchronous graph checkpoint
+** DONE 8.3 Pass the synchronous graph checkpoint
 
 Acceptance:
 
@@ -1097,12 +1099,12 @@ Acceptance:
 - repeat the whole Rust suite, clients if their protocol surface changed, and
   one operational save/search/view/rebuild smoke test with port 1729 closed.
 
-* TODO Phase 9: finish current documentation, operations, and the named follow-up
+* DONE Phase 9: finish current documentation, operations, and the named follow-up
 
 Goal: leave no current instructions or client vocabulary describing the old
 architecture.
 
-** TODO 9.1 Split and complete the data-model documentation
+** DONE 9.1 Split and complete the data-model documentation
 
 Rename =docs/data-model.org= to =docs/data-model_friendly.org= and update every
 current link.  Preserve its approachable conceptual role.
@@ -1127,7 +1129,7 @@ Create =docs/data-model_technical.org= covering, at minimum:
 Link validators/tests from the technical doc where useful, avoiding claims
 that only deleted =schema.tql= once enforced.
 
-** TODO 9.2 Update commands, API, setup, and architecture prose
+** DONE 9.2 Update commands, API, setup, and architecture prose
 
 Update =README.org=, =api-and-formats.md=, =glossary.md=,
 =docs/COMMANDS.org=, =docs/COMMANDS-nvim.org=, setup, usage, troubleshooting,
@@ -1145,7 +1147,7 @@ source/privacy, save/rebuild, and architecture docs.  Say plainly:
 Historical TODOs may retain accurate history; distinguish them from current
 instructions so static search results are classifiable.
 
-** TODO 9.3 Normalize scripts and user-facing diagnostics
+** DONE 9.3 Normalize scripts and user-facing diagnostics
 
 Ensure start/stop/help output refers only to Skg and its actual prerequisites.
 Remove stale TypeDB health, port, Docker, cleanup, and troubleshooting text.
@@ -1154,7 +1156,7 @@ Ensure Tantivy background failure messages name the new rebuild command.
 Run shell syntax checks on changed scripts and exercise start/stop from a clean
 state without TypeDB.
 
-** TODO 9.4 Create the named external-environment follow-up
+** DONE 9.4 Create the named external-environment follow-up
 
 Create =TODO/ditch-typedb/3_external-environment-followup.org= (or a more
 specific adjacent name if repository discovery warrants it) with actionable
@@ -1169,7 +1171,7 @@ specific adjacent name if repository discovery warrants it) with actionable
 
 This follow-up is created and named here, not executed here.
 
-** TODO 9.5 Pass the Phase 9 gate
+** DONE 9.5 Pass the Phase 9 gate
 
 Acceptance:
 
@@ -1180,12 +1182,12 @@ Acceptance:
 - client tests and changed-script syntax/smoke tests pass; and
 - the external-environment follow-up is self-contained.
 
-* TODO Phase 10: final proof, operational soak, and handoff
+* DONE Phase 10: final proof, operational soak, and handoff
 
 Goal: prove the repository is graph-only, quantify the simplification, and
 leave a compact durable completion record.
 
-** TODO 10.1 Run the final static census
+** DONE 10.1 Run the final static census
 
 Run and classify at least:
 
@@ -1203,7 +1205,7 @@ retired-key migration messages.  Historical documents may match only if each
 hit is clearly historical.  Every retained async hit in the scoped graph call
 chains needs a real-I/O explanation.
 
-** TODO 10.2 Run the final closed-port test census
+** DONE 10.2 Run the final closed-port test census
 
 Stop the server and TypeDB, verify nothing listens on TypeDB's port 1729, then
 run the quiet-wrapper versions of:
@@ -1217,7 +1219,7 @@ run the quiet-wrapper versions of:
 Do not retry failures blindly.  Bind every result to the final fingerprint and
 retain log paths.
 
-** TODO 10.3 Perform the operational mutation/read soak
+** DONE 10.3 Perform the operational mutation/read soak
 
 On Jeff's explicitly non-production copy:
 
@@ -1235,7 +1237,7 @@ On Jeff's explicitly non-production copy:
 Inspect graph internal-index validation and filesystem/Tantivy consistency at
 the end.  Record timing and unexpected warnings.
 
-** TODO 10.4 Measure the result and audit removals
+** DONE 10.4 Measure the result and audit removals
 
 Record before/after production and total LOC using one reproducible command,
 startup timing, representative save response, search enrichment, full-suite
@@ -1247,7 +1249,7 @@ merely to maximize LOC reduction.
 Review =git diff --check=, the complete scoped diff, and all user-owned dirty
 files for accidental overlap.  Confirm no unrelated change was overwritten.
 
-** TODO 10.5 Complete the initiative and durable handoff
+** DONE 10.5 Complete the initiative and durable handoff
 
 Acceptance:
 

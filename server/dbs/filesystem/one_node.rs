@@ -8,26 +8,25 @@ use crate::telescope::unfold::{
 use crate::types::misc::{ID, SkgConfig, SourceName, members_msv};
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::NodeComplete;
-use crate::dbs::typedb::search::pid_and_source_from_id;
+use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::util::path_from_pid_and_source;
 use std::error::Error;
 use std::io;
 use std::path::Path;
 use std::fs;
 use serde_yaml;
-use typedb_driver::TypeDBDriver;
 
-pub async fn nodecomplete_from_id (
+pub fn nodecomplete_from_id (
   config : &SkgConfig,
-  driver : &TypeDBDriver,
   skgid  : &ID
 ) -> Result<NodeComplete, Box<dyn Error>> {
+  let nodes = read_all_skg_files_from_sources (config)?;
+  let graph = InRustGraph::from_nodecompletes (&nodes);
   let (pid, source) : (ID, SourceName) =
-    pid_and_source_from_id (
-      & config . db_name, driver, skgid
-    ) . await ?
+    graph . pid_and_source (skgid)
     . ok_or_else ( || format! (
-      "ID '{}' not found in database", skgid ) ) ?;
+      "ID '{}' not found in graph", skgid ) ) ?;
   Ok ( nodecomplete_from_pid_and_source (
     config, pid, &source )? ) }
 
@@ -89,14 +88,13 @@ pub(crate) fn telescope_from_disk (
 /// Reads a node from disk, returning None if not found
 /// (either in DB or on filesystem).
 /// ERRORS are propagated only if they are not of the 'not found' kind.
-pub async fn optnodecomplete_from_id (
+pub fn optnodecomplete_from_id (
   config : &SkgConfig,
-  driver : &TypeDBDriver,
   skgid  : &ID
 ) -> Result<Option<NodeComplete>, Box<dyn Error>> {
   match nodecomplete_from_id(
-    config, driver, skgid
-  ) . await {
+    config, skgid
+  ) {
     Ok (nodecomplete) => Ok(Some (nodecomplete)),
     Err (e)      => {
       let error_msg: String = e . to_string();
@@ -109,14 +107,13 @@ pub async fn optnodecomplete_from_id (
 
 /// If there's no such .skg file at path,
 /// returns the empty vector.
-pub async fn fetch_aliases_from_file (
+pub fn fetch_aliases_from_file (
   config : &SkgConfig,
-  driver : &TypeDBDriver,
   skgid  : ID,
 ) -> Vec<String> {
   match optnodecomplete_from_id(
-    config, driver, &skgid
-  ) . await {
+    config, &skgid
+  ) {
     Ok ( Some (nodecomplete)) =>
       members_msv ( & nodecomplete . aliases ) . into_vec(),
     _ => Vec::new(), }}

@@ -57,6 +57,7 @@ fn titles_by_ids_handler_sends_parseable_titles (
   handle_titles_by_ids_request (
     &mut server,
     request,
+    &InRustGraph::new (),
     &tantivy_index,
     &SkgConfig::dummyFromSources (HashMap::new ()),
     false );
@@ -216,6 +217,7 @@ fn titles_by_ids_finds_deleted_git_file_title_without_diff_mode (
   handle_titles_by_ids_request (
     &mut server,
     &request,
+    &InRustGraph::new (),
     &tantivy_index,
     &config,
     false );
@@ -276,6 +278,7 @@ fn titles_by_ids_finds_untracked_git_file_title_without_diff_mode (
   handle_titles_by_ids_request (
     &mut server,
     &request,
+    &InRustGraph::new (),
     &tantivy_index,
     &config,
     false );

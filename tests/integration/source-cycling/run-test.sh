@@ -23,19 +23,15 @@ enhanced_cleanup() {
 
 trap enhanced_cleanup EXIT
 
-check_typedb_server
 
 AVAILABLE_PORT=$(find_available_port)
 echo "Using port $AVAILABLE_PORT for test server..."
 
 TEMP_CONFIG="$TEST_DIR/data/skgconfig.toml"
-DB_NAME=$(generate_db_name)
 cat > "$TEMP_CONFIG" << EOF
-db_name = "$DB_NAME"
 tantivy_folder = "$TEST_DIR/data/.index.tantivy"
 port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
-delete_on_quit = true
 
 [[sources]]
 name = "public"

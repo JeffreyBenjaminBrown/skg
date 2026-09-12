@@ -18,7 +18,7 @@
 (require 'skg-request-edge-source-info)
 (require 'skg-request-export-org)
 (require 'skg-request-git-diff-mode)
-(require 'skg-request-rebuild-dbs)
+(require 'skg-request-rebuild-ephemeral-data-stores)
 (require 'skg-request-rerender-all-views)
 (require 'skg-request-save)
 (require 'skg-request-source-sets)

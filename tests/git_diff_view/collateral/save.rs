@@ -4,15 +4,14 @@
 /// retain diff annotations (textChanged, new-here, etc.).
 
 use super::common::*;
-use std::sync::Arc;
-use skg::test_utils::{run_with_shared_test_db, SharedDbSession};
+use skg::test_utils::{run_with_shared_test_stores, SharedStoreSession};
 
 use std::io::BufReader;
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_stores (
     "skg-test-git-diff-collateral-save",
     |s| Box::pin ( async move {
       test_collateral_view_preserves_diff_annotations (s) . await ?;
@@ -22,7 +21,7 @@ fn all_tests
 /// After saving buffer 1 with a new child, collateral buffer 2
 /// should still show textChanged on b and new-here on the new child.
 async fn test_collateral_view_preserves_diff_annotations (
-  s : &mut SharedDbSession,
+  s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
   let temp_dir : TempDir = TempDir::new()?;
@@ -30,17 +29,17 @@ async fn test_collateral_view_preserves_diff_annotations (
   setup_git_repo_with_fixtures (repo_path)?;
   s . reset_with_source_path (
     "test_collateral_view_preserves_diff_annotations",
-    repo_path ) . await ?;
-  let (config, driver, tantivy)
-    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
-    = (&s . config, &s . driver, &mut s . tantivy);
+    repo_path ) ?;
+  let (config, tantivy)
+    : (&SkgConfig, &mut TantivyIndex)
+    = (&s . config, &mut s . tantivy);
 
   // 1. Get an initial diff view of "a".
   let root_ids : Vec<ID> = vec![ID("a" . to_string())];
   let (initial_buffer, pids, viewforest)
     : (String, Vec<ID>, Tree<ViewNode>) =
     multi_root_view (
-      &driver, &config, None, &root_ids, true ) . await ?;
+      &config, None, &root_ids, true ) ?;
 
   // Sanity: initial view should match expected diff output.
   assert_buffer_contains(&initial_buffer, GIT_DIFF_VIEW);
@@ -49,7 +48,7 @@ async fn test_collateral_view_preserves_diff_annotations (
   // (Fixture nodes are on disk via setup_git_repo_with_fixtures;
   // the rerender pipeline reads them as needed.)
   let graph : InRustGraphHandle =
-    new_handle (InRustGraph::new ());
+    graph_handle_from_config (&config)?;
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : true,
     open_views            : OpenViews::new (),};
@@ -59,9 +58,9 @@ async fn test_collateral_view_preserves_diff_annotations (
   let uri_1 : ViewUri = ViewUri::ContentView ( "buffer-1" . to_string() );
   let uri_2 : ViewUri = ViewUri::ContentView ( "buffer-2" . to_string() );
   views_state . open_views . register_view (
-    uri_1 . clone (), viewforest . clone (), &pids );
+    &graph . load_full (), uri_1 . clone (), viewforest . clone (), &pids );
   views_state . open_views . register_view (
-    uri_2 . clone (), viewforest . clone (), &pids );
+    &graph . load_full (), uri_2 . clone (), viewforest . clone (), &pids );
 
   // 4. Save buffer 1 with a new child "c" of "a".
   //    This also updates the in-Rust graph and re-renders collateral views.
@@ -72,7 +71,7 @@ async fn test_collateral_view_preserves_diff_annotations (
   let _save_response : SaveResponse =
     update_from_and_rerender_buffer (
       &mut stream,
-      &save_input, &driver, &config, tantivy, &graph, true,
+      &save_input, &config, tantivy, &graph, true,
       &Ok ( uri_1 . clone () ),
       &mut views_state ) . await ?;
   // Close the write end so read_all_lp_messages (which reads to
@@ -133,7 +132,7 @@ async fn test_collateral_view_preserves_diff_annotations (
 /// Asserts that the collateral re-render correctly attributes each
 /// change to the right stage.
 async fn test_collateral_view_staged_text_and_unstaged_add (
-  s : &mut SharedDbSession,
+  s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
   let temp_dir : TempDir = TempDir::new()?;
@@ -141,22 +140,22 @@ async fn test_collateral_view_staged_text_and_unstaged_add (
   setup_git_repo_with_fixtures_staged (repo_path)?;
   s . reset_with_source_path (
     "test_collateral_view_staged_text_and_unstaged_add",
-    repo_path ) . await ?;
-  let (config, driver, tantivy)
-    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
-    = (&s . config, &s . driver, &mut s . tantivy);
+    repo_path ) ?;
+  let (config, tantivy)
+    : (&SkgConfig, &mut TantivyIndex)
+    = (&s . config, &mut s . tantivy);
 
   let root_ids : Vec<ID> = vec![ID("a" . to_string())];
   let (initial_buffer, pids, viewforest)
     : (String, Vec<ID>, Tree<ViewNode>) =
     multi_root_view (
-      &driver, &config, None, &root_ids, true ) . await ?;
+      &config, None, &root_ids, true ) ?;
 
   // Sanity: initial view has textChanged attributed to staged.
   assert_buffer_contains(&initial_buffer, GIT_DIFF_VIEW_STAGED);
 
   let graph : InRustGraphHandle =
-    new_handle (InRustGraph::new ());
+    graph_handle_from_config (&config)?;
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : true,
     open_views            : OpenViews::new (),};
@@ -164,9 +163,9 @@ async fn test_collateral_view_staged_text_and_unstaged_add (
   let uri_1 : ViewUri = ViewUri::ContentView ( "buffer-1" . to_string() );
   let uri_2 : ViewUri = ViewUri::ContentView ( "buffer-2" . to_string() );
   views_state . open_views . register_view (
-    uri_1 . clone (), viewforest . clone (), &pids );
+    &graph . load_full (), uri_1 . clone (), viewforest . clone (), &pids );
   views_state . open_views . register_view (
-    uri_2 . clone (), viewforest . clone (), &pids );
+    &graph . load_full (), uri_2 . clone (), viewforest . clone (), &pids );
 
   let save_input : String = insert_after (
     &initial_buffer, "(id a)",
@@ -175,7 +174,7 @@ async fn test_collateral_view_staged_text_and_unstaged_add (
   let _save_response : SaveResponse =
     update_from_and_rerender_buffer (
       &mut stream,
-      &save_input, &driver, &config, tantivy, &graph, true,
+      &save_input, &config, tantivy, &graph, true,
       &Ok ( uri_1 . clone () ),
       &mut views_state ) . await ?;
   // Close the write end so read_all_lp_messages (which reads to

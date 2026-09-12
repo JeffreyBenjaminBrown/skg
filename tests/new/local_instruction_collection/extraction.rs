@@ -16,7 +16,7 @@ use skg::from_text::local_instruction_collection::traverse::collect_instructions
 use skg::from_text::local_instruction_collection::types::SubscribeeVisibility;
 use skg::from_text::validate::validate_and_filter_foreign_instructions;
 use skg::test_utils::extract_nodecomplete_if_save_else_error;
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::types::errors::BufferValidationError;
 use skg::types::git::Sign;
 use skg::types::misc::{ID, MSV, SkgConfig, SourceName, members_of, members_msv};
@@ -30,8 +30,6 @@ use skg::types::tree::forest::{MpViewForest, ViewForest};
 use skg::types::viewnode::{ViewNode, ViewNodeKind, viewforest_root_viewnode};
 use skg::types::viewnode::{Vognode, Phantom};
 use std::error::Error;
-use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
 
 const SUBSCRIBEE_EDIT_CONFIG: &str =
   "tests/hidden_from_subscriptions/fixtures-subscribee-edit/skgconfig.toml";
@@ -177,18 +175,18 @@ fn find_active_or_phantom (
 async fn save_instructions_from_org_with_disk (
   org_text : &str,
   config   : &skg::types::misc::SkgConfig,
-  driver   : &typedb_driver::TypeDBDriver,
+
 ) -> Result<Vec<DefineNode>, Box<dyn Error>> {
   let (mut maybePlaced_viewforest, _parsing_errors, _warnings)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>) =
     org_to_uninterpreted_viewforest (org_text) ?;
   add_missing_info_to_viewforest (
-    &mut maybePlaced_viewforest, &config . db_name, driver) . await?;
+    &mut maybePlaced_viewforest, &config)?;
   let viewforest : ViewForest =
     maybePlaced_to_placed_viewforest (maybePlaced_viewforest) ?;
   let (save_plan, _nodeMerge_acquisitions) =
     extract_nonmergeSavePlan_locally (
-      &viewforest, config, driver, None) . await?;
+      &viewforest, config, None)?;
   Ok (save_plan . define_nodes) }
 
 #[test]
@@ -831,79 +829,78 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_stores (
     "skg-test-new-lic-extraction",
     |s| Box::pin ( async move {
       s . reset_from_config (
         "subscribee_as_such_child_list_removal_does_not_save_subscribee",
-        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+        SUBSCRIBEE_EDIT_CONFIG) ?;
       subscribee_as_such_child_list_removal_does_not_save_subscribee (
-        &s . config, &s . driver ) . await ?;
+        &s . config ) . await ?;
       s . reset_from_config (
         "subscribee_as_such_child_removal_is_not_foreign_contains_edit",
-        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+        SUBSCRIBEE_EDIT_CONFIG) ?;
       subscribee_as_such_child_removal_is_not_foreign_contains_edit (
-        &s . config, &s . driver ) . await ?;
+        &s . config ) . await ?;
       s . reset_from_config (
         "subscribee_as_such_child_list_removal_infers_subscriber_hide",
-        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+        SUBSCRIBEE_EDIT_CONFIG) ?;
       subscribee_as_such_child_list_removal_infers_subscriber_hide (
-        &s . config, &s . driver ) . await ?;
+        &s . config ) . await ?;
       s . reset_from_config (
         "moving_subscribee_as_such_child_to_subscriber_does_not_hide",
-        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+        SUBSCRIBEE_EDIT_CONFIG) ?;
       moving_subscribee_as_such_child_to_subscriber_does_not_hide (
-        &s . config, &s . driver ) . await ?;
+        &s . config ) . await ?;
       s . reset_from_config (
         "subscribee_as_such_visible_child_removes_subscriber_hide",
-        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml") . await ?;
+        "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml") ?;
       subscribee_as_such_visible_child_removes_subscriber_hide (
-        &s . config, &s . driver ) . await ?;
+        &s . config ) . await ?;
       s . reset_from_config (
         "subscribee_as_such_unhide_preserves_unrelated_hides",
-        "tests/hidden_from_subscriptions/fixtures-every-kind-of-col/skgconfig.toml") . await ?;
+        "tests/hidden_from_subscriptions/fixtures-every-kind-of-col/skgconfig.toml") ?;
       subscribee_as_such_unhide_preserves_unrelated_hides (
-        &s . config, &s . driver ) . await ?;
+        &s . config ) . await ?;
       s . reset_from_config (
         "overlapping_subscribee_hiderel_conflict_rejects_save",
-        "tests/hidden_from_subscriptions/fixtures-overlapping-subscribees/skgconfig.toml") . await ?;
+        "tests/hidden_from_subscriptions/fixtures-overlapping-subscribees/skgconfig.toml") ?;
       overlapping_subscribee_hiderel_conflict_rejects_save (
-        &s . config, &s . driver ) . await ?;
+        &s . config ) . await ?;
       s . reset_from_config (
         "ordinary_owned_child_list_edit_still_changes_contains",
-        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+        SUBSCRIBEE_EDIT_CONFIG) ?;
       ordinary_owned_child_list_edit_still_changes_contains (
-        &s . config, &s . driver ) . await ?;
+        &s . config ) . await ?;
       s . reset_from_config (
         "ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee",
-        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+        SUBSCRIBEE_EDIT_CONFIG) ?;
       ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee (
-        &s . config, &s . driver ) . await ?;
+        &s . config ) . await ?;
       s . reset_from_config (
         "recursive_descendant_under_as_subscribee_keeps_own_contains_edit",
-        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+        SUBSCRIBEE_EDIT_CONFIG) ?;
       recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
-        &s . config, &s . driver ) . await ?;
+        &s . config ) . await ?;
       s . reset_from_config (
         "foreign_subscribee_as_such_title_edit_is_rejected",
-        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+        SUBSCRIBEE_EDIT_CONFIG) ?;
       foreign_subscribee_as_such_title_edit_is_rejected (
-        &s . config, &s . driver ) . await ?;
+        &s . config ) . await ?;
       s . reset_from_config (
         "owned_as_subscribee_title_edit_is_rejected",
-        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+        SUBSCRIBEE_EDIT_CONFIG) ?;
       owned_as_subscribee_title_edit_is_rejected (
-        &s . config, &s . driver ) . await ?;
+        &s . config ) . await ?;
       s . reset_from_config (
         "owned_as_subscribee_body_edit_is_rejected",
-        SUBSCRIBEE_EDIT_CONFIG) . await ?;
+        SUBSCRIBEE_EDIT_CONFIG) ?;
       owned_as_subscribee_body_edit_is_rejected (
-        &s . config, &s . driver ) . await ?;
+        &s . config ) . await ?;
       Ok (( )) } )) }
 
 async fn subscribee_as_such_child_list_removal_does_not_save_subscribee (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
@@ -914,7 +911,7 @@ async fn subscribee_as_such_child_list_removal_does_not_save_subscribee (
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
-          input, config, driver) . await?;
+          input, config) . await?;
       assert!(
         ! save_ids (&instructions) . contains (&ID::from ("e")),
         "subscribee-as-such should not produce a SaveNode: {:?}",
@@ -923,7 +920,6 @@ async fn subscribee_as_such_child_list_removal_does_not_save_subscribee (
 
 async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
@@ -934,7 +930,7 @@ async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
-          input, config, driver) . await?;
+          input, config) . await?;
       // Editing within a subscribee-as-such is not a foreign-contains
       // edit of e: e is neither rejected as a ModifiedForeignNode, nor
       // written, nor forked. (e2, the foreign content shown under it, may
@@ -951,9 +947,11 @@ async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
           default           : Some (SourceName::from ("owned")), };
       let ( define_nodes, fork_specs ) =
         validate_and_filter_foreign_instructions (
-          instructions, &[], &clone_source_inputs,
+          instructions, &[],
+          &graph_handle_from_config (config)? . load_full (),
+          &clone_source_inputs,
           &std::collections::HashMap::new(),
-          config, driver) . await
+          config)
         . expect ("the subscribee-as-such edit must not error");
       assert!(
         ! save_ids (&define_nodes) . contains (&ID::from ("e")),
@@ -965,7 +963,6 @@ async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
 
 async fn subscribee_as_such_child_list_removal_infers_subscriber_hide (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
@@ -976,7 +973,7 @@ async fn subscribee_as_such_child_list_removal_infers_subscriber_hide (
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
-          input, config, driver) . await?;
+          input, config) . await?;
       assert_eq!(
         members_msv (&saved_node_by_id (&instructions, "r")
           . hides_from_its_subscriptions),
@@ -989,7 +986,6 @@ async fn subscribee_as_such_child_list_removal_infers_subscriber_hide (
 
 async fn moving_subscribee_as_such_child_to_subscriber_does_not_hide (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
@@ -1001,7 +997,7 @@ async fn moving_subscribee_as_such_child_to_subscriber_does_not_hide (
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
-          input, config, driver) . await?;
+          input, config) . await?;
       assert_eq!(
         saved_node_by_id (&instructions, "r")
           . hides_from_its_subscriptions,
@@ -1013,7 +1009,6 @@ async fn moving_subscribee_as_such_child_to_subscriber_does_not_hide (
 
 async fn subscribee_as_such_visible_child_removes_subscriber_hide (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
@@ -1026,7 +1021,7 @@ async fn subscribee_as_such_visible_child_removes_subscriber_hide (
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
-          input, config, driver) . await?;
+          input, config) . await?;
       assert_eq!(
         saved_node_by_id (&instructions, "R")
           . hides_from_its_subscriptions,
@@ -1039,7 +1034,6 @@ async fn subscribee_as_such_visible_child_removes_subscriber_hide (
 
 async fn subscribee_as_such_unhide_preserves_unrelated_hides (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
@@ -1053,7 +1047,7 @@ async fn subscribee_as_such_unhide_preserves_unrelated_hides (
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
-          input, config, driver) . await?;
+          input, config) . await?;
       assert_eq!(
         members_msv (&saved_node_by_id (&instructions, "R")
           . hides_from_its_subscriptions),
@@ -1064,7 +1058,6 @@ async fn subscribee_as_such_unhide_preserves_unrelated_hides (
 
 async fn overlapping_subscribee_hiderel_conflict_rejects_save (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
@@ -1076,7 +1069,7 @@ async fn overlapping_subscribee_hiderel_conflict_rejects_save (
                 "};
       let result : Result<Vec<DefineNode>, Box<dyn Error>> =
         save_instructions_from_org_with_disk (
-          input, config, driver) . await;
+          input, config) . await;
       let error : Box<dyn Error> =
         result . unwrap_err();
       let buffer_error : &BufferValidationError =
@@ -1093,7 +1086,6 @@ async fn overlapping_subscribee_hiderel_conflict_rejects_save (
 
 async fn ordinary_owned_child_list_edit_still_changes_contains (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
@@ -1102,7 +1094,7 @@ async fn ordinary_owned_child_list_edit_still_changes_contains (
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
-          input, config, driver) . await?;
+          input, config) . await?;
       assert_eq!(
         members_of (&saved_node_by_id (&instructions, "r") . contains),
         vec![ID::from ("r1")]);
@@ -1110,7 +1102,6 @@ async fn ordinary_owned_child_list_edit_still_changes_contains (
 
 async fn ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
@@ -1123,7 +1114,7 @@ async fn ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
-          input, config, driver) . await?;
+          input, config) . await?;
       assert_eq!(
         members_of (&saved_node_by_id (&instructions, "e") . contains),
         vec![ID::from ("e1")]);
@@ -1162,7 +1153,6 @@ fn idcol_resident_activeNode_saves_itself_but_is_not_content (
 
 async fn recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
@@ -1173,7 +1163,7 @@ async fn recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
-          input, config, driver) . await?;
+          input, config) . await?;
       assert!(
         ! save_ids (&instructions) . contains (&ID::from ("e")),
         "subscribee-as-such should not produce a SaveNode: {:?}",
@@ -1185,7 +1175,6 @@ async fn recursive_descendant_under_as_subscribee_keeps_own_contains_edit (
 
 async fn foreign_subscribee_as_such_title_edit_is_rejected (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
@@ -1196,7 +1185,7 @@ async fn foreign_subscribee_as_such_title_edit_is_rejected (
                 "};
       let result : Result<Vec<DefineNode>, Box<dyn Error>> =
         save_instructions_from_org_with_disk (
-          input, config, driver) . await;
+          input, config) . await;
       let error : Box<dyn Error> =
         result . unwrap_err();
       let buffer_error : &BufferValidationError =
@@ -1215,7 +1204,6 @@ async fn foreign_subscribee_as_such_title_edit_is_rejected (
 
 async fn owned_as_subscribee_title_edit_is_rejected (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
@@ -1226,7 +1214,7 @@ async fn owned_as_subscribee_title_edit_is_rejected (
                 "};
       let result : Result<Vec<DefineNode>, Box<dyn Error>> =
         save_instructions_from_org_with_disk (
-          input, config, driver) . await;
+          input, config) . await;
       let error : Box<dyn Error> =
         result . unwrap_err();
       let buffer_error : &BufferValidationError =
@@ -1245,7 +1233,6 @@ async fn owned_as_subscribee_title_edit_is_rejected (
 
 async fn owned_as_subscribee_body_edit_is_rejected (
   config : &SkgConfig,
-  driver : &Arc<TypeDBDriver>,
 ) -> Result<(), Box<dyn Error>> {
       let input : &str =
         indoc! {"
@@ -1257,7 +1244,7 @@ async fn owned_as_subscribee_body_edit_is_rejected (
                 "};
       let result : Result<Vec<DefineNode>, Box<dyn Error>> =
         save_instructions_from_org_with_disk (
-          input, config, driver) . await;
+          input, config) . await;
       let error : Box<dyn Error> =
         result . unwrap_err();
       let buffer_error : &BufferValidationError =

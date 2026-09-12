@@ -2,7 +2,7 @@
 ;;; Load with (load-file "../test-wait.el") from any test directory.
 ;;;
 ;;; These replace fixed (sleep-for N) calls with adaptive polling,
-;;; so tests don't flake under heavy parallel TypeDB contention.
+;;; so tests don't flake under heavy parallel server load.
 
 (defun skg-test-wait-for (predicate &optional timeout-secs)
   "Poll PREDICATE every 0.1s, processing network I/O between polls.

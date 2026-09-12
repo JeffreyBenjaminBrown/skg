@@ -109,7 +109,7 @@ pub fn expand_true_content_at_activeNode (
             => t . is_indefinitive (),
           _ => false } ) ?;
     if is_indefinitive {
-      clobberIndefinitiveViewnode( tree, node, config ) ?;
+      clobberIndefinitiveViewnode( tree, node, graph_snap, config ) ?;
       return Ok (( )); }}
   if deleted_by_this_save_pids . contains (&pid) {
     mutate_activeNode_to_deletednode (
@@ -124,7 +124,7 @@ pub fn expand_true_content_at_activeNode (
   clear_edit_request (tree, node) ?;
   let nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
-      config, &pid, &initial_source ) ?;
+      graph_snap, config, &pid, &initial_source ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §8.3: EVERY definitive node re-syncs title/body/source from the snapshot,
   // saved and collateral alike. (After extraction the snapshot already reflects
   // the saved buffer's text, so re-syncing the saved node yields the same
@@ -441,7 +441,7 @@ fn content_goal_list (
                                     "content_goal_list" ) ?;
     let grandparent_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
-        config, &grandparent_pid, &grandparent_source ) ?;
+        graph_snap, config, &grandparent_pid, &grandparent_source ) ?;
     // Resolve the subtrahends through extra_id -> pid the same way
     // 'content_ids' (the minuend) was resolved by the caller. Without
     // this, a child the subscriber has integrated under a now-MERGED id
@@ -757,7 +757,7 @@ fn build_child_creation_data (
     if child_sources . contains_key (id) { continue; }
     let child_source : SourceName =
       match find_source_with_optional_tantivy (
-        id, deleted_since_head_pid_src_map, None, config )
+        graph_snap, id, deleted_since_head_pid_src_map, None, config )
       { Some (s) => s,
         None => {
           // TODO/DONE/local-view-update/plan_v2.org §7.6: the id resolves to nothing (a dangling reference). Render an
@@ -812,7 +812,7 @@ fn build_child_creation_data (
           drawn . 0 )) ? };
     let skg : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
-        config, fetch_id, &fetch_source ) ?;
+        graph_snap, config, fetch_id, &fetch_source ) ?;
     result . insert( id . clone(),
                    ChildData { title: skg . title . clone(),
                                source: skg . source . clone(),

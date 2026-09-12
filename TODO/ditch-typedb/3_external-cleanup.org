@@ -1,0 +1,25 @@
+#+TITLE: Follow-up: remove TypeDB from the external development image
+#+TODO: TODO | DONE
+
+* TODO Rebuild and simplify the external container image
+
+This repository no longer starts, contacts, or depends on TypeDB.  The image
+used by =bash/docker.sh= may still contain the TypeDB executable, data volume,
+packages, ports, and old logs because that image is maintained outside this
+repository.
+
+After the graph-only server has soaked successfully:
+
+1. Remove the TypeDB installation and its transitive image dependencies.
+2. Remove port 1729 exposure, health checks, entrypoint logic, and persistent
+   TypeDB data-volume declarations from the image project.
+3. Decide whether to archive or delete the old external database directory;
+   do not make that destructive choice as part of the repository refactor.
+4. Rebuild the image, run the Linux and Windows packaging smoke tests, and
+   compare image size and startup time.
+5. Update any deployment notes or CI configuration that live outside this
+   repository.
+
+The old TypeDB data should remain untouched through at least the first
+post-cutover soak, so rollback evidence is available even though the server no
+longer reads it.

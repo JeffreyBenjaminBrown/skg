@@ -22,19 +22,17 @@ use crate::types::tree::forest::{MpViewForest, ViewForest};
 
 use buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use buffer_to_viewnodes::add_missing_info::{
-  add_missing_info_to_viewforest,
+  add_missing_info_to_viewforest_in_graph,
   absent_parentIs_under_visible_parent_becomes_isContainer,
   EnrichmentProvenance};
-use buffer_to_viewnodes::validate_tree::find_buffer_errors_for_saving;
 use fork::{
   CloneSourceInputs,
   explicit_new_child_sources_for_foreign_vognodes,
   fork_spec_from_buffer_node,
   new_foreign_nodes_adopting_clone_sources,
   owned_ancestor_sources_for_foreign_vognodes,
-  validate_fork_specs};
-use local_instruction_collection::{
-  extract_nonmergeSavePlan_locally, NonmergeSavePlan };
+  validate_fork_specs_in_graph};
+use local_instruction_collection::NonmergeSavePlan;
 use validate::{validate_and_filter_foreign_instructions, validate_no_simultaneous_move_and_nodeMerge};
 
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
@@ -43,7 +41,6 @@ use crate::types::viewnode::{ViewNodeKind, Vognode, ViewRequest};
 use std::collections::{HashMap, HashSet};
 use crate::types::misc::SourceName;
 use crate::types::save::ForkSpec;
-use typedb_driver::TypeDBDriver;
 
 /// Save preparation deliberately validates at several
 /// data-maturity stages:
@@ -59,27 +56,27 @@ use typedb_driver::TypeDBDriver;
 /// kept apart (TODO/DONE/local-view-update/plan_v2.org §11): the graph-mutation
 /// step consumes only the SavePlan; the rerender step consumes the ViewForest
 /// (plus the plan's PIDs, for collateral selection). One parse produces both.
-pub async fn buffer_to_validated_saveplan (
+pub fn buffer_to_validated_saveplan_in_graph (
   buffer_text : &str,
+  graph       : &crate::dbs::in_rust_graph::InRustGraph,
   config      : &SkgConfig,
-  driver      : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   // No user-set clone sources: every fork's source resolves by
   // inference-else-default. The fork-confirmation re-save uses the
   // _with_fork_sources entry below.
-  buffer_to_validated_saveplan_with_fork_sources (
-    buffer_text, config, driver, active_source_set, &HashMap::new () )
-    . await }
+  buffer_to_validated_saveplan_with_fork_sources_in_graph (
+    buffer_text, graph, config, active_source_set, &HashMap::new () )
+    }
 
 /// As 'buffer_to_validated_saveplan', but with the per-fork clone
 /// sources the user chose in the confirmation buffer ('fork_sources',
 /// keyed by each forked node N's pid). These take priority over the
 /// inferred/default source when each clone's source is resolved.
-pub async fn buffer_to_validated_saveplan_with_fork_sources (
+pub fn buffer_to_validated_saveplan_with_fork_sources_in_graph (
   buffer_text : &str,
+  graph       : &crate::dbs::in_rust_graph::InRustGraph,
   config      : &SkgConfig,
-  driver      : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
   fork_sources : &HashMap<ID, SourceName>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
@@ -100,18 +97,19 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
       // Metadata filling must precede maybePlaced-tree validation,
       // because those validators compare nodes by pid,
       // and expect sources to be inherited/resolved.
-      add_missing_info_to_viewforest (
-        & mut maybePlaced_viewforest, & config . db_name, driver )
-      . await } . map_err (SaveError::DatabaseError) ?;
+      add_missing_info_to_viewforest_in_graph (
+        & mut maybePlaced_viewforest, graph )
+      } . map_err (SaveError::DatabaseError) ?;
   absent_parentIs_under_visible_parent_becomes_isContainer (
     &mut maybePlaced_viewforest );
   { // If saving is impossible, don't.
     let mut validation_errors : Vec<BufferValidationError> =
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "find_buffer_errors_for_saving" ). entered();
-        find_buffer_errors_for_saving (
-          & maybePlaced_viewforest, config, driver )
-        . await } . map_err (SaveError::DatabaseError) ?;
+        crate::from_text::buffer_to_viewnodes::validate_tree
+          ::find_buffer_errors_for_saving_in_graph (
+          & maybePlaced_viewforest, graph, config )
+ } . map_err (SaveError::DatabaseError) ?;
     validation_errors . extend (parsing_errors);
     if ! validation_errors . is_empty () {
       // Warnings always accompany errors (decided 2026-06-12): the
@@ -126,16 +124,17 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
         . map_err ( |e| SaveError::ParseError (e) ) ?;
   let ( nonmerge_plan, nodeMerge_acquisitions )
     : ( NonmergeSavePlan, Vec<(ID, ID)> )
-    = extract_nonmergeSavePlan_locally (
-        &viewforest, config, driver, restricted_source_set )
-      . await . map_err (SaveError::DatabaseError) ?;
+    = crate::from_text::local_instruction_collection
+      ::extract_nonmergeSavePlan_locally_in_graph (
+        &viewforest, graph, config, restricted_source_set )
+ . map_err (SaveError::DatabaseError) ?;
   let nodeMerge_instructions : Vec<NodeMerge> =
     // PITFALL: The edit_requests consumed here remain in viewforest until cleared by expand_true_content_at_activeNode, during complete_viewforest. NodeMerge extraction only plans nodeMerge mutations; it does not mutate the saved viewforest.
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "nodeMerge_instructions_from_pairs" ). entered();
       nodeMerge_instructions_from_pairs (
-        &nodeMerge_acquisitions, config, driver )
-      . await } . map_err (SaveError::DatabaseError) ?;
+        &nodeMerge_acquisitions, graph, config )
+ } . map_err (SaveError::DatabaseError) ?;
   // C's source is inferred from N's nearest OWNED vognode ancestor in
   // the view. The flat DefineNodes have lost that ancestry, so resolve
   // it here, where the placed viewforest is live, keyed by foreign pid.
@@ -191,11 +190,11 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
       validate_and_filter_foreign_instructions (
         nonmerge_plan . define_nodes,
         &nodeMerge_instructions,
+        graph,
         &clone_source_inputs,
         &adopt_clone_source,
-        config,
-        driver )
-      . await } . map_err ( |errors| SaveError::BufferValidationErrors {
+        config )
+ } . map_err ( |errors| SaveError::BufferValidationErrors {
         errors, warnings : parsing_warnings . clone () } ) ?;
   validate_no_simultaneous_move_and_nodeMerge (
     &nonmerge_plan . source_moves, &nodeMerge_instructions )
@@ -212,7 +211,7 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
     let mut specs : Vec<ForkSpec> = fork_specs;
     specs . extend (
       explicit_fork_specs_from_viewforest (
-        &viewforest, config, &clone_source_inputs )
+        &viewforest, graph, config, &clone_source_inputs )
       . map_err ( |errors| SaveError::BufferValidationErrors {
           errors, warnings : parsing_warnings . clone () } ) ? );
     specs };
@@ -220,7 +219,8 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
     // commit). Monogamy reads the live graph; the source-set check uses
     // the active set.
     let fork_errors : Vec<BufferValidationError> =
-      validate_fork_specs (&fork_specs, config, restricted_source_set);
+      validate_fork_specs_in_graph (
+        &fork_specs, graph, config, restricted_source_set);
     if ! fork_errors . is_empty () {
       return Err ( SaveError::BufferValidationErrors {
         errors   : fork_errors,
@@ -229,7 +229,7 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
     let mut warnings : Vec<String> = parsing_warnings;
     warnings . extend ( nonmerge_plan . warnings );
     warnings . extend (
-      dead_link_warnings ( &define_nodes, &fork_specs ) );
+      dead_link_warnings ( graph, &define_nodes, &fork_specs ) );
     warnings };
   Ok (( viewforest,
         SavePlan {
@@ -241,21 +241,47 @@ pub async fn buffer_to_validated_saveplan_with_fork_sources (
             nonmerge_plan . post_commit_notice_candidates },
         warnings )) }
 
+/// Transitional compatibility for callers not yet carrying a generation.
+pub fn buffer_to_validated_saveplan (
+  buffer_text : &str,
+  config      : &SkgConfig,
+  active_source_set : Option<&ActiveSourceSet>,
+) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
+  let nodes = crate::dbs::filesystem::multiple_nodes
+    ::read_all_skg_files_from_sources (config)
+    . map_err (|e| SaveError::DatabaseError (Box::new (e)))?;
+  let graph = crate::dbs::in_rust_graph::InRustGraph::from_nodecompletes (&nodes);
+  buffer_to_validated_saveplan_in_graph (
+    buffer_text, &graph, config, active_source_set ) }
+
+/// Transitional compatibility for the fork-confirmation surface.
+pub fn buffer_to_validated_saveplan_with_fork_sources (
+  buffer_text : &str,
+  config      : &SkgConfig,
+  active_source_set : Option<&ActiveSourceSet>,
+  fork_sources : &HashMap<ID, SourceName>,
+) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
+  let nodes = crate::dbs::filesystem::multiple_nodes
+    ::read_all_skg_files_from_sources (config)
+    . map_err (|e| SaveError::DatabaseError (Box::new (e)))?;
+  let graph = crate::dbs::in_rust_graph::InRustGraph::from_nodecompletes (&nodes);
+  buffer_to_validated_saveplan_with_fork_sources_in_graph (
+    buffer_text, &graph, config, active_source_set, fork_sources ) }
+
 /// One nonfatal warning per DEAD textlink this save writes: a
 /// '[[id:X][label]]' in a saved title or body where X is neither in
 /// the graph nor created by this same save (TODO/more.org, "Warn the
 /// user when they make dead links"). Only nodes the save actually
 /// writes are scanned -- the noop filter has already dropped
 /// unchanged ones -- so an old dead link warns again only when its
-/// carrier is edited. Skipped entirely without a process-global
-/// graph handle (some tests): no warning beats a false one.
+/// carrier is edited. The explicit save-planning graph makes this check use
+/// the same snapshot as every other validation stage.
 fn dead_link_warnings (
+  graph        : &crate::dbs::in_rust_graph::InRustGraph,
   define_nodes : &[DefineNode],
   fork_specs   : &[ForkSpec],
 ) -> Vec<String> {
-  use crate::dbs::in_rust_graph::snapshot_global;
   use crate::types::textlinks::textlinks_from_node;
-  let Some (graph) = snapshot_global () else { return Vec::new (); };
   let saved_nodes : Vec<&NodeComplete> =
     define_nodes . iter ()
     . filter_map ( |dn| match dn {
@@ -292,6 +318,7 @@ fn dead_link_warnings (
 /// or already-forked target, so this only builds.
 fn explicit_fork_specs_from_viewforest (
   viewforest          : &ViewForest,
+  graph               : &crate::dbs::in_rust_graph::InRustGraph,
   config              : &SkgConfig,
   clone_source_inputs : &CloneSourceInputs,
 ) -> Result<Vec<ForkSpec>, Vec<BufferValidationError>> {
@@ -309,7 +336,7 @@ fn explicit_fork_specs_from_viewforest (
     if ! seen . insert (pid . clone ()) { continue; }
     let snapshot : NodeComplete =
       match nodecomplete_rustFirst_by_pid_and_source (
-        config, pid, & t . source ) {
+        graph, config, pid, & t . source ) {
         Ok (nc) => nc,
         Err (e) => {
           errors . push ( BufferValidationError::Other ( format! (

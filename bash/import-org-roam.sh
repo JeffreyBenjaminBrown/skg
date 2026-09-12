@@ -76,13 +76,13 @@ fi
 rm -f "$TEMPLATE"
 
 #
-# Step 4: Rebuild DBs
+# Step 4: Rebuild ephemeral data stores
 #
 
-read -rp "Rebuild databases now? [y/N] " yn
+read -rp "Rebuild ephemeral data stores now? [y/N] " yn
 if [[ "$yn" =~ ^[Yy]$ ]]; then
-  echo "Sending rebuild-dbs request to port $SKG_PORT ..."
-  echo '((request . "rebuild dbs"))' | nc -w1 localhost "$SKG_PORT"
+  echo "Sending rebuild-ephemeral-data-stores request to port $SKG_PORT ..."
+  echo '((request . "rebuild ephemeral data stores"))' | nc -w1 localhost "$SKG_PORT"
   echo "Rebuild request sent."
   echo "Run M-x skg-close-all-skg-buffers to close stale views."
 fi

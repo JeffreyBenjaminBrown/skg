@@ -14,10 +14,10 @@ use std::net::{TcpListener, TcpStream};
 
 
 use skg::dbs::in_rust_graph::{
-  InRustGraphHandle, install_or_swap_global_handle};
+  InRustGraphHandle};
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::test_utils::{
-  run_with_test_db, graph_handle_from_config,
+  run_with_test_stores, graph_handle_from_config,
   read_all_lp_messages};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::single_root_view;
@@ -37,14 +37,13 @@ fn mk_pair () -> (TcpStream, TcpStream) {
 #[test]
 fn deleting_a_node_present_in_another_view_reports_no_errors
   () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_test_stores (
     "skg-test-collateral-delete",
     "tests/collateral_delete/fixtures",
     "/tmp/tantivy-test-collateral-delete",
-    |config, driver, tantivy| Box::pin ( async move {
+    |config, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
-      install_or_swap_global_handle ( graph . clone () );
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views        : OpenViews::new (), };
@@ -54,11 +53,11 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       // A view of P (showing L) stays open.
       let (p_view, p_pids, p_vf) =
         single_root_view (
-          driver, config, Some (tantivy), &ID::from ("P"), false ) . await ?;
+          config, Some (tantivy), &ID::from ("P"), false ) ?;
       assert! ( p_view . contains ("(id L)"),
         "P's view should show L:\n{}", p_view );
       views_state . open_views . register_view (
-        p_uri . clone (), p_vf, &p_pids );
+        &graph . load_full (), p_uri . clone (), p_vf, &p_pids );
 
       { // A SECOND content view rooted at L, and a search view whose
         // result list holds L, both stay open too -- the deleted node
@@ -66,29 +65,31 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
         // reached it (a search, or a goto-id view).
         let (_v, pids2, vf2) =
           single_root_view (
-            driver, config, Some (tantivy), &ID::from ("L"), false ) . await ?;
+            config, Some (tantivy), &ID::from ("L"), false ) ?;
         views_state . open_views . register_view (
+          &graph . load_full (),
           ViewUri::ContentView ("collat-del-L-2" . into ()), vf2, &pids2 );
         let (_v3, pids3, vf3) =
           single_root_view (
-            driver, config, Some (tantivy), &ID::from ("L"), false ) . await ?;
+            config, Some (tantivy), &ID::from ("L"), false ) ?;
         views_state . open_views . register_view (
+          &graph . load_full (),
           ViewUri::SearchView ("to X" . into ()), vf3, &pids3 ); }
 
       // A second view of L alone; register it, then save it with L
       // marked for deletion.
       let (_l_view, l_pids, l_vf) =
         single_root_view (
-          driver, config, Some (tantivy), &ID::from ("L"), false ) . await ?;
+          config, Some (tantivy), &ID::from ("L"), false ) ?;
       views_state . open_views . register_view (
-        l_uri . clone (), l_vf, &l_pids );
+        &graph . load_full (), l_uri . clone (), l_vf, &l_pids );
       let delete_buffer : String =
         "* (skg (node (id L) (source main) (editRequest delete))) [[id:X][to X]]\n"
         . to_string ();
       let (mut stream, read_end) : (TcpStream, TcpStream) = mk_pair ();
       let response : SaveResponse =
         update_from_and_rerender_buffer (
-          &mut stream, &delete_buffer, driver, config, tantivy, &graph,
+          &mut stream, &delete_buffer, config, tantivy, &graph,
           false, &Ok (l_uri . clone ()), &mut views_state ) . await ?;
       drop (stream);
       let msgs : Vec<String> = {
@@ -107,19 +108,16 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
 #[test]
 fn dead_links_warn_on_save
   () -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_test_stores (
     "skg-test-dead-links",
     "tests/collateral_delete/fixtures",
     "/tmp/tantivy-test-dead-links",
-    |config, driver, _tantivy| Box::pin ( async move {
-      let graph : InRustGraphHandle =
-        graph_handle_from_config (config) ?;
-      install_or_swap_global_handle ( graph . clone () );
+    |config, _tantivy| Box::pin ( async move {
       let buffer : &str =
         "* (skg (node (id P) (source main))) P links to [[id:does-not-exist][nowhere]] and [[id:X][to X]]\n";
       let ( _vf, _plan, warnings ) =
         buffer_to_validated_saveplan (
-          buffer, config, driver, None ) . await ?;
+          buffer, config, None )  ?;
       assert! ( warnings . iter () . any ( |w|
           w . contains ("Dead link")
           && w . contains ("does-not-exist") ),

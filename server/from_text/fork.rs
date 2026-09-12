@@ -11,7 +11,8 @@
 //! in the save handler.
 
 use crate::dbs::in_rust_graph::override_invariants::existing_user_owned_overrider_of;
-use crate::dbs::in_rust_graph::snapshot_global;
+use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName, members_of, members_at_source};
@@ -287,24 +288,22 @@ pub fn build_fork_confirmation_buffer (
 ///   silently; reject with 'ForkSourceInactive'.
 ///
 /// 'restricted_source_set' is None when nothing is restricted (the set
-/// 'all'); the monogamy graph is the process-global snapshot, absent
-/// only in tests that bypass it (then monogamy is left to the commit-time
-/// invariant check).
-pub fn validate_fork_specs (
+/// 'all'). The monogamy check uses the explicit save-planning graph; the
+/// commit-time invariant check remains a defense in depth.
+pub fn validate_fork_specs_in_graph (
   fork_specs            : &[ForkSpec],
+  graph                 : &crate::dbs::in_rust_graph::InRustGraph,
   config                : &SkgConfig,
   restricted_source_set : Option<&ActiveSourceSet>,
 ) -> Vec<BufferValidationError> {
   let mut errors : Vec<BufferValidationError> = Vec::new ();
-  let graph_snap = snapshot_global ();
   for spec in fork_specs {
-    if let Some (graph) = graph_snap . as_deref () {
-      if let Some (existing) = existing_user_owned_overrider_of (
+    if let Some (existing) = existing_user_owned_overrider_of (
         config, graph, & spec . original_id )
       { errors . push (
           BufferValidationError::ForkAlreadyExists (
             spec . original_id . clone (), existing ));
-        continue; }}
+        continue; }
     let clone_source : &SourceName = & spec . clone . 0 . source;
     if ! config . user_owns_source (clone_source) {
       errors . push (
@@ -321,6 +320,18 @@ pub fn validate_fork_specs (
           spec . original_id . clone (),
           clone_source . clone () )); }}
   errors }
+
+pub fn validate_fork_specs (
+  fork_specs            : &[ForkSpec],
+  config                : &SkgConfig,
+  restricted_source_set : Option<&ActiveSourceSet>,
+) -> Vec<BufferValidationError> {
+  let graph = match read_all_skg_files_from_sources (config) {
+    Ok (nodes) => InRustGraph::from_nodecompletes (&nodes),
+    Err (e) => return vec! [BufferValidationError::Other (
+      format! ("Could not read graph for fork validation: {}", e))], };
+  validate_fork_specs_in_graph (
+    fork_specs, &graph, config, restricted_source_set ) }
 
 /// Construct the clone C from the edited foreign buffer node N and a
 /// resolved owned source. C copies N's title/body/contains (the

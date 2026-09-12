@@ -11,13 +11,12 @@ use crate::types::viewnode::Vognode;
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
-pub async fn execute_activeNode_view_requests (
+pub fn execute_activeNode_view_requests (
   node               : NodeId,
   tree               : &mut Tree<ViewNode>,
+  graph              : &crate::dbs::in_rust_graph::InRustGraph,
   config             : &SkgConfig,
-  driver             : &TypeDBDriver,
   errors             : &mut Vec<String>,
   active_source_set  : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
@@ -31,15 +30,15 @@ pub async fn execute_activeNode_view_requests (
     extract_view_requests( tree, node ) ?;
   if ! requests . is_empty() {
     execute_view_requests(
-      tree, requests, config, driver, errors,
-      active_source_set ) . await ?; }
+      tree, requests, graph, config, errors,
+      active_source_set ) ?; }
   Ok(( )) }
 
-pub async fn ensure_hiddenin_col_under_definitive_subscribee (
+pub fn ensure_hiddenin_col_under_definitive_subscribee (
   tree   : &mut Tree<ViewNode>,
   node   : NodeId,
+  graph  : &crate::dbs::in_rust_graph::InRustGraph,
   config : &SkgConfig,
-  driver : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
 ) -> Result<(), Box<dyn Error>> {
@@ -56,8 +55,8 @@ pub async fn ensure_hiddenin_col_under_definitive_subscribee (
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   if is_indefinitive { return Ok (( )); }
   maybe_add_hiddenInSubscribeeCol_branch (
-    tree, node, config, driver,
-    active_source_set, source_diffs ) . await }
+    tree, node, graph, config,
+    active_source_set, source_diffs ) }
 
 /// Read the node's non-consumed view_requests as a Vec. View completion
 /// (dispatch_node_update) settles

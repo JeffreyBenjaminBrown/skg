@@ -14,13 +14,13 @@ use crate::context::ContextOriginType;
 use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
 use crate::dbs::tantivy::search::{
   SearchOptions, has_overPrivateText_telescope, search_index};
-use crate::dbs::typedb::ancestry::{ AncestryTree, ancestry_by_id_from_ids_async};
+use crate::dbs::in_rust_graph::ancestry::{ AncestryTree, ancestry_by_id_from_ids};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::dbs::typedb::search::all_graphnodestats::{
+use crate::dbs::in_rust_graph::stats::{
   AllGraphNodeStats,
   fetch_all_graphnodestats_with_source_set};
-use crate::types::env::SkgEnv;
+use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
 use crate::update_buffer::set_viewnodestats_in_viewforest;
 use crate::serve::ViewsState;
@@ -49,7 +49,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use tantivy::{TantivyDocument, Searcher};
 use tantivy::schema::document::Value;
-use typedb_driver::TypeDBDriver;
 
 /// Maps each ID to search hits (plural -- IDs can have aliases,
 /// so one ID might get multiple matches).
@@ -73,6 +72,7 @@ pub fn search_ids_for_source_set_for_test (
     tantivy_index, config, active, terms, limit ) }
 
 pub fn enriched_search_buffer_for_source_set_for_test (
+  graph          : &InRustGraph,
   terms          : &str,
   matches_by_id  : &MatchGroups,
   search_results : &[ID],
@@ -85,6 +85,7 @@ pub fn enriched_search_buffer_for_source_set_for_test (
     build_search_viewforest (terms, matches_by_id, &HashSet::new ());
   render_enriched_search_buffer::insert_containerward_ancestries_into_search_view (
     &mut viewforest,
+    graph,
     search_results,
     ancestry_by_id,
     tantivy_index,
@@ -92,6 +93,7 @@ pub fn enriched_search_buffer_for_source_set_for_test (
     active );
   render_enriched_search_buffer::insert_override_ancestries_into_search_view (
     &mut viewforest,
+    graph,
     search_results,
     active );
   set_viewnodestats_in_viewforest (
@@ -101,6 +103,7 @@ pub fn enriched_search_buffer_for_source_set_for_test (
     // here -- sourceAtBoundary is derived from the tree alone; the maps
     // only feed the containsParent stat, which this test does not assert.
     &mut viewforest,
+    graph,
     & HashMap::new (),
     & HashMap::new (),
     config,
@@ -110,6 +113,7 @@ pub fn enriched_search_buffer_for_source_set_for_test (
 /// Structured enrichment data passed through the slot,
 /// replacing the raw rendered String.
 pub struct SearchEnrichmentPayload {
+  pub runtime        : Arc<RuntimeGeneration>,
   pub terms          : String,
   pub search_results : Vec<ID>,
   pub ancestry_by_id : HashMap<ID, AncestryTree>,
@@ -160,8 +164,9 @@ pub fn handle_text_search_request (
       // Wait for any in-flight background save-index writes to commit, so
       // the search reflects every save issued so far (read-your-writes).
       wait_for_tantivy_writes_idle ();
+      let runtime = env . runtime_snapshot ();
       let index_has_overPrivateText : bool =
-        match has_overPrivateText_telescope (&env . tantivy_index) {
+        match has_overPrivateText_telescope (&runtime . tantivy_index) {
           Ok (has_overPrivateText) => has_overPrivateText,
           Err (error) => {
             send_response_with_length_prefix (
@@ -186,7 +191,7 @@ pub fn handle_text_search_request (
         exclude_overPrivateText_telescope : ! include_overPrivateText_telescopes,
       };
       // --- Phase 1: immediate results without paths ---
-      match search_index ( &env . tantivy_index,
+      match search_index ( &runtime . tantivy_index,
                            &search_terms,
                            &search_opts ) {
         Ok (( best_matches, searcher )) => {
@@ -202,7 +207,7 @@ pub fn handle_text_search_request (
               group_matches_by_id (
               best_matches,
               searcher,
-              &env . tantivy_index,
+              &runtime . tantivy_index,
               &search_terms,
               &search_opts,
               Some (active) ),
@@ -217,8 +222,8 @@ pub fn handle_text_search_request (
           let suppressed : HashSet<ID> =
             suppressed_result_ids (
               &matches_by_id,
-              & env . in_rust_graph_snapshot (),
-              &env . config,
+              &runtime . graph,
+              &runtime . config,
               active );
           let (viewforest, search_results) : (ViewForest, Vec<ID>) =
             build_search_viewforest (
@@ -231,7 +236,7 @@ pub fn handle_text_search_request (
             } else { HashSet::new () };
           let release = decide_text_release (
             "text-search", active, &search_results,
-            &env . in_rust_graph_snapshot (), &approved );
+            &runtime . graph, &approved );
           if matches! (
             release, TextReleaseDecision::Challenge { .. } ) {
             send_response_with_length_prefix (
@@ -243,7 +248,7 @@ pub fn handle_text_search_request (
             _ => Vec::new (), };
           let rendered : String =
             // Render first, before register_view moves the viewforest
-            viewforest_to_string ( &viewforest, &env . config )
+            viewforest_to_string ( &viewforest, &runtime . config )
             . expect ("search viewforest rendering never fails");
           let uri : ViewUri =
             ViewUri::SearchView ( search_terms . clone () );
@@ -251,7 +256,7 @@ pub fn handle_text_search_request (
             // Replace prior search with the same terms.
             views_state . open_views . unregister_view (&uri); }
           views_state . open_views . register_view (
-            uri, viewforest, &search_results );
+            &runtime . graph, uri, viewforest, &search_results );
           send_response_with_length_prefix (
             // phase 1 (unenriched) tagged LP response
             stream,
@@ -259,7 +264,7 @@ pub fn handle_text_search_request (
           spawn_enrichment_thread (
             // phase 2 (enriched) search results, backgrounded
             enrichment_slot, search_cancelled,
-            &env . driver, &env . config,
+            runtime . clone (),
             &search_terms, &search_results, active,
             include_overPrivateText_telescopes ); },
         Err (e) => {
@@ -306,8 +311,7 @@ fn filter_match_groups_to_active_sources (
 fn spawn_enrichment_thread (
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
-  typedb_driver    : &Arc<TypeDBDriver>,
-  config           : &SkgConfig,
+  runtime          : Arc<RuntimeGeneration>,
   search_terms     : &str,
   search_results   : &[ID],
   active           : &ActiveSourceSet,
@@ -322,20 +326,18 @@ fn spawn_enrichment_thread (
   let slot_clone    : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::clone (enrichment_slot);
   let cancel_clone  : Arc<AtomicBool>   = Arc::clone (search_cancelled);
-  let driver_clone  : Arc<TypeDBDriver> = Arc::clone (typedb_driver);
-  let config_clone  : SkgConfig         = config . clone ();
   let active_clone  : ActiveSourceSet   = active . clone ();
   let terms_clone   : String            = search_terms . to_string ();
   let ids_clone     : Vec<ID>           = search_results . to_vec ();
-  let max_depth : usize = config . max_ancestry_depth;
+  let max_depth : usize = runtime . config . max_ancestry_depth;
   std::thread::spawn ( move || {
-    tracing::info! ("search enrichment: thread started for {} IDs",
-              ids_clone . len ());
+    tracing::info! (
+      generation = runtime . generation,
+      result_count = ids_clone . len (),
+      "search enrichment thread started");
     let ancestry_by_id : HashMap<ID, AncestryTree> =
-      futures::executor::block_on (
-        ancestry_by_id_from_ids_async (
-          &ids_clone, &config_clone . db_name,
-          &driver_clone, max_depth ));
+      ancestry_by_id_from_ids (
+        &runtime . graph, &ids_clone, max_depth );
     tracing::info! ("search enrichment: ancestry computed ({} entries)",
               ancestry_by_id . len ());
     if cancel_clone . load (Ordering::SeqCst) {
@@ -352,15 +354,13 @@ fn spawn_enrichment_thread (
         collect_ids_from_ancestry_node ( tree, &mut id_set ); }
       id_set . extend (
         render_enriched_search_buffer::collect_override_relative_ids (
-          &ids_clone, &active_clone ) );
+          &runtime . graph, &ids_clone, &active_clone ) );
       id_set . into_iter () . collect () };
     let graphnodestats : AllGraphNodeStats =
-      futures::executor::block_on (
-        fetch_all_graphnodestats_with_source_set (
-          &config_clone . db_name,
-          &driver_clone,
-          &all_enriched_ids,
-          Some (&active_clone) ) )
+      fetch_all_graphnodestats_with_source_set (
+        &runtime . graph,
+        &all_enriched_ids,
+        Some (&active_clone) )
       . unwrap_or_else ( |e| {
         tracing::warn! ("search enrichment: graphnodestats failed: {}", e);
         AllGraphNodeStats::empty () } );
@@ -373,6 +373,7 @@ fn spawn_enrichment_thread (
     let mut guard : MutexGuard<Option<SearchEnrichmentPayload>> =
       slot_clone . lock () . unwrap ();
     *guard = Some ( SearchEnrichmentPayload {
+      runtime,
       terms          : terms_clone,
       search_results : ids_clone,
       ancestry_by_id,

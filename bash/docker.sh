@@ -61,9 +61,7 @@ docker run --name "$CONTAINER_NAME" -it -d                 \
   #   directory is mounted at /home/ubuntu/.codex. This preserves all Codex
   #   state without hiding the rest of the image-provided /home/ubuntu tree.
   # --ulimit raises the file-descriptor cap for every process in the
-  #   container. The default of 1024 is too low for TypeDB under
-  #   concurrent test load: each RocksDB database opens many handles,
-  #   and exceeding 1024 panics TypeDB's gRPC thread, leaving a
-  #   half-alive server that breaks the test suite.
+  #   container. The server and concurrent test suite can hold many files
+  #   and sockets open at once.
   # The DNS bits, somehow, permit Claude Code to
   #   work through my phone's mobile hotspot.

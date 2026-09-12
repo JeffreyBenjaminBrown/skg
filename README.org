@@ -35,10 +35,13 @@ are in (my public knowledge) .skg graph,
 * [[./docs/setup.org][How to set up Skg]]
   This includes how to import data from org-roam.
 * [[./docs/COMMANDS.org][Commands available in Skg]]
-* [[./docs/data-model.org][The Skg data model]]
-  Describes the ideas but not the code.
+* [[./docs/data-model_friendly.org][The Skg data model]]
+  A conceptual introduction; see also the [[./docs/data-model_technical.org][technical reference]].
 * to understand the code
-The graph uses [[./schema.tql][this TypeDB schema]]. The server is written in Rust, which makes TypeDB queries. Clients could be written for other editors; so far I've written one, for Emacs, in Emacs Lisp.
+The server and its graph are written in Rust. The =.skg= files are
+authoritative; the server builds an immutable in-memory graph and a derived
+Tantivy search index from them. Clients exist for Emacs and Neovim, and the
+TCP protocol is editor-independent.
 
 The API, the view metadata format, and the .skg file format are described in [[./api-and-formats.md][api-and-formats.md]].
 

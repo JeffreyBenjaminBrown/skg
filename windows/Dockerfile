@@ -8,14 +8,12 @@ COPY tools/introspect/call-graph /opt/skg/tools/introspect/call-graph
 COPY tools/introspect/change-forest /opt/skg/tools/introspect/change-forest
 COPY tools/scope-reducer /opt/skg/tools/scope-reducer
 COPY tools/rust-field-tags /opt/skg/tools/rust-field-tags
-COPY schema.tql /opt/skg/schema.tql
 RUN cargo build --release --bin skg
 
 FROM jeffreybbrown/hode:latest
 
 WORKDIR /opt/skg
 COPY --from=builder /opt/skg/target/release/skg /usr/local/bin/skg
-COPY schema.tql /opt/skg/schema.tql
 COPY windows/container/start-servers.sh /opt/skg/windows/container/start-servers.sh
 COPY README.org /opt/skg/README.org
 COPY glossary.md /opt/skg/glossary.md
@@ -25,6 +23,8 @@ COPY docs/merging.org /opt/skg/docs/merging.org
 COPY docs/moving-nodes-across-repos.org /opt/skg/docs/moving-nodes-across-repos.org
 COPY docs/hyperlinks.md /opt/skg/docs/hyperlinks.md
 COPY docs/forks.md /opt/skg/docs/forks.md
+COPY docs/data-model_friendly.org /opt/skg/docs/data-model_friendly.org
+COPY docs/data-model_technical.org /opt/skg/docs/data-model_technical.org
 RUN chmod +x /usr/local/bin/skg /opt/skg/windows/container/start-servers.sh
 
 ENV SKG_PROJECT_ROOT=/opt/skg

@@ -88,6 +88,7 @@ fn staged_change_separates_head_from_index () {
 
 #[test]
 fn hiddenin_signs_come_from_either_input_list_with_exact_stages () {
+  let graph = InRustGraph::new ();
   // Subscriber S hides [h1, h2] throughout; subscribee B's contains
   // gained h2 STAGED.  h2's hidden-in membership is therefore newly
   // derived-in with a STAGED Plus -- driven by the contains input,
@@ -107,6 +108,7 @@ fn hiddenin_signs_come_from_either_input_list_with_exact_stages () {
     None );
   let (goal, removed, axes) =
     goal_list_for_hiddeninsubscribee_col (
+      &graph,
       &id ("B"), &src ("main"),
       &id ("S"), &src ("main"),
       & ids (&["h1", "h2"]), // B's worktree contains
@@ -122,6 +124,7 @@ fn hiddenin_signs_come_from_either_input_list_with_exact_stages () {
 
 #[test]
 fn hiddenin_removed_member_gets_exact_stage_label () {
+  let graph = InRustGraph::new ();
   // S's hides dropped h1 UNSTAGED while B's contains kept it: h1
   // leaves the derived membership with an unstaged Minus, and joins
   // the goal list as a removed member.
@@ -133,6 +136,7 @@ fn hiddenin_removed_member_gets_exact_stage_label () {
       Diff_Item::Removed (id ("h1")) ] )) ));
   let (goal, removed, axes) =
     goal_list_for_hiddeninsubscribee_col (
+      &graph,
       &id ("B"), &src ("main"),
       &id ("S"), &src ("main"),
       & ids (&["h1"]), // B's worktree contains
@@ -146,8 +150,10 @@ fn hiddenin_removed_member_gets_exact_stage_label () {
 
 #[test]
 fn no_diffs_means_no_signs_and_the_worktree_goal () {
+  let graph = InRustGraph::new ();
   let (goal, removed, axes) =
     goal_list_for_hiddeninsubscribee_col (
+      &graph,
       &id ("B"), &src ("main"),
       &id ("S"), &src ("main"),
       & ids (&["h1", "v"]),

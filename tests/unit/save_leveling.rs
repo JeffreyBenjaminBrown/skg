@@ -1,11 +1,10 @@
 //! Unit tests for the sticky-else-default source rule
 //! ('apply_sticky_sources'), its home clamp, the hide floor, and the
-//! restricted-set deletion refusal. Installs the process-global
-//! graph handle, so it assumes per-test process isolation (nextest),
-//! like tests/override_substitution.rs.
+//! restricted-set deletion refusal. Each test builds the exact graph fixture
+//! it passes to the source-resolution function.
 
-use super::{apply_sticky_sources, refuse_delete_with_inactive_sections};
-use crate::dbs::in_rust_graph::{InRustGraph, install_or_swap_global_handle, new_handle};
+use super::{apply_sticky_sources_in_graph, refuse_delete_with_inactive_sections};
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::from_text::local_instruction_collection::lower::RequestedRelationshipSources;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{
@@ -45,11 +44,10 @@ fn node_at (
   n . source = SourceName::from (source);
   n }
 
-fn install_graph (
+fn graph_from (
   nodes : &[NodeComplete],
-) {
-  install_or_swap_global_handle ( new_handle (
-    InRustGraph::from_nodecompletes (nodes) )); }
+) -> InRustGraph {
+  InRustGraph::from_nodecompletes (nodes) }
 
 fn pm (
   source : &str,
@@ -66,7 +64,7 @@ fn sticky_preserves_disk_sources_and_default_takes_more_private_home (
   let old_target : NodeComplete = node_at ("old", "public");
   let new_target : NodeComplete = node_at ("fresh", "private");
   let owner      : NodeComplete = node_at ("owner", "public");
-  install_graph ( & [ owner . clone (), old_target, new_target ] );
+  let graph : InRustGraph = graph_from ( & [ owner . clone (), old_target, new_target ] );
   let mut disk : NodeComplete = owner . clone ();
   disk . contains = vec! [
     pm ("private", "old") ]; // privatized on disk
@@ -75,8 +73,8 @@ fn sticky_preserves_disk_sources_and_default_takes_more_private_home (
     pm ("public", "old"),    // degenerate intent tag
     pm ("public", "fresh") ]; // new edge to a private-homed target
   let resolved : NodeComplete =
-    apply_sticky_sources (
-      buffer, &disk, &RequestedRelationshipSources::default (), &config) . unwrap ();
+    apply_sticky_sources_in_graph (
+      buffer, &disk, &RequestedRelationshipSources::default (), &graph, &config) . unwrap ();
   assert_eq! ( resolved . contains, vec! [
     pm ("private", "old"),    // STICKY: the disk's privatization survives
     pm ("private", "fresh") ] ); // DEFAULT: more private of the homes
@@ -88,15 +86,15 @@ fn sticky_round_trip_restores_a_resolved_extra_ids_raw_disk_spelling () {
   let mut target : NodeComplete = node_at ("target", "public");
   target . extra_ids = vec![ID::new ("target-extra")];
   let owner : NodeComplete = node_at ("owner", "public");
-  install_graph (&[owner . clone (), target]);
+  let graph : InRustGraph = graph_from (&[owner . clone (), target]);
   let mut disk : NodeComplete = owner . clone ();
   disk . contains = vec![pm ("public", "target-extra")];
   let mut buffer : NodeComplete = owner;
   // Rendering names the resolved node by PID, but the relationship on disk
   // names its extra ID.  A no-op save must preserve the raw stored value.
   buffer . contains = vec![pm ("public", "target")];
-  let resolved = apply_sticky_sources (
-    buffer, &disk, &RequestedRelationshipSources::default (), &config ).unwrap ();
+  let resolved = apply_sticky_sources_in_graph (
+    buffer, &disk, &RequestedRelationshipSources::default (), &graph, &config ).unwrap ();
   assert_eq! (resolved . contains, vec![pm ("public", "target-extra")]);
 }
 
@@ -107,15 +105,15 @@ fn home_move_to_more_private_clamps_member_sources_up (
     config_with_order ( & ["public", "private"] );
   let child : NodeComplete = node_at ("child", "public");
   let owner_before : NodeComplete = node_at ("owner", "public");
-  install_graph ( & [ owner_before . clone (), child ] );
+  let graph : InRustGraph = graph_from ( & [ owner_before . clone (), child ] );
   let mut disk : NodeComplete = owner_before;
   disk . contains = vec! [ pm ("public", "child") ];
   let mut buffer : NodeComplete = node_at ("owner", "private");
   // the buffer moved the node's home to private
   buffer . contains = vec! [ pm ("private", "child") ];
   let resolved : NodeComplete =
-    apply_sticky_sources (
-      buffer, &disk, &RequestedRelationshipSources::default (), &config) . unwrap ();
+    apply_sticky_sources_in_graph (
+      buffer, &disk, &RequestedRelationshipSources::default (), &graph, &config) . unwrap ();
   assert_eq! ( resolved . contains, vec! [
     pm ("private", "child") ],
     "the sticky public source rises to the new, more private home" );
@@ -132,7 +130,7 @@ fn hide_floor_is_the_most_public_explaining_subscription (
   let mut container_b : NodeComplete = node_at ("expl-b", "public");
   container_b . contains = vec! [ pm ("public", "victim") ];
   let owner : NodeComplete = node_at ("owner", "public");
-  install_graph ( & [
+  let graph : InRustGraph = graph_from ( & [
     owner . clone (), hidden, container_a, container_b ] );
   { // Only a PRIVATE subscription explains the hide: the hide must
     // be private, else it leaks the inference that the private
@@ -149,8 +147,8 @@ fn hide_floor_is_the_most_public_explaining_subscription (
     buffer . hides_from_its_subscriptions = MSV::Specified ( vec! [
       pm ("public", "victim") ] ); // degenerate tag
     let resolved : NodeComplete =
-      apply_sticky_sources (
-        buffer, &disk, &RequestedRelationshipSources::default (), &config) . unwrap ();
+      apply_sticky_sources_in_graph (
+        buffer, &disk, &RequestedRelationshipSources::default (), &graph, &config) . unwrap ();
     assert_eq! (
       resolved . subscribes_to . or_default (),
       & [ pm ("private", "expl-a") ] );
@@ -170,8 +168,8 @@ fn hide_floor_is_the_most_public_explaining_subscription (
     buffer . hides_from_its_subscriptions = MSV::Specified ( vec! [
       pm ("public", "victim") ] );
     let resolved : NodeComplete =
-      apply_sticky_sources (
-        buffer, &disk, &RequestedRelationshipSources::default (), &config) . unwrap ();
+      apply_sticky_sources_in_graph (
+        buffer, &disk, &RequestedRelationshipSources::default (), &graph, &config) . unwrap ();
     assert_eq! (
       resolved . hides_from_its_subscriptions . or_default (),
       & [ pm ("public", "victim") ] ); }
@@ -187,7 +185,7 @@ fn explicit_source_at_or_more_private_than_floor_is_honored (
     config_with_order ( & ["public", "trusted", "private"] );
   let child : NodeComplete = node_at ("child", "public");
   let owner_before : NodeComplete = node_at ("owner", "public");
-  install_graph ( & [ owner_before . clone (), child ] );
+  let graph : InRustGraph = graph_from ( & [ owner_before . clone (), child ] );
   let mut disk : NodeComplete = owner_before;
   disk . contains = vec! [ pm ("public", "child") ];
   let mut buffer : NodeComplete = node_at ("owner", "public");
@@ -197,7 +195,7 @@ fn explicit_source_at_or_more_private_than_floor_is_honored (
       ( ID::new ("child"), SourceName::from ("trusted") ) ]),
     .. RequestedRelationshipSources::default () };
   let resolved : NodeComplete =
-    apply_sticky_sources (buffer, &disk, &explicit, &config) . unwrap ();
+    apply_sticky_sources_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
   assert_eq! ( resolved . contains, vec! [
     pm ("trusted", "child") ],
     "an explicit source at or more private than the default wins outright" );
@@ -213,7 +211,7 @@ fn explicit_source_more_public_than_floor_is_rejected (
     config_with_order ( & ["public", "trusted", "private"] );
   let child : NodeComplete = node_at ("child", "private"); // forces the default floor to "private"
   let owner_before : NodeComplete = node_at ("owner", "public");
-  install_graph ( & [ owner_before . clone (), child ] );
+  let graph : InRustGraph = graph_from ( & [ owner_before . clone (), child ] );
   let disk : NodeComplete = owner_before; // no sticky entry for "child"
   let mut buffer : NodeComplete = node_at ("owner", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
@@ -222,7 +220,7 @@ fn explicit_source_more_public_than_floor_is_rejected (
       ( ID::new ("child"), SourceName::from ("public") ) ]), // more public than the "private" floor
     .. RequestedRelationshipSources::default () };
   let err : String =
-    apply_sticky_sources (buffer, &disk, &explicit, &config)
+    apply_sticky_sources_in_graph (buffer, &disk, &explicit, &graph, &config)
     . unwrap_err ();
   assert! ( err . contains ("child"),   "names the member: {}", err );
   assert! ( err . contains ("public"),  "names the offered source: {}", err );
@@ -239,7 +237,7 @@ fn explicit_source_moves_a_sticky_edge_to_its_default (
     config_with_order ( & ["public", "trusted", "private"] );
   let child : NodeComplete = node_at ("child", "public");
   let owner_before : NodeComplete = node_at ("owner", "public");
-  install_graph ( & [ owner_before . clone (), child ] );
+  let graph : InRustGraph = graph_from ( & [ owner_before . clone (), child ] );
   let mut disk : NodeComplete = owner_before;
   disk . contains = vec! [
     pm ("private", "child") ]; // stuck more private than its default
@@ -250,7 +248,7 @@ fn explicit_source_moves_a_sticky_edge_to_its_default (
       ( ID::new ("child"), SourceName::from ("public") ) ]), // = default
     .. RequestedRelationshipSources::default () };
   let resolved : NodeComplete =
-    apply_sticky_sources (buffer, &disk, &explicit, &config) . unwrap ();
+    apply_sticky_sources_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
   assert_eq! ( resolved . contains, vec! [
     pm ("public", "child") ],
     "an explicit source AT the default lowers the sticky edge's privacy" );
@@ -263,7 +261,7 @@ fn explicit_source_between_default_and_sticky_is_accepted (
     config_with_order ( & ["public", "trusted", "private"] );
   let child : NodeComplete = node_at ("child", "public");
   let owner_before : NodeComplete = node_at ("owner", "public");
-  install_graph ( & [ owner_before . clone (), child ] );
+  let graph : InRustGraph = graph_from ( & [ owner_before . clone (), child ] );
   let mut disk : NodeComplete = owner_before;
   disk . contains = vec! [ pm ("private", "child") ];
   let mut buffer : NodeComplete = node_at ("owner", "public");
@@ -273,7 +271,7 @@ fn explicit_source_between_default_and_sticky_is_accepted (
       ( ID::new ("child"), SourceName::from ("trusted") ) ]),
     .. RequestedRelationshipSources::default () };
   let resolved : NodeComplete =
-    apply_sticky_sources (buffer, &disk, &explicit, &config) . unwrap ();
+    apply_sticky_sources_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
   assert_eq! ( resolved . contains, vec! [
     pm ("trusted", "child") ],
     "moving privacy partway toward the default is accepted" );
@@ -288,7 +286,7 @@ fn explicit_more_public_than_default_is_rejected_and_names_the_default (
     config_with_order ( & ["public", "trusted", "private"] );
   let child : NodeComplete = node_at ("child", "trusted"); // default floor: trusted
   let owner_before : NodeComplete = node_at ("owner", "public");
-  install_graph ( & [ owner_before . clone (), child ] );
+  let graph : InRustGraph = graph_from ( & [ owner_before . clone (), child ] );
   let mut disk : NodeComplete = owner_before;
   disk . contains = vec! [
     pm ("private", "child") ]; // sticky sits more private than the default
@@ -299,7 +297,7 @@ fn explicit_more_public_than_default_is_rejected_and_names_the_default (
       ( ID::new ("child"), SourceName::from ("public") ) ]), // more public than default
     .. RequestedRelationshipSources::default () };
   let err : String =
-    apply_sticky_sources (buffer, &disk, &explicit, &config)
+    apply_sticky_sources_in_graph (buffer, &disk, &explicit, &graph, &config)
     . unwrap_err ();
   assert! ( err . contains ("'trusted'"),
             "the floor named is the default: {}", err );
@@ -319,7 +317,7 @@ fn explicit_at_a_more_public_than_default_disk_source_round_trips (
     config_with_order ( & ["public", "trusted", "private"] );
   let child : NodeComplete = node_at ("child", "private");
   let owner_before : NodeComplete = node_at ("owner", "public");
-  install_graph ( & [ owner_before . clone (), child ] );
+  let graph : InRustGraph = graph_from ( & [ owner_before . clone (), child ] );
   let mut disk : NodeComplete = owner_before;
   disk . contains = vec! [
     pm ("public", "child") ]; // more public than the "private" default
@@ -331,8 +329,8 @@ fn explicit_at_a_more_public_than_default_disk_source_round_trips (
         ( ID::new ("child"), SourceName::from ("public") ) ]),
       .. RequestedRelationshipSources::default () };
     let resolved : NodeComplete =
-      apply_sticky_sources (
-        buffer, &disk, &explicit, &config ) . unwrap ();
+      apply_sticky_sources_in_graph (
+        buffer, &disk, &explicit, &graph, &config ) . unwrap ();
     assert_eq! ( resolved . contains, vec! [ pm ("public", "child") ],
       "the rendered atom saves back unchanged" ); }
   { // Moving it partway toward the default is accepted.
@@ -343,8 +341,8 @@ fn explicit_at_a_more_public_than_default_disk_source_round_trips (
         ( ID::new ("child"), SourceName::from ("trusted") ) ]),
       .. RequestedRelationshipSources::default () };
     let resolved : NodeComplete =
-      apply_sticky_sources (
-        buffer, &disk, &explicit, &config ) . unwrap ();
+      apply_sticky_sources_in_graph (
+        buffer, &disk, &explicit, &graph, &config ) . unwrap ();
     assert_eq! ( resolved . contains, vec! [ pm ("trusted", "child") ],
       "making a legacy more-public edge more private is accepted" ); }
 }
@@ -369,7 +367,7 @@ fn explicit_lowering_moves_the_edge_between_section_files (
       . unwrap () . path = path; }
   let child : NodeComplete = node_at ("child", "trusted"); // home already moved
   let owner : NodeComplete = node_at ("owner", "public");
-  install_graph ( & [ owner . clone (), child ] );
+  let graph : InRustGraph = graph_from ( & [ owner . clone (), child ] );
   let mut disk : NodeComplete = owner;
   disk . contains = vec! [ pm ("private", "child") ];
   write_nodecomplete_telescope ( &disk, &config ) . unwrap ();
@@ -389,7 +387,7 @@ fn explicit_lowering_moves_the_edge_between_section_files (
       ( ID::new ("child"), SourceName::from ("trusted") ) ]), // the new default
     .. RequestedRelationshipSources::default () };
   let resolved : NodeComplete =
-    apply_sticky_sources (buffer, &disk, &explicit, &config) . unwrap ();
+    apply_sticky_sources_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
   assert_eq! ( resolved . contains, vec! [ pm ("trusted", "child") ] );
   write_nodecomplete_telescope ( &resolved, &config ) . unwrap ();
   assert! ( ! private_file . is_file (),
@@ -418,7 +416,7 @@ fn owned_to_foreign_new_edges_default_to_the_owner_home (
         . unwrap () . user_owns_it = true;
       let owner : NodeComplete = node_at ("owner", owner_home);
       let member : NodeComplete = node_at ("member", member_home);
-      install_graph (&[owner . clone (), member]);
+      let graph : InRustGraph = graph_from (&[owner . clone (), member]);
       let disk : NodeComplete = owner;
       let mut buffer : NodeComplete = node_at ("owner", owner_home);
       match relation {
@@ -428,8 +426,8 @@ fn owned_to_foreign_new_edges_default_to_the_owner_home (
         "overrides_view_of" => buffer . overrides_view_of =
           MSV::Specified (vec! [pm (owner_home, "member")]),
         _ => unreachable! (), }
-      let resolved : NodeComplete = apply_sticky_sources (
-        buffer, &disk, &RequestedRelationshipSources::default (), &config ) . unwrap ();
+      let resolved : NodeComplete = apply_sticky_sources_in_graph (
+        buffer, &disk, &RequestedRelationshipSources::default (), &graph, &config ) . unwrap ();
       let source : &SourceName = match relation {
         "contains" => &resolved . contains [0] . source,
         "subscribes_to" =>
@@ -450,7 +448,7 @@ fn owned_to_foreign_explicit_owned_source_is_allowed_and_foreign_refused (
     . unwrap () . user_owns_it = false;
   let mut owner : NodeComplete = node_at ("owner", "public");
   let member : NodeComplete = node_at ("member", "foreign");
-  install_graph (&[owner . clone (), member]);
+  let graph : InRustGraph = graph_from (&[owner . clone (), member]);
 
   let disk : NodeComplete = owner . clone ();
   owner . contains = vec! [pm ("public", "member")];
@@ -458,8 +456,8 @@ fn owned_to_foreign_explicit_owned_source_is_allowed_and_foreign_refused (
     contains : HashMap::from ([
       (ID::new ("member"), SourceName::from ("private")) ]),
     .. RequestedRelationshipSources::default () };
-  let resolved : NodeComplete = apply_sticky_sources (
-    owner . clone (), &disk, &allowed, &config ) . unwrap ();
+  let resolved : NodeComplete = apply_sticky_sources_in_graph (
+    owner . clone (), &disk, &allowed, &graph, &config ) . unwrap ();
   assert_eq! (resolved . contains [0] . source,
               SourceName::from ("private"));
 
@@ -467,8 +465,8 @@ fn owned_to_foreign_explicit_owned_source_is_allowed_and_foreign_refused (
     contains : HashMap::from ([
       (ID::new ("member"), SourceName::from ("foreign")) ]),
     .. RequestedRelationshipSources::default () };
-  let error : String = apply_sticky_sources (
-    owner, &disk, &refused, &config ) . unwrap_err ();
+  let error : String = apply_sticky_sources_in_graph (
+    owner, &disk, &refused, &graph, &config ) . unwrap_err ();
   assert! (error . contains ("non-owned source 'foreign'"), "{}", error);
 }
 
@@ -477,6 +475,7 @@ fn explicit_alias_source_is_load_bearing_and_validated (
 ) {
   let config : SkgConfig =
     config_with_order (&["public", "trusted", "private"]);
+  let graph : InRustGraph = InRustGraph::new ();
   let disk : NodeComplete = node_at ("owner", "public");
   let mut buffer : NodeComplete = disk . clone ();
   buffer . aliases = MSV::Specified (vec! [
@@ -486,8 +485,8 @@ fn explicit_alias_source_is_load_bearing_and_validated (
     aliases : HashMap::from ([
       ("nickname" . to_string (), SourceName::from ("private")) ]),
     .. RequestedRelationshipSources::default () };
-  let resolved : NodeComplete = apply_sticky_sources (
-    buffer, &disk, &explicit, &config ) . unwrap ();
+  let resolved : NodeComplete = apply_sticky_sources_in_graph (
+    buffer, &disk, &explicit, &graph, &config ) . unwrap ();
   assert_eq! (
     resolved . aliases . or_default () [0] . source,
     SourceName::from ("private") );
@@ -499,8 +498,8 @@ fn explicit_alias_source_is_load_bearing_and_validated (
   buffer . aliases = MSV::Specified (vec! [
     crate::types::misc::MemberAtSource::at_source (
       SourceName::from ("public"), "nickname" . to_string ()) ]);
-  let error : String = apply_sticky_sources (
-    buffer, &disk, &explicit, &foreign_config ) . unwrap_err ();
+  let error : String = apply_sticky_sources_in_graph (
+    buffer, &disk, &explicit, &graph, &foreign_config ) . unwrap_err ();
   assert! (error . contains ("non-owned source 'private'"), "{}", error);
 }
 

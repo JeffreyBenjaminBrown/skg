@@ -24,7 +24,7 @@
 
 use super::common::*;
 use skg::test_utils::graph_handle_from_config;
-use skg::test_utils::{run_with_shared_test_db, SharedDbSession};
+use skg::test_utils::{run_with_shared_test_stores, SharedStoreSession};
 use skg::types::misc::members_msv;
 
 fn setup_filter_fixtures (
@@ -81,7 +81,7 @@ const EXPECTED_STAGED : &str = "\
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_stores (
     "skg-test-git-diff-filter-cols",
     |s| Box::pin ( async move {
       filter_cols_show_exact_phantoms_and_newM_unstaged (s) . await ?;
@@ -90,7 +90,7 @@ fn all_tests
       Ok (( )) } )) }
 
 async fn run_filter_col_test (
-  s            : &mut SharedDbSession,
+  s            : &mut SharedStoreSession,
   subtest_name : &str,
   staged   : bool,
   expected : &str,
@@ -99,10 +99,10 @@ async fn run_filter_col_test (
   let repo_path : &Path = temp_dir . path ();
   if staged { setup_filter_fixtures_staged (repo_path)?; }
   else      { setup_filter_fixtures        (repo_path)?; }
-  s . reset_with_source_path (subtest_name, repo_path) . await ?;
-  let (config, driver, tantivy)
-    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
-    = (&s . config, &s . driver, &mut s . tantivy);
+  s . reset_with_source_path (subtest_name, repo_path) ?;
+  let (config, tantivy)
+    : (&SkgConfig, &mut TantivyIndex)
+    = (&s . config, &mut s . tantivy);
     let graph = graph_handle_from_config (&config)?;
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : true,
@@ -110,7 +110,7 @@ async fn run_filter_col_test (
     let first = {
       let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
       update_from_and_rerender_buffer (
-        &mut stream, INPUT, &driver, &config, &tantivy, &graph,
+        &mut stream, INPUT, &config, &tantivy, &graph,
         true, &Err (String::new ()), &mut views_state ) . await ? };
     assert_buffer_contains (&first . saved_view, expected);
     { // Idempotence: saving the rendered result (phantoms included)
@@ -118,7 +118,7 @@ async fn run_filter_col_test (
       let second = {
         let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
         update_from_and_rerender_buffer (
-          &mut stream, &first . saved_view, &driver, &config,
+          &mut stream, &first . saved_view, &config,
           &tantivy, &graph,
           true, &Err (String::new ()), &mut views_state ) . await ? };
       assert_buffer_contains (&second . saved_view, expected);
@@ -131,7 +131,7 @@ async fn run_filter_col_test (
     Ok (( )) }
 
 async fn filter_cols_show_exact_phantoms_and_newM_unstaged (
-  s : &mut SharedDbSession,
+  s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   run_filter_col_test (
     s, "skg-test-git-diff-filter-unstaged", false,
@@ -142,17 +142,17 @@ async fn filter_cols_show_exact_phantoms_and_newM_unstaged (
 /// hidden-outside) still yields each col, holding only phantoms.
 /// Outside diff mode the emptied cols do not appear.
 async fn emptied_filter_cols_still_render_in_diff_mode (
-  s : &mut SharedDbSession,
+  s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   let temp_dir : TempDir = TempDir::new ()?;
   let repo_path : &Path = temp_dir . path ();
   setup_filter_fixtures (repo_path)?;
   s . reset_with_source_path (
     "emptied_filter_cols_still_render_in_diff_mode",
-    repo_path ) . await ?;
-  let (config, driver, tantivy)
-    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
-    = (&s . config, &s . driver, &mut s . tantivy);
+    repo_path ) ?;
+  let (config, tantivy)
+    : (&SkgConfig, &mut TantivyIndex)
+    = (&s . config, &mut s . tantivy);
   let input : &str = "\
 * (skg (node (id S2) (source main))) S2
 ** (skg subscribeeCol)
@@ -165,7 +165,7 @@ async fn emptied_filter_cols_still_render_in_diff_mode (
         open_views        : OpenViews::new (), };
       let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer (
-        &mut stream, input, &driver, &config, &tantivy, &graph,
+        &mut stream, input, &config, &tantivy, &graph,
         true, &Err (String::new ()), &mut views_state ) . await ?;
       assert_buffer_contains ( &response . saved_view, "\
 **** (skg hiddenInSubscribeeCol)
@@ -180,7 +180,7 @@ async fn emptied_filter_cols_still_render_in_diff_mode (
         open_views        : OpenViews::new (), };
       let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
       let response = update_from_and_rerender_buffer (
-        &mut stream, input, &driver, &config, &tantivy, &graph,
+        &mut stream, input, &config, &tantivy, &graph,
         false, &Err (String::new ()), &mut views_state ) . await ?;
       for col in [ "hiddenInSubscribeeCol",
                    "hiddenOutsideOfSubscribeeCol" ] {
@@ -190,7 +190,7 @@ async fn emptied_filter_cols_still_render_in_diff_mode (
     Ok (( )) }
 
 async fn filter_cols_show_exact_phantoms_and_newM_staged (
-  s : &mut SharedDbSession,
+  s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   run_filter_col_test (
     s, "skg-test-git-diff-filter-staged", true,

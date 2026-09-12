@@ -20,7 +20,8 @@ pub mod lower;
 pub mod resolve_visibility;
 pub mod validate_text_claims;
 
-use crate::dbs::node_lookup::nodecomplete_from_in_rust_graph;
+use crate::dbs::node_lookup::nodecomplete_from_graph;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::from_text::supplement_from_disk::{
   build_diskSupplemented_defineNodes,
   Definenodes_with_Sourcemoves };
@@ -38,7 +39,6 @@ use types::CollectedIntents;
 use validate_text_claims::validate_text_claims;
 
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 pub struct NonmergeSavePlan {
   pub define_nodes : Vec<DefineNode>,
@@ -51,10 +51,10 @@ pub struct NonmergeSavePlan {
 /// local instruction collection. It returns the plan, plus the
 /// (acquirer, acquiree) pairs that nodeMerge expansion consumes.
 #[allow(non_snake_case)]
-pub async fn extract_nonmergeSavePlan_locally (
+pub fn extract_nonmergeSavePlan_locally_in_graph (
   viewforest : &ViewForest,
+  graph      : &InRustGraph,
   config     : &SkgConfig,
-  driver     : &TypeDBDriver,
   restricted_source_set : Option<&ActiveSourceSet>, // None means no restriction; callers normalize 'all' to None.
 ) -> Result<(NonmergeSavePlan, Vec<(ID, ID)>), Box<dyn Error>> {
   let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -62,7 +62,7 @@ pub async fn extract_nonmergeSavePlan_locally (
   let collected : CollectedIntents =
     collect_instructions_locally (viewforest)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  validate_text_claims (&collected, config, driver) . await ?;
+  validate_text_claims (&collected, graph, config) ?;
   let nodeMerge_acquisitions : Vec<(ID, ID)> =
     nodeMerge_pairs (&collected);
   let (resolved, post_commit_notice_candidates)
@@ -71,14 +71,14 @@ pub async fn extract_nonmergeSavePlan_locally (
       lower_collected_intents (collected)
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     resolve_visibility (
-      intents, &visibility, &hidden_outside, config, driver,
-      restricted_source_set ) . await ? };
+      intents, &visibility, &hidden_outside, graph, config,
+      restricted_source_set ) ? };
   let with_disk : Definenodes_with_Sourcemoves =
     build_diskSupplemented_defineNodes (
       resolved . into_ordered_intents(),
-      config, driver, restricted_source_set ) . await ?;
+      graph, config, restricted_source_set ) ?;
   let sans_noops : Vec<DefineNode> =
-    filter_wouldbe_noop_defineNodes (with_disk . instructions);
+    filter_wouldbe_noop_defineNodes (graph, with_disk . instructions);
   let (define_nodes, source_moves, suppressed_writes)
     : (Vec<DefineNode>, Vec<SourceMove>, bool)
     = suppress_writes_to_inactive_nodes (
@@ -96,8 +96,8 @@ pub async fn extract_nonmergeSavePlan_locally (
           let kept : Vec<(ID, ID)> =
             nodeMerge_acquisitions . into_iter ()
             . filter ( |(acquirer, acquiree)|
-                member_is_visible (acquirer, config, active)
-                && member_is_visible (acquiree, config, active) )
+                member_is_visible (graph, acquirer, config, active)
+                && member_is_visible (graph, acquiree, config, active) )
             . collect ();
           let suppressed : bool = kept . len () < before;
           (kept, suppressed) }};
@@ -113,6 +113,18 @@ pub async fn extract_nonmergeSavePlan_locally (
           post_commit_notice_candidates },
         nodeMerge_acquisitions )) }
 
+/// Transitional compatibility for direct extraction tests.
+pub fn extract_nonmergeSavePlan_locally (
+  viewforest : &ViewForest,
+  config     : &SkgConfig,
+  restricted_source_set : Option<&ActiveSourceSet>,
+) -> Result<(NonmergeSavePlan, Vec<(ID, ID)>), Box<dyn Error>> {
+  let nodes = crate::dbs::filesystem::multiple_nodes
+    ::read_all_skg_files_from_sources (config)?;
+  let graph = InRustGraph::from_nodecompletes (&nodes);
+  extract_nonmergeSavePlan_locally_in_graph (
+    viewforest, &graph, config, restricted_source_set ) }
+
 /// Filters out Save instructions that would be no-ops,
 /// because they match the pre-save in-Rust graph entry
 /// (nothing changed). Delete instructions and new nodes (not yet
@@ -120,6 +132,7 @@ pub async fn extract_nonmergeSavePlan_locally (
 /// supplementation so unspecified fields have already been restored
 /// to their disk values before comparison.
 fn filter_wouldbe_noop_defineNodes (
+  graph        : &InRustGraph,
   instructions : Vec<DefineNode>,
 ) -> Vec<DefineNode> {
   let initial_count : usize = instructions . len();
@@ -127,7 +140,7 @@ fn filter_wouldbe_noop_defineNodes (
     . into_iter()
     . filter(|instr| match instr {
       DefineNode::Save(SaveNode (node)) => {
-        match nodecomplete_from_in_rust_graph (&node . pid) {
+        match nodecomplete_from_graph (graph, &node . pid) {
           Some (pre_save) =>
             buffernode_differs_from_disknode (node, &pre_save),
           None => true, }}
