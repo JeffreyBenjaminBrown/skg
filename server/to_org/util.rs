@@ -263,7 +263,7 @@ pub fn mark_view_roots_parent_absent (
 ///
 /// Forest roots have no ActiveNode parent and therefore
 /// do not fall through this check. Also relies on the save pipeline's
-/// invariant that 'apply_definenodes' has updated the in-Rust-graph
+/// invariant that prepared graph publication has updated the in-Rust-graph
 /// graph before the rerender pass runs (see
 /// 'update_views_after_save').
 pub fn validate_parentIs_relationships (

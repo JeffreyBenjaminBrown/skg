@@ -561,7 +561,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       "coherence_debug_assert" ). entered();
     debug_assert! (
       // TODO | PITFALL: This is quite a weak assertion.
-      // PURPOSE: The in-Rust graph must already reflect every Save and Delete in 'define_nodes' by the time this function runs. Violating this invariant (e.g. by reordering the save pipeline so that 'update_views_after_save' runs before 'apply_definenodes') would let the rerender read stale NodeCompletes from the in-Rust graph.
+      // PURPOSE: The in-Rust graph must already reflect every Save and Delete in 'define_nodes' by the time this function runs. Violating this invariant (e.g. by reordering the save pipeline so that 'update_views_after_save' runs before prepared graph publication) would let the rerender read stale NodeCompletes from the in-Rust graph.
       in_rust_graph_coherent_with_save_instructions_in (
           &published . graph, &define_nodes
         ) . is_ok (),

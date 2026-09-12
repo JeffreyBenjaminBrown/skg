@@ -16,6 +16,7 @@ pub mod stats;
 pub mod internal_index_validation;
 pub mod override_invariants;
 pub mod override_resolution;
+pub(crate) mod prepared_update;
 pub mod relation_accessors;
 
 use arc_swap::ArcSwap;
@@ -163,7 +164,7 @@ pub(crate) fn add_to_inverse_indexes (
 /// is mapped to its corresponding pid (which might be the id itself)
 /// via the CURRENT 'extra_id_to_pid'. Correct because the prior
 /// 'add_to_inverse_indexes' for this node used the same table, and
-/// 'apply_definenodes' only grows that table — never shrinks —
+/// the current graph-only transform only grows that table — never shrinks —
 /// so the key each second-member's contribution originally landed
 /// under is still reachable through the same lookup now.
 fn remove_from_inverse_indexes (g: &mut InRustGraph, node: &NodeRust) {
@@ -245,54 +246,20 @@ fn remove_from_inverse_map (
     if set . is_empty () { map . remove (key); }
     else                 { map . insert ( key . clone (), set ); } } }
 
-/// Apply a batch of DefineNodes to the shared graph atomically.
-/// Clones the current InRustGraph (cheap due to 'im''s structural
-/// sharing), applies Save/Delete mutations along with their inverse-
-/// index updates, and publishes the new snapshot via ArcSwap.
-///
-/// Per-Save ordering: remove-old-inverse → migrate-inverse-for-new-
-/// extraids → insert-new-node → add-new-inverse. The migration step
-/// is load-bearing for nodeMerges: when an acquirer gains the acquiree's
-/// pid as an extra_id, any inverse-index entries keyed under the
-/// acquiree pid (pre-nodeMerge references from neighbors) need to move
-/// to the acquirer pid. The add step then runs with extra_id_to_pid
-/// already updated, so subsequent Saves in the same batch look up
-/// corresponding pids through the new alias.
-///
-/// PITFALL (monotonic alias acquisition): we rely on extra_id_to_pid
-/// only growing within a batch, never retracting. 'remove_from_inverse_
-/// indexes' looks up each second-member's (see [[docs/data-model_technical.org]]) PID
-/// through the current alias map, which finds
-/// the key the old add originally landed under because nothing revoked
-/// that mapping between then and now. If revocation is ever added as
-/// a real operation, the remove-side lookup needs to be rethought.
-///
-/// PITFALL (extra_id revocation unsupported): a Save whose new
-/// NodeRust /drops/ an extra_id that the old NodeRust had is not
-/// handled gracefully. Neighbor raw references to the dropped
-/// extra_id would fall through 'id_to_pid_if_found' (since 'id_to_pid_if_found' would
-/// no longer know the extra_id) and land under the raw id —
-/// inconsistent with the rest of the graph. No production path exercises this today;
-/// if a user feature ever needs it, a dedicated migration (symmetric
-/// to the acquire path) would be required.
-///
-/// Called from the save pipeline after the filesystem write has
-/// succeeded.
-pub fn apply_definenodes (
-  graph     : &InRustGraphHandle,
-  node_defs : &[DefineNode],
-) {
-  let old : Arc<InRustGraph> = graph . load_full ();
-  let mut new_graph : InRustGraph = (*old) . clone ();
-  apply_definenodes_to_inRustGraph (&mut new_graph, node_defs);
-  graph . store ( Arc::new (new_graph) ); }
-
 /// Apply a batch of DefineNodes to an ordinary in-memory graph value.
 ///
 /// This is the shared mutation path for the live graph update and for
 /// save-time validation simulations.  Keep graph mutation semantics in
 /// this helper so the validator asks the same "what graph would this
 /// produce?" question as the real save path.
+///
+/// Per-Save ordering is remove-old-inverse, migrate inverse entries for newly
+/// acquired extra IDs, insert the new node, then add its new inverse entries.
+/// This still relies on aliases only growing within a batch.  Arbitrary extra-
+/// ID revocation and deletion with surviving raw inbound references require
+/// the batch-aware reindexing described in
+/// =TODO/incremental-validation/2_plan.org=; until that lands, callers must not
+/// treat this transform alone as proof of candidate coherence.
 pub fn apply_definenodes_to_inRustGraph (
   mut new_graph : &mut InRustGraph,
   node_defs : &[DefineNode],
@@ -321,7 +288,7 @@ pub fn apply_definenodes_to_inRustGraph (
 /// in_rust_graph, and every Delete's id is absent. Used as a 'debug_assert!'
 /// invariant guard at the top of 'update_views_after_save' to catch
 /// pipeline-ordering regressions (someone reshuffles the pipeline so
-/// rerender runs before 'apply_definenodes'). Returns Ok (()) on
+/// rerender runs before prepared graph publication). Returns Ok (()) on
 /// coherence, Err with the offending pid's detail otherwise. Never
 /// panics — the caller wraps in 'debug_assert!' so release builds pay
 /// no cost.

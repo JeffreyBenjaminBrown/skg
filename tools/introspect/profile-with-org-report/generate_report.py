@@ -440,7 +440,7 @@ def main() -> None:
                              * server_fraction if total_native_samples else 0.0)
     validation_costs = sorted(costs_named(
         native_roots["server"],
-        "complete_validation::validate_graph_after_definitions"), reverse=True)[:2]
+        "complete_validation::validate_complete_graph_candidate"), reverse=True)[:2]
     validation_fractions = [cost / total_native_samples * server_fraction
                             for cost in validation_costs]
     validation_summary = (f"{validation_fractions[0]:.1%} and "

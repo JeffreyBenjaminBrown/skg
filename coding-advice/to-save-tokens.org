@@ -139,18 +139,3 @@ Retain useful test logs and metadata under =target/=, but exclude reproducible
 package staging trees and other generated copies from fingerprints.  Remove
 only artifacts created by the current work, using exact paths, and never clean
 the user's data or unrelated dirty state merely to make a checkpoint tidy.
-
-* A compact proposal to Jeff
-
-For a substantial task, a future agent can ask something like:
-
-#+begin_quote
-This looks large enough to benefit from the optional token-saving workflow in
-=coding-advice/to-save-tokens.org=: focused reading, quiet fingerprinted test
-logs, a narrow-to-broad test ladder, and a compact progress ledger.  Would you
-like me to use that workflow for this task?
-#+end_quote
-
-Adjust the proposal to the actual job.  Do not mention techniques that would
-not help, and do not treat Jeff's approval on one initiative as a permanent
-project-wide preference.

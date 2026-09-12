@@ -51,6 +51,10 @@ The work is complete when all of the following are true:
 however seems natural.
 ** Make progress visible here
 by cycling headlines and subheadlines through TODO, ONGOING and DONE.
+** In order to save tokens
+please use the tricks described at coding-advice/to-save-tokens.org.
+There's no need for token-hungry parallelization;
+lately my credits have been running out before my time does.
 * Settled decisions
 
 These choices came from =1_discussion.org=.  Reopen one only if code or test
@@ -629,7 +633,7 @@ full-validator normalization test, and a raw-YAML save test cover the contract.
 At this checkpoint =cargo check --all-targets=, all 226 =grouped_unit= tests,
 and the nine focused filesystem/save-override/merge tests pass.
 
-** ONGOING Introduce the prepared token and remove duplicate whole validation
+** DONE Introduce the prepared token and remove duplicate whole validation
 
 - Rename the transitional oracle to =validate_complete_graph_candidate=.
 - Add =PreparedGraphUpdate= with private construction and consuming
@@ -655,7 +659,21 @@ validation for an ordinary save, one per prepared phase for a combined save,
 and zero revalidation inside =apply_defineNodes=.  Deliberately corrupt/stale
 tokens cannot be constructed outside the defining module.
 
-** TODO Add final-state batches, identity overlay, and change-set derivation
+=PreparedGraphUpdate= now owns its base, normalized definitions, and exact
+whole-validated candidate.  Its private constructor is the only token source;
+it rejects stale-base publication, and both ordinary and merge store paths
+publish its candidate rather than reapplying definitions.  The combined path
+prepares nonempty ordinary and merge phases consecutively before the existing
+union filesystem preflight.  =apply_defineNodes= performs no validation, and
+=enqueue_tantivy_delta= derives context from the candidate and moves the
+definitions into one task.
+
+Call inspection shows one =validate_complete_graph_candidate= invocation in
+the preparer and none in either store-application function.  Three token tests,
+=cargo check --all-targets=, and all 115 runnable =grouped_saves= tests pass;
+the one skipped test is the intentionally ignored R2 specification.
+
+** ONGOING Add final-state batches, identity overlay, and change-set derivation
 
 - Implement =NormalizedDefineNodeBatch= and deterministic last-definition per
   PID coalescing for graph semantics.

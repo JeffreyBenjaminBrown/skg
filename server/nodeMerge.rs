@@ -5,9 +5,12 @@ use crate::dbs::filesystem::multiple_nodes::{
   error_unless_each_id_names_one_node,
   read_all_skg_files_from_sources};
 use crate::dbs::init::rebuild_tantivy_from_nodes;
-use crate::dbs::in_rust_graph::{InRustGraphHandle, apply_definenodes};
+use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
 use crate::dbs::in_rust_graph::complete_validation::{
-  format_complete_graph_errors, validate_graph_after_definitions,
+  format_complete_graph_errors,
+};
+use crate::dbs::in_rust_graph::prepared_update::{
+  PreparedGraphUpdate, prepare_graph_update,
 };
 use crate::save::{ update_fs_from_saveinstructions_with_hoist_approval, update_tantivy_from_saveinstructions };
 use crate::types::env::MutationGate;
@@ -16,6 +19,7 @@ use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{DefineNode, NodeMerge};
 use std::error::Error;
 use std::collections::HashSet;
+use std::sync::Arc;
 
 /// Applies NodeMerges to the three stores, in order:
 ///   1) Filesystem (source of truth)
@@ -47,6 +51,28 @@ pub(crate) fn merge_nodes_with_hoist_approval (
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   if nodeMerge_instructions . is_empty () {
     return Ok (None); }
+  error_unless_nodeMerge_hoist_is_approved (
+    nodeMerge_instructions, &config, hoist_approved_pids ) ?;
+  let primary_definenodes : Vec<DefineNode> =
+    nodeMerge_instructions . iter ()
+    . flat_map ( |node_merge| node_merge . to_vec () )
+    . collect ();
+  let base : Arc<InRustGraph> = graph . load_full ();
+  let prepared : PreparedGraphUpdate = prepare_graph_update (
+    &config, base, primary_definenodes)
+    . map_err ( |errors| -> Box<dyn Error> {
+      format_complete_graph_errors (&errors) . into () } ) ?;
+  apply_prepared_nodeMerges (
+    Some (prepared), config, tantivy_index, graph, hoist_approved_pids )
+}
+
+pub(crate) fn error_unless_nodeMerge_hoist_is_approved (
+  nodeMerge_instructions : &[NodeMerge],
+  config                 : &SkgConfig,
+  hoist_approved_pids    : &HashSet<ID>,
+) -> Result<(), Box<dyn Error>> {
+  if nodeMerge_instructions . is_empty () {
+    return Ok (()); }
   // A direct/noninteractive merge gets the empty approval set from the public
   // wrapper above. Refuse if it would copy text out of an overPrivateText acquiree. The
   // interactive save path first inserts and verifies an acquiree Hoist repair,
@@ -61,30 +87,35 @@ pub(crate) fn merge_nodes_with_hoist_approval (
       candidates . iter ()
         . map ( |candidate| candidate . pid . as_str () )
         . collect::<Vec<&str>> () . join (", ") ) . into ()); }
+  Ok (())
+}
+
+pub(crate) fn apply_prepared_nodeMerges (
+  prepared          : Option<PreparedGraphUpdate>,
+  config            : SkgConfig,
+  tantivy_index     : &TantivyIndex,
+  graph             : &InRustGraphHandle,
+  hoist_approved_pids : &HashSet<ID>,
+) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
+  let Some (prepared) = prepared else { return Ok (None); };
   tracing::info!(
     "Merging nodes in filesystem, in-Rust graph, and Tantivy ..." );
-
-  let primary_definenodes : Vec<DefineNode> =
-    nodeMerge_instructions . iter ()
-    . flat_map ( |m| m . to_vec () )
-    . collect ();
-  let graph_snapshot = graph . load_full ();
-  let validation = validate_graph_after_definitions (
-    &config, &graph_snapshot, &primary_definenodes);
-  if ! validation . errors . is_empty () {
-    return Err (format_complete_graph_errors (&validation . errors) . into ()); }
+  prepared . verify_base (graph)
+    . map_err ( |message| -> Box<dyn Error> { message . into () } ) ?;
   { // Filesystem.
     tracing::info!("1) Merging in filesystem ...");
     update_fs_from_saveinstructions_with_hoist_approval (
-      &primary_definenodes,
+      prepared . definitions (),
       &[], // No source-moves during a merge.
       config . clone (),
       hoist_approved_pids ) ?;
     tracing::info!("   Filesystem merge complete."); }
 
-  { // In-Rust graph.
-    apply_definenodes (graph, &primary_definenodes);
-    tracing::info!("   In-Rust graph merge complete."); }
+  let (_candidate, primary_definenodes)
+    : (Arc<InRustGraph>, Vec<DefineNode>) =
+    prepared . publish (graph)
+    . map_err ( |message| -> Box<dyn Error> { message . into () } ) ?;
+  tracing::info!("   In-Rust graph merge complete.");
 
   { // Tantivy.
     match update_tantivy_from_saveinstructions (

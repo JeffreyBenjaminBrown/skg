@@ -1,6 +1,6 @@
 use skg::dbs::in_rust_graph::complete_validation::{
   CompleteGraphError, format_complete_graph_errors, validate_complete_graph,
-  validate_graph_after_definitions,
+  validate_complete_graph_candidate,
 };
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::override_invariants::OverrideInvariantViolation;
@@ -145,7 +145,7 @@ fn save_candidate_is_rejected_before_publication () {
   ]);
   let mut edited = node ("edited", "unconfigured-home");
   edited . extra_ids = vec![ID::from ("existing")];
-  let report = validate_graph_after_definitions (
+  let report = validate_complete_graph_candidate (
     &config (), &current, &[DefineNode::Save (SaveNode (edited))]);
   assert! (report . errors . iter () . any (|error| matches! (
     error, CompleteGraphError::PrimaryExtraCollision { id, .. }

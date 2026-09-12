@@ -168,7 +168,7 @@ pub fn validated_graph (
 /// Materialize a complete candidate node set by applying definitions to one
 /// captured graph.  This is intentionally used before filesystem mutation so
 /// save-time identity/source/topology checks happen before filesystem mutation.
-pub fn validate_graph_after_definitions (
+pub fn validate_complete_graph_candidate (
   config : &SkgConfig,
   current : &InRustGraph,
   definitions : &[DefineNode],
