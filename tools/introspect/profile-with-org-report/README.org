@@ -1,0 +1,69 @@
+#+TITLE: Save-pipeline profiler
+
+* Purpose
+
+This tool profiles the concrete slow-save case rooted at
+=2f77ea44-9e5e-4dfc-b89b-2019971ab05a=.  It copies =data/= to a temporary
+directory below =target/=, starts an isolated server on an unused port, opens
+the recursive content view, adds one single-token headline per measured save,
+and saves it.  The real =data/= tree is read but never written.
+
+It records three complementary kinds of evidence:
+
+- client-observed wall and CPU time;
+- exact Callgrind user-space instruction counts from the Rust server, normal
+  process CPU time, and Emacs's Lisp CPU profiler;
+- counts of graph files, view bytes/headlines, request bytes, save
+  instructions, and files changed in the disposable copy.
+
+The server's structured tracing log supplies nested wall-time spans.  This is
+important because an on-CPU profile cannot account for filesystem or lock
+waits.
+
+* Requirements
+
+=Callgrind= is used because it works when this host denies non-root perf
+events. Install the pinned Valgrind build below =target/profile-tools/= with:
+
+#+begin_src sh
+tools/introspect/profile-with-org-report/install-callgrind.sh
+#+end_src
+
+The optional Samply backend in =run.sh= instead needs =samply= and Linux
+=kernel.perf_event_paranoid=1= or lower.
+
+* Run
+
+From the repository root:
+
+#+begin_src sh
+tools/introspect/profile-with-org-report/run-all.sh
+#+end_src
+
+Optional environment variables:
+
+| variable | default | meaning |
+|----------+---------+---------|
+| =PROFILE_RUNS= | =5= | Number of consecutive one-headline saves. |
+| =PROFILE_SETTLE_SECONDS= | =30= | Time after server readiness for initial Tantivy merges to drain. |
+| =PROFILE_BETWEEN_RUN_SECONDS= | =0.2= | Cooldown between normal-speed saves. |
+| =PROFILE_RATE= | =499= | Samply samples per second. |
+| =PROFILE_KEEP_COPY= | unset | Keep the disposable data root when nonempty. |
+
+Raw evidence is written to =raw/= and the generated Org report to
+=result.org=.  =generate_report.py= can regenerate the report without rerunning
+the benchmark.
+
+* Files
+
+- =run-all.sh=: runs normal-speed wall/CPU measurement, then one exact
+  instruction-count profile, and writes the report.
+- =run.sh=: isolated-data normal-speed orchestration, counted-work manifests,
+  and optional Samply capture.
+- =run-callgrind.sh=: one-save Callgrind capture with collection disabled for
+  startup and enabled only for the save request.
+- =install-callgrind.sh=: pinned, checksum-verified local Valgrind installer.
+- =profile-save.el=: exact Emacs view/edit/save workload and Lisp CPU profile.
+- =generate_report.py=: reads raw evidence and writes the timed Org tree.
+- =how-it-works.toml=: hand-written explanations inserted beneath generated
+  =how that works= headlines.
