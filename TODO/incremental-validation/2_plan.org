@@ -1,0 +1,1057 @@
+#+TITLE: Incremental save validation: implementation plan
+#+TODO: TODO ONGOING | DONE
+
+* Purpose
+
+This is the implementation plan for replacing save-time complete-graph
+validation with validation proportional to the change.  It turns the settled
+decisions in =1_discussion.org= into dependency order, concrete APIs,
+algorithms, test obligations, and completion gates.
+
+The performance target is not permission to weaken an invariant.  The final
+save path must enforce the same hard guarantees as a fresh startup/rebuild,
+must warn about every telescope problem whose truth can have changed, and must
+publish the exact graph candidate that passed those checks.  What changes is
+the proof: a valid base graph plus locally checked changes implies a valid
+candidate, so an ordinary save need not reconstruct and inspect all 54,836
+nodes.
+
+This document is the execution authority.  Change task headlines through
+=TODO -> ONGOING -> DONE= while implementing it.  Do not mark a parent DONE
+until every actionable child and its checkpoint are DONE.  Record important
+implementation evidence directly under the relevant task; avoid creating a
+second, divergent plan.
+
+* Completion contract
+
+The work is complete when all of the following are true:
+
+- an ordinary save constructs one persistent graph candidate from its captured
+  base, incrementally validates it, writes the prepared filesystem output,
+  publishes that exact candidate, and enqueues one owned Tantivy delta;
+- a combined save prepares an ordinary phase from the base and a merge phase
+  from the ordinary candidate, preflights both phases before either writes,
+  and validates neither phase a second time;
+- direct ordinary-save and direct node-merge entry points use those same
+  preparation boundaries and cannot bypass them;
+- save-time hard validation is proportional to changed nodes, changed edges,
+  changed identity mappings, affected inbound owners, and traversed override
+  chains—not total graph size;
+- startup, rebuild, explicit audits, and test oracles retain full validation;
+- arbitrary extra-ID revocation by =Save(P)= is rejected before mutation,
+  while =Delete(P)= correctly rekeys surviving raw references;
+- telescope warnings are recomputed for exactly a conservative affected-owner
+  set, including merge-only changes and absent-target privacy;
+- the old neighbor-resave assumption and dead full-warning work are gone; and
+- a repeat of the original recursive-content benchmark is no longer dominated
+  by complete-graph validation.
+
+* Jeff adds
+** Make incremental commits
+however seems natural.
+** Make progress visible here
+by cycling headlines and subheadlines through TODO, ONGOING and DONE.
+* Settled decisions
+
+These choices came from =1_discussion.org=.  Reopen one only if code or test
+evidence exposes a contradiction, not merely because another implementation
+is possible.
+
+1. Keep =validate_complete_graph= as the startup/rebuild/full-audit oracle.
+   Remove it from the production save hot path after the incremental proof is
+   differentially established.
+2. Use a private prepared token, not an =already_validated= boolean.
+3. Publish the candidate carried by that token; never reapply its definitions
+   to whatever graph happens to be current.
+4. For combined saves, use selected Option A: prepare ordinary and node-merge
+   phases separately, based on consecutive snapshots, and preflight all
+   filesystem work before the first write.
+5. Normalize a node's IDs stably: its PID is the first occurrence; retain only
+   the first occurrence of every different extra ID.
+6. Primary/extra and extra/extra ownership conflicts mean claims by distinct
+   PIDs.  Repetition by one owner is normalization, not collision.  The raw
+   startup case in which multiple telescopes define the same primary PID
+   remains a separate =DuplicatePrimaryId= error.
+7. Interpret a batch simultaneously for identity purposes: remove all touched
+   old claims, then add each PID's final claims.
+8. Reject arbitrary extra-ID removal by =Save(P)=.  Accept additions and merge
+   acquisition.  Treat =Delete(P)= as a supported operation with local inverse-
+   index rekeying.
+9. Do not provide managed arbitrary ID revocation.  A user may think an unused
+   extra ID is safe to delete while somebody else uses it to link to the data.
+   Even the most private dataset may have been shared with a trusted person,
+   and Skg cannot infer that social boundary.  A determined user can edit the
+   raw file and rebuild, but such memory micro-optimization is rarely worth
+   the broken-link risk.
+10. Derive override work from changed canonicalization and changed ownership/
+    edges, not from which neighbors happened to receive =SaveNode=s.
+11. Keep filesystem telescope preparation incremental and ahead of mutation.
+12. Treat internal-index checks as code-consistency checks.  Use always-on
+    local postconditions for a save candidate and reserve the independent full
+    reconstruction comparison for startup, rebuild, explicit audit, and tests.
+13. Telescope violations remain warnings.  A dangling relationship is judged
+    against its extant owner's home until its target exists.
+14. Preserve ordinary-then-merge Tantivy ordering and existing node-merge
+    recovery behavior in this initiative.
+15. Preserve today's save-time warning delivery (logging after successful
+    commit).  Do not add a live persistent warning index or a sampled/background
+    full audit without evidence that either is needed.
+
+* Target architecture
+
+** Authority and proof boundary
+
+The authoritative state and proof flow should be:
+
+#+begin_example
+captured valid Arc<InRustGraph>
+          + normalized final phase definitions
+          |
+          v
+prepare_graph_update
+  - simultaneous identity overlay
+  - configured-home and revocation checks
+  - old/new change-set derivation
+  - one batch-aware apply_definenodes_to_inRustGraph
+  - affected override checks
+  - local internal-index postconditions
+          |
+          v
+PreparedGraphUpdate
+  - exact base Arc
+  - owned normalized definitions
+  - exact candidate Arc
+  - change metadata
+          |
+          +--> filesystem preparation succeeds before mutation
+          |
+          v
+apply_defineNodes
+  - verify expected base
+  - apply prepared filesystem output
+  - publish exact candidate
+  - enqueue owned Tantivy delta (ordinary phase)
+#+end_example
+
+The induction hypothesis is that a graph admitted at startup or published by a
+previous prepared update satisfies all hard invariants and has coherent
+indexes.  Every production mutation of an existing graph must pass through the
+new boundary.  Rebuild is the separate base case: it constructs and fully
+validates an entire replacement graph before publication.
+
+** Combined-save sequence
+
+The selected combined path remains two store phases, but all fallible semantic
+and serialization preparation occurs before the first mutation:
+
+#+begin_example
+hold the environment mutation gate
+  capture base
+  finish delete propagation, Hoist repairs, and fork definitions
+  normalize ordinary definitions
+  prepare ordinary graph candidate from base
+  expand and normalize merge triples
+  prepare merge graph candidate from ordinary candidate
+  prepare ordinary filesystem token
+  prepare merge filesystem token
+  derive final telescope warnings from base -> merge candidate
+
+  apply ordinary filesystem token
+  publish the exact ordinary candidate to the private/direct graph handle
+  enqueue the ordinary Tantivy delta
+
+  apply merge filesystem token
+  publish the exact merge candidate
+  perform the synchronous merge Tantivy update/rebuild fallback
+
+  emit the final affected-owner telescope warnings
+release gate / publish the final runtime generation
+#+end_example
+
+In the TCP handler the two graph publications affect its private
+=working_graph=; readers see only the final runtime publication.  A direct
+combined caller retains today's observable ordinary-then-merge sequence.  The
+second token's base must be the first token's exact candidate =Arc=.
+
+If either graph preparation or either filesystem preparation fails, neither
+phase writes.  Filesystem application can still partially fail, just as it can
+today; making multi-file disk writes transactional is outside this plan.
+
+** Direct one-phase sequence
+
+=update_graph_minus_nodeMerges= and =merge_nodes= continue to acquire the
+shared mutation gate.  Their under-gate implementations must:
+
+1. load the base once;
+2. finish phase-specific expansion/Hoist checks;
+3. prepare one graph token and one filesystem token;
+4. apply the filesystem token;
+5. consume the graph token to publish its candidate; and
+6. enqueue or synchronously update Tantivy as appropriate.
+
+There is no public or crate-private path that accepts arbitrary definitions and
+stores them without preparation.
+
+* Concrete types and API boundaries
+
+Names below are targets.  Small adjustments for Rust visibility or existing
+module conventions are allowed, but their contracts are not.
+
+** =GraphChangeSet=
+
+Put the change derivation beside graph mutation, likely in a new old-style
+submodule under =server/dbs/in_rust_graph/=.  Keep fields private and expose
+purpose-specific accessors so unrelated callers cannot begin depending on
+incidental sets.
+
+#+begin_src rust
+struct GraphChangeSet {
+  touched_pids: HashSet<ID>,
+  saved_pids: HashSet<ID>,
+  deleted_pids: HashSet<ID>,
+  affected_ids: HashSet<ID>,
+  canonicalization_changes: Vec<CanonicalizationChange>,
+  owners_to_reindex: HashSet<ID>,
+  override_sources_to_check: HashSet<ID>,
+  override_targets_to_check: HashSet<ID>,
+  telescope_owners_to_check: HashSet<ID>,
+  identity_acquisitions: Vec<IdentityAcquisition>,
+}
+#+end_src
+
+=affected_ids= is the union of old and final PIDs/extras of touched owners.
+=CanonicalizationChange= records a raw ID and its old and final resolved PID
+(each optional).  =IdentityAcquisition= records enough provenance to recognize
+that a merge made the acquiree ID resolve to the acquirer and to render the
+specific four-party override diagnostic.
+
+The change set is derived from the captured base and the phase's coalesced
+final definitions before mutating the candidate.  It is not rediscovered by
+diffing every node afterward.
+
+** Normalized phase batch
+
+Preparation needs both filesystem instructions and one final graph state per
+PID.  Represent that explicitly rather than relying on repeated-definition
+order:
+
+#+begin_src rust
+struct NormalizedDefineNodeBatch {
+  filesystem_definitions: Vec<DefineNode>,
+  final_graph_definitions: Vec<DefineNode>,
+}
+#+end_src
+
+- Normalize every =SaveNode='s IDs in =filesystem_definitions= so bytes written
+  to disk agree with the candidate.
+- Coalesce =final_graph_definitions= to the last definition for each PID, in a
+  deterministic order.  This is the simultaneous logical overlay used by
+  validation and graph mutation.
+- Preserve the filesystem instructions required by the existing telescope
+  writer.  Do not silently change delete/write or ordinary/merge disk ordering
+  while introducing graph coalescing.
+- Test repeated =Save/Save=, =Save/Delete=, and =Delete/Save= definitions even
+  if the parser normally reconciles them earlier.  The preparation boundary
+  must have defined behavior on all three.
+
+** =PreparedGraphUpdate=
+
+Use a crate-private type with private fields and no public constructor:
+
+#+begin_src rust
+struct PreparedGraphUpdate {
+  base: Arc<InRustGraph>,
+  candidate: Arc<InRustGraph>,
+  definitions: Vec<DefineNode>,
+  changes: GraphChangeSet,
+}
+#+end_src
+
+Preparation returns this only after all hard checks and local consistency
+postconditions pass.  It owns the definitions so the ordinary Tantivy task can
+take them without cloning.  Read-only accessors may expose the candidate and
+change metadata while preparing a consecutive merge phase and final warnings.
+
+Before any filesystem mutation, its consumer checks =Arc::ptr_eq= between the
+token's base and the handle's current graph.  All supported consumers also hold
+the mutation gate.  The pointer check therefore catches API misuse or an
+un-audited writer; it is not the synchronization mechanism.  After the check
+and successful filesystem application, consuming publication stores
+=candidate= directly.  It never calls the graph transformation again.
+
+** Prepared filesystem tokens
+
+Retain the existing =PreparedFilesystemUpdate= concept in =server/save.rs=,
+but expose a crate-private constructor and consuming =apply=.  Stop using a
+preflight that prepares and discards serialized output only for each lower
+phase to prepare it again.
+
+For a combined save, construct both the ordinary token (with source moves) and
+the merge token (with no source moves) before consuming either.  This is the
+selected union preflight while preserving two application phases and their
+ordering.  Each token retains its prepared telescope bytes, deletion paths,
+and Hoist verification data.
+
+** Errors
+
+Define structured preparation errors and format them only at the save/protocol
+boundary.  Required variants are:
+
+- distinct-owner identity collision, with the contested ID and owners;
+- unconfigured final home, with PID and source;
+- arbitrary extra-ID revocation, with PID, title, and every dropped ID;
+- ordinary override monogamy/cycle violation;
+- merge-created override collision, with the acquisition plus acquirer,
+  acquiree, existing overrider(s), and redirected overrider(s);
+- local internal-index inconsistency, identifying index/key/owner; and
+- stale prepared base, identifying an internal writer-boundary bug.
+
+Keep user-data violations separate from internal-consistency failures.  The
+former should become =SaveError::BufferValidationErrors= and preserve parse
+warnings.  The latter should be reported as an internal/database failure, not
+as advice that the user repair valid data.
+
+Errors must be deterministic: sort IDs, owners, cycles, and participant lists
+before formatting.
+
+** Names and visibility
+
+Perform the accepted name cleanup while introducing the boundary:
+
+- =apply_defineNodes= is the multi-store commit orchestrator;
+- =apply_definenodes_to_inRustGraph= remains the graph-only transformation;
+- remove the ambiguous handle-mutating =apply_definenodes= wrapper;
+- rename =validate_graph_after_definitions= to
+  =validate_complete_graph_candidate= while it remains a whole-graph oracle;
+- add =enqueue_tantivy_delta= for the ordinary queued path; and
+- make raw candidate transformation/publication no more visible than tests and
+  preparation require.
+
+=enqueue_tantivy_delta= takes the exact post-phase candidate, the Tantivy
+handle, and owned definitions.  It derives context-origin types from that
+candidate, constructs =TantivyWriteTask=, and enqueues it.  This removes the
+current definitions clone and prevents context metadata from being read from a
+later graph snapshot.
+
+* Incremental algorithms
+
+** Stable ID normalization
+
+Add one shared =NodeComplete= helper that scans =extra_ids= in order with a
+seen set initially containing =pid=.  It retains the first occurrence of every
+other ID and removes later occurrences plus the PID itself.  It is idempotent
+and does not sort.
+
+Call it:
+
+- immediately after telescope folding produces a =NodeComplete=;
+- on every final synthesized =SaveNode= entering graph/filesystem preparation;
+  and
+- defensively inside the complete validator's owned/materialized input path so
+  direct tests and explicit audits use the same semantics.
+
+Update =validate_complete_graph= to collect sets of owning PIDs rather than
+occurrence counts.  =DuplicateExtraId= requires at least two distinct owners;
+=PrimaryExtraCollision= requires that a distinct extra owner claims another
+node's PID.  Cross-node collisions remain hard errors.
+
+** Final-state identity overlay
+
+Validate claims without cloning or walking the base graph:
+
+1. coalesce the phase to one final definition per PID;
+2. regard every touched PID and all of its old extras as removed from the base
+   ownership view;
+3. add every final =Save='s PID and normalized extras to a small overlay;
+4. for each claim, consult untouched base primary and extra owners plus the
+   overlay; and
+5. reject only if two distinct PIDs own the same ID.
+
+This ordering permits a node merge to transfer =N2= from primary ownership to
+an extra ID of =N1= in one phase.  It also catches two saves claiming the same
+new ID and a changed node colliding with an untouched primary or extra owner.
+
+For each final =Save(P)=, compare its final extra set with the base node's old
+extra set.  If =old - final= is nonempty, return the selected protective
+revocation error before graph or filesystem preparation.  Do not run this
+check when the final definition for =P= is =Delete(P)=.
+
+Configured-home validation is simply a membership lookup for each final saved
+node.  A valid base means untouched homes require no work.
+
+** Batch-aware persistent graph update
+
+Replace the current per-definition monotonic-alias assumptions inside
+=apply_definenodes_to_inRustGraph=.  The final algorithm should be:
+
+1. Clone the base =InRustGraph=.  The =im= maps structurally share untouched
+   branches.
+2. Determine owners needing inverse-index rebuild:
+   - every touched owner; and
+   - every possible inbound owner found at the old canonical keys of IDs whose
+     canonical target changes.
+3. For each such owner, remove all of its old contributions to the five
+   inverse indexes.  Resolve its raw forward members with the /base/ identity
+   map, not a partially mutated map.
+4. Remove touched nodes and their old extra-ID claims.
+5. Insert all final nodes and all final extra-ID claims in a first pass.  The
+   complete final canonical map must exist before any forward relation is
+   indexed.
+6. Re-add contributions for every surviving affected owner from its final raw
+   forward fields, resolving through the /final/ identity map.  For untouched
+   inbound owners, use their existing =NodeRust= and =textlinks_to=; do not
+   parse their bodies again.
+7. Return the candidate without publishing it.
+
+Removing and re-adding all five relationship contributions for the relatively
+small affected owner set is preferable to five subtly different migration
+algorithms.  It handles alias acquisition, transfer, supported deletion,
+changed outgoing edges, and body text-link changes with one rule.
+
+For =Delete(P)=, candidate-owner discovery must conservatively inspect the old
+=contained_by[P]=, =subscribers_of[P]=, =hiders_of[P]=, =overriders_of[P]=,
+and =textlinks_in[P]= sets.  These keys may aggregate raw references to =P=
+and any of its extras.  Reindex the discovered surviving owners from their raw
+fields under the final map:
+
+- delete propagation has already stripped owned structural references, so
+  those make no new contribution;
+- foreign structural references survive and become dangling under their raw
+  spelling; and
+- text links survive and likewise move to their correct final raw key.
+
+This is the supported deletion-specific rekey.  It must not be generalized
+into managed arbitrary alias revocation.
+
+** Local internal-index postconditions
+
+Keep =validate_internal_indexes= as the independent O(graph) oracle.  Add a
+separate local checker over the preparation artifacts.
+
+For =nodes= and =extra_id_to_pid=, assert:
+
+- every final Save PID maps to exactly its final =NodeRust=;
+- every final Delete PID is absent;
+- every affected final extra maps to its sole final owner;
+- every old claim removed by the phase is absent unless the overlay assigns it
+  to a new owner; and
+- no PID is stored as its own extra mapping after normalization.
+
+For each of =contained_by=, =subscribers_of=, =hiders_of=, =overriders_of=,
+and =textlinks_in=:
+
+1. derive the old expected keys for each affected owner from its base raw
+   forward fields and base canonical map;
+2. derive the final expected keys from its candidate raw fields and final map;
+3. inspect the union of those keys;
+4. assert that owner membership was removed from =old - final= and exists in
+   =final=; and
+5. assert that an affected key whose set becomes empty is absent, not retained
+   with an empty set.
+
+Also compare full sets at canonicalization-migration keys when every base
+member of those sets was placed in =owners_to_reindex=.  This catches loss or
+duplication while moving aggregated inbound sets.
+
+These postconditions are always on because their work is bounded by the delta.
+Failure is an internal bug and aborts before filesystem mutation.  In tests,
+follow them with the complete independent =validate_internal_indexes= oracle.
+
+** Affected override validation
+
+Compute the proof neighborhood from semantics, not incidental writes.
+
+=override_sources_to_check= contains:
+
+- every final saved node whose source or raw =overrides_view_of= can differ;
+  and
+- every old/new inbound owner reached through =overriders_of= at both sides of
+  a canonicalization change.
+
+=override_targets_to_check= contains the old and final canonical targets of
+every raw override edge belonging to those sources.  On the exact candidate:
+
+- for each target, use =overriders_of= and final source ownership to reject
+  more than one user-owned overrider;
+- from every affected source that is user-owned in the candidate, run the
+  existing functional =resolve_override= walk and reject a cycle; and
+- canonicalize/deduplicate cycle errors exactly as the whole validator does.
+
+A new violation in a previously valid base must contain a changed edge, an
+owner whose owned/foreign class changed, or an edge whose target was
+recanonicalized.  The above source set includes each such edge owner.  Deleting
+an edge or node can resolve an old problem but cannot create an unrelated one.
+
+Keep the whole override scan in the save path temporarily while differential
+tests compare its result with the affected check.  Remove it only after the
+canonicalization cases pass without artificial neighbor saves.
+
+** Merge-specific override diagnostic
+
+When an =IdentityAcquisition= redirects an old inbound override onto a target
+that already has another user-owned overrider, produce the structured merge
+error rather than only the generic final-state error.
+
+For the =N1/N2/R1/R2= shape:
+
+- acquirer =N1= is the final owner of acquired ID =N2=;
+- acquiree =N2= comes from the base graph and may be absent in the candidate;
+- existing overrider =R1= already resolved to =N1= in the base; and
+- redirected overrider =R2= resolved to =N2= in the base and resolves to =N1=
+  in the candidate.
+
+Gather IDs and titles from the captured base/candidate graphs—never a disk
+reread.  Support vectors in case a corrupt/test input supplies more than one
+participant, while rendering the normal four-party case plainly.  The message
+must explain the canonicalization, state the monogamy rule, and show both chain
+repairs:
+
+#+begin_example
+Before the merge:
+  R1 -> N1
+  R2 -> N2
+
+The merge would produce:
+  R1 -> N1
+  R2 -> N1
+
+Remove either edge, or choose precedence:
+  R2 -> R1 -> N1
+or
+  R1 -> R2 -> N1
+#+end_example
+
+The symbolic diagram stays symbolic; the separately rendered participant
+list carries actual IDs and titles.
+
+** Affected telescope warnings
+
+Warnings must describe the overall committed state, not an intermediate
+ordinary phase that a merge immediately changes.  For a one-phase operation,
+use its base, candidate, and change set.  For a combined operation, union the
+two phase change sets and evaluate once against the final merge candidate.
+
+The affected-owner set contains:
+
+- every final saved PID whose raw relationship fields or home can differ; and
+- owners in the old and final =contained_by=, =subscribers_of=, =hiders_of=,
+  and =overriders_of= sets at the old and final canonical keys for an ID whose
+  existence, canonical PID, or target home changed.
+
+The second rule catches untouched owners when a target is created, deleted,
+merged, acquires an alias, or changes home.  It is deliberately conservative:
+checking a few owners whose warning could not change is safe; omitting one
+whose warning could change is not.
+
+Call =telescope_violations_of= once for each sorted affected owner on the exact
+final candidate.  Do not inspect =textlinks_in=: telescope privacy applies to
+the four structural relationship fields, not body links.
+
+Extend =TelescopeViolation= with a distinct absent-target privacy warning.  In
+=telescope_violations_of=:
+
+- if a member resolves to an extant target, keep using the target's home as
+  the privacy ceiling;
+- if it does not resolve, use the extant owner's home as the ceiling; and
+- warn if the relationship's recording source is strictly more public than
+  that ceiling.
+
+Use the same primitive in full startup/rebuild reports and incremental save
+checks.  Its message must distinguish “target absent; judged against owner
+home” from an extant-target leak so the repair advice is intelligible.
+
+* Dependency-ordered implementation work
+
+** TODO Establish a clean baseline and regression fixtures
+
+- Record HEAD and the pre-existing worktree changes; preserve unrelated user
+  files and never modify =data/=.
+- Run focused current tests for complete validation, internal indexes,
+  overrides, telescope invariants, ordinary save, merge, and delete.
+- Run the profiler once only if the existing raw/result evidence does not match
+  the current HEAD.  It must use the tool's disposable data copy.
+- Capture, in trace/profile evidence rather than a durable behavioral test,
+  that the no-merge save currently calls the complete candidate validator
+  twice.
+- Add regression tests that expose the semantic targets before refactoring:
+  - the merge collision fails without an artificial =Save(R2)= once the new
+    affected check is substituted;
+  - rejection happens before filesystem and graph changes; and
+  - direct ordinary and merge entry points enforce validation.
+- Record narrow nextest filters that select these tests reliably.
+
+*** Checkpoint
+
+The focused baseline is green except for deliberately added ignored/pending
+regressions that describe the new behavior.  The original CPU profile and its
+graph size/definition counts are identified for final comparison.
+
+** TODO Implement one stable ID-normalization rule and repair the full oracle
+
+- Add the idempotent =NodeComplete= helper and unit tests for order retention,
+  repeated extras, PID-in-extras, and already-normal input.
+- Call it after telescope fold and at final =SaveNode= preparation.
+- Make =validate_complete_graph= materialize normalized nodes and count
+  distinct owners for extra-ID claims, while retaining its raw duplicate-
+  primary-telescope check.
+- Update complete-validation tests so self-repetition is accepted/normalized
+  and every distinct-owner collision remains rejected.
+- Verify graph construction and serialized telescope output both receive the
+  same normalized list.
+
+*** Checkpoint
+
+Focused telescope and complete-validation tests pass, followed by
+=cargo nextest run --test grouped_unit=.  No existing merge extra-ID order
+expectation changes except removal of actual duplicates/PID self-repetition.
+
+** TODO Introduce the prepared token and remove duplicate whole validation
+
+- Rename the transitional oracle to =validate_complete_graph_candidate=.
+- Add =PreparedGraphUpdate= with private construction and consuming
+  publication.
+- Initially allow preparation to use the complete validator and carry its
+  returned graph as the exact candidate.  This provides a safe halfway state:
+  one whole rebuild, not two, and the checked graph is the published graph.
+- Refactor ordinary, combined, and direct merge entry points to prepare once
+  per phase and consume their tokens.
+- Add the expected-base pointer check before filesystem mutation.
+- Rename =apply_defineNodes_to_stores= to =apply_defineNodes= and delete the
+  handle-mutating =apply_definenodes= wrapper.
+- Extract =enqueue_tantivy_delta= and transfer owned ordinary definitions into
+  the background task without cloning.
+- Preserve synchronous merge Tantivy update and rebuild fallback.
+- Remove the outer/inner revalidation pair and any =already validated= escape
+  mechanism.
+
+*** Checkpoint
+
+All save/merge tests pass.  Instrumentation shows one whole candidate
+validation for an ordinary save, one per prepared phase for a combined save,
+and zero revalidation inside =apply_defineNodes=.  Deliberately corrupt/stale
+tokens cannot be constructed outside the defining module.
+
+** TODO Add final-state batches, identity overlay, and change-set derivation
+
+- Implement =NormalizedDefineNodeBatch= and deterministic last-definition per
+  PID coalescing for graph semantics.
+- Derive touched/saved/deleted PIDs and old/final identity sets.
+- Implement simultaneous removal/addition ownership lookup without a graph
+  scan.
+- Add configured-home and protective revocation errors.
+- Record every changed raw-ID canonical mapping and merge identity acquisition.
+- Add unit tests for collisions with untouched owners, within-batch
+  collisions, repeated definitions, valid merge transfer, additions,
+  revocation refusal, and full store non-mutation on refusal.
+
+*** Checkpoint
+
+For generated small identity-only graphs and batches, incremental
+acceptance/errors equal the revised full validator.  Complexity counters show
+lookups proportional to affected IDs, not =graph.nodes.len()=.
+
+** TODO Make graph mutation batch-aware, including supported deletion rekeying
+
+- Refactor inverse removal/addition helpers to accept an explicit old or final
+  canonical resolver.
+- Implement affected-owner discovery across all five inverse indexes.
+- Remove old contributions before changing identity, install all final
+  identity claims, then add final contributions.
+- Reuse stored =NodeRust.textlinks_to= for untouched owners.
+- Implement deletion rekeying for surviving foreign relations and text links;
+  retain delete-propagation removal of owned structural references.
+- Replace monotonic-acquisition/revocation comments with the new batch
+  contract.
+- Keep =apply_definenodes_to_inRustGraph= pure with respect to publication.
+
+*** Checkpoint
+
+Focused tests cover add/remove/migration in each inverse index, acquisition of
+primary and extra IDs, deletion through primary/extra/raw text spellings, and
+empty-key removal.  Every candidate equals =InRustGraph::from_nodecompletes=
+on the same final nodes and passes =validate_internal_indexes=.
+
+** TODO Add always-on local internal-index postconditions
+
+- Implement delta-scoped node, extra-ID, and five-inverse-index checks.
+- Make preparation return an internal-consistency error before filesystem
+  preparation if a postcondition fails.
+- Add fault-injection unit tests that deliberately omit a removal, insertion,
+  migration, and empty-key cleanup and prove the relevant local check notices.
+- Retain =validate_internal_indexes= unchanged as an independent whole-graph
+  audit, apart from normalization semantics required by the revised oracle.
+
+*** Checkpoint
+
+The local checker catches each injected mutation bug and examines no unrelated
+node/index key in complexity-instrumented tests.  The full checker remains
+green on every accepted candidate.
+
+** TODO Replace touched-only override validation with affected validation
+
+- Derive affected sources and targets from old/new raw edges, source ownership,
+  and canonicalization changes.
+- Check candidate monogamy at affected targets and cycles from affected owned
+  sources.
+- Compare affected and full override results across generated small graphs and
+  batches.
+- Rewrite =merge_that_collides_two_overriders_is_rejected= without unchanged
+  =Save(R2)=.
+- Add alias-redirection cycle, ownership-class change, edge deletion, target
+  deletion, and chain-success tests.
+- Implement and test the structured N1/N2/R1/R2 diagnostic, including all four
+  actual IDs/titles, canonicalization explanation, and both repair chains.
+- Prove collision rejection precedes filesystem mutation and graph
+  publication.
+- Only after those tests pass, remove the whole override pass from production
+  preparation.
+
+*** Checkpoint
+
+Incremental and whole override validators agree in property tests.  The stale
+collision fixture no longer supplies =Save(R2)=, and its error is actionable
+rather than generic.
+
+** TODO Switch preparation from the whole candidate oracle to incremental proof
+
+- Build the candidate by cloning the captured persistent base and invoking the
+  batch-aware =apply_definenodes_to_inRustGraph= exactly once.
+- Run identity, configured-home, revocation, affected-override, and local-index
+  checks on/around that exact candidate.
+- Stop calling =validate_complete_graph_candidate= in production preparation.
+- Keep a test-only/differential helper that materializes the final complete
+  node set and runs the whole oracle.
+- Audit all graph publication sites.  Existing-save mutation must be reachable
+  only by consuming =PreparedGraphUpdate=; startup/rebuild remain full-build
+  base cases under the mutation gate.
+
+*** Checkpoint
+
+Repository-wide call search finds no production save call to
+=validate_complete_graph_candidate=, =validate_complete_graph=,
+=validate_override_invariants=, or =validate_internal_indexes=.  Property
+tests show accepted candidates and rejected hard errors match the whole oracle.
+
+** TODO Reuse prepared filesystem work in the two-phase store pipeline
+
+- Expose crate-private preparation and consuming application for
+  =PreparedFilesystemUpdate=.
+- Construct ordinary and merge filesystem tokens before consuming either.
+- Remove prepare-and-discard preflight calls and lower-phase reserialization.
+- Keep ordinary source moves attached only to the ordinary token.
+- Preserve Hoist disk reread/confirmation behavior and post-write verification.
+- Keep graph publication after that phase's successful filesystem application.
+- Derive =deleted_by_this_save_extra_ids= from the captured base and complete
+  definition set before tokens are consumed, preserving rerender behavior.
+
+*** Checkpoint
+
+Fault tests for serialization, ownership, Hoist refusal, and invalid deletion
+path prove neither phase mutates when either preparation fails.  Existing
+ordinary-then-merge partial-I/O/recovery behavior is unchanged.
+
+** TODO Remove the obsolete merge-neighbor resave assumption
+
+- Confirm with repository-wide call search that
+  =neighbor_savenodes_for_nodeMerges= and its supporting neighbor query have no
+  production caller.
+- Add a successful merge with inbound structural relations and text links that
+  proves all inverse sets move/rekey to the acquirer while neighbor files'
+  bytes and mtimes remain unchanged.
+- Keep the rewritten R1/R2 collision test as proof that no neighbor write is
+  required for validation either.
+- Delete the dead helper and now-unused imports only after both tests pass.
+- Correct TypeDB-era cascade/resave explanations in source and tests.  Do not
+  introduce collateral no-op saves as a replacement.
+
+*** Checkpoint
+
+Call search finds no neighbor-resave helper or claim that merges rewrite
+unchanged inbound neighbors.  Merge graph queries and a fresh full graph rebuild
+produce the same inverse indexes without those writes.
+
+** TODO Implement affected telescope warnings and absent-target privacy
+
+- Add the explicit absent-target violation and display text.
+- Apply owner-home fallback uniformly to =contains=, =subscribes_to=,
+  =hides_from_its_subscriptions=, and =overrides_view_of=.
+- Derive conservative affected owners for one-phase and combined operations.
+- Evaluate warnings against the final candidate before mutation; emit them
+  only after successful commit, preserving warning-only enforcement.
+- For combined saves, evaluate the union once against the final merge
+  candidate so intermediate warnings are neither duplicated nor leaked.
+- Differentially prove that every owner whose full before/after warning set
+  changes is in the affected-owner set, and compare emitted warnings with the
+  full final warnings restricted to that set.
+- Add targeted absent-more-public, absent-at-owner-home, absent-more-private,
+  absent-to-present, present-to-absent, target-home-move, alias acquisition,
+  and merge-only tests for all four relationship fields.
+
+*** Checkpoint
+
+Affected and full before/after warning comparisons agree.  Instrumentation
+shows one =telescope_violations_of= call per affected owner and none for an
+unaffected graph node.
+
+** TODO Retire dead full-warning and transitional save code
+
+- Remove complete-graph warning computation whose result is discarded by save.
+- Remove the old post-save loop over ordinary saved PIDs.
+- Make the final affected-owner result the sole save-time telescope warning
+  source.
+- Keep =validate_all_telescopes= for startup, rebuild, full report generation,
+  and explicit/test audit.
+- Remove transitional adapters, obsolete comments, spans, imports, and error
+  formatting reachable only from the old save validator.
+- Update =docs/data-model_technical.org= where ID normalization, revocation,
+  deletion rekeying, or validation boundaries are described.
+- Update profiling =how-it-works.toml= labels if renamed spans/functions would
+  otherwise make the generated report stale.
+
+*** Checkpoint
+
+Repository-wide call search proves no save path calls
+=validate_all_telescopes=.  Startup/rebuild warning reports and save affected
+warnings both still use =telescope_violations_of=.
+
+** TODO Run the soundness and regression gates
+
+- Run focused tests after every task; do not postpone the first meaningful
+  feedback until the full suite.
+- Run the relevant grouped suites:
+
+#+begin_src sh
+cargo check --all-targets
+cargo nextest run --test grouped_unit
+cargo nextest run --test grouped_saves
+cargo nextest run --test grouped_overrides
+cargo nextest run --test grouped_sources
+cargo nextest run --test grouped_views
+cargo nextest run --test git_diff_view --test git_diff_view_partner_cols
+cargo test --doc
+#+end_src
+
+- Run client/integration gates because save errors and warnings cross the
+  protocol boundary:
+
+#+begin_src sh
+bash/emacs-tests.sh
+bash/nvim-tests.sh
+bash/integration-tests.sh
+#+end_src
+
+- Run formatting only on touched Rust files or the repository-standard target;
+  do not reformat unrelated user work.
+- On failure, record the exact fingerprint and first cause.  A green result at
+  a different source fingerprint is not evidence for the final state.
+
+*** Checkpoint
+
+All focused, grouped, documentation, client, and integration gates are green
+at the final implementation fingerprint, with no server required to write the
+repository's real =data/=.
+
+** TODO Reprofile the original slow save and report scaling
+
+Run:
+
+#+begin_src sh
+tools/introspect/profile-with-org-report/run-all.sh
+#+end_src
+
+The tool must continue to copy =data/= beneath =target/= and mutate only that
+disposable copy.  Compare with the original report using all already-supported
+measures:
+
+- client wall time;
+- server process CPU time;
+- Callgrind instruction count/share;
+- nested span wall time; and
+- Emacs Lisp CPU time.
+
+Add or retain counters for total graph nodes, normalized definitions, affected
+IDs, owners reindexed, override sources/targets checked, override-chain steps,
+telescope owners checked, and local-index keys checked.  These counts make the
+scaling claim falsifiable even when absolute host timing is noisy.
+
+Required profile assertions:
+
+- no production save stack contains =validate_complete_graph_candidate= or a
+  full graph materialization;
+- the candidate transform runs once per prepared phase;
+- ordinary context types are derived from that candidate and definitions are
+  moved into one Tantivy queue task;
+- body text-link parsing occurs only for saved nodes;
+- validation/index work tracks the recorded affected counts, not 54,836; and
+- validation no longer dominates end-to-end save time.
+
+Do not commit generated =result.org= or =raw/= output; the top-level
+=.gitignore= remains authoritative for profiling artifacts.
+
+*** Checkpoint
+
+The new generated Org report contains the five measurements and work counters,
+and its explanation maps the remaining material costs to real work.  If wall
+time remains unexpectedly high, use the CPU/wait distinction to identify a new
+culprit before declaring this initiative complete.
+
+* Differential and property-test design
+
+Use =proptest=, already present in the repository, for small graph/batch
+generation.  Keep cases small enough that the whole oracle is cheap and make
+failure seeds reproducible.
+
+** Valid base generation
+
+- Generate unique primary IDs and disjoint stable extra-ID sets.
+- Generate configured owned/foreign homes.
+- Generate relationship members as primary IDs, extra IDs, and unknown IDs,
+  each with configured source annotations.
+- Generate override forests/chains satisfying monogamy and acyclicity; include
+  foreign override edges that do not participate in automatic replacement.
+- Generate optional bodies with zero or more =id:= links.
+- Construct the base with =validate_complete_graph= and discard invalid bases
+  rather than encoding a second full invariant implementation in the generator.
+
+** Batch generation
+
+Generate ordinary Saves, Deletes, source moves, and merge-shaped batches,
+including repeated definitions for one PID.  Classify arbitrary alias removal
+as an expected incremental rejection even if a materialized final graph would
+otherwise be globally valid; it is a deliberately stronger operation-policy
+gate, not a graph invariant.
+
+** Comparisons
+
+For every permitted batch compare:
+
+- incremental identity/home acceptance with the whole final graph;
+- affected override violations with the whole override validator;
+- the prepared candidate's nodes and six indexes with a fresh
+  =InRustGraph::from_nodecompletes=;
+- local internal-index success with full =validate_internal_indexes=; and
+- every owner whose warning set changes is included in the derived affected
+  set, and the affected warning result equals the full final warnings restricted
+  to that set.
+
+For every rejection assert that filesystem bytes, graph =Arc= identity, and
+Tantivy queue state are unchanged.
+
+* Targeted regression matrix
+
+| Concern | Required cases |
+|---------+----------------|
+| normalization | repeated extra; repeated PID as extra; stable first-occurrence order; idempotence |
+| identity | collision with untouched primary; collision with untouched extra owner; two batch Saves claim one ID; valid simultaneous transfer |
+| repeated definitions | Save/Save; Save/Delete; Delete/Save; graph final state and filesystem behavior explicit |
+| revocation | ordinary drop rejected with PID/title/all IDs; unchanged alias accepted; addition accepted; merge acquisition accepted |
+| deletion | owned structural refs stripped; foreign primary/extra refs survive/rekey; text links survive/rekey; empty inverse keys removed |
+| configured homes | new/moved Save to unknown source rejected; Delete unaffected |
+| override monogamy | new parallel edge; ownership change; alias redirects untouched R2; removal succeeds |
+| override cycles | changed edge closes cycle; acquired ID closes cycle through untouched edge; legal chain accepted |
+| merge error UX | N1/N2/R1/R2 IDs and titles; causal text; both chain repairs; no pre-error mutation |
+| graph token | exact candidate published; stale base rejected; definitions cannot drift; direct entry points prepare |
+| filesystem | either phase preflight failure writes nothing; phase order retained; Hoist behavior retained |
+| Tantivy | one owned ordinary task; candidate-derived context; merge synchronous recovery retained; tests wait for writer idle |
+| telescope extant target | relationship more public than target warns; equal/more private does not |
+| telescope absent target | relationship more public than owner warns; equal/more private does not; all four relation types |
+| warning affected set | target create/delete/home move; alias acquire; merge-only output; untouched unrelated node skipped |
+| no neighbor resave | collision caught without Save(R2); successful inbound migration without neighbor byte/mtime changes |
+
+Every test that reads Tantivy after an ordinary save must call
+=wait_for_tantivy_writes_idle=.  Filesystem/Tantivy fixtures must use distinct
+temporary directories so nextest parallelism cannot create false races.
+
+* Mutation-boundary audit
+
+Before removing any whole save validator, use =rg= and the local call-graph tool
+to enumerate:
+
+- every call to =apply_definenodes_to_inRustGraph=;
+- every =InRustGraphHandle.store= or equivalent publication;
+- every caller of ordinary and merge store updates;
+- rebuild/runtime-generation publication; and
+- tests that intentionally construct inconsistent graphs.
+
+The final allowed production categories are:
+
+1. preparation builds a private candidate via
+   =apply_definenodes_to_inRustGraph=;
+2. =apply_defineNodes= consumes a prepared token and publishes that candidate;
+3. startup/rebuild fully constructs, validates, and publishes a new base
+   generation; and
+4. tests invoke lower-level transforms to compare or inject faults.
+
+Document any other caller before deciding whether it is another base case or a
+bug.  Do not leave correctness dependent on “all current callers happen to hold
+the gate” when module visibility can encode the restriction.
+
+* Performance guardrails
+
+Avoid introducing hidden graph-sized work in helpers whose outer loop is
+incremental:
+
+- no collecting =graph.nodes= merely to sort an error; sort only affected IDs;
+- no =NodeRust -> NodeComplete= conversion for untouched nodes;
+- no rebuilding an inverse index to check a local mutation;
+- no body parse for an untouched inbound owner—use =textlinks_to=;
+- no full telescope-warning pass hidden in a formatter/report helper;
+- no preparing/serializing the same filesystem output twice; and
+- no cloning owned definitions just to enqueue Tantivy.
+
+Debug builds should use the same delta-scoped production checks.  Put full
+shadow comparisons in tests rather than =debug_assert!= if a developer save on
+a large real graph would otherwise remain slow.
+
+* Documentation and observability
+
+Keep comments close to the invariants they protect:
+
+- =PreparedGraphUpdate=: proof/token and exact-publication contract;
+- =apply_definenodes_to_inRustGraph=: remove-old-under-old-map, install final
+  identity, add-final-under-final-map ordering;
+- deletion rekey: why arbitrary revocation remains rejected but deletion is
+  supported;
+- override affected set: the induction argument and canonicalization case;
+- telescope affected set: why create/delete/home/canonical changes reach
+  untouched inbound owners; and
+- =enqueue_tantivy_delta=: why context is captured before another mutation.
+
+Use tracing spans/counters whose names describe work, not when a helper happened
+to be called.  Useful stable names include =prepare_graph_update=,
+=validate_identity_overlay=, =derive_affected_graph_owners=,
+=apply_definenodes_to_inRustGraph=, =validate_affected_overrides=,
+=validate_local_internal_indexes=, =prepare_filesystem_update=,
+=publish_prepared_graph_update=, =derive_affected_telescope_warnings=, and
+=enqueue_tantivy_delta=.
+
+Do not retain =validate_graph_after_definitions= or similarly timing-based
+names: they say when, not what, and invite callers to assume the wrong scope.
+
+* Source map
+
+| Concern | Principal source/tests |
+|---------+------------------------|
+| TCP gate, private working graph, final runtime publication | =server/serve/handlers/save_buffer.rs= |
+| ordinary/combined store orchestration and filesystem preparation | =server/save.rs= |
+| direct node-merge store path and Tantivy recovery | =server/nodeMerge.rs= |
+| node-merge triple construction and obsolete neighbor helper | =server/nodeMerge/nodeMergeInstructionTriple.rs= |
+| persistent graph and inverse-index mutation | =server/dbs/in_rust_graph.rs= |
+| complete validation oracle | =server/dbs/in_rust_graph/complete_validation.rs= |
+| internal-index full oracle | =server/dbs/in_rust_graph/internal_index_validation.rs= |
+| override validation and resolution | =server/dbs/in_rust_graph/override_invariants.rs=, =server/dbs/in_rust_graph/override_resolution.rs= |
+| telescope warnings | =server/telescope/invariants.rs= |
+| stable NodeComplete ID normalization | =server/types/nodes/complete.rs=, =server/telescope/fold.rs= |
+| structured save errors | =server/types/errors.rs= |
+| complete/index unit coverage | =tests/dbs/in_rust_graph/complete_validation.rs=, =tests/dbs/in_rust_graph/internal_index_validation.rs= |
+| save override coverage | =tests/save/override_invariants.rs= |
+| merge behavior/indexes | =tests/merge/merge_nodes.rs= and sibling merge modules |
+| deletion propagation/rekey | =tests/delete_strips_references_from_neighbors.rs= |
+| telescope unit coverage | =tests/unit/telescope_invariants.rs= |
+| profiler and generated explanation | =tools/introspect/profile-with-org-report/= |
+
+* more decisions surfaced
+
+None.  The remaining choices are local implementation details with a clearly
+preferred answer under the settled correctness, compatibility, and performance
+constraints above.
