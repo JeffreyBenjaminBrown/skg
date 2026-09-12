@@ -47,4 +47,6 @@ tools/introspect/call-graph/db/
 tools/introspect/call-graph/output/
 tools/introspect/code-map/code-map.org
 tools/introspect/code-map/output/
+tools/introspect/profile-with-org-report/raw/
+tools/introspect/profile-with-org-report/result.org
 tools/md-to-org/.org-id-db.json

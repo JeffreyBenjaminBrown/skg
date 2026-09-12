@@ -4,7 +4,7 @@ There are two alternatives:
 
 ## Install nothing. Run it in a tailor-made Docker container.
 
-Find that container at https://github.com/JeffreyBenjaminBrown/docker-typedb-rust and build it.
+Build the project container described by `bash/docker.sh`.
 
 Start it (using something like the
 `docker run` command in `docker.sh`).
@@ -14,15 +14,12 @@ Enter it (using something like the
 
 Run `cd` to go to the home folder (`/home/ubuntu`).
 
-Then continue at "If you've already got Rust and TypeDB",
+Then continue at "If you've already got Rust",
 below.
 
-## If you've already got Rust and TypeDB
+## If you've already got Rust
 
-First start the TypeDB server
-(by typing just that: `typedb server`).
-
-In a separate shell, run `cargo run`.
+Run `cargo run -- data/skgconfig.toml` (or use `bash/start-servers.sh`).
 This starts the Rust server.
 
 Now you can use the [Emacs client](../elisp/skg-client.el).

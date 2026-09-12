@@ -41,6 +41,7 @@ fn edge_source_info_response_body (
   request : &str,
   env     : &SkgEnv,
 ) -> Result<String, String> {
+  let runtime = env . runtime_snapshot ();
   let owner : ID = ID (
     value_from_request_sexp ("owner", request) ? );
   let member : ID = ID (
@@ -49,7 +50,7 @@ fn edge_source_info_response_body (
     & value_from_request_sexp ("relation", request) ? ) ?;
   let (default, current) : (SourceName, Option<SourceName>) =
     edge_source_info (
-      & env . in_rust_graph_snapshot (), & env . config,
+      &runtime . graph, &runtime . config,
       &owner, &member, relation ) ?;
   let mut body : String = format! (
     "(default {})", quoted ( & default . 0 ));

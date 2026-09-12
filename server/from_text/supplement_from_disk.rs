@@ -8,20 +8,19 @@
 /// which means it must be read from disk
 /// and inserted into the NodeComplete.
 
-use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
 use crate::from_text::local_instruction_collection::lower::{
   RequestedRelationshipSources, NodeIntent, NodeSaveIntent };
 use crate::from_text::weave::{relationship_member_is_visible, set_difference_merge, weave};
 use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
-use crate::dbs::in_rust_graph::snapshot_global;
+use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::node_lookup::opt_nodecomplete_by_id;
 use crate::types::misc::{ID, MSV, MemberAtSource, RelationshipMemberKey, SkgConfig, SourceName, members_of, members_at_source};
 use crate::types::phantom::home_from_disk;
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use std::collections::HashMap;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 pub struct Definenodes_with_Sourcemoves {
   pub instructions : Vec<DefineNode>,
@@ -52,10 +51,10 @@ impl Definenodes_with_Sourcemoves {
       self . source_moves . push (sm); }}
 }
 
-pub async fn build_diskSupplemented_defineNodes (
+pub fn build_diskSupplemented_defineNodes (
   intents : Vec<NodeIntent>,
+  graph   : &InRustGraph,
   config  : &SkgConfig,
-  driver  : &TypeDBDriver,
   restricted_source_set : Option<&ActiveSourceSet>, // None means no restriction; callers normalize 'all' to None.
 ) -> Result<Definenodes_with_Sourcemoves, Box<dyn Error>> {
   let mut result : Definenodes_with_Sourcemoves =
@@ -63,14 +62,14 @@ pub async fn build_diskSupplemented_defineNodes (
   for intent in intents {
     let supplemented : Definenode_with_Opt_Sourcemove =
       supplement_nodeeditintent_from_disk (
-        intent, config, driver, restricted_source_set ) . await ?;
+        intent, graph, config, restricted_source_set ) ?;
     result . push (supplemented); }
   Ok (result) }
 
-async fn supplement_nodeeditintent_from_disk (
+fn supplement_nodeeditintent_from_disk (
   intent : NodeIntent,
+  graph  : &InRustGraph,
   config : &SkgConfig,
-  driver : &TypeDBDriver,
   restricted_source_set : Option<&ActiveSourceSet>,
 ) -> Result<Definenode_with_Opt_Sourcemove, Box<dyn Error>> {
   match intent {
@@ -87,20 +86,20 @@ async fn supplement_nodeeditintent_from_disk (
     _ => supplement_saveintent_from_disk (
       intent . save_intent()
         . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
-      config, driver, restricted_source_set ) . await,
+      graph, config, restricted_source_set ),
   }}
 
-async fn supplement_saveintent_from_disk (
+fn supplement_saveintent_from_disk (
   from_buffer : NodeSaveIntent,
+  graph       : &InRustGraph,
   config      : &SkgConfig,
-  driver      : &TypeDBDriver,
   restricted_source_set : Option<&ActiveSourceSet>,
 ) -> Result<Definenode_with_Opt_Sourcemove, Box<dyn Error>> {
   let pid : ID =
     from_buffer . pid . clone();
   let from_disk : Option<NodeComplete> =
-    optNodeComplete_rustFIrst_by_id (
-      config, driver, &pid) . await ?;
+    opt_nodecomplete_by_id (
+      graph, config, &pid) ?;
   match from_disk {
     None => {
       // A brand-new node has no sticky sources (no disk edges to be
@@ -119,8 +118,9 @@ async fn supplement_saveintent_from_disk (
         source : supplemented . source . clone (),
         .. empty_node_complete () };
       let supplemented : NodeComplete =
-        apply_sticky_sources (
-          supplemented, &empty_disk, &requested_relationship_sources, config )
+        apply_sticky_sources_in_graph (
+          supplemented, &empty_disk, &requested_relationship_sources,
+          graph, config )
         . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
       Ok (Definenode_with_Opt_Sourcemove {
         instruction : DefineNode::Save (SaveNode (supplemented)),
@@ -148,9 +148,10 @@ async fn supplement_saveintent_from_disk (
           match restricted_source_set {
             None => supplemented,
             Some (active) => preserve_invisible_members (
-              supplemented, &disk_node, config, active ) };
-        apply_sticky_sources (
-          supplemented, &disk_node, &requested_relationship_sources, config )
+              supplemented, &disk_node, graph, config, active ) };
+        apply_sticky_sources_in_graph (
+          supplemented, &disk_node, &requested_relationship_sources,
+          graph, config )
           . map_err ( |e| -> Box<dyn Error> { e . into () } ) ? };
       Ok (Definenode_with_Opt_Sourcemove {
         instruction : DefineNode::Save (SaveNode (supplemented)),
@@ -169,28 +170,27 @@ async fn supplement_saveintent_from_disk (
 fn preserve_invisible_members (
   mut supplemented : NodeComplete,
   disk_node        : &NodeComplete,
+  graph            : &InRustGraph,
   config           : &SkgConfig,
   active           : &ActiveSourceSet,
 ) -> NodeComplete {
   let member_key = |id : &ID| -> RelationshipMemberKey {
-    snapshot_global ()
-      . map (|snap| snap . relationship_member_key (id))
-      . unwrap_or_else (|| RelationshipMemberKey::UnresolvedRawId (id . clone ())) };
+    graph . relationship_member_key (id) };
   let contains_visible = |id : &ID| -> bool {
     disk_node . contains . iter ()
       . find (|member| &member . member == id)
       . is_some_and (|member| relationship_member_is_visible (
-        member, config, active)) };
+        graph, member, config, active)) };
   let subscribes_visible = |id : &ID| -> bool {
     disk_node . subscribes_to . or_default () . iter ()
       .find (|member| &member . member == id)
       .is_some_and (|member| relationship_member_is_visible (
-        member, config, active)) };
+        graph, member, config, active)) };
   let overrides_visible = |id : &ID| -> bool {
     disk_node . overrides_view_of . or_default () . iter ()
       .find (|member| &member . member == id)
       .is_some_and (|member| relationship_member_is_visible (
-        member, config, active)) };
+        graph, member, config, active)) };
   // Rendering may canonicalize a resolvable extra ID to its primary PID.  The
   // comparison key says that is the same relationship, but the disk spelling
   // is load-bearing: restore it before the weave so an untouched round trip
@@ -295,26 +295,23 @@ pub fn refuse_delete_with_inactive_sections (
 ///   inference that a private subscription exists. Hides carry no
 ///   explicit-source path: the col that displays them is read-only
 ///   (the set-relationship-source gesture refuses there).
-pub(crate) fn apply_sticky_sources (
+pub(crate) fn apply_sticky_sources_in_graph (
   mut supplemented : NodeComplete,
   disk_node        : &NodeComplete,
   explicit         : &RequestedRelationshipSources,
+  graph            : &InRustGraph,
   config           : &SkgConfig,
 ) -> Result<NodeComplete, String> {
   let owner_pid  : ID         = supplemented . pid    . clone ();
   let owner_home : SourceName = supplemented . source . clone ();
   let resolve = |id : &ID| -> ID {
-    snapshot_global ()
-      . and_then ( |snap| snap . pid_of (id) )
+    graph . pid_of (id)
       . unwrap_or_else ( || id . clone () ) };
   let member_key = |id : &ID| -> RelationshipMemberKey {
-    snapshot_global ()
-      . map (|snap| snap . relationship_member_key (id))
-      . unwrap_or_else (|| RelationshipMemberKey::UnresolvedRawId (id . clone ())) };
+    graph . relationship_member_key (id) };
   let home_of = |id : &ID| -> Option<SourceName> {
-    snapshot_global ()
-      . and_then ( |snap| snap . pid_and_source (id)
-                   . map ( |(_pid, src)| src ))
+    graph . pid_and_source (id)
+      . map ( |(_pid, src)| src )
       . or_else ( || home_from_disk (id, config) ) };
   // The DEFAULT floor for one member. Owned-to-owned edges use the
   // more private endpoint home. An owned-to-foreign edge stays at
@@ -437,7 +434,7 @@ pub(crate) fn apply_sticky_sources (
         let unclamped : SourceName = match sticky {
           Some (source) => source,
           None => hide_source (
-            config, &owner_home, &m . member, &subscribes,
+            graph, config, &owner_home, &m . member, &subscribes,
             &resolve ), };
         m . source = config . more_private_of (
           unclamped, owner_home . clone () );
@@ -484,6 +481,7 @@ pub(crate) fn apply_sticky_sources (
 /// source, and with no subscriptions at all, to the endpoint rule
 /// alone (junk-tolerant; the validators report residue).
 fn hide_source (
+  graph      : &InRustGraph,
   config     : &SkgConfig,
   owner_home : &SourceName,
   hidden     : &ID,
@@ -492,21 +490,18 @@ fn hide_source (
 ) -> SourceName {
   let endpoint_floor : SourceName = {
     let target_home : Option<SourceName> =
-      snapshot_global ()
-      . and_then ( |snap| snap . pid_and_source (hidden)
-                   . map ( |(_pid, src)| src ));
+      graph . pid_and_source (hidden)
+      . map ( |(_pid, src)| src );
     match target_home {
       Some (h) => config . more_private_of (
         owner_home . clone (), h ),
       None => owner_home . clone (), }};
   let hidden_key : ID = resolve (hidden);
   let explaining_sources : Vec<SourceName> = {
-    let Some (snap) = snapshot_global () else {
-      return endpoint_floor; };
     subscribes . iter ()
       . filter ( |sub| {
-        snap . pid_of ( & sub . member )
-          . and_then ( |p| snap . nodes . get (&p) )
+        graph . pid_of ( & sub . member )
+          . and_then ( |p| graph . nodes . get (&p) )
           . map ( |subscribee| subscribee . contains . iter ()
                   . any ( |c| resolve ( &c . member ) == hidden_key ))
           . unwrap_or (false) } )

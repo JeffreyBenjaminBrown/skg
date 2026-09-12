@@ -10,12 +10,11 @@
 use crate::types::viewnode::NodeEditRequest;
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpActiveNode};
 use crate::types::maybe_placed_viewnode::MpVognode;
-use crate::types::misc::{ID, SkgConfig};
-use crate::dbs::typedb::search::pid_and_source_from_id;
+use crate::types::misc::ID;
+use crate::dbs::in_rust_graph::InRustGraph;
 use ego_tree::Tree;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 struct NodeMergeValidationData<'a> {
   acquirer_viewnodes    : Vec<&'a MpViewnode>,
@@ -26,10 +25,9 @@ struct NodeMergeValidationData<'a> {
 /// Validates merge requests in an viewnode viewforest.
 /// Returns a vector of validation error messages,
 /// which is empty if all are valid.
-pub async fn validate_nodeMerge_requests(
+pub fn validate_nodeMerge_requests(
   viewforest: &Tree<MpViewnode>,
-  config: &SkgConfig,
-  driver: &TypeDBDriver,
+  graph: &InRustGraph,
 ) -> Result<Vec<String>, Box<dyn Error>> {
   let mut errors: Vec<String> = Vec::new();
   let nodeMerge_validation_data : NodeMergeValidationData =
@@ -48,8 +46,8 @@ pub async fn validate_nodeMerge_requests(
     if let Some(NodeEditRequest::NodeMerge (acquiree_id))
       = t . edit_request ()
     { let pair_errors : Vec<String> = validate_nodeMerge_pair(
-        config, driver, acquirer_id, acquiree_id,
-        &nodeMerge_validation_data . to_delete_ids) . await?;
+        graph, acquirer_id, acquiree_id,
+        &nodeMerge_validation_data . to_delete_ids)?;
       errors . extend (pair_errors); }}
   errors . extend( {
     let monogamy_errors : Vec<String> =
@@ -96,17 +94,15 @@ fn collect_nodeMerge_validation_data<'a>(
 /// Validates a single merge pair (acquirer + acquiree).
 /// Returns a vector of validation errors for this pair.
 /// The error messages explain what each passage does.
-async fn validate_nodeMerge_pair(
-  config: &SkgConfig,
-  driver: &TypeDBDriver,
+fn validate_nodeMerge_pair(
+  graph: &InRustGraph,
   acquirer_id: &ID,
   acquiree_id: &ID,
   to_delete_ids: &HashSet<ID>,
 ) -> Result<Vec<String>, Box<dyn Error>> {
   let mut errors: Vec<String> = Vec::new();
   let acquirer_pid : ID = (
-    match pid_and_source_from_id (
-      &config . db_name, driver, acquirer_id) . await?
+    match graph . pid_and_source (acquirer_id)
     { Some((pid, _source)) => pid,
       None      => {
         errors . push(format!(
@@ -114,8 +110,7 @@ async fn validate_nodeMerge_pair(
           acquirer_id . as_str() ));
         return Ok (errors); }} );
   let acquiree_pid : ID = (
-    match pid_and_source_from_id(
-      &config . db_name, driver, acquiree_id) . await?
+    match graph . pid_and_source (acquiree_id)
     { Some((pid, _source)) => pid,
       None => {
         errors . push(format!(

@@ -18,7 +18,7 @@
 ///   the user; an invisible one absent from the buffer was OMITTED
 ///   by rendering and must survive.
 
-use crate::dbs::in_rust_graph::snapshot_global;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, MemberAtSource, SkgConfig, SourceName};
 use crate::types::phantom::home_from_disk;
@@ -30,15 +30,15 @@ use std::hash::Hash;
 /// resolves (in-Rust graph first, then disk) and is in the active
 /// set.
 pub fn member_is_visible (
+  graph  : &InRustGraph,
   id     : &ID,
   config : &SkgConfig,
   active : &ActiveSourceSet,
 ) -> bool {
   let source : Option<SourceName> = {
     let from_graph : Option<SourceName> =
-      snapshot_global ()
-      . and_then ( |snap| snap . pid_and_source (id)
-                          . map ( |(_pid, src)| src ));
+      graph . pid_and_source (id)
+      . map ( |(_pid, src)| src );
     from_graph . or_else ( || home_from_disk (id, config) ) };
   match source {
     Some (src) => active . contains_source (&src),
@@ -49,14 +49,15 @@ pub fn member_is_visible (
 /// raw member has no home and is deliberately visible whenever its relationship
 /// source is active, so the user can retain or remove the Unknown occurrence.
 pub fn relationship_member_is_visible (
+  graph  : &InRustGraph,
   member : &MemberAtSource<ID>,
   config : &SkgConfig,
   active : &ActiveSourceSet,
 ) -> bool {
   if ! active . contains_source (&member . source) { return false; }
-  let home : Option<SourceName> = snapshot_global ()
-    . and_then (|snap| snap . pid_and_source (&member . member)
-               . map (|(_pid, source)| source))
+  let home : Option<SourceName> = graph
+    . pid_and_source (&member . member)
+    . map (|(_pid, source)| source)
     . or_else (|| home_from_disk (&member . member, config));
   home . map_or (true, |source| active . contains_source (&source))
 }

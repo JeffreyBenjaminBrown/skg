@@ -15,9 +15,8 @@
 /// overriderCol is the inbound case); ES subscribed to [EB].
 
 use super::common::*;
-use skg::dbs::in_rust_graph::install_or_swap_global_handle;
 use skg::test_utils::{graph_handle_from_config, skg_env_from_parts};
-use skg::test_utils::{run_with_shared_test_db, SharedDbSession};
+use skg::test_utils::{run_with_shared_test_stores, SharedStoreSession};
 use skg::to_org::render::content_view::multi_root_view_via_env;
 use skg::types::env::SkgEnv;
 use skg::types::misc::members_msv;
@@ -63,7 +62,7 @@ const EXPECTED_STAGED : &str = "\
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_stores (
     "skg-test-git-diff-overrides",
     |s| Box::pin ( async move {
       outbound_cols_show_phantoms_and_newM_de_novo_unstaged (s) . await ?;
@@ -73,7 +72,7 @@ fn all_tests
       Ok (( )) } )) }
 
 async fn run_overrides_view_test (
-  s            : &mut SharedDbSession,
+  s            : &mut SharedStoreSession,
   subtest_name : &str,
   staged  : bool,
   expected : &str,
@@ -82,30 +81,24 @@ async fn run_overrides_view_test (
   let repo_path : &Path = temp_dir . path ();
   if staged { setup_overrides_fixtures_staged (repo_path)?; }
   else      { setup_overrides_fixtures        (repo_path)?; }
-  s . reset_with_source_path (subtest_name, repo_path) . await ?;
-  let (config, driver, tantivy)
-    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
-    = (&s . config, &s . driver, &mut s . tantivy);
+  s . reset_with_source_path (subtest_name, repo_path) ?;
+  let (config, tantivy)
+    : (&SkgConfig, &mut TantivyIndex)
+    = (&s . config, &mut s . tantivy);
     let graph = graph_handle_from_config (&config)?;
-    // De novo PartnerCol creation reads the process-global graph
-    // handle (maybe_add_partnerCol_branches). Sub-tests share this
-    // process, so install_or_swap_global_handle re-points the
-    // handle at this sub-test's fixtures each time.
-    install_or_swap_global_handle (
-      graph_handle_from_config (&config)? );
+    // De novo PartnerCol creation reads this fixture-local graph.
     let env : SkgEnv =
-      skg_env_from_parts (
-        &config, Arc::clone (&driver), &tantivy, &graph );
+      skg_env_from_parts (&config, &tantivy, &graph);
     let mut warnings : Vec<String> = Vec::new ();
     let (actual, _pids, _tree) =
       multi_root_view_via_env (
         &env, &[ ID::from ("R") ], true, None, &mut warnings
-      ) . await ?;
+      ) ?;
     assert_buffer_contains (&actual, expected);
     Ok (( )) }
 
 async fn outbound_cols_show_phantoms_and_newM_de_novo_unstaged (
-  s : &mut SharedDbSession,
+  s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   run_overrides_view_test (
     s, "skg-test-git-diff-overrides-unstaged", false,
@@ -118,29 +111,28 @@ async fn outbound_cols_show_phantoms_and_newM_de_novo_unstaged (
 /// inverse scan), and the subscribeeCol.  Outside diff mode the
 /// emptied cols still do not appear.
 async fn emptied_cols_still_render_in_diff_mode_de_novo (
-  s : &mut SharedDbSession,
+  s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   let temp_dir : TempDir = TempDir::new ()?;
   let repo_path : &Path = temp_dir . path ();
   setup_overrides_fixtures (repo_path)?;
   s . reset_with_source_path (
     "emptied_cols_still_render_in_diff_mode_de_novo",
-    repo_path ) . await ?;
-  let (config, driver, tantivy)
-    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
-    = (&s . config, &s . driver, &mut s . tantivy);
+    repo_path ) ?;
+  let (config, tantivy)
+    : (&SkgConfig, &mut TantivyIndex)
+    = (&s . config, &mut s . tantivy);
     let graph = graph_handle_from_config (&config)?;
-    install_or_swap_global_handle (
+    (
       graph_handle_from_config (&config)? );
     let env : SkgEnv =
-      skg_env_from_parts (
-        &config, Arc::clone (&driver), &tantivy, &graph );
+      skg_env_from_parts (&config, &tantivy, &graph);
     let roots : [ID; 3] =
       [ ID::from ("E"), ID::from ("EN"), ID::from ("ES") ];
     { let mut warnings : Vec<String> = Vec::new ();
       let (diff_view, _pids, _tree) =
         multi_root_view_via_env (
-          &env, &roots, true, None, &mut warnings ) . await ?;
+          &env, &roots, true, None, &mut warnings ) ?;
       assert_buffer_contains ( &diff_view, "\
 * (skg (node (id E) (source main))) E
 ** (skg overriddenCol)
@@ -158,7 +150,7 @@ async fn emptied_cols_still_render_in_diff_mode_de_novo (
       let mut warnings : Vec<String> = Vec::new ();
       let (plain_view, _pids, _tree) =
         multi_root_view_via_env (
-          &env, &roots, false, None, &mut warnings ) . await ?;
+          &env, &roots, false, None, &mut warnings ) ?;
       for col in [ "overriddenCol", "hiddenCol",
                    "overriderCol", "subscribeeCol" ] {
         assert! ( ! plain_view . contains (col),
@@ -167,7 +159,7 @@ async fn emptied_cols_still_render_in_diff_mode_de_novo (
     Ok (( )) }
 
 async fn outbound_cols_show_phantoms_and_newM_de_novo_staged (
-  s : &mut SharedDbSession,
+  s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   run_overrides_view_test (
     s, "skg-test-git-diff-overrides-staged", true,
@@ -179,17 +171,17 @@ async fn outbound_cols_show_phantoms_and_newM_de_novo_staged (
 /// collects a phantom as a writable-col member (saving the phantom
 /// line must not re-add W to R's overrides_view_of).
 async fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
-  s : &mut SharedDbSession,
+  s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   let temp_dir : TempDir = TempDir::new ()?;
   let repo_path : &Path = temp_dir . path ();
   setup_overrides_fixtures (repo_path)?;
   s . reset_with_source_path (
     "diff_mode_save_is_noop_and_regenerates_outbound_phantoms",
-    repo_path ) . await ?;
-  let (config, driver, tantivy)
-    : (&SkgConfig, &Arc<TypeDBDriver>, &mut TantivyIndex)
-    = (&s . config, &s . driver, &mut s . tantivy);
+    repo_path ) ?;
+  let (config, tantivy)
+    : (&SkgConfig, &mut TantivyIndex)
+    = (&s . config, &mut s . tantivy);
     let graph = graph_handle_from_config (&config)?;
     let input : &str = "\
 * (skg (node (id R) (source main))) R
@@ -206,7 +198,7 @@ async fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
     let first = {
       let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
       update_from_and_rerender_buffer (
-        &mut stream, input, &driver, &config, &tantivy, &graph,
+        &mut stream, input, &config, &tantivy, &graph,
         true, &Err (String::new ()), &mut views_state ) . await ? };
     assert_buffer_contains (
       &first . saved_view, EXPECTED_UNSTAGED );
@@ -216,7 +208,7 @@ async fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
       let second = {
         let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
         update_from_and_rerender_buffer (
-          &mut stream, &first . saved_view, &driver, &config,
+          &mut stream, &first . saved_view, &config,
           &tantivy, &graph,
           true, &Err (String::new ()), &mut views_state ) . await ? };
       assert_buffer_contains (

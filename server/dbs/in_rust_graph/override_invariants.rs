@@ -56,7 +56,8 @@ pub fn validate_override_invariants (
     else { continue; };
     if ! user_owns_node { continue; }
     for target in members_of ( node . overrides_view_of . or_default () ) {
-      // Override targets can be written as primary IDs or extra IDs. Validate against the effective primary PID, matching how the in-Rust graph and TypeDB relationship creation resolve edges.
+      // Override targets can be primary or extra IDs. Validate against the
+      // effective primary PID, matching graph relationship resolution.
       let overridden : ID =
         graph . pid_of (&target)
         . unwrap_or_else ( || target . clone () );

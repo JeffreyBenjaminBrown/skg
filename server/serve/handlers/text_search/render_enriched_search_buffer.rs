@@ -1,7 +1,7 @@
 use crate::dbs::tantivy::title_and_source_by_id;
-use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::dbs::typedb::ancestry::AncestryTree;
+use crate::dbs::in_rust_graph::ancestry::AncestryTree;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
@@ -16,6 +16,7 @@ use std::collections::{HashMap, HashSet};
 /// Ancestry children are prepended (inserted first among siblings).
 pub(crate) fn insert_containerward_ancestries_into_search_view (
   viewforest     : &mut Tree<ViewNode>,
+  graph          : &InRustGraph,
   search_results : &[ID],
   ancestry_by_id : &HashMap<ID, AncestryTree>,
   tantivy_index  : &TantivyIndex,
@@ -43,7 +44,7 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
           // the ancestry ends up first among siblings.
           insert_containerward_ancestry_tree (
             child, node_id, *node_nid,
-            viewforest, tantivy_index, config, active ); } } } } }
+            viewforest, graph, tantivy_index, config, active ); } } } } }
 
 /// Recursively insert an AncestryTree and its children
 /// as indefinitive non-content ActiveNode children
@@ -53,6 +54,7 @@ fn insert_containerward_ancestry_tree(
   contained_id  : &ID, // the node this ancestry step CONTAINS
   parent_nid    : NodeId,
   viewforest        : &mut Tree<ViewNode>,
+  graph          : &InRustGraph,
   tantivy_index : &TantivyIndex,
   config        : &SkgConfig,
   active        : &ActiveSourceSet,
@@ -63,9 +65,8 @@ fn insert_containerward_ancestry_tree(
     // when both nodes are public. The edge's owner is the
     // container (this ancestry step).
     let edge_visible : bool =
-      snapshot_global ()
-      . and_then ( |snap| snap . edge_source (
-        node . id (), NodeRelation::Contains, contained_id ))
+      graph . edge_source (
+        node . id (), NodeRelation::Contains, contained_id )
       . map ( |source| active . contains_source (&source) )
       . unwrap_or (true); // unknown edge: fall through to the
                           // node-source gate below, as before
@@ -80,7 +81,7 @@ fn insert_containerward_ancestry_tree(
     for child in children {
       insert_containerward_ancestry_tree (
         child, node . id (), child_nid,
-        viewforest, tantivy_index, config, active ); } } }
+        viewforest, graph, tantivy_index, config, active ); } } }
 
 /// Which way an override graft walks from a node, and the backpath
 /// birth role it stamps on each grafted relative.
@@ -105,10 +106,10 @@ enum OverrideDir {
 /// edge-source-hidden, or whose own source is inactive, is skipped.
 pub fn insert_override_ancestries_into_search_view (
   viewforest     : &mut Tree<ViewNode>,
+  graph          : &InRustGraph,
   search_results : &[ID],
   active         : &ActiveSourceSet,
 ) {
-  let Some (graph) = snapshot_global () else { return; };
   let level1_ids : Vec<(NodeId, ID)> = {
     let root_ref : NodeRef<ViewNode> = viewforest . root ();
     root_ref . children ()
@@ -124,7 +125,7 @@ pub fn insert_override_ancestries_into_search_view (
       let mut path : HashSet<ID> =
         HashSet::from ([ node_id . clone () ]);
       graft_override_chain (
-        node_id, *node_nid, dir, &graph,
+        node_id, *node_nid, dir, graph,
         viewforest, active, &mut path ); }} }
 
 /// Every id that 'insert_override_ancestries_into_search_view' would
@@ -137,11 +138,11 @@ pub fn insert_override_ancestries_into_search_view (
 /// with 'graft_override_chain' (same directions, same gated accessors,
 /// same node-source gate). Returns empty without a graph handle.
 pub fn collect_override_relative_ids (
+  graph          : &InRustGraph,
   search_results : &[ID],
   active         : &ActiveSourceSet,
 ) -> HashSet<ID> {
   let mut out : HashSet<ID> = HashSet::new ();
-  let Some (graph) = snapshot_global () else { return out; };
   for root in search_results {
     for dir in [ OverrideDir::Overriddenward,
                  OverrideDir::Overriderward ] {

@@ -11,9 +11,6 @@ NEXTEST_JOBS="$(skg_positive_int_or_default "${SKG_NEXTEST_JOBS:-}" "$DEFAULT_NE
 NEXTEST_BUILD_JOBS="$(skg_positive_int_or_default \
   "${SKG_NEXTEST_BUILD_JOBS:-}" "$(skg_default_jobs 8)")"
 
-# Clean up any leftover test databases from prior runs
-"$PROJECT_ROOT/target/debug/cleanup-test-dbs"
-
 # Run tests, forwarding all arguments
 echo "Running nextest with $NEXTEST_JOBS concurrent test(s). Override with SKG_NEXTEST_JOBS."
 # --build-jobs: without it, cargo compiles/links with every core.

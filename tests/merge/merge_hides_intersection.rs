@@ -13,7 +13,7 @@
 // cannot see it); nobody shows z (no subscribee contains it).
 
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::types::misc::{ID, MemberAtSource};
 use skg::types::save::NodeMerge;
 
@@ -22,15 +22,16 @@ use std::error::Error;
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  run_with_shared_test_db (
+  run_with_shared_test_stores (
     "skg-test-merge-hides-intersection",
     |s| Box::pin ( async move {
       s . reset ("merge_drops_hides_the_other_member_contradicted",
-                 "tests/merge/merge_hides_intersection/fixtures") . await ?;
+                 "tests/merge/merge_hides_intersection/fixtures") ?;
       let merges : Vec<NodeMerge> =
         nodeMerge_instructions_from_pairs (
           & [ ( ID::from ("a"), ID::from ("b") ) ],
-          &s . config, &s . driver ) . await ?;
+          &graph_handle_from_config (&s . config)? . load_full (),
+           &s . config ) ?;
       assert_eq! ( merges . len (), 1 );
       let hides : &[MemberAtSource<ID>] =
         merges[0] . updated_acquirer . 0

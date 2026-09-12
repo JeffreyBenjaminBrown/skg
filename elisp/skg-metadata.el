@@ -355,7 +355,7 @@ be meaningless.")
     (overriddenCol . "overrides_view_of"))
   "The PartnerCol scaffold atoms whose members' edges are WRITABLE
 from this side, each mapped to its relation's wire name
-(NodeRelation::typeql_name, server/dbs/in_rust_graph/
+(NodeRelation::relation_name, server/dbs/in_rust_graph/
 relation_accessors.rs). The col's org-parent (the anchor) owns the
 outbound edge to each member.")
 
@@ -547,7 +547,7 @@ next save will do with the edge."
       "A member of the view-parent's overriddenCol. Sets the source of each anchor-overrides-view-of-member edge.")))
   "The relationship-kind menu for
 `skg-set-relationship-source-recursive': one entry per node-node
-relation in schema.tql, each listing its two roles as
+relation in docs/data-model_technical.org, each listing its two roles as
 (ROLE-NAME KIND-OR-NIL DESCRIPTION). ROLE-NAME is the role the
 VIEW-CHILD would play toward its view-parent. KIND-OR-NIL is the
 symbol the walk dispatches on (`contained', `subscribee' or

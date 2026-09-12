@@ -4,54 +4,44 @@ pub mod validate_nodeMerge;
 use crate::dbs::filesystem::multiple_nodes::{
   error_unless_each_id_names_one_node,
   read_all_skg_files_from_sources};
-use crate::dbs::init::{rebuild_tantivy_from_nodes, wipe_then_init_typedb_db};
+use crate::dbs::init::rebuild_tantivy_from_nodes;
 use crate::dbs::in_rust_graph::{InRustGraphHandle, apply_definenodes};
-use crate::nodeMerge::nodeMergeInstructionTriple::neighbor_savenodes_for_nodeMerges;
-use crate::save::{ update_fs_from_saveinstructions_with_hoist_approval, update_tantivy_from_saveinstructions, update_typedb_from_saveinstructions };
+use crate::dbs::in_rust_graph::complete_validation::{
+  format_complete_graph_errors, validate_graph_after_definitions,
+};
+use crate::save::{ update_fs_from_saveinstructions_with_hoist_approval, update_tantivy_from_saveinstructions };
+use crate::types::env::MutationGate;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::save::{DefineNode, NodeMerge, SaveNode};
+use crate::types::save::{DefineNode, NodeMerge};
 use std::error::Error;
 use std::collections::HashSet;
-use typedb_driver::TypeDBDriver;
 
-/// Applies NodeMerges by fanning a single 'Vec<DefineNode>' through the
-/// four ordinary sink functions. Four sinks, in order:
+/// Applies NodeMerges to the three stores, in order:
 ///   1) Filesystem (source of truth)
 ///   2) In-Rust graph
-///   3) TypeDB (with recovery: rebuild from disk on failure)
-///   4) Tantivy (with recovery: rebuild from disk on failure)
+///   3) Tantivy (with recovery: rebuild from disk on failure)
 ///
-/// Returns 'None' when all four stores updated normally.
+/// Returns 'None' when all stores updated normally.
 /// Returns 'Some(new_index)' when Tantivy had to be rebuilt.
 ///
-/// PITFALL: TypeDB receives neighbor SaveNodes in addition to the
-/// primary 3N DefineNodes from 'NodeMerge::to_vec()'. Their purpose is to
-/// close the temporal gap where TypeDB's cascade-delete of the
-/// acquiree destroys inbound edges and nothing re-creates them until
-/// neighbors are saved. FS, graph, and Tantivy see only the primary
-/// 3N: neighbor .skg files are unchanged (acquiree_id stays in
-/// neighbor fields, resolved to acquirer via extra_id at read time);
-/// the in-Rust graph stores outbound-only references just like disk;
-/// Tantivy indexes title+body+aliases, none of which change on a
-/// neighbor during a merge.
 pub async fn merge_nodes (
   nodeMerge_instructions : &[NodeMerge],
   config             : SkgConfig,
   tantivy_index      : &TantivyIndex,
-  driver             : &TypeDBDriver,
   graph              : &InRustGraphHandle,
+  mutation_gate      : &MutationGate,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
+  let _mutation_guard = mutation_gate . lock () . await;
   merge_nodes_with_hoist_approval (
-    nodeMerge_instructions, config, tantivy_index, driver, graph,
-    &HashSet::new () ) . await
+    nodeMerge_instructions, config, tantivy_index, graph,
+    &HashSet::new () )
 }
 
-pub(crate) async fn merge_nodes_with_hoist_approval (
+pub(crate) fn merge_nodes_with_hoist_approval (
   nodeMerge_instructions : &[NodeMerge],
   config             : SkgConfig,
   tantivy_index      : &TantivyIndex,
-  driver             : &TypeDBDriver,
   graph              : &InRustGraphHandle,
   hoist_approved_pids : &HashSet<ID>,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
@@ -72,17 +62,17 @@ pub(crate) async fn merge_nodes_with_hoist_approval (
         . map ( |candidate| candidate . pid . as_str () )
         . collect::<Vec<&str>> () . join (", ") ) . into ()); }
   tracing::info!(
-    "Merging nodes in FS, in-Rust graph, TypeDB, and Tantivy, in that order ..." );
-  let db_name : &str = &config . db_name;
+    "Merging nodes in filesystem, in-Rust graph, and Tantivy ..." );
 
   let primary_definenodes : Vec<DefineNode> =
     nodeMerge_instructions . iter ()
     . flat_map ( |m| m . to_vec () )
     . collect ();
-  let neighbor_savenodes : Vec<SaveNode> =
-    neighbor_savenodes_for_nodeMerges (
-      nodeMerge_instructions, &config, driver ) . await ?;
-
+  let graph_snapshot = graph . load_full ();
+  let validation = validate_graph_after_definitions (
+    &config, &graph_snapshot, &primary_definenodes);
+  if ! validation . errors . is_empty () {
+    return Err (format_complete_graph_errors (&validation . errors) . into ()); }
   { // Filesystem.
     tracing::info!("1) Merging in filesystem ...");
     update_fs_from_saveinstructions_with_hoist_approval (
@@ -95,37 +85,6 @@ pub(crate) async fn merge_nodes_with_hoist_approval (
   { // In-Rust graph.
     apply_definenodes (graph, &primary_definenodes);
     tracing::info!("   In-Rust graph merge complete."); }
-
-  { // TypeDB: primary + neighbor SaveNodes.
-    let typedb_definenodes : Vec<DefineNode> = {
-      let mut v : Vec<DefineNode> =
-        primary_definenodes . clone ();
-      for sn in & neighbor_savenodes {
-        v . push ( DefineNode::Save ( sn . clone () )); }
-      v };
-    if let Err (e) = update_typedb_from_saveinstructions (
-      db_name, driver, &typedb_definenodes, &[],
-      None ) . await // bulk recreate: pid migration makes a set-diff subtle
-    { tracing::error!(
-        "   TypeDB merge failed: {}. Rebuilding from disk...", e);
-      let nodes : Vec<NodeComplete> =
-        read_all_skg_files_from_sources (&config)
-        . map_err ( |e2| -> Box<dyn Error> { format!(
-           "TypeDB rebuild also failed: {}. Restart the server.", e2)
-           . into () } ) ?;
-      error_unless_each_id_names_one_node (
-        &nodes, &config . data_root)
-        . map_err ( |e2| -> Box<dyn Error> { format!(
-           "TypeDB rebuild also failed: {}. Restart the server.", e2)
-           . into () } ) ?;
-      wipe_then_init_typedb_db (&config, driver, &nodes) . await
-        . map_err ( |e2| -> Box<dyn Error> { format!(
-           "TypeDB rebuild also failed: {}. Restart the server.", e2)
-           . into () } ) ?;
-      tracing::warn!(
-        "NodeMerge succeeded, but TypeDB had to be rebuilt from disk.");
-    } else {
-      tracing::info!("   TypeDB merge complete."); } }
 
   { // Tantivy.
     match update_tantivy_from_saveinstructions (

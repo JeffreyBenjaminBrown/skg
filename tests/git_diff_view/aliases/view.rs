@@ -10,7 +10,7 @@ use super::common::*;
 fn test_aliases_diff_shows_alias_col_scaffold()
   -> Result<(), Box<dyn Error>>
 {
-  let db_name = "skg-test-git-diff-aliases";
+  let test_name = "skg-test-git-diff-aliases";
   let tantivy_folder = "/tmp/tantivy-test-git-diff-aliases";
 
   let temp_dir = TempDir::new()?;
@@ -18,17 +18,16 @@ fn test_aliases_diff_shows_alias_col_scaffold()
   setup_git_repo_with_fixtures (repo_path)?;
 
   block_on(async {
-    let (config, driver, _tantivy) =
-      setup_test_dbs(db_name, repo_path . to_str() . unwrap(), tantivy_folder) . await?;
+    let (config, _tantivy) =
+      setup_test_stores(test_name, repo_path . to_str() . unwrap(), tantivy_folder) . await?;
 
     let root_ids = vec![ID("1" . to_string())];
     let (actual, _pids, _) : (String, Vec<ID>, _) =
-      multi_root_view(&driver, &config, None, &root_ids, true) . await?;
+      multi_root_view(&config, None, &root_ids, true)?;
 
     assert_buffer_contains(&actual, GIT_DIFF_VIEW);
 
-    cleanup_test_dbs(db_name, &driver,
-                     Some(Path::new (tantivy_folder))
+    cleanup_test_stores(test_name, Some(Path::new (tantivy_folder))
                     ) . await?;
     Ok(())
   })
@@ -44,7 +43,7 @@ fn test_aliases_diff_shows_alias_col_scaffold()
 fn test_saving_a_diff_view_with_aliases_shown_does_not_duplicate_them()
   -> Result<(), Box<dyn Error>>
 {
-  let db_name = "skg-test-git-diff-aliases-resave";
+  let test_name = "skg-test-git-diff-aliases-resave";
   let tantivy_folder = "/tmp/tantivy-test-git-diff-aliases-resave";
 
   let temp_dir = TempDir::new()?;
@@ -52,21 +51,21 @@ fn test_saving_a_diff_view_with_aliases_shown_does_not_duplicate_them()
   setup_git_repo_with_fixtures (repo_path)?;
 
   block_on(async {
-    let (config, driver, mut tantivy) =
-      setup_test_dbs(db_name, repo_path . to_str() . unwrap(), tantivy_folder) . await?;
+    let (config, mut tantivy) =
+      setup_test_stores(test_name, repo_path . to_str() . unwrap(), tantivy_folder) . await?;
 
     let root_ids = vec![ID("1" . to_string())];
     let (rendered, _pids, _) : (String, Vec<ID>, _) =
-      multi_root_view(&driver, &config, None, &root_ids, true) . await?;
+      multi_root_view(&config, None, &root_ids, true)?;
 
-    let graph : InRustGraphHandle = new_handle (InRustGraph::new ());
+    let graph : InRustGraphHandle = graph_handle_from_config (&config)?;
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : true,
       open_views        : OpenViews::new (), };
     let (mut stream, _) = mk_test_tcp_stream_pair ();
     let response = update_from_and_rerender_buffer (
       &mut stream,
-      &rendered, &driver, &config, &mut tantivy, &graph, true,
+      &rendered, &config, &mut tantivy, &graph, true,
       &Err ( String::new () ), &mut views_state ) . await?;
     assert! ( response . errors . is_empty (),
       "re-saving the rendered diff view must not error: {:?}",
@@ -80,8 +79,7 @@ fn test_saving_a_diff_view_with_aliases_shown_does_not_duplicate_them()
     assert_eq! ( saved . matches ("aliasCol") . count (), 1,
       "exactly one aliasCol must survive the re-save:\n{}", saved );
 
-    cleanup_test_dbs(db_name, &driver,
-                     Some(Path::new (tantivy_folder))
+    cleanup_test_stores(test_name, Some(Path::new (tantivy_folder))
                     ) . await?;
     Ok(())
   })

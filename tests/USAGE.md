@@ -7,11 +7,11 @@ There are three kinds of tests. The authoritative description lives in `coding-a
    - Some tests require the skg server (`cargo run --bin skg`) to be running
 
 2. **Rust tests**: `cargo nextest run` (plain `cargo test` also works, but nextest gives each test its own process, avoiding a known flake)
-   - Requires `typedb server` to be running
+   - Runs without any external database service
 
 3. **Integration tests**: `bash/integration-tests.sh`
    - End-to-end tests in `tests/integration/*/run-test.sh`
-   - Requires both `typedb server` and the skg server to be running
+   - Starts and exercises the Skg server
 
 Note that `tests/nvim/` holds the Neovim client's tests.
 

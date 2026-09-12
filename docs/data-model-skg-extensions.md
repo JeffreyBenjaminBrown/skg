@@ -9,7 +9,9 @@ This is [the data model that almost all serious knowledge mapping software seems
 ### What the `contains` relation means, and how it differs from textlinks
 Each document is a curated view of data defined by the `contains` relation. Any document that includes the node N also includes every node that descends from N via `contains`.
 
-As is evident from the [schema](../schema.tql), there are a number of ways nodes can be connected: `contains`, `textlinks_to`, and a few more. Containment and textlinks differ in two ways:
+As described in the [technical data model](data-model_technical.org), nodes can
+be connected by `contains`, `textlinks_to`, and several other relationships.
+Containment and textlinks differ in two ways:
 
 - TextLinks are defined by the text in a node, whereas containment is defined by nodes' spatial relationships to each other in a tree (the document containing them).
 - Following a textlink requires the user to jump to a different context, whereas following a containment relationship need only require moving your eyes. If A contains B, looking at A means looking at a document that already contains B underneath A.
@@ -20,7 +22,8 @@ A file F can override the view of file O. The override is not silent: when the u
 
 Overriding is useful for both sharing and privacy, as is explained below.
 
-Overriding is represented in the [schema](../schema.tql) with the `overrides_view_of` relationship.
+Overriding is represented in the graph with the `overrides_view_of`
+relationship.
 ## Sharing
 When you "edit" a note N that you don't own, what actually happens is you gain a new note N', which begins with all of the content from N plus a (deletable) subscription to N and a (deletable) overrides relationship to N.
 

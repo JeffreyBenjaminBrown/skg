@@ -615,18 +615,43 @@
   and recommendations are in the top-level 'profiling-save.org'.
   (Two of the four -- the override full-scan and the Tantivy double
   commit -- are fixed; their entries are in TODO/DONE/problems.org.)
-** Override validation deep-clones the whole in-Rust graph per save
-   'validate_override_invariants_after_save' (server/save.rs) builds
-   its simulated post-save graph via '(*graph_snap) . clone ()' -- a
-   deep clone of every node -- before applying the save's DefineNodes
-   and running the (now incremental) touched-only validation. The
-   validation itself is O(touched), but the clone is O(total graph)
-   in time and memory, so every save still pays a whole-graph cost.
-   Fix direction: simulate with a lightweight overlay (the base
-   snapshot plus a small map of changed nodes consulted first)
-   instead of cloning, or clone only the neighborhood the validator
-   can reach. Successor to the fixed "re-scans the whole graph"
-   entry, discovered while verifying that fix (2026-07-03).
+** Complete-graph validation runs twice per ordinary save (~96% of CPU evidence)
+   Saving one new headline from the recursive-content view rooted at
+   2f77ea44-9e5e-4dfc-b89b-2019971ab05a took a median 2.6 seconds on a
+   54,836-node graph. Almost all of that was two roughly equal,
+   otherwise-unspanned blocks around 'validate_graph_after_definitions'.
+
+   'update_graph_including_nodeMerges_under_mutation_gate'
+   (server/save.rs) first validates 'all_filesystem_outputs'. It then
+   calls 'update_graph_minus_nodeMerges_with_hoist_approval', whose
+   'apply_defineNodes_to_stores' validates the ordinary 'node_defs'
+   again. For a non-merge save these definition sets are identical;
+   even with merges, the second set is a subset of the candidate the
+   first call just accepted under the same mutation gate.
+
+   Every call materializes all current nodes as NodeComplete values in
+   a BTreeMap, constructs a fresh InRustGraph in two full passes,
+   independently recomputes and compares every inverse index, checks
+   whole-graph override constraints and every telescope, and sorts the
+   reports. The measured save changed two definitions and two files,
+   so this repeated O(total graph) work is unrelated to edit size.
+
+   Fix direction: make the save-level validation result/proof usable by
+   'apply_defineNodes_to_stores', while retaining the inner validation
+   for callers that have not preflighted. After removing the duplicate,
+   make save validation incremental where each invariant permits it;
+   keep the complete validator as the startup/rebuild oracle. Profile
+   and generated report:
+   tools/introspect/profile-with-org-report/result.org
+   (2026-09-12).
+** The old “override validation deep-clones the graph” diagnosis is stale
+   'validate_override_invariants_after_save' does clone InRustGraph,
+   but its fields are persistent 'im' maps, so the clone structurally
+   shares the graph. In this profile that entire span was about 0.3 ms,
+   below 0.02% of save time. It is not the whole-graph cost observed
+   here; the complete-graph validation above is. This corrects the
+   previous entry after measuring the current implementation
+   (2026-09-12).
 ** TypeDB relationship update is delete-all-then-recreate-all (~15%, O(children))
    'update_typedb_from_saveinstructions' (server/save.rs) deletes and
    recreates ALL outbound edges of each saved node every save, so
@@ -1243,3 +1268,44 @@
   F, F2, and R shape and semantic override facts, but the rendered
   overriders lack the expected =Oa= herald marker.  No Rust production
   code changed in the navigation fix.
+* Problems confirmed while planning TypeDB removal (2026-09-12)
+** Whole save transactions are not serialized across connection threads
+   'serve' spawns one thread per client connection and gives each a clone
+   of 'SkgEnv'.  The clones share an
+   'Arc<ArcSwap<InRustGraph>>', but 'apply_definenodes' performs a
+   load -> clone/mutate -> store sequence with no shared writer lock.
+   Two saves of different nodes can load the same old snapshot and the
+   last store loses the other save's graph update.  Two saves of the same
+   node can interleave filesystem and graph writes in different orders,
+   leaving the final graph different from the final file even if only the
+   graph swap is locked.
+
+   This was already identified in
+   'TODO/partial-reload-and-magit/2_discussion.org', where Jeff chose the
+   mutex option, but that choice has not reached this worktree.  The lock
+   must cover the graph-dependent validation through filesystem mutation,
+   graph publication, and ordered Tantivy handoff for save, nodeMerge,
+   rebuild, and reload -- not merely the final ArcSwap store.
+** Hidden edges participate in path and ancestry topology
+   'path_to_first_nonlinearity' calls the legacy, stringly typed
+   'find_related_nodes', which has no active-source-set argument.
+   'full_containerward_ancestry_from_in_rust_graph' reads 'contained_by'
+   directly, likewise ungated.  Their rendering callers pass the active
+   set only later while inserting nodes.
+
+   The late insertion path does check the exact edge source as well as
+   the endpoint's home.  Once the TypeDB servers were available, all five
+   tests in 'tests/leak_battery.rs' passed, including the rendered
+   containerward case between two public endpoint nodes.  No direct leak
+   is demonstrated here.
+
+   The hidden edge still shapes the traversal before being discarded.  It
+   can create a false fork that truncates an otherwise linear visible
+   path; in full ancestry, hidden branches share the 'visited' set and can
+   cause a node on a visible branch to be classified as 'Repeated'.  A
+   post-traversal render gate cannot recover the omitted visible suffix.
+   Fix by making the graph-native path and ancestry APIs accept
+   'RelationRole' plus the active source-set and use the gated directional
+   accessors during traversal.  Retain insertion-time edge gating as
+   defence-in-depth, and add hidden-sibling-fork and mixed-visibility
+   diamond regressions.

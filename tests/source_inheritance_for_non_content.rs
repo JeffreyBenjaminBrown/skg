@@ -8,6 +8,7 @@ use skg::types::misc::{ ID, SourceName, SkgConfig, SkgfileSource };
 use skg::types::viewnode::{ ParentIs, ViewNode, ViewNodeKind, viewforest_root_viewnode, mk_definitive_viewnode, mk_indefinitive_viewnode };
 use skg::types::viewnode::Vognode;
 use skg::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
+use skg::dbs::in_rust_graph::InRustGraph;
 
 use ego_tree::Tree;
 use std::collections::HashMap;
@@ -57,6 +58,7 @@ fn source_inheritance_across_non_content_same_source () {
     viewforest . get_mut (a_id) . unwrap () . append (vn); }
   set_viewnodestats_in_viewforest (
     &mut viewforest,
+    &InRustGraph::new (),
     &container_to_contents,
     &content_to_containers,
     &config,
@@ -98,6 +100,7 @@ fn source_inheritance_across_non_content_different_source () {
     viewforest . get_mut (a_id) . unwrap () . append (vn); }
   set_viewnodestats_in_viewforest (
     &mut viewforest,
+    &InRustGraph::new (),
     &container_to_contents,
     &content_to_containers,
     &config,

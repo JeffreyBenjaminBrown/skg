@@ -17,7 +17,7 @@ Three sources: public (owned), private (owned), foreign (read-only).
 
 ** What the tests do
 - Move b (and sometimes c) from public to private.
-- Verify FS, TypeDB and Tantivy all reflect the new source.
+- Verify the filesystem, graph, and Tantivy all reflect the new source.
 - Verify containment relationships survive the move.
 - Test error cases: move to/from foreign, move + merge, source-only change with populated pool.
 - Test that extra_ids are preserved and that nodes referenced by extra_id (not PID) still move correctly.

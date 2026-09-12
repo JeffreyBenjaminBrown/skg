@@ -1,4 +1,3 @@
-db_name = "unused"
 tantivy_folder = "/tmp/unused"
 port = 0
 beep_when_server_becomes_available = false

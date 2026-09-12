@@ -2,13 +2,13 @@
 // This uses manual async recursions, rather than calls to
 // `do_everywhere_in_tree_dfs`, because some dispatch targets
 // are async, and `do_everywhere_in_tree_dfs` takes a sync
-// `FnMut` closure which cannot `.await`.
+// `FnMut` closure which cannot ``.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
 use crate::to_org::expand::definitive::{ apply_definitive_draw_rule, DrawOutcome};
 use crate::to_org::util::DefinitiveMap;
-use crate::types::env::SkgEnv;
+use crate::types::env::RuntimeGeneration;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName, TantivyIndex};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, read_at_ancestor_in_tree};
@@ -41,7 +41,7 @@ pub(super) struct CompletionContext<'a> {
   /// applies every content diff effect afterward at the node's own visit (TODO/DONE/local-view-update/plan_v2.org §9
   /// reversal / #3).
   pub(super) source_diffs                   : &'a Option<HashMap<SourceName, SourceDiff>>,
-  pub(super) env                            : &'a SkgEnv,
+  pub(super) runtime                        : &'a RuntimeGeneration,
   pub(super) graph_snap                     : &'a Arc<InRustGraph>,
   pub(super) errors                         : &'a mut Vec<String>,
   pub(super) deleted_since_head_pid_src_map : &'a HashMap<ID, SourceName>,
@@ -75,7 +75,7 @@ pub(super) struct CompletionContext<'a> {
   pub(super) warning_sink : Option<&'a mut Vec<CompletionWarning>>,
 }
 
-pub(super) async fn complete_viewforest (
+pub(super) fn complete_viewforest (
   viewforest : &mut Tree<ViewNode>,
   context    : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
@@ -88,7 +88,7 @@ pub(super) async fn complete_viewforest (
   // content children created during a node's visit are reached later in the
   // same BFS.
   complete_nodes_in_level_order (
-    viewforest, root_treeid, context ) . await ?;
+    viewforest, root_treeid, context ) ?;
   prune_self_deletable_when_empty (viewforest) ?;
   Ok(( )) }
 
@@ -103,7 +103,7 @@ pub(super) async fn complete_viewforest (
 /// -- is the one that wins, and the Finalizable draw rule makes that safe. A
 /// node's expansion depends only on its ancestors and the graph, never on
 /// siblings or descendants, so it can be processed the moment it is dequeued.
-async fn complete_nodes_in_level_order (
+fn complete_nodes_in_level_order (
   tree     : &mut Tree<ViewNode>,
   root_treeid : NodeId,
   context  : &mut CompletionContext<'_>,
@@ -111,7 +111,7 @@ async fn complete_nodes_in_level_order (
   let mut queue : VecDeque<NodeId> = VecDeque::new ();
   queue . push_back (root_treeid);
   while let Some (treeid) = queue . pop_front () {
-    dispatch_node_update (tree, treeid, context) . await ?;
+    dispatch_node_update (tree, treeid, context) ?;
     // Enqueue the node's *current* children -- including any this visit
     // just created -- so they are completed after every node already in
     // their level. (See 'MANUAL RECURSION' comment at top of file: the
@@ -124,7 +124,7 @@ async fn complete_nodes_in_level_order (
 /// One BFS visit: dispatch on (kind, parent-kind) to the node's update rule
 /// (TODO/DONE/local-view-update/plan_v2.org §3/§4). Cols are reconciled at their own visit (the BFS reaches a
 /// col after its Normal parent created it).
-async fn dispatch_node_update (
+fn dispatch_node_update (
   tree    : &mut Tree<ViewNode>,
   treeid  : NodeId,
   context : &mut CompletionContext<'_>,
@@ -144,26 +144,26 @@ async fn dispatch_node_update (
     return Ok (( )); }
   match &kind {
     ViewNodeKind::Vognode (Vognode::Active (_)) =>
-      visit_normal_node (tree, treeid, context) . await ?,
+      visit_normal_node (tree, treeid, context) ?,
     ViewNodeKind::PartnerCol (PartnerCol::Subscribee) =>
       // A col fills its members WHOLE and is budget-neutral (TODO/DONE/local-view-update/plan_v2.org §5.5): the owning
       // vognode already spent its 1 budget unit when it expanded, so drawing all
       // the members here costs nothing more and never truncates a group.
       reconcile_subscribee_col_children (
-        treeid, tree, context . source_diffs, context . env,
+        treeid, tree, context . source_diffs, context . runtime,
         context . deleted_since_head_pid_src_map,
         context . deleted_by_this_save_extra_ids,
-        context . active_source_set ) . await ?,
+        context . active_source_set ) ?,
     ViewNodeKind::PartnerCol (PartnerCol::HiddenInSubscribee) =>
       reconcile_hiddenin_subscribee_col_children (
-        treeid, tree, context . source_diffs, context . env,
+        treeid, tree, context . source_diffs, context . runtime,
         context . deleted_since_head_pid_src_map,
         context . deleted_by_this_save_extra_ids,
         context . active_source_set,
         context . warning_sink . as_deref_mut () ) ?,
     ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutside_subscribee_col_children (
-        treeid, tree, context . source_diffs, context . env,
+        treeid, tree, context . source_diffs, context . runtime,
         context . deleted_since_head_pid_src_map,
         context . deleted_by_this_save_extra_ids,
         context . active_source_set,
@@ -176,7 +176,7 @@ async fn dispatch_node_update (
       if role . relation_member_role () . is_some () =>
       reconcile_partnerCol_children (
         treeid, tree, *role, context . source_diffs,
-        context . env, context . graph_snap,
+        context . runtime, context . graph_snap,
         context . deleted_since_head_pid_src_map,
         context . deleted_by_this_save_extra_ids,
         context . active_source_set,
@@ -187,10 +187,12 @@ async fn dispatch_node_update (
     // diff entries. Diffs flow inline for both de-novo and post-save.
     ViewNodeKind::QualCol (QualCol::Alias) =>
       super::reconcile::aliascol::reconcile_alias_col_children (
-        tree, treeid, context . source_diffs, &context . env . config ) ?,
+        tree, treeid, &context . runtime . graph,
+        context . source_diffs, &context . runtime . config ) ?,
     ViewNodeKind::QualCol (QualCol::ID) =>
       super::reconcile::id_col::reconcile_id_col_children (
-        treeid, tree, context . source_diffs, &context . env . config ) ?,
+        treeid, tree, &context . runtime . graph,
+        context . source_diffs, &context . runtime . config ) ?,
     _ => {
       // No-op for: Inactive (an anonymous placeholder -- it carries no
       // identity, and flipping it to a "DELETED" marker would leak that
@@ -207,7 +209,7 @@ async fn dispatch_node_update (
 /// requests, ensure a definitive subscribee's HiddenInSubscribeeCol, and
 /// finally (in diff mode) compute this node's diff inline. The BFS reaches
 /// every col/child this creates and reconciles it in turn.
-async fn visit_normal_node (
+fn visit_normal_node (
   tree    : &mut Tree<ViewNode>,
   treeid  : NodeId,
   context : &mut CompletionContext<'_>,
@@ -242,7 +244,8 @@ async fn visit_normal_node (
     settled = true;
   } else if had_dvr {
     match apply_definitive_draw_rule (
-      tree, treeid, &context . env . config, context . defmap ) ? {
+      tree, treeid, &context . runtime . graph,
+      &context . runtime . config, context . defmap ) ? {
       DrawOutcome::Deferred => {
         // Deferred to an existing Final occurrence: the node is now
         // indefinitive; the content engine (settled) will clobber+return.
@@ -251,7 +254,7 @@ async fn visit_normal_node (
         settled = true; cascade = true; } } }
   expand_true_content_at_activeNode (
     treeid, tree, context . defmap,
-    &context . env . config, context . graph_snap,
+    &context . runtime . config, context . graph_snap,
     context . deleted_since_head_pid_src_map,
     context . deleted_by_this_save_pids,
     context . deleted_by_this_save_extra_ids,
@@ -281,21 +284,23 @@ async fn visit_normal_node (
       . unwrap_or (false);
     if ! parent_is_partner_col {
       maybe_add_partnerCol_branches (
-        tree, treeid, &context . env . config,
-        &context . env . driver,
+        tree, treeid, &context . runtime . graph,
+        &context . runtime . config,
         context . active_source_set,
-        context . source_diffs ) . await ?; } }
+        context . source_diffs ) ?; } }
   // Remaining view requests (Aliases / Containerward / Sourceward); the
   // Definitive request was already consumed by apply_definitive_draw_rule.
   super::reconcile::view_requests::execute_activeNode_view_requests (
-    treeid, tree, &context . env . config, &context . env . driver,
-    context . errors, context . active_source_set ) . await ?;
+    treeid, tree, &context . runtime . graph,
+    &context . runtime . config,
+    context . errors, context . active_source_set ) ?;
   // Ensure a definitive subscribee's HiddenInSubscribeeCol exists; the BFS
   // reconciles it on reaching it.
   super::reconcile::view_requests::ensure_hiddenin_col_under_definitive_subscribee (
-    tree, treeid, &context . env . config, &context . env . driver,
+    tree, treeid, &context . runtime . graph,
+    &context . runtime . config,
     context . active_source_set,
-    context . source_diffs ) . await ?;
+    context . source_diffs ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3 / Jeff): compute this node's content+scaffold diff LOCALLY,
   // at its own BFS visit. Runs last, after the node is fully completed as a
   // worktree Active node (content, cols, view requests), so process_activeNode_diff
@@ -307,10 +312,10 @@ async fn visit_normal_node (
     let node_mut : NodeMut<ViewNode> =
       tree . get_mut (treeid) . unwrap ();
     process_activeNode_diff (
-      node_mut, real_diffs,
+      node_mut, &context . runtime . graph, real_diffs,
       context . deleted_since_head_pid_src_map,
       context . diff_tantivy_index,
-      &context . env . config )
+      &context . runtime . config )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   Ok(( )) }
 

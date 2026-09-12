@@ -46,8 +46,7 @@ Returns the absolute data-root path."
     (test-skg-git-add--sh src "commit" "-q" "-m" "initial")
     (test-skg-git-add--sh src "add" "staged.skg") ;; staged-new: in index, not in HEAD
     (with-temp-file (expand-file-name "skgconfig.toml" root)
-      (insert "db_name = \"t\"\n"
-              "tantivy_folder = \".idx\"\n"
+      (insert "tantivy_folder = \".idx\"\n"
               "port = 9999\n"
               "beep_when_server_becomes_available = false\n\n"
               "[[sources]]\n"

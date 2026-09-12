@@ -2,7 +2,7 @@ use indoc::indoc;
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_viewforest;
 use skg::types::tree::forest::ViewForest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
-use skg::test_utils::run_with_test_db;
+use skg::test_utils::{run_with_test_stores, graph_handle_from_config};
 use skg::types::misc::{ID, MSV, SourceName, members_msv};
 use skg::types::save::SaveNode;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
@@ -10,11 +10,11 @@ use std::error::Error;
 
 #[test]
 fn test_single_merge() -> Result<(), Box<dyn Error>> {
-  run_with_test_db(
+  run_with_test_stores(
     "skg-test-merge-single",
     "tests/merge/saveinstructions_from_the_merges_in_an_viewforest/fixtures",
     "/tmp/tantivy-test-merge-single",
-    |config, driver, _tantivy| {
+    |config, _tantivy| {
       Box::pin(async move {
         // Create a viewforest with node 1 requesting to merge node 2
         let input = indoc! {"
@@ -25,8 +25,9 @@ fn test_single_merge() -> Result<(), Box<dyn Error>> {
         let viewforest = maybePlaced_to_placed_tree (unchecked_viewforest)?;
         let nodeMerge_instructions =
         nodeMerge_instructions_from_viewforest(
-         &ViewForest::from_internal_tree (viewforest), config, driver)
-        . await?;
+         &ViewForest::from_internal_tree (viewforest),
+         &graph_handle_from_config (config)? . load_full (), config)
+?;
 
         // Should produce exactly 1 MergeInstructionTriple
         assert_eq!(

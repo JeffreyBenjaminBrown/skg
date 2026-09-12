@@ -83,9 +83,23 @@ Each buffer is a forest of "viewnodes".
 
 ## "child" and "parent"
 
-The TypeDB graph contains a number of relationships -- 'contains', 'textlinks to', etc. Where in this code the terms "child" or "parent" are used, it refers to none of those TypeDB relations, but rather the relationship between headlines in an Emacs org mode buffer. (I have tried to stick to the more precise "org-child" and "org-parent".)
+They are shorthand for 'viewchild' and 'viewparent'.
 
-The reason for this is that the map from the child-parent relationship in an Emacs buffer to the corresponding relationship, if any, in TypeDB depends on context. Usually, if an org headline P has a child headline C, they will correspond to a TypeDB node Outer that 'contains' a TypeDB node Inner, where Outer corresponds to P and Inner to C. But that does not always hold: see, for instance, the discussion of alias nodes in [the architecture documentation](coding-advice/architecture.md).
+There are two concepts of node in skg: graphnode and viewnode.
+Viewnodes are nodes in a view, and some of them correspond to nodes in the graph,
+but some of them don't -- they describe their parent,
+or the relationship between their parent and their children,
+or maybe something else.
+
+The Skg graph contains a few (currently five) formal relationships -- `contains`,
+`textlinks_to`, etc. In the graph, there is no concept of parent or child;
+those are only meaningful in a view.
+Where the code says "child" or "parent", it means the relationship between viewnodes
+-- e.g., in Emacs, the relationship between headlines in an Org buffer
+-- and might or might not correspond to a graph relation.
+
+For one example, see the discussion of alias nodes in
+[the architecture documentation](coding-advice/architecture.md).
 
 ## "col" is short for "collection"
 
@@ -197,7 +211,8 @@ See `docs/forks.md` and `docs/sharing-model.md`.
 
 ## hiderel = "hides" relationship
 
-See schema.tql for what a "hides" relationship is.
+See [the technical data model](docs/data-model_technical.org) for the hiding
+relationship.
 
 ## interp = interpretation
 
@@ -293,7 +308,7 @@ skips the menu and opens the requested node itself.
 ## "subscribee as such"
 
 In Skg some nodes are "subscribers", which "subscribe" to "subscribees".
-(See [the schema](./schema.tql).)
+(See [the technical data model](docs/data-model_technical.org).)
 A node that plays the 'subscribee' role can be viewed as an ordinary node,
 or *as* a subscribee. In the latter case it appears
 underneath the relevant subscriber, in a 'subscribeeCol':

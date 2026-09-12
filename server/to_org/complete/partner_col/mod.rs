@@ -6,12 +6,8 @@ pub mod kind;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::phantom::home_from_disk;
 use crate::update_buffer::reconcile::omit_inactive_members;
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::dbs::typedb::search::hidden_in_subscribee_content::{
-  partition_subscribee_content_for_subscriber,
-  what_node_hides,
-  what_nodes_contain };
-use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
+use crate::dbs::node_lookup::nodecomplete_graphFirst_by_pid_and_source;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::to_org::complete::partner_col::child_data::{
   ChildData, reconcile_partnerCol_children_against_goal_list };
@@ -36,14 +32,12 @@ use crate::types::tree::viewnode_nodecomplete::{
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::sync::Arc;
-use typedb_driver::TypeDBDriver;
 
 /// Resolve each goal-list id to its primary-pid form (so extra_ids
 /// collapse to their primary pid), keeping the original input order
 /// and de-duplicating, and build a 'ChildData' for each.
 ///
-/// Uses 'nodecomplete_and_viewnode_from_id' (TypeDB-aware) so
+/// Uses 'nodecomplete_and_viewnode_from_id' with the captured graph so
 /// cross-source IDs and extra_id-to-primary resolution both work,
 /// matching the source-resolution behavior of the per-id append
 /// loops this code replaced.
@@ -55,16 +49,16 @@ use typedb_driver::TypeDBDriver;
 /// 'phantom' is always 'None' on initial render: there is no diff
 /// view, no removed children, and no notion of a node that "used
 /// to be here" from a previous state.
-async fn build_initial_render_child_data (
+fn build_initial_render_child_data (
   ids    : &[ID],
+  graph  : &InRustGraph,
   config : &SkgConfig,
-  driver : &TypeDBDriver,
 ) -> Result<(Vec<ID>, HashMap<ID, ChildData>), Box<dyn Error>> {
   let mut goal     : Vec<ID>                = Vec::with_capacity (ids . len ());
   let mut resolved : HashMap<ID, ChildData> = HashMap::new ();
   for id in ids {
     let lookup : Option<(NodeComplete, ViewNode)> =
-      nodecomplete_and_viewnode_from_id (config, driver, id) . await ?;
+      nodecomplete_and_viewnode_from_id (graph, config, id) ?;
     let (primary_pid, source, title, unknown) : (ID, SourceName, String, bool) = match lookup {
       Some ((nc, _vn)) =>
         ( nc . pid . clone (),
@@ -110,11 +104,11 @@ pub fn type_and_parent_type_consistent_with_subscribee (
 /// - for each subscribee, an indefinitive Subscribee child
 /// - if any hidden nodes are outside subscribee content,
 ///   a HiddenOutsideOfSubscribeeCol
-pub async fn maybe_add_subscribeeCol_branch (
+pub fn maybe_add_subscribeeCol_branch (
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId, // if applicable, this is the subscriber
+  graph   : &InRustGraph,
   config  : &SkgConfig,
-  driver  : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
   force_create_when_empty : bool, // a Col view-request materializes the
@@ -140,7 +134,8 @@ pub async fn maybe_add_subscribeeCol_branch (
       &ViewNodeKind::PartnerCol (PartnerCol::Subscribee) )? . is_some ()
     { return Ok (( )); }}
   let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) =
-    pids_for_subscriber_and_its_subscribees ( tree, node_id, config ) ?;
+    pids_for_subscriber_and_its_subscribees (
+      tree, node_id, graph, config ) ?;
   let subscriber_source : SourceName =
     read_at_node_in_tree (
       tree, node_id,
@@ -157,9 +152,8 @@ pub async fn maybe_add_subscribeeCol_branch (
     omit_inactive_members (
       subscribee_ids,
       active_source_set,
-      |id : &ID| snapshot_global ()
-                 . and_then ( |g| g . pid_and_source (id)
-                                  . map ( |(_pid, src)| src ))
+      |id : &ID| graph . pid_and_source (id)
+                 . map ( |(_pid, src)| src )
                  . or_else ( || home_from_disk (id, config) ));
   if subscribee_ids . is_empty () {
     // Skip because it would be empty -- unless, in diff mode, the
@@ -177,36 +171,19 @@ pub async fn maybe_add_subscribeeCol_branch (
 
   let hidden_outside_content : HashSet < ID > = {
     // hidden IDs that are outside all subscribee content. Read
-    // edge-source-GATED from the in-Rust graph when the global
-    // handle is present (production always; render-and-gating,
-    // 5_plan.org): hides and memberships recorded outside the active
-    // prefix must not shape this derived col. TypeDB fallback is
-    // ungated (it stores no recording sources; harness-only).
+    // edge-source-GATED from the captured graph: hides and memberships
+    // recorded outside the active prefix must not shape this derived col.
     let r_hides : HashSet < ID > =
-      match snapshot_global () {
-        Some (snap) =>
-          snap . outbound_pids_for_relation_gated (
+          graph . outbound_pids_for_relation_gated (
             & subscriber_pid,
             NodeRelation::HidesFromItsSubscriptions,
             active_source_set )
-          . into_iter () . collect (),
-        None =>
-          { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-              "what_node_hides" ). entered();
-            what_node_hides (
-              &config . db_name, driver, & subscriber_pid ) . await } ? };
+          . into_iter () . collect ();
     let all_subscribee_content : HashSet < ID > =
-      match snapshot_global () {
-        Some (snap) =>
           subscribee_ids . iter ()
-          . flat_map ( |id| snap . outbound_pids_for_relation_gated (
+          . flat_map ( |id| graph . outbound_pids_for_relation_gated (
             id, NodeRelation::Contains, active_source_set ))
-          . collect (),
-        None =>
-          { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-              "what_nodes_contain" ). entered();
-            what_nodes_contain (
-              &config . db_name, driver, & subscribee_ids ) . await } ? };
+          . collect ();
     r_hides . iter ()
       . filter ( | id | ! all_subscribee_content . contains (id) )
       . cloned () . collect () };
@@ -216,7 +193,7 @@ pub async fn maybe_add_subscribeeCol_branch (
       ViewNodeKind::PartnerCol (PartnerCol::Subscribee), true ) ?;
   { let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
       build_initial_render_child_data (
-        &subscribee_ids, config, driver ) . await ?;
+        &subscribee_ids, graph, config ) ?;
     reconcile_partnerCol_children_against_goal_list (
       tree, subscribee_col_nid,
       PartnerCol::Subscribee,
@@ -227,13 +204,14 @@ pub async fn maybe_add_subscribeeCol_branch (
     hidden_outside_content . is_empty ()
     && source_diffs . is_some ()
     && { let wt_hides : Vec<ID> =
-           nodecomplete_rustFirst_by_pid_and_source (
-             config, &subscriber_pid, &subscriber_source )
+           nodecomplete_graphFirst_by_pid_and_source (
+             graph, config, &subscriber_pid, &subscriber_source )
            . ok ()
            . map ( |skg| members_of (
                        skg . hides_from_its_subscriptions . or_default () ) )
            . unwrap_or_default ();
          ! goal_list_for_hiddenoutsideof_subscribeecol (
+             graph,
              &subscriber_pid, &subscriber_source,
              &wt_hides, &subscribee_ids,
              source_diffs, config ) . 0 . is_empty () };
@@ -256,7 +234,7 @@ pub async fn maybe_add_subscribeeCol_branch (
       hidden_outside_content . into_iter () . collect ();
     let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
       build_initial_render_child_data (
-        &hidden_outside_ids, config, driver ) . await ?;
+        &hidden_outside_ids, graph, config ) ?;
     reconcile_partnerCol_children_against_goal_list (
       tree, hidden_outside_col_nid,
       PartnerCol::HiddenOutsideOfSubscribee,
@@ -266,11 +244,11 @@ pub async fn maybe_add_subscribeeCol_branch (
 /// Handle maybe_add_subscribeeCol_branch separately,
 /// and then run maybe_add_one_partnerCol
 /// for the other kinds of PartnerCols.
-pub async fn maybe_add_partnerCol_branches (
+pub fn maybe_add_partnerCol_branches (
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
+  graph   : &InRustGraph,
   config  : &SkgConfig,
-  driver  : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
 ) -> Result < (), Box<dyn Error> > {
@@ -288,10 +266,8 @@ pub async fn maybe_add_partnerCol_branches (
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_indefinitive { return Ok(( )); } }
   maybe_add_subscribeeCol_branch (
-    tree, node_id, config, driver, active_source_set,
-    source_diffs, false ) . await ?;
-  let Some (graph) = snapshot_global () else {
-    return Ok (( )); };
+    tree, node_id, graph, config, active_source_set,
+    source_diffs, false ) ?;
   for kind in [
     PartnerCol::Subscriber,
     PartnerCol::Overridden,
@@ -299,8 +275,8 @@ pub async fn maybe_add_partnerCol_branches (
     PartnerCol::Hider,
     PartnerCol::Hidden,
   ] { maybe_add_one_partnerCol (
-        tree, node_id, kind, config, driver, &graph,
-        active_source_set, source_diffs, false ) . await ?; }
+        tree, node_id, kind, config, graph,
+        active_source_set, source_diffs, false ) ?; }
   Ok (( )) }
 
 /// Add a generated PartnerCol for `node_id` if it would
@@ -311,13 +287,12 @@ pub async fn maybe_add_partnerCol_branches (
 /// "add here" surface even when the relation has no members. (Only ever
 /// passed 'true' for a writable col; an empty read-only col would just
 /// be pruned again.)
-pub async fn maybe_add_one_partnerCol (
+pub fn maybe_add_one_partnerCol (
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
   kind    : PartnerCol,
   config  : &SkgConfig,
-  driver  : &TypeDBDriver,
-  graph   : &Arc<InRustGraph>,
+  graph   : &InRustGraph,
   active_source_set : Option<&ActiveSourceSet>,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
   force_create_when_empty : bool,
@@ -376,7 +351,7 @@ pub async fn maybe_add_one_partnerCol (
       tree, node_id, ViewNodeKind::PartnerCol (kind), true) ?;
   let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
     build_initial_render_child_data (
-      &member_ids, config, driver ) . await ?;
+      &member_ids, graph, config ) ?;
   reconcile_partnerCol_children_against_goal_list (
     tree, col_nid, kind, &goal, &data ) ?;
   Ok (( )) }
@@ -386,11 +361,11 @@ pub async fn maybe_add_one_partnerCol (
 /// then prepend a HiddenInSubscribeeCol to hold those hidden nodes.
 /// The subscriber is the Subscribee's grandparent:
 ///   subscriber -> SubsribeeCol -> Subscribee
-pub async fn maybe_add_hiddenInSubscribeeCol_branch (
+pub fn maybe_add_hiddenInSubscribeeCol_branch (
   tree              : &mut Tree<ViewNode>,
   subscribee_treeid : NodeId,
+  graph             : &InRustGraph,
   config            : &SkgConfig,
-  driver            : &TypeDBDriver,
   active_source_set : Option<&ActiveSourceSet>,
   source_diffs      : &Option<HashMap<SourceName, SourceDiff>>,
 ) -> Result < (), Box<dyn Error> > {
@@ -405,24 +380,21 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
   { return Ok (( )); }
   let ( subscribee_pid, subscriber_pid ) : ( ID, ID ) =
     pid_for_subscribee_and_its_subscriber_grandparent (
-      tree, subscribee_treeid, config ) ?;
+      tree, subscribee_treeid, graph, config ) ?;
   let ( _visible, hidden_in_content )
     : ( HashSet < ID >, HashSet < ID > )
-    = match snapshot_global () {
-      // Edge-source-GATED when the global handle is present
-      // (production always; render-and-gating, 5_plan.org): hides
-      // and memberships outside the active prefix must not shape
-      // this derived col. TypeDB fallback is ungated (no recording sources;
-      // harness-only).
-      Some (snap) => {
+    = {
+      // Edge-source-GATED from the captured graph: hides and memberships
+      // outside the active prefix must not shape this derived col.
+      {
         let subscriber_hides : HashSet<ID> =
-          snap . outbound_pids_for_relation_gated (
+          graph . outbound_pids_for_relation_gated (
             & subscriber_pid,
             NodeRelation::HidesFromItsSubscriptions,
             active_source_set )
           . into_iter () . collect ();
         let subscribee_content : HashSet<ID> =
-          snap . outbound_pids_for_relation_gated (
+          graph . outbound_pids_for_relation_gated (
             & subscribee_pid, NodeRelation::Contains,
             active_source_set )
           . into_iter () . collect ();
@@ -431,11 +403,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
             . cloned () . collect (),
           subscribee_content . iter ()
             . filter ( |id| subscriber_hides . contains (id) )
-            . cloned () . collect () ) }
-      None =>
-        partition_subscribee_content_for_subscriber (
-          & config . db_name, driver,
-          & subscriber_pid, & subscribee_pid ) . await ? };
+            . cloned () . collect () ) } };
   if hidden_in_content . is_empty () {
     // Skip because it would be empty -- unless, in diff mode, the
     // HEAD-side DERIVED membership is non-empty: a hidden-in
@@ -444,9 +412,8 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
     let head_side_occupied : bool =
       source_diffs . is_some ()
       && { let source_of = | pid : &ID | -> SourceName {
-             snapshot_global ()
-               . and_then ( |g| g . pid_and_source (pid)
-                                . map ( |(_p, src)| src ))
+             graph . pid_and_source (pid)
+               . map ( |(_p, src)| src )
                . or_else ( || home_from_disk (pid, config) )
                . unwrap_or_else ( SourceName::not_found ) };
            let subscribee_source : SourceName =
@@ -454,18 +421,19 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
            let subscriber_source : SourceName =
              source_of (&subscriber_pid);
            let subscribee_contains : Vec<ID> =
-             nodecomplete_rustFirst_by_pid_and_source (
-               config, &subscribee_pid, &subscribee_source )
+             nodecomplete_graphFirst_by_pid_and_source (
+               graph, config, &subscribee_pid, &subscribee_source )
              . ok () . map ( |skg| members_of (& skg . contains) )
              . unwrap_or_default ();
            let subscriber_hides : Vec<ID> =
-             nodecomplete_rustFirst_by_pid_and_source (
-               config, &subscriber_pid, &subscriber_source )
+             nodecomplete_graphFirst_by_pid_and_source (
+               graph, config, &subscriber_pid, &subscriber_source )
              . ok ()
              . map ( |skg| members_of (
                          skg . hides_from_its_subscriptions . or_default () ) )
              . unwrap_or_default ();
            ! goal_list_for_hiddeninsubscribee_col (
+               graph,
                &subscribee_pid, &subscribee_source,
                &subscriber_pid, &subscriber_source,
                &subscribee_contains, &subscriber_hides,
@@ -487,7 +455,7 @@ pub async fn maybe_add_hiddenInSubscribeeCol_branch (
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
     build_initial_render_child_data (
-      &hidden_in_ids, config, driver ) . await ?;
+      &hidden_in_ids, graph, config ) ?;
   reconcile_partnerCol_children_against_goal_list (
     tree, hidden_col_nid,
     PartnerCol::HiddenInSubscribee,

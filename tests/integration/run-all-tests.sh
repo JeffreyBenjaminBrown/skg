@@ -22,12 +22,6 @@ echo "Integration directory: $INTEGRATION_DIR"
 echo "Results will be written to: $TESTS_LOG"
 echo ""
 
-# Clean up any straggler test databases from previous runs
-# Uses TypeDB's API for safe deletion (doesn't require stopping TypeDB)
-echo "Cleaning up straggler test databases..."
-"$PROJECT_ROOT/target/debug/cleanup-test-dbs"
-echo ""
-
 # Auto-discover test directories (any subdirectory with a run-test.sh)
 TEST_DIRS=()
 for dir in "$INTEGRATION_DIR"/*/; do
@@ -75,7 +69,7 @@ run_single_test() {
 echo ""
 echo "Running ${#TEST_DIRS[@]} tests in parallel..."
 
-# Max parallel tests. Each test spins up a server (TypeDB + Tantivy init),
+# Max parallel tests. Each test spins up a server (graph + Tantivy init),
 # so too many at once can starve the system, especially under an RT kernel.
 DEFAULT_PARALLEL="$(skg_default_jobs 2)"
 MAX_PARALLEL="$(skg_positive_int_or_default "${SKG_TEST_PARALLEL:-}" "$DEFAULT_PARALLEL")"
@@ -171,28 +165,5 @@ fi
 
 echo ""
 echo "Complete results available in: $TESTS_LOG"
-
-# PITFALL: Manual DB deletion here would cause TypeDB to crash
-# (when it tries to checkpoint deleted databases).
-# But test DBs *should* be cleaned up by each test server,
-# due to delete_on_quit = true in their configs.
-
-# Report any straggler test databases that leaked.
-token=$(curl -s -X POST http://127.0.0.1:8000/v1/signin \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"password"}' 2>/dev/null \
-  | grep -oP '"token"\s*:\s*"\K[^"]+' 2>/dev/null) || true
-if [ -n "$token" ]; then
-  stragglers=$(curl -s http://127.0.0.1:8000/v1/databases \
-    -H "Authorization: Bearer $token" 2>/dev/null \
-    | grep -oP '"name"\s*:\s*"\Kskg-test[^"]*' 2>/dev/null) || true
-  if [ -n "$stragglers" ]; then
-    count=$(echo "$stragglers" | wc -l)
-    echo ""
-    echo "⚠  $count straggler test database(s) leaked:"
-    echo "$stragglers" | sed 's/^/  - /'
-    echo "  Run: ./target/debug/cleanup-test-dbs"
-  fi
-fi
 
 exit $overall_result

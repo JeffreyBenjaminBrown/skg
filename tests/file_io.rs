@@ -12,7 +12,7 @@ use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::misc::{ID, MSV, MemberAtSource, SkgConfig, SourceName, members_at_source_msv};
 use skg::test_utils::set_source_retagging_member_sources;
-use skg::test_utils::{run_with_test_db, nodecomplete_example};
+use skg::test_utils::{run_with_test_stores, nodecomplete_example};
 
 const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
 
@@ -192,28 +192,28 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
 #[test]
 fn test_fetch_aliases_from_file(
 ) -> Result<(), Box<dyn std::error::Error>> {
-  run_with_test_db(
+  run_with_test_stores(
     "skg-test-fetch-aliases",
     "tests/file_io/fixtures",
     "/tmp/tantivy-test-fetch-aliases",
-    |config, driver, _tantivy| Box::pin(async move {
-      test_fetch_aliases_from_file_impl(config, driver) . await
+    |config, _tantivy| Box::pin(async move {
+      test_fetch_aliases_from_file_impl(config) . await
     } )) }
 
 async fn test_fetch_aliases_from_file_impl(
   config: &SkgConfig,
-  driver: &typedb_driver::TypeDBDriver,
+
 ) -> Result<(), Box<dyn std::error::Error>> {
   let aliases_result : Vec<String> =
     fetch_aliases_from_file (
-      &config, driver, ID::new ("node_with_aliases") ) . await;
+      &config, ID::new ("node_with_aliases") );
   assert_eq! ( aliases_result,
                vec![ "first alias" . to_string (),
                      "second alias" . to_string () ],
                "Should return aliases when present" );
   let no_aliases_result =
     fetch_aliases_from_file (
-      &config, driver, ID::new ("node_without_aliases") ) . await;
+      &config, ID::new ("node_without_aliases") );
   assert_eq! ( no_aliases_result, Vec::<String>::new(),
                "Should return empty Vec when no aliases" );
   Ok (( )) }

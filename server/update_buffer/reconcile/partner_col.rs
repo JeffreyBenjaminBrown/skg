@@ -10,7 +10,7 @@ use crate::to_org::complete::partner_col::goal_list::{
   outbound_member_axes,
 };
 use crate::to_org::complete::partner_col::inverse_scan::inverse_scan_for_inbound_col;
-use crate::types::env::SkgEnv;
+use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
 use crate::types::misc::{ID, MemberAtSource, SourceName};
 use crate::source_sets::ActiveSourceSet;
@@ -37,7 +37,7 @@ pub fn reconcile_partnerCol_children (
   tree         : &mut Tree<ViewNode>,
   kind         : PartnerCol,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-  env          : &SkgEnv,
+  runtime      : &RuntimeGeneration,
   graph_snap   : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
@@ -60,7 +60,7 @@ pub fn reconcile_partnerCol_children (
   let source_resolver = |id : &ID| -> Option<SourceName> {
     graph_snap . pid_and_source (id)
       . map ( |(_pid, src)| src )
-      . or_else ( || home_from_disk (id, &env . config) ) };
+      . or_else ( || home_from_disk (id, &runtime . config) ) };
   let outbound : bool = // the col shows a list in the OWNER's file
     owner_role . is_first_role ();
   let raw_outbound_members : Vec<MemberAtSource<ID>> = if outbound {
@@ -148,8 +148,8 @@ pub fn reconcile_partnerCol_children (
         tail = // phantoms of inactive members are omitted too
           omit_inactive_members (
             tail, active_source_set,
-            |id : &ID| env . find_source (
-              id, deleted_since_head_pid_src_map ));
+            |id : &ID| SkgEnv::find_source_in_generation (
+              runtime, id, deleted_since_head_pid_src_map ));
         tail . sort_by ( |a, b| a . 0 . cmp (&b . 0) );
         let removed : HashSet<ID> =
           tail . iter () . cloned () . collect ();
@@ -190,7 +190,7 @@ pub fn reconcile_partnerCol_children (
       tree, node,
       &goal_list, &removed_ids, axes_for_removed,
       source_diffs, deleted_since_head_pid_src_map,
-      &relationship_sources, env ) ?;
+      &relationship_sources, runtime ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §6.0/§16: the reconciler deletes a stale member that is a view-leaf and
   // demotes one that is a branch, so a read-only PartnerCol
   // drops a stale leaf member instead of preserving it.

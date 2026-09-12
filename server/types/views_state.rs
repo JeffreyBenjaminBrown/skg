@@ -1,4 +1,4 @@
-use crate::dbs::in_rust_graph::snapshot_global;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::many_to_many::ManyToMany;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::ViewNodeKind;
@@ -102,13 +102,14 @@ impl OpenViews {
 
   pub fn register_view (
     &mut self,
+    graph  : &InRustGraph,
     uri    : ViewUri,
     viewforest : impl Into<ViewForest>,
     pids   : &[ID],
   ) { let viewforest : ViewForest =
         viewforest . into ();
       let rids : HashSet<ID> =
-        root_ids_from_viewforest ( &viewforest );
+        root_ids_from_viewforest ( graph, &viewforest );
       for rid in &rids {
         self . root_ids . insert (
           rid . clone (), uri . clone () ); }
@@ -120,6 +121,7 @@ impl OpenViews {
 
   pub fn update_view (
     &mut self,
+    graph      : &InRustGraph,
     uri        : &ViewUri,
     new_viewforest : impl Into<ViewForest>,
   ) { let new_viewforest : ViewForest =
@@ -128,7 +130,7 @@ impl OpenViews {
         pids_from_viewforest ( &new_viewforest );
       self . root_ids . remove_right (uri);
       let rids : HashSet<ID> =
-        root_ids_from_viewforest ( &new_viewforest );
+        root_ids_from_viewforest ( graph, &new_viewforest );
       for rid in &rids {
         self . root_ids . insert (
           rid . clone (), uri . clone () ); }
@@ -186,21 +188,18 @@ pub fn pids_from_viewforest (
 /// (There can be graph roots at other levels, via non-Content parentIs;
 /// this does not return those.)
 ///
-/// Extra_ids are pulled from the in-Rust graph. If in-Rust graph isn't
-/// initialized (tests that bypass 'init_global_handle_for_first_time_or_panic'), only
-/// primary ids are collected — extras aren't available.
+/// Extra IDs are pulled from the operation's captured in-Rust graph.
 fn root_ids_from_viewforest (
+  graph      : &InRustGraph,
   viewforest : &ViewForest,
 ) -> HashSet<ID> {
   let mut ids : HashSet<ID> = HashSet::new ();
-  let graph_snap = snapshot_global ();
   for child in viewforest . roots () {
     if let Some (vid) = child . value () . active_or_diff_phantom_id () {
       ids . insert ( vid . clone () );
-      if let Some (graph) = graph_snap . as_ref () {
-        if let Some (pid) = graph . pid_of ( vid ) {
+      if let Some (pid) = graph . pid_of ( vid ) {
           if let Some (node) = graph . nodes . get (&pid) {
             ids . insert ( pid . clone () );
             for extra_id in &node . extra_ids {
-              ids . insert ( extra_id . clone () ); }}}}}}
+              ids . insert ( extra_id . clone () ); }}}}}
   ids }

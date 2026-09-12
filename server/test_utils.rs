@@ -1,16 +1,11 @@
 mod guard;
-pub use guard::TestDbGuard;
+pub use guard::TestStoreGuard;
 
-use crate::consts::TYPEDB_ADDRESS;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
-use crate::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema, create_empty_tantivy_index};
-use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, audit::{audit_inrustgraph_against_typedb, format_mismatches}, new_handle};
+use crate::dbs::init::create_empty_tantivy_index;
+use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 use crate::dbs::tantivy::search::{SearchOptions, search_index};
-use crate::dbs::typedb::nodes::create_all_nodes;
-use crate::dbs::typedb::relationships::create_all_relationships;
-use crate::dbs::typedb::sources::create_all_sources;
-use crate::dbs::typedb::util::extract_payload_from_typedb_string_rep;
 use crate::types::env::SkgEnv;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
 use crate::serve::ViewsState;
@@ -18,7 +13,6 @@ use crate::serve::handlers::save_buffer::{SaveResponse, update_from_and_rerender
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
 use crate::types::views_state::ViewUri;
 use crate::types::misc::{MSV, SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName, members_at_source, members_at_source_msv, MemberAtSource};
-use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::maybe_placed_viewnode::{ MpViewnode, MpViewnodeKind };
@@ -26,18 +20,14 @@ use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 
 use ego_tree::{Tree, NodeRef};
 use futures::FutureExt;
-use futures::StreamExt;
 use futures::executor::block_on;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::future::Future;
 use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use typedb_driver::answer::{QueryAnswer, ConceptRow};
-use typedb_driver::{TypeDBDriver, Addresses, Credentials, DriverOptions, DriverTlsConfig, Transaction, TransactionType, Database, DatabaseManager};
-use crate::dbs::typedb::util::ConceptRowStream;
 use std::sync::Arc;
 use tantivy::{DocAddress, Searcher, TantivyDocument};
 use tantivy::schema::document::Value;
@@ -47,51 +37,50 @@ use tantivy::schema::document::Value;
 ///
 /// This helper function encapsulates the common pattern of:
 /// 1. Copying fixtures to a temp directory (so saves don't corrupt originals)
-/// 2. Setting up a test database and Tantivy index
+/// 2. Setting up a Tantivy index
 /// 3. Running test functions
 /// 4. Cleaning up the database, index, and temp fixtures
 ///
-/// The test_fn closure receives references to SkgConfig, TypeDBDriver, and TantivyIndex
+/// The test_fn closure receives references to SkgConfig and TantivyIndex
 /// and can run multiple test functions sequentially.
 ///
 /// Example:
 /// ```
 /// #[test]
 /// fn my_test() -> Result<(), Box<dyn Error>> {
-///   run_with_test_db(
+///   run_with_test_stores(
 ///     "skg-test-my-test",
 ///     "tests/my_test/fixtures",
 ///     "/tmp/tantivy-test-my-test",
-///     |config, driver, tantivy| Box::pin(async move {
-///       test_function_1(config, driver, tantivy).await?;
-///       test_function_2(config, driver, tantivy).await?;
+///     |config, tantivy| Box::pin(async move {
+///       test_function_1(config, tantivy).await?;
+///       test_function_2(config, tantivy).await?;
 ///       Ok(())
 ///     } )) }
 /// ```
-pub fn run_with_test_db<F>(
-  db_name: &str,
+pub fn run_with_test_stores<F>(
+  test_name: &str,
   fixtures_folder: &str,
   tantivy_folder: &str,
   test_fn: F,
 ) -> Result<(), Box<dyn Error>>
 where
   F: for<'a>
-  FnOnce(&'a SkgConfig, &'a Arc<TypeDBDriver>, &'a mut TantivyIndex)
+  FnOnce(&'a SkgConfig, &'a mut TantivyIndex)
          -> Pin<Box<dyn Future<Output = Result
                                <(), Box<dyn Error>>> + 'a>>,
 {
   let _groups_lock : std::sync::MutexGuard<()> =
-    // Serializes against other db tests in this process (see
-    // SHARED_DB_GROUPS_MUTEX): under plain 'cargo test' a binary's
-    // tests share one process, and unserialized db tests race on
-    // process-global state (the in-Rust graph OnceLock, the Tantivy
-    // background writer) -- the historical flake family in
+    // Serializes against other store tests in this process (see
+    // TEST_STORE_GROUPS_MUTEX): under plain 'cargo test' a binary's
+    // tests share one process, and tests can race on shared temporary paths
+    // and the Tantivy background writer -- the historical flake family in
     // TODO/problems.org. Uncontended under nextest.
-    SHARED_DB_GROUPS_MUTEX . lock ()
+    TEST_STORE_GROUPS_MUTEX . lock ()
     . unwrap_or_else ( |poisoned| poisoned . into_inner () );
   let temp_fixtures : PathBuf =
     // Copy fixtures to temp so saves don't corrupt originals
-    PathBuf::from(format!("/tmp/{}-fixtures", db_name));
+    PathBuf::from(format!("/tmp/{}-fixtures", test_name));
   if temp_fixtures . exists() {
     fs::remove_dir_all (&temp_fixtures)?;
   }
@@ -99,17 +88,15 @@ where
     &PathBuf::from (fixtures_folder),
     &temp_fixtures)?;
   let result : Result<(), Box<dyn Error>> = block_on(async {
-    let (config, driver, mut tantivy)
-      : (SkgConfig, TypeDBDriver, TantivyIndex)
-      = setup_test_tantivy_and_typedb_dbs(
-          db_name,
+    let (config, mut tantivy) : (SkgConfig, TantivyIndex)
+      = setup_test_tantivy(
+          test_name,
           temp_fixtures . to_str() . unwrap(),
-          tantivy_folder ). await?;
-    let driver_arc : Arc<TypeDBDriver> = Arc::new (driver);
+          tantivy_folder )?;
     guarded_test_then_cleanup(
-      db_name, &config, &driver_arc,
+      test_name,
       Some(config . tantivy_folder . clone()),
-      test_fn(&config, &driver_arc, &mut tantivy),
+      test_fn(&config, &mut tantivy),
     ). await
   } );
   if temp_fixtures . exists() { // more cleanup
@@ -117,103 +104,78 @@ where
   result
 }
 
-/// Like run_with_test_db, but loads config from a TOML file
+/// Like run_with_test_stores, but loads config from a TOML file
 /// (supporting multi-source setups) and skips Tantivy.
-pub fn run_with_test_db_from_config<F>(
-  db_name: &str,
+pub fn run_with_test_stores_from_config<F>(
+  test_name: &str,
   config_path: &str,
   test_fn: F,
 ) -> Result<(), Box<dyn Error>>
 where
   F: for<'a>
-  FnOnce(&'a SkgConfig, &'a Arc<TypeDBDriver>)
+  FnOnce(&'a SkgConfig)
          -> Pin<Box<dyn Future<Output = Result
                                <(), Box<dyn Error>>> + 'a>>,
 {
   let _groups_lock : std::sync::MutexGuard<()> =
-    // See the twin lock in run_with_test_db.
-    SHARED_DB_GROUPS_MUTEX . lock ()
+    // See the twin lock in run_with_test_stores.
+    TEST_STORE_GROUPS_MUTEX . lock ()
     . unwrap_or_else ( |poisoned| poisoned . into_inner () );
   block_on(async {
     let config: SkgConfig =
-      load_config_with_overrides(config_path, Some (db_name), &[])?;
-    let driver: TypeDBDriver = TypeDBDriver::new(
-        Addresses::try_from_address_str(TYPEDB_ADDRESS)?,
-        Credentials::new("admin", "password"),
-        DriverOptions::new(DriverTlsConfig::disabled()),
-      ). await?;
-    overwrite_new_empty_typedb_db(db_name, &driver) . await?;
-    read_and_use_schema(db_name, &driver) . await?;
-    populate_data_from_config(&config, db_name, &driver) . await?;
-    let driver_arc : Arc<TypeDBDriver> = Arc::new (driver);
+      load_config_with_overrides(config_path, Some (test_name), &[])?;
     guarded_test_then_cleanup(
-      db_name, &config, &driver_arc, None,
-      test_fn(&config, &driver_arc),
+      test_name, None,
+      test_fn(&config),
     ) . await
   } )
 }
 
-/// Serializes db-using tests (shared-db groups AND the per-test
-/// run_with_test_db family) within one process. Under nextest every
+/// Serializes store-using tests (shared groups AND the per-test
+/// run_with_test_stores family) within one process. Under nextest every
 /// test is its own process, so this is uncontended there; under
-/// plain 'cargo test' (threads in one process) it keeps db tests
-/// from racing on process-global state (the in-Rust graph OnceLock,
-/// the Tantivy background writer).
-static SHARED_DB_GROUPS_MUTEX : std::sync::Mutex<()> =
+/// plain 'cargo test' (threads in one process) it keeps tests from racing on
+/// shared temporary paths and the Tantivy background writer.
+static TEST_STORE_GROUPS_MUTEX : std::sync::Mutex<()> =
   std::sync::Mutex::new (( ));
 
-/// One database + driver + schema, shared by a whole group of
+/// One fixture workspace, shared by a whole group of
 /// sequential sub-tests. 'reset' restores a pristine state between
 /// sub-tests by wiping the DATA in place (~10ms) instead of
-/// deleting and recreating the database (~250ms) -- see
+/// deleting and recreating the fixture stores (~250ms) -- see
 /// TODO/faster-tests.org for the measurements.
-pub struct SharedDbSession {
-  pub db_name    : String,
+pub struct SharedStoreSession {
+  pub test_name    : String,
   temp_fixtures  : PathBuf, // where reset() copies each sub-test's fixtures, so saves don't corrupt originals
   tantivy_folder : PathBuf,
   pub config     : SkgConfig,
-  pub driver     : Arc<TypeDBDriver>,
   pub tantivy    : TantivyIndex,
 }
 
-impl SharedDbSession {
-  /// Install the in-Rust graph globally from the session's current
-  /// config (reading the .skg files on disk). View-render tests call
-  /// this after a 'reset' (and after any save that rewrites disk) so the
-  /// production stats path ('snapshot_global', used by graphnodestats +
-  /// viewnodestats) reflects the data -- the uniform-herald stats have
-  /// no TypeDB fallback. Low-level tests that mutate TypeDB directly do
-  /// NOT call it, so their direct-readback paths keep hitting TypeDB.
-  pub fn install_graph_handle (
-    &self,
-  ) -> Result<(), Box<dyn Error>> {
-    crate::dbs::in_rust_graph::install_or_swap_global_handle (
-      graph_handle_from_config (&self . config) ? );
-    Ok (( )) }
-
+impl SharedStoreSession {
   /// Restore a pristine state for the next sub-test: wipe all data,
   /// copy `fixtures_folder` to the temp dir, point a config at it,
   /// repopulate, fresh Tantivy index. If the fixtures contain a
   /// 'skgconfig.toml' (multi-source setups), that config is loaded
   /// from the temp copy; otherwise a single-source ("main") config
-  /// is built around the copy. The schema and the database object
-  /// survive.
+  /// is built around the copy. The shared session object survives;
+  /// its graph snapshot and Tantivy index are replaced.
   /// `subtest_name` is printed so a failing group identifies which
   /// sub-test died (libtest replays captured stdout on failure).
-  pub async fn reset (
+  pub fn reset (
     &mut self,
     subtest_name    : &str,
     fixtures_folder : &str,
   ) -> Result<(), Box<dyn Error>> {
     self . reset_with_fixture_prep (
-      subtest_name, fixtures_folder, |_| Ok (( )) ) . await }
+      subtest_name, fixtures_folder, |_| Ok (( )) ) }
 
   /// Like 'reset', but runs `prep` on the temp fixture copy BEFORE
-  /// the config is loaded and the database populated -- for
-  /// sub-tests whose fixtures need mutation that the database must
+  /// the config is loaded and the graph snapshot populated -- for
+  /// sub-tests whose fixtures need mutation that the snapshot must
   /// reflect (e.g. git-initializing a source and leaving a
   /// worktree-vs-HEAD diff).
-  pub async fn reset_with_fixture_prep<P> (
+  pub fn reset_with_fixture_prep<P> (
     &mut self,
     subtest_name    : &str,
     fixtures_folder : &str,
@@ -235,7 +197,7 @@ impl SharedDbSession {
       if copied_config . exists () {
         let mut config : SkgConfig = load_config_with_overrides (
           copied_config . to_str () . unwrap (),
-          Some ( &self . db_name ), &[] ) ?;
+          Some ( &self . test_name ), &[] ) ?;
         config . tantivy_folder = self . tantivy_folder . clone ();
         config
       } else {
@@ -248,16 +210,15 @@ impl SharedDbSession {
             abbreviation : None,
             path         : self . temp_fixtures . clone (),
             user_owns_it : true, });
-        SkgConfig::fromSourcesAndDbName (
+        SkgConfig::fromSourcesAndTantivyFolder (
           sources,
-          &self . db_name,
           self . tantivy_folder . to_str () . unwrap () ) }};
-    self . wipe_then_repopulate () . await }
+    self . wipe_then_repopulate () }
 
   /// Like 'reset', but for sub-tests that prepare their own source
   /// directory (e.g. a git repo in a TempDir): no fixture copy; the
   /// single-source ("main") config points at `source_path` directly.
-  pub async fn reset_with_source_path (
+  pub fn reset_with_source_path (
     &mut self,
     subtest_name : &str,
     source_path  : &Path,
@@ -273,90 +234,75 @@ impl SharedDbSession {
           abbreviation : None,
           path         : source_path . to_path_buf (),
           user_owns_it : true, });
-      SkgConfig::fromSourcesAndDbName (
+      SkgConfig::fromSourcesAndTantivyFolder (
         sources,
-        &self . db_name,
         self . tantivy_folder . to_str () . unwrap () ) };
-    self . wipe_then_repopulate () . await }
+    self . wipe_then_repopulate () }
 
   /// Like 'reset', but loads a (possibly multi-source) config from a
   /// TOML file, reading fixtures in place -- the same convention as
-  /// 'run_with_test_db_from_config'.
-  pub async fn reset_from_config (
+  /// 'run_with_test_stores_from_config'.
+  pub fn reset_from_config (
     &mut self,
     subtest_name : &str,
     config_path  : &str,
   ) -> Result<(), Box<dyn Error>> {
     println! ("-- sub-test: {}", subtest_name);
     self . config = load_config_with_overrides (
-      config_path, Some ( &self . db_name ), &[] ) ?;
+      config_path, Some ( &self . test_name ), &[] ) ?;
     self . config . tantivy_folder =
       self . tantivy_folder . clone ();
-    self . wipe_then_repopulate () . await }
+    self . wipe_then_repopulate () }
 
-  async fn wipe_then_repopulate (
+  fn wipe_then_repopulate (
     &mut self,
   ) -> Result<(), Box<dyn Error>> {
     crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
-    wipe_all_data ( &self . db_name, &self . driver ) . await ?;
-    populate_data_from_config (
-      &self . config, &self . db_name, &self . driver ) . await ?;
     self . tantivy = create_empty_tantivy_index (
       &self . tantivy_folder ) ?;
     Ok (( )) }
 }
 
-/// Run a group of sub-tests against one shared database.
-/// Creates the database and defines the schema once; the test_fn
+/// Run a group of sub-tests against one shared fixture workspace.
+/// The test_fn
 /// should call 'session.reset' (or 'session.reset_from_config')
-/// before each sub-test. Cleanup mirrors 'run_with_test_db':
-/// panic-safe via TestDbGuard + catch_unwind.
-pub fn run_with_shared_test_db<F> (
-  db_name : &str,
+/// before each sub-test. Cleanup mirrors 'run_with_test_stores':
+/// panic-safe via TestStoreGuard + catch_unwind.
+pub fn run_with_shared_test_stores<F> (
+  test_name : &str,
   test_fn : F,
 ) -> Result<(), Box<dyn Error>>
 where
   F: for<'a>
-  FnOnce(&'a mut SharedDbSession)
+  FnOnce(&'a mut SharedStoreSession)
          -> Pin<Box<dyn Future<Output = Result
                                <(), Box<dyn Error>>> + 'a>>,
 {
   let _groups_lock : std::sync::MutexGuard<()> =
-    SHARED_DB_GROUPS_MUTEX . lock ()
+    TEST_STORE_GROUPS_MUTEX . lock ()
     . unwrap_or_else ( |poisoned| poisoned . into_inner () );
   let temp_fixtures : PathBuf =
-    PathBuf::from ( format! ("/tmp/{}-fixtures", db_name) );
+    PathBuf::from ( format! ("/tmp/{}-fixtures", test_name) );
   let tantivy_folder : PathBuf =
-    PathBuf::from ( format! ("/tmp/tantivy-test-{}", db_name) );
+    PathBuf::from ( format! ("/tmp/tantivy-test-{}", test_name) );
   let result : Result<(), Box<dyn Error>> = block_on ( async {
-    let driver : TypeDBDriver = TypeDBDriver::new (
-      Addresses::try_from_address_str (TYPEDB_ADDRESS) ?,
-      Credentials::new ("admin", "password"),
-      DriverOptions::new (DriverTlsConfig::disabled ()),
-    ) . await ?;
-    overwrite_new_empty_typedb_db (db_name, &driver) . await ?;
-    read_and_use_schema (db_name, &driver) . await ?;
-    let mut session : SharedDbSession = SharedDbSession {
-      db_name        : db_name . to_string (),
+    let mut session : SharedStoreSession = SharedStoreSession {
+      test_name        : test_name . to_string (),
       temp_fixtures  : temp_fixtures . clone (),
       tantivy_folder : tantivy_folder . clone (),
       config         : // placeholder; every sub-test runs after a reset, which overwrites it
-        SkgConfig::fromSourcesAndDbName (
-          HashMap::new (), db_name,
+        SkgConfig::fromSourcesAndTantivyFolder (
+          HashMap::new (),
           tantivy_folder . to_str () . unwrap () ),
-      driver         : Arc::new (driver),
       tantivy        : create_empty_tantivy_index (&tantivy_folder) ?, };
-    let mut guard : TestDbGuard = TestDbGuard::new (
-      db_name, Some ( tantivy_folder . clone () ));
+    let mut guard : TestStoreGuard = TestStoreGuard::new (
+      test_name, Some ( tantivy_folder . clone () ));
     let test_result : Result<Result<(), Box<dyn Error>>, _> =
       AssertUnwindSafe ( test_fn (&mut session) )
       . catch_unwind () . await;
     crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
     let cleanup_result : Result<(), Box<dyn Error>> =
-      cleanup_test_tantivy_and_typedb_dbs (
-        db_name, &session . driver,
-        Some (&tantivy_folder),
-      ) . await;
+      cleanup_test_tantivy (Some (&tantivy_folder)) ;
     guard . disarm ();
     match test_result {
       Ok (inner) => { cleanup_result ?; inner },
@@ -368,88 +314,16 @@ where
     fs::remove_dir_all (&temp_fixtures) ?; }
   result }
 
-/// Every entity and relation type in schema.tql.
-/// PITFALL: must be updated when schema.tql gains a type; the
-/// shared-session self-test (tests/shared_db_session.rs) pins that
-/// wiping these leaves zero instances of each.
-pub const ALL_SCHEMA_INSTANCE_TYPES : [&str; 10] = [
-  // relations first, entities after (deletion order doesn't matter;
-  // TypeDB drops a relation when its players go, but deleting them
-  // explicitly doesn't rely on that)
-  "contains", "textlinks_to", "subscribes",
-  "hides_from_its_subscriptions", "overrides_view_of",
-  "has_source", "has_extra_id",
-  "node", "extra_id", "source" ];
-
-/// Delete every data instance in the database, leaving the schema
-/// (and the database object) intact. Orphaned attribute VALUES may
-/// survive, but with no owner they are invisible to has-queries and
-/// harmless to re-insert ('@key' constrains owners, not values).
-pub async fn wipe_all_data (
-  db_name : &str,
-  driver  : &TypeDBDriver,
-) -> Result<(), Box<dyn Error>> {
-  let tx : Transaction = driver . transaction (
-    db_name, TransactionType::Write ) . await ?;
-  for type_name in ALL_SCHEMA_INSTANCE_TYPES {
-    tx . query ( format! (
-      "match $x isa {}; delete $x;", type_name )) . await ?; }
-  tx . commit () . await ?;
-  Ok (( )) }
-
-/// Count the data instances of one entity or relation type.
-pub async fn count_instances_of_type (
-  db_name   : &str,
-  driver    : &TypeDBDriver,
-  type_name : &str,
-) -> Result<usize, Box<dyn Error>> {
-  let tx : Transaction = driver . transaction (
-    db_name, TransactionType::Read ) . await ?;
-  let answer : QueryAnswer = tx . query ( format! (
-    "match $x isa {};", type_name )) . await ?;
-  let mut count : usize = 0;
-  let mut stream : ConceptRowStream = answer . into_rows ();
-  while let Some (row_result) = stream . next () . await {
-    row_result ?;
-    count += 1; }
-  Ok (count) }
-
-/// Read .skg files per `config` and create the corresponding
-/// sources, nodes, and relationships. Unlike
-/// 'populate_test_db_from_fixtures' this assumes the database and
-/// schema already exist, so a shared session can call it after a
-/// data wipe.
-pub async fn populate_data_from_config (
-  config  : &SkgConfig,
-  db_name : &str,
-  driver  : &TypeDBDriver,
-) -> Result<(), Box<dyn Error>> {
-  let nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources (config) ?;
-  create_all_sources (
-    db_name, driver, config ) . await ?;
-  let typedb_nodes : Vec<NodeTypedb> =
-    nodes . iter ()
-    . map (NodeTypedb::from_complete_parsing_textlinks)
-    . collect ();
-  create_all_nodes (
-    db_name, driver, &typedb_nodes ) . await ?;
-  create_all_relationships (
-    db_name, driver, &typedb_nodes ) . await ?;
-  Ok (( )) }
-
-/// Run a test future with a TestDbGuard safety net, then clean up.
+/// Run a test future with a TestStoreGuard safety net, then clean up.
 /// Catches panics so cleanup runs even if the test fails.
 async fn guarded_test_then_cleanup(
-  db_name: &str,
-  _config: &SkgConfig,
-  driver: &TypeDBDriver,
+  test_name: &str,
   tantivy_folder: Option<PathBuf>,
   test_future: Pin<Box<dyn Future<Output = Result
                                   <(), Box<dyn Error>>> + '_>>,
 ) -> Result<(), Box<dyn Error>> {
-  let mut guard: TestDbGuard = TestDbGuard::new(
-    db_name, tantivy_folder.clone());
+  let mut guard: TestStoreGuard = TestStoreGuard::new(
+    test_name, tantivy_folder.clone());
   let test_result: Result<Result<(), Box<dyn Error>>, _> =
     AssertUnwindSafe(test_future)
     . catch_unwind() . await;
@@ -458,10 +332,7 @@ async fn guarded_test_then_cleanup(
   // index out from under the worker.
   crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
   let cleanup_result: Result<(), Box<dyn Error>> =
-    cleanup_test_tantivy_and_typedb_dbs(
-      db_name, driver,
-      tantivy_folder . as_deref(),
-    ) . await;
+    cleanup_test_tantivy(tantivy_folder . as_deref()) ;
   guard . disarm();
   match test_result {
     Ok (inner) => { cleanup_result?; inner },
@@ -489,8 +360,7 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), Box<dyn Error>> {
 }
 
 /// Build an in-Rust graph handle preloaded from the test config's
-/// fixtures on disk. Use this when a test needs the in-Rust graph
-/// to agree with TypeDB for auditing.
+/// fixtures on disk.
 pub fn graph_handle_from_config (
   config : &SkgConfig,
 ) -> Result<InRustGraphHandle, Box<dyn Error>> {
@@ -499,22 +369,13 @@ pub fn graph_handle_from_config (
   Ok ( new_handle ( InRustGraph::from_nodecompletes (&nodes) )) }
 
 /// Bundle a test's existing handles into a 'SkgEnv'.
-///
-/// Tests should hold their driver as 'Arc<TypeDBDriver>' to match
-/// the production shape. '&Arc<TypeDBDriver>' deref-coerces to
-/// '&TypeDBDriver' in argument position, so old-style calls
-/// continue to work unchanged.
 pub fn skg_env_from_parts (
   config        : &SkgConfig,
-  driver        : Arc<TypeDBDriver>,
   tantivy_index : &TantivyIndex,
   graph         : &InRustGraphHandle,
 ) -> SkgEnv {
-  SkgEnv {
-    config        : config . clone (),
-    in_rust_graph : graph . clone (),
-    tantivy_index : tantivy_index . clone (),
-    driver, } }
+  SkgEnv::new_with_graph_handle (
+    config . clone (), graph . clone (), tantivy_index . clone () ) }
 
 /// Test shim around 'update_from_and_rerender_buffer' that accepts
 /// the four DB handles separately, builds a 'SkgEnv', and calls the
@@ -529,7 +390,6 @@ pub fn skg_env_from_parts (
 pub async fn update_from_and_rerender_buffer_test (
   stream                      : &mut std::net::TcpStream,
   org_buffer_text             : &str,
-  driver                      : &Arc<TypeDBDriver>,
   config                      : &SkgConfig,
   tantivy_index               : &TantivyIndex,
   graph                       : &InRustGraphHandle,
@@ -541,7 +401,7 @@ pub async fn update_from_and_rerender_buffer_test (
   // the COMMIT path. The fork-confirmation (commit-nothing) path has its
   // own shim below.
   update_from_and_rerender_buffer_with_fork_approval_test (
-    stream, org_buffer_text, driver, config, tantivy_index, graph,
+    stream, org_buffer_text, config, tantivy_index, graph,
     diff_mode_enabled, viewuri_from_request_result, views_state,
     /* fork_approved = */ true ) . await }
 
@@ -551,7 +411,6 @@ pub async fn update_from_and_rerender_buffer_test (
 pub async fn update_from_and_rerender_buffer_with_fork_approval_test (
   stream                      : &mut std::net::TcpStream,
   org_buffer_text             : &str,
-  driver                      : &Arc<TypeDBDriver>,
   config                      : &SkgConfig,
   tantivy_index               : &TantivyIndex,
   graph                       : &InRustGraphHandle,
@@ -563,7 +422,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_approval_test (
   // No user-set clone sources: every fork's source resolves by
   // inference-else-default.
   update_from_and_rerender_buffer_with_fork_sources_test (
-    stream, org_buffer_text, driver, config, tantivy_index, graph,
+    stream, org_buffer_text, config, tantivy_index, graph,
     diff_mode_enabled, viewuri_from_request_result, views_state,
     fork_approved, &HashMap::new () ) . await }
 
@@ -574,7 +433,6 @@ pub async fn update_from_and_rerender_buffer_with_fork_approval_test (
 pub async fn update_from_and_rerender_buffer_with_fork_sources_test (
   stream                      : &mut std::net::TcpStream,
   org_buffer_text             : &str,
-  driver                      : &Arc<TypeDBDriver>,
   config                      : &SkgConfig,
   tantivy_index               : &TantivyIndex,
   graph                       : &InRustGraphHandle,
@@ -585,9 +443,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_sources_test (
   fork_sources                : &HashMap<ID, SourceName>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut env : SkgEnv =
-    skg_env_from_parts (
-      config, Arc::clone (driver),
-      tantivy_index, graph );
+    skg_env_from_parts (config, tantivy_index, graph);
   update_from_and_rerender_buffer (
     stream,
     org_buffer_text,
@@ -624,19 +480,15 @@ pub fn set_source_retagging_member_sources (
     for m in v . iter_mut () {
       m . source = source . clone (); }} }
 
-/// Audit the given in-Rust graph handle against TypeDB; panic with a
-/// detailed message if they disagree. Intended for per-test-fixture
-/// post-mutation verification.
-pub async fn audit_inrustgraph_or_panic (
+/// Verify the published graph's inverse indexes after a mutation.
+pub fn audit_inrustgraph_or_panic (
   handle  : &InRustGraphHandle,
-  db_name : &str,
-  driver  : &TypeDBDriver,
 ) -> Result<(), Box<dyn Error>> {
   let snap : Arc<InRustGraph> = handle . load_full ();
-  let mismatches = audit_inrustgraph_against_typedb (
-    &snap, db_name, driver ) . await ?;
-  if ! mismatches . is_empty () {
-    panic! ("audit failed:\n{}", format_mismatches (&mismatches)); }
+  let errors = crate::dbs::in_rust_graph::internal_index_validation
+    ::validate_internal_indexes (&snap);
+  if ! errors . is_empty () {
+    panic! ("graph index audit failed:\n{:#?}", errors); }
   Ok (( )) }
 
 /// A converted fixture (author-folder layout) keeps its .skg files
@@ -650,141 +502,43 @@ pub fn prefer_owned_subdir (
   if owned . is_dir () { owned }
   else { root . to_path_buf () }}
 
-/// A helper function for tests.
-pub async fn populate_test_db_from_fixtures (
-  data_folder: &str,
-  db_name: &str,
-  driver: &TypeDBDriver
-) -> Result<(), Box<dyn Error>> {
-  let config : SkgConfig = {
-    let source_path : PathBuf =
-      // A converted fixture keeps its .skg files under owned/ (the
-      // author-folder layout); a flat fixture keeps them at the root.
-      prefer_owned_subdir ( Path::new (data_folder) );
-    let mut sources: HashMap<SourceName, SkgfileSource> =
-      HashMap::new();
-    sources . insert(
-      SourceName::from ("main"),
-      SkgfileSource {
-        name: SourceName::from ("main"),
-        abbreviation: None,
-        path: source_path,
-        user_owns_it: true, } );
-    SkgConfig::dummyFromSources (sources) };
-  overwrite_new_empty_typedb_db (
-    db_name, driver ) . await ?;
-  read_and_use_schema (
-    db_name, driver ) . await?;
-  populate_data_from_config (
-    &config, db_name, driver ) . await ?;
-  Ok (( )) }
-
-/* PURPOSE: Set up test dbs (Tantivy and TypeDB)
-with fixtures from the given folder.
-The test database will be named with the given db_name prefix.
-The program calling this should call `cleanup_test_tantivy_and_typedb_dbs`
-after the test completes to remove the database.
-.
-PITFALL: This sets delete_on_quit=false
-because tests tear down the db themselves.
-Unit tests don't even run the Rust-Emacs server (integration tests do),
-so while there's something to delete, there's no server to quit. */
-pub async fn setup_test_tantivy_and_typedb_dbs (
-  db_name: &str,
+/// Set up a test config and empty Tantivy index from copied fixtures.
+pub fn setup_test_tantivy (
+  _test_name: &str,
   fixtures_folder: &str,
   tantivy_folder: &str,
-) -> Result<(SkgConfig, TypeDBDriver, TantivyIndex), Box<dyn Error>> {
-  // PITFALL: Tests control cleanup via cleanup_test_tantivy_and_typedb_dbs,
-  // not via delete_on_quit, because there's no server to quit.
-  let config: SkgConfig = {
-    let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new();
-    sources . insert (
-      SourceName::from ("main"),
-      SkgfileSource {
-        name         : SourceName::from ("main"),
-        abbreviation : None,
-        path         : prefer_owned_subdir (
-          Path::new (fixtures_folder) ), // see populate_test_db_from_fixtures
-        user_owns_it : true, });
-    SkgConfig::fromSourcesAndDbName (
-      sources, db_name, tantivy_folder ) };
-  let driver: TypeDBDriver = TypeDBDriver::new(
-    Addresses::try_from_address_str(TYPEDB_ADDRESS)?,
-    Credentials::new("admin", "password"),
-    DriverOptions::new(DriverTlsConfig::disabled())
-  ) . await ?;
-  populate_test_db_from_fixtures(
-    fixtures_folder,
-    db_name,
-    &driver
-  ) . await?;
-  let tantivy_index: TantivyIndex =
-    create_empty_tantivy_index(&config . tantivy_folder)?;
-  Ok ((config, driver, tantivy_index)) }
+) -> Result<(SkgConfig, TantivyIndex), Box<dyn Error>> {
+  let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new();
+  sources . insert (
+    SourceName::from ("main"),
+    SkgfileSource {
+      name         : SourceName::from ("main"),
+      abbreviation : None,
+      path         : prefer_owned_subdir (Path::new (fixtures_folder)),
+      user_owns_it : true, });
+  let config : SkgConfig = SkgConfig::fromSourcesAndTantivyFolder (
+    sources, tantivy_folder );
+  let tantivy_index : TantivyIndex =
+    create_empty_tantivy_index (&config . tantivy_folder) ?;
+  Ok ((config, tantivy_index)) }
 
-/// Clean up test database and tantivy index after a test completes.
-///
-/// This deletes:
-/// - The TypeDB database (if it exists)
-/// - The Tantivy index directory (if it exists)
-///
-/// Does NOT delete the .skg fixture files.
-///
-/// PITFALL: Retries TypeDB delete on "database is in use" errors.
-/// This is a race: when a test returns, Rust Transactions drop and
-/// signal close asynchronously, but the TypeDB server may not have
-/// finished releasing them before we ask to delete the database.
-/// The retries give the server time to catch up.
-pub async fn cleanup_test_tantivy_and_typedb_dbs(
-  db_name: &str,
-  driver: &TypeDBDriver,
+/// Drain Tantivy's writer and remove a test index.
+pub fn cleanup_test_tantivy (
   tantivy_folder: Option<&Path>,
 ) -> Result<(), Box<dyn Error>> {
-  // The Tantivy index is written by a background worker
-  // (server/dbs/tantivy/background_writer.rs). Drain it before touching
-  // the index directory, so no commit or merge thread is still creating
-  // files when we delete it -- otherwise remove_dir_all races them and
-  // fails with DirectoryNotEmpty. (guarded_test_then_cleanup drains too,
-  // but many tests call this helper directly.)
   crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle ();
-
-  { // Delete TypeDB database (with retry).
-    let databases : &DatabaseManager = driver . databases();
-    if databases . contains (db_name) . await? {
-      let max_attempts : usize = 20; // 20 * 50ms = 1s total
-      let mut last_err : Option<Box<dyn Error>> = None;
-      for attempt in 0 .. max_attempts {
-        let database : Arc<Database> =
-          databases . get (db_name) . await?;
-        match database . delete() . await {
-          Ok (()) => { last_err = None; break; }
-          Err (e) => {
-            let msg : String = e . to_string();
-            if msg . contains ("is in use") && attempt + 1 < max_attempts {
-              // block_on is single-threaded; a blocking sleep
-              // is safe and doesn't need a tokio/async-std timer.
-              std::thread::sleep (
-                std::time::Duration::from_millis (50) );
-              last_err = Some ( Box::new (e) ); }
-            else { last_err = Some ( Box::new (e) ); break; }} } }
-      if let Some (e) = last_err { return Err (e); } } }
-
-  // Delete Tantivy index if path provided and exists. Belt-and-suspenders:
-  // even after draining the worker, retry on DirectoryNotEmpty in case the
-  // OS or Tantivy is still finishing background file cleanup.
   if let Some (tantivy_path) = tantivy_folder {
     if tantivy_path . exists() {
-      let max_attempts : usize = 20; // 20 * 50ms = 1s total
+      let max_attempts : usize = 20;
       for attempt in 0 .. max_attempts {
         match fs::remove_dir_all (tantivy_path) {
           Ok (()) => break,
           Err (e)
-            if e . raw_os_error() == Some (39) // ENOTEMPTY
+            if e . raw_os_error() == Some (39)
                && attempt + 1 < max_attempts => {
             std::thread::sleep (
               std::time::Duration::from_millis (50) ); }
           Err (e) => return Err ( Box::new (e) ), } } } }
-
   Ok (( )) }
 
 /// Compare two org-mode headlines ignoring ID differences.
@@ -921,57 +675,6 @@ fn strip_id_from_metadata_struct(
     meta
   } ) }
 
-/// Query all primary node IDs from TypeDB.
-/// Returns a HashSet of all IDs belonging to primary nodes (not extra_ids).
-pub async fn all_pids_from_typedb(
-  db_name: &str,
-  driver: &TypeDBDriver,
-) -> Result<HashSet<ID>, Box<dyn Error>> {
-  let tx: Transaction = driver . transaction(
-    db_name, TransactionType::Read ) . await ?;
-  let query: String =
-    "match $node isa node, has id $node_id; select $node_id;"
-    . to_string();
-  let answer: QueryAnswer = tx . query (query) . await?;
-  let mut node_ids: HashSet<ID> = HashSet::new();
-  let mut stream : ConceptRowStream = answer . into_rows();
-  while let Some (row_result) = stream . next() . await {
-    let row : ConceptRow = row_result?;
-    if let Some (concept) = row . get ("node_id")? {
-      let node_id_str: String =
-        extract_payload_from_typedb_string_rep(
-          &concept . to_string());
-      node_ids . insert(ID (node_id_str)); }}
-  Ok (node_ids) }
-
-/// Query all extra_ids for a given primary node ID from TypeDB.
-/// Returns a Vec of all extra_ids associated with the node.
-pub async fn extra_ids_from_pid(
-  db_name: &str,
-  driver: &TypeDBDriver,
-  skgid: &ID,
-) -> Result<Vec<ID>, Box<dyn Error>> {
-  let tx: Transaction = driver . transaction(
-    db_name, TransactionType::Read ) . await?;
-  let query : String = format!(
-    r#"match $node isa node, has id "{}";
-       $e isa extra_id;
-       $rel isa has_extra_id (node: $node, extra_id: $e);
-       $e has id $extra_id_value;
-       select $extra_id_value;"#,
-    skgid . 0 );
-  let answer: QueryAnswer = tx . query (query) . await?;
-  let mut extra_ids : Vec<ID> = Vec::new();
-  let mut stream : ConceptRowStream = answer . into_rows();
-  while let Some (row_result) = stream . next() . await {
-    let row : ConceptRow = row_result?;
-    if let Some (concept) = row . get ("extra_id_value")? {
-      let extra_id_str : String =
-        extract_payload_from_typedb_string_rep(
-          &concept . to_string());
-      extra_ids . push(
-        ID (extra_id_str)); }}
-  Ok (extra_ids) }
 
 /// Check if a specific ID exists in Tantivy search results.
 /// Searches for the given query and checks if any result has the exact ID.

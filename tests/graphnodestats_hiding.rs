@@ -2,13 +2,12 @@
 /// that hides another counts its outbound 'hides'; the node it hides
 /// counts its inbound 'hiders'; a bystander has neither.
 ///
-/// The TypeDB-fallback path was retired with the uniform-heralds
-/// rewrite (the directional counts have no reasonable TypeQL form), so
+/// Statistics are graph-native after the uniform-heralds rewrite, so
 /// only the in-Rust graph path is exercised here.
 
-use skg::dbs::typedb::search::all_graphnodestats::{
+use skg::dbs::in_rust_graph::stats::{
   AllGraphNodeStats, fetch_all_graphnodestats, graphnodestats_for_pid};
-use skg::test_utils::{graph_handle_from_config, run_with_test_db};
+use skg::test_utils::{graph_handle_from_config, run_with_test_stores};
 use skg::types::misc::ID;
 use skg::types::viewnode::RelationCounts;
 
@@ -38,17 +37,16 @@ fn assert_hiding_stats (
 #[test]
 fn in_rust_path_computes_hiding (
 ) -> Result<(), Box<dyn Error>> {
-  run_with_test_db (
+  run_with_test_stores (
     "skg-test-graphnodestats-hiding-inrust",
     "tests/graphnodestats_hiding/fixtures",
     "/tmp/tantivy-test-graphnodestats-hiding-inrust",
-    |config, driver, _tantivy| Box::pin ( async move {
-      skg::dbs::in_rust_graph::try_init_global_handle (
-        graph_handle_from_config (config) ? );
+    |config, _tantivy| Box::pin ( async move {
+      let graph = graph_handle_from_config (config) ? . load_full ();
       let stats : AllGraphNodeStats =
         fetch_all_graphnodestats (
-          & config . db_name, driver,
+          &graph,
           & [ ID::from ("hider"), ID::from ("hidden"),
-              ID::from ("bystander") ] ) . await ?;
+              ID::from ("bystander") ] ) ?;
       assert_hiding_stats (&stats);
       Ok (( )) } ) ) }

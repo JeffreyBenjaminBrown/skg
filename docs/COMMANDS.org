@@ -774,7 +774,7 @@ might be broken" note.
 
 Existing files in the output dir are overwritten in place; other
 files there are left untouched.
-** connection, reload, rebuild dbs
+** connection, reload, rebuild ephemeral data stores
 Unless you're coding or troubleshooting,
 you probably won't need these.
 *** skg-connection-verify
@@ -783,9 +783,11 @@ to check if the connection is working.
 Displays the result in the minibuffer.
 *** skg-connection-end
 Closes the TCP connection to the Rust server.
-*** skg-rebuild-dbs
-Rebuilds TypeDB and Tantivy databases,
-using the .skg files on disk.
+*** skg-rebuild-ephemeral-data-stores
+Re-reads the authoritative =.skg= files, validates and replaces the in-memory
+graph, and rebuilds the derived Tantivy search index. It does not rewrite the
+=.skg= files. Existing views are closed after successful publication because
+they belong to the previous runtime generation.
 *** skg-strip-trailing-whitespace-from-bodies
 Strips trailing whitespace from every line of every body,
 and trailing blank lines from each body's tail,
@@ -796,7 +798,7 @@ the derived caches are refreshed to match.
 Review the result with 'git diff --ignore-all-space',
 which should show nothing.
 *** skg-close-all-skg-buffers
-This may be warranted after a database rebuild.
+This may be warranted after an ephemeral-data-store rebuild.
 *** skg-reload
 Unloads all skg elisp modules and reloads them from disk.
 Useful when you've changed elisp code

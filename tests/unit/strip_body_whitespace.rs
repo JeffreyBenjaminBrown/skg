@@ -66,8 +66,8 @@ fn strips_on_disk_only_where_needed () {
           abbreviation : None,
           path         : dir . clone (),
           user_owns_it : owns, } ); }
-    SkgConfig::fromSourcesAndDbName (
-      sources, "db",
+    SkgConfig::fromSourcesAndTantivyFolder (
+      sources,
       & tmp . path () . join ("tantivy") . to_string_lossy () ) };
   let (all_nodes, changed) : (Vec<NodeComplete>, Vec<NodeComplete>) =
     strip_body_whitespace_on_disk (&config) . unwrap ();

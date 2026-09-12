@@ -58,6 +58,17 @@ fn reject_retired_config_keys (
 ) -> Result<(), Box<dyn std::error::Error>> {
   let parsed : Option<toml::Value> =
     toml::from_str::<toml::Value> (contents) . ok ();
+  let retired : Vec<&str> =
+    ["db_name", "delete_on_quit", "auto_audit_daily"]
+    . into_iter ()
+    . filter (|key| parsed . as_ref ()
+      .map (|value| value . get (*key) . is_some ())
+      . unwrap_or (false))
+    . collect ();
+  if ! retired . is_empty () {
+    return Err (format! (
+      "This config sets retired TypeDB keys: {}. TypeDB has been removed; delete these keys from skgconfig.toml.",
+      retired . join (", ")) . into ()); }
   let has_source_sets : bool =
     parsed . as_ref ()
     . map ( |v| v . get ("source_sets") . is_some () )
@@ -173,7 +184,7 @@ pub fn load_config (
 
 /// Load config from TOML file with optional overrides for testing.
 ///
-/// - If `db_name` is Some, overrides db_name and sets tantivy_folder to /tmp/tantivy-{db_name}
+/// - If `test_name` is Some, sets tantivy_folder to /tmp/tantivy-{test_name}
 /// - `source_overrides` replaces paths for the specified source names
 ///
 /// # Examples
@@ -185,7 +196,7 @@ pub fn load_config (
 ///   &[("output", PathBuf::from("/tmp/output"))],
 /// ).unwrap();
 ///
-/// // Override just db_name (for tests needing unique databases):
+/// // Select a unique test Tantivy folder:
 /// let config = load_config_with_overrides(
 ///   "tests/my_test/fixtures/skgconfig.toml",
 ///   Some("skg-test-my-test"),
@@ -201,7 +212,7 @@ pub fn load_config (
 /// ```
 pub fn load_config_with_overrides (
   path             : &str,
-  db_name          : Option<&str>, // None for no override
+  test_name        : Option<&str>,
   source_overrides : &[(&str, std::path::PathBuf)],
 ) -> Result <SkgConfig, Box<dyn std::error::Error>> {
   if !Path::new (path) . exists() {
@@ -228,8 +239,7 @@ pub fn load_config_with_overrides (
   make_paths_absolute (&mut config);
   derive_ownership_and_labels (&mut config, &raw_paths);
   validate_source_sets (&config)?;
-  if let Some (name) = db_name {
-    config . db_name = name . to_string();
+  if let Some (name) = test_name {
     config . tantivy_folder =
       std::path::PathBuf::from(format!("/tmp/tantivy-{}", name)); }
   for (source_name, new_path) in source_overrides {
@@ -270,3 +280,25 @@ fn make_paths_absolute (
     if source . path . is_relative () {
       source . path = root . join (
         &source . path ); } } }
+
+#[cfg(test)]
+mod retired_typedb_config_tests {
+  use super::reject_retired_config_keys;
+
+  #[test]
+  fn each_retired_key_is_rejected_and_all_present_keys_are_named () {
+    for key in ["db_name", "delete_on_quit", "auto_audit_daily"] {
+      let input = format! ("{} = true\n", key);
+      let message = reject_retired_config_keys (&input)
+        . expect_err ("retired TypeDB config key must be rejected")
+        . to_string ();
+      assert! (message . contains (key), "{}", message);
+      assert! (message . contains ("TypeDB has been removed"), "{}", message); }
+
+    let message = reject_retired_config_keys (
+      "db_name = 'old'\ndelete_on_quit = true\nauto_audit_daily = false\n")
+      . expect_err ("all retired keys must be rejected")
+      . to_string ();
+    for key in ["db_name", "delete_on_quit", "auto_audit_daily"] {
+      assert! (message . contains (key), "{}", message); }}
+}

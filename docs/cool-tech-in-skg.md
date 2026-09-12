@@ -1,8 +1,11 @@
 # Skg is built on cool technologies.
-Skg uses Rust for the server, TypeDB for the DB, and Emacs for the client.
+Skg uses Rust for the server and immutable in-memory graph, Tantivy for its
+derived search index, and Emacs Lisp or Lua for its clients.
 
 Rust surely needs no introduction, but I want to point out that it's actually not that hard, now that AI understands it.
 
-TypeDB is a stupendously expressive graph database, in which relationships can have any number of members (instead of the usual 2) and can themselves be members of other relationships.
+The Rust graph uses typed relationship fields and persistent collections, so
+readers retain coherent immutable generations while a writer publishes the
+next one atomically.
 
 Lisp might be the most venerated language in history. Emacs is written in Lisp, and is basically an interactive Lisp interpreter. It offers the user a degree of control that beggars belief.

@@ -3,7 +3,7 @@
  * Usage: cargo run --bin bench-context-inmemory <config-path>
  *   default config: data/real/skgconfig.toml
  *
- * No TypeDB needed — reads .skg files from disk and computes
+ * Reads .skg files from disk and computes
  * context types entirely in memory.
  */
 

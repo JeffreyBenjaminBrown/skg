@@ -1,5 +1,5 @@
 use crate::source_sets::ActiveSourceSet;
-use crate::types::env::SkgEnv;
+use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::to_org::complete::partner_col::child_data::{ChildData, apply_membership_axes_to_col_members, build_child_data, reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids};
 use crate::to_org::complete::partner_col::goal_list::goal_list_for_hiddeninsubscribee_col;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
@@ -43,7 +43,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
   node                           : NodeId,
   tree                           : &mut Tree<ViewNode>,
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
-  env                            : &SkgEnv,
+  runtime                        : &RuntimeGeneration,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   active_source_set              : Option<&ActiveSourceSet>,
@@ -54,10 +54,11 @@ pub fn reconcile_hiddenin_subscribee_col_children (
   kind . error_unless_node_is_this_kind (tree, node) ?;
 
   let context : HiddenInContext =
-    read_hiddenin_context (tree, node, kind, env, active_source_set) ?;
+    read_hiddenin_context (tree, node, kind, runtime, active_source_set) ?;
   let (goal_list, removed_ids, member_axes)
     : (Vec<ID>, HashSet<ID>, HashMap<ID, MembershipAxes>) =
     goal_list_for_hiddeninsubscribee_col (
+      &runtime . graph,
       &context . subscribee_pid, &context . subscribee_source,
       &context . subscriber_pid, &context . subscriber_source,
       &context . subscribee_contains, &context . subscriber_hides,
@@ -67,7 +68,8 @@ pub fn reconcile_hiddenin_subscribee_col_children (
     // members; no retention for this filter col.
     omit_inactive_members (
       goal_list, active_source_set,
-      |id : &ID| env . find_source (id, deleted_since_head_pid_src_map) );
+      |id : &ID| SkgEnv::find_source_in_generation (
+        runtime, id, deleted_since_head_pid_src_map) );
   // TODO/DONE/local-view-update/plan_v2.org §5.5: a col fills its members WHOLE and is budget-neutral -- the owning
   // subscribee already spent its budget unit when it expanded, so drawing all
   // the hidden members here costs nothing and never truncates the group.
@@ -88,7 +90,7 @@ pub fn reconcile_hiddenin_subscribee_col_children (
       tree, node,
       &goal_list, &removed_ids, &axes_for_removed,
       source_diffs, deleted_since_head_pid_src_map,
-      &context . relationship_sources, env ) ?;
+      &context . relationship_sources, runtime ) ?;
   let summary =
     reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids (
       // TODO/DONE/local-view-update/plan_v2.org §6.0: a HiddenInSubscribeeCol child that becomes stale (e.g. the user
@@ -116,7 +118,7 @@ fn read_hiddenin_context (
   tree               : &Tree<ViewNode>,
   node               : NodeId,
   kind               : PartnerCol,
-  env                : &SkgEnv,
+  runtime            : &RuntimeGeneration,
   active_source_set  : Option<&ActiveSourceSet>,
 ) -> Result<HiddenInContext, Box<dyn Error>> {
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: ancestry table indices -- subscribee = index 0 (parent), subscriber =
@@ -142,7 +144,8 @@ fn read_hiddenin_context (
   let subscribee_contains : Vec<ID> = {
     let subscribee_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
-        &env . config, &subscribee_pid, &subscribee_source ) ?;
+        &runtime . graph, &runtime . config,
+        &subscribee_pid, &subscribee_source ) ?;
     subscribee_nodecomplete . contains . iter ()
       . filter ( |m| source_active (& m . source) )
       . map ( |m| m . member . clone () )
@@ -150,7 +153,8 @@ fn read_hiddenin_context (
   let (subscriber_hides, relationship_sources) : (Vec<ID>, HashMap<ID, SourceName>) = {
     let subscriber_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
-        &env . config, &subscriber_pid, &subscriber_source ) ?;
+        &runtime . graph, &runtime . config,
+        &subscriber_pid, &subscriber_source ) ?;
     let members = subscriber_nodecomplete . hides_from_its_subscriptions
       . or_default () . iter ()
       . filter ( |m| source_active (& m . source) )

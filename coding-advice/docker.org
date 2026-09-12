@@ -34,7 +34,9 @@
 
 * What is in the container, for coding skg
   - Rust: =cargo=, =rustc=, =cargo-nextest=, =cargo-watch=.
-  - TypeDB: the =typedb= server binary.
+  - A legacy image may still contain an unused =typedb= binary until the
+    external image-cleanup follow-up is deployed. Skg never starts or contacts
+    it.
   - Native build deps are already present (=gcc=, =gnumake=, =cmake=,
     =pkg-config=, =openssl=, alsa/pipewire/dbus/glib, etc.), so
     =cargo build= of skg's C-linked crates works out of the box.
@@ -50,22 +52,19 @@
 
 * Running and testing skg here
   - Ports and collisions: the container runs =--network host=, so every
-    skg (and TypeDB) TCP port lands directly on the host and is shared
+    Skg TCP port lands directly on the host and is shared
     across all the containers. Jeff usually runs ~3 containers at once
     (two dev, one prod), each launched with its OWN =skgconfig.toml= that
     picks distinct TCP port(s), db name, and data/tantivy folders so they
     do not clobber each other's traffic or data. There is therefore NO
     fixed skg API port -- never hardcode or assume one; read the
-    =skgconfig.toml= the running server was started with. Treat TypeDB's
-    port the same way: config-governed, verify before assuming. See
+    =skgconfig.toml= the running server was started with. See
     =development-process.md= for isolating instances.
-  - =bash/start-servers.sh= brings up TypeDB + a skg server;
-    =bash/stop-servers.sh= tears them down. Many tests need one or both
-    running -- see =tests/USAGE.md= and =development-process.md= for which.
-    =bash/all-tests.sh= runs the whole suite; =cargo nextest run= the Rust
-    tests (needs TypeDB up).
-  - Source of truth is the =.skg= files on disk; TypeDB and Tantivy are
-    derived caches, rebuilt from disk on failure. Any change that
+  - =bash/start-servers.sh= brings up an Skg server and
+    =bash/stop-servers.sh= tears it down. =bash/all-tests.sh= manages the
+    isolated servers used by the full suite; Rust tests are service-free.
+  - Source of truth is the =.skg= files on disk. The in-Rust graph and Tantivy
+    are derived and rebuilt from disk on startup. Any change that
     correctly lands on the filesystem is recoverable.
 
 * Modifying the image
@@ -76,12 +75,10 @@
     parser in a non-obvious way; if you need to touch it, read
     =../other-projects/docker-typedb-rust/docker-travails.org= first.)
   - That directory is its own git repo, untracked by the skg repo. Its
-    =PITFALLS.org= holds the deeper build/maintenance facts you'll need
-    for non-trivial edits: pinning the TypeDB tarball hash in =typedb.nix=
-    (and keeping the =typedb-driver= crate in =Cargo.toml= in step with
-    the TypeDB major version), the FHS loader shim that lets the
-    npm-installed =claude=/=codex= run, and how Claude's own state
-    persists across rebuilds via =CLAUDE_CONFIG_DIR=.
+    =PITFALLS.org= holds the deeper build/maintenance facts needed for
+    non-trivial edits, including the FHS loader shim that lets the
+    npm-installed =claude=/=codex= run and how agent state persists across
+    rebuilds via =CLAUDE_CONFIG_DIR=.
   - PITFALL: because the container uses the host's =/nix/store= read-only,
     aggressive nix GC on the host can break an already-loaded image at
     runtime. Jeff should keep the built =result= (or a GC root) around.

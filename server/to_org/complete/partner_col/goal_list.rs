@@ -5,11 +5,11 @@
 /// that should appear as phantoms (present at HEAD but absent in the
 /// worktree). Outside diff view, the second element is empty.
 
-use crate::dbs::in_rust_graph::snapshot_global;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::types::git::{GitDiffStatus, MembershipAxes, NodeChanges, NodeCompleteDiff, Sign, SourceDiff, axes_from_per_stage_diffs, net_diff_from_per_stage, per_stage_node_changes_for_activeNode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
+use crate::dbs::node_lookup::nodecomplete_graphFirst_by_pid_and_source;
 use crate::types::misc::{ID, RelationshipMemberKey, SkgConfig, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::phantom::home_from_disk;
@@ -17,10 +17,11 @@ use crate::types::phantom::home_from_disk;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
-fn relationship_member_key (id : &ID) -> RelationshipMemberKey {
-  snapshot_global () . as_deref ()
-    . map (|graph| graph . relationship_member_key (id))
-    . unwrap_or_else (|| RelationshipMemberKey::UnresolvedRawId (id . clone ()))
+fn relationship_member_key (
+  graph : &InRustGraph,
+  id    : &ID,
+) -> RelationshipMemberKey {
+  graph . relationship_member_key (id)
 }
 
 /// Goal list for an OUTBOUND col -- one whose membership is a
@@ -197,6 +198,7 @@ fn axes_from_three_snapshots (
 /// single relation's diff can express.  Returns (goal list,
 /// removed-id set, per-member membership axes).
 pub fn goal_list_for_hiddeninsubscribee_col (
+  graph                : &InRustGraph,
   subscribee_pid      : &ID,
   subscribee_source   : &SourceName,
   subscriber_pid      : &ID,
@@ -208,9 +210,9 @@ pub fn goal_list_for_hiddeninsubscribee_col (
   let derived = | hides : &[ID], contains : &[ID] | -> Vec<ID> {
     // Intersection, preserving order from the hides list.
     let contains_set : HashSet<RelationshipMemberKey> =
-      contains . iter () . map (relationship_member_key) . collect ();
+      contains . iter () . map (|id| relationship_member_key (graph, id)) . collect ();
     hides . iter ()
-      . filter ( |id| contains_set . contains (&relationship_member_key (id)) )
+      . filter ( |id| contains_set . contains (&relationship_member_key (graph, id)) )
       . cloned () . collect () };
   if source_diffs . is_none () {
     return ( derived (subscriber_hides, subscribee_contains),
@@ -248,6 +250,7 @@ pub fn goal_list_for_hiddeninsubscribee_col (
 /// 'newM'.  Returns (goal list, removed-id set, per-member
 /// membership axes).
 pub fn goal_list_for_hiddenoutsideof_subscribeecol (
+  graph                : &InRustGraph,
   subscriber_pid       : &ID,
   subscriber_source    : &SourceName,
   wt_subscriber_hides  : &[ID],
@@ -259,12 +262,12 @@ pub fn goal_list_for_hiddenoutsideof_subscribeecol (
                   all_subscribee_content : &HashSet<RelationshipMemberKey> | -> Vec<ID> {
     hides . iter ()
       . filter ( |id| ! all_subscribee_content
-                . contains (&relationship_member_key (id)) )
+                . contains (&relationship_member_key (graph, id)) )
       . cloned () . collect () };
   let wt_subscribee_content_of = | pid : &ID | -> Vec<ID> {
-    match snapshot_global_source (pid, config) {
+    match graph_source (graph, pid, config) {
       Some (src) =>
-        nodecomplete_rustFirst_by_pid_and_source ( config, pid, &src )
+        nodecomplete_graphFirst_by_pid_and_source ( graph, config, pid, &src )
           . ok ()
           . map ( |skg| members_of (& skg . contains) )
           . unwrap_or_default (),
@@ -273,7 +276,7 @@ pub fn goal_list_for_hiddenoutsideof_subscribeecol (
     let wt_all_subscribee_content : HashSet<RelationshipMemberKey> =
       wt_subscribees . iter ()
         . flat_map ( |pid| wt_subscribee_content_of (pid) )
-        . map (|id| relationship_member_key (&id))
+        . map (|id| relationship_member_key (graph, &id))
         . collect ();
     return ( derived (wt_subscriber_hides, &wt_all_subscribee_content),
              HashSet::new (), HashMap::new () ); }
@@ -298,7 +301,7 @@ pub fn goal_list_for_hiddenoutsideof_subscribeecol (
           let wt_contains : Vec<ID> =
             wt_subscribee_content_of (&pid);
           let source : Option<SourceName> =
-            snapshot_global_source (&pid, config)
+            graph_source (graph, &pid, config)
             . or_else ( || source_in_diffs_for_file (
                 &pid, source_diffs ));
           let snapshots : [Vec<ID>; 3] = match source {
@@ -318,7 +321,7 @@ pub fn goal_list_for_hiddenoutsideof_subscribeecol (
               content3_by_subscribee . get (pid)
                 . map ( |snaps| snaps [k] . clone () )
                 . unwrap_or_default () )
-          . map (|id| relationship_member_key (&id))
+          . map (|id| relationship_member_key (graph, &id))
           . collect ();
       derived ( &hides3 [k], &all_subscribee_content ) } );
   let axes : HashMap<ID, MembershipAxes> =
@@ -352,16 +355,14 @@ mod three_snapshot_tests;
 
 /// Resolve a node's source: try the in-Rust graph snapshot first,
 /// fall back to scanning source directories for the matching '.skg'
-/// file. Tests that bypass
-/// `init_global_handle_for_first_time_or_panic` rely on the disk
-/// fallback.
-fn snapshot_global_source (
+/// file. The disk fallback handles diff/deletion states absent from the current
+/// graph snapshot.
+fn graph_source (
+  graph  : &InRustGraph,
   pid    : &ID,
   config : &SkgConfig,
 ) -> Option<SourceName> {
   if let Some (s) =
-    snapshot_global ()
-      . as_deref ()
-      . and_then ( |g| g . pid_and_source (pid) . map ( |(_, s)| s ) )
+    graph . pid_and_source (pid) . map ( |(_, s)| s )
   { return Some (s); }
   home_from_disk (pid, config) }

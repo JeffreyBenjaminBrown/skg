@@ -1,5 +1,5 @@
 /* top-contents: print nodes with the largest outbound 'contains'
- * list. Reads .skg files directly; no TypeDB needed.
+ * list. Reads .skg files directly; no running server needed.
  * Usage: cargo run --bin top-contents [<config-path>] [<top-n>]
  *   default config: data/skgconfig.toml
  *   default top-n: 20

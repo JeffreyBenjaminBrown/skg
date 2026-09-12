@@ -10,8 +10,8 @@ use ego_tree::{NodeId, Tree};
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 use skg::dbs::filesystem::not_nodes::load_config;
-use skg::dbs::typedb::ancestry::AncestryTree;
-use skg::dbs::typedb::search::all_graphnodestats::AllGraphNodeStats;
+use skg::dbs::in_rust_graph::ancestry::AncestryTree;
+use skg::dbs::in_rust_graph::stats::AllGraphNodeStats;
 use skg::serve::ViewsState;
 use skg::serve::handlers::source_sets::handle_source_set_request;
 use skg::serve::handlers::text_search::SearchEnrichmentPayload;
@@ -22,10 +22,10 @@ use skg::source_sets::{
   filter_branches_to_active_sources_for_test,
   prepare_git_diff_fixture,
   run_with_source_set_test_db};
-use skg::dbs::in_rust_graph::install_or_swap_global_handle;
+use skg::dbs::node_lookup::nodecomplete_from_graph;
 use skg::to_org::render::content_view::multi_root_view;
-use skg::test_utils::set_source_retagging_member_sources;
-use skg::test_utils::run_with_shared_test_db;
+use skg::test_utils::{set_source_retagging_member_sources, graph_handle_from_config};
+use skg::test_utils::run_with_shared_test_stores;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::org_to_text::viewforest_to_string;
@@ -53,58 +53,57 @@ use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use typedb_driver::TypeDBDriver;
 
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
   let fixtures : &str = "tests/source_sets/fixtures";
-  run_with_shared_test_db (
+  run_with_shared_test_stores (
     "skg-test-source-sets",
     |s| Box::pin ( async move {
-      s . reset ("source_set_switch_rerenders_views_and_cancels_stale_search_enrichment", fixtures) . await ?;
+      s . reset ("source_set_switch_rerenders_views_and_cancels_stale_search_enrichment", fixtures) ?;
       source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("content_view_omits_inactive_contained_nodes", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("content_view_omits_inactive_contained_nodes", fixtures) ?;
       content_view_omits_inactive_contained_nodes (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       s . reset_with_fixture_prep (
         // prepare_git_diff_fixture leaves the public source with a
         // real worktree-vs-HEAD diff, which this sub-test renders.
         "diff_view_omits_inactive_members_without_content_leak", fixtures,
-        |root| prepare_git_diff_fixture (root) ) . await ?;
+        |root| prepare_git_diff_fixture (root) ) ?;
       diff_view_omits_inactive_members_without_content_leak (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("search_filters_inactive_sources_before_ranking_and_truncation", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("search_filters_inactive_sources_before_ranking_and_truncation", fixtures) ?;
       search_filters_inactive_sources_before_ranking_and_truncation (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("inactive_placeholder_in_buffer_does_not_drive_contains", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("inactive_placeholder_in_buffer_does_not_drive_contains", fixtures) ?;
       inactive_placeholder_in_buffer_does_not_drive_contains (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("saving_edits_to_inactive_placeholder_content_are_rejected", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("saving_edits_to_inactive_placeholder_content_are_rejected", fixtures) ?;
       saving_edits_to_inactive_placeholder_content_are_rejected (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("restricted_source_search_and_save_work_together_end_to_end", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("restricted_source_search_and_save_work_together_end_to_end", fixtures) ?;
       restricted_source_search_and_save_work_together_end_to_end (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("containerward_expansion_truncates_before_inactive_container", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("containerward_expansion_truncates_before_inactive_container", fixtures) ?;
       containerward_expansion_truncates_before_inactive_container (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks", fixtures) ?;
       sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("stale_inactive_placeholders_under_cols_save_without_error", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("stale_inactive_placeholders_under_cols_save_without_error", fixtures) ?;
       stale_inactive_placeholders_under_cols_save_without_error (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to", fixtures) ?;
       inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("weave_preserves_omitted_inactive_content_members", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("weave_preserves_omitted_inactive_content_members", fixtures) ?;
       weave_preserves_omitted_inactive_content_members (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
-      s . reset ("restricted_save_preserves_invisible_override_targets", fixtures) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("restricted_save_preserves_invisible_override_targets", fixtures) ?;
       restricted_save_preserves_invisible_override_targets (
-        &s . config, &s . driver, &mut s . tantivy ) . await ?;
+        &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
 /// PIN (the override-substitution-across-switch case discussed in
@@ -121,7 +120,7 @@ fn all_tests
 /// contains the public 'ovr-sub-child' (D). Under "all" R substitutes
 /// for N; switching to "public" makes R inactive.
 ///
-/// Installs the process-global graph handle (override resolution reads
+/// Installs the explicit graph handle (override resolution reads
 /// it), so it assumes per-test process isolation (nextest), like
 /// tests/override_substitution.rs.
 #[test]
@@ -131,16 +130,16 @@ fn override_substitute_across_source_switch_anonymizes_and_keeps_original (
     "skg-test-ovr-sub-switch",
     "tests/source_sets/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-ovr-sub-switch",
-    |config, driver, tantivy| Box::pin ( async move {
-      install_or_swap_global_handle (
+    |config, tantivy| Box::pin ( async move {
+      (
         skg::test_utils::graph_handle_from_config (config) ? );
 
       // 1. Under "all", R is drawn in place of N (substitution).
       let (view_all, _pids, tree_all)
         : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view (
-          driver, config, Some (tantivy),
-          &[ ID::from ("ovr-sub-container") ], false ) . await ?;
+          config, Some (tantivy),
+          &[ ID::from ("ovr-sub-container") ], false ) ?;
       assert! (
         view_all . contains ("(overridesHere ovr-sub-original)"),
         "under 'all' the overrider should substitute for N:\n{}",
@@ -154,7 +153,7 @@ fn override_substitute_across_source_switch_anonymizes_and_keeps_original (
         skg::test_utils::graph_handle_from_config (config) ?;
       let env : skg::types::env::SkgEnv =
         skg::test_utils::skg_env_from_parts (
-          config, Arc::clone (driver), tantivy, &graph );
+          config, tantivy, &graph );
       let mut active : ActiveSourceSet =
         ActiveSourceSet::named (config, SourceSetName::from ("all")) ?;
       let mut views_state : ViewsState =
@@ -209,7 +208,7 @@ fn override_substitute_across_source_switch_anonymizes_and_keeps_original (
       let public : ActiveSourceSet =
         ActiveSourceSet::named (config, SourceSetName::from ("public")) ?;
       let plan = buffer_to_validated_saveplan (
-        &view_public, config, driver, Some (&public) ) . await ? . 1;
+        &view_public, config, Some (&public) )  ? . 1;
       if let Some (c) = plan . define_nodes . iter () . find_map (
         |i| match i {
           DefineNode::Save (SaveNode (n))
@@ -241,6 +240,19 @@ fn saved_node_by_id<'a> (
       if node . pid == ID::from (id) {
         return node; }}}
   panic! ("SaveNode not found: {}", id) }
+
+fn saved_or_graph_node_by_id (
+  instructions : &[DefineNode],
+  id           : &str,
+  graph        : &skg::dbs::in_rust_graph::InRustGraph,
+) -> NodeComplete {
+  instructions . iter () . find_map (|instruction| match instruction {
+    DefineNode::Save (SaveNode (node)) if node . pid == ID::from (id) =>
+      Some (node . clone ()),
+    _ => None, })
+    . or_else (|| nodecomplete_from_graph (graph, &ID::from (id)))
+    . unwrap_or_else (|| panic! ("Node not found in plan or graph: {}", id))
+}
 
 fn viewforest_from_org (
   input : &str,
@@ -315,8 +327,7 @@ fn config_rejects_reserved_all_source_and_source_set_names (
 }
 
 async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // TODO/full-schema/9-2_source-set-safety.org: a switch RE-RENDERS
@@ -325,7 +336,7 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
         skg::test_utils::graph_handle_from_config (config) ?;
       let env : skg::types::env::SkgEnv =
         skg::test_utils::skg_env_from_parts (
-          config, std::sync::Arc::clone (driver), tantivy, &graph );
+          config, tantivy, &graph );
       let mut active : ActiveSourceSet =
         ActiveSourceSet::named (
           config,
@@ -343,6 +354,7 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
           pids       : HashSet::from ([ID::from ("active-search-hit")]), });
       let enrichment_slot : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
         Arc::new (Mutex::new (Some (SearchEnrichmentPayload {
+          runtime        : env . runtime_snapshot (),
           terms          : "shared ranking term" . to_string (),
           search_results : vec![ID::from ("active-search-hit")],
           ancestry_by_id : HashMap::new (),
@@ -382,8 +394,7 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
       Ok (( )) }
 
 async fn content_view_omits_inactive_contained_nodes (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // TODO/full-schema/9-2_source-set-safety.org: rendering OMITS
@@ -395,10 +406,10 @@ async fn content_view_omits_inactive_contained_nodes (
           SourceSetName::from ("public"))?;
       let (actual, pids, _viewforest) : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view_with_source_set (
-          driver, config, None,
+          config, None,
           &[ID::from ("root")],
           false,
-          &active ) . await ?;
+          &active ) ?;
       assert! (
         ! actual . contains ("private-a"),
         "an inactive contained node must be omitted entirely: {}",
@@ -416,8 +427,7 @@ async fn content_view_omits_inactive_contained_nodes (
       Ok (( )) }
 
 async fn diff_view_omits_inactive_members_without_content_leak (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let active : ActiveSourceSet =
@@ -426,10 +436,10 @@ async fn diff_view_omits_inactive_members_without_content_leak (
           SourceSetName::from ("public"))?;
       let (actual, _pids, _viewforest) : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view_with_source_set (
-          driver, config, None,
+          config, None,
           &[ID::from ("diff-root")],
           true,
-          &active ) . await ?;
+          &active ) ?;
       // Defense in depth: the connection-level refusals
       // (TODO/full-schema/12-2_diff-mode-policy_discussion.org) keep
       // diff mode and restricted source-sets from combining through
@@ -457,7 +467,7 @@ async fn diff_view_omits_inactive_members_without_content_leak (
 
 async fn search_filters_inactive_sources_before_ranking_and_truncation (
   config  : &SkgConfig,
-  _driver : &Arc<TypeDBDriver>,
+
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let active : ActiveSourceSet =
@@ -479,8 +489,7 @@ async fn search_filters_inactive_sources_before_ranking_and_truncation (
       Ok (( )) }
 
 async fn inactive_placeholder_in_buffer_does_not_drive_contains (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // An inactive placeholder is read-only: it emits no save intention
@@ -504,10 +513,12 @@ async fn inactive_placeholder_in_buffer_does_not_drive_contains (
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (
-            reordered, config, driver, Some (&active) ) . await?
+            reordered, config, Some (&active) ) ?
           . 1 . define_nodes;
+        let graph = graph_handle_from_config (config)? . load_full ();
         assert_eq! (
-          members_of (& saved_node_by_id (&instructions, "root") . contains),
+          members_of (& saved_or_graph_node_by_id (
+            &instructions, "root", &graph) . contains),
           vec![ ID::from ("active-a"), ID::from ("private-a"),
                 ID::from ("active-b") ],
           "reordering a read-only placeholder must not move its disk \
@@ -526,10 +537,12 @@ async fn inactive_placeholder_in_buffer_does_not_drive_contains (
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (
-            stale, config, driver, Some (&active) ) . await?
+            stale, config, Some (&active) ) ?
           . 1 . define_nodes;
+        let graph = graph_handle_from_config (config)? . load_full ();
         let contains : Vec<ID> =
-          members_of (& saved_node_by_id (&instructions, "root") . contains);
+          members_of (& saved_or_graph_node_by_id (
+            &instructions, "root", &graph) . contains);
         assert_eq! (
           contains,
           vec![ ID::from ("active-a"), ID::from ("private-a"),
@@ -541,8 +554,7 @@ async fn inactive_placeholder_in_buffer_does_not_drive_contains (
       Ok (( )) }
 
 async fn saving_edits_to_inactive_placeholder_content_are_rejected (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let buffer = indoc! {"
@@ -552,7 +564,7 @@ async fn saving_edits_to_inactive_placeholder_content_are_rejected (
       "};
       let result =
         buffer_to_validated_saveplan (
-          buffer, config, driver, None ) . await;
+          buffer, config, None ) ;
       assert! (
         matches! ( result, Err (SaveError::BufferValidationErrors { .. }) ),
         "editing inactive placeholder title/body should be rejected: {:?}",
@@ -560,8 +572,7 @@ async fn saving_edits_to_inactive_placeholder_content_are_rejected (
 	      Ok (( )) }
 
 async fn restricted_source_search_and_save_work_together_end_to_end (
-  config  : &SkgConfig,
-  driver  : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let active : ActiveSourceSet =
@@ -581,10 +592,10 @@ async fn restricted_source_search_and_save_work_together_end_to_end (
         "restricted search should only return active-source hits" );
       let (rendered, _pids, _viewforest) : (String, Vec<ID>, Tree<ViewNode>) =
         multi_root_view_with_source_set (
-          driver, config, None,
+          config, None,
           &[ID::from ("root")],
           false,
-          &active ) . await ?;
+          &active ) ?;
       assert! (
         ! rendered . contains ("private-a"),
         "restricted content view must omit inactive members: {}",
@@ -596,10 +607,12 @@ async fn restricted_source_search_and_save_work_together_end_to_end (
       "};
       let instructions : Vec<DefineNode> =
         buffer_to_validated_saveplan (
-          edited_buffer, config, driver, Some (&active) ) . await?
+          edited_buffer, config, Some (&active) ) ?
         . 1 . define_nodes;
+      let graph = graph_handle_from_config (config)? . load_full ();
       assert_eq! (
-        members_of (& saved_node_by_id (&instructions, "root") . contains),
+        members_of (& saved_or_graph_node_by_id (
+          &instructions, "root", &graph) . contains),
         vec![ ID::from ("active-a"), ID::from ("private-a"),
               ID::from ("active-b") ],
         "restricted save should preserve the omitted inactive member \
@@ -622,13 +635,14 @@ fn backward_path_truncates_before_first_inactive_node (
     ActiveSourceSet::named (
       &config,
       SourceSetName::from ("public"))?;
+  let graph = graph_handle_from_config (&config)? . load_full ();
   let path : Vec<ID> =
     vec![
       ID::from ("active-container"),
       ID::from ("private-container"),
       ID::from ("active-root-after-private") ];
   assert_eq! (
-    filter_path_to_active_sources_for_test (&config, &active, path)?,
+    filter_path_to_active_sources_for_test (&graph, &config, &active, path)?,
     vec![ID::from ("active-container")],
     "mid-path filtering should keep exactly the active prefix \
      and stop before the first inactive node" );
@@ -643,13 +657,14 @@ fn backward_path_filters_forks_per_branch_and_omits_empty_forks (
     ActiveSourceSet::named (
       &config,
       SourceSetName::from ("public"))?;
+  let graph = graph_handle_from_config (&config)? . load_full ();
   let mixed_branches : BTreeSet<ID> =
     BTreeSet::from ([
       ID::from ("active-fork-branch"),
       ID::from ("private-fork-branch")]);
   assert_eq! (
     filter_branches_to_active_sources_for_test (
-      &config, &active, mixed_branches)?,
+      &graph, &config, &active, mixed_branches)?,
     BTreeSet::from ([ID::from ("active-fork-branch")]),
     "partially inactive forks should render only active branches" );
   let inactive_branches : BTreeSet<ID> =
@@ -658,16 +673,16 @@ fn backward_path_filters_forks_per_branch_and_omits_empty_forks (
       ID::from ("private-other-branch")]);
   assert! (
     filter_branches_to_active_sources_for_test (
-      &config, &active, inactive_branches)?
+      &graph, &config, &active, inactive_branches)?
     . is_empty (),
     "fully inactive forks should not render an empty fork scaffold" );
   Ok (( )) }
 
 async fn containerward_expansion_truncates_before_inactive_container (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
+      let graph = skg::test_utils::graph_handle_from_config (config)? . load_full ();
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           &config,
@@ -680,9 +695,9 @@ async fn containerward_expansion_truncates_before_inactive_container (
       build_and_integrate_containerward_path_with_source_set (
         &mut viewforest,
         child_id,
+        &graph,
         config,
-        driver,
-        Some (&active)) . await ?;
+        Some (&active)) ?;
       let child_children : BTreeSet<ID> =
         true_child_ids (&viewforest, child_id);
       assert_eq! (
@@ -704,10 +719,10 @@ async fn containerward_expansion_truncates_before_inactive_container (
       Ok (( )) }
 
 async fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
+      let graph = skg::test_utils::graph_handle_from_config (config)? . load_full ();
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           &config,
@@ -726,10 +741,10 @@ async fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
           ID::from ("private-fork-branch"),
           ID::from ("private-other-branch")]),
         HashSet::new (),
+        &graph,
         config,
-        driver,
         Birth::Backpath (RelationRole::LINK_SOURCE),
-        Some (&active)) . await ?;
+        Some (&active)) ?;
       assert_eq! (
         true_child_ids (&viewforest, child_id),
         BTreeSet::from ([ID::from ("active-fork-branch")]),
@@ -750,10 +765,10 @@ async fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
           ID::from ("private-fork-branch"),
           ID::from ("private-other-branch")]),
         HashSet::new (),
+        &graph,
         config,
-        driver,
         Birth::Backpath (RelationRole::LINK_SOURCE),
-        Some (&active)) . await ?;
+        Some (&active)) ?;
       assert! (
         true_child_ids (&empty_fork_viewforest, empty_fork_child_id)
         . is_empty (),
@@ -789,6 +804,9 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
   private_container . title =
     "private container title must not leak" . to_string ();
   set_source_retagging_member_sources ( &mut private_container, &SourceName::from ("private") );
+  let graph = skg::dbs::in_rust_graph::InRustGraph::from_nodecompletes (
+    &[result_node . clone (), active_container . clone (),
+      private_container . clone ()]);
   let index_dir : &str =
     "/tmp/tantivy-test-source-sets-search-enrichment-truncation";
   let (tantivy, _count) =
@@ -813,6 +831,7 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
   let rendered : String =
     skg::serve::handlers::text_search
       ::enriched_search_buffer_for_source_set_for_test (
+        &graph,
         "search term",
         &matches_by_id,
         &[ID::from ("active-search-hit")],
@@ -866,8 +885,7 @@ fn titles_by_ids_omits_inactive_source_titles (
   Ok (( )) }
 
 async fn stale_inactive_placeholders_under_cols_save_without_error (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // TODO/full-schema/9-2_source-set-safety.org: the formerly-unsavable
@@ -884,15 +902,14 @@ async fn stale_inactive_placeholders_under_cols_save_without_error (
           config, SourceSetName ("public" . to_string ())) ?;
       let result =
         buffer_to_validated_saveplan (
-          buffer, config, driver, Some (&active) ) . await;
+          buffer, config, Some (&active) ) ;
       assert! ( result . is_ok (),
         "an InactiveNode under a col must not block saving: {:?}",
         result . err () . map ( |e| format! ("{:?}", e)) );
       Ok (( )) }
 
 async fn inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // An inactive placeholder emits no subscribes_to membership, just as
@@ -912,7 +929,7 @@ async fn inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to (
           config, SourceSetName ("public" . to_string ())) ?;
       let instructions : Vec<DefineNode> =
         buffer_to_validated_saveplan (
-          buffer, config, driver, Some (&active) ) . await ?
+          buffer, config, Some (&active) )  ?
         . 1 . define_nodes;
       assert_eq! (
         members_of (
@@ -923,8 +940,7 @@ async fn inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to (
       Ok (( )) }
 
 async fn weave_preserves_omitted_inactive_content_members (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // TODO/full-schema/9-2_source-set-safety.org: under a restricted
@@ -933,6 +949,7 @@ async fn weave_preserves_omitted_inactive_content_members (
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
           config, SourceSetName ("public" . to_string ())) ?;
+      let graph = graph_handle_from_config (config)? . load_full ();
       { // Disk: root contains [active-a, private-a, active-b].
         // The restricted buffer omits private-a; saving must keep it,
         // anchored after active-a.
@@ -943,10 +960,11 @@ async fn weave_preserves_omitted_inactive_content_members (
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (
-            buffer, config, driver, Some (&active) ) . await ?
+            buffer, config, Some (&active) )  ?
           . 1 . define_nodes;
         assert_eq! (
-          members_of (& saved_node_by_id (&instructions, "root") . contains),
+          members_of (& saved_or_graph_node_by_id (
+            &instructions, "root", &graph) . contains),
           vec![ ID::from ("active-a"), ID::from ("private-a"),
                 ID::from ("active-b") ],
           "omitted inactive member must survive, anchored" ); }
@@ -959,10 +977,11 @@ async fn weave_preserves_omitted_inactive_content_members (
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (
-            buffer, config, driver, Some (&active) ) . await ?
+            buffer, config, Some (&active) )  ?
           . 1 . define_nodes;
         assert_eq! (
-          members_of (& saved_node_by_id (&instructions, "root") . contains),
+          members_of (& saved_or_graph_node_by_id (
+            &instructions, "root", &graph) . contains),
           vec![ ID::from ("active-b"), ID::from ("active-a"),
                 ID::from ("private-a") ],
           "the invisible member follows its anchor" ); }
@@ -974,18 +993,18 @@ async fn weave_preserves_omitted_inactive_content_members (
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (
-            buffer, config, driver, Some (&active) ) . await ?
+            buffer, config, Some (&active) )  ?
           . 1 . define_nodes;
         assert_eq! (
-          members_of (& saved_node_by_id (&instructions, "root") . contains),
+          members_of (& saved_or_graph_node_by_id (
+            &instructions, "root", &graph) . contains),
           vec![ ID::from ("private-a"), ID::from ("active-b") ],
           "visible deletion lands; invisible member survives" ); }
       Ok (( )) }
 
 
 async fn restricted_save_preserves_invisible_override_targets (
-  config   : &SkgConfig,
-  driver   : &Arc<TypeDBDriver>,
+  config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // The pipeline-level half of the second named regression
@@ -1012,7 +1031,7 @@ async fn restricted_save_preserves_invisible_override_targets (
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (
-            unmodified, &config, driver, Some (&active) ) . await?
+            unmodified, &config, Some (&active) ) ?
           . 1 . define_nodes;
         if let Some (DefineNode::Save (SaveNode (owner))) =
           instructions . iter () . find ( |i| matches! (
@@ -1029,7 +1048,7 @@ async fn restricted_save_preserves_invisible_override_targets (
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (
-            deleted, &config, driver, Some (&active) ) . await?
+            deleted, &config, Some (&active) ) ?
           . 1 . define_nodes;
         assert_eq! (
           override_set ( saved_node_by_id (&instructions, "ovr-owner") ),

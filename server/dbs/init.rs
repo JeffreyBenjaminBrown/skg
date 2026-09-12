@@ -1,48 +1,28 @@
-// PURPOSE: Initialize TypeDB and Tantivy databases.
+// PURPOSE: Build the reconstructible in-memory graph and Tantivy index.
 
 use crate::context::{MapToContent, MapToContainers};
 use crate::context::{content_maps_from_nodes, had_id_set_from_nodes};
 use crate::context::link_dests_from_nodes;
-use crate::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_collecting_violations;
-use crate::dbs::filesystem::multiple_nodes::read_recently_modified_skgfiles_from_sources;
-use crate::dbs::tantivy::{mk_tantivy_schema, open_existing_tantivy_index, tantivy_index_from_index};
+use crate::dbs::tantivy::{mk_tantivy_schema, tantivy_index_from_index};
 use crate::dbs::tantivy::write::update_index_with_nodes;
-use crate::dbs::typedb::nodes::create_all_nodes;
-use crate::dbs::typedb::nodes::create_only_nodes_with_no_ids_present;
-use crate::dbs::typedb::relationships::create_all_relationships;
-use crate::dbs::typedb::relationships::delete_all_outbound_relationships_to_nodes;
-use crate::dbs::typedb::sources::create_all_sources;
-use crate::dbs::typedb::util::connect_to_typedb;
 use crate::types::env::SkgEnv;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::tantivy::NodeTantivy;
-use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::nodes::complete::NodeComplete;
 use crate::telescope::dependencies_manifest::{foreign_manifest_order_warnings, write_dependencies_manifests};
-use crate::telescope::invariants::{TelescopeViolation, report_all_telescope_violations};
+use crate::telescope::invariants::{TelescopeViolation, report_telescope_violations};
 use crate::dbs::in_rust_graph::{
   InRustGraph,
-  InRustGraphHandle,
-  new_handle,
-  override_invariants::error_unless_override_invariants_hold,
+  complete_validation::validated_graph,
 };
 
-use futures::executor::block_on;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
-use std::time::Instant;
 use tantivy::Index;
-use typedb_driver::{
-  Database,
-  DatabaseManager,
-  Transaction,
-  TransactionType,
-  TypeDBDriver,
-};
 
 /// One-shot init handoff. Holds derived data needed exactly once
 /// after startup: it is fed to 'compute_context_origin_types' and
@@ -57,198 +37,51 @@ pub struct InitContextHandoff {
   pub map_to_containers : MapToContainers,
 }
 
-/// Initializes TypeDB and Tantivy databases.
-/// If a marker file exists, the TypeDB database exists,
-/// and the schema hasn't changed,
-/// it rebuilds incrementally (only re-reading modified .skg files).
-/// Otherwise rebuilds completely.
-/// Ends by touching the marker file.
-/// RETURNS (long-lived SkgEnv,
-///          init handoff for context-computation,
-///          nodes used to create them).
+/// Read the authoritative files once, validate and build the graph, and build
+/// Tantivy from that exact node vector. There is intentionally no marker or
+/// incremental branch: both derived stores are reconstructed at startup, so
+/// files deleted while the server was stopped cannot leave orphaned records.
 pub fn initialize_dbs (
-  config : & SkgConfig,
+  config : &SkgConfig,
 ) -> (SkgEnv, InitContextHandoff, Vec<NodeComplete>) {
-  let driver : TypeDBDriver = connect_to_typedb();
-  let marker_path : PathBuf =
-    config . data_root . join (".skg_init_marker");
-  let can_incremental : bool = block_on ( async {
-    can_do_incremental_init_of_dbs (
-      &driver, &config . db_name, &marker_path,
-      Path::new ( &config . tantivy_folder ),
-      &config . config_path,
-    ) . await } );
-  let result : (SkgEnv, InitContextHandoff, Vec<NodeComplete>) =
-    if can_incremental {
-      let marker_mtime : std::time::SystemTime =
-        fs::metadata (&marker_path)
-        . and_then ( |m| m . modified() )
-        . unwrap(); // safe: can_do_incremental_init_of_dbs confirmed it exists
-      match incremental_init_of_dbs (
-        config, &driver, marker_mtime )
-      { Ok (( tantivy_index )) => {
-          tracing::info! ("Incremental init succeeded.");
-          // The incremental step above updated TypeDB and Tantivy from only the modified .skg files, which is all those databases need. The in-Rust graph (env.in_rust_graph) and the InitContextHandoff (contains maps, had_id_set, link_dests) are rebuilt from scratch on every startup, so they need every NodeComplete. The read below is therefore a full file read, but not a full re-initialization of the databases.
-          let (nodes, load_violations)
-            : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
-            read_all_skg_files_from_sources_collecting_violations (config)
-            . unwrap_or_default ();
-          error_unless_each_id_names_one_node (
-            &nodes, &config . data_root )
-            . unwrap_or_else ( |e| {
-              tracing::error! ("Id-conflict check failed: {}", e);
-              std::process::exit (1); } );
-          let graph : InRustGraph =
-            InRustGraph::from_nodecompletes (&nodes);
-          if let Err (e)
-            = error_unless_override_invariants_hold (config, &graph)
-            { tracing::error! (
-                "Override invariant validation failed: {}", e);
-              std::process::exit (1); }
-          report_all_telescope_violations (
-            config, &graph, load_violations );
-          let (env, handoff) : (SkgEnv, InitContextHandoff) =
-            env_and_handoff_from_nodes (
-              config, &nodes, Arc::new (driver), tantivy_index );
-          (env, handoff, nodes) }
-        Err (e) => {
-          tracing::warn! ("Incremental init failed ({}), \
-                     falling back to full rebuild.", e);
-          full_init (config, driver) }}
-    } else {
-      full_init (config, driver) };
-  { // DEPENDENCIES.toml: regenerate the publisher manifests, and
-    // warn when a foreign manifest contradicts this config's order.
-    // Done here (not in full_init) so it runs at EVERY server start,
-    // incremental path included -- the manifests describe the config
-    // and the sources' git remotes, neither of which the incremental
-    // path otherwise revisits.
-    if let Err (e) = write_dependencies_manifests (config) {
-      tracing::warn! ( error = %e,
-        "could not write DEPENDENCIES.toml manifests" ); }
-    for w in foreign_manifest_order_warnings (config) {
-      tracing::warn! ( "{}", w ); }}
-  touch_init_marker (&marker_path);
-  result }
-
-/// DEAD ? See "incremental init" in is-it-dead.org.
-///
-/// PURPOSE:
-/// Checks preconditions for incremental init:
-/// 1. TypeDB database exists
-/// 2. Marker file exists
-/// 3. schema.tql mtime <= marker mtime
-/// 4. skgconfig.toml mtime <= marker mtime
-/// 5. Tantivy index directory contains files
-///    (guards against manual deletion of index contents)
-async fn can_do_incremental_init_of_dbs (
-  driver        : &TypeDBDriver,
-  db_name       : &str,
-  marker_path   : &Path,
-  tantivy_path  : &Path,
-  config_path   : &Path,
-) -> bool {
-  let db_exists : bool =
-    match driver . databases() . contains (db_name) . await {
-      Ok (b)  => b,
-      Err (_) => false, };
-  if ! db_exists { return false; }
-  let marker_mtime : std::time::SystemTime =
-    match fs::metadata (marker_path)
-      . and_then ( |m| m . modified() )
-    {
-      Ok (t)  => t,
-      Err (_) => return false, };
-  // PITFALL: "schema.tql" is a relative path, resolved from the CWD.
-  // If the server is started from an unexpected directory the file
-  // won't be found, which triggers a full rebuild -- a safe fallback.
-  let schema_mtime : std::time::SystemTime =
-    match fs::metadata ("schema.tql")
-      . and_then ( |m| m . modified() )
-    {
-      Ok (t)  => t,
-      Err (_) => return false, };
-  if schema_mtime > marker_mtime { return false; }
-  if ! config_path . as_os_str () . is_empty () {
-    let config_mtime : std::time::SystemTime =
-      match fs::metadata (config_path)
-        . and_then ( |m| m . modified() )
-      { Ok (t)  => t,
-        Err (_) => return false, };
-    if config_mtime > marker_mtime { return false; }}
-  let tantivy_has_files : bool =
-    tantivy_path . is_dir ()
-    && fs::read_dir (tantivy_path)
-       . map ( |mut entries| entries . next () . is_some () )
-       . unwrap_or (false);
-  if ! tantivy_has_files {
+  retire_stale_tantivy_generation_directories (&config . tantivy_folder);
+  tracing::info! ("Reading authoritative .skg files from all sources...");
+  let (nodes, load_violations)
+    : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
+    read_all_skg_files_from_sources_collecting_violations (config)
+    . unwrap_or_else (|e| {
+      tracing::error! ("Failed to read .skg files: {}", e);
+      std::process::exit (1); });
+  let (graph, mut graph_warnings) = validated_graph (config, &nodes)
+    . unwrap_or_else (|e| {
+      tracing::error! ("Complete graph validation failed:\n{}", e);
+      std::process::exit (1); });
+  graph_warnings . extend (load_violations);
+  graph_warnings . sort_by (|(pid_a, a), (pid_b, b)|
+    pid_a . cmp (pid_b)
+      . then_with (|| a . to_string () . cmp (&b . to_string ())));
+  if let Err (e) = report_telescope_violations (
+    &graph_warnings, &config . data_root ) {
+    tracing::warn! (error = %e, "could not write the telescope report"); }
+  tracing::info! (
+    files = nodes . len (), sources = config . sources . len (),
+    ".skg files read and graph validated");
+  let tantivy_index = wipe_then_init_tantivy_db_with_logs_and_errors (
+    config, &nodes);
+  let (env, handoff) = env_and_handoff_from_nodes (
+    config, &nodes, graph, tantivy_index);
+  if let Err (e) = write_dependencies_manifests (config) {
     tracing::warn! (
-      "Tantivy index directory is empty or missing; forcing full rebuild.");
-    return false; }
-  true }
-
-/// PITFALL: Deleted .skg files are not detected by this path.
-/// Their nodes remain as orphans in TypeDB. This doesn't happen in
-/// the normal `cargo watch` workflow (deletions go through the save
-/// pipeline while the server is running). For manual deletions,
-/// restart with delete_on_quit = true, or delete the TypeDB database
-/// manually, to force a clean full rebuild.
-fn incremental_init_of_dbs (
-  config       : &SkgConfig,
-  driver       : &TypeDBDriver,
-  marker_mtime : std::time::SystemTime,
-) -> Result<TantivyIndex, Box<dyn Error>> {
-  let tantivy_index : TantivyIndex =
-    open_existing_tantivy_index (
-      Path::new ( &config . tantivy_folder )) ?;
-  tracing::info! ("Reading modified .skg files...");
-  let nodes : Vec<NodeComplete> =
-    read_recently_modified_skgfiles_from_sources (
-      config, marker_mtime ) ?;
-  if nodes . is_empty() {
-    tracing::info! ("No modified .skg files found.");
-    return Ok (tantivy_index); }
-  tracing::info! (count = nodes . len(),
-                  "Modified .skg file(s) found.");
-  let typedb_nodes : Vec<NodeTypedb> = // Convert to NodeTypedb (narrow) at the boundary. Parses textlinks from each node's title+body.
-    nodes . iter ()
-    . map (NodeTypedb::from_complete_parsing_textlinks)
-    . collect ();
-  block_on ( async {
-    let t0 : Instant = Instant::now();
-    let created : usize =
-      create_only_nodes_with_no_ids_present (
-        &config . db_name, driver, &typedb_nodes ) . await ?;
-    tracing::info! (created, elapsed_s = ?t0 . elapsed(),
-              "New nodes created");
-    let t1 : Instant = Instant::now();
-    let pids : Vec<ID> =
-      nodes . iter()
-      . map ( |n| n . pid . clone() )
-      . collect();
-    delete_all_outbound_relationships_to_nodes (
-      &config . db_name, driver, &pids ) . await ?;
-    tracing::info! (elapsed_s = ?t1 . elapsed(),
-              "Deleted stale relationships");
-    let t2 : Instant = Instant::now();
-    create_all_relationships (
-      &config . db_name, driver, &typedb_nodes ) . await ?;
-    tracing::info! (elapsed_s = ?t2 . elapsed(),
-              "Recreated relationships");
-    Ok::<(), Box<dyn Error>> (( )) } ) ?;
-  let t3 : Instant = Instant::now();
-  let tantivy_nodes : Vec<NodeTantivy> = // Convert to NodeTantivy (narrow) at the boundary.
-    nodes . iter () . map (NodeTantivy::from) . collect ();
-  let indexed : usize =
-    update_index_with_nodes (&tantivy_nodes, &tantivy_index) ?;
-  tracing::info! (indexed, elapsed_s = ?t3 . elapsed(),
-            "Tantivy: updated documents");
-  Ok (tantivy_index) }
+      error = %e, "could not write DEPENDENCIES.toml manifests" ); }
+  for warning in foreign_manifest_order_warnings (config) {
+    tracing::warn! ("{}", warning); }
+  (env, handoff, nodes)
+}
 
 fn env_and_handoff_from_nodes (
   config        : &SkgConfig,
   nodes         : &[NodeComplete],
-  driver        : Arc<TypeDBDriver>,
+  graph         : InRustGraph,
   tantivy_index : TantivyIndex,
 ) -> (SkgEnv, InitContextHandoff) {
   let had_id_set : HashSet<ID> =
@@ -262,130 +95,14 @@ fn env_and_handoff_from_nodes (
   let ( map_to_content, map_to_containers )
     : ( MapToContent, MapToContainers )
     = content_maps_from_nodes (&nodes);
-  let in_rust_graph : InRustGraphHandle =
-    new_handle ( InRustGraph::from_nodecompletes (nodes) );
-  ( SkgEnv {
-      config : config . clone (),
-      in_rust_graph,
-      tantivy_index,
-      driver, },
+  ( SkgEnv::new (
+      config . clone (), Arc::new (graph), tantivy_index ),
     InitContextHandoff {
       had_id_set,
       all_node_ids,
       link_dests,
       map_to_content,
       map_to_containers } ) }
-
-/// Full rebuild: reads all .skg files, populates both databases.
-/// Also computes had_id_set and contains maps from the loaded nodes,
-/// avoiding re-reading files or querying TypeDB for context computation.
-/// RETURNS (long-lived SkgEnv,
-///          init handoff,
-///          nodes that produced them).
-fn full_init (
-  config : &SkgConfig,
-  driver : TypeDBDriver,
-) -> (SkgEnv, InitContextHandoff, Vec<NodeComplete>) {
-  tracing::info! ("Performing full init...");
-  let (nodes, load_violations)
-    : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "read_all_skg_files" ). entered();
-      tracing::info! ("Reading .skg files from all sources...");
-      read_all_skg_files_from_sources_collecting_violations (config)
-      . unwrap_or_else ( |e| {
-        tracing::error! ("Failed to read .skg files: {}", e);
-        std::process::exit (1); } ) };
-  error_unless_each_id_names_one_node (
-    // BEFORE the databases are built, not after: an id claimed by
-    // two nodes either dies inside TypeDB with a raw key-violation
-    // error that names neither claimant (extra_id vs extra_id) or
-    // is accepted silently and makes id resolution ambiguous (pid
-    // vs extra_id). Either way there is no reason to fill a
-    // database from data we already know is broken.
-    &nodes, &config . data_root )
-    . unwrap_or_else ( |e| {
-      tracing::error! ("Id-conflict check failed: {}", e);
-      std::process::exit (1); } );
-  let graph : InRustGraph =
-    InRustGraph::from_nodecompletes (&nodes);
-  if let Err (e)
-    = error_unless_override_invariants_hold (config, &graph)
-    { tracing::error! ("Override invariant validation failed: {}", e);
-      std::process::exit (1); }
-  report_all_telescope_violations (config, &graph, load_violations);
-  tracing::info! (files = nodes . len(),
-            sources = config . sources . len(),
-            ".skg files read from source(s)");
-  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "populate_typedb" ). entered();
-    block_on ( async {
-      if let Err (e) = wipe_then_init_typedb_db (
-        config, &driver, &nodes
-      ) . await {
-        tracing::error! ("Failed to populate TypeDB: {}", e);
-        std::process::exit (1); }} ) };
-  tracing::info! ("TypeDB database initialized successfully.");
-  let tantivy_index : TantivyIndex =
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "initialize_tantivy" ). entered();
-      wipe_then_init_tantivy_db_with_logs_and_errors (config, &nodes) };
-  let (env, handoff) : (SkgEnv, InitContextHandoff) =
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "extract_context_data_from_nodes" ). entered();
-      env_and_handoff_from_nodes (
-        config, &nodes, Arc::new (driver), tantivy_index ) };
-  (env, handoff, nodes) }
-
-fn touch_init_marker (
-  path : &Path,
-) {
-  if let Err (e) = fs::write (path, b"") {
-    tracing::warn! ("Could not touch init marker {:?}: {}",
-               path, e); } }
-
-/// Populates a TypeDB database from the given nodes:
-/// overwrites with empty db, defines schema,
-/// creates all nodes and relationships.
-/// Uses an existing driver connection rather than creating a new one.
-/// Callers are responsible for reading the .skg files
-/// (and, if desired, checking for ids claimed by two nodes) beforehand.
-pub async fn wipe_then_init_typedb_db (
-  config : &SkgConfig,
-  driver : &TypeDBDriver,
-  nodes  : &[NodeComplete],
-) -> Result<(), Box<dyn Error>> {
-  let graph : InRustGraph =
-    InRustGraph::from_nodecompletes (nodes);
-  error_unless_override_invariants_hold (
-    config, &graph ) ?;
-  overwrite_new_empty_typedb_db (
-    & config . db_name,
-    driver ) . await ?;
-  read_and_use_schema (
-    & config . db_name,
-    driver ) . await ?;
-  create_all_sources (
-    & config . db_name,
-    driver,
-    config ) . await ?;
-  let t0 : Instant = Instant::now();
-  let typedb_nodes : Vec<NodeTypedb> = // Convert to NodeTypedb (narrow) at the boundary. Parses textlinks from each node's title+body.
-    nodes . iter ()
-    . map (NodeTypedb::from_complete_parsing_textlinks)
-    . collect ();
-  create_all_nodes (
-    & config . db_name,
-    driver,
-    &typedb_nodes ) . await ?;
-  tracing::info! (elapsed_s = ?t0 . elapsed(), "TypeDB nodes created");
-  let t1 : Instant = Instant::now();
-  create_all_relationships (
-    & config . db_name,
-    driver,
-    &typedb_nodes ) . await ?;
-  tracing::info! (elapsed_s = ?t1 . elapsed(), "TypeDB relationships created");
-  Ok (( )) }
 
 fn wipe_then_init_tantivy_db_with_logs_and_errors (
   config : & SkgConfig,
@@ -419,6 +136,47 @@ pub fn rebuild_tantivy_from_nodes (
       Path::new ( & config . tantivy_folder )) ?;
   Ok (tantivy_index) }
 
+/// Build a live-reload candidate in a sibling directory, leaving the index in
+/// the currently published generation untouched.  The returned config points
+/// at the candidate directory and is published atomically with the index.
+pub fn rebuild_tantivy_as_generation (
+  config : &SkgConfig,
+  nodes : &[NodeComplete],
+  generation : u64,
+) -> Result<(SkgConfig, TantivyIndex), Box<dyn Error>> {
+  let mut generation_config = config . clone ();
+  let base = &config . tantivy_folder;
+  let parent = base . parent () . unwrap_or_else (|| Path::new ("."));
+  let base_name = base . file_name ()
+    .and_then (|name| name . to_str ())
+    .unwrap_or ("tantivy");
+  generation_config . tantivy_folder = parent . join (format! (
+    "{}.skg-generation-{}-{}", base_name, std::process::id (), generation));
+  let index = rebuild_tantivy_from_nodes (&generation_config, nodes)?;
+  Ok ((generation_config, index))
+}
+
+/// Prior-process generation directories are never live after restart.  Retire
+/// only siblings with our exact generated prefix; the configured base index
+/// and unrelated directories are never candidates.
+fn retire_stale_tantivy_generation_directories (base : &Path) {
+  let parent = base . parent () . unwrap_or_else (|| Path::new ("."));
+  let Some (base_name) = base . file_name () . and_then (|name| name . to_str ())
+    else { return; };
+  let prefix = format! ("{}.skg-generation-", base_name);
+  let Ok (entries) = fs::read_dir (parent) else { return; };
+  for entry in entries . flatten () {
+    let name = entry . file_name ();
+    let Some (name) = name . to_str () else { continue; };
+    if ! name . starts_with (&prefix) { continue; }
+    let path = entry . path ();
+    if path . is_dir () {
+      if let Err (error) = fs::remove_dir_all (&path) {
+        tracing::warn! (
+          path = %path . display (), error = %error,
+          "could not retire stale Tantivy generation directory"); } } }
+}
+
 /// Create an empty TantivyIndex, cleaning up any existing index first.
 pub fn create_empty_tantivy_index (
   index_path : &Path,
@@ -447,46 +205,12 @@ pub fn empty_in_ram_tantivy_index (
 pub fn wipe_then_init_tantivy_db (
   nodes      : &[NodeComplete],
   index_path : &Path,
-) -> Result<(TantivyIndex,
-             usize), // number of documents indexed
-            Box<dyn Error>> {
+) -> Result<(TantivyIndex, usize), Box<dyn Error>> {
   let tantivy_index : TantivyIndex =
     create_empty_tantivy_index (index_path)?;
-  let tantivy_nodes : Vec<NodeTantivy> = // Convert to NodeTantivy (narrow) at the boundary.
+  let tantivy_nodes : Vec<NodeTantivy> =
     nodes . iter () . map (NodeTantivy::from) . collect ();
-  let indexed_count: usize =
-    update_index_with_nodes ( &tantivy_nodes, & tantivy_index )?;
-  Ok (( tantivy_index, indexed_count )) }
-
-pub async fn overwrite_new_empty_typedb_db (
-  // Destroys the db named `db_name` if it exists,
-  // then makes a new, empty one.
-  db_name : &str,
-  driver  : &TypeDBDriver
-) -> Result < (), Box<dyn Error> > {
-  let databases : &DatabaseManager = driver . databases ();
-  if databases . contains (db_name) . await ? {
-    tracing::info! ( db_name, "Deleting existing database" );
-    { let database : Arc<Database> =
-        databases . get (db_name) . await ?;
-      database } . delete () . await ?; }
-  tracing::info! ( db_name, "Creating empty database" );
-  databases . create (db_name) . await ?;
-  Ok (()) }
-
-pub async fn read_and_use_schema (
-  db_name : &str,
-  driver  : &TypeDBDriver
-)-> Result < (), Box<dyn Error> > {
-  let tx : Transaction =
-    driver . transaction ( db_name,
-                         TransactionType::Schema )
-    . await ?;
-  tracing::info! ("Defining schema ...");
-  tx . query ( {
-    let schema : String = fs::read_to_string
-      ("schema.tql")
-      . expect ("Failed to read TypeDB schema file");
-    schema } ) . await ?;
-  tx . commit () . await ?;
-  Ok (()) }
+  let indexed_count =
+    update_index_with_nodes (&tantivy_nodes, &tantivy_index)?;
+  Ok ((tantivy_index, indexed_count))
+}

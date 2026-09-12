@@ -1,0 +1,112 @@
+#+TITLE: Follow-up: remove TypeDB from the external development image
+#+TODO: TODO | DONE
+
+* ONGOING Rebuild and simplify the external container image
+
+This repository no longer starts, contacts, or depends on TypeDB.  The image
+used by =bash/docker.sh= may still contain the TypeDB executable, data volume,
+packages, ports, and old logs because that image is maintained outside this
+repository.
+
+After the graph-only server has soaked successfully:
+
+1. Remove the TypeDB installation and its transitive image dependencies.
+2. Remove port 1729 exposure, health checks, entrypoint logic, and persistent
+   TypeDB data-volume declarations from the image project.
+3. Decide whether to archive or delete the old external database directory;
+   do not make that destructive choice as part of the repository refactor.
+4. Rebuild the image, run the Linux and Windows packaging smoke tests, and
+   compare image size and startup time.
+5. Update any deployment notes or CI configuration that live outside this
+   repository.
+
+The old TypeDB data should remain untouched through at least the first
+post-cutover soak, so rollback evidence is available even though the server no
+longer reads it.
+
+** DONE Prepare the Skg side of the image cutover
+
+The graph-only server passed its closed-port startup, rebuild, restart, and
+complete test soak.  Current =coding-advice/= architecture, testing, recovery,
+and container guidance now describes the graph-only server.  The external
+checkout continues to be named =other-projects/docker-typedb-rust= until that
+repository itself is available and a less historical name can be evaluated.
+
+** TODO Make the external image checkout accessible in this container
+
+The checkout named by =coding-advice/docker.org= is not mounted here.  Searches
+under =/home/ubuntu=, =/mnt=, and =/workspace= found no =docker.nix=,
+=typedb.nix=, or image =PITFALLS.org=.  This container also has no =docker=,
+=nix=, =nix-build=, or =nix-instantiate= executable, as expected from the
+documented host/container boundary.
+
+Jeff: bind-mount or otherwise expose the existing
+=other-projects/docker-typedb-rust= git checkout somewhere beneath
+=/home/ubuntu/host=, preserving its =.git= directory and dirty state.  Once it
+is visible, Codex can inventory and edit that repository without guessing at
+its Nix expressions.
+
+** TODO Remove TypeDB from the image definition
+
+After the checkout is accessible:
+
+1. Read its =PITFALLS.org= and all recursively referenced local guidance.
+2. Record its initial branch, status, image size, and user-owned dirty files.
+3. Remove the TypeDB package/expression and dependencies used only by it.
+4. Remove port 1729, health checks, entrypoint/server startup, data-volume,
+   environment-variable, cleanup, and log assumptions.
+5. Update current image documentation while preserving accurate history.
+6. Run the fastest available static/evaluation checks without touching the old
+   database directory.
+
+** TODO Rebuild and verify on the host
+
+Because Nix and Docker run only on the host, Jeff will need to execute the
+repository-specific equivalents of:
+
+#+begin_src sh
+nix-instantiate --eval docker.nix
+nix-build docker.nix
+docker load < result
+#+end_src
+
+Write complete output into a file in the mounted checkout rather than =/tmp=,
+so Codex can inspect it.  Then start a new container from the rebuilt image and
+verify that =typedb= is absent, port 1729 is closed, =bash/start= starts Skg,
+and the Linux/full-suite and Windows-package smoke checks pass.  Record image
+size and graph-only startup timing against the pre-rebuild image.
+
+** TODO Decide the old external database directory's disposition
+
+Default to archiving or leaving it untouched through verification.  Deletion
+is destructive, provides no benefit to the graph-only server, and requires an
+explicit later choice once rollback evidence is no longer useful.
+
+** Progress report at the external-access stop
+
+*** What is done and went well
+
+- The Skg refactor is committed as =773d0506=.
+- The server and complete suite work with TypeDB stopped and port 1729 closed.
+- Four stale current orientation files were corrected locally.
+- The external project's documented location and tool boundary were confirmed.
+
+*** Changes to the plan's envisioned order
+
+The plan expected image-source edits before the host rebuild request.  The
+source checkout is not present in this container, so repository-local guidance
+was cleaned first and image editing must wait for the mount.
+
+*** What is imperfect about what is done
+
+The currently running legacy image can still contain an unused TypeDB binary
+and related Nix closure.  No claim is made that the image, exposure metadata,
+or old external data has been cleaned; those artifacts cannot be inspected
+from this container.
+
+*** Choices determining the future
+
+The immediate requirement is where to expose the existing external checkout
+inside this container.  After the rebuilt image has passed its soak, Jeff must
+separately choose whether the old database directory is archived or deleted;
+archival is the conservative default.

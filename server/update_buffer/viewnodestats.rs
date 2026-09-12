@@ -1,4 +1,4 @@
-use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole };
 use crate::herald_tokens::{AncestorFlags, relationship_heralds_sexp};
@@ -9,7 +9,6 @@ use crate::types::viewnode::{
 use crate::update_buffer::ancestry::required_ancestor;
 use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 
 /// The five graph relations whose flags the H/S/O/L checks consult via
 /// the in-Rust graph (contains is checked via the containment maps).
@@ -21,24 +20,20 @@ const GRAPH_RELATIONS : [NodeRelation; 4] = [
 
 pub fn set_viewnodestats_in_viewforest (
   viewforest            : &mut Tree<ViewNode>,
+  graph                 : &InRustGraph,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
   config                : &SkgConfig,
   active                : Option<&ActiveSourceSet>,
 ) {
   let multi_source : bool = config . sources . len () > 1;
-  let graph : Option<Arc<InRustGraph>> =
-    // None only on paths that bypass the global handle (some tests);
-    // then the relation flags stay empty and only contains-based
-    // heralds (via the maps) can appear.
-    snapshot_global ();
   let mut ancestor_ids : HashSet<ID> = HashSet::new ();
   let root_treeid : NodeId = viewforest . root () . id ();
   set_viewnodestats_recursive (
     viewforest,
     root_treeid,
     multi_source,
-    graph . as_deref (),
+    Some (graph),
     config,
     active,
     &mut ancestor_ids,

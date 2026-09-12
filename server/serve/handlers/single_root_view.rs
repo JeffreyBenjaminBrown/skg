@@ -1,8 +1,7 @@
-use crate::dbs::in_rust_graph::scheduled_audit::take_pending_audit_warning;
 use crate::types::env::SkgEnv;
 use crate::serve::ViewsState;
-use crate::to_org::render::content_view::multi_root_view_via_env;
-use crate::to_org::render::override_menu::override_menu_view;
+use crate::to_org::render::content_view::multi_root_view_via_runtime;
+use crate::to_org::render::override_menu::override_menu_view_with_runtime;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
@@ -40,12 +39,13 @@ pub fn handle_single_root_view_request (
   views_state : &mut ViewsState,
   active_source_set : &ActiveSourceSet,
 ) {
+  let runtime = env . runtime_snapshot ();
   let view_uri_result : Result<ViewUri, String> =
     view_uri_from_request (request);
   match node_id_from_single_root_view_request (request) {
     Ok (node_id) => {
       match active_source_set . id_source_is_active (
-        &env . config, &node_id ) {
+        &runtime . graph, &runtime . config, &node_id ) {
         Ok (true) => {},
         Ok (false) => {
           let response_sexp : String =
@@ -116,8 +116,7 @@ pub fn handle_single_root_view_request (
                   TcpToClient::ContentView, &response_sexp ));
               return; }}};
       let pid : ID = // the menu is per resolved node, extra-IDs included
-        env . in_rust_graph . load_full ()
-        . pid_of (&node_id)
+        runtime . graph . pid_of (&node_id)
         . unwrap_or_else ( || node_id . clone () );
       let menu_uri : ViewUri =
         ViewUri::OverrideMenu ( pid . 0 . clone () );
@@ -150,20 +149,21 @@ pub fn handle_single_root_view_request (
             // too (decided 2026-06-11): the menu is navigation, not
             // decoration, and it presents raw graph facts.
             match if bypass_menu { Ok (None) }
-                  else { override_menu_view (
-                           env, &pid,
-                           Some (active_source_set) ) . await }
+                  else { override_menu_view_with_runtime (
+                           env, &runtime, &pid,
+                           Some (active_source_set) ) }
             { Ok ( Some ((menu_content, menu_pids, menu_forest)) ) => {
                 let release = decide_text_release (
                   "override-menu",
                   active_source_set,
                   &menu_pids,
-                  &env . in_rust_graph_snapshot (),
+                  &runtime . graph,
                   &approved_overPrivateText_pids );
                 if matches! (
                   release, TextReleaseDecision::Challenge { .. } ) {
                   return challenge_response (&release) . unwrap (); }
                 views_state . open_views . register_view (
+                  &runtime . graph,
                   menu_uri . clone (),
                   menu_forest,
                   &menu_pids );
@@ -172,7 +172,6 @@ pub fn handle_single_root_view_request (
                   warning,
                 } = release {
                   warnings . push (warning); }
-                warnings . extend (take_pending_audit_warning ());
                 return tag_sexp_response (
                   TcpToClient::ContentView,
                   & format_override_menu_response_sexp (
@@ -190,24 +189,25 @@ pub fn handle_single_root_view_request (
                         "Error generating override menu: {}", e ) ],
                     &[] ) ); }}
             let mut render_warnings : Vec<String> = Vec::new ();
-            match multi_root_view_via_env (
-              env,
+            match multi_root_view_via_runtime (
+              &runtime,
               &[node_id . clone ()],
               views_state . diff_mode_enabled,
               Some (active_source_set),
-              &mut render_warnings ) . await
+              &mut render_warnings )
             { Ok ( (buffer_content, pids, viewforest) ) => {
                 let release = decide_text_release (
                   "single-root-view",
                   active_source_set,
                   &pids,
-                  &env . in_rust_graph_snapshot (),
+                  &runtime . graph,
                   &approved_overPrivateText_pids );
                 if matches! (
                   release, TextReleaseDecision::Challenge { .. } ) {
                   return challenge_response (&release) . unwrap (); }
                 if let Ok (view_uri) = &view_uri_result {
                   views_state . open_views . register_view (
+                    &runtime . graph,
                     view_uri . clone (),
                     viewforest,
                     &pids ); }
@@ -218,8 +218,6 @@ pub fn handle_single_root_view_request (
                       warning,
                     } = release {
                       warnings . push (warning); }
-                    warnings . extend (
-                      take_pending_audit_warning () );
                     warnings };
                 tag_sexp_response (
                   TcpToClient::ContentView,
@@ -227,11 +225,8 @@ pub fn handle_single_root_view_request (
                     & buffer_content,
                     &[],
                     & warnings ) ) },
-              Err (e) => { // If we fail to generate the view, ship the generation error (and any pending audit warning) in the errors vec, with empty content so the client skips opening a main buffer.
+              Err (e) => {
                 let mut errors : Vec<String> = Vec::new ();
-                let mut warnings : Vec<String> = Vec::new ();
-                if let Some (w) = take_pending_audit_warning ()
-                { warnings . push (w); }
                 errors . push ( format! (
                   "Error generating document: {}", e ));
                 tag_sexp_response (
@@ -239,7 +234,7 @@ pub fn handle_single_root_view_request (
                   & format_buffer_response_sexp (
                     & String::new (),
                     & errors,
-                    & warnings ) ) }} } ) };
+                    &[] ) ) }} } ) };
       send_response_with_length_prefix (
         stream, &response ); },
     Err (err) => {

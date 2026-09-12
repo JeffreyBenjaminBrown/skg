@@ -1,14 +1,8 @@
 // Binary grouping (TODO/faster-tests.org): override / PartnerCol
 // tests. See tests/grouped_unit.rs for why test files are grouped
 // into a few [[test]] targets.
-//
-// The files here install the process-global in-Rust graph handle
-// (most via install_or_swap_global_handle, so each sub-test points
-// it at its own fixtures). Keeping the installers together, away
-// from tests that depend on an UNinstalled handle
-// (graphnodestats_hiding, in grouped_unit), preserves those tests'
-// semantics under plain 'cargo test'; db tests across this binary
-// are serialized by the mutex in server/test_utils.rs.
+// Store-using tests across this binary are serialized by the fixture mutex in
+// server/test_utils.rs when plain `cargo test` runs them in one process.
 
 #[path = "collateral_partner_col.rs"]
 mod collateral_partner_col;

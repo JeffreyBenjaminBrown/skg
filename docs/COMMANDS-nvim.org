@@ -689,7 +689,7 @@ might be broken" note.
 
 Existing files in the output dir are overwritten in place; other
 files there are left untouched.
-** connection, reload, rebuild dbs
+** connection, reload, rebuild ephemeral data stores
 Unless you're coding or troubleshooting,
 you probably won't need these.
 *** :SkgConnectionVerify
@@ -698,13 +698,14 @@ to check if the connection is working.
 Displays the result in the echo area.
 *** :SkgConnectionEnd
 Closes the TCP connection to the Rust server.
-*** :SkgRebuildDbs
-Rebuilds TypeDB and Tantivy databases,
-using the .skg files on disk.
+*** :SkgRebuildEphemeralDataStores
+Re-reads the authoritative =.skg= files, validates and replaces the in-memory
+graph, and rebuilds the derived Tantivy search index. It does not rewrite the
+=.skg= files.
 Existing skg views are now invalid; run ':SkgCloseAllSkgBuffers'
 to close them.
 *** :SkgCloseAllSkgBuffers
-This may be warranted after a database rebuild.
+This may be warranted after an ephemeral-data-store rebuild.
 Kills every skg view buffer (each triggers a close-view notice to
 the server first).
 *** :SkgReload

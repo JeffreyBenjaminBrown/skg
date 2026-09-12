@@ -1,0 +1,203 @@
+#+TITLE: Ditch TypeDB: replacement and constraint inventory
+#+TODO: TODO ONGOING | DONE
+
+* Inventory snapshot
+
+Captured for Phase 0.4 on 2026-09-12 at HEAD
+=03d9609920b450d82fe4a6d5b62d500188ca2b16=.  This is a bounded execution
+inventory, not a second plan.  =2_plan.org= remains the phase authority and
+=progress.org= remains the live ledger.
+
+Searches used:
+
+#+begin_src sh
+rg -l -i 'typedb_driver|dbs::typedb|typedb::|TypeDB|TypeQL' server --glob '*.rs'
+rg -n '^pub(\([^)]*\))? (async )?fn |^pub (struct|enum|type|const)' server/dbs/typedb --glob '*.rs'
+rg -l 'db_name|delete_on_quit|auto_audit_daily' --glob '!target/**' .
+rg -l 'rebuild dbs|rebuild-dbs|RebuildDbs|rebuild_dbs|skg-rebuild-dbs' --glob '!target/**' .
+#+end_src
+
+Search results must be repeated after every cutover.  A match is not by itself
+a deletion order: classify current code/config/commands separately from
+historical discussion and from the intentionally retained migration error.
+
+* Direct backend surface
+
+** TypeDB facade modules
+
+| Module | Current responsibility | Replacement/disposition | Phase |
+|--------+------------------------+-------------------------+-------|
+| =typedb/search.rs= | container, relationship, PID/source lookup; graph fallback | graph-owned explicit-snapshot ID and relation API; delete TypeQL fallback | 3, 7 |
+| =typedb/ancestry.rs= | BFS ancestry tree | move =AncestryTree= and port BFS over gated graph neighbors | 3, 8 |
+| =typedb/paths.rs= | paths to first nonlinearity and bulk path stats | graph-owned traversal preserving behavior, initially async facade | 3, 8 |
+| =typedb/relationships.rs= | create/update/delete TypeDB relation facts; role constant | move role vocabulary; remove CRUD after filesystem/graph mutation path is complete | 3, 5, 7 |
+| =typedb/nodes.rs= | node/extra-ID CRUD and existence | graph/validation/disk mutation; delete database mechanics | 1, 5, 7 |
+| =typedb/sources.rs= | source entity CRUD and node-source queries | config/graph home-source operations | 3, 5, 7 |
+| =typedb/search/all_graphnodestats.rs= | already graph-derived statistics with stale driver signature/global fallback | move to graph module; explicit snapshot; later synchronous | 2, 3, 8 |
+| =typedb/search/contains_from_pids.rs= | containment query | graph relation API | 3, 7 |
+| =typedb/search/hidden_in_subscribee_content.rs= | hide/subscribee query | gated graph relation API | 3, 7 |
+| =typedb/util.rs= and =util/*= | driver connect/delete, concept documents, TypeQL result parsing, PID tree rewrite | delete TypeQL/driver helpers; retain/move only pure tree-ID rewrite if callers still need it | 3, 7 |
+
+** Public API replacement map
+
+| Existing API | Required graph-native contract | Notes |
+|--------------+-------------------------------+-------|
+| =find_container_ids_of_pid= | captured graph =contained_by= lookup, PID canonicalized | incoming order becomes deterministic before display |
+| =find_related_nodes= / =find_related_nodes_from_in_rust_graph= | typed relation accessor over captured graph | cover all five relations, both directions, and PID precedence |
+| =pid_and_source_from_id= | =graph.pid_and_source= | no global/disk/TypeDB fallback for complete runtime graph |
+| =full_containerward_ancestry= / =ancestry_by_id_from_ids_async= | graph BFS with depth/repeated/diamond contract | source gates apply while expanding |
+| =containerward_path_stats_bulk= / =path*= | graph traversal returning same path/first-fork semantics | port tests before deleting DB path |
+| =fetch_all_graphnodestats*= | graph stats module | presently behaviorally graph-only but still global/driver-shaped |
+| =contains_from_pids= / hidden-subscribee helpers | graph relation and visibility operations | test topology, not only final rendering |
+| =source_ownership_for_node_ids= / =source_name_for_node_ids= | config + graph node-home queries | =user_owns_it= remains config/path-derived |
+| =node_source_relation_count= | graph validation/index test helper | no production query needed after startup validation |
+| =create_all_sources= / =update_node_source= | config/source-move publication | never create a second source authority |
+| =create_all_nodes=, =which_ids_exist=, =create_node=, =overwrite_extra_ids_of_node=, =delete_nodes_from_pids= | candidate validation + authoritative disk + graph publish | TypeDB transaction-only APIs delete |
+| =create_all_relationships= / delta/delete helpers | graph reconstruction from node fields; save delta/inverse index update | audit every synthetic neighbor repair before deleting |
+| =OUTBOUND_RELATIONSHIP_TYPES= | graph/domain relation vocabulary | move before any TypeDB module deletion; current users include relation accessors and node merge |
+| =replace_ids_with_pids= / =pids_from_ids= | explicit captured-graph canonicalization pass | preserve view-tree behavior; remove TypeDB fallback |
+| =collect_ids_in_tree= / =assign_pids_throughout_tree_from_map= | pure view-tree utility if callers remain | move out of the TypeDB path or delete with its final caller |
+| =connect_to_typedb= / =delete_database= | none | delete |
+
+** Direct production callers, grouped by migration work area
+
+- Runtime/bootstrap and driver fields: =server/types/env.rs=,
+  =server/dbs/init.rs=, =server/main.rs=, =server/serve.rs=,
+  =server/consts.rs=, =server/dbs/mod.rs=, and =server/dbs/node_lookup.rs=.
+  Replace by shared runtime generation in Phases 2 and 6; delete driver
+  plumbing in Phase 7.
+- Mutation/write path: =server/save.rs=, =server/nodeMerge.rs=,
+  =server/nodeMerge/nodeMergeInstructionTriple.rs=,
+  =server/nodeMerge/validate_nodeMerge.rs=, =server/source_sets.rs=, and
+  =server/dbs/filesystem/one_node.rs=.  Replace only after the Phase 1 writer
+  gate and Phase 5 authority-order tests exist.
+- Read/render/parse callers: =server/from_text.rs=,
+  =server/from_text/buffer_to_viewnodes/add_missing_info.rs=,
+  =server/from_text/buffer_to_viewnodes/validate_tree.rs=,
+  =server/from_text/local_instruction_collection/{mod,resolve_visibility,
+  validate_text_claims}.rs=, =server/from_text/supplement_from_disk.rs=,
+  =server/from_text/validate.rs=, =server/export_org.rs=,
+  =server/update_buffer.rs=, =server/update_buffer/graphnodestats.rs=,
+  =server/update_buffer/reconcile/view_requests.rs=,
+  =server/to_org/complete/partner_col/mod.rs=,
+  =server/to_org/expand/{aliases,backpath,col_request,definitive,
+  unused_but_nice}.rs=, =server/to_org/render/content_view.rs=, and
+  =server/to_org/util.rs=.  Convert in Phase 3 while preserving public async
+  shapes.
+- Search/rebuild/handler callers: =server/serve/handlers/text_search.rs=,
+  =server/serve/handlers/text_search/render_enriched_search_buffer.rs=,
+  =server/serve/handlers/rebuild_dbs.rs=,
+  =server/serve/handlers/export_to_org.rs=, and
+  =server/serve/handlers/strip_body_whitespace.rs=.  Snapshot/rebuild work is
+  Phases 2, 3, and 6.
+- Existing global/audit coupling: =server/dbs/in_rust_graph.rs=,
+  =relation_accessors.rs=, =audit.rs=, =audit_store.rs=,
+  =scheduled_audit.rs=, and =override_invariants.rs=.  Extract pure graph
+  validation in Phase 1, explicit snapshots in Phase 2, delete scheduling in
+  Phase 7.
+
+* schema.tql constraint matrix
+
+The schema is a useful checklist but not the future authority.  “Type-system”
+means parsing/model types prevent malformed local shape; it does not replace a
+cross-node validator.
+
+| Schema fact | Rust home after cutover | Enforcement class | Required proof |
+|-------------+-------------------------+-------------------+----------------|
+| =node owns id @key= | node-set/graph identity validator and =nodes= map | hard cross-node error | duplicate PID tests |
+| =extra_id owns id @key= | extra-ID ownership/index validator | hard cross-node error | duplicate extra ID tests |
+| TypeDB's keys are per owner type, so PID/extra collision was not rejected | primary-wins lookup plus collision validator | hard migration/save error; lookup retains documented PID precedence | collision regression |
+| =source owns source_name @key= | =SkgConfig= source parsing/validation | hard config error | duplicate source-name fixture |
+| =user_owns_it= derives from path | config/path helper, never persisted graph authority | type/config-derived fact | owned/foreign source tests |
+| =has_source= node card(1) | complete node home field plus configured-source validation | type-system + hard cross-node/config error | missing/unknown home tests |
+| =extra_id= plays =has_extra_id= card(1) | one canonical PID per extra ID in =extra_id_to_pid= | hard graph error | reused-extra-ID test |
+| relation/role declarations for contains, textlinks, subscribes, hides, overrides | graph-domain =NodeRelation=/role API and parsed relation fields | type-system for shape; validator for cross-node facts | all-role forward/inverse tests |
+| node/source/extra entity plays declarations | typed node fields and config source map | type-system + graph constructor | malformed-role parsing tests |
+| TypeDB binary relation endpoints | graph relation accessors and constructor | type-system/validator | raw/dangling member tests |
+| no schema representation of edge recording source | stored member provenance plus active-source gates | hard semantic invariant | inactive-edge topology tests |
+| no schema override monogamy/cycle rule | =override_invariants= | hard save/startup error for owned edges | monogamy, chain, cycle tests |
+| no schema telescope rule | telescope validator | hard/warning according to existing invariant | telescope suite |
+| no schema inverse-index equivalence rule | pure =InRustGraph= index validator | test/debug invariant | construction/update/delete equivalence suite |
+
+Before deleting =schema.tql=, link each “required proof” to a concrete Rust
+test/module and write the technical-doc explanation.  Retain raw dangling IDs
+and recorded sources: the validator must not turn their intentional tolerance
+into a fatal schema imitation.
+
+* Test classification
+
+** Port from TypeDB tests
+
+- The relation-pair and recursive-document assertions in =tests/typedb.rs=
+  have a graph contract and must be recreated as graph fixture tests.  Its
+  create-only-node, delete-out-links, source-entity count, TypeQL row, and
+  transaction assertions are storage-mechanism tests and are deleted or
+  replaced by the graph/disk validations below.
+- =tests/typedb/ancestry.rs= and =tests/typedb/paths.rs=: port contracts to
+  explicit graph fixtures, including cycles, diamonds, depth limits, source
+  gates, and deterministic ordering.
+- =tests/typedb/search.rs= and =search/contains_from_pids.rs=: port ID
+  canonicalization, relation lookup, containment, source/home provenance, and
+  hidden/subscription behavior.
+- TypeDB-dependent assertions embedded in view, source-set, override, merge,
+  save, and git-diff tests: retain the user-visible behavior but swap the
+  service fixture for graph/runtime fixtures.
+
+** Replace with graph/disk tests
+
+- =tests/typedb/update_typedb_from_saveinstructions.rs=: replace with save
+  authority-order, graph forward/inverse-index, and Tantivy queue assertions.
+- Delete/extra-ID coverage that only inspects TypeDB entities becomes disk +
+  candidate-graph + index validation coverage; user-visible delete behavior
+  remains in =grouped_saves=.
+- =server/test_utils.rs= and =server/test_utils/guard.rs=: replace random DB
+  names, driver setup, database cleanup, global graph installation, and serial
+  DB guard with owned temporary fixture state.
+
+** Delete as storage-mechanism-only
+
+- =tests/typedb/delete_nodes.rs= TypeQL/database deletion mechanics.
+- The =tests/typedb.rs= module root disappears after its graph-contract tests
+  have moved to descriptively named modules; it is not itself retained as a
+  misleading umbrella.
+- tests of concept-document extraction, TypeQL strings, transactions, schema
+  installation, database existence, and cleanup tooling, unless a pure
+  tree-ID helper survives a caller audit.
+
+The exact deletion is delayed until a test is either ported/replaced or shown
+to have no behavior contract.  Do not use passing old TypeDB integration tests
+as the post-driver proof.
+
+* Non-code artifact classification
+
+| Artifact class | Current locations | Cutover treatment |
+|----------------+-------------------+-------------------|
+| Manifest/dependency | =Cargo.toml=, =Cargo.lock= | remove =typedb-driver= in Phase 7 after callers are gone |
+| Schema | =schema.tql= | delete only after matrix/tests/technical doc complete |
+| Runtime config | config loader, =data= and =example-data= configs, test fixtures | reject retired keys; remove from every live fixture in Phase 6 |
+| Scheduled audit | graph audit/store/scheduler modules, config key, warnings, audit tools | extract pure index check; delete scheduler/store/tooling in Phase 7 |
+| Test service lifecycle | =bash/all-tests.sh=, =bash/nextest.sh=, test helpers, integration scripts | remove cleanup/fanout/DB names after service-free fixtures in Phase 4/7 |
+| Server service lifecycle | =bash/start-servers.sh=, help/troubleshooting/current setup | stop starting/health-checking TypeDB in Phase 7/9; preserve only Skg lifecycle |
+| Tools | =cleanup-test-dbs=, =delete-one-db=, =bench-audit=, =probe-audit=, likely =bench-context= | delete or retarget after imports are classified |
+| Rebuild protocol | Rust protocol/handler, Emacs request/client, Neovim misc request/keymap, API/command docs | rename atomically in Phase 6; no compatibility alias |
+| Data model docs | =docs/data-model.org= and current links | rename friendly doc, add technical graph spec, then delete schema |
+| TypeDB troubleshooting docs | =docs/troubleshooting/typedb/= | delete or move only clearly historical material; current setup must not point there |
+| External environment | external image/container repository | create named follow-up in Phase 9; do not rebuild it here |
+
+Known search false positives:
+
+- =bash/quiet-test.sh= intentionally mentions “TypeDB-refactor” in its default
+  fingerprint scope; it does not use TypeDB.
+- =TODO/= and historical completed plans may truthfully mention TypeDB.  Keep
+  them only when clearly historical; do not let them mask a current instruction.
+- profiling/history notes about TypeDB idle CPU are historical evidence, not a
+  runtime dependency.
+
+* Completion check for Phase 0.4
+
+The inventory is complete when each direct production category has a planned
+phase and replacement, every public facade API is mapped or marked delete,
+every schema fact has a Rust/test/doc home, every =tests/typedb= file is
+classified, and config/protocol/tool/script/doc search hits are grouped by
+cutover treatment.  The Phase 7 and Phase 10 static searches remain the final
+proof that this inventory was exhaustive.

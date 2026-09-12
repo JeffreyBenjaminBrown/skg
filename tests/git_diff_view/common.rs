@@ -6,23 +6,17 @@ pub use std::error::Error;
 pub use std::fs;
 pub use std::net::TcpStream;
 pub use std::path::{Path, PathBuf};
-pub use std::sync::Arc;
 pub use tempfile::TempDir;
 
 pub use futures::executor::block_on;
-pub use typedb_driver::{TypeDBDriver, Addresses, Credentials, DriverOptions, DriverTlsConfig, Database};
 
-pub use skg::dbs::init::{overwrite_new_empty_typedb_db, read_and_use_schema, create_empty_tantivy_index};
-pub use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
-pub use skg::dbs::typedb::nodes::create_all_nodes;
-pub use skg::dbs::typedb::relationships::create_all_relationships;
-pub use skg::dbs::typedb::sources::create_all_sources;
+pub use skg::dbs::init::create_empty_tantivy_index;
 pub use skg::to_org::render::content_view::multi_root_view;
 pub use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
+pub use skg::test_utils::graph_handle_from_config;
 pub use skg::types::misc::{ID, SkgConfig, SkgfileSource, TantivyIndex, SourceName};
-pub use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
+pub use skg::dbs::in_rust_graph::InRustGraphHandle;
 pub use skg::types::nodes::fs::NodeFS;
-pub use skg::types::nodes::typedb::NodeTypedb;
 pub use skg::types::nodes::complete::NodeComplete;
 pub use skg::serve::ViewsState;
 pub use skg::types::views_state::OpenViews;
@@ -74,63 +68,28 @@ pub fn commit_all(repo: &Repository, message: &str) {
 // Database helpers
 //
 
-pub async fn setup_test_dbs(
-  db_name: &str,
+pub async fn setup_test_stores(
+  _test_name: &str,
   source_path: &str,
   tantivy_folder: &str,
-) -> Result<(SkgConfig, Arc<TypeDBDriver>, TantivyIndex), Box<dyn Error>> {
-  let config : SkgConfig = {
-    let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new();
-    sources . insert(SourceName::from ("main"), SkgfileSource {
-      name: SourceName::from ("main"),
-        abbreviation: None,
-      path: PathBuf::from (source_path),
-      user_owns_it: true,
-    });
-    SkgConfig::fromSourcesAndDbName(sources, db_name, tantivy_folder)
-  };
+) -> Result<(SkgConfig, TantivyIndex), Box<dyn Error>> {
+  let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new();
+  sources . insert (SourceName::from ("main"), SkgfileSource {
+    name: SourceName::from ("main"),
+    abbreviation: None,
+    path: PathBuf::from (source_path),
+    user_owns_it: true, });
+  let config = SkgConfig::fromSourcesAndTantivyFolder (
+    sources, tantivy_folder );
+  let tantivy_index =
+    create_empty_tantivy_index (&config . tantivy_folder) ?;
+  Ok ((config, tantivy_index)) }
 
-  let driver = TypeDBDriver::new(
-    Addresses::try_from_address_str("127.0.0.1:1729")?,
-    Credentials::new("admin", "password"),
-    DriverOptions::new(DriverTlsConfig::disabled())
-  ) . await?;
+pub async fn cleanup_test_stores(
+  _test_name: &str,
 
-  let nodes : Vec<NodeComplete> = {
-    let mut sources : HashMap<SourceName, SkgfileSource> =
-      HashMap::new();
-    sources . insert(SourceName::from ("main"),
-                   SkgfileSource { name: SourceName::from ("main"),
-        abbreviation: None,
-                                   path: PathBuf::from (source_path),
-                                   user_owns_it: true, });
-    read_all_skg_files_from_sources(
-      &SkgConfig::dummyFromSources (sources))? };
-
-  let typedb_nodes : Vec<NodeTypedb> =
-    nodes . iter ()
-    . map (NodeTypedb::from_complete_parsing_textlinks)
-    . collect ();
-  overwrite_new_empty_typedb_db(db_name, &driver) . await?;
-  read_and_use_schema(db_name, &driver) . await?;
-  create_all_sources(db_name, &driver, &config) . await?;
-  create_all_nodes(db_name, &driver, &typedb_nodes) . await?;
-  create_all_relationships(db_name, &driver, &typedb_nodes) . await?;
-
-  let tantivy_index = create_empty_tantivy_index(&config . tantivy_folder)?;
-  Ok((config, Arc::new (driver), tantivy_index))
-}
-
-pub async fn cleanup_test_dbs(
-  db_name: &str,
-  driver: &Arc<TypeDBDriver>,
   tantivy_folder: Option<&Path>,
 ) -> Result<(), Box<dyn Error>> {
-  let databases = driver . databases();
-  if databases . contains (db_name) . await? {
-    let database: Arc<Database> = databases . get (db_name) . await?;
-    database . delete() . await?;
-  }
   if let Some (path) = tantivy_folder {
     // A save's Tantivy update commits on a background worker
     // (coding-advice/common-gotchas.md); removing the folder while a

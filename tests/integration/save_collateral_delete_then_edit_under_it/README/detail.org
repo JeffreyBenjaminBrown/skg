@@ -594,8 +594,8 @@ I should verify that these work before relying on them in the test.
 
 ** Sleep durations
 
-The server's save pipeline is slow (TypeDB update + FS writes +
-Tantivy reindex + merge + collateral completion). The containerward
+The server's save pipeline includes filesystem writes, graph publication, and
+Tantivy reindex, merge, and collateral completion. The containerward
 test needed 2.0s sleeps. This test has TWO save-and-verify cycles,
 so the total test time will be significant. Timeout should be at
 least 30s, possibly 40s.

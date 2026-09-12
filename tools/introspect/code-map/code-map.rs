@@ -70,7 +70,7 @@ fn process_directory(dir: &Path, output: &mut String, level: usize, org_path: &s
         .filter_map(|e| e.ok())
         .collect();
 
-    // Sort alphabetically (so typedb.rs appears next to typedb/)
+    // Sort alphabetically for stable output.
     entries.sort_by(|a, b| a.file_name().cmp(b.file_name()));
 
     let stars = "*".repeat(level);

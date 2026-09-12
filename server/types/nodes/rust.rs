@@ -2,7 +2,7 @@
 //!
 //! Wide enough to match everything NodeComplete carries (except
 //! derived fields), plus textlinks_to — derived from body parsing at
-//! NodeRust construction time, matching how NodeTypedb is built.
+//! NodeRust construction time.
 
 use crate::types::misc::{ID, MSV, MemberAtSource, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};

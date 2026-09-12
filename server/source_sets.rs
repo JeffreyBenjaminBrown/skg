@@ -1,20 +1,14 @@
-use crate::consts::TYPEDB_ADDRESS;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
-use crate::dbs::init::{
-  create_empty_tantivy_index, overwrite_new_empty_typedb_db,
-  read_and_use_schema};
-use crate::dbs::typedb::nodes::create_all_nodes;
-use crate::dbs::typedb::relationships::create_all_relationships;
-use crate::dbs::typedb::sources::create_all_sources;
+use crate::dbs::init::create_empty_tantivy_index;
 use crate::types::env::find_source_with_optional_tantivy;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 pub use crate::types::misc::SourceSetName;
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::nodes::typedb::NodeTypedb;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, mk_inactive_viewnode};
 use crate::types::viewnode::{Vognode, Phantom};
-use crate::test_utils::cleanup_test_tantivy_and_typedb_dbs;
+use crate::test_utils::cleanup_test_tantivy;
 
 use ego_tree::{NodeId, NodeMut, Tree};
 use futures::executor::block_on;
@@ -26,8 +20,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::process::Command;
-use std::sync::Arc;
-use typedb_driver::{Addresses, Credentials, DriverOptions, DriverTlsConfig, TypeDBDriver};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ActiveSourceSet {
@@ -64,6 +56,7 @@ impl ActiveSourceSet {
 
   pub fn id_source_is_active (
     &self,
+    graph  : &InRustGraph,
     config : &SkgConfig,
     id     : &ID,
   ) -> Result<bool, Box<dyn Error>> {
@@ -72,12 +65,13 @@ impl ActiveSourceSet {
     let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
       HashMap::new ();
     Ok ( match find_source_with_optional_tantivy (
-      id, &deleted_since_head_pid_src_map, None, config ) {
+      graph, id, &deleted_since_head_pid_src_map, None, config ) {
       Some (source) => self . contains_source (&source),
       None          => false } ) }
 }
 
 pub fn filter_path_to_active_sources_for_test (
+  graph  : &InRustGraph,
   config : &SkgConfig,
   active : &ActiveSourceSet,
   path   : Vec<ID>,
@@ -88,7 +82,7 @@ pub fn filter_path_to_active_sources_for_test (
   for id in path {
     let source : SourceName =
       match find_source_with_optional_tantivy (
-        &id, &deleted_since_head_pid_src_map, None, config ) {
+        graph, &id, &deleted_since_head_pid_src_map, None, config ) {
         Some (source) => source,
         None => break };
     if active . contains_source (&source) {
@@ -98,6 +92,7 @@ pub fn filter_path_to_active_sources_for_test (
   Ok (result) }
 
 pub fn filter_branches_to_active_sources_for_test (
+  graph    : &InRustGraph,
   config   : &SkgConfig,
   active   : &ActiveSourceSet,
   branches : BTreeSet<ID>,
@@ -108,7 +103,7 @@ pub fn filter_branches_to_active_sources_for_test (
   for id in branches {
     if let Some (source) =
       find_source_with_optional_tantivy (
-        &id, &deleted_since_head_pid_src_map, None, config )
+        graph, &id, &deleted_since_head_pid_src_map, None, config )
     {
       if active . contains_source (&source) {
         result . insert (id); }}}
@@ -195,57 +190,37 @@ pub fn search_ids_for_source_set_for_test (
   Ok (hits) }
 
 pub fn run_with_source_set_test_db<F>(
-  db_name        : &str,
+  test_name        : &str,
   config_path    : &str,
   tantivy_folder : &str,
   test_fn        : F,
 ) -> Result<(), Box<dyn Error>>
 where
   F: for<'a>
-  FnOnce(&'a SkgConfig, &'a Arc<TypeDBDriver>, &'a mut TantivyIndex)
+  FnOnce(&'a SkgConfig, &'a mut TantivyIndex)
          -> Pin<Box<dyn Future<Output = Result
                                <(), Box<dyn Error>>> + 'a>>,
 {
   block_on ( async {
     let fixture_config_path : PathBuf =
-      prepare_source_set_fixture_copy (db_name, config_path)?;
+      prepare_source_set_fixture_copy (test_name, config_path)?;
     let mut config : SkgConfig =
       load_config_with_overrides (
         fixture_config_path . to_str ()
         . ok_or ("fixture config path is not UTF-8")?,
-        Some (db_name),
+        Some (test_name),
         &[])?;
     config . tantivy_folder = PathBuf::from (tantivy_folder);
-    let driver : TypeDBDriver =
-      TypeDBDriver::new (
-        Addresses::try_from_address_str (TYPEDB_ADDRESS)?,
-        Credentials::new ("admin", "password"),
-        DriverOptions::new (DriverTlsConfig::disabled ()) ) . await?;
-    let nodes : Vec<NodeComplete> =
-      read_all_skg_files_from_sources (&config)?;
-    let typedb_nodes : Vec<NodeTypedb> =
-      nodes . iter ()
-      . map (NodeTypedb::from_complete_parsing_textlinks)
-      . collect ();
-    overwrite_new_empty_typedb_db (db_name, &driver) . await?;
-    read_and_use_schema (db_name, &driver) . await?;
-    create_all_sources (
-      db_name, &driver, &config ) . await?;
-    create_all_nodes (db_name, &driver, &typedb_nodes) . await?;
-    create_all_relationships (db_name, &driver, &typedb_nodes) . await?;
     let mut tantivy : TantivyIndex =
       create_empty_tantivy_index (&config . tantivy_folder)?;
-    let driver_arc : Arc<TypeDBDriver> =
-      Arc::new (driver);
     let result : Result<(), Box<dyn Error>> =
-      test_fn (&config, &driver_arc, &mut tantivy) . await;
-    cleanup_test_tantivy_and_typedb_dbs (
-      db_name, &driver_arc, Some (config . tantivy_folder . as_path ())
-    ) . await?;
+      test_fn (&config, &mut tantivy) . await;
+    cleanup_test_tantivy (
+      Some (config . tantivy_folder . as_path ())) ?;
     result }) }
 
 fn prepare_source_set_fixture_copy (
-  db_name     : &str,
+  test_name     : &str,
   config_path : &str,
 ) -> Result<PathBuf, Box<dyn Error>> {
   let source_config_path : PathBuf =
@@ -255,7 +230,7 @@ fn prepare_source_set_fixture_copy (
     . ok_or ("source set fixture config has no parent")?;
   let target_root : PathBuf =
     PathBuf::from (format! (
-      "/tmp/skg-source-set-fixtures-{}", db_name));
+      "/tmp/skg-source-set-fixtures-{}", test_name));
   if target_root . exists () {
     fs::remove_dir_all (&target_root)?; }
   copy_dir_recursively (source_root, &target_root)?;
@@ -282,7 +257,7 @@ fn copy_dir_recursively (
   Ok (( )) }
 
 /// Public so source-set diff tests can replay this prep on a
-/// SharedDbSession's fixture copy (reset_with_fixture_prep).
+/// SharedStoreSession's fixture copy (reset_with_fixture_prep).
 pub fn prepare_git_diff_fixture (
   fixture_root : &Path,
 ) -> Result<(), Box<dyn Error>> {

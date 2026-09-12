@@ -19,7 +19,7 @@
 //! context pass), since backgrounding the worker means it can now run
 //! concurrently with those. On a background-write failure the worker
 //! logs and moves on: the filesystem already holds the truth, so the
-//! index stays recoverable via a 'rebuild dbs'.
+//! index stays recoverable via a 'rebuild ephemeral data stores'.
 
 use crate::save::update_tantivy_from_saveinstructions;
 use crate::types::misc::{ID, TantivyIndex};
@@ -74,7 +74,7 @@ fn worker () -> &'static Worker {
           &task . instructions, &task . tantivy_index, &task . context_types )
         { tracing::error! (
             "Background Tantivy write failed: {}. The filesystem is correct; \
-             run 'rebuild dbs' to resync the search index.", e ); }
+             run 'rebuild ephemeral data stores' to resync the search index.", e ); }
         decrement_and_maybe_notify (&worker_inflight); } });
     Worker { sender : Mutex::new (sender), inflight } } ) }
 

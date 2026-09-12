@@ -1,7 +1,7 @@
 -- PURPOSE: The small one-shot request/response commands:
--- verify-connection, rebuild-dbs and strip-body-whitespace. The Lua
+-- verify-connection, rebuild-ephemeral-data-stores and strip-body-whitespace. The Lua
 -- port of elisp/skg-request-verify-connection.el,
--- elisp/skg-request-rebuild-dbs.el and
+-- elisp/skg-request-rebuild-ephemeral-data-stores.el and
 -- elisp/skg-request-strip-body-whitespace.el.
 
 local client = require('skg.client')
@@ -27,11 +27,11 @@ function M.connection_verify ()
   client.send_string('((request . "verify connection"))\n')
 end
 
----Wipe and rebuild TypeDB and Tantivy from the .skg files on disk.
----Does not touch the filesystem -- only the derived databases.
-function M.rebuild_dbs ()
-  vim.notify('Rebuilding databases (this may take a while) ...')
-  state.register_response_handler('rebuild-dbs',
+---Rebuild the in-memory graph and Tantivy from authoritative .skg files.
+---The .skg files are not changed.
+function M.rebuild_ephemeral_data_stores ()
+  vim.notify('Rebuilding ephemeral data stores (this may take a while) ...')
+  state.register_response_handler('rebuild-ephemeral-data-stores',
     function (_payload, response)
       local content = payload.field_text(response, 'content')
       vim.notify((content or 'Rebuild complete.')
@@ -39,7 +39,7 @@ function M.rebuild_dbs ()
                  .. ' Run :SkgCloseAllSkgBuffers to close them.')
     end, true)
   state.lp_reset()
-  client.send_string('((request . "rebuild dbs"))\n')
+  client.send_string('((request . "rebuild ephemeral data stores"))\n')
 end
 
 ---Strip trailing whitespace from every line of every body, in every

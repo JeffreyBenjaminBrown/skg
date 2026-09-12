@@ -123,7 +123,6 @@ function Initialize-DataRoot($DataRoot) {
     }
   }
   @"
-db_name = "skg"
 tantivy_folder = ".index.tantivy"
 port = 1731
 beep_when_server_becomes_available = false

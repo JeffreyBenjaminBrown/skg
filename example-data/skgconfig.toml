@@ -1,4 +1,3 @@
-db_name = "skg-dev"
 tantivy_folder = ".index.tantivy"
 port = 1730 # TCP port for Rust-Emacs API communication.
 default_source_set = "public"

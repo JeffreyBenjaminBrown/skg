@@ -216,7 +216,6 @@ pub struct SkgConfig {
   #[serde(default = "default_owned_folder")]
   pub owned_folder : String,
 
-  pub db_name        : String,
   pub tantivy_folder : PathBuf,
 
   #[serde(default = "default_port")]
@@ -226,13 +225,7 @@ pub struct SkgConfig {
   pub initial_node_limit : usize, // Max nodes to render in initial content views.
 
   #[serde (default)] // defaults to false
-  pub delete_on_quit : bool, // Delete TypeDB db on server shutdown. Tests use it.
-
-  #[serde (default)] // defaults to false
   pub timing_log     : bool, // Write JSON log to <data_root>/logs/server.jsonl.
-
-  #[serde (default)] // defaults to false
-  pub auto_audit_daily : bool, // If true, the server runs the in-Rust-graph-vs-TypeDB consistency audit at most once per day, backgrounded at lowest priority, and reports any mismatches via <data_root>/audits.org.
 
   #[serde(default = "default_beep_when_server_becomes_available")]
   pub beep_when_server_becomes_available : bool, // Play a local sound when server initialization finishes.
@@ -468,21 +461,16 @@ impl SkgConfig {
       source_order       : Vec::new (),
       default_source_set : SourceSetName::from ("all"),
       owned_folder       : "owned" . to_string (),
-      db_name            : "unused" . to_string(),
       tantivy_folder     : PathBuf::from ("/tmp/unused"),
       port               : 0,
       initial_node_limit : DEFAULT_INITIAL_NODE_LIMIT,
-      delete_on_quit     : false,
       timing_log         : false,
-      auto_audit_daily   : false,
       beep_when_server_becomes_available : false,
       max_ancestry_depth : default_max_ancestry_depth(), }}
 
-  /// Creates a SkgConfig with test-appropriate values for db_name and tantivy_folder.
-  /// Useful for tests that actually connect to TypeDB and create Tantivy indices.
-  pub fn fromSourcesAndDbName (
+  /// Creates a SkgConfig with a test-specific Tantivy folder.
+  pub fn fromSourcesAndTantivyFolder (
     sources        : HashMap<SourceName, SkgfileSource>,
-    db_name        : &str,
     tantivy_folder : &str,
   ) -> Self {
     SkgConfig {
@@ -492,13 +480,10 @@ impl SkgConfig {
       source_order       : Vec::new (),
       default_source_set : SourceSetName::from ("all"),
       owned_folder       : "owned" . to_string (),
-      db_name            : db_name . to_string(),
       tantivy_folder     : PathBuf::from (tantivy_folder),
       port               : DEFAULT_PORT,
       initial_node_limit : DEFAULT_INITIAL_NODE_LIMIT,
-      delete_on_quit     : false,
       timing_log         : false,
-      auto_audit_daily   : false,
       beep_when_server_becomes_available : false,
       max_ancestry_depth : default_max_ancestry_depth(), }}
 

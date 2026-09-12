@@ -8,7 +8,7 @@ use crate::serve::handlers::text_release::{
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_errors_warnings_sexp, format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response, tag_text_response};
 use crate::source_sets::ActiveSourceSet;
-use crate::types::env::SkgEnv;
+use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::views_state::ViewUri;
@@ -26,6 +26,7 @@ struct PreparedView {
 }
 
 pub(crate) struct PreparedRerenders {
+  runtime  : std::sync::Arc<RuntimeGeneration>,
   uris     : Vec<ViewUri>,
   views    : Vec<PreparedView>,
   errors   : Vec<String>,
@@ -66,7 +67,7 @@ pub fn stream_rerender_views (
     env, views_state, views_state . diff_mode_enabled,
     active_source_set, prepass, create_partnerCols );
   if ! authorize_prepared_rerenders (
-    stream, env, &mut prepared, active_source_set,
+    stream, &mut prepared, active_source_set,
     operation, approved_pids ) {
     return; }
   stream_prepared_rerenders (stream, views_state, prepared);
@@ -84,7 +85,7 @@ pub fn stream_rerender_views_after_absent_reference_cleanup (
   affected_owner_pids : &HashSet<crate::types::misc::ID>,
 ) {
   let prepared = prepare_rerender_views_where (
-    env, views_state, views_state . diff_mode_enabled,
+    env, env . runtime_snapshot (), views_state, views_state . diff_mode_enabled,
     Some (active_source_set), None, false,
     |viewforest| view_can_display_absent_reference_change (
       viewforest, raw_id, affected_owner_pids ));
@@ -102,8 +103,23 @@ pub(crate) fn prepare_rerender_views (
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
   create_partnerCols  : bool,
 ) -> PreparedRerenders {
+  let runtime = env . runtime_snapshot ();
+  prepare_rerender_views_with_runtime (
+    env, runtime, views_state, diff_mode_enabled, active_source_set, prepass,
+    create_partnerCols)
+}
+
+pub(crate) fn prepare_rerender_views_with_runtime (
+  env                 : &SkgEnv,
+  runtime             : std::sync::Arc<RuntimeGeneration>,
+  views_state         : &ViewsState,
+  diff_mode_enabled   : bool,
+  active_source_set   : Option<&ActiveSourceSet>,
+  prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
+  create_partnerCols  : bool,
+) -> PreparedRerenders {
   prepare_rerender_views_where (
-    env, views_state, diff_mode_enabled, active_source_set, prepass,
+    env, runtime, views_state, diff_mode_enabled, active_source_set, prepass,
     create_partnerCols, |_| true )
 }
 
@@ -112,6 +128,7 @@ pub(crate) fn prepare_rerender_views (
 /// command can leave unrelated clean *and dirty* buffers entirely untouched.
 fn prepare_rerender_views_where (
   env                 : &SkgEnv,
+  runtime             : std::sync::Arc<RuntimeGeneration>,
   views_state         : &ViewsState,
   diff_mode_enabled   : bool,
   active_source_set   : Option<&ActiveSourceSet>,
@@ -123,8 +140,8 @@ fn prepare_rerender_views_where (
     .filter (|(_, state)| include (&state . viewforest))
     .map (|(uri, _)| uri . clone ()) . collect ();
   let mut context : RerenderAfterSaveContext =
-    RerenderAfterSaveContext::without_save (
-      env, diff_mode_enabled, active_source_set );
+    RerenderAfterSaveContext::without_save_with_runtime (
+      env, runtime, diff_mode_enabled, active_source_set );
   let mut rendered_views : Vec<PreparedView> = Vec::new ();
   for uri in &uris {
     let mut viewforest : ViewForest = match
@@ -151,7 +168,7 @@ fn prepare_rerender_views_where (
         &mut context,
         None, // streamed rerenders repair silently.
         create_partnerCols
-      ) . await } )
+      ) } )
     { Ok (text) => {
         rendered_views . push ( PreparedView {
           uri : uri . clone (), text, viewforest } ); },
@@ -160,6 +177,7 @@ fn prepare_rerender_views_where (
           "View {}: {}",
           uri . repr_in_client (), e )); }} }
   PreparedRerenders {
+    runtime : context . runtime . clone (),
     uris,
     views    : rendered_views,
     errors   : context . errors,
@@ -187,7 +205,6 @@ fn view_can_display_absent_reference_change (
 
 pub(crate) fn authorize_prepared_rerenders (
   stream            : &mut TcpStream,
-  env               : &SkgEnv,
   prepared          : &mut PreparedRerenders,
   active_source_set : Option<&ActiveSourceSet>,
   operation         : &str,
@@ -201,7 +218,7 @@ pub(crate) fn authorize_prepared_rerenders (
     . collect ();
   let release = decide_text_release (
     operation, active, &candidates,
-    &env . in_rust_graph_snapshot (), approved_pids );
+    &prepared . runtime . graph, approved_pids );
   match release {
     TextReleaseDecision::Challenge { .. } => {
       send_response_with_length_prefix (
@@ -227,6 +244,7 @@ pub(crate) fn stream_prepared_rerenders (
       & format_lock_views_sexp (&prepared . uris) ));
   for view in prepared . views {
     views_state . open_views . update_view (
+      &prepared . runtime . graph,
       &view . uri, view . viewforest);
     send_response_with_length_prefix (
       stream,
@@ -296,12 +314,13 @@ pub fn handle_git_diff_toggle_and_rerender (
     env, views_state, next_diff_mode, Some (active_source_set),
     None, false );
   if ! authorize_prepared_rerenders (
-    stream, env, &mut prepared, Some (active_source_set),
+    stream, &mut prepared, Some (active_source_set),
     "diff-mode-rerender", &approved_pids_from_request (request) ) {
     return; }
   views_state . diff_mode_enabled = next_diff_mode;
   let msg : String =
-    git_diff_mode_message (views_state . diff_mode_enabled, &env . config);
+    git_diff_mode_message (
+      views_state . diff_mode_enabled, &prepared . runtime . config);
   tracing::info! ( msg = %msg, "Git diff mode toggled" );
   send_response_with_length_prefix (
     stream,

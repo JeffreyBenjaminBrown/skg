@@ -32,14 +32,23 @@ use std::sync::Arc;
 /// a primary ID). Returns None when no overrider of 'pid' is
 /// visible under the active source-set -- a menu with no choices
 /// would be noise, and the caller falls through to a normal render.
-pub async fn override_menu_view (
+pub fn override_menu_view (
   env    : &SkgEnv,
   pid    : &ID,
   active : Option<&ActiveSourceSet>,
 ) -> Result < Option<(String, Vec<ID>, Tree<ViewNode>)>,
               Box<dyn Error> > {
-  let graph : Arc<InRustGraph> =
-    env . in_rust_graph . load_full ();
+  let runtime = env . runtime_snapshot ();
+  override_menu_view_with_runtime (env, &runtime, pid, active)
+}
+
+pub(crate) fn override_menu_view_with_runtime (
+  _env : &SkgEnv,
+  runtime : &crate::types::env::RuntimeGeneration,
+  pid : &ID,
+  active : Option<&ActiveSourceSet>,
+) -> Result<Option<(String, Vec<ID>, Tree<ViewNode>)>, Box<dyn Error>> {
+  let graph : Arc<InRustGraph> = runtime . graph . clone ();
   if visible_overriders (&graph, active, pid) . is_empty () {
     return Ok (None); }
   let Some (root_node) = graph . nodes . get (pid)
@@ -59,8 +68,8 @@ pub async fn override_menu_view (
       &graph, active, pid, &mut path ); }
   let rendered : String =
     finish_viewforest (
-      &mut viewforest, &env . config, &env . driver,
-      active ) . await ?;
+      &mut viewforest, &runtime . graph, &runtime . config,
+      active ) ?;
   let pids : Vec<ID> =
     pids_from_viewforest ( &viewforest )
     . into_iter () . collect ();

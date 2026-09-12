@@ -17,8 +17,6 @@ protected title or body. Except for search's include/exclude choice,
 approval is always the exact request-local list
 `(allow-overPrivateText-telescopes "P" ...)` and is never cached.
 
-Note: Port 1729 is used for Rust-TypeDB communication (the TypeDB server), not Rust-Emacs communication.
-
 So far there are these endpoints:
 
 ## Verify connection
@@ -209,7 +207,7 @@ So far there are these endpoints:
     shape with human-readable `content` beginning `Error:`.
   - The server deliberately returns the computed path when the file no
     longer exists, so deleted nodes can still be located in a git diff.
-  - Does not require TypeDB or Tantivy -- only the config.
+  - Does not require the live graph or Tantivy -- only the config.
   - If the requested source is inactive in the current connection's
     active source-set, the server refuses to expose the path. Direct
     file visits outside Skg are not intercepted.
@@ -348,12 +346,16 @@ So far there are these endpoints:
     contribute nothing. When no moves are found, the script body is a
     single `# No moves detected.` comment.
 
-## Rebuild databases
-  - Request: ((request . "rebuild dbs"))
-  - Response: LP response-type "rebuild-dbs" with `((content "..."))`.
-    Content is "Databases rebuilt successfully." on success,
+## Rebuild ephemeral data stores
+  - Request: ((request . "rebuild ephemeral data stores"))
+  - Response: LP response-type "rebuild-ephemeral-data-stores" with `((content "..."))`.
+    Content reports that the graph and Tantivy were rebuilt on success,
     or "Rebuild failed: ..." on error.
-  - Behavior: Wipes and rebuilds both TypeDB and Tantivy from the .skg files on disk. Does not touch the filesystem. Also recomputes context rankings for search. Useful after importing new data or when the databases have stale metadata.
+  - Behavior: Reads the authoritative `.skg` files once, validates a complete
+    candidate graph, builds that graph and a fresh Tantivy index from the same
+    node vector, then atomically publishes the new runtime generation. It does
+    not rewrite `.skg` files. Failure leaves the old generation live. Success
+    closes existing views and recomputes context rankings for search.
 
 ## Edge source info
   - Request: ((request . "edge source info") (owner . "ID")
@@ -389,9 +391,8 @@ So far there are these endpoints:
     left untouched (stripping them would make them diverge from
     their upstreams). Rewrites exactly the .skg files whose bodies
     changed (a clean file stays byte-identical); a body that strips
-    to nothing is dropped from its file. The in-Rust graph and Tantivy are refreshed to match;
-    TypeDB needs no update (it stores no body text, and textlink
-    extraction cannot see trailing whitespace). The clients suggest
+    to nothing is dropped from its file. The graph and Tantivy are refreshed
+    to match. The clients suggest
     reviewing the result with `git diff --ignore-all-space`, which
     should show nothing.
 
@@ -419,7 +420,7 @@ So far there are these endpoints:
     limited to `NAME`, stripped of skg metadata, with
     `[[id:..][label]]` links rewritten to relative org links.
     Existing files are overwritten; others are left untouched. Needs
-    neither TypeDB nor Tantivy.
+    neither the live graph nor Tantivy.
     Before writing anything, a restricted export involving overPrivateText
     telescopes returns LP `overPrivateText-telescope-confirmation` with
     `(operation export-to-org)` and the exact PIDs. An approved retry
@@ -437,7 +438,7 @@ So far there are these endpoints:
     `9ff04e25-01e8-4634-8aa5-f5849bc1eb81` ("Some links might be
     broken."); if that note is itself not exported, the link degrades
     to plain label text.
-  - The same export is available as a CLI subcommand (no TypeDB):
+  - The same export is available as a CLI subcommand (no running server):
     `cargo run --bin skg -- export-org [config-path] [source-set]
     [output-dir] [--include-overPrivateText-telescopes]`. Under a restricted set it
     fails closed before writing unless the flag is present; under `all`
@@ -559,11 +560,13 @@ So far there are these endpoints:
   - Request: ((request . "shutdown"))
   - Has the same effect as sending SIGINT (Ctrl+C) or SIGTERM (kill) to the server.
   - Response: LP `((response-type shutdown) (content "Server shutting down..."))`.
-  - Behavior: `delete_on_quit` might be `= true` in the server's config file. (It defaults to false, and need not be mentioned.) If it's true, then the TypeDB database will be deleted before the server exits. This is primarily for integration tests to prevent database accumulation.
+  - Behavior: exits after sending the response. Derived graph and search state
+    are reconstructed from disk at the next startup.
   - TODO | PITFALL: Any client can shut down the server. If ever multiple users share a server, one could bother the other. The server exits immediately after sending the response, which interrupts any in-flight requests from other clients.
 
 ## Busy-initializing signal
-  - Triggered when Emacs connects while the server is still initializing TypeDB/Tantivy.
+  - Triggered when a client connects while the server is still building the
+    graph and Tantivy.
   - Response: the unprefixed, newline-terminated
     `((busy-initializing . "human-readable status message"))`.
   - Emacs should display the message and retry the request (or let the user retry manually).
@@ -779,15 +782,15 @@ Pass its path as a command-line argument (default: `data/skgconfig.toml`) when s
 
 | Field                | Required | Default | Description                                                      |
 |----------------------|----------|---------|------------------------------------------------------------------|
-| `db_name`            | yes      |         | TypeDB database name.                                            |
 | `tantivy_folder`     | yes      |         | Directory for the Tantivy search index. Relative to data root.   |
 | `port`               | no       | 1730    | TCP port for Rust-Emacs communication.                           |
 | `initial_node_limit` | no       | 1000    | Max nodes to render in initial content views.                    |
-| `delete_on_quit`     | no       | false   | Delete the TypeDB database on server shutdown. Mainly for tests. |
 | `timing_log`         | no       | false   | When true, writes a JSON log to `<data_root>/logs/server.jsonl`. |
-| `auto_audit_daily`   | no       | false   | When true, audits the in-Rust memory against TypeDB at most once per day, backgrounded at lowest priority. Mismatches are appended to `<data_root>/audits.org` and flagged to the client on the next outbound buffer. |
 | `beep_when_server_becomes_available` | no | true | When true, plays a local sound after server initialization finishes. |
 | `default_source_set` | no | `all` | Source-set active when a client connects. Runtime changes are per connection and are not written back. |
+
+The retired keys `db_name`, `delete_on_quit`, and `auto_audit_daily` are
+rejected with a migration error; remove them from older configurations.
 
 ## Sources
 

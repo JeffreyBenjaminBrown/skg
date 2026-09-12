@@ -5,7 +5,7 @@ pub mod edge_source_info;
 pub mod export_to_org;
 pub mod get_file_path;
 pub mod herald_rules;
-pub mod rebuild_dbs;
+pub mod rebuild_ephemeral_data_stores;
 pub mod rerender_all_views;
 pub mod save_buffer;
 pub mod text_release;

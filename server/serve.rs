@@ -11,8 +11,6 @@ pub mod parse_metadata_sexp;
 pub mod protocol;
 pub mod util;
 
-use crate::consts::SHUTDOWN_DB_DELETE_DELAY_MS;
-use crate::dbs::typedb::util::delete_database;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
@@ -22,7 +20,7 @@ use crate::serve::handlers::edge_source_info::handle_edge_source_info_request;
 use crate::serve::handlers::export_to_org::handle_export_to_org_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_source_set;
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
-use crate::serve::handlers::rebuild_dbs::handle_rebuild_dbs_request;
+use crate::serve::handlers::rebuild_ephemeral_data_stores::handle_rebuild_ephemeral_data_stores_request;
 use crate::serve::handlers::rerender_all_views::{ handle_git_diff_toggle_and_rerender, handle_rerender_all_views_request};
 use crate::serve::handlers::save_buffer::handle_save_buffer_request;
 use crate::serve::handlers::text_release::{
@@ -94,19 +92,20 @@ fn handle_emacs (
   mut stream : TcpStream,
   mut env    : SkgEnv,
 ) {
+  let runtime = env . runtime_snapshot ();
   let mut views_state : ViewsState =
     ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (), };
   let mut active_source_set : ActiveSourceSet =
     ActiveSourceSet::default_from_config (
-      &env . config )
+      &runtime . config )
       . unwrap_or_else ( |e| {
         tracing::error! (
           error = %e,
           "failed to initialize active source-set; falling back to all");
         ActiveSourceSet::named (
-          &env . config,
+          &runtime . config,
           SourceSetName::from ("all"))
         . expect ("reserved source-set all should always resolve") });
 
@@ -133,6 +132,7 @@ fn handle_emacs (
       Ok (0) => break, // emacs disconnected
       Ok (_n) => {
         tracing::info! ( request = request_header . trim_end (), "Received request" );
+        let runtime = env . runtime_snapshot ();
         match request_type_from_request (&request_header) {
           // For most types of requests, the header is the entire request, and the reader is no longer needed. For saving, though, the reader still contains the buffer content, so it is passed along.
           Ok (RequestType::SingleRootContentView) =>
@@ -192,22 +192,22 @@ fn handle_emacs (
           Ok (RequestType::GetFilePath) =>
             handle_get_file_path_request_with_source_set ( &mut stream,
                                            &request_header,
-                                           &env . config,
+                                           &runtime . config,
                                            &active_source_set ),
           Ok (RequestType::TitlesByIds) =>
             handle_titles_by_ids_request_with_source_set (
               &mut stream, &request_header,
-              &env . tantivy_index, &env . config,
+              &runtime . tantivy_index, &runtime . config,
               views_state . diff_mode_enabled,
               &active_source_set,
-              &env . in_rust_graph_snapshot () ),
+              &runtime . graph ),
           Ok (RequestType::DiffAnalysis) =>
             handle_diff_analysis_request_with_source_set (
-              &mut stream, &request_header, &env . config,
+              &mut stream, &request_header, &runtime . config,
               &active_source_set ),
           Ok (RequestType::StageMoves) =>
             handle_stage_moves_request (
-              &mut stream, &env . config ),
+              &mut stream, &runtime . config ),
           Ok (RequestType::EdgeSourceInfo) =>
             handle_edge_source_info_request (
               &mut stream, &request_header, &env ),
@@ -233,10 +233,10 @@ fn handle_emacs (
               &active_source_set ),
           Ok (RequestType::ExportToOrg) =>
             handle_export_to_org_request ( &mut stream,
-                                           &env . config,
+                                           &runtime . config,
                                            &request_header ),
-          Ok (RequestType::RebuildDbs) =>
-            handle_rebuild_dbs_request ( &mut stream,
+          Ok (RequestType::RebuildEphemeralDataStores) =>
+            handle_rebuild_ephemeral_data_stores_request ( &mut stream,
                                          &mut env,
                                          &mut views_state ),
           Ok (RequestType::StripBodyWhitespace) =>
@@ -295,7 +295,7 @@ fn handle_snapshot_response (
   stream          : &mut TcpStream,
   request         : &str,
   enrichment_slot : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
-  env             : &SkgEnv,
+  _env            : &SkgEnv,
   views_state      : &mut ViewsState,
   active_source_set : &ActiveSourceSet,
 ) {
@@ -317,6 +317,7 @@ fn handle_snapshot_response (
       None => { tracing::warn! (
                   "snapshot response: no enrichment payload");
                 return; }} };
+  let runtime = payload . runtime . clone ();
   if payload . terms != terms {
     tracing::warn! ("snapshot response: terms mismatch ('{}' vs '{}')",
                     payload . terms, terms);
@@ -335,32 +336,34 @@ fn handle_snapshot_response (
       tracing::error! ("snapshot response: parse failed: {}", e);
       return; }};
   insert_containerward_ancestries_into_search_view (
-    &mut viewforest, &payload . search_results,
-    &payload . ancestry_by_id, &env . tantivy_index,
-    &env . config, active_source_set );
+    &mut viewforest, &runtime . graph, &payload . search_results,
+    &payload . ancestry_by_id, &runtime . tantivy_index,
+    &runtime . config, active_source_set );
   insert_override_ancestries_into_search_view (
-    &mut viewforest, &payload . search_results,
+    &mut viewforest, &runtime . graph, &payload . search_results,
     active_source_set );
   { let root_treeid : NodeId =
       viewforest . root () . id ();
     set_metadata_relationships_in_node_recursive (
       &mut viewforest, root_treeid,
+      &runtime . graph,
       &payload . graphnodestats,
-      &env . config ); }
+      &runtime . config ); }
   mark_view_roots_parent_absent (
     &mut viewforest );
   set_viewnodestats_in_viewforest (
     &mut viewforest,
+    &runtime . graph,
     & payload . graphnodestats . container_to_contents,
     & payload . graphnodestats . content_to_containers,
-    & env . config,
+    &runtime . config,
     Some (active_source_set) );
   apply_source_set_to_viewforest (
     &mut viewforest,
     active_source_set );
   if ! payload . include_overPrivateText_telescopes {
     exclude_overPrivateText_nodes_from_viewforest (
-      &mut viewforest, &env . in_rust_graph_snapshot () ); }
+      &mut viewforest, &runtime . graph ); }
   let rendered_pids : Vec<_> =
     viewforest . root () . descendants ()
     . filter_map ( |node| match &node . value () . kind {
@@ -375,7 +378,7 @@ fn handle_snapshot_response (
     } else { std::collections::HashSet::new () };
   let release = decide_text_release (
     "search-enrichment", active_source_set, &rendered_pids,
-    &env . in_rust_graph_snapshot (), &approved );
+    &runtime . graph, &approved );
   if matches! (release, TextReleaseDecision::Challenge { .. }) {
     // Preflight and the load-bearing payload should make this unreachable.
     // Fail closed rather than serialize if a future change violates either.
@@ -386,14 +389,15 @@ fn handle_snapshot_response (
     TextReleaseDecision::AllowWithWarning { warning } => vec! [warning],
     _ => Vec::new (), };
   let enriched : String =
-    viewforest_to_string ( &viewforest, &env . config )
+    viewforest_to_string ( &viewforest, &runtime . config )
     . expect ("search viewforest rendering never fails");
   let enriched_sexp : String =
     mk_search_enrichment_sexp (
       &terms, &enriched, &release_warnings );
   { let uri : ViewUri = // update ViewsState with enriched viewforest
       ViewUri::SearchView ( terms . clone () );
-    views_state . open_views . update_view ( &uri, viewforest ); }
+    views_state . open_views . update_view (
+      &runtime . graph, &uri, viewforest ); }
   tracing::debug! (bytes = enriched_sexp . len (),
                    "snapshot response: sending enrichment");
   send_response_with_length_prefix (
@@ -417,26 +421,8 @@ fn handle_shutdown_request (
       TcpToClient::Shutdown, "Server shutting down..." ));
   cleanup_and_shutdown (env); }
 
-/// Performs cleanup before server shutdown.
-/// Deletes the database if delete_on_quit is configured, then exits.
-fn cleanup_and_shutdown (env : &SkgEnv) {
-  if env . config . delete_on_quit {
-    tracing::info! (
-      db_name = %env . config . db_name,
-      "Deleting database before shutdown" );
-
-    // Wait briefly to allow any pending operations to complete.
-    // This helps ensure the database isn't marked as "in use".
-    std::thread::sleep (
-      std::time::Duration::from_millis (
-        SHUTDOWN_DB_DELETE_DELAY_MS ) );
-
-    futures::executor::block_on ( async {
-      if let Err (e) =
-        delete_database (
-          &env . driver, & env . config . db_name )
-        . await {
-          tracing::error! ( error = %e, "Failed to delete database" );
-        }} ); }
+/// Finish the process. Authoritative files are already durable and derived
+/// stores require no shutdown-time cleanup.
+fn cleanup_and_shutdown (_env : &SkgEnv) {
   tracing::info! ("Shutdown complete.");
   std::process::exit (0); }

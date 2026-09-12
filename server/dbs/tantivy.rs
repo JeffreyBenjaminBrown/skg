@@ -26,17 +26,7 @@ use tantivy::collector::TopDocs;
 use tantivy::schema;
 use std::collections::HashMap;
 use std::error::Error;
-use std::path::Path;
 use std::sync::Arc;
-
-
-/// Opens an existing Tantivy index at `index_path`.
-/// Returns Err if the directory doesn't exist or the
-/// index can't be opened (caller falls back to full rebuild).
-pub(crate) fn open_existing_tantivy_index (
-  index_path : &Path,
-) -> Result<TantivyIndex, Box<dyn Error>> {
-  tantivy_index_from_index ( Index::open_in_dir (index_path) ? ) }
 
 /// Build a TantivyIndex from an already-constructed Index: derive its schema,
 /// look up the fields, and open a reader. Shared by the open-existing,

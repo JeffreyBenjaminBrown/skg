@@ -1,6 +1,7 @@
-use crate::dbs::typedb::relationships::OUTBOUND_RELATIONSHIP_TYPES;
-use crate::dbs::typedb::search::find_related_nodes;
-use crate::dbs::node_lookup::{nodeComplete_rustFIrst_by_id, optNodeComplete_rustFIrst_by_id};
+use crate::dbs::in_rust_graph::relation_accessors::OUTBOUND_RELATIONSHIP_TYPES;
+use crate::dbs::in_rust_graph::query::find_related_nodes;
+use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::node_lookup::{nodecomplete_by_id, opt_nodecomplete_by_id};
 use crate::from_text::local_instruction_collection::lower::nodeMerge_pairs;
 use crate::from_text::local_instruction_collection::traverse::collect_instructions_locally;
 use crate::from_text::local_instruction_collection::types::CollectedIntents;
@@ -12,7 +13,6 @@ use crate::types::tree::forest::ViewForest;
 
 use std::collections::HashSet;
 use std::error::Error;
-use typedb_driver::TypeDBDriver;
 
 /// Find every node that has an outbound relation pointing at the
 /// acquiree via one of the five outbound-relation shapes. The
@@ -23,17 +23,15 @@ use typedb_driver::TypeDBDriver;
 /// acquiree is deleted; they must be re-saved so the save pipeline
 /// re-creates the edges (extra_id resolution then redirects them to
 /// the acquirer).
-pub async fn affected_neighbors_of_nodeMerge (
-  db_name     : &str,
-  driver      : &TypeDBDriver,
+pub fn affected_neighbors_of_nodeMerge (
+  graph       : &InRustGraph,
   acquiree_id : &ID,
 ) -> Result < HashSet<ID>, Box<dyn Error> > {
   let inputs : [ID; 1] = [ acquiree_id . clone () ];
   let mut all : HashSet<ID> = HashSet::new ();
   for (relation, neighbor_role, acquiree_role) in OUTBOUND_RELATIONSHIP_TYPES {
     let neighbors : HashSet<ID> = find_related_nodes (
-      db_name, driver, &inputs,
-      relation, acquiree_role, neighbor_role ) . await ?;
+      graph, &inputs, relation, acquiree_role, neighbor_role );
     all . extend (neighbors); }
   Ok (all) }
 
@@ -43,12 +41,11 @@ pub async fn affected_neighbors_of_nodeMerge (
 /// DefineNodes), load each neighbor's NodeComplete from disk, and wrap
 /// in SaveNode. The resulting SaveNodes carry /unchanged/ NodeCompletes
 /// — the acquiree_id stays in whatever vectors it's in, and extra_id
-/// resolution handles the redirection to acquirer at TypeDB
-/// relationship-creation time.
-pub async fn neighbor_savenodes_for_nodeMerges (
+/// resolution handles the redirection to the acquirer in the graph.
+pub fn neighbor_savenodes_for_nodeMerges (
   nodeMerges : &[NodeMerge],
+  graph  : &InRustGraph,
   config : &SkgConfig,
-  driver : &TypeDBDriver,
 ) -> Result < Vec<SaveNode>, Box<dyn Error> > {
   if nodeMerges . is_empty () {
     return Ok (Vec::new ()); }
@@ -60,8 +57,8 @@ pub async fn neighbor_savenodes_for_nodeMerges (
   let mut neighbors : HashSet<ID> = HashSet::new ();
   for nodeMerge in nodeMerges {
     let for_this : HashSet<ID> = affected_neighbors_of_nodeMerge (
-      &config . db_name, driver, nodeMerge . acquiree_id ()
-    ) . await ?;
+      graph, nodeMerge . acquiree_id ()
+    ) ?;
     neighbors . extend (for_this); }
   let to_load : Vec<ID> =
     neighbors . difference (&primary_pids) . cloned () . collect ();
@@ -69,7 +66,7 @@ pub async fn neighbor_savenodes_for_nodeMerges (
     Vec::with_capacity (to_load . len ());
   for pid in &to_load {
     let node : NodeComplete =
-      nodeComplete_rustFIrst_by_id (config, driver, pid) . await ?;
+      nodecomplete_by_id (graph, config, pid) ?;
     save_nodes . push ( SaveNode (node) ); }
   Ok (save_nodes) }
 
@@ -82,46 +79,46 @@ pub async fn neighbor_savenodes_for_nodeMerges (
 /// plus 'nodeMerge_instructions_from_pairs'; the production save
 /// pipeline collects once and calls the pair form directly.
 #[allow(non_snake_case)]
-pub async fn nodeMerge_instructions_from_viewforest (
+pub fn nodeMerge_instructions_from_viewforest (
   viewforest : &ViewForest,
+  graph      : &InRustGraph,
   config     : &SkgConfig,
-  driver     : &TypeDBDriver,
 ) -> Result<Vec<NodeMerge>, Box<dyn Error>> {
   let collected : CollectedIntents =
     collect_instructions_locally (viewforest)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   nodeMerge_instructions_from_pairs (
-    &nodeMerge_pairs (&collected), config, driver ) . await }
+    &nodeMerge_pairs (&collected), graph, config ) }
 
 /// This builds the NodeMerge triples for a batch of (acquirer,
 /// acquiree) pairs, as collected from the buffer by local
 /// instruction collection ('nodeMerge_pairs').
 #[allow(non_snake_case)]
-pub async fn nodeMerge_instructions_from_pairs (
+pub fn nodeMerge_instructions_from_pairs (
   pairs  : &[(ID, ID)],
+  graph  : &InRustGraph,
   config : &SkgConfig,
-  driver : &TypeDBDriver,
 ) -> Result<Vec<NodeMerge>, Box<dyn Error>> {
   let mut merges : Vec<NodeMerge> =
     Vec::with_capacity (pairs . len());
   for (acquirer_id, acquiree_id) in pairs {
     merges . push (
       nodeMerge_from_acquirer_and_acquiree (
-        acquirer_id, acquiree_id, config, driver ) . await ? ); }
+        acquirer_id, acquiree_id, graph, config ) ? ); }
   Ok (merges) }
 
-async fn nodeMerge_from_acquirer_and_acquiree (
+fn nodeMerge_from_acquirer_and_acquiree (
   acquirer_id : &ID,
   acquiree_id : &ID,
+  graph       : &InRustGraph,
   config      : &SkgConfig,
-  driver      : &TypeDBDriver,
 ) -> Result<NodeMerge, Box<dyn Error>> {
   let acquirer_from_disk : NodeComplete =
-    nodeComplete_rustFIrst_by_id (
-      config, driver, acquirer_id ) . await?;
+    nodecomplete_by_id (
+      graph, config, acquirer_id )?;
   let acquiree_from_disk : NodeComplete =
-    nodeComplete_rustFIrst_by_id (
-      config, driver, &acquiree_id ) . await?;
+    nodecomplete_by_id (
+      graph, config, &acquiree_id )?;
   let acquiree_text_preserver : NodeComplete =
     create_acquiree_text_preserver (&acquiree_from_disk);
   let shown_pre_merge : HashSet<ID> = {
@@ -132,10 +129,10 @@ async fn nodeMerge_from_acquirer_and_acquiree (
     // hides below.
     let mut shown : HashSet<ID> =
       ids_shown_through_subscriptions (
-        &acquirer_from_disk, config, driver ) . await ?;
+        &acquirer_from_disk, graph, config ) ?;
     shown . extend (
       ids_shown_through_subscriptions (
-        &acquiree_from_disk, config, driver ) . await ? );
+        &acquiree_from_disk, graph, config ) ? );
     shown };
   let updated_acquirer : NodeComplete =
     three_nodeMerged_nodecompletes( config,
@@ -277,10 +274,10 @@ fn three_nodeMerged_nodecompletes(
 /// its own contents (the subscribee-as-such display rule,
 /// docs/sharing-model.md). A subscribee with no disk entry
 /// contributes nothing.
-async fn ids_shown_through_subscriptions (
+fn ids_shown_through_subscriptions (
   node   : &NodeComplete,
+  graph  : &InRustGraph,
   config : &SkgConfig,
-  driver : &TypeDBDriver,
 ) -> Result<HashSet<ID>, Box<dyn Error>> {
   let mut shown : HashSet<ID> = HashSet::new ();
   let hides : Vec<ID> =
@@ -288,8 +285,8 @@ async fn ids_shown_through_subscriptions (
   let contains : Vec<ID> =
     members_of ( & node . contains );
   for subscribee_id in members_of ( node . subscribes_to . or_default () ) {
-    let Some (subscribee) = optNodeComplete_rustFIrst_by_id (
-      config, driver, &subscribee_id ) . await ?
+    let Some (subscribee) = opt_nodecomplete_by_id (
+      graph, config, &subscribee_id ) ?
     else { continue; };
     for id in members_of ( & subscribee . contains ) {
       if ! hides . contains (&id)

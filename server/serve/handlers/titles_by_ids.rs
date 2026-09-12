@@ -1,5 +1,5 @@
 use crate::dbs::tantivy::titles_by_ids;
-use crate::dbs::in_rust_graph::{InRustGraph, snapshot_global};
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
   approved_pids_from_request,
@@ -13,7 +13,7 @@ use crate::source_sets::{
   SourceSetName,
   titles_for_source_set_for_test,
 };
-use crate::types::env::find_source_with_optional_tantivy;
+use crate::types::phantom::home_from_disk;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName, SkgConfig, TantivyIndex};
 use crate::types::sexp::extract_string_list_from_sexp;
@@ -21,7 +21,6 @@ use crate::types::sexp::extract_string_list_from_sexp;
 use sexp::{Sexp, Atom};
 use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
-use std::sync::Arc;
 
 pub fn titles_by_ids_for_source_set_for_test (
   config : &SkgConfig,
@@ -37,6 +36,7 @@ pub fn titles_by_ids_for_source_set_for_test (
 pub fn handle_titles_by_ids_request (
   stream            : &mut TcpStream,
   request           : &str,
+  graph             : &InRustGraph,
   tantivy_index     : &TantivyIndex,
   config            : &SkgConfig,
   diff_mode_enabled : bool,
@@ -46,12 +46,9 @@ pub fn handle_titles_by_ids_request (
       config,
       SourceSetName::from ("all"))
     . expect ("reserved source-set all should always resolve");
-  let graph : Arc<InRustGraph> =
-    snapshot_global () . unwrap_or_else (
-      || Arc::new (InRustGraph::new ()) );
   handle_titles_by_ids_request_with_source_set (
     stream, request, tantivy_index, config,
-    diff_mode_enabled, &active, &graph ) }
+    diff_mode_enabled, &active, graph ) }
 
 pub fn handle_titles_by_ids_request_with_source_set (
   stream            : &mut TcpStream,
@@ -99,11 +96,10 @@ pub fn handle_titles_by_ids_request_with_source_set (
     if active . is_all () {
       true
     } else {
-      let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
-        HashMap::new ();
-      find_source_with_optional_tantivy (
-        id, &deleted_since_head_pid_src_map,
-        Some (tantivy_index), config )
+      graph . pid_and_source (id) . map (|(_, source)| source)
+      . or_else (|| crate::dbs::tantivy::title_and_source_by_id (
+        tantivy_index, id ) . map (|(_, source)| source))
+      . or_else (|| home_from_disk (id, config))
       . map ( |source| active . contains_source (&source) )
       . unwrap_or (false) } } );
   let requested : HashSet<ID> = ids . iter () . cloned () . collect ();

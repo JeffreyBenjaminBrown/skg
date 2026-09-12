@@ -1,13 +1,12 @@
 use crate::dbs::in_rust_graph::{
-  in_rust_graph_coherent_with_save_instructions, snapshot_global };
-use crate::dbs::node_lookup::nodecomplete_from_in_rust_graph;
-use crate::from_text::buffer_to_validated_saveplan_with_fork_sources;
+  in_rust_graph_coherent_with_save_instructions_in, new_handle };
+use crate::dbs::node_lookup::nodecomplete_from_graph;
+use crate::from_text::buffer_to_validated_saveplan_with_fork_sources_in_graph;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::save::{
   apply_delete_propagation_cleanup,
-  preflight_fs_from_saveinstructions_with_hoist_approval,
-  update_graph_including_nodeMerges,
+  update_graph_including_nodeMerges_under_mutation_gate,
 };
 use crate::serve::ViewsState;
 use crate::source_sets::ActiveSourceSet;
@@ -440,10 +439,18 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   hoist_approved_pids         : &HashSet<ID>,
   text_approved_pids        : &HashSet<ID>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
+  // Save-plan construction reads the current files and graph.  Hold the sole
+  // writer gate from before those reads through publication, or two requests
+  // can serialize their writes yet still act on the same stale disk snapshot.
+  let mutation_gate = env . mutation_gate ();
+  let mutation_guard = mutation_gate . lock () . await;
+  let runtime = env . runtime_snapshot ();
+  let working_graph = new_handle ((*runtime . graph) . clone ());
+  let mut working_tantivy = runtime . tantivy_index . clone ();
   if diff_mode_enabled { // diff mode is undefined for merge commits
     let sources : Vec<SourceName> =
-      env . config . sources . keys() . cloned() . collect();
-    validate_no_merge_commits ( &sources, &env . config )
+      runtime . config . sources . keys() . cloned() . collect();
+    validate_no_merge_commits ( &sources, &runtime . config )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?; }
 
   let ( viewforest, save_plan, parse_warnings )
@@ -451,9 +458,9 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
             "buffer_to_validated_saveplan"
           ) . entered();
-        buffer_to_validated_saveplan_with_fork_sources (
-          org_buffer_text, &env . config, &env . driver,
-          active_source_set, fork_sources ) . await
+        buffer_to_validated_saveplan_with_fork_sources_in_graph (
+          org_buffer_text, &runtime . graph, &runtime . config,
+          active_source_set, fork_sources )
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
   if viewforest . is_empty ()
@@ -469,12 +476,12 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   { // Delete propagation adds collateral writes. Derive them before the
     // disk Hoist classification so "touched pids" means every telescope
     // this save will actually rewrite, not only what appeared in the buffer.
-    let graph_snap = env . in_rust_graph . load_full ();
+    let graph_snap = working_graph . load_full ();
     apply_delete_propagation_cleanup (
-      &mut nonmerge_defineNodes, &graph_snap, &env . config ); }
+      &mut nonmerge_defineNodes, &graph_snap, &runtime . config ); }
   let hoist_candidates : Vec<HoistCandidate> =
     hoist_candidates_from_disk (
-      &nonmerge_defineNodes, &nodeMerges, &env . config ) ?;
+      &nonmerge_defineNodes, &nodeMerges, &runtime . config ) ?;
   if hoist_needs_confirmation (
       &hoist_candidates, hoist_approved_pids ) {
     return Ok ( SaveResponse {
@@ -490,7 +497,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   // copies its text into a fresh preservation node and deletes it.
   nonmerge_defineNodes . extend (
     repair_saves_for_unwritten_candidates (
-      &hoist_candidates, &nonmerge_defineNodes, &env . config ) ? );
+      &hoist_candidates, &nonmerge_defineNodes, &runtime . config ) ? );
   if ! fork_specs . is_empty () && ! fork_approved {
     // A save that found forks but was not pre-approved commits NOTHING.
     // Return a read-only fork-confirmation buffer; the client shows it,
@@ -519,65 +526,44 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       nodes . push ( DefineNode::Save ( spec . clone . clone () )); }
     nodes };
 
-  { // The ordinary-save and nodeMerge phases execute separately, but their
-    // filesystem validity is one save-level decision. Check their union now,
-    // before either phase writes or deletes anything.
-    let all_filesystem_outputs : Vec<DefineNode> =
-      nonmerge_defineNodes . iter () . cloned ()
-      .chain ( nodeMerges . iter ()
-               . flat_map ( |node_merge| node_merge . to_vec () ) )
-      .collect ();
-    preflight_fs_from_saveinstructions_with_hoist_approval (
-      &all_filesystem_outputs,
-      &source_moves,
-      &env . config,
-      hoist_approved_pids ) ?; }
-
   let define_nodes : Vec<DefineNode> = // includes the nodeMerges
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "define_nodes_build" ). entered();
       nonmerge_defineNodes . iter () . cloned ()
       . chain ( nodeMerges . iter ()
                 . flat_map ( |nodeMerge| nodeMerge . to_vec () ))
-      . collect () };
-  // The post-save graph cannot answer which raw extra IDs belonged to a
-  // deleted pid.  Preserve just that fact for the immediate rerender, so an
-  // open view whose Active child uses the pid can retain a surviving raw
-  // relationship member as Unknown rather than turning it into Deleted.
-  let deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>> = {
-    let graph_before_save = env . in_rust_graph . load_full ();
-    define_nodes . iter () . filter_map ( |instruction| match instruction {
-      DefineNode::Delete (delete) => graph_before_save . nodes . get (&delete . id)
-        . map (|node| (delete . id . clone (),
-                       node . extra_ids . iter () . cloned () . collect ())),
-      _ => None }) . collect () };
-
+    . collect () };
+  let deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>> =
   { // update the graph. Context origin types (for search ranking) are
     // computed from the post-save in-Rust graph and written inside the
     // single Tantivy index pass, so there is no separate context pass.
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "update_graph_including_nodeMerges" ). entered();
-    update_graph_including_nodeMerges (
+    update_graph_including_nodeMerges_under_mutation_gate (
       nonmerge_defineNodes . clone(),
       &nodeMerges,
       &source_moves,
-      env . config . clone(),
-      &mut env . tantivy_index,
-      &env . driver,
-      &env . in_rust_graph,
-      hoist_approved_pids ) . await
+      (*runtime . config) . clone(),
+      &mut working_tantivy,
+      &working_graph,
+      hoist_approved_pids )
     // Warnings always accompany errors: a post-parse validation
     // failure (e.g. the override-invariant check) back-fills the
     // save's parse-time warnings, which the error itself did not see.
-    . map_err ( |e| backfill_parse_warnings (e, &parse_warnings) ) ?; }
+    . map_err ( |e| backfill_parse_warnings (e, &parse_warnings) ) ? };
+  let published = env . runtime . publish (
+    runtime . config . clone (), working_graph . load_full (), working_tantivy);
+  // Rerender reads the newly published graph but performs no authoritative
+  // mutation, so it must not lengthen the writer critical section.
+  drop (mutation_guard);
 
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "coherence_debug_assert" ). entered();
     debug_assert! (
       // TODO | PITFALL: This is quite a weak assertion.
       // PURPOSE: The in-Rust graph must already reflect every Save and Delete in 'define_nodes' by the time this function runs. Violating this invariant (e.g. by reordering the save pipeline so that 'update_views_after_save' runs before 'apply_definenodes') would let the rerender read stale NodeCompletes from the in-Rust graph.
-      in_rust_graph_coherent_with_save_instructions (
-          &define_nodes
+      in_rust_graph_coherent_with_save_instructions_in (
+          &published . graph, &define_nodes
         ) . is_ok (),
       "update_views_after_save: in-Rust graph not coherent with define_nodes" ); }
 
@@ -590,18 +576,19 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         define_nodes,
         diff_mode_enabled,
         env,
+        published . clone (),
         viewuri_from_request_result,
         views_state,
         active_source_set,
         deleted_by_this_save_extra_ids,
-        text_approved_pids ) . await ?;
+        text_approved_pids ) ?;
     { // Nonfatal parse warnings (e.g. discarded col headline text)
       // precede the completion-repair warnings.
       let mut warnings : Vec<String> = parse_warnings;
       warnings . extend ( response . warnings );
       warnings . extend (
         post_commit_hiddenoutside_warnings (
-          &post_commit_notice_candidates ) );
+          &published . graph, &post_commit_notice_candidates ) );
       response . warnings = warnings; }
     Ok (response) } }
 
@@ -610,14 +597,14 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
 /// intentionally downstream of graph/filesystem mutation: failure and every
 /// confirmation return leave the candidate silent.
 fn post_commit_hiddenoutside_warnings (
+  graph      : &crate::dbs::in_rust_graph::InRustGraph,
   candidates : &[PostCommitNoticeCandidate],
 ) -> Vec<String> {
   let key = |id : &ID| -> ID {
-    snapshot_global ()
-      . and_then (|graph| graph . pid_of (id))
+    graph . pid_of (id)
       . unwrap_or_else (|| id . clone ()) };
   let label = |id : &ID| -> String {
-    match nodecomplete_from_in_rust_graph (id) {
+    match nodecomplete_from_graph (graph, id) {
       Some (node) => format! ("{} ({})", node . title, node . pid),
       None => id . to_string (), } };
   let mut warnings : Vec<String> = Vec::new ();
@@ -625,12 +612,12 @@ fn post_commit_hiddenoutside_warnings (
     let PostCommitNoticeCandidate::HiddenOutsideAdded {
       subscriber, member } = candidate;
     let Some (subscriber_node) =
-      nodecomplete_from_in_rust_graph (subscriber)
+      nodecomplete_from_graph (graph, subscriber)
     else { continue; };
     let mut containing_subscribees : Vec<String> = Vec::new ();
     for subscribee in subscriber_node . subscribes_to . or_default () {
       let Some (subscribee_node) =
-        nodecomplete_from_in_rust_graph (&subscribee . member)
+        nodecomplete_from_graph (graph, &subscribee . member)
       else { continue; };
       if subscribee_node . contains . iter ()
         . any (|content| key (&content . member) == key (member))

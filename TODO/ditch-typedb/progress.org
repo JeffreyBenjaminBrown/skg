@@ -1,0 +1,558 @@
+#+TITLE: Ditch TypeDB: execution progress ledger
+#+TODO: TODO ONGOING | DONE
+
+* DONE Phase 0: establish resumable execution and a trustworthy baseline
+
+** DONE 0.1 Create and initialize the progress ledger
+
+This ledger is the compact continuation record for the initiative.  Update it
+before likely compaction, at every task/phase boundary, and whenever a test is
+used as evidence.  Test evidence is valid only for its recorded fingerprint.
+
+** Current checkpoint
+
+- Timestamp: 2026-09-12 UTC
+- HEAD: =03d9609920b4= (=discussions, plans=)
+- Branch: =ditch-typedb...origin/ditch-typedb=
+- Active behavior change: TypeDB runtime, dependency, mutations, queries,
+  lifecycle scripts, and storage tests are removed. Graph-only paths are
+  synchronous and runtime generations are explicit.
+- Main-agent task: complete; all ten phases are DONE.
+- Next small action: optional external development-image cleanup, recorded in
+  =TODO/ditch-typedb/3_external-cleanup.org=.
+- Current plan state: DONE.  The final stable-fingerprint, closed-port suite
+  passed, the operational start/rebuild/restart checks passed, and the static
+  census has no unexplained current-code hits.
+
+** Baseline worktree
+
+The following user-owned state existed before Phase 0 edits and is not part of
+this initiative unless a later task explicitly needs a surgical overlapping
+change:
+
+- modified: =bash/docker.sh= — six hook-installation lines added by Jeff;
+- untracked: =forking-and-privacy.org=, =git-comment=, and
+  =rust-comment-long-to-wide.el=.
+
+The previous plan/discussion commit is =03d9609920b4=.  The source-affecting
+TypeDB worktree fingerprint will be captured by the new wrapper.  Control
+documents (=1_discussion.org=, =2_plan.org=, and this ledger) are intentionally
+not included in behavioral test fingerprints: updating the ledger must not make
+an otherwise identical test result stale.  The wrapper will record its exact
+scope and any excluded untracked files in every metadata record.
+
+** Known baseline facts and risks
+
+- =override_menu::all_tests= was reported as a possible existing failure on
+  2026-08-24.  It is not an accepted exemption until Phase 0.3 re-runs and
+  records it.
+- Current startup/Tantivy measurement already observed: 55,909 documents,
+  Tantivy build 2.10 seconds most recently (previous 2.45 and 2.18 seconds);
+  current full startup about 46 seconds and TypeDB construction about 34.9
+  seconds.  Phase 0.3 will reproduce the relevant baseline with commands/logs.
+- Do not use the post-divergence =partial-reload-and-magit= branch as an
+  implementation source.
+- TypeDB data remains untouched through the first post-cutover soak.
+- Fresh full-suite wall time: 153 seconds.  Current =target/debug/skg= size:
+  284,640,608 bytes (recorded 2026-09-12).  Existing profiling infrastructure
+  will be used for save/search/idle comparisons at their relevant cutover
+  phases rather than disturb the active garden merely to create a synthetic
+  Phase 0 number.
+
+** Test evidence
+
+- PASS — quiet wrapper self-test
+  - Fingerprint: =0585d697df195c5837898aa5de0512a4850edfea8718a764e71120e0fa092b4f=
+    (scopes =bash tests=)
+  - Command: =bash tests/quiet-test-wrapper.sh=, executed through
+    =bash/quiet-test.sh --label quiet-test-wrapper --scope bash --scope tests=.
+  - Duration: 0 seconds; exit 0.
+  - Raw log:
+    =target/test-logs/ditch-typedb/20260912T024654Z-quiet-test-wrapper-8051.log=
+  - Metadata:
+    =target/test-logs/ditch-typedb/20260912T024654Z-quiet-test-wrapper-8051.meta=
+  - It proves passing/failing command propagation, bounded failure diagnostics,
+    argument-array quoting, log retention, command metadata, and scoped
+    fingerprint creation.  The metadata correctly excluded user-owned
+    untracked files outside =bash= and =tests=.
+- PASS — baseline compile
+  - Fingerprint: =21d5975b57fd470f4a00c7d57226282743feb60ece2099d60ec2d248e38d70bc=
+  - Command: =cargo check --all-targets= through =bash/quiet-test.sh= with
+    the TypeDB-refactor source/test/documentation scopes.
+  - Duration: 34 seconds; exit 0.
+  - Raw log:
+    =target/test-logs/ditch-typedb/20260912T024738Z-phase0-cargo-check-all-targets-8258.log=
+  - Metadata:
+    =target/test-logs/ditch-typedb/20260912T024738Z-phase0-cargo-check-all-targets-8258.meta=
+  - Result: all targets compile.  The log appropriately includes the current
+    =typedb-driver= dependency; this is a pre-refactor baseline, not an
+    indication that the cutover has begun.
+- PASS — Rust grouped/direct baseline at
+  =21d5975b57fd470f4a00c7d57226282743feb60ece2099d60ec2d248e38d70bc=
+
+  | Command | Duration | Raw log | Metadata |
+  |---------+----------+---------+----------|
+  | =cargo nextest run --test grouped_unit= | 9s | =target/test-logs/ditch-typedb/20260912T024845Z-phase0-grouped-unit-10821.log= | =target/test-logs/ditch-typedb/20260912T024845Z-phase0-grouped-unit-10821.meta= |
+  | =cargo nextest run --test grouped_sources= | 2s | =target/test-logs/ditch-typedb/20260912T024900Z-phase0-grouped-sources-12519.log= | =target/test-logs/ditch-typedb/20260912T024900Z-phase0-grouped-sources-12519.meta= |
+  | =cargo nextest run --test grouped_saves= | 12s | =target/test-logs/ditch-typedb/20260912T024906Z-phase0-grouped-saves-14498.log= | =target/test-logs/ditch-typedb/20260912T024906Z-phase0-grouped-saves-14498.meta= |
+  | =cargo nextest run --test grouped_overrides= | 11s | =target/test-logs/ditch-typedb/20260912T024922Z-phase0-grouped-overrides-17523.log= | =target/test-logs/ditch-typedb/20260912T024922Z-phase0-grouped-overrides-17523.meta= |
+  | =cargo nextest run --test grouped_views= | 8s | =target/test-logs/ditch-typedb/20260912T024940Z-phase0-grouped-views-20252.log= | =target/test-logs/ditch-typedb/20260912T024940Z-phase0-grouped-views-20252.meta= |
+  | =cargo nextest run --test git_diff_view --test git_diff_view_partner_cols= | 10s | =target/test-logs/ditch-typedb/20260912T024952Z-phase0-git-diff-binaries-21487.log= | =target/test-logs/ditch-typedb/20260912T024952Z-phase0-git-diff-binaries-21487.meta= |
+
+  All six commands exited 0.  They were run serially because the current
+  source group still exercises TypeDB/database lifecycle behavior.
+- PASS — fresh complete baseline
+  - Fingerprint: =21d5975b57fd470f4a00c7d57226282743feb60ece2099d60ec2d248e38d70bc=
+  - Command: =bash/all-tests.sh --no-sound= through =bash/quiet-test.sh=.
+  - Duration: 153 seconds; exit 0.
+  - Raw log:
+    =target/test-logs/ditch-typedb/20260912T025047Z-phase0-full-suite-23981.log=
+  - Metadata:
+    =target/test-logs/ditch-typedb/20260912T025047Z-phase0-full-suite-23981.meta=
+  - Inner report: build 0s, Emacs 2s, Neovim 1s, nextest 66s, doctests 4s,
+    and 68/68 integration runs passed.  This disproves the old
+    =override_menu::all_tests= concern as a current baseline exemption.
+
+** Decisions made during execution
+
+- The first implementation task is test/ledger infrastructure, so no new
+  architectural decision has been made beyond the settled plan.
+- The wrapper fingerprints only caller-selected scopes; its default is the
+  TypeDB-refactor surface.  It records untracked files outside those scopes but
+  does not read their contents.  This keeps user-owned unrelated material out
+  of routine test evidence while making that exclusion visible.
+
+** Chronological work log
+
+*** DONE 2026-09-12 — begin Phase 0
+
+Created the durable execution ledger and marked the initiative, Phase 0, and
+Task 0.1 ONGOING.  Preserved the pre-existing =bash/docker.sh= change and three
+untracked user files.  Task 0.1 is now DONE.
+
+*** DONE 2026-09-12 — quiet test wrapper
+
+Added =bash/quiet-test.sh= and =tests/quiet-test-wrapper.sh=.  The wrapper
+retains raw stdout/stderr and a separate metadata record beneath
+=target/test-logs/ditch-typedb/=, reports only a compact result, and does not
+perform cleanup/retries/escalation.  Its initial self-test exposed a GNU =tr=
+character-class warning in filename sanitization; corrected the dash position
+and reran successfully.  Task 0.2 is DONE.
+
+*** DONE 2026-09-12 — baseline collection
+
+Task 0.3 has begun.  =cargo check --all-targets= passed in 34 seconds at
+=21d5975b57fd470f4a00c7d57226282743feb60ece2099d60ec2d248e38d70bc=.
+All five grouped Rust binaries and the two git-diff binaries subsequently
+passed at that same fingerprint.  Next: inspect existing full-suite evidence,
+then run only the missing baseline gates through the wrapper.
+
+*** DONE 2026-09-12 — fresh full baseline
+
+The prior full report was from 2026-07-02 and did not qualify.  A new
+=bash/all-tests.sh --no-sound= baseline passed in 153 seconds at
+=21d5975b57fd470f4a00c7d57226282743feb60ece2099d60ec2d248e38d70bc=, including
+doctests, both client unit suites, nextest, and 68 integration runs.  Task 0.3
+is DONE; no current baseline failure is exempted.
+
+*** DONE 2026-09-12 — replacement inventory and constraint matrix
+
+Task 0.4 has begun.  The inventory will use bounded path-specific searches;
+each production TypeDB call, schema constraint, test, tool, script action,
+config key, protocol string, and current-doc reference receives a concrete
+replacement, test/doc home, or deletion reason before Phase 0 closes.
+
+*** DONE 2026-09-12 — Phase 0 gate
+
+Created =0_inventory.org= with the public API replacement map, direct caller
+groups, schema constraint matrix, test classifications, artifact groups, and
+known false positives.  The ledger, quiet wrapper, fresh passing baseline, and
+inventory satisfy the Phase 0.5 gate.  The next dashboard task is Phase 1.1.
+
+* DONE Phase 1: mutation serialization and graph integrity
+
+** DONE 1.1 Inspect and introduce the shared mutation gate
+
+Next: read the save, merge, source-move, rebuild, and Tantivy queue entry
+points; establish a complete lock-order map before modifying their signatures
+or adding a mutex.  The current full-suite baseline remains the last green
+behavioral checkpoint.
+
+** Test evidence
+
+- PASS — Phase 1.1 compile and affected groups
+  - Fingerprint: =44884729df6f4f7807024c0b2efbf39597a940292558207610bc700d16e956aa=
+  - =cargo check --all-targets=: 1s;
+    =target/test-logs/ditch-typedb/20260912T030053Z-phase1-mutation-gate-check-rerun-49458.log=
+  - =cargo nextest run --test grouped_saves=: 19s;
+    =target/test-logs/ditch-typedb/20260912T030106Z-phase1-mutation-gate-saves-49557.log=
+  - =cargo nextest run --test grouped_sources=: 9s;
+    =target/test-logs/ditch-typedb/20260912T030130Z-phase1-mutation-gate-sources-53920.log=
+  - Each command has a sibling =.meta= record in the same log directory.
+  - A first compile at the prior interim fingerprint correctly caught two
+    missed direct =merge_nodes= test callers.  They were repaired before this
+    passing fingerprint; it is not a baseline failure.
+
+** Lock-order map
+
+- The shared =Arc<tokio::sync::Mutex<()>>= lives in =SkgEnv=, so all cloned
+  per-connection environments share it.  New construction sites create one
+  gate per independent test environment.
+- Normal save/merge: mutation gate -> captured/current graph and override
+  validation -> filesystem -> graph publication -> foreground TypeDB (until
+  Phase 7) -> Tantivy enqueue or merge writer -> release gate.
+- Rebuild: mutation gate -> wait for queued Tantivy writes -> candidate
+  disk/config/graph validation -> TypeDB/Tantivy rebuild -> graph publication
+  -> release gate.  The background Tantivy worker takes only its writer lock,
+  never the mutation gate, so this order cannot form a queue/gate cycle.
+- Standalone save, merge, absent-reference cleanup, and rebuild all enter the
+  same gate.  Internal =*_with_hoist_approval= helpers do not reacquire it;
+  the combined save path therefore holds one guard across its ordinary and
+  node-merge portions.
+  The TCP save handler now acquires before save-plan construction (whose disk
+  reads would otherwise permit two serialized writes based on the same old
+  files), and releases immediately after publication, before rerendering.
+
+- PASS — first deterministic concurrent-writer regression
+  - Fingerprint: =2e46377cb079a4e8b517c254db8bb30856f583e219238e56cd64dfb3b439ca16=
+  - Exact test: =cargo nextest run --test grouped_saves -E
+    'test(mutation_gate::)'=; 5s;
+    =target/test-logs/ditch-typedb/20260912T030343Z-phase1-mutation-gate-regression-56223.log=.
+  - Group gate: =cargo nextest run --test grouped_saves=; 3s;
+    =target/test-logs/ditch-typedb/20260912T030352Z-phase1-mutation-gate-saves-rerun-56600.log=.
+  - The test intentionally demonstrates the ungated old race with a two-party
+    barrier (final graph has one node), then uses the shared gate and a
+    notification-controlled schedule to prove the second writer cannot capture
+    before the first publishes (final graph has both nodes).
+
+*** DONE 2026-09-12 — shared mutation gate
+
+Added =MutationGate= to =SkgEnv= and initialized it in production and every
+test environment constructor.  Standalone save/merge APIs accept an explicit
+gate; server save, absent-reference cleanup, and rebuild use the shared one.
+The runtime-compatible Tokio mutex is already a direct dependency.  The
+compiler and affected groups pass at the recorded fingerprint.  Task 1.1 is
+DONE; Task 1.2 is ONGOING.
+
+** DONE 1.2 Add deterministic concurrent-writer regressions
+
+Barrier/notification-controlled fixtures now cover the former same-snapshot
+lost update, save following merge/delete, save-plan capture following a source
+move, rebuild following a normal mutation, and actual FIFO Tantivy writes for
+two versions of one pid.  Graph assertions include forward nodes, canonical
+extra-ID lookup, and the affected inverse index; the actual Tantivy test holds
+the writer lock until both tasks are queued and then asserts only the second
+title is searchable.
+
+*** DONE 2026-09-12 — deterministic mutation-gate regression
+
+Added =tests/mutation_gate.rs= to =grouped_saves=.  Its two tests force the
+old lost-update schedule and its gated replacement without filesystem or
+TypeDB timing.  The exact regression and its containing saves group pass at
+=2e46377cb079a4e8b517c254db8bb30856f583e219238e56cd64dfb3b439ca16=.
+
+The expanded six-test suite passes in 8 seconds at
+=370b567ed3b2d8a7dea6a7df4943781ea27b4ca046d420857469008f8c14c244=
+(=target/test-logs/ditch-typedb/20260912T034427Z-phase1-race-suite-62764.log=).
+While adding it, the source-move case exposed that acquiring only inside the
+database update was too late: save-plan parsing reads disk first.  The server
+handler now holds the gate across parsing, union filesystem preflight,
+pre-save deletion metadata capture, validation, disk write, graph publication,
+TypeDB update, and Tantivy enqueue, then drops it before rerender.  This is a
+planned-goal implementation correction, not an architecture change.  The
+absent-reference handler likewise holds one guard across approval revalidation
+and rewrite, and drops it before streaming rerenders.  Task 1.2 is DONE.
+
+** DONE 1.3 Extract pure graph internal-index validation
+
+Next: add a graph-owned pure validator that independently recomputes and
+compares =contained_by=, =subscribers_of=, =hiders_of=, =overriders_of=,
+=textlinks_in=, and =extra_id_to_pid=, with deterministic exact diagnostics.
+
+*** DONE 2026-09-12 — pure internal-index equivalence
+
+Added =in_rust_graph::internal_index_validation=.  It independently rebuilds
+all five relationship inverse maps and the extra-ID owner map from forward
+node data, preserving dangling raw-ID keys and canonicalizing uniquely-owned
+extra IDs.  Mismatches are sorted by fixed index order and key and show exact
+expected/actual PID sets; duplicate extra owners are representable rather than
+silently collapsed in the expected side.  Tests cover construction, all five
+relationship roles, text links, aliases, dangling members, incremental update,
+alias acquisition/migration, meaningful deletion, and corruption of all six
+stored indexes.  The final focused suite passed in 5 seconds at the Phase 1
+validator fingerprint (log
+=target/test-logs/ditch-typedb/20260912T034808Z-phase1-internal-index-tests-final-68125.log=).
+Task 1.3 is DONE.
+
+** DONE 1.4 Establish the Rust constraint validator matrix
+
+Added =in_rust_graph::complete_validation= as the canonical whole-candidate
+entry point.  It returns a graph plus deterministic hard errors and telescope
+warnings.  Hard errors cover duplicate primary IDs, duplicate extra IDs,
+PID/extra collisions, unconfigured node homes, override topology, and internal
+index coherence.  Typed node fields make malformed relationship roles
+structurally impossible; every relationship member retains its recording
+source.  Unconfigured edge sources and leak-shaped orientation remain repair
+warnings, while configured dangling IDs are deliberately retained and accepted.
+
+Startup (incremental and full), manual rebuild, and defensive TypeDB rebuild
+now use this entry point.  Save and nodeMerge validate the complete simulated
+candidate before the first filesystem mutation, so correctness no longer
+depends on a later TypeDB key/cardinality error.  The validated graph instance
+is reused for environment publication at startup instead of reconstructed.
+Focused validator tests and the entire save, source, and override groups pass
+at fingerprint
+=53b2f31f19d1b74613829c19223cb25c1aae7fdb3f92771eb6d81bc19ed0c39c=.
+Relevant logs:
+
+- =target/test-logs/ditch-typedb/20260912T035407Z-phase1-validator-unit-73662.log=
+- =target/test-logs/ditch-typedb/20260912T035419Z-phase1-validator-saves-75382.log=
+- =target/test-logs/ditch-typedb/20260912T035446Z-phase1-validator-sources-80816.log=
+- =target/test-logs/ditch-typedb/20260912T035450Z-phase1-validator-overrides-80815.log=
+
+Task 1.4 is DONE.
+
+** DONE 1.5 Pass the Phase 1 gate
+
+Next: run the all-target compile and affected grouped tests at one stable
+fingerprint, then close Phase 1 if all acceptance clauses remain satisfied.
+
+*** DONE 2026-09-12 — Phase 1 gate
+
+At fingerprint
+=ff9fbd186e114d743b3637d95b58688028c5c35428122537275a590b5452aaf3=,
+all-target compilation and the complete grouped unit, saves, sources, and
+overrides binaries pass.  Logs are =20260912T035618Z-phase1-final-check-92619=,
+=20260912T035622Z-phase1-final-saves-92868=,
+=20260912T035632Z-phase1-final-sources-95907=, and
+=20260912T035640Z-phase1-final-overrides-92618= beneath the ledger log folder
+(each with =.log= and =.meta=).  The first full unit run caught only a changed
+override-refusal phrase; the canonical formatter was changed to reuse the
+existing actionable override diagnostic, and the complete unit group then
+passed.  All Phase 1 acceptance clauses are satisfied; Phase 1 is DONE.
+
+*** DONE 2026-09-12 — TypeDB cutover, synchronous conversion, and documentation
+
+Execution continued through the mechanically dependent work before the plan
+markers were refreshed.  This ordering deviation is now explicit: TypeDB
+reads/writes and driver state were removed, graph-native modules and explicit
+runtime snapshots replaced them, the test harness became graph/Tantivy-only,
+startup became a full filesystem read plus graph validation and Tantivy build,
+and the rebuild protocol was deliberately renamed.  =typedb-driver= is absent
+from the manifest/lockfile and the old backend, audit, tools, and storage tests
+are deleted.  The three retired config keys are rejected together with an
+actionable migration error.
+
+Graph-only parsing, lookup, traversal, rendering, and save-planning chains are
+now synchronous; actual mutation-gate and I/O boundaries remain async.  After
+the conversion, =cargo check --all-targets= passed and all seven principal Rust
+binaries passed (394 tests) in two seconds.  Evidence:
+
+- =target/test-logs/ditch-typedb/20260912T062539Z-phase8-sync-groups-retry-224304.log=
+- sibling =.meta= fingerprint record
+
+The immediately preceding combined run hit =DirectoryNotEmpty= in one shared
+temporary-fixture cleanup; the exact test passed in isolation at
+=20260912T062534Z-phase8-none-noops-retry-224109.log=, and the complete retry
+then passed.  It is treated as a harness race, not an accepted behavioral
+failure.
+
+Documentation work has begun: the surviving shared content-view fixtures moved
+out of =tests/typedb=; obsolete TypeDB troubleshooting material and
+=schema.tql= were removed after =docs/data-model_technical.org= received the
+node fields, relationships, constraints, indexes, and generation model;
+=docs/data-model.org= moved to =docs/data-model_friendly.org=.  Current task is
+to finish terminology/config/script cleanup, then run the deferred cargo-tree,
+closed-port, client, integration, operational, timing, and full-suite gates.
+
+*** DONE 2026-09-12 — three graph-only startup measurements
+
+Stopped exactly the running Skg and =typedb_server_bin= PIDs, confirmed ports
+1729 and 1730 closed, built the driver-free server, and started it directly
+three times against =data/skgconfig.toml=.  Port 1729 remained closed in every
+run.  Results:
+
+| Run | Ready wall time | File read + graph validation | Tantivy build | Context | Nodes | Tantivy docs |
+|-----+-----------------+------------------------------+---------------+---------+-------+--------------|
+| 1 | 6.352s | 3.136s | 1.786s | 0.978s | 54,836 | 55,909 |
+| 2 | 6.366s | 2.859s | 2.096s | 0.897s | 54,836 | 55,909 |
+| 3 | 6.035s | 2.881s | 1.864s | 0.915s | 54,836 | 55,909 |
+
+Raw logs are =target/startup-measurements/graph-only-20260912/run-{1,2,3}.log=.
+The full startup improved from the measured pre-cutover ~46 seconds to about
+6.0–6.4 seconds.  Tantivy remains in the previously observed 2.10/2.18/2.45
+second neighborhood; removing the ~34.9-second old graph-store construction
+accounts for most of the improvement.  Task 6.5 is DONE.
+
+* DONE Phase 2: coherent runtime generations and explicit snapshots
+
+** DONE 2.1 Introduce the shared runtime-generation abstraction
+
+Added =RuntimeGeneration= and =SharedRuntime=.  Each environment family now
+shares one =ArcSwap= publication point and mutation gate; a generation holds
+the config, immutable Rust graph, Tantivy handle, and monotonically increasing
+ID.  Constructors, startup, normal saves, absent-reference cleanup, body-
+whitespace migration, and manual rebuild now publish through that shared
+runtime.  Save rerendering retains the exact generation it published.
+
+Manual Tantivy rebuild now targets a uniquely named sibling directory.  Only
+after the graph, config, and new index are ready does rebuild publish them as
+one generation; exact stale sibling directories are retired on a later
+startup.  This avoids wiping files beneath readers of the old generation.
+
+Focused runtime tests prove cross-clone publication, retention of an old Arc,
+failed/unpublished candidate isolation, coherent config/graph/Tantivy change,
+and non-destructive sibling-index construction.  They pass in 9 seconds at
+=d6bdf5ae334af468637a3ec623e049c82ef2d856b025dda0d1d62c868407c5b3=
+(log =20260912T041638Z-phase2-runtime-generation-111479.log= and sibling
+=.meta=).  =cargo check --all-targets= and =git diff --check= also pass at
+this source state.
+
+The runtime temporarily mirrors publications into the old global graph
+handle solely while its remaining consumers are converted.  This transitional
+double publication must be deleted before the Phase 2 gate.
+
+** DONE 2.2 Thread one snapshot through every operation
+
+Request entry points for rendering, source sets, text search, save, rebuild,
+edge-source lookup, and update-buffer now capture and retain an explicit
+generation.  Nested rendering/reconciliation contexts carry that generation
+instead of reloading it.  Next: remove every remaining production
+=snapshot_global= consumer.  Where a TypeDB facade currently selects the Rust
+graph through the singleton, move its graph-native operation forward from
+Phase 3 and accept =\&InRustGraph= explicitly rather than preserving a hidden
+fallback merely for phase ordering.
+
+The graph/statistics/herald path and foreground plus background search
+enrichment now use an explicit graph from one generation.  Search enrichment
+payloads retain the exact =Arc<RuntimeGeneration>= that launched the work, so
+the later client snapshot response cannot combine old ancestry/stats with a
+new config, graph, or index.  Title lookup likewise accepts an explicit graph.
+
+The production save parser now receives the captured graph through local
+instruction collection, visibility resolution, restricted-source weaving,
+sticky relationship-source selection, fork validation, buffer marker
+validation, dead-link warnings, and post-commit warnings.  Compatibility
+wrappers for direct tests still load the global and are explicitly
+transitional; production calls the =*_in_graph= forms.
+
+The first full saves-group run exposed a real transitional-handle bug: a test
+environment's runtime had copied the supplied =ArcSwap=, so publication
+updated the runtime mirror but left the test/audit handle stale.  Added a
+handle-preserving environment constructor and made test environments share
+the supplied handle.  The isolated regression then passed, followed by all of
+=grouped_saves= in 12 seconds at
+=e5374eb4090713b047161040822ef7fe93bfc94410865b46d473184c63dbc0b6=
+(log =20260912T043106Z-phase2-explicit-save-pipeline-131221.log=).  The complete
+unit group had also passed at its immediately earlier fingerprint (log
+=20260912T042804Z-phase2-explicit-read-context-unit-120521.log=).
+
+* DONE Final graph-only checkpoint and handoff
+
+** DONE Stable-fingerprint closed-port suite
+
+The final source fingerprint is
+=acbebf11d1f012e25d323dc02da458400330c35af0ae1d9826efccbd953803ac=
+at HEAD =03d9609920b450d82fe4a6d5b62d500188ca2b16=.  With nothing listening
+on TypeDB port 1729, =bash/all-tests.sh --no-sound= passed in 68 seconds:
+
+- Emacs unit tests: PASS
+- Neovim unit tests: PASS
+- Nextest/Rust tests: PASS
+- Rust doctests: PASS
+- both-client integration suite: PASS (68 integration cases)
+
+Raw log:
+=target/test-logs/graph-only/20260912T065508Z-graph-only-final-suite-stable-fingerprint-274549.log=.
+Metadata:
+=target/test-logs/graph-only/20260912T065508Z-graph-only-final-suite-stable-fingerprint-274549.meta=.
+The quiet-wrapper self-test also passed after excluding derived
+=windows/out= package copies from fingerprints (log prefix
+=20260912T065508Z-quiet-wrapper-post-package-exclusion-274552=).
+
+The prior explicit Rust checkpoint ran all seven principal binaries: 394 tests
+passed.  Its log is
+=target/test-logs/graph-only/20260912T064020Z-cleanup-rust-groups-234679.log=.
+=cargo check --all-targets= passed before and after the final synchronous test-
+harness cleanup.  Changed shell scripts pass =bash -n=, and
+=git diff --check= is clean.
+
+** DONE Static census and retained boundaries
+
+=cargo tree= contains no =typedb= or =typeql= package.  There are no global
+graph snapshot/install handles, old rebuild protocol identifiers, TypeDB
+imports/modules/service lifecycle, or retired config fields.  The only current
+code hits are the deliberate migration error and its tests in
+=server/dbs/filesystem/not_nodes.rs= for =db_name=, =delete_on_quit=, and
+=auto_audit_daily=.  =api-and-formats.md= documents those retired keys.
+
+Historical TypeDB prose remains in old documents, the explicitly named
+external-image follow-up, Jeff's =.skg= knowledge corpus, and pre-cutover
+=data/logs/server.jsonl=.  These are classified history/content, not runtime
+assumptions.  Jeff's =data/owned= files have no worktree diff.
+
+The retained production async/blocking bridges all cross real concurrency or
+I/O boundaries: the shared mutation gate in save/merge and filesystem-
+rewriting handlers, asynchronous rerender/search work in request handlers, and
+Tantivy background synchronization.  Pure graph lookup, traversal, validation,
+render planning, fixture reset, and Tantivy test cleanup are synchronous.
+The direct =async-std= dependency and its now-unused transitive graph were
+removed.
+
+** DONE Operational graph/Tantivy soak
+
+With TypeDB stopped, three real starts against =data/skgconfig.toml= loaded
+54,836 nodes and indexed 55,909 documents in 6.035--6.366 seconds.  The file
+read plus graph validation took 2.859--3.136 seconds, Tantivy 1.786--2.096
+seconds, and context construction 0.897--0.978 seconds.  Logs are under
+=target/startup-measurements/graph-only-20260912/run-{1,2,3}.log=.
+
+A live client verified the connection, invoked =rebuild ephemeral data
+stores=, observed one coherent newly published generation, verified again on
+a second connection, and then passed a stop/restart reconstruction.  The old
+published generation remained isolated during candidate construction; focused
+runtime-generation tests cover failed candidate non-publication.  Stale
+=.index.tantivy.skg-generation-*= directories were retired on restart.
+Mutation-gate tests deterministically cover concurrent saves, save versus
+delete/merge/source move, rebuild serialization, and Tantivy FIFO ordering.
+The complete Rust and client integration suites exercise save, merge, delete,
+source move, immediate search, source privacy, views, and rebuild behavior.
+After final verification no Skg or TypeDB process listens on ports 1732 or
+1729.
+
+** DONE Size and simplification measurements
+
+Using tracked HEAD files as the before set and current working files as the
+after set:
+
+| Surface | Before | After | Change |
+|---------+--------+-------+--------|
+| =server/**/*.rs= lines | 43,687 | 40,177 | -3,510 (-8.0%) |
+| =server tests tools bash elisp nvim windows= Rust/shell/Elisp/Lua lines | 129,264 | 122,414 | -6,850 (-5.3%) |
+| debug =target/debug/skg= | 284,640,608 bytes | 191,452,096 bytes | -93,188,512 (-32.7%) |
+
+The complete worktree diff is 381 files, 3,788 insertions, and 14,479
+deletions.  Startup fell from roughly 46 seconds to 6.0--6.4 seconds; the old
+TypeDB construction alone had taken roughly 34.9 seconds.  Tantivy time stayed
+within the earlier 2.10/2.18/2.45-second neighborhood.  Final full-suite wall
+time is 68 seconds versus the 153-second baseline.
+
+Deleted surfaces include the TypeDB backend and node representation, schema,
+scheduled cross-database audit, TypeDB CRUD/query/search adapters, service and
+test-database lifecycle, storage-mechanism tests, cleanup/probe/audit tools,
+and the old rebuild command.  Their enduring semantics now live in the Rust
+graph validators, graph-native queries, runtime generations, and technical
+data-model document.
+
+** DONE User-state and residual follow-up
+
+Jeff's pre-existing six-line Codex hook addition in =bash/docker.sh= is
+preserved; only its obsolete TypeDB-specific ulimit explanation was edited.
+The pre-existing untracked =forking-and-privacy.org=, =git-comment=, and
+=rust-comment-long-to-wide.el= remain untouched.  Generated =windows/out=
+package staging was removed after its assembly check; it is reproducible and
+was not user data.
+
+No code or repository work remains for this initiative.  The deliberately
+out-of-scope external development-image cleanup is fully specified in
+=TODO/ditch-typedb/3_external-cleanup.org=.

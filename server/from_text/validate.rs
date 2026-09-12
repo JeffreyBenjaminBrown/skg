@@ -1,13 +1,13 @@
 use crate::from_text::fork::{CloneSourceInputs, fork_spec_from_buffer_node};
 use crate::source_sets::ActiveSourceSet;
-use crate::dbs::node_lookup::optNodeComplete_rustFIrst_by_id;
+use crate::dbs::node_lookup::opt_nodecomplete_by_id;
+use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName, members_of};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, ForkSpec, NodeMerge, SourceMove};
 use crate::types::nodes::complete::NodeComplete;
 
 use std::collections::{HashMap, HashSet};
-use typedb_driver::TypeDBDriver;
 
 /// Applies the foreign-node write policy, and -- this is where forking
 /// begins -- turns an edit of a foreign node into a fork.
@@ -30,13 +30,13 @@ use typedb_driver::TypeDBDriver;
 /// Requires disk-supplemented DefineNodes: unchanged foreign saves are
 /// harmless only after unspecified fields have been filled from disk,
 /// and foreign creates are recognized by checking disk for the pid.
-pub async fn validate_and_filter_foreign_instructions(
+pub fn validate_and_filter_foreign_instructions(
   instructions       : Vec<DefineNode>,
   nodeMerge_instructions : &[NodeMerge],
+  graph              : &InRustGraph,
   clone_source_inputs : &CloneSourceInputs, // everything clone-source resolution can draw on, in priority order
   adopt_clone_source : &HashMap<ID, ID>, // new node -> forked N whose clone's source it adopts (see 'new_foreign_nodes_adopting_clone_sources')
   config             : &SkgConfig,
-  driver             : &TypeDBDriver,
 ) -> Result<(Vec<DefineNode>, Vec<ForkSpec>),
             Vec<BufferValidationError>> {
   let mut outcomes : Vec<ForeignPolicyOutcome> =
@@ -52,15 +52,15 @@ pub async fn validate_and_filter_foreign_instructions(
     outcomes . push (
       apply_foreign_policy(
         instruction, /* fork_eligible = */ true,
-        adopt_clone_source, config, driver
-      ) . await? ); }
+        adopt_clone_source, graph, config
+      )? ); }
   { let no_adoptions : HashMap<ID, ID> = HashMap::new ();
     for instruction in nodeMerge_definenodes . iter () {
       outcomes . push (
         apply_foreign_policy(
           instruction, /* fork_eligible = */ false,
-          &no_adoptions, config, driver
-        ) . await? ); }}
+          &no_adoptions, graph, config
+        )? ); }}
   collect_foreign_policy_outcomes (&outcomes)?;
   // Build the clones from the fork candidates. A fork candidate only
   // ever arises from a regular `instructions` Save (a nodeMerge's saves
@@ -94,12 +94,12 @@ enum ForeignPolicyOutcome {
   Reject(BufferValidationError), // Must reject before persistence.
 }
 
-async fn apply_foreign_policy(
+fn apply_foreign_policy(
   instr: &DefineNode,
   fork_eligible: bool, // true for a direct buffer edit (which forks a changed foreign node); false for a nodeMerge-derived save (which still rejects).
   adopt_clone_source: &HashMap<ID, ID>, // new node -> forked N (empty for nodeMerge-derived saves)
+  graph: &InRustGraph,
   config: &SkgConfig,
-  driver: &TypeDBDriver,
 ) -> Result<ForeignPolicyOutcome,
             Vec<BufferValidationError>> {
   match instr {
@@ -115,9 +115,9 @@ async fn apply_foreign_policy(
       if !source_is_foreign (config, &node . source) {
         // not foreign, so keep
         return Ok (ForeignPolicyOutcome::Keep); }
-      match optNodeComplete_rustFIrst_by_id(
-        config, driver, &node . pid
-      ) . await {
+      match opt_nodecomplete_by_id(
+        graph, config, &node . pid
+      ) {
         Ok(Some (disk_node)) => {
           if buffernode_differs_from_disknode(node, &disk_node) {
             // A direct edit of a foreign node forks it (no longer a

@@ -29,7 +29,7 @@ fn config_two_owned_one_foreign () -> SkgConfig {
         abbreviation : None,
         path         : PathBuf::from (name),
         user_owns_it : owns, } ); }
-  SkgConfig::fromSourcesAndDbName ( sources, "db", "/tmp/none" ) }
+  SkgConfig::fromSourcesAndTantivyFolder ( sources, "/tmp/none" ) }
 
 fn active (id : &str, source : &str) -> ViewNode {
   mk_definitive_viewnode (

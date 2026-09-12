@@ -20,6 +20,7 @@ use crate::types::phantom::title_for_phantom;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, mk_phantom_viewnode };
 use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual};
 use crate::types::tree::viewnode_nodecomplete::pid_and_source_from_treenode;
+use crate::dbs::in_rust_graph::InRustGraph;
 
 use ego_tree::{NodeMut, NodeRef, NodeId};
 use std::collections::HashMap;
@@ -32,6 +33,7 @@ use std::path::PathBuf;
 /// generalized-orphan check at their later visits.
 pub(crate) fn process_activeNode_diff (
   mut node_mut                   : NodeMut<ViewNode>,
+  graph                          : &InRustGraph,
   source_diffs                   : &HashMap<SourceName, SourceDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
   tantivy_index                  : Option<&TantivyIndex>,
@@ -163,7 +165,7 @@ pub(crate) fn process_activeNode_diff (
       staged_changes   . map ( |c| c . contains_diff . as_slice () ),
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
   insert_phantoms_for_missing_contains (
-    &mut node_mut, tree_node_id, &net_contains, &removed_membership_by_id,
+    &mut node_mut, graph, tree_node_id, &net_contains, &removed_membership_by_id,
     source_diff, source_diffs,
     deleted_since_head_pid_src_map, tantivy_index, config ) ?;
   Ok (( )) }
@@ -268,6 +270,7 @@ fn mark_membership_on_existing_children (
 /// merged contains diff) and X axes (if its file is also gone in some stage).
 fn insert_phantoms_for_missing_contains (
   node_mut                       : &mut NodeMut<ViewNode>,
+  graph                          : &InRustGraph,
   parent_node_id                 : NodeId,
   net_contains                   : &[Diff_Item<ID>],
   membership_by_id               : &HashMap<ID, MembershipAxes>,
@@ -307,14 +310,14 @@ fn insert_phantoms_for_missing_contains (
     // path; TODO/DONE/local-view-update/plan_v2.org §7.6).
     let child_source : SourceName =
       find_source_with_optional_tantivy (
-        &id, deleted_since_head_pid_src_map,
+        graph, &id, deleted_since_head_pid_src_map,
         tantivy_index, config )
         . unwrap_or_else ( SourceName::not_found );
     let child_existence : ExistenceAxes =
       existence_axes_for_phantom (&id, &child_source, source_diff, source_diffs);
     let child_title : String =
       title_for_phantom (
-        &id, &child_source,
+        graph, &id, &child_source,
         Some (source_diffs), config );
     let phantom : ViewNode =
       mk_phantom_viewnode (
