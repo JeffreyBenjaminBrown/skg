@@ -1,3 +1,4 @@
+* ONGOING TODO/incremental-validation/
 * next
 ** language changes
 *** Introduce the term 'folder viewnode' instead of 'col'.
@@ -75,6 +76,14 @@ but divides it at spaces if point is interior to it.
 ** DONE drop TypeDB
 Implemented by [[./TODO/ditch-typedb/2_plan.org][the graph-only refactor]]. The =.skg= files are authoritative;
 the Rust graph represents dangling references directly.
+* We could update viewstats in the background after save.
+Show 'rebuilding' in the modeline while rebuilding.
+Don't update a dirty buffer silentl; show 'stale' instead.
+* skg-show-definition
+Implement a function 'skg-define' that prompts for a phrase
+and brings them to the relevant line in
+docs/COMMANDS.org, or glossary.org, or types/../something.rs.
+Should cover terms like STALE from the modeline.
 * Magit is dangerous!
 One key command can stage all changes,
 effectively erasing the work of a careful review
