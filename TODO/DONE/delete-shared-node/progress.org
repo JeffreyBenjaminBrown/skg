@@ -63,6 +63,4 @@ policy.
 
 ** choices determining the future
 
-The named Unknown extraction, same-session deletion, cleanup-command,
-fact/request, and maintained-client checks now pass.  No architectural
-stumper was found.
+None.

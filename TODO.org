@@ -1,4 +1,3 @@
-* ONGOING BUG : Can't delete a node someone else has referred to.
 * next
 ** language changes
 *** Introduce the term 'folder viewnode' instead of 'col'.
@@ -89,6 +88,9 @@ https://github.com/typedb/typeql/issues/434#issuecomment-5553099146
 This way I can really treat the public skg graph
 as the source of documentation truth.
 * TODO ? Is overrides unnecessary?
+* TODO BUG moving more private data to more public data
+It asks whether to publicize the relationship too, then doesn't.
+I try to repair with C-c s r, it doesn't work either.
 * DONE [[./TODO/refer-to-ids-not-buffer-names/it.org][BUG : Can't visit my cooking node]]
 after subscribing back to (but not overriding) cheese-man's cooking node
 * TODO BUG cycling TODO | DONE etc. hides text
