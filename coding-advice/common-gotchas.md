@@ -19,23 +19,19 @@ and you're considering using the other in its place,
 throw an error instead.
 # Don't rename 'node' to 'parent' or 'child'
 Often there's a 'node' (or 'id', or 'pid') argument to a function, which a single 'origin node' at which the function is called. In those cases, call that thing 'node' throughout the function. Its children, we should call 'children', and its parent, 'parent'. I don't want to call the node 'parent', even if we're dealing with its children, because that's confusing.
-# If 'typedb server' won't start,
-see troubleshooting/.
-# If 'typedb server' is not running,
-some Rust tests won't pass.
 # If 'cargo run --bin skg' is not running,
 some Emacs Lisp tests might not pass.
 # Beware race conditions across tests.
 Tests are executed in parallel,
-so they can't use the same db name.
+so they must not share mutable fixture or index directories.
 # The Tantivy search index is updated in the background, after a save.
 A save (the save-buffer pipeline, 'update_graph_minus_merges', etc.)
 returns BEFORE its Tantivy search-index update has committed. The index
 update is handed to a single background worker
 ('server/dbs/tantivy/background_writer.rs') so the save can respond
 without paying for the Tantivy commit (~60ms) on the critical path. The
-filesystem and TypeDB are updated synchronously (before the save
-returns); only Tantivy is deferred.
+filesystem and in-Rust graph generation are updated synchronously
+(before the save returns); only Tantivy is deferred.
 
 Consequence: if you read the search index right after a save and expect
 to see that save's changes, you must first call
