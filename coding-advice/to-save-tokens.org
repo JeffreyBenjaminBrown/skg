@@ -1,0 +1,156 @@
+#+TITLE: Optional techniques for saving agent tokens
+
+* Ask Jeff before adopting this workflow
+
+This file records techniques that worked well during a large refactor.  It is
+not blanket authorization to impose them on every task.
+
+Before using the techniques below as a package, briefly tell Jeff what you
+propose to use and why it seems worthwhile, and ask whether he wants that
+workflow for the task.  In particular, ask before introducing a progress
+ledger, changing the test cadence, delegating work, or replacing ordinary test
+output with quiet captured logs.  Once Jeff approves a workflow for one task,
+do not interrupt him for approval before every individual command.
+
+Small investigations and ordinary focused tests do not need ceremony.  The
+point is to let Jeff choose whether the extra bookkeeping and reduced live
+output are a good trade for a long-running job.
+
+Token economy must never mean weaker verification, hidden failures, unread
+code, or silently narrowed scope.  Preserve the full evidence on disk and
+surface anything that affects correctness or requires a decision.
+
+* The quiet test wrapper
+
+=bash/quiet-test.sh= runs an arbitrary command, captures its complete output,
+and prints only a one-line result on success.  On failure it prints a bounded
+diagnostic and points to the full log.  It does not retry, clean state, widen
+the command, or use =eval=.
+
+Basic use:
+
+#+begin_src sh
+bash/quiet-test.sh --label cargo-check -- cargo check --all-targets
+bash/quiet-test.sh --label save-tests -- \
+  cargo nextest run --test grouped_saves
+#+end_src
+
+The =--= is required.  Everything after it is passed as an argument array, so
+quoted arguments remain quoted.  The command runs in the caller's current
+directory, while logs always go beneath:
+
+#+begin_example
+target/test-logs/graph-only/
+#+end_example
+
+That directory name is historical; the wrapper is otherwise general-purpose.
+Each run writes a =.log= containing all stdout/stderr and a sibling =.meta=
+containing:
+
+- command and working directory;
+- start/end time, duration, and exit status;
+- HEAD and a worktree fingerprint;
+- fingerprint scopes; and
+- included and excluded untracked files.
+
+On failure, read the bounded diagnostic first.  Open the full log only as far
+as needed to diagnose the first actionable failure.  Do not blindly rerun a
+failed expensive suite.
+
+** Fingerprint scopes
+
+By default the wrapper fingerprints the refactor's broad code, test, client,
+script, documentation, data/config, and packaging surface.  It does not cover
+every repository file; notably, =coding-advice/= and =TODO/= are outside the
+default.  Derived =windows/out/= package copies are deliberately excluded.
+
+For focused work, explicitly name the paths whose changes could affect the
+result:
+
+#+begin_src sh
+bash/quiet-test.sh --label wrapper-self-test \
+  --scope bash --scope tests -- \
+  bash tests/quiet-test-wrapper.sh
+#+end_src
+
+Use =--scope .= only when a whole-worktree fingerprint is genuinely useful.
+It can hash unrelated untracked files, which may be slow or privacy-surprising.
+Never claim that a green result covers a later or differently scoped worktree;
+compare the fingerprint in the =.meta= file.
+
+* Other techniques that saved context
+
+** Keep raw output out of the conversation
+
+Put complete compiler/test output in an ignored log and report only the
+command, result, duration/counts, first useful failure, and log path.  Set
+bounded output limits on exploratory shell commands.  Do not paste thousands
+of passing lines into the conversation or a planning document.
+
+** Read from narrow to broad
+
+Start with =rg= to locate definitions and callers, then read the relevant
+ranges and follow the call graph as correctness requires.  This is a discovery
+order, not permission to ignore surrounding invariants.  The repository's
+=tools/introspect/call-graph=, =change-forest=, and =code-map= can help when the
+ordinary text search stops being clear.
+
+** Use a test ladder
+
+After a local edit, run the smallest test that proves it.  At a coherent work
+boundary run the affected group, at a signature/dependency boundary run
+=cargo check --all-targets=, and at the settled endpoint run the complete
+suite.  Reuse green evidence only while its fingerprint and dependency surface
+remain applicable.
+
+Stop at the first useful failure during development.  Run broad
+=--no-fail-fast= censuses only when learning the complete failure set is the
+purpose.  Classify an infrastructure failure before retrying it.
+
+** Let compiler diagnostics bound mechanical work
+
+For signature changes, compiler error spans can provide a precise caller list.
+Make the smallest mechanical correction, compile again, and finish with =rg=
+for feature-gated, script, protocol, documentation, and dead-code references
+the compiler cannot see.  Compiler-guided editing is not a substitute for
+understanding semantic call sites.
+
+** Maintain a compact resume record for long tasks
+
+For work likely to survive many context compactions, a small dashboard plus a
+chronological progress ledger can record:
+
+- current task and exact next action;
+- HEAD, dirty state, and fingerprint;
+- behavior changed;
+- green tests with durations and log paths;
+- failures and their classification;
+- decisions, assumptions, and remaining risks; and
+- user-owned dirty files that must remain untouched.
+
+Cycle plan headlines through =TODO=, =ONGOING=, and =DONE= as work advances.
+Update the resume pointer before a likely compaction and before stopping.  Keep
+the plan itself focused on intended work and the ledger focused on observed
+evidence; do not turn either into a raw command transcript.
+
+** Separate durable evidence from generated artifacts
+
+Retain useful test logs and metadata under =target/=, but exclude reproducible
+package staging trees and other generated copies from fingerprints.  Remove
+only artifacts created by the current work, using exact paths, and never clean
+the user's data or unrelated dirty state merely to make a checkpoint tidy.
+
+* A compact proposal to Jeff
+
+For a substantial task, a future agent can ask something like:
+
+#+begin_quote
+This looks large enough to benefit from the optional token-saving workflow in
+=coding-advice/to-save-tokens.org=: focused reading, quiet fingerprinted test
+logs, a narrow-to-broad test ladder, and a compact progress ledger.  Would you
+like me to use that workflow for this task?
+#+end_quote
+
+Adjust the proposal to the actual job.  Do not mention techniques that would
+not help, and do not treat Jeff's approval on one initiative as a permanent
+project-wide preference.

@@ -83,16 +83,23 @@ Each buffer is a forest of "viewnodes".
 
 ## "child" and "parent"
 
-The Skg graph contains a number of relationships -- `contains`,
-`textlinks_to`, etc. Where the code says "child" or "parent", it means the
-relationship between headlines in an Org buffer, not automatically one of
-those graph relations. (The more precise terms are "org-child" and
-"org-parent".)
+They are shorthand for 'viewchild' and 'viewparent'.
 
-The mapping from an Org child-parent relationship to a graph relationship, if
-any, depends on context. Usually a headline P with child C represents a graph
-node Outer that `contains` node Inner, but that does not always hold; see the
-discussion of alias nodes in [the architecture documentation](coding-advice/architecture.md).
+There are two concepts of node in skg: graphnode and viewnode.
+Viewnodes are nodes in a view, and some of them correspond to nodes in the graph,
+but some of them don't -- they describe their parent,
+or the relationship between their parent and their children,
+or maybe something else.
+
+The Skg graph contains a few (currently five) formal relationships -- `contains`,
+`textlinks_to`, etc. In the graph, there is no concept of parent or child;
+those are only meaningful in a view.
+Where the code says "child" or "parent", it means the relationship between viewnodes
+-- e.g., in Emacs, the relationship between headlines in an Org buffer
+-- and might or might not correspond to a graph relation.
+
+For one example, see the discussion of alias nodes in
+[the architecture documentation](coding-advice/architecture.md).
 
 ## "col" is short for "collection"
 
