@@ -482,9 +482,11 @@ fn prepare_fs_update (
   config              : &SkgConfig,
   hoist_approved_pids : &HashSet<ID>,
 ) -> io::Result<PreparedFilesystemUpdate> {
-  let ( to_delete, to_save )
+  let ( to_delete, mut to_save )
     : ( Vec<DeleteNode>, Vec<SaveNode> )
     = DefineNode::partition_save_and_delete (node_defs);
+  for SaveNode (node) in &mut to_save {
+    node . normalize_ids (); }
   let prepared_writes : Vec<PreparedTelescopeWrite> =
     to_save . iter ()
     . map ( |SaveNode (node)|

@@ -39,7 +39,7 @@ impl From<&NodeComplete> for NodeRust {
     NodeRust {
       pid                          : c . pid . clone (),
       source                       : c . source . clone (),
-      extra_ids                    : c . extra_ids . clone (),
+      extra_ids                    : c . normalized_extra_ids (),
       title                        : c . title . clone (),
       overPrivateText_telescope               : c . overPrivateText_telescope,
       aliases                      : c . aliases . clone (),

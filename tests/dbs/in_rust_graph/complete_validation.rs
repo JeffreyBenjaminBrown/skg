@@ -45,9 +45,12 @@ fn identity_errors_are_aggregated_and_deterministically_ordered () {
   let mut first = node ("same-pid", "public");
   first . extra_ids = vec![ID::from ("shared-extra"), ID::from ("also-primary")];
   let mut second = node ("same-pid", "private");
-  second . extra_ids = vec![ID::from ("shared-extra")];
+  second . extra_ids = vec![ID::from ("same-pid")];
+  let mut other = node ("other", "private");
+  other . extra_ids = vec![ID::from ("shared-extra")];
   let also_primary = node ("also-primary", "public");
-  let report = validate_complete_graph (&config (), &[first, second, also_primary]);
+  let report = validate_complete_graph (
+    &config (), &[first, second, other, also_primary]);
   assert! (matches! (
     report . errors [0], CompleteGraphError::DuplicatePrimaryId { .. }));
   assert! (matches! (
@@ -58,6 +61,28 @@ fn identity_errors_are_aggregated_and_deterministically_ordered () {
   assert! (text . contains ("duplicate primary id 'same-pid'"));
   assert! (text . contains ("duplicate extra id 'shared-extra'"));
   assert! (text . contains ("id 'also-primary' is both primary"));
+}
+
+#[test]
+fn repeated_ids_of_one_owner_are_normalized_not_rejected () {
+  let mut owner = node ("owner", "public");
+  owner . extra_ids = vec![
+    ID::from ("B"),
+    ID::from ("owner"),
+    ID::from ("A"),
+    ID::from ("B"),
+    ID::from ("A"),
+  ];
+  let report = validate_complete_graph (&config (), &[owner]);
+  assert! (report . is_valid ());
+  assert_eq! (
+    report . graph . get (&ID::from ("owner")) . unwrap () . extra_ids,
+    vec![ID::from ("B"), ID::from ("A")]);
+  assert_eq! (
+    report . graph . extra_id_to_pid . get (&ID::from ("B")),
+    Some (&ID::from ("owner")));
+  assert! (! report . graph . extra_id_to_pid . contains_key (
+    &ID::from ("owner")));
 }
 
 #[test]

@@ -9,12 +9,47 @@ use skg::dbs::filesystem::one_node::{
   fetch_aliases_from_file,
   nodecomplete_from_pid_and_source, write_nodecomplete_to_source};
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
+use skg::save::update_fs_from_saveinstructions;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
-use skg::types::misc::{ID, MSV, MemberAtSource, SkgConfig, SourceName, members_at_source_msv};
+use skg::types::nodes::fs::NodeFS;
+use skg::types::misc::{
+  ID, MSV, MemberAtSource, SkgConfig, SkgfileSource, SourceName,
+  members_at_source_msv,
+};
+use skg::types::save::{DefineNode, SaveNode};
 use skg::test_utils::set_source_retagging_member_sources;
 use skg::test_utils::{run_with_test_stores, nodecomplete_example};
 
 const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
+
+#[test]
+fn save_filesystem_preparation_writes_normalized_ids (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let dir : tempfile::TempDir = tempfile::tempdir () ?;
+  let source : SourceName = SourceName::from ("temp");
+  let config : SkgConfig = SkgConfig::dummyFromSources (
+    std::collections::HashMap::from ([
+    (source . clone (), SkgfileSource {
+      name         : source . clone (),
+      abbreviation : None,
+      path         : dir . path () . to_path_buf (),
+      user_owns_it : true, }),
+  ]));
+  let mut node : NodeComplete = empty_node_complete ();
+  node . pid = ID::from ("P");
+  node . title = "P" . to_string ();
+  node . source = source;
+  node . extra_ids = vec![
+    ID::from ("B"), ID::from ("P"), ID::from ("A"), ID::from ("B")];
+
+  update_fs_from_saveinstructions (
+    &[DefineNode::Save (SaveNode (node))], &[], config ) ?;
+
+  let yaml : String = fs::read_to_string (dir . path () . join ("P.skg")) ?;
+  let on_disk : NodeFS = serde_yaml::from_str (&yaml) ?;
+  assert_eq! (on_disk . extra_ids, vec![ID::from ("B"), ID::from ("A")]);
+  Ok (( ))
+}
 
 #[test]
 fn test_node_io() {

@@ -222,7 +222,7 @@ impl NodeSaveIntent {
     self,
   ) -> NodeComplete {
     let source : SourceName = self . source . clone();
-    NodeComplete {
+    let mut node : NodeComplete = NodeComplete {
       title                        : self . title,
       overPrivateText_telescope               : false,
       aliases                      :
@@ -248,7 +248,9 @@ impl NodeSaveIntent {
       overrides_view_of            :
         members_at_source_msv (&source, ids_only_msv (self . overrides_view_of)),
       misc                         : self . misc,
-    }}
+    };
+    node . normalize_ids ();
+    node }
 
   fn apply_hiderel_delta (
     &mut self,

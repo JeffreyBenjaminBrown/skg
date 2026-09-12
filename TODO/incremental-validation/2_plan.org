@@ -600,13 +600,13 @@ in this task's implementing commit message, using filters
 =save::override_invariants=, =merge::merge_nodes=, and
 =delete_strips_references_from_neighbors=.
 
-** ONGOING Implement one stable ID-normalization rule and repair the full oracle
+** DONE Implement one stable ID-normalization rule and repair the full oracle
 
 - Add the idempotent =NodeComplete= helper and unit tests for order retention,
   repeated extras, PID-in-extras, and already-normal input.
 - Call it after telescope fold and at final =SaveNode= preparation.
-- Make =validate_complete_graph= materialize normalized nodes and count
-  distinct owners for extra-ID claims, while retaining its raw duplicate-
+- Make =validate_complete_graph= validate normalized ID claims and construct a
+  normalized graph, counting distinct owners while retaining its raw duplicate-
   primary-telescope check.
 - Update complete-validation tests so self-repetition is accepted/normalized
   and every distinct-owner collision remains rejected.
@@ -619,7 +619,17 @@ Focused telescope and complete-validation tests pass, followed by
 =cargo nextest run --test grouped_unit=.  No existing merge extra-ID order
 expectation changes except removal of actual duplicates/PID self-repetition.
 
-** TODO Introduce the prepared token and remove duplicate whole validation
+Implemented stable first-occurrence normalization in =NodeComplete= and applied
+it after telescope fold, after buffer lowering, during =NodeRust= projection,
+inside the full validator, and to cloned filesystem instructions before
+serialization.  The full oracle now uses distinct extra-ID owners while keeping
+raw duplicate-primary detection.  Three direct normalization tests, a
+full-validator normalization test, and a raw-YAML save test cover the contract.
+
+At this checkpoint =cargo check --all-targets=, all 226 =grouped_unit= tests,
+and the nine focused filesystem/save-override/merge tests pass.
+
+** ONGOING Introduce the prepared token and remove duplicate whole validation
 
 - Rename the transitional oracle to =validate_complete_graph_candidate=.
 - Add =PreparedGraphUpdate= with private construction and consuming

@@ -15,6 +15,8 @@
 
 use crate::types::misc::{ID, MSV, MemberAtSource, SourceName};
 
+use std::collections::HashSet;
+
 /// This could be extended.
 /// A .skg file can have any number of associated FileProperties.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -55,6 +57,26 @@ impl NodeComplete {
   pub fn all_ids (&self) -> impl Iterator<Item = &ID> {
     std::iter::once (&self . pid)
       . chain (self . extra_ids . iter()) }
+
+  /// Make this node's ID list a stable set.  The primary ID is logically the
+  /// first claim, so it never also appears among the extras; otherwise the
+  /// first occurrence wins and the user's meaningful extra-ID order remains
+  /// intact.  This is idempotent.
+  pub fn normalize_ids (
+    &mut self,
+  ) {
+    self . extra_ids = self . normalized_extra_ids (); }
+
+  pub fn normalized_extra_ids (
+    &self,
+  ) -> Vec<ID> {
+    let mut seen : HashSet<ID> = HashSet::new ();
+    seen . insert (self . pid . clone ());
+    self . extra_ids . iter ()
+      . filter_map ( |id| {
+        if seen . insert (id . clone ()) { Some (id . clone ()) }
+        else                             { None } } )
+      . collect () }
 }
 
 //
@@ -97,3 +119,7 @@ pub fn empty_node_complete () -> NodeComplete {
     overrides_view_of            : MSV::Unspecified,
     misc                         : Vec::new (),
   }}
+
+#[cfg(test)]
+#[path = "../../../tests/unit/nodecomplete.rs"]
+mod tests;

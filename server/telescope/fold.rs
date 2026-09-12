@@ -61,12 +61,13 @@ pub fn fold_telescope_collecting_warnings (
   let misc      : Vec<FileProperty> = telescope . misc ();
   let (folded, warnings) : (FoldedNode, Vec<FoldWarning>) =
     fold_sections ( & telescope . into_slices (), resolve );
-  let node : NodeComplete = nodecomplete_from_fold (
+  let mut node : NodeComplete = nodecomplete_from_fold (
     pid . clone (), extra_ids, misc, folded )
     . ok_or_else ( || io::Error::new (
       io::ErrorKind::InvalidData,
       format! ("Telescope '{}' has no title in any section.",
                pid ))) ?;
+  node . normalize_ids ();
   Ok (( node, warnings )) }
 
 /// 'fold_telescope_collecting_warnings', with the warnings logged

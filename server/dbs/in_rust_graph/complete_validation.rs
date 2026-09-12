@@ -19,7 +19,7 @@ use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompleteGraphError {
@@ -51,13 +51,13 @@ pub fn validate_complete_graph (
   nodes : &[NodeComplete],
 ) -> CompleteGraphValidation {
   let mut primary_homes : BTreeMap<ID, Vec<SourceName>> = BTreeMap::new ();
-  let mut extra_owners : BTreeMap<ID, Vec<ID>> = BTreeMap::new ();
+  let mut extra_owners : BTreeMap<ID, BTreeSet<ID>> = BTreeMap::new ();
   for node in nodes {
     primary_homes . entry (node . pid . clone ()) . or_default ()
       . push (node . source . clone ());
-    for extra in &node . extra_ids {
-      extra_owners . entry (extra . clone ()) . or_default ()
-        . push (node . pid . clone ()); }}
+    for extra in node . normalized_extra_ids () {
+      extra_owners . entry (extra) . or_default ()
+        . insert (node . pid . clone ()); }}
 
   let mut errors : Vec<CompleteGraphError> = Vec::new ();
   for (pid, homes) in &primary_homes {
@@ -68,17 +68,20 @@ pub fn validate_complete_graph (
         pid : pid . clone (), homes }); }}
   for (id, owners) in &extra_owners {
     if owners . len () > 1 {
-      let mut owners = owners . clone ();
-      owners . sort ();
       errors . push (CompleteGraphError::DuplicateExtraId {
-        id : id . clone (), owners }); }}
+        id : id . clone (),
+        owners : owners . iter () . cloned () . collect (), }); }}
   for id in primary_homes . keys () {
     if let Some (extras) = extra_owners . get (id) {
-      let primary_owners : Vec<ID> = vec![id . clone ()];
-      let mut extra_owners = extras . clone ();
-      extra_owners . sort ();
-      errors . push (CompleteGraphError::PrimaryExtraCollision {
-        id : id . clone (), primary_owners, extra_owners }); }}
+      let extra_owners : Vec<ID> = extras . iter ()
+        . filter ( |owner| *owner != id )
+        . cloned ()
+        . collect ();
+      if ! extra_owners . is_empty () {
+        errors . push (CompleteGraphError::PrimaryExtraCollision {
+          id : id . clone (),
+          primary_owners : vec![id . clone ()],
+          extra_owners, }); }}}
   let mut nodes_by_pid : Vec<&NodeComplete> = nodes . iter () . collect ();
   nodes_by_pid . sort_by (|a, b| a . pid . cmp (&b . pid));
   for node in nodes_by_pid {
