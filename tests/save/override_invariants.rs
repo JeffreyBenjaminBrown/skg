@@ -118,6 +118,42 @@ fn merge_that_collides_two_overriders_is_rejected () {
       &graph );
   assert_override_validation_error (result); }
 
+/// The production graph no longer needs unchanged inbound neighbors to be
+/// re-saved during a merge.  Canonicalizing N2 to N1 is itself what makes R2's
+/// old raw edge relevant.  This is ignored until the affected-neighborhood
+/// validator replaces the current touched-only validator.
+#[test]
+#[ignore = "incremental canonicalization-derived override neighborhood not implemented"]
+fn merge_collision_is_found_without_neighbor_resave () {
+  let initial : Vec<NodeComplete> = vec![
+    node ("N1", &[]),
+    node ("N2", &[]),
+    node ("R1", &["N1"]),
+    node ("R2", &["N2"]),
+  ];
+  let graph : InRustGraphHandle =
+    new_handle (InRustGraph::from_nodecompletes (&initial));
+  let updated_acquirer : NodeComplete = {
+    let mut n1 : NodeComplete = node ("N1", &[]);
+    n1 . extra_ids = vec![ID::from ("N2")];
+    n1 };
+  let merge : NodeMerge = NodeMerge {
+    acquiree_text_preserver :
+      SaveNode (node ("merged-N2-text", &[])),
+    updated_acquirer :
+      SaveNode (updated_acquirer),
+    acquiree_to_delete :
+      DeleteNode {
+        id     : ID::from ("N2"),
+        source : SourceName::from ("owned"), }, };
+  let result : Result<(), Box<dyn Error>> =
+    validate_override_invariants_after_save (
+      &[],
+      &[merge],
+      &config (),
+      &graph );
+  assert_override_validation_error (result); }
+
 #[test]
 fn save_simulation_accepts_user_owned_override_chain () {
   // The graph has y overriding z; saving x overriding y closes a

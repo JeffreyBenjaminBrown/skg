@@ -562,7 +562,7 @@ home” from an extant-target leak so the repair advice is intelligible.
 
 * Dependency-ordered implementation work
 
-** TODO Establish a clean baseline and regression fixtures
+** DONE Establish a clean baseline and regression fixtures
 
 - Record HEAD and the pre-existing worktree changes; preserve unrelated user
   files and never modify =data/=.
@@ -586,7 +586,21 @@ The focused baseline is green except for deliberately added ignored/pending
 regressions that describe the new behavior.  The original CPU profile and its
 graph size/definition counts are identified for final comparison.
 
-** TODO Implement one stable ID-normalization rule and repair the full oracle
+Baseline at =2080de4d=: 25 focused graph-validator/index/override tests, four
+telescope-invariant tests, and six focused save/merge/delete tests passed.  The
+new =merge_collision_is_found_without_neighbor_resave= specification compiles
+but is ignored until canonicalization-derived override validation lands.  The
+existing profiler report records 54,836 nodes, two definitions, and the two
+complete-candidate validations; its harness mutates only a disposable copy.
+
+Stable focused commands are the three =cargo nextest run= invocations recorded
+in this task's implementing commit message, using filters
+=in_rust_graph_complete_validation=, =in_rust_graph_internal_index_validation=,
+=in_rust_graph_override_invariants=, =telescope::invariants=,
+=save::override_invariants=, =merge::merge_nodes=, and
+=delete_strips_references_from_neighbors=.
+
+** ONGOING Implement one stable ID-normalization rule and repair the full oracle
 
 - Add the idempotent =NodeComplete= helper and unit tests for order retention,
   repeated extras, PID-in-extras, and already-normal input.
