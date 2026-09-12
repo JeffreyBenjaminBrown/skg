@@ -1,5 +1,7 @@
-* ONGOING BUG : Can't delete a node someone else has referred to.
 * next
+** urgent
+*** warn user if part of their saved changes would be discarded
+because indefinitive
 ** language changes
 *** Introduce the term 'folder viewnode' instead of 'col'.
 *** "indefinitive" is user-facing and confusing
@@ -38,8 +40,6 @@ orphans the link that went from S to L.
 
 This is probably true of other relationships to L, too.
 **** should offer to delete it
-*** warn user if part of their saved changes would be discarded
-because indefinitive
 *** Each save should incrementally update the magit map from id to title
 *** TODO the content herald for a subscribee should count unintegated content, not all of it
 or both somehow
@@ -83,12 +83,29 @@ unless phantoms become TypeDB entities.
 One key command can stage all changes,
 effectively erasing the work of a careful review
 over which one had staged some changes.
+* simplify
+** step 1: shuffle
+Welcome, Codex! Please read coding-advice/ORIENTATION.org, and whatever it refers to (recursively), for orientation. (If anything refers to Claude in the present or future tense, please don't be offended. You are the chosen one, um, lately.)
+
+Then: This project has gotten too big. server/ has 43,000 lines of Rust code. It did almost everything it now does 20K lines ago. Every change is now a massive ordeal. Our mission is to reduce that complexity.
+
+But before we can even *surveil* it, we need to shuffle things. The codebase has been growing for 1.5 years. At some point I gave up and let AI do lots of things with much less oversight than I would like to give, and now concerns are extremely mixed across files.
+
+So I would like you to make a plan, which I will review, to move functions across files until each collection feels coherent.
+
+You might find the call-graph and code-map tools at tools/introspect/ helpful. (You'll certainly want that kind of information, but maybe not in that format.)
+
+Please put your results in a new headline below this one.
+** step 2: surveil
 * TODO can I use this?
 https://github.com/typedb/typeql/issues/434#issuecomment-5553099146
 * I need code to import org and md into skg.
 This way I can really treat the public skg graph
 as the source of documentation truth.
 * TODO ? Is overrides unnecessary?
+* TODO BUG moving more private data to more public data
+It asks whether to publicize the relationship too, then doesn't.
+I try to repair with C-c s r, it doesn't work either.
 * DONE [[./TODO/refer-to-ids-not-buffer-names/it.org][BUG : Can't visit my cooking node]]
 after subscribing back to (but not overriding) cheese-man's cooking node
 * TODO BUG cycling TODO | DONE etc. hides text
