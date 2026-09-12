@@ -1243,3 +1243,44 @@
   F, F2, and R shape and semantic override facts, but the rendered
   overriders lack the expected =Oa= herald marker.  No Rust production
   code changed in the navigation fix.
+* Problems confirmed while planning TypeDB removal (2026-09-12)
+** Whole save transactions are not serialized across connection threads
+   'serve' spawns one thread per client connection and gives each a clone
+   of 'SkgEnv'.  The clones share an
+   'Arc<ArcSwap<InRustGraph>>', but 'apply_definenodes' performs a
+   load -> clone/mutate -> store sequence with no shared writer lock.
+   Two saves of different nodes can load the same old snapshot and the
+   last store loses the other save's graph update.  Two saves of the same
+   node can interleave filesystem and graph writes in different orders,
+   leaving the final graph different from the final file even if only the
+   graph swap is locked.
+
+   This was already identified in
+   'TODO/partial-reload-and-magit/2_discussion.org', where Jeff chose the
+   mutex option, but that choice has not reached this worktree.  The lock
+   must cover the graph-dependent validation through filesystem mutation,
+   graph publication, and ordered Tantivy handoff for save, nodeMerge,
+   rebuild, and reload -- not merely the final ArcSwap store.
+** Hidden edges participate in path and ancestry topology
+   'path_to_first_nonlinearity' calls the legacy, stringly typed
+   'find_related_nodes', which has no active-source-set argument.
+   'full_containerward_ancestry_from_in_rust_graph' reads 'contained_by'
+   directly, likewise ungated.  Their rendering callers pass the active
+   set only later while inserting nodes.
+
+   The late insertion path does check the exact edge source as well as
+   the endpoint's home.  Once the TypeDB servers were available, all five
+   tests in 'tests/leak_battery.rs' passed, including the rendered
+   containerward case between two public endpoint nodes.  No direct leak
+   is demonstrated here.
+
+   The hidden edge still shapes the traversal before being discarded.  It
+   can create a false fork that truncates an otherwise linear visible
+   path; in full ancestry, hidden branches share the 'visited' set and can
+   cause a node on a visible branch to be classified as 'Repeated'.  A
+   post-traversal render gate cannot recover the omitted visible suffix.
+   Fix by making the graph-native path and ancestry APIs accept
+   'RelationRole' plus the active source-set and use the gated directional
+   accessors during traversal.  Retain insertion-time edge gating as
+   defence-in-depth, and add hidden-sibling-fork and mixed-visibility
+   diamond regressions.

@@ -1,0 +1,1117 @@
+#+TITLE: Ditch TypeDB: discussion and work sketch
+
+* Conclusion
+
+This is worth doing, and it is less of a semantic rewrite than the size
+of the deletion suggests.  The production server already answers most
+graph-shaped reads from 'InRustGraph'.  TypeDB is now principally:
+
+- a second, lossy projection of the same '.skg' data;
+- a foreground write sink on every save and nodeMerge;
+- a slow part of full initialization;
+- a source of fallback branches used mainly by tests;
+- the other side of an elaborate consistency audit; and
+- an external service that every developer and test run must arrange.
+
+The migration should therefore be organized as "make the Rust graph's
+existing authority explicit, prove its semantics, then delete the
+projection", not as a new graph implementation.
+
+The important qualification is that Skg will not literally have only
+one data representation afterward.  The intended target is:
+
+| Component      | Responsibility                                      | Durable? |
+|----------------+-----------------------------------------------------+----------|
+| '.skg' files   | Authoritative user data and privacy-telescope facts | yes      |
+| 'InRustGraph'  | Identity, relationships, edge sources, graph reads  | no       |
+| Tantivy        | Disposable full-text and regex search index         | no       |
+
+That separation is healthy.  TypeDB and 'InRustGraph' overlap; Tantivy
+does a specialized job the graph does not.  I assume Tantivy remains,
+but make that an explicit decision at the end.
+
+* Evidence from the present code
+
+** The Rust graph is already the richer graph model
+
+'NodeRust' carries every folded 'NodeComplete' field (including
+'misc') plus parsed 'textlinks_to'.  'InRustGraph' has:
+
+- the primary-pid node map;
+- 'extra_id_to_pid';
+- all five forward relations; and
+- inverse indexes for contains, subscribes, hides, overrides, and
+  textlinks.
+
+The typed accessors in
+[[../../server/dbs/in_rust_graph/relation_accessors.rs][relation_accessors.rs]]
+also know the recording source of structured edges and can gate both
+directions by an active source-set.  TypeDB deliberately stores the
+full fold without edge recording sources.  It cannot answer that
+privacy question.  In that respect TypeDB is not only redundant but
+strictly less faithful than the Rust graph.
+
+** Most production reads have already moved
+
+Several functions still live under 'server/dbs/typedb/' and still take
+'db_name' and a 'TypeDBDriver', but production takes an in-Rust fast
+path whenever the process-global graph is installed:
+
+| Responsibility                 | Present production behavior                       |
+|--------------------------------+---------------------------------------------------|
+| ID -> pid and home source      | graph first                                       |
+| arbitrary relation lookup      | graph first                                       |
+| containerward ancestry         | graph first                                       |
+| paths to first nonlinearity    | graph indirectly through relation lookup          |
+| graph-node statistics          | graph only in the running server                   |
+| hidden subscription derivation | graph indirectly in production                    |
+| node lookup                    | graph first, with disk where a complete read needs it |
+
+The fallback implementations mostly survive because old tests bypass
+startup and therefore do not install the global graph.  Removing
+TypeDB is partly a test-harness migration disguised as a database
+migration.
+
+** TypeDB still owns expensive writes and lifecycle code
+
+TypeDB is still populated at full init, incrementally reconciled at
+startup, updated in the foreground after every filesystem/graph save,
+repaired by a disk rebuild on write failure, updated specially for
+nodeMerge, optionally deleted at shutdown, and rebuilt by the
+'rebuild dbs' endpoint.
+
+The nodeMerge path even synthesizes neighbor SaveNodes solely to
+restore inbound TypeDB edges erased by TypeDB's cascade delete.  The
+Rust graph's extra-ID and inverse-index migration makes those synthetic
+neighbors unnecessary for the graph.
+
+** The deletion is large
+
+Line counts from this worktree (physical lines, including comments and
+blanks):
+
+| Self-contained area                                      | Lines |
+|----------------------------------------------------------+-------|
+| 'server/dbs/typedb/'                                     | 2,498 |
+| TypeDB comparison audit/scheduler/store                  |   894 |
+| 'server/types/nodes/typedb.rs'                           |    63 |
+| 'schema.tql'                                             |   117 |
+| direct tests in 'tests/typedb.rs' and 'tests/typedb/'    | 1,865 |
+|----------------------------------------------------------+-------|
+| directly removable or replaceable floor                 | 5,437 |
+
+That excludes TypeDB-only portions of 'init.rs', 'save.rs',
+'nodeMerge.rs', 'main.rs', 'serve.rs', the 1,114-line shared database
+test harness, the 91-line 'cleanup-test-dbs' executable, call-site
+parameters across much of rendering and parsing, shell code, config
+fixtures, and documentation.  Some new graph-native APIs and tests
+will offset the deletions, but a large net reduction is realistic.
+
+There is a similarly large runtime payoff.  Two recent full-startup
+logs for the roughly 56,000-document garden show TypeDB population
+taking 49.6 seconds and 37.6 seconds.  Tantivy rebuild took 2.45 seconds
+and 2.18 seconds in the same runs.  The all-file read, invariant checks,
+and context computation remain, but TypeDB is the dominant removable
+piece.
+
+* Target invariants
+
+The refactor should finish with these statements true:
+
+1. Every graph fact used by production comes from one explicit
+   'Arc<InRustGraph>' snapshot, not a TypeDB query and not a hidden
+   process-global fallback.
+2. '.skg' files remain the only durable authority.  Startup and an
+   explicit rebuild/reload can reconstruct all derived state from
+   them.
+3. A mutation is serialized against every other mutation from its
+   graph-dependent validation through filesystem write, graph
+   publication, and Tantivy enqueue/rebuild ordering.
+   (Elaborated on below.)
+4. Readers never take that writer lock.  They see either the complete
+   old graph snapshot or the complete new one.
+5. ID resolution prefers a primary pid over an extra ID, exactly as
+   'InRustGraph::pid_of' does today.
+6. Outbound user-ordered relations keep stored order.  Inbound and
+   otherwise set-like results are deterministically sorted.
+7. Source-set-aware rendering gates the relationship by its recording
+   source as well as gating its endpoint nodes by their homes.
+8. Unresolved raw relationship members and their recording sources are
+   preserved.  Removing TypeDB must not turn supported dangling
+   references into automatic deletion or make them invisible.
+9. The Rust pre-write validators enforce every constraint Skg relied
+   on TypeDB to reject, before any filesystem mutation.
+10. A complete test run requires neither a TypeDB process nor a
+    TypeDB data directory.
+
+Items 5 through 8 are existing data-model decisions, not opportunities
+to choose new semantics during a mechanical port.
+
+** DONE please explain
+"3. A mutation is serialized against every other mutation from its
+   graph-dependent validation through filesystem write, graph
+   publication, and Tantivy enqueue/rebuild ordering."
+
+*** Response
+
+A "mutation" here means any operation that changes the garden or its
+derived state: save, nodeMerge, full rebuild/reload, and eventually
+partial reload.  "Serialized" means that only one such operation may be
+inside its state-changing critical section at a time.  Readers remain
+concurrent and lock-free; they keep reading an immutable graph snapshot.
+
+The critical section has to start before validation that depends on the
+current graph.  Suppose saves A and B both read graph G.  A computes G+A
+and B computes G+B.  If they are allowed to publish independently, the
+last ArcSwap store wins: the process ends with either G+A or G+B rather
+than G+A+B.  Locking only the store does not help, because both new
+graphs were already calculated from the same stale base.
+
+For the same reason, the lock cannot be released between writing the
+'.skg' file and publishing the corresponding graph.  With two saves of
+the same node, this is otherwise possible:
+
+1. A writes file version A.
+2. B writes the later file version B and publishes graph B.
+3. A publishes graph A.
+
+Disk then says B while the in-memory graph says A.  Serializing the
+whole sequence makes one mutation finish its validation, disk write,
+and graph publication before the next mutation reads the graph and
+starts its own write.
+
+Tantivy adds an ordering requirement rather than another authority.
+Ordinary saves need not hold the mutex until background indexing has
+finished, but they must hand their index update to the queue while still
+in the critical section.  Then graph publications and queued search
+updates have the same order.  A full Tantivy rebuild must also coordinate
+with that queue under a documented lock order, so it cannot publish an
+index built from an older disk snapshot after a newer save.
+
+In compact form, each writer does:
+
+#+begin_example
+parse outside the lock
+  -> acquire the shared mutation mutex
+  -> validate against the current graph
+  -> compute the replacement graph
+  -> write the authoritative .skg changes
+  -> publish the replacement graph
+  -> enqueue/coordinate the matching Tantivy change
+  -> release the mutex
+#+end_example
+
+This is process-level consistency, not a claim of crash-atomicity across
+the filesystem and memory.  After a process crash, disk remains the
+authority and startup reconstructs the graph and Tantivy from it.  The
+mutex prevents live concurrent requests from losing one another or
+publishing derived states in an order different from their disk writes.
+
+* Two prerequisites to fix before trusting the cutover
+
+** Serialize the whole mutation, not only the graph swap
+
+[[../partial-reload-and-magit/2_discussion.org][The partial-reload discussion]]
+already identified that 'ArcSwap' writers do load -> clone -> store and
+that two connection threads can lose an update.  The recorded decision
+there is "yes, mutex", but it has not reached this worktree.
+
+The lock needs to cover more than 'apply_definenodes'.  For two saves
+of the same node, this interleaving is possible today:
+
+1. A writes its filesystem version.
+2. B writes its later filesystem version and publishes graph B.
+3. A publishes graph A.
+
+The graph then disagrees with disk even if the graph swap itself is
+protected.  For saves of different nodes, two writers can clone the
+same graph and the last store can discard the other node's update.
+
+Add one mutation lock shared by every 'SkgEnv' clone.  Parsing can stay
+outside it; acquire it before graph-dependent validation and keep it
+through filesystem mutation, graph publication, and the ordered
+Tantivy handoff.  Save, nodeMerge, full rebuild/reload, and any planned
+partial reload must use the same lock and one documented lock order.
+The user already chose the mutex, so this is a prerequisite rather
+than a question reopened below.
+
+** Move source-set gating into graph-native traversal
+
+'path_to_first_nonlinearity' traverses through the stringly typed,
+ungated 'find_related_nodes'.  'full_containerward_ancestry' directly
+walks 'contained_by' without an active source-set.  Their rendering
+callers pass the active set only later, while inserting resolved nodes.
+
+That late check is stronger than it first appears.  Both backpath
+rendering and search-ancestry enrichment check the exact edge source as
+well as the endpoint node's home before grafting a node.  With the
+servers running, all five tests in 'tests/leak_battery.rs' pass,
+including the case where two public nodes are joined only by a private
+containment edge.  Thus the present code does not directly reveal that
+edge in the tested rendered surfaces.
+
+The traversal is nevertheless computed with the wrong topology.  A
+hidden edge can count as a fork and stop an otherwise linear visible
+path.  In a full ancestry, hidden branches participate in the shared
+'visited' set, so a node also reachable by a visible branch can become
+'Repeated' on the visible branch; unordered inbound sets make that
+shape especially fragile.  The later graft filter prevents disclosure,
+but it cannot reconstruct visible traversal that was never performed.
+It also leaves privacy dependent on every renderer remembering a second
+gate instead of making the returned data safe by construction.
+
+Port paths and ancestries to accept a typed 'RelationRole' and an
+optional 'ActiveSourceSet', and traverse through
+'other_member_pids_gated'.  Keep the insertion-time check as
+defence-in-depth, but do not preserve the TypeDB-shaped triple
+'(relation, input_role, output_role)' as the new internal API.
+
+After the harness conversion, the existing leak battery should remain
+a fast, service-free regression.  Add topology-sensitive cases too: a
+hidden sibling must not create a visible fork, and a hidden route in a
+diamond must not steal the visible route's ancestry position.
+
+* Work sketch
+
+These are dependency-ordered work areas, deliberately named by outcome
+rather than numbered as implementation phases.
+
+** Establish one graph vocabulary
+
+- Move 'OUTBOUND_RELATIONSHIP_TYPES' out of
+  'dbs/typedb/relationships.rs'.  Today 'NodeRelation::roles' imports
+  that TypeDB constant, so deleting TypeDB would otherwise delete a
+  dependency of the supposedly authoritative graph.
+- Make 'NodeRelation', 'RelationRole', role names, glyphs, and wire
+  role names the one domain vocabulary.
+- Delete TypeQL-only string conversion once no caller forms TypeQL.
+  Path traversal should take 'RelationRole', not three strings.
+- Move enduring non-TypeDB types out of the TypeDB directory:
+  'AncestryTree', 'PathToFirstNonlinearity', and 'AllGraphNodeStats'.
+  Reasonable homes are graph traversal/statistics modules under
+  'dbs/in_rust_graph/' or neutral domain modules if they are primarily
+  view data.
+- Move genuinely generic tree helpers such as collecting IDs and
+  assigning resolved pids to a module named for ID resolution, rather
+  than retaining a 'typedb::util' shell.
+
+Success gate: graph modules have no import from 'dbs::typedb' and no
+TypeQL relationship/role string in an internal traversal signature.
+
+** Make snapshots explicit
+
+- Keep 'InRustGraphHandle' in 'SkgEnv', but take one snapshot at the
+  beginning of each read operation and thread '&InRustGraph' through
+  its helpers.
+- Background search enrichment must capture one 'Arc<InRustGraph>' for
+  the job, just as a foreground render captures one for the request.
+- The save path must distinguish its pre-save snapshot (validation and
+  deltas) from its post-save snapshot (rerender and context facts).
+- Replace 'snapshot_global()' callers.  Once none remain, remove
+  'GLOBAL_HANDLE', 'try_init_global_handle', and
+  'install_or_swap_global_handle'.
+- Change test constructors to own a graph/handle explicitly.  This
+  removes the current ordering hazards between tests that swap a
+  process-global graph.
+
+This is the largest signature cascade, but the compiler makes it
+mechanical.  It also prevents one render from consulting several graph
+versions because separate helpers happened to call 'snapshot_global'
+at different times.
+
+** Port every surviving graph read to typed Rust APIs
+
+- ID/source lookup: call 'pid_of' or 'pid_and_source' directly.
+- Node lookup: use the graph-native path in 'dbs/node_lookup.rs'; read
+  disk only when the caller truly needs a filesystem representation or
+  an out-of-band fallback.
+- Related nodes and PartnerCols: use
+  'other_member_pids_gated', the directional accessors, and the raw-ID
+  accessor where an unresolved member must render.
+- Containerward ancestry and all nine backpath roles: implement one
+  synchronous traversal over a caller-supplied snapshot, preserving
+  cycle/fork/depth semantics and edge-source gating.
+- Graph-node statistics: move the already-authoritative in-Rust
+  implementation, remove unused 'db_name'/'driver' parameters, and
+  retain source-set gating.
+- Hidden-in/outside-subscription derivations: compose the typed graph
+  accessors instead of keeping wrappers in
+  'typedb/search/hidden_in_subscribee_content.rs'.
+- Bulk containment queries: replace 'contains_from_pids' with a simple
+  graph pass or the existing content maps, whichever matches the
+  caller's ordering contract.
+- Buffer parsing, validation, definitive rendering, alias expansion,
+  export, and nodeMerge validation: remove driver parameters once the
+  lookup they called is graph-native.
+
+For each port, first move the behavioral test to the graph API, then
+delete the fallback.  Production already uses many of these paths, but
+tests may reveal accidental differences in extra-ID canonicalization,
+fork/cycle order, unknown IDs, or source gating.
+
+** Put all constraints in Rust before filesystem writes
+
+TypeDB's schema currently supplies key/cardinality/type checks.  Most
+meaningful constraints already have Rust equivalents:
+
+- one folded node has one pid and one home source by its type;
+- 'error_unless_each_id_names_one_node' checks global primary/extra-ID
+  uniqueness at startup and rebuild;
+- override monogamy/cycle invariants are checked at save and load;
+- relation endpoint kinds are encoded by Rust types; and
+- telescope ownership/shape has dedicated validation.
+
+Do a constraint-by-constraint audit before deleting 'schema.tql'.  In
+particular, validate the simulated post-save graph's complete ID
+namespace before the filesystem write.  'extra_id_to_pid.insert'
+silently overwrites on a conflict; it is not a replacement for
+TypeDB's key constraint.  Share one graph-invariant entry point between
+startup, rebuild, and pre-save simulation so the fast and full checks
+cannot drift unnoticed.
+
+Also add a pure internal-index check for tests: rebuild inverse indexes
+and the extra-ID map from the graph's nodes and compare them with the
+incrementally maintained indexes.  That preserves the useful part of
+the old cross-database audit without retaining a second database.
+
+** Simplify saves
+
+- Remove 'driver' and 'db_name' from the save orchestration.
+- Delete 'update_typedb_from_saveinstructions' and its imports.
+- Delete the TypeDB failure/rebuild recovery branch.  A successful
+  filesystem write followed by an infallible graph transformation no
+  longer waits on a network transaction.
+- Preserve the order: prepare/validate -> filesystem -> graph publish
+  -> derive context facts from the post-save snapshot -> enqueue
+  Tantivy.
+- Put the whole state-changing portion under the shared mutation lock.
+- Rename log messages and comments that count three or four stores.
+- Revisit 'SaveError::DatabaseError'.  Most current uses are graph/disk
+  lookup or validation errors passing through a historical name; use
+  names that describe the actual failure after the driver disappears.
+
+Tantivy remains asynchronous for ordinary saves.  Search already waits
+for queued writes when it needs read-your-writes behavior.
+
+** Simplify nodeMerge
+
+- Keep the primary 'NodeMerge::to_vec()' filesystem and graph
+  instructions.
+- Delete 'neighbor_savenodes_for_nodeMerges' and
+  'affected_neighbors_of_nodeMerge' if the compiler confirms their
+  only remaining purpose is repairing TypeDB cascade deletion.
+- Delete the TypeDB-specific primary-plus-neighbor instruction batch
+  and recovery rebuild.
+- Preserve and strengthen tests for acquiree-pid promotion to an extra
+  ID, inverse-index key migration, raw neighbor references, aliases,
+  source ownership, and override invariants.
+- Keep Tantivy's acquiree deletion/acquirer update and its recovery
+  behavior.
+
+The danger is assuming TypeDB's synthetic neighbor saves were general
+merge semantics.  They were not filesystem writes, and the Rust graph
+already migrates inverse-index entries when the acquiree pid becomes an
+extra ID.  Tests, rather than the old TypeDB query result, should prove
+that statement.
+
+** Replace initialization with a disk-first constructor
+
+Every startup already reads all '.skg' files to build 'InRustGraph' and
+the context handoff, even on the so-called incremental path.  Refactor
+startup around one full read:
+
+1. load and fold all telescope sections;
+2. report fold/telescope violations;
+3. reject ID conflicts;
+4. build the Rust graph;
+5. validate whole-graph invariants;
+6. construct or reconcile Tantivy per the decision below;
+7. compute/store context types; and
+8. publish 'SkgEnv' and become ready.
+
+Then remove:
+
+- 'connect_to_typedb';
+- TypeDB existence checks;
+- schema-mtime checks;
+- TypeDB full/incremental population;
+- TypeDB fallback rebuilds;
+- the TypeDB driver from 'SkgEnv'; and
+- '.skg_init_marker' if Tantivy is always rebuilt.
+
+If a Tantivy incremental policy survives, rename and redesign the
+marker as a search-index concern.  Do not leave a marker whose name and
+correctness rules silently inherit TypeDB assumptions.  The present
+mtime scheme misses deletions and can leave stale Tantivy documents
+after branch switches, pulls, manual moves, or imports.
+
+Existing marker files and TypeDB data are derived artifacts.  The new
+server may ignore them, but it should not automatically delete either;
+automatic deletion reaches outside the graph migration and complicates
+rollback.
+
+** Make rebuild/reload transactional at the derived-state level
+
+- Read and validate the fresh config and all files before publishing a
+  new graph.
+- Build the fresh graph and fresh Tantivy index off to the side.
+- Wait for old queued Tantivy writes using one documented lock order.
+- Under the shared mutation lock, publish a coherent graph/index/config
+  set or leave the old set usable on failure.
+- Clear/rerender views only after success.
+
+The current 'SkgEnv' is cloned per connection.  Its graph handle is
+shared, but assigning a replacement 'tantivy_index' or 'config' to one
+connection's clone does not update other existing connections.  The
+TypeDB removal should either put all reloadable state behind shared
+handles or explicitly retain the current single-client assumption.
+This is not caused by TypeDB, but rebuild work should not claim atomic
+multi-connection publication while that split remains.
+
+** Replace the TypeDB test harness
+
+- Introduce small fixture helpers that read '.skg' files, validate
+  them, build an 'InRustGraphHandle', and optionally create a temporary
+  Tantivy index.
+- Remove database names, driver connections, schema setup, data wipes,
+  cleanup guards, and the process-wide TypeDB-test mutex.
+- Delete the 'cleanup-test-dbs' binary and calls from 'all-tests.sh'
+  and 'nextest.sh'.
+- Convert high-level render/save/merge/source-set tests to the new
+  fixture environment.  Their behavior assertions should normally
+  survive unchanged.
+- Port behavior tests for ancestry, paths, ID resolution, relationship
+  direction, stats, source ownership, merge resolution, and delete
+  propagation to pure graph tests.
+- Delete tests whose only contract is TypeQL query syntax, TypeDB CRUD,
+  schema instance counts, database wipe behavior, or graph-vs-TypeDB
+  agreement.
+- Split helpers currently living in production modules only because
+  tests needed a TypeDB setup, such as
+  'run_with_source_set_test_db'.
+
+This should make the ordinary Rust suite service-free and substantially
+faster.  The historical test-speed investigation found TypeDB database
+creation/reset dominating many tests; after this migration there is no
+reason to retain the grouping and serialization choices that existed
+only to amortize TypeDB churn.  Do not mechanically ungroup tests,
+though: first measure whether smaller binaries or better failure
+granularity justify that separate cleanup.
+
+** Delete TypeDB and its operational surface
+
+After graph-native tests cover the behavior and production has no
+TypeDB call:
+
+- delete 'server/dbs/typedb/' and its module declaration;
+- delete 'NodeTypedb' and its module declaration;
+- delete the TypeDB comparison audit, scheduled daemon, audit store,
+  warning-piggyback code, and TypeDB-only benchmark tools, subject to
+  the audit decision below;
+- remove 'typedb-driver' from 'Cargo.toml' and regenerate
+  'Cargo.lock';
+- remove 'TYPEDB_ADDRESS', TypeDB transaction fanout, and shutdown
+  delete-delay constants;
+- remove 'driver' from 'SkgEnv';
+- remove TypeDB signal-handler/shutdown cleanup;
+- remove the TypeDB test-cleanup executable;
+- remove 'db_name', 'delete_on_quit', and (if the scheduled audit is
+  removed) 'auto_audit_daily' from 'SkgConfig' and all live config
+  fixtures; and
+- delete or relocate 'schema.tql' per the decision below.
+
+Do not rewrite old completed TODO discussions merely to erase the word
+TypeDB.  They are historical records.  Update current architecture,
+setup, API, troubleshooting, and contributor guidance; let git history
+explain old plans.
+
+** Update clients, scripts, containers, and docs
+
+At minimum:
+
+- stop 'bash/start-servers.sh' from starting/checking TypeDB;
+- remove TypeDB cleanup/fanout reporting from test scripts;
+- update 'bash/docker.sh' carefully (it already has unrelated local
+  modifications in this worktree);
+- remove current TypeDB troubleshooting pages or move them explicitly
+  into history;
+- update 'README.org', 'api-and-formats.md', 'glossary.md', setup docs,
+  commands docs, architecture advice, and test usage;
+- update example and test TOMLs;
+- rename the Emacs rebuild command/request/response if that decision is
+  taken; and
+- stop the runtime environment from launching TypeDB.
+
+The external 'docker-typedb-rust' setup is a separate repository
+according to 'coding-advice/docker.org'.  Removing TypeDB from this
+repository does not by itself remove TypeDB from that image or rename
+the environment.  Coordinate that cutover rather than silently editing
+an untracked copy under this worktree.
+
+* Suggested proof order
+
+Each checkpoint should build and run its focused tests before the next.
+This order keeps behavior changes separate from deletion:
+
+- add the shared whole-mutation lock and its two-writer regression;
+- add pure graph invariant/round-trip tests;
+- move relation vocabulary and graph-domain result types out of the
+  TypeDB tree;
+- implement typed, gated, explicit-snapshot path and ancestry APIs;
+- convert lookup, stats, PartnerCol, parser, and render callers;
+- convert the fixture/test environment until high-level tests no
+  longer need a driver;
+- remove TypeDB from save and nodeMerge;
+- simplify startup/rebuild/shutdown/config;
+- delete implementation, schema, dependency, direct tests, and
+  operational scripts; and
+- optionally do the now-obvious async/name cleanup as a separate green
+  checkpoint.
+
+There should be no permanent backend feature flag.  If comparison is
+useful during development, keep TypeDB compiling only until graph
+behavior tests have been ported, then remove it in the same initiative.
+A dual-backend abstraction would preserve exactly the complexity this
+work is intended to erase.
+
+* Verification and cutover gates
+
+** Static gates
+
+- 'cargo check --all-targets'.
+- No 'typedb-driver' in the dependency tree.
+- No production import of 'dbs::typedb'.
+- No current config or current documentation requiring 'db_name',
+  'delete_on_quit', or TypeDB startup.
+- No TypeDB relation-name strings used as internal dispatch keys.
+
+** Behavioral gates
+
+- ID conflict: pid/pid, extra/extra, and pid/extra collisions fail
+  before disk mutation.
+- Extra-ID resolution: primary wins, merge promotion resolves old raw
+  references, and all inverse indexes migrate.
+- Every relation works in both directions.
+- Outbound ordering and deterministic inbound ordering are pinned.
+- Fork, cycle, depth-limit, and immediate-branch path behavior match
+  the existing contract.
+- The privacy leak battery covers content, all PartnerCols, paths,
+  ordinary/search ancestry, and graph-node stats with public endpoints
+  joined by a private edge.
+- Dangling structured members retain raw ID plus edge source and render
+  as Unknown where the UI supports them.
+- Delete propagation preserves foreign telescopes and scrubs only the
+  owned structured references it is allowed to write.
+- Save, source move, fork, override chain, and nodeMerge tests pass
+  without TypeDB.
+- Search observes queued saves and a Tantivy failure remains recoverable
+  from disk.
+- Two simultaneous mutations cannot lose an update or leave graph and
+  disk ordered differently.
+- Rebuild failure leaves the previous published derived state usable.
+
+** Suite and operational gates
+
+- Run the full Rust suite with port 1729 closed.
+- Run Emacs tests and integration tests without a TypeDB process.
+- Start the real garden without TypeDB and exercise view, save, merge,
+  source move, source-set switching, search enrichment, rebuild, and
+  shutdown.
+- Benchmark cold and warm startup, save response, search enrichment,
+  full test time, binary size, and idle CPU against the recorded
+  baseline.
+- Keep the old TypeDB data directory untouched through a short soak if
+  easy rollback is desired.  It is derived data and can be manually
+  removed later; the migration should never delete it automatically.
+
+* Decisions for Jeff
+
+The recommendations below are designed for the stated goal: one graph
+implementation, fewer lines, no legacy backend, and a mechanically
+reviewable refactor.
+
+** TODO I (Jeff) have marked each chosen branch TODO.
+Sometimes I made other edits.
+** DONE Should Tantivy remain?
+*** TODO Yes.
+** DONE How should graph snapshots reach readers?
+*** TODO A. Take one explicit snapshot per operation and thread it through (recommended)
+
+- Pros: coherent reads; no hidden dependencies; deterministic tests;
+  removes global fallback branches; ownership and source gating are
+  visible in signatures.
+- Cons: the largest call-site diff; some long rendering signatures may
+  need a small context struct to stay readable.
+- Danger: blindly adding '&InRustGraph' everywhere can create parameter
+  soup.  Use an existing request/environment context where several
+  related dependencies already travel together.
+
+*** B. Keep 'snapshot_global()' and only delete the TypeDB fallback
+
+- Pros: fastest, smallest initial diff; production behavior already
+  assumes the global is installed.
+- Cons: tests keep swapping process-global state; helpers can observe
+  different snapshots within one operation; dependencies remain
+  invisible.
+- Danger: the removal appears complete while preserving the main
+  architectural debt that forced many TypeDB test fallbacks.
+
+*** C. Keep the global temporarily, then do explicit plumbing later
+
+- Pros: isolates backend deletion from signature cleanup; easier first
+  compile milestone.
+- Cons: two migrations touch the same call graph; the "later" cleanup
+  is easy to defer indefinitely.
+- Danger: new graph-only code may deepen the global dependency during
+  the interval.
+
+** DONE What should startup do with Tantivy?
+*** TODO A. Rebuild Tantivy from the already-read nodes every startup (recommended initially)
+
+- Pros: smallest and most obviously correct code; detects deletions,
+  moves, branch switches, imports, config changes, and index-format
+  changes; deletes the flawed shared init marker.
+- Cons: pays the measured roughly 2.2--2.45-second index rebuild plus
+  context computation every start; cost grows with the garden.
+- Danger: cold storage or a much larger future corpus could make the
+  simple policy annoying, so retain timing spans and a benchmark.
+
+*** B. Keep the present mtime-based incremental Tantivy update
+
+- Pros: fastest warm starts when only a few files changed; least startup
+  churn.
+- Cons: preserves marker/config complexity and known incorrectness for
+  deletions and several out-of-band changes.
+- Danger: a stale search result may expose deleted/private text or send
+  the user to a node that no longer exists.  This option should not be
+  chosen without fixing reconciliation.
+
+*** C. Build a correct content-fingerprint/manifest reconciliation
+
+- Pros: fast warm starts and exact deletion/change detection; can
+  version the Tantivy schema/config explicitly.
+- Cons: new manifest, hashing, crash recovery, and tests add code just
+  as this project is trying to remove lifecycle code.
+- Danger: a subtly incomplete fingerprint recreates the present stale
+  cache under a more trustworthy-looking name.  Benchmark option A
+  before paying this complexity.
+
+** DONE What should replace the daily graph-vs-TypeDB audit?
+A.
+*** TODO A. Delete the scheduled audit; keep pre-write/startup validation and pure internal-index tests (recommended)
+
+- Pros: removes about 894 lines plus config, daemon, persistence, and
+  client-warning plumbing; checks invariants at the points that create
+  state; no second authority is needed.
+- Cons: does not periodically detect out-of-band disk edits while a
+  long-running server remains up.
+- Danger: this is safe only if the mutation lock lands and the planned
+  reload/watcher story is honest about external changes.
+
+*** B. Repurpose it as a disk-vs-graph audit
+
+- Pros: detects manual edits, git operations, and missed reload events;
+  preserves the user's opt-in daily safety net.
+- Cons: rereads the corpus, keeps scheduler/store/notification code,
+  and overlaps the planned partial-reload feature.
+- Danger: comparing only folded nodes can miss per-section telescope
+  differences; comparing raw sections correctly is not a trivial rename
+  of the TypeDB audit.
+
+*** C. Retain only a scheduled internal-index recomputation
+
+- Pros: catches incremental inverse-index bugs without reading disk.
+- Cons: a cheap assertion can already run in tests or debug builds;
+  scheduling and user notification are disproportionate machinery.
+- Danger: it can report the graph self-consistent while graph and disk
+  disagree, giving a false sense of coverage.
+
+** DONE How should retired config keys behave?
+
+The keys are 'db_name', 'delete_on_quit', and, if the audit is deleted,
+'auto_audit_daily'.
+
+*** TODO A. Reject them with one clear migration error (recommended)
+
+- Pros: users know the old setting no longer does anything; especially
+  important for 'auto_audit_daily = true'; matches the project's
+  existing treatment of retired config mechanisms.
+- Cons: every live config and fixture must be edited before the new
+  server starts.
+- Danger: a vague error would make a simple migration feel like a
+  startup regression.  Name all offending keys and the exact deletion
+  required.
+
+*** B. Silently ignore them through Serde's current unknown-key behavior
+
+- Pros: old configs continue to parse with no ceremony; smallest loader
+  change.
+- Cons: users can believe database deletion or daily auditing is still
+  active when it is not; stale examples persist.
+- Danger: silent security/maintenance expectation drift is worse than
+  a one-time clean break.
+
+*** C. Warn but accept them for a transition period
+
+- Pros: gentler rollout across several gardens.
+- Cons: requires legacy code and a later removal despite the project's
+  no-compatibility policy.
+- Danger: warning-only migrations tend to become permanent and are
+  easy to miss in background server logs.
+
+** DONE What should the rebuild command be called?
+
+*** A. Rename it to 'rebuild derived state' / 'skg-rebuild-derived-state' (recommended)
+
+- Pros: accurately covers Rust graph reconstruction plus Tantivy;
+  remains valid if more disposable indexes appear; does not call an
+  in-memory structure a database.
+- Cons: changes Rust protocol enums/strings, Emacs command names,
+  docs, and integrations.
+- Danger: all clients must change in the same cutover because no
+  compatibility alias is recommended.
+
+*** B. Rename it to 'reload from disk' / 'skg-reload-from-disk'
+
+- Pros: emphasizes the direction of authority and is intuitive after
+  manual file or git changes.
+- Cons: overlaps terminology with the planned partial-reload feature;
+  does not advertise that the search index is rebuilt.
+- Danger: users may confuse a full derived-state rebuild with a cheap
+  targeted reload.
+
+*** C. Keep 'rebuild dbs'
+
+- Pros: no protocol/client churn.
+- Cons: becomes misleading when there is one search index and one
+  in-memory graph, and keeps dead architecture in the user vocabulary.
+- Danger: future maintainers may infer another database exists and
+  recreate special cases around it.
+
+*** TODO Call it 'rebuild ephemeral data stores'
+and explain in docs/COMMANDS.org what those are,
+and what the authority is.
+** DONE What should happen to 'schema.tql'?
+
+*** TODO A. Delete it and move enduring explanations to Rust/domain docs (recommended)
+
+- Pros: no stale executable-looking second schema; relation vocabulary
+  has one source of truth; git retains the historical file.
+- Cons: loses a compact overview unless 'docs/data-model.org' and the
+  relation module receive a concise replacement table.
+- Danger: deleting it before the constraint audit can silently discard
+  the only record of a key/cardinality assumption.
+
+**** TODO shuffle files
+Rename docs/data-model.org -> docs/data-model_friendly.org,
+and add docs/data-model_technical.org alongside that,
+which explains what a node carries,
+what relationships are possible,
+what they mean,
+and all graph (but not view) constraints.
+
+*** B. Move it under an explicitly historical docs location
+
+- Pros: preserves an easy snapshot of the former model without
+  presenting it as live.
+- Cons: historical TODO links need adjustment or become stale; adds a
+  file with no executable purpose.
+- Danger: people can still mistake it for a maintained specification
+  unless its header is unmistakable.
+
+*** C. Leave it at repository root as documentation
+
+- Pros: zero link churn; familiar compact relation list.
+- Cons: the filename and TypeQL syntax strongly imply it governs the
+  running system.
+- Danger: it will drift from Rust again and recreate two claimed
+  schemas, even without two databases.
+
+** DONE How far should synchronous cleanup go in this initiative?
+
+*** TODO A. Use two green checkpoints: remove the driver while preserving async shapes, then make graph-only paths synchronous (recommended)
+
+- Pros: separates semantic backend replacement from mechanical async
+  cleanup; still finishes with honest signatures; failures are easier
+  to localize.
+- Cons: some functions and call sites are touched twice.
+- Danger: the second checkpoint must remain part of the agreed scope or
+  it can be deferred forever.
+
+*** B. Convert each call chain to synchronous while porting it
+
+- Pros: touch each path once; maximum immediate simplification.
+- Cons: larger diffs mix behavior, ownership/lifetime, and async
+  changes; recursive backpath code may need restructuring.
+- Danger: regressions become harder to attribute to graph semantics
+  versus executor/signature changes.
+
+*** C. Leave graph-only functions async indefinitely
+
+- Pros: smallest refactor; async functions can return immediately.
+- Cons: misleading APIs, needless 'await' propagation, and continued
+  executor use in otherwise pure calculations.
+- Danger: future code may assume cancellation/concurrency semantics
+  that these functions do not actually provide.
+
+** DONE Is the external container environment part of this cutover?
+
+*** A. Update/rebuild the external environment in the same initiative
+
+- Pros: TypeDB truly disappears from runtime, image, setup, and user
+  workflow at once; no idle process or obsolete package remains.
+- Cons: crosses repository boundaries and may require deciding what the
+  'docker-typedb-rust' environment should be renamed to.
+- Danger: editing the untracked copy in this worktree can target the
+  wrong checkout or mix unrelated environment changes.
+
+*** TODO B. Stop using TypeDB here, then clean the external image in a named follow-up (recommended if repository access or rebuild timing is inconvenient)
+
+- Pros: keeps the server refactor bounded; the new server can prove it
+  does not need the service before environment surgery.
+- Cons: image size, package baggage, and possibly idle TypeDB startup
+  remain until the follow-up.
+- Danger: an unnamed follow-up will be forgotten.  Record the external
+  repository/path and an acceptance test: no TypeDB process after
+  environment startup.
+
+* TODO question for Codex
+** the question
+The test suite is verbose. I ate through three weeks' worth of credits in a week trying to do big refactors like this. So we need to include some kind of token minimization strategy in the plan. That should include, I think:
+
+*** not running all the tests every time
+*** using delegates
+Maybe have a persistent Luna-Medium run tests and report the important bits? It's fine if this is a slow serial process; I expect this project to take a long time and don't need parallelization, esp. if it means multiple people reading the same thing.
+*** keeping your own reading focused
+My initial orientation was so sprawling that you had to compact almost right after that. But I'm not sure this is possible, because you have to understand everything. Let me know what you think.
+** the answer
+
+*** Recommendation
+
+Yes: make token economy an explicit implementation constraint, alongside
+correctness and reviewability.  Optimize for model tokens rather than
+wall-clock time.  The default working arrangement should be:
+
+- one capable main agent owns architecture, edits, and the meaning of
+  failures;
+- small checks run directly through a quiet-output wrapper, because
+  creating any delegate just to run one passing command costs extra
+  inference;
+- one Luna-Medium test steward handles long grouped/full suites and the
+  first-pass classification of failures;
+- work is serial: the main agent stops editing while the steward tests a
+  named checkpoint; and
+- no additional delegates unless a specific independent task will avoid
+  more reading than it duplicates.
+
+This choice is supported by the
+[[https://developers.openai.com/api/docs/models][official OpenAI model catalog]],
+which describes Luna as the cost-sensitive, high-volume model and lists
+medium reasoning as available.  Its published API token prices are much
+lower than Astra's, but Codex-plan credits need not map one-for-one to API
+prices, so we should measure actual credit consumption over the first two
+work areas instead of claiming a numerical saving in advance.  The
+[[https://developers.openai.com/api/docs/guides/latest-model][current model guidance]]
+also recommends explicitly limiting delegation and broadening/repeating
+tests only when the change or a failure justifies it.
+
+*** A test ladder, not a test reflex
+
+Use the narrowest meaningful gate, and do not rerun a green gate until
+something in its dependency surface changes.
+
+1. During a mechanical edit, use a quiet 'cargo check' or compile only
+   the affected test target.  Fix the first coherent compiler-error
+   cluster before asking for hundreds of downstream errors.
+2. After one behavior change, run the exact unit/module filter named in
+   that test file, usually a 'cargo nextest run --test GROUP -E
+   test(MODULE::)' command.
+3. At the end of one work area, run its grouped Rust binary and any one
+   cross-cutting privacy/save test implicated by the change.
+4. At a signature or dependency boundary, run 'cargo check
+   --all-targets' plus the relevant grouped binaries.
+5. Run the complete Rust/client/integration suite only at named cutover
+   gates:
+   - once to record a baseline, if there is no sufficiently recent one;
+   - once when TypeDB has disappeared and the suite is first run with
+     port 1729 closed; and
+   - once after final cleanup.
+
+An unexpected failure can justify moving upward one rung.  A passing
+test does not.  During development, stop at the first useful failure;
+'--no-fail-fast' belongs to the final census, where learning every
+remaining failure in one slow run is useful.  Use '--no-capture' only on
+one already-identified failing test.
+
+The plan should contain a small test matrix mapping each work area to
+its exact narrow, grouped, and cutover gates.  Update that matrix as
+TypeDB-only tests are deleted or converted.  This prevents each new
+agent turn from rediscovering what to run.
+
+*** Keep test output out of model context
+
+Before the refactor, add a small quiet test wrapper.  It should:
+
+- redirect the complete stdout/stderr to a timestamped file under
+  'target/test-logs/ditch-typedb/' (which is disposable and ignored by
+  Git);
+- record the command, exit status, duration, current commit, and a
+  worktree-diff fingerprint;
+- on success, print only one summary line with counts and duration;
+- on failure, print the failing test names, the first actionable error
+  cluster, and the raw-log path, with a hard line limit; and
+- never dump the complete log merely because the command failed.
+
+The raw evidence remains available.  The main agent reads only the
+relevant slice if it must diagnose the failure.  This is safer than
+discarding verbose output and much cheaper than injecting every passing
+test name, warning, and TypeDB trace into the conversation.
+
+The existing 'bash/all-tests.sh' already demonstrates the useful half
+of this pattern by saving per-suite logs and printing short status
+lines.  The new wrapper should provide the same behavior for arbitrary
+targeted 'cargo check', 'cargo nextest', Emacs, Neovim, and integration
+commands.  It should not run cleanup, retry, or a broader suite unless
+the caller explicitly requested that behavior.
+
+*** The Luna test-steward contract
+
+Use one 'gpt-5.6-luna' agent at medium reasoning, spawned without the
+main conversation history.  Give it a short standalone contract and a
+pointer to the test-matrix section of the implementation plan.  Do not
+make it read the orientation, this discussion, or the implementation
+modules merely to execute a command.
+
+For each handoff, the main agent supplies only:
+
+- the checkpoint name and worktree fingerprint;
+- the changed-file list and one-sentence semantic risk;
+- the exact test rung to run; and
+- any already-recorded baseline failure relevant to interpreting it.
+
+The steward runs serially and returns at most:
+
+#+begin_example
+RESULT: PASS | FAIL | INFRASTRUCTURE
+CHECKPOINT: <name and fingerprint>
+COMMAND: <exact command>
+DURATION/COUNTS: <short summary>
+FAILURES: <names only, or none>
+FIRST CAUSE: <one short diagnosis, only on failure>
+LOG: <path>
+NEXT: <at most one narrower diagnostic command; do not run it yet>
+#+end_example
+
+It does not edit code, independently broaden the test scope, rerun a
+failure, or paste raw logs.  The main agent decides whether a failure is
+semantic, compilation fallout, infrastructure, or pre-existing before
+authorizing another run.
+
+Persistence has a tradeoff: it avoids repeating the steward contract
+and baseline, but a months-long agent accumulates its own costly context.
+Keep one steward alive for a coherent work area, then retire it at the
+area boundary.  Start the next Luna agent with no forked history and the
+updated compact test matrix/progress ledger.  That is "persistent"
+enough to amortize setup without turning the steward into a second
+ever-growing project brain.
+
+The main agent must not edit concurrently with a test steward.  Agents
+share the worktree; otherwise the reported result might test a mixture
+of checkpoints.  The commit plus diff fingerprint makes stale evidence
+obvious.
+
+*** Keep the main agent's reading focused
+
+The main agent does not need every implementation detail resident at
+once.  It needs the global invariants, mutation order, authority
+boundaries, and cutover gates.  Those are now distilled in this
+discussion; the implementation plan should distill them further.
+
+Create two compact working documents before code changes:
+
+- '2_plan.org': decisions, invariants, dependency-ordered work areas,
+  relevant file map, and the test matrix;
+- 'progress.org': current checkpoint, changed behavior, tests already
+  passed for the current fingerprint, known baseline failures, and the
+  next small action.
+
+Then follow these reading rules:
+
+- Never repeat the recursive orientation during this initiative.  It
+  has served its purpose.
+- At the start of a work area, read its plan slice, the directly involved
+  modules, their callers found with 'rg'/call-graph, and their focused
+  tests.  Do not inventory unrelated subsystems.
+- Let Rust imports and 'cargo check' expose the next dependency instead
+  of reading every possible caller preemptively.
+- Constrain searches by path and cap their output.  First ask for file
+  names or matching line numbers; open only the relevant ranges.
+- Do not ask another agent to perform an independent broad orientation
+  or parallel review of the same code.  That pays twice for almost the
+  same context.
+- Before a likely compaction or at every work-area boundary, update
+  'progress.org'.  After compaction, resume from '2_plan.org',
+  'progress.org', 'git status', and the current diff rather than replaying
+  the conversation or rereading the repository.
+- Treat the post-divergence 'partial-reload-and-magit' branch and its
+  later plans as out of scope.  The writer lock should be designed from
+  current-main requirements, not recovered from that branch.
+
+Compaction helps a long task continue, but it is not free.  Use the
+milestone ledger to make automatic compaction accurate; do not trigger
+repeated broad summaries after every small change.
+
+*** Credit stop rules
+
+- Default main-agent reasoning to medium; increase it only for the
+  constraint audit, concurrency/publication design, or a failure whose
+  cause remains genuinely ambiguous.
+- Do not browse the web for repository facts.  Browse only when a current
+  external fact materially affects a decision.
+- Do not rerun a command whose fingerprint already has a recorded green
+  result.
+- Do not retry infrastructure failures automatically.  Inspect one
+  bounded diagnostic first.
+- Do not turn pre-existing failures into side quests.  Verify against the
+  baseline, record them, and continue unless they invalidate this
+  refactor's proof.
+- At each work-area boundary, report which rungs ran and why.  If actual
+  credit use is still high after two areas, pause and tighten the matrix
+  or shorten the Luna steward lifetime before proceeding.
+
+*** Dangers and safeguards
+
+- Narrow tests can miss cross-cutting regressions.  The grouped and full
+  cutover gates deliberately catch those at less frequent, meaningful
+  points.
+- A cheap model can misclassify a subtle failure.  Luna reports the first
+  cause; the main agent owns architectural diagnosis and opens the raw
+  log only when necessary.
+- Quiet output can conceal evidence.  The complete timestamped log is
+  retained and named in every report.
+- A stale test result can look green after more edits.  Every report is
+  bound to a commit plus worktree-diff fingerprint.
+- A persistent delegate can become another swollen context.  Persistence
+  ends at each work-area boundary.
+
+I do not need clarification to incorporate this policy.  My strongest
+recommendation is the combination of a test ladder, captured output, and
+phase-scoped Luna stewardship.  Delegation alone would move tokens around;
+these three measures reduce the amount any model ever has to read.
+
+** TODO Jeff reacts
+I don't want to tie the main agent's hands.
+These should only be recommendations.
+If it needs to understand how something works,
+reading around might be the best way to do it.
+
+Against your suggestion,
+I will start the main agent (you) with High reasoning.
+This is a pretty big overhaul. I do want to save tokens,
+but not at the expense of correctness.
+
+* TODO Cycle headlines in the plan between between TODO, ONGOING and DONE.
+Every headline, be it top-level or nested, that represents a thing to do
+should cycle between TODO, ONGOING and DONE.
+This should help both the executor (across handoffs) and me
+understand what's going on.
