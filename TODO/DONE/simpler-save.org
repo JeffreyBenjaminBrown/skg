@@ -211,7 +211,7 @@ Suggested split:
 #+begin_src text
 apply_delete_propagation_cleanup(&mut node_defs, graph_snap)
 
-apply_define_nodes_to_stores(prepared, source_moves, ...)
+apply_defineNodes_to_stores(prepared, source_moves, ...)
 #+end_src
 
 This would be a meaningful simplification because it turns a hidden
@@ -220,7 +220,7 @@ delete propagation cheaper: they could assert the prepared
 instructions without exercising filesystem/TypeDB/Tantivy.
 
 Status: partial. The store-writing body now lives behind
-=apply_define_nodes_to_stores=, so persistence effects are separated
+=apply_defineNodes_to_stores=, so persistence effects are separated
 from the top-level orchestration. Delete-propagation cleanup still
 runs in =update_graph_minus_merges= immediately before that call; it
 is not yet exposed as a separate testable preparation API.

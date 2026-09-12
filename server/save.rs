@@ -67,14 +67,14 @@ pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
     let graph_snap : Arc<InRustGraph> = graph . load_full ();
     apply_delete_propagation_cleanup (
       &mut node_defs, &graph_snap, &config ); }
-  apply_define_nodes_to_stores ( node_defs,
+  apply_defineNodes_to_stores ( node_defs,
                                  source_moves,
                                  config,
                                  tantivy_index,
                                  graph,
                                  hoist_approved_pids ) }
 
-fn apply_define_nodes_to_stores (
+fn apply_defineNodes_to_stores (
   node_defs     : Vec<DefineNode>,
   source_moves  : &[SourceMove],
   config        : SkgConfig,

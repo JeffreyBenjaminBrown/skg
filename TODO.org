@@ -116,7 +116,7 @@ Did my audio app steal it?
 ../elisp/skg-request-reload-paths.el: Warning: ‘if-let’ is an obsolete macro (as of 31.1); use ‘if-let*’ instead.
 ../elisp/skg-request-reload-paths.el: Warning: ‘when-let’ is an obsolete macro (as of 31.1); use ‘when-let*’ or ‘and-let*’ instead. [3 times]
 * rename
-** apply_define_nodes_to_stores
+** apply_defineNodes_to_stores
 -> apply_defineNodes_to_stores
 * Should I have made Skg reactive?
 * document telescoping privacy's representation in .skg files with an illustration
