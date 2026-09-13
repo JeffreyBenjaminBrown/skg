@@ -1,3 +1,155 @@
+* Further completed entries cleared from TODO/problems.org (reviewed 2026-09-13)
+** api-and-formats.md misdescribed the verify-connection response (fixed)
+   Commit =4c0c8243= audited the protocol release boundaries.  The API
+   document now states that both verify-connection and get-file-path return
+   length-prefixed, tagged responses, matching the server.
+** Cargo cannot self-detect truncated build artifacts (resolved/documented)
+   This is an external Cargo freshness limitation rather than Skg work: after
+   a power loss, fingerprints and mtimes can bless a truncated rlib forever.
+   The incident was repaired with a targeted =cargo clean=, and
+   =docs/troubleshooting/check-rlibs.py= plus the corresponding troubleshooting
+   document provide the durable diagnosis path.
+** Diff scaffolds were missing after a definitive view request (fixed)
+   The local-view-update work replaced the one-time pre-request scaffold pass
+   with diff processing at each Active-node visit.  A node made definitive
+   during that visit therefore receives its TextChanged, IDCol, AliasCol, and
+   relationship diffs immediately; the completed plan records the regression.
+** Complete-graph validation ran twice per ordinary save (fixed)
+   Prepared graph candidates now carry the validated candidate through the
+   save pipeline instead of reconstructing and validating it again.  Commit
+   =9a9099c2= published exact prepared candidates and =87b8296b= retired the
+   transitional second validation; complete validation remains the
+   startup/rebuild oracle.
+** Sharing-col members from inactive sources made buffers unsavable (fixed)
+   Restricted renders now omit inactive members, save supplementation weaves
+   the invisible disk members back into writable relationship lists, and
+   inactive-node rewrite suppression prevents foreign/inactive writes.
+   Commits =cbd41dab= and =7814202b= supplied the core behavior, with the
+   relationship-matrix and inactive-suppression suites covering it.
+** De-novo PartnerCol rendering depended on a global graph handle (fixed)
+   PartnerCol construction now receives the captured =InRustGraph= explicitly
+   through the render environment.  No =snapshot_global= call remains, so
+   de-novo rendering and its harnesses no longer need that process-global
+   installation.
+** Only two owner-relative relationship kinds were computed (fixed)
+   The semantic relationship-stat machinery now computes contains,
+   subscribes, overrides, and hides in both directions through the owning
+   ancestry, including the deeper filter columns.  The uniform-herald matrix
+   superseded the old =grandparentOverrides=/=grandparentSubscribes=-only path.
+** Export marker bodies were not valid TOML (resolved by contract)
+   The exporter deliberately accepts a tolerant =key = value= line rather
+   than requiring strict TOML.  =parse_target_filepath= handles bare and
+   quoted values, rejects unsafe paths and ambiguous bare whitespace, and has
+   focused unit coverage.  The unquoted deployed marker is therefore valid
+   input under the implemented contract.
+** Override monogamy validation depended on collateral neighbor saves (fixed)
+   The old touched-source check could notice a node-merge collision only when
+   an inbound overrider happened to be resaved.  Commit =5c024fb9= introduced
+   an affected-neighborhood scope that explicitly derives changed override
+   targets and pulls in overriders across canonical-ID changes.  Prepared
+   update tests compare the incremental result against the complete oracle.
+** CompoundOverrideChain was a near-dead warning (resolved)
+   Override chains are now legal and resolved normally.  Commit =33deda76=
+   removed =CompletionWarning::CompoundOverrideChain= and its obsolete notice
+   path and tests, so the old warning-policy question no longer exists.
+** TypeDB process lifecycle after repeated starts (obsolete)
+   The old =stop-servers.sh= could miss a TypeDB process launched by an earlier
+   =start-servers.sh= process group.  Commit =773d0506= removed TypeDB and its
+   lifecycle from Skg, so this teardown ambiguity no longer exists.
+** Empty and incorrect TypeDB troubleshooting documentation (obsolete)
+   Three recorded defects—the empty final section in
+   =typedb-will-not-start.org=, broken script paths in that document and
+   =database-cleanup.md=, and the latter's stale development-database name—
+   disappeared when commit =773d0506= removed those TypeDB-only documents and
+   scripts.
+** TypeDB graph-stat fetching scaled linearly with view size (obsolete)
+   The per-PID =fetch_all_graphnodestats= query path and its effective
+   concurrency ceiling were deleted with the TypeDB backend in =773d0506=.
+   Graph stats now come from the in-Rust graph.
+** TypeDB relationship updates rewrote every outbound edge (obsolete)
+   The delete-all/recreate-all TypeDB write path was first made incremental,
+   then removed altogether with the backend in =773d0506=.
+** TypeDB 3.11.5 made the recorded 3.10.3 idle baseline stale (obsolete)
+   The version-bump reminder became moot when Skg removed TypeDB in
+   =773d0506=.
+** TypeDB-fallback graphStats ignored the active source set (obsolete)
+   The fallback implementation was deleted with TypeDB.  The authoritative
+   in-Rust graph-stat path is source-set-aware.
+** TypeDB computed from-leaves link counts by subtraction (obsolete)
+   The TypeDB-only derivation and its possible dedup mismatch were deleted in
+   =773d0506=.
+** TypeDB had a fixed idle CPU and wakeup tax (obsolete)
+   The two reports about its per-process idle tax and roughly 2,000 timer
+   wakeups per second described a dependency Skg no longer starts or needs.
+   Removing TypeDB in =773d0506= removed that application-level cost.
+** TypeDB CPU-percentage measurement cautions (obsolete here)
+   The notes about clock-dependent idle percentages and =ps %CPU= being a
+   process-lifetime average remain useful general profiling knowledge, but no
+   longer represent open Skg work after TypeDB's removal.
+** schema.tql overstated the meaning of subscribes (obsolete)
+   The misleading schema comment disappeared when =schema.tql= and the TypeDB
+   schema were removed in =773d0506=.  Current user-facing documentation
+   describes a fork as subscribe plus override, not every subscription as a
+   fork.
+
+* Completed entries cleared from TODO/problems.org (reviewed 2026-09-13)
+** Indefinitive source edits were silently dropped (fixed 2026-09-13)
+   The client safeguard from 2026-07-22 stopped =skg-set-source= from
+   editing indefinitive occurrences, but hand-edited or stale metadata could
+   still reach the server and be ignored. Commit =fc27938e= made
+   =ViewsState= retain the previously rendered forest and reject edits to
+   existing indefinitive occurrences. Newly inserted indefinitive
+   occurrences remain allowed, their children are parked independent, and
+   definitive descendants remain self-writers.
+** Save rerender omitted a newly needed HiddenInSubscribeeCol (fixed)
+   A save could add a hide while the submitted view had no corresponding
+   scaffold, so completing only existing scaffolds left the returned view
+   stale. Commit =25c4941d= added the missing scaffold when needed; current
+   completion performs that check for every definitive subscribee.
+** Removed read-only-col members could remain visually live (fixed)
+   A stale saved buffer could retain an Active member after its edge vanished.
+   The reconciliation path now stamps the net-removed membership axes on that
+   occurrence and converts it to a diff phantom instead of rendering an
+   undecorated live member.
+** Subscribee-as-such content duplicated integrated subscriber content (fixed)
+   The display formerly subtracted explicit hides but not content already
+   integrated into the subscriber. Commit =4ab3d074= made
+   =content_goal_list= subtract both sets (with resolved IDs and source-set
+   gating), and the move-into-graph regression now asserts that the child is
+   not shown a second time as unintegrated subscribed content.
+** overrides_view_of had no proven production writer or round trip (fixed)
+   Fork/override work made the writable OverriddenCol and explicit fork
+   gesture real producers, with save, substitution, source-set, and
+   relationship-matrix coverage. Commits =303ebbf5= and =e8543e8f= cover the
+   production fork path.
+** One diff-mode crash was caused by a partial data commit, not save code (resolved)
+   HEAD deleted the =earplugs= node but its =backpack= container still named
+   it; the worktree already removed that reference. The inconsistent HEAD
+   explained the otherwise unresolvable removed-member phantom. The separate
+   open problem—auditing dangling structured references—remains in
+   =TODO/problems.org=.
+** Delete propagation tried to rewrite foreign referencers (fixed 2026-09-10)
+   Cleanup once synthesized a full SaveNode for every referencer of a deleted
+   PID, including wholly foreign telescopes, and therefore aborted an
+   otherwise authorized deletion at filesystem preflight. Cleanup now
+   receives the configuration, synthesizes collateral saves only for retained
+   owned telescopes, and strips IDs only from owned saves. Regression coverage
+   preserves a foreign referencer byte-for-byte while cleaning an owned
+   extra-ID reference.
+** Whole save transactions were not serialized across clients (fixed)
+   Concurrent saves could plan from the same graph snapshot and publish lost
+   updates. Commit =2c64c440= introduced the process-global mutation gate over
+   save, reload, and rebuild. The current save path holds that gate from before
+   graph-dependent planning through filesystem mutation and graph/Tantivy
+   publication; concurrency regressions cover both the failure shape and the
+   serialized behavior.
+** The override-validation deep-clone diagnosis was disproved (resolved 2026-09-12)
+   Profiling showed that cloning =InRustGraph= structurally shares its
+   persistent =im= maps. The entire override-validation span was about 0.3 ms,
+   below 0.02% of save time. The measured whole-graph cost instead belonged to
+   complete-graph validation; the later prepared-update work recorded above
+   removed that save-path bottleneck.
+
 * Successful saves echoed consumed edit requests into the rerender (fixed 2026-09-13)
   Post-save content expansion cleared only a definitive active node's
   delete/merge request. Relationship-source requests live separately on
