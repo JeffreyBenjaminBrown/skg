@@ -998,7 +998,7 @@ extra-ID revocation.  Profiler explanations name the new prepared and affected
 operations.  =cargo check --all-targets= and the grouped unit and save suites
 pass at this checkpoint.
 
-** ONGOING Run the soundness and regression gates
+** DONE Run the soundness and regression gates
 
 - Run focused tests after every task; do not postpone the first meaningful
   feedback until the full suite.
@@ -1035,7 +1035,20 @@ All focused, grouped, documentation, client, and integration gates are green
 at the final implementation fingerprint, with no server required to write the
 repository's real =data/=.
 
-** TODO Reprofile the original slow save and report scaling
+At commit =e6d6e44d=, =cargo check --all-targets=; grouped unit, saves,
+overrides, sources, views, and git-diff view suites; Rust documentation tests;
+and the Emacs, Neovim, and integration scripts all pass.  The save group ran
+112 tests.  One wider run exposed a real protocol classification regression:
+incremental monogamy rejection had become =Other= instead of
+=OverrideInvariantViolation=.  The preparation error now preserves that
+classification, while direct graph-update callers retain detailed revocation
+diagnostics.  An unrelated =DirectoryNotEmpty= in the same concurrent run was
+classified as test-fixture cleanup interference after the focused test and the
+complete 112-test save group both passed unchanged.  =git diff --check= is
+clean; this toolchain has no =cargo fmt= command, and the repository's
+deliberately spaced Rust style was left intact.
+
+** ONGOING Reprofile the original slow save and report scaling
 
 Run:
 
