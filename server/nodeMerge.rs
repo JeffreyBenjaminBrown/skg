@@ -6,9 +6,6 @@ use crate::dbs::filesystem::multiple_nodes::{
   read_all_skg_files_from_sources};
 use crate::dbs::init::rebuild_tantivy_from_nodes;
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
-use crate::dbs::in_rust_graph::complete_validation::{
-  format_complete_graph_errors,
-};
 use crate::dbs::in_rust_graph::prepared_update::{
   PreparedGraphUpdate, prepare_graph_update,
 };
@@ -60,8 +57,8 @@ pub(crate) fn merge_nodes_with_hoist_approval (
   let base : Arc<InRustGraph> = graph . load_full ();
   let prepared : PreparedGraphUpdate = prepare_graph_update (
     &config, base, primary_definenodes)
-    . map_err ( |errors| -> Box<dyn Error> {
-      format_complete_graph_errors (&errors) . into () } ) ?;
+    . map_err ( |error| -> Box<dyn Error> {
+      error . to_string () . into () } ) ?;
   apply_prepared_nodeMerges (
     Some (prepared), config, tantivy_index, graph, hoist_approved_pids )
 }

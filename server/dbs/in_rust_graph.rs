@@ -78,9 +78,9 @@ impl InRustGraph {
   pub fn from_nodecompletes (completes: &[NodeComplete]) -> Self {
     let mut g : InRustGraph = InRustGraph::new ();
     for c in completes {
-      for extraid in &c . extra_ids {
+      for extraid in c . normalized_extra_ids () {
         g . extra_id_to_pid . insert (
-          extraid . clone (), c . pid . clone () ); } }
+          extraid, c . pid . clone () ); } }
     for c in completes {
       let rust : NodeRust = NodeRust::from (c);
       g . nodes . insert ( rust . pid . clone (), rust . clone () );

@@ -74,7 +74,7 @@ fn repeated_ids_of_one_owner_are_normalized_not_rejected () {
     ID::from ("A"),
   ];
   let report = validate_complete_graph (&config (), &[owner]);
-  assert! (report . is_valid ());
+  assert! (report . is_valid (), "{:?}", report . errors);
   assert_eq! (
     report . graph . get (&ID::from ("owner")) . unwrap () . extra_ids,
     vec![ID::from ("B"), ID::from ("A")]);

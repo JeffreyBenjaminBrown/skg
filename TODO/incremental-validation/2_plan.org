@@ -673,7 +673,7 @@ the preparer and none in either store-application function.  Three token tests,
 =cargo check --all-targets=, and all 115 runnable =grouped_saves= tests pass;
 the one skipped test is the intentionally ignored R2 specification.
 
-** ONGOING Add final-state batches, identity overlay, and change-set derivation
+** DONE Add final-state batches, identity overlay, and change-set derivation
 
 - Implement =NormalizedDefineNodeBatch= and deterministic last-definition per
   PID coalescing for graph semantics.
@@ -692,7 +692,26 @@ For generated small identity-only graphs and batches, incremental
 acceptance/errors equal the revised full validator.  Complexity counters show
 lookups proportional to affected IDs, not =graph.nodes.len()=.
 
-** TODO Make graph mutation batch-aware, including supported deletion rekeying
+=NormalizedDefineNodeBatch= now retains normalized filesystem instructions
+while coalescing graph semantics to the final instruction per PID.  The
+simultaneous overlay derives touched/saved/deleted PIDs, affected raw IDs,
+canonical-owner changes, and merge acquisitions without enumerating nodes.
+It rejects unconfigured homes, distinct-owner collisions, and managed
+extra-ID revocation before any store mutation.
+
+Targeted tests cover untouched and within-batch collisions, all three repeated
+definition orderings, merge transfer, alias addition, actionable revocation,
+and graph/filesystem/Tantivy non-mutation on refusal.  A 256-case generated
+suite agrees with the independent full oracle's identity decisions.  The
+instrumented identity lookup bound is identical for equivalent changes on
+1-node and 1,000-node bases.  This work also exposed and repaired a rebuild
+constructor mismatch: normalized =NodeRust.extra_ids= and =extra_id_to_pid=
+now derive from the same normalized alias list.
+
+At this checkpoint =cargo check --all-targets=, all 226 =grouped_unit= tests,
+and all =grouped_saves= tests pass (with the one intentional R2 test ignored).
+
+** ONGOING Make graph mutation batch-aware, including supported deletion rekeying
 
 - Refactor inverse removal/addition helpers to accept an explicit old or final
   canonical resolver.

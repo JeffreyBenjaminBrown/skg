@@ -13,9 +13,6 @@ use crate::dbs::in_rust_graph::{
     format_override_invariant_violations,
     validate_touched_override_invariants,
   },
-  complete_validation::{
-    format_complete_graph_errors,
-  },
 };
 use crate::dbs::tantivy::background_writer::{enqueue_tantivy_write, lock_tantivy_writes, TantivyWriteTask};
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
@@ -70,8 +67,8 @@ pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
   let base : Arc<InRustGraph> = graph . load_full ();
   let prepared : PreparedGraphUpdate = prepare_graph_update (
     &config, base, node_defs)
-    . map_err ( |errors| -> Box<dyn Error> {
-      format_complete_graph_errors (&errors) . into () } ) ?;
+    . map_err ( |error| -> Box<dyn Error> {
+      error . to_string () . into () } ) ?;
   apply_defineNodes ( prepared,
                       source_moves,
                       config,
@@ -205,10 +202,10 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
     if save_instructions . is_empty () { None }
     else { Some (prepare_graph_update (
       &config, graph_before_save . clone (), save_instructions)
-      . map_err ( |errors| -> Box<dyn Error> {
+      . map_err ( |error| -> Box<dyn Error> {
         Box::new (SaveError::BufferValidationErrors {
           errors : vec![BufferValidationError::Other (
-            format_complete_graph_errors (&errors))],
+            error . to_string ())],
           warnings : vec![],
         }) } ) ?) };
   let graph_after_save : Arc<InRustGraph> = prepared_save . as_ref ()
@@ -222,10 +219,10 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
     if nodeMerge_definitions . is_empty () { None }
     else { Some (prepare_graph_update (
       &config, graph_after_save, nodeMerge_definitions)
-      . map_err ( |errors| -> Box<dyn Error> {
+      . map_err ( |error| -> Box<dyn Error> {
         Box::new (SaveError::BufferValidationErrors {
           errors : vec![BufferValidationError::Other (
-            format_complete_graph_errors (&errors))],
+            error . to_string ())],
           warnings : vec![],
         }) } ) ?) };
   // The ordinary-save and nodeMerge phases execute separately, but their
