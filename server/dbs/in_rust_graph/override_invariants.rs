@@ -24,18 +24,6 @@ pub enum OverrideInvariantViolation {
     // collapses to one violation.
     cycle: Vec<ID> }}
 
-pub fn error_unless_override_invariants_hold (
-  config : &SkgConfig,
-  graph  : &InRustGraph,
-) -> Result<(), String> {
-  let violations : Vec<OverrideInvariantViolation> =
-    validate_override_invariants (config, &graph);
-  if violations . is_empty () {
-    Ok (())
-  } else { Err (
-    format_override_invariant_violations (&violations))
-  }}
-
 /// User-owned data must adhere to two constraints:
 /// - monogamy: No node is overridden by more than one user-owned node.
 /// - no cycles: following the user-owned override edges out of a node
@@ -121,65 +109,6 @@ fn canonicalize_cycle (
   out . extend_from_slice ( &cycle [min_index ..] );
   out . extend_from_slice ( &cycle [.. min_index] );
   out }
-
-/// Save-time override-invariant check, scoped to the nodes a save
-/// touched. The rest of the graph satisfied the invariants before the
-/// save and is unchanged, so a new violation can only involve an
-/// override edge incident to a touched node (whose 'overrides_view_of'
-/// or 'source' changed). Checking each touched node's edges therefore
-/// suffices, and the cost is O(touched) rather than O(whole graph).
-///
-/// 'graph' must be the post-save (simulated) graph, with its inverse
-/// indexes ('overriders_of') already reflecting the save.
-///
-/// For each touched user-owned node T:
-/// - monogamy: for each X that T overrides, flag X if it now has more
-///   than one user-owned overrider. Only this (target) end needs
-///   checking — adding the edge T → X can only over-subscribe X.
-/// - no cycles: walk the user-owned override edges out of T (the shared
-///   'resolve_override' walk, ungated). A save that closes a user-owned
-///   cycle leaves a written (touched) node on the cycle, and monogamy
-///   makes the walk functional, so the walk from that T returns to a
-///   repeat. Cost O(touched · chain length).
-pub fn validate_touched_override_invariants (
-  config  : &SkgConfig,
-  graph   : &InRustGraph,
-  touched : &HashSet<ID>,
-) -> Vec<OverrideInvariantViolation> {
-  let mut violations : Vec<OverrideInvariantViolation> = Vec::new ();
-  for pid in touched {
-    let Some (node) = graph . nodes . get (pid)
-      // A touched id absent post-save (e.g. deleted) has no out-edges,
-      // and deletions can only resolve violations, never create them.
-      else { continue; };
-    let Some (user_owns_pid) = user_owns_node (
-      config, pid, &node . source, &mut violations )
-      else { continue; };
-    if ! user_owns_pid { continue; }
-    let targets : Vec<ID> = // T's override targets, resolved to pids
-      members_of ( node . overrides_view_of . or_default () ) . iter ()
-      . map ( |t| graph . pid_of (t)
-              . unwrap_or_else ( || t . clone () ) )
-      . collect ();
-    for overridden in &targets {
-      // monogamy (target end only)
-      let mut overriders : Vec<ID> =
-        user_owned_overriders_of (config, graph, overridden);
-      if overriders . len () > 1 {
-        overriders . sort ();
-        violations . push (
-          OverrideInvariantViolation::MultipleUserOwnedOverriders {
-            overridden : overridden . clone (),
-            overriders, } ); } }
-    { // no cycles: the functional, ungated walk out of this touched
-      // user-owned node returns to a repeat iff the save put it on a
-      // cycle.
-      let resolution = resolve_override (config, graph, None, pid);
-      if resolution . cycle_detected {
-        violations . push (
-          OverrideInvariantViolation::UserOwnedOverrideCycle {
-            cycle : canonicalize_cycle (resolution . cycle) } ); } } }
-  dedup_violations (violations) }
 
 /// Derive every override source and target whose invariant truth can change
 /// between two valid graph snapshots. Canonicalization changes pull in

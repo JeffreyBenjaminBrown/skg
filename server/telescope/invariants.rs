@@ -1,6 +1,6 @@
 //! The telescope invariant validator: ONE shared primitive
 //! ('telescope_violations_of') consulted at both gates -- init /
-//! rebuild (whole graph, aggregated report) and save (touched pids)
+//! rebuild (whole graph, aggregated report) and save (affected owners)
 //! -- per the override-invariants lesson in TODO/problems.org (two
 //! divergent validators nearly let bad data through).
 //!
@@ -18,10 +18,10 @@ use crate::telescope::types::FoldWarning;
 use crate::types::misc::{ID, MSV, MemberAtSource, SkgConfig, SourceName};
 use crate::types::nodes::rust::NodeRust;
 
+use std::collections::HashSet;
 use std::fmt;
 use std::io;
 use std::path::Path;
-use std::collections::HashSet;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TelescopeViolation {
@@ -212,8 +212,7 @@ pub fn affected_telescope_warnings (
 
 /// The init/rebuild gate: every node, aggregated. Returns the
 /// violations paired with their nodes; the caller decides
-/// presentation (report file + logs at init; save warnings at
-/// save).
+/// presentation (report file + logs at init/rebuild).
 pub fn validate_all_telescopes (
   config : &SkgConfig,
   graph  : &InRustGraph,

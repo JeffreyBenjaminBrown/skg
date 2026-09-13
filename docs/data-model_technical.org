@@ -18,7 +18,7 @@ derived text links.
 | Field | Type | Meaning and storage |
 |-------+------+---------------------|
 | =pid= | =ID= | Immutable primary identity.  It determines the home filename and is the key in =InRustGraph.nodes= and Tantivy. |
-| =extra_ids= | =Vec<ID>= | Former identities acquired by node merge.  Any primary or extra ID resolves to the node's =pid=. |
+| =extra_ids= | =Vec<ID>= | Former identities acquired by node merge.  They are normalized in stable first-occurrence order, excluding the node's own PID.  Any primary or extra ID resolves to the node's =pid=. |
 | =source= | =SourceName= | The node's home: the most public source with a retained telescope section.  It is inferred from file location and never serialized inside YAML. |
 | =title= | =String= | Folded node title. |
 | =body= | =Option<String>= | Folded body text.  Leading and trailing whitespace-only lines are normalized away; a body with no remaining content is =None=. |
@@ -59,8 +59,11 @@ relationship entities.  Edge recording source remains part of every stored
 
 * Hard validation constraints
 
-=validate_complete_graph= runs before startup/rebuild publication and the
-equivalent candidate validation runs before save mutation.  A candidate is
+=validate_complete_graph= runs before startup/rebuild publication.  Saves
+preserve the same constraints incrementally: while holding the mutation gate,
+they derive an exact persistent candidate from the current valid snapshot,
+validate the identities and relationships whose truth can change, and check
+the affected inverse-index entries before any file mutation.  A candidate is
 rejected when any of these conditions holds:
 
 1. A primary ID identifies more than one folded node.
@@ -80,11 +83,19 @@ checks privacy/provenance rules.  Telescope violations are deterministic
 warnings rather than hard graph-construction errors; callers surface them for
 repair while retaining readable data.
 
-Save validation constructs the complete proposed node set in memory and
-checks these constraints before changing files.  The shared mutation gate
-serializes candidate construction, filesystem mutation, graph publication,
-and Tantivy enqueue so two writers cannot validate against the same stale
-snapshot.
+The incremental proof relies on induction: startup or rebuild establishes a
+valid base, and each serialized save proves that its delta preserves validity.
+Identity ownership is evaluated as one simultaneous final-state overlay;
+override checks include touched sources, changed canonical targets, and
+untouched inbound overriders affected by either.  Local index checks compare
+only keys that could change.  The complete validator remains an independent
+startup/rebuild gate and test oracle.
+
+The shared mutation gate serializes candidate construction, filesystem
+mutation, graph publication, and Tantivy enqueue so two writers cannot validate
+against the same stale snapshot.  Filesystem preflight and graph validation
+produce tokens tied to that exact snapshot; commit consumes those prepared
+values rather than recomputing them after writes begin.
 
 * Graph indexes
 
@@ -102,16 +113,27 @@ derived indexes are:
 
 Construction is two-pass: first collect every extra-ID mapping, then insert
 nodes and build inverse indexes.  This makes results independent of file read
-order.  Incremental updates remove a node's old contributions, migrate inverse
-entries when a merge introduces new extra IDs, insert the replacement node,
-and add its new contributions.  Writers clone the persistent graph and publish
-one new =Arc= atomically; readers retain the immutable generation they captured
-at operation start.
+order.  Incremental mutation instead installs the batch's complete final
+identity state first, then reindexes each touched node and every untouched
+owner whose raw relationship can resolve differently under the final identity
+map.  All five inverse indexes use that same final resolver.  Deletion is
+supported: references to a deleted PID remain raw and surviving owners are
+rekeyed where canonical resolution changed.  Writers clone the persistent
+graph and publish one new =Arc= atomically; readers retain the immutable
+generation they captured at operation start.
 
-The current mutation model supports monotonic acquisition of extra IDs during
-node merge.  Arbitrary extra-ID revocation is not a supported user operation;
-it would require a symmetric migration of raw neighbor references and inverse
-keys.
+Managed saves support monotonic acquisition of extra IDs during node merge,
+but reject arbitrary extra-ID revocation.  An apparently unused alias may be
+how someone else's data links to the node, and Skg cannot infer that even the
+most private source was never shared with a trusted person.  Raw-file editing
+and rebuild remain an escape hatch, but spending effort to remove such tiny
+identity metadata is usually a poor trade.
+
+Telescope warnings use the target's home as the privacy ceiling when the
+target exists.  For a dangling relationship there is no target home, so the
+extant owner's home is the conservative ceiling.  Saves recompute warnings for
+saved owners plus untouched inbound owners affected by identity, existence, or
+home changes; startup and rebuild still audit every owner.
 
 * Runtime generations and rebuilding
 

@@ -9,13 +9,7 @@ use crate::telescope::invariants::{
 use crate::dbs::in_rust_graph::{
   InRustGraph,
   InRustGraphHandle,
-  apply_definenodes_to_inRustGraph,
   prepared_update::{PreparedGraphUpdate, prepare_graph_update},
-  override_invariants::{
-    derive_affected_override_scope,
-    format_override_invariant_violations,
-    validate_affected_override_invariants,
-  },
 };
 use crate::dbs::tantivy::background_writer::{enqueue_tantivy_write, lock_tantivy_writes, TantivyWriteTask};
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
@@ -287,55 +281,6 @@ pub(crate) fn emit_telescope_warnings (
       pid = %pid, violation = %violation,
       "telescope warning after save" ); }
 }
-
-pub fn validate_override_invariants_after_save (
-  save_instructions  : &[DefineNode],
-  nodeMerge_instructions : &[NodeMerge],
-  config             : &SkgConfig,
-  graph              : &InRustGraphHandle,
-) -> Result<(), Box<dyn Error>> {
-  let graph_snap : Arc<InRustGraph> =
-    graph . load_full ();
-  let mut simulated : InRustGraph =
-    (*graph_snap) . clone ();
-  let mut nonmerge : Vec<DefineNode> =
-    save_instructions . to_vec ();
-  apply_delete_propagation_cleanup (
-    &mut nonmerge, &graph_snap, config );
-  apply_definenodes_to_inRustGraph (&mut simulated, &nonmerge);
-  let nodeMerge_definenodes : Vec<DefineNode> =
-    nodeMerge_instructions . iter ()
-    . flat_map ( |nodeMerge| nodeMerge . to_vec () )
-    . collect ();
-  apply_definenodes_to_inRustGraph (&mut simulated, &nodeMerge_definenodes);
-  let touched : HashSet<ID> = // every node this save actually wrote
-    nonmerge . iter () . chain ( nodeMerge_definenodes . iter () )
-    . map ( |dn| match dn {
-        DefineNode::Save (SaveNode (n)) => n . pid . clone (),
-        DefineNode::Delete (DeleteNode { id, .. }) => id . clone (), } )
-    . collect ();
-  let mut affected_ids : HashSet<ID> = touched . clone ();
-  for pid in &touched {
-    if let Some (node) = graph_snap . nodes . get (pid) {
-      affected_ids . extend (node . extra_ids . iter () . cloned ()); }
-    if let Some (node) = simulated . nodes . get (pid) {
-      affected_ids . extend (node . extra_ids . iter () . cloned ()); }}
-  let scope = derive_affected_override_scope (
-    &graph_snap, &simulated, &touched, &affected_ids);
-  let violations =
-    validate_affected_override_invariants (config, &simulated, &scope);
-  if violations . is_empty () {
-    Ok (( ))
-  } else {
-    Err (Box::new (SaveError::BufferValidationErrors {
-      errors : vec![
-        BufferValidationError::OverrideInvariantViolation (
-          format_override_invariant_violations (&violations)) ],
-      // This check runs after parsing, so no parse warnings are in
-      // scope here; the buffer-validation path (from_text) carries
-      // them. update_from_and_rerender_buffer also back-fills the
-      // save's parse warnings onto any post-parse validation error.
-      warnings : vec![], } )) }}
 
 /// Two-phase cleanup so deletes don't leave dangling references on
 /// disk:

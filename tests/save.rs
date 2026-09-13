@@ -9,8 +9,5 @@ mod birth_and_indefinitive;
 #[path = "save/validate_foreign_nodes.rs"]
 mod validate;
 
-#[path = "save/override_invariants.rs"]
-mod override_invariants;
-
 #[path = "save/extra_id_revocation.rs"]
 mod extra_id_revocation;

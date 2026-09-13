@@ -134,7 +134,7 @@ pub(crate) struct PreparedGraphUpdate {
   base        : Arc<InRustGraph>,
   candidate   : Arc<InRustGraph>,
   definitions : Vec<DefineNode>,
-  // Consumed by the batch-aware mutator in the next plan task.
+  // Retained as proof metadata and consumed by the batch-aware mutator.
   #[allow(dead_code)]
   changes     : GraphChangeSet,
 }

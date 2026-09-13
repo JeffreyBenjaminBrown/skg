@@ -967,7 +967,7 @@ full startup/rebuild primitive remains unchanged apart from the corrected
 absent-target semantics.  =cargo check --all-targets= and both grouped suites
 pass without warnings.
 
-** ONGOING Retire dead full-warning and transitional save code
+** DONE Retire dead full-warning and transitional save code
 
 - Remove complete-graph warning computation whose result is discarded by save.
 - Remove the old post-save loop over ordinary saved PIDs.
@@ -988,7 +988,17 @@ Repository-wide call search proves no save path calls
 =validate_all_telescopes=.  Startup/rebuild warning reports and save affected
 warnings both still use =telescope_violations_of=.
 
-** TODO Run the soundness and regression gates
+The obsolete touched-only override validator and its save adapter/tests are
+removed.  Save modules have no call to either =validate_all_telescopes= or
+=validate_complete_graph_candidate=; the complete candidate adapter remains
+only as a differential-test oracle.  The technical data-model reference now
+documents stable ID normalization, the incremental validity proof, final-state
+batch reindexing, deletion rekeying, and the rationale for rejecting managed
+extra-ID revocation.  Profiler explanations name the new prepared and affected
+operations.  =cargo check --all-targets= and the grouped unit and save suites
+pass at this checkpoint.
+
+** ONGOING Run the soundness and regression gates
 
 - Run focused tests after every task; do not postpone the first meaningful
   feedback until the full suite.
