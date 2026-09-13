@@ -1,19 +1,10 @@
 ;;; -*- lexical-binding: t; -*-
 
 (require 'skg-buffer)
-(require 'skg-config)
 
 (defun skg-view-new-empty ()
-  "Open a new skg content view for a new node.
-Prompts to choose an owned source, then opens a buffer
-with an indefinitive ActiveNode (no ID yet) and a placeholder title."
+  "Open a blank skg content view for creating new nodes."
   (interactive)
-  (let* ((source (skg--prompt-for-owned-source))
-         (org-text
-          (format
-           "* (skg (node (source %s) indef)) life, the universe and everything\n"
-           source)))
-    (skg-open-org-buffer-from-text
-     nil org-text (skg-content-view-buffer-name org-text))))
+  (skg-open-empty-content-view))
 
 (provide 'skg-view-new-empty)

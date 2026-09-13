@@ -17,7 +17,7 @@
 
   ;; Ensure we start from a clean state
   (setq integration-test-phase "open-empty-buffer")
-  (skg-open-empty-content-view)
+  (skg-view-new-empty)
 
   (let ((content-buffer (get-buffer "*skg-empty*")))
     (unless content-buffer

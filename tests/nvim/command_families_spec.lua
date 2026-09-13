@@ -312,19 +312,12 @@ describe('skg.org_ancestry and view_new_empty', function ()
     assert.are.equal('* a\n** c\n*** e', buffer_text())
   end)
 
-  it('view_new_empty opens an indefinitive root in the chosen source',
-     function ()
-    require('skg.herald_rules').install_rules(
-      require('skg.sexpr.parse').read('(skg (node (id)))'))
-    local picker = require('skg.picker')
-    local original = picker.prompt_for_owned_source
-    picker.prompt_for_owned_source = function () return 'public' end
+  it('view_new_empty opens a blank skg content view', function ()
     require('skg.view_new_empty').view_new_empty()
-    picker.prompt_for_owned_source = original
-    assert.is_truthy(buffer_text():find(
-      '* (skg (node (source public) indef)) life, the universe'
-      .. ' and everything', 1, true))
+    assert.are.equal('', buffer_text())
     assert.is_truthy(vim.b[vim.api.nvim_get_current_buf()]
                      .skg_view_uri)
+    assert.is_true(vim.b[vim.api.nvim_get_current_buf()]
+                   .skg_content_view)
   end)
 end)

@@ -8,16 +8,9 @@ T.arm_timeout(20)
 
 print('Starting integration test...')
 
--- The elisp test opens the buffer via skg-open-empty-content-view,
--- which is itself just (skg-open-org-buffer-from-text nil "" "*skg-empty*")
--- ("Retaining for tests. Not user-facing; dominated by
--- skg-view-new-empty", per elisp/skg-buffer.el). The nvim client has
--- no such test-only wrapper (skg.view_new_empty prompts interactively
--- for an owned source, which this test does not want), so call the
--- underlying buffer constructor directly -- the exact port target.
 print('open-empty-buffer')
-local buffer = require('skg.buffer')
-local content_buffer = buffer.open_org_buffer_from_text('', 'skg://skg-empty')
+require('skg.view_new_empty').view_new_empty()
+local content_buffer = vim.api.nvim_get_current_buf()
 if not content_buffer or not vim.api.nvim_buf_is_valid(content_buffer) then
   T.fail('skg content buffer was not created')
 end

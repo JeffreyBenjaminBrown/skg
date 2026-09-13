@@ -619,13 +619,11 @@ restricted source-set, Skg asks before changing the mode or any view.
 Declining leaves the mode and buffers unchanged; the protocol still sends
 an empty rerender stream so preemptive client locks are released.
 *** C-c v e : skg-view-new-empty
-Asks you to pick a data source,
-and then provides a root node with that source.
+Opens a blank Skg content view in which to create new nodes.
 **** why
-Every node needs a source.
-Children can inherit from their parents,
-but to make a root (which has no parents)
-you need to choose its source explicitly.
+Creating a headline through Skg's commands prompts for any source it
+cannot inherit.  Save validation also catches a root whose source was
+omitted when the headline was entered as plain text.
 *** C-c v h : skg-view-heralds-mode
 This command toggles it.
 This toggles whether, at the start of every node,
