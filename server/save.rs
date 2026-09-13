@@ -85,7 +85,7 @@ pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
   let base : Arc<InRustGraph> = graph . load_full ();
   let prepared : PreparedGraphUpdate = prepare_graph_update (
     &config, base . clone (), node_defs)
-    . map_err (graph_preparation_save_error) ?;
+    . map_err (|error| -> Box<dyn Error> { Box::new (error) }) ?;
   let prepared_filesystem : PreparedFilesystemUpdate = prepare_fs_update (
     prepared . definitions (), source_moves, &config, hoist_approved_pids) ?;
   let telescope_warnings : Vec<(ID, TelescopeViolation)> =
