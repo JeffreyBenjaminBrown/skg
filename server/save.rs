@@ -481,6 +481,8 @@ pub(crate) fn prepare_fs_update (
   config              : &SkgConfig,
   hoist_approved_pids : &HashSet<ID>,
 ) -> io::Result<PreparedFilesystemUpdate> {
+  let _span : tracing::span::EnteredSpan =
+    tracing::info_span! ("prepare_fs_update") . entered ();
   let ( to_delete, mut to_save )
     : ( Vec<DeleteNode>, Vec<SaveNode> )
     = DefineNode::partition_save_and_delete (node_defs);

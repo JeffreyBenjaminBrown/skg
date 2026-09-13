@@ -14,7 +14,9 @@ It records three complementary kinds of evidence:
 - exact Callgrind user-space instruction counts from the Rust server, normal
   process CPU time, and Emacs's Lisp CPU profiler;
 - counts of graph files, view bytes/headlines, request bytes, save
-  instructions, and files changed in the disposable copy.
+  instructions, files changed in the disposable copy, and the incremental
+  graph neighborhood actually checked (affected IDs, reindexed owners,
+  override scope/steps, telescope owners, and local-index keys).
 
 The server's structured tracing log supplies nested wall-time spans.  This is
 important because an on-CPU profile cannot account for filesystem or lock

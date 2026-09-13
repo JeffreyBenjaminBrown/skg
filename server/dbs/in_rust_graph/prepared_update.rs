@@ -17,8 +17,9 @@ use crate::dbs::in_rust_graph::internal_index_validation::{
   validate_local_internal_indexes,
 };
 use crate::dbs::in_rust_graph::override_invariants::{
-  OverrideCheckScope, OverrideInvariantViolation,
-  derive_affected_override_scope, validate_affected_override_invariants,
+  AffectedOverrideValidation, OverrideCheckScope, OverrideInvariantViolation,
+  derive_affected_override_scope,
+  validate_affected_override_invariants_with_counts,
 };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
@@ -199,12 +200,18 @@ pub(crate) fn prepare_graph_update (
   base        : Arc<InRustGraph>,
   definitions : Vec<DefineNode>,
 ) -> Result<PreparedGraphUpdate, GraphUpdatePreparationError> {
-  let batch : NormalizedDefineNodeBatch =
-    normalize_and_coalesce_definitions (definitions);
+  let _span : tracing::span::EnteredSpan =
+    tracing::info_span! ("prepare_graph_update") . entered ();
+  let batch : NormalizedDefineNodeBatch = {
+    let _span : tracing::span::EnteredSpan =
+      tracing::info_span! ("normalize_graph_definitions") . entered ();
+    normalize_and_coalesce_definitions (definitions) };
   let (mut changes, incremental_errors, revocations)
     : (GraphChangeSet, Vec<CompleteGraphError>, Vec<ExtraIdRevocation>) =
-    validate_identity_and_derive_changes (
-      config, &base, &batch . final_graph_definitions);
+    { let _span : tracing::span::EnteredSpan =
+        tracing::info_span! ("validate_identity_delta") . entered ();
+      validate_identity_and_derive_changes (
+        config, &base, &batch . final_graph_definitions) };
   if ! incremental_errors . is_empty () || ! revocations . is_empty () {
     return Err (GraphUpdatePreparationError {
       complete_graph_errors : incremental_errors,
@@ -213,22 +220,50 @@ pub(crate) fn prepare_graph_update (
       merge_override_collisions : Vec::new (),
     }); }
   let mut candidate : InRustGraph = (*base) . clone ();
-  apply_definenodes_to_inRustGraph (
-    &mut candidate, &batch . final_graph_definitions);
-  let override_scope : OverrideCheckScope = derive_affected_override_scope (
-    &base, &candidate, &changes . touched_pids, &changes . affected_ids);
+  { let _span : tracing::span::EnteredSpan =
+      tracing::info_span! ("apply_definenodes_to_inRustGraph") . entered ();
+    apply_definenodes_to_inRustGraph (
+      &mut candidate, &batch . final_graph_definitions); }
+  let override_scope : OverrideCheckScope = {
+    let _span : tracing::span::EnteredSpan =
+      tracing::info_span! ("derive_affected_override_scope") . entered ();
+    derive_affected_override_scope (
+      &base, &candidate, &changes . touched_pids, &changes . affected_ids) };
   changes . override_sources_to_check = override_scope . sources . clone ();
   changes . override_targets_to_check = override_scope . targets . clone ();
   changes . telescope_owners_to_check = derive_affected_telescope_owners (
     &base, &candidate, &changes . saved_pids, &changes . affected_ids);
+  let affected_override_validation : AffectedOverrideValidation = {
+    let _span : tracing::span::EnteredSpan =
+      tracing::info_span! ("validate_affected_override_invariants") . entered ();
+    validate_affected_override_invariants_with_counts (
+      config, &candidate, &override_scope) };
   let affected_override_errors : Vec<OverrideInvariantViolation> =
-    validate_affected_override_invariants (config, &candidate, &override_scope);
+    affected_override_validation . violations;
   let merge_override_collisions : Vec<MergeOverrideCollision> =
     derive_merge_override_collisions (
       config, &base, &candidate, &changes, &affected_override_errors);
-  let local_index_validation : LocalIndexValidation =
+  let local_index_validation : LocalIndexValidation = {
+    let _span : tracing::span::EnteredSpan =
+      tracing::info_span! ("validate_local_internal_indexes") . entered ();
     validate_local_internal_indexes (
-      &base, &candidate, &batch . final_graph_definitions, &changes);
+      &base, &candidate, &batch . final_graph_definitions, &changes) };
+  tracing::info! (
+    "incremental graph work: graph_nodes={} normalized_definitions={} affected_ids={} owners_reindexed={} override_sources_checked={} override_targets_checked={} override_chain_steps={} local_index_keys_checked={} local_node_checks={} local_identity_checks={} local_relationship_checks={}",
+    base . nodes . len (),
+    batch . final_graph_definitions . len (),
+    changes . affected_ids . len (),
+    changes . owners_to_reindex . len (),
+    changes . override_sources_to_check . len (),
+    changes . override_targets_to_check . len (),
+    affected_override_validation . chain_steps,
+    local_index_validation . node_checks
+      + local_index_validation . identity_checks
+      + local_index_validation . relationship_membership_checks,
+    local_index_validation . node_checks,
+    local_index_validation . identity_checks,
+    local_index_validation . relationship_membership_checks,
+  );
   if ! local_index_validation . errors . is_empty () {
     return Err (GraphUpdatePreparationError {
       complete_graph_errors : Vec::new (),

@@ -292,22 +292,23 @@ def derived_unspanned_remainders(spans: dict[str, list[float]]) -> list[tuple[st
     update_graph_remainder = max(
         0.0,
         median_span(spans, "update_graph_including_nodeMerges")
-        - median_span(spans, "validate_override_invariants_after_save")
-        - median_span(spans, "update_graph_minus_nodeMerges")
-        - median_span(spans, "merge_nodes"),
+        - median_span(spans, "prepare_graph_update")
+        - median_span(spans, "prepare_fs_update")
+        - median_span(spans, "affected_telescope_warnings")
+        - median_span(spans, "apply_ordinary_defineNodes")
+        - median_span(spans, "apply_nodeMerge_defineNodes"),
     )
     stores_remainder = max(
         0.0,
-        median_span(spans, "update_graph_minus_nodeMerges")
-        - median_span(spans, "apply_delete_propagation_cleanup")
+        median_span(spans, "apply_ordinary_defineNodes")
         - median_span(spans, "update_fs_from_savenode_defs")
-        - median_span(spans, "apply_definenodes_to_inRustGraph")
+        - median_span(spans, "publish_prepared_graph_update")
         - median_span(spans, "context_origin_types_for_saved"),
     )
     return [
-        ("unspanned before/after store update inside update_graph_including_nodeMerges",
+        ("unspanned transaction orchestration",
          update_graph_remainder),
-        ("unspanned inside update_graph_minus_nodeMerges", stores_remainder),
+        ("unspanned ordinary commit orchestration", stores_remainder),
     ]
 
 
@@ -327,13 +328,21 @@ def changed_file_counts() -> tuple[int, int, int]:
     return added, removed, size_changed
 
 
-def counted_save_work() -> tuple[list[int], list[tuple[int, int]]]:
+def counted_save_work() -> tuple[
+    list[int], list[tuple[int, int]], list[dict[str, int]], list[int]
+]:
     log = (RAW_DIR / "server.stderr.log").read_text()
     definitions = [int(value) for value in re.findall(
         r"Writing ([0-9]+) instruction\(s\) to disk", log)]
     file_changes = [(int(deleted), int(written)) for deleted, written in re.findall(
         r"Deleted ([0-9]+) file\(s\), wrote ([0-9]+) file\(s\)", log)]
-    return definitions, file_changes
+    graph_work = [
+        {key: int(value) for key, value in re.findall(r"(\w+)=([0-9]+)", payload)}
+        for payload in re.findall(r"incremental graph work: ([^\n]+)", log)
+    ]
+    telescope_owners = [int(value) for value in re.findall(
+        r"incremental telescope work: telescope_owners_checked=([0-9]+)", log)]
+    return definitions, file_changes, graph_work, telescope_owners
 
 
 def explanation_for(name: str, explanations: dict[str, Any]) -> str:
@@ -421,7 +430,7 @@ def main() -> None:
     measured_server_cpus = [float(row["server_cpu_seconds"]) for row in client_rows]
     emacs_cpus = [float(row["emacs_cpu_seconds"]) for row in client_rows]
     added, removed, size_changed = changed_file_counts()
-    definitions, file_changes = counted_save_work()
+    definitions, file_changes, graph_work, telescope_owners = counted_save_work()
     emacs_cpu_total = sum(emacs_cpus)
     server_cpu_proxy = sum(measured_server_cpus)
     if server_cpu_proxy <= 0:
@@ -443,9 +452,38 @@ def main() -> None:
         "complete_validation::validate_complete_graph_candidate"), reverse=True)[:2]
     validation_fractions = [cost / total_native_samples * server_fraction
                             for cost in validation_costs]
-    validation_summary = (f"{validation_fractions[0]:.1%} and "
-                          f"{validation_fractions[1]:.1%}"
-                          if len(validation_fractions) >= 2 else "most")
+    if validation_fractions:
+        validation_summary = ", ".join(
+            f"{fraction:.1%}" for fraction in validation_fractions)
+        principal_finding = (
+            "Unexpectedly, the production stack still contains whole-candidate validation "
+            f"({validation_summary} of total CPU evidence)."
+        )
+    else:
+        principal_finding = (
+            "The production save stack contains no complete-graph candidate validation. "
+            "Graph validity, inverse-index auditing, override checks, and telescope warnings "
+            "are bounded by the recorded save delta and affected neighborhood."
+        )
+    median_wall = statistics.median(walls)
+    median_server_cpu = statistics.median(measured_server_cpus)
+    old_wall = 2.576
+    old_server_cpu = 3.010
+    old_instructions = 27_749_080_334
+    graph_count_rows: list[str] = []
+    for key, label in [
+        ("graph_nodes", "graph nodes visible to each prepared phase"),
+        ("normalized_definitions", "normalized definitions"),
+        ("affected_ids", "affected IDs"),
+        ("owners_reindexed", "owners reindexed"),
+        ("override_sources_checked", "override sources checked"),
+        ("override_targets_checked", "override targets checked"),
+        ("override_chain_steps", "override-chain steps"),
+        ("local_index_keys_checked", "local-index keys checked"),
+    ]:
+        values = [row[key] for row in graph_work if key in row]
+        graph_count_rows.append(
+            f"| {label} per prepared phase | {', '.join(map(str, values))} |")
     lines = [
         "#+TITLE: Recursive-content save profile",
         "#+PROPERTY: header-args :eval never-export",
@@ -454,13 +492,9 @@ def main() -> None:
         f"={metadata['root_pid']}=.  Each save adds one single-token level-two headline.",
         "The benchmark ran against a disposable copy of =data/=; the original data was not written.",
         "",
-        f"Median end-to-end save latency was *{statistics.median(walls):.3f} s* "
+        f"Median end-to-end save latency was *{median_wall:.3f} s* "
         f"(min {min(walls):.3f} s, p95 {percentile(walls, 0.95):.3f} s, max {max(walls):.3f} s).",
-        "The principal finding is that the same whole-graph candidate is validated twice under one "
-        f"mutation gate. The two calls consume {validation_summary} of total CPU evidence. "
-        "Safely reusing the first result "
-        "should therefore remove roughly half the work; making the remaining validation incremental "
-        "is the larger follow-on opportunity.",
+        principal_finding,
         "Top-level CPU fractions use measured process CPU time. Rust sub-branches divide the server "
         "share according to Callgrind user-space instruction counts. They are CPU-work attribution, "
         "not fractions of wall time or hardware cycle counts.",
@@ -474,6 +508,19 @@ def main() -> None:
         "Structured tracing supplies nested span wall times; Emacs supplies per-save process CPU time "
         "and a Lisp profiler capture. Instruction share is a deterministic proxy for CPU work; "
         "different instructions need not have identical cycle cost.",
+        "",
+        "/Before/after comparison./ The baseline is the earlier profile of the same disposable-data "
+        "workload and 54,836-node graph. Absolute timings are host-sensitive; instruction count and "
+        "the recorded work bounds are the stronger scaling evidence.",
+        "",
+        "| measure | whole-validation baseline | incremental result | change |",
+        "|---------+---------------------------+--------------------+--------|",
+        f"| median client wall time | {old_wall:.3f} s | {median_wall:.3f} s | "
+        f"{old_wall / median_wall:.1f}x faster |",
+        f"| median server process CPU | {old_server_cpu:.3f} s | {median_server_cpu:.3f} s | "
+        f"{old_server_cpu / median_server_cpu:.1f}x lower |",
+        f"| Callgrind instructions | {old_instructions:,} | {total_native_samples:,} | "
+        f"{old_instructions / total_native_samples:.1f}x fewer |",
         "",
         f"The runtime graph began with {int(metadata['runtime_graph_nodes']):,} folded nodes and "
         f"{int(metadata['runtime_graph_edges']):,} containment edges. The copied owned tree contained "
@@ -494,6 +541,8 @@ def main() -> None:
         f"| save definitions per run | {', '.join(map(str, definitions))} |",
         f"| filesystem deletes/writes per run | {', '.join(f'{deleted}/{written}' for deleted, written in file_changes)} |",
         f"| copied-tree files added/removed/size-changed after all runs | {added}/{removed}/{size_changed} |",
+        *graph_count_rows,
+        f"| telescope owners checked per final save | {', '.join(map(str, telescope_owners))} |",
         "",
         "/Wall-time spans./ These are elapsed-time spans and therefore intentionally separate from "
         "the CPU-fraction tree. They can expose waits that an on-CPU sampler cannot see.",
@@ -521,10 +570,9 @@ def main() -> None:
                      f"{row['headlines_before']} | {row['bytes_after']} | {row['headlines_after']} |")
     lines.extend([
         "",
-        "Server CPU is process-wide and may exceed wall time when multiple threads run. In this fresh-server "
-        "benchmark, runs 2 and 3 overlap an initial Tantivy segment merge queued before measurement; the "
-        "exact first-save Callgrind window attributes 99.9% of native instructions to the synchronous request. "
-        "The merge is therefore concurrency evidence, not charged to synchronous save latency.",
+        "Server CPU is process-wide and may exceed wall time when multiple threads run. The execution-context "
+        "table separates synchronous-request instructions from concurrent/background work in the exact "
+        "first-save Callgrind window.",
         "",
         "/Native CPU evidence by execution context./",
         "",

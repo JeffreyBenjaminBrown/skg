@@ -10,6 +10,11 @@ pub struct OverrideCheckScope {
   pub targets : HashSet<ID>,
 }
 
+pub(crate) struct AffectedOverrideValidation {
+  pub(crate) violations  : Vec<OverrideInvariantViolation>,
+  pub(crate) chain_steps : usize,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OverrideInvariantViolation {
   UnknownSource {
@@ -154,7 +159,17 @@ pub fn validate_affected_override_invariants (
   graph  : &InRustGraph,
   scope  : &OverrideCheckScope,
 ) -> Vec<OverrideInvariantViolation> {
+  validate_affected_override_invariants_with_counts (config, graph, scope)
+    . violations
+}
+
+pub(crate) fn validate_affected_override_invariants_with_counts (
+  config : &SkgConfig,
+  graph  : &InRustGraph,
+  scope  : &OverrideCheckScope,
+) -> AffectedOverrideValidation {
   let mut violations : Vec<OverrideInvariantViolation> = Vec::new ();
+  let mut chain_steps : usize = 0;
   for target in &scope . targets {
     let mut overriders : Vec<ID> =
       user_owned_overriders_of (config, graph, target);
@@ -172,12 +187,20 @@ pub fn validate_affected_override_invariants (
       else { continue; };
     if ! user_owned { continue; }
     let resolution = resolve_override (config, graph, None, source);
+    chain_steps += if resolution . cycle_detected {
+      resolution . cycle . len ()
+    } else {
+      resolution . path . len ()
+    };
     if resolution . cycle_detected {
       violations . push (
         OverrideInvariantViolation::UserOwnedOverrideCycle {
           cycle : canonicalize_cycle (resolution . cycle),
         }); }}
-  dedup_violations (violations)
+  AffectedOverrideValidation {
+    violations : dedup_violations (violations),
+    chain_steps,
+  }
 }
 
 /// The single user-owned node (by pid) that already overrides

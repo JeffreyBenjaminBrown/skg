@@ -197,9 +197,14 @@ pub fn affected_telescope_warnings (
   saved_pids   : &HashSet<ID>,
   affected_ids : &HashSet<ID>,
 ) -> Vec<(ID, TelescopeViolation)> {
+  let _span : tracing::span::EnteredSpan =
+    tracing::info_span! ("affected_telescope_warnings") . entered ();
   let mut owners : Vec<ID> = derive_affected_telescope_owners (
     base, candidate, saved_pids, affected_ids) . into_iter () . collect ();
   owners . sort ();
+  tracing::info! (
+    "incremental telescope work: telescope_owners_checked={}",
+    owners . len ());
   let mut warnings : Vec<(ID, TelescopeViolation)> = Vec::new ();
   for owner in owners {
     for warning in telescope_violations_of (config, candidate, &owner) {
