@@ -110,6 +110,10 @@ rather than via `unload-feature'."
         (unload-feature feat t)))
     (load-file (expand-file-name "skg-keymaps-and-aliases.el" elisp-dir))
     (load-file (expand-file-name "skg-init.el"                elisp-dir))
-    (load-file (expand-file-name "skg-buffer.el"              elisp-dir))))
+    (load-file (expand-file-name "skg-buffer.el"              elisp-dir))
+    (dolist (buffer (buffer-list))
+      (when (buffer-local-value 'skg-view-uri buffer)
+        (with-current-buffer buffer
+          (skg--install-two-dirty-buffer-warning-hooks))))))
 
 (provide 'skg-reload)

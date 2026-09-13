@@ -4,12 +4,14 @@ Each time you save, your view is rebuilt.
 This is because you can put 'requests' into your view,
 in which you request more data,
 such as a node's ancestors, or the nodes that link to it.
-Since views can overlap,
-saving one open view can change another.
+Since views can overlap, saving one open view can change another.
 For this reason the client will warn you
-if you have unsaved edits in one view
-and beegin to edit another one.
-It won't stop you, but the results could be bad.
+if you have unsaved edits in one view and begin to edit another one.
+You can proceed, but the results could be bad --
+one save could clobber an earlier one.
+That approval lasts until point enters another buffer.
+If point enters the second view again while another view is still dirty,
+Skg asks again before letting you edit it.
 
 If the current files for anything being saved select a title or body
 from below that node's home, Skg stops before every write and offers
