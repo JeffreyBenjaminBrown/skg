@@ -891,7 +891,7 @@ preparation fail after ordinary preparation; neither the ordinary bytes nor
 the graph snapshot changes.  =cargo check --all-targets= and both grouped unit
 and save suites pass without warnings.
 
-** ONGOING Remove the obsolete merge-neighbor resave assumption
+** DONE Remove the obsolete merge-neighbor resave assumption
 
 - Confirm with repository-wide call search that
   =neighbor_savenodes_for_nodeMerges= and its supporting neighbor query have no
@@ -911,7 +911,19 @@ Call search finds no neighbor-resave helper or claim that merges rewrite
 unchanged inbound neighbors.  Merge graph queries and a fresh full graph rebuild
 produce the same inverse indexes without those writes.
 
-** TODO Implement affected telescope warnings and absent-target privacy
+Repository-wide production call search confirmed both neighbor helpers were
+dead.  They and their TypeDB-era cascade explanation are removed, along with
+the relation-query imports they alone needed.  No collateral no-op Save was
+introduced.
+
+The successful merge integration fixture now includes inbound =contains=,
+=subscribes_to=, =hides_from_its_subscriptions=, =overrides_view_of=, and body
+text-link owners.  After merging, every inverse query resolves to the
+acquirer, every neighbor file retains identical bytes and modification time,
+and all six inverse maps equal a fresh graph rebuild from the resulting disk.
+The R1/R2 rejection test likewise succeeds without a neighbor Save.
+
+** ONGOING Implement affected telescope warnings and absent-target privacy
 
 - Add the explicit absent-target violation and display text.
 - Apply owner-home fallback uniformly to =contains=, =subscribes_to=,

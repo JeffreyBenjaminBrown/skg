@@ -1,5 +1,3 @@
-use crate::dbs::in_rust_graph::relation_accessors::OUTBOUND_RELATIONSHIP_TYPES;
-use crate::dbs::in_rust_graph::query::find_related_nodes;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::{nodecomplete_by_id, opt_nodecomplete_by_id};
 use crate::from_text::local_instruction_collection::lower::nodeMerge_pairs;
@@ -13,62 +11,6 @@ use crate::types::tree::forest::ViewForest;
 
 use std::collections::HashSet;
 use std::error::Error;
-
-/// Find every node that has an outbound relation pointing at the
-/// acquiree via one of the five outbound-relation shapes. The
-/// acquiree plays the object (second relationship member — role_b in
-/// 'OUTBOUND_RELATIONSHIP_TYPES'); the neighbor plays the subject
-/// (first relationship member — role_a). These neighbors'
-/// outbound edges to acquiree would be destroyed by cascade when the
-/// acquiree is deleted; they must be re-saved so the save pipeline
-/// re-creates the edges (extra_id resolution then redirects them to
-/// the acquirer).
-pub fn affected_neighbors_of_nodeMerge (
-  graph       : &InRustGraph,
-  acquiree_id : &ID,
-) -> Result < HashSet<ID>, Box<dyn Error> > {
-  let inputs : [ID; 1] = [ acquiree_id . clone () ];
-  let mut all : HashSet<ID> = HashSet::new ();
-  for (relation, neighbor_role, acquiree_role) in OUTBOUND_RELATIONSHIP_TYPES {
-    let neighbors : HashSet<ID> = find_related_nodes (
-      graph, &inputs, relation, acquiree_role, neighbor_role );
-    all . extend (neighbors); }
-  Ok (all) }
-
-/// For a batch of merges, discover every affected neighbor across all
-/// acquirees, filter out any that are themselves acquirers or acquirees
-/// in the batch (those are already handled by the primary 3×N
-/// DefineNodes), load each neighbor's NodeComplete from disk, and wrap
-/// in SaveNode. The resulting SaveNodes carry /unchanged/ NodeCompletes
-/// — the acquiree_id stays in whatever vectors it's in, and extra_id
-/// resolution handles the redirection to the acquirer in the graph.
-pub fn neighbor_savenodes_for_nodeMerges (
-  nodeMerges : &[NodeMerge],
-  graph  : &InRustGraph,
-  config : &SkgConfig,
-) -> Result < Vec<SaveNode>, Box<dyn Error> > {
-  if nodeMerges . is_empty () {
-    return Ok (Vec::new ()); }
-  let primary_pids : HashSet<ID> = nodeMerges . iter ()
-    . flat_map ( |m| [
-        m . acquirer_id () . clone (),
-        m . acquiree_id () . clone () ] )
-    . collect ();
-  let mut neighbors : HashSet<ID> = HashSet::new ();
-  for nodeMerge in nodeMerges {
-    let for_this : HashSet<ID> = affected_neighbors_of_nodeMerge (
-      graph, nodeMerge . acquiree_id ()
-    ) ?;
-    neighbors . extend (for_this); }
-  let to_load : Vec<ID> =
-    neighbors . difference (&primary_pids) . cloned () . collect ();
-  let mut save_nodes : Vec<SaveNode> =
-    Vec::with_capacity (to_load . len ());
-  for pid in &to_load {
-    let node : NodeComplete =
-      nodecomplete_by_id (graph, config, pid) ?;
-    save_nodes . push ( SaveNode (node) ); }
-  Ok (save_nodes) }
 
 /// PURPOSE: For each nodeMerge request in the viewforest, this
 /// creates a NodeMerge:

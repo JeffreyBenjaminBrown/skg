@@ -1,6 +1,8 @@
 // cargo test merge::merge_nodes
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
+use skg::dbs::in_rust_graph::InRustGraph;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_viewforest;
 use skg::nodeMerge::merge_nodes;
 use skg::test_utils::{run_with_shared_test_stores, tantivy_contains_id, graph_handle_from_config, audit_inrustgraph_or_panic};
@@ -16,7 +18,9 @@ use skg::dbs::in_rust_graph::query::find_related_nodes;
 use ego_tree::Tree;
 use std::collections::HashSet;
 use std::error::Error;
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 fn mk_test_viewnode (
   title        : &str,
@@ -441,6 +445,16 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
       config )?;
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
+  let neighbor_paths : Vec<PathBuf> = [
+    "contains-1.skg", "subscribes-to-1.skg",
+    "hides-1-from-subscriptions.skg", "overrider-of-1.skg",
+    "links-to-1.skg",
+  ] . iter () . map (|name|
+    config . sources [&SourceName::from ("main")] . path . join (name))
+    . collect ();
+  let neighbor_before : Vec<(Vec<u8>, SystemTime)> = neighbor_paths . iter ()
+    . map (|path| Ok ((fs::read (path) ?, fs::metadata (path) ? . modified () ?)))
+    . collect::<Result<Vec<(Vec<u8>, SystemTime)>, std::io::Error>> () ?;
   merge_nodes (
     &nodeMerge_instructions, config . clone (),
     tantivy, &graph,
@@ -448,6 +462,12 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
 
   let snap = graph . load_full ();
   let input_acquirer : Vec<ID> = vec![ID::from ("2")];
+
+  for (path, (expected_bytes, expected_mtime)) in
+    neighbor_paths . iter () . zip (&neighbor_before)
+  {
+    assert_eq! (&fs::read (path) ?, expected_bytes);
+    assert_eq! (&fs::metadata (path) ? . modified () ?, expected_mtime); }
 
   // === Inverse queries: "who points at pid 2?" ===
 
@@ -458,6 +478,12 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   assert!( subscribers . contains (&ID::from ("subscribes-to-1")),
            "inverse subscribes under pid 2 should include \
             subscribes-to-1 (its subscribes_to = [1], which aliases 2)" );
+
+  let containers : HashSet<ID> =
+    find_related_nodes (
+      &snap, &input_acquirer,
+      "contains", "contained", "container" );
+  assert! (containers . contains (&ID::from ("contains-1")));
 
   let hiders : HashSet<ID> =
     find_related_nodes (
@@ -520,5 +546,15 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   assert!( destinations_of_l1 . contains (&ID::from ("2")),
            "links-to-1's forward textlinks should resolve to \
             canonical pid 2" );
+
+  let disk_nodes : Vec<NodeComplete> =
+    read_all_skg_files_from_sources (config) ?;
+  let rebuilt : InRustGraph = InRustGraph::from_nodecompletes (&disk_nodes);
+  assert_eq! (snap . contained_by, rebuilt . contained_by);
+  assert_eq! (snap . subscribers_of, rebuilt . subscribers_of);
+  assert_eq! (snap . hiders_of, rebuilt . hiders_of);
+  assert_eq! (snap . overriders_of, rebuilt . overriders_of);
+  assert_eq! (snap . textlinks_in, rebuilt . textlinks_in);
+  assert_eq! (snap . extra_id_to_pid, rebuilt . extra_id_to_pid);
 
   Ok (( )) }
