@@ -118,6 +118,20 @@ impl fmt::Display for GraphUpdatePreparationError {
 
 impl Error for GraphUpdatePreparationError {}
 
+impl GraphUpdatePreparationError {
+  pub(crate) fn is_internal (&self) -> bool {
+    ! self . internal_index_errors . is_empty () }
+
+  pub(crate) fn is_override_invariant_only (&self) -> bool {
+    ! self . complete_graph_errors . is_empty ()
+      && self . complete_graph_errors . iter () . all (|error|
+        matches! (error, CompleteGraphError::Override (_)))
+      && self . extra_id_revocations . is_empty ()
+      && self . internal_index_errors . is_empty ()
+      && self . merge_override_collisions . is_empty ()
+  }
+}
+
 struct NormalizedDefineNodeBatch {
   filesystem_definitions : Vec<DefineNode>,
   final_graph_definitions : Vec<DefineNode>,

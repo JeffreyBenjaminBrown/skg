@@ -9,7 +9,9 @@ use crate::telescope::invariants::{
 use crate::dbs::in_rust_graph::{
   InRustGraph,
   InRustGraphHandle,
-  prepared_update::{PreparedGraphUpdate, prepare_graph_update},
+  prepared_update::{
+    GraphUpdatePreparationError, PreparedGraphUpdate, prepare_graph_update,
+  },
 };
 use crate::dbs::tantivy::background_writer::{enqueue_tantivy_write, lock_tantivy_writes, TantivyWriteTask};
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
@@ -26,6 +28,25 @@ use std::error::Error;
 use std::io;
 use std::sync::Arc;
 use tantivy::IndexWriter;
+
+fn graph_preparation_save_error (
+  error : GraphUpdatePreparationError,
+) -> Box<dyn Error> {
+  if error . is_internal () {
+    return Box::new (SaveError::DatabaseError (Box::new (error))); }
+  let is_override_invariant : bool =
+    error . is_override_invariant_only ();
+  let message : String = error . to_string ();
+  let buffer_error : BufferValidationError = if is_override_invariant {
+    BufferValidationError::OverrideInvariantViolation (message)
+  } else {
+    BufferValidationError::Other (message)
+  };
+  Box::new (SaveError::BufferValidationErrors {
+    errors : vec![buffer_error],
+    warnings : vec![],
+  })
+}
 
 /// Updates the authoritative and derived stores from prepared `DefineNode`s:
 ///   1) Filesystem (source of truth)
@@ -64,8 +85,7 @@ pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
   let base : Arc<InRustGraph> = graph . load_full ();
   let prepared : PreparedGraphUpdate = prepare_graph_update (
     &config, base . clone (), node_defs)
-    . map_err ( |error| -> Box<dyn Error> {
-      error . to_string () . into () } ) ?;
+    . map_err (graph_preparation_save_error) ?;
   let prepared_filesystem : PreparedFilesystemUpdate = prepare_fs_update (
     prepared . definitions (), source_moves, &config, hoist_approved_pids) ?;
   let telescope_warnings : Vec<(ID, TelescopeViolation)> =
@@ -192,12 +212,7 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
     if save_instructions . is_empty () { None }
     else { Some (prepare_graph_update (
       &config, graph_before_save . clone (), save_instructions)
-      . map_err ( |error| -> Box<dyn Error> {
-        Box::new (SaveError::BufferValidationErrors {
-          errors : vec![BufferValidationError::Other (
-            error . to_string ())],
-          warnings : vec![],
-        }) } ) ?) };
+      . map_err (graph_preparation_save_error) ?) };
   let graph_after_save : Arc<InRustGraph> = prepared_save . as_ref ()
     . map ( |prepared| prepared . candidate () . clone () )
     . unwrap_or_else ( || graph_before_save . clone () );
@@ -209,12 +224,7 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
     if nodeMerge_definitions . is_empty () { None }
     else { Some (prepare_graph_update (
       &config, graph_after_save, nodeMerge_definitions)
-      . map_err ( |error| -> Box<dyn Error> {
-        Box::new (SaveError::BufferValidationErrors {
-          errors : vec![BufferValidationError::Other (
-            error . to_string ())],
-          warnings : vec![],
-        }) } ) ?) };
+      . map_err (graph_preparation_save_error) ?) };
   // Prepare and retain both filesystem phases before either is consumed.
   // This is the save-level all-or-nothing preflight for fallible ownership,
   // shape, path, and serialization work.
