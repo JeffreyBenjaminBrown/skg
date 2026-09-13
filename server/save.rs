@@ -70,20 +70,20 @@ pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
     &config, base, node_defs)
     . map_err ( |error| -> Box<dyn Error> {
       error . to_string () . into () } ) ?;
+  let prepared_filesystem : PreparedFilesystemUpdate = prepare_fs_update (
+    prepared . definitions (), source_moves, &config, hoist_approved_pids) ?;
   apply_defineNodes ( prepared,
-                      source_moves,
+                      prepared_filesystem,
                       config,
                       tantivy_index,
-                      graph,
-                      hoist_approved_pids ) }
+                      graph ) }
 
 fn apply_defineNodes (
   prepared      : PreparedGraphUpdate,
-  source_moves  : &[SourceMove],
+  prepared_filesystem : PreparedFilesystemUpdate,
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
   graph         : &InRustGraphHandle,
-  hoist_approved_pids : &HashSet<ID>,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   prepared . verify_base (graph)
     . map_err ( |message| -> Box<dyn Error> { message . into () } ) ?;
@@ -96,9 +96,7 @@ fn apply_defineNodes (
     let (deleted_count, written_count) : (usize, usize) =
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "update_fs_from_savenode_defs") . entered ();
-        update_fs_from_saveinstructions_with_hoist_approval (
-          prepared . definitions (), source_moves,
-          config . clone (), hoist_approved_pids ) } ?;
+        prepared_filesystem . apply (&config) } ?;
     tracing::info!( "   Deleted {} file(s), wrote {} file(s).",
               deleted_count, written_count ); }
 
@@ -219,12 +217,17 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
             error . to_string ())],
           warnings : vec![],
         }) } ) ?) };
-  // The ordinary-save and nodeMerge phases execute separately, but their
-  // filesystem validity is one save-level decision.  Keep this preflight and
-  // the pre-save snapshot under the mutation gate: otherwise another writer
-  // can invalidate either between inspection and publication.
-  preflight_fs_from_saveinstructions_with_hoist_approval (
-    &all_filesystem_outputs, source_moves, &config, hoist_approved_pids ) ?;
+  // Prepare and retain both filesystem phases before either is consumed.
+  // This is the save-level all-or-nothing preflight for fallible ownership,
+  // shape, path, and serialization work.
+  let prepared_save_filesystem : Option<PreparedFilesystemUpdate> =
+    prepared_save . as_ref () . map (|prepared| prepare_fs_update (
+      prepared . definitions (), source_moves, &config, hoist_approved_pids))
+    . transpose () ?;
+  let prepared_nodeMerge_filesystem : Option<PreparedFilesystemUpdate> =
+    prepared_nodeMerge . as_ref () . map (|prepared| prepare_fs_update (
+      prepared . definitions (), &[], &config, hoist_approved_pids))
+    . transpose () ?;
   let deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>> =
     all_filesystem_outputs . iter ()
     . filter_map ( |instruction| match instruction {
@@ -234,21 +237,23 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
       _ => None })
     . collect ();
   let config_for_telescope_gate : SkgConfig = config . clone ();
-  if let Some (prepared) = prepared_save {
+  if let Some ((prepared, prepared_filesystem)) =
+    prepared_save . zip (prepared_save_filesystem)
+  {
     let save_replacement : Option<TantivyIndex> =
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "apply_ordinary_defineNodes" ). entered();
         apply_defineNodes (
-          prepared, source_moves, config . clone (),
-          tantivy_index, graph, hoist_approved_pids ) } ?;
+          prepared, prepared_filesystem, config . clone (),
+          tantivy_index, graph ) } ?;
     if let Some (new_index) = save_replacement {
       *tantivy_index = new_index; }}
   let nodeMerge_replacement : Option<TantivyIndex> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "apply_nodeMerge_defineNodes" ). entered();
       crate::nodeMerge::apply_prepared_nodeMerges (
-        prepared_nodeMerge, config,
-        tantivy_index, graph, hoist_approved_pids ) } ?;
+        prepared_nodeMerge . zip (prepared_nodeMerge_filesystem), config,
+        tantivy_index, graph ) } ?;
   if let Some (new_index) = nodeMerge_replacement {
     *tantivy_index = new_index; }
   { // The save-side telescope warning gate: same primitive as the
@@ -468,28 +473,14 @@ pub(crate) fn update_fs_from_saveinstructions_with_hoist_approval (
   . apply (&config)
 }
 
-/// Validate and serialize a prospective filesystem batch, then discard the
-/// prepared bytes. The interactive save handler uses this on the union of its
-/// ordinary and nodeMerge outputs before either phase is allowed to mutate.
-pub(crate) fn preflight_fs_from_saveinstructions_with_hoist_approval (
-  node_defs           : &[DefineNode],
-  source_moves        : &[SourceMove],
-  config              : &SkgConfig,
-  hoist_approved_pids : &HashSet<ID>,
-) -> io::Result<()> {
-  prepare_fs_update (
-    node_defs, source_moves, config, hoist_approved_pids ) ?;
-  Ok (( ))
-}
-
-struct PreparedFilesystemUpdate {
+pub(crate) struct PreparedFilesystemUpdate {
   writes       : Vec<PreparedTelescopeWrite>,
   deletions    : Vec<String>,
   deleted_pids : HashSet<ID>,
 }
 
 impl PreparedFilesystemUpdate {
-  fn apply (
+  pub(crate) fn apply (
     self,
     config : &SkgConfig,
   ) -> io::Result<(usize, usize)> {
@@ -508,7 +499,7 @@ impl PreparedFilesystemUpdate {
   }
 }
 
-fn prepare_fs_update (
+pub(crate) fn prepare_fs_update (
   node_defs           : &[DefineNode],
   source_moves        : &[SourceMove],
   config              : &SkgConfig,

@@ -1,9 +1,7 @@
 use crate::delete_references_to_absent_node::{
   preview, preview_warning_org, result_org, rewrite };
 use crate::dbs::in_rust_graph::new_handle;
-use crate::save::{
-  preflight_fs_from_saveinstructions_with_hoist_approval,
-  update_graph_minus_nodeMerges_with_hoist_approval };
+use crate::save::update_graph_minus_nodeMerges_with_hoist_approval;
 use crate::serve::handlers::rerender_all_views::{
   stream_empty_rerender, stream_rerender_views_after_absent_reference_cleanup };
 use crate::serve::protocol::TcpToClient;
@@ -58,9 +56,6 @@ pub fn handle_delete_references_to_absent_node_request (
     Ok (writes) => writes,
     Err (e) => return refuse (stream, &e), };
   if ! writes . is_empty () {
-    if let Err (e) = preflight_fs_from_saveinstructions_with_hoist_approval (
-      &writes, &[], &runtime . config, &HashSet::new ())
-    { return refuse (stream, &e . to_string ()); }
     if let Err (e) = update_graph_minus_nodeMerges_with_hoist_approval (
       writes, &[], (*runtime . config) . clone (), &runtime . tantivy_index,
       &working_graph, &HashSet::new () )

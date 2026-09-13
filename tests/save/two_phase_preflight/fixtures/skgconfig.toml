@@ -1,0 +1,9 @@
+tantivy_folder = "/tmp/unused-two-phase-preflight"
+
+[[sources]]
+name = "main"
+path = "owned/main"
+
+[[sources]]
+name = "foreign"
+path = "foreign"

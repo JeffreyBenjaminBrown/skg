@@ -9,7 +9,8 @@ use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
 use crate::dbs::in_rust_graph::prepared_update::{
   PreparedGraphUpdate, prepare_graph_update,
 };
-use crate::save::{ update_fs_from_saveinstructions_with_hoist_approval, update_tantivy_from_saveinstructions };
+use crate::save::{PreparedFilesystemUpdate, prepare_fs_update,
+                  update_tantivy_from_saveinstructions};
 use crate::types::env::MutationGate;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::complete::NodeComplete;
@@ -59,8 +60,11 @@ pub(crate) fn merge_nodes_with_hoist_approval (
     &config, base, primary_definenodes)
     . map_err ( |error| -> Box<dyn Error> {
       error . to_string () . into () } ) ?;
+  let prepared_filesystem : PreparedFilesystemUpdate = prepare_fs_update (
+    prepared . definitions (), &[], &config, hoist_approved_pids) ?;
   apply_prepared_nodeMerges (
-    Some (prepared), config, tantivy_index, graph, hoist_approved_pids )
+    Some ((prepared, prepared_filesystem)), config,
+    tantivy_index, graph )
 }
 
 pub(crate) fn error_unless_nodeMerge_hoist_is_approved (
@@ -88,24 +92,20 @@ pub(crate) fn error_unless_nodeMerge_hoist_is_approved (
 }
 
 pub(crate) fn apply_prepared_nodeMerges (
-  prepared          : Option<PreparedGraphUpdate>,
+  prepared          : Option<(PreparedGraphUpdate, PreparedFilesystemUpdate)>,
   config            : SkgConfig,
   tantivy_index     : &TantivyIndex,
   graph             : &InRustGraphHandle,
-  hoist_approved_pids : &HashSet<ID>,
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
-  let Some (prepared) = prepared else { return Ok (None); };
+  let Some ((prepared, prepared_filesystem)) = prepared
+    else { return Ok (None); };
   tracing::info!(
     "Merging nodes in filesystem, in-Rust graph, and Tantivy ..." );
   prepared . verify_base (graph)
     . map_err ( |message| -> Box<dyn Error> { message . into () } ) ?;
   { // Filesystem.
     tracing::info!("1) Merging in filesystem ...");
-    update_fs_from_saveinstructions_with_hoist_approval (
-      prepared . definitions (),
-      &[], // No source-moves during a merge.
-      config . clone (),
-      hoist_approved_pids ) ?;
+    prepared_filesystem . apply (&config) ?;
     tracing::info!("   Filesystem merge complete."); }
 
   let (_candidate, primary_definenodes)

@@ -857,7 +857,7 @@ or complete replacements built by explicit rebuild-style operations.
 =validate_complete_graph_candidate= remains referenced only by its definition
 and test code.
 
-** ONGOING Reuse prepared filesystem work in the two-phase store pipeline
+** DONE Reuse prepared filesystem work in the two-phase store pipeline
 
 - Expose crate-private preparation and consuming application for
   =PreparedFilesystemUpdate=.
@@ -875,7 +875,23 @@ Fault tests for serialization, ownership, Hoist refusal, and invalid deletion
 path prove neither phase mutates when either preparation fails.  Existing
 ordinary-then-merge partial-I/O/recovery behavior is unchanged.
 
-** TODO Remove the obsolete merge-neighbor resave assumption
+=PreparedFilesystemUpdate= and =prepare_fs_update= are now crate-private phase
+boundaries.  Direct ordinary and merge paths prepare once and pass the owned
+token into their store orchestrator.  Combined saves prepare and retain both
+phase tokens before either write; application consumes their already-
+serialized telescopes.  The prepare-and-discard union preflight and the
+redundant handler preflight are gone.  Ordinary source moves are supplied only
+to ordinary preparation, and graph publication still follows that phase's
+successful filesystem application.
+
+The captured-base =deleted_by_this_save_extra_ids= derivation remains before
+token consumption.  Existing filesystem ownership/serialization/Hoist tests
+remain green, and a new combined integration fault makes merge filesystem
+preparation fail after ordinary preparation; neither the ordinary bytes nor
+the graph snapshot changes.  =cargo check --all-targets= and both grouped unit
+and save suites pass without warnings.
+
+** ONGOING Remove the obsolete merge-neighbor resave assumption
 
 - Confirm with repository-wide call search that
   =neighbor_savenodes_for_nodeMerges= and its supporting neighbor query have no

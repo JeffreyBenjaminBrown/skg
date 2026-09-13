@@ -2,7 +2,8 @@ use skg::dbs::filesystem::one_node::nodecomplete_from_id;
 use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
 use skg::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
 use skg::nodeMerge::merge_nodes;
-use skg::save::update_graph_minus_nodeMerges;
+use skg::save::{update_graph_including_nodeMerges,
+                update_graph_minus_nodeMerges};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores,
                       tantivy_contains_id};
 use skg::types::env::new_mutation_gate;
@@ -28,8 +29,50 @@ fn rejected_revocation_does_not_mutate_any_store () -> Result<(), Box<dyn Error>
         "rejected_merge_override_does_not_mutate_any_store",
         "tests/save/override_collision/fixtures") ?;
       exercise_rejected_merge_override (
-        &stores . config, &stores . tantivy) . await
+        &stores . config, &stores . tantivy) . await ?;
+      stores . reset (
+        "second_phase_preflight_prevents_first_phase_write",
+        "tests/save/two_phase_preflight/fixtures") ?;
+      exercise_second_phase_preflight (
+        &stores . config, &mut stores . tantivy) . await
     }))
+}
+
+async fn exercise_second_phase_preflight (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let before_graph : Arc<InRustGraph> = graph . load_full ();
+  let ordinary_path : PathBuf = config . sources [&SourceName::from ("main")]
+    . path . join ("ordinary.skg");
+  let before_bytes : Vec<u8> = fs::read (&ordinary_path) ?;
+  let mut ordinary : NodeComplete =
+    nodecomplete_from_id (config, &ID::from ("ordinary")) ?;
+  ordinary . title = "would have changed" . to_string ();
+  let acquiree : NodeComplete =
+    nodecomplete_from_id (config, &ID::from ("acquiree")) ?;
+  let mut foreign_acquirer : NodeComplete =
+    nodecomplete_from_id (config, &ID::from ("foreign-acquirer")) ?;
+  foreign_acquirer . extra_ids = vec![ID::from ("acquiree")];
+  let mut preserver : NodeComplete = acquiree;
+  preserver . pid = ID::from ("preserver");
+  preserver . extra_ids . clear ();
+  let merge : NodeMerge = NodeMerge {
+    acquiree_text_preserver : SaveNode (preserver),
+    updated_acquirer        : SaveNode (foreign_acquirer),
+    acquiree_to_delete      : DeleteNode {
+      id : ID::from ("acquiree"), source : SourceName::from ("main"),
+    },
+  };
+  let result = update_graph_including_nodeMerges (
+    vec![DefineNode::Save (SaveNode (ordinary))], &[merge], &[],
+    config . clone (), tantivy, &graph, &new_mutation_gate (),
+    &std::collections::HashSet::new ()) . await;
+  assert! (result . is_err (), "foreign merge phase must fail preflight");
+  assert! (Arc::ptr_eq (&before_graph, &graph . load_full ()));
+  assert_eq! (before_bytes, fs::read (&ordinary_path) ?);
+  Ok (( ))
 }
 
 async fn exercise_rejected_merge_override (
