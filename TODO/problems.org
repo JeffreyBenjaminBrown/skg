@@ -152,9 +152,19 @@
    message. WHAT REMAINS is the server-side gap: a source change that
    reaches the save on an indefinitive instance by any other path
    (hand-edited metadata, a stale buffer) is still dropped silently.
-   Suggested fix: the save could warn when a buffer's indefinitive
-   instance carries a source differing from disk, like the "Inactive
-   nodes present..." warning.
+   THE SERVER SIDE IS FIXED (2026-09-13): =ViewsState= retains the
+   last rendered =ViewForest= for each open buffer. On save, Skg
+   compares each indefinitive occurrence that was already present at
+   the same tree location: its title, source, and owned collection
+   claims (content, aliases, subscribee/overridden, and hidden-outside
+   membership) must still match that image. Newly inserted
+   indefinitive occurrences are allowed; their direct Active-node
+   children are normalized to =parentIs=independent= because the new
+   occurrence cannot write a contains relation. Body text on an
+   indefinitive occurrence is rejected during parsing, because
+   rendering never supplies such text. A definitive descendant's own
+   title/body edit remains allowed: it is a self-writer even below an
+   indefinitive ancestor.
 ** skg--relationship-edge-at-point misclassifies some positions
    It classifies "activeNode child of an activeNode parent" as the
    parent-contains-child edge, without checking:

@@ -1,7 +1,8 @@
 use crate::dbs::in_rust_graph::{
   in_rust_graph_coherent_with_save_instructions_in, new_handle };
 use crate::dbs::node_lookup::nodecomplete_from_graph;
-use crate::from_text::buffer_to_validated_saveplan_with_fork_sources_in_graph;
+use crate::from_text
+  ::buffer_to_validated_saveplan_with_fork_sources_and_previous_view_in_graph;
 use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::save::{
@@ -458,9 +459,12 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
             "buffer_to_validated_saveplan"
           ) . entered();
-        buffer_to_validated_saveplan_with_fork_sources_in_graph (
+        buffer_to_validated_saveplan_with_fork_sources_and_previous_view_in_graph (
           org_buffer_text, &runtime . graph, &runtime . config,
-          active_source_set, fork_sources )
+          active_source_set, fork_sources,
+          viewuri_from_request_result . as_ref () . ok ()
+            . and_then ( |uri| views_state . open_views
+              . viewuri_to_view (uri) ) )
       } . map_err (
         |e| Box::new (e) as Box<dyn Error> ) ?;
   if viewforest . is_empty ()

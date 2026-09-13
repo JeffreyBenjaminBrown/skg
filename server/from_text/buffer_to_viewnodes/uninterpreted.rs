@@ -160,6 +160,10 @@ fn linecol_to_viewnode(
       parsed_metadata
     } else { // No metadata, so use defaults.
       default_metadata () };
+  let body_on_indefinitive : bool =
+    metadata . indefinitive
+    && body_text . as_ref () . is_some_and (
+      |body| ! body . trim () . is_empty () );
   let ( viewnode, error_opt, warning_opt )
     : ( MpViewnode, Option<BufferValidationError>, Option<String> )
     = viewnode_from_metadata ( &metadata, title, body_text );
@@ -169,6 +173,14 @@ fn linecol_to_viewnode(
   { return Err (
       "forestRoot metadata is internal and cannot appear in buffer text"
       . to_string () ); }
+  let error_opt : Option<BufferValidationError> =
+    error_opt . or_else ( || if body_on_indefinitive {
+      Some (match metadata . id . clone () {
+        Some (id) => BufferValidationError::EditedIndefinitive (id),
+        None => BufferValidationError::Other (
+          "An indefinitive node has body text, which saving would discard. Add an ID and edit a definitive occurrence instead."
+          . to_string ()), })
+    } else { None } );
   Ok ( ( level, viewnode, error_opt, warning_opt ) ) }
 
 /// Check if a line is a valid headline and extract level, metadata, and title.

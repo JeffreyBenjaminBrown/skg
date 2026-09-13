@@ -7,6 +7,7 @@
 
 pub mod buffer_to_viewnodes;
 pub mod fork;
+pub mod indefinitive_edits;
 pub mod local_instruction_collection;
 pub mod supplement_from_disk;
 pub mod weave;
@@ -80,6 +81,20 @@ pub fn buffer_to_validated_saveplan_with_fork_sources_in_graph (
   active_source_set : Option<&ActiveSourceSet>,
   fork_sources : &HashMap<ID, SourceName>,
 ) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
+  buffer_to_validated_saveplan_with_fork_sources_and_previous_view_in_graph (
+    buffer_text, graph, config, active_source_set, fork_sources, None ) }
+
+/// As 'buffer_to_validated_saveplan_with_fork_sources_in_graph', while also
+/// comparing an open view's last server-rendered forest. This detects edits to
+/// data that an indefinitive occurrence would otherwise silently ignore.
+pub fn buffer_to_validated_saveplan_with_fork_sources_and_previous_view_in_graph (
+  buffer_text : &str,
+  graph       : &crate::dbs::in_rust_graph::InRustGraph,
+  config      : &SkgConfig,
+  active_source_set : Option<&ActiveSourceSet>,
+  fork_sources : &HashMap<ID, SourceName>,
+  previous_viewforest : Option<&ViewForest>,
+) -> Result<(ViewForest, SavePlan, Vec<String>), SaveError> {
   let restricted_source_set : Option<&ActiveSourceSet> =
     // The set 'all' restricts nothing; downstream stages treat None
     // as "no restriction", so normalize here, once.
@@ -117,11 +132,20 @@ pub fn buffer_to_validated_saveplan_with_fork_sources_in_graph (
       return Err ( SaveError::BufferValidationErrors {
         errors   : validation_errors,
         warnings : parsing_warnings, } ); }}
-  let viewforest : ViewForest =
+  let mut viewforest : ViewForest =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "maybePlaced_to_placed_viewforest" ). entered();
       maybePlaced_to_placed_viewforest (maybePlaced_viewforest) }
         . map_err ( |e| SaveError::ParseError (e) ) ?;
+  if let Some (previous) = previous_viewforest {
+    let errors : Vec<BufferValidationError> =
+      indefinitive_edits
+      ::errors_and_normalize_new_indefinitive_occurrences (
+        &mut viewforest, previous );
+    if ! errors . is_empty () {
+      return Err ( SaveError::BufferValidationErrors {
+        errors,
+        warnings : parsing_warnings, } ); }}
   let ( nonmerge_plan, nodeMerge_acquisitions )
     : ( NonmergeSavePlan, Vec<(ID, ID)> )
     = crate::from_text::local_instruction_collection

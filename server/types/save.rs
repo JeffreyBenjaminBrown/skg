@@ -157,8 +157,6 @@ pub fn format_save_error_as_org (
         content . push_str(&format!("** Error {}\n", i + 1));
         content . push_str(&format_buffer_validation_error (error));
         content . push ('\n'); }
-      content . push_str ("** Resolution\n");
-      content . push_str ("Please fix these errors and try saving again.\n");
       content }} }
 
 fn format_buffer_validation_error (
@@ -250,6 +248,9 @@ fn format_buffer_validation_error (
               id . 0, msg) },
     BufferValidationError::EditRequestOnIndefinitive (id) => {
       format!("Edit request on an indefinitive (possibly a phantom) node:\n- ID: {}\n- Indefinitive nodes cannot carry write instructions.\n- To delete or merge this node, visit a definitive view of it first (C-c g RET).\n",
+              id . 0) },
+    BufferValidationError::EditedIndefinitive (id) => {
+      format!("Edited indefinitive occurrence:\n- ID: {}\n- This occurrence changed since the server rendered it, but indefinitive occurrences do not write their own text or collections.\n- Re-render, then edit a definitive occurrence instead.\n",
               id . 0) },
     BufferValidationError::Other (msg) => {
       format!("{}\n", msg) }, }}
