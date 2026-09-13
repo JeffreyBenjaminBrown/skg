@@ -778,7 +778,7 @@ edit on bases with zero and 1,000 unrelated nodes.  Generated batch-mutator
 tests continue to pass the independent full index checker.  =cargo check
 --all-targets=, all =grouped_unit= tests, and all =grouped_saves= tests pass.
 
-** ONGOING Replace touched-only override validation with affected validation
+** DONE Replace touched-only override validation with affected validation
 
 - Derive affected sources and targets from old/new raw edges, source ownership,
   and canonicalization changes.
@@ -813,13 +813,17 @@ preparation still invokes =validate_complete_graph_candidate=, whose bundled
 whole checks include override validation.  Remove that call through the
 incremental-proof switch, then close this task.
 
+The coupled cutover is now complete: production preparation invokes only the
+affected validator.  The complete override walk remains solely in the full
+startup/rebuild/audit oracle and differential tests.
+
 *** Checkpoint
 
 Incremental and whole override validators agree in property tests.  The stale
 collision fixture no longer supplies =Save(R2)=, and its error is actionable
 rather than generic.
 
-** TODO Switch preparation from the whole candidate oracle to incremental proof
+** DONE Switch preparation from the whole candidate oracle to incremental proof
 
 - Build the candidate by cloning the captured persistent base and invoking the
   batch-aware =apply_definenodes_to_inRustGraph= exactly once.
@@ -839,7 +843,21 @@ Repository-wide call search finds no production save call to
 =validate_override_invariants=, or =validate_internal_indexes=.  Property
 tests show accepted candidates and rejected hard errors match the whole oracle.
 
-** TODO Reuse prepared filesystem work in the two-phase store pipeline
+=prepare_graph_update= now clones its captured persistent base, invokes
+=apply_definenodes_to_inRustGraph= once, and gates that exact candidate with
+incremental identity/home/revocation checks, affected override validation, and
+local index postconditions.  It no longer imports or calls
+=validate_complete_graph_candidate=.  A 256-case differential suite compares
+acceptance and every candidate node/index map with the full oracle.
+
+Publication audit finds one existing-graph snapshot store: consuming
+=PreparedGraphUpdate::publish=.  Ordinary save and node merge both use it;
+runtime-generation publications expose graphs already prepared by those paths
+or complete replacements built by explicit rebuild-style operations.
+=validate_complete_graph_candidate= remains referenced only by its definition
+and test code.
+
+** ONGOING Reuse prepared filesystem work in the two-phase store pipeline
 
 - Expose crate-private preparation and consuming application for
   =PreparedFilesystemUpdate=.

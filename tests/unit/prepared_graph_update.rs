@@ -439,6 +439,9 @@ proptest! {
     prop_assert! (revocations . is_empty ());
     let full = validate_complete_graph_candidate (
       &config (), &base, &batch . final_graph_definitions);
+    let prepared = prepare_graph_update (
+      &config (), Arc::new (base . clone ()),
+      batch . filesystem_definitions . clone ());
     let mut local : Vec<String> = local_errors . iter ()
       . map (|error| format! ("{error:?}"))
       . collect ();
@@ -454,5 +457,16 @@ proptest! {
     local . sort ();
     oracle . sort ();
     prop_assert_eq! (local, oracle);
+    prop_assert_eq! (prepared . is_ok (), full . errors . is_empty ());
+    if let Ok (prepared) = prepared {
+      let actual : &InRustGraph = prepared . candidate ();
+      prop_assert_eq! (&actual . nodes, &full . graph . nodes);
+      prop_assert_eq! (&actual . extra_id_to_pid, &full . graph . extra_id_to_pid);
+      prop_assert_eq! (&actual . contained_by, &full . graph . contained_by);
+      prop_assert_eq! (&actual . subscribers_of, &full . graph . subscribers_of);
+      prop_assert_eq! (&actual . hiders_of, &full . graph . hiders_of);
+      prop_assert_eq! (&actual . overriders_of, &full . graph . overriders_of);
+      prop_assert_eq! (&actual . textlinks_in, &full . graph . textlinks_in);
+    }
   }
 }

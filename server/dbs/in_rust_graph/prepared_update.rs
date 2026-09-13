@@ -10,8 +10,7 @@ use crate::dbs::in_rust_graph::{
   inbound_owners_at,
 };
 use crate::dbs::in_rust_graph::complete_validation::{
-  CompleteGraphError, CompleteGraphValidation, format_complete_graph_errors,
-  validate_complete_graph_candidate,
+  CompleteGraphError, format_complete_graph_errors,
 };
 use crate::dbs::in_rust_graph::internal_index_validation::{
   InternalIndexMismatch, LocalIndexValidation, format_internal_index_mismatches,
@@ -209,24 +208,15 @@ pub(crate) fn prepare_graph_update (
       internal_index_errors : local_index_validation . errors,
       merge_override_collisions : Vec::new (),
     }); }
-  let validation : CompleteGraphValidation = validate_complete_graph_candidate (
-    config, &base, &batch . final_graph_definitions);
-  let full_override_errors : Vec<OverrideInvariantViolation> = validation . errors
-    . iter () . filter_map (|error| match error {
-      CompleteGraphError::Override (violation) => Some (violation . clone ()),
-      _ => None,
-    }) . collect ();
-  debug_assert_eq! (affected_override_errors, full_override_errors,
-    "affected override validation diverged from the complete oracle");
   if ! merge_override_collisions . is_empty () {
     let merge_targets : HashSet<ID> = merge_override_collisions . iter ()
       . map (|collision| collision . acquirer . id . clone ()) . collect ();
-    let remaining_errors : Vec<CompleteGraphError> = validation . errors
-      . into_iter () . filter (|error| ! matches! (
-        error,
-        CompleteGraphError::Override (
-          OverrideInvariantViolation::MultipleUserOwnedOverriders {
-            overridden, .. }) if merge_targets . contains (overridden)))
+    let remaining_errors : Vec<CompleteGraphError> = affected_override_errors
+      . into_iter () . filter (|violation| ! matches! (
+        violation,
+        OverrideInvariantViolation::MultipleUserOwnedOverriders {
+          overridden, .. } if merge_targets . contains (overridden)))
+      . map (CompleteGraphError::Override)
       . collect ();
     return Err (GraphUpdatePreparationError {
       complete_graph_errors : remaining_errors,
@@ -234,9 +224,10 @@ pub(crate) fn prepare_graph_update (
       internal_index_errors : Vec::new (),
       merge_override_collisions,
     }); }
-  if ! validation . errors . is_empty () {
+  if ! affected_override_errors . is_empty () {
     return Err (GraphUpdatePreparationError {
-      complete_graph_errors : validation . errors,
+      complete_graph_errors : affected_override_errors . into_iter ()
+        . map (CompleteGraphError::Override) . collect (),
       extra_id_revocations  : Vec::new (),
       internal_index_errors : Vec::new (),
       merge_override_collisions : Vec::new (),

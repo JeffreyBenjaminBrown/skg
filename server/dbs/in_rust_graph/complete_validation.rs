@@ -165,9 +165,9 @@ pub fn validated_graph (
     Err (format_complete_graph_errors (&report . errors)) }
 }
 
-/// Materialize a complete candidate node set by applying definitions to one
-/// captured graph.  This is intentionally used before filesystem mutation so
-/// save-time identity/source/topology checks happen before filesystem mutation.
+/// Materialize and fully validate a candidate for differential tests and
+/// explicit audits. Production save preparation proves the same invariants
+/// incrementally and does not call this whole-graph oracle.
 pub fn validate_complete_graph_candidate (
   config : &SkgConfig,
   current : &InRustGraph,
