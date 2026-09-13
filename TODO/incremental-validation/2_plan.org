@@ -1048,7 +1048,7 @@ complete 112-test save group both passed unchanged.  =git diff --check= is
 clean; this toolchain has no =cargo fmt= command, and the repository's
 deliberately spaced Rust style was left intact.
 
-** ONGOING Reprofile the original slow save and report scaling
+** DONE Reprofile the original slow save and report scaling
 
 Run:
 
@@ -1091,6 +1091,30 @@ The new generated Org report contains the five measurements and work counters,
 and its explanation maps the remaining material costs to real work.  If wall
 time remains unexpectedly high, use the CPU/wait distinction to identify a new
 culprit before declaring this initiative complete.
+
+At server commit =5174b62c=, the five-run disposable-copy benchmark on 54,836
+active nodes measured median client wall time of 0.063 s (formerly 2.576 s),
+median server process CPU of 0.080 s (formerly 3.010 s), and 44,910,697
+synchronous-save Callgrind instructions (formerly 27,749,080,334): 40.6x,
+37.6x, and 617.9x improvements respectively.  The exact first-save window has
+zero complete candidate validations and zero full graph builds, one candidate
+transform, one saved-context derivation, and one Tantivy enqueue.
+
+Each ordinary phase recorded two normalized definitions, two affected IDs,
+two owners reindexed, two override sources, zero targets or chain steps, two
+telescope owners, and 7--11 local-index keys as the newly added headlines
+accumulated.  The graph's 54,836--54,840 visible-node count is context rather
+than work performed.  The candidate plus independent local audit converted the
+two saved nodes twice each; unrelated bodies were not parsed.
+
+Nested elapsed/busy/idle spans put the Rust save request at 0.012 s median and
+incremental graph preparation at 0.0018 s.  The remaining roughly 0.051 s of
+client-observed wall time is outside the server request and comparable to the
+profiling harness's 50 ms wait ceiling, so it is client/transport/scheduling
+resolution rather than validation.  The generated report contains no
+unexplained profiled branch or failed profile assertion.  Its ignored
+=result.org= and =raw/= evidence were not staged, and the harness removed both
+temporary copied data roots.
 
 * Differential and property-test design
 
