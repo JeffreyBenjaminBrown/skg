@@ -3,14 +3,17 @@
 //! restricted-set deletion refusal. Each test builds the exact graph fixture
 //! it passes to the source-resolution function.
 
-use super::{apply_sticky_sources_in_graph, refuse_delete_with_inactive_sections};
+use super::{apply_sticky_sources_in_graph, build_diskSupplemented_defineNodes,
+            refuse_delete_with_inactive_sections};
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::from_text::local_instruction_collection::lower::RequestedRelationshipSources;
+use crate::from_text::local_instruction_collection::lower::{
+  NodeIntent, RequestedRelationshipSources};
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{
   ID, MSV, MemberAtSource, SkgConfig, SkgfileSource, SourceName,
   SourceSetName};
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
+use crate::types::save::{DefineNode, SaveNode};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -400,6 +403,103 @@ fn explicit_lowering_moves_the_edge_between_section_files (
   assert! ( ! std::fs::read_to_string (&public_file) . unwrap ()
             . contains ("child"),
             "after: the home section does not name the child" );
+}
+
+#[test]
+fn same_save_child_home_move_allows_publicizing_its_parent_edge (
+) {
+  // A source move and its parent's explicit edge-source request occur in one
+  // save. The parent must calculate the edge default from the child's NEW
+  // home, not the pre-save graph's old home.
+  let config : SkgConfig = config_with_order ( & ["public", "pers-p"] );
+  let mut parent : NodeComplete = node_at ("parent", "public");
+  parent . contains = vec! [ pm ("pers-p", "child") ];
+  let child : NodeComplete = node_at ("child", "pers-p");
+  let graph : InRustGraph = graph_from ( & [ parent . clone (), child ] );
+
+  let mut parent_intent : NodeIntent =
+    NodeIntent::graph_save_from_nodecomplete (parent);
+  if let NodeIntent::Save (intent) = &mut parent_intent {
+    intent . contains = MSV::Specified (vec! [(
+      ID::new ("child"), Some (SourceName::from ("public"))) ]); }
+  let child_intent : NodeIntent = NodeIntent::graph_save_from_nodecomplete (
+    node_at ("child", "public"));
+
+  let planned = build_diskSupplemented_defineNodes (
+    vec! [ parent_intent, child_intent ], &graph, &config, None )
+    . expect ("the same-save home move makes public the edge's default");
+  let parent = planned . instructions . into_iter ()
+    .find_map ( |instruction| match instruction {
+      DefineNode::Save (SaveNode (node)) if node . pid == ID::new ("parent")
+        => Some (node),
+      _ => None })
+    .expect ("parent save instruction");
+  assert_eq! ( parent . contains, vec! [ pm ("public", "child") ] );
+  assert_eq! ( planned . source_moves . len (), 1 );
+  assert_eq! ( planned . source_moves [0] . pid, ID::new ("child") );
+}
+
+#[test]
+fn same_save_hidden_node_home_move_sets_the_new_hide_source (
+) {
+  // Hides have an inferred relationship source rather than an explicit
+  // relSource request, but their endpoint floor must use the same pending
+  // home view as the other relationship kinds.
+  let config : SkgConfig = config_with_order ( & ["public", "pers-p"] );
+  let hider : NodeComplete = node_at ("hider", "public");
+  let hidden : NodeComplete = node_at ("hidden", "pers-p");
+  let graph : InRustGraph = graph_from ( & [ hider . clone (), hidden ] );
+
+  let mut hider_intent : NodeIntent =
+    NodeIntent::graph_save_from_nodecomplete (hider);
+  if let NodeIntent::Save (intent) = &mut hider_intent {
+    intent . hides_from_its_subscriptions =
+      MSV::Specified (vec! [ID::new ("hidden")]); }
+  let hidden_intent : NodeIntent = NodeIntent::graph_save_from_nodecomplete (
+    node_at ("hidden", "public"));
+
+  let planned = build_diskSupplemented_defineNodes (
+    vec! [ hider_intent, hidden_intent ], &graph, &config, None )
+    . expect ("the pending hidden-node home participates in the hide floor");
+  let hider = planned . instructions . into_iter ()
+    .find_map ( |instruction| match instruction {
+      DefineNode::Save (SaveNode (node)) if node . pid == ID::new ("hider")
+        => Some (node),
+      _ => None })
+    .expect ("hider save instruction");
+  assert_eq! (
+    hider . hides_from_its_subscriptions,
+    MSV::Specified (vec! [pm ("public", "hidden")]) );
+}
+
+#[test]
+fn new_private_child_in_the_same_save_gets_a_private_edge (
+) {
+  // The child is absent from the pre-save graph, so its Save intent is the
+  // only available source of its home. Falling back to the public parent's
+  // home here would create exactly the leak shape the endpoint floor forbids.
+  let config : SkgConfig = config_with_order ( & ["public", "pers-p"] );
+  let parent : NodeComplete = node_at ("parent", "public");
+  let graph : InRustGraph = graph_from ( & [ parent . clone () ] );
+
+  let mut parent_intent : NodeIntent =
+    NodeIntent::graph_save_from_nodecomplete (parent);
+  if let NodeIntent::Save (intent) = &mut parent_intent {
+    intent . contains = MSV::Specified (vec! [(
+      ID::new ("new-child"), None )]); }
+  let child_intent : NodeIntent = NodeIntent::graph_save_from_nodecomplete (
+    node_at ("new-child", "pers-p"));
+
+  let planned = build_diskSupplemented_defineNodes (
+    vec! [ parent_intent, child_intent ], &graph, &config, None )
+    . expect ("same-save new nodes supply their relationship endpoint homes");
+  let parent = planned . instructions . into_iter ()
+    .find_map ( |instruction| match instruction {
+      DefineNode::Save (SaveNode (node)) if node . pid == ID::new ("parent")
+        => Some (node),
+      _ => None })
+    .expect ("parent save instruction");
+  assert_eq! ( parent . contains, vec! [ pm ("pers-p", "new-child") ] );
 }
 
 #[test]

@@ -761,6 +761,28 @@ it are not offered (they cannot actually publicize)."
        (should (string-match-p "(source public)"
                                (test--line-of-id id)))))))
 
+(ert-deftest test-set-source-single-publicizes-a-public-parents-child-edge ()
+  "Moving a private child into public offers its public parent's edge too."
+  (test--with-skg-content-view
+   (concat
+    "* (skg (node (id parent) (source public))) parent\n"
+    "** (skg (node (id child) (source private))) child\n")
+   test--config-public-private-trusted
+   (lambda ()
+     (goto-char (point-min))
+     (search-forward "(id child)")
+     (beginning-of-line)
+     (cl-letf (((symbol-function 'skg--prompt-for-source-change)
+                (lambda (_current) "public"))
+               ((symbol-function 'y-or-n-p)
+                (lambda (prompt)
+                  (should (string-match-p "1 content relationship " prompt))
+                  t)))
+       (test--messages-during (lambda () (skg-set-source))))
+     (should (string-match-p "(source public)" (test--line-of-id "child")))
+     (should (string-match-p "(relSource public)"
+                             (test--line-of-id "child"))))))
+
 (ert-deftest test-set-source-single-offers-direct-child-edges ()
   "A single (non-recursive) publicizing move offers only the edges it
 actually changes: its direct children's inbound edges whose default

@@ -59,18 +59,36 @@ pub fn build_diskSupplemented_defineNodes (
 ) -> Result<Definenodes_with_Sourcemoves, Box<dyn Error>> {
   let mut result : Definenodes_with_Sourcemoves =
     Definenodes_with_Sourcemoves::with_capacity (intents . len());
+  let prospective_homes : HashMap<ID, SourceName> =
+    homes_declared_by_save_intents (&intents);
   for intent in intents {
     let supplemented : Definenode_with_Opt_Sourcemove =
       supplement_nodeeditintent_from_disk (
-        intent, graph, config, restricted_source_set ) ?;
+        intent, graph, config, restricted_source_set, &prospective_homes ) ?;
     result . push (supplemented); }
   Ok (result) }
+
+/// Each Save intent's source is the node home after this save. Relationship
+/// floors must see these homes across the entire batch: a parent may name a
+/// child before the child intent is supplemented, and a same-save home move
+/// must make its newly public edge legal.
+fn homes_declared_by_save_intents (
+  intents : &[NodeIntent],
+) -> HashMap<ID, SourceName> {
+  let mut homes : HashMap<ID, SourceName> = HashMap::new ();
+  for intent in intents {
+    let NodeIntent::Save (intent) = intent else { continue; };
+    for id in std::iter::once (&intent . pid) . chain (
+      intent . extra_ids . iter ()) {
+      homes . insert (id . clone (), intent . source . clone ()); }}
+  homes }
 
 fn supplement_nodeeditintent_from_disk (
   intent : NodeIntent,
   graph  : &InRustGraph,
   config : &SkgConfig,
   restricted_source_set : Option<&ActiveSourceSet>,
+  prospective_homes : &HashMap<ID, SourceName>,
 ) -> Result<Definenode_with_Opt_Sourcemove, Box<dyn Error>> {
   match intent {
     NodeIntent::Delete (ref delete) => {
@@ -86,7 +104,7 @@ fn supplement_nodeeditintent_from_disk (
     _ => supplement_saveintent_from_disk (
       intent . save_intent()
         . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
-      graph, config, restricted_source_set ),
+      graph, config, restricted_source_set, prospective_homes ),
   }}
 
 fn supplement_saveintent_from_disk (
@@ -94,6 +112,7 @@ fn supplement_saveintent_from_disk (
   graph       : &InRustGraph,
   config      : &SkgConfig,
   restricted_source_set : Option<&ActiveSourceSet>,
+  prospective_homes : &HashMap<ID, SourceName>,
 ) -> Result<Definenode_with_Opt_Sourcemove, Box<dyn Error>> {
   let pid : ID =
     from_buffer . pid . clone();
@@ -118,9 +137,9 @@ fn supplement_saveintent_from_disk (
         source : supplemented . source . clone (),
         .. empty_node_complete () };
       let supplemented : NodeComplete =
-        apply_sticky_sources_in_graph (
+        apply_sticky_sources_in_graph_with_prospective_homes (
           supplemented, &empty_disk, &requested_relationship_sources,
-          graph, config )
+          graph, config, prospective_homes )
         . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
       Ok (Definenode_with_Opt_Sourcemove {
         instruction : DefineNode::Save (SaveNode (supplemented)),
@@ -149,9 +168,9 @@ fn supplement_saveintent_from_disk (
             None => supplemented,
             Some (active) => preserve_invisible_members (
               supplemented, &disk_node, graph, config, active ) };
-        apply_sticky_sources_in_graph (
+        apply_sticky_sources_in_graph_with_prospective_homes (
           supplemented, &disk_node, &requested_relationship_sources,
-          graph, config )
+          graph, config, prospective_homes )
           . map_err ( |e| -> Box<dyn Error> { e . into () } ) ? };
       Ok (Definenode_with_Opt_Sourcemove {
         instruction : DefineNode::Save (SaveNode (supplemented)),
@@ -295,12 +314,24 @@ pub fn refuse_delete_with_inactive_sections (
 ///   inference that a private subscription exists. Hides carry no
 ///   explicit-source path: the col that displays them is read-only
 ///   (the set-relationship-source gesture refuses there).
+#[cfg(test)]
 pub(crate) fn apply_sticky_sources_in_graph (
+  supplemented : NodeComplete,
+  disk_node    : &NodeComplete,
+  explicit     : &RequestedRelationshipSources,
+  graph        : &InRustGraph,
+  config       : &SkgConfig,
+) -> Result<NodeComplete, String> {
+  apply_sticky_sources_in_graph_with_prospective_homes (
+    supplemented, disk_node, explicit, graph, config, &HashMap::new ()) }
+
+fn apply_sticky_sources_in_graph_with_prospective_homes (
   mut supplemented : NodeComplete,
   disk_node        : &NodeComplete,
   explicit         : &RequestedRelationshipSources,
   graph            : &InRustGraph,
   config           : &SkgConfig,
+  prospective_homes : &HashMap<ID, SourceName>,
 ) -> Result<NodeComplete, String> {
   let owner_pid  : ID         = supplemented . pid    . clone ();
   let owner_home : SourceName = supplemented . source . clone ();
@@ -310,9 +341,11 @@ pub(crate) fn apply_sticky_sources_in_graph (
   let member_key = |id : &ID| -> RelationshipMemberKey {
     graph . relationship_member_key (id) };
   let home_of = |id : &ID| -> Option<SourceName> {
-    graph . pid_and_source (id)
+    prospective_homes . get ( &resolve (id) ) . cloned ()
+      .or_else ( || prospective_homes . get (id) . cloned () )
+      .or_else ( || graph . pid_and_source (id)
       . map ( |(_pid, src)| src )
-      . or_else ( || home_from_disk (id, config) ) };
+      . or_else ( || home_from_disk (id, config) ) ) };
   // The DEFAULT floor for one member. Owned-to-owned edges use the
   // more private endpoint home. An owned-to-foreign edge stays at
   // the owner's home; Skg never proposes writing a foreign section.
@@ -435,7 +468,7 @@ pub(crate) fn apply_sticky_sources_in_graph (
           Some (source) => source,
           None => hide_source (
             graph, config, &owner_home, &m . member, &subscribes,
-            &resolve ), };
+            &resolve, &home_of ), };
         m . source = config . more_private_of (
           unclamped, owner_home . clone () );
         m . member = raw_disk_member (disk, &submitted); }} }
@@ -487,12 +520,10 @@ fn hide_source (
   hidden     : &ID,
   subscribes : &[MemberAtSource<ID>],
   resolve    : &dyn Fn (&ID) -> ID,
+  home_of    : &dyn Fn (&ID) -> Option<SourceName>,
 ) -> SourceName {
   let endpoint_floor : SourceName = {
-    let target_home : Option<SourceName> =
-      graph . pid_and_source (hidden)
-      . map ( |(_pid, src)| src );
-    match target_home {
+    match home_of (hidden) {
       Some (h) => config . more_private_of (
         owner_home . clone (), h ),
       None => owner_home . clone (), }};
