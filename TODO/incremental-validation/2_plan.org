@@ -923,7 +923,7 @@ acquirer, every neighbor file retains identical bytes and modification time,
 and all six inverse maps equal a fresh graph rebuild from the resulting disk.
 The R1/R2 rejection test likewise succeeds without a neighbor Save.
 
-** ONGOING Implement affected telescope warnings and absent-target privacy
+** DONE Implement affected telescope warnings and absent-target privacy
 
 - Add the explicit absent-target violation and display text.
 - Apply owner-home fallback uniformly to =contains=, =subscribes_to=,
@@ -946,7 +946,28 @@ Affected and full before/after warning comparisons agree.  Instrumentation
 shows one =telescope_violations_of= call per affected owner and none for an
 unaffected graph node.
 
-** TODO Retire dead full-warning and transitional save code
+=TelescopeViolation= now distinguishes absent-target privacy from an extant
+target leak.  The shared primitive uses the extant target's home when present
+and the extant owner's home otherwise, with explicit repair text.  Tests cover
+absent edges more public than, at, and more private than the owner across all
+four structural relationship fields.
+
+Affected-owner derivation includes every saved owner plus old/final inbound
+owners whenever a target's existence, canonical PID, or home changes.  An
+exhaustive 60-case matrix spans all four roles and absent-to-present,
+present-to-absent, home move, alias acquisition, and merge-only changes; every
+before/after warning difference is covered, and incremental output equals the
+full final warning set restricted to those owners.  A two-phase test proves an
+intermediate warning removed by the merge is never reported.
+
+Ordinary, direct-merge, and combined paths compute warnings against their
+exact final candidate before mutation and log them only after successful
+commit.  Combined saves union both phase change sets and evaluate once.  The
+full startup/rebuild primitive remains unchanged apart from the corrected
+absent-target semantics.  =cargo check --all-targets= and both grouped suites
+pass without warnings.
+
+** ONGOING Retire dead full-warning and transitional save code
 
 - Remove complete-graph warning computation whose result is discarded by save.
 - Remove the old post-save loop over ordinary saved PIDs.

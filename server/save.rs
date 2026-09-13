@@ -3,7 +3,9 @@ use crate::context::context_origin_types_for_saved_from_in_rust_graph;
 use crate::dbs::filesystem::one_node::{
   PreparedTelescopeWrite, prepare_nodecomplete_telescope,
 };
-use crate::telescope::invariants::telescope_violations_of;
+use crate::telescope::invariants::{
+  TelescopeViolation, affected_telescope_warnings,
+};
 use crate::dbs::in_rust_graph::{
   InRustGraph,
   InRustGraphHandle,
@@ -67,16 +69,24 @@ pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
       &mut node_defs, &graph_snap, &config ); }
   let base : Arc<InRustGraph> = graph . load_full ();
   let prepared : PreparedGraphUpdate = prepare_graph_update (
-    &config, base, node_defs)
+    &config, base . clone (), node_defs)
     . map_err ( |error| -> Box<dyn Error> {
       error . to_string () . into () } ) ?;
   let prepared_filesystem : PreparedFilesystemUpdate = prepare_fs_update (
     prepared . definitions (), source_moves, &config, hoist_approved_pids) ?;
-  apply_defineNodes ( prepared,
-                      prepared_filesystem,
-                      config,
-                      tantivy_index,
-                      graph ) }
+  let telescope_warnings : Vec<(ID, TelescopeViolation)> =
+    affected_telescope_warnings (
+      &config, &base, prepared . candidate (),
+      prepared . saved_pids (), prepared . affected_ids ());
+  let result : Result<Option<TantivyIndex>, Box<dyn Error>> =
+    apply_defineNodes ( prepared,
+                        prepared_filesystem,
+                        config,
+                        tantivy_index,
+                        graph );
+  if result . is_ok () {
+    emit_telescope_warnings (&telescope_warnings); }
+  result }
 
 fn apply_defineNodes (
   prepared      : PreparedGraphUpdate,
@@ -184,12 +194,6 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
   crate::nodeMerge::error_unless_nodeMerge_hoist_is_approved (
     nodeMerge_instructions, &config, hoist_approved_pids ) ?;
 
-  let touched_pids_for_telescope_gate : Vec<ID> =
-    save_instructions . iter ()
-    . filter_map ( |definition| match definition {
-      DefineNode::Save (save) => Some (save . 0 . pid . clone ()),
-      DefineNode::Delete (_)  => None, } )
-    . collect ();
   let prepared_save : Option<PreparedGraphUpdate> =
     if save_instructions . is_empty () { None }
     else { Some (prepare_graph_update (
@@ -228,6 +232,23 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
     prepared_nodeMerge . as_ref () . map (|prepared| prepare_fs_update (
       prepared . definitions (), &[], &config, hoist_approved_pids))
     . transpose () ?;
+  let final_candidate : &InRustGraph = prepared_nodeMerge . as_ref ()
+    .map (|prepared| prepared . candidate () . as_ref ())
+    .or_else (|| prepared_save . as_ref ()
+      .map (|prepared| prepared . candidate () . as_ref ()))
+    .unwrap_or (&graph_before_save);
+  let saved_pids_for_telescope : HashSet<ID> = prepared_save . iter ()
+    .chain (prepared_nodeMerge . iter ())
+    .flat_map (|prepared| prepared . saved_pids () . iter () . cloned ())
+    .collect ();
+  let affected_ids_for_telescope : HashSet<ID> = prepared_save . iter ()
+    .chain (prepared_nodeMerge . iter ())
+    .flat_map (|prepared| prepared . affected_ids () . iter () . cloned ())
+    .collect ();
+  let telescope_warnings : Vec<(ID, TelescopeViolation)> =
+    affected_telescope_warnings (
+      &config, &graph_before_save, final_candidate,
+      &saved_pids_for_telescope, &affected_ids_for_telescope);
   let deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>> =
     all_filesystem_outputs . iter ()
     . filter_map ( |instruction| match instruction {
@@ -236,7 +257,6 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
                        node . extra_ids . iter () . cloned () . collect ())),
       _ => None })
     . collect ();
-  let config_for_telescope_gate : SkgConfig = config . clone ();
   if let Some ((prepared, prepared_filesystem)) =
     prepared_save . zip (prepared_save_filesystem)
   {
@@ -256,16 +276,17 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
         tantivy_index, graph ) } ?;
   if let Some (new_index) = nodeMerge_replacement {
     *tantivy_index = new_index; }
-  { // The save-side telescope warning gate: same primitive as the
-    // init/rebuild gate, on the touched nodes only. Warnings, never
-    // failures (the write has already, deliberately, happened).
-    let snap = graph . load_full ();
-    for pid in &touched_pids_for_telescope_gate {
-      for v in telescope_violations_of (
-        &config_for_telescope_gate, &snap, pid ) {
-        tracing::warn! ( pid = %pid, violation = %v,
-                         "telescope warning after save" ); }} }
+  emit_telescope_warnings (&telescope_warnings);
   Ok (deleted_by_this_save_extra_ids) }
+
+pub(crate) fn emit_telescope_warnings (
+  warnings : &[(ID, TelescopeViolation)],
+) {
+  for (pid, violation) in warnings {
+    tracing::warn! (
+      pid = %pid, violation = %violation,
+      "telescope warning after save" ); }
+}
 
 pub fn validate_override_invariants_after_save (
   save_instructions  : &[DefineNode],

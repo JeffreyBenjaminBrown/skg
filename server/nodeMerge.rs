@@ -10,7 +10,11 @@ use crate::dbs::in_rust_graph::prepared_update::{
   PreparedGraphUpdate, prepare_graph_update,
 };
 use crate::save::{PreparedFilesystemUpdate, prepare_fs_update,
+                  emit_telescope_warnings,
                   update_tantivy_from_saveinstructions};
+use crate::telescope::invariants::{
+  TelescopeViolation, affected_telescope_warnings,
+};
 use crate::types::env::MutationGate;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::complete::NodeComplete;
@@ -57,14 +61,22 @@ pub(crate) fn merge_nodes_with_hoist_approval (
     . collect ();
   let base : Arc<InRustGraph> = graph . load_full ();
   let prepared : PreparedGraphUpdate = prepare_graph_update (
-    &config, base, primary_definenodes)
+    &config, base . clone (), primary_definenodes)
     . map_err ( |error| -> Box<dyn Error> {
       error . to_string () . into () } ) ?;
   let prepared_filesystem : PreparedFilesystemUpdate = prepare_fs_update (
     prepared . definitions (), &[], &config, hoist_approved_pids) ?;
-  apply_prepared_nodeMerges (
+  let telescope_warnings : Vec<(ID, TelescopeViolation)> =
+    affected_telescope_warnings (
+      &config, &base, prepared . candidate (),
+      prepared . saved_pids (), prepared . affected_ids ());
+  let result : Result<Option<TantivyIndex>, Box<dyn Error>> =
+    apply_prepared_nodeMerges (
     Some ((prepared, prepared_filesystem)), config,
-    tantivy_index, graph )
+    tantivy_index, graph );
+  if result . is_ok () {
+    emit_telescope_warnings (&telescope_warnings); }
+  result
 }
 
 pub(crate) fn error_unless_nodeMerge_hoist_is_approved (

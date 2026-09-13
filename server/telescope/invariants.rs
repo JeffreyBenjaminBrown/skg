@@ -21,6 +21,7 @@ use crate::types::nodes::rust::NodeRust;
 use std::fmt;
 use std::io;
 use std::path::Path;
+use std::collections::HashSet;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TelescopeViolation {
@@ -37,6 +38,15 @@ pub enum TelescopeViolation {
     source      : SourceName,
     member      : ID,
     member_home : SourceName,
+  },
+  /// A dangling relationship recorded more publicly than its extant owner.
+  /// With no target home to consult, the owner's home is the conservative
+  /// privacy ceiling.
+  AbsentTargetLeakShapedMember {
+    relation   : &'static str,
+    source     : SourceName,
+    member     : ID,
+    owner_home : SourceName,
   },
   /// An edge whose source names no configured source: its section
   /// could never be written. Arises only from junk or a config
@@ -75,6 +85,11 @@ impl fmt::Display for TelescopeViolation {
         write! ( f,
           "{} member '{}' carries source '{}', which is not configured",
           relation, member, source ),
+      TelescopeViolation::AbsentTargetLeakShapedMember {
+        relation, source, member, owner_home } =>
+        write! ( f,
+          "leak-shaped {} member with absent target: edge at source '{}' names '{}'; because the target is absent, privacy is judged against the extant owner's home '{}'. Move the membership with skg-set-relationship-source (C-c s r).",
+          relation, source, member, owner_home ),
       TelescopeViolation::IgnoredForeignPidCollision {
         ignored_sources } =>
         write! ( f,
@@ -109,16 +124,24 @@ pub fn telescope_violations_of (
         graph . pid_of ( &m . member )
         . and_then ( |p| graph . nodes . get (&p) )
         . map ( |n| n . source . clone () );
-      if let Some (home) = target_home {
-        // A dangling member (no node) is a different, pre-existing
-        // problem (TODO/problems.org, the dangling-reference audit
-        // gap); not this validator's to report.
-        if config . is_strictly_more_public ( &m . source, &home ) {
+      let privacy_ceiling : &SourceName = target_home . as_ref ()
+        . unwrap_or (&node . source);
+      if config . is_strictly_more_public ( &m . source, privacy_ceiling ) {
+        match target_home {
+          Some (home) =>
           violations . push ( TelescopeViolation::LeakShapedMember {
             relation,
             source      : m . source . clone (),
             member      : m . member . clone (),
-            member_home : home, } ); }} }};
+            member_home : home, } ),
+          None =>
+            violations . push (
+              TelescopeViolation::AbsentTargetLeakShapedMember {
+                relation,
+                source     : m . source . clone (),
+                member     : m . member . clone (),
+                owner_home : node . source . clone (),
+              }), }} }};
   check ("contains", &node . contains);
   let msv = |m : &MSV<MemberAtSource<ID>>| -> Vec<MemberAtSource<ID>> {
     m . or_default () . to_vec () };
@@ -129,6 +152,63 @@ pub fn telescope_violations_of (
   check ("overrides_view_of",
          & msv ( &node . overrides_view_of ));
   violations }
+
+/// Owners whose telescope-warning truth may differ between two valid
+/// snapshots. Saved owners are always included; untouched inbound owners are
+/// included when a target's existence, canonical PID, or home changed.
+pub fn derive_affected_telescope_owners (
+  base         : &InRustGraph,
+  candidate    : &InRustGraph,
+  saved_pids   : &HashSet<ID>,
+  affected_ids : &HashSet<ID>,
+) -> HashSet<ID> {
+  let mut owners : HashSet<ID> = saved_pids . clone ();
+  for raw in affected_ids {
+    let old_pid : Option<ID> = base . pid_of (raw);
+    let final_pid : Option<ID> = candidate . pid_of (raw);
+    let old_home : Option<SourceName> = old_pid . as_ref ()
+      .and_then (|pid| base . nodes . get (pid))
+      .map (|node| node . source . clone ());
+    let final_home : Option<SourceName> = final_pid . as_ref ()
+      .and_then (|pid| candidate . nodes . get (pid))
+      .map (|node| node . source . clone ());
+    if old_pid == final_pid && old_home == final_home { continue; }
+    let old_key : &ID = old_pid . as_ref () . unwrap_or (raw);
+    let final_key : &ID = final_pid . as_ref () . unwrap_or (raw);
+    for (graph, key) in [
+      (base, old_key), (base, final_key),
+      (candidate, old_key), (candidate, final_key),
+    ] {
+      for index in [
+        &graph . contained_by,
+        &graph . subscribers_of,
+        &graph . hiders_of,
+        &graph . overriders_of,
+      ] {
+        if let Some (inbound) = index . get (key) {
+          owners . extend (inbound . iter () . cloned ()); }}} }
+  owners
+}
+
+pub fn affected_telescope_warnings (
+  config       : &SkgConfig,
+  base         : &InRustGraph,
+  candidate    : &InRustGraph,
+  saved_pids   : &HashSet<ID>,
+  affected_ids : &HashSet<ID>,
+) -> Vec<(ID, TelescopeViolation)> {
+  let mut owners : Vec<ID> = derive_affected_telescope_owners (
+    base, candidate, saved_pids, affected_ids) . into_iter () . collect ();
+  owners . sort ();
+  let mut warnings : Vec<(ID, TelescopeViolation)> = Vec::new ();
+  for owner in owners {
+    for warning in telescope_violations_of (config, candidate, &owner) {
+      warnings . push ((owner . clone (), warning)); }}
+  warnings . sort_by (|(pid_a, warning_a), (pid_b, warning_b)|
+    pid_a . cmp (pid_b) . then_with (||
+      warning_a . to_string () . cmp (&warning_b . to_string ())));
+  warnings
+}
 
 /// The init/rebuild gate: every node, aggregated. Returns the
 /// violations paired with their nodes; the caller decides

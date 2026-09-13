@@ -22,6 +22,7 @@ use crate::dbs::in_rust_graph::override_invariants::{
 };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
+use crate::telescope::invariants::derive_affected_telescope_owners;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::error::Error;
@@ -53,6 +54,7 @@ pub(crate) struct GraphChangeSet {
   pub(crate) owners_to_reindex        : HashSet<ID>,
   pub(crate) override_sources_to_check : HashSet<ID>,
   pub(crate) override_targets_to_check : HashSet<ID>,
+  pub(crate) telescope_owners_to_check : HashSet<ID>,
   #[cfg(test)]
   pub(crate) identity_base_lookup_bound : usize,
 }
@@ -148,6 +150,16 @@ impl PreparedGraphUpdate {
   ) -> &[DefineNode] {
     &self . definitions }
 
+  pub(crate) fn saved_pids (
+    &self,
+  ) -> &HashSet<ID> {
+    &self . changes . saved_pids }
+
+  pub(crate) fn affected_ids (
+    &self,
+  ) -> &HashSet<ID> {
+    &self . changes . affected_ids }
+
   pub(crate) fn verify_base (
     &self,
     graph : &InRustGraphHandle,
@@ -193,6 +205,8 @@ pub(crate) fn prepare_graph_update (
     &base, &candidate, &changes . touched_pids, &changes . affected_ids);
   changes . override_sources_to_check = override_scope . sources . clone ();
   changes . override_targets_to_check = override_scope . targets . clone ();
+  changes . telescope_owners_to_check = derive_affected_telescope_owners (
+    &base, &candidate, &changes . saved_pids, &changes . affected_ids);
   let affected_override_errors : Vec<OverrideInvariantViolation> =
     validate_affected_override_invariants (config, &candidate, &override_scope);
   let merge_override_collisions : Vec<MergeOverrideCollision> =
@@ -481,6 +495,7 @@ fn validate_identity_and_derive_changes (
     owners_to_reindex,
     override_sources_to_check : HashSet::new (),
     override_targets_to_check : HashSet::new (),
+    telescope_owners_to_check : HashSet::new (),
     #[cfg(test)]
     identity_base_lookup_bound,
   }, errors, revocations)
