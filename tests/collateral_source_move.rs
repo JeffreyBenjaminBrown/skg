@@ -130,6 +130,54 @@ fn test_source_move_updates_collateral_view_metadata (
     Some (config . tantivy_folder . as_path()))?;
   Ok (( )) }
 
+#[test]
+fn successful_save_consumes_relationship_source_edit_request (
+) -> Result<(), Box<dyn Error>> {
+  let test_name : &str =
+    "skg-test-consume-relationship-source-edit-request";
+  let temp_dir : TempDir = TempDir::new () ?;
+  copy_dir_all (
+    Path::new ("tests/move_source/fixtures"), temp_dir . path () ) ?;
+  let tantivy_folder : PathBuf = temp_dir . path () . join ("tantivy");
+  let (config, tantivy, initial_nodes)
+    : (SkgConfig, TantivyIndex, Vec<NodeComplete>) =
+    block_on (setup_test_stores (
+      test_name, temp_dir . path (), &tantivy_folder )) ?;
+  let graph : InRustGraphHandle =
+    new_handle (InRustGraph::from_nodecompletes (&initial_nodes));
+
+  let saved : String = block_on ( async {
+    let (initial_buffer, _pids, _viewforest) = multi_root_view (
+      &config, None, &[ID::new ("a")], false ) ?;
+    let save_input : String = initial_buffer . replace (
+      "(id b) (source public)",
+      "(id b) (source public) (editRequest (relSource private))" );
+    assert_ne! (save_input, initial_buffer,
+      "fixture rendering should expose b's active-node metadata");
+
+    let mut views_state : ViewsState = ViewsState {
+      diff_mode_enabled : false,
+      open_views        : OpenViews::new (), };
+    let (mut stream, _read_end) = mk_test_tcp_stream_pair ();
+    let response : SaveResponse = update_from_and_rerender_buffer (
+      &mut stream, &save_input, &config, &tantivy, &graph, false,
+      &Err (String::new ()), &mut views_state ) . await ?;
+    assert! (response . errors . is_empty (),
+      "relationship-source save should succeed: {:?}", response . errors);
+    Result::<_, Box<dyn Error>>::Ok (response . saved_view)
+  } ) ?;
+
+  let b_line : &str = saved . lines ()
+    . find (|line| line . contains ("(id b)"))
+    . unwrap_or_else (|| panic! ("rerender omitted b:\n{}", saved));
+  assert! (b_line . contains ("(relSource private)"),
+    "the completed edge source remains as display state:\n{}", b_line);
+  assert! (!saved . contains ("(editRequest"),
+    "a successful rerender must not echo consumed edit requests:\n{}", saved);
+
+  cleanup_test_tantivy (Some (config . tantivy_folder . as_path ())) ?;
+  Ok (( )) }
+
 async fn setup_test_stores (
   test_name        : &str,
   fixtures_root  : &Path,

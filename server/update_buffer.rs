@@ -171,6 +171,11 @@ pub fn update_views_after_save (
         env, runtime, diff_mode_enabled, &define_nodes,
         deleted_by_this_save_extra_ids, active_source_set ) };
   let mut saved_view_mut : ViewForest = saved_view;
+  // The graph mutation has committed, so every `(editRequest ...)` in the
+  // submitted view is now consumed input. Clear all request carriers at this
+  // one boundary before completion can echo any of them into the response.
+  // `viewRequests` remain: those are fulfilled by completion below.
+  saved_view_mut . consume_edit_requests_after_save ();
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "rewriteInPlace_viewnodes_whose_id_is_newly_extra" ). entered();
     rewriteInPlace_viewnodes_whose_id_is_newly_extra (

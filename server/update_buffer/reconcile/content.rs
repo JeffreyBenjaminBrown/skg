@@ -121,7 +121,6 @@ pub fn expand_true_content_at_activeNode (
   // for free. visit_normal_node already forced this node indefinitive if the
   // budget was 0, so here it is > 0; saturating_sub is defensive.
   *node_budget = node_budget . saturating_sub (1);
-  clear_edit_request (tree, node) ?;
   let nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
       graph_snap, config, &pid, &initial_source ) ?;
@@ -165,18 +164,6 @@ fn attach_cascade_dvrs_to_affected_content (
       tree, cid,
       |t| { t . view_requests . insert ( ViewRequest::Definitive ); } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
-  Ok (( )) }
-
-/// The edit request should have been used by now.
-fn clear_edit_request (
-  tree : &mut Tree<ViewNode>,
-  node : NodeId,
-) -> Result<(), Box<dyn Error>> {
-  write_at_activeNode_in_tree (
-    tree, node,
-    |t| { if let IndefOrDef::Definitive { edit_request, .. }
-          = &mut t . indef_or_def
-          { *edit_request = None; }} ) ?;
   Ok (( )) }
 
 /// Overwrite the viewnode's title, source, and body with the fresh values from

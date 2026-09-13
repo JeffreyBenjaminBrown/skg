@@ -715,6 +715,25 @@ impl AsMut<ViewNode> for ViewNode {
     self }}
 
 impl ViewNode {
+  /// Consume every save-only `(editRequest ...)` carried by this occurrence.
+  /// Call only after the save has committed: failed saves and confirmation
+  /// round-trips must leave requests in the user's buffer. `view_requests` are
+  /// deliberately separate -- completion fulfills those while rendering.
+  pub fn consume_edit_request_after_save (
+    &mut self,
+  ) {
+    match &mut self . kind {
+      ViewNodeKind::Vognode (Vognode::Active (active)) => {
+        active . rel_source_request = None;
+        if let IndefOrDef::Definitive { edit_request, .. } =
+          &mut active . indef_or_def
+        { *edit_request = None; }},
+      ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
+        unknown . rel_source_request = None,
+      ViewNodeKind::Qual (Qual::Alias { rel_source_request, .. }) =>
+        *rel_source_request = None,
+      _ => {}, }}
+
   pub fn normal_to_phantom (
     &mut self,
   ) {

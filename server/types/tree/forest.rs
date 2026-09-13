@@ -21,7 +21,16 @@ pub type MpViewForest = Forest<MpViewnode>;
 impl Forest<ViewNode> {
   pub fn new () -> Self {
     Forest { tree : Tree::new (
-      viewforest_root_viewnode () ) }}}
+      viewforest_root_viewnode () ) }}
+
+  /// Drop save-only edit requests from every occurrence in a successfully
+  /// committed saved view. View requests have a different lifecycle and are
+  /// intentionally preserved for completion to execute.
+  pub fn consume_edit_requests_after_save (
+    &mut self,
+  ) {
+    for viewnode in self . values_mut () {
+      viewnode . consume_edit_request_after_save (); }}}
 
 impl Forest<MpViewnode> {
   pub fn new () -> Self {

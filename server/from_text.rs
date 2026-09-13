@@ -153,7 +153,10 @@ pub fn buffer_to_validated_saveplan_with_fork_sources_and_previous_view_in_graph
         &viewforest, graph, config, restricted_source_set )
  . map_err (SaveError::DatabaseError) ?;
   let nodeMerge_instructions : Vec<NodeMerge> =
-    // PITFALL: The edit_requests consumed here remain in viewforest until cleared by expand_true_content_at_activeNode, during complete_viewforest. NodeMerge extraction only plans nodeMerge mutations; it does not mutate the saved viewforest.
+    // NodeMerge extraction only plans mutations; it does not mutate the saved
+    // viewforest. After a successful commit, the common edit-request
+    // consumption boundary in update_views_after_save clears this request
+    // together with every other `(editRequest ...)` carrier.
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "nodeMerge_instructions_from_pairs" ). entered();
       nodeMerge_instructions_from_pairs (
