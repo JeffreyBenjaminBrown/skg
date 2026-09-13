@@ -711,7 +711,7 @@ now derive from the same normalized alias list.
 At this checkpoint =cargo check --all-targets=, all 226 =grouped_unit= tests,
 and all =grouped_saves= tests pass (with the one intentional R2 test ignored).
 
-** ONGOING Make graph mutation batch-aware, including supported deletion rekeying
+** DONE Make graph mutation batch-aware, including supported deletion rekeying
 
 - Refactor inverse removal/addition helpers to accept an explicit old or final
   canonical resolver.
@@ -732,7 +732,23 @@ primary and extra IDs, deletion through primary/extra/raw text spellings, and
 empty-key removal.  Every candidate equals =InRustGraph::from_nodecompletes=
 on the same final nodes and passes =validate_internal_indexes=.
 
-** TODO Add always-on local internal-index postconditions
+=apply_definenodes_to_inRustGraph= now coalesces final PID state, captures the
+structurally shared base, installs all final nodes and identity claims, and
+reindexes the union of touched owners and inbound owners reached through a
+changed canonical key.  Old contributions resolve through the base; final
+contributions resolve through the complete candidate identity map.  Untouched
+owners reuse stored =NodeRust= fields, including parsed =textlinks_to=.
+
+Focused tests cover removal and insertion in every relationship index, alias
+acquisition, primary-plus-extra merge transfer, deletion with surviving raw
+primary/extra structural and text references, and empty-key cleanup.  Each
+targeted candidate equals an independent =from_nodecompletes= rebuild and
+passes the full internal-index audit.  A further 128 generated relation/batch
+cases compare the batch mutator to reconstruction.  =cargo check
+--all-targets=, all 230 =grouped_unit= tests, and all 116 =grouped_saves=
+tests pass (one intentionally ignored).
+
+** ONGOING Add always-on local internal-index postconditions
 
 - Implement delta-scoped node, extra-ID, and five-inverse-index checks.
 - Make preparation return an internal-consistency error before filesystem
