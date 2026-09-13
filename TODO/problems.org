@@ -3,6 +3,13 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
+* Dead-link warnings miss targets deleted by the same save (2026-09-13)
+  =dead_link_warnings= regards every ID present in the pre-save graph as
+  live. Therefore, when one buffer both saves a text link and deletes that
+  link's target, the final graph contains a dead link but no warning is
+  emitted. Computing final ID existence must account for Save, Delete,
+  fork, and nodeMerge outcomes together; merely subtracting Delete intents
+  would mishandle IDs retained by a merge.
 * Problems noted while cleaning up stray servers (2026-07-26)
   Context: two cargo-watch processes and one skg were alive at once;
   the newer skg had died with 'Address already in use'. Root cause is

@@ -1,3 +1,31 @@
+* Successful saves echoed consumed edit requests into the rerender (fixed 2026-09-13)
+  Post-save content expansion cleared only a definitive active node's
+  delete/merge request. Relationship-source requests live separately on
+  active nodes, unknown nodes, and alias scaffolds, so those survived into
+  the rendered save response and kept their =request:~SOURCE= heralds.
+
+  FIXED: immediately after commit, before rerendering the saved forest, one
+  forest-wide consumption boundary clears every =(editRequest ...)= carrier.
+  The carrier operation is exhaustive over all four representations.
+  =viewRequests= are intentionally untouched because completion executes
+  those during rendering. Unit coverage pins every carrier and an end-to-end
+  save verifies that the new relationship-source display fact remains while
+  its consumed request disappears.
+
+* Same-save child source moves used the stale home for their parent edge's floor (fixed 2026-09-13)
+  Moving a content child from =pers-p= to =public= and accepting the
+  offered =contains= edge move submitted both requests correctly. During
+  disk supplementation, however, the parent was processed before its child,
+  and the edge floor consulted only the pre-save graph. It therefore still
+  saw =pers-p= and rejected the requested =public= edge.
+
+  FIXED: supplementation builds a home map from every Save intent before
+  resolving any relationship source. An edge now uses an endpoint's pending
+  home when that endpoint is part of the same save. The shared lookup covers
+  ordinary relationships and inferred hides. Regression coverage exercises
+  the exact public-parent/private-child move, a same-save hidden-node move,
+  and a brand-new private child absent from the pre-save graph.
+
 * Same-title Skg views overwrote each other and left stale server URIs (fixed 2026-08-24)
    'skg-open-org-buffer-from-text' used 'get-buffer-create' with a name
    derived only from the first headline's title. Opening a distinct
