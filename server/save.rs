@@ -10,8 +10,9 @@ use crate::dbs::in_rust_graph::{
   apply_definenodes_to_inRustGraph,
   prepared_update::{PreparedGraphUpdate, prepare_graph_update},
   override_invariants::{
+    derive_affected_override_scope,
     format_override_invariant_violations,
-    validate_touched_override_invariants,
+    validate_affected_override_invariants,
   },
 };
 use crate::dbs::tantivy::background_writer::{enqueue_tantivy_write, lock_tantivy_writes, TantivyWriteTask};
@@ -182,13 +183,6 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
     . chain ( nodeMerge_instructions . iter ()
              . flat_map ( |node_merge| node_merge . to_vec () ) )
     . collect ();
-  { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "validate_override_invariants_after_save" ). entered();
-    validate_override_invariants_after_save (
-      &save_instructions,
-      nodeMerge_instructions,
-      &config,
-      graph ) } ?;
   crate::nodeMerge::error_unless_nodeMerge_hoist_is_approved (
     nodeMerge_instructions, &config, hoist_approved_pids ) ?;
 
@@ -294,8 +288,16 @@ pub fn validate_override_invariants_after_save (
         DefineNode::Save (SaveNode (n)) => n . pid . clone (),
         DefineNode::Delete (DeleteNode { id, .. }) => id . clone (), } )
     . collect ();
+  let mut affected_ids : HashSet<ID> = touched . clone ();
+  for pid in &touched {
+    if let Some (node) = graph_snap . nodes . get (pid) {
+      affected_ids . extend (node . extra_ids . iter () . cloned ()); }
+    if let Some (node) = simulated . nodes . get (pid) {
+      affected_ids . extend (node . extra_ids . iter () . cloned ()); }}
+  let scope = derive_affected_override_scope (
+    &graph_snap, &simulated, &touched, &affected_ids);
   let violations =
-    validate_touched_override_invariants (config, &simulated, &touched);
+    validate_affected_override_invariants (config, &simulated, &scope);
   if violations . is_empty () {
     Ok (( ))
   } else {

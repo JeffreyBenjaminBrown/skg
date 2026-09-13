@@ -797,6 +797,22 @@ tests continue to pass the independent full index checker.  =cargo check
 - Only after those tests pass, remove the whole override pass from production
   preparation.
 
+*** Progress
+
+Affected scope derivation and validation are implemented.  Canonicalization
+changes pull unchanged inbound overriders into the proof neighborhood; the
+named N1/N2/R1/R2 regression no longer supplies =Save(R2)=.  Targeted tests
+cover alias-redirection cycles, ownership-class changes, edge and target
+deletion, and a valid chain, while 256 generated one-node edits agree with the
+whole oracle.  Merge collisions now report all four real IDs and titles, the
+canonicalization, and both precedence repairs; an integration test proves
+rejection leaves graph and filesystem stores unchanged.
+
+The remaining bullet is deliberately coupled to the next task: production
+preparation still invokes =validate_complete_graph_candidate=, whose bundled
+whole checks include override validation.  Remove that call through the
+incremental-proof switch, then close this task.
+
 *** Checkpoint
 
 Incremental and whole override validators agree in property tests.  The stale

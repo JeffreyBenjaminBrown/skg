@@ -10,7 +10,7 @@ use crate::dbs::in_rust_graph::internal_index_validation::{
   LocalIndexValidation, validate_local_internal_indexes,
 };
 use crate::types::misc::{
-  ID, SkgConfig, SkgfileSource, SourceName, members_at_source,
+  ID, MSV, SkgConfig, SkgfileSource, SourceName, members_at_source,
 };
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
@@ -372,6 +372,41 @@ fn local_index_check_work_does_not_grow_with_unrelated_nodes () {
   assert_eq! (
     small . relationship_membership_checks,
     large . relationship_membership_checks);
+}
+
+#[test]
+fn merge_override_collision_names_participants_and_both_repairs () {
+  let source : SourceName = SourceName::from ("main");
+  let mut n1 : NodeComplete = node ("N1");
+  n1 . title = "Acquirer title" . to_string ();
+  let mut n2 : NodeComplete = node ("N2");
+  n2 . title = "Acquiree title" . to_string ();
+  let mut r1 : NodeComplete = node ("R1");
+  r1 . title = "Existing overrider title" . to_string ();
+  r1 . overrides_view_of = MSV::Specified (members_at_source (
+    &source, vec![ID::from ("N1")]));
+  let mut r2 : NodeComplete = node ("R2");
+  r2 . title = "Redirected overrider title" . to_string ();
+  r2 . overrides_view_of = MSV::Specified (members_at_source (
+    &source, vec![ID::from ("N2")]));
+  let base : Arc<InRustGraph> = Arc::new (
+    InRustGraph::from_nodecompletes (&[n1 . clone (), n2, r1, r2]));
+  n1 . extra_ids = vec![ID::from ("N2")];
+  let error : GraphUpdatePreparationError = prepare_graph_update (
+    &config (), base, vec![
+      DefineNode::Save (SaveNode (n1)),
+      DefineNode::Delete (DeleteNode {
+        id : ID::from ("N2"), source,
+      }),
+    ]) . expect_err ("merge redirection must violate monogamy");
+  assert_eq! (error . merge_override_collisions . len (), 1);
+  let message : String = error . to_string ();
+  for expected in [
+    "N1", "N2", "R1", "R2", "Acquirer title", "Acquiree title",
+    "Existing overrider title", "Redirected overrider title",
+    "canonicalizing", "R2 -> R1 -> N1", "R1 -> R2 -> N1",
+  ] {
+    assert! (message . contains (expected), "missing {expected}: {message}"); }
 }
 
 proptest! {

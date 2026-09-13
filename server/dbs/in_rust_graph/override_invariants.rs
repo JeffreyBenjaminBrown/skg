@@ -4,6 +4,12 @@ use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
 
 use std::collections::{HashMap, HashSet};
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct OverrideCheckScope {
+  pub sources : HashSet<ID>,
+  pub targets : HashSet<ID>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OverrideInvariantViolation {
   UnknownSource {
@@ -175,6 +181,76 @@ pub fn validate_touched_override_invariants (
             cycle : canonicalize_cycle (resolution . cycle) } ); } } }
   dedup_violations (violations) }
 
+/// Derive every override source and target whose invariant truth can change
+/// between two valid graph snapshots. Canonicalization changes pull in
+/// untouched inbound overriders, which is the case a touched-only check misses
+/// during node merge.
+pub fn derive_affected_override_scope (
+  base         : &InRustGraph,
+  candidate    : &InRustGraph,
+  touched_pids : &HashSet<ID>,
+  affected_ids : &HashSet<ID>,
+) -> OverrideCheckScope {
+  let mut sources : HashSet<ID> = touched_pids . clone ();
+  for raw in affected_ids {
+    let old_key : ID = base . pid_of (raw)
+      . unwrap_or_else (|| raw . clone ());
+    let final_key : ID = candidate . pid_of (raw)
+      . unwrap_or_else (|| raw . clone ());
+    if old_key == final_key { continue; }
+    for (graph, key) in [
+      (base, &old_key), (base, &final_key),
+      (candidate, &old_key), (candidate, &final_key),
+    ] {
+      if let Some (overriders) = graph . overriders_of . get (key) {
+        sources . extend (overriders . iter () . cloned ()); }} }
+
+  let mut targets : HashSet<ID> = HashSet::new ();
+  for source in &sources {
+    if let Some (node) = base . nodes . get (source) {
+      targets . extend (
+        members_of (node . overrides_view_of . or_default ()) . into_iter ()
+          . map (|raw| base . pid_of (&raw) . unwrap_or (raw))); }
+    if let Some (node) = candidate . nodes . get (source) {
+      targets . extend (
+        members_of (node . overrides_view_of . or_default ()) . into_iter ()
+          . map (|raw| candidate . pid_of (&raw) . unwrap_or (raw))); }}
+  OverrideCheckScope { sources, targets }
+}
+
+/// Check monogamy at affected targets and acyclicity from affected owned
+/// sources. A valid base makes violations elsewhere irrelevant to this delta.
+pub fn validate_affected_override_invariants (
+  config : &SkgConfig,
+  graph  : &InRustGraph,
+  scope  : &OverrideCheckScope,
+) -> Vec<OverrideInvariantViolation> {
+  let mut violations : Vec<OverrideInvariantViolation> = Vec::new ();
+  for target in &scope . targets {
+    let mut overriders : Vec<ID> =
+      user_owned_overriders_of (config, graph, target);
+    if overriders . len () > 1 {
+      overriders . sort ();
+      violations . push (
+        OverrideInvariantViolation::MultipleUserOwnedOverriders {
+          overridden : target . clone (),
+          overriders,
+        }); }}
+  for source in &scope . sources {
+    let Some (node) = graph . nodes . get (source) else { continue; };
+    let Some (user_owned) = user_owns_node (
+      config, source, &node . source, &mut violations)
+      else { continue; };
+    if ! user_owned { continue; }
+    let resolution = resolve_override (config, graph, None, source);
+    if resolution . cycle_detected {
+      violations . push (
+        OverrideInvariantViolation::UserOwnedOverrideCycle {
+          cycle : canonicalize_cycle (resolution . cycle),
+        }); }}
+  dedup_violations (violations)
+}
+
 /// The single user-owned node (by pid) that already overrides
 /// 'overridden', if any -- the monogamy pre-check a fork runs before
 /// minting a new clone. Returns the first such overrider (monogamy
@@ -231,8 +307,9 @@ fn user_owns_node (
       None }}}
 
 fn dedup_violations (
-  violations : Vec<OverrideInvariantViolation>,
+  mut violations : Vec<OverrideInvariantViolation>,
 ) -> Vec<OverrideInvariantViolation> {
+  violations . sort_by_key (|violation| format! ("{violation:?}"));
   let mut out : Vec<OverrideInvariantViolation> = Vec::new ();
   for violation in violations {
     if ! out . contains (&violation) {

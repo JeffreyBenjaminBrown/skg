@@ -1,12 +1,16 @@
-use skg::dbs::in_rust_graph::InRustGraph;
+use skg::dbs::in_rust_graph::{InRustGraph, apply_definenodes_to_inRustGraph};
 use skg::dbs::in_rust_graph::override_invariants::{
   OverrideInvariantViolation,
+  derive_affected_override_scope,
+  validate_affected_override_invariants,
   validate_override_invariants,
   validate_touched_override_invariants,
 };
 use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, members_at_source};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
+use skg::types::save::{DefineNode, DeleteNode, SaveNode};
 
+use proptest::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
@@ -68,6 +72,31 @@ fn touched_violations_for (
     touched . iter () . map ( |p| ID::from (*p) ) . collect ();
   validate_touched_override_invariants (
     &config (), &graph, &touched_set ) }
+
+fn affected_and_full (
+  base_nodes  : Vec<NodeComplete>,
+  definitions : Vec<DefineNode>,
+) -> (Vec<OverrideInvariantViolation>, Vec<OverrideInvariantViolation>) {
+  let base : InRustGraph = InRustGraph::from_nodecompletes (&base_nodes);
+  assert_eq! (validate_override_invariants (&config (), &base), vec![]);
+  let mut candidate : InRustGraph = base . clone ();
+  apply_definenodes_to_inRustGraph (&mut candidate, &definitions);
+  let touched : HashSet<ID> = definitions . iter () . map (|definition|
+    match definition {
+      DefineNode::Save (SaveNode (node)) => node . pid . clone (),
+      DefineNode::Delete (DeleteNode { id, .. }) => id . clone (),
+    }) . collect ();
+  let mut affected_ids : HashSet<ID> = touched . clone ();
+  for pid in &touched {
+    if let Some (old) = base . nodes . get (pid) {
+      affected_ids . extend (old . extra_ids . iter () . cloned ()); }
+    if let Some (final_node) = candidate . nodes . get (pid) {
+      affected_ids . extend (final_node . extra_ids . iter () . cloned ()); }}
+  let scope = derive_affected_override_scope (
+    &base, &candidate, &touched, &affected_ids);
+  (validate_affected_override_invariants (&config (), &candidate, &scope),
+   validate_override_invariants (&config (), &candidate))
+}
 
 #[test]
 fn one_user_owned_overrider_is_valid () {
@@ -225,6 +254,105 @@ fn chain_from_foreign_first_is_valid () {
       node ("x", "foreign", &["y"]),
     ]),
     vec![] ); }
+
+#[test]
+fn alias_redirection_that_closes_a_cycle_is_affected () {
+  let mut acquirer : NodeComplete = node ("B", "owned", &["A"]);
+  acquirer . extra_ids = vec![ID::from ("future")];
+  let (affected, full) = affected_and_full (
+    vec![
+      node ("A", "owned", &["future"]),
+      node ("B", "owned", &["A"]),
+    ],
+    vec![DefineNode::Save (SaveNode (acquirer))]);
+  assert_eq! (affected, full);
+  assert! (has_cycle_over (&affected, &["A", "B"]));
+}
+
+#[test]
+fn ownership_class_change_can_create_monogamy_violation () {
+  let (affected, full) = affected_and_full (
+    vec![
+      node ("target", "owned", &[]),
+      node ("changed", "foreign", &["target"]),
+      node ("existing", "owned", &["target"]),
+    ],
+    vec![DefineNode::Save (SaveNode (
+      node ("changed", "owned", &["target"]))) ]);
+  assert_eq! (affected, full);
+  assert! (matches! (
+    affected . first (),
+    Some (OverrideInvariantViolation::MultipleUserOwnedOverriders {
+      overridden, ..
+    }) if overridden == &ID::from ("target")));
+}
+
+#[test]
+fn edge_and_target_deletions_do_not_create_override_errors () {
+  let (edge_affected, edge_full) = affected_and_full (
+    vec![
+      node ("target", "owned", &[]),
+      node ("source", "owned", &["target"]),
+    ],
+    vec![DefineNode::Save (SaveNode (
+      node ("source", "owned", &[]))) ]);
+  assert_eq! (edge_affected, edge_full);
+  assert! (edge_affected . is_empty ());
+
+  let (delete_affected, delete_full) = affected_and_full (
+    vec![
+      node ("target", "owned", &[]),
+      node ("source", "owned", &["target"]),
+    ],
+    vec![DefineNode::Delete (DeleteNode {
+      id : ID::from ("target"), source : SourceName::from ("owned"),
+    })]);
+  assert_eq! (delete_affected, delete_full);
+  assert! (delete_affected . is_empty ());
+}
+
+#[test]
+fn adding_a_linear_override_chain_remains_valid () {
+  let (affected, full) = affected_and_full (
+    vec![
+      node ("A", "owned", &[]),
+      node ("B", "owned", &["C"]),
+      node ("C", "owned", &[]),
+    ],
+    vec![DefineNode::Save (SaveNode (
+      node ("A", "owned", &["B"]))) ]);
+  assert_eq! (affected, full);
+  assert! (affected . is_empty ());
+}
+
+proptest! {
+  #![proptest_config (ProptestConfig::with_cases (256))]
+
+  #[test]
+  fn affected_override_check_matches_full_for_one_node_edits (
+    changed_index in 0usize..4,
+    target_index in 0usize..5,
+    owned in any::<bool> (),
+  ) {
+    let ids : [&str; 4] = ["A", "B", "C", "D"];
+    let base : Vec<NodeComplete> = vec![
+      node ("A", "owned", &["B"]),
+      node ("B", "owned", &["C"]),
+      node ("C", "owned", &[]),
+      node ("D", "foreign", &["C"]),
+    ];
+    let targets : Vec<&str> =
+      if target_index == 4 { Vec::new () }
+      else { vec![ids [target_index]] };
+    let changed : NodeComplete = node (
+      ids [changed_index],
+      if owned { "owned" } else { "foreign" },
+      &targets);
+    let (affected, full) = affected_and_full (
+      base, vec![DefineNode::Save (SaveNode (changed))]);
+    prop_assert_eq! (affected, full);
+  }
+}
 
 // --- scoped (save-time) validator ---------------------------------
 
