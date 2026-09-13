@@ -1,11 +1,17 @@
-use super::{GraphUpdatePreparationError, PreparedGraphUpdate,
+use super::{GraphChangeSet, GraphUpdatePreparationError, PreparedGraphUpdate,
             normalize_and_coalesce_definitions, prepare_graph_update,
             validate_identity_and_derive_changes};
 use crate::dbs::in_rust_graph::complete_validation::{
   CompleteGraphError, validate_complete_graph_candidate,
 };
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
-use crate::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
+use crate::dbs::in_rust_graph::apply_definenodes_to_inRustGraph;
+use crate::dbs::in_rust_graph::internal_index_validation::{
+  LocalIndexValidation, validate_local_internal_indexes,
+};
+use crate::types::misc::{
+  ID, SkgConfig, SkgfileSource, SourceName, members_at_source,
+};
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
 
@@ -34,6 +40,42 @@ fn node (
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
   node
+}
+
+fn changed_edge_fixture (
+  unrelated_count : usize,
+) -> (InRustGraph, InRustGraph, Vec<DefineNode>, GraphChangeSet) {
+  let mut old_owner : NodeComplete = node ("owner");
+  old_owner . contains = members_at_source (
+    &SourceName::from ("main"), vec![ID::from ("old")]);
+  let mut base_nodes : Vec<NodeComplete> = vec![old_owner];
+  base_nodes . extend ((0..unrelated_count)
+    . map (|i| node (&format! ("unrelated-{i}"))));
+  let base : InRustGraph = InRustGraph::from_nodecompletes (&base_nodes);
+  let mut final_owner : NodeComplete = node ("owner");
+  final_owner . contains = members_at_source (
+    &SourceName::from ("main"), vec![ID::from ("new")]);
+  let definitions : Vec<DefineNode> =
+    vec![DefineNode::Save (SaveNode (final_owner))];
+  let (changes, errors, revocations)
+    : (GraphChangeSet, Vec<CompleteGraphError>, Vec<super::ExtraIdRevocation>) =
+    validate_identity_and_derive_changes (&config (), &base, &definitions);
+  assert! (errors . is_empty ());
+  assert! (revocations . is_empty ());
+  let mut candidate : InRustGraph = base . clone ();
+  apply_definenodes_to_inRustGraph (&mut candidate, &definitions);
+  (base, candidate, definitions, changes)
+}
+
+fn add_membership (
+  index : &mut im::HashMap<ID, im::HashSet<ID>>,
+  key   : &str,
+  owner : &str,
+) {
+  let mut owners : im::HashSet<ID> = index . get (&ID::from (key))
+    . cloned () . unwrap_or_default ();
+  owners . insert (ID::from (owner));
+  index . insert (ID::from (key), owners);
 }
 
 #[test]
@@ -255,6 +297,81 @@ fn identity_lookup_work_does_not_grow_with_the_base_graph () {
   assert_eq! (
     small . changes . identity_base_lookup_bound,
     large . changes . identity_base_lookup_bound);
+}
+
+#[test]
+fn local_index_check_catches_an_omitted_removal () {
+  let (base, mut candidate, definitions, changes) = changed_edge_fixture (0);
+  add_membership (&mut candidate . contained_by, "old", "owner");
+  let report : LocalIndexValidation = validate_local_internal_indexes (
+    &base, &candidate, &definitions, &changes);
+  assert! (report . errors . iter () . any (|error|
+    error . index == "contained_by" && error . key == ID::from ("old")));
+}
+
+#[test]
+fn local_index_check_catches_an_omitted_insertion () {
+  let (base, mut candidate, definitions, changes) = changed_edge_fixture (0);
+  candidate . contained_by . remove (&ID::from ("new"));
+  let report : LocalIndexValidation = validate_local_internal_indexes (
+    &base, &candidate, &definitions, &changes);
+  assert! (report . errors . iter () . any (|error|
+    error . index == "contained_by" && error . key == ID::from ("new")));
+}
+
+#[test]
+fn local_index_check_catches_an_omitted_canonical_migration () {
+  let mut owner : NodeComplete = node ("owner");
+  owner . contains = members_at_source (
+    &SourceName::from ("main"), vec![ID::from ("future")]);
+  let base : InRustGraph = InRustGraph::from_nodecompletes (&[owner]);
+  let mut target : NodeComplete = node ("target");
+  target . extra_ids = vec![ID::from ("future")];
+  let definitions : Vec<DefineNode> =
+    vec![DefineNode::Save (SaveNode (target))];
+  let (changes, errors, revocations)
+    : (GraphChangeSet, Vec<CompleteGraphError>, Vec<super::ExtraIdRevocation>) =
+    validate_identity_and_derive_changes (&config (), &base, &definitions);
+  assert! (errors . is_empty () && revocations . is_empty ());
+  let mut candidate : InRustGraph = base . clone ();
+  apply_definenodes_to_inRustGraph (&mut candidate, &definitions);
+  candidate . contained_by . remove (&ID::from ("target"));
+  add_membership (&mut candidate . contained_by, "future", "owner");
+  let report : LocalIndexValidation = validate_local_internal_indexes (
+    &base, &candidate, &definitions, &changes);
+  assert_eq! (
+    report . errors . iter ()
+      . filter (|error| error . index == "contained_by") . count (),
+    2);
+}
+
+#[test]
+fn local_index_check_catches_an_empty_key_left_behind () {
+  let (base, mut candidate, definitions, changes) = changed_edge_fixture (0);
+  candidate . contained_by . insert (
+    ID::from ("old"), im::HashSet::new ());
+  let report : LocalIndexValidation = validate_local_internal_indexes (
+    &base, &candidate, &definitions, &changes);
+  assert! (report . errors . iter () . any (|error|
+    error . index == "contained_by" && error . key == ID::from ("old")));
+}
+
+#[test]
+fn local_index_check_work_does_not_grow_with_unrelated_nodes () {
+  let (small_base, small_candidate, small_definitions, small_changes) =
+    changed_edge_fixture (0);
+  let (large_base, large_candidate, large_definitions, large_changes) =
+    changed_edge_fixture (1_000);
+  let small : LocalIndexValidation = validate_local_internal_indexes (
+    &small_base, &small_candidate, &small_definitions, &small_changes);
+  let large : LocalIndexValidation = validate_local_internal_indexes (
+    &large_base, &large_candidate, &large_definitions, &large_changes);
+  assert! (small . errors . is_empty () && large . errors . is_empty ());
+  assert_eq! (small . node_checks, large . node_checks);
+  assert_eq! (small . identity_checks, large . identity_checks);
+  assert_eq! (
+    small . relationship_membership_checks,
+    large . relationship_membership_checks);
 }
 
 proptest! {

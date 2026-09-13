@@ -6,7 +6,10 @@
 //! suspected of internal corruption.
 
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::prepared_update::GraphChangeSet;
 use crate::types::misc::{ID, members_of};
+use crate::types::nodes::rust::NodeRust;
+use crate::types::save::{DefineNode, DeleteNode, SaveNode};
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -19,6 +22,183 @@ pub struct InternalIndexMismatch {
 }
 
 type ExpectedIndex = BTreeMap<ID, BTreeSet<ID>>;
+
+#[derive(Debug)]
+#[allow(dead_code)]
+pub(crate) struct LocalIndexValidation {
+  pub(crate) errors                         : Vec<InternalIndexMismatch>,
+  pub(crate) node_checks                    : usize,
+  pub(crate) identity_checks                : usize,
+  pub(crate) relationship_membership_checks : usize,
+}
+
+/// Check only nodes and index memberships whose truth can have changed in one
+/// prepared batch. Unlike `validate_internal_indexes`, this is bounded by the
+/// delta and is suitable as an always-on save guard.
+pub(crate) fn validate_local_internal_indexes (
+  base        : &InRustGraph,
+  candidate   : &InRustGraph,
+  definitions : &[DefineNode],
+  changes     : &GraphChangeSet,
+) -> LocalIndexValidation {
+  let mut result : Vec<InternalIndexMismatch> = Vec::new ();
+  let mut relationship_membership_checks : usize = 0;
+  validate_local_nodes (candidate, definitions, &mut result);
+  validate_local_identity (base, candidate, changes, &mut result);
+  for owner in &changes . owners_to_reindex {
+    let old_keys : BTreeMap<&'static str, BTreeSet<ID>> = base . nodes
+      . get (owner)
+      . map (|node| relationship_keys (base, node))
+      . unwrap_or_default ();
+    let final_keys : BTreeMap<&'static str, BTreeSet<ID>> = candidate . nodes
+      . get (owner)
+      . map (|node| relationship_keys (candidate, node))
+      . unwrap_or_default ();
+    for index_name in [
+      "contained_by", "subscribers_of", "hiders_of", "overriders_of",
+      "textlinks_in",
+    ] {
+      let keys : BTreeSet<ID> = old_keys . get (index_name) . into_iter ()
+        . flatten () . chain (
+          final_keys . get (index_name) . into_iter () . flatten ())
+        . cloned () . collect ();
+      for key in keys {
+        relationship_membership_checks += 1;
+        let expected : bool = final_keys . get (index_name)
+          . is_some_and (|set| set . contains (&key));
+        let actual_set : Option<&im::HashSet<ID>> =
+          relationship_index (candidate, index_name) . get (&key);
+        let actual : bool = actual_set
+          . is_some_and (|set| set . contains (owner));
+        if expected != actual {
+          result . push (membership_mismatch (
+            index_name, key . clone (), owner, expected, actual)); }
+        if actual_set . is_some_and (|set| set . is_empty ()) {
+          result . push (InternalIndexMismatch {
+            index    : index_name,
+            key,
+            expected : Vec::new (),
+            actual   : Vec::new (),
+          }); }} }}
+  result . sort_by (|left, right|
+    left . index . cmp (right . index)
+      . then_with (|| left . key . cmp (&right . key))
+      . then_with (|| left . expected . cmp (&right . expected))
+      . then_with (|| left . actual . cmp (&right . actual)));
+  LocalIndexValidation {
+    errors : result,
+    node_checks : definitions . len (),
+    identity_checks : changes . affected_ids . len (),
+    relationship_membership_checks,
+  }
+}
+
+fn validate_local_nodes (
+  candidate   : &InRustGraph,
+  definitions : &[DefineNode],
+  result      : &mut Vec<InternalIndexMismatch>,
+) {
+  for definition in definitions {
+    match definition {
+      DefineNode::Save (SaveNode (node)) => {
+        let expected : NodeRust = NodeRust::from (node);
+        if candidate . nodes . get (&node . pid) != Some (&expected) {
+          result . push (InternalIndexMismatch {
+            index    : "nodes",
+            key      : node . pid . clone (),
+            expected : vec![node . pid . clone ()],
+            actual   : candidate . nodes . get (&node . pid)
+              . map (|actual| vec![actual . pid . clone ()])
+              . unwrap_or_default (),
+          }); }}
+      DefineNode::Delete (DeleteNode { id, .. }) => {
+        if candidate . nodes . contains_key (id) {
+          result . push (InternalIndexMismatch {
+            index    : "nodes",
+            key      : id . clone (),
+            expected : Vec::new (),
+            actual   : vec![id . clone ()],
+          }); }} }
+  }
+}
+
+fn validate_local_identity (
+  base      : &InRustGraph,
+  candidate : &InRustGraph,
+  changes   : &GraphChangeSet,
+  result    : &mut Vec<InternalIndexMismatch>,
+) {
+  for id in &changes . affected_ids {
+    let final_owner : Option<ID> =
+      match changes . canonicalization_changes . iter ()
+        . find (|change| &change . id == id) {
+        Some (change) => change . new_owner . clone (),
+        None          => base . pid_of (id),
+      };
+    let expected_extra_owner : Option<ID> = match &final_owner {
+      Some (owner) if owner != id => Some (owner . clone ()),
+      _                           => None,
+    };
+    let actual_extra_owner : Option<ID> =
+      candidate . extra_id_to_pid . get (id) . cloned ();
+    if expected_extra_owner != actual_extra_owner {
+      result . push (InternalIndexMismatch {
+        index    : "extra_id_to_pid",
+        key      : id . clone (),
+        expected : expected_extra_owner . into_iter () . collect (),
+        actual   : actual_extra_owner . into_iter () . collect (),
+      }); }
+  }
+}
+
+fn relationship_keys (
+  identity : &InRustGraph,
+  node     : &NodeRust,
+) -> BTreeMap<&'static str, BTreeSet<ID>> {
+  let canonical = |raw : &ID| -> ID {
+    identity . pid_of (raw) . unwrap_or_else (|| raw . clone ()) };
+  BTreeMap::from ([
+    ("contained_by", members_of (&node . contains) . into_iter ()
+      . map (|raw| canonical (&raw)) . collect ()),
+    ("subscribers_of", members_of (node . subscribes_to . or_default ())
+      . into_iter () . map (|raw| canonical (&raw)) . collect ()),
+    ("hiders_of", members_of (node . hides_from_its_subscriptions . or_default ())
+      . into_iter () . map (|raw| canonical (&raw)) . collect ()),
+    ("overriders_of", members_of (node . overrides_view_of . or_default ())
+      . into_iter () . map (|raw| canonical (&raw)) . collect ()),
+    ("textlinks_in", node . textlinks_to . iter ()
+      . map (canonical) . collect ()),
+  ])
+}
+
+fn relationship_index<'a> (
+  graph : &'a InRustGraph,
+  name  : &str,
+) -> &'a im::HashMap<ID, im::HashSet<ID>> {
+  match name {
+    "contained_by"   => &graph . contained_by,
+    "subscribers_of" => &graph . subscribers_of,
+    "hiders_of"      => &graph . hiders_of,
+    "overriders_of"  => &graph . overriders_of,
+    "textlinks_in"   => &graph . textlinks_in,
+    _ => unreachable! ("known relationship index"),
+  }
+}
+
+fn membership_mismatch (
+  index    : &'static str,
+  key      : ID,
+  owner    : &ID,
+  expected : bool,
+  actual   : bool,
+) -> InternalIndexMismatch {
+  InternalIndexMismatch {
+    index,
+    key,
+    expected : if expected { vec![owner . clone ()] } else { Vec::new () },
+    actual   : if actual { vec![owner . clone ()] } else { Vec::new () },
+  }
+}
 
 /// Return deterministic, exact differences between all stored derived indexes
 /// and indexes independently recomputed from `graph.nodes`.

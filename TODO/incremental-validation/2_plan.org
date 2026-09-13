@@ -748,7 +748,7 @@ cases compare the batch mutator to reconstruction.  =cargo check
 --all-targets=, all 230 =grouped_unit= tests, and all 116 =grouped_saves=
 tests pass (one intentionally ignored).
 
-** ONGOING Add always-on local internal-index postconditions
+** DONE Add always-on local internal-index postconditions
 
 - Implement delta-scoped node, extra-ID, and five-inverse-index checks.
 - Make preparation return an internal-consistency error before filesystem
@@ -764,7 +764,21 @@ The local checker catches each injected mutation bug and examines no unrelated
 node/index key in complexity-instrumented tests.  The full checker remains
 green on every accepted candidate.
 
-** TODO Replace touched-only override validation with affected validation
+Preparation now constructs its exact candidate with the batch mutator and
+runs an always-on delta checker before the still-transitional full oracle.  It
+checks final Save/Delete node values, affected alias ownership, old-versus-
+final membership for each affected owner across all five relationship
+indexes, and absence of empty keys.  Internal mismatches have a separate
+preparation-error field and abort before filesystem preparation.
+
+Four fault-injection tests independently restore a stale membership, remove a
+required insertion, undo a canonical migration, and leave an empty key; every
+fault is detected.  Instrumented work counts are identical for the same edge
+edit on bases with zero and 1,000 unrelated nodes.  Generated batch-mutator
+tests continue to pass the independent full index checker.  =cargo check
+--all-targets=, all =grouped_unit= tests, and all =grouped_saves= tests pass.
+
+** ONGOING Replace touched-only override validation with affected validation
 
 - Derive affected sources and targets from old/new raw edges, source ownership,
   and canonicalization changes.

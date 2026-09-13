@@ -187,7 +187,7 @@ fn remove_relationship_contributions (
     let key : ID = canonical_key (identity, second_member);
     remove_from_inverse_map (&mut graph . textlinks_in, &key, pid); } }
 
-fn inbound_owners_at (
+pub(crate) fn inbound_owners_at (
   graph : &InRustGraph,
   key   : &ID,
 ) -> HashSet<ID> {

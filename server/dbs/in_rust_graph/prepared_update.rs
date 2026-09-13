@@ -5,10 +5,17 @@
 //! but publication consumes it and never reapplies definitions to a newer
 //! graph.
 
-use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
+use crate::dbs::in_rust_graph::{
+  InRustGraph, InRustGraphHandle, apply_definenodes_to_inRustGraph,
+  inbound_owners_at,
+};
 use crate::dbs::in_rust_graph::complete_validation::{
-  CompleteGraphError, format_complete_graph_errors,
+  CompleteGraphError, CompleteGraphValidation, format_complete_graph_errors,
   validate_complete_graph_candidate,
+};
+use crate::dbs::in_rust_graph::internal_index_validation::{
+  InternalIndexMismatch, LocalIndexValidation, format_internal_index_mismatches,
+  validate_local_internal_indexes,
 };
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
@@ -40,6 +47,7 @@ pub(crate) struct GraphChangeSet {
   pub(crate) affected_ids             : HashSet<ID>,
   pub(crate) canonicalization_changes : Vec<CanonicalizationChange>,
   pub(crate) identity_acquisitions    : Vec<IdentityAcquisition>,
+  pub(crate) owners_to_reindex        : HashSet<ID>,
   #[cfg(test)]
   pub(crate) identity_base_lookup_bound : usize,
 }
@@ -55,6 +63,7 @@ pub(crate) struct ExtraIdRevocation {
 pub(crate) struct GraphUpdatePreparationError {
   pub(crate) complete_graph_errors : Vec<CompleteGraphError>,
   pub(crate) extra_id_revocations  : Vec<ExtraIdRevocation>,
+  pub(crate) internal_index_errors : Vec<InternalIndexMismatch>,
 }
 
 impl fmt::Display for GraphUpdatePreparationError {
@@ -66,6 +75,9 @@ impl fmt::Display for GraphUpdatePreparationError {
     if ! self . complete_graph_errors . is_empty () {
       sections . push (format_complete_graph_errors (
         &self . complete_graph_errors)); }
+    if ! self . internal_index_errors . is_empty () {
+      sections . push (format_internal_index_mismatches (
+        &self . internal_index_errors)); }
     for revocation in &self . extra_id_revocations {
       sections . push (format! (
         "Cannot save node '{}' ('{}') because it would revoke existing extra ID(s): {}. Skg keeps acquired IDs stable because another dataset may link to them. Raw-file editing followed by rebuild remains the explicit escape hatch.",
@@ -148,17 +160,31 @@ pub(crate) fn prepare_graph_update (
     return Err (GraphUpdatePreparationError {
       complete_graph_errors : incremental_errors,
       extra_id_revocations  : revocations,
+      internal_index_errors : Vec::new (),
     }); }
-  let validation = validate_complete_graph_candidate (
+  let mut candidate : InRustGraph = (*base) . clone ();
+  apply_definenodes_to_inRustGraph (
+    &mut candidate, &batch . final_graph_definitions);
+  let local_index_validation : LocalIndexValidation =
+    validate_local_internal_indexes (
+      &base, &candidate, &batch . final_graph_definitions, &changes);
+  if ! local_index_validation . errors . is_empty () {
+    return Err (GraphUpdatePreparationError {
+      complete_graph_errors : Vec::new (),
+      extra_id_revocations  : Vec::new (),
+      internal_index_errors : local_index_validation . errors,
+    }); }
+  let validation : CompleteGraphValidation = validate_complete_graph_candidate (
     config, &base, &batch . final_graph_definitions);
   if ! validation . errors . is_empty () {
     return Err (GraphUpdatePreparationError {
       complete_graph_errors : validation . errors,
       extra_id_revocations  : Vec::new (),
+      internal_index_errors : Vec::new (),
     }); }
   Ok (PreparedGraphUpdate {
     base,
-    candidate   : Arc::new (validation . graph),
+    candidate   : Arc::new (candidate),
     definitions : batch . filesystem_definitions,
     changes,
   })
@@ -298,6 +324,15 @@ fn validate_identity_and_derive_changes (
           new_owner,
         }); }} }
 
+  let mut owners_to_reindex : HashSet<ID> = touched_pids . clone ();
+  for change in &canonicalization_changes {
+    let old_key : &ID = change . old_owner . as_ref ()
+      . unwrap_or (&change . id);
+    let new_key : &ID = change . new_owner . as_ref ()
+      . unwrap_or (&change . id);
+    if old_key != new_key {
+      owners_to_reindex . extend (inbound_owners_at (base, old_key)); }}
+
   #[cfg(test)]
   let identity_base_lookup_bound : usize =
     touched_pids . len () + affected_ids . len () * 4 + saved_pids . len ();
@@ -308,6 +343,7 @@ fn validate_identity_and_derive_changes (
     affected_ids,
     canonicalization_changes,
     identity_acquisitions,
+    owners_to_reindex,
     #[cfg(test)]
     identity_base_lookup_bound,
   }, errors, revocations)
