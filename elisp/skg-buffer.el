@@ -32,6 +32,17 @@ buffer name if another content view opens with the same title.  Later
 view-forest edits do not change it.")
 (put 'skg-contentView-initialRoot-source 'permanent-local t)
 
+(defvar-local skg--buffer-warned_two-dirty-buffers_since-last-looked-here nil
+  "Whether the user accepted editing this view while another is dirty.
+Here, \"last looked here\" means the last time point entered this buffer.")
+
+(defvar skg--buffer-containing-selected-point-at-last-buffer-list-update
+  (window-buffer (selected-window))
+  "The buffer containing the selected window's point at the last update.")
+
+(defvar-local skg--before-change-functions-before-refused-edit nil
+  "The hooks to restore after a two-dirty-buffer warning aborts an edit.")
+
 (defun skg-content-view-buffer-name (org-text)
   "Generate buffer name for content view from ORG-TEXT."
   (let ((title (skg-extract-top-headline-title org-text)))
@@ -152,8 +163,7 @@ otherwise generate a new UUID."
       (setq skg-view-uri uri)
       (setq skg-contentView-initialRoot-source source)
       (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
-      (add-hook 'first-change-hook
-                #'skg-warn-if-other-buffer-modified nil t)
+      (skg--install-two-dirty-buffer-warning-hooks)
       (set-buffer-modified-p nil)
       (goto-char (point-min)))
     (switch-to-buffer buffer)))
@@ -172,16 +182,95 @@ otherwise generate a new UUID."
   (when (boundp 'skg-rust-tcp-proc)
     (skg-send-close-view-uri skg-rust-tcp-proc skg-view-uri)))
 
-(defun skg-warn-if-other-buffer-modified ()
-  "Warn if another skg buffer has unsaved modifications."
-  (let ((other-modified
-         (cl-some (lambda (buf)
-                    (and (not (eq buf (current-buffer)))
-                         (buffer-local-value 'skg-view-uri buf)
-                         (buffer-modified-p buf)))
-                  (buffer-list))))
-    (when other-modified
-      (message "WARNING: Another skg buffer has unsaved modifications. Saving is ill-defined when multiple buffers have unsaved edits.")) ))
+(defun skg--install-two-dirty-buffer-warning-hooks ()
+  "Install this view's hooks for warning about two dirty skg buffers."
+  (remove-hook 'first-change-hook
+               #'skg-warn-if-other-buffer-modified t)
+  (remove-hook 'window-buffer-change-functions
+               #'skg--rearm-two-dirty-buffer-warning-when-made-visible t)
+  (remove-hook 'post-command-hook
+               #'skg--rearm-two-dirty-buffer-warning-after-refused-edit t)
+  (if skg--buffer-warned_two-dirty-buffers_since-last-looked-here
+      (remove-hook 'before-change-functions
+                   #'skg-warn-if-other-buffer-modified t)
+    (add-hook 'before-change-functions
+              #'skg-warn-if-other-buffer-modified nil t)))
+
+(defun skg--rearm-two-dirty-buffer-warning-when-point-enters-buffer ()
+  "Rearm a skg view's warning when selected point enters that buffer."
+  (let ((selected-buffer (window-buffer (selected-window))))
+    (unless (eq selected-buffer
+                skg--buffer-containing-selected-point-at-last-buffer-list-update)
+      (setq skg--buffer-containing-selected-point-at-last-buffer-list-update
+            selected-buffer)
+      (with-current-buffer selected-buffer
+        (when skg-view-uri
+          (setq
+           skg--buffer-warned_two-dirty-buffers_since-last-looked-here nil)
+          (add-hook 'before-change-functions
+                    #'skg-warn-if-other-buffer-modified nil t))))))
+
+(add-hook 'buffer-list-update-hook
+          #'skg--rearm-two-dirty-buffer-warning-when-point-enters-buffer)
+
+(defun skg--rearm-two-dirty-buffer-warning-after-refused-edit ()
+  "Restore the warning hook that Emacs clears when it aborts an edit."
+  (remove-hook 'post-command-hook
+               #'skg--rearm-two-dirty-buffer-warning-after-refused-edit t)
+  (if skg--before-change-functions-before-refused-edit
+      (setq before-change-functions
+            skg--before-change-functions-before-refused-edit)
+    (add-hook 'before-change-functions
+              #'skg-warn-if-other-buffer-modified nil t))
+  (setq skg--before-change-functions-before-refused-edit nil))
+
+(defun skg-warn-if-other-buffer-modified (&rest _change-bounds)
+  "Ask before editing when another skg view has unsaved modifications.
+One accepted warning covers edits until point leaves this buffer and returns."
+  (cond
+   (skg--buffer-warned_two-dirty-buffers_since-last-looked-here)
+   (noninteractive
+    (remove-hook 'before-change-functions
+                 #'skg-warn-if-other-buffer-modified t))
+   (t
+    (let ((others (skg--other-unsaved-skg-buffers)))
+      (if (null others)
+          (remove-hook 'before-change-functions
+                       #'skg-warn-if-other-buffer-modified t)
+        (let ((accepted nil))
+          (unwind-protect
+              (when (yes-or-no-p
+                     (format
+                      "DANGER: %d other skg buffer(s) have unsaved edits (%s). Editing this buffer too can make saving ill-defined. Edit anyway? "
+                      (length others)
+                      (mapconcat #'buffer-name others ", ")))
+                (setq accepted t)
+                (setq
+                 skg--buffer-warned_two-dirty-buffers_since-last-looked-here
+                 t)
+                (remove-hook 'before-change-functions
+                             #'skg-warn-if-other-buffer-modified t))
+            (unless accepted
+              (setq skg--before-change-functions-before-refused-edit
+                    (copy-sequence before-change-functions))
+              (add-hook
+               'post-command-hook
+               #'skg--rearm-two-dirty-buffer-warning-after-refused-edit
+               nil t)))
+          (unless accepted
+            (user-error
+             "Edit aborted: another skg buffer has unsaved edits"))))))))
+
+(defun skg--other-unsaved-skg-buffers ()
+  "Return modified skg view buffers other than the current buffer."
+  (let ((self (current-buffer))
+        (result nil))
+    (dolist (buf (buffer-list))
+      (when (and (not (eq buf self))
+                 (buffer-local-value 'skg-view-uri buf)
+                 (buffer-modified-p buf))
+        (push buf result)))
+    result))
 
 (defun skg-find-buffer-by-uri (uri)
   "Find the buffer whose skg-view-uri matches URI."

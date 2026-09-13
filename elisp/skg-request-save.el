@@ -8,18 +8,6 @@
 (require 'skg-buffer)
 (require 'skg-lock-buffers)
 
-(defun skg--other-unsaved-skg-buffers ()
-  "Return the list of skg view buffers OTHER than the current one that
-have unsaved modifications (`buffer-modified-p')."
-  (let ((self (current-buffer))
-        (result nil))
-    (dolist (buf (buffer-list))
-      (when (and (not (eq buf self))
-                 (buffer-local-value 'skg-view-uri buf)
-                 (buffer-modified-p buf))
-        (push buf result)))
-    result))
-
 (defun skg--confirm-save-despite-other-unsaved ()
   "plan_v2 §8.4: if other skg buffers have unsaved edits that this save's
 collateral rerenders might overwrite, warn loudly and ask before sending.
@@ -68,8 +56,9 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
            (looking-at "\\*+ (skg")))
         (save-point-position
          (skg--current-save-point-position)))
-    (skg-add-folded-markers)
-    (skg-add-focused-marker)
+    (let ((skg--buffer-warned_two-dirty-buffers_since-last-looked-here t))
+      (skg-add-folded-markers)
+      (skg-add-focused-marker))
     (let* ((tcp-proc (skg-tcp-connect-to-rust))
            (save-buffer (current-buffer))
            (saved-uri skg-view-uri)
@@ -86,11 +75,12 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
            (content-bytes (encode-coding-string buffer-contents 'utf-8))
            (content-length (length content-bytes))
            (header (format "Content-Length: %d\r\n\r\n" content-length)))
-      (progn ;; Rust needs these markers, but the user doesn't.
-        (skg-remove-focused-marker)
-        (skg-remove-folded-markers))
-      (unless focused-had-metadata
-        (skg-strip-bare-skg-at-focused-headline))
+      (let ((skg--buffer-warned_two-dirty-buffers_since-last-looked-here t))
+        (progn ;; Rust needs these markers, but the user doesn't.
+          (skg-remove-focused-marker)
+          (skg-remove-folded-markers))
+        (unless focused-had-metadata
+          (skg-strip-bare-skg-at-focused-headline)))
 
       (unless skg-view-uri
         ;; Guard: refuse to save when skg-view-uri is nil.
@@ -730,7 +720,8 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
   "Replace the current buffer contents with NEW-CONTENT from Rust.
 After inserting content, folds marked headlines, removes fold markers,
 moves point to focused headline, and removes focus marker."
-  (let ((inhibit-read-only t))
+  (let ((inhibit-read-only t)
+        (skg--buffer-warned_two-dirty-buffers_since-last-looked-here t))
     (erase-buffer)
     (insert new-content)
     (;; PITFALL: `erase-buffer' does NOT remove overlays — they collapse
@@ -755,13 +746,10 @@ moves point to focused headline, and removes focus marker."
       (skg-fold-marked-headlines)
       (skg-remove-folded-markers))
     (skg--restore-save-point-position save-point-position)
-    (set-buffer-modified-p
-     ;; Clear modified flag and re-register the one-shot hook
-     ;; AFTER all buffer modifications are done.
-     nil)
-    (add-hook 'first-change-hook
-              #'skg-warn-if-other-buffer-modified nil t)
-    (message "Buffer updated with processed content from Rust")))
+    (set-buffer-modified-p nil))
+  (setq skg--buffer-warned_two-dirty-buffers_since-last-looked-here nil)
+  (skg--install-two-dirty-buffer-warning-hooks)
+  (message "Buffer updated with processed content from Rust"))
 
 (defun skg--restore-save-point-position (save-point-position)
   "Restore point and window row from SAVE-POINT-POSITION, if available."
