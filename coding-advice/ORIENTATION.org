@@ -1,40 +1,52 @@
-* Welcome!
-My name's Jeff.
-It's been a pleasure working with other instances of you
-and/or your predecessors, so I look forward to working with you.
-* To know about the project,
-  These resources cover the space decently, with some redundacy.
-** README.org
-** api-and-formats.md
-** glossary.md
-** the coding-advice/ folder
-** docs/data-model_technical.org
-** https://github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org
-** TODO.org
-** Three of the tools in tools/introspect
-namely these:
-```
-call-graph
-change-forest
-code-map
-```
-might be helpful -- particularly call-graph.
-** anything the above link to
-* I find you easiest to read
-  in an org file on disk, rather than inside this CLI.
-  For anything longer than a couple paragraphs,
-  please refer me to a file.
-* Please report problems in the code.
-Whether or not my latest request takes such things into consideration,
-if you find any:
+* How to work
+** Conserve tokens
+Read [[file:to-conserve-tokens.org][the token-conservation advice]] and apply it throughout the task.
+Before a tool call, identify the unresolved question it will settle. Work one
+narrow, tested slice at a time; use focused reads and tests; do not duplicate
+an investigation that another agent owns. See also
+[[file:../codex-thinking/token-discipline.org][the recorded drift and prevention rules]].
+** Edit conservatively
+Do not alter Git configuration, credentials, index, branches, or commits
+unless explicitly asked. Do not gratuitously rename things or add legacy
+compatibility code. Preserve relevant comments and follow the existing local
+style when modifying code. The code is authoritative when documentation and
+code differ.
 
-- bugs or deviations from spec
-- noteworthy inefficiencies
-- opportunities to improve the architecture
+Do not change or commit git state unless explicitly asked.
+If asked to commit, I probably meant to ask for granular commits
+that will make the history easy to spelunk, rather than one mega-commit.
+*** That said, name verbosely, as described in [[./naming.org]].
+** Push back when needed
+Call out requests that are vague, contradictory, inefficient, unnecessary, or
+overly complex rather than silently guessing at a bad interpretation.
+* Project essentials
+Skg is a local knowledge-graph editor. Its canonical data is in plaintext
+'.skg' files; the 'in-Rust graph' and Tantivy are derived stores.
+The Rust server is in
+'server/', with Emacs Lisp and Neovim clients in 'elisp/' and 'nvim/'. A
+server retains one interactive user and admits one interactive client at a
+time.
 
-please report them, in 'TODO/problems.org'.
-If that file doesn't exist, please create it.
-* Please report problems with my requests.
-For each of my requests, push back against anything vague or ill-specified, inefficient, unnecessary or overly complex.
-* Thanks,
-  Jeff
+For a task, start with the smallest relevant local source:
+** [[file:../README.org][README.org]] for a concise project map and entry points.
+** [[file:../api-and-formats.md][api-and-formats.md]] for protocol, view metadata, configuration, and file-format contracts.
+** [[file:../glossary.md][glossary.md]] and [[file:../docs/data-model.org][docs/data-model.org]] for domain vocabulary and semantics.
+** [[file:development-process.md][coding-advice/development-process.md]], [[file:common-gotchas.md][common-gotchas.md]], and [[file:docker.org][docker.org]] for testing, runtime, and environment constraints.
+** The relevant implementation, callers, tests, and focused documentation for the requested behavior.
+
+Do not read all documentation or TODO material as onboarding; it's too much.
+Consult a plan, open question, or historical note
+only when the current task points to it.
+The external knowledge graph is optional background material, not required
+orientation: the repository's code and local documentation contain the
+operative information for implementation.
+* How to communicate and maintain knowledge
+For a response longer than a couple of paragraphs, prefer an Org file in the
+repository and link to it. Note that an org file uniformly of depth 2,
+with bullets inside the bodies, is a weird LLM smell.
+The natural way knowledge divides is as a tree of verying depth,
+with complex parts being more bushy. And bullets defeat the purpose of org,
+so prefer headlines -- those let me (Jeff) respond granularly.
+
+Report discovered bugs, specification deviations, important inefficiencies,
+or architectural opportunities in 'TODO/problems.org'.
