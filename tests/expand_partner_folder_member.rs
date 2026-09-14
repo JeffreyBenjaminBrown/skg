@@ -1,8 +1,8 @@
-// cargo nextest run --test grouped_overrides -E 'test(expand_partner_col_member::)'
+// cargo nextest run --test grouped_overrides -E 'test(expand_partner_folder_member::)'
 //
-// Definitive expansion of a read-only PartnerCol member
+// Definitive expansion of a read-only PartnerFolder member
 // (TODO/full-schema/13_test-rel-matrix.org). Confirmed 2026-06-12:
-// expanding a subscriberCol member behaves like expanding any
+// expanding a subscriberFolder member behaves like expanding any
 // indefinitive node -- the member line stays a raw member, its own
 // content appears, and NO subscription-hides apply (those are scoped
 // to subscribees-as-such, the other direction).
@@ -47,12 +47,12 @@ fn line_containing<'a> ( buf : &'a str, fragment : &str ) -> &'a str {
       || panic! ("no line contains {:?} in:\n{}", fragment, buf )) }
 
 #[test]
-fn expanding_subscriberCol_member_is_plain_expansion
+fn expanding_subscriberFolder_member_is_plain_expansion
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
-    "skg-test-expand-partner-col-member",
-    "tests/expand_partner_col_member/fixtures",
-    "/tmp/tantivy-test-expand-partner-col-member",
+    "skg-test-expand-partner-folder-member",
+    "tests/expand_partner_folder_member/fixtures",
+    "/tmp/tantivy-test-expand-partner-folder-member",
     |config, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
@@ -61,11 +61,11 @@ fn expanding_subscriberCol_member_is_plain_expansion
         multi_root_view (
           config, Some (tantivy), &[ID::from ("N")], false )
  ?;
-      assert! ( n_view . contains ("subscriberCol")
+      assert! ( n_view . contains ("subscriberFolder")
                 && line_containing (&n_view, "(id S)") . contains (" indef"),
-        "N's view should show S as an indefinitive subscriberCol \
+        "N's view should show S as an indefinitive subscriberFolder \
          member:\n{}", n_view );
-      // Request definitive expansion of the subscriberCol member S.
+      // Request definitive expansion of the subscriberFolder member S.
       // Since uniform-heralds the indefinitive member line carries
       // 'indef (birthHerald ...)' (the old graphStats atom is gone), so
       // we inject the definitiveView request right after 'indef'. S is
@@ -79,9 +79,9 @@ fn expanding_subscriberCol_member_is_plain_expansion
       let saved : String =
         save (&expanded_request, config, tantivy, &graph)
         . await ? . saved_view;
-      // S stays a raw subscriberCol member, now definitive...
-      assert! ( saved . contains ("subscriberCol"),
-        "S should remain under the subscriberCol:\n{}", saved );
+      // S stays a raw subscriberFolder member, now definitive...
+      assert! ( saved . contains ("subscriberFolder"),
+        "S should remain under the subscriberFolder:\n{}", saved );
       assert! ( ! line_containing (&saved, "(id S)") . contains (" indef"),
         "S should be definitive after expansion:\n{}", saved );
       // ...its own content appears...
@@ -89,8 +89,8 @@ fn expanding_subscriberCol_member_is_plain_expansion
         "S's own content (C) should appear on expansion:\n{}", saved );
       // ...and NO subscription-hides apply (S is a subscriber here, not
       // a subscribee-as-such): no hidden-subscription scaffolds.
-      assert! ( ! saved . contains ("hiddenInSubscribeeCol")
-                && ! saved . contains ("hiddenOutsideOfSubscribeeCol"),
-        "expanding a subscriberCol member must not apply hides:\n{}",
+      assert! ( ! saved . contains ("hiddenInSubscribeeFolder")
+                && ! saved . contains ("hiddenOutsideOfSubscribeeFolder"),
+        "expanding a subscriberFolder member must not apply hides:\n{}",
         saved );
       Ok (( )) } )) }

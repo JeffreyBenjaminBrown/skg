@@ -6,7 +6,7 @@
 use skg::from_text::local_instruction_collection::predicates::{
   active_child_counts_as_content,
   active_child_counts_as_visible_content,
-  member_counts_for_partnerCol };
+  member_counts_for_partnerFolder };
 use skg::types::git::Sign;
 use skg::types::misc::{ID, SourceName};
 use skg::types::viewnode::{
@@ -31,37 +31,37 @@ fn with_edit_request (
   t }
 
 #[test]
-fn relation_collection_membership_conditions () {
-  assert!( member_counts_for_partnerCol (
+fn relation_folder_membership_conditions () {
+  assert!( member_counts_for_partnerFolder (
     &base_activeNode () ));
   { // affectsParent != Affected excludes.
     let mut t : ActiveNode = base_activeNode ();
     t . affectsParent = AffectsParent::False;
-    assert!( ! member_counts_for_partnerCol (&t) ); }
+    assert!( ! member_counts_for_partnerFolder (&t) ); }
   { // A negative staged membership axis (would-be diff phantom) excludes.
     let mut t : ActiveNode = base_activeNode ();
     t . membership . staged = Some (Sign::Minus);
-    assert!( ! member_counts_for_partnerCol (&t) ); }
+    assert!( ! member_counts_for_partnerFolder (&t) ); }
   { // A negative unstaged membership axis excludes.
     let mut t : ActiveNode = base_activeNode ();
     t . membership . unstaged = Some (Sign::Minus);
-    assert!( ! member_counts_for_partnerCol (&t) ); }
+    assert!( ! member_counts_for_partnerFolder (&t) ); }
   { // A negative unstaged existence axis (file deleted) excludes.
     let mut t : ActiveNode = base_activeNode ();
     t . existence . unstaged = Some (Sign::Minus);
-    assert!( ! member_counts_for_partnerCol (&t) ); }
+    assert!( ! member_counts_for_partnerFolder (&t) ); }
   { // A positive axis does not exclude.
     let mut t : ActiveNode = base_activeNode ();
     t . membership . unstaged = Some (Sign::Plus);
-    assert!( member_counts_for_partnerCol (&t) ); }
+    assert!( member_counts_for_partnerFolder (&t) ); }
   // A Delete edit request excludes; a NodeMerge edit request does not.
-  assert!( ! member_counts_for_partnerCol (
+  assert!( ! member_counts_for_partnerFolder (
     &with_edit_request (NodeEditRequest::Delete) ));
-  assert!( member_counts_for_partnerCol (
+  assert!( member_counts_for_partnerFolder (
     &with_edit_request (NodeEditRequest::NodeMerge (ID::from ("other"))) )); }
 
 #[test]
-fn content_membership_coincides_with_relation_collection_membership () {
+fn content_membership_coincides_with_relation_folder_membership () {
   // The two predicates encode one condition today; if they ever
   // diverge, this test should be split per condition.
   let cases : Vec<ActiveNode> = {
@@ -81,7 +81,7 @@ fn content_membership_coincides_with_relation_collection_membership () {
     cases };
   for t in &cases {
     assert_eq!( active_child_counts_as_content (t),
-                member_counts_for_partnerCol (t) ); }}
+                member_counts_for_partnerFolder (t) ); }}
 
 #[test]
 fn visible_content_membership_conditions () {
@@ -97,7 +97,7 @@ fn visible_content_membership_conditions () {
   assert!( active_child_counts_as_visible_content (
     &with_edit_request (NodeEditRequest::NodeMerge (ID::from ("other"))) ));
   { // This pins an asymmetry: negative diff axes do NOT exclude
-    // here, unlike in the contains and PartnerCol
+    // here, unlike in the contains and PartnerFolder
     // predicates.
     let mut t : ActiveNode = base_activeNode ();
     t . membership . staged   = Some (Sign::Minus);

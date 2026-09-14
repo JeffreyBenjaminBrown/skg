@@ -48,11 +48,11 @@ fn ordinary_definitive_emissions () {
       Root body
       ** (skg (node (id child) (source main))) child
       ** (skg (node (id independent) (source main) (affectsParent false))) independent
-      ** (skg aliasCol) aliases
+      ** (skg aliasFolder) aliases
       *** (skg alias) nickname
-      ** (skg subscribeeCol)
+      ** (skg subscribeeFolder)
       *** (skg (node (id s) (source main) indef)) s
-      ** (skg overriddenCol)
+      ** (skg overriddenFolder)
       *** (skg (node (id o) (source main) indef)) o
       * (skg (node (id doomed) (source main) (editRequest delete))) doomed
       * (skg (node (id acquirer) (source main) (editRequest (merge acquiree)))) acquirer
@@ -88,7 +88,7 @@ fn subscribee_as_such_emits_claim_and_visibility () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id subscriber) (source main))) subscriber
-      ** (skg subscribeeCol)
+      ** (skg subscribeeFolder)
       *** (skg (node (id e) (source main))) e
       Subscribee body
       **** (skg (node (id visible) (source main))) visible
@@ -119,32 +119,32 @@ fn subscribee_as_such_emits_claim_and_visibility () {
     assert!( visible . title_and_body . is_some() ); }}
 
 #[test]
-fn aliascol_under_subscribee_as_such_emits_nothing () {
+fn aliasfolder_under_subscribee_as_such_emits_nothing () {
   // This is the trap from the discussion: a naive implementation
   // would write the subscribee's aliases.
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id subscriber) (source main))) subscriber
-      ** (skg subscribeeCol)
+      ** (skg subscribeeFolder)
       *** (skg (node (id e) (source main))) e
-      **** (skg aliasCol) aliases
+      **** (skg aliasFolder) aliases
       ***** (skg alias) sneaky alias
       "} );
   assert_eq!( entry (&collected, "e") . aliases, None ); }
 
 #[test]
-fn cols_under_toDelete_or_indefinitive_owners_emit_nothing () {
+fn folders_under_toDelete_or_indefinitive_owners_emit_nothing () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id doomed) (source main) (editRequest delete))) doomed
-      ** (skg aliasCol) aliases
+      ** (skg aliasFolder) aliases
       *** (skg alias) dead alias
-      ** (skg subscribeeCol)
+      ** (skg subscribeeFolder)
       *** (skg (node (id s) (source main) indef)) s
       * (skg (node (id ghost) (source main) indef)) ghost
-      ** (skg aliasCol) aliases
+      ** (skg aliasFolder) aliases
       *** (skg alias) ghost alias
-      ** (skg overriddenCol)
+      ** (skg overriddenFolder)
       *** (skg (node (id o) (source main) indef)) o
       "} );
   { let doomed : &IntentsForOneId = entry (&collected, "doomed");
@@ -152,14 +152,14 @@ fn cols_under_toDelete_or_indefinitive_owners_emit_nothing () {
     assert_eq!( doomed . aliases, None );
     assert_eq!( doomed . subscribes_to, None ); }
   assert!( collected . by_pid . get (&ID::from ("ghost")) . is_none(),
-           "an indefinitive vognode and its cols emit nothing" ); }
+           "an indefinitive vognode and its folders emit nothing" ); }
 
 #[test]
-fn definitive_member_of_readonly_col_emits_for_itself_only () {
+fn definitive_member_of_readonly_folder_emits_for_itself_only () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id owner) (source main))) owner
-      ** (skg subscriberCol)
+      ** (skg subscriberFolder)
       *** (skg (node (id intruder) (source main))) intruder
       Intruder body
       **** (skg (node (id intruder-child) (source main))) intruder child
@@ -170,7 +170,7 @@ fn definitive_member_of_readonly_col_emits_for_itself_only () {
                         Some ("Intruder body" . to_string()) )) );
     assert_eq!( intruder . contains,
                 Some (vec![(ID::from ("intruder-child"), None)]) ); }
-  { // The col's owner is unaffected by the col's membership.
+  { // The folder's owner is unaffected by the folder's membership.
     let owner : &IntentsForOneId = entry (&collected, "owner");
     assert_eq!( owner . contains, Some (vec![]) );
     assert_eq!( owner . subscribes_to, None ); }}
@@ -233,7 +233,7 @@ fn indefinitive_subscribee_as_such_emits_nothing () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id subscriber) (source main))) subscriber
-      ** (skg subscribeeCol)
+      ** (skg subscribeeFolder)
       *** (skg (node (id e) (source main) indef)) e
       **** (skg (node (id under) (source main) indef)) under
       "} );
@@ -245,7 +245,7 @@ fn definitive_subscribee_under_indefinitive_subscriber_claims_without_visibility
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id subscriber) (source main) indef)) subscriber
-      ** (skg subscribeeCol)
+      ** (skg subscribeeFolder)
       *** (skg (node (id e) (source main))) e
       **** (skg (node (id visible) (source main))) visible
       "} );
@@ -258,40 +258,40 @@ fn definitive_subscribee_under_indefinitive_subscriber_claims_without_visibility
            "no visibility intent reaches an indefinitive subscriber" ); }
 
 #[test]
-fn present_but_empty_cols_differ_from_absent_cols () {
+fn present_but_empty_folders_differ_from_absent_folders () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id explicit) (source main))) explicit
-      ** (skg aliasCol) aliases
-      ** (skg subscribeeCol)
-      ** (skg overriddenCol)
+      ** (skg aliasFolder) aliases
+      ** (skg subscribeeFolder)
+      ** (skg overriddenFolder)
       * (skg (node (id silent) (source main))) silent
       "} );
   { let explicit : &IntentsForOneId = entry (&collected, "explicit");
-    // A present-but-empty col is an explicitly empty field.
+    // A present-but-empty folder is an explicitly empty field.
     assert_eq!( explicit . aliases, Some (vec![]) );
     assert_eq!( explicit . subscribes_to, Some (vec![]) );
     assert_eq!( explicit . overrides, Some (vec![]) ); }
   { let silent : &IntentsForOneId = entry (&collected, "silent");
-    // An absent col expresses no opinion.
+    // An absent folder expresses no opinion.
     assert_eq!( silent . aliases, None );
     assert_eq!( silent . subscribes_to, None );
     assert_eq!( silent . overrides, None ); }}
 
 #[test]
-fn duplicate_defining_col_members_dedup_preserving_order () {
+fn duplicate_defining_folder_members_dedup_preserving_order () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id owner) (source main))) owner
-      ** (skg aliasCol) aliases
+      ** (skg aliasFolder) aliases
       *** (skg alias) echo
       *** (skg alias) other
       *** (skg alias) echo
-      ** (skg subscribeeCol)
+      ** (skg subscribeeFolder)
       *** (skg (node (id s1) (source main) indef)) s1
       *** (skg (node (id s2) (source main) indef)) s2
       *** (skg (node (id s1) (source main) indef)) s1
-      ** (skg overriddenCol)
+      ** (skg overriddenFolder)
       *** (skg (node (id o1) (source main) indef)) o1
       *** (skg (node (id o2) (source main) indef)) o2
       *** (skg (node (id o1) (source main) indef)) o1

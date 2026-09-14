@@ -28,7 +28,7 @@ use std::collections::{HashMap, HashSet};
 /// vognode. A fork's clone C must live in an owned source; the foreign
 /// node N's own source is read-only, so C inherits from N's IMMEDIATE
 /// container context -- the nearest vognode ancestor reached by skipping
-/// only scaffolds (cols, etc.). The walk STOPS at that nearest vognode
+/// only scaffolds (folders, etc.). The walk STOPS at that nearest vognode
 /// ancestor and never passes it: if the ancestor is foreign (or
 /// inactive), nothing is inferred (the source then defaults, or the user
 /// sets it in the confirmation buffer). Inferring a distant owned node
@@ -62,7 +62,7 @@ pub fn owned_ancestor_sources_for_foreign_vognodes (
           // never an owned source): infer nothing.
           break,
         _ =>
-          // A scaffold (col, etc.): skip it and keep walking rootward.
+          // A scaffold (folder, etc.): skip it and keep walking rootward.
           { current = parent; }} }}
   map }
 
@@ -108,7 +108,7 @@ pub fn new_foreign_nodes_adopting_clone_sources (
         ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
           break,
         _ =>
-          // A scaffold (col, etc.): skip it and keep walking rootward.
+          // A scaffold (folder, etc.): skip it and keep walking rootward.
           { current = parent; }} }}
   map }
 

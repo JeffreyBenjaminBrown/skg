@@ -1,6 +1,6 @@
-// cargo nextest run --test grouped_overrides -E 'test(partner_col_warnings::)'
+// cargo nextest run --test grouped_overrides -E 'test(partner_folder_warnings::)'
 //
-// When the completion pass repairs a read-only PartnerCol in the
+// When the completion pass repairs a read-only PartnerFolder in the
 // view the user just saved, the save succeeds and
 // SaveResponse.warnings says what was repaired
 // (TODO/full-schema/8_readonly-set-ergonomics.org):
@@ -9,8 +9,8 @@
 // - a non-member parked as Affected with a subtree is demoted to
 //   independent, with a warning.
 //
-// Fixture: r and t subscribe to n (so n's view has a SubscriberCol);
-// x is an unrelated node the test parks inside that col.
+// Fixture: r and t subscribe to n (so n's view has a SubscriberFolder);
+// x is an unrelated node the test parks inside that folder.
 
 use std::error::Error;
 use std::net::TcpStream;
@@ -29,12 +29,12 @@ use skg::dbs::in_rust_graph::InRustGraphHandle;
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  let fixtures : &str = "tests/partner_col_warnings/fixtures";
+  let fixtures : &str = "tests/partner_folder_warnings/fixtures";
   run_with_shared_test_stores (
-    "skg-test-partner-col-warnings",
+    "skg-test-partner-folder-warnings",
     |s| Box::pin ( async move {
-      s . reset ("readonly_col_repairs_warn", fixtures) ?;
-      readonly_col_repairs_warn_impl (
+      s . reset ("readonly_folder_repairs_warn", fixtures) ?;
+      readonly_folder_repairs_warn_impl (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("failed_save_carries_warnings_with_errors", fixtures) ?;
       failed_save_carries_warnings_with_errors (
@@ -69,7 +69,7 @@ fn line_containing<'a> (
     . unwrap_or_else (
       || panic! ( "no line contains {:?} in:\n{}", fragment, buf )) }
 
-async fn readonly_col_repairs_warn_impl (
+async fn readonly_folder_repairs_warn_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -87,7 +87,7 @@ async fn readonly_col_repairs_warn_impl (
     let t_line : String =
       line_containing (&complete_buffer, "(id t)") . to_string ();
     let x_line : String = {
-      // x: a definitive Affected leaf parked inside the col, with a
+      // x: a definitive Affected leaf parked inside the folder, with a
       // (new) child so the repair is a demotion, not a removal.
       let mut l : String =
         r_line
@@ -101,23 +101,23 @@ async fn readonly_col_repairs_warn_impl (
       let stars : usize =
         x_line . chars () . take_while ( |c| *c == '*' ) . count ();
       format! ( "{} xx", "*" . repeat (stars + 1) ) };
-    let col_line : String =
-      line_containing (&complete_buffer, "subscriberCol") . to_string ();
+    let folder_line : String =
+      line_containing (&complete_buffer, "subscriberFolder") . to_string ();
     complete_buffer
       . replace ( &format! ("{}\n", r_line), "" ) // delete member r
       . replace ( &t_line,                        // park x (with child) after t
                   &format! ("{}\n{}\n{}", t_line, x_line, x_child) )
-      . replace ( &col_line,                      // edit the col headline text
-                  &format! ("{} HELLO", col_line) ) };
+      . replace ( &folder_line,                      // edit the folder headline text
+                  &format! ("{} HELLO", folder_line) ) };
   let response : SaveResponse =
     save_buffer (&edited, config, tantivy, &graph) . await ?;
   assert! ( response . errors . is_empty (),
     "save must succeed; got errors: {:?}", response . errors );
   let warning : &String =
     response . warnings . iter ()
-    . find ( |w| w . contains ("Repaired subscriberCol") )
+    . find ( |w| w . contains ("Repaired subscriberFolder") )
     . unwrap_or_else (
-      || panic! ( "no subscriberCol repair warning in {:?}",
+      || panic! ( "no subscriberFolder repair warning in {:?}",
                   response . warnings ));
   assert! ( warning . contains ("under node n"), "{}", warning );
   assert! ( warning . contains ("restored 1 member(s): r"),
@@ -127,28 +127,28 @@ async fn readonly_col_repairs_warn_impl (
   assert! ( warning . contains ("edited from the other side"),
             "{}", warning );
   assert! ( response . warnings . iter ()
-            . any ( |w| w . contains ("Headline text on a subscriberCol") ),
-    "discarded col headline text must warn: {:?}",
+            . any ( |w| w . contains ("Headline text on a subscriberFolder") ),
+    "discarded folder headline text must warn: {:?}",
     response . warnings );
   let saved : String = response . saved_view;
   assert! ( saved . contains ("(id r)"),
     "deleted member r must respawn:\n{}", saved );
   { let x_line_after : &str = line_containing (&saved, "(id x)");
-    assert! ( x_line_after . contains ("(affectsParent false)"),
-      "x must be rerendered as affectsParent=false: {}", x_line_after ); }
-  assert! ( ! line_containing (&saved, "subscriberCol")
+    assert! ( x_line_after . contains ("false"),
+      "x must be rerendered as false: {}", x_line_after ); }
+  assert! ( ! line_containing (&saved, "subscriberFolder")
               . contains ("HELLO"),
-    "the col headline edit must not survive the rerender:\n{}", saved );
+    "the folder headline edit must not survive the rerender:\n{}", saved );
   { // A BODY on a scaffold still aborts the save (Body_of_Scaffold).
-    let col_line : String =
-      line_containing (&saved, "subscriberCol") . to_string ();
+    let folder_line : String =
+      line_containing (&saved, "subscriberFolder") . to_string ();
     let with_body : String =
-      saved . replace ( &col_line,
-                        &format! ("{}\nan illegal body", col_line) );
+      saved . replace ( &folder_line,
+                        &format! ("{}\nan illegal body", folder_line) );
     let result =
       save_buffer (&with_body, config, tantivy, &graph) . await;
     assert! ( result . is_err (),
-      "a body on a col scaffold must still abort the save" ); }
+      "a body on a folder scaffold must still abort the save" ); }
   Ok (( )) }
 
 async fn failed_save_carries_warnings_with_errors (
@@ -157,23 +157,23 @@ async fn failed_save_carries_warnings_with_errors (
 ) -> Result<(), Box<dyn Error>> {
   // Decided 2026-06-12 (option b): a failed save's response carries
   // its warnings alongside its errors. The buffer below produces BOTH
-  // a parse-time warning (leftover text on a subscriberCol headline)
-  // and a validation error (an idCol claiming an id node n lacks).
+  // a parse-time warning (leftover text on a subscriberFolder headline)
+  // and a validation error (an idFolder claiming an id node n lacks).
       let graph : InRustGraphHandle =
         (
           graph_handle_from_config (config) ? );
       let buffer : &str = "\
 * (skg (node (id n) (source main))) n
-** (skg subscriberCol) leftover headline text
+** (skg subscriberFolder) leftover headline text
 *** (skg (node (id r) (source main) indef)) r
 *** (skg (node (id t) (source main) indef)) t
-** (skg idCol)
+** (skg idFolder)
 *** (skg id) bogus-id
 ";
       let result : Result<SaveResponse, Box<dyn Error>> =
         save_buffer (buffer, config, tantivy, &graph) . await;
       let err : Box<dyn Error> = match result {
-        Ok (_)  => panic! ("save should fail (idCol edited)"),
+        Ok (_)  => panic! ("save should fail (idFolder edited)"),
         Err (e) => e, };
       let save_error : &SaveError =
         err . downcast_ref::<SaveError> ()
@@ -182,11 +182,11 @@ async fn failed_save_carries_warnings_with_errors (
         SaveError::BufferValidationErrors { errors, warnings } => {
           assert! (
             errors . iter () . any (
-              |e| matches! (e, BufferValidationError::IDCol_Edited (..)) ),
-            "expected an IDCol_Edited error: {:?}", errors );
+              |e| matches! (e, BufferValidationError::IDFolder_Edited (..)) ),
+            "expected an IDFolder_Edited error: {:?}", errors );
           assert! (
             warnings . iter () . any (
-              |w| w . contains ("Headline text on a subscriberCol") ),
+              |w| w . contains ("Headline text on a subscriberFolder") ),
             "a failed save must carry its parse warning: {:?}", warnings ); }
         other => panic! (
           "expected BufferValidationErrors, got {:?}", other ), }

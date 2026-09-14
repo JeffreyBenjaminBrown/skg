@@ -24,7 +24,7 @@ fn raw_drawn_overridden_root_children_are_raw
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
     "skg-test-expand-raw-overridden-children",
-    "tests/expand_partner_col_member/fixtures",
+    "tests/expand_partner_folder_member/fixtures",
     "/tmp/tantivy-test-expand-raw-overridden-children",
     |config, tantivy| Box::pin ( async move {
       let (x_view, _pids, _tree)

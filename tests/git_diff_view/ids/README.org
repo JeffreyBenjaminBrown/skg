@@ -10,7 +10,7 @@
   If the root IDs of the view are the singleton set [1],
   then the view should look like:
   * 1
-  ** (skg (scaffold idCol))
+  ** (skg (scaffold idFolder))
   *** (skg (scaffold id) 1
   *** (skg (scaffold id) (diff removed)) 2
   *** (skg (scaffold id) (diff new)) 2'
@@ -18,6 +18,6 @@
   ** child
   (I might have the metadata format wrong but that's the idea.)
 * expected save behavior
-  editing any of the idCol's children, or the idCol with its children,
+  editing any of the idFolder's children, or the idFolder with its children,
   or even moving the IDs to be siblings or children of 'child',
   should have no effect on disk or in the buffer.

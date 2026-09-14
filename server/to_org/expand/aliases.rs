@@ -4,8 +4,8 @@ use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
 use crate::types::git::MembershipAxes;
 use crate::types::misc::{ID, MemberAtSource, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest, ColRelation};
-use crate::types::viewnode::{QualCol, Qual};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest, FolderRelation};
+use crate::types::viewnode::{QualFolder, Qual};
 use crate::types::tree::viewnode_nodecomplete::{
   insert_scaffold_as_child, unique_scaffold_child_of_viewnode};
 
@@ -24,21 +24,21 @@ pub fn build_and_integrate_aliases_view_then_drop_request (
       tree, node_id, graph, config );
   remove_completed_view_request (
     tree, node_id,
-    ViewRequest::Col (ColRelation::Aliases),
+    ViewRequest::Folder (FolderRelation::Aliases),
     "Failed to integrate aliases view",
     errors, result ) }
 
-/// Integrate an AliasCol child with its Alias grandchildren
+/// Integrate an AliasFolder child with its Alias grandchildren
 /// into the ViewNode tree containing the target node.
 ///
 /// PITFALL: This function fetches aliases from disk and
-/// populates them immediately, whereas 'reconcile_alias_col_children' (in
-/// update_buffer) is only called on an AliasCol already in the tree.
-/// These two distinct ways of populating an AliasCol are necessary,
+/// populates them immediately, whereas 'reconcile_aliasFolder_children' (in
+/// update_buffer) is only called on an AliasFolder already in the tree.
+/// These two distinct ways of populating an AliasFolder are necessary,
 /// because in 'complete_or_restore_each_node_in_branch',
 /// view requests are only processed AFTER recursing to children
 /// (for reasons explained in that function's header comment),
-/// so any newly-created empty AliasCol
+/// so any newly-created empty AliasFolder
 /// would not be visited in the same save cycle.
 pub fn build_and_integrate_aliases (
   tree      : &mut Tree<ViewNode>,
@@ -50,9 +50,9 @@ pub fn build_and_integrate_aliases (
     get_id_from_treenode ( tree, node_id ) ?;
   if unique_scaffold_child_of_viewnode (
     tree, node_id,
-    &ViewNodeKind::QualCol (QualCol::Alias) )? . is_some ()
-  { // If it already has an AliasCol child,
-    // then reconcile_alias_col_children (in update_buffer) already handled it.
+    &ViewNodeKind::QualFolder (QualFolder::Alias) )? . is_some ()
+  { // If it already has an AliasFolder child,
+    // then reconcile_aliasFolder_children (in update_buffer) already handled it.
     return Ok (( )); }
   let node : Option<NodeComplete> =
     nodecomplete_from_graph (graph, &node_id_val);
@@ -61,12 +61,12 @@ pub fn build_and_integrate_aliases (
   let aliases : Vec<MemberAtSource<String>> = node
     . map ( |node| node . aliases . or_default () . to_vec () )
     . unwrap_or_default ();
-  let aliascol_id : ego_tree::NodeId =
+  let aliasfolder_id : ego_tree::NodeId =
     insert_scaffold_as_child ( tree, node_id,
-      ViewNodeKind::QualCol (QualCol::Alias), true ) ?;
+      ViewNodeKind::QualFolder (QualFolder::Alias), true ) ?;
   for alias in & aliases {
     insert_scaffold_as_child (
-      tree, aliascol_id,
+      tree, aliasfolder_id,
       ViewNodeKind::Qual (
         Qual::Alias { text: alias . member . clone (),
                       rel_source: home . as_ref ()

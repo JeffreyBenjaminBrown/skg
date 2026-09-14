@@ -24,11 +24,11 @@ mod collateral;
 #[path = "git_diff_view/inbound/mod.rs"]
 mod inbound;
 
-#[path = "git_diff_view/filter_cols/mod.rs"]
-mod filter_cols;
+#[path = "git_diff_view/filter_folders/mod.rs"]
+mod filter_folders;
 
 #[path = "git_diff_view/roundtrip/mod.rs"]
 mod roundtrip;
 
-// The outbound-col diff tests live in their own focused target,
-// tests/git_diff_view_partner_cols.rs. The inbound tests remain here.
+// The outbound-folder diff tests live in their own focused target,
+// tests/git_diff_view_partner_folders.rs. The inbound tests remain here.

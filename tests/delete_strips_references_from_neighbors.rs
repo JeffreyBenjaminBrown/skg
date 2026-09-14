@@ -273,7 +273,7 @@ async fn delete_in_foreign_subscribee_rerenders_as_unknown (
   let response = update_from_and_rerender_buffer (
     &mut stream, indoc! {"
       * (skg (node (id subscriber) (source foreign))) foreign subscriber
-      ** (skg subscribeeCol)
+      ** (skg subscribeeFolder)
       *** (skg (node (id victim) (source owned) (affectsParent false) (editRequest delete))) victim
     "}, config, tantivy, &graph, false,
     &Err (String::new ()), &mut views_state ) . await ?;
@@ -300,7 +300,7 @@ async fn delete_in_foreign_overridden_rerenders_as_unknown (
   let response = update_from_and_rerender_buffer (
     &mut stream, indoc! {"
       * (skg (node (id overrider) (source foreign))) foreign overrider
-      ** (skg overriddenCol)
+      ** (skg overriddenFolder)
       *** (skg (node (id victim) (source owned) (editRequest delete))) victim
     "}, config, tantivy, &graph, false,
     &Err (String::new ()), &mut views_state ) . await ?;
@@ -310,7 +310,7 @@ async fn delete_in_foreign_overridden_rerenders_as_unknown (
     response . saved_view);
   // Reopen the serialized view with a new graph handle, which exercises the
   // restart path without relying on the content-only default to request this
-  // on-demand collection.
+  // on-demand folder.
   let fresh_graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut restarted_views : ViewsState = ViewsState {
     diff_mode_enabled : false, open_views : OpenViews::new (), };
@@ -337,9 +337,9 @@ async fn delete_in_foreign_hiddenoutside_rerenders_as_unknown (
   let response = update_from_and_rerender_buffer (
     &mut stream, indoc! {"
       * (skg (node (id hide-subscriber) (source foreign))) foreign hide subscriber
-      ** (skg subscribeeCol)
+      ** (skg subscribeeFolder)
       *** (skg (node (id hide-subscribee) (source foreign))) foreign hide subscribee
-      *** (skg hiddenOutsideOfSubscribeeCol)
+      *** (skg hiddenOutsideOfSubscribeeFolder)
       **** (skg (node (id victim) (source owned) (editRequest delete))) victim
     "}, config, tantivy, &graph, false,
     &Err (String::new ()), &mut views_state ) . await ?;

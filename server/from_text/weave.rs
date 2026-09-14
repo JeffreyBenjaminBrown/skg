@@ -10,7 +10,7 @@
 /// - A disk member is POSITIONED iff it appears in the buffer list.
 ///   Only visible members ever do: save extraction never puts an
 ///   inactive (invisible) member into a container's list (see
-///   'content_members' / 'subscribeeCol_members' in
+///   'content_members' / 'subscribeeFolder_members' in
 ///   local_instruction_collection/traverse.rs), so every invisible
 ///   disk member is non-positioned and the weave alone decides its
 ///   presence and position.

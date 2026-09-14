@@ -81,13 +81,13 @@ skg-config-dir is set and `skg--source-names' works."
                     '(:owner "owner" :member "kid"
                       :relation "contains"))))))
 
-(ert-deftest test-relationship-edge-writable-col-member ()
-  "A subscribeeCol member's edge: owner = the col's ANCHOR (its
-org-parent), relation = the col's relation."
+(ert-deftest test-relationship-edge-writable-folder-member ()
+  "A subscribeeFolder member's edge: owner = the folder's ANCHOR (its
+org-parent), relation = the folder's relation."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id anchor) (source public))) anchor\n"
-    "** (skg subscribeeCol)\n"
+    "** (skg subscribeeFolder)\n"
     "*** (skg (node (id seen) (source public) indef)) seen\n")
    test--config-public-private-trusted
    (lambda ()
@@ -98,12 +98,12 @@ org-parent), relation = the col's relation."
                     '(:owner "anchor" :member "seen"
                       :relation "subscribes_to"))))))
 
-(ert-deftest test-relationship-edge-refuses-on-readonly-col-member ()
-  "Refuses (user-error) on a member of a read-only col."
+(ert-deftest test-relationship-edge-refuses-on-readonly-folder-member ()
+  "Refuses (user-error) on a member of a read-only folder."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (source public))) owner\n"
-    "** (skg subscriberCol)\n"
+    "** (skg subscriberFolder)\n"
     "*** (skg (node (id sub) (source public))) sub\n")
    test--config-public-private-trusted
    (lambda ()
@@ -113,7 +113,7 @@ org-parent), relation = the col's relation."
      (let ((err (should-error (skg--relationship-edge-at-point)
                               :type 'user-error)))
        (should (string-match-p "read-only" (cadr err)))
-       (should (string-match-p "subscriberCol" (cadr err)))))))
+       (should (string-match-p "subscriberFolder" (cadr err)))))))
 
 (ert-deftest test-relationship-edge-refuses-on-root ()
   "Refuses on a root headline: with no org-parent there is no edge."
@@ -131,11 +131,11 @@ org-parent), relation = the col's relation."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (source public))) owner\n"
-    "** (skg aliasCol) aliases\n")
+    "** (skg aliasFolder) aliases\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (search-forward "(skg aliasCol)" nil t)
+     (search-forward "(skg aliasFolder)" nil t)
      (beginning-of-line)
      (should-error (skg--relationship-edge-at-point)
                    :type 'user-error))))
@@ -223,7 +223,7 @@ the displayed relSource fact; its message says the SAVED source survives
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (source public))) owner\n"
-    "** (skg aliasCol)\n"
+    "** (skg aliasFolder)\n"
     "*** (skg alias) nickname\n")
    test--config-public-private-trusted
    (lambda ()
@@ -279,7 +279,7 @@ the displayed relSource fact; its message says the SAVED source survives
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (source private))) owner\n"
-    "** (skg aliasCol)\n"
+    "** (skg aliasFolder)\n"
     "*** (skg alias) nickname\n")
    test--config-public-private-trusted
    (lambda ()
@@ -402,15 +402,15 @@ choices, so the prompt pre-fills with the default instead."
    "*** (skg (node (id d) (source public))) d\n"
    "** (skg (node (id e) (source public) indef)) e\n"
    "*** (skg (node (id f) (source public))) f\n"
-   "** (skg subscribeeCol)\n"
+   "** (skg subscribeeFolder)\n"
    "*** (skg (node (id g) (source public))) g\n"
    "**** (skg (node (id h) (source public))) h\n"
-   "** (skg aliasCol) aliases\n")
+   "** (skg aliasFolder) aliases\n")
   "A view-root tree exercising the walk's qualification and pruning:
 true content (a, b), an false branch (c, d), an
 indefinitive-but-true member (e) over content (f), a
-subscribeeCol member (g) over subscribee-as-such content (h), and an
-aliasCol.")
+subscribeeFolder member (g) over subscribee-as-such content (h), and an
+aliasFolder.")
 
 (defun test--line-of-id (id)
   "Return the text of the buffer line whose metadata carries ID."
@@ -424,7 +424,7 @@ aliasCol.")
   "Kind `contained' hits true content children of definitive
 activeNode parents only: the root's own (na) edge is skipped, the
 false branch and everything below the indefinitive node and the
-subscribee-as-such member are pruned, and col members are untouched."
+subscribee-as-such member are pruned, and folder members are untouched."
   (test--with-skg-content-view
    test--recursive-content-tree
    test--config-public-private-trusted
@@ -441,7 +441,7 @@ subscribee-as-such member are pruned, and col members are untouched."
                                      (test--line-of-id id))))))))
 
 (ert-deftest test-recursive-walk-subscribee ()
-  "Kind `subscribee' hits only subscribeeCol members, leaving content
+  "Kind `subscribee' hits only subscribeeFolder members, leaving content
 children and subscribee-as-such content untouched."
   (test--with-skg-content-view
    test--recursive-content-tree
@@ -476,12 +476,12 @@ own edge to its view-parent."
                                (test--line-of-id "b")))))))
 
 (ert-deftest test-recursive-walk-overridden-and-member-content ()
-  "An overriddenCol member matches kind `overridden'; the member's
+  "An overriddenFolder member matches kind `overridden'; the member's
 own content children (the member being definitive) match kind
-`contained' through the col."
+`contained' through the folder."
   (let ((tree (concat
                "* (skg (node (id anchor) (source public))) anchor\n"
-               "** (skg overriddenCol)\n"
+               "** (skg overriddenFolder)\n"
                "*** (skg (node (id o) (source public))) o\n"
                "**** (skg (node (id oc) (source public))) oc\n")))
     (test--with-skg-content-view
@@ -505,13 +505,13 @@ own content children (the member being definitive) match kind
        (should-not (string-match-p "relSource"
                                    (test--line-of-id "o")))))))
 
-(ert-deftest test-recursive-walk-prunes-readonly-col ()
-  "A read-only col's whole branch is pruned: even a definitive
+(ert-deftest test-recursive-walk-prunes-readonly-folder ()
+  "A read-only folder's whole branch is pruned: even a definitive
 member's content children are not reached."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (source public))) owner\n"
-    "** (skg subscriberCol)\n"
+    "** (skg subscriberFolder)\n"
     "*** (skg (node (id s) (source public))) s\n"
     "**** (skg (node (id sc) (source public))) sc\n")
    test--config-public-private-trusted
@@ -523,14 +523,14 @@ member's content children are not reached."
        (should-not (string-match-p "relSource"
                                    (test--line-of-id id)))))))
 
-(ert-deftest test-recursive-walk-indefinitive-col-anchor ()
-  "A writable col under an INDEFINITIVE anchor is not collected at
+(ert-deftest test-recursive-walk-indefinitive-folder-anchor ()
+  "A writable folder under an INDEFINITIVE anchor is not collected at
 save, so its members do not match -- whether the walk starts at the
-anchor (pruned below the indefinitive node) or at the col itself
+anchor (pruned below the indefinitive node) or at the folder itself
 (refused by the anchor-definitiveness check)."
   (let ((tree (concat
                "* (skg (node (id anchor) (source public) indef)) anchor\n"
-               "** (skg subscribeeCol)\n"
+               "** (skg subscribeeFolder)\n"
                "*** (skg (node (id g) (source public))) g\n")))
     (test--with-skg-content-view
      tree test--config-public-private-trusted
@@ -544,7 +544,7 @@ anchor (pruned below the indefinitive node) or at the col itself
      tree test--config-public-private-trusted
      (lambda ()
        (goto-char (point-min))
-       (search-forward "subscribeeCol")
+       (search-forward "subscribeeFolder")
        (beginning-of-line)
        (should (= 0 (skg--set-relationship-source-recursive-walk
                      'subscribee "trusted")))

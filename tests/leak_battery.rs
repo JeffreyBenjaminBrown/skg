@@ -177,7 +177,7 @@ fn inbound_containerward_data_hides_N_at_public (
       Ok (( )) } )) }
 
 #[test]
-fn subscriberCol_style_inbound_gates_privately_recorded_subscription (
+fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
 ) -> Result<(), Box<dyn Error>> {
   run_with_source_set_test_db (
     "skg-test-leak-battery-subscriber",
@@ -193,7 +193,7 @@ fn subscriberCol_style_inbound_gates_privately_recorded_subscription (
       let graph : InRustGraph =
         InRustGraph::from_nodecompletes (&nodes);
 
-      // C's subscriberCol goal list: 'other_member_pids_gated' at
+      // C's subscriberFolder goal list: 'other_member_pids_gated' at
       // the SUBSCRIBEE role (C's own role -- who subscribes to C).
       // S's subscription is recorded only in S's private section, so
       // it must not appear at "public" even though S itself is a
@@ -204,7 +204,7 @@ fn subscriberCol_style_inbound_gates_privately_recorded_subscription (
       assert! (
         ! subscribers_public . contains (&ID::from ("S")),
         "S's privately-recorded subscription to C must not surface \
-         in C's subscriberCol goal list at public: {:?}",
+         in C's subscriberFolder goal list at public: {:?}",
         subscribers_public );
       let subscribers_all : Vec<ID> =
         graph . other_member_pids_gated (

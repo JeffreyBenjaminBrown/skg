@@ -89,24 +89,24 @@ describe('skg.heralds', function ()
 
   it('displays viewRequests as req:* heralds', function ()
     assert.is_truthy(
-      herald_text('(skg (node (id 1) (viewRequests (col aliases))))')
-      :find('req:col:?aliases'))
+      herald_text('(skg (node (id 1) (viewRequests (folder aliases))))')
+      :find('req:folder:?aliases'))
     assert.is_truthy(
       herald_text('(skg (node (id 2) (viewRequests (path container))))')
       :find('req:path:?container'))
     local many = herald_text(
-      '(skg (node (id 4) (viewRequests (col aliases)'
+      '(skg (node (id 4) (viewRequests (folder aliases)'
       .. ' (path container) (path linkSource))))')
-    assert.is_truthy(many:find('req:col:?aliases'))
+    assert.is_truthy(many:find('req:folder:?aliases'))
     assert.is_truthy(many:find('req:path:?container'))
     assert.is_truthy(many:find('req:path:?linkSource'))
   end)
 
   it('displays scaffold kinds', function ()
-    assert.is_truthy(herald_text('(skg aliasCol)'):find('aliases'))
+    assert.is_truthy(herald_text('(skg aliasFolder)'):find('aliases'))
     assert.is_truthy(herald_text('(skg alias)'):find('alias'))
     assert.is_truthy(
-      herald_text('(skg folded aliasCol)'):find('aliases'))
+      herald_text('(skg folded aliasFolder)'):find('aliases'))
     local changed = herald_text('(skg (textChanged staged unstaged))')
     assert.is_truthy(changed:find('text changed : staged', 1, true))
     assert.is_truthy(changed:find('text changed : unstaged', 1, true))

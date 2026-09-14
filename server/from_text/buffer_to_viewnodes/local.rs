@@ -4,7 +4,7 @@
 
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpActiveNode, MpPhantomDiff};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
-use crate::types::viewnode::{NodeEditRequest, IndefOrDef, AffectsParent, PartnerCol, Qual, QualCol};
+use crate::types::viewnode::{NodeEditRequest, IndefOrDef, AffectsParent, PartnerFolder, Qual, QualFolder};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::viewnode_nodecomplete::{
   generation_includes_only,
@@ -45,25 +45,25 @@ pub fn validate_local_structure (
         Vec::new (),
       MpViewnodeKind::Qual (Qual::Alias { .. }) =>
           validate_alias(tree, node_id),
-      MpViewnodeKind::QualCol (QualCol::Alias) =>
-          validate_aliascol(tree, node_id),
-      MpViewnodeKind::PartnerCol (PartnerCol::HiddenInSubscribee) =>
-          validate_hidden_in_subscribee_col(tree, node_id),
-      MpViewnodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) =>
-          validate_hidden_outside_of_subscribee_col(tree, node_id),
-      MpViewnodeKind::PartnerCol (
-        role @ (PartnerCol::Hidden
-          | PartnerCol::Hider
-          | PartnerCol::Overridden
-          | PartnerCol::Overrider
-          | PartnerCol::Subscriber))
-        => validate_relation_col(tree, node_id, *role),
-      MpViewnodeKind::PartnerCol (PartnerCol::Subscribee) =>
-          validate_subscribeecol(tree, node_id),
+      MpViewnodeKind::QualFolder (QualFolder::Alias) =>
+          validate_aliasfolder(tree, node_id),
+      MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee) =>
+          validate_hiddenInSubscribee_folder(tree, node_id),
+      MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
+          validate_hiddenOutsideOfSubscribee_folder(tree, node_id),
+      MpViewnodeKind::PartnerFolder (
+        role @ (PartnerFolder::Hidden
+          | PartnerFolder::Hider
+          | PartnerFolder::Overridden
+          | PartnerFolder::Overrider
+          | PartnerFolder::Subscriber))
+        => validate_relation_folder(tree, node_id, *role),
+      MpViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) =>
+          validate_subscribeefolder(tree, node_id),
       MpViewnodeKind::Qual (Qual::TextChanged { .. }) =>
           validate_text_changed(tree, node_id),
-      MpViewnodeKind::QualCol (QualCol::ID) =>
-          validate_idcol(tree, node_id),
+      MpViewnodeKind::QualFolder (QualFolder::ID) =>
+          validate_idFolder(tree, node_id),
       MpViewnodeKind::Qual (Qual::ID { .. }) =>
           validate_idscaffold(tree, node_id),
       MpViewnodeKind::Phantom (MpPhantom::Deleted (_))
@@ -95,11 +95,11 @@ fn validate_alias (
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::QualCol (QualCol::Alias)))
-    { errors . push("Alias must have an AliasCol parent." . to_string()); }
+                    MpViewnodeKind::QualFolder (QualFolder::Alias)))
+    { errors . push("Alias must have an AliasFolder parent." . to_string()); }
   errors }
 
-fn validate_aliascol (
+fn validate_aliasfolder (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
@@ -108,24 +108,24 @@ fn validate_aliascol (
     tree, node_id, 1, true,
     |node| matches!(&node . kind,
                     MpViewnodeKind::Qual (Qual::Alias { .. } )))
-    { errors . push("AliasCol's (non-ignored) children must include only Aliases."
+    { errors . push("AliasFolder's (non-ignored) children must include only Aliases."
                     . to_string()); }
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| matches!(&node . kind,
                     MpViewnodeKind::Vognode (
                       MpVognode::Active (_) )))
-    { errors . push("AliasCol must have an ActiveNode parent." . to_string()); }
+    { errors . push("AliasFolder must have an ActiveNode parent." . to_string()); }
   if !siblings_cannot_include(
     tree, node_id,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::QualCol (QualCol::Alias)))
-    { errors . push("AliasCol must be unique among its siblings."
+                    MpViewnodeKind::QualFolder (QualFolder::Alias)))
+    { errors . push("AliasFolder must be unique among its siblings."
                     . to_string()); }
   errors }
 
 /// Read the error messages to see what this validates.
-fn validate_hidden_in_subscribee_col (
+fn validate_hiddenInSubscribee_folder (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
@@ -134,7 +134,7 @@ fn validate_hidden_in_subscribee_col (
     tree, node_id, -1, false,
     |node| node . is_active_or_diff_phantom ())
     { errors . push(
-        "HiddenInSubscribeeCol must have an ActiveNode parent (the subscribee)"
+        "HiddenInSubscribeeFolder must have an ActiveNode parent (the subscribee)"
         . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
@@ -142,7 +142,7 @@ fn validate_hidden_in_subscribee_col (
            || matches! ( &node . kind,
                          MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) ))
     { errors . push(
-        "HiddenInSubscribeeCol's children can only be ActiveNodes or Unknown placeholders (to hide)."
+        "HiddenInSubscribeeFolder's children can only be ActiveNodes or Unknown placeholders (to hide)."
         . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
@@ -155,22 +155,22 @@ fn validate_hidden_in_subscribee_col (
         => true,
       _ => false, } )
     { errors . push(
-        "HiddenInSubscribeeCol ActiveNode children must have affectsParent=true."
+        "HiddenInSubscribeeFolder ActiveNode children must have affectsParent=true."
       . to_string()); }
   if !siblings_cannot_include(
     tree, node_id,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::PartnerCol (
-                      PartnerCol::HiddenInSubscribee )))
-    { errors . push("HiddenInSubscribeeCol must be unique among its siblings."
+                    MpViewnodeKind::PartnerFolder (
+                      PartnerFolder::HiddenInSubscribee )))
+    { errors . push("HiddenInSubscribeeFolder must be unique among its siblings."
                     . to_string()); }
-  if !partnerCol_children_have_distinct_ids(tree, node_id)
+  if !partnerFolder_children_have_distinct_ids(tree, node_id)
     { errors . push(
-      "HiddenInSubscribeeCol must not have duplicate ActiveNode children."
+      "HiddenInSubscribeeFolder must not have duplicate ActiveNode children."
         . to_string() ); }
   errors }
 
-fn validate_hidden_outside_of_subscribee_col (
+fn validate_hiddenOutsideOfSubscribee_folder (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
@@ -178,17 +178,17 @@ fn validate_hidden_outside_of_subscribee_col (
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::PartnerCol (
-                      PartnerCol::Subscribee)))
+                    MpViewnodeKind::PartnerFolder (
+                      PartnerFolder::Subscribee)))
     { errors . push(
-        "HiddenOutsideOfSubscribeeCol must have a SubscribeeCol parent."
+        "HiddenOutsideOfSubscribeeFolder must have a SubscribeeFolder parent."
         . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| node . is_active_or_diff_phantom ()
            || matches! ( &node . kind,
                          MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) ))
-    { errors . push("HiddenOutsideOfSubscribeeCol's children must include only ActiveNodes or Unknown placeholders." . to_string()); }
+    { errors . push("HiddenOutsideOfSubscribeeFolder's children must include only ActiveNodes or Unknown placeholders." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
@@ -200,23 +200,23 @@ fn validate_hidden_outside_of_subscribee_col (
         => true,
       _ => false, } )
     { errors . push(
-        "HiddenOutsideOfSubscribeeCol ActiveNode children must be affectsParent=true."
+        "HiddenOutsideOfSubscribeeFolder ActiveNode children must be affectsParent=true."
         . to_string()); }
   if !siblings_cannot_include(
     tree, node_id,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::PartnerCol (
-                      PartnerCol::HiddenOutsideOfSubscribee )))
+                    MpViewnodeKind::PartnerFolder (
+                      PartnerFolder::HiddenOutsideOfSubscribee )))
     { errors . push(
-        "HiddenOutsideOfSubscribeeCol must be unique among its siblings."
+        "HiddenOutsideOfSubscribeeFolder must be unique among its siblings."
         . to_string()); }
-  if !partnerCol_children_have_distinct_ids(tree, node_id)
+  if !partnerFolder_children_have_distinct_ids(tree, node_id)
     { errors . push(
-        "HiddenOutsideOfSubscribeeCol must not have duplicate ActiveNode children."
+        "HiddenOutsideOfSubscribeeFolder must not have duplicate ActiveNode children."
         . to_string() ); }
   errors }
 
-fn validate_subscribeecol (
+fn validate_subscribeefolder (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
@@ -224,16 +224,16 @@ fn validate_subscribeecol (
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| node . is_active_or_diff_phantom ())
-    { errors . push("SubscribeeCol must have an ActiveNode parent." . to_string()); }
+    { errors . push("SubscribeeFolder must have an ActiveNode parent." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| node . is_active_or_diff_phantom ()
            || matches!(&node . kind,
                     MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive subscribee may sit here as an inert display placeholder; it emits no subscribes_to membership (TODO/full-schema/9-2_source-set-safety.org)
                       | MpViewnodeKind::Phantom (MpPhantom::Unknown (_))
-                      | MpViewnodeKind::PartnerCol (
-                          PartnerCol::HiddenOutsideOfSubscribee) ))
-    { errors . push( "SubscribeeCol's children must include only ActiveNodes, Unknown or inactive placeholders, or HiddenOutsideOfSubscribeeCol." . to_string()); }
+                      | MpViewnodeKind::PartnerFolder (
+                          PartnerFolder::HiddenOutsideOfSubscribee) ))
+    { errors . push( "SubscribeeFolder's children must include only ActiveNodes, Unknown or inactive placeholders, or HiddenOutsideOfSubscribeeFolder." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
@@ -245,27 +245,27 @@ fn validate_subscribeecol (
         true,
       MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) =>
         true,
-      MpViewnodeKind::PartnerCol (
-        PartnerCol::HiddenOutsideOfSubscribee)
+      MpViewnodeKind::PartnerFolder (
+        PartnerFolder::HiddenOutsideOfSubscribee)
         => true,
       _ => false, } )
-    { errors . push("SubscribeeCol ActiveNode children must have affectsParent=true."
+    { errors . push("SubscribeeFolder ActiveNode children must have affectsParent=true."
                     . to_string() ); }
-  // There is no duplicate-member check here: SubscribeeCol is a
-  // defining col, and duplicate members of defining cols are
+  // There is no duplicate-member check here: SubscribeeFolder is a
+  // defining folder, and duplicate members of defining folders are
   // silently deduplicated at emission rather than bouncing the save.
   errors }
 
 /// PURPOSE: See the error messages it could return.
 /// PITFALL: Does not check whether the members are correct for the graph;
 /// save extraction and completion decide relation meaning later.
-fn validate_relation_col (
+fn validate_relation_folder (
   tree     : &Tree<MpViewnode>,
   node_id  : NodeId,
-  partnerCol  : PartnerCol,
+  partnerFolder  : PartnerFolder,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
-  let label : String = partnerCol . repr_in_client () . to_string ();
+  let label : String = partnerFolder . repr_in_client () . to_string ();
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| node . is_active_or_diff_phantom ())
@@ -273,12 +273,12 @@ fn validate_relation_col (
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| node . is_active_or_diff_phantom ()
-           || ( partnerCol == PartnerCol::Overridden
+           || ( partnerFolder == PartnerFolder::Overridden
                 && matches! ( &node . kind,
                               MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) ))
            || matches!(&node . kind,
                        MpViewnodeKind::Vognode (MpVognode::Inactive (_)))) // tolerated from stale buffers; the rerender removes it (TODO/full-schema/9-2_source-set-safety.org)
-    { errors . push(format!("{}'s children must include only ActiveNodes, inactive placeholders, or (for OverriddenCol) Unknown placeholders.", label)); }
+    { errors . push(format!("{}'s children must include only ActiveNodes, inactive placeholders, or (for OverriddenFolder) Unknown placeholders.", label)); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
@@ -289,21 +289,21 @@ fn validate_relation_col (
       MpViewnodeKind::Phantom (MpPhantom::Diff (_))
         => true,
       MpViewnodeKind::Phantom (MpPhantom::Unknown (_))
-        if partnerCol == PartnerCol::Overridden => true,
+        if partnerFolder == PartnerFolder::Overridden => true,
       _ => false, } )
     { errors . push(format!(
         "{} ActiveNode children must have affectsParent=true.", label)); }
   if !siblings_cannot_include(
     tree, node_id,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::PartnerCol (r)
-                    if *r == partnerCol))
+                    MpViewnodeKind::PartnerFolder (r)
+                    if *r == partnerFolder))
     { errors . push(format!("{} must be unique among its siblings.", label)); }
-  if partnerCol != PartnerCol::Overridden
-    // OverriddenCol is a defining col: duplicate members are silently
+  if partnerFolder != PartnerFolder::Overridden
+    // OverriddenFolder is a defining folder: duplicate members are silently
     // deduplicated at emission rather than bouncing the save. The
     // read-only roles keep the check.
-    && !partnerCol_children_have_distinct_ids(tree, node_id) {
+    && !partnerFolder_children_have_distinct_ids(tree, node_id) {
     errors . push(format!(
       "{} must not have duplicate ActiveNode children.", label)); }
   errors }
@@ -326,7 +326,7 @@ fn validate_text_changed (
     { errors . push("TextChanged must be unique among its siblings." . to_string()); }
   errors }
 
-fn validate_idcol (
+fn validate_idFolder (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
@@ -334,18 +334,18 @@ fn validate_idcol (
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| node . is_active_or_diff_phantom ())
-    { errors . push("IDCol must have an ActiveNode parent." . to_string()); }
+    { errors . push("IDFolder must have an ActiveNode parent." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| matches!(&node . kind,
                     MpViewnodeKind::Qual (Qual::ID { .. } )) )
-    { errors . push("IDCol's (non-ignored) children can only be ID scaffolds."
+    { errors . push("IDFolder's (non-ignored) children can only be ID scaffolds."
                     . to_string() ); }
   if !siblings_cannot_include(
     tree, node_id,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::QualCol (QualCol::ID)))
-    { errors . push("IDCol must be unique among its siblings." . to_string()); }
+                    MpViewnodeKind::QualFolder (QualFolder::ID)))
+    { errors . push("IDFolder must be unique among its siblings." . to_string()); }
   errors }
 
 fn validate_idscaffold (
@@ -358,8 +358,8 @@ fn validate_idscaffold (
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::QualCol (QualCol::ID)))
-    { errors . push("ID scaffold must have an IDCol parent." . to_string()); }
+                    MpViewnodeKind::QualFolder (QualFolder::ID)))
+    { errors . push("ID scaffold must have an IDFolder parent." . to_string()); }
   errors }
 
 fn validate_inactive_node (
@@ -367,7 +367,7 @@ fn validate_inactive_node (
   node_id : NodeId,
 ) -> Vec<String> {
   // TODO/full-schema/9-2_source-set-safety.org: an InactiveNode may
-  // sit under a col (a stale buffer from before a source-set
+  // sit under a folder (a stale buffer from before a source-set
   // switch) or under another gnode, and it may have children (the
   // retained case: an inactive node kept on screen because of its
   // active children).  Its own content stays read-only -- the
@@ -379,11 +379,11 @@ fn validate_inactive_node (
     |node| node . is_active_or_diff_phantom ()
            || matches! ( &node . kind,
                          MpViewnodeKind::Vognode (MpVognode::Inactive (_))
-                         | MpViewnodeKind::QualCol (_)
-                         | MpViewnodeKind::PartnerCol (_)
+                         | MpViewnodeKind::QualFolder (_)
+                         | MpViewnodeKind::PartnerFolder (_)
                          | MpViewnodeKind::DeadScaffold
                          | MpViewnodeKind::BufferRoot )) // an InactiveNode can be a view root: a root that went inactive but was retained for its active children
-    { errors . push("Inactive placeholder must have an ActiveNode, col or DeadScaffold parent, or be a view root."
+    { errors . push("Inactive placeholder must have an ActiveNode, folder or DeadScaffold parent, or be a view root."
                     . to_string()); }
   errors }
 
@@ -407,19 +407,19 @@ fn validate_gnode_identity_and_structure (
   if !id_present {
     errors . push( format!("{} must have an ID.", label) ); }
   let is_subscribee_as_such : bool =
-    // A subscribee-as-such (gnode child of a SubscribeeCol) is the
+    // A subscribee-as-such (gnode child of a SubscribeeFolder) is the
     // one gnode position that legitimately carries a
-    // HiddenInSubscribeeCol; rendering puts the col there, so a
+    // HiddenInSubscribeeFolder; rendering puts the folder there, so a
     // saved buffer must round-trip it.
     tree . get (node_id)
     . and_then ( |n| n . parent () )
     . map ( |p| matches! ( & p . value () . kind,
-              MpViewnodeKind::PartnerCol (PartnerCol::Subscribee) ))
+              MpViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) ))
     . unwrap_or (false);
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| !cannot_be_child_of_gnode (node, is_subscribee_as_such))
-    { errors . push( format!("{} has a child whose structure belongs elsewhere: BufferRoot, Alias, ID, HiddenInSubscribeeCol (outside a subscribee-as-such), or HiddenOutsideOfSubscribeeCol.", label) ); }
+    { errors . push( format!("{} has a child whose structure belongs elsewhere: BufferRoot, Alias, ID, HiddenInSubscribeeFolder (outside a subscribee-as-such), or HiddenOutsideOfSubscribeeFolder.", label) ); }
   if !nonignored_children_have_distinct_ids(tree, node_id) {
     errors . push( format!("{}'s non-ignored content children must be unique (no two sharing the same ID).", label) ); }
   errors }
@@ -462,12 +462,12 @@ fn cannot_be_child_of_gnode (
   matches!(&node . kind,
     MpViewnodeKind::BufferRoot |
     MpViewnodeKind::Qual (Qual::Alias { .. } | Qual::ID { .. }) |
-    MpViewnodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee))
+    MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee))
   || ( ! affects_parent_subscribee_as_such
        // validate_hiddenin REQUIRES a gnode parent; a
        // subscribee-as-such is the position that warrants one.
        && matches!(&node . kind,
-            MpViewnodeKind::PartnerCol (PartnerCol::HiddenInSubscribee)) ) }
+            MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)) ) }
 
 /// Check if an MpActiveNode has an ID.
 pub fn has_id ( t : &MpActiveNode ) -> bool {
@@ -525,7 +525,7 @@ pub fn nonignored_children_have_distinct_ids (
         return false; }}}
   true }
 
-fn partnerCol_children_have_distinct_ids (
+fn partnerFolder_children_have_distinct_ids (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
 ) -> bool {

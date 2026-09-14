@@ -52,7 +52,7 @@ use crate::types::save::ForkSpec;
 /// - non-nodeMerge plus nodeMerge plan: cross-plan source-move/nodeMerge policy.
 ///
 /// Returns the saved view, the plan derived from it, and nonfatal
-/// parse warnings (e.g. discarded col headline text, destined for
+/// parse warnings (e.g. discarded folder headline text, destined for
 /// 'SaveResponse.warnings'). View and plan are
 /// kept apart (TODO/DONE/local-view-update/plan_v2.org §11): the graph-mutation
 /// step consumes only the SavePlan; the rerender step consumes the ViewForest

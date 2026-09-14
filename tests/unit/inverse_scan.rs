@@ -86,7 +86,7 @@ fn signs_come_from_modified_deleted_and_added_files_per_stage () {
   let diffs : Option<HashMap<SourceName, SourceDiff>> =
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
   let scan : HashMap<ID, MembershipAxes> =
-    inverse_scan_for_inbound_col (
+    inverse_scan_for_inbound_folder (
       &owner, NodeRelation::OverridesViewOf, &diffs, None );
   assert_eq! ( scan . len (), 3, "{:?}", scan );
   assert_eq! ( scan [ &id ("edge-r") ],
@@ -109,7 +109,7 @@ fn owner_absent_from_every_diff_yields_nothing () {
   let diffs : Option<HashMap<SourceName, SourceDiff>> =
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
   let scan : HashMap<ID, MembershipAxes> =
-    inverse_scan_for_inbound_col (
+    inverse_scan_for_inbound_folder (
       &id ("N"), NodeRelation::OverridesViewOf, &diffs, None );
   assert! ( scan . is_empty (), "{:?}", scan );
 }
@@ -117,8 +117,8 @@ fn owner_absent_from_every_diff_yields_nothing () {
 #[test]
 fn each_relation_is_read_separately () {
   // One Modified member file removed its SUBSCRIPTION to N while its
-  // override of N is untouched: the overriderCol's scan must see
-  // nothing, the subscriberCol's scan the Minus.
+  // override of N is untouched: the overriderFolder's scan must see
+  // nothing, the subscriberFolder's scan the Minus.
   let owner : ID = id ("N");
   let mut sd : SourceDiff = empty_source_diff ();
   sd . unstaged . insert (
@@ -133,10 +133,10 @@ fn each_relation_is_read_separately () {
       after_node : None } );
   let diffs : Option<HashMap<SourceName, SourceDiff>> =
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
-  assert! ( inverse_scan_for_inbound_col (
+  assert! ( inverse_scan_for_inbound_folder (
       &owner, NodeRelation::OverridesViewOf, &diffs, None )
     . is_empty () );
-  assert_eq! ( inverse_scan_for_inbound_col (
+  assert_eq! ( inverse_scan_for_inbound_folder (
       &owner, NodeRelation::Subscribes, &diffs, None ) [ &id ("m") ],
     MembershipAxes { staged : None, unstaged : Some (Sign::Minus) } );
 }
@@ -160,7 +160,7 @@ fn cross_source_move_yields_no_membership_change () {
       ( src ("a"), sd_a ),
       ( src ("b"), sd_b ) ]) );
   let scan : HashMap<ID, MembershipAxes> =
-    inverse_scan_for_inbound_col (
+    inverse_scan_for_inbound_folder (
       &owner, NodeRelation::OverridesViewOf, &diffs, None );
   assert! ( scan . is_empty (),
     "a move must not fabricate a membership change: {:?}", scan );
@@ -190,14 +190,14 @@ fn edge_source_gates_deleted_stage_signs () {
     name    : SourceSetName::from ("public"),
     sources : BTreeSet::from ([ src ("public") ]) };
   let gated : HashMap<ID, MembershipAxes> =
-    inverse_scan_for_inbound_col (
+    inverse_scan_for_inbound_folder (
       &owner, NodeRelation::OverridesViewOf, &diffs,
       Some (&public_only) );
   assert! ( gated . is_empty (),
     "a Deleted-stage sign recorded at an inactive source must not \
      surface: {:?}", gated );
   let ungated : HashMap<ID, MembershipAxes> =
-    inverse_scan_for_inbound_col (
+    inverse_scan_for_inbound_folder (
       &owner, NodeRelation::OverridesViewOf, &diffs, None );
   assert! ( ! ungated . is_empty (),
     "ungated (None) scan should still see the Deleted-stage sign: {:?}",

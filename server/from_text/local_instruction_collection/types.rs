@@ -20,24 +20,24 @@ pub enum LocalContext {
   TopLevel, // The node is a child of the BufferRoot.
   UnderVognode { // The node's parent is a vognode, a phantom, or a DeadScaffold.
     parent_if_writeable : Option<ID>, }, // This is Some iff the parent is save-eligible.
-  UnderDefiningCol ( // The node is inside an AliasCol, a SubscribeeCol, or an OverriddenCol.
-    DefiningColOwner ),
-  SubscribeeAsSuchPosition { // The node is a direct child of a SubscribeeCol.
+  UnderDefiningFolder ( // The node is inside an AliasFolder, a SubscribeeFolder, or an OverriddenFolder.
+    DefiningFolderOwner ),
+  SubscribeeAsSuchPosition { // The node is a direct child of a SubscribeeFolder.
     subscriber               : ID,
     subscriber_is_definitive : bool, },
-  HiddenOutsidePosition { // The one derived-but-editable filter under a SubscribeeCol.
+  HiddenOutsidePosition { // The one derived-but-editable filter under a SubscribeeFolder.
     subscriber       : ID,
     is_saveEligible  : bool, },
-  UnderReadOnlyCol, // The node is inside one of the six read-only RoleCols, an IDCol, or a Qual.
+  UnderReadOnlyFolder, // The node is inside one of the six read-only RoleFolders, an IDFolder, or a Qual.
 }
 
-/// A DefiningColOwner is what a defining col knows about its owner
-/// (the col's parent). The id and definitiveness are carried even
-/// when the owner is not save-eligible, because a SubscribeeCol's
+/// A DefiningFolderOwner is what a defining folder knows about its owner
+/// (the folder's parent). The id and definitiveness are carried even
+/// when the owner is not save-eligible, because a SubscribeeFolder's
 /// children need them for text claims, which outlive the visibility
 /// guard.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DefiningColOwner {
+pub struct DefiningFolderOwner {
   pub id              : ID,
   pub is_definitive   : bool, // True iff the owner is Active and definitive.
   pub is_saveEligible : bool, // True iff the owner is definitive, Active, carries no Delete request, and is not in subscribee-as-such position.

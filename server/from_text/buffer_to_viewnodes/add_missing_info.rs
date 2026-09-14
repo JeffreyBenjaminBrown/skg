@@ -7,7 +7,7 @@ use crate::types::git::MembershipAxes;
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::viewnode::AffectsParent;
-use crate::types::viewnode::{IndefOrDef, QualCol, Qual};
+use crate::types::viewnode::{IndefOrDef, QualFolder, Qual};
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
@@ -120,20 +120,20 @@ pub fn na_affectsParent_under_visible_parent_becomes_isContainer (
 
 /// Make it a Qual::Alias if both:
 /// - it is an ActiveNode
-/// - its parent is an AliasCol
+/// - its parent is an AliasFolder
 fn make_alias_if_appropriate(
   node: &mut NodeMut<MpViewnode>
 ) -> Result<(), String> {
   if let MpViewnodeKind::Vognode (MpVognode::Active (_))
     = &node . value() . kind
   { // It is a real, normal gnode.
-    let affects_parent_aliascol : bool =
+    let affects_parent_aliasFolder : bool =
       node . parent()
       . map(|mut p|
             matches!(&p . value() . kind,
-                     MpViewnodeKind::QualCol (QualCol::Alias)))
+                     MpViewnodeKind::QualFolder (QualFolder::Alias)))
       . unwrap_or (false);
-    if affects_parent_aliascol { // Make it an Alias.
+    if affects_parent_aliasFolder { // Make it an Alias.
       let org : &mut MpViewnode = node . value();
       let MpViewnodeKind::Vognode (MpVognode::Active (t))
         : &MpViewnodeKind
@@ -207,11 +207,11 @@ fn collect_sourceless_active_ids (
 
 /// If the node is a sourceless, INDEFINITIVE ActiveNode whose id the
 /// graph resolved, set its source from 'source_of_id' (built before the
-/// DFS). This is how a bare col-member reference acquires the source of
+/// DFS). This is how a bare folder-member reference acquires the source of
 /// the existing node it names -- something
 /// 'inherit_parent_source_if_possible' cannot do, since the org-parent
 /// is a scaffold rather than an ActiveNode with a source. The
-/// indefinitive gate matches the collection above, so a definitive node
+/// indefinitive gate matches the folder above, so a definitive node
 /// sharing an id with an indefinitive one is never filled.
 fn fill_source_from_graph_map (
   node         : &mut NodeMut<MpViewnode>,

@@ -86,9 +86,9 @@ fn all_tests
                              SUBSCRIBEE_EDIT_CONFIG) ?;
       pipeline_subscribee_hiderels (
         &s . config ) . await ?;
-      s . reset ("pipeline_readonly_col_member_edits",
+      s . reset ("pipeline_readonly_folder_member_edits",
                  "tests/merge/merge_nodes/fixtures") ?;
-      pipeline_readonly_col_member_edits (
+      pipeline_readonly_folder_member_edits (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("pipeline_inactive_subtree",
                  "tests/merge/merge_nodes/fixtures") ?;
@@ -116,20 +116,20 @@ async fn pipeline_basic_mixed_tree (
         indoc! {"
             * (skg (node (id root) (source main))) root
             Root body
-            ** (skg aliasCol) aliases
+            ** (skg aliasFolder) aliases
             *** (skg alias) first alias
             *** (skg alias) second alias
             ** (skg (node (id child) (source main))) child
             *** (skg (node (id grandchild) (source main))) grandchild
             ** (skg (node (id independent) (source main) (affectsParent false))) independent
-            ** (skg subscribeeCol)
+            ** (skg subscribeeFolder)
             *** (skg (node (id s1) (source main) indef)) s1
-            ** (skg overriddenCol)
+            ** (skg overriddenFolder)
             *** (skg (node (id o1) (source main) indef)) o1
             * (skg (node (id explicit) (source main))) explicit
-            ** (skg aliasCol) aliases
-            ** (skg subscribeeCol)
-            ** (skg overriddenCol)
+            ** (skg aliasFolder) aliases
+            ** (skg subscribeeFolder)
+            ** (skg overriddenFolder)
             * (skg (node (id doomed) (source main) (editRequest delete))) doomed
             "};
       let (plan, nodeMerge_acquisitions)
@@ -160,7 +160,7 @@ async fn pipeline_basic_mixed_tree (
                     MSV::Specified (vec![ID::from ("o1")]) ); }
       { let explicit : &NodeComplete =
           saved_node_by_id (&plan . define_nodes, "explicit");
-        // Present-but-empty cols are explicit emptiness.
+        // Present-but-empty folders are explicit emptiness.
         assert_eq!( explicit . aliases,
                     MSV::Specified (vec![]) );
         assert_eq!( explicit . subscribes_to,
@@ -177,7 +177,7 @@ async fn pipeline_subscribee_hiderels (
       let input : &str =
         indoc! {"
             * (skg (node (id r) (source owned))) r
-            ** (skg subscribeeCol)
+            ** (skg subscribeeFolder)
             *** (skg (node (id e) (source foreign))) subscribee-e
             **** (skg (node (id e2) (source foreign))) e2
             "};
@@ -197,19 +197,19 @@ async fn pipeline_subscribee_hiderels (
         "subscribee-as-such should not produce a SaveNode" );
       Ok (( )) }
 
-async fn pipeline_readonly_col_member_edits (
+async fn pipeline_readonly_folder_member_edits (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // This tests the new recursion surface: definitive members of
-  // read-only cols (and their subtrees) save their own edits.
+  // read-only folders (and their subtrees) save their own edits.
       let input : &str =
         indoc! {"
             * (skg (node (id owner) (source main))) owner
-            ** (skg subscriberCol)
+            ** (skg subscriberFolder)
             *** (skg (node (id intruder) (source main))) intruder
             **** (skg (node (id intruder-child) (source main))) intruder child
-            ** (skg hiddenCol)
+            ** (skg hiddenFolder)
             *** (skg (node (id lurker) (source main))) lurker
             "};
       let (plan, _) =
@@ -332,7 +332,7 @@ async fn pipeline_rejects_text_claim_mismatch (
       let input : &str =
         indoc! {"
             * (skg (node (id r) (source owned))) r
-            ** (skg subscribeeCol)
+            ** (skg subscribeeFolder)
             *** (skg (node (id e) (source foreign))) changed title
             **** (skg (node (id e2) (source foreign))) e2
             "};

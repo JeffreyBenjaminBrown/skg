@@ -183,11 +183,11 @@ describe('skg.sexpr.activenode_defaults stripping', function ()
   it('keeps populated viewRequests', function ()
     assert.are.same(
       sexpr.read('(skg (node (id abc) (source jeff)'
-                 .. ' (viewRequests (col aliases) (path container))))'),
+                 .. ' (viewRequests (folder aliases) (path container))))'),
       strip_to_sexp(table.concat({
         '* skg', '** node', '*** id', '**** abc',
         '*** source', '**** jeff',
-        '*** viewRequests', '**** col', '***** aliases',
+        '*** viewRequests', '**** folder', '***** aliases',
         '**** path', '***** container' }, '\n')))
   end)
 

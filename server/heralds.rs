@@ -19,7 +19,7 @@
 /// nested RULE. The special label ANY matches any leaf; IT echoes
 /// the matched value(s).
 
-use crate::types::viewnode::{PartnerCol, Qual, QualCol, ViewRequest};
+use crate::types::viewnode::{PartnerFolder, Qual, QualFolder, ViewRequest};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeraldColor { Red, Green, Blue, Yellow, Orange }
@@ -85,8 +85,8 @@ fn leaf (
 ) -> RuleChild {
   crule ( color, label, vec! [ s (text) ] ) }
 
-/// (COLOR label "☮ text") -- a read-only col scaffold leaf: the ☮
-/// marker, a space, then its label text, meaning "this collection
+/// (COLOR label "☮ text") -- a read-only folder scaffold leaf: the ☮
+/// marker, a space, then its label text, meaning "this folder
 /// cannot be changed from here" -- the same sense ☮ ('indef') carries
 /// on a node. (A lock 🔒 here is a one-line swap; the conformance test
 /// pins atoms, not the emitted glyph.) A macro, not a function, because
@@ -153,8 +153,8 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///
 /// A few patterns (full engine semantics in skg-lens.el):
 ///
-///   * Simple leaves -- e.g. the aliasCol rule matches the bare atom
-///     'aliasCol' and emits the literal "aliases" in green. Children
+///   * Simple leaves -- e.g. the aliasFolder rule matches the bare atom
+///     'aliasFolder' and emits the literal "aliases" in green. Children
 ///     are consumed positionally; 'any' in a child position matches
 ///     any leaf/atom.
 ///
@@ -180,7 +180,7 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///
 ///   * deletedScaffold vs deleted -- two shapes come in from the
 ///     server depending on whether the deletion is on a scaffold row
-///     (like a deleted aliasCol) or on a file-level node. Each gets
+///     (like a deleted aliasFolder) or on a file-level node. Each gets
 ///     its own matcher; both render as "DELETED ...".
 ///
 ///   * Two scaffold-level staged/unstaged INTERC rules and two
@@ -203,7 +203,7 @@ pub fn herald_rule_table () -> HeraldRule {
       vac ("focused"),
       vac ("folded"),
       vac ("bodyFolded"),
-      leaf (Green, QualCol::Alias . repr_in_client (), "aliases"),
+      leaf (Green, QualFolder::Alias . repr_in_client (), "aliases"),
       leaf (Green, "alias", "alias"), // Qual::Alias
       // An alias's stored relationship source is a display fact.  A
       // requested replacement lives under editRequest below, so the
@@ -212,26 +212,26 @@ pub fn herald_rule_table () -> HeraldRule {
       rule ("editRequest", vec! [
         crule (Red, "relSource", vec! [
           any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]),
-      // The six READ-ONLY col scaffolds carry ☮ ("cannot be changed
-      // from here"); the writable cols (subscribeeCol, overriddenCol,
-      // aliasCol) do not.
-      leaf_ro! (Green, PartnerCol::HiddenInSubscribee . repr_in_client (),
+      // The six READ-ONLY folder scaffolds carry ☮ ("cannot be changed
+      // from here"); the writable folders (subscribeeFolder, overriddenFolder,
+      // aliasFolder) do not.
+      leaf_ro! (Green, PartnerFolder::HiddenInSubscribee . repr_in_client (),
             "It contains these, but the subscribing ancestor hides them."),
-      leaf (Green, PartnerCol::HiddenOutsideOfSubscribee . repr_in_client (),
+      leaf (Green, PartnerFolder::HiddenOutsideOfSubscribee . repr_in_client (),
             "The subscriber ancestor hides these, but subscribes to nothing that contains them."),
-      leaf (Green, PartnerCol::Subscribee . repr_in_client (),
+      leaf (Green, PartnerFolder::Subscribee . repr_in_client (),
             "It subscribes to these."),
-      leaf_ro! (Green, PartnerCol::Subscriber . repr_in_client (),
+      leaf_ro! (Green, PartnerFolder::Subscriber . repr_in_client (),
             "These subscribe to it."),
-      leaf_ro! (Green, PartnerCol::Hidden . repr_in_client (),
+      leaf_ro! (Green, PartnerFolder::Hidden . repr_in_client (),
             "It hides these from its subscriptions."),
-      leaf_ro! (Green, PartnerCol::Hider . repr_in_client (),
+      leaf_ro! (Green, PartnerFolder::Hider . repr_in_client (),
             "These hide it from their subscriptions."),
-      leaf (Green, PartnerCol::Overridden . repr_in_client (),
+      leaf (Green, PartnerFolder::Overridden . repr_in_client (),
             "It overrides the view of these."),
-      leaf_ro! (Green, PartnerCol::Overrider . repr_in_client (),
+      leaf_ro! (Green, PartnerFolder::Overrider . repr_in_client (),
             "These override the view of it."),
-      leaf (Green, QualCol::ID . repr_in_client (), "IDs"),
+      leaf (Green, QualFolder::ID . repr_in_client (), "IDs"),
       leaf (Green, "id", "ID"), // Qual::ID
       crule (Green, "textChanged", vec! [
         s ("text changed : "),
@@ -308,7 +308,7 @@ pub fn herald_rule_table () -> HeraldRule {
           crule (Red, "relSource", vec! [
             any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]),
         crule (Green, "viewRequests", vec! [
-          rule ("col",  vec! [ any (vec! [ s ("req:col:"),  RuleChild::It ]) ]),
+          rule ("folder",  vec! [ any (vec! [ s ("req:folder:"),  RuleChild::It ]) ]),
           rule ("path", vec! [ any (vec! [ s ("req:path:"), RuleChild::It ]) ]),
           rule ("definitiveView", vec! [ s ("req:definitive") ]) ]),
         interc (Some (Green), "", Some ("staged"), vec! [
@@ -442,7 +442,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   atoms . extend ( viewstats_atoms () );
   atoms . extend ( affectsParent_emitted_atoms () );
   atoms . extend ( axis_atoms () );
-  atoms . extend ( qual_and_col_atoms () );
+  atoms . extend ( qual_and_folder_atoms () );
   atoms . extend ( ViewRequest::EMITTABLE_MATCH_ATOMS );
   atoms . into_iter () . collect () }
 
@@ -496,27 +496,27 @@ fn axis_atoms () -> Vec<&'static str> {
   let _ = guard;
   vec! [ "newX", "removedX", "newM", "removedM" ] }
 
-/// Col and Qual atoms, via the same repr_in_client constants the
+/// Folder and Qual atoms, via the same repr_in_client constants the
 /// serializer uses.
-fn qual_and_col_atoms () -> Vec<&'static str> {
-  fn partnerCol_guard ( c : PartnerCol ) { // compile error here = update all_partnerCols
+fn qual_and_folder_atoms () -> Vec<&'static str> {
+  fn partnerFolder_guard ( c : PartnerFolder ) { // compile error here = update all_partnerFolders
     match c {
-      PartnerCol::Subscribee | PartnerCol::Subscriber
-      | PartnerCol::Overridden | PartnerCol::Overrider
-      | PartnerCol::Hider | PartnerCol::Hidden
-      | PartnerCol::HiddenInSubscribee
-      | PartnerCol::HiddenOutsideOfSubscribee => () }}
-  let _ = partnerCol_guard;
-  let all_partnerCols : [PartnerCol; 8] = [
-    PartnerCol::Subscribee, PartnerCol::Subscriber,
-    PartnerCol::Overridden, PartnerCol::Overrider,
-    PartnerCol::Hider, PartnerCol::Hidden,
-    PartnerCol::HiddenInSubscribee,
-    PartnerCol::HiddenOutsideOfSubscribee ];
-  fn qualCol_guard ( c : QualCol ) { // ditto
-    match c { QualCol::ID | QualCol::Alias => () }}
-  let _ = qualCol_guard;
-  let all_qualCols : [QualCol; 2] = [ QualCol::ID, QualCol::Alias ];
+      PartnerFolder::Subscribee | PartnerFolder::Subscriber
+      | PartnerFolder::Overridden | PartnerFolder::Overrider
+      | PartnerFolder::Hider | PartnerFolder::Hidden
+      | PartnerFolder::HiddenInSubscribee
+      | PartnerFolder::HiddenOutsideOfSubscribee => () }}
+  let _ = partnerFolder_guard;
+  let all_partnerFolders : [PartnerFolder; 8] = [
+    PartnerFolder::Subscribee, PartnerFolder::Subscriber,
+    PartnerFolder::Overridden, PartnerFolder::Overrider,
+    PartnerFolder::Hider, PartnerFolder::Hidden,
+    PartnerFolder::HiddenInSubscribee,
+    PartnerFolder::HiddenOutsideOfSubscribee ];
+  fn qualFolder_guard ( c : QualFolder ) { // ditto
+    match c { QualFolder::ID | QualFolder::Alias => () }}
+  let _ = qualFolder_guard;
+  let all_qualFolders : [QualFolder; 2] = [ QualFolder::ID, QualFolder::Alias ];
   let all_qual_atoms : [&'static str; 3] = {
     fn qual_guard ( q : &Qual ) { // ditto
       match q {
@@ -525,9 +525,9 @@ fn qual_and_col_atoms () -> Vec<&'static str> {
     let _ = qual_guard;
     [ "alias", "id", "textChanged" ] };
   let mut out : Vec<&'static str> = Vec::new ();
-  out . extend ( all_partnerCols . iter ()
+  out . extend ( all_partnerFolders . iter ()
                  . map ( |c| c . repr_in_client () ) );
-  out . extend ( all_qualCols . iter ()
+  out . extend ( all_qualFolders . iter ()
                  . map ( |c| c . repr_in_client () ) );
   out . extend ( all_qual_atoms );
   out }

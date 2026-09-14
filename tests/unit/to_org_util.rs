@@ -137,11 +137,11 @@ fn containerof_false_claim_flipped () {
 }
 
 #[test]
-fn orphan_under_dead_parent_demoted_member_under_col_kept () {
+fn orphan_under_dead_parent_demoted_member_under_folder_kept () {
   // §A (Jeff's invariant): an Affected Active node under a non-container
   // parent (Diff phantom / DeadScaffold) demotes to Independent; a legitimate
-  // col MEMBER (Affected Normal under a PartnerCol) is left untouched.
-  use crate::types::viewnode::{ mk_phantom_viewnode, PartnerCol };
+  // folder MEMBER (Affected Normal under a PartnerFolder) is left untouched.
+  use crate::types::viewnode::{ mk_phantom_viewnode, PartnerFolder };
   use crate::types::git::{ ExistenceAxes, MembershipAxes };
   let mut vf : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = vf . root () . id ();
@@ -158,10 +158,10 @@ fn orphan_under_dead_parent_demoted_member_under_col_kept () {
   let under_dead : NodeId = vf . get_mut (dead) . unwrap () . append (
     mk_indefinitive_viewnode (id ("B"), src (), "B" . to_string (),
                               AffectsParent::True) ) . id ();
-  let col : NodeId = vf . get_mut (root) . unwrap () . append (
+  let folder : NodeId = vf . get_mut (root) . unwrap () . append (
     ViewNode { focused: false, folded: false, body_folded: false,
-               kind: ViewNodeKind::PartnerCol (PartnerCol::Subscribee) } ) . id ();
-  let member : NodeId = vf . get_mut (col) . unwrap () . append (
+               kind: ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee) } ) . id ();
+  let member : NodeId = vf . get_mut (folder) . unwrap () . append (
     mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
                               AffectsParent::True) ) . id ();
 
@@ -172,7 +172,7 @@ fn orphan_under_dead_parent_demoted_member_under_col_kept () {
   assert_eq! (affectsParent_if_normal (&vf, under_dead), AffectsParent::False,
     "Affected child under a DeadScaffold must demote to Independent");
   assert_eq! (affectsParent_if_normal (&vf, member), AffectsParent::True,
-    "Affected member under a PartnerCol must stay Affected (legitimate membership)");
+    "Affected member under a PartnerFolder must stay Affected (legitimate membership)");
 }
 
 #[test]

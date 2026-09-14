@@ -47,7 +47,7 @@ but from the graph itself.
 *** <localleader>dR : :SkgDeleteRecursive
 Same as Delete, but also marks every activeNode org-descendent
 of the node at point. Descendent headlines that are not activeNodes
-(phantoms, aliascol, id-col, etc.) are skipped.
+(phantoms, aliasFolder, id-folder, etc.) are skipped.
 
 Its own binding, not a prefix-arg variant -- nvim has no prefix-arg
 protocol to reuse here the way Emacs's C-u did. Call it directly as
@@ -312,30 +312,30 @@ there is skipped, not deleted, since 'git rm' would silently remove
 it. Review the script, then run it from the skg data root. Unlike
 most commands here, this one does not depend on the node at point;
 it reports moves across all sources.
-** <localleader>c : show a collection (both cols of a relation)
+** <localleader>c : show a folder (both folders of a relation)
 These commands don't edit the graph. Each inserts a request into the
 metadata of the node at point that, on save, causes the server to
-render the relation's collections (cols) into the view, POPULATED from
-the graph. Each builds BOTH cols of its relation. The read-only-col ☮
-marks a col you cannot change from here. Every command auto-saves.
-*** <localleader>ca : :SkgShowCollectionAliases
-The aliasCol -- other text you could search for to find this node
+render the relation's folder viewnodes into the view, POPULATED from
+the graph. Each builds BOTH folders of its relation. The read-only folder ☮
+marks a folder you cannot change from here. Every command auto-saves.
+*** <localleader>ca : :SkgShowFolderOfAliases
+The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:
 type an alias in and save.
-*** <localleader>co : :SkgShowCollectionOverrides
-The overriddenCol (the nodes this node overrides -- WRITABLE, shown
+*** <localleader>co : :SkgShowFolderOfOverrides
+The overriddenFolder (the nodes this node overrides -- WRITABLE, shown
 even when empty as an "add an override here" surface) and the
-overriderCol (the nodes that override this one -- read-only, ☮).
-*** <localleader>ch : :SkgShowCollectionHides
-The hiderCol and hiddenCol -- BOTH read-only (☮). Hiding is edited from
-a subscribee-as-such, never from these cols. On a node that neither
+overriderFolder (the nodes that override this one -- read-only, ☮).
+*** <localleader>ch : :SkgShowFolderOfHides
+The hiderFolder and hiddenFolder -- BOTH read-only (☮). Hiding is edited from
+a subscribee-as-such, never from these folders. On a node that neither
 hides nor is hidden, nothing appears.
-*** <localleader>cs : :SkgShowCollectionSubscribes
-The subscribeeCol (the nodes this node subscribes to -- WRITABLE, shown
-even when empty) and the subscriberCol (the nodes that subscribe to
+*** <localleader>cs : :SkgShowFolderOfSubscribes
+The subscribeeFolder (the nodes this node subscribes to -- WRITABLE, shown
+even when empty) and the subscriberFolder (the nodes that subscribe to
 this one -- read-only, ☮).
 ** <localleader>p : show a path (the backpath through one relation role)
-Like the collections, each inserts a request that, on save, grafts the
+Like the folders, each inserts a request that, on save, grafts the
 partners reached through one relation role as inverted, read-only
 children, climbing transitively until a fork, cycle, or root. UPPER =
 the partner's active (first) role; lower = its passive (second) role.

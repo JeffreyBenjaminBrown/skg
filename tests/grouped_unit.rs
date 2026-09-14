@@ -52,8 +52,8 @@ mod source_inheritance_for_non_content;
 #[path = "source_path_validation.rs"]
 mod source_path_validation;
 
-#[path = "subscribee_col.rs"]
-mod subscribee_col;
+#[path = "subscribee_folder.rs"]
+mod subscribee_folder;
 
 #[path = "tantivy.rs"]
 mod tantivy;

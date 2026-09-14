@@ -1,7 +1,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
 use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
-use crate::to_org::complete::partner_col::maybe_add_partnerCol_branches;
+use crate::to_org::complete::partner_folder::maybe_add_partnerFolder_branches;
 use crate::dbs::node_lookup::nodecomplete_graphFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
@@ -148,11 +148,11 @@ pub fn complete_branch_minus_content (
   { clobberIndefinitiveViewnode (
       tree, node_id, graph, config ) ?; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "maybe_add_partnerCol_branches" ). entered();
-    maybe_add_partnerCol_branches (
+      "maybe_add_partnerFolder_branches" ). entered();
+    maybe_add_partnerFolder_branches (
       tree, node_id, graph, config, active_source_set,
       // This birth path runs outside the diff-aware BFS (search
-      // results, ancestry attachment, stubs); diff-mode col
+      // results, ancestry attachment, stubs); diff-mode folder
       // existence is decided at each node's completion visit, which
       // passes the real diffs.
       &None ) } ?;
@@ -342,21 +342,21 @@ pub fn validate_affectsParent_relationships (
 /// must have AffectsParent=False. A Active node whose PARENT is a
 /// non-container -- a Diff phantom, a Deleted, or a DeadScaffold -- is exactly
 /// that: it survives (is not itself dead) but its container is gone, so its
-/// =Affected= claim (that it is part of that parent's collection) cannot hold.
+/// =Affected= claim (that it is part of that parent's membership) cannot hold.
 /// Demote it to Independent so it renders as its own graph-contains root rather
 /// than claiming to affect a parent that no longer contains anything.
 ///
 /// Scope, deliberately narrow:
 /// - PARENT is Diff phantom / Deleted / DeadScaffold -> demote an Affected child.
-/// - PARENT is a Col (QualCol / PartnerCol): the child is a legitimate col
-///   MEMBER; Affected is correct -> leave. (A col whose own ancestry broke is
+/// - PARENT is a Folder (QualFolder / PartnerFolder): the child is a legitimate folder
+///   MEMBER; Affected is correct -> leave. (A folder whose own ancestry broke is
 ///   deadened to DeadScaffold first, and then THIS pass catches its members.)
 /// - PARENT is an Active vognode: handled by validate_affectsParent_relationships.
 /// - PARENT is BufferRoot: the child is a forest root, handled by
 ///   mark_view_roots_parent_na.
 /// Belt-and-suspenders: most cases are already demoted during the BFS
 /// (mark_erroneous_content_children_as_indep for content children;
-/// dispose_orphaned_col_child for a deadened col's members). This final pass
+/// dispose_orphaned_folder_child for a deadened folder's members). This final pass
 /// GUARANTEES the invariant for any survivor those miss (e.g. a removedHere
 /// phantom's content children), in both the post-save and de-novo paths. Purely
 /// structural -- no graph read.

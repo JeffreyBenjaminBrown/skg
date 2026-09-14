@@ -1,6 +1,6 @@
 # Hidden Without But None Within
 
-Tests that `HiddenOutsideOfSubscribeeCol` appears when a hidden node is NOT in any subscribee's content.
+Tests that `HiddenOutsideOfSubscribeeFolder` appears when a hidden node is NOT in any subscribee's content.
 
 ## Graph Structure
 

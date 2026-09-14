@@ -27,7 +27,7 @@ local sexpr = require('skg.sexpr.parse')
 ---(depth type title) triples for every headline in BUF that carries
 ---skg metadata; headlines without metadata are skipped. Type is
 ---derived from the second element of the (skg ...) form: node,
----deleted, deletedScaffold, aliasCol, etc. The port of
+---deleted, deletedScaffold, aliasFolder, etc. The port of
 ---save_collateral_break_cycle/test-helpers.el's
 ---headline-types-and-titles.
 ---@param buf integer
@@ -166,7 +166,7 @@ do
   local line_11 = nth_line_with_title(buf1, '11', 1)
   T.check(line_11, "phase 2: found node '11' in buffer 1")
   metadata.edit_metadata_at_line(line_11,
-    sexpr.read('(skg (node (viewRequests (col aliases))))'))
+    sexpr.read('(skg (node (viewRequests (folder aliases))))'))
 end
 vim.api.nvim_buf_set_lines(buf1, -1, -1, false, {
   '* (skg (node (id subee) (source main))) subee',
@@ -177,14 +177,14 @@ print('Buffer 1 after multi-root save:\n' .. T.buffer_text(buf1))
 assert_headline_types_and_titles(buf1,
   { { 1, 'node', '1' },
     { 2, 'node', '11' },
-    { 3, 'aliasCol', '' },
+    { 3, 'aliasFolder', '' },
     { 4, 'alias', 'eleven' },
-    { 3, 'hiddenCol', '' },
+    { 3, 'hiddenFolder', '' },
     { 4, 'node', 'subee-1' },
     { 4, 'node', 'also-hidden' },
-    { 3, 'subscribeeCol', '' },
+    { 3, 'subscribeeFolder', '' },
     { 4, 'node', 'subee' },
-    { 4, 'hiddenOutsideOfSubscribeeCol', '' },
+    { 4, 'hiddenOutsideOfSubscribeeFolder', '' },
     { 5, 'node', 'also-hidden' },
     { 1, 'node', 'subee' },
     { 2, 'node', 'subee-1' } },

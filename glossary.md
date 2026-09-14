@@ -101,51 +101,81 @@ Where the code says "child" or "parent", it means the relationship between viewn
 For one example, see the discussion of alias nodes in
 [the architecture documentation](coding-advice/architecture.md).
 
-## "col" is short for "collection"
+## col
 
-in some type definitions or enum varieties.
+**Col** was the old name for a folder viewnode (short for
+"collection"). It has been expunged from production code, but may still
+appear in old documentation, plans, or the knowledge graph.
 
-## PartnerCol, and the col-policy vocabulary
+## PartnerFolder, and the folder-policy vocabulary
 
-A **PartnerCol** is the general concept of a generated org-collection
-that gathers the members of one schema relation under a node, in one
-role.  It is the `ViewNodeKind::PartnerCol` variant and the payload
-type of the same name.  ("role col", "relation col" and bare "sharing
-col" are retired as names for the general concept; "sharing-col" may
-survive only where it genuinely denotes the subscribee-related
-completers.)
+### The idea
 
-There are eight PartnerCols, named by their external scaffold atom:
+Recall that viewnodes and graph nodes are distinct.
+Some viewnodes correspond to individual graph nodes.
+Other viewnodes mediate a relationship between their parent and their children.
+For instance, a 'subscribee folder' viewnode contains it's parent's subscribees:
+```
+  * subscriber
+  ** subscribee folder
+  *** subscribee
+  *** subscribee
+```
 
-- writable: `subscribeeCol`, `overriddenCol`;
-- read-only inbound: `subscriberCol`, `overriderCol`, `hiderCol`,
-  `hiddenCol`;
-- read-only filter: `hiddenInSubscribeeCol`,
-  `hiddenOutsideOfSubscribeeCol`.
+In that example, the first viewnode represents a graphnode,
+as do the last two. The subscriber subscribes to the two subscribees.
+Ths second viewnode, though, corresponds to nothing in the graph.
+It exists only to name the relationship between its children and its parent.
 
-Each kind's behavior is decided by one method, `PartnerCol::policy`
-(`server/types/viewnode.rs`), returning a **ColPolicy**.  This single
+A **PartnerFolder** is the general concept.
+Recall that there are five relationships in the graph:
+containment, textlink, subscription, hiding, and overriding.
+Because a node can be on either side of each relationship --
+it can be the container or the content, the hider or the hidden, etc. --
+there are 5x2 = 10 kinds of partnerCols.
+A hiddenCol lists (as its children)
+every node that plays hidden to its parent's 'hider';
+a subscribeeCol lists every node that plays subscribee to its parent's subscriber;
+etc.
+
+### Some extremely technical details
+
+It is the `ViewNodeKind::PartnerFolder` variant and the payload
+type of the same name.  “Folder” here describes an org scaffold that groups
+viewnodes; it does not mean a filesystem directory.  “Role col”, “relation
+col”, and bare “sharing col” are retired names for the general concept.
+
+There are eight PartnerFolders, named by their external scaffold atom:
+
+- writable: `subscribeeFolder`, `overriddenFolder`;
+- read-only inbound: `subscriberFolder`, `overriderFolder`, `hiderFolder`,
+  `hiddenFolder`;
+- read-only filter: `hiddenInSubscribeeFolder`,
+  `hiddenOutsideOfSubscribeeFolder`.
+
+Each kind's behavior is decided by one method, `PartnerFolder::policy`
+(`server/types/viewnode.rs`), returning a **FolderPolicy**.  This single
 arbiter is consulted by reconciliation dispatch, save extraction's
 read-only treatment, and herald/warning gating, so a new relation
 cannot acquire inconsistent policies in different layers:
 
-- **WritableSet** (`subscribeeCol`, `overriddenCol`): membership edits
-  are graph edits.  An absent col means "no opinion" (its field lowers
-  to `MSV::Unspecified`, filled from disk); a present-but-empty col
+- **WritableSet** (`subscribeeFolder`, `overriddenFolder`): membership edits
+  are graph edits.  An absent folder means "no opinion" (its field lowers
+  to `MSV::Unspecified`, filled from disk); a present-but-empty folder
   means an explicit empty set (`MSV::Specified(vec![])`).
-- **ReadOnlySet** (`subscriberCol`, `overriderCol`, `hiderCol`,
-  `hiddenCol`): membership is generated from graph facts; the user's
+- **ReadOnlySet** (`subscriberFolder`, `overriderFolder`, `hiderFolder`,
+  `hiddenFolder`): membership is generated from graph facts; the user's
   order is respected view-locally; repairs warn.  See [read-only set](#read-only-set).
-- **ReadOnlyFilter** (`hiddenInSubscribeeCol`,
-  `hiddenOutsideOfSubscribeeCol`): membership is derived from hide
+- **ReadOnlyFilter** (`hiddenInSubscribeeFolder`,
+  `hiddenOutsideOfSubscribeeFolder`): membership is derived from hide
   state rather than from a single relation role.
 
-The SIX read-only cols (the `ReadOnlySet` four plus the `ReadOnlyFilter`
-two) carry the ☮ herald on their col headline, meaning "this collection
+The SIX read-only folders (the `ReadOnlySet` four plus the `ReadOnlyFilter`
+two) carry the ☮ herald on their folder headline, meaning "this folder
 cannot be changed from here" — the same sense ☮ (`indef`) carries on a
-node.  The two `WritableSet` cols and `aliasCol` do not.  This is a
+node.  The two `WritableSet` folders and `aliasFolder` do not.  This is a
 herald-table fact only (`server/heralds.rs`), with no wire atom of its
-own: which cols are read-only is already known from the col atom.
+own: which folders are read-only is already known from the folder atom.
 
 The stale-member rule is uniform across all eight kinds (decided
 2026-06-10, demote-not-discard): a stale `affectsParent=true` member
@@ -153,20 +183,20 @@ that is a leaf is deleted; one with children is demoted to
 `affectsParent=false` so the user keeps any subtree they built under
 it; duplicates are deleted; missing graph members are restored.
 
-**Col scaffolds read the process-global graph handle.**  De-novo
-rendering of a node's cols (all the read-only cols, and the outbound
-`hiddenCol`/`overriddenCol`) consults `snapshot_global`, not the
-render environment's own in-Rust graph; only the `subscribeeCol` is
+**Folder scaffolds read the process-global graph handle.**  De-novo
+rendering of a node's folders (all the read-only folders, and the outbound
+`hiddenFolder`/`overriddenFolder`) consults `snapshot_global`, not the
+render environment's own in-Rust graph; only the `subscribeeFolder` is
 built from the owner's outbound edges alone.  Production always has
 the handle installed, but a test harness that renders without it will
-see those cols silently missing (see `tests/partner_col_matrix.rs`,
+see those folders silently missing (see `tests/partner_folder_matrix.rs`,
 which installs the handle in its render-heavy function).
 
 **Independent children jump above the members.**  An `Independent`
-(non-member) child parked inside any col is reordered above the
+(non-member) child parked inside any folder is reordered above the
 generated members on save (`complete_relevant_children` moves
 irrelevant children to the front).  This is deliberate, not a bug: the
-membership is generated and ordered, so a note you park inside a col is
+membership is generated and ordered, so a note you park inside a folder is
 kept but visibly separated from the live membership.
 
 ## ephem = ephemeral
@@ -292,7 +322,7 @@ COLLECTED ID is what it contributes to its parent's saved lists:
 the marker's original if present, else its own ID -- so saving a
 view that draws R in place of N keeps N in the parent's contains.
 
-An OVERRIDDEN-AS-SUCH is an Affected child of an overriddenCol --
+An OVERRIDDEN-AS-SUCH is an Affected child of an overriddenFolder --
 the position that always shows the original; its definitive
 expansion applies neither the owner's hides nor substitution to
 its immediate children.
@@ -311,10 +341,10 @@ In Skg some nodes are "subscribers", which "subscribe" to "subscribees".
 (See [the technical data model](docs/data-model_technical.org).)
 A node that plays the 'subscribee' role can be viewed as an ordinary node,
 or *as* a subscribee. In the latter case it appears
-underneath the relevant subscriber, in a 'subscribeeCol':
+underneath the relevant subscriber, in a 'subscribeeFolder':
 ```
   * subscriber
-  ** subscribeeCol
+  ** subscribeeFolder
   *** subsribee1
   *** subsribee2
   ...
@@ -328,10 +358,10 @@ what the relevant subscriber hides, nothing else.
 
 ## read-only set
 
-A read-only set is a generated collection whose membership follows
-from graph facts rather than direct edits to that collection.  A view
+A read-only set is a generated folder whose membership follows
+from graph facts rather than direct edits to that folder.  A view
 may preserve an order for the set locally, but adding or removing an
-item in the generated collection does not add or remove the underlying
+item in the generated folder does not add or remove the underlying
 graph membership fact.  If a user labels a nonmember inside such a set,
 the save treats that item as independent of the generated membership.
 If completion discovers that a real member is missing from the view, it
@@ -341,19 +371,19 @@ For instance, if nodes R and T subscribe to nodes N, the user might land
 at a view like the following:
 ```
   * N
-  ** subscriberCol
+  ** subscriberFolder
   *** R
   *** T
 ```
-The subscriberCol ("collection of subscribees") is a read-only set.
-Thus the user could flip the order of R and T in the subscribeeCol,
+The subscriberFolder ("folder of subscribers") is a read-only set.
+Thus the user could flip the order of R and T in the subscriberFolder,
 and this change would be respected in the display, but have no effect
-in the graph. The user could insert X under subscriberCol,
+in the graph. The user could insert X under subscriberFolder,
 but because it is a read-only set, X will have its affectsParent field
 rewritten to 'Independent', and have no effect on N.
 (If the user wants X to subscribe to N, they must modify X, not N.)
 The user could delete R, but it will respawn as soon as they save,
-because, again, the subscriberCol is a read-only set.
+because, again, the subscriberFolder is a read-only set.
 
 ## scaffold
 

@@ -107,7 +107,7 @@ fn hiddenin_signs_come_from_either_input_list_with_exact_stages () {
       after_node : None } )),
     None );
   let (goal, removed, axes) =
-    goal_list_for_hiddeninsubscribee_col (
+    goal_list_for_hiddenInSubscribee_folder (
       &graph,
       &id ("B"), &src ("main"),
       &id ("S"), &src ("main"),
@@ -135,7 +135,7 @@ fn hiddenin_removed_member_gets_exact_stage_label () {
     Some (( s_file, modified_hides_entry ( vec! [
       Diff_Item::Removed (id ("h1")) ] )) ));
   let (goal, removed, axes) =
-    goal_list_for_hiddeninsubscribee_col (
+    goal_list_for_hiddenInSubscribee_folder (
       &graph,
       &id ("B"), &src ("main"),
       &id ("S"), &src ("main"),
@@ -152,7 +152,7 @@ fn hiddenin_removed_member_gets_exact_stage_label () {
 fn no_diffs_means_no_signs_and_the_worktree_goal () {
   let graph = InRustGraph::new ();
   let (goal, removed, axes) =
-    goal_list_for_hiddeninsubscribee_col (
+    goal_list_for_hiddenInSubscribee_folder (
       &graph,
       &id ("B"), &src ("main"),
       &id ("S"), &src ("main"),

@@ -3,11 +3,11 @@
 pub use super::super::common::*;
 
 /// The expected git diff view output for id changes.
-/// When an id is added or removed, an idCol scaffold appears showing the diff.
+/// When an id is added or removed, an idFolder scaffold appears showing the diff.
 /// Individual ids appear as children with diff markers for added/removed.
 pub const GIT_DIFF_VIEW: &str = "\
 * (skg (node (id 1) (source main))) 1
-** (skg idCol)
+** (skg idFolder)
 *** (skg id) 1
 *** (skg id (unstaged removedM)) 2
 *** (skg id (unstaged newM)) 2'
@@ -40,7 +40,7 @@ pub fn setup_git_repo_with_fixtures_staged(
 /// Expected diff view when the id changes are staged (not unstaged).
 pub const GIT_DIFF_VIEW_STAGED: &str = "\
 * (skg (node (id 1) (source main))) 1
-** (skg idCol)
+** (skg idFolder)
 *** (skg id) 1
 *** (skg id (staged removedM)) 2
 *** (skg id (staged newM)) 2'

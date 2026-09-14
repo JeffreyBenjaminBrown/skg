@@ -14,7 +14,7 @@ use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, PhantomDeleted, IndefOrDef,
     AffectsParent, ViewRequest, mk_definitive_viewnode};
-use crate::types::viewnode::{Vognode, Phantom, PartnerCol};
+use crate::types::viewnode::{Vognode, Phantom, PartnerFolder};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_nodecomplete::{
     pid_and_source_from_treenode,
@@ -116,8 +116,8 @@ pub fn expand_true_content_at_activeNode (
       tree, node, &pid, &initial_source ) ?;
     return Ok (( )); }
   // TODO/DONE/local-view-update/plan_v2.org §5.5: this vognode is definitive and about to expand -- draw its whole
-  // content group, and (via the BFS) its cols. Each expansion costs ONE budget
-  // unit; an indefinitive node (returned above) costs nothing, and a col fills
+  // content group, and (via the BFS) its folders. Each expansion costs ONE budget
+  // unit; an indefinitive node (returned above) costs nothing, and a folder fills
   // for free. visit_normal_node already forced this node indefinitive if the
   // budget was 0, so here it is > 0; saturating_sub is defensive.
   *node_budget = node_budget . saturating_sub (1);
@@ -253,15 +253,15 @@ fn reconcile_content_children (
   // not per child, so a node either fully expands or is left indefinitive; we
   // never create a silent partial sibling set.
   // A content child this save deleted stays here; at its own BFS visit it
-  // becomes a PhantomDeleted whose cols generalized-orphan and deaden -- so no col
+  // becomes a PhantomDeleted whose folders generalized-orphan and deaden -- so no folder
   // reconciles against a missing NodeComplete -- while any user subtree under it
   // is preserved (demoted), and a now-childless PhantomDeleted is removed by the
   // TODO/DONE/local-view-update/plan_v2.org §6.6 prune sweep.
   let substitution_for_children : bool =
     // The raw-drawn-override rule (generalized 2026-06-12 from the
     // plan-11 overridden-as-such case): when this node is itself
-    // overridden but drawn RAW by its position -- a read-only col
-    // member, an overriddenCol member, or a view root -- the user is
+    // overridden but drawn RAW by its position -- a read-only folder
+    // member, an overriddenFolder member, or a view root -- the user is
     // looking at the ORIGINAL, so its immediate children draw raw too.
     // Depth one level: a content child is not a raw position, so
     // substitution resumes there (matching the overridden-as-such
@@ -330,10 +330,10 @@ fn mutate_activeNode_to_deletednode (
 /// that substitution must be disabled for its immediate children (one
 /// level; a content child is a substituting position, so substitution
 /// resumes there). Generalizes the plan-11 overridden-as-such rule (an
-/// overriddenCol member) to every raw-drawn position. Decided
+/// overriddenFolder member) to every raw-drawn position. Decided
 /// 2026-06-12:
-/// - POSITION: a member of any PartnerCol that draws raw -- every col
-///   EXCEPT the writable subscribeeCol, whose subscribees-as-such DO
+/// - POSITION: a member of any PartnerFolder that draws raw -- every folder
+///   EXCEPT the writable subscribeeFolder, whose subscribees-as-such DO
 ///   substitute (the subscriber's view of them) -- or a view root.
 /// - OVERRIDDEN: ownership-gated, visibility-UNGATED ('active' = None),
 ///   so even a node whose only overrider is invisible counts as
@@ -348,11 +348,11 @@ fn is_overridden_drawn_raw (
   graph_snap : &Arc<InRustGraph>,
 ) -> Result<bool, Box<dyn Error>> {
   let in_raw_position : bool = {
-    let affects_parent_raw_drawing_col : bool =
+    let affects_parent_raw_drawing_folder : bool =
       read_at_ancestor_in_tree( tree, node, 1,
         |vn : &ViewNode| match &vn . kind {
-          ViewNodeKind::PartnerCol (pc)
-            => ! matches!( pc, PartnerCol::Subscribee ),
+          ViewNodeKind::PartnerFolder (pc)
+            => ! matches!( pc, PartnerFolder::Subscribee ),
           _ => false } )
       . unwrap_or (false);
     let is_view_root : bool =
@@ -363,7 +363,7 @@ fn is_overridden_drawn_raw (
         |vn : &ViewNode| matches!( &vn . kind,
           ViewNodeKind::BufferRoot ))
       . unwrap_or (false);
-    affects_parent_raw_drawing_col || is_view_root };
+    affects_parent_raw_drawing_folder || is_view_root };
   if ! in_raw_position { return Ok (false); }
   let (id, has_marker) : (Option<ID>, bool) =
     read_at_node_in_tree( tree, node,
@@ -379,7 +379,7 @@ fn is_overridden_drawn_raw (
   Ok (overridden) }
 
 /// Whether this node claims affectsParent=true
-/// and is a child of SubscribeeCol (and not a phantom).
+/// and is a child of SubscribeeFolder (and not a phantom).
 fn is_subscribee (
   tree : &Tree<ViewNode>,
   node : NodeId,
@@ -390,17 +390,17 @@ fn is_subscribee (
         ViewNodeKind::Vognode (Vognode::Active (t))
           => t . affectsParent == AffectsParent::True,
         _ => false } ) ?;
-  let affects_parent_subscribee_col : bool =
+  let affects_parent_subscribeeFolder : bool =
     read_at_ancestor_in_tree( tree, node, 1,
       |vn : &ViewNode| matches!( &vn . kind,
-        ViewNodeKind::PartnerCol (PartnerCol::Subscribee)))
+        ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee)))
     . unwrap_or (false);
-  Ok( is_member_of_parent && affects_parent_subscribee_col ) }
+  Ok( is_member_of_parent && affects_parent_subscribeeFolder ) }
 
 /// The worktree content goal list for a node: the (extra-id-resolved) contains,
 /// in order. For a subscribee-as-such (TODO/DONE/local-view-update/plan_v2.org §6.1) it is contains MINUS what the
 /// subscriber neither HIDES nor CONTAINS: the hidden remainder shows in the
-/// HiddenInSubscribeeCol, and content the subscriber has integrated into its
+/// HiddenInSubscribeeFolder, and content the subscriber has integrated into its
 /// own graph (any node it contains) has dropped out of "unintegrated subscribed
 /// content" entirely. Hiding is the explicit integration signal; containing is
 /// the implicit one (a node moved into the subscriber is not also hidden --
@@ -495,7 +495,7 @@ fn complete_content_children (
     tree, node, goal_list, relationship_sources, owner_home, graph_snap,
     deleted_by_this_save_extra_ids ) ?;
   // The RepairSummary is dropped: content is not a generated
-  // collection, so its reconciliation is not a "repair" to warn about.
+  // folder, so its reconciliation is not a "repair" to warn about.
   complete_relevant_children_in_viewnodetree(
     tree, node,
     |vn : &ViewNode| match &vn . kind {
@@ -659,9 +659,9 @@ fn order_children_as_scaffolds_then_ignored_then_content (
   let groups : HashMap<i32, Vec<NodeId>> =
     partition_children( tree, node,
       |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::QualCol (_)
+        ViewNodeKind::QualFolder (_)
           | ViewNodeKind::Qual (_)
-          | ViewNodeKind::PartnerCol (_)
+          | ViewNodeKind::PartnerFolder (_)
           | ViewNodeKind::BufferRoot
           | ViewNodeKind::DeadScaffold                => 0,
         ViewNodeKind::Vognode (Vognode::Active (t))

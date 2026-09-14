@@ -1,5 +1,5 @@
-/// Git diff view tests for the FILTER cols (hiddenInSubscribeeCol,
-/// hiddenOutsideOfSubscribeeCol): their membership is DERIVED, so
+/// Git diff view tests for the FILTER folders (hiddenInSubscribeeFolder,
+/// hiddenOutsideOfSubscribeeFolder): their membership is DERIVED, so
 /// per-stage signs come from comparing the derived membership at the
 /// three snapshots -- HEAD, index, worktree -- rather than from any
 /// one relation's diff
@@ -32,30 +32,30 @@ fn setup_filter_fixtures (
 ) -> Result<Repository, Box<dyn Error>> {
   super::common::setup_git_repo_with_fixtures (
     repo_path,
-    "tests/git_diff_view/filter_cols/fixtures/head",
-    "tests/git_diff_view/filter_cols/fixtures/worktree" ) }
+    "tests/git_diff_view/filter_folders/fixtures/head",
+    "tests/git_diff_view/filter_folders/fixtures/worktree" ) }
 
 fn setup_filter_fixtures_staged (
   repo_path : &Path,
 ) -> Result<Repository, Box<dyn Error>> {
   super::common::setup_git_repo_with_fixtures_staged (
     repo_path,
-    "tests/git_diff_view/filter_cols/fixtures/head",
-    "tests/git_diff_view/filter_cols/fixtures/worktree" ) }
+    "tests/git_diff_view/filter_folders/fixtures/head",
+    "tests/git_diff_view/filter_folders/fixtures/worktree" ) }
 
 /// The worktree state of the view, as a user's diff-mode buffer
 /// would hold it (B expanded as a definitive subscribee-as-such).
 const INPUT : &str = "\
 * (skg (node (id S) (source main))) S
-** (skg subscribeeCol)
+** (skg subscribeeFolder)
 *** (skg (node (id B) (source main))) B
-**** (skg hiddenInSubscribeeCol)
+**** (skg hiddenInSubscribeeFolder)
 ***** (skg (node (id h1) (source main))) h1
 ***** (skg (node (id h2) (source main))) h2
 ***** (skg (node (id h3) (source main))) h3
 **** (skg (node (id v) (source main))) v
 **** (skg (node (id h4) (source main))) h4
-*** (skg hiddenOutsideOfSubscribeeCol)
+*** (skg hiddenOutsideOfSubscribeeFolder)
 **** (skg (node (id h5) (source main))) h5
 ";
 
@@ -82,14 +82,14 @@ const EXPECTED_STAGED : &str = "\
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
   run_with_shared_test_stores (
-    "skg-test-git-diff-filter-cols",
+    "skg-test-git-diff-filter-folders",
     |s| Box::pin ( async move {
-      filter_cols_show_exact_phantoms_and_newM_unstaged (s) . await ?;
-      emptied_filter_cols_still_render_in_diff_mode (s) . await ?;
-      filter_cols_show_exact_phantoms_and_newM_staged (s) . await ?;
+      filter_folders_show_exact_phantoms_and_newM_unstaged (s) . await ?;
+      emptied_filter_folders_still_render_in_diff_mode (s) . await ?;
+      filter_folders_show_exact_phantoms_and_newM_staged (s) . await ?;
       Ok (( )) } )) }
 
-async fn run_filter_col_test (
+async fn run_filter_folder_test (
   s            : &mut SharedStoreSession,
   subtest_name : &str,
   staged   : bool,
@@ -127,35 +127,35 @@ async fn run_filter_col_test (
         members_msv (&s . hides_from_its_subscriptions) . or_default () . to_vec (),
         vec! [ ID::from ("h1"), ID::from ("h2"),
                ID::from ("h3"), ID::from ("h5") ],
-        "filter-col phantoms must not edit the hides list" ); }
+        "filter-folder phantoms must not edit the hides list" ); }
     Ok (( )) }
 
-async fn filter_cols_show_exact_phantoms_and_newM_unstaged (
+async fn filter_folders_show_exact_phantoms_and_newM_unstaged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
-  run_filter_col_test (
+  run_filter_folder_test (
     s, "skg-test-git-diff-filter-unstaged", false,
     EXPECTED_UNSTAGED ) . await }
 
-/// Col existence for the filter cols: a DERIVED membership emptied
+/// Folder existence for the filter folders: a DERIVED membership emptied
 /// since HEAD (S2 stopped hiding x2 and y2; x2 was hidden-in B2, y2
-/// hidden-outside) still yields each col, holding only phantoms.
-/// Outside diff mode the emptied cols do not appear.
-async fn emptied_filter_cols_still_render_in_diff_mode (
+/// hidden-outside) still yields each folder, holding only phantoms.
+/// Outside diff mode the emptied folders do not appear.
+async fn emptied_filter_folders_still_render_in_diff_mode (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   let temp_dir : TempDir = TempDir::new ()?;
   let repo_path : &Path = temp_dir . path ();
   setup_filter_fixtures (repo_path)?;
   s . reset_with_source_path (
-    "emptied_filter_cols_still_render_in_diff_mode",
+    "emptied_filter_folders_still_render_in_diff_mode",
     repo_path ) ?;
   let (config, tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
   let input : &str = "\
 * (skg (node (id S2) (source main))) S2
-** (skg subscribeeCol)
+** (skg subscribeeFolder)
 *** (skg (node (id B2) (source main))) B2
 **** (skg (node (id x2) (source main))) x2
 ";
@@ -168,13 +168,13 @@ async fn emptied_filter_cols_still_render_in_diff_mode (
         &mut stream, input, &config, &tantivy, &graph,
         true, &Err (String::new ()), &mut views_state ) . await ?;
       assert_buffer_contains ( &response . saved_view, "\
-**** (skg hiddenInSubscribeeCol)
+**** (skg hiddenInSubscribeeFolder)
 ***** (skg (node (id x2) (source main) indef (unstaged removedM))) x2
 **** (skg (node (id x2) (source main))) x2
-*** (skg hiddenOutsideOfSubscribeeCol)
+*** (skg hiddenOutsideOfSubscribeeFolder)
 **** (skg (node (id y2) (source main) indef (unstaged removedM))) y2
 " ); }
-    { // The same save outside diff mode creates neither col.
+    { // The same save outside diff mode creates neither folder.
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : false,
         open_views        : OpenViews::new (), };
@@ -182,16 +182,16 @@ async fn emptied_filter_cols_still_render_in_diff_mode (
       let response = update_from_and_rerender_buffer (
         &mut stream, input, &config, &tantivy, &graph,
         false, &Err (String::new ()), &mut views_state ) . await ?;
-      for col in [ "hiddenInSubscribeeCol",
-                   "hiddenOutsideOfSubscribeeCol" ] {
-        assert! ( ! response . saved_view . contains (col),
+      for folder in [ "hiddenInSubscribeeFolder",
+                   "hiddenOutsideOfSubscribeeFolder" ] {
+        assert! ( ! response . saved_view . contains (folder),
           "an empty {} must not render outside diff mode:\n{}",
-          col, response . saved_view ); }}
+          folder, response . saved_view ); }}
     Ok (( )) }
 
-async fn filter_cols_show_exact_phantoms_and_newM_staged (
+async fn filter_folders_show_exact_phantoms_and_newM_staged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
-  run_filter_col_test (
+  run_filter_folder_test (
     s, "skg-test-git-diff-filter-staged", true,
     EXPECTED_STAGED ) . await }

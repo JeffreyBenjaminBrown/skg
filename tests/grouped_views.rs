@@ -14,5 +14,5 @@ mod hidden_from_subscriptions;
 #[path = "initial_view_bfs.rs"]
 mod initial_view_bfs;
 
-#[path = "subscribee_col_empty_persists.rs"]
-mod subscribee_col_empty_persists;
+#[path = "subscribee_folder_empty_persists.rs"]
+mod subscribee_folder_empty_persists;

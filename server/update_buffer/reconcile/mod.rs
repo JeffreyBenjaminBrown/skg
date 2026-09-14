@@ -2,13 +2,13 @@
 // complete.rs) dispatches to. There is no preorder/postorder split: each is run
 // at its node's own BFS visit.
 
-pub mod aliascol;
+pub mod aliasfolder;
 pub mod content;
-pub mod hiddeninsubscribee_col;
-pub mod hiddenoutsideof_subscribeecol;
-pub mod id_col;
-pub mod partner_col;
-pub mod subscribee_col;
+pub mod hiddeninsubscribee_folder;
+pub mod hiddenoutsideof_subscribeefolder;
+pub mod id_folder;
+pub mod partner_folder;
+pub mod subscribee_folder;
 pub mod view_requests;
 
 use crate::source_sets::ActiveSourceSet;

@@ -10,11 +10,11 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-git-diff-ids-view",
     |s| Box::pin ( async move {
-      test_ids_diff_shows_id_col_scaffold (s) . await ?;
+      test_ids_diff_shows_id_folder_scaffold (s) . await ?;
       test_ids_diff_staged_shows_staged_tag (s) . await ?;
       Ok (( )) } )) }
 
-async fn test_ids_diff_shows_id_col_scaffold (
+async fn test_ids_diff_shows_id_folder_scaffold (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
@@ -22,7 +22,7 @@ async fn test_ids_diff_shows_id_col_scaffold (
   let repo_path = temp_dir . path();
   setup_git_repo_with_fixtures (repo_path)?;
   s . reset_with_source_path (
-    "test_ids_diff_shows_id_col_scaffold",
+    "test_ids_diff_shows_id_folder_scaffold",
     repo_path ) ?;
   let (config, _tantivy)
     : (&SkgConfig, &mut TantivyIndex)
@@ -38,7 +38,7 @@ async fn test_ids_diff_shows_id_col_scaffold (
 }
 
 /// When the same id changes are staged (git add) rather than unstaged,
-/// the IDCol children should say `(staged ...)` not `(unstaged ...)`.
+/// the IDFolder children should say `(staged ...)` not `(unstaged ...)`.
 async fn test_ids_diff_staged_shows_staged_tag (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>

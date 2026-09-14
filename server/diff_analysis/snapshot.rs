@@ -2,7 +2,7 @@ use crate::dbs::filesystem::multiple_nodes::{
   read_skg_sections_from_folder};
 use crate::telescope::fold::fold_telescope;
 use crate::telescope::types::{
-  Telescope, retain_owned_sections_when_pid_collides,
+  Telescope, retain_owned_sections_when_pid_folderlides,
 };
 use crate::diff_analysis::types::{
   ChangedSnapshotPair, DiffSelection, GraphSnapshot, SnapshotKind, SnapshotPair};
@@ -394,7 +394,7 @@ fn read_telescope_sections_at_endpoint (
         kind, &repo, &source_name, &rel_path ) ? {
       sections . push (( source_name, node_fs )); }}
   let (sections, collision) =
-    retain_owned_sections_when_pid_collides (sections, config);
+    retain_owned_sections_when_pid_folderlides (sections, config);
   if let Some (collision) = collision {
     tracing::warn! (
       pid = %pid,
@@ -584,7 +584,7 @@ fn snapshot_from_sections (
     let sections : Vec<(SourceName, NodeFS)> =
       std::mem::take (telescope_sections);
     let (retained, collision) =
-      retain_owned_sections_when_pid_collides (sections, config);
+      retain_owned_sections_when_pid_folderlides (sections, config);
     *telescope_sections = retained;
     if let Some (collision) = collision {
       tracing::warn! (

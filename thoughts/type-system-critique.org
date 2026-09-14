@@ -200,9 +200,9 @@ This would let code that should never touch phantoms take
 * AWAITS ? Scaffold parent-child rules: not typed
 
 The local validator (~validate_local_structure~) checks that:
-- Alias is under AliasCol
-- AliasCol is under TrueNode
-- ID is under IDCol
+- Alias is under AliasFolder
+- AliasFolder is under TrueNode
+- ID is under IDFolder
 - etc.
 
 These rules exist only as runtime predicates. A typed tree

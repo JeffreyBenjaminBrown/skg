@@ -1,6 +1,6 @@
 /// The INVERSE SCAN
 /// (TODO/full-schema/12-2_diff-mode-policy_discussion.org): for an
-/// inbound col -- subscriberCol, overriderCol, hiderCol -- the edges
+/// inbound folder -- subscriberFolder, overriderFolder, hiderFolder -- the edges
 /// live in the MEMBERS' files, so the owner's own diff says nothing
 /// about them.  This scan answers: which nodes' files asserted a
 /// 'relation' edge to 'owner' at HEAD or assert one now, and in
@@ -33,11 +33,11 @@ use crate::types::nodes::complete::NodeComplete;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-/// Per-member, per-stage membership signs for the inbound col of
+/// Per-member, per-stage membership signs for the inbound folder of
 /// 'owner' under 'relation'.  Members with no surviving sign in
 /// either stage (e.g. a cancelled cross-source move) are omitted.
 /// A member whose axes' net result is "gone from the worktree"
-/// ('MembershipAxes::net_is_present' = false) belongs in the col's
+/// ('MembershipAxes::net_is_present' = false) belongs in the folder's
 /// goal list as a phantom; a present member's Plus signs become its
 /// 'newM' marks.
 ///
@@ -50,7 +50,7 @@ use std::path::PathBuf;
 /// (the historical 'leveled-lists' work item deferred this; still true
 /// here), so a Modified-file sign is emitted regardless of source. None = ungated
 /// (every stage counts), matching every other gated accessor here.
-pub fn inverse_scan_for_inbound_col (
+pub fn inverse_scan_for_inbound_folder (
   owner        : &ID,
   relation     : NodeRelation,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,

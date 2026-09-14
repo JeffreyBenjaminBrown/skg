@@ -166,15 +166,15 @@ fn format_buffer_validation_error (
     BufferValidationError::Body_of_Scaffold(title, kind) => {
       format!("{} node has a body (not allowed):\n- Title: {}\n",
               kind, title) },
-    BufferValidationError::IDCol_Edited(owner, buffer_ids, real_ids) => {
+    BufferValidationError::IDFolder_Edited(owner, buffer_ids, real_ids) => {
       let fmt_ids = |ids : &Vec<ID>| -> String {
         ids . iter() . map(|i| i . 0 . as_str())
           . collect::<Vec<&str>>() . join(", ") };
       if real_ids . is_empty() {
-        format!("Node {} is not in the graph, so it cannot carry an idCol:\n- ids claimed by the buffer: {}\n- IDs cannot be created through the buffer. To edit a node's ID list, edit its .skg file directly.\n",
+        format!("Node {} is not in the graph, so it cannot carry an idFolder:\n- ids claimed by the buffer: {}\n- IDs cannot be created through the buffer. To edit a node's ID list, edit its .skg file directly.\n",
                 owner . 0, fmt_ids(buffer_ids))
       } else {
-        format!("The idCol under node {} was edited; saving would not honor that, so the save was aborted:\n- ids claimed by the buffer: {}\n- the node's real ids: {}\n- Reordering is fine, but IDs cannot be added, removed or edited through the buffer. To edit a node's ID list, edit its .skg file directly.\n",
+        format!("The idFolder under node {} was edited; saving would not honor that, so the save was aborted:\n- ids claimed by the buffer: {}\n- the node's real ids: {}\n- Reordering is fine, but IDs cannot be added, removed or edited through the buffer. To edit a node's ID list, edit its .skg file directly.\n",
                 owner . 0, fmt_ids(buffer_ids), fmt_ids(real_ids)) }},
     BufferValidationError::OverridesHere_Mismatch(carrier, original, effective) => {
       let fmt_opt = |id : &Option<ID>| -> String {
@@ -250,7 +250,7 @@ fn format_buffer_validation_error (
       format!("Edit request on an indefinitive (possibly a phantom) node:\n- ID: {}\n- Indefinitive nodes cannot carry write instructions.\n- To delete or merge this node, visit a definitive view of it first (C-c g RET).\n",
               id . 0) },
     BufferValidationError::EditedIndefinitive (id) => {
-      format!("Edited indefinitive occurrence:\n- ID: {}\n- This occurrence changed since the server rendered it, but indefinitive occurrences do not write their own text or collections.\n- Re-render, then edit a definitive occurrence instead.\n",
+      format!("Edited indefinitive occurrence:\n- ID: {}\n- This occurrence changed since the server rendered it, but indefinitive occurrences do not write their own text or folders.\n- Re-render, then edit a definitive occurrence instead.\n",
               id . 0) },
     BufferValidationError::Other (msg) => {
       format!("{}\n", msg) }, }}

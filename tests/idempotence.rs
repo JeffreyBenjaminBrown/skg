@@ -11,10 +11,10 @@
 // metadata; idempotence is specifically that a second rerender changes nothing.)
 //
 // Fixture exercises several ViewNode kinds in one view: Active content (a -> b,
-// c), an AliasCol + Alias (b has alias "bee"), the IDCols, a SubscribeeCol +
-// subscribee-as-such (c subscribes to d), the HiddenOutsideOfSubscribeeCol, and
-// a PartnerCol -- e subscribes to b, so b shows a SubscriberCol listing e.
-// (The death-cleanup / generalized-orphan path -- a col whose owning node was
+// c), an AliasFolder + Alias (b has alias "bee"), the IDFolders, a SubscribeeFolder +
+// subscribee-as-such (c subscribes to d), the HiddenOutsideOfSubscribeeFolder, and
+// a PartnerFolder -- e subscribes to b, so b shows a SubscriberFolder listing e.
+// (The death-cleanup / generalized-orphan path -- a folder whose owning node was
 // deleted -- is covered separately by the save_collateral_delete_then_edit_under_it
 // integration test, which only a delete can trigger, not an unchanged-graph rerender.)
 

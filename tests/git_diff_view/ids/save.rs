@@ -1,7 +1,7 @@
 /// Tests for git diff view - save behavior with id changes.
-/// Deleting the whole idCol is a no-op (absence means no opinion),
-/// but editing an idCol's membership -- deleting, adding, editing or
-/// relocating id scaffolds -- aborts the save with IDCol_Edited
+/// Deleting the whole idFolder is a no-op (absence means no opinion),
+/// but editing an idFolder's membership -- deleting, adding, editing or
+/// relocating id scaffolds -- aborts the save with IDFolder_Edited
 /// (TODO/full-schema/8_readonly-set-ergonomics.org). Net-removed
 /// diff entries (removedM) are git history, not membership claims,
 /// and do not trip the check.
@@ -15,25 +15,25 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-git-diff-ids-save",
     |s| Box::pin ( async move {
-      test_delete_id_col_scaffold_respawns (s) . await ?;
+      test_delete_id_folder_scaffold_respawns (s) . await ?;
       test_delete_id_scaffolds_aborts (s) . await ?;
       test_edit_id_scaffold_aborts (s) . await ?;
       test_reorder_id_scaffolds_saves (s) . await ?;
       test_move_id_scaffolds_to_child_aborts (s) . await ?;
-      test_delete_id_col_scaffold_respawns_staged (s) . await ?;
+      test_delete_id_folder_scaffold_respawns_staged (s) . await ?;
       Ok (( )) } )) }
 
-/// Deleting an idCol scaffold should be a no-op.
+/// Deleting an idFolder scaffold should be a no-op.
 /// The scaffold respawns in the returned buffer.
-async fn test_delete_id_col_scaffold_respawns (
+async fn test_delete_id_folder_scaffold_respawns (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test(
     s,
-    "skg-test-save-del-idcol",
+    "skg-test-save-del-idFolder",
     |config, tantivy, repo_path| { Box::pin(async move {
-      // User deletes the entire idCol scaffold (and its children)
+      // User deletes the entire idFolder scaffold (and its children)
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "skg id");
 
@@ -59,14 +59,14 @@ async fn test_delete_id_col_scaffold_respawns (
       assert!(!node_1 . all_ids () . any(|id| id == &ID("2" . to_string())),
         "1.skg should not have id '2'");
 
-      // BUFFER: idCol scaffold should respawn
+      // BUFFER: idFolder scaffold should respawn
       assert_buffer_contains(
         &response . saved_view, GIT_DIFF_VIEW);
       Ok(()) }) }) . await
 }
 
-/// Deleting individual id scaffolds (keeping the idCol) aborts the
-/// save with an IDCol_Edited error, and the disk is untouched.
+/// Deleting individual id scaffolds (keeping the idFolder) aborts the
+/// save with an IDFolder_Edited error, and the disk is untouched.
 async fn test_delete_id_scaffolds_aborts (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
@@ -75,7 +75,7 @@ async fn test_delete_id_scaffolds_aborts (
     s,
     "skg-test-save-del-ids",
     |config, tantivy, repo_path| { Box::pin(async move {
-      // User deletes the id scaffolds but keeps the idCol
+      // User deletes the id scaffolds but keeps the idFolder
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "(skg id)");
 
@@ -93,9 +93,9 @@ async fn test_delete_id_scaffolds_aborts (
       let err : String =
         format! ( "{:?}",
                   result . err ()
-                  . expect ("editing idCol membership must abort the save") );
-      assert!(err . contains ("IDCol_Edited"),
-        "the error should be IDCol_Edited: {}", err);
+                  . expect ("editing idFolder membership must abort the save") );
+      assert!(err . contains ("IDFolder_Edited"),
+        "the error should be IDFolder_Edited: {}", err);
 
       // DISK: 1.skg should still have the worktree ids
       let node_1 = read_nodecomplete(repo_path, "1")?;
@@ -105,7 +105,7 @@ async fn test_delete_id_scaffolds_aborts (
 }
 
 /// Editing an id scaffold's text aborts the save with an
-/// IDCol_Edited error, and the disk is untouched.
+/// IDFolder_Edited error, and the disk is untouched.
 async fn test_edit_id_scaffold_aborts (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
@@ -133,8 +133,8 @@ async fn test_edit_id_scaffold_aborts (
         format! ( "{:?}",
                   result . err ()
                   . expect ("editing an id scaffold must abort the save") );
-      assert!(err . contains ("IDCol_Edited"),
-        "the error should be IDCol_Edited: {}", err);
+      assert!(err . contains ("IDFolder_Edited"),
+        "the error should be IDFolder_Edited: {}", err);
 
       // DISK: 1.skg should still have the original worktree ids
       let node_1 = read_nodecomplete(repo_path, "1")?;
@@ -176,8 +176,8 @@ async fn test_reorder_id_scaffolds_saves (
       Ok(()) }) }) . await
 }
 
-/// Moving the idCol to another node aborts the save: the receiving
-/// node's real ID list does not match the moved idCol's claims.
+/// Moving the idFolder to another node aborts the save: the receiving
+/// node's real ID list does not match the moved idFolder's claims.
 async fn test_move_id_scaffolds_to_child_aborts (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
@@ -190,7 +190,7 @@ async fn test_move_id_scaffolds_to_child_aborts (
       let input = "\
 * (skg (node (id 1) (source main))) 1
 ** (skg (node (id child) (source main))) child
-*** (skg idCol)
+*** (skg idFolder)
 **** (skg id) 1
 **** (skg id (unstaged removedM)) 2
 **** (skg id (unstaged newM)) 2'
@@ -211,9 +211,9 @@ async fn test_move_id_scaffolds_to_child_aborts (
       let err : String =
         format! ( "{:?}",
                   result . err ()
-                  . expect ("an idCol moved under another node must abort the save") );
-      assert!(err . contains ("IDCol_Edited"),
-        "the error should be IDCol_Edited: {}", err);
+                  . expect ("an idFolder moved under another node must abort the save") );
+      assert!(err . contains ("IDFolder_Edited"),
+        "the error should be IDFolder_Edited: {}", err);
 
       // DISK: child.skg should not have any new ids
       let node_child = read_nodecomplete(repo_path, "child")?;
@@ -229,19 +229,19 @@ async fn test_move_id_scaffolds_to_child_aborts (
       Ok(()) }) }) . await
 }
 
-/// Same as 'test_delete_id_col_scaffold_respawns' but with the fixture
-/// transition staged (git add) rather than unstaged. The respawned IDCol
+/// Same as 'test_delete_id_folder_scaffold_respawns' but with the fixture
+/// transition staged (git add) rather than unstaged. The respawned IDFolder
 /// children should report '(staged ...)' tags — this verifies that the
-/// save-rerender pipeline (reconcile_id_col_children + complete_viewforest) honors the
+/// save-rerender pipeline (reconcile_idFolder_children + complete_viewforest) honors the
 /// staged/unstaged distinction instead of merging stages and defaulting
 /// to unstaged.
-async fn test_delete_id_col_scaffold_respawns_staged (
+async fn test_delete_id_folder_scaffold_respawns_staged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test_staged(
     s,
-    "skg-test-save-del-idcol-staged",
+    "skg-test-save-del-idFolder-staged",
     |config, tantivy, _repo_path| { Box::pin(async move {
       let input = without_lines_containing(
         GIT_DIFF_VIEW_STAGED, "skg id");

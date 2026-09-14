@@ -1,14 +1,14 @@
-// cargo nextest run --test grouped_overrides -E 'test(partner_col_matrix::)'
+// cargo nextest run --test grouped_overrides -E 'test(partner_folder_matrix::)'
 //
 // The batched relationship-matrix target
 // (TODO/full-schema/13_test-rel-matrix.org). ONE test function builds
 // ONE database of mutually independent subgraphs (IDs prefixed by
 // scenario), then runs the matrix scenarios serially against it: de
-// novo rendering of the read-only cols, and -- per col -- save after
+// novo rendering of the read-only folders, and -- per folder -- save after
 // reorder, insertion of a non-member, deletion of a member, plus the
-// writable cols' membership edits and the restricted-set omission.
+// writable folders' membership edits and the restricted-set omission.
 // Scenario failures ACCUMULATE: every mismatch is collected and the
-// test fails once at the end, so one broken col does not mask the
+// test fails once at the end, so one broken folder does not mask the
 // rest.
 //
 // DEVIATION from the plan (recorded in progress.org): instead of
@@ -16,8 +16,8 @@
 // to render de novo. Rather than
 // hand-author expected buffers, each scenario renders de novo, edits
 // the real rendered text, saves, and asserts on the saved view, its
-// warnings, and (for writable cols) the would-be disk lists -- the
-// established style of partner_col_order / partner_col_warnings, which
+// warnings, and (for writable folders) the would-be disk lists -- the
+// established style of partner_folder_order / partner_folder_warnings, which
 // keeps the metadata always correct.
 
 use std::error::Error;
@@ -135,7 +135,7 @@ fn swap_lines ( buf : &str, a : &str, b : &str ) -> String {
 /// member's indentation, plus a child one level deeper, so the repair
 /// is a demotion-to-independent rather than a removal. Built fresh
 /// (not cloned from a member line) so it never inherits a foreign
-/// source -- the overriderCol's members are foreign.
+/// source -- the overriderFolder's members are foreign.
 fn intruder_with_child (
   member_line : &str,
   intruder_id : &str,
@@ -150,34 +150,34 @@ fn intruder_with_child (
   ( line, child ) }
 
 //////////////////////////////////////////////////////////////
-// Read-only col spec and per-behavior scenario helpers
+// Read-only folder spec and per-behavior scenario helpers
 //////////////////////////////////////////////////////////////
 
-struct ColSpec {
-  atom     : &'static str, // e.g. "subscriberCol"
+struct FolderSpec {
+  atom     : &'static str, // e.g. "subscriberFolder"
   owner    : &'static str,
   member_a : &'static str, // sorts before member_b
   member_b : &'static str,
-  intruder : &'static str, // a public non-member to park in the col
+  intruder : &'static str, // a public non-member to park in the folder
 }
 
-const READONLY_COLS : [ColSpec; 4] = [
-  ColSpec { atom : "subscriberCol", owner : "roSub-owner",
+const READONLY_FOLDERS : [FolderSpec; 4] = [
+  FolderSpec { atom : "subscriberFolder", owner : "roSub-owner",
             member_a : "roSub-a", member_b : "roSub-b",
             intruder : "roSub-x" },
-  ColSpec { atom : "overriderCol", owner : "roOvr-owner",
+  FolderSpec { atom : "overriderFolder", owner : "roOvr-owner",
             member_a : "roOvr-a", member_b : "roOvr-b",
             intruder : "roOvr-x" },
-  ColSpec { atom : "hiderCol", owner : "roHider-owner",
+  FolderSpec { atom : "hiderFolder", owner : "roHider-owner",
             member_a : "roHider-a", member_b : "roHider-b",
             intruder : "roHider-x" },
-  ColSpec { atom : "hiddenCol", owner : "roHidden-owner",
+  FolderSpec { atom : "hiddenFolder", owner : "roHidden-owner",
             member_a : "roHidden-a", member_b : "roHidden-b",
             intruder : "roHidden-x" },
 ];
 
 async fn readonly_reorder (
-  fails : &mut Fails, spec : &ColSpec,
+  fails : &mut Fails, spec : &FolderSpec,
   config : &SkgConfig,
   tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
@@ -208,7 +208,7 @@ async fn readonly_reorder (
   Ok (( )) }
 
 async fn readonly_insert (
-  fails : &mut Fails, spec : &ColSpec,
+  fails : &mut Fails, spec : &FolderSpec,
   config : &SkgConfig,
   tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
@@ -248,7 +248,7 @@ async fn readonly_insert (
   Ok (( )) }
 
 async fn readonly_delete (
-  fails : &mut Fails, spec : &ColSpec,
+  fails : &mut Fails, spec : &FolderSpec,
   config : &SkgConfig,
   tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
@@ -282,17 +282,17 @@ async fn readonly_delete (
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
-// De-novo render of the four read-only cols on one owner
+// De-novo render of the four read-only folders on one owner
 //////////////////////////////////////////////////////////////
 
 async fn denovo_readonly_render (
   fails : &mut Fails,
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  let s : &str = "denovo/read-only-cols";
+  let s : &str = "denovo/read-only-folders";
   let buf : String = render ("dn-owner", config) . await ?;
-  for atom in ["subscriberCol", "overriderCol",
-               "hiderCol", "hiddenCol"] {
+  for atom in ["subscriberFolder", "overriderFolder",
+               "hiderFolder", "hiddenFolder"] {
     fails . want_contains (s, &buf, &format! ("(skg {})", atom)); }
   for (a, b) in [("dn-sub-a", "dn-sub-b"),
                  ("dn-ovr-a", "dn-ovr-b"),
@@ -316,16 +316,16 @@ async fn denovo_readonly_render (
 fn relationship_matrix
   () -> Result<(), Box<dyn Error>> {
   run_with_source_set_test_db (
-    "skg-test-partner-col-matrix",
-    "tests/partner_col_matrix/fixtures/skgconfig.toml",
-    "/tmp/tantivy-test-partner-col-matrix",
+    "skg-test-partner-folder-matrix",
+    "tests/partner_folder_matrix/fixtures/skgconfig.toml",
+    "/tmp/tantivy-test-partner-folder-matrix",
     |config, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
       let mut fails : Fails = Fails::new ();
 
       denovo_readonly_render (&mut fails, config) . await ?;
-      for spec in &READONLY_COLS {
+      for spec in &READONLY_FOLDERS {
         readonly_reorder (
           &mut fails, spec, config, tantivy, &graph) . await ?;
         readonly_insert (
@@ -333,12 +333,12 @@ fn relationship_matrix
         readonly_delete (
           &mut fails, spec, config, tantivy, &graph) . await ?;
       }
-      writable_subscribeeCol (&mut fails, config) . await ?;
-      writable_overriddenCol (&mut fails, config) . await ?;
-      hiddenCol_delete_does_not_unhide (
+      writable_subscribeeFolder (&mut fails, config) . await ?;
+      writable_overriddenFolder (&mut fails, config) . await ?;
+      hiddenFolder_delete_does_not_unhide (
         &mut fails, config) . await ?;
       omission_scenarios (&mut fails, config) . await ?;
-      col_request_scenarios (
+      folder_request_scenarios (
         &mut fails, config, tantivy, &graph) . await ?;
       path_request_scenarios (
         &mut fails, config, tantivy, &graph) . await ?;
@@ -434,69 +434,69 @@ async fn path_request_scenarios (
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
-// The Col view-request, '(viewRequests (col RELNAME))': build BOTH
-// cols of the relation, the writable one even when empty (decision A).
+// The Folder view-request, '(viewRequests (folder RELNAME))': build BOTH
+// folders of the relation, the writable one even when empty (decision A).
 // Save a minimal definitive buffer carrying just the request and assert
-// on the rerendered view. An absent writable col means "no opinion"
+// on the rerendered view. An absent writable folder means "no opinion"
 // (MSV::Unspecified, filled from disk), so these saves never wipe the
-// relation -- the cols come back populated/empty in the rerender.
+// relation -- the folders come back populated/empty in the rerender.
 //////////////////////////////////////////////////////////////
 
-async fn col_request_scenarios (
+async fn folder_request_scenarios (
   fails : &mut Fails,
   config : &SkgConfig,
   tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   let request_buf = | owner : &str, rel : &str | -> String {
     format! (
-      "* (skg (node (id {}) (source public) (viewRequests (col {})))) {}\n",
+      "* (skg (node (id {}) (source public) (viewRequests (folder {})))) {}\n",
       owner, rel, owner ) };
-  { // (col overrides) on wSub-owner, which overrides nothing and is
-    // overridden by nothing: the WRITABLE overriddenCol appears EMPTY
-    // (the "add an override here" surface); the read-only overriderCol
-    // does not appear (empty read-only cols are pruned).
-    let s : &str = "col-request/overrides-empty";
+  { // (folder overrides) on wSub-owner, which overrides nothing and is
+    // overridden by nothing: the WRITABLE overriddenFolder appears EMPTY
+    // (the "add an override here" surface); the read-only overriderFolder
+    // does not appear (empty read-only folders are pruned).
+    let s : &str = "folder-request/overrides-empty";
     let resp : SaveResponse = save (
       &request_buf ("wSub-owner", "overrides"),
       config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
-    fails . want_contains (s, &resp . saved_view, "(skg overriddenCol)");
-    fails . want_absent  (s, &resp . saved_view, "overriderCol"); }
-  { // (col overrides) on wOvr-owner, which overrides wOvr-a and wOvr-b:
-    // the overriddenCol appears POPULATED with both.
-    let s : &str = "col-request/overrides-populated";
+    fails . want_contains (s, &resp . saved_view, "(skg overriddenFolder)");
+    fails . want_absent  (s, &resp . saved_view, "overriderFolder"); }
+  { // (folder overrides) on wOvr-owner, which overrides wOvr-a and wOvr-b:
+    // the overriddenFolder appears POPULATED with both.
+    let s : &str = "folder-request/overrides-populated";
     let resp : SaveResponse = save (
       &request_buf ("wOvr-owner", "overrides"),
       config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
-    fails . want_contains (s, &resp . saved_view, "(skg overriddenCol)");
+    fails . want_contains (s, &resp . saved_view, "(skg overriddenFolder)");
     fails . want_contains (s, &resp . saved_view, "(id wOvr-a)");
     fails . want_contains (s, &resp . saved_view, "(id wOvr-b)"); }
-  { // (col subscribes) on wSub-owner: subscribeeCol POPULATED (a,b,c).
-    let s : &str = "col-request/subscribes-populated";
+  { // (folder subscribes) on wSub-owner: subscribeeFolder POPULATED (a,b,c).
+    let s : &str = "folder-request/subscribes-populated";
     let resp : SaveResponse = save (
       &request_buf ("wSub-owner", "subscribes"),
       config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
-    fails . want_contains (s, &resp . saved_view, "(skg subscribeeCol)");
+    fails . want_contains (s, &resp . saved_view, "(skg subscribeeFolder)");
     fails . want_contains (s, &resp . saved_view, "(id wSub-a)"); }
-  { // (col hides) on wSub-owner, which neither hides nor is hidden:
+  { // (folder hides) on wSub-owner, which neither hides nor is hidden:
     // both sides read-only and empty, so NOTHING appears.
-    let s : &str = "col-request/hides-empty";
+    let s : &str = "folder-request/hides-empty";
     let resp : SaveResponse = save (
       &request_buf ("wSub-owner", "hides"),
       config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
-    fails . want_absent (s, &resp . saved_view, "hiderCol");
-    fails . want_absent (s, &resp . saved_view, "hiddenCol"); }
+    fails . want_absent (s, &resp . saved_view, "hiderFolder");
+    fails . want_absent (s, &resp . saved_view, "hiddenFolder"); }
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
-// Writable cols (subscribeeCol, overriddenCol): the membership
+// Writable folders (subscribeeFolder, overriddenFolder): the membership
 // edits land on disk. Checked through buffer_to_validated_saveplan,
 // which builds (but does not write) the plan, so we read the
 // would-be NodeComplete for the owner.
@@ -516,18 +516,18 @@ fn member_line ( stars : usize, id : &str ) -> String {
   format! ( "{} (skg (node (id {}) (source public) indef)) {}",
             "*" . repeat (stars), id, id ) }
 
-fn col_member_stars ( buf : &str, any_member_fragment : &str ) -> usize {
+fn folder_member_stars ( buf : &str, any_member_fragment : &str ) -> usize {
   line_containing (buf, any_member_fragment)
     . chars () . take_while ( |c| *c == '*' ) . count () }
 
-async fn writable_subscribeeCol (
+async fn writable_subscribeeFolder (
   fails : &mut Fails,
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let buf : String = render ("wSub-owner", config) . await ?;
-  let stars : usize = col_member_stars (&buf, "(id wSub-a)");
+  let stars : usize = folder_member_stars (&buf, "(id wSub-a)");
   { // reorder: [a,b,c] -> swap a,c -> [c,b,a]
-    let s : &str = "subscribeeCol/reorder";
+    let s : &str = "subscribeeFolder/reorder";
     let reordered : String =
       swap_lines (&buf, "(id wSub-a)", "(id wSub-c)");
     let nodes : Vec<DefineNode> =
@@ -539,7 +539,7 @@ async fn writable_subscribeeCol (
           "reordered subscribes_to wrong: {:?}", n . subscribes_to)); },
       None => fails . record (s, "no SaveNode for wSub-owner" . into ()), } }
   { // delete one: remove b -> [a,c]
-    let s : &str = "subscribeeCol/delete";
+    let s : &str = "subscribeeFolder/delete";
     let b_line : String =
       line_containing (&buf, "(id wSub-b)") . to_string ();
     let edited : String = buf . replace (&format! ("{}\n", b_line), "");
@@ -552,7 +552,7 @@ async fn writable_subscribeeCol (
           "after delete, subscribes_to wrong: {:?}", n . subscribes_to)); },
       None => fails . record (s, "no SaveNode for wSub-owner" . into ()), } }
   { // insert a member: add d -> [a,b,c,d]
-    let s : &str = "subscribeeCol/insert";
+    let s : &str = "subscribeeFolder/insert";
     let c_line : String =
       line_containing (&buf, "(id wSub-c)") . to_string ();
     let edited : String = buf . replace (
@@ -573,14 +573,14 @@ fn override_set ( n : &NodeComplete ) -> Vec<ID> {
     MSV::Specified (ids) => { let mut v = members_of (ids); v . sort (); v }
     MSV::Unspecified => Vec::new (), } }
 
-async fn writable_overriddenCol (
+async fn writable_overriddenFolder (
   fails : &mut Fails,
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   let buf : String = render ("wOvr-owner", config) . await ?;
-  let stars : usize = col_member_stars (&buf, "(id wOvr-a)");
+  let stars : usize = folder_member_stars (&buf, "(id wOvr-a)");
   { // reorder is harmless: order-free set unchanged
-    let s : &str = "overriddenCol/reorder";
+    let s : &str = "overriddenFolder/reorder";
     let reordered : String =
       swap_lines (&buf, "(id wOvr-a)", "(id wOvr-b)");
     let nodes : Vec<DefineNode> =
@@ -592,7 +592,7 @@ async fn writable_overriddenCol (
           "reorder changed the override set: {:?}", n . overrides_view_of)); },
       None => fails . record (s, "no SaveNode for wOvr-owner" . into ()), } }
   { // delete one: remove a -> [b]
-    let s : &str = "overriddenCol/delete";
+    let s : &str = "overriddenFolder/delete";
     let a_line : String =
       line_containing (&buf, "(id wOvr-a)") . to_string ();
     let edited : String = buf . replace (&format! ("{}\n", a_line), "");
@@ -604,7 +604,7 @@ async fn writable_overriddenCol (
           "after delete, override set wrong: {:?}", n . overrides_view_of)); },
       None => fails . record (s, "no SaveNode for wOvr-owner" . into ()), } }
   { // insert a member: add c -> {a,b,c}
-    let s : &str = "overriddenCol/insert";
+    let s : &str = "overriddenFolder/insert";
     let b_line : String =
       line_containing (&buf, "(id wOvr-b)") . to_string ();
     let edited : String = buf . replace (
@@ -619,16 +619,16 @@ async fn writable_overriddenCol (
       None => fails . record (s, "no SaveNode for wOvr-owner" . into ()), } }
   Ok (( )) }
 
-/// Deleting a member from the read-only hiddenCol must not unhide it
+/// Deleting a member from the read-only hiddenFolder must not unhide it
 /// on disk: the owner's hides_from_its_subscriptions is never read
-/// from the col, so the deleted member stays hidden. (The view-level
-/// twin -- respawn in the saved view -- is the hiddenCol case of
+/// from the folder, so the deleted member stays hidden. (The view-level
+/// twin -- respawn in the saved view -- is the hiddenFolder case of
 /// readonly_delete; the extraction-seam twin is in commit 1.)
-async fn hiddenCol_delete_does_not_unhide (
+async fn hiddenFolder_delete_does_not_unhide (
   fails : &mut Fails,
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  let s : &str = "hiddenCol/no-unhide-on-disk";
+  let s : &str = "hiddenFolder/no-unhide-on-disk";
   let buf : String = render ("roHidden-owner", config) . await ?;
   let a_line : String =
     line_containing (&buf, "(id roHidden-a)") . to_string ();
@@ -643,13 +643,13 @@ async fn hiddenCol_delete_does_not_unhide (
       MSV::Unspecified => Vec::new (), };
     if ! hides . is_empty () && ! hides . contains (&ID::from ("roHidden-a")) {
       fails . record (s, format! (
-        "deleting from hiddenCol unhid roHidden-a: hides = {:?}", hides)); } }
+        "deleting from hiddenFolder unhid roHidden-a: hides = {:?}", hides)); } }
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
 // Omission under a restricted source-set: an inactive-source member
 // beside an active one is omitted from the render (no placeholder);
-// for the writable col, the save weaves the omitted member back.
+// for the writable folder, the save weaves the omitted member back.
 //////////////////////////////////////////////////////////////
 
 async fn omission_scenarios (
@@ -658,17 +658,17 @@ async fn omission_scenarios (
 ) -> Result<(), Box<dyn Error>> {
   let active : ActiveSourceSet =
     ActiveSourceSet::named (config, SourceSetName::from ("public")) ?;
-  { // read-only subscriberCol: inactive omitted, active shown
-    let s : &str = "subscriberCol/omission";
+  { // read-only subscriberFolder: inactive omitted, active shown
+    let s : &str = "subscriberFolder/omission";
     let (buf, _p, _t) : (String, Vec<ID>, Tree<ViewNode>) =
       multi_root_view_with_source_set (
         config, None, &[ID::from ("omSub-owner")],
         false, &active ) ?;
     fails . want_contains (s, &buf, "(id omSub-active)");
     fails . want_absent (s, &buf, "omSub-inactive"); }
-  { // writable subscribeeCol: inactive omitted from render, but the
+  { // writable subscribeeFolder: inactive omitted from render, but the
     // restricted save weaves it back into subscribes_to.
-    let s : &str = "subscribeeCol/omission";
+    let s : &str = "subscribeeFolder/omission";
     let (buf, _p, _t) : (String, Vec<ID>, Tree<ViewNode>) =
       multi_root_view_with_source_set (
         config, None, &[ID::from ("omWsub-owner")],
@@ -704,7 +704,7 @@ async fn omission_scenarios (
 // Function 2 (its own database, since it must observe a REJECTED
 // save): the buffer-level half of "two user-owned overriders rejected
 // at save". A save adds a second user-owned overrider for an
-// already-overridden target via an overriddenCol; the save is
+// already-overridden target via an overriddenFolder; the save is
 // rejected with the monogamy error and disk is unchanged.
 //
 // The override-invariant check reads the save's own graph handle, and
@@ -715,9 +715,9 @@ async fn omission_scenarios (
 fn buffer_save_rejects_second_user_owned_overrider
   () -> Result<(), Box<dyn Error>> {
   run_with_source_set_test_db (
-    "skg-test-partner-col-matrix-monogamy",
-    "tests/partner_col_matrix/fixtures-monogamy/skgconfig.toml",
-    "/tmp/tantivy-test-partner-col-matrix-monogamy",
+    "skg-test-partner-folder-matrix-monogamy",
+    "tests/partner_folder_matrix/fixtures-monogamy/skgconfig.toml",
+    "/tmp/tantivy-test-partner-folder-matrix-monogamy",
     |config, tantivy| Box::pin ( async move {
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
@@ -725,7 +725,7 @@ fn buffer_save_rejects_second_user_owned_overrider
       // makes mono-r2 override it too.
       let buffer : &str = indoc! {"
         * (skg (node (id mono-r2) (source public))) mono-r2
-        ** (skg overriddenCol)
+        ** (skg overriddenFolder)
         *** (skg (node (id mono-target) (source public) indef)) mono-target
       "};
       let result : Result<SaveResponse, Box<dyn Error>> =

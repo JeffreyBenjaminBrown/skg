@@ -35,7 +35,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_parent_na, validate_affectsParent_relationships, mark_orphans_under_dead_parents_false};
 use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
 use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind};
-use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual, ViewRequest};
+use crate::types::viewnode::{Vognode, Phantom, QualFolder, Qual, ViewRequest};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 
 use ego_tree::{Tree, NodeId, NodeMut};
@@ -218,8 +218,8 @@ pub fn update_views_after_save (
         Some (&mut repair_warnings),
         false ) } ?;
   context . warnings . extend (
-    // Repairs the completion pass made to read-only PartnerCols in
-    // the saved view, batched per (col, owner).
+    // Repairs the completion pass made to read-only PartnerFolders in
+    // the saved view, batched per (folder, owner).
     render_completion_warnings (&repair_warnings) );
   let mut collateral_views : Vec<RenderedCollateralView> = Vec::new ();
   for curi in &collateral_uris {
@@ -372,15 +372,15 @@ pub(crate) fn find_collateral_view_uris (
 /// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): build a DE-NOVO (initial) content view by running the ONE
 /// post-save view completion (complete_viewforest) over a stub forest of the
 /// requested roots. View completion
-/// creates each fresh node's PartnerCols (create_partnerCols_for_fresh_nodes
-/// = true), expands content, reconciles cols, and applies the TODO/DONE/local-view-update/plan_v2.org §5.5 node budget.
+/// creates each fresh node's PartnerFolders (create_partnerFolders_for_fresh_nodes
+/// = true), expands content, reconciles folders, and applies the TODO/DONE/local-view-update/plan_v2.org §5.5 node budget.
 /// When diff_mode, the git diff is computed inline by view completion (per node,
 /// at its BFS visit, via process_activeNode_diff) -- the same path post-save uses.
 /// The caller (multi_root_view_via_env) then adds containerward ancestry and
 /// stats.
 /// Returns the completed viewforest plus any warning strings the
 /// render itself produced -- today only compound-override-chain
-/// notices. (Col-repair warnings stay silent for de novo renders;
+/// notices. (Folder-repair warnings stay silent for de novo renders;
 /// see the warning-sink filtering at the bottom.)
 pub fn render_initial_view (
   runtime   : &RuntimeGeneration,
@@ -414,8 +414,8 @@ pub fn render_initial_view (
   let mut errors : Vec<String> = Vec::new ();
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): de-novo diff is computed INLINE by view completion, exactly
   // like post-save -- compute the real diffs here and feed them via source_diffs
-  // (which drives the inline process_activeNode_diff and the diff-aware QualCol /
-  // PartnerCol reconcilers).
+  // (which drives the inline process_activeNode_diff and the diff-aware QualFolder /
+  // PartnerFolder reconcilers).
   let real_diffs : Option<HashMap<SourceName, SourceDiff>> =
     if diff_mode { Some ( compute_diff_for_every_source (&runtime . config) ) }
     else         { None };
@@ -435,7 +435,7 @@ pub fn render_initial_view (
     deleted_by_this_save_extra_ids : &HashMap::new (),
     active_source_set              : active,
     node_budget                    : runtime . config . initial_node_limit,
-    create_partnerCols_for_fresh_nodes : true,
+    create_partnerFolders_for_fresh_nodes : true,
     diff_tantivy_index : if diff_mode { Some (&runtime . tantivy_index) }
                          else         { None },
     warning_sink : Some (&mut sink), };
@@ -452,7 +452,7 @@ pub fn rerender_view (
   viewforest    : &mut ViewForest,
   context       : &mut RerenderAfterSaveContext<'_>,
   warning_sink  : Option<&mut Vec<CompletionWarning>>, // Some only for the view the user just saved.
-  create_partnerCols : bool, // false post-save (cols round-trip from the buffer); true for the source-switch rerender, where pruning removed them and the new set decides which return.
+  create_partnerFolders : bool, // false post-save (folders round-trip from the buffer); true for the source-switch rerender, where pruning removed them and the new set decides which return.
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
   { tracing::debug!("rerender_view: starting");
@@ -462,8 +462,8 @@ pub fn rerender_view (
     let mut completion_context : CompletionContext = CompletionContext {
       defmap                         : &mut defmap,
       // The real per-source diffs drive ALL diff inline: process_activeNode_diff
-      // (content axes + phantom flip + TextChanged/IDCol/AliasCol) and the
-      // diff-aware QualCol / PartnerCol reconcilers, each at its own BFS visit
+      // (content axes + phantom flip + TextChanged/IDFolder/AliasFolder) and the
+      // diff-aware QualFolder / PartnerFolder reconcilers, each at its own BFS visit
       // (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3). The content reconcile itself stays worktree-only.
       source_diffs                   : &context . source_diffs,
       runtime                        : &context . runtime,
@@ -474,12 +474,12 @@ pub fn rerender_view (
       deleted_by_this_save_extra_ids : &context . deleted_by_this_save_extra_ids,
       active_source_set              : context . active_source_set,
       node_budget                    : context . runtime . config . initial_node_limit,
-      // Post-save (and rerender-all) reuse the saved buffer's PartnerCols and
+      // Post-save (and rerender-all) reuse the saved buffer's PartnerFolders and
       // pass false: re-creating them would change the buffer and break the save
       // round-trip (TODO/DONE/local-view-update/plan_v2.org §18). The
-      // source-switch rerender passes true: its prune removed the cols, and the
+      // source-switch rerender passes true: its prune removed the folders, and the
       // new set decides which return.
-      create_partnerCols_for_fresh_nodes : create_partnerCols,
+      create_partnerFolders_for_fresh_nodes : create_partnerFolders,
       // Post-save: phantom sources resolve via the deleted-id map + disk scan
       // (the de-novo path passes the tantivy index instead).
       diff_tantivy_index : None,
@@ -686,13 +686,13 @@ fn remove_branches_that_git_marked_removed (
   Ok (( )) }
 
 /// Remove scaffolds that exist only to display diff information:
-/// TextChanged and IDCol.
+/// TextChanged and IDFolder.
 /// These are regenerated from scratch by 'process_activeNode_diff' (the inline
 /// per-node diff) at each node's BFS visit, so stale ones must be stripped first.
-/// AliasCol is NOT removed: it may have been requested by the user
+/// AliasFolder is NOT removed: it may have been requested by the user
 /// (not just injected by diff mode), and tracking which case applies
 /// is not worth the complexity. Phantom Alias children (injected by
-/// diff mode) are cleaned up by reconcile_alias_col_children during the postorder
+/// diff mode) are cleaned up by reconcile_aliasFolder_children during the postorder
 /// pass: its goal list won't include them, so they are detached.
 fn remove_diff_only_scaffolds (
   viewforest : &mut ViewForest
@@ -706,7 +706,7 @@ fn remove_diff_only_scaffolds (
       let is_diff_scaffold : bool =
         matches! ( &node . value() . kind,
           ViewNodeKind::Qual (Qual::TextChanged { .. }) |
-          ViewNodeKind::QualCol (QualCol::ID) );
+          ViewNodeKind::QualFolder (QualFolder::ID) );
       if is_diff_scaffold {
         node . detach();
         Ok (false) // pruned — don't recurse into detached children
@@ -714,7 +714,7 @@ fn remove_diff_only_scaffolds (
   Ok (( )) }
 
 /// Clear diff metadata from all ActiveNodes in the viewforest.
-/// Diff-only scaffolds (TextChanged, IDCol) are
+/// Diff-only scaffolds (TextChanged, IDFolder) are
 /// removed by 'remove_diff_only_scaffolds' before this runs.
 fn clear_diff_metadata (
   viewforest : &mut ViewForest

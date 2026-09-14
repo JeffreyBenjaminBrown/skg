@@ -1,9 +1,9 @@
 // cargo nextest run --test grouped_views -E 'test(hidden_from_subscriptions::)'
 //
-// Tests for HiddenOutsideOfSubscribeeCol, HiddenInSubscribeeCol, and HiddenFromSubscribees.
+// Tests for HiddenOutsideOfSubscribeeFolder, HiddenInSubscribeeFolder, and HiddenFromSubscribees.
 // These test that:
-// 1. Initial view shows subscribees as indef with HiddenOutsideOfSubscribeeCol
-// 2. After saving with definitive view requests, HiddenInSubscribeeCol is shown
+// 1. Initial view shows subscribees as indef with HiddenOutsideOfSubscribeeFolder
+// 2. After saving with definitive view requests, HiddenInSubscribeeFolder is shown
 
 use indoc::indoc;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
@@ -52,7 +52,7 @@ fn mk_test_tcp_stream_pair ()
 
 /// Add (viewRequests definitiveView) to all subscribee nodes in org text.
 /// Modifies the node section of each subscribee to request a definitive view.
-/// Subscribees are ActiveNode children of SubscribeeCol scaffolds.
+/// Subscribees are ActiveNode children of SubscribeeFolder scaffolds.
 ///
 /// KLUDGE: We identify subscribees by matching on "subscribee-" in the title.
 /// That's easier than navigating the org-tree's topoogy.
@@ -167,14 +167,14 @@ fn expanded_subscribee_edit_view (
       without_e1 ),
     _ => panic! ("unknown edit kind: {}", edit_kind), }}
 
-fn assert_hides_e1_in_subscribee_col (
+fn assert_hides_e1_in_subscribee_folder (
   buffer : &str,
 ) {
   assert! (
-    // 'folded': a new hidden col begins folded (TODO/fork-fixes.org),
+    // 'folded': a new hidden folder begins folded (TODO/fork-fixes.org),
     // expressed as a fold marker on each member.
-    buffer . contains ("**** (skg hiddenInSubscribeeCol)\n***** (skg folded (node (id e1) (source foreign) indef"),
-    "Expected e1 to be rendered folded under HiddenInSubscribeeCol:\n{}",
+    buffer . contains ("**** (skg hiddenInSubscribeeFolder)\n***** (skg folded (node (id e1) (source foreign) indef"),
+    "Expected e1 to be rendered folded under HiddenInSubscribeeFolder:\n{}",
     buffer );
   assert! (
     ! buffer . lines() . any ( |line|
@@ -186,23 +186,23 @@ fn assert_does_not_hide_e1 (
   buffer : &str,
 ) {
   assert! (
-    ! buffer . contains ("hiddenInSubscribeeCol"),
-    "Expected no HiddenInSubscribeeCol for e1:\n{}",
+    ! buffer . contains ("hiddenInSubscribeeFolder"),
+    "Expected no HiddenInSubscribeeFolder for e1:\n{}",
     buffer ); }
 
-fn move_h_from_hiddenin_col_to_visible_subscribee_content (
+fn move_h_from_hiddenin_folder_to_visible_subscribee_content (
   buffer : &str,
 ) -> String {
   buffer
     . lines()
     . filter_map ( |line| {
-      if line . contains ("(skg hiddenInSubscribeeCol)") {
+      if line . contains ("(skg hiddenInSubscribeeFolder)") {
         None
       } else if line . contains ("(id H)") {
         Some (line . replacen ("***** ", "**** ", 1)
               // A real client manages fold markers itself (they are
               // re-derived from visibility at save), so the moved
-              // line would not carry the col's 'folded' mark.
+              // line would not carry the folder's 'folded' mark.
               . replacen ("(skg folded ", "(skg ", 1))
       } else {
         Some (line . to_string()) }})
@@ -215,17 +215,17 @@ fn remove_hiddenin_branch (
   buffer
     . lines()
     . filter ( |line|
-      ! line . contains ("(skg hiddenInSubscribeeCol)")
+      ! line . contains ("(skg hiddenInSubscribeeFolder)")
       && ! line . contains ("(id H)") )
     . collect::<Vec<_>>()
     . join ("\n") + "\n" }
 
-fn add_e11_to_hiddenoutside_col (
+fn add_e11_to_hiddenoutside_folder (
   buffer : &str,
 ) -> String {
   insert_after_line_containing (
     buffer,
-    "(skg hiddenOutsideOfSubscribeeCol)",
+    "(skg hiddenOutsideOfSubscribeeFolder)",
     "**** (skg (node (id E11) (source main) indef)) E11" ) }
 
 fn assert_e1_removed_from_visible_subscribee_branch (
@@ -335,9 +335,9 @@ fn all_tests
         "tests/hidden_from_subscriptions/fixtures-subscribee-edit") ?;
       test_extra_view_child_under_owned_subscribee_is_deleted (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset_from_config ("test_subscribee_and_filter_cols",
-        "tests/hidden_from_subscriptions/fixtures-every-kind-of-col/skgconfig.toml") ?;
-      test_subscribee_and_filter_cols (
+      s . reset_from_config ("test_subscribee_and_filter_folders",
+        "tests/hidden_from_subscriptions/fixtures-every-kind-of-folder/skgconfig.toml") ?;
+      test_subscribee_and_filter_folders (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_hidden_within_but_none_without",
         "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without/skgconfig.toml") ?;
@@ -351,17 +351,17 @@ fn all_tests
         "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without") ?;
       test_collateral_view_reflects_newly_unhidden_subscribee_content (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_deleting_from_hiddenin_col_does_not_unhide",
+      s . reset ("test_deleting_from_hiddenin_folder_does_not_unhide",
         "tests/hidden_from_subscriptions/fixtures-hidden-within-but-none-without") ?;
-      test_deleting_from_hiddenin_col_does_not_unhide (
+      test_deleting_from_hiddenin_folder_does_not_unhide (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_hidden_without_but_none_within",
         "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within/skgconfig.toml") ?;
       test_hidden_without_but_none_within (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_adding_to_hiddenoutside_col_hides_and_moves_inside",
+      s . reset ("test_adding_to_hiddenoutside_folder_hides_and_moves_inside",
         "tests/hidden_from_subscriptions/fixtures-hidden-without-but-none-within") ?;
-      test_adding_to_hiddenoutside_col_hides_and_moves_inside (
+      test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_from_config ("test_overlapping_hidden_within",
         "tests/hidden_from_subscriptions/fixtures-overlapping-hidden-within/skgconfig.toml") ?;
@@ -431,7 +431,7 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
       &Err (String::new ()), &mut views_state ) . await ?;
     let rerendered : String = response . saved_view;
 
-    assert_hides_e1_in_subscribee_col (&rerendered);
+    assert_hides_e1_in_subscribee_folder (&rerendered);
     let r_skg : NodeComplete =
       node_from_disk (&config, "r")?;
     assert_eq!(
@@ -561,7 +561,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       collateral_views . len(), 1,
       "Expected one collateral view:\n{:?}",
       collateral_views);
-    // e1 was hidden, so it appears under the HiddenInSubscribeeCol. But e1's
+    // e1 was hidden, so it appears under the HiddenInSubscribeeFolder. But e1's
     // in-view subtree (e11) is a user branch, so §6.0 DEMOTES the visible
     // occurrence to affectsParent=false rather than deleting it -- chaos-
     // monkey safety: the user may have deliberately placed content there, and
@@ -570,8 +570,8 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
     let collateral : &str = &collateral_views[0];
     assert! (
       collateral . contains (
-        "**** (skg hiddenInSubscribeeCol)\n***** (skg folded (node (id e1) (source foreign) indef"),
-      "Expected e1 under HiddenInSubscribeeCol:\n{}", collateral );
+        "**** (skg hiddenInSubscribeeFolder)\n***** (skg folded (node (id e1) (source foreign) indef"),
+      "Expected e1 under HiddenInSubscribeeFolder:\n{}", collateral );
     assert! (
       collateral . lines() . any ( |line|
         line . starts_with ("**** (skg (node (id e1)")
@@ -652,7 +652,7 @@ async fn test_moving_foreign_subscribee_content_elsewhere_still_hides (
         &edited, &config, tantivy, &graph, &mut views_state
       ) . await?;
 
-    assert_hides_e1_in_subscribee_col (&rerendered);
+    assert_hides_e1_in_subscribee_folder (&rerendered);
     assert! (
       rerendered . contains (
         "** (skg (node (id e1) (source foreign) indef" ),
@@ -725,7 +725,7 @@ async fn test_extra_view_child_under_owned_subscribee_is_deleted (
     let edited : String =
       indoc! {"
               * (skg (node (id a) (source owned))) a
-              ** (skg subscribeeCol)
+              ** (skg subscribeeFolder)
               *** (skg (node (id r) (source owned))) r
               **** (skg (node (id r2) (source owned) indef)) r2
               **** (skg (node (id e) (source foreign) indef)) subscribee-e
@@ -745,7 +745,7 @@ async fn test_extra_view_child_under_owned_subscribee_is_deleted (
       rerendered );
     assert_line_order (&rerendered, "(id r1)", "(id r2)");
     assert!(
-      ! rerendered . contains ("hiddenInSubscribeeCol"),
+      ! rerendered . contains ("hiddenInSubscribeeFolder"),
       "Extra view-child should not infer a hide:\n{}",
       rerendered );
     let r_skg : NodeComplete =
@@ -757,7 +757,7 @@ async fn test_extra_view_child_under_owned_subscribee_is_deleted (
 
     Ok (( )) }
 
-/// Every kind of Col:
+/// Every kind of Folder:
 /// - R subscribes to E1, E2
 /// - R hides hidden-in-E1, hidden-in-E2, hidden-for-no-reason
 /// - E1 contains hidden-in-E1 (hidden) and E11 (not hidden)
@@ -768,9 +768,9 @@ async fn test_extra_view_child_under_owned_subscribee_is_deleted (
 /// - Initial view from R: subscribees are indef (bare leaves)
 /// - View from R with definitive views expanded at each subscribee
 ///
-/// Also tests ordering rule: HiddenInSubscribeeCol precedes content regardless of .skg order.
-/// E2's .skg has [E21, hidden-in-E2] but view shows HiddenInSubscribeeCol before E21.
-async fn test_subscribee_and_filter_cols (
+/// Also tests ordering rule: HiddenInSubscribeeFolder precedes content regardless of .skg order.
+/// E2's .skg has [E21, hidden-in-E2] but view shows HiddenInSubscribeeFolder before E21.
+async fn test_subscribee_and_filter_folders (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -785,19 +785,19 @@ async fn test_subscribee_and_filter_cols (
 
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 3))))) R
-       ** (skg hiddenCol)
+       ** (skg hiddenFolder)
        *** (skg (node (id hidden-in-E1) (source main) indef (rels (contains (in 1)) (hides (in 1 (ancestors 2))) (birth hides)))) hidden-in-E1
        *** (skg (node (id hidden-in-E2) (source main) indef (rels (contains (in 1)) (hides (in 1 (ancestors 2))) (birth hides)))) hidden-in-E2
        *** (skg (node (id hidden-for-no-reason) (source main) indef (rels (hides (in 1 (ancestors 2))) (birth hides)))) hidden-for-no-reason
-       ** (skg subscribeeCol)
+       ** (skg subscribeeFolder)
        *** (skg (node (id E1) (source main) indef (rels (contains (out 2)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
        *** (skg (node (id E2) (source main) indef (rels (contains (out 2)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
-       *** (skg hiddenOutsideOfSubscribeeCol)
+       *** (skg hiddenOutsideOfSubscribeeFolder)
        **** (skg folded (node (id hidden-for-no-reason) (source main) indef (rels (hides (in 1 (ancestors 3))) (birth hides)))) hidden-for-no-reason
        ** (skg (node (id R1) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) R1
        "};
     assert_metadata_eq!(initial_view, expected_initial,
-      "Initial view from R: indef subscribees are bare leaves; only HiddenOutsideOfSubscribeeCol shown");
+      "Initial view from R: indef subscribees are bare leaves; only HiddenOutsideOfSubscribeeFolder shown");
 
     let expanded = { // Request definitive views, then save
       let modified_view : String =
@@ -821,25 +821,25 @@ async fn test_subscribee_and_filter_cols (
 
     let expected_expanded = indoc! {
       "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 3))))) R
-       ** (skg hiddenCol)
+       ** (skg hiddenFolder)
        *** (skg (node (id hidden-in-E1) (source main) indef (rels (contains (in 1)) (hides (in 1 (ancestors 2))) (birth hides)))) hidden-in-E1
        *** (skg (node (id hidden-in-E2) (source main) indef (rels (contains (in 1)) (hides (in 1 (ancestors 2))) (birth hides)))) hidden-in-E2
        *** (skg (node (id hidden-for-no-reason) (source main) indef (rels (hides (in 1 (ancestors 2))) (birth hides)))) hidden-for-no-reason
-       ** (skg subscribeeCol)
+       ** (skg subscribeeFolder)
        *** (skg (node (id E1) (source main) (rels (contains (out 2)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
-       **** (skg hiddenInSubscribeeCol)
+       **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded (node (id hidden-in-E1) (source main) indef (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4))) (birth contains hides)))) hidden-in-E1
        **** (skg (node (id E11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) E11
        *** (skg (node (id E2) (source main) (rels (contains (out 2)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
-       **** (skg hiddenInSubscribeeCol)
+       **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded (node (id hidden-in-E2) (source main) indef (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4))) (birth contains hides)))) hidden-in-E2
        **** (skg (node (id E21) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) E21
-       *** (skg hiddenOutsideOfSubscribeeCol)
+       *** (skg hiddenOutsideOfSubscribeeFolder)
        **** (skg folded (node (id hidden-for-no-reason) (source main) indef (rels (hides (in 1 (ancestors 3))) (birth hides)))) hidden-for-no-reason
        ** (skg (node (id R1) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) R1
        "};
     assert_metadata_eq!(expanded, expected_expanded,
-      "View with expanded subscribees: HiddenInSubscribeeCol shown before content; HiddenOutsideOfSubscribeeCol at end");
+      "View with expanded subscribees: HiddenInSubscribeeFolder shown before content; HiddenOutsideOfSubscribeeFolder at end");
 
     Ok (( )) }
 
@@ -850,9 +850,9 @@ async fn test_subscribee_and_filter_cols (
 ///
 /// Tests two views:
 /// - Initial view from R: E1 is indef (bare leaf), H doesn't appear
-/// - View from R with definitive views expanded at each subscribee: H appears in HiddenInSubscribeeCol before E11 and E12
+/// - View from R with definitive views expanded at each subscribee: H appears in HiddenInSubscribeeFolder before E11 and E12
 ///
-/// No HiddenOutsideOfSubscribeeCol in either state (H is in E1's content).
+/// No HiddenOutsideOfSubscribeeFolder in either state (H is in E1's content).
 async fn test_hidden_within_but_none_without (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -866,9 +866,9 @@ async fn test_hidden_within_but_none_without (
 
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 1)) (hides (out 1))))) R
-       ** (skg hiddenCol)
+       ** (skg hiddenFolder)
        *** (skg (node (id H) (source main) indef (rels (contains (in 1)) (hides (in 1 (ancestors 2))) (birth hides)))) H
-       ** (skg subscribeeCol)
+       ** (skg subscribeeFolder)
        *** (skg (node (id E1) (source main) indef (rels (contains (out 3)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
        ** (skg (node (id R1) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) R1
        "};
@@ -895,22 +895,22 @@ async fn test_hidden_within_but_none_without (
       response . saved_view };
     println!("View from R after save with definitive view requests:\n{}", expanded);
 
-    // HiddenInSubscribeeCol precedes content regardless of .skg order.
-    // E1.skg has [E11, H, E12] but view shows HiddenInSubscribeeCol (with H) before E11 and E12.
+    // HiddenInSubscribeeFolder precedes content regardless of .skg order.
+    // E1.skg has [E11, H, E12] but view shows HiddenInSubscribeeFolder (with H) before E11 and E12.
     let expected_expanded = indoc! {
       "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 1)) (hides (out 1))))) R
-       ** (skg hiddenCol)
+       ** (skg hiddenFolder)
        *** (skg (node (id H) (source main) indef (rels (contains (in 1)) (hides (in 1 (ancestors 2))) (birth hides)))) H
-       ** (skg subscribeeCol)
+       ** (skg subscribeeFolder)
        *** (skg (node (id E1) (source main) (rels (contains (out 3)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
-       **** (skg hiddenInSubscribeeCol)
+       **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded (node (id H) (source main) indef (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4))) (birth contains hides)))) H
        **** (skg (node (id E11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) E11
        **** (skg (node (id E12) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) E12
        ** (skg (node (id R1) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) R1
        "};
     assert_metadata_eq!(expanded, expected_expanded,
-      "View with expanded subscribees: HiddenInSubscribeeCol with H before E11 and E12");
+      "View with expanded subscribees: HiddenInSubscribeeFolder with H before E11 and E12");
 
     Ok (( )) }
 
@@ -937,7 +937,7 @@ async fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
         &config, tantivy, &graph, &mut views_state
       ) . await?;
     let edited : String =
-      move_h_from_hiddenin_col_to_visible_subscribee_content (
+      move_h_from_hiddenin_folder_to_visible_subscribee_content (
         &expanded );
     let rerendered : String =
       save_buffer_for_hidden_subscriptions_test (
@@ -945,8 +945,8 @@ async fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
       ) . await?;
 
     assert! (
-      ! rerendered . contains ("hiddenInSubscribeeCol"),
-      "Expected no HiddenInSubscribeeCol after unhiding H:\n{}",
+      ! rerendered . contains ("hiddenInSubscribeeFolder"),
+      "Expected no HiddenInSubscribeeFolder after unhiding H:\n{}",
       rerendered );
     assert! (
       rerendered . lines() . any ( |line|
@@ -1009,7 +1009,7 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
       &graph . load_full (), collateral_uri, expanded_viewforest, &expanded_pids);
 
     let edited : String =
-      move_h_from_hiddenin_col_to_visible_subscribee_content (
+      move_h_from_hiddenin_folder_to_visible_subscribee_content (
         &expanded );
     let (_saved_view, collateral_views) =
       save_buffer_and_read_collateral_views (
@@ -1021,8 +1021,8 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
       "Expected one collateral view:\n{:?}",
       collateral_views);
     assert!(
-      ! collateral_views[0] . contains ("hiddenInSubscribeeCol"),
-      "Expected collateral view to remove HiddenInSubscribeeCol:\n{}",
+      ! collateral_views[0] . contains ("hiddenInSubscribeeFolder"),
+      "Expected collateral view to remove HiddenInSubscribeeFolder:\n{}",
       collateral_views[0]);
     assert! (
       collateral_views[0] . lines() . any ( |line|
@@ -1032,7 +1032,7 @@ async fn test_collateral_view_reflects_newly_unhidden_subscribee_content (
 
     Ok (( )) }
 
-async fn test_deleting_from_hiddenin_col_does_not_unhide (
+async fn test_deleting_from_hiddenin_folder_does_not_unhide (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -1063,13 +1063,13 @@ async fn test_deleting_from_hiddenin_col_does_not_unhide (
 
     assert! (
       rerendered . contains (
-        "**** (skg hiddenInSubscribeeCol)\n***** (skg folded (node (id H)"),
-      "Expected H to be regenerated under HiddenInSubscribeeCol:\n{}",
+        "**** (skg hiddenInSubscribeeFolder)\n***** (skg folded (node (id H)"),
+      "Expected H to be regenerated under HiddenInSubscribeeFolder:\n{}",
       rerendered );
     assert! (
       ! rerendered . lines() . any ( |line|
         line . starts_with ("**** (skg (node (id H)") ),
-      "Expected deleting from HiddenInSubscribeeCol not to unhide H:\n{}",
+      "Expected deleting from HiddenInSubscribeeFolder not to unhide H:\n{}",
       rerendered );
 
     Ok (( )) }
@@ -1082,10 +1082,10 @@ async fn test_deleting_from_hiddenin_col_does_not_unhide (
 /// - E2 has no content
 ///
 /// Tests two views:
-/// - Initial view from R: E1, E2 are indef (bare leaves), H in HiddenOutsideOfSubscribeeCol
-/// - View from R with definitive views expanded at each subscribee: E1 shows E11, E12 (E12 indef); E2 expanded but empty; H still in HiddenOutsideOfSubscribeeCol
+/// - Initial view from R: E1, E2 are indef (bare leaves), H in HiddenOutsideOfSubscribeeFolder
+/// - View from R with definitive views expanded at each subscribee: E1 shows E11, E12 (E12 indef); E2 expanded but empty; H still in HiddenOutsideOfSubscribeeFolder
 ///
-/// No HiddenInSubscribeeCol in either state (H is not in any subscribee's content).
+/// No HiddenInSubscribeeFolder in either state (H is not in any subscribee's content).
 async fn test_hidden_without_but_none_within (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -1098,17 +1098,17 @@ async fn test_hidden_without_but_none_within (
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
-       ** (skg hiddenCol)
+       ** (skg hiddenFolder)
        *** (skg (node (id H) (source main) indef (rels (hides (in 1 (ancestors 2))) (birth hides)))) H
-       ** (skg subscribeeCol)
+       ** (skg subscribeeFolder)
        *** (skg (node (id E1) (source main) indef (rels (contains (out 2)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
        *** (skg (node (id E2) (source main) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
-       *** (skg hiddenOutsideOfSubscribeeCol)
+       *** (skg hiddenOutsideOfSubscribeeFolder)
        **** (skg folded (node (id H) (source main) indef (rels (hides (in 1 (ancestors 3))) (birth hides)))) H
        ** (skg (node (id R1) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) R1
        "};
     assert_metadata_eq!(initial_view, expected_initial,
-      "Initial view from R: H in HiddenOutsideOfSubscribeeCol; E1 and E2 are indef bare leaves");
+      "Initial view from R: H in HiddenOutsideOfSubscribeeFolder; E1 and E2 are indef bare leaves");
     let with_subscribees_expanded = {
       let modified_view : String =
         add_definitive_view_request_to_subscribees (&initial_view);
@@ -1130,24 +1130,24 @@ async fn test_hidden_without_but_none_within (
              with_subscribees_expanded);
     let expected_expanded = indoc! {
       "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
-       ** (skg hiddenCol)
+       ** (skg hiddenFolder)
        *** (skg (node (id H) (source main) indef (rels (hides (in 1 (ancestors 2))) (birth hides)))) H
-       ** (skg subscribeeCol)
+       ** (skg subscribeeFolder)
        *** (skg (node (id E1) (source main) (rels (contains (out 2)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
        **** (skg (node (id E11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) E11
        **** (skg (node (id E12) (source main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) E12
        ***** (skg (node (id E121) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) E121
        *** (skg (node (id E2) (source main) (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
-       *** (skg hiddenOutsideOfSubscribeeCol)
+       *** (skg hiddenOutsideOfSubscribeeFolder)
        **** (skg folded (node (id H) (source main) indef (rels (hides (in 1 (ancestors 3))) (birth hides)))) H
        ** (skg (node (id R1) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) R1
        "};
     assert_metadata_eq!(with_subscribees_expanded, expected_expanded,
-      "View with expanded subscribees: H still in HiddenOutsideOfSubscribeeCol (at end); E1 expanded with E11, E12; E2 expanded but empty");
+      "View with expanded subscribees: H still in HiddenOutsideOfSubscribeeFolder (at end); E1 expanded with E11, E12; E2 expanded but empty");
 
     Ok (( )) }
 
-async fn test_adding_to_hiddenoutside_col_hides_and_moves_inside (
+async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -1165,7 +1165,7 @@ async fn test_adding_to_hiddenoutside_col_hides_and_moves_inside (
           &ID ("R" . to_string()),
           false )?;
     let edited : String =
-      add_e11_to_hiddenoutside_col (&initial_view);
+      add_e11_to_hiddenoutside_folder (&initial_view);
     let mut stream : TcpStream = mk_test_tcp_stream ();
     let response = update_from_and_rerender_buffer (
       &mut stream, &edited, config, tantivy, &graph, false,
@@ -1186,11 +1186,11 @@ async fn test_adding_to_hiddenoutside_col_hides_and_moves_inside (
     assert! (
       members_of (subscriber . hides_from_its_subscriptions . or_default ())
         . contains (&ID::from ("E11")),
-      "Expected adding E11 to HiddenOutsideOfSubscribeeCol to save a hide." );
+      "Expected adding E11 to HiddenOutsideOfSubscribeeFolder to save a hide." );
     assert! (
       response . warnings . iter () . any ( |warning|
         warning . contains ("Saved hide for")
-        && warning . contains ("HiddenInSubscribeeCol") ),
+        && warning . contains ("HiddenInSubscribeeFolder") ),
       "Expected the post-commit moved-inside warning: {:?}",
       response . warnings );
     let without_h : String = rerendered . lines ()
@@ -1204,7 +1204,7 @@ async fn test_adding_to_hiddenoutside_col_hides_and_moves_inside (
       ! members_of (
           subscriber_after_removal . hides_from_its_subscriptions . or_default ())
         . contains (&ID::from ("H")),
-      "Removing H from HiddenOutsideOfSubscribeeCol must remove its hide." );
+      "Removing H from HiddenOutsideOfSubscribeeFolder must remove its hide." );
 
     Ok (( )) }
 
@@ -1215,9 +1215,9 @@ async fn test_adding_to_hiddenoutside_col_hides_and_moves_inside (
 ///
 /// Tests two views:
 /// - Initial view from R: E1, E2 are indef (bare leaves), H doesn't appear
-/// - View from R with definitive views expanded at each subscribee: H appears in HiddenInSubscribeeCol under BOTH E1 and E2
+/// - View from R with definitive views expanded at each subscribee: H appears in HiddenInSubscribeeFolder under BOTH E1 and E2
 ///
-/// No HiddenOutsideOfSubscribeeCol in either state (H is in subscribees' content).
+/// No HiddenOutsideOfSubscribeeFolder in either state (H is in subscribees' content).
 async fn test_overlapping_hidden_within (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -1230,9 +1230,9 @@ async fn test_overlapping_hidden_within (
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
-       ** (skg hiddenCol)
+       ** (skg hiddenFolder)
        *** (skg (node (id H) (source main) indef (rels (contains (in 2)) (hides (in 1 (ancestors 2))) (birth hides)))) H
-       ** (skg subscribeeCol)
+       ** (skg subscribeeFolder)
        *** (skg (node (id E1) (source main) indef (rels (contains (out 1)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
        *** (skg (node (id E2) (source main) indef (rels (contains (out 1)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
        ** (skg (node (id R1) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) R1
@@ -1260,17 +1260,17 @@ async fn test_overlapping_hidden_within (
     println!("View from R after save with definitive view requests:\n{}", expanded);
     let expected_expanded = indoc! {
       "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
-       ** (skg hiddenCol)
+       ** (skg hiddenFolder)
        *** (skg (node (id H) (source main) indef (rels (contains (in 2)) (hides (in 1 (ancestors 2))) (birth hides)))) H
-       ** (skg subscribeeCol)
+       ** (skg subscribeeFolder)
        *** (skg (node (id E1) (source main) (rels (contains (out 1)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
-       **** (skg hiddenInSubscribeeCol)
+       **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded (node (id H) (source main) indef (rels (contains (in 2 (ancestors 2))) (hides (in 1 (ancestors 4))) (birth contains hides)))) H
        *** (skg (node (id E2) (source main) (rels (contains (out 1)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
-       **** (skg hiddenInSubscribeeCol)
+       **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded (node (id H) (source main) indef (rels (contains (in 2 (ancestors 2))) (hides (in 1 (ancestors 4))) (birth contains hides)))) H
        ** (skg (node (id R1) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) R1
        "};
     assert_metadata_eq!(expanded, expected_expanded,
-      "View with expanded subscribees: H appears in HiddenInSubscribeeCol under both E1 and E2");
+      "View with expanded subscribees: H appears in HiddenInSubscribeeFolder under both E1 and E2");
     Ok (( )) }

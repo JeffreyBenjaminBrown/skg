@@ -57,14 +57,14 @@ M.commands = {
   GotoInGitParentAndCloseThis = { module = 'skg.goto_git',
                                   fn = 'goto_in_git_parent_and_close_this',
                                   desc = 'Goto in git parent, closing this buffer' },
-  ShowCollectionAliases = { module = 'skg.view_requests', fn = 'show_collection_aliases',
-                            desc = 'Request the alias collection (auto-saves)' },
-  ShowCollectionOverrides = { module = 'skg.view_requests', fn = 'show_collection_overrides',
-                              desc = 'Request the override collections (auto-saves)' },
-  ShowCollectionHides = { module = 'skg.view_requests', fn = 'show_collection_hides',
-                          desc = 'Request the hide collections (auto-saves)' },
-  ShowCollectionSubscribes = { module = 'skg.view_requests', fn = 'show_collection_subscribes',
-                               desc = 'Request the subscribe collections (auto-saves)' },
+  ShowFolderOfAliases = { module = 'skg.view_requests', fn = 'show_folderOf_aliases',
+                            desc = 'Request the alias folder (auto-saves)' },
+  ShowFolderOfOverrides = { module = 'skg.view_requests', fn = 'show_folderOf_overrides',
+                              desc = 'Request the override folders (auto-saves)' },
+  ShowFolderOfHides = { module = 'skg.view_requests', fn = 'show_folderOf_hides',
+                          desc = 'Request the hide folders (auto-saves)' },
+  ShowFolderOfSubscribes = { module = 'skg.view_requests', fn = 'show_folderOf_subscribes',
+                               desc = 'Request the subscribe folders (auto-saves)' },
   ShowPathsThroughContainers = { module = 'skg.view_requests', fn = 'show_paths_through_containers',
                                  desc = 'Graft the containment ancestry (auto-saves)' },
   ShowPathsThroughLinkSources = { module = 'skg.view_requests', fn = 'show_paths_through_link_sources',
@@ -212,10 +212,10 @@ M.content_view_bindings = {
   { 'Gm', 'GotoInGitAndCloseThis' },     -- C-c G m
   { 'gM', 'GotoInGitParent' },           -- C-c g M
   { 'GM', 'GotoInGitParentAndCloseThis' }, -- C-c G M
-  { 'ca', 'ShowCollectionAliases' },     -- C-c c a
-  { 'co', 'ShowCollectionOverrides' },   -- C-c c o
-  { 'ch', 'ShowCollectionHides' },       -- C-c c h
-  { 'cs', 'ShowCollectionSubscribes' },  -- C-c c s
+  { 'ca', 'ShowFolderOfAliases' },
+  { 'co', 'ShowFolderOfOverrides' },
+  { 'ch', 'ShowFolderOfHides' },
+  { 'cs', 'ShowFolderOfSubscribes' },
   { 'pC', 'ShowPathsThroughContainers' }, -- C-c p C
   { 'pL', 'ShowPathsThroughLinkSources' }, -- C-c p L
   { 'pl', 'ShowPathsThroughLinkDests' }, -- C-c p l

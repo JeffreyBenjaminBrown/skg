@@ -152,7 +152,7 @@ hides_from_its_subscriptions"). Consequences you might weigh in on:
 - MOVING C elsewhere in the same buffer also records the hide (the
   doc says it should; the rule sees only "C left F.contains").
 - The symmetric direction: RE-ADDING C to F.contains removes a stale
-  hide of C by F (otherwise C's hiderCol would keep listing F, though
+  hide of C by F (otherwise C's hiderFolder would keep listing F, though
   the subscription view would be unaffected either way).
 - If the same save both removes C from F.contains and shows C as a
   visible child of the subscribee-as-such, the explicit

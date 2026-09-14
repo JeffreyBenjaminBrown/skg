@@ -1,18 +1,18 @@
-/// Shared per-child information for PartnerCol reconciliation.
+/// Shared per-child information for PartnerFolder reconciliation.
 ///
-/// Used by the rerender-time completers for SubscribeeCol,
-/// HiddenInSubscribeeCol, and HiddenOutsideOfSubscribeeCol.
+/// Used by the rerender-time completers for SubscribeeFolder,
+/// HiddenInSubscribeeFolder, and HiddenOutsideOfSubscribeeFolder.
 ///
 /// Vocabulary for this module:
 ///
-/// - A `goal_list` is the ordered list of node IDs that a col
+/// - A `goal_list` is the ordered list of node IDs that a folder
 ///   should present after completion.  The list is computed from the
 ///   graph and, in diff views, from git-diff state.
 /// - A goal child is a child ViewNode whose ActiveNode ID appears in
 ///   that `goal_list`, whether it already existed in the buffer or
 ///   was created during reconciliation.
 /// - A relevant child is one this reconciliation pass is allowed to
-///   manage: for PartnerCols, an ActiveNode marked affectsParent=true.
+///   manage: for PartnerFolders, an ActiveNode marked affectsParent=true.
 ///   Relevant children whose IDs are not in the goal list are removed
 ///   or otherwise demoted by the caller-specific cleanup step.
 /// - `ChildData` is the pre-fetched title/source/phantom metadata
@@ -24,7 +24,7 @@ use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff};
 use crate::types::misc::{ID, SourceName};
 use crate::types::phantom::title_for_phantom;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Vognode, AffectsParent, PartnerCol, mk_indefinitive_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Vognode, AffectsParent, PartnerFolder, mk_indefinitive_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
 
@@ -34,7 +34,7 @@ use std::error::Error;
 use std::io;
 
 /// Per-child information needed to build a viewnode for a sharing
-/// col's child (subscribee, hidden-in-subscribee, or
+/// folder's child (subscribee, hidden-in-subscribee, or
 /// hidden-outside-of-subscribees).
 ///
 /// `phantom: None` => normal indef child marked AffectsParent::True.
@@ -54,17 +54,17 @@ pub struct ChildData {
 /// closure of `complete_relevant_children_in_viewnodetree`.
 /// The sharing completers build this before mutation so their flow
 /// stays explicit: read tree and graph facts, compute the goal list,
-/// prepare child data, then reconcile col children.
+/// prepare child data, then reconcile folder children.
 ///
 /// `axes_for_removed` supplies each removed member's per-stage diff
-/// axes.  The caller must name the relation its col represents when
-/// building that closure (outbound cols call `phantom_axes` with
-/// their relation; inbound cols read the inverse scan; filter cols
+/// axes.  The caller must name the relation its folder represents when
+/// building that closure (outbound folders call `phantom_axes` with
+/// their relation; inbound folders read the inverse scan; filter folders
 /// compare derived membership), so an axis can never silently come
 /// from a different relation involving the same ID.
 pub fn build_child_data (
   tree                           : &Tree<ViewNode>,
-  col_node                       : NodeId,
+  folder_node                       : NodeId,
   goal_list                      : &[ID],
   removed_ids                    : &HashSet<ID>,
   axes_for_removed               : &dyn Fn (&ID, &SourceName)
@@ -76,7 +76,7 @@ pub fn build_child_data (
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
   let existing_children : HashMap<ID, (SourceName, String)> = {
     let node_ref : NodeRef<ViewNode> =
-      tree . get (col_node)
+      tree . get (folder_node)
         . ok_or ("build_child_data: node not found") ?;
     let mut m : HashMap<ID, (SourceName, String)> = HashMap::new ();
     for child_ref in node_ref . children () {
@@ -151,47 +151,47 @@ pub fn build_child_data (
   }
   Ok (result) }
 
-/// Reconcile a PartnerCol's children against a goal list.
+/// Reconcile a PartnerFolder's children against a goal list.
 ///
-/// The rerender-time PartnerCol completers
-/// (SubscribeeCol, HiddenInSubscribeeCol,
-/// HiddenOutsideOfSubscribeeCol) share the same call shape: build
+/// The rerender-time PartnerFolder completers
+/// (SubscribeeFolder, HiddenInSubscribeeFolder,
+/// HiddenOutsideOfSubscribeeFolder) share the same call shape: build
 /// per-child data before mutation, then call
 /// `complete_relevant_children_in_viewnodetree` with identical
 /// relevance/key/create closures. Phantom-flagged ChildData entries
 /// produce phantom viewnodes; non-phantom entries produce
 /// indefinitive viewnodes marked AffectsParent::True.
-pub fn reconcile_partnerCol_children_against_goal_list (
+pub fn reconcile_partnerFolder_children_against_goal_list (
   tree          : &mut Tree<ViewNode>,
-  col_node      : NodeId,
-  kind          : PartnerCol,
+  folder_node      : NodeId,
+  kind          : PartnerFolder,
   goal_list     : &[ID],
   child_data    : &HashMap<ID, ChildData>,
 ) -> Result<RepairSummary<ID>, Box<dyn Error>> {
-  reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids (
-    tree, col_node, kind, goal_list, child_data, &HashMap::new () )
+  reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
+    tree, folder_node, kind, goal_list, child_data, &HashMap::new () )
 }
 
 /// As above, with the raw aliases captured for nodes deleted by the current
 /// save.  Only the immediate post-save rerender has this information.
-pub fn reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids (
+pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
   tree          : &mut Tree<ViewNode>,
-  col_node      : NodeId,
-  kind          : PartnerCol,
+  folder_node      : NodeId,
+  kind          : PartnerFolder,
   goal_list     : &[ID],
   child_data    : &HashMap<ID, ChildData>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
 ) -> Result<RepairSummary<ID>, Box<dyn Error>> {
   let label : &'static str = kind . caller_label ();
   normalize_relationship_backed_partner_unknowns (
-    tree, col_node, child_data, deleted_by_this_save_extra_ids ) ?;
+    tree, folder_node, child_data, deleted_by_this_save_extra_ids ) ?;
   let summary : RepairSummary<ID> =
     complete_relevant_children_in_viewnodetree (
-    tree, col_node,
+    tree, folder_node,
     // An InactiveNode child is IRRELEVANT
     // (TODO/full-schema/9-2_source-set-safety.org): the goal omits
     // every inactive member, and a retained placeholder already in the
-    // col survives as an irrelevant child (preserved as-is, not
+    // folder survives as an irrelevant child (preserved as-is, not
     // goal-matched), so it needs no id.
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Active (t))
@@ -229,22 +229,22 @@ pub fn reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids (
               id . clone (), d . source . clone (),
               d . title . clone (), ex, mem ) } } ) },
   ) ?;
-  mark_goal_children_as_collectionBranch_members (
-    tree, col_node, goal_list) ?;
+  mark_goal_children_as_folder_members (
+    tree, folder_node, goal_list) ?;
   Ok (summary) }
 
-/// An already-open PartnerCol can still hold an Active occurrence after its
+/// An already-open PartnerFolder can still hold an Active occurrence after its
 /// graph node was deleted.  When the rebuilt raw goal retains that membership,
 /// turn it into Unknown before the generic deletion pass.  Replacing only the
 /// kind keeps focus/folding state but removes title, body, home, and node edits.
 fn normalize_relationship_backed_partner_unknowns (
   tree       : &mut Tree<ViewNode>,
-  col_node   : NodeId,
+  folder_node   : NodeId,
   child_data : &HashMap<ID, ChildData>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
 ) -> Result<(), Box<dyn Error>> {
   treat_certain_children (
-    tree, col_node,
+    tree, folder_node,
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Active (active)) =>
         active . affectsParent == AffectsParent::True
@@ -276,9 +276,9 @@ fn normalize_relationship_backed_partner_unknowns (
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }
 
-/// Stamp per-stage membership signs onto a col's existing Active
-/// members, from a per-member axes map (an outbound col reads the
-/// owner's relation diff via 'outbound_member_axes'; an inbound col
+/// Stamp per-stage membership signs onto a folder's existing Active
+/// members, from a per-member axes map (an outbound folder reads the
+/// owner's relation diff via 'outbound_member_axes'; an inbound folder
 /// reads the inverse scan):
 /// - a member PRESENT after both stages gets only its Plus signs
 ///   ('newM'), mirroring 'mark_membership_on_existing_children's
@@ -286,17 +286,17 @@ fn normalize_relationship_backed_partner_unknowns (
 ///   handled by the goal list);
 /// - an Active child whose net result is REMOVED -- reachable only
 ///   when a stale saved buffer still holds, as an Active member, a
-///   read-only-col member whose edge is gone -- gets the full axes
+///   read-only-folder member whose edge is gone -- gets the full axes
 ///   and flips to a phantom, so the rendered buffer cannot show a
 ///   removed edge as a live member.
-pub fn apply_membership_axes_to_col_members (
+pub fn apply_membership_axes_to_folder_members (
   tree       : &mut Tree<ViewNode>,
-  col_node   : NodeId,
+  folder_node   : NodeId,
   axes_by_id : &HashMap<ID, MembershipAxes>,
 ) -> Result<(), Box<dyn Error>> {
   if axes_by_id . is_empty () { return Ok (( )); }
   treat_certain_children (
-    tree, col_node,
+    tree, folder_node,
     |vn : &ViewNode| matches! (
       &vn . kind, ViewNodeKind::Vognode (Vognode::Active (_)) ),
     |vn : &mut ViewNode| {
@@ -329,8 +329,8 @@ mod tests {
     let raw_extra : ID = id ("surviving-extra");
     let mut tree : Tree<ViewNode> = Tree::new (
       ViewNode { focused: false, folded: false, body_folded: false,
-                 kind: ViewNodeKind::PartnerCol (PartnerCol::Subscribee) });
-    let col : NodeId = tree . root () . id ();
+                 kind: ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee) });
+    let folder : NodeId = tree . root () . id ();
     let mut child : ViewNode = mk_indefinitive_viewnode (
       primary . clone (), source ("main"), "last seen" . to_string (),
       AffectsParent::True );
@@ -344,8 +344,8 @@ mod tests {
     deleted_extra_ids . insert (
       primary, [raw_extra . clone ()] . into_iter () . collect ());
 
-    reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids (
-      &mut tree, col, PartnerCol::Subscribee, &[raw_extra . clone ()],
+    reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
+      &mut tree, folder, PartnerFolder::Subscribee, &[raw_extra . clone ()],
       &child_data, &deleted_extra_ids ) . unwrap ();
 
     let rendered = tree . get (child_nid) . unwrap () . value ();
@@ -362,17 +362,17 @@ mod tests {
 /// See this module's header for definition of "goal child".
 ///
 /// This function repairs surviving or newly matched goal children whose
-/// membership marker is stale, so the col continues to own them
-/// as generated collection members.
-fn mark_goal_children_as_collectionBranch_members (
+/// membership marker is stale, so the folder continues to own them
+/// as generated folder members.
+fn mark_goal_children_as_folder_members (
   tree          : &mut Tree<ViewNode>,
-  col_node      : NodeId,
+  folder_node      : NodeId,
   goal_list     : &[ID],
 ) -> Result<(), Box<dyn Error>> {
   let goal_set : HashSet<ID> =
     goal_list . iter () . cloned () . collect ();
   treat_certain_children (
-    tree, col_node,
+    tree, folder_node,
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Active (t)) =>
         goal_set . contains (&t . id)

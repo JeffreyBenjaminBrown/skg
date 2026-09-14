@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_unit -E 'test(subscribee_col::)'
+// cargo nextest run --test grouped_unit -E 'test(subscribee_folder::)'
 
 use indoc::indoc;
 use skg::assert_metadata_eq;
@@ -9,7 +9,7 @@ use skg::types::misc::{SkgConfig, ID};
 use futures::executor::block_on;
 use std::error::Error;
 
-const CONFIG_PATH: &str = "tests/subscribee_col/fixtures/skgconfig.toml";
+const CONFIG_PATH: &str = "tests/subscribee_folder/fixtures/skgconfig.toml";
 
 /// Helper to set up multi-source test environment
 async fn setup_multi_source_test(
@@ -31,20 +31,20 @@ async fn cleanup_test(
 }
 
 #[test]
-fn test_subscribee_col_appears_for_subscribers(
+fn test_subscribee_folder_appears_for_subscribers(
 ) -> Result<(), Box<dyn Error>> {
   block_on(async {
-    let test_name = "skg-test-subscribee-col";
+    let test_name = "skg-test-subscribee-folder";
     let config =
       setup_multi_source_test (test_name) . await?;
     let (result, _pids, _) : (String, Vec<ID>, _) =
       single_root_view( &config, None, &ID("1" . to_string()), false
                       )?;
-    println!("SubscribeeCol test result:\n{}", result);
+    println!("SubscribeeFolder test result:\n{}", result);
 
-    // Nodes 11 and 12 subscribe to something, so they get SubscribeeCol children.
-    // Each SubscribeeCol has Subscribee children showing what the node subscribes to.
-    // Nodes 13 and 14 do not subscribe to anything, so no SubscribeeCol.
+    // Nodes 11 and 12 subscribe to something, so they get SubscribeeFolder children.
+    // Each SubscribeeFolder has Subscribee children showing what the node subscribes to.
+    // Nodes 13 and 14 do not subscribe to anything, so no SubscribeeFolder.
     // The 11/12 -> *-sees edges run from owned "home" nodes to foreign
     // "away" nodes. Their default is the owner's home: that is writable
     // and deliberately exposes the foreign ID/relationship there. Since
@@ -53,18 +53,18 @@ fn test_subscribee_col_appears_for_subscribers(
     let expected = indoc! {
       "* (skg (node (id 1) (source home) (affectsParent na) (rels (contains (out 4))) (viewStats (sourceHerald ⌂:home)))) 1
       ** (skg (node (id 11) (source home) (rels (contains (in 1 (ancestors 1)) (out 1)) (subscribes (out 1)) (birth contains)))) 11
-      *** (skg subscribeeCol)
+      *** (skg subscribeeFolder)
       **** (skg (node (id 11-sees) (source away) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)) (viewStats (sourceHerald ⌂:away)))) 11-sees
       *** (skg (node (id 111) (source home) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 111
       ** (skg (node (id 12) (source home) (rels (contains (in 1 (ancestors 1))) (subscribes (out 1)) (birth contains)))) 12
-      *** (skg subscribeeCol)
+      *** (skg subscribeeFolder)
       **** (skg (node (id 12-sees) (source away) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)) (viewStats (sourceHerald ⌂:away)))) 12-sees
       ** (skg (node (id 13) (source home) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
       ** (skg (node (id 14) (source home) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 14
       *** (skg (node (id 141) (source home) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 141
 "};
     assert_metadata_eq!(result, expected,
-      "Nodes with subscriptions should have SubscribeeCol children");
+      "Nodes with subscriptions should have SubscribeeFolder children");
     cleanup_test(
       test_name,
       &config . tantivy_folder,

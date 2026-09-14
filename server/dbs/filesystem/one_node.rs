@@ -1,6 +1,6 @@
 use crate::telescope::fold::fold_telescope;
 use crate::telescope::types::{
-  Telescope, retain_owned_sections_when_pid_collides,
+  Telescope, retain_owned_sections_when_pid_folderlides,
 };
 use crate::telescope::unfold::{
   UnfoldInput, UnfoldedTelescope, unfold_node,
@@ -74,7 +74,7 @@ pub(crate) fn telescope_from_disk (
   if sections . is_empty () {
     return Ok (None); }
   let (sections, collision) =
-    retain_owned_sections_when_pid_collides (sections, config);
+    retain_owned_sections_when_pid_folderlides (sections, config);
   if let Some (collision) = collision {
     tracing::warn! (
       pid = %pid,
