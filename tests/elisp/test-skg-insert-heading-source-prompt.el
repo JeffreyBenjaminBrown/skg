@@ -332,7 +332,7 @@ and shows the title under a `title' group."
                      (3 . "source")
                      (4 . "only")
                      (3 . "indef")
-                     (3 . "parentIs")
+                     (3 . "affectsParent")
                      (3 . "birth")
                      (3 . "editRequest")
                      (3 . "viewRequests"))))))
@@ -400,7 +400,7 @@ in place and opens the empty-node view: source pre-filled, others childless."
                   (buffer-substring-no-properties
                    (point-min) (point-max)))))))))
 
-;; Round-trip: a field the user populates survives; the rest stay absent.
+;; Round-trip: a field the user populates survives; the rest stay na.
 
 (ert-deftest test-edit-metadata-empty-commit-with-indef ()
   "Populating indef=true in the view yields (skg (node (source only) indef)),

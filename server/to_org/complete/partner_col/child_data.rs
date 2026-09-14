@@ -12,7 +12,7 @@
 ///   that `goal_list`, whether it already existed in the buffer or
 ///   was created during reconciliation.
 /// - A relevant child is one this reconciliation pass is allowed to
-///   manage: for PartnerCols, an ActiveNode marked parentIs=affected.
+///   manage: for PartnerCols, an ActiveNode marked affectsParent=true.
 ///   Relevant children whose IDs are not in the goal list are removed
 ///   or otherwise demoted by the caller-specific cleanup step.
 /// - `ChildData` is the pre-fetched title/source/phantom metadata
@@ -24,7 +24,7 @@ use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff};
 use crate::types::misc::{ID, SourceName};
 use crate::types::phantom::title_for_phantom;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Vognode, ParentIs, PartnerCol, mk_indefinitive_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Vognode, AffectsParent, PartnerCol, mk_indefinitive_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
 
@@ -37,7 +37,7 @@ use std::io;
 /// col's child (subscribee, hidden-in-subscribee, or
 /// hidden-outside-of-subscribees).
 ///
-/// `phantom: None` => normal indef child marked ParentIs::Affected.
+/// `phantom: None` => normal indef child marked AffectsParent::True.
 /// `phantom: Some(axes)` => diff-view phantom marking removal.
 pub struct ChildData {
   pub source  : SourceName,
@@ -160,7 +160,7 @@ pub fn build_child_data (
 /// `complete_relevant_children_in_viewnodetree` with identical
 /// relevance/key/create closures. Phantom-flagged ChildData entries
 /// produce phantom viewnodes; non-phantom entries produce
-/// indefinitive viewnodes marked ParentIs::Affected.
+/// indefinitive viewnodes marked AffectsParent::True.
 pub fn reconcile_partnerCol_children_against_goal_list (
   tree          : &mut Tree<ViewNode>,
   col_node      : NodeId,
@@ -195,7 +195,7 @@ pub fn reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids (
     // goal-matched), so it needs no id.
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Active (t))
-        => t . parentIs == ParentIs::Affected,
+        => t . affectsParent == AffectsParent::True,
       ViewNodeKind::Phantom (crate::types::viewnode::Phantom::Unknown (_))
         => true,
       _ => false },
@@ -223,7 +223,7 @@ pub fn reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids (
           None => mk_indefinitive_viewnode ( id . clone (),
                                              d . source . clone (),
                                              d . title . clone (),
-                                             ParentIs::Affected ),
+                                             AffectsParent::True ),
           Some ((ex, mem)) =>
             mk_phantom_viewnode (
               id . clone (), d . source . clone (),
@@ -247,7 +247,7 @@ fn normalize_relationship_backed_partner_unknowns (
     tree, col_node,
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Active (active)) =>
-        active . parentIs == ParentIs::Affected
+        active . affectsParent == AffectsParent::True
         && (child_data . get (&active . id)
             . is_some_and (|data| data . unknown)
             || deleted_by_this_save_extra_ids . get (&active . id)
@@ -333,7 +333,7 @@ mod tests {
     let col : NodeId = tree . root () . id ();
     let mut child : ViewNode = mk_indefinitive_viewnode (
       primary . clone (), source ("main"), "last seen" . to_string (),
-      ParentIs::Affected );
+      AffectsParent::True );
     child . focused = true;
     let child_nid : NodeId = tree . root_mut () . append (child) . id ();
     let mut child_data : HashMap<ID, ChildData> = HashMap::new ();
@@ -381,6 +381,6 @@ fn mark_goal_children_as_collectionBranch_members (
     |vn : &mut ViewNode| {
       if let ViewNodeKind::Vognode (Vognode::Active (t))
         = &mut vn . kind
-        { t . parentIs = ParentIs::Affected; }} )
+        { t . affectsParent = AffectsParent::True; }} )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (( )) }

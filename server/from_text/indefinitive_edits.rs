@@ -208,7 +208,7 @@ fn make_direct_active_children_independent (
     if let Some (mut child) = viewforest . get_mut (child_id) {
       if let ViewNodeKind::Vognode (Vognode::Active (active)) =
         &mut child . value () . kind
-      { active . parentIs = crate::types::viewnode::ParentIs::Independent; }} }
+      { active . affectsParent = crate::types::viewnode::AffectsParent::False; }} }
 }
 
 fn content_members (
@@ -279,7 +279,7 @@ mod tests {
   use crate::from_text::buffer_to_viewnodes::uninterpreted
     ::org_to_uninterpreted_viewforest;
   use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
-  use crate::types::viewnode::ParentIs;
+  use crate::types::viewnode::AffectsParent;
   use indoc::indoc;
 
   fn forest (text : &str) -> ViewForest {
@@ -335,7 +335,7 @@ mod tests {
     { ViewNodeKind::Vognode (Vognode::Active (active))
         if active . id == ID::from ("child") => Some (active),
       _ => None, }) . unwrap ();
-    assert_eq! (child . parentIs, ParentIs::Independent);
+    assert_eq! (child . affectsParent, AffectsParent::False);
   }
 
   #[test]

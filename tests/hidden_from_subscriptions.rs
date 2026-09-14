@@ -563,7 +563,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
       collateral_views);
     // e1 was hidden, so it appears under the HiddenInSubscribeeCol. But e1's
     // in-view subtree (e11) is a user branch, so §6.0 DEMOTES the visible
-    // occurrence to parentIs=Independent rather than deleting it -- chaos-
+    // occurrence to affectsParent=false rather than deleting it -- chaos-
     // monkey safety: the user may have deliberately placed content there, and
     // we must not lose it. So e1 shows twice: once hidden (indef), once as a
     // preserved Independent branch.
@@ -575,7 +575,7 @@ async fn test_collateral_view_reflects_newly_hidden_subscribee_content (
     assert! (
       collateral . lines() . any ( |line|
         line . starts_with ("**** (skg (node (id e1)")
-        && line . contains ("(parentIs independent)") ),
+        && line . contains ("(affectsParent false)") ),
       "Expected hidden branch e1 demoted to Independent (subtree preserved):\n{}",
       collateral );
 
@@ -784,7 +784,7 @@ async fn test_subscribee_and_filter_cols (
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 3))))) R
+      "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 3))))) R
        ** (skg hiddenCol)
        *** (skg (node (id hidden-in-E1) (source main) indef (rels (contains (in 1)) (hides (in 1 (ancestors 2))) (birth hides)))) hidden-in-E1
        *** (skg (node (id hidden-in-E2) (source main) indef (rels (contains (in 1)) (hides (in 1 (ancestors 2))) (birth hides)))) hidden-in-E2
@@ -820,7 +820,7 @@ async fn test_subscribee_and_filter_cols (
     println!("View from R after save with definitive view requests:\n{}", expanded);
 
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 3))))) R
+      "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 3))))) R
        ** (skg hiddenCol)
        *** (skg (node (id hidden-in-E1) (source main) indef (rels (contains (in 1)) (hides (in 1 (ancestors 2))) (birth hides)))) hidden-in-E1
        *** (skg (node (id hidden-in-E2) (source main) indef (rels (contains (in 1)) (hides (in 1 (ancestors 2))) (birth hides)))) hidden-in-E2
@@ -865,7 +865,7 @@ async fn test_hidden_within_but_none_without (
     println!("Initial view from R:\n{}", initial_view);
 
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (rels (contains (out 1)) (subscribes (out 1)) (hides (out 1))))) R
+      "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 1)) (hides (out 1))))) R
        ** (skg hiddenCol)
        *** (skg (node (id H) (source main) indef (rels (contains (in 1)) (hides (in 1 (ancestors 2))) (birth hides)))) H
        ** (skg subscribeeCol)
@@ -898,7 +898,7 @@ async fn test_hidden_within_but_none_without (
     // HiddenInSubscribeeCol precedes content regardless of .skg order.
     // E1.skg has [E11, H, E12] but view shows HiddenInSubscribeeCol (with H) before E11 and E12.
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (rels (contains (out 1)) (subscribes (out 1)) (hides (out 1))))) R
+      "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 1)) (hides (out 1))))) R
        ** (skg hiddenCol)
        *** (skg (node (id H) (source main) indef (rels (contains (in 1)) (hides (in 1 (ancestors 2))) (birth hides)))) H
        ** (skg subscribeeCol)
@@ -1097,7 +1097,7 @@ async fn test_hidden_without_but_none_within (
                           false )?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
+      "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
        ** (skg hiddenCol)
        *** (skg (node (id H) (source main) indef (rels (hides (in 1 (ancestors 2))) (birth hides)))) H
        ** (skg subscribeeCol)
@@ -1129,7 +1129,7 @@ async fn test_hidden_without_but_none_within (
     println!("View from R after save with definitive view requests:\n{}",
              with_subscribees_expanded);
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
+      "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
        ** (skg hiddenCol)
        *** (skg (node (id H) (source main) indef (rels (hides (in 1 (ancestors 2))) (birth hides)))) H
        ** (skg subscribeeCol)
@@ -1229,7 +1229,7 @@ async fn test_overlapping_hidden_within (
                           false )?;
     println!("Initial view from R:\n{}", initial_view);
     let expected_initial = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
+      "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
        ** (skg hiddenCol)
        *** (skg (node (id H) (source main) indef (rels (contains (in 2)) (hides (in 1 (ancestors 2))) (birth hides)))) H
        ** (skg subscribeeCol)
@@ -1259,7 +1259,7 @@ async fn test_overlapping_hidden_within (
       response . saved_view };
     println!("View from R after save with definitive view requests:\n{}", expanded);
     let expected_expanded = indoc! {
-      "* (skg (node (id R) (source main) (parentIs absent) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
+      "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
        ** (skg hiddenCol)
        *** (skg (node (id H) (source main) indef (rels (contains (in 2)) (hides (in 1 (ancestors 2))) (birth hides)))) H
        ** (skg subscribeeCol)

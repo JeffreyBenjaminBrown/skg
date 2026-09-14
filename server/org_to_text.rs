@@ -5,7 +5,7 @@ use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   ViewNode, ViewNodeKind, Vognode, Phantom, Qual, QualCol, ActiveNode, PhantomDiff,
   PhantomDeleted, PhantomUnknown, NodeEditRequest, GraphNodeStats,
-  ParentIs,
+  AffectsParent,
 };
 
 use ego_tree::{NodeRef, Tree};
@@ -325,14 +325,14 @@ fn activeNode_metadata_to_string (
       vec! [ "node" . to_string () ];
     parts . push ( format! ( "(id {})", activeNode . id . 0 ));
     parts . push ( format! ( "(source {})", activeNode . source ));
-    // ParentIs::Affected is left implicit because it is the default
+    // AffectsParent::True is left implicit because it is the default
     // membership relation.
-    match activeNode . parentIs {
-      ParentIs::Affected => {},
-      ParentIs::Absent =>
-        parts . push ( "(parentIs absent)" . to_string () ),
-      ParentIs::Independent =>
-        parts . push ( "(parentIs independent)" . to_string () ) }
+    match activeNode . affectsParent {
+      AffectsParent::True => {},
+      AffectsParent::NA =>
+        parts . push ( "(affectsParent na)" . to_string () ),
+      AffectsParent::False =>
+        parts . push ( "(affectsParent false)" . to_string () ) }
     if activeNode . is_indefinitive () {
       // "indef" is short for "indefinitive" -- a read-only view of
       // a node (see IndefOrDef in types/viewnode.rs). The metadata
@@ -368,7 +368,7 @@ fn activeNode_metadata_to_string (
 /// client can tell a moved/removed phantom apart from a live node without
 /// inferring it from the diff axes. A phantom is always indefinitive (so always
 /// emits `indef` and never a body, editRequest, or viewRequests) and its
-/// parentIs is implicit Affected and birth Unremarkable (so neither atom
+/// affectsParent is implicit Affected and birth Unremarkable (so neither atom
 /// appears, and graphStats is rendered as if Affected / Unremarkable). It
 /// carries no viewStats. What remains: id, source, indef, graphStats, the
 /// staged/unstaged diff axes, and notInGit.
@@ -387,7 +387,7 @@ fn phantomDiff_metadata_to_string (
       vec! [ "diffPhantom" . to_string () ];
     parts . push ( format! ( "(id {})", phantom . id . 0 ));
     parts . push ( format! ( "(source {})", phantom . source ));
-    // parentIs is implicit Affected and birth Unremarkable on a phantom, so
+    // affectsParent is implicit Affected and birth Unremarkable on a phantom, so
     // neither atom is emitted; both are passed as such to graphnodestats.
     parts . push ( "indef" . to_string () );
     if let Some (s) = phantom_rels_atom (& phantom . graphStats)

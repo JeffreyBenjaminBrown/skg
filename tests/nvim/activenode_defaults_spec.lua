@@ -64,7 +64,7 @@ describe('skg.sexpr.activenode_defaults expansion', function ()
   it('inserts all default fields into a minimal ActiveNode', function ()
     local headlines =
       expanded_headlines('(skg (node (id abc) (source jeff)))')
-    -- skg, node, id/abc, source/jeff, indef/false, parentIs/affected,
+    -- skg, node, id/abc, source/jeff, indef/false, affectsParent/true,
     -- birth/unremarkable, editRequest/none, viewRequests/none:
     -- each key AND each value is a separate headline.
     assert.are.equal(16, #headlines)
@@ -82,13 +82,13 @@ describe('skg.sexpr.activenode_defaults expansion', function ()
     assert.are.equal('true', headlines[indef_index + 1].text)
   end)
 
-  it('inserts affected (default) when parentIs is missing', function ()
+  it('inserts true (default) when affectsParent is missing', function ()
     local headlines =
       expanded_headlines('(skg (node (id abc) (source jeff)))')
-    local parentIs_index = find_text(headlines, 'parentIs')
-    assert.is_not_nil(parentIs_index)
-    assert.are.equal('affected (default)',
-                     headlines[parentIs_index + 1].text)
+    local affectsParent_index = find_text(headlines, 'affectsParent')
+    assert.is_not_nil(affectsParent_index)
+    assert.are.equal('true (default)',
+                     headlines[affectsParent_index + 1].text)
   end)
 
   it('orders fields canonically', function ()
@@ -100,7 +100,7 @@ describe('skg.sexpr.activenode_defaults expansion', function ()
         table.insert(level_3, headline.text) end
     end
     assert.are.same(
-      { 'id', 'source', 'indef', 'parentIs', 'birth',
+      { 'id', 'source', 'indef', 'affectsParent', 'birth',
         'editRequest', 'viewRequests', 'graphStats' },
       level_3)
   end)
@@ -119,7 +119,7 @@ describe('skg.sexpr.activenode_defaults stripping', function ()
         '* skg', '** node', '*** id', '**** abc',
         '*** source', '**** jeff',
         '*** indef', '**** true',
-        '*** parentIs', '**** affected (default)',
+        '*** affectsParent', '**** true (default)',
         '*** birth', '**** unremarkable (default)',
         '*** editRequest', '**** none (default)',
         '*** viewRequests', '**** none (default)' }, '\n')))
@@ -131,7 +131,7 @@ describe('skg.sexpr.activenode_defaults stripping', function ()
         '* skg', '** node', '*** id', '**** abc',
         '*** source', '**** jeff',
         '*** indef', '**** false',
-        '*** parentIs', '**** affected',
+        '*** affectsParent', '**** true',
         '*** birth', '**** unremarkable',
         '*** editRequest', '**** none',
         '*** viewRequests', '**** none' }, '\n')))
@@ -170,14 +170,14 @@ describe('skg.sexpr.activenode_defaults stripping', function ()
         '\n')))
   end)
 
-  it('keeps parentIs=independent', function ()
+  it('keeps affectsParent=false', function ()
     assert.are.same(
       sexpr.read('(skg (node (id abc) (source jeff)'
-                 .. ' (parentIs independent)))'),
+                 .. ' (affectsParent false)))'),
       strip_to_sexp(table.concat({
         '* skg', '** node', '*** id', '**** abc',
         '*** source', '**** jeff',
-        '*** parentIs', '**** independent' }, '\n')))
+        '*** affectsParent', '**** false' }, '\n')))
   end)
 
   it('keeps populated viewRequests', function ()
@@ -196,7 +196,7 @@ describe('skg.sexpr.activenode_defaults stripping', function ()
     assert.are.same(sexpr.read('(skg (node (source only)))'),
       strip_to_sexp(table.concat({
         '* skg', '** node', '*** source', '**** only',
-        '*** indef', '*** parentIs', '*** birth',
+        '*** indef', '*** affectsParent', '*** birth',
         '*** editRequest', '*** viewRequests' }, '\n')))
   end)
 
@@ -283,7 +283,7 @@ describe('skg.sexpr.activenode_defaults real-world metadata', function ()
     assert.is_not_nil(find_text(headlines, 'source'))
     assert.is_not_nil(find_text(headlines, 'public'))
     assert.is_not_nil(find_text(headlines, 'indef'))
-    assert.is_not_nil(find_text(headlines, 'parentIs'))
+    assert.is_not_nil(find_text(headlines, 'affectsParent'))
     assert.is_not_nil(find_text(headlines, 'editRequest'))
     assert.is_not_nil(find_text(headlines, 'rels'))
   end)

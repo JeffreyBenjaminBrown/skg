@@ -36,7 +36,7 @@ use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnr
 use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request_with_source_set;
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
-use crate::to_org::util::mark_view_roots_parent_absent;
+use crate::to_org::util::mark_view_roots_parent_na;
 use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
 use crate::source_sets::ActiveSourceSet;
@@ -349,7 +349,7 @@ fn handle_snapshot_response (
       &runtime . graph,
       &payload . graphnodestats,
       &runtime . config ); }
-  mark_view_roots_parent_absent (
+  mark_view_roots_parent_na (
     &mut viewforest );
   set_viewnodestats_in_viewforest (
     &mut viewforest,

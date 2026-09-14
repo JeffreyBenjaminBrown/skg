@@ -5,7 +5,7 @@
 ///   ActiveNodes: (skg [focused] [folded]
 ///                   (node [(id ID)]
 ///                         [(source SOURCE)]
-///                         [(parentIs affected|independent|absent)]
+///                         [(affectsParent true|false|na)]
 ///                         [(birth backpath ROLENAME)]
 ///                         [indef]   ; short for "indefinitive"
 ///                         [cycle]
@@ -23,7 +23,7 @@ use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::viewnode::{
   GraphNodeStats, ViewNodeStats, NodeEditRequest, ViewRequest, ColRelation,
   Qual, QualCol, PartnerCol, PhantomDeleted, InactiveNode, PhantomUnknown,
-  Birth, IndefOrDef, ParentIs,
+  Birth, IndefOrDef, AffectsParent,
 };
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::maybe_placed_viewnode::{
@@ -49,7 +49,7 @@ pub struct ViewnodeMetadata {
   // ActiveNode fields (ignored if scaffold is Some)
   pub id: Option<ID>,
   pub source: Option<SourceName>,
-  pub parentIs: ParentIs,
+  pub affectsParent: AffectsParent,
   pub birth: Birth,
   pub indefinitive: bool,
   pub graphStats: GraphNodeStats,
@@ -92,7 +92,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     non_vognode: None,
     id: None,
     source: None,
-    parentIs: ParentIs::Affected,
+    affectsParent: AffectsParent::True,
     birth: Birth::Unremarkable,
     indefinitive: false,
     graphStats: GraphNodeStats::default(),
@@ -236,7 +236,7 @@ pub fn viewnode_from_metadata (
             title,
             id               : metadata . id . clone (),
             source           : metadata . source . clone (),
-            parentIs         : metadata . parentIs,
+            affectsParent         : metadata . affectsParent,
             birth            : metadata . birth,
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
@@ -253,7 +253,7 @@ pub fn viewnode_from_metadata (
             // live node carrying e.g. removedM stays a Vognode. The
             // EditRequestOnIndefinitive validation above already fired if this
             // phantom (indefinitive) carried an edit_request, so dropping
-            // indef_or_def/parentIs/etc. here loses nothing.
+            // indef_or_def/affectsParent/etc. here loses nothing.
             MpViewnodeKind::Phantom (
               MpPhantom::Diff (
                 MpPhantomDiff::from_activeNode (t) )) }
@@ -499,17 +499,17 @@ fn parse_node_sexp (
           "viewRequests" => {
             parse_viewrequests_sexp (
               &subitems[1..], &mut metadata . view_requests ) ?; },
-          "parentIs" => {
+          "affectsParent" => {
             if subitems . len () != 2 {
-              return Err ( "parentIs requires exactly one value" . to_string () ); }
+              return Err ( "affectsParent requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
-            metadata . parentIs = match value . as_str () {
-              "affected"    => ParentIs::Affected,
-              "independent" => ParentIs::Independent,
-              "absent"      => ParentIs::Absent,
+            metadata . affectsParent = match value . as_str () {
+              "true"  => AffectsParent::True,
+              "false" => AffectsParent::False,
+              "na"    => AffectsParent::NA,
               _ => return Err ( format! (
-                "Invalid parentIs value: {}", value )), }; },
+                "Invalid affectsParent value: {}", value )), }; },
           "staged" => {
             apply_axis_atoms_to_activeNode (
               &subitems[1..],

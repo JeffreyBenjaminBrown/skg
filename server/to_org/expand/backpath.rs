@@ -18,7 +18,7 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::tree::viewnode_nodecomplete::{ find_child_by_id, find_children_by_ids};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_from_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, AffectsParent, mk_indefinitive_from_viewnode, mk_unknown_viewnode };
 use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId,Tree};
@@ -443,7 +443,7 @@ pub fn prepend_indef_indep_child (
     ) ? {
       Some ((_nc, child_viewnode)) =>
         mk_indefinitive_from_viewnode (
-          child_viewnode, ParentIs::Independent, birth )
+          child_viewnode, AffectsParent::False, birth )
           . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
       None => mk_unknown_viewnode (child_skgid . clone ()), };
   let new_child_treeid : NodeId =

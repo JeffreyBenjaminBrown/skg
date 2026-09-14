@@ -89,16 +89,16 @@ pub fn type_and_parent_type_consistent_with_subscribee (
   let node_ref : NodeRef < ViewNode > =
     tree . get (node_id)
     . ok_or ("type_and_parent_type_consistent_with_subscribee: node not found") ?;
-  let is_activeNode_and_parentIs_affected : bool =
-    node_ref . value () . is_activeNode_and_parentIs_affected ();
-  let parent_is_subscribee_col : bool =
+  let is_activeNode_and_affectsParent_true : bool =
+    node_ref . value () . is_activeNode_and_affectsParent_true ();
+  let affects_parent_subscribee_col : bool =
     node_ref . parent ()
     . map ( |p| matches! (
               & p . value () . kind,
               ViewNodeKind::PartnerCol (PartnerCol::Subscribee)))
     . unwrap_or (false);
-  Ok ( is_activeNode_and_parentIs_affected
-       && parent_is_subscribee_col ) }
+  Ok ( is_activeNode_and_affectsParent_true
+       && affects_parent_subscribee_col ) }
 
 /// If appropriate, prepend a SubscribeeCol child containing:
 /// - for each subscribee, an indefinitive Subscribee child

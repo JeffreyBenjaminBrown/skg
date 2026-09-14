@@ -158,15 +158,15 @@ describe('skg.metadata commands', function ()
     assert.is_false(subtree_p(result, '(skg (node (source public)))'))
   end)
 
-  it('set_source_recursive prunes non-content parentIs', function ()
-    -- Mirrors test-skg-set-source-recursive-prunes-non-content-parentIs.
+  it('set_source_recursive prunes non-content affectsParent', function ()
+    -- Mirrors test-skg-set-source-recursive-prunes-non-content-affectsParent.
     buffer_with(table.concat({
-      '* (skg (node (id root) (source public) (parentIs absent))) root',
+      '* (skg (node (id root) (source public) (affectsParent na))) root',
       '** (skg (node (id content-child) (source public))) content child',
       '*** (skg (node (id content-grandchild) (source public))) content grandchild',
       '** (skg (node (id mismatched-content) (source foreign))) mismatched content',
       '*** (skg (node (id public-under-mismatch) (source public))) public under mismatch',
-      '** (skg (node (id link-child) (source public) (parentIs independent) (birth backpath linkSource))) link child',
+      '** (skg (node (id link-child) (source public) (affectsParent false) (birth backpath linkSource))) link child',
       '*** (skg (node (id under-link) (source public))) under link',
       '** (skg aliasCol) aliases',
       '*** (skg (node (id under-scaffold) (source public))) under scaffold' },
@@ -281,7 +281,7 @@ describe('skg.metadata editing helpers', function ()
       '* (skg value) 4' }, '\n'), buffer_text())
   end)
 
-  it('leaves metadata alone when the key is absent', function ()
+  it('leaves metadata alone when the key is na', function ()
     -- "Alone" up to normalization: reconstruction orders kv-pairs
     -- before bare values, exactly as the elisp expectations show
     -- (input '(skg value (k v))' comes back '(skg (k v) value)').
@@ -301,7 +301,7 @@ describe('skg.metadata editing helpers', function ()
       '* (skg (k v)) 4' }, '\n'), buffer_text())
   end)
 
-  it('leaves metadata alone when the value is absent', function ()
+  it('leaves metadata alone when the value is na', function ()
     buffer_with(example_data)
     apply_to_all_lines(metadata.delete_value_from_metadata,
                        'nonexistent')

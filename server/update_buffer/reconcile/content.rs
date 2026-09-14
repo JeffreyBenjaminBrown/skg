@@ -13,7 +13,7 @@ use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, PhantomDeleted, IndefOrDef,
-    ParentIs, ViewRequest, mk_definitive_viewnode};
+    AffectsParent, ViewRequest, mk_definitive_viewnode};
 use crate::types::viewnode::{Vognode, Phantom, PartnerCol};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
 use crate::types::tree::viewnode_nodecomplete::{
@@ -145,7 +145,7 @@ pub fn expand_true_content_at_activeNode (
 /// non-phantom Active content child of a Final node -- new and existing
 /// alike -- so the main BFS draws each Final (and it in turn cascades to its
 /// own content). The cascade does *not* flow through scaffolds, so only
-/// parentIs=Affected content children receive it.
+/// affectsParent=true content children receive it.
 fn attach_cascade_dvrs_to_affected_content (
   tree : &mut Tree<ViewNode>,
   node : NodeId,
@@ -155,7 +155,7 @@ fn attach_cascade_dvrs_to_affected_content (
     . children ()
     . filter ( |c| matches!( &c . value () . kind,
         ViewNodeKind::Vognode (Vognode::Active (t))
-          if t . parentIs == ParentIs::Affected
+          if t . affectsParent == AffectsParent::True
              && ! t . should_be_diffPhantom () ) )
     . map ( |c| c . id () )
     . collect ();
@@ -189,7 +189,7 @@ fn sync_activeNode_from_disk (
 
 /// Compute the content goal list (diff-aware), reconcile
 /// children against it, and mark any surviving non-goal children
-/// as ParentIs::Independent.
+/// as AffectsParent::False.
 fn reconcile_content_children (
   tree                           : &mut Tree<ViewNode>,
   node                           : NodeId,
@@ -348,7 +348,7 @@ fn is_overridden_drawn_raw (
   graph_snap : &Arc<InRustGraph>,
 ) -> Result<bool, Box<dyn Error>> {
   let in_raw_position : bool = {
-    let parent_is_raw_drawing_col : bool =
+    let affects_parent_raw_drawing_col : bool =
       read_at_ancestor_in_tree( tree, node, 1,
         |vn : &ViewNode| match &vn . kind {
           ViewNodeKind::PartnerCol (pc)
@@ -357,13 +357,13 @@ fn is_overridden_drawn_raw (
       . unwrap_or (false);
     let is_view_root : bool =
       // During completion a view root is a child of the BufferRoot
-      // sentinel; its 'parentIs == Absent' is stamped only later, at
+      // sentinel; its 'affectsParent == Absent' is stamped only later, at
       // render.
       read_at_ancestor_in_tree( tree, node, 1,
         |vn : &ViewNode| matches!( &vn . kind,
           ViewNodeKind::BufferRoot ))
       . unwrap_or (false);
-    parent_is_raw_drawing_col || is_view_root };
+    affects_parent_raw_drawing_col || is_view_root };
   if ! in_raw_position { return Ok (false); }
   let (id, has_marker) : (Option<ID>, bool) =
     read_at_node_in_tree( tree, node,
@@ -378,7 +378,7 @@ fn is_overridden_drawn_raw (
     resolve_override (config, graph_snap, None, &id) . effective != id;
   Ok (overridden) }
 
-/// Whether this node claims parentIs=affected
+/// Whether this node claims affectsParent=true
 /// and is a child of SubscribeeCol (and not a phantom).
 fn is_subscribee (
   tree : &Tree<ViewNode>,
@@ -388,14 +388,14 @@ fn is_subscribee (
     read_at_node_in_tree( tree, node,
       |vn : &ViewNode| match &vn . kind {
         ViewNodeKind::Vognode (Vognode::Active (t))
-          => t . parentIs == ParentIs::Affected,
+          => t . affectsParent == AffectsParent::True,
         _ => false } ) ?;
-  let parent_is_subscribee_col : bool =
+  let affects_parent_subscribee_col : bool =
     read_at_ancestor_in_tree( tree, node, 1,
       |vn : &ViewNode| matches!( &vn . kind,
         ViewNodeKind::PartnerCol (PartnerCol::Subscribee)))
     . unwrap_or (false);
-  Ok( is_member_of_parent && parent_is_subscribee_col ) }
+  Ok( is_member_of_parent && affects_parent_subscribee_col ) }
 
 /// The worktree content goal list for a node: the (extra-id-resolved) contains,
 /// in order. For a subscribee-as-such (TODO/DONE/local-view-update/plan_v2.org §6.1) it is contains MINUS what the
@@ -500,7 +500,7 @@ fn complete_content_children (
     tree, node,
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Active (t))
-        => t . parentIs == ParentIs::Affected,
+        => t . affectsParent == AffectsParent::True,
       ViewNodeKind::Phantom (Phantom::Diff (_))
         // Existing phantoms are reordered or replaced, not duplicated.
         => true,
@@ -586,7 +586,7 @@ fn normalize_relationship_backed_content_unknowns (
     tree, node,
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Active (active)) =>
-        active . parentIs == ParentIs::Affected
+        active . affectsParent == AffectsParent::True
         && graph_snap . pid_of (&active . collected_id ()) . is_none ()
         && goal_list . iter () . any (|raw_member|
           raw_member == &active . collected_id ()
@@ -615,14 +615,14 @@ fn normalize_relationship_backed_content_unknowns (
 
 /// 'erroneous content children' are children that look like content,
 /// but are not actually content.
-/// This marks them parentIs=Independent.
+/// This marks them affectsParent=false.
 ///
 /// `content_ids` describes the parent's current, saved/worktree
 /// `contains` list. A removed-here phantom deliberately is *not* in that
 /// list: the point of the phantom is to show content that used to be under
 /// this parent in HEAD, but was removed from this parent in the worktree.
 /// If we treated that missing worktree membership as erroneous view
-/// placement, we would rewrite the phantom to `ParentIs::Independent` and
+/// placement, we would rewrite the phantom to `AffectsParent::False` and
 /// lose the information that the diff is about removed content.
 fn mark_erroneous_content_children_as_indep (
   tree        : &mut Tree<ViewNode>,
@@ -635,7 +635,7 @@ fn mark_erroneous_content_children_as_indep (
     tree, node,
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (Vognode::Active (t)) =>
-        t . parentIs == ParentIs::Affected
+        t . affectsParent == AffectsParent::True
         // collected_id: a drawn substitute is a member via its
         // original, and must not be demoted to Independent.
         && !content_id_set . contains( &t . collected_id () )
@@ -644,7 +644,7 @@ fn mark_erroneous_content_children_as_indep (
     |vn : &mut ViewNode| {
       if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
         = vn . kind
-        { t . parentIs = ParentIs::Independent; }},
+        { t . affectsParent = AffectsParent::False; }},
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
 /// Reorder children into three groups:
@@ -665,7 +665,7 @@ fn order_children_as_scaffolds_then_ignored_then_content (
           | ViewNodeKind::BufferRoot
           | ViewNodeKind::DeadScaffold                => 0,
         ViewNodeKind::Vognode (Vognode::Active (t))
-          if t . parentIs != ParentIs::Affected                  => 1,
+          if t . affectsParent != AffectsParent::True                  => 1,
         ViewNodeKind::Phantom (Phantom::Diff (_))  => 2,
         ViewNodeKind::Vognode (Vognode::Active (_))   => 2,
         ViewNodeKind::Phantom (Phantom::Deleted (_))  => 2,
@@ -721,7 +721,7 @@ fn build_child_creation_data (
           // Keys are COLLECTED ids, matching the reconcile's orderkey:
           // an existing drawn substitute registers under its original.
           ViewNodeKind::Vognode (Vognode::Active (t))
-            if t . parentIs == ParentIs::Affected
+            if t . affectsParent == AffectsParent::True
             => { m . insert( t . collected_id (),
                              t . source . clone()); },
           ViewNodeKind::Phantom (Phantom::Diff (p))

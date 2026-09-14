@@ -47,7 +47,7 @@ fn ordinary_definitive_emissions () {
       * (skg (node (id root) (source main))) root
       Root body
       ** (skg (node (id child) (source main))) child
-      ** (skg (node (id independent) (source main) (parentIs independent))) independent
+      ** (skg (node (id independent) (source main) (affectsParent false))) independent
       ** (skg aliasCol) aliases
       *** (skg alias) nickname
       ** (skg subscribeeCol)
@@ -92,7 +92,7 @@ fn subscribee_as_such_emits_claim_and_visibility () {
       *** (skg (node (id e) (source main))) e
       Subscribee body
       **** (skg (node (id visible) (source main))) visible
-      **** (skg (node (id parked) (source main) (parentIs independent))) parked
+      **** (skg (node (id parked) (source main) (affectsParent false))) parked
       **** (skg (node (id leaving) (source main) (editRequest delete))) leaving
       "} );
   { let e : &IntentsForOneId = entry (&collected, "e");

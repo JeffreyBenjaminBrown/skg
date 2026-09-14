@@ -413,7 +413,7 @@ Save the view afterward (':w') to apply the move.
 Like 'SetSource', but it also
 changes the source of every content descendent of the node at point
 whose source matches the original source of the node at point.
-Only descendents for which ParentIs=Affected are traversed.
+Only descendents for which AffectsParent=True are traversed.
 *** <localleader>sm : :SkgSetMergeRequest
 (See [[./merging.org][the docs on merging]] for why would you merge two nodes,
 and what it means to do that.)
@@ -527,7 +527,7 @@ When called from a node in a view of the graph,
 this switches to a view of the metadata of that node,
 with one field per org branch. ':w' (or <localleader>cc) commits
 the edited tree back into the source headline; ':bd!' cancels;
-S-Left / S-Right cycle a field's value (indef, parentIs,
+S-Left / S-Right cycle a field's value (indef, affectsParent,
 editRequest, source, ...).
 It's easy to edit this way.
 Note that some properties don't make sense to edit,

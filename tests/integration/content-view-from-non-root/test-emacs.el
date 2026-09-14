@@ -34,13 +34,13 @@
                             (match-string 0 text))))
         (unless root-line
           (fail "no view-root headline for child; buffer:\n%s" text))
-        (when (string-match-p "(parentIs independent)" root-line)
-          (fail "contained view-root should be content, not independent; line: %S"
+        (when (string-match-p "(affectsParent false)" root-line)
+          (fail "contained view-root should be content, not false; line: %S"
                 root-line))
-        (when (string-match-p "(parentIs independent) indef (rels (contains (out 1 (ancestors 1))) (birth contains))" root-line)
+        (when (string-match-p "(affectsParent false) indef (rels (contains (out 1 (ancestors 1))) (birth contains))" root-line)
           (fail "contained view-root should be content, not content; line: %S"
                 root-line))
-        (when (string-match-p "(parentIs independent) indef (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo))" root-line)
+        (when (string-match-p "(affectsParent false) indef (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo))" root-line)
           (fail "contained view-root should be content, not line: %S"
                 root-line)))
       (let ((line (and (string-match
@@ -48,8 +48,8 @@
                        (match-string 0 text))))
         (unless line
           (fail "no level-2 headline for parent; buffer:\n%s" text))
-        (unless (string-match-p "(parentIs independent) indef (rels (contains (out 1 (ancestors 1))) (birth contains))" line)
-          (fail "parent is not (parentIs independent) indef (rels (contains (out 1 (ancestors 1))) (birth contains)); line: %S" line))
+        (unless (string-match-p "(affectsParent false) indef (rels (contains (out 1 (ancestors 1))) (birth contains))" line)
+          (fail "parent is not (affectsParent false) indef (rels (contains (out 1 (ancestors 1))) (birth contains)); line: %S" line))
         (unless (string-match-p " indef\\b" line)
           (fail "parent is not indefinitive; line: %S" line))))))
 

@@ -43,7 +43,7 @@ payload -- (contains (in 2 (ancestors 1))), birth contains -- renders as
 the C token 2aC: the multi-contains \"2\" (orange), the ancestor \"a\"
 (yellow), and the birth \"C\" (black-on-white)."
   (with-temp-buffer
-    (insert "Line with (skg (node (id 123) (parentIs independent) (rels (contains (in 2 (ancestors 1))) (birth contains)) (viewStats cycle) (editRequest delete))) text")
+    (insert "Line with (skg (node (id 123) (affectsParent false) (rels (contains (in 2 (ancestors 1))) (birth contains)) (viewStats cycle) (editRequest delete))) text")
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
       (let* ( ( herald-start

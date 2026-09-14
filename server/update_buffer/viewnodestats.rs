@@ -5,7 +5,7 @@ use crate::herald_tokens::{AncestorFlags, relationship_heralds_sexp};
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{
-  Birth, GraphNodeStats, ParentIs, PartnerCol, ViewNode, ViewNodeKind, Vognode };
+  Birth, GraphNodeStats, AffectsParent, PartnerCol, ViewNode, ViewNodeKind, Vognode };
 use crate::update_buffer::ancestry::required_ancestor;
 use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet};
@@ -110,12 +110,12 @@ fn set_herald_strings_in_viewnode (
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
-  let (gstats, parentIs, birth, overridesHere)
-    : (GraphNodeStats, ParentIs, Birth, bool) = {
+  let (gstats, affectsParent, birth, overridesHere)
+    : (GraphNodeStats, AffectsParent, Birth, bool) = {
     let ViewNodeKind::Vognode (Vognode::Active (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
-    ( t . graphStats . clone (), t . parentIs, t . birth,
+    ( t . graphStats . clone (), t . affectsParent, t . birth,
       t . viewStats . overridesHere . is_some () ) };
   let counts = match & gstats . rels {
     Some (c) => c . clone (),
@@ -130,7 +130,7 @@ fn set_herald_strings_in_viewnode (
       container_to_contents, content_to_containers,
       node_pid, &anc_pid, generation ); }
   let birth_rels : Vec<NodeRelation> =
-    birth_relations (&parent_kind, parentIs, birth, &flags,
+    birth_relations (&parent_kind, affectsParent, birth, &flags,
                      overridesHere);
   let rel_heralds : Option<String> = relationship_heralds_sexp (
     &counts, gstats . aliases, gstats . extra_ids, &flags, &birth_rels );
@@ -237,17 +237,17 @@ fn flag_ancestor_relations (
 /// is [Hides, Contains].
 fn birth_relations (
   parent_kind : &ParentKind,
-  parentIs    : ParentIs,
+  affectsParent    : AffectsParent,
   birth       : Birth,
   flags       : &AncestorFlags,
   overridesHere : bool, // whether the node is drawn in place of a node it overrides
 ) -> Vec<NodeRelation> {
   let mut rels : Vec<NodeRelation> = {
     // A backpath graft's birth is its role's relation, regardless of
-    // parentIs (grafts are typically Independent/Indefinitive).
+    // affectsParent (grafts are typically Independent/Indefinitive).
     if let Birth::Backpath (role) = birth {
       vec![ role . relation ]
-    } else if parentIs != ParentIs::Affected { Vec::new ()
+    } else if affectsParent != AffectsParent::True { Vec::new ()
     } else {
       match parent_kind {
         ParentKind::Gnode (_) =>
@@ -316,7 +316,7 @@ fn set_hidden_body (
 /// (see 'RelationRole::is_first_role') -- then compares the edge's
 /// actual source ('InRustGraph::edge_source') against its applicable
 /// relationship default. None on any of: no
-/// graph handle; parentIs != Affected or a backpath graft (not a
+/// graph handle; affectsParent != Affected or a backpath graft (not a
 /// genuine member here); a compound filter col
 /// (HiddenInSubscribee / HiddenOutsideOfSubscribee: no single
 /// 'relation_member_role'); no recorded edge; unresolvable homes;
@@ -330,12 +330,12 @@ fn set_rel_source (
   let rel_source : Option<SourceName> = 'compute : {
     let graph : &InRustGraph = match graph {
       Some (g) => g, None => break 'compute None, };
-    let (node_pid, parentIs, birth) : (ID, ParentIs, Birth) = {
+    let (node_pid, affectsParent, birth) : (ID, AffectsParent, Birth) = {
       let ViewNodeKind::Vognode (Vognode::Active (t)) =
         & tree . get (treeid) . unwrap () . value () . kind
       else { break 'compute None; };
-      ( t . collected_id (), t . parentIs, t . birth ) };
-    if parentIs != ParentIs::Affected
+      ( t . collected_id (), t . affectsParent, t . birth ) };
+    if affectsParent != AffectsParent::True
       || birth != Birth::Unremarkable {
       // Not a genuine member of the collection at this position (a
       // self-writer parked under a col, or a backpath graft): there

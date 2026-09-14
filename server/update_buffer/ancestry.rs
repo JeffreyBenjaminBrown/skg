@@ -30,7 +30,7 @@
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::generic::{ read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree };
 use crate::types::tree::viewnode_nodecomplete::write_at_activeNode_in_tree;
-use crate::types::viewnode::{ ParentIs, PartnerCol, ViewNode, ViewNodeKind, Vognode };
+use crate::types::viewnode::{ AffectsParent, PartnerCol, ViewNode, ViewNodeKind, Vognode };
 use crate::update_buffer::util::detach_scaffold_transferring_focus;
 
 use ego_tree::{ NodeId, NodeRef, Tree };
@@ -209,8 +209,8 @@ pub fn deaden_generalized_orphan_col (
   Ok (( )) }
 
 /// Dispose one direct child of a deadened orphan col (TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5.1.a):
-/// - an Affected (parentIs=Affected Normal) view-leaf -> delete;
-/// - an Affected branch (has children) -> demote to parentIs=Independent, so
+/// - an Affected (affectsParent=true Normal) view-leaf -> delete;
+/// - an Affected branch (has children) -> demote to affectsParent=false, so
 ///   the user's subtree survives;
 /// - a nested col (QualCol / PartnerCol) -> LEAVE it untouched: it is itself a
 ///   generalized orphan under this now-dead col, so it deadens itself -- and
@@ -234,7 +234,7 @@ fn dispose_orphaned_col_child (
     : (bool, bool, bool, bool) = {
     let c : NodeRef<ViewNode> = tree . get (child)
       . ok_or ("dispose_orphaned_col_child: child not found") ?;
-    ( c . value () . is_activeNode_and_parentIs_affected (),
+    ( c . value () . is_activeNode_and_affectsParent_true (),
       c . children () . next () . is_none (),
       matches! ( &c . value () . kind,
                  ViewNodeKind::Vognode (_) | ViewNodeKind::Phantom (_) ),
@@ -244,7 +244,7 @@ fn dispose_orphaned_col_child (
       detach_scaffold_transferring_focus (tree, child) ?;
     } else {
       write_at_activeNode_in_tree ( tree, child,
-        |t| { t . parentIs = ParentIs::Independent; } )
+        |t| { t . affectsParent = AffectsParent::False; } )
         . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   } else if is_col {
     // Leave it: a nested col self-deadens at its own visit (see doc above).

@@ -35,7 +35,7 @@
 /// save-eligible for itself but invisible to the col's owner.)
 /// .
 /// DEFINITION: a vognode is *in subscribee-as-such position* iff it
-/// is an Active, parentIs=Affected direct child of a SubscribeeCol.
+/// is an Active, affectsParent=true direct child of a SubscribeeCol.
 /// A non-Affected child of a SubscribeeCol is not a member of the
 /// col, hence not shown *as* a subscribee: it is an ordinary
 /// self-writer parked there.
@@ -50,7 +50,7 @@ use crate::from_text::local_instruction_collection::types::{
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  NodeEditRequest, ParentIs, Qual, QualCol, PartnerCol, ActiveNode, ViewNode,
+  NodeEditRequest, AffectsParent, Qual, QualCol, PartnerCol, ActiveNode, ViewNode,
   ViewNodeKind, Vognode, Phantom };
 
 use ego_tree::NodeRef;
@@ -130,7 +130,7 @@ fn visit_active_vognode (
     match context {
       LocalContext::SubscribeeAsSuchPosition {
         subscriber, subscriber_is_definitive }
-        if t . parentIs == ParentIs::Affected =>
+        if t . affectsParent == AffectsParent::True =>
         Some (( subscriber, *subscriber_is_definitive )),
       _ => None };
   let is_definitive : bool =

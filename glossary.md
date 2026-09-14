@@ -148,9 +148,9 @@ herald-table fact only (`server/heralds.rs`), with no wire atom of its
 own: which cols are read-only is already known from the col atom.
 
 The stale-member rule is uniform across all eight kinds (decided
-2026-06-10, demote-not-discard): a stale `parentIs=Affected` member
+2026-06-10, demote-not-discard): a stale `affectsParent=true` member
 that is a leaf is deleted; one with children is demoted to
-`parentIs=Independent` so the user keeps any subtree they built under
+`affectsParent=false` so the user keeps any subtree they built under
 it; duplicates are deleted; missing graph members are restored.
 
 **Col scaffolds read the process-global graph handle.**  De-novo
@@ -349,7 +349,7 @@ The subscriberCol ("collection of subscribees") is a read-only set.
 Thus the user could flip the order of R and T in the subscribeeCol,
 and this change would be respected in the display, but have no effect
 in the graph. The user could insert X under subscriberCol,
-but because it is a read-only set, X will have its parentIs field
+but because it is a read-only set, X will have its affectsParent field
 rewritten to 'Independent', and have no effect on N.
 (If the user wants X to subscribe to N, they must modify X, not N.)
 The user could delete R, but it will respawn as soon as they save,

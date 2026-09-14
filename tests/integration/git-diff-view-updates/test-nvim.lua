@@ -8,8 +8,8 @@ T.arm_timeout(45)
 local metadata = require('skg.metadata')
 local sexpr = require('skg.sexpr.parse')
 
-local INDEPENDENT = sexpr.symbol('independent')
-local AFFECTED = sexpr.symbol('affected')
+local INDEPENDENT = sexpr.symbol('false')
+local AFFECTED = sexpr.symbol('true')
 
 ---The first element of LIST (a 1-indexed array of sexps) that is a list
 ---whose head is the symbol NAME, or nil.
@@ -28,7 +28,7 @@ end
 ---(ancestors ...)) side, mapped to its role (contains -> container,
 ---textlinksTo -> linkSource, subscribes -> subscribee, overrides ->
 ---overrider, hides -> hider). Only meaningful for a node already known
----to be a graft (parentIs independent).
+---to be a graft (affectsParent false).
 ---@param rels_body any|nil
 ---@return string|nil
 local function graft_role_from_rels (rels_body)
@@ -47,23 +47,23 @@ local function graft_role_from_rels (rels_body)
 end
 
 ---Classify a parsed metadata SEXP (or nil) into a relation string:
----the graft role of a backpath graft (independent node with an
----outbound-ancestor relation), else the explicit parentIs, else the
----implicit 'affected'. Port of headline--relation-from-sexp.
+---the graft role of a backpath graft (false node with an
+---outbound-ancestor relation), else the explicit affectsParent, else the
+---implicit 'true'. Port of headline--relation-from-sexp.
 ---@param sexp any|nil
 ---@return string
 local function relation_from_sexp (sexp)
-  local parentIs_list =
-    metadata.sexp_cdr_at_path(sexp, { 'skg', 'node', 'parentIs' })
+  local affectsParent_list =
+    metadata.sexp_cdr_at_path(sexp, { 'skg', 'node', 'affectsParent' })
   local rels_body =
     metadata.sexp_cdr_at_path(sexp, { 'skg', 'node', 'rels' })
-  local independent = parentIs_list and parentIs_list[1] == INDEPENDENT
-  local graft_role = independent
+  local false = affectsParent_list and affectsParent_list[1] == INDEPENDENT
+  local graft_role = false
     and graft_role_from_rels(rels_body) or nil
   if graft_role then return graft_role end
-  if not parentIs_list or parentIs_list[1] == AFFECTED then
-    return 'affected' end
-  return sexpr.atom_text(parentIs_list[1])
+  if not affectsParent_list or affectsParent_list[1] == AFFECTED then
+    return 'true' end
+  return sexpr.atom_text(affectsParent_list[1])
 end
 
 ---(depth, relation, title) triples for every headline in BUF. Port of
@@ -133,26 +133,26 @@ require('skg.content_view').request_single_root_content_view_from_id('a')
 local buf_a = T.wait_for_buffer('skg://a')
 if not buf_a then T.fail('phase 1: buffer skg://a not created') end
 assert_headline_titles(buf_a,
-  { { 1, 'absent', 'a' },
-    { 2, 'affected', 'b' },
-    { 3, 'affected', 'c' },
-    { 3, 'affected', 'd' },
-    { 3, 'affected', 'e' } },
+  { { 1, 'na', 'a' },
+    { 2, 'true', 'b' },
+    { 3, 'true', 'c' },
+    { 3, 'true', 'd' },
+    { 3, 'true', 'e' } },
   'phase 1: view-a initial')
 
 -- PHASE 2: open view-b. multi_root_view prepends b's containerward
--- ancestry (a) as b's first child before the definitive affected
+-- ancestry (a) as b's first child before the definitive true
 -- children (c, d, e).
 print('=== PHASE 2: Open view from b ===')
 require('skg.content_view').request_single_root_content_view_from_id('b')
 local buf_b = T.wait_for_buffer('skg://b')
 if not buf_b then T.fail('phase 2: buffer skg://b not created') end
 assert_headline_titles(buf_b,
-  { { 1, 'absent', 'b' },
+  { { 1, 'na', 'b' },
     { 2, 'container', 'a' },
-    { 2, 'affected', 'c' },
-    { 2, 'affected', 'd' },
-    { 2, 'affected', 'e' } },
+    { 2, 'true', 'c' },
+    { 2, 'true', 'd' },
+    { 2, 'true', 'e' } },
   'phase 2: view-b initial')
 
 -- PHASE 3: edit view-b and save. c gets editRequest delete; d is
@@ -176,10 +176,10 @@ T.check(T.wait_for_response(), 'phase 3: save response arrived')
 print('=== PHASE 4: Verify view-b after save ===')
 print('Buffer-b after save: ' .. T.buffer_text(buf_b))
 assert_headline_titles(buf_b,
-  { { 1, 'absent', 'b' },
-    { 2, 'affected', 'e, edited' },
-    { 2, 'affected', 'f' },
-    { 3, 'affected', 'd' } },
+  { { 1, 'na', 'b' },
+    { 2, 'true', 'e, edited' },
+    { 2, 'true', 'f' },
+    { 3, 'true', 'd' } },
   'phase 4: view-b after save')
 
 -- PHASE 5: toggle git diff mode ON. Must be in a content-view buffer
@@ -246,10 +246,10 @@ T.check(T.wait_for_response(20), 'phase 10: diff-mode-off response arrived')
 -- PHASE 11: verify both views are clean (no diff/phantom markers).
 print('=== PHASE 11: Verify views are clean (no diff markers) ===')
 assert_headline_titles(buf_b,
-  { { 1, 'absent', 'b' },
-    { 2, 'affected', 'e, edited' },
-    { 2, 'affected', 'f' },
-    { 3, 'affected', 'd' } },
+  { { 1, 'na', 'b' },
+    { 2, 'true', 'e, edited' },
+    { 2, 'true', 'f' },
+    { 3, 'true', 'd' } },
   'phase 11: view-b clean')
 do
   local titles_a = headline_titles(buf_a)

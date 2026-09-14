@@ -168,7 +168,7 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///
 ///   * 'leaf_abut' -- the emitted token glues onto the preceding
 ///     token with no space (used so the indefinitive marker "☮" sits
-///     directly on its parentIs glyph).
+///     directly on its affectsParent glyph).
 ///
 /// WHY SOME RULES LOOK EMPTY OR REDUNDANT:
 ///
@@ -188,12 +188,12 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///     axes because existence-change markers only apply to ActiveNodes,
 ///     not to scaffolds.
 ///
-///   * The 'parentIs' sub-rule 'container' names an atom the server
-///     NEVER emits: the server leaves parentIs=affected implicit, and
-///     Emacs ('heralds--inject-default-parentIs') inserts the
+///   * The 'affectsParent' sub-rule 'container' names an atom the server
+///     NEVER emits: the server leaves affectsParent=true implicit, and
+///     Emacs ('heralds--inject-default-affectsParent') inserts the
 ///     internal-only 'container' atom so omitted ordinary content
-///     keeps its "{" herald while explicit '(parentIs affected)'
-///     stays quiet. 'affected' itself is accepted on parse but never
+///     keeps its "{" herald while explicit '(affectsParent true)'
+///     stays quiet. 'true' itself is accepted on parse but never
 ///     emitted. Both are in ACCEPTED_NOT_EMITTED_ATOMS in the
 ///     conformance test.
 pub fn herald_rule_table () -> HeraldRule {
@@ -269,10 +269,10 @@ pub fn herald_rule_table () -> HeraldRule {
       rule ("node", vec! [
         vac ("id"),
         vac ("source"),
-        rule ("parentIs", vec! [
-          vac ("absent"),
-          vac ("affected"),
-          leaf (Orange, "independent", "⊥") ]),
+        rule ("affectsParent", vec! [
+          vac ("na"),
+          vac ("true"),
+          leaf (Orange, "false", "⊥") ]),
         // The server emits the abbreviated atom 'indef'
         // (see org_to_text.rs); we match that here.
         leaf_abut (Green, "indef", "☮"),
@@ -328,7 +328,7 @@ pub fn herald_rule_table () -> HeraldRule {
       // own root atom 'diffPhantom', not 'node'. Its grammar is the
       // strict subset of node's that phantomDiff_metadata_to_string can
       // produce: id, source, indef, graphStats, the staged/unstaged diff
-      // axes, and notInGit -- never parentIs/birth/viewStats/editRequest/
+      // axes, and notInGit -- never affectsParent/birth/viewStats/editRequest/
       // viewRequests.
       rule ("diffPhantom", vec! [
         vac ("id"),
@@ -428,7 +428,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     "deletedScaffold",
     // Keys inside node / diffPhantom / deleted / unknown forms:
     "id", "source",
-    "parentIs", "indef", "hiddenBody", "notInGit",
+    "affectsParent", "indef", "hiddenBody", "notInGit",
     // The assembled relationship-herald atom, a payload of styled spans
     // (server/herald_tokens.rs); its span sub-forms are value position,
     // consumed by the client's renderer, so they are not match atoms.
@@ -440,7 +440,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   ];
   atoms . extend ( graphstats_atoms () );
   atoms . extend ( viewstats_atoms () );
-  atoms . extend ( parentIs_emitted_atoms () );
+  atoms . extend ( affectsParent_emitted_atoms () );
   atoms . extend ( axis_atoms () );
   atoms . extend ( qual_and_col_atoms () );
   atoms . extend ( ViewRequest::EMITTABLE_MATCH_ATOMS );
@@ -478,15 +478,15 @@ fn viewstats_atoms () -> Vec<&'static str> {
   let _ = guard;
   vec! [ "cycle", "sourceHerald", "overridesHere", "relSource" ] }
 
-/// ParentIs values the serializer can emit (Affected stays implicit).
-fn parentIs_emitted_atoms () -> Vec<&'static str> {
-  use crate::types::viewnode::ParentIs;
-  fn guard ( p : ParentIs ) { // compile error here = update the list below
+/// AffectsParent values the serializer can emit (True stays implicit).
+fn affectsParent_emitted_atoms () -> Vec<&'static str> {
+  use crate::types::viewnode::AffectsParent;
+  fn guard ( p : AffectsParent ) { // compile error here = update the list below
     match p {
-      ParentIs::Affected | ParentIs::Independent | ParentIs::Absent
+      AffectsParent::True | AffectsParent::False | AffectsParent::NA
         => () }}
   let _ = guard;
-  vec! [ "independent", "absent" ] }
+  vec! [ "false", "na" ] }
 
 /// The staged/unstaged axis atoms, from types/git.rs.
 fn axis_atoms () -> Vec<&'static str> {

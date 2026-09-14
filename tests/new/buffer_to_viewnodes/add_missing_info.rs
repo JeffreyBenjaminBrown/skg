@@ -6,7 +6,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::{
   org_to_uninterpreted_viewforest};
 use skg::from_text::buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest,
-  absent_parentIs_under_visible_parent_becomes_isContainer};
+  na_affectsParent_under_visible_parent_becomes_isContainer};
 use skg::test_utils::{run_with_shared_test_stores, compare_viewnode_trees_modulo_id, compare_viewnode_trees};
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, MpViewnodeKind, MpVognode};
@@ -14,7 +14,7 @@ use skg::types::misc::{SkgConfig, ID, SourceName, TantivyIndex};
 use skg::types::tree::forest::{
   MpViewForest,
   tree_forest_root_ids};
-use skg::types::viewnode::ParentIs;
+use skg::types::viewnode::AffectsParent;
 
 use ego_tree::Tree;
 
@@ -146,16 +146,16 @@ async fn test_add_missing_info_logic (
   Ok (( )) }
 
 #[test]
-fn test_absent_parentIs_under_visible_parent_becomes_isContainer () {
+fn test_na_affectsParent_under_visible_parent_becomes_isContainer () {
   let input : &str =
     indoc! {"
-            * (skg (node (id root) (source main) (parentIs absent))) root
-            ** (skg (node (id moved) (source main) (parentIs absent))) moved
+            * (skg (node (id root) (source main) (affectsParent na))) root
+            ** (skg (node (id moved) (source main) (affectsParent na))) moved
         "};
   let mut viewforest : MpViewForest =
     org_to_uninterpreted_viewforest (input) . unwrap() . 0;
 
-  absent_parentIs_under_visible_parent_becomes_isContainer (
+  na_affectsParent_under_visible_parent_becomes_isContainer (
     &mut viewforest );
 
   let root_node =
@@ -166,12 +166,12 @@ fn test_absent_parentIs_under_visible_parent_becomes_isContainer () {
   match &root_node . value() . kind {
     MpViewnodeKind::Vognode (
       MpVognode::Active (t)) =>
-      assert_eq! (t . parentIs, ParentIs::Absent),
+      assert_eq! (t . affectsParent, AffectsParent::NA),
     _ => panic! ("expected root ActiveNode") }
   match &moved_node . value() . kind {
     MpViewnodeKind::Vognode (
       MpVognode::Active (t)) =>
-      assert_eq! (t . parentIs, ParentIs::Affected),
+      assert_eq! (t . affectsParent, AffectsParent::True),
     _ => panic! ("expected moved ActiveNode") }
 }
 

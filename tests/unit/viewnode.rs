@@ -25,7 +25,7 @@ fn partnerCol_policy_mapping () {
 fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   let mut active : ViewNode = mk_viewnode (
     ID::from ("active"), SourceName::from ("public"), "active" . into (),
-    ParentIs::Affected, Birth::Unremarkable,
+    AffectsParent::True, Birth::Unremarkable,
     IndefOrDef::Definitive {
       body : None,
       edit_request : Some (NodeEditRequest::Delete) },

@@ -38,7 +38,7 @@ use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::source_sets::{ActiveSourceSet, search_ids_for_source_set_for_test as search_ids_for_source_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_viewnode};
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, AffectsParent, mk_indefinitive_viewnode};
 use crate::types::viewnode::{QualCol, Qual};
 
 use ego_tree::{NodeId, NodeMut};
@@ -626,7 +626,7 @@ pub fn build_search_viewforest (
             (*id) . clone (),
             (*source) . clone (),
             title . clone (),
-            ParentIs::Absent ) );
+            AffectsParent::NA ) );
       if sorted_matches . len () > 1 {
         // We bury all but the best match in an AliasCol.
         // PITFALL: The title might not be the best match,

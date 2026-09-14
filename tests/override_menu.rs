@@ -28,7 +28,7 @@ use skg::to_org::render::override_menu::override_menu_view;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::tree::forest::ViewForest;
-use skg::types::viewnode::{ParentIs, mk_indefinitive_viewnode};
+use skg::types::viewnode::{AffectsParent, mk_indefinitive_viewnode};
 use skg::types::misc::SourceName;
 use skg::types::views_state::{OpenViews, ViewUri};
 
@@ -103,7 +103,7 @@ async fn menu_shows_all_edges_with_override_ancestor_facts (
       { let (z_depth, z_line) =
           line_with_id (&menu, "Z") . expect ("Z is the root");
         assert_eq! (z_depth, 1, "{}", menu);
-        assert! ( z_line . contains ("(parentIs absent)"),
+        assert! ( z_line . contains ("(affectsParent na)"),
                   "{}", menu ); }
       for overrider in ["R", "F"] {
         let (depth, line) =
@@ -113,7 +113,7 @@ async fn menu_shows_all_edges_with_override_ancestor_facts (
               overrider, menu ));
         assert_eq! ( depth, 2, "{}", menu );
         assert! ( line . contains ("indef"), "{}", menu );
-        assert! ( line . contains ("(parentIs independent)"),
+        assert! ( line . contains ("(affectsParent false)"),
           "a menu child must not read as content (saving the menu \
            must not edit Z's contains):\n{}", menu );
         // The semantic herald wire says that the visible parent
@@ -409,7 +409,7 @@ async fn handler_precedence_and_menu_dedup (
           f . append_root (
             mk_indefinitive_viewnode (
               ID::from ("Z"), SourceName::from ("main"),
-              "Z" . to_string (), ParentIs::Absent ));
+              "Z" . to_string (), AffectsParent::NA ));
           f };
         views_state . open_views . register_view (
           &graph . load_full (),

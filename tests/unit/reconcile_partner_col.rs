@@ -4,12 +4,12 @@ use crate::types::viewnode::{mk_indefinitive_viewnode, viewforest_root_viewnode}
 fn active_affected (id_str : &str) -> ViewNode {
   mk_indefinitive_viewnode (
     ID::from (id_str), SourceName::from ("main"),
-    id_str . to_string (), ParentIs::Affected ) }
+    id_str . to_string (), AffectsParent::True ) }
 
 fn active_independent (id_str : &str) -> ViewNode {
   mk_indefinitive_viewnode (
     ID::from (id_str), SourceName::from ("main"),
-    id_str . to_string (), ParentIs::Independent ) }
+    id_str . to_string (), AffectsParent::False ) }
 
 fn mk_col (kind : PartnerCol) -> ViewNode {
   ViewNode {

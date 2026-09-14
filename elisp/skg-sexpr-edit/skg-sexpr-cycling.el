@@ -43,8 +43,8 @@ Returns nil if the field is not cycleable."
   (cond
    ((string= field-name "indef")
    '("false (default)" "true"))
-   ((string= field-name "parentIs")
-    '("affected (default)" "independent" "absent"))
+   ((string= field-name "affectsParent")
+    '("true (default)" "false" "na"))
    ((string= field-name "editRequest")
     '("none (default)" "delete" "merge"))
    ((string= field-name "source") ;; from the config

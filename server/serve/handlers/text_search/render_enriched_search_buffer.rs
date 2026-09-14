@@ -5,7 +5,7 @@ use crate::dbs::in_rust_graph::ancestry::AncestryTree;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use crate::types::viewnode::{Birth, ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_viewnode_with_birth};
+use crate::types::viewnode::{Birth, ViewNode, ViewNodeKind, AffectsParent, mk_indefinitive_viewnode_with_birth};
 use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
@@ -195,7 +195,7 @@ fn graft_override_chain (
     if ! active . contains_source (&node . source) { continue; }
     let child : ViewNode = mk_indefinitive_viewnode_with_birth (
       rel . clone (), node . source . clone (), node . title . clone (),
-      ParentIs::Independent, Birth::Backpath (birth_role) );
+      AffectsParent::False, Birth::Backpath (birth_role) );
     let child_nid : NodeId = {
       let mut parent_mut : NodeMut<ViewNode> =
         viewforest . get_mut (parent_nid) . unwrap ();
@@ -225,12 +225,12 @@ fn prepend_containing_child_from_tantivy (
         } else {
           mk_indefinitive_viewnode_with_birth (
             node_id . clone (), source, title,
-            ParentIs::Independent, Birth::Backpath (RelationRole::CONTAINER) ) }},
+            AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER) ) }},
       None =>
         mk_indefinitive_viewnode_with_birth (
           node_id . clone (), SourceName::from ("search"),
           node_id . as_str () . to_string (),
-          ParentIs::Independent, Birth::Backpath (RelationRole::CONTAINER) ) };
+          AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER) ) };
   let mut parent_mut : NodeMut<ViewNode> =
     viewforest . get_mut (parent_treeid) . unwrap ();
   Some (parent_mut . prepend (viewnode) . id ()) }

@@ -18,12 +18,12 @@ local M = {}
 ---Canonical order for node fields. Fields not in this list go last.
 M.canonical_field_order = {
   'id', 'source',
-  'indef', 'parentIs', 'birth', 'editRequest', 'viewRequests' }
+  'indef', 'affectsParent', 'birth', 'editRequest', 'viewRequests' }
 
 ---Editable field names mapped to their default value text.
 M.editable_defaults = {
   { name = 'indef', default = 'false (default)' },
-  { name = 'parentIs', default = 'affected (default)' },
+  { name = 'affectsParent', default = 'true (default)' },
   { name = 'birth', default = 'unremarkable (default)' },
   { name = 'editRequest', default = 'none (default)' },
   { name = 'viewRequests', default = 'none (default)' } }
@@ -109,7 +109,7 @@ function M.expand_headlines (headlines, default_source)
   return M.concatenated(before_node, expanded_children, remainder)
 end
 
----The index of the 'node' headline in HEADLINES; errors if absent.
+---The index of the 'node' headline in HEADLINES; errors if na.
 ---@param headlines table[]
 ---@return integer
 function M.find_node_headline (headlines)
@@ -290,7 +290,7 @@ function M.strip_one_field (group, field_name, child_level)
       -- Collapse to bare atom (no children).
       return { { level = child_level, text = field_name } } end
     return group end
-  if field_name == 'parentIs' then
+  if field_name == 'affectsParent' then
     if value_text == nil or M.default_affected_p(value_text) then
       return nil end
     return group end
@@ -345,7 +345,7 @@ end
 ---@return boolean
 function M.default_affected_p (text)
   local trimmed = vim.trim(text)
-  return trimmed == 'affected (default)' or trimmed == 'affected'
+  return trimmed == 'true (default)' or trimmed == 'true'
 end
 
 ---@param text string

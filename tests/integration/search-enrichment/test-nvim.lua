@@ -30,7 +30,7 @@ local function search_root_line (buf)
 end
 
 ---Assert BUF's leaf-b search-root line exists and carries none of the
----special-origin birthHeralds (independent / content / linksToParent):
+---special-origin birthHeralds (false / content / linksToParent):
 ---a plain search result should just be a content-type root.
 ---@param buf integer
 ---@param phase string for failure messages
@@ -38,13 +38,13 @@ local function assert_leaf_b_root_is_content (buf, phase)
   local line = search_root_line(buf)
   T.check(line ~= nil,
     'leaf-b search root found during ' .. phase)
-  T.check(not line:find('(parentIs independent)', 1, true),
-    'leaf-b search root is not independent during ' .. phase)
+  T.check(not line:find('(affectsParent false)', 1, true),
+    'leaf-b search root is not false during ' .. phase)
   T.check(not line:find(
-            '(parentIs independent) indef (rels (contains (out 1 (ancestors 1))) (birth contains))', 1, true),
+            '(affectsParent false) indef (rels (contains (out 1 (ancestors 1))) (birth contains))', 1, true),
     'leaf-b search root is not content-birthed during ' .. phase)
   T.check(not line:find(
-            '(parentIs independent) indef (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo))', 1, true),
+            '(affectsParent false) indef (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo))', 1, true),
     'leaf-b search root is not linksToParent-birthed during ' .. phase)
 end
 

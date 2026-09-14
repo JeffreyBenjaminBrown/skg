@@ -10,7 +10,7 @@ use skg::from_text::local_instruction_collection::predicates::{
 use skg::types::git::Sign;
 use skg::types::misc::{ID, SourceName};
 use skg::types::viewnode::{
-  default_activeNode, NodeEditRequest, IndefOrDef, ParentIs,
+  default_activeNode, NodeEditRequest, IndefOrDef, AffectsParent,
   ActiveNode };
 
 fn base_activeNode (
@@ -34,9 +34,9 @@ fn with_edit_request (
 fn relation_collection_membership_conditions () {
   assert!( member_counts_for_partnerCol (
     &base_activeNode () ));
-  { // parentIs != Affected excludes.
+  { // affectsParent != Affected excludes.
     let mut t : ActiveNode = base_activeNode ();
-    t . parentIs = ParentIs::Independent;
+    t . affectsParent = AffectsParent::False;
     assert!( ! member_counts_for_partnerCol (&t) ); }
   { // A negative staged membership axis (would-be diff phantom) excludes.
     let mut t : ActiveNode = base_activeNode ();
@@ -70,7 +70,7 @@ fn content_membership_coincides_with_relation_collection_membership () {
             with_edit_request (NodeEditRequest::Delete),
             with_edit_request (NodeEditRequest::NodeMerge (ID::from ("other"))) ];
     { let mut t : ActiveNode = base_activeNode ();
-      t . parentIs = ParentIs::Independent;
+      t . affectsParent = AffectsParent::False;
       cases . push (t); }
     { let mut t : ActiveNode = base_activeNode ();
       t . membership . unstaged = Some (Sign::Minus);
@@ -87,9 +87,9 @@ fn content_membership_coincides_with_relation_collection_membership () {
 fn visible_content_membership_conditions () {
   assert!( active_child_counts_as_visible_content (
     &base_activeNode () ));
-  { // parentIs != Affected excludes.
+  { // affectsParent != Affected excludes.
     let mut t : ActiveNode = base_activeNode ();
-    t . parentIs = ParentIs::Independent;
+    t . affectsParent = AffectsParent::False;
     assert!( ! active_child_counts_as_visible_content (&t) ); }
   // A Delete edit request excludes; a NodeMerge edit request does not.
   assert!( ! active_child_counts_as_visible_content (

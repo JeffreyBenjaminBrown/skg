@@ -19,12 +19,12 @@
 
 (defconst skg-activeNode--canonical-field-order
   '("id" "source"
-    "indef" "parentIs" "birth" "editRequest" "viewRequests")
+    "indef" "affectsParent" "birth" "editRequest" "viewRequests")
   "Canonical order for node fields. Fields not in this list go last.")
 
 (defconst skg-activeNode--editable-defaults
   '(("indef"  . "false (default)")
-    ("parentIs"      . "affected (default)")
+    ("affectsParent"      . "true (default)")
     ("birth"         . "unremarkable (default)")
     ("editRequest"   . "none (default)")
     ("viewRequests"  . "none (default)"))
@@ -289,7 +289,7 @@ CHILD-LEVEL is the level of the field headline."
         ;; Collapse to bare atom (no children)
         (list (cons child-level field-name)))
        (t group)))
-     ((string= field-name "parentIs")
+     ((string= field-name "affectsParent")
       (cond
        ((or (null value-text)
             (skg-activeNode--default-content-p value-text))
@@ -353,10 +353,10 @@ CHILD-LEVEL is the level of the field headline."
         (string= trimmed "false"))))
 
 (defun skg-activeNode--default-content-p (text)
-  "Return non-nil if TEXT represents the default 'affected' value."
+  "Return non-nil if TEXT represents the default 'true' value."
   (let ((trimmed (string-trim text)))
-    (or (string= trimmed "affected (default)")
-        (string= trimmed "affected"))))
+    (or (string= trimmed "true (default)")
+        (string= trimmed "true"))))
 
 (defun skg-activeNode--default-birth-p (text)
   "Return non-nil if TEXT represents the default birth value."

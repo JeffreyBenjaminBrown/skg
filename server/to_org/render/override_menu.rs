@@ -19,7 +19,7 @@ use crate::types::env::SkgEnv;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ParentIs, ViewNode, mk_indefinitive_viewnode};
+  AffectsParent, ViewNode, mk_indefinitive_viewnode};
 use crate::types::views_state::pids_from_viewforest;
 use crate::update_buffer::finish_viewforest;
 
@@ -60,7 +60,7 @@ pub(crate) fn override_menu_view_with_runtime (
         pid . clone (),
         root_node . source . clone (),
         root_node . title . clone (),
-        ParentIs::Absent ));
+        AffectsParent::NA ));
   { let mut path : HashSet<ID> =
       HashSet::from ( [ pid . clone () ] );
     add_overrider_branches (
@@ -100,7 +100,7 @@ fn add_overrider_branches (
           overrider . clone (),
           node . source . clone (),
           node . title . clone (),
-          ParentIs::Independent ))
+          AffectsParent::False ))
         . id () };
     if path . insert ( overrider . clone () ) {
       add_overrider_branches (

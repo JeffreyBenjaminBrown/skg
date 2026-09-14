@@ -373,12 +373,12 @@ fn test_extract_nonmergeSavePlan_mixed_relations() {
   let input: &str =
     indoc! {"
             * (skg (node (id root) (source main))) root node
-            ** (skg (node (id unrelated1) (source main) (parentIs independent))) unrelated child
+            ** (skg (node (id unrelated1) (source main) (affectsParent false))) unrelated child
             ** (skg (node (id content1) (source main))) content child 1
             ** (skg aliasCol) aliases
             *** (skg alias) my alias
             ** (skg (node (id content2) (source main))) content child 2
-            ** (skg (node (id unrelated2) (source main) (parentIs independent))) another unrelated child
+            ** (skg (node (id unrelated2) (source main) (affectsParent false))) another unrelated child
         "};
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
@@ -407,7 +407,7 @@ fn extraction_preserves_content_and_independent_children (
     indoc! {"
             * (skg (node (id root) (source main))) root
             ** (skg (node (id ordinary) (source main))) ordinary
-            ** (skg (node (id independent) (source main) (parentIs independent))) independent
+            ** (skg (node (id independent) (source main) (affectsParent false))) independent
         "};
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
@@ -693,7 +693,7 @@ fn subscribee_hiderel_intent_excludes_non_content_delete_and_phantom_children (
             ** (skg subscribeeCol)
             *** (skg (node (id subscribee) (source main))) subscribee
             **** (skg (node (id keep) (source main))) keep
-            **** (skg (node (id independent) (source main) (parentIs independent))) independent
+            **** (skg (node (id independent) (source main) (affectsParent false))) independent
             **** (skg (node (id delete-me) (source main) (editRequest delete))) delete me
             **** (skg (node (id phantom) (source main))) phantom
             "};
@@ -785,7 +785,7 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
     indoc! {"
             * (skg (node (id root) (source main))) root
             Root body
-            ** (skg (node (id independent) (source main) (parentIs independent))) independent
+            ** (skg (node (id independent) (source main) (affectsParent false))) independent
             ** (skg (node (id content) (source main))) content
             ** (skg aliasCol) aliases
             *** (skg alias) root alias
@@ -1373,7 +1373,7 @@ fn test_extract_nonmergeSavePlan_complex_scenario() {
             ** (skg (node (id section2) (source main) (editRequest delete))) Section 2
             ** (skg (node (id section3) (source main))) Section 3
             * (skg (node (id doc2) (source main))) Document 2
-            ** (skg (node (id ref_section) (source main) (parentIs independent))) Reference Section
+            ** (skg (node (id ref_section) (source main) (affectsParent false))) Reference Section
         "};
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
@@ -1500,7 +1500,7 @@ fn independent_member_is_excluded_from_overriddens (
             * (skg (node (id overrider) (source main))) overrider
             ** (skg overriddenCol)
             *** (skg (node (id keep) (source main))) keep
-            *** (skg (node (id bystander) (source main) (parentIs independent))) bystander
+            *** (skg (node (id bystander) (source main) (affectsParent false))) bystander
         "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);

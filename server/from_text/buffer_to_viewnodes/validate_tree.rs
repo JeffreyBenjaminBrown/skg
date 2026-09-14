@@ -6,7 +6,7 @@ use crate::dbs::in_rust_graph::override_resolution::{
 use crate::dbs::in_rust_graph::override_invariants::existing_user_owned_overrider_of;
 use crate::dbs::node_lookup::opt_nodecomplete_by_id;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::viewnode::{ParentIs, Qual, QualCol, ViewRequest};
+use crate::types::viewnode::{AffectsParent, Qual, QualCol, ViewRequest};
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 use crate::types::tree::forest::MpViewForest;
@@ -278,7 +278,7 @@ fn validate_view_roots (
 /// For each node in the viewforest, if it has a definitive view request,
 /// verify that:
 /// - The node is indefinitive.
-/// - It has no content children (ActiveNode children with parentIs ==
+/// - It has no content children (ActiveNode children with affectsParent ==
 ///   Container). Non-content children — containerward ancestry stubs,
 ///   link sources, scaffolds, etc. — don't block expansion:
 ///   they won't be clobbered by it.
@@ -310,7 +310,7 @@ fn validate_definitive_view_requests (
               node_ref . children () . any ( |child| matches! (
                 &child . value () . kind,
                 MpViewnodeKind::Vognode (MpVognode::Active (ct))
-                  if ct . parentIs == ParentIs::Affected ));
+                  if ct . affectsParent == AffectsParent::True ));
             if has_content_children
             { errors . push(
               BufferValidationError::DefinitiveRequestOnNodeWithContentChildren(

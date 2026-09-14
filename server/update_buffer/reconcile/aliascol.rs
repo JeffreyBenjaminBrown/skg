@@ -3,7 +3,7 @@ use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, ParentIs};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, AffectsParent};
 use crate::types::viewnode::{Vognode, QualCol, Qual};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
@@ -21,7 +21,7 @@ use std::error::Error;
 /// - Fetch the corresponding NodeComplete from the map
 /// - Read its aliases into 'aliases'
 /// - Partition the AliasCol's children into:
-///   - ActiveNodes with parentIs != Affected
+///   - ActiveNodes with affectsParent != Affected
 ///   - Alias scaffold nodes
 ///   (Error if any child does not fit these categories.)
 /// - Reorder children: ignored ActiveNodes first, then Alias nodes
@@ -111,13 +111,13 @@ pub fn reconcile_alias_col_children (
   treat_certain_children(
       // Currently unreachable: validation rejects active vognode
       // children of AliasCol. If that is later relaxed, only Normal
-      // Vognodes need repair; parentIs is a vestigial field in Phantoms.
+      // Vognodes need repair; affectsParent is a vestigial field in Phantoms.
       tree, aliascol_node_id,
       |vn : &ViewNode| matches!( &vn . kind,
                                   ViewNodeKind::Vognode (Vognode::Active (_)) ),
       |vn : &mut ViewNode| {
         if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
           = vn . kind
-          { t . parentIs = ParentIs::Independent; }},
+          { t . affectsParent = AffectsParent::False; }},
     ) . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   Ok( () ) }

@@ -24,7 +24,7 @@ use crate::types::tree::forest::{MpViewForest, ViewForest};
 use buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest_in_graph,
-  absent_parentIs_under_visible_parent_becomes_isContainer,
+  na_affectsParent_under_visible_parent_becomes_isContainer,
   EnrichmentProvenance};
 use fork::{
   CloneSourceInputs,
@@ -115,7 +115,7 @@ pub fn buffer_to_validated_saveplan_with_fork_sources_and_previous_view_in_graph
       add_missing_info_to_viewforest_in_graph (
         & mut maybePlaced_viewforest, graph )
       } . map_err (SaveError::DatabaseError) ?;
-  absent_parentIs_under_visible_parent_becomes_isContainer (
+  na_affectsParent_under_visible_parent_becomes_isContainer (
     &mut maybePlaced_viewforest );
   { // If saving is impossible, don't.
     let mut validation_errors : Vec<BufferValidationError> =

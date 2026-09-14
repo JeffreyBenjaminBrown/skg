@@ -230,20 +230,20 @@ async fn readonly_insert (
   if ! resp . errors . is_empty () {
     fails . record (&scenario, format! (
       "save reported errors: {:?}", resp . errors)); return Ok (( )); }
-  // The intruder is demoted to independent in the rerendered view.
+  // The intruder is demoted to affectsParent=false in the rerendered view.
   { let intruder_after : &str = line_containing (
       &resp . saved_view, &format! ("(id {})", spec . intruder) );
-    if ! intruder_after . contains ("independent") {
+    if ! intruder_after . contains ("(affectsParent false)") {
       fails . record (&scenario, format! (
-        "intruder must be demoted to independent: {}",
+        "intruder must be demoted to affectsParent=false: {}",
         intruder_after )); } }
   // ... and a warning says so.
   if ! resp . warnings . iter () . any ( |w|
       w . contains (&format! ("Repaired {}", spec . atom))
-      && w . contains ("independent")
+      && w . contains ("false")
       && w . contains (spec . intruder) ) {
     fails . record (&scenario, format! (
-      "expected a demote-to-independent warning naming {}: {:?}",
+      "expected an affectsParent=false warning naming {}: {:?}",
       spec . intruder, resp . warnings )); }
   Ok (( )) }
 

@@ -109,7 +109,7 @@ plain parens (TODO/more.org). Fields producing no herald get none."
   (skg-test-install-herald-rules)
   (with-temp-buffer
     (insert "* skg\n** node\n*** source\n**** main\n*** indef\n"
-            "*** parentIs\n**** independent\n")
+            "*** affectsParent\n**** false\n")
     (org-mode)
     (skg-sexp-edit--decorate-with-heralds)
     (let ((hint-on-line
@@ -128,7 +128,7 @@ plain parens (TODO/more.org). Fields producing no herald get none."
                (and ov (substring-no-properties
                         (overlay-get ov 'after-string)))))))
       (should (equal (funcall hint-on-line "*** indef") " (\u262e)"))
-      (should (equal (funcall hint-on-line "**** independent") " (\u22a5)"))
+      (should (equal (funcall hint-on-line "**** false") " (\u22a5)"))
       (should-not (funcall hint-on-line "**** main"))
       (should-not (funcall hint-on-line "*** source"))
       ;; The buffer TEXT is untouched: committing must not see hints.

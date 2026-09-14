@@ -5,7 +5,7 @@ use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{members_of, ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, ActiveNode, ParentIs };
+    ViewNode, ViewNodeKind, ActiveNode, AffectsParent };
 use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual, PartnerCol};
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind };
@@ -232,7 +232,7 @@ pub fn find_children_by_ids (
 /// Check if all nodes at the specified generation satisfy the predicate.
 /// Returns true if the generation is empty (vacuously true).
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes ActiveNodes with parentIs != Affected.
+/// If skip_non_content, excludes ActiveNodes with affectsParent != Affected.
 pub fn generation_includes_only<F> (
   tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
@@ -248,7 +248,7 @@ where F: Fn (&MpViewnode) -> bool
 
 /// Check if the generation is nonempty and all nodes satisfy the predicate.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes ActiveNodes with parentIs != Affected.
+/// If skip_non_content, excludes ActiveNodes with affectsParent != Affected.
 pub fn generation_exists_and_includes<F> (
   tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
@@ -266,7 +266,7 @@ where F: Fn (&MpViewnode) -> bool
 
 /// Check if the specified generation is empty.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes ActiveNodes with parentIs != Affected.
+/// If skip_non_content, excludes ActiveNodes with affectsParent != Affected.
 pub fn generation_does_not_exist (
   tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
@@ -281,7 +281,7 @@ pub fn generation_does_not_exist (
 /// Positive generation = descendants (1 = children, 2 = grandchildren, etc.)
 /// Generation 0 returns just the node itself.
 /// If 'skip_non_content' is true and generation > 0,
-///   then we exclude ActiveNodes with parentIs != Affected.
+///   then we exclude ActiveNodes with affectsParent != Affected.
 fn collect_generation (
   tree               : &Tree<MpViewnode>,
   node_id            : NodeId,
@@ -311,11 +311,11 @@ fn collect_generation (
           next_gen . extend(
             n . children()
               . filter(|c| !skip_non_content ||
-                          // TODO/DONE/local-view-update/plan_v2.org §11: a phantom has no parentIs and is implicitly
+                          // TODO/DONE/local-view-update/plan_v2.org §11: a phantom has no affectsParent and is implicitly
                           // Affected (content), so it is never filtered here.
                           !matches!(&c . value() . kind,
                                     MpViewnodeKind::Vognode (MpVognode::Active (t))
-                                    if t . parentIs != ParentIs::Affected ))
+                                    if t . affectsParent != AffectsParent::True ))
               . map(|c| c . id()) ); }}
       current_gen = next_gen; }
     current_gen } }

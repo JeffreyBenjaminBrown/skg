@@ -135,7 +135,7 @@ parent's (source X) with each child's (id N)."
   (with-temp-buffer
     (insert "# FORK CONFIRMATION\n")
     (insert "* (skg (node (source owned2) (viewStats (sourceHerald ⌂:owned2)))) N-edited\n")
-    (insert "** (skg (node (id N) (source foreign) (parentIs independent) indef (rels \"aO\"))) N-original\n")
+    (insert "** (skg (node (id N) (source foreign) (affectsParent false) indef (rels \"aO\"))) N-original\n")
     (org-mode)
     (should (equal (skg--fork-sources-from-confirmation-buffer)
                    '(("N" . "owned2"))))))
@@ -162,7 +162,7 @@ ordinary-save refusal on C-x C-s."
   (let ((origin (generate-new-buffer "*fork-origin*")))
     (unwind-protect
         (let ((buf (skg--show-fork-confirmation
-                    "# FORK CONFIRMATION\n* (skg (node (source owned))) N-edited\n** (skg (node (id N) (source foreign) (parentIs independent) indef (rels \"aO\"))) N-original\n"
+                    "# FORK CONFIRMATION\n* (skg (node (source owned))) N-edited\n** (skg (node (id N) (source foreign) (affectsParent false) indef (rels \"aO\"))) N-original\n"
                     origin)))
           (unwind-protect
               (with-current-buffer buf
@@ -201,7 +201,7 @@ clone) as the default, and writes the choice into the metadata."
     (insert "Some explanation.\n")
     (insert "# Suggested source for the clone below: owned2\n")
     (insert "* (skg (node (source PICK-A-SOURCE) (viewStats (sourceHerald ⌂:PICK-A-SOURCE)))) N-edited\n")
-    (insert "** (skg (node (id N) (source foreign) (parentIs independent) indef)) N-original\n")
+    (insert "** (skg (node (id N) (source foreign) (affectsParent false) indef)) N-original\n")
     (org-mode)
     (let ((offered-defaults nil))
       (cl-letf (((symbol-function 'skg--owned-sources)
@@ -223,7 +223,7 @@ clone) as the default, and writes the choice into the metadata."
 saved metadata, so the server omitted the placeholder) prompts nothing."
   (with-temp-buffer
     (insert "* (skg (node (source owned2) (viewStats (sourceHerald ⌂:owned2)))) N-edited\n")
-    (insert "** (skg (node (id N) (source foreign) (parentIs independent) indef)) N-original\n")
+    (insert "** (skg (node (id N) (source foreign) (affectsParent false) indef)) N-original\n")
     (org-mode)
     (cl-letf (((symbol-function 'skg--completing-read-with-cycle)
                (lambda (&rest _)

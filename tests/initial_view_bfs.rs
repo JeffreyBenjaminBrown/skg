@@ -83,18 +83,18 @@ async fn test_bfs_limit_across_multiple_trees (
 
       println!("BFS multi-tree limit result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 3))))) 1
+      let expected = indoc! {"* (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 3))))) 1
                               ** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
                               ** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 12
                               *** (skg (node (id 121) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121
                               *** (skg (node (id 122) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 122
                               *** (skg (node (id 123) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
                               ** (skg (node (id 13) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
-                              * (skg (node (id 2) (source main) (parentIs absent) (rels (contains (out 3))))) 2
+                              * (skg (node (id 2) (source main) (affectsParent na) (rels (contains (out 3))))) 2
                               ** (skg (node (id 21) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 21
                               ** (skg (node (id 22) (source main) indef (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 22
                               ** (skg (node (id 23) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 23
-                              * (skg (node (id 3) (source main) (parentIs absent) (rels (contains (out 3))))) 3
+                              * (skg (node (id 3) (source main) (affectsParent na) (rels (contains (out 3))))) 3
                               ** (skg (node (id 31) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 31
                               ** (skg (node (id 32) (source main) indef (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 32
                               ** (skg (node (id 33) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 33
@@ -129,21 +129,21 @@ async fn test_bfs_limit_9_three_branches (
 
       println!("BFS limit=9 three branches result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 3))))) 1
+      let expected = indoc! {"* (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 3))))) 1
                               ** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
                               ** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 12
                               *** (skg (node (id 121) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121
                               *** (skg (node (id 122) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 122
                               *** (skg (node (id 123) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
                               ** (skg (node (id 13) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
-                              * (skg (node (id 2) (source main) (parentIs absent) (rels (contains (out 3))))) 2
+                              * (skg (node (id 2) (source main) (affectsParent na) (rels (contains (out 3))))) 2
                               ** (skg (node (id 21) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 21
                               ** (skg (node (id 22) (source main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 22
                               *** (skg (node (id 221) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 221
                               *** (skg (node (id 222) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 222
                               *** (skg (node (id 223) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 223
                               ** (skg (node (id 23) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 23
-                              * (skg (node (id 3) (source main) (parentIs absent) (rels (contains (out 3))))) 3
+                              * (skg (node (id 3) (source main) (affectsParent na) (rels (contains (out 3))))) 3
                               ** (skg (node (id 31) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 31
                               ** (skg (node (id 32) (source main) indef (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 32
                               ** (skg (node (id 33) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 33
@@ -177,14 +177,14 @@ async fn test_bfs_limit_8_two_branches (
 
       println!("BFS limit=8 two branches result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 3))))) 1
+      let expected = indoc! {"* (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 3))))) 1
                               ** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
                               ** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 12
                               *** (skg (node (id 121) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121
                               *** (skg (node (id 122) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 122
                               *** (skg (node (id 123) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
                               ** (skg (node (id 13) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
-                              * (skg (node (id 2) (source main) (parentIs absent) (rels (contains (out 3))))) 2
+                              * (skg (node (id 2) (source main) (affectsParent na) (rels (contains (out 3))))) 2
                               ** (skg (node (id 21) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 21
                               ** (skg (node (id 22) (source main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 22
                               *** (skg (node (id 221) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 221
@@ -220,7 +220,7 @@ async fn test_budget_content_beats_subscribers (
 
       println!("content-vs-subscribers (budget 3):\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id r) (source main) (parentIs absent) (rels (contains (out 1)) (subscribes (out 2))))) r
+      let expected = indoc! {"* (skg (node (id r) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2))))) r
                               ** (skg subscribeeCol)
                               *** (skg (node (id s1) (source main) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)))) s1
                               *** (skg (node (id s2) (source main) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)))) s2

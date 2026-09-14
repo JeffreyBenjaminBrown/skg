@@ -4,7 +4,7 @@
 
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpActiveNode, MpPhantomDiff};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
-use crate::types::viewnode::{NodeEditRequest, IndefOrDef, ParentIs, PartnerCol, Qual, QualCol};
+use crate::types::viewnode::{NodeEditRequest, IndefOrDef, AffectsParent, PartnerCol, Qual, QualCol};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::viewnode_nodecomplete::{
   generation_includes_only,
@@ -148,14 +148,14 @@ fn validate_hidden_in_subscribee_col (
     tree, node_id, 1, true,
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t))
-        => t . parentIs == ParentIs::Affected,
+        => t . affectsParent == AffectsParent::True,
       MpViewnodeKind::Phantom (MpPhantom::Diff (_))
         => true,
       MpViewnodeKind::Phantom (MpPhantom::Unknown (_))
         => true,
       _ => false, } )
     { errors . push(
-        "HiddenInSubscribeeCol ActiveNode children must have parentIs=affected."
+        "HiddenInSubscribeeCol ActiveNode children must have affectsParent=true."
       . to_string()); }
   if !siblings_cannot_include(
     tree, node_id,
@@ -193,14 +193,14 @@ fn validate_hidden_outside_of_subscribee_col (
     tree, node_id, 1, true,
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t))
-        => t . parentIs == ParentIs::Affected,
+        => t . affectsParent == AffectsParent::True,
       MpViewnodeKind::Phantom (MpPhantom::Diff (_))
         => true,
       MpViewnodeKind::Phantom (MpPhantom::Unknown (_))
         => true,
       _ => false, } )
     { errors . push(
-        "HiddenOutsideOfSubscribeeCol ActiveNode children must be parentIs=affected."
+        "HiddenOutsideOfSubscribeeCol ActiveNode children must be affectsParent=true."
         . to_string()); }
   if !siblings_cannot_include(
     tree, node_id,
@@ -238,7 +238,7 @@ fn validate_subscribeecol (
     tree, node_id, 1, true,
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
-        t . parentIs == ParentIs::Affected,
+        t . affectsParent == AffectsParent::True,
       MpViewnodeKind::Vognode (MpVognode::Inactive (_)) =>
         true,
       MpViewnodeKind::Phantom (MpPhantom::Diff (_)) =>
@@ -249,7 +249,7 @@ fn validate_subscribeecol (
         PartnerCol::HiddenOutsideOfSubscribee)
         => true,
       _ => false, } )
-    { errors . push("SubscribeeCol ActiveNode children must have parentIs=affected."
+    { errors . push("SubscribeeCol ActiveNode children must have affectsParent=true."
                     . to_string() ); }
   // There is no duplicate-member check here: SubscribeeCol is a
   // defining col, and duplicate members of defining cols are
@@ -283,7 +283,7 @@ fn validate_relation_col (
     tree, node_id, 1, true,
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t))
-        => t . parentIs == ParentIs::Affected,
+        => t . affectsParent == AffectsParent::True,
       MpViewnodeKind::Vognode (MpVognode::Inactive (_))
         => true,
       MpViewnodeKind::Phantom (MpPhantom::Diff (_))
@@ -292,7 +292,7 @@ fn validate_relation_col (
         if partnerCol == PartnerCol::Overridden => true,
       _ => false, } )
     { errors . push(format!(
-        "{} ActiveNode children must have parentIs=affected.", label)); }
+        "{} ActiveNode children must have affectsParent=true.", label)); }
   if !siblings_cannot_include(
     tree, node_id,
     |node| matches!(&node . kind,
@@ -457,13 +457,13 @@ fn validate_phantom (
 
 fn cannot_be_child_of_gnode (
   node : &MpViewnode,
-  parent_is_subscribee_as_such : bool,
+  affects_parent_subscribee_as_such : bool,
 ) -> bool {
   matches!(&node . kind,
     MpViewnodeKind::BufferRoot |
     MpViewnodeKind::Qual (Qual::Alias { .. } | Qual::ID { .. }) |
     MpViewnodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee))
-  || ( ! parent_is_subscribee_as_such
+  || ( ! affects_parent_subscribee_as_such
        // validate_hiddenin REQUIRES a gnode parent; a
        // subscribee-as-such is the position that warrants one.
        && matches!(&node . kind,
@@ -493,7 +493,7 @@ fn has_empty_title ( t : &MpActiveNode ) -> bool {
 
 /// Check that all non-ignored, non-phantom content children
 /// have distinct IDs.
-/// "Non-ignored" means parentIs == Affected.
+/// "Non-ignored" means affectsParent == Affected.
 /// "Non-phantom" means diff is not Removed or RemovedHere.
 /// Returns true if all such children have distinct IDs,
 /// or if there are no such children.
@@ -512,7 +512,7 @@ pub fn nonignored_children_have_distinct_ids (
       // originals.
       match &child . value() . kind {
         MpViewnodeKind::Vognode (MpVognode::Active (t))
-          if t . parentIs == ParentIs::Affected
+          if t . affectsParent == AffectsParent::True
           => t . collected_id (),
         MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
           Some (u . id . clone()),

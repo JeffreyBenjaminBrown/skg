@@ -600,14 +600,14 @@ if and only if it adheres to the following:
   - Extra whitespace is ignored.
   - Keys and values should contain no whitespace.
 
-Inside a `(node ...)` form, `(parentIs ...)` describes whether the
+Inside a `(node ...)` form, `(affectsParent ...)` describes whether the
 node participates in the collection represented by its visible parent:
 
-- omitted `parentIs` means `affected`;
-- `(parentIs affected)` is accepted but normally omitted when rendered;
-- `(parentIs independent)` means the node is preserved/displayed but
+- omitted `affectsParent` means `true`;
+- `(affectsParent true)` is accepted but normally omitted when rendered;
+- `(affectsParent false)` means the node is preserved/displayed but
   does not alter the parent's collection on save;
-- `(parentIs absent)` is rendered for view roots.
+- `(affectsParent na)` is rendered for view roots.
 
 The bare atom `hiddenBody` accompanies `indef` on an indefinitive
 node whose graph node HAS a body — one the rendering hides. Herald

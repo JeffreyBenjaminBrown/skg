@@ -296,18 +296,18 @@ C-c p o must bind to distinct commands."
                      "[[id:acquiree][Acquiree title]]"))
       (should (null skg-id-stack)))))
 
-(ert-deftest test-skg-set-source-recursive-prunes-non-content-parentIs ()
+(ert-deftest test-skg-set-source-recursive-prunes-non-content-affectsParent ()
   "Test recursive source change follows only container org relationships."
   (with-temp-buffer
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id root) (source public) (parentIs absent))) root\n"
+      "* (skg (node (id root) (source public) (affectsParent na))) root\n"
       "** (skg (node (id content-child) (source public))) content child\n"
       "*** (skg (node (id content-grandchild) (source public))) content grandchild\n"
       "** (skg (node (id mismatched-content) (source foreign))) mismatched content\n"
       "*** (skg (node (id public-under-mismatch) (source public))) public under mismatch\n"
-      "** (skg (node (id link-child) (source public) (parentIs independent) (birth backpath linkSource))) link child\n"
+      "** (skg (node (id link-child) (source public) (affectsParent false) (birth backpath linkSource))) link child\n"
       "*** (skg (node (id under-link) (source public))) under link\n"
       "** (skg aliasCol) aliases\n"
       "*** (skg (node (id under-scaffold) (source public))) under scaffold\n"))

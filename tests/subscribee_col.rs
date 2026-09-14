@@ -51,7 +51,7 @@ fn test_subscribee_col_appears_for_subscribers(
     // the fixture records both edges at exactly that default, no
     // (relSource ...) override appears.
     let expected = indoc! {
-      "* (skg (node (id 1) (source home) (parentIs absent) (rels (contains (out 4))) (viewStats (sourceHerald ⌂:home)))) 1
+      "* (skg (node (id 1) (source home) (affectsParent na) (rels (contains (out 4))) (viewStats (sourceHerald ⌂:home)))) 1
       ** (skg (node (id 11) (source home) (rels (contains (in 1 (ancestors 1)) (out 1)) (subscribes (out 1)) (birth contains)))) 11
       *** (skg subscribeeCol)
       **** (skg (node (id 11-sees) (source away) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)) (viewStats (sourceHerald ⌂:away)))) 11-sees

@@ -126,10 +126,10 @@ async fn test_multi_root_view_logic (
 
   println!("Multi-root view result:\n{}", result);
 
-  let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent))) 1
+  let expected = indoc! {"* (skg (node (id 1) (source main) (affectsParent na))) 1
                           1 has a body
-                          * (skg (node (id 2) (source main) (parentIs absent))) 2
-                          * (skg (node (id 1) (source main) (parentIs absent) indef hiddenBody)) 1
+                          * (skg (node (id 2) (source main) (affectsParent na))) 2
+                          * (skg (node (id 1) (source main) (affectsParent na) indef hiddenBody)) 1
                           "};
                           // 'hiddenBody': node 1 HAS a body, and this
                           // (repeated, hence indefinitive) draw of it
@@ -153,7 +153,7 @@ async fn test_single_root_view_with_cycle (
 
       println!("Single root view with cycle result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id a) (source main) (parentIs absent) (rels (contains (out 1))))) a
+      let expected = indoc! {"* (skg (node (id a) (source main) (affectsParent na) (rels (contains (out 1))))) a
                               ** (skg (node (id b) (source main) (rels (contains (in 2 (ancestors 1)) (out 1)) (birth contains)))) b
                               b has a body
                               *** (skg (node (id c) (source main) (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1))) (birth contains)))) c
@@ -188,7 +188,7 @@ async fn test_multi_root_view_with_shared_nodes (
       // indef Content) as the first child of the level-1 view of
       // node 2.
       let expected = indoc! {
-        "* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 2)) (hides (out 2))))) title 1
+        "* (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 2)) (hides (out 2))))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg hiddenCol)
@@ -205,9 +205,9 @@ async fn test_multi_root_view_with_shared_nodes (
          *** (skg subscriberCol)
          **** (skg (node (id 2) (source main) indef hiddenBody (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2 (ancestors 2))) (extraIds 1) (birth subscribes)))) title 2
          **** (skg (node (id 3) (source main) indef hiddenBody (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2 (ancestors 2))) (overrides (in 1 (ancestors 2))) (extraIds 1) (birth subscribes)))) title 3
-         * (skg (node (id 2) (source main) (parentIs absent) (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2)) (extraIds 1)))) title 2
+         * (skg (node (id 2) (source main) (affectsParent na) (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2)) (extraIds 1)))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (source main) (parentIs independent) indef hiddenBody (rels (contains (out 2 (ancestors 1))) (hides (out 2)) (birth contains)))) title 1
+         ** (skg (node (id 1) (source main) (affectsParent false) indef hiddenBody (rels (contains (out 2 (ancestors 1))) (hides (out 2)) (birth contains)))) title 1
          ** (skg subscribeeCol)
          *** (skg (node (id 4) (source main) indef hiddenBody (rels (subscribes (in 2 (ancestors 2))) (overrides (in 1)) (hides (in 1)) (extraIds 1) (birth subscribes)))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (source main) indef hiddenBody (rels (textlinksTo (in 1) (out (ancestors 2))) (subscribes (in 2 (ancestors 2))) (overrides (out 2)) (hides (in 1)) (extraIds 1) (birth subscribes)))) this title includes a [[id:22][textlink to another file]]
@@ -245,7 +245,7 @@ async fn test_multi_root_view_with_node_limit (
       // their bodies + cols (cols are not budget-bound); subscribee members
       // are indef.
       let expected = indoc! {
-        "* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 2)) (hides (out 2))))) title 1
+        "* (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 2)) (hides (out 2))))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
          ** (skg hiddenCol)
@@ -262,9 +262,9 @@ async fn test_multi_root_view_with_node_limit (
          *** (skg subscriberCol)
          **** (skg (node (id 2) (source main) indef hiddenBody (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2 (ancestors 2))) (extraIds 1) (birth subscribes)))) title 2
          **** (skg (node (id 3) (source main) indef hiddenBody (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2 (ancestors 2))) (overrides (in 1 (ancestors 2))) (extraIds 1) (birth subscribes)))) title 3
-         * (skg (node (id 2) (source main) (parentIs absent) (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2)) (extraIds 1)))) title 2
+         * (skg (node (id 2) (source main) (affectsParent na) (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2)) (extraIds 1)))) title 2
          this one string could span pages
-         ** (skg (node (id 1) (source main) (parentIs independent) indef hiddenBody (rels (contains (out 2 (ancestors 1))) (hides (out 2)) (birth contains)))) title 1
+         ** (skg (node (id 1) (source main) (affectsParent false) indef hiddenBody (rels (contains (out 2 (ancestors 1))) (hides (out 2)) (birth contains)))) title 1
          ** (skg subscribeeCol)
          *** (skg (node (id 4) (source main) indef hiddenBody (rels (subscribes (in 2 (ancestors 2))) (overrides (in 1)) (hides (in 1)) (extraIds 1) (birth subscribes)))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (source main) indef hiddenBody (rels (textlinksTo (in 1) (out (ancestors 2))) (subscribes (in 2 (ancestors 2))) (overrides (out 2)) (hides (in 1)) (extraIds 1) (birth subscribes)))) this title includes a [[id:22][textlink to another file]]
@@ -305,7 +305,7 @@ async fn test_limit_with_multiple_sibling_groups (
 
       println!("Result with multiple sibling groups:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 2))))) 1
+      let expected = indoc! {"* (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 2))))) 1
                               1 body
                               ** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1)) (out 2)) (birth contains)))) 11
                               11 body

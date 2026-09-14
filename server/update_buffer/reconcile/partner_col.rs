@@ -19,7 +19,7 @@ use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::{CompletionWarning, RepairKind};
-use crate::types::viewnode::{ColPolicy, ParentIs, PartnerCol, ViewNode, ViewNodeKind, Vognode};
+use crate::types::viewnode::{ColPolicy, AffectsParent, PartnerCol, ViewNode, ViewNodeKind, Vognode};
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -29,9 +29,9 @@ use std::sync::Arc;
 /// Reconciles one PartnerCol (TODO/DONE/local-view-update/plan_v2.org §19 terminology: a col = a collecting scaffold)
 /// from a node in the view tree with the current in-Rust graph snapshot's data
 /// about that node.
-/// Makes the col's ActiveNode children marked parentIs=affected match a goal list,
+/// Makes the col's ActiveNode children marked affectsParent=true match a goal list,
 /// preserving reusable children and creating missing ones,
-/// then demotes stale children marked parentIs=affected to 'parentIs=independent'.
+/// then demotes stale children marked affectsParent=true to 'affectsParent=false'.
 pub fn reconcile_partnerCol_children (
   node         : NodeId, // The PartnerCol. Its parent is an ActiveNode.
   tree         : &mut Tree<ViewNode>,
@@ -239,7 +239,7 @@ pub fn push_repair_warnings (
         children } ); }}}
 
 /// The effective goal list for a ColPolicy::ReadOnlySet col:
-/// the col's existing Active parentIs=Affected children, in their
+/// the col's existing Active affectsParent=true children, in their
 /// current view order, filtered to graph-real members (first
 /// occurrence of a duplicate wins; the reconciler detaches the
 /// duplicates themselves), then every graph member not yet listed,
@@ -262,7 +262,7 @@ fn view_order_preserving_goal_list (
     for child in col_ref . children () {
       if let ViewNodeKind::Vognode (Vognode::Active (t))
         = & child . value () . kind
-      { if t . parentIs == ParentIs::Affected
+      { if t . affectsParent == AffectsParent::True
           && member_set . contains (&t . id)
           && seen . insert (t . id . clone ())
         { goal . push (t . id . clone ()); }}}}

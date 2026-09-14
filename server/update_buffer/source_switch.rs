@@ -87,12 +87,12 @@ fn should_prune (
     . ok_or ("should_prune: node not found") ?;
   let is_leaf : bool =
     ! node_ref . has_children ();
-  let parent_is_partner_col : bool =
+  let affects_parent_partner_col : bool =
     node_ref . parent ()
     . map ( |p| matches! ( &p . value () . kind,
                            ViewNodeKind::PartnerCol (_) ))
     . unwrap_or (false);
-  let grandparent_is_inactive : bool =
+  let grandaffects_parent_inactive : bool =
     node_ref . parent ()
     . and_then ( |p| p . parent () )
     . map ( |gp| matches! ( &gp . value () . kind,
@@ -102,9 +102,9 @@ fn should_prune (
     ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
       is_leaf,
     ViewNodeKind::Qual (_) =>
-      is_leaf && grandparent_is_inactive,
+      is_leaf && grandaffects_parent_inactive,
     ViewNodeKind::Vognode (Vognode::Active (t)) =>
-      is_leaf && parent_is_partner_col && t . is_indefinitive (),
+      is_leaf && affects_parent_partner_col && t . is_indefinitive (),
     ViewNodeKind::QualCol (QualCol::ID)
       | ViewNodeKind::QualCol (QualCol::Alias)
       | ViewNodeKind::PartnerCol (PartnerCol::Subscribee)

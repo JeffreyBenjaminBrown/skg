@@ -59,28 +59,28 @@ local function graft_role_from_rels (rels_body)
 end
 
 ---Classify a headline's parsed metadata SEXP into a relation string: a
----graft role name, 'affected', or the literal parentIs symbol text
----(e.g. 'absent', 'independent'). Mirrors headline--relation-from-sexp.
+---graft role name, 'true', or the literal affectsParent symbol text
+---(e.g. 'na', 'false'). Mirrors headline--relation-from-sexp.
 ---@param sexp any|nil
 ---@return string
 local function relation_from_sexp (sexp)
-  local parentIs_list = sexp
-    and metadata.sexp_cdr_at_path(sexp, { 'skg', 'node', 'parentIs' })
+  local affectsParent_list = sexp
+    and metadata.sexp_cdr_at_path(sexp, { 'skg', 'node', 'affectsParent' })
     or nil
   local rels_body = sexp
     and metadata.sexp_cdr_at_path(sexp, { 'skg', 'node', 'rels' })
     or nil
-  local independent = parentIs_list ~= nil and parentIs_list[1] ~= nil
-    and parentIs_list[1] == sexpr.symbol('independent')
-  local graft_role = independent
+  local false = affectsParent_list ~= nil and affectsParent_list[1] ~= nil
+    and affectsParent_list[1] == sexpr.symbol('false')
+  local graft_role = false
     and graft_role_from_rels(rels_body)
     or nil
   if graft_role then return graft_role end
-  if parentIs_list == nil or #parentIs_list == 0
-     or parentIs_list[1] == sexpr.symbol('affected') then
-    return 'affected'
+  if affectsParent_list == nil or #affectsParent_list == 0
+     or affectsParent_list[1] == sexpr.symbol('true') then
+    return 'true'
   end
-  return sexpr.atom_text(parentIs_list[1])
+  return sexpr.atom_text(affectsParent_list[1])
 end
 
 ---Extract {depth, relation, title} triples for every headline in BUF.
@@ -158,10 +158,10 @@ local buf_a = T.wait_for_buffer('skg://a')
 T.check(buf_a, "buffer 'skg://a' was created")
 -- a -> {b -> c(indef), c}.
 assert_headline_titles(buf_a,
-  { { 1, 'absent', 'a' },
-    { 2, 'affected', 'b' },
-    { 3, 'affected', 'c' },
-    { 2, 'affected', 'c' } },
+  { { 1, 'na', 'a' },
+    { 2, 'true', 'b' },
+    { 3, 'true', 'c' },
+    { 2, 'true', 'c' } },
   'phase 1: initial view')
 
 print('=== PHASE 2: Remove c from under b and save ===')
@@ -182,9 +182,9 @@ vim.api.nvim_buf_set_lines(buf_a, indef_c_line - 1, indef_c_line, false, {})
 
 -- Buffer should now be: a -> {b, c}
 assert_headline_titles(buf_a,
-  { { 1, 'absent', 'a' },
-    { 2, 'affected', 'b' },
-    { 2, 'affected', 'c' } },
+  { { 1, 'na', 'a' },
+    { 2, 'true', 'b' },
+    { 2, 'true', 'c' } },
   'phase 2: after removing c from b')
 
 save.request_save_buffer()

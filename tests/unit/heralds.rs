@@ -4,10 +4,10 @@ use std::collections::HashSet;
 
 /// Atoms that legitimately appear in the rule table although the
 /// server never emits them:
-/// - "affected" is accepted by the parser but left implicit by the
+/// - "true" is accepted by the parser but left implicit by the
 ///   serializer; its vacuous rule documents that.
 const ACCEPTED_NOT_EMITTED_ATOMS : [&str; 1] =
-  [ "affected" ];
+  [ "true" ];
 
 // The required core of the herald migration: every metadata atom the
 // server can emit has a rule, and every rule names a live atom.

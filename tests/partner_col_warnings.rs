@@ -122,7 +122,7 @@ async fn readonly_col_repairs_warn_impl (
   assert! ( warning . contains ("under node n"), "{}", warning );
   assert! ( warning . contains ("restored 1 member(s): r"),
             "{}", warning );
-  assert! ( warning . contains ("demoted 1 non-member(s) to independent: x"),
+  assert! ( warning . contains ("demoted 1 non-member(s) to false: x"),
             "{}", warning );
   assert! ( warning . contains ("edited from the other side"),
             "{}", warning );
@@ -134,8 +134,8 @@ async fn readonly_col_repairs_warn_impl (
   assert! ( saved . contains ("(id r)"),
     "deleted member r must respawn:\n{}", saved );
   { let x_line_after : &str = line_containing (&saved, "(id x)");
-    assert! ( x_line_after . contains ("independent"),
-      "x must be rerendered as independent: {}", x_line_after ); }
+    assert! ( x_line_after . contains ("(affectsParent false)"),
+      "x must be rerendered as affectsParent=false: {}", x_line_after ); }
   assert! ( ! line_containing (&saved, "subscriberCol")
               . contains ("HELLO"),
     "the col headline edit must not survive the rerender:\n{}", saved );

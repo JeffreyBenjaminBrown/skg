@@ -250,13 +250,13 @@ Consider ~numContainers: None~ as the default, and treating
 ** Jeff here: Most nodes in a tree have only one container
    and most of the graph should be treelike.
 
-* DONE parentIsContainer / parentIsContent: two bools instead of one enum
+* DONE affectsParentContainer / affectsParentContent: two bools instead of one enum
 
 ViewNodeStats has:
 
 #+begin_src rust
-pub parentIsContainer : bool,
-pub parentIsContent   : bool,
+pub affectsParentContainer : bool,
+pub affectsParentContent   : bool,
 #+end_src
 
 These are near-mutually-exclusive. The type permits

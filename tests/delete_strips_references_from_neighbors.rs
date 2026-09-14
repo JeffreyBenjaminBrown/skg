@@ -274,7 +274,7 @@ async fn delete_in_foreign_subscribee_rerenders_as_unknown (
     &mut stream, indoc! {"
       * (skg (node (id subscriber) (source foreign))) foreign subscriber
       ** (skg subscribeeCol)
-      *** (skg (node (id victim) (source owned) (parentIs independent) (editRequest delete))) victim
+      *** (skg (node (id victim) (source owned) (affectsParent false) (editRequest delete))) victim
     "}, config, tantivy, &graph, false,
     &Err (String::new ()), &mut views_state ) . await ?;
   assert! (response . errors . is_empty (), "{:?}", response . errors);

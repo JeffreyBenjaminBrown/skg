@@ -155,7 +155,7 @@ org-parent), relation = the col's relation."
                  '("trusted"))))
 
 (ert-deftest test-relationship-source-choices-full-ladder-fallback ()
-  "With no default (or one absent from the ladder), the whole ladder
+  "With no default (or one na from the ladder), the whole ladder
 is offered; the server's save-time floor check backstops."
   (should (equal (skg--relationship-source-choices
                   '("public" "private") nil)
@@ -245,14 +245,14 @@ the displayed relSource fact; its message says the SAVED source survives
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (source public))) owner\n"
-    "** (skg (unknown (id absent) (viewStats (relSource private))))\n")
+    "** (skg (unknown (id na) (viewStats (relSource private))))\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
      (forward-line 1)
      (skg--apply-relationship-source-choice "trusted")
      (should (string-match-p
-              "(unknown (id absent) (viewStats (relSource private)) (editRequest (relSource trusted)))"
+              "(unknown (id na) (viewStats (relSource private)) (editRequest (relSource trusted)))"
               (test--buffer-line 2)))
      (skg--apply-relationship-source-choice
       skg--relationship-source-no-override)
@@ -398,7 +398,7 @@ choices, so the prompt pre-fills with the default instead."
    "* (skg (node (id r) (source public))) r\n"
    "** (skg (node (id a) (source public))) a\n"
    "*** (skg (node (id b) (source public))) b\n"
-   "** (skg (node (id c) (source public) (parentIs independent))) c\n"
+   "** (skg (node (id c) (source public) (affectsParent false))) c\n"
    "*** (skg (node (id d) (source public))) d\n"
    "** (skg (node (id e) (source public) indef)) e\n"
    "*** (skg (node (id f) (source public))) f\n"
@@ -407,8 +407,8 @@ choices, so the prompt pre-fills with the default instead."
    "**** (skg (node (id h) (source public))) h\n"
    "** (skg aliasCol) aliases\n")
   "A view-root tree exercising the walk's qualification and pruning:
-affected content (a, b), an independent branch (c, d), an
-indefinitive-but-affected member (e) over content (f), a
+true content (a, b), an false branch (c, d), an
+indefinitive-but-true member (e) over content (f), a
 subscribeeCol member (g) over subscribee-as-such content (h), and an
 aliasCol.")
 
@@ -421,9 +421,9 @@ aliasCol.")
      (line-beginning-position) (line-end-position))))
 
 (ert-deftest test-recursive-walk-contained ()
-  "Kind `contained' hits affected content children of definitive
-activeNode parents only: the root's own (absent) edge is skipped, the
-independent branch and everything below the indefinitive node and the
+  "Kind `contained' hits true content children of definitive
+activeNode parents only: the root's own (na) edge is skipped, the
+false branch and everything below the indefinitive node and the
 subscribee-as-such member are pruned, and col members are untouched."
   (test--with-skg-content-view
    test--recursive-content-tree

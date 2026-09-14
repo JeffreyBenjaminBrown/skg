@@ -10,7 +10,7 @@ use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
 use super::git::{ExistenceAxes, MembershipAxes};
-use super::viewnode::{ ViewNode, ViewNodeKind, ActiveNode, Vognode, Phantom, QualCol, Qual, PartnerCol, PhantomDeleted, InactiveNode, PhantomUnknown, GraphNodeStats, ViewNodeStats, Birth, IndefOrDef, ParentIs, };
+use super::viewnode::{ ViewNode, ViewNodeKind, ActiveNode, Vognode, Phantom, QualCol, Qual, PartnerCol, PhantomDeleted, InactiveNode, PhantomUnknown, GraphNodeStats, ViewNodeStats, Birth, IndefOrDef, AffectsParent, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -72,7 +72,7 @@ impl TryFrom<MpActiveNode> for ActiveNode {
       title          : u . title,
       id,
       source,
-      parentIs          : u . parentIs,
+      affectsParent          : u . affectsParent,
       birth          : u . birth,
       graphStats     : u . graphStats,
       viewStats      : u . viewStats,
@@ -170,7 +170,7 @@ impl From<ActiveNode> for MpActiveNode {
       title          : t . title,
       id             : Some(t . id),
       source         : Some(t . source),
-      parentIs          : t . parentIs,
+      affectsParent          : t . affectsParent,
       birth          : t . birth,
       graphStats     : t . graphStats,
       viewStats      : t . viewStats,
@@ -285,7 +285,7 @@ impl Default for MpActiveNode {
       title          : String::new(),
       id             : None,
       source         : None,
-      parentIs       : ParentIs::Affected,
+      affectsParent       : AffectsParent::True,
       birth          : Birth::Unremarkable,
       graphStats     : GraphNodeStats::default(),
       viewStats      : ViewNodeStats::default(),

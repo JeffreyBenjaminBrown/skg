@@ -59,7 +59,7 @@ describe('skg.heralds', function ()
     -- renders as the C token 2aC: the multi-contains "2" (orange), the
     -- ancestor "a" (yellow), and the birth "C" (black-on-white).
     local buf = scratch_buffer_with({
-      'Line with (skg (node (id 123) (parentIs independent)'
+      'Line with (skg (node (id 123) (affectsParent false)'
       .. ' (rels (contains (in 2 (ancestors 1))) (birth contains))'
       .. ' (viewStats cycle) (editRequest delete))) text' })
     heralds.enable(buf)
@@ -74,7 +74,7 @@ describe('skg.heralds', function ()
       hl_of[chunk[1]] = chunk[2] end
     -- the sentinel placeholder must never leak into the display
     assert.is_falsy(text:find('__RELS_SPANS__', 1, true))
-    -- ⊥ (independent), the 2aC relationship token, ⟳ (cycle), delete
+    -- ⊥ (false), the 2aC relationship token, ⟳ (cycle), delete
     assert.is_truthy(text:find('⊥', 1, true))
     assert.is_truthy(text:find('2aC', 1, true))
     assert.is_truthy(text:find('⟳', 1, true))

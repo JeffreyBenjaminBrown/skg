@@ -17,17 +17,17 @@ use std::str::FromStr;
 /// its visible parent. For an ordinary Vognode parent, that collection
 /// is the parent's content. For a PartnerCol parent, the PartnerCol
 /// decides the collection (per its relation and role). For other kinds of parent's,
-/// a node's ParentIs has no effect.
+/// a node's AffectsParent has no effect.
 ///
 /// PITFALL: If a vognode is indefinitive, *none* of it children affect it,
 /// just as edits to itself do not affect it,
-/// regardless of what the children might claim with their ParentIs field.
+/// regardless of what the children might claim with their AffectsParent field.
 ///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ParentIs {
-  Affected,    // default: upon saving, this can affect its parent's collection
-  Independent, // upon saving, this cannot affect its parent
-  Absent,      // No (visible) parent. (BufferRoot is not visible.)
+pub enum AffectsParent {
+  True,  // this node affects its parent
+  False, // it doesn't
+  NA,    // It has no parent
 }
 
 /// Why a generated node was originally displayed under its visible parent.
@@ -83,7 +83,7 @@ pub enum Vognode {
 /// in how much they can still say about it.
 #[derive( Debug, Clone, PartialEq )]
 pub enum Phantom {
-  Diff    (PhantomDiff), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim PhantomDiff, not an ActiveNode -- a phantom is always indefinitive/bodyless and its parentIs is never read or rendered, so it needs none of ActiveNode's parentIs/birth/viewStats/view_requests/indef_or_def. See PhantomDiff_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
+  Diff    (PhantomDiff), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim PhantomDiff, not an ActiveNode -- a phantom is always indefinitive/bodyless and its affectsParent is never read or rendered, so it needs none of ActiveNode's affectsParent/birth/viewStats/view_requests/indef_or_def. See PhantomDiff_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
   Deleted (PhantomDeleted), // Epistemically: No longer exists in the graph. Procedurally: Skg just watched the user delete this node (maybe from a different view), but for some reason (e.g. its view-descendents are interesting, or it is a root) had to retain an image of it here.
   // PITFALL: There is an exception. If Skg watches a user delete a node, while that user has a view of a foreign node that refers to the deleted node, that "foreigner's view" will show it as Unknown rather than Deleted. This is to maintain consistency with how that relationship to a nonexistent node will appear when viewed in later sessions.
   Unknown (PhantomUnknown), // Skg can't find it (and, unlike Deleted, does not know why). Can result from bad data, or from a reference to another user's node that has since been deleted.
@@ -107,7 +107,7 @@ pub enum Phantom {
 ///
 /// USED: inert -- it generates no save instructions and is excluded from its
 /// parent's contains list. It is never "completed", yet it retains its children
-/// (which `mark_orphans_under_dead_parents_independent` demotes to Independent)
+/// (which `mark_orphans_under_dead_parents_false` demotes to Independent)
 /// so the user's subtree under a vanished node survives. A childless Deleted is
 /// pruned by the postorder sweep (`is_self_deletable_when_empty`), and a Deleted
 /// may stand as a view root (validate_tree) so a deleted root still shows.
@@ -189,7 +189,7 @@ pub struct ActiveNode_Generic < Id, Src > {
   pub title         : String,
   pub id            : Id,
   pub source        : Src,
-  pub parentIs      : ParentIs,
+  pub affectsParent      : AffectsParent,
   pub birth         : Birth,
 
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
@@ -231,7 +231,7 @@ pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
 /// USED: as a read-only diff annotation. It depicts a removed member at its
 /// correct HEAD position among surviving siblings, decorated with per-stage diff
 /// atoms. Always indefinitive and bodyless (enforced by `normal_to_phantom` /
-/// `mk_phantom_viewnode`); its parentIs is never read or rendered (implicit
+/// `mk_phantom_viewnode`); its affectsParent is never read or rendered (implicit
 /// Affected); a Normal child left under it is demoted to Independent.
 ///
 /// DISTINCT INFO: it is the only phantom that carries the git-diff coordinates
@@ -239,9 +239,9 @@ pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
 /// it exists solely to show a change between git snapshots. It keeps a `title`
 /// and `source` (resolved via `title_for_phantom`; the source may be the
 /// SourceName NOT_FOUND sentinel) and `graphStats`, which IS rendered on
-/// phantoms. It needs NONE of ActiveNode's parentIs / birth / viewStats /
+/// phantoms. It needs NONE of ActiveNode's affectsParent / birth / viewStats /
 /// view_requests / indef_or_def (TODO/DONE/local-view-update/plan_v2.org §11 reduction; see §18): nothing
-/// reads a phantom's parentIs, and every phantom is indefinitive.
+/// reads a phantom's affectsParent, and every phantom is indefinitive.
 #[derive( Debug, Clone, PartialEq )]
 pub struct PhantomDiff_Generic < Id, Src > {
   pub title      : String,
@@ -259,7 +259,7 @@ pub struct PhantomDiff_Generic < Id, Src > {
 
 impl < Id, Src > PhantomDiff_Generic < Id, Src > {
   /// Build a phantom payload from an ActiveNode, keeping only the phantom-relevant
-  /// fields and discarding parentIs / birth / viewStats / view_requests /
+  /// fields and discarding affectsParent / birth / viewStats / view_requests /
   /// indef_or_def. Used when flipping an Active node to a phantom and by the
   /// placed<->maybe-placed conversions.
   pub fn from_activeNode ( t : ActiveNode_Generic < Id, Src > ) -> Self {
@@ -348,7 +348,7 @@ pub struct GraphNodeStats {
 
 /// View-specific statistics about a node.
 /// These depend on the node's position in the current view tree.
-/// `cycle` depends on ancestors; `parentIs*` depends on the specific parent.
+/// `cycle` depends on ancestors; `affectsParent*` depends on the specific parent.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewNodeStats {
   pub cycle             : bool,
@@ -387,7 +387,7 @@ pub struct ViewNodeStats {
   /// TODO/user-owned_autofork_chain/5_plan.org) -- the herald marks
   /// exactly the deliberately privatized edges. Also None: without a
   /// graph handle; for a node that is not genuinely a member here
-  /// (parentIs != Affected, or a backpath graft); and for the two
+  /// (affectsParent != Affected, or a backpath graft); and for the two
   /// compound filter cols (HiddenInSubscribee /
   /// HiddenOutsideOfSubscribee), which have no single
   /// 'relation_member_role' to read a source from.
@@ -438,7 +438,7 @@ pub enum PartnerCol {
 /// discard policy once planned for the filter cols in
 /// TODO/full-schema/7_saving-readonly-cols.org): during
 /// reconciliation, a stale member that is a leaf is deleted, and one
-/// with children is demoted to parentIs=Independent, whatever the
+/// with children is demoted to affectsParent=false, whatever the
 /// policy. The policies differ in:
 /// - whether buffer membership is read at save extraction
 ///   ('WritableSet' and 'EditableFilter'),
@@ -786,10 +786,10 @@ impl ViewNode {
         | ViewNodeKind::DeadScaffold => None,
     }}
 
-  pub fn is_activeNode_and_parentIs_affected (&self) -> bool {
+  pub fn is_activeNode_and_affectsParent_true (&self) -> bool {
     match &self . kind {
       ViewNodeKind::Vognode (Vognode::Active (t)) =>
-        t . parentIs == ParentIs::Affected,
+        t . affectsParent == AffectsParent::True,
       _ => false,
     }}
 
@@ -886,7 +886,7 @@ pub fn default_activeNode (
     title,
     id,
     source,
-    parentIs       : ParentIs::Affected,
+    affectsParent       : AffectsParent::True,
     birth          : Birth::Unremarkable,
     graphStats     : GraphNodeStats::default(),
     viewStats      : ViewNodeStats::default(),
@@ -911,7 +911,7 @@ pub fn mk_phantom_viewnode (
   membership : MembershipAxes,
 ) -> ViewNode {
   let mut viewnode : ViewNode =
-    mk_indefinitive_viewnode ( id, source, title, ParentIs::Affected );
+    mk_indefinitive_viewnode ( id, source, title, AffectsParent::True );
   if let ViewNodeKind::Vognode (Vognode::Active (mut t)) = viewnode . kind
     { t . existence  = existence;
       t . membership = membership;
@@ -932,7 +932,7 @@ pub fn mk_definitive_viewnode (
 ) -> ViewNode { mk_viewnode ( id,
                             source,
                             title,
-                            ParentIs::Affected,
+                            AffectsParent::True,
                             Birth::Unremarkable,
                             IndefOrDef::Definitive {
                               body,
@@ -974,21 +974,21 @@ pub fn mk_indefinitive_viewnode (
   id     : ID,
   source : SourceName,
   title  : String,
-  parentIs  : ParentIs,
+  affectsParent  : AffectsParent,
 ) -> ViewNode {
   mk_indefinitive_viewnode_with_birth (
-    id, source, title, parentIs, Birth::Unremarkable ) }
+    id, source, title, affectsParent, Birth::Unremarkable ) }
 
 pub fn mk_indefinitive_viewnode_with_birth (
   id       : ID,
   source   : SourceName,
   title    : String,
-  parentIs : ParentIs,
+  affectsParent : AffectsParent,
   birth    : Birth,
 ) -> ViewNode { mk_viewnode ( id,
                             source,
                             title,
-                            parentIs,
+                            affectsParent,
                             birth,
                             IndefOrDef::Indefinitive,
                             HashSet::new ( )) } // view_requests
@@ -998,7 +998,7 @@ pub fn mk_indefinitive_viewnode_with_birth (
 /// Errors if the input is not an ActiveNode.
 pub fn mk_indefinitive_from_viewnode (
   mut viewnode : ViewNode,
-  parentIs    : ParentIs,
+  affectsParent    : AffectsParent,
   birth       : Birth,
 ) -> Result < ViewNode, String > {
   match &mut viewnode . kind {
@@ -1006,7 +1006,7 @@ pub fn mk_indefinitive_from_viewnode (
       // Mutate in place, so that every field not named here
       // (view_requests, diff axes, graphStats, viewStats, and any
       // field added later) is preserved rather than silently reset.
-      t . parentIs = parentIs;
+      t . affectsParent = affectsParent;
       t . birth = birth;
       t . indef_or_def = // discards body and edit_request
         IndefOrDef::Indefinitive;
@@ -1016,7 +1016,7 @@ pub fn mk_indefinitive_from_viewnode (
       // so it is rebuilt rather than mutated.
       Ok ( mk_indefinitive_viewnode_with_birth (
         p . id . clone (), p . source . clone (), p . title . clone (),
-        parentIs, birth )),
+        affectsParent, birth )),
     _ => Err (
       "mk_indefinitive_from_viewnode: expected ActiveNode"
         . to_string () ) }}
@@ -1029,7 +1029,7 @@ pub fn mk_viewnode (
   id            : ID,
   source        : SourceName,
   title         : String,
-  parentIs      : ParentIs,
+  affectsParent      : AffectsParent,
   birth         : Birth,
   indef_or_def  : IndefOrDef,
   view_requests : HashSet < ViewRequest >,
@@ -1039,7 +1039,7 @@ pub fn mk_viewnode (
              body_folded : false,
              kind        : ViewNodeKind::Vognode (
                Vognode::Active (
-                 ActiveNode { parentIs,
+                 ActiveNode { affectsParent,
                             birth,
                             view_requests,
                             indef_or_def,

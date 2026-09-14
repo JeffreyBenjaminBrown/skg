@@ -286,13 +286,13 @@ describe('skg.metadata_edit', function ()
   it('cycles field values by their parent field', function ()
     buffer_with(table.concat({
       metadata_edit.help_text, '',
-      '* skg', '** node', '*** parentIs',
-      '**** affected (default)' }, '\n'))
+      '* skg', '** node', '*** affectsParent',
+      '**** true (default)' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 6, 0 })
     metadata_edit.cycle(1)
-    assert.are.equal('**** independent', metadata.line_text(6))
+    assert.are.equal('**** false', metadata.line_text(6))
     metadata_edit.cycle(-1)
-    assert.are.equal('**** affected (default)', metadata.line_text(6))
+    assert.are.equal('**** true (default)', metadata.line_text(6))
   end)
 end)
 

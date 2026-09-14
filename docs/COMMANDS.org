@@ -413,7 +413,7 @@ Two safeguards, shared with the recursive form below:
 Like 'skg-set-source', but it also
 changes the source of every content descendent of the node at point
 whose source matches the original source of the node at point.
-Only descendents for which ParentIs=Affected are traversed.
+Only descendents for which AffectsParent=True are traversed.
 The stuck-relationship offer and the indefinitive warning described
 under =C-c s s= apply here too, across the whole subtree.
 *** C-c s m : skg-set-merge-request
@@ -515,7 +515,7 @@ validates each edge (an offered source more public than some edge's
 default makes the save fail, naming that edge).
 
 The walk applies to, and recurses on, only viewchildren that affect
-their viewparents: parentIs=affected activeNodes, through the two
+their viewparents: affectsParent=true activeNodes, through the two
 writable cols. It prunes below indefinitive nodes and
 subscribee-as-such members (their org-children's edges are not
 collected at save), and prunes read-only cols and other scaffolds

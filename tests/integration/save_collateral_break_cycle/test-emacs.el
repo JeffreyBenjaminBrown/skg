@@ -29,11 +29,11 @@
       (kill-emacs 1))
     (assert-headline-structure
      buf
-     '((1 absent "a")
+     '((1 na "a")
        (2 container "b")
        (3 container "a")
-       (2 affected       "b")
-       (3 affected       "a"))
+       (2 true       "b")
+       (3 true       "a"))
      "phase 1: buffer A initial")))
 
 (defun phase-2-open-buffer-b ()
@@ -48,11 +48,11 @@
       (kill-emacs 1))
     (assert-headline-structure
      buf
-     '((1 absent "b")
+     '((1 na "b")
        (2 container "a")
        (3 container "b")
-       (2 affected       "a")
-       (3 affected       "b"))
+       (2 true       "a")
+       (3 true       "b"))
      "phase 2: buffer B initial")))
 
 (defun phase-3-remove-and-save ()
@@ -81,10 +81,10 @@
                (buffer-substring-no-properties (point-min) (point-max))))
     (assert-headline-structure
      buf
-     '((1 absent "a")
-       (2 independent     "b")  ;; was container; corrected after b dropped a
+     '((1 na "a")
+       (2 false     "b")  ;; was container; corrected after b dropped a
        (3 container "a")
-       (2 affected       "b"))
+       (2 true       "b"))
      "phase 4: buffer A after collateral update")))
 
 (defun run-all-tests ()

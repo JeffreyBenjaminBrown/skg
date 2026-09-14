@@ -52,7 +52,7 @@ pub enum BufferValidationError {
   ForkRequestMultiple            (ID),  // Two headlines for the same id both carry an explicit fork request; at most one is allowed.
   OverrideInvariantViolation     (String),
   DefinitiveRequestOnDefinitiveNode      (ID), // A definitive view request on a node that is already definitive
-  DefinitiveRequestOnNodeWithContentChildren (ID), // A definitive view request on a node that has content (parentIs=Container) children. Non-content children (e.g. containerward ancestry stubs) don't trigger this.
+  DefinitiveRequestOnNodeWithContentChildren (ID), // A definitive view request on a node that has content (affectsParent=Container) children. Non-content children (e.g. containerward ancestry stubs) don't trigger this.
   MultipleDefinitiveRequestsForSameId    (ID), // Multiple definitive view requests for the same ID
   EmptyTitle                             (ID),
   LocalStructureViolation        (String, ID), // (error message, nearest ancestor ID)

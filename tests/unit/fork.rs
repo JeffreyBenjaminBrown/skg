@@ -162,7 +162,7 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
   // source, indef, independent, pO, original title.
   assert! ( lines . iter () . any ( |l|
       l . starts_with ("** (skg (node (id N) (source foreign)")
-      && l . contains ("(parentIs independent)")
+      && l . contains ("(affectsParent false)")
       && l . contains ("indef")
       && l . contains ("parentOverrides")
       && l . ends_with ("N-original") ),

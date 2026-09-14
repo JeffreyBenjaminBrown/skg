@@ -182,8 +182,8 @@ end
 function M.cycle_values_for_field (field_name, field_value)
   if field_name == 'indef' then
     return { 'false (default)', 'true' } end
-  if field_name == 'parentIs' then
-    return { 'affected (default)', 'independent', 'absent' } end
+  if field_name == 'affectsParent' then
+    return { 'true (default)', 'false', 'na' } end
   if field_name == 'editRequest' then
     return { 'none (default)', 'delete', 'merge' } end
   if field_name == 'source' then

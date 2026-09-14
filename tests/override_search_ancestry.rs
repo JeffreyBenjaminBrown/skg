@@ -26,7 +26,7 @@ use skg::serve::handlers::text_search::render_enriched_search_buffer::{
 use skg::source_sets::{
   ActiveSourceSet, SourceSetName, apply_source_set_to_viewforest};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
-use skg::to_org::util::mark_view_roots_parent_absent;
+use skg::to_org::util::mark_view_roots_parent_na;
 use skg::types::misc::{ID, SkgConfig, SourceName};
 use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{Birth, ViewNode, ViewNodeKind, Vognode};
@@ -107,7 +107,7 @@ async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
   let root_id : NodeId = viewforest . root () . id ();
   set_metadata_relationships_in_node_recursive (
     &mut viewforest, root_id, &graph, &stats, config );
-  mark_view_roots_parent_absent ( &mut viewforest );
+  mark_view_roots_parent_na ( &mut viewforest );
   set_viewnodestats_in_viewforest (
     &mut viewforest,
     &graph,

@@ -6,7 +6,7 @@
 use crate::types::git::MembershipAxes;
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::MpVognode;
-use crate::types::viewnode::ParentIs;
+use crate::types::viewnode::AffectsParent;
 use crate::types::viewnode::{IndefOrDef, QualCol, Qual};
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::forest::MpViewForest;
@@ -94,7 +94,7 @@ fn finish_missing_info_enrichment(
       Ok (( )) } )?;
   Ok (provenance) }
 
-pub fn absent_parentIs_under_visible_parent_becomes_isContainer (
+pub fn na_affectsParent_under_visible_parent_becomes_isContainer (
   viewforest : &mut MpViewForest,
 ) {
   let root_id : NodeId =
@@ -102,21 +102,21 @@ pub fn absent_parentIs_under_visible_parent_becomes_isContainer (
   let mut need_changing : Vec<NodeId> = Vec::new();
   for node_ref in viewforest . nodes() {
     // collect immuatable references to what needs changing
-    let parent_is_visible : bool =
+    let affects_parent_visible : bool =
       node_ref . parent()
       . map ( |p| p . id() != root_id )
       . unwrap_or (false);
-    if ! parent_is_visible { continue; }
+    if ! affects_parent_visible { continue; }
     if let MpViewnodeKind::Vognode (MpVognode::Active (t))
       = &node_ref . value() . kind
-      { if t . parentIs == ParentIs::Absent
+      { if t . affectsParent == AffectsParent::NA
         { need_changing . push (node_ref . id()); }}}
   for node_id in need_changing { // change them
     let mut node_mut : NodeMut<MpViewnode> =
       viewforest . get_mut (node_id) . unwrap();
     if let MpViewnodeKind::Vognode (MpVognode::Active (t))
       = &mut node_mut . value() . kind
-      { t . parentIs = ParentIs::Affected; }}}
+      { t . affectsParent = AffectsParent::True; }}}
 
 /// Make it a Qual::Alias if both:
 /// - it is an ActiveNode
@@ -127,13 +127,13 @@ fn make_alias_if_appropriate(
   if let MpViewnodeKind::Vognode (MpVognode::Active (_))
     = &node . value() . kind
   { // It is a real, normal gnode.
-    let parent_is_aliascol : bool =
+    let affects_parent_aliascol : bool =
       node . parent()
       . map(|mut p|
             matches!(&p . value() . kind,
                      MpViewnodeKind::QualCol (QualCol::Alias)))
       . unwrap_or (false);
-    if parent_is_aliascol { // Make it an Alias.
+    if affects_parent_aliascol { // Make it an Alias.
       let org : &mut MpViewnode = node . value();
       let MpViewnodeKind::Vognode (MpVognode::Active (t))
         : &MpViewnodeKind

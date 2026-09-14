@@ -27,10 +27,10 @@
     ;; a -> {b -> c(indef), c}.
     (assert-headline-titles
      buf
-     '((1 absent "a")
-       (2 affected   "b")
-       (3 affected   "c")
-       (2 affected   "c"))
+     '((1 na "a")
+       (2 true   "b")
+       (3 true   "c")
+       (2 true   "c"))
      "phase 1: initial view")))
 
 (defun phase-2-remove-c-from-under-b-and-save ()
@@ -52,9 +52,9 @@
     ;; Buffer should now be: a -> {b, c}
     (assert-headline-titles
      (current-buffer)
-     '((1 absent "a")
-       (2 affected   "b")
-       (2 affected   "c"))
+     '((1 na "a")
+       (2 true   "b")
+       (2 true   "c"))
      "phase 2: after removing c from b")
     (skg-request-save-buffer)
     (skg-test-wait-for-response)

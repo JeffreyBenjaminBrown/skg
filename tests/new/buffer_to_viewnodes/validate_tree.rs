@@ -513,14 +513,14 @@ async fn test_definitive_request_with_only_non_content_children_is_allowed (
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // A definitive view request on an indefinitive node whose children
-  // are all NON-content (parentIs != Affected) should be permitted: the
+  // are all NON-content (affectsParent != Affected) should be permitted: the
   // expansion would fill the node with content, and non-content
   // children (e.g. 'birth backpath container' ancestry stubs) don't conflict
   // with that. Only Container children would be clobbered.
       let input : &str =
         indoc! {"
                 * (skg (node (id parent) (source main) indef (viewRequests definitiveView))) parent
-                ** (skg (node (id ancestor) (source main) (parentIs independent))) non-content child
+                ** (skg (node (id ancestor) (source main) (affectsParent false))) non-content child
             "};
       let viewforest : MpViewForest =
         org_to_uninterpreted_viewforest (input) . unwrap () . 0;
@@ -541,7 +541,7 @@ async fn test_definitive_request_with_content_child_is_rejected (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // Flip side: a Container child (the default when 'parentIs' is absent)
+  // Flip side: a Container child (the default when 'affectsParent' is absent)
   // DOES conflict with expansion, so the error should fire.
       let input : &str =
         indoc! {"

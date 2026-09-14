@@ -121,7 +121,7 @@ async fn pipeline_basic_mixed_tree (
             *** (skg alias) second alias
             ** (skg (node (id child) (source main))) child
             *** (skg (node (id grandchild) (source main))) grandchild
-            ** (skg (node (id independent) (source main) (parentIs independent))) independent
+            ** (skg (node (id independent) (source main) (affectsParent false))) independent
             ** (skg subscribeeCol)
             *** (skg (node (id s1) (source main) indef)) s1
             ** (skg overriddenCol)

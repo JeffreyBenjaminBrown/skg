@@ -31,17 +31,17 @@ fn test_birth_and_indefinitive(
   // Run test with database
   let result : Result<(), Box<dyn Error>> =
     run_with_test_stores (
-      "skg-test-parentIs",
+      "skg-test-affectsParent",
       "tests/save/birth_and_indefinitive/fixtures",
-      "/tmp/tantivy-test-parentIs",
+      "/tmp/tantivy-test-affectsParent",
       |config, _tantivy| Box::pin ( async move {
         // Simulate user saving this org buffer:
-        // Node 1 contains node 2 (which has parentIs=Independent and indef)
+        // Node 1 contains node 2 (which has affectsParent=false and indef)
         // Node 2 contains node 3 (already) and should contain node 4 (new)
-        // Node 2 should NOT affect node 1 because parentIs=Independent
+        // Node 2 should NOT affect node 1 because affectsParent=false
         let org_text = indoc! {"
           * (skg (node (id 1) (source main))) 1
-          ** (skg (node (id 2) (source main) (parentIs independent) indef)) 2
+          ** (skg (node (id 2) (source main) (affectsParent false) indef)) 2
           *** (skg (node (id 4) (source main))) 4
         "};
         let ( _viewforest, save_plan, _warnings ) =
@@ -63,14 +63,14 @@ fn test_birth_and_indefinitive(
           vec![ ID("3" . to_string()) ],
           "Node 2 should only contain [3]. It might look like 4 was appended, but because node 2 is 'indefinitive', that node 4 child should be ignored by node 2." ); }
 
-        { // verify parentIs=Independent is treated correctly
+        { // verify affectsParent=false is treated correctly
           let node1 : NodeComplete =
             nodecomplete_from_id(
               config, &ID("1" . to_string() ))
 ?;
         assert!(
           node1 . contains . is_empty(),
-          "Node 1 should have empty contents (empty when read from disk), because its child 2 has parentIs=Independent in its metadata." ); }
+          "Node 1 should have empty contents (empty when read from disk), because its child 2 has affectsParent=false in its metadata." ); }
 
         Ok (( )) } )
     );

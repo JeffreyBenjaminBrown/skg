@@ -277,12 +277,12 @@ fn visit_normal_node (
   // maybe_add_partnerCol_branches is itself idempotent + skips empties. OFF
   // for post-save (flag false), keeping that path byte-identical.
   if context . create_partnerCols_for_fresh_nodes {
-    let parent_is_partner_col : bool =
+    let affects_parent_partner_col : bool =
       read_at_ancestor_in_tree ( tree, treeid, 1,
         |vn : &ViewNode| matches! ( &vn . kind,
           ViewNodeKind::PartnerCol (_) ) )
       . unwrap_or (false);
-    if ! parent_is_partner_col {
+    if ! affects_parent_partner_col {
       maybe_add_partnerCol_branches (
         tree, treeid, &context . runtime . graph,
         &context . runtime . config,
@@ -368,12 +368,12 @@ fn prune_self_deletable_when_empty (
       None => continue };
     let has_children : bool =
       node . children () . next () . is_some ();
-    let parent_is_buffer_root : bool =
+    let affects_parent_buffer_root : bool =
       node . parent ()
       . map ( |p| matches! ( &p . value () . kind,
                              ViewNodeKind::BufferRoot ) )
       . unwrap_or (false);
-    if ! has_children && ! parent_is_buffer_root {
+    if ! has_children && ! affects_parent_buffer_root {
       detach_scaffold_transferring_focus (tree, treeid) ?; }
   }
   Ok (( )) }

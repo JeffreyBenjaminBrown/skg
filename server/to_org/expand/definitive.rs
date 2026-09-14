@@ -4,7 +4,7 @@ use crate::to_org::expand::backpath::build_and_integrate_path_view_then_drop_req
 use crate::to_org::expand::col_request::build_and_integrate_col_then_drop_request;
 use crate::to_org::util::{ DefinitiveMap, Finalizable, get_id_from_treenode, makeIndefinitiveAndClobber, activeNode_in_tree_is_indefinitive };
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ColRelation, IndefOrDef, ParentIs };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ColRelation, IndefOrDef, AffectsParent };
 use crate::types::viewnode::Vognode;
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
@@ -144,7 +144,7 @@ fn indefinitize_content_subtree (
         node_ref . children ()
         . filter ( |c| matches! ( &c . value() . kind,
                                   ViewNodeKind::Vognode (Vognode::Active (t))
-                                  if t . parentIs == ParentIs::Affected ))
+                                  if t . affectsParent == AffectsParent::True ))
         . map ( |c| c . id () )
         . collect ();
       (node_pid, content_child_treeids) };

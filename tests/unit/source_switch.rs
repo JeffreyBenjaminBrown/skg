@@ -3,7 +3,7 @@ use crate::source_sets::SourceSetName;
 use crate::types::misc::{ID, SourceName};
 use crate::types::viewnode::{
   mk_indefinitive_viewnode, mk_definitive_viewnode,
-  viewforest_root_viewnode, ParentIs };
+  viewforest_root_viewnode, AffectsParent };
 
 use std::collections::BTreeSet;
 
@@ -20,7 +20,7 @@ fn def (id : &str, source : &str) -> ViewNode {
 fn indef (id : &str, source : &str) -> ViewNode {
   mk_indefinitive_viewnode (
     ID::from (id), SourceName::from (source),
-    id . to_string (), ParentIs::Affected ) }
+    id . to_string (), AffectsParent::True ) }
 
 fn col (kind : PartnerCol) -> ViewNode {
   ViewNode {

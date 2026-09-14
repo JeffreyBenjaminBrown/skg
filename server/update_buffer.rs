@@ -32,7 +32,7 @@ use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
 use crate::types::tree::forest::ViewForest;
-use crate::to_org::util::{mark_view_roots_parent_absent, validate_parentIs_relationships, mark_orphans_under_dead_parents_independent};
+use crate::to_org::util::{mark_view_roots_parent_na, validate_affectsParent_relationships, mark_orphans_under_dead_parents_false};
 use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
 use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind};
 use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual, ViewRequest};
@@ -513,14 +513,14 @@ pub fn rerender_view (
 ///     post-save roots come from the saved buffer WITHOUT the request, so a save
 ///     never re-generates the containerward (it round-trips as ordinary content).
 ///   - attaches containerward ancestry to every removed-here phantom,
-///   - marks view-root and orphan parentIs,
-///   - validates parentIs against the captured graph (the de-novo path could
+///   - marks view-root and orphan affectsParent,
+///   - validates affectsParent against the captured graph (the de-novo path could
 ///     skip it for speed, but running it in both keeps the tails one),
 ///   - computes graph- then view-node stats,
 ///   - applies the active source set, and renders to a buffer string.
-/// Step order is immaterial between the parentIs marks and graphnodestats:
-/// parentIs is a view property and graphnodestats reads only the in-Rust graph,
-/// never parentIs, so the final state is identical either way.
+/// Step order is immaterial between the affectsParent marks and graphnodestats:
+/// affectsParent is a view property and graphnodestats reads only the in-Rust graph,
+/// never affectsParent, so the final state is identical either way.
 pub fn finish_viewforest (
   viewforest        : &mut ViewForest,
   graph             : &InRustGraph,
@@ -535,15 +535,15 @@ pub fn finish_viewforest (
       "attach_containerward_ancestries_to_removedhere_phantoms" ). entered();
     attach_containerward_ancestries_to_removedhere_phantoms (
       viewforest, graph, config, active_source_set ) ? ; }
-  mark_view_roots_parent_absent ( viewforest );
+  mark_view_roots_parent_na ( viewforest );
   // §A (Jeff's invariant): an Active survivor left under a non-container parent
   // (a phantom / Deleted / DeadScaffold) is a non-dead generalized orphan and
   // must become Independent.
-  mark_orphans_under_dead_parents_independent ( viewforest );
-  // Correct any parentIs markers whose claimed relation to the parent doesn't
+  mark_orphans_under_dead_parents_false ( viewforest );
+  // Correct any affectsParent markers whose claimed relation to the parent doesn't
   // hold in the captured graph (e.g. user moved a birth=linksToParent node
   // under a new parent it doesn't link to).
-  validate_parentIs_relationships ( viewforest, graph );
+  validate_affectsParent_relationships ( viewforest, graph );
   let ( container_to_contents, content_to_containers ) =
     match active_source_set {
       Some (active) =>
@@ -628,7 +628,7 @@ fn strip_stale_diff_state (
 
 /// Strip every stale diff phantom from the viewforest, REGARDLESS of its
 /// relation to its parent (Jeff's TODO/DONE/local-view-update/progress.org §9 TODO): a phantom anywhere
-/// but a forest root is removed, whatever its parentIs. Disposal depends on
+/// but a forest root is removed, whatever its affectsParent. Disposal depends on
 /// whether it has children:
 ///   - childless phantom -> detached (deleted) and its branch pruned;
 ///   - phantom WITH children -> demoted to DeadScaffold, so any real user
@@ -638,12 +638,12 @@ fn strip_stale_diff_state (
 /// Exception: a forest root (top-level view node) is NOT stripped -- stripping
 /// it would empty the view, and unlike a content phantom the diff overlay does
 /// not regenerate a root. (This is the only surviving relation-to-parent test;
-/// it is about tree position and regeneration, not parentIs.)
+/// it is about tree position and regeneration, not affectsParent.)
 ///
-/// Previously this stripped only content phantoms (parentIs == Affected),
+/// Previously this stripped only content phantoms (affectsParent == Affected),
 /// preserving Independent/Absent ones. But a phantom dragged out of position
 /// is a confusing lie -- it claims a node is missing somewhere it never was --
-/// so we now drop it too; parentIs is no longer read here at all.
+/// so we now drop it too; affectsParent is no longer read here at all.
 ///
 /// PITFALL:
 /// Beware, ye who would preserve phantom nodes across save-buffer ops:
