@@ -2,14 +2,14 @@
 //! rendered indefinitively. The server keeps the last rendered `ViewForest`
 //! for every open view, so this compares the incoming forest with that image
 //! rather than guessing from the graph (which cannot represent view-local
-//! collection occurrences).
+//! folder occurrences).
 
 use crate::from_text::local_instruction_collection::predicates::{
-  active_child_counts_as_content, member_counts_for_partnerCol};
+  active_child_counts_as_content, member_counts_for_partnerFolder};
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{PartnerCol, Qual, QualCol, Phantom, ViewNode, ViewNodeKind, Vognode};
+use crate::types::viewnode::{PartnerFolder, Qual, QualFolder, Phantom, ViewNode, ViewNodeKind, Vognode};
 
 use ego_tree::{NodeId, NodeRef};
 use std::collections::HashSet;
@@ -21,19 +21,19 @@ enum OccurrencePathStep {
   DiffPhantom (ID),
   DeletedPhantom (ID),
   UnknownPhantom (ID),
-  QualCol (QualCol),
+  QualFolder (QualFolder),
   Alias,
   ID,
   TextChanged,
-  PartnerCol (PartnerCol),
+  PartnerFolder (PartnerFolder),
   DeadScaffold,
 }
 
 /// The parts of an indefinitive occurrence that save extraction does not read.
 /// Descendant vognodes deliberately do not contribute their own title/body
 /// here: a definitive descendant remains a self-writer even below an
-/// indefinitive ancestor. The occurrence's own collections do contribute,
-/// because their owner emits no `SetContains` or defining-col instruction.
+/// indefinitive ancestor. The occurrence's own folders do contribute,
+/// because their owner emits no `SetContains` or defining-folder instruction.
 #[derive(Debug, PartialEq)]
 struct IndefinitiveOccurrence {
   id       : ID,
@@ -156,8 +156,8 @@ fn collect_occurrences (
         source   : active . source . clone (),
         content  : content_members (node),
         aliases  : aliases (node),
-        subscribes : partner_members (node, PartnerCol::Subscribee),
-        overrides  : partner_members (node, PartnerCol::Overridden),
+        subscribes : partner_members (node, PartnerFolder::Subscribee),
+        overrides  : partner_members (node, PartnerFolder::Overridden),
         hidden_outside : hidden_outside_members (node),
       }}); }}
   for child in node . children () {
@@ -178,16 +178,16 @@ fn path_step (
       OccurrencePathStep::DeletedPhantom (phantom . id . clone ()),
     ViewNodeKind::Phantom (Phantom::Unknown (phantom)) =>
       OccurrencePathStep::UnknownPhantom (phantom . id . clone ()),
-    ViewNodeKind::QualCol (col) =>
-      OccurrencePathStep::QualCol (*col),
+    ViewNodeKind::QualFolder (folder) =>
+      OccurrencePathStep::QualFolder (*folder),
     ViewNodeKind::Qual (Qual::Alias { .. }) =>
       OccurrencePathStep::Alias,
     ViewNodeKind::Qual (Qual::ID { .. }) =>
       OccurrencePathStep::ID,
     ViewNodeKind::Qual (Qual::TextChanged { .. }) =>
       OccurrencePathStep::TextChanged,
-    ViewNodeKind::PartnerCol (col) =>
-      OccurrencePathStep::PartnerCol (*col),
+    ViewNodeKind::PartnerFolder (folder) =>
+      OccurrencePathStep::PartnerFolder (*folder),
     ViewNodeKind::DeadScaffold =>
       OccurrencePathStep::DeadScaffold,
     ViewNodeKind::BufferRoot => unreachable! (
@@ -228,8 +228,8 @@ fn aliases (
   node : NodeRef<ViewNode>,
 ) -> Option<Vec<(String, Option<SourceName>)>> {
   node . children () . find ( |child| matches! (
-    &child . value () . kind, ViewNodeKind::QualCol (QualCol::Alias)))
-    . map ( |alias_col| alias_col . children () . filter_map ( |alias| {
+    &child . value () . kind, ViewNodeKind::QualFolder (QualFolder::Alias)))
+    . map ( |alias_folder| alias_folder . children () . filter_map ( |alias| {
       let ViewNodeKind::Qual (Qual::Alias { text, rel_source_request, .. }) =
         &alias . value () . kind else { return None; };
       Some ((text . clone (), rel_source_request . clone ()))
@@ -238,14 +238,14 @@ fn aliases (
 
 fn partner_members (
   node : NodeRef<ViewNode>,
-  wanted : PartnerCol,
+  wanted : PartnerFolder,
 ) -> Option<Vec<(ID, Option<SourceName>)>> {
   node . children () . find ( |child| matches! (
-    &child . value () . kind, ViewNodeKind::PartnerCol (col) if *col == wanted))
-    . map ( |col| col . children () . filter_map ( |member| {
+    &child . value () . kind, ViewNodeKind::PartnerFolder (folder) if *folder == wanted))
+    . map ( |folder| folder . children () . filter_map ( |member| {
       match &member . value () . kind {
         ViewNodeKind::Vognode (Vognode::Active (active))
-          if member_counts_for_partnerCol (active) =>
+          if member_counts_for_partnerFolder (active) =>
             Some ((active . id . clone (), active . rel_source_request . clone ())),
         ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
           Some ((unknown . id . clone (), unknown . rel_source_request . clone ())),
@@ -259,14 +259,14 @@ fn hidden_outside_members (
 ) -> Option<Vec<ID>> {
   node . children () . find ( |child| matches! (
     &child . value () . kind,
-    ViewNodeKind::PartnerCol (PartnerCol::Subscribee)))
-    . and_then ( |subscribee_col| subscribee_col . children () . find ( |child|
+    ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee)))
+    . and_then ( |subscribee_folder| subscribee_folder . children () . find ( |child|
       matches! (&child . value () . kind,
-        ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee))))
+        ViewNodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee))))
     . map ( |hidden_outside| hidden_outside . children () . filter_map ( |member|
       match &member . value () . kind {
         ViewNodeKind::Vognode (Vognode::Active (active))
-          if member_counts_for_partnerCol (active) => Some (active . id . clone ()),
+          if member_counts_for_partnerFolder (active) => Some (active . id . clone ()),
         ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
           Some (unknown . id . clone ()),
         _ => None,
@@ -290,17 +290,17 @@ mod tests {
   }
 
   #[test]
-  fn catches_title_content_and_writable_collection_edits_but_not_child_text () {
+  fn catches_title_content_and_writable_folder_edits_but_not_child_text () {
     let original = forest (indoc! {"
       * (skg (node (id owner) (source main) indef)) owner
       ** (skg (node (id content) (source main))) content
-      ** (skg subscribeeCol)
+      ** (skg subscribeeFolder)
       *** (skg (node (id subscribee) (source main))) subscribee
     "});
     let mut child_text_changed = forest (indoc! {"
       * (skg (node (id owner) (source main) indef (viewRequests definitiveView))) owner
       ** (skg (node (id content) (source main))) changed child text
-      ** (skg subscribeeCol)
+      ** (skg subscribeeFolder)
       *** (skg (node (id subscribee) (source main))) subscribee
     "});
     assert! (errors_and_normalize_new_indefinitive_occurrences (
@@ -309,7 +309,7 @@ mod tests {
     let mut changed = forest (indoc! {"
       * (skg (node (id owner) (source main) indef)) changed owner
       ** (skg (node (id other) (source main))) other content
-      ** (skg subscribeeCol)
+      ** (skg subscribeeFolder)
       *** (skg (node (id other-subscribee) (source main))) other subscribee
     "});
     assert_eq! (

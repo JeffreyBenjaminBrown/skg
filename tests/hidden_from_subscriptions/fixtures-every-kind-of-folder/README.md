@@ -1,6 +1,6 @@
-# Every Kind of Col
+# Every Kind of Folder
 
-Tests that both `HiddenOutsideOfSubscribeeCol` and `HiddenInSubscribeeCol` collectors appear when needed.
+Tests that both `HiddenOutsideOfSubscribeeFolder` and `HiddenInSubscribeeFolder` collectors appear when needed.
 
 ## PITFALL: id "E" <=> title "subscribee"
 

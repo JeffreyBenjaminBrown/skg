@@ -23,7 +23,7 @@ Does NOT save; call `skg-request-save-buffer' afterward."
 (defun skg-delete-recursive ()
   "Mark the headline at point, and every activeNode org-descendent of it,
 for deletion. Descendent headlines that are not activeNodes (phantoms,
-aliascol, id-col, etc.) are skipped. Does NOT save;
+aliasFolder, id-folder, etc.) are skipped. Does NOT save;
 call `skg-request-save-buffer' afterward."
   (interactive)
   (unless (org-at-heading-p)
@@ -339,10 +339,10 @@ or nil when SOURCE is nil or names no configured source."
   (and source
        (seq-position (skg--source-names) source #'string=)))
 
-(defconst skg--relationship-source-unsupported-col-atoms
-  '(subscriberCol overriderCol hiderCol hiddenCol
-    hiddenInSubscribeeCol hiddenOutsideOfSubscribeeCol)
-  "The PartnerCol scaffold atoms where an explicit relationship-source
+(defconst skg--relationship-source-unsupported-folder-atoms
+  '(subscriberFolder overriderFolder hiderFolder hiddenFolder
+    hiddenInSubscribeeFolder hiddenOutsideOfSubscribeeFolder)
+  "The PartnerFolder scaffold atoms where an explicit relationship-source
 request is unsupported from this side.  HiddenOutside membership is
 editable as a derived filter, but hide sources are still derived and
 cannot carry this request.
@@ -350,24 +350,24 @@ cannot carry this request.
 the edge belongs to the other end, so setting its source here would
 be meaningless.")
 
-(defconst skg--writable-col-relations
-  '((subscribeeCol . "subscribes_to")
-    (overriddenCol . "overrides_view_of"))
-  "The PartnerCol scaffold atoms whose members' edges are WRITABLE
+(defconst skg--writable-folder-relations
+  '((subscribeeFolder . "subscribes_to")
+    (overriddenFolder . "overrides_view_of"))
+  "The PartnerFolder scaffold atoms whose members' edges are WRITABLE
 from this side, each mapped to its relation's wire name
 (NodeRelation::relation_name, server/dbs/in_rust_graph/
-relation_accessors.rs). The col's org-parent (the anchor) owns the
+relation_accessors.rs). The folder's org-parent (the anchor) owns the
 outbound edge to each member.")
 
 (defun skg--relationship-edge-at-point ()
   "Classify the relationship edge the headline at point represents.
 Returns a plist (:owner OWNER-ID :member MEMBER-ID :relation NAME):
 for a content child, the org-parent contains the node at point; for
-a writable-col member, the col's anchor (the col's org-parent) owns
-the col's relation toward the node at point. Signals `user-error'
+a writable-folder member, the folder's anchor (the folder's org-parent) owns
+the folder's relation toward the node at point. Signals `user-error'
 when point represents no writable edge: not on an activeNode or Unknown
 headline, on a root headline (no org-parent, so no edge), on a
-member of a read-only col, or with an ID missing."
+member of a read-only folder, or with an ID missing."
   (unless (org-at-heading-p)
     (user-error "Not on a headline"))
   (let ((member-sexp (skg--metadata-sexp-at-point-or-nil)))
@@ -387,29 +387,29 @@ member of a read-only col, or with an ID missing."
              (and (consp parent-sexp)
                   (seq-find (lambda (atom)
                               (memq atom (cdr parent-sexp)))
-                            skg--relationship-source-unsupported-col-atoms))))
+                            skg--relationship-source-unsupported-folder-atoms))))
         (when readonly-atom
           (user-error
            "Cannot set the relationship's source from this read-only %s position"
            readonly-atom)))
-      (let ((writable-col
+      (let ((writable-folder
              (and (consp parent-sexp)
                   (seq-find (lambda (entry)
                               (memq (car entry) (cdr parent-sexp)))
-                            skg--writable-col-relations))))
+                            skg--writable-folder-relations))))
         (cond
-         (writable-col
+         (writable-folder
           (let ((anchor-id
                  (save-excursion
-                   (and (org-up-heading-safe) ;; to the col
+                   (and (org-up-heading-safe) ;; to the folder
                         (org-up-heading-safe) ;; to its anchor
                         (skg--node-id
                          (skg--metadata-sexp-at-point-or-nil))))))
             (unless anchor-id
-              (user-error "Could not find the col's anchor headline"))
+              (user-error "Could not find the folder's anchor headline"))
             (list :owner anchor-id
                   :member member-id
-                  :relation (cdr writable-col))))
+                  :relation (cdr writable-folder))))
          ((skg--activeNode-sexp-p parent-sexp)
           (let ((parent-id (skg--node-id parent-sexp)))
             (unless parent-id
@@ -418,7 +418,7 @@ member of a read-only col, or with an ID missing."
                   :member member-id
                   :relation "contains")))
          (t (user-error
-             "The parent headline is neither a node nor a writable col")))))))
+             "The parent headline is neither a node nor a writable folder")))))))
 
 (defun skg--relationship-source-current-value ()
   "Return the displayed `(relSource NAME)' fact at point, if any."
@@ -532,19 +532,19 @@ next save will do with the edge."
       "Textlinks are inferred from body text; they carry no independent recording source, so there is nothing to set."))
     ("subscribes"
      ("subscriber" nil
-      "A subscriberCol member: the subscribes edge belongs to the member (the subscriber), not to the view-parent. Read-only from here.")
+      "A subscriberFolder member: the subscribes edge belongs to the member (the subscriber), not to the view-parent. Read-only from here.")
      ("subscribee" subscribee
-      "A member of the view-parent's subscribeeCol. Sets the source of each anchor-subscribes-to-member edge."))
+      "A member of the view-parent's subscribeeFolder. Sets the source of each anchor-subscribes-to-member edge."))
     ("hides_from_its_subscriptions"
      ("hider" nil
-      "Hide sources are derived at save, floored at the most public explaining subscription; the hiderCol is read-only.")
+      "Hide sources are derived at save, floored at the most public explaining subscription; the hiderFolder is read-only.")
      ("hidden" nil
-      "Hide sources are derived at save, floored at the most public explaining subscription; the hiddenCol is read-only."))
+      "Hide sources are derived at save, floored at the most public explaining subscription; the hiddenFolder is read-only."))
     ("overrides_view_of"
      ("overrider" nil
-      "An overriderCol member: the overrides edge belongs to the member (the overrider), not to the view-parent. Read-only from here.")
+      "An overriderFolder member: the overrides edge belongs to the member (the overrider), not to the view-parent. Read-only from here.")
      ("overridden" overridden
-      "A member of the view-parent's overriddenCol. Sets the source of each anchor-overrides-view-of-member edge.")))
+      "A member of the view-parent's overriddenFolder. Sets the source of each anchor-overrides-view-of-member edge.")))
   "The relationship-kind menu for
 `skg-set-relationship-source-recursive': one entry per node-node
 relation in docs/data-model_technical.org, each listing its two roles as
@@ -568,7 +568,7 @@ First presents an org-menu of the schema's five node-node relations
 RET, the role the view-CHILDREN should play toward their
 view-parents. Only three roles are settable from the child's
 position: `contained' (ordinary content), `subscribee' (a
-subscribeeCol member) and `overridden' (an overriddenCol member);
+subscribeeFolder member) and `overridden' (an overriddenFolder member);
 RET on any other role explains why it cannot be set from there.
 
 Then prompts for a source over the whole ladder, plus the
@@ -580,9 +580,9 @@ floor check (see `apply_sticky_sources') is what validates each one.
 The walk starts at the node at point (inclusive: its own edge to
 its view-parent counts when it matches) and recurses only on
 viewchildren that affect their viewparents: parentIs=affected
-activeNodes and writable cols. It prunes below indefinitive nodes
+activeNodes and writable folders. It prunes below indefinitive nodes
 and subscribee-as-such members (their org-children's edges are not
-collected at save), and prunes read-only cols and other scaffolds
+collected at save), and prunes read-only folders and other scaffolds
 entirely.
 
 Like other metadata edits, this only modifies the buffer; it does
@@ -686,7 +686,7 @@ where edits still affect the graph: it prunes below indefinitive
 nodes and subscribee-as-such members, prunes non-affected
 (parentIs=independent) nodes -- except the walk's root, which the
 user chose deliberately -- and prunes scaffolds other than the two
-writable cols. Returns the number of edges affected."
+writable folders. Returns the number of edges affected."
   (let ((targets (skg--relationship-source-recursive-targets kind)))
     ;; Do not let a late conflict leave earlier targets edited.  This
     ;; preflight is deliberately before the first metadata rewrite.
@@ -714,7 +714,7 @@ command, but does not edit anything."
         (push (copy-marker (line-beginning-position)) targets))
       (when (or (and (skg--activeNode-sexp-p root-meta)
                      (not (skg--relSource-prune-below-p root-meta)))
-                (skg--writable-col-sexp-p root-meta))
+                (skg--writable-folder-sexp-p root-meta))
         (outline-next-heading)
         (while (and (not (eobp))
                     (> (org-outline-level) start-level))
@@ -732,9 +732,9 @@ command, but does not edit anything."
               (when (skg--relationship-kind-matches-p kind)
                 (push (copy-marker (line-beginning-position)) targets))
               (outline-next-heading))
-             ((skg--writable-col-sexp-p meta)
+             ((skg--writable-folder-sexp-p meta)
               (outline-next-heading))
-             (t ;; read-only cols, alias/ID cols, and other phantoms.
+             (t ;; read-only folders, alias/ID folders, and other phantoms.
               (skg--goto-next-heading-after-subtree))))))
       (nreverse targets))))
 
@@ -746,7 +746,7 @@ definitive activeNode not in subscribee-as-such position (an
 indefinitive or subscribee-as-such parent's contains is not
 collected at save, so a relationship-source request under one would be
 inert); for `subscribee' and `overridden', the view-parent must be
-the matching writable col with a definitive anchor."
+the matching writable folder with a definitive anchor."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (and (or (and (skg--activeNode-sexp-p meta)
                   (skg--node-parentIs-content-of-p meta))
@@ -760,13 +760,13 @@ the matching writable col with a definitive anchor."
                          (not (skg--node-indefinitive-p parent-sexp))
                          (not (skg--subscribee-as-such-at-point-p))))
                    ((skg--scaffold-atom-present-p parent-sexp
-                                                  'subscribeeCol)
+                                                  'subscribeeFolder)
                     (and (eq kind 'subscribee)
-                         (skg--col-anchor-definitive-p)))
+                         (skg--folder-anchor-definitive-p)))
                    ((skg--scaffold-atom-present-p parent-sexp
-                                                  'overriddenCol)
+                                                  'overriddenFolder)
                     (and (eq kind 'overridden)
-                         (skg--col-anchor-definitive-p)))
+                         (skg--folder-anchor-definitive-p)))
                    (t nil))))))))
 
 (defun skg--relSource-prune-below-p (metadata-sexp)
@@ -780,7 +780,7 @@ not writable edges."
 
 (defun skg--subscribee-as-such-at-point-p ()
   "Non-nil iff the headline at point sits in subscribee-as-such
-position: an affected activeNode member of a subscribeeCol."
+position: an affected activeNode member of a subscribeeFolder."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
     (and (skg--activeNode-sexp-p meta)
          (skg--node-parentIs-content-of-p meta)
@@ -788,12 +788,12 @@ position: an affected activeNode member of a subscribeeCol."
            (and (org-up-heading-safe)
                 (skg--scaffold-atom-present-p
                  (skg--metadata-sexp-at-point-or-nil)
-                 'subscribeeCol))))))
+                 'subscribeeFolder))))))
 
-(defun skg--col-anchor-definitive-p ()
-  "Non-nil iff the col headline at point has a definitive activeNode
-anchor (its org-parent). An indefinitive anchor's writable cols are
-not collected at save (the col owner is not save-eligible), so
+(defun skg--folder-anchor-definitive-p ()
+  "Non-nil iff the folder headline at point has a definitive activeNode
+anchor (its org-parent). An indefinitive anchor's writable folders are
+not collected at save (the folder owner is not save-eligible), so
 atoms on their members would be inert."
   (save-excursion
     (and (org-up-heading-safe)
@@ -806,13 +806,13 @@ atoms on their members would be inert."
   (and (consp metadata-sexp)
        (memq atom (cdr metadata-sexp))))
 
-(defun skg--writable-col-sexp-p (metadata-sexp)
-  "Non-nil iff METADATA-SEXP is a writable-col scaffold's metadata:
-it carries one of the `skg--writable-col-relations' atoms."
+(defun skg--writable-folder-sexp-p (metadata-sexp)
+  "Non-nil iff METADATA-SEXP is a writable-folder scaffold's metadata:
+it carries one of the `skg--writable-folder-relations' atoms."
   (and (consp metadata-sexp)
        (seq-find (lambda (entry)
                    (memq (car entry) (cdr metadata-sexp)))
-                 skg--writable-col-relations)
+                 skg--writable-folder-relations)
        t))
 
 (defun skg-set-merge-request (acquiree-id-or-link)

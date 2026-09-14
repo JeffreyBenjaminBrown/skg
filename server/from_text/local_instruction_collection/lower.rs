@@ -61,7 +61,7 @@ pub struct NodeSaveIntent {
 /// Sources the buffer explicitly requested via '(editRequest
 /// (relSource NAME))', keyed by member
 /// ID, one map per relation that carries per-member sources (hides is
-/// absent: it is inferred, and the col that shows it is read-only --
+/// absent: it is inferred, and the folder that shows it is read-only --
 /// the set-relationship-source gesture refuses there). Threaded
 /// separately from
 /// NodeComplete because NodeComplete's 'MemberAtSource::source' is a
@@ -340,7 +340,7 @@ pub fn lower_collected_intents (
     intents . by_pid . insert (pid, intent); }
   for (pid, leftover) in &by_pid {
     // Whatever remains holds only signals. Field intents can only
-    // come from cols under a save-eligible owner, and a
+    // come from folders under a save-eligible owner, and a
     // save-eligible owner emits a title/body, putting its entry in
     // 'lowerable_order'; so anything else here is a collection bug.
     if leftover . contains . is_some()

@@ -24,7 +24,7 @@
 
 (defun strip-metadata-details-and-bodies (text)
   "Return TEXT with metadata details and body content removed.
-The SKG metadata kind is retained, so collection scaffolds remain
+The SKG metadata kind is retained, so folder scaffolds remain
 visible in expected strings."
   (with-temp-buffer
     (insert text)
@@ -67,7 +67,7 @@ LINE-NUMBER is zero-based."
       (forward-line line-number)
       (setq integration-test-phase
             (format "requesting-aliases-view-line-%d" line-number))
-      (skg-show-collection-aliases) ;; auto-saves to send the request
+      (skg-show-folderOf-aliases) ;; auto-saves to send the request
       (skg-test-wait-for-response)
       (buffer-substring-no-properties (point-min) (point-max)))))
 
@@ -95,12 +95,12 @@ LINE-NUMBER is zero-based."
 
   (let ((expected-with-aliases
          (concat "* (skg (node (id test-node) (source main) (parentIs absent) (rels (aliases 2)))) Test Node\n"
-                 "** (skg aliasCol)\n"
+                 "** (skg aliasFolder)\n"
                  "*** (skg alias) first alias\n"
                  "*** (skg alias) second alias\n"))
         (expected-stripped
          (concat "* node Test Node\n"
-                 "** aliasCol\n"
+                 "** aliasFolder\n"
                  "*** alias first alias\n"
                  "*** alias second alias\n")))
 

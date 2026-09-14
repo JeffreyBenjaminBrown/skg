@@ -59,7 +59,7 @@ pub enum TelescopeViolation {
   /// Non-owned sections used the same pid as at least one owned
   /// section. The owned telescope won and these sources were
   /// ignored before folding or id-claim collection.
-  IgnoredForeignPidCollision {
+  IgnoredForeignPidFolderlision {
     ignored_sources : Vec<SourceName>,
   },
   /// Anything the FOLD noticed while combining a node's sections
@@ -90,7 +90,7 @@ impl fmt::Display for TelescopeViolation {
         write! ( f,
           "leak-shaped {} member with absent target: edge at source '{}' names '{}'; because the target is absent, privacy is judged against the extant owner's home '{}'. Move the membership with skg-set-relationship-source (C-c s r).",
           relation, source, member, owner_home ),
-      TelescopeViolation::IgnoredForeignPidCollision {
+      TelescopeViolation::IgnoredForeignPidFolderlision {
         ignored_sources } =>
         write! ( f,
           "non-owned source(s) [{}] use the same pid as one or more of your files. Skg kept your owned telescope, ignored those non-owned files, and left them untouched. Their contents are unreachable within Skg; inspect the raw .skg files if you need them.",

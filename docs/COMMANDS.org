@@ -34,7 +34,7 @@ but from the graph itself.
 *** C-u C-c <backspace> : skg-delete-recursive
 Same as skg-delete, but also marks every activeNode org-descendent
 of the node at point. Descendent headlines that are not activeNodes
-(phantoms, aliascol, id-col, etc.) are skipped.
+(phantoms, aliasFolder, id-folder, etc.) are skipped.
 
 Prefix-arg variant of skg-delete; callable directly via M-x
 as skg-delete-recursive.
@@ -304,30 +304,30 @@ detected); a file still present there is skipped, not deleted, since
 'git rm' would silently remove it. Review the script, then run it from
 the skg data root. Unlike most commands here, this one does not depend
 on the node at point; it reports moves across all sources.
-** C-c c : show a collection (both cols of a relation)
+** C-c l : show a folder (both folders of a relation)
 These commands don't edit the graph. Each inserts a request into the
 metadata of the node at point that, on save, causes the server to
-render the relation's collections (cols) into the view, POPULATED from
-the graph. Each builds BOTH cols of its relation. The read-only-col ☮
-marks a col you cannot change from here. Every command auto-saves.
-*** C-c c a : skg-show-collection-aliases
-The aliasCol -- other text you could search for to find this node
+render the relation's folder viewnodes into the view, POPULATED from
+the graph. Each builds BOTH folders of its relation. The read-only folder ☮
+marks a folder you cannot change from here. Every command auto-saves.
+*** C-c l a : skg-show-folderOf-aliases
+The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:
 type an alias in and save.
-*** C-c c o : skg-show-collection-overrides
-The overriddenCol (the nodes this node overrides -- WRITABLE, shown
+*** C-c l o : skg-show-folderOf-overrides
+The overriddenFolder (the nodes this node overrides -- WRITABLE, shown
 even when empty as an "add an override here" surface) and the
-overriderCol (the nodes that override this one -- read-only, ☮).
-*** C-c c h : skg-show-collection-hides
-The hiderCol and hiddenCol -- BOTH read-only (☮). Hiding is edited from
-a subscribee-as-such, never from these cols. On a node that neither
+overriderFolder (the nodes that override this one -- read-only, ☮).
+*** C-c l h : skg-show-folderOf-hides
+The hiderFolder and hiddenFolder -- BOTH read-only (☮). Hiding is edited from
+a subscribee-as-such, never from these folders. On a node that neither
 hides nor is hidden, nothing appears.
-*** C-c c s : skg-show-collection-subscribes
-The subscribeeCol (the nodes this node subscribes to -- WRITABLE, shown
-even when empty) and the subscriberCol (the nodes that subscribe to
+*** C-c l s : skg-show-folderOf-subscribes
+The subscribeeFolder (the nodes this node subscribes to -- WRITABLE, shown
+even when empty) and the subscriberFolder (the nodes that subscribe to
 this one -- read-only, ☮).
 ** C-c p : show a path (the backpath through one relation role)
-Like the collections, each inserts a request that, on save, grafts the
+Like the folders, each inserts a request that, on save, grafts the
 partners reached through one relation role as inverted, read-only
 children, climbing transitively until a fork, cycle, or root. UPPER =
 the partner's active (first) role; lower = its passive (second) role.
@@ -429,8 +429,8 @@ The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the merge.
 *** C-c s r : skg-set-relationship-source
 Sets the recording source of the relationship instance the headline at
-point represents -- =contains= for a content child, the col's
-relation for a writable PartnerCol member, or the alias membership
+point represents -- =contains= for a content child, the folder's
+relation for a writable PartnerFolder member, or the alias membership
 for an alias headline. An Unknown placeholder in one of those writable
 positions is supported too: it carries only its raw relationship member ID,
 never a node edit. (Formerly
@@ -470,9 +470,9 @@ The no-override choice removes the request, which means "no opinion":
 a saved edge keeps its saved source (sticky). It does NOT reset the
 edge to its default -- to reach the default, choose it.
 
-Refuses with an error when point is on a member of a read-only col
-(subscriberCol, overriderCol, hiderCol, hiddenCol,
-hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol): the
+Refuses with an error when point is on a member of a read-only folder
+(subscriberFolder, overriderFolder, hiderFolder, hiddenFolder,
+hiddenInSubscribeeFolder, hiddenOutsideOfSubscribeeFolder): the
 relationship belongs to the other end there, so setting its source
 from this side would be meaningless. Also refuses on a root
 headline, which represents no edge.
@@ -500,9 +500,9 @@ relations are the level-1 headlines, and each level-2 headline is a
 role the view-CHILD would play in that relation toward its
 view-parent. Only three roles are settable from the child's
 position -- =contained= (ordinary content), =subscribee= (a
-subscribeeCol member) and =overridden= (an overriddenCol member);
+subscribeeFolder member) and =overridden= (an overriddenFolder member);
 RET on any other role explains why its edge cannot be set from
-there (read-only cols belong to the other end; textlinks carry no
+there (read-only folders belong to the other end; textlinks carry no
 independent source; hide sources are derived at save). RET picks a
 role; q aborts.
 
@@ -516,9 +516,9 @@ default makes the save fail, naming that edge).
 
 The walk applies to, and recurses on, only viewchildren that affect
 their viewparents: parentIs=affected activeNodes, through the two
-writable cols. It prunes below indefinitive nodes and
+writable folders. It prunes below indefinitive nodes and
 subscribee-as-such members (their org-children's edges are not
-collected at save), and prunes read-only cols and other scaffolds
+collected at save), and prunes read-only folders and other scaffolds
 entirely.
 
 This is the gesture for republicizing a subtree's relationship

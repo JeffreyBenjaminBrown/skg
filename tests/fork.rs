@@ -6,7 +6,7 @@
 // contains, subscribes to N and overrides N; N itself is untouched.
 //
 // Installs the explicit graph handle (override substitution and
-// subscribeeCol content read it), so it belongs among the
+// subscribeeFolder content read it), so it belongs among the
 // grouped_overrides installers.
 
 use std::error::Error;
@@ -688,8 +688,8 @@ async fn fork_fixture_files (
   Ok (( )) }
 
 /// Round-trip: after the fork, reopening P draws the clone in N's
-/// place, carrying (overridesHere N), with both an overriddenCol and a
-/// subscribeeCol listing N. The load-bearing property: P's stored
+/// place, carrying (overridesHere N), with both an overriddenFolder and a
+/// subscribeeFolder listing N. The load-bearing property: P's stored
 /// 'contains' is NOT rewritten to the clone -- it still lists N, so the
 /// marker round-trips and a save never silently re-points containers at
 /// the clone. (That the clone's subscribee-as-such view of N starts
@@ -721,10 +721,10 @@ async fn fork_round_trip (
     p_view );
   assert! ( p_view . contains (& format! ("(id {})", clone_id . 0)),
     "the drawn substitute must be the clone {}:\n{}", clone_id . 0, p_view );
-  assert! ( p_view . contains ("subscribeeCol"),
-    "the clone (a subscriber of N) shows a subscribeeCol:\n{}", p_view );
-  assert! ( p_view . contains ("overriddenCol"),
-    "the clone (an overrider of N) shows an overriddenCol:\n{}", p_view );
+  assert! ( p_view . contains ("subscribeeFolder"),
+    "the clone (a subscriber of N) shows a subscribeeFolder:\n{}", p_view );
+  assert! ( p_view . contains ("overriddenFolder"),
+    "the clone (an overrider of N) shows an overriddenFolder:\n{}", p_view );
 
   // The load-bearing round-trip: P's stored contains was NOT rewritten
   // to the clone; it still lists N (the marker collected N, not C).

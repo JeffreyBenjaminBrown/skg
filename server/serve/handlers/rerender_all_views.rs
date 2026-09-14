@@ -51,7 +51,7 @@ pub fn handle_rerender_all_views_request (
 /// Shared by 'handle_rerender_all_views_request',
 /// 'handle_git_diff_toggle_and_rerender', and the source-set switch
 /// ('set_active_source_set'), which passes a per-view prepass (the
-/// convert-and-prune step) and asks for PartnerCol re-creation
+/// convert-and-prune step) and asks for PartnerFolder re-creation
 /// (TODO/full-schema/9-2_source-set-safety.org).
 pub fn stream_rerender_views (
   stream     : &mut TcpStream,
@@ -59,13 +59,13 @@ pub fn stream_rerender_views (
   views_state : &mut ViewsState,
   active_source_set : Option<&ActiveSourceSet>,
   prepass    : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
-  create_partnerCols : bool,
+  create_partnerFolders : bool,
   operation          : &str,
   approved_pids      : &HashSet<crate::types::misc::ID>,
 ) {
   let mut prepared : PreparedRerenders = prepare_rerender_views (
     env, views_state, views_state . diff_mode_enabled,
-    active_source_set, prepass, create_partnerCols );
+    active_source_set, prepass, create_partnerFolders );
   if ! authorize_prepared_rerenders (
     stream, &mut prepared, active_source_set,
     operation, approved_pids ) {
@@ -101,12 +101,12 @@ pub(crate) fn prepare_rerender_views (
   diff_mode_enabled   : bool,
   active_source_set   : Option<&ActiveSourceSet>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
-  create_partnerCols  : bool,
+  create_partnerFolders  : bool,
 ) -> PreparedRerenders {
   let runtime = env . runtime_snapshot ();
   prepare_rerender_views_with_runtime (
     env, runtime, views_state, diff_mode_enabled, active_source_set, prepass,
-    create_partnerCols)
+    create_partnerFolders)
 }
 
 pub(crate) fn prepare_rerender_views_with_runtime (
@@ -116,11 +116,11 @@ pub(crate) fn prepare_rerender_views_with_runtime (
   diff_mode_enabled   : bool,
   active_source_set   : Option<&ActiveSourceSet>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
-  create_partnerCols  : bool,
+  create_partnerFolders  : bool,
 ) -> PreparedRerenders {
   prepare_rerender_views_where (
     env, runtime, views_state, diff_mode_enabled, active_source_set, prepass,
-    create_partnerCols, |_| true )
+    create_partnerFolders, |_| true )
 }
 
 /// Prepare only open views selected from their already-held ViewForest.
@@ -133,7 +133,7 @@ fn prepare_rerender_views_where (
   diff_mode_enabled   : bool,
   active_source_set   : Option<&ActiveSourceSet>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
-  create_partnerCols  : bool,
+  create_partnerFolders  : bool,
   include             : impl Fn (&ViewForest) -> bool,
 ) -> PreparedRerenders {
   let uris : Vec<ViewUri> = views_state . open_views . views . iter ()
@@ -167,7 +167,7 @@ fn prepare_rerender_views_where (
         &mut viewforest,
         &mut context,
         None, // streamed rerenders repair silently.
-        create_partnerCols
+        create_partnerFolders
       ) } )
     { Ok (text) => {
         rendered_views . push ( PreparedView {

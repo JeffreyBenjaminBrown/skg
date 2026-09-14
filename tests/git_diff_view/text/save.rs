@@ -220,7 +220,7 @@ async fn test_move_text_changed_to_unedited_node_respawns (
 /// respawned scaffold should report '(textChanged staged)' instead
 /// of '(textChanged unstaged)' -- guards the save-rerender pipeline's
 /// per-stage attribution for text changes, mirroring
-/// ids::save::test_delete_id_col_scaffold_respawns_staged.
+/// ids::save::test_delete_id_folder_scaffold_respawns_staged.
 async fn test_delete_text_changed_scaffold_respawns_staged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>

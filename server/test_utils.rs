@@ -638,13 +638,13 @@ fn compare_two_viewnode_branches_recursively_modulo_id (
         MpViewnodeKind::Phantom (MpPhantom::Diff (p)) => p . id = id2,
         _ => {} }
       if n1_copy != *n2 { return false; }}
-    ( MpViewnodeKind::QualCol (_)
+    ( MpViewnodeKind::QualFolder (_)
       | MpViewnodeKind::Qual (_)
-      | MpViewnodeKind::PartnerCol (_)
+      | MpViewnodeKind::PartnerFolder (_)
       | MpViewnodeKind::BufferRoot,
-      MpViewnodeKind::QualCol (_)
+      MpViewnodeKind::QualFolder (_)
       | MpViewnodeKind::Qual (_)
-      | MpViewnodeKind::PartnerCol (_)
+      | MpViewnodeKind::PartnerFolder (_)
       | MpViewnodeKind::BufferRoot) =>
     { if n1 != n2 { return false; }}
     ( MpViewnodeKind::Phantom (MpPhantom::Deleted (_)),

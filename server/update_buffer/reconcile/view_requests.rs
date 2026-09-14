@@ -1,4 +1,4 @@
-use crate::to_org::complete::partner_col::{ maybe_add_hiddenInSubscribeeCol_branch, type_and_parent_type_consistent_with_subscribee };
+use crate::to_org::complete::partner_folder::{ maybe_add_hiddenInSubscribeeFolder_branch, type_and_parent_type_consistent_with_subscribee };
 use crate::to_org::expand::definitive::execute_view_requests;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::git::SourceDiff;
@@ -34,7 +34,7 @@ pub fn execute_activeNode_view_requests (
       active_source_set ) ?; }
   Ok(( )) }
 
-pub fn ensure_hiddenin_col_under_definitive_subscribee (
+pub fn ensure_hiddenInFolder_under_definitive_subscribee (
   tree   : &mut Tree<ViewNode>,
   node   : NodeId,
   graph  : &crate::dbs::in_rust_graph::InRustGraph,
@@ -54,14 +54,14 @@ pub fn ensure_hiddenin_col_under_definitive_subscribee (
         _ => false } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   if is_indefinitive { return Ok (( )); }
-  maybe_add_hiddenInSubscribeeCol_branch (
+  maybe_add_hiddenInSubscribeeFolder_branch (
     tree, node, graph, config,
     active_source_set, source_diffs ) }
 
 /// Read the node's non-consumed view_requests as a Vec. View completion
 /// (dispatch_node_update) settles
 /// every Definitive request at the node's own visit (the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule), so
-/// only Col/Path requests should remain here; execute_view_requests
+/// only Folder/Path requests should remain here; execute_view_requests
 /// errors loudly if a Definitive one survives.
 fn extract_view_requests (
   tree : &Tree<ViewNode>,

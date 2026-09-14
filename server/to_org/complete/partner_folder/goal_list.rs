@@ -24,9 +24,9 @@ fn relationship_member_key (
   graph . relationship_member_key (id)
 }
 
-/// Goal list for an OUTBOUND col -- one whose membership is a
-/// relation list stored in the owner's own file (subscribeeCol,
-/// overriddenCol, hiddenCol): the owner's worktree list, in diff
+/// Goal list for an OUTBOUND folder -- one whose membership is a
+/// relation list stored in the owner's own file (subscribeeFolder,
+/// overriddenFolder, hiddenFolder): the owner's worktree list, in diff
 /// mode LCS-interleaved against the owner's HEAD-side list so
 /// removed members appear as phantoms at their HEAD positions.
 ///
@@ -38,7 +38,7 @@ fn relationship_member_key (
 /// An owner whose file is Added (not Modified) in some stage has no
 /// HEAD side, so -- like content under a new file -- its members
 /// carry no membership marks from here.
-pub fn goal_list_for_outbound_col (
+pub fn goal_list_for_outbound_folder (
   owner_pid     : &ID,
   owner_source  : &SourceName,
   relation      : NodeRelation,
@@ -59,7 +59,7 @@ pub fn goal_list_for_outbound_col (
       unstaged_nc . and_then ( |c| relation . diff_in_nodechanges (c) ));
   itemlist_and_removedset_from_diff (&net) }
 
-/// The per-stage membership axes of an outbound col's members, read
+/// The per-stage membership axes of an outbound folder's members, read
 /// from the owner's per-stage diff of the named relation.  Used to
 /// stamp 'newM' on PRESENT members; removed members are phantoms,
 /// which carry their axes already.  Empty when the owner's file is
@@ -89,7 +89,7 @@ pub fn outbound_member_axes (
 ///   after = empty;
 /// - Added in a stage: before = empty, after = 'after_node's list;
 /// - absent from a stage map: that stage changed nothing.
-/// Used by the filter cols' three-snapshot derived-membership
+/// Used by the filter folders' three-snapshot derived-membership
 /// comparison.
 pub fn three_snapshots_of_relation_list (
   pid           : &ID,
@@ -189,7 +189,7 @@ fn axes_from_three_snapshots (
       result . insert ( (*id) . clone (), axes ); }}
   result }
 
-/// Goal list for a HiddenInSubscribeeCol: the intersection of the
+/// Goal list for a HiddenInSubscribeeFolder: the intersection of the
 /// subscriber's hides-list and the subscribee's contains-list.  In
 /// diff mode, the DERIVED membership is compared at the three
 /// snapshots (HEAD, index, worktree), so removed members phantom at
@@ -197,7 +197,7 @@ fn axes_from_three_snapshots (
 /// members get per-stage 'newM' -- honest signs for a membership no
 /// single relation's diff can express.  Returns (goal list,
 /// removed-id set, per-member membership axes).
-pub fn goal_list_for_hiddeninsubscribee_col (
+pub fn goal_list_for_hiddenInSubscribee_folder (
   graph                : &InRustGraph,
   subscribee_pid      : &ID,
   subscribee_source   : &SourceName,
@@ -240,7 +240,7 @@ pub fn goal_list_for_hiddeninsubscribee_col (
     itemlist_and_removedset_from_diff (&diff);
   (goal, removed, axes) }
 
-/// Goal list for a HiddenOutsideOfSubscribeeCol: the subscriber's
+/// Goal list for a HiddenOutsideOfSubscribeeFolder: the subscriber's
 /// hides-list minus everything contained by any subscribee.  In
 /// diff mode, the DERIVED membership is compared at the three
 /// snapshots (HEAD, index, worktree) -- the hides list, the
@@ -249,7 +249,7 @@ pub fn goal_list_for_hiddeninsubscribee_col (
 /// with exact per-stage labels and added members get per-stage
 /// 'newM'.  Returns (goal list, removed-id set, per-member
 /// membership axes).
-pub fn goal_list_for_hiddenoutsideof_subscribeecol (
+pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
   graph                : &InRustGraph,
   subscriber_pid       : &ID,
   subscriber_source    : &SourceName,
@@ -336,7 +336,7 @@ pub fn goal_list_for_hiddenoutsideof_subscribeecol (
 /// Locate a file's source by scanning the diff maps for it: serves
 /// nodes whose file is gone from both the graph and the disk (e.g. a
 /// subscribee deleted since HEAD), whose history nonetheless shaped
-/// a filter col's HEAD-side membership.
+/// a filter folder's HEAD-side membership.
 fn source_in_diffs_for_file (
   pid          : &ID,
   source_diffs : &Option<HashMap<SourceName, SourceDiff>>,

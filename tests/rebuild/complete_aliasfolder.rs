@@ -4,7 +4,7 @@ use indoc::indoc;
 use std::collections::HashMap;
 use std::error::Error;
 
-use skg::update_buffer::reconcile::aliascol::reconcile_alias_col_children;
+use skg::update_buffer::reconcile::aliasfolder::reconcile_aliasFolder_children;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
@@ -19,26 +19,26 @@ use ego_tree::{Tree, NodeId};
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  let fixtures : &str = "tests/rebuild/complete_aliascol/fixtures";
+  let fixtures : &str = "tests/rebuild/complete_aliasfolder/fixtures";
   run_with_shared_test_stores (
-    "skg-test-rebuild-complete-aliascol",
+    "skg-test-rebuild-complete-aliasFolder",
     |s| Box::pin ( async move {
-      s . reset ("test_reconcile_alias_col_children", fixtures) ?;
-      test_reconcile_alias_col_children (
+      s . reset ("test_reconcile_alias_folder_children", fixtures) ?;
+      test_reconcile_alias_folder_children (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_reconcile_alias_col_children_duplicate_aliases_different_orders",
+      s . reset ("test_reconcile_alias_folder_children_duplicate_aliases_different_orders",
                  fixtures) ?;
-      test_reconcile_alias_col_children_duplicate_aliases_different_orders (
+      test_reconcile_alias_folder_children_duplicate_aliases_different_orders (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
-async fn test_reconcile_alias_col_children (
+async fn test_reconcile_alias_folder_children (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
-      test_reconcile_alias_col_children_logic ( config ) . await }
+      test_reconcile_alias_folder_children_logic ( config ) . await }
 
-async fn test_reconcile_alias_col_children_logic (
+async fn test_reconcile_alias_folder_children_logic (
   config : &SkgConfig,
 
 ) -> Result < (), Box<dyn Error> > {
@@ -46,19 +46,19 @@ async fn test_reconcile_alias_col_children_logic (
   let source_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
   let graph = graph_handle_from_config (config)? . load_full ();
 
-  // Create org text with three AliasCol scenarios
+  // Create org text with three AliasFolder scenarios
   let org_text : &str =
     indoc! { "
       * (skg (node (id a) (source main))) a
-      ** (skg aliasCol) aliases 1
+      ** (skg aliasFolder) aliases 1
       *** (skg alias) c
       *** (skg alias) d
       *** (skg alias) c
       *** (skg alias) d
-      ** (skg aliasCol) aliases 2
+      ** (skg aliasFolder) aliases 2
       *** (skg alias) b
       *** (skg focused alias) d
-      * (skg aliasCol) aliases 3
+      * (skg aliasFolder) aliases 3
       ** (skg alias) the above should break
     " };
 
@@ -71,35 +71,35 @@ async fn test_reconcile_alias_col_children_logic (
   let tree_a_id : NodeId =
     viewforest . root () . first_child () . unwrap () . id ();
 
-  // Find the NodeIds for the AliasCol nodes
-  let aliascol_1_id : NodeId = {
+  // Find the NodeIds for the AliasFolder nodes
+  let aliasfolder_1_id : NodeId = {
     viewforest . get (tree_a_id) . unwrap ()
       . first_child () . unwrap ()
       . id ()
   };
-  let aliascol_2_id : NodeId = {
+  let aliasfolder_2_id : NodeId = {
     viewforest . get (tree_a_id) . unwrap ()
       . first_child () . unwrap ()
       . next_sibling () . unwrap ()
       . id ()
   };
 
-  // Test 1: First AliasCol should have b and c (deduped, valid only, disk order)
-  reconcile_alias_col_children (
-    &mut viewforest, aliascol_1_id, &graph, &source_diffs, config )?;
+  // Test 1: First AliasFolder should have b and c (deduped, valid only, disk order)
+  reconcile_aliasFolder_children (
+    &mut viewforest, aliasfolder_1_id, &graph, &source_diffs, config )?;
 
   {
-    let aliascol_1_ref =
-      viewforest . get (aliascol_1_id) . unwrap ();
+    let aliasfolder_1_ref =
+      viewforest . get (aliasfolder_1_id) . unwrap ();
     let children : Vec < String > =
-      aliascol_1_ref . children () . map (
+      aliasfolder_1_ref . children () . map (
         |n| n . value() . title() . to_string() )
       . collect();
 
     assert_eq! (
       children . len (),
       2,
-      "AliasCol 1 should have exactly 2 children"
+      "AliasFolder 1 should have exactly 2 children"
     );
     assert_eq! (
       children [ 0 ],
@@ -113,23 +113,23 @@ async fn test_reconcile_alias_col_children_logic (
     );
   }
 
-  // Test 2: Second AliasCol should have b and c, and gain focus
-  reconcile_alias_col_children (
-    &mut viewforest, aliascol_2_id, &graph, &source_diffs, config )?;
+  // Test 2: Second AliasFolder should have b and c, and gain focus
+  reconcile_aliasFolder_children (
+    &mut viewforest, aliasfolder_2_id, &graph, &source_diffs, config )?;
 
   {
-    let aliascol_2_ref =
-      viewforest . get (aliascol_2_id) . unwrap ();
-    let aliascol_2_new : &ViewNode = aliascol_2_ref . value ();
+    let aliasfolder_2_ref =
+      viewforest . get (aliasfolder_2_id) . unwrap ();
+    let aliasfolder_2_new : &ViewNode = aliasfolder_2_ref . value ();
     let children : Vec < String > =
-      aliascol_2_ref . children () . map (
+      aliasfolder_2_ref . children () . map (
         |n| n . value() . title() . to_string() )
       . collect();
 
     assert_eq! (
       children . len (),
       2,
-      "AliasCol 2 should have exactly 2 children"
+      "AliasFolder 2 should have exactly 2 children"
     );
     assert_eq! (
       children [ 0 ],
@@ -142,22 +142,22 @@ async fn test_reconcile_alias_col_children_logic (
       "Second child should be 'c'"
     );
     assert! (
-      aliascol_2_new . focused,
-      "AliasCol 2 should have gained focus"
+      aliasfolder_2_new . focused,
+      "AliasFolder 2 should have gained focus"
     );
   }
 
-  // Test 3: Third AliasCol should error (no parent or parent has no ID)
-  // Get the second "tree root" (AliasCol 3)
-  let aliascol_3_id : NodeId =
+  // Test 3: Third AliasFolder should error (no parent or parent has no ID)
+  // Get the second "tree root" (AliasFolder 3)
+  let aliasfolder_3_id : NodeId =
     viewforest . root () . first_child () . unwrap ()
     . next_sibling () . unwrap ()
     . id ();
 
   let result : Result < (), Box<dyn Error> > =
-    reconcile_alias_col_children (
+    reconcile_aliasFolder_children (
       &mut viewforest,
-      aliascol_3_id,
+      aliasfolder_3_id,
       &graph,
       &source_diffs,
       config
@@ -165,19 +165,19 @@ async fn test_reconcile_alias_col_children_logic (
 
   assert! (
     result . is_err (),
-    "AliasCol 3 should error (no parent)"
+    "AliasFolder 3 should error (no parent)"
   );
 
   Ok (( )) }
 
-async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders (
+async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result < (), Box<dyn Error> > {
-      test_reconcile_alias_col_children_duplicate_aliases_different_orders_logic (
+      test_reconcile_alias_folder_children_duplicate_aliases_different_orders_logic (
         config ) . await }
 
-async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders_logic (
+async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders_logic (
   config : &SkgConfig,
 
 ) -> Result < (), Box<dyn Error> > {
@@ -188,10 +188,10 @@ async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders_lo
   let org_text : &str =
     indoc! { "
       * (skg (node (id a) (source main))) a
-      ** (skg aliasCol) aliases
+      ** (skg aliasFolder) aliases
       *** (skg alias) b
       *** (skg focused alias) b
-      ** (skg aliasCol) aliases
+      ** (skg aliasFolder) aliases
       *** (skg focused alias) b
       *** (skg alias) b
     " };
@@ -204,41 +204,41 @@ async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders_lo
   let tree_root_id : NodeId =
     viewforest . root () . first_child () . unwrap () . id ();
 
-  // Find the NodeIds for both AliasCol nodes
-  let first_aliascol_id : NodeId = {
+  // Find the NodeIds for both AliasFolder nodes
+  let first_aliasfolder_id : NodeId = {
     viewforest . get (tree_root_id) . unwrap ()
       . first_child () . unwrap ()
       . id ()
   };
-  let second_aliascol_id : NodeId = {
+  let second_aliasfolder_id : NodeId = {
     viewforest . get (tree_root_id) . unwrap ()
       . first_child () . unwrap ()
       . next_sibling () . unwrap ()
       . id ()
   };
 
-  // Test first AliasCol
-  reconcile_alias_col_children (
+  // Test first AliasFolder
+  reconcile_aliasFolder_children (
     &mut viewforest,
-    first_aliascol_id,
+    first_aliasfolder_id,
     &graph,
     &source_diffs,
     config
   )?;
 
   {
-    let aliascol_ref =
-      viewforest . get (first_aliascol_id) . unwrap ();
-    let aliascol_vn : &ViewNode = aliascol_ref . value ();
+    let aliasfolder_ref =
+      viewforest . get (first_aliasfolder_id) . unwrap ();
+    let aliasfolder_vn : &ViewNode = aliasfolder_ref . value ();
     let children_new : Vec < &ViewNode > =
-      aliascol_ref . children ()
+      aliasfolder_ref . children ()
       . map ( |n| n . value () )
       . collect ();
 
     assert_eq! (
       children_new . len (),
       2,
-      "First AliasCol should have exactly 2 children (b, c)"
+      "First AliasFolder should have exactly 2 children (b, c)"
     );
     assert_eq! (
       children_new [ 0 ] . title (),
@@ -247,11 +247,11 @@ async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders_lo
     );
     assert! (
       ! children_new [ 0 ] . focused,
-      "First child should not be focused (focus transferred to AliasCol)"
+      "First child should not be focused (focus transferred to AliasFolder)"
     );
     assert! (
-      aliascol_vn . focused,
-      "AliasCol itself should have gained focus"
+      aliasfolder_vn . focused,
+      "AliasFolder itself should have gained focus"
     );
     assert_eq! (
       children_new [ 1 ] . title (),
@@ -264,27 +264,27 @@ async fn test_reconcile_alias_col_children_duplicate_aliases_different_orders_lo
     );
   }
 
-  // Test second AliasCol
-  reconcile_alias_col_children (
+  // Test second AliasFolder
+  reconcile_aliasFolder_children (
     &mut viewforest,
-    second_aliascol_id,
+    second_aliasfolder_id,
     &graph,
     &source_diffs,
     config
   )?;
 
   {
-    let aliascol_ref =
-      viewforest . get (second_aliascol_id) . unwrap ();
+    let aliasfolder_ref =
+      viewforest . get (second_aliasfolder_id) . unwrap ();
     let children : Vec < &ViewNode > =
-      aliascol_ref . children ()
+      aliasfolder_ref . children ()
       . map ( |n| n . value () )
       . collect ();
 
     assert_eq! (
       children . len (),
       2,
-      "Second AliasCol should have exactly 2 children (b focused, c)"
+      "Second AliasFolder should have exactly 2 children (b focused, c)"
     );
     assert_eq! (
       children [ 0 ] . title (),

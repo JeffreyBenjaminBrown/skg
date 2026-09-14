@@ -2,14 +2,14 @@
 //
 // The position-relative sharing view-stats
 // (TODO/full-schema/10_heralds-and-stats.org):
-// - grandparentOverrides ("gO"): a subscribee-as-such whose col owner
+// - grandparentOverrides ("gO"): a subscribee-as-such whose folder owner
 //   also overrides it;
-// - grandparentSubscribes ("gS"): an overriddenCol member whose col
+// - grandparentSubscribes ("gS"): an overriddenFolder member whose folder
 //   owner also subscribes to it;
 // - overridesParent ("Op"): a node drawn under a gnode it overrides.
 // One fixture serves all three: R subscribes to E and F and overrides
-// E (so E under R's subscribeeCol carries gO and under R's
-// overriddenCol carries gS, while F carries neither); R contains P,
+// E (so E under R's subscribeeFolder carries gO and under R's
+// overriddenFolder carries gS, while F carries neither); R contains P,
 // P contains C, and C overrides P (so C as content of P carries Op,
 // and C as a view root does not). Each stat round-trips through a
 // save (the viewStats parser errors on unknown atoms, so this also
@@ -50,19 +50,19 @@ fn lines_containing<'a> (
     . filter ( |l| l . contains (fragment) )
     . collect () }
 
-/// The col (by its metadata atom) most recently opened above each
-/// E line. The fixture draws E only as a col member, so this
-/// attributes each E copy to its col regardless of col order.
-fn e_lines_by_enclosing_col (
+/// The folder (by its metadata atom) most recently opened above each
+/// E line. The fixture draws E only as a folder member, so this
+/// attributes each E copy to its folder regardless of folder order.
+fn e_lines_by_enclosing_folder (
   buf : &str,
 ) -> Vec<(&'static str, &str)> {
-  let mut current_col : &'static str = "";
+  let mut current_folder : &'static str = "";
   let mut result : Vec<(&'static str, &str)> = Vec::new ();
   for line in buf . lines () {
-    if line . contains ("subscribeeCol)") { current_col = "subscribeeCol"; }
-    else if line . contains ("overriddenCol)") { current_col = "overriddenCol"; }
+    if line . contains ("subscribeeFolder)") { current_folder = "subscribeeFolder"; }
+    else if line . contains ("overriddenFolder)") { current_folder = "overriddenFolder"; }
     else if line . contains ("(id E)") {
-      result . push ((current_col, line)); }}
+      result . push ((current_folder, line)); }}
   result }
 
 fn assert_sharing_stats_in_view_of_R (
@@ -70,25 +70,25 @@ fn assert_sharing_stats_in_view_of_R (
   label : &str,
 ) {
   let e_lines : Vec<(&'static str, &str)> =
-    e_lines_by_enclosing_col (buf);
+    e_lines_by_enclosing_folder (buf);
   assert_eq! ( e_lines . len (), 2,
-    "{}: E should appear under both the subscribeeCol and the \
-     overriddenCol:\n{}", label, buf );
+    "{}: E should appear under both the subscribeeFolder and the \
+     overriddenFolder:\n{}", label, buf );
   // In the SEMANTIC wire the parent-relative stats are relationships to
   // E's grandparent R (generation 2): R both subscribes to and overrides
-  // E. Under a col, the COL relation is E's reason-for-being (birth); the
+  // E. Under a folder, the FOLDER relation is E's reason-for-being (birth); the
   // OTHER (the old gO/gS sharing stat) shows as an ordinary relation.
-  // Both carry (ancestors 2). The cols differ by which relation is birth.
-  for (col, line) in &e_lines {
-    match *col {
-      "subscribeeCol" => {
+  // Both carry (ancestors 2). The folders differ by which relation is birth.
+  for (folder, line) in &e_lines {
+    match *folder {
+      "subscribeeFolder" => {
         assert! ( line . contains ("(birth subscribes)"),
           "{}: E-as-subscribee is born of the subscribe:\n{}", label, buf );
         assert! ( line . contains ("(overrides")
                   && line . contains ("(ancestors 2)"),
           "{}: E-as-subscribee also shows gO (R overrides E, gen 2):\n{}",
           label, buf ); },
-      "overriddenCol" => {
+      "overriddenFolder" => {
         assert! ( line . contains ("(birth overrides)"),
           "{}: E-as-overridden is born of the override:\n{}", label, buf );
         assert! ( line . contains ("(subscribes")
@@ -96,11 +96,11 @@ fn assert_sharing_stats_in_view_of_R (
           "{}: E-as-overridden also shows gS (R subscribes E, gen 2):\n{}",
           label, buf ); },
       other => panic! (
-        "{}: E drawn outside any col ({:?}):\n{}", label, other, buf ),
+        "{}: E drawn outside any folder ({:?}):\n{}", label, other, buf ),
     }}
   for f_line in lines_containing (buf, "(id F)") {
     // F is a subscribee R does NOT override, so it has no overrides
-    // relation at all -- only its col subscribe (its reason-for-being).
+    // relation at all -- only its folder subscribe (its reason-for-being).
     assert! ( ! f_line . contains ("(overrides"),
       "{}: F, a subscribee R does not override, shows no override \
        relation:\n{}", label, buf ); }

@@ -4,7 +4,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, ParentIs};
-use crate::types::viewnode::{Vognode, QualCol, Qual};
+use crate::types::viewnode::{Vognode, QualFolder, Qual};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, treat_certain_children};
@@ -12,15 +12,15 @@ use ego_tree::{NodeId, Tree};
 use std::collections::HashMap;
 use std::error::Error;
 
-/// Reconciles an AliasCol's children against
+/// Reconciles an AliasFolder's children against
 ///   the aliases on disk (via the map) for its parent ActiveNode.
 ///
 /// Per the spec in buffer-update.org:
-/// - Verify this node is an AliasCol
+/// - Verify this node is an AliasFolder
 /// - Verify its parent is an ActiveNode
 /// - Fetch the corresponding NodeComplete from the map
 /// - Read its aliases into 'aliases'
-/// - Partition the AliasCol's children into:
+/// - Partition the AliasFolder's children into:
 ///   - ActiveNodes with parentIs != Affected
 ///   - Alias scaffold nodes
 ///   (Error if any child does not fit these categories.)
@@ -28,30 +28,30 @@ use std::error::Error;
 /// - Among the Alias children, discard any not in 'aliases'
 /// - Create new Alias nodes for values in 'aliases' not already present
 /// - Order the final Alias children to match the order in 'aliases'
-pub fn reconcile_alias_col_children (
+pub fn reconcile_aliasFolder_children (
   tree             : &mut Tree<ViewNode>,
-  aliascol_node_id : NodeId,
+  aliasfolder_node_id : NodeId,
   graph            : &InRustGraph,
   source_diffs     : &Option<HashMap<SourceName, SourceDiff>>,
   config           : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  { let is_aliascol : bool = // barf if not an aliascol
+  { let is_aliasFolder : bool = // barf if not an aliasFolder
       read_at_ancestor_in_tree(
-        tree, aliascol_node_id, 0,
+        tree, aliasfolder_node_id, 0,
         |viewnode| matches!( &viewnode . kind,
-                            ViewNodeKind::QualCol (QualCol::Alias)) )
+                            ViewNodeKind::QualFolder (QualFolder::Alias)) )
       . map_err( |e| -> Box<dyn Error> { e . into() } )?;
-    if !is_aliascol { return Err(
-      "reconcile_alias_col_children: Node is not an AliasCol" . into() ); }}
+    if !is_aliasFolder { return Err(
+      "reconcile_aliasFolder_children: Node is not an AliasFolder" . into() ); }}
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: parent Active vognode read through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 0).
   let (parent_pid, parent_source) : (ID, SourceName) =
     pid_and_source_from_required_ancestor(
-      tree, aliascol_node_id, 0,
-      "reconcile_alias_col_children" ) ?;
+      tree, aliasfolder_node_id, 0,
+      "reconcile_aliasFolder_children" ) ?;
   let parent_nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
       graph, config, &parent_pid, &parent_source )
-    . map_err ( |_| "reconcile_alias_col_children: parent NodeComplete not found" ) ?;
+    . map_err ( |_| "reconcile_aliasFolder_children: parent NodeComplete not found" ) ?;
   let alias_sources : HashMap<String, SourceName> =
     parent_nodecomplete . aliases . or_default () . iter ()
     .map ( |alias| (alias . member . clone (), alias . source . clone ()) )
@@ -84,7 +84,7 @@ pub fn reconcile_alias_col_children (
     |viewnode| match &viewnode . kind {
       ViewNodeKind::Qual (Qual::Alias { text, .. } ) =>
         Ok ( text . clone() ),
-      _ => Err ( "reconcile_alias_col_children: relevant child is not an alias"
+      _ => Err ( "reconcile_aliasFolder_children: relevant child is not an alias"
                  . to_string() ), }; // relevance means Qual::Alias
   let create_alias = |text: &String| -> Result<ViewNode, String> {
     let membership : MembershipAxes =
@@ -103,16 +103,16 @@ pub fn reconcile_alias_col_children (
                                                membership } ), })};
   complete_relevant_children_in_viewnodetree(
     tree,
-    aliascol_node_id,
+    aliasfolder_node_id,
     is_alias,
     view_alias_text,
     &goal_list,
     create_alias )?;
   treat_certain_children(
       // Currently unreachable: validation rejects active vognode
-      // children of AliasCol. If that is later relaxed, only Normal
+      // children of AliasFolder. If that is later relaxed, only Normal
       // Vognodes need repair; parentIs is a vestigial field in Phantoms.
-      tree, aliascol_node_id,
+      tree, aliasfolder_node_id,
       |vn : &ViewNode| matches!( &vn . kind,
                                   ViewNodeKind::Vognode (Vognode::Active (_)) ),
       |vn : &mut ViewNode| {

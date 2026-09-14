@@ -1,4 +1,4 @@
-# Test fixtures for SubscribeeCol functionality.
+# Test fixtures for SubscribeeFolder functionality.
 
 Two sources: 'home' (user-owned) and 'away' (foreign).
 
@@ -20,10 +20,10 @@ Structure:
 Expected content view from node 1:
   * 1
   ** 11
-  *** subscribees     <-- SubscribeeCol because 11 subscribes to something
+  *** subscribees     <-- SubscribeeFolder because 11 subscribes to something
   *** 111
   ** 12
-  *** subscribees     <-- SubscribeeCol because 12 subscribes to something
-  ** 13               <-- no SubscribeeCol (no subscriptions)
-  ** 14               <-- no SubscribeeCol (no subscriptions)
+  *** subscribees     <-- SubscribeeFolder because 12 subscribes to something
+  ** 13               <-- no SubscribeeFolder (no subscriptions)
+  ** 14               <-- no SubscribeeFolder (no subscriptions)
   *** 141

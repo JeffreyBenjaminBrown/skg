@@ -2,7 +2,7 @@ use super::*;
 use crate::types::git::MembershipAxes;
 use crate::types::viewnode::{
   mk_indefinitive_viewnode, viewforest_root_viewnode,
-  Phantom, PhantomDeleted, Qual, QualCol };
+  Phantom, PhantomDeleted, Qual, QualFolder };
 
 fn sid (s : &str) -> ID { ID::from (s) }
 fn src () -> SourceName { SourceName::from ("main") }
@@ -16,13 +16,13 @@ fn deleted (title : &str) -> ViewNode {
       id : sid (title), source : src (),
       title : title . to_string (), body : None })) } }
 
-fn role_col (rc : PartnerCol) -> ViewNode {
+fn role_folder (rc : PartnerFolder) -> ViewNode {
   ViewNode { focused : false, folded : false, body_folded : false,
-    kind : ViewNodeKind::PartnerCol (rc) } }
+    kind : ViewNodeKind::PartnerFolder (rc) } }
 
-fn qual_col (qc : QualCol) -> ViewNode {
+fn qual_folder (qc : QualFolder) -> ViewNode {
   ViewNode { focused : false, folded : false, body_folded : false,
-    kind : ViewNodeKind::QualCol (qc) } }
+    kind : ViewNodeKind::QualFolder (qc) } }
 
 fn alias_qual (text : &str) -> ViewNode {
   ViewNode { focused : false, folded : false, body_folded : false,
@@ -49,33 +49,33 @@ fn is_detached (tree : &Tree<ViewNode>, parent : NodeId, id : NodeId) -> bool {
   ! tree . get (parent) . unwrap () . children ()
     . any ( |c| c . id () == id ) }
 
-// ---- col_is_generalized_orphan ----
+// ---- folder_is_generalized_orphan ----
 
 #[test]
-fn aliascol_under_normal_is_not_orphan () {
+fn aliasfolder_under_normal_is_not_orphan () {
   let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let n : NodeId = child (&mut t, root, normal ("N", ParentIs::Affected));
-  let ac : NodeId = child (&mut t, n, qual_col (QualCol::Alias));
-  assert! ( ! col_is_generalized_orphan (&t, ac) . unwrap () ); }
+  let ac : NodeId = child (&mut t, n, qual_folder (QualFolder::Alias));
+  assert! ( ! folder_is_generalized_orphan (&t, ac) . unwrap () ); }
 
 #[test]
-fn aliascol_under_deleted_is_orphan () {
+fn aliasfolder_under_deleted_is_orphan () {
   let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let d : NodeId = child (&mut t, root, deleted ("D"));
-  let ac : NodeId = child (&mut t, d, qual_col (QualCol::Alias));
-  assert! ( col_is_generalized_orphan (&t, ac) . unwrap () ); }
+  let ac : NodeId = child (&mut t, d, qual_folder (QualFolder::Alias));
+  assert! ( folder_is_generalized_orphan (&t, ac) . unwrap () ); }
 
 #[test]
-fn relation_col_under_deadscaffold_is_orphan () {
+fn relation_folder_under_deadscaffold_is_orphan () {
   let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let dead : NodeId = child (&mut t, root,
     ViewNode { focused : false, folded : false, body_folded : false,
       kind : ViewNodeKind::DeadScaffold });
-  let rc : NodeId = child (&mut t, dead, role_col (PartnerCol::Subscriber));
-  assert! ( col_is_generalized_orphan (&t, rc) . unwrap () ); }
+  let rc : NodeId = child (&mut t, dead, role_folder (PartnerFolder::Subscriber));
+  assert! ( folder_is_generalized_orphan (&t, rc) . unwrap () ); }
 
 // Multi-level: the immediate parent (subscribee) is a live Normal, but the
 // FAR ancestor (subscriber, depth 3) is dead -- the generalized (not just
@@ -86,24 +86,24 @@ fn build_subscribee_chain (
   let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let sber : NodeId = child (&mut t, root, subscriber);
-  let scol : NodeId = child (&mut t, sber, role_col (PartnerCol::Subscribee));
-  let sbee : NodeId = child (&mut t, scol,
+  let subscribee_folder : NodeId = child (&mut t, sber, role_folder (PartnerFolder::Subscribee));
+  let sbee : NodeId = child (&mut t, subscribee_folder,
     normal ("subscribee", ParentIs::Affected));
   let hin : NodeId = child (&mut t, sbee,
-    role_col (PartnerCol::HiddenInSubscribee));
-  (t, sber, scol, sbee, hin) }
+    role_folder (PartnerFolder::HiddenInSubscribee));
+  (t, sber, subscribee_folder, sbee, hin) }
 
 #[test]
 fn hiddenin_full_valid_chain_is_not_orphan () {
-  let (t, _sber, _scol, _sbee, hin) =
+  let (t, _sber, _sfolder, _sbee, hin) =
     build_subscribee_chain (normal ("subscriber", ParentIs::Affected));
-  assert! ( ! col_is_generalized_orphan (&t, hin) . unwrap () ); }
+  assert! ( ! folder_is_generalized_orphan (&t, hin) . unwrap () ); }
 
 #[test]
 fn hiddenin_dead_far_subscriber_is_orphan () {
-  let (t, _sber, _scol, _sbee, hin) =
+  let (t, _sber, _sfolder, _sbee, hin) =
     build_subscribee_chain (deleted ("subscriber"));
-  assert! ( col_is_generalized_orphan (&t, hin) . unwrap (),
+  assert! ( folder_is_generalized_orphan (&t, hin) . unwrap (),
     "immediate parent (subscribee) is live but the depth-3 subscriber is \
      dead -- the generalized check must report orphan" ); }
 
@@ -111,21 +111,21 @@ fn hiddenin_dead_far_subscriber_is_orphan () {
 
 #[test]
 fn required_ancestor_walks_the_chain () {
-  let (t, sber, scol, sbee, hin) =
+  let (t, sber, subscribee_folder, sbee, hin) =
     build_subscribee_chain (normal ("subscriber", ParentIs::Affected));
   assert_eq! ( required_ancestor (&t, hin, 0) . unwrap (), Some (sbee) );
-  assert_eq! ( required_ancestor (&t, hin, 1) . unwrap (), Some (scol) );
+  assert_eq! ( required_ancestor (&t, hin, 1) . unwrap (), Some (subscribee_folder) );
   assert_eq! ( required_ancestor (&t, hin, 2) . unwrap (), Some (sber) );
   assert_eq! ( required_ancestor (&t, hin, 3) . unwrap (), None ); }
 
 #[test]
 fn required_ancestor_reads_without_revalidating_kind () {
   // §20.4: required_ancestor no longer re-validates each ancestor's KIND -- the
-  // orphan pre-check (col_is_generalized_orphan) does that before any reconcile
+  // orphan pre-check (folder_is_generalized_orphan) does that before any reconcile
   // runs. So on a broken chain (dead subscriber) it still returns the
   // table-indexed ancestor; detecting the break is the orphan check's job (see
   // hiddenin_dead_far_subscriber_is_orphan).
-  let (t, sber, _scol, sbee, hin) =
+  let (t, sber, _sfolder, sbee, hin) =
     build_subscribee_chain (deleted ("subscriber"));
   assert_eq! ( required_ancestor (&t, hin, 0) . unwrap (), Some (sbee) );
   assert_eq! ( required_ancestor (&t, hin, 2) . unwrap (), Some (sber),
@@ -133,37 +133,37 @@ fn required_ancestor_reads_without_revalidating_kind () {
   assert_eq! ( required_ancestor (&t, hin, 3) . unwrap (), None,
     "still None past the end of the table" ); }
 
-// ---- deaden_generalized_orphan_col (child disposal) ----
+// ---- deaden_generalized_orphan_folder (child disposal) ----
 
 #[test]
 fn deaden_disposes_each_child_kind () {
   let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let d : NodeId = child (&mut t, root, deleted ("D"));
-  let scol : NodeId = child (&mut t, d, role_col (PartnerCol::Subscribee));
+  let subscribee_folder : NodeId = child (&mut t, d, role_folder (PartnerFolder::Subscribee));
   // Affected leaf -> delete.
-  let leaf : NodeId = child (&mut t, scol, normal ("L", ParentIs::Affected));
+  let leaf : NodeId = child (&mut t, subscribee_folder, normal ("L", ParentIs::Affected));
   // Affected branch (has a child) -> demote to Independent, keep.
-  let branch : NodeId = child (&mut t, scol, normal ("B", ParentIs::Affected));
+  let branch : NodeId = child (&mut t, subscribee_folder, normal ("B", ParentIs::Affected));
   let _bchild : NodeId = child (&mut t, branch, normal ("Bc", ParentIs::Affected));
-  // Nested col -> leave it (self-deadens at its own visit).
-  let nested : NodeId = child (&mut t, scol,
-    role_col (PartnerCol::HiddenOutsideOfSubscribee));
+  // Nested folder -> leave it (self-deadens at its own visit).
+  let nested : NodeId = child (&mut t, subscribee_folder,
+    role_folder (PartnerFolder::HiddenOutsideOfSubscribee));
   // Non-Affected vognode -> keep untouched.
-  let indep : NodeId = child (&mut t, scol, normal ("I", ParentIs::Independent));
+  let indep : NodeId = child (&mut t, subscribee_folder, normal ("I", ParentIs::Independent));
 
-  deaden_generalized_orphan_col (&mut t, scol) . unwrap ();
+  deaden_generalized_orphan_folder (&mut t, subscribee_folder) . unwrap ();
 
-  assert! ( matches! ( kind_at (&t, scol), ViewNodeKind::DeadScaffold ),
-    "the orphan col itself becomes a DeadScaffold" );
-  assert! ( is_detached (&t, scol, leaf),
+  assert! ( matches! ( kind_at (&t, subscribee_folder), ViewNodeKind::DeadScaffold ),
+    "the orphan folder itself becomes a DeadScaffold" );
+  assert! ( is_detached (&t, subscribee_folder, leaf),
     "an Affected leaf is deleted" );
   assert_eq! ( parentis_at (&t, branch), Some (ParentIs::Independent),
     "an Affected branch is demoted to Independent and kept" );
-  assert! ( ! is_detached (&t, scol, branch) );
+  assert! ( ! is_detached (&t, subscribee_folder, branch) );
   assert! ( matches! ( kind_at (&t, nested),
-                       ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) ),
-    "a nested col is left untouched to self-deaden at its visit" );
+                       ViewNodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) ),
+    "a nested folder is left untouched to self-deaden at its visit" );
   assert_eq! ( parentis_at (&t, indep), Some (ParentIs::Independent),
     "a non-Affected vognode is kept untouched" ); }
 
@@ -172,9 +172,9 @@ fn deaden_converts_qual_leaf_to_deadscaffold () {
   let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let d : NodeId = child (&mut t, root, deleted ("D"));
-  let ac : NodeId = child (&mut t, d, qual_col (QualCol::Alias));
+  let ac : NodeId = child (&mut t, d, qual_folder (QualFolder::Alias));
   let q : NodeId = child (&mut t, ac, alias_qual ("eleven"));
-  deaden_generalized_orphan_col (&mut t, ac) . unwrap ();
+  deaden_generalized_orphan_folder (&mut t, ac) . unwrap ();
   assert! ( matches! ( kind_at (&t, ac), ViewNodeKind::DeadScaffold ) );
   assert! ( matches! ( kind_at (&t, q), ViewNodeKind::DeadScaffold ),
     "a Qual leaf (which does not self-dispatch) is converted to DeadScaffold" ); }

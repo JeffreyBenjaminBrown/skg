@@ -350,7 +350,7 @@ function M.delete ()
 end
 
 ---Mark the headline at point, and every activeNode org-descendant,
----for deletion. Non-activeNode descendants (phantoms, cols, ...) are
+---for deletion. Non-activeNode descendants (phantoms, folders, ...) are
 ---skipped. Does NOT save.
 function M.delete_recursive ()
   if not M.at_heading_p() then error('Not on a headline') end

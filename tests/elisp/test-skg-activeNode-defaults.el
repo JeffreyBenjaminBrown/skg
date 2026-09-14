@@ -269,7 +269,7 @@
                            "*** source\n"
                            "**** jeff\n"
                            "*** viewRequests\n"
-                           "**** col\n"
+                           "**** folder\n"
                            "***** aliases\n"
                            "**** path\n"
                            "***** container"))
@@ -277,7 +277,7 @@
          (result (org-to-sexp stripped)))
     (should (equal result
                    '(skg (node (id abc) (source jeff)
-                               (viewRequests (col aliases) (path container))))))))
+                               (viewRequests (folder aliases) (path container))))))))
 
 ;;
 ;; Strip: the empty-node view skeleton (childless editable fields)

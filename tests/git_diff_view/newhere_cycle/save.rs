@@ -51,7 +51,7 @@ fn test_newhere_cycle_survives_save()
 /// respawned cycle child should keep '(staged newM)' instead of
 /// '(unstaged newM)' -- guards the save-rerender pipeline's per-stage
 /// attribution for the newhere-cycle scaffold, mirroring
-/// ids::save::test_delete_id_col_scaffold_respawns_staged.
+/// ids::save::test_delete_id_folder_scaffold_respawns_staged.
 #[test]
 fn test_newhere_cycle_survives_save_staged()
   -> Result<(), Box<dyn Error>>

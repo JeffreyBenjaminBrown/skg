@@ -112,7 +112,7 @@ fn each_relation_reads_its_own_diff_when_one_owner_bears_both () {
   // The mislabeling case that motivated relation-true attribution:
   // one owner both contains and overrides the same child, each edge
   // removed in a DIFFERENT stage. The contains-phantom must carry
-  // the contains stage and the overriddenCol-phantom the overrides
+  // the contains stage and the overriddenFolder-phantom the overrides
   // stage; a first-hit scan across relations would label both from
   // whichever relation it checked first.
   let parent : ID = id ("parent");
@@ -155,7 +155,7 @@ fn each_relation_reads_its_own_diff_when_one_owner_bears_both () {
     NodeRelation::OverridesViewOf, Some (&diffs) );
   assert_eq! ( overrides_mem, MembershipAxes {
     staged: None, unstaged: Some (Sign::Minus) },
-    "the overriddenCol phantom is labeled from \
+    "the overriddenFolder phantom is labeled from \
      overrides_view_of_diff only" );
 }
 

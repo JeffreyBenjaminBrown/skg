@@ -1,10 +1,10 @@
 use crate::source_sets::ActiveSourceSet;
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::backpath::build_and_integrate_path_view_then_drop_request;
-use crate::to_org::expand::col_request::build_and_integrate_col_then_drop_request;
+use crate::to_org::expand::folder_request::build_and_integrate_folder_then_drop_request;
 use crate::to_org::util::{ DefinitiveMap, Finalizable, get_id_from_treenode, makeIndefinitiveAndClobber, activeNode_in_tree_is_indefinitive };
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ColRelation, IndefOrDef, ParentIs };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, FolderRelation, IndefOrDef, ParentIs };
 use crate::types::viewnode::Vognode;
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
@@ -24,12 +24,12 @@ pub fn execute_view_requests (
 ) -> Result < (), Box<dyn Error> > {
   for (node_id, request) in requests {
     match request {
-      ViewRequest::Col (ColRelation::Aliases) => {
+      ViewRequest::Folder (FolderRelation::Aliases) => {
         build_and_integrate_aliases_view_then_drop_request (
           viewforest, node_id, graph, config, errors )
  ?; },
-      ViewRequest::Col (rel) => {
-        build_and_integrate_col_then_drop_request (
+      ViewRequest::Folder (rel) => {
+        build_and_integrate_folder_then_drop_request (
           viewforest, node_id, graph, rel, config, errors,
           active_source_set ) ?; },
       ViewRequest::Path (role) => {

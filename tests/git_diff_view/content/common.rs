@@ -77,7 +77,7 @@ pub fn setup_git_repo_with_removed_subscribee_fixtures_staged(
 /// The added direction: a subscriber whose subscribes_to GAINED node 22
 /// between HEAD and worktree, so the present member 22 must carry
 /// (unstaged newM) (TODO/full-schema/12-2_diff-mode-policy_discussion.org,
-/// outbound col completeness).
+/// outbound folder completeness).
 pub fn setup_git_repo_with_added_subscribee_fixtures(
   repo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {

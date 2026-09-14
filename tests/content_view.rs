@@ -181,8 +181,8 @@ async fn test_multi_root_view_with_shared_nodes (
 
       // BFS processes all roots (generation 1) before children (generation 2),
       // so node 2 appears first as a root, then as a child (marked indef).
-      // Definitive nodes with subscriptions get SubscribeeCol children,
-      // and each SubscribeeCol has Subscribee children with the subscribed IDs.
+      // Definitive nodes with subscriptions get SubscribeeFolder children,
+      // and each SubscribeeFolder has Subscribee children with the subscribed IDs.
       // Because node 2 has node 1 as a container, the multi_root_view
       // pipeline prepends node 1's ancestry (here just node 1 itself,
       // indef Content) as the first child of the level-1 view of
@@ -191,24 +191,24 @@ async fn test_multi_root_view_with_shared_nodes (
         "* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 2)) (hides (out 2))))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
-         ** (skg hiddenCol)
+         ** (skg hiddenFolder)
          *** (skg (node (id 4) (source main) indef hiddenBody (rels (subscribes (in 2)) (overrides (in 1)) (hides (in 1 (ancestors 2))) (extraIds 1) (birth hides)))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (source main) indef hiddenBody (rels (textlinksTo (in 1)) (subscribes (in 2)) (overrides (out 2)) (hides (in 1 (ancestors 2))) (extraIds 1) (birth hides)))) this title includes a [[id:22][textlink to another file]]
          ** (skg (node (id 2) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1)) (subscribes (out 2)) (extraIds 1) (birth contains)))) title 2
          ** (skg (node (id 5) (source main) (rels (textlinksTo (in 1)) (subscribes (in 2)) (overrides (out 2)) (hides (in 1 (ancestors 1))) (extraIds 1) (birth overrides)) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
-         *** (skg hiderCol)
+         *** (skg hiderFolder)
          **** (skg (node (id 1) (source main) indef hiddenBody (rels (contains (out 2)) (hides (out 2 (ancestors 2))) (birth hides)) (viewStats cycle))) title 1
-         *** (skg overriddenCol)
+         *** (skg overriddenFolder)
          **** (skg (node (id 3) (source main) indef hiddenBody (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2 (ancestors 2))) (overrides (in 1 (ancestors 2))) (extraIds 1) (birth overrides)))) title 3
          **** (skg (node (id 4) (source main) indef hiddenBody (rels (subscribes (in 2)) (overrides (in 1 (ancestors 2))) (hides (in 1)) (extraIds 1) (birth overrides)))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg subscriberCol)
+         *** (skg subscriberFolder)
          **** (skg (node (id 2) (source main) indef hiddenBody (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2 (ancestors 2))) (extraIds 1) (birth subscribes)))) title 2
          **** (skg (node (id 3) (source main) indef hiddenBody (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2 (ancestors 2))) (overrides (in 1 (ancestors 2))) (extraIds 1) (birth subscribes)))) title 3
          * (skg (node (id 2) (source main) (parentIs absent) (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2)) (extraIds 1)))) title 2
          this one string could span pages
          ** (skg (node (id 1) (source main) (parentIs independent) indef hiddenBody (rels (contains (out 2 (ancestors 1))) (hides (out 2)) (birth contains)))) title 1
-         ** (skg subscribeeCol)
+         ** (skg subscribeeFolder)
          *** (skg (node (id 4) (source main) indef hiddenBody (rels (subscribes (in 2 (ancestors 2))) (overrides (in 1)) (hides (in 1)) (extraIds 1) (birth subscribes)))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (source main) indef hiddenBody (rels (textlinksTo (in 1) (out (ancestors 2))) (subscribes (in 2 (ancestors 2))) (overrides (out 2)) (hides (in 1)) (extraIds 1) (birth subscribes)))) this title includes a [[id:22][textlink to another file]]
          "};
@@ -242,30 +242,30 @@ async fn test_multi_root_view_with_node_limit (
       // content children (2, and node 5 drawn in place of 3, under root 1; and
       // root 2's independent containerward node 1). Those nodes are created
       // DEFINITIVELY (no indef placeholders), so the drawn 5 and root 2 expand
-      // their bodies + cols (cols are not budget-bound); subscribee members
+      // their bodies + folders (folders are not budget-bound); subscribee members
       // are indef.
       let expected = indoc! {
         "* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 2)) (hides (out 2))))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
-         ** (skg hiddenCol)
+         ** (skg hiddenFolder)
          *** (skg (node (id 4) (source main) indef hiddenBody (rels (subscribes (in 2)) (overrides (in 1)) (hides (in 1 (ancestors 2))) (extraIds 1) (birth hides)))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (source main) indef hiddenBody (rels (textlinksTo (in 1)) (subscribes (in 2)) (overrides (out 2)) (hides (in 1 (ancestors 2))) (extraIds 1) (birth hides)))) this title includes a [[id:22][textlink to another file]]
          ** (skg (node (id 2) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1)) (subscribes (out 2)) (extraIds 1) (birth contains)))) title 2
          ** (skg (node (id 5) (source main) (rels (textlinksTo (in 1)) (subscribes (in 2)) (overrides (out 2)) (hides (in 1 (ancestors 1))) (extraIds 1) (birth overrides)) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
-         *** (skg hiderCol)
+         *** (skg hiderFolder)
          **** (skg (node (id 1) (source main) indef hiddenBody (rels (contains (out 2)) (hides (out 2 (ancestors 2))) (birth hides)) (viewStats cycle))) title 1
-         *** (skg overriddenCol)
+         *** (skg overriddenFolder)
          **** (skg (node (id 3) (source main) indef hiddenBody (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2 (ancestors 2))) (overrides (in 1 (ancestors 2))) (extraIds 1) (birth overrides)))) title 3
          **** (skg (node (id 4) (source main) indef hiddenBody (rels (subscribes (in 2)) (overrides (in 1 (ancestors 2))) (hides (in 1)) (extraIds 1) (birth overrides)))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg subscriberCol)
+         *** (skg subscriberFolder)
          **** (skg (node (id 2) (source main) indef hiddenBody (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2 (ancestors 2))) (extraIds 1) (birth subscribes)))) title 2
          **** (skg (node (id 3) (source main) indef hiddenBody (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2 (ancestors 2))) (overrides (in 1 (ancestors 2))) (extraIds 1) (birth subscribes)))) title 3
          * (skg (node (id 2) (source main) (parentIs absent) (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2)) (extraIds 1)))) title 2
          this one string could span pages
          ** (skg (node (id 1) (source main) (parentIs independent) indef hiddenBody (rels (contains (out 2 (ancestors 1))) (hides (out 2)) (birth contains)))) title 1
-         ** (skg subscribeeCol)
+         ** (skg subscribeeFolder)
          *** (skg (node (id 4) (source main) indef hiddenBody (rels (subscribes (in 2 (ancestors 2))) (overrides (in 1)) (hides (in 1)) (extraIds 1) (birth subscribes)))) This is a [[id:shgulasdghu][test]] of a second kind.
          *** (skg (node (id 5) (source main) indef hiddenBody (rels (textlinksTo (in 1) (out (ancestors 2))) (subscribes (in 2 (ancestors 2))) (overrides (out 2)) (hides (in 1)) (extraIds 1) (birth subscribes)))) this title includes a [[id:22][textlink to another file]]
          "};

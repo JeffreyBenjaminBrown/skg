@@ -1,14 +1,14 @@
-// cargo nextest run --test grouped_views -E 'test(subscribee_col_empty_persists::)'
+// cargo nextest run --test grouped_views -E 'test(subscribee_folder_empty_persists::)'
 //
-// plan_v2 §3.4/§6.7 exception: an *empty* SubscribeeCol is PRESERVED, not
+// plan_v2 §3.4/§6.7 exception: an *empty* SubscribeeFolder is PRESERVED, not
 // self-deleted. It is the editable interface onto the origin's outgoing
 // subscriptions; if it vanished when emptied, the user would lose the place to
 // add one back.
 //
 // Fixture: node s subscribes to nothing. The input buffer nonetheless carries
-// an (skg subscribeeCol) under s (as it would right after the user deleted s's
-// last subscription). On rerender the SubscribeeCol's goal list is empty; the
-// col must survive as an empty `subscribeeCol` headline rather than being
+// an (skg subscribeeFolder) under s (as it would right after the user deleted s's
+// last subscription). On rerender the SubscribeeFolder's goal list is empty; the
+// folder must survive as an empty `subscribeeFolder` headline rather than being
 // detached (the pre-fix behavior).
 
 use indoc::indoc;
@@ -27,34 +27,34 @@ use skg::types::misc::{SkgConfig, TantivyIndex};
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  let fixtures : &str = "tests/subscribee_col_empty_persists/fixtures";
+  let fixtures : &str = "tests/subscribee_folder_empty_persists/fixtures";
   run_with_shared_test_stores (
-    "skg-test-subscribee-col-empty-persists",
+    "skg-test-subscribee-folder-empty-persists",
     |s| Box::pin ( async move {
-      s . reset ("test_empty_subscribee_col_persists", fixtures) ?;
-      test_empty_subscribee_col_persists (
+      s . reset ("test_empty_subscribee_folder_persists", fixtures) ?;
+      test_empty_subscribee_folder_persists (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_empty_subscriber_col_is_removed", fixtures) ?;
-      test_empty_subscriber_col_is_removed (
+      s . reset ("test_empty_subscriber_folder_is_removed", fixtures) ?;
+      test_empty_subscriber_folder_is_removed (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
-async fn test_empty_subscribee_col_persists (
+async fn test_empty_subscribee_folder_persists (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      empty_subscribee_col_persists_impl (
+      empty_subscribee_folder_persists_impl (
         config, tantivy ) . await }
 
-async fn empty_subscribee_col_persists_impl (
+async fn empty_subscribee_folder_persists_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // s subscribes to nothing (fixture has no subscribes_to), but the buffer
-  // still shows a subscribeeCol -- the editable interface the user just emptied.
+  // still shows a subscribeeFolder -- the editable interface the user just emptied.
   let input_org_text : &str = indoc! {"
     * (skg (node (id s) (source main))) s
-    ** (skg subscribeeCol)
+    ** (skg subscribeeFolder)
   "};
 
   let graph : InRustGraphHandle =
@@ -76,33 +76,33 @@ async fn empty_subscribee_col_persists_impl (
   if ! response . errors . is_empty () {
     println!("Errors: {:?}", response . errors); }
 
-  assert! ( response . saved_view . contains ("subscribeeCol"),
-    "an empty SubscribeeCol must be PRESERVED on rerender (the editable \
+  assert! ( response . saved_view . contains ("subscribeeFolder"),
+    "an empty SubscribeeFolder must be PRESERVED on rerender (the editable \
      interface onto the origin's subscriptions), not self-deleted; got:\n{}",
     response . saved_view );
   assert! ( response . errors . is_empty (),
-    "rerender of a node with an empty SubscribeeCol must not error; got: {:?}",
+    "rerender of a node with an empty SubscribeeFolder must not error; got: {:?}",
     response . errors );
   Ok (( )) }
 
-// Contrast (plan_v2 §3.4/§6.8): an empty *read-only* PartnerCol -- here a
-// subscriberCol -- IS removed by the postorder prune sweep, because (unlike the
-// SubscribeeCol) it is not an editable interface; an emptied one is just noise.
-async fn test_empty_subscriber_col_is_removed (
+// Contrast (plan_v2 §3.4/§6.8): an empty *read-only* PartnerFolder -- here a
+// subscriberFolder -- IS removed by the postorder prune sweep, because (unlike the
+// SubscribeeFolder) it is not an editable interface; an emptied one is just noise.
+async fn test_empty_subscriber_folder_is_removed (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      empty_subscriber_col_removed_impl (
+      empty_subscriber_folder_removed_impl (
         config, tantivy ) . await }
 
-async fn empty_subscriber_col_removed_impl (
+async fn empty_subscriber_folder_removed_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // Nobody subscribes to s, but the buffer carries a subscriberCol under it.
+  // Nobody subscribes to s, but the buffer carries a subscriberFolder under it.
   let input_org_text : &str = indoc! {"
     * (skg (node (id s) (source main))) s
-    ** (skg subscriberCol)
+    ** (skg subscriberFolder)
   "};
 
   let graph : InRustGraphHandle =
@@ -121,8 +121,8 @@ async fn empty_subscriber_col_removed_impl (
     &Err ( String::new () ), &mut views_state ) . await ?;
 
   println!("Rendered buffer:\n{}", response . saved_view);
-  assert! ( ! response . saved_view . contains ("subscriberCol"),
-    "an empty read-only subscriberCol must be REMOVED by the §3.4 prune sweep; \
+  assert! ( ! response . saved_view . contains ("subscriberFolder"),
+    "an empty read-only subscriberFolder must be REMOVED by the §3.4 prune sweep; \
      got:\n{}", response . saved_view );
   assert! ( response . errors . is_empty (),
     "rerender must not error; got: {:?}", response . errors );

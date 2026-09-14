@@ -3,7 +3,7 @@ use crate::types::git::MembershipAxes;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ViewNode, ViewNodeKind, Vognode, Phantom, Qual, QualCol, ActiveNode, PhantomDiff,
+  ViewNode, ViewNodeKind, Vognode, Phantom, Qual, QualFolder, ActiveNode, PhantomDiff,
   PhantomDeleted, PhantomUnknown, NodeEditRequest, GraphNodeStats,
   ParentIs,
 };
@@ -138,18 +138,18 @@ pub fn viewnode_to_string (
   config   : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   match &viewnode . kind {
-    ViewNodeKind::QualCol (col) =>
-      qualcol_metadata_to_string (
+    ViewNodeKind::QualFolder (folder) =>
+      qualFolder_metadata_to_string (
         viewnode . focused, viewnode . folded,
-        viewnode . body_folded, col ),
+        viewnode . body_folded, folder ),
     ViewNodeKind::Qual (qual) =>
       qual_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, qual ),
-    ViewNodeKind::PartnerCol (partnerCol) =>
+    ViewNodeKind::PartnerFolder (partnerFolder) =>
       Ok ( non_vognode_atom_metadata_to_string (
         viewnode . focused, viewnode . folded,
-        viewnode . body_folded, partnerCol . repr_in_client () ) ),
+        viewnode . body_folded, partnerFolder . repr_in_client () ) ),
     ViewNodeKind::BufferRoot =>
       Err ( "viewnode_to_string: BufferRoot should never be rendered" . into () ),
     ViewNodeKind::DeadScaffold =>
@@ -190,14 +190,14 @@ fn non_vognode_atom_metadata_to_string (
   parts . push (atom . to_string ());
   parts . join (" ") }
 
-fn qualcol_metadata_to_string (
+fn qualFolder_metadata_to_string (
   focused     : bool,
   folded      : bool,
   body_folded : bool,
-  col         : &QualCol,
+  folder         : &QualFolder,
 ) -> Result < String, Box<dyn Error> > {
   Ok ( non_vognode_atom_metadata_to_string (
-    focused, folded, body_folded, col . repr_in_client () ) ) }
+    focused, folded, body_folded, folder . repr_in_client () ) ) }
 
 fn qual_metadata_to_string (
   focused     : bool,
@@ -455,7 +455,7 @@ fn phantomUnknown_metadata_to_string (
   parts . join (" ") }
 
 /// Render an inactive placeholder as the bare atom 'inactiveNode',
-/// like the other dataless scaffold markers (aliasCol, subscribeeCol,
+/// like the other dataless scaffold markers (aliasFolder, subscribeeFolder,
 /// ...). It carries no id/source/etc. -- those describe content the
 /// user hid by restricting the source-set, so emitting them would leak
 /// (see InactiveNode).

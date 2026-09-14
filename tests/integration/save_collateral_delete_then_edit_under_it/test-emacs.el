@@ -72,7 +72,7 @@ contains to [], overwriting subee.skg on disk."
     ;; Add aliases view request to node 11.
     (goto-nth-headline-with-title "11" 1)
     (skg-edit-metadata-at-point
-     '(skg (node (viewRequests (col aliases)))))
+     '(skg (node (viewRequests (folder aliases)))))
     ;; Append standalone subee root with child.
     (goto-char (point-max))
     (unless (bolp) (insert "\n"))
@@ -88,14 +88,14 @@ contains to [], overwriting subee.skg on disk."
      buf
      '((1 node "1")
        (2 node "11")
-       (3 aliasCol "")
+       (3 aliasFolder "")
        (4 alias "eleven")
-       (3 hiddenCol "")
+       (3 hiddenFolder "")
        (4 node "subee-1")
        (4 node "also-hidden")
-       (3 subscribeeCol "")
+       (3 subscribeeFolder "")
        (4 node "subee")
-       (4 hiddenOutsideOfSubscribeeCol "")
+       (4 hiddenOutsideOfSubscribeeFolder "")
        (5 node "also-hidden")
        (1 node "subee")
        (2 node "subee-1"))

@@ -2,7 +2,7 @@
 
 use skg::to_org::util::get_id_from_treenode;
 use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode, ActiveNode, default_activeNode};
-use skg::types::viewnode::QualCol;
+use skg::types::viewnode::QualFolder;
 use skg::types::misc::{ID, SourceName};
 use ego_tree::{NodeId,Tree};
 
@@ -37,8 +37,8 @@ fn test_get_id_from_treenode_scaffold() {
       focused     : false,
       folded       : false,
       body_folded : false,
-      kind        : ViewNodeKind::QualCol (
-        QualCol::Alias) };
+      kind        : ViewNodeKind::QualFolder (
+        QualFolder::Alias) };
   let tree : Tree<ViewNode> = Tree::new (viewnode);
   let root_id : NodeId = tree . root() . id();
   let result :

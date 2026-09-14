@@ -3,11 +3,11 @@
 pub use super::super::common::*;
 
 /// Expected git diff view output when a node's aliases list changes.
-/// Mirrors the IDCol diff (ids/common.rs): an AliasCol scaffold appears, with
+/// Mirrors the IDFolder diff (ids/common.rs): an AliasFolder scaffold appears, with
 /// each alias as a child carrying a per-stage diff marker for added/removed.
 pub const GIT_DIFF_VIEW: &str = "\
 * (skg (node (id 1) (source main))) 1
-** (skg aliasCol)
+** (skg aliasFolder)
 *** (skg alias (unstaged removedM)) old-alias
 *** (skg alias (unstaged newM)) new-alias
 *** (skg alias) keep

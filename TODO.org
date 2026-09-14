@@ -4,7 +4,7 @@
 *** warn user if part of their saved changes would be discarded
 because indefinitive
 ** language changes
-*** Introduce the term 'folder viewnode' instead of 'col'.
+*** DONE Introduce the term 'folder viewnode'.
 *** "indefinitive" is user-facing and confusing
 "at peace"?
 and what's the similar term for independent of parent?
@@ -16,7 +16,7 @@ it should be deleted.
 But not if it retains other relationships, in or out,
 including non-content relationships.
 ** behavior changes
-*** Don't show overriddenCol etc. by default.
+*** Don't show overriddenFolder etc. by default.
 **** request for Claude
 The default view of a node should include
 nonempty alias and subscribee subfolder nodes,
@@ -753,8 +753,8 @@ fold-preservation
 *** is_ancestor duplicates something done a different way elsewhere
 * ? lessons learned
 ** Validate ancestry, not descendents.
-   For instance, "an alias should have an aliascol parent"
-   is easier to say than "an aliascol's children can only be aliases".
+   For instance, "an alias should have an aliasFolder parent"
+   is easier to say than "an aliasFolder's children can only be aliases".
    (Because it prevents combinatorial explosion?)
 ** Sourceward paths could have been easier.
    Just let the user add all sources from one node at a time.

@@ -7,43 +7,43 @@ use crate::types::git::{SourceDiff, axes_from_per_stage_diffs, per_stage_node_ch
 use crate::types::tree::generic::error_unless_node_satisfies;
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
-use crate::types::viewnode::{QualCol, Qual};
+use crate::types::viewnode::{QualFolder, Qual};
 use crate::update_buffer::util::complete_relevant_children_in_viewnodetree;
 use ego_tree::{NodeId, Tree};
 use std::collections::HashMap;
 use std::error::Error;
 
-/// Reconciles an IDCol's children against
+/// Reconciles an IDFolder's children against
 ///   the IDs on disk (via the map) for its parent ActiveNode.
 ///
-/// - Verify this node is an IDCol
+/// - Verify this node is an IDFolder
 /// - Verify its parent is an ActiveNode
 /// - Fetch the corresponding NodeComplete from the map
 /// - Read its IDs into a goal list
 /// - In diff view, also build a diff-status map from NodeChanges.ids_diff
 /// - Reconcile children via complete_relevant_children_in_viewnodetree
-pub fn reconcile_id_col_children (
-  idcol_node_id : NodeId,
+pub fn reconcile_idFolder_children (
+  idfolder_node_id : NodeId,
   tree          : &mut Tree<ViewNode>,
   graph         : &InRustGraph,
   source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
   config        : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
-    tree, idcol_node_id,
+    tree, idfolder_node_id,
     |viewnode| matches!( &viewnode . kind,
-                         ViewNodeKind::QualCol (QualCol::ID) ),
-    "reconcile_id_col_children: Node is not an IDCol" )
+                         ViewNodeKind::QualFolder (QualFolder::ID) ),
+    "reconcile_idFolder_children: Node is not an IDFolder" )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: parent Active vognode read through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 0).
   let (parent_pid, parent_source) : (ID, SourceName) =
     pid_and_source_from_required_ancestor(
-      tree, idcol_node_id, 0,
-      "reconcile_id_col_children" ) ?;
+      tree, idfolder_node_id, 0,
+      "reconcile_idFolder_children" ) ?;
   let parent_nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
       graph, config, &parent_pid, &parent_source )
-    . map_err ( |_| "reconcile_id_col_children: parent NodeComplete not found" ) ?;
+    . map_err ( |_| "reconcile_idFolder_children: parent NodeComplete not found" ) ?;
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
     per_stage_node_changes_for_activeNode (
@@ -74,7 +74,7 @@ pub fn reconcile_id_col_children (
     |viewnode| match &viewnode . kind {
       ViewNodeKind::Qual (Qual::ID { id, .. } ) =>
         Ok ( id . clone() ),
-      _ => Err ( "reconcile_id_col_children: relevant child is not an ID scaffold"
+      _ => Err ( "reconcile_idFolder_children: relevant child is not an ID scaffold"
                  . to_string() ), };
   let create_id = |id: &ID| -> Result<ViewNode, String> {
     let membership : MembershipAxes =
@@ -88,7 +88,7 @@ pub fn reconcile_id_col_children (
           id: id . clone(), membership } ) } ) };
   complete_relevant_children_in_viewnodetree(
     tree,
-    idcol_node_id,
+    idfolder_node_id,
     is_id,
     view_id_text,
     &goal_list,

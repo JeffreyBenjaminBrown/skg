@@ -120,12 +120,12 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c G m")   #'skg-goto-in-magit-and-close-this)
     (define-key map (kbd "C-c g M")   #'skg-goto-in-magit-parent)
     (define-key map (kbd "C-c G M")   #'skg-goto-in-magit-parent-and-close-this))
-  (progn;; show COLLECTIONS (C-c c) and PATHS (C-c p): request a local
+  (progn;; show FOLDERS (C-c l) and PATHS (C-c p): request a local
     ;; view change the server fulfills on save. Each command auto-saves.
-    (define-key map (kbd "C-c c a") #'skg-show-collection-aliases)
-    (define-key map (kbd "C-c c o") #'skg-show-collection-overrides)
-    (define-key map (kbd "C-c c h") #'skg-show-collection-hides)
-    (define-key map (kbd "C-c c s") #'skg-show-collection-subscribes)
+    (define-key map (kbd "C-c l a") #'skg-show-folderOf-aliases)
+    (define-key map (kbd "C-c l o") #'skg-show-folderOf-overrides)
+    (define-key map (kbd "C-c l h") #'skg-show-folderOf-hides)
+    (define-key map (kbd "C-c l s") #'skg-show-folderOf-subscribes)
     ;; UPPER = the partner's active (first) role; lower = passive (second).
     (define-key map (kbd "C-c p C") #'skg-show-paths-through-containers)
     (define-key map (kbd "C-c p L") #'skg-show-paths-through-link-sources)

@@ -145,7 +145,7 @@ PHASE-LABEL is used in log messages. Kills emacs with exit 1 on failure."
 (defun headline-types-and-titles (buffer)
   "Extract (depth type title) triples from every headline in BUFFER.
 Type is a symbol derived from the metadata:
-  node, deleted, deletedScaffold, subscribeeCol, etc.
+  node, deleted, deletedScaffold, subscribeeFolder, etc.
 For (skg (node ...)) the type is node; for (skg (deleted ...)) it is
 deleted; for (skg (deletedScaffold KIND)) it is deletedScaffold; and so on."
   (with-current-buffer buffer

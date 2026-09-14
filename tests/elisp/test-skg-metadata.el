@@ -183,13 +183,13 @@ Returns the parsed s-expression or nil if not found."
   (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c s m"))
               'skg-set-merge-request)))
 
-(ert-deftest test-skg-collection-and-path-keybindings ()
-  "A sample of the C-c c (collections) and C-c p (paths) bindings.
+(ert-deftest test-skg-folder-and-path-keybindings ()
+  "A sample of the C-c l (folders) and C-c p (paths) bindings.
 The UPPER/lower path letters select opposite roles, so C-c p O and
 C-c p o must bind to distinct commands."
-  (dolist (pair '(("C-c c a" . skg-show-collection-aliases)
-                  ("C-c c o" . skg-show-collection-overrides)
-                  ("C-c c s" . skg-show-collection-subscribes)
+  (dolist (pair '(("C-c l a" . skg-show-folderOf-aliases)
+                  ("C-c l o" . skg-show-folderOf-overrides)
+                  ("C-c l s" . skg-show-folderOf-subscribes)
                   ("C-c p C" . skg-show-paths-through-containers)
                   ("C-c p L" . skg-show-paths-through-link-sources)
                   ("C-c p l" . skg-show-paths-through-link-dests)
@@ -309,7 +309,7 @@ C-c p o must bind to distinct commands."
       "*** (skg (node (id public-under-mismatch) (source public))) public under mismatch\n"
       "** (skg (node (id link-child) (source public) (parentIs independent) (birth backpath linkSource))) link child\n"
       "*** (skg (node (id under-link) (source public))) under link\n"
-      "** (skg aliasCol) aliases\n"
+      "** (skg aliasFolder) aliases\n"
       "*** (skg (node (id under-scaffold) (source public))) under scaffold\n"))
     (goto-char (point-min))
     (cl-letf (((symbol-function 'skg--prompt-for-source-change)
@@ -352,7 +352,7 @@ C-c p o must bind to distinct commands."
       "* (skg (node (id r) (source public))) R\n"
       "** (skg (node (id p) (source public))) P\n"
       "body point starts here\n"
-      "*** (skg aliasCol) aliases\n"
+      "*** (skg aliasFolder) aliases\n"
       "*** (skg (node (id c) (source public) indef)) child\n"
       "** (skg (node (id p) (source public) indef)) P elsewhere\n"))
     (goto-char (point-min))

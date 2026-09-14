@@ -92,8 +92,8 @@ fn all_tests
       s . reset ("sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks", fixtures) ?;
       sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("stale_inactive_placeholders_under_cols_save_without_error", fixtures) ?;
-      stale_inactive_placeholders_under_cols_save_without_error (
+      s . reset ("stale_inactive_placeholders_under_folders_save_without_error", fixtures) ?;
+      stale_inactive_placeholders_under_folders_save_without_error (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to", fixtures) ?;
       inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to (
@@ -884,16 +884,16 @@ fn titles_by_ids_omits_inactive_source_titles (
     "inactive-source title lookup must omit private-a" );
   Ok (( )) }
 
-async fn stale_inactive_placeholders_under_cols_save_without_error (
+async fn stale_inactive_placeholders_under_folders_save_without_error (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // TODO/full-schema/9-2_source-set-safety.org: the formerly-unsavable
   // buffer. A buffer rendered before a source-set switch can hold
-  // InactiveNodes under cols; saving it must not error.
+  // InactiveNodes under folders; saving it must not error.
       let buffer = indoc! {"
         * (skg (node (id root) (source public))) root
-        ** (skg subscriberCol)
+        ** (skg subscriberFolder)
         *** (skg (inactiveNode (id private-a) (source private)))
         ** (skg (node (id active-b) (source public) indef)) active-b
       "};
@@ -904,7 +904,7 @@ async fn stale_inactive_placeholders_under_cols_save_without_error (
         buffer_to_validated_saveplan (
           buffer, config, Some (&active) ) ;
       assert! ( result . is_ok (),
-        "an InactiveNode under a col must not block saving: {:?}",
+        "an InactiveNode under a folder must not block saving: {:?}",
         result . err () . map ( |e| format! ("{:?}", e)) );
       Ok (( )) }
 
@@ -916,11 +916,11 @@ async fn inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to (
   // it emits no contains membership: 'subscribes_to' is
   // order-meaningful, but the disk merge (weave) owns invisible
   // subscribees, so a buffer-present placeholder must not feed the
-  // owner's subscribeeCol. (root has no subscribes_to on disk, so the
+  // owner's subscribeeFolder. (root has no subscribes_to on disk, so the
   // active member is the only one written.)
       let buffer = indoc! {"
         * (skg (node (id root) (source public))) root
-        ** (skg subscribeeCol)
+        ** (skg subscribeeFolder)
         *** (skg (inactiveNode (id private-a) (source private)))
         *** (skg (node (id active-b) (source public) indef)) active-b
       "};
@@ -1026,7 +1026,7 @@ async fn restricted_save_preserves_invisible_override_targets (
         // emits no SaveNode -- which is itself preservation.)
         let unmodified = indoc! {"
           * (skg (node (id ovr-owner) (source public))) ovr-owner
-          ** (skg overriddenCol)
+          ** (skg overriddenFolder)
           *** (skg (node (id ovr-visible) (source public) indef)) ovr-visible
         "};
         let instructions : Vec<DefineNode> =
@@ -1044,7 +1044,7 @@ async fn restricted_save_preserves_invisible_override_targets (
       { // Delete the visible member: disk holds exactly [ovr-inactive].
         let deleted = indoc! {"
           * (skg (node (id ovr-owner) (source public))) ovr-owner
-          ** (skg overriddenCol)
+          ** (skg overriddenFolder)
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (

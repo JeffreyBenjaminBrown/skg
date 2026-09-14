@@ -38,7 +38,7 @@ struct ViewNodeLineCol {
 /// That function detects the majority of possible errors,
 /// but it can't detect them all because it uses a tree of MpViewnodes,
 /// which permit fewer kinds of invalid state than the raw text.
-/// (For instance, Alias and AliasCol cannot have bodies,
+/// (For instance, Alias and AliasFolder cannot have bodies,
 /// but they can in the raw text, and that's an error.)
 pub fn org_to_uninterpreted_nodes(
   input: &str
@@ -51,7 +51,7 @@ pub fn org_to_uninterpreted_nodes(
   Ok ( ( viewforest . into_internal_tree (), parsing_errors ) ) }
 
 /// The third element of the result is nonfatal parse warnings
-/// (e.g. discarded headline text on a col scaffold), destined for
+/// (e.g. discarded headline text on a folder scaffold), destined for
 /// 'SaveResponse.warnings'.
 pub fn org_to_uninterpreted_viewforest(
   input: &str

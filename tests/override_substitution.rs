@@ -299,7 +299,7 @@ async fn extraction_honors_the_marker (
         // the original, so no phantom hide of N is inferred.
         let buffer = indoc! {"
           * (skg (node (id S) (source main))) S
-          ** (skg subscribeeCol)
+          ** (skg subscribeeFolder)
           *** (skg (node (id E) (source main))) E
           **** (skg (node (id R) (source main) (viewStats (overridesHere N)) indef)) R
         "};

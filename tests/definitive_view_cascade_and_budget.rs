@@ -58,9 +58,9 @@ fn all_tests
       s . reset ("test_definitive_view_request_cleared", fixtures) ?;
       test_definitive_view_request_cleared (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_budget_aliascol_is_neutral",
+      s . reset ("test_budget_aliasfolder_is_neutral",
                  "tests/definitive_view_cascade_and_budget/fixtures-aliases") ?;
-      test_budget_aliascol_is_neutral (
+      test_budget_aliasfolder_is_neutral (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
@@ -187,7 +187,7 @@ async fn test_definitive_view_limit_5_or_6 (
       println!("Result with limit=6:\n{}", result_6);
 
       // §5.5: the budget counts vognode EXPANSIONS (cost 1 each), in BFS order.
-      // The expansion order here is 1, 2, 11, 12, 13, 121, 122, ... A col fills
+      // The expansion order here is 1, 2, 11, 12, 13, 121, 122, ... A folder fills
       // WHOLE for free, so a node's whole content group is always drawn -- the
       // budget only governs how many of those children then EXPAND in turn; the
       // rest stay indefinitive (visible, collapsed). Never a partial group.
@@ -532,29 +532,29 @@ async fn test_definitive_view_request_cleared (
       Ok (( )) }
 
 // ===================================================
-// Test: an AliasCol fills WHOLE and is budget-NEUTRAL (§5.5).
+// Test: an AliasFolder fills WHOLE and is budget-NEUTRAL (§5.5).
 // ===================================================
 // Companion to initial_view_bfs::test_budget_content_beats_subscribers (which
-// pins the same neutrality for the auto-rendered SubscribeeCol). An AliasCol,
-// unlike a SubscribeeCol, is NOT auto-rendered de-novo -- it appears only on an
+// pins the same neutrality for the auto-rendered SubscribeeFolder). An AliasFolder,
+// unlike a SubscribeeFolder, is NOT auto-rendered de-novo -- it appears only on an
 // explicit `aliases` view request -- so this exercises the request path through
-// the rerender (build_and_integrate_aliases / reconcile_alias_col_children),
+// the rerender (build_and_integrate_aliases / reconcile_aliasFolder_children),
 // neither of which takes node_budget.
 //
 // Fixture: root r contains the chain c1 -> c2, and r has two aliases. The budget
 // counts vognode EXPANSIONS (cost 1), so the whole content here is exactly 3
 // expansions: r, c1, c2. With limit=3 the chain fully expands (c2 definitive)
-// AND the AliasCol shows BOTH aliases. The alias members are scaffolds, so they
+// AND the AliasFolder shows BOTH aliases. The alias members are scaffolds, so they
 // cost nothing: were they charged, the 3 units could not also cover c2, which
 // would then be left indefinitive (verified: at limit=2 c2 *is* indefinitive
-// while the AliasCol stays whole). That c2 is definitive here is the guarantee
+// while the AliasFolder stays whole). That c2 is definitive here is the guarantee
 // this test pins.
-async fn test_budget_aliascol_is_neutral (
+async fn test_budget_aliasfolder_is_neutral (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
-        * (skg (node (id r) (source main) (viewRequests (col aliases)))) r
+        * (skg (node (id r) (source main) (viewRequests (folder aliases)))) r
         ** (skg (node (id c1) (source main))) c1
         *** (skg (node (id c2) (source main))) c2
       "};
@@ -578,13 +578,13 @@ async fn test_budget_aliascol_is_neutral (
 
       let expected = indoc! {"
         * (skg (node (id r) (source main) (parentIs absent) (rels (contains (out 1)) (aliases 2)))) r
-        ** (skg aliasCol)
+        ** (skg aliasFolder)
         *** (skg alias) first alias
         *** (skg alias) second alias
         ** (skg (node (id c1) (source main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) c1
         *** (skg (node (id c2) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) c2
       "};
       assert_metadata_eq!(result, expected,
-        "budget 3 expands the whole content chain; the AliasCol is whole + budget-neutral");
+        "budget 3 expands the whole content chain; the AliasFolder is whole + budget-neutral");
 
       Ok (( )) }

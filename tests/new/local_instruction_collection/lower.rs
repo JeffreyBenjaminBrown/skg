@@ -33,10 +33,10 @@ fn lowering_produces_ordered_definenodes_and_signals () {
     collected_from_org ( indoc! {"
       * (skg (node (id root) (source main))) root
       Root body
-      ** (skg aliasCol) aliases
+      ** (skg aliasFolder) aliases
       *** (skg alias) nickname
       ** (skg (node (id child) (source main))) child
-      ** (skg subscribeeCol)
+      ** (skg subscribeeFolder)
       *** (skg (node (id e) (source main))) e
       **** (skg (node (id visible) (source main))) visible
       * (skg (node (id doomed) (source main) (editRequest delete))) doomed

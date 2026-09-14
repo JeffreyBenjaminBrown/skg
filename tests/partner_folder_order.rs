@@ -1,13 +1,13 @@
-// cargo nextest run --test grouped_overrides -E 'test(partner_col_order::)'
+// cargo nextest run --test grouped_overrides -E 'test(partner_folder_order::)'
 //
-// A ColPolicy::ReadOnlySet col (here a SubscriberCol) respects the
+// A FolderPolicy::ReadOnlySet folder (here a SubscriberFolder) respects the
 // user's view-local member order across save and rerender
 // (TODO/full-schema/8_readonly-set-ergonomics.org): present members
 // keep their buffer order, and the order survives a further
 // unchanged save. The order never reaches disk; it is view-local.
 //
 // Fixture: r and t both subscribe to n, so a view of n shows a
-// SubscriberCol whose de-novo member order is sorted by ID (r, t).
+// SubscriberFolder whose de-novo member order is sorted by ID (r, t).
 // The test swaps them in the buffer and saves.
 
 use std::error::Error;
@@ -23,14 +23,14 @@ use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 
 #[test]
-fn readonly_col_order_is_preserved
+fn readonly_folder_order_is_preserved
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
-    "skg-test-partner-col-order",
-    "tests/partner_col_order/fixtures",
-    "/tmp/tantivy-test-partner-col-order",
+    "skg-test-partner-folder-order",
+    "tests/partner_folder_order/fixtures",
+    "/tmp/tantivy-test-partner-folder-order",
     |config, tantivy| Box::pin ( async move {
-      readonly_col_order_is_preserved_impl (
+      readonly_folder_order_is_preserved_impl (
         config, tantivy ) . await
     } )) }
 
@@ -80,7 +80,7 @@ fn assert_member_order (
   assert! ( i < j,
     "{}: expected {:?} before {:?} in:\n{}", label, first, second, buf ); }
 
-async fn readonly_col_order_is_preserved_impl (
+async fn readonly_folder_order_is_preserved_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {

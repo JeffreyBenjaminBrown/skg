@@ -8,7 +8,7 @@ local sexpr = require('skg.sexpr.parse')
 local metadata = require('skg.metadata')
 
 ---The kind symbol name from an skg METADATA_TEXT sexp, e.g.
----'(skg (node ...))' -> 'node', '(skg aliasCol)' -> 'aliasCol'.
+---'(skg (node ...))' -> 'node', '(skg aliasFolder)' -> 'aliasFolder'.
 ---Port of skg-aliases--metadata-kind.
 ---@param metadata_text string
 ---@return string
@@ -60,7 +60,7 @@ local function request_on_line (line_number)
   vim.api.nvim_win_set_cursor(0, { line_number + 1, 0 })
   print(string.format(
     'requesting-aliases-view-line-%d', line_number))
-  require('skg.view_requests').show_collection_aliases() -- auto-saves
+  require('skg.view_requests').show_folderOf_aliases() -- auto-saves
   T.check(T.wait_for_response(),
           string.format('aliases view response arrived for line %d',
                         line_number))
@@ -92,11 +92,11 @@ print('=== SKG Aliases View Request Integration Test ===')
 local expected_with_aliases =
   '* (skg (node (id test-node) (source main) (parentIs absent)'
   .. ' (rels (aliases 2)))) Test Node\n'
-  .. '** (skg aliasCol)\n'
+  .. '** (skg aliasFolder)\n'
   .. '*** (skg alias) first alias\n'
   .. '*** (skg alias) second alias\n'
 local expected_stripped =
-  '* node Test Node\n** aliasCol\n*** alias first alias\n'
+  '* node Test Node\n** aliasFolder\n*** alias first alias\n'
   .. '*** alias second alias\n'
 
 verify_view(0, expected_with_aliases, expected_stripped)

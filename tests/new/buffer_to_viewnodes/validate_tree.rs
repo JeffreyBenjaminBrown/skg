@@ -31,8 +31,8 @@ fn all_tests
       s . reset ("test_find_buffer_errors_for_saving_empty_input", fixtures) ?;
       test_find_buffer_errors_for_saving_empty_input (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_multiple_aliascols_in_children", fixtures) ?;
-      test_multiple_aliascols_in_children (
+      s . reset ("test_multiple_aliasfolders_in_children", fixtures) ?;
+      test_multiple_aliasfolders_in_children (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_duplicated_content_error", fixtures) ?;
       test_duplicated_content_error (
@@ -71,13 +71,13 @@ async fn test_find_buffer_errors_for_saving (
       let input_with_errors: &str =
         indoc! {"
                 * (skg (node (id root) (source main))) Valid root node
-                ** (skg aliasCol) AliasCol with body problem
-                This body should not exist on AliasCol
-                *** (skg (node (id bad_child))) Child of AliasCol with ID
+                ** (skg aliasFolder) AliasFolder with body problem
+                This body should not exist on AliasFolder
+                *** (skg (node (id bad_child))) Child of AliasFolder with ID
                 ** (skg alias) Alias with body problem and orphaned
                 This body should not exist on Alias
                 *** (skg (node (id alias_child))) Any child of Alias (bad)
-                ** (skg alias) Alias under non-AliasCol parent
+                ** (skg alias) Alias under non-AliasFolder parent
                 * (skg alias) Root level Alias (bad)
                 * (skg (node (id conflict) (source main) (editRequest delete))) Node with deletion conflict
                 * (skg (node (id conflict) (source main))) Same ID but no toDelete flag
@@ -99,17 +99,17 @@ async fn test_find_buffer_errors_for_saving (
         . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(_, _)))
         . collect();
 
-      // AliasCol children must be Aliases (bad_child is an ActiveNode child of AliasCol)
-      { let aliascol_children_re =
-          Regex::new(r"(?i)aliascol.*children.*must.*alias") . unwrap();
-        let aliascol_children_errors: Vec<&BufferValidationError> =
+      // AliasFolder children must be Aliases (bad_child is an ActiveNode child of AliasFolder)
+      { let aliasfolder_children_re =
+          Regex::new(r"(?i)aliasFolder.*children.*must.*alias") . unwrap();
+        let aliasfolder_children_errors: Vec<&BufferValidationError> =
           local_errors . iter() . copied()
           . filter(|e| matches!(
             e, BufferValidationError::LocalStructureViolation(msg, _)
-            if aliascol_children_re . is_match (msg)))
+            if aliasfolder_children_re . is_match (msg)))
           . collect();
-        assert_eq!(aliascol_children_errors . len(), 1,
-                   "Should find 1 'AliasCol children must be Aliases' error"); }
+        assert_eq!(aliasfolder_children_errors . len(), 1,
+                   "Should find 1 'AliasFolder children must be Aliases' error"); }
 
       // Alias must have no children ("Alias with body problem" has alias_child)
       { let alias_children_re = Regex::new(r"(?i)alias.*must.*no.*children") . unwrap();
@@ -121,10 +121,10 @@ async fn test_find_buffer_errors_for_saving (
         assert_eq!(alias_children_errors . len(), 1,
                    "Should find 1 'Alias must have no children' error"); }
 
-      // Alias must have AliasCol parent
-      // (3 aliases: "Alias with body problem", "Alias under non-AliasCol", "Root level Alias")
+      // Alias must have AliasFolder parent
+      // (3 aliases: "Alias with body problem", "Alias under non-AliasFolder", "Root level Alias")
       { let alias_parent_re =
-          Regex::new(r"(?i)alias.*must.*aliascol.*parent") . unwrap();
+          Regex::new(r"(?i)alias.*must.*aliasFolder.*parent") . unwrap();
         let alias_parent_errors: Vec<&BufferValidationError> =
           local_errors . iter() . copied()
           . filter(|e| matches!(
@@ -132,7 +132,7 @@ async fn test_find_buffer_errors_for_saving (
             if alias_parent_re . is_match (msg)))
           . collect();
         assert_eq!(alias_parent_errors . len(), 3,
-                   "Should find 3 'Alias must have AliasCol parent' errors"); }
+                   "Should find 3 'Alias must have AliasFolder parent' errors"); }
 
       // AmbiguousDeletion
       { let ambiguous_deletion_errors: Vec<&BufferValidationError> = errors . iter()
@@ -174,8 +174,8 @@ async fn test_find_buffer_errors_for_saving (
                    "Should find 2 Body_of_Scaffold errors");
         assert!(body_of_scaffold_errors . iter() . any(|e| {
           matches!(e, BufferValidationError::Body_of_Scaffold(title, kind)
-                   if title == "AliasCol with body problem" && kind == "aliasCol")
-        }), "Should find Body_of_Scaffold error for aliasCol");
+                   if title == "AliasFolder with body problem" && kind == "aliasFolder")
+        }), "Should find Body_of_Scaffold error for aliasFolder");
         assert!(body_of_scaffold_errors . iter() . any(|e| {
           matches!(e, BufferValidationError::Body_of_Scaffold(title, kind)
                    if title == "Alias with body problem and orphaned" && kind == "alias")
@@ -191,7 +191,7 @@ async fn test_find_buffer_errors_for_saving (
         assert_eq!(viewroot_errors . len(), 1,
                    "Should find 1 'View roots must be ActiveNodes or deleted nodes' error"); }
 
-      // ActiveNode child belongs elsewhere (root has Alias children directly, not via AliasCol)
+      // ActiveNode child belongs elsewhere (root has Alias children directly, not via AliasFolder)
       { let activeNode_children_re =
           Regex::new(r"(?i)activeNode.*child.*belongs.*elsewhere") . unwrap();
         let activeNode_children_errors: Vec<&BufferValidationError> =
@@ -204,7 +204,7 @@ async fn test_find_buffer_errors_for_saving (
         assert_eq!(activeNode_children_errors . len(), 1,
                    "Should find 1 misplaced ActiveNode child error"); }
 
-      // "Alias with body problem" fails two checks (no children + AliasCol parent),
+      // "Alias with body problem" fails two checks (no children + AliasFolder parent),
       // but multiple errors on one node combine into a single LocalStructureViolation.
       assert_eq!(local_errors . len(), 7,
                  "Should find exactly 7 LocalStructureViolation errors");
@@ -219,7 +219,7 @@ async fn test_find_buffer_errors_for_saving_valid_input (
       let valid_input: &str =
         indoc! {"
                 * (skg (node (id root) (source main))) Valid root node
-                ** (skg aliasCol) AliasCol without body
+                ** (skg aliasFolder) AliasFolder without body
                 *** (skg alias) An alias
                 *** (skg alias) Another alias
                 ** (skg (node (id normal) (source main))) Normal node with body
@@ -248,35 +248,35 @@ async fn test_find_buffer_errors_for_saving_empty_input (
       Ok(())
 }
 
-async fn test_multiple_aliascols_in_children (
+async fn test_multiple_aliasfolders_in_children (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      // Test input with multiple AliasCol children
-      let input_with_multiple_aliascols: &str =
+      // Test input with multiple AliasFolder children
+      let input_with_multiple_aliasfolders: &str =
         indoc! {"
-                * (skg (node (id root) (source main))) Node with multiple AliasCol children
-                ** (skg aliasCol) First AliasCol
+                * (skg (node (id root) (source main))) Node with multiple AliasFolder children
+                ** (skg aliasFolder) First AliasFolder
                 *** (skg alias) First alias
-                ** (skg aliasCol) Second AliasCol
+                ** (skg aliasFolder) Second AliasFolder
                 *** (skg alias) Second alias
             "};
 
       let viewforest: MpViewForest =
-        org_to_uninterpreted_viewforest (input_with_multiple_aliascols) . unwrap() . 0;
+        org_to_uninterpreted_viewforest (input_with_multiple_aliasfolders) . unwrap() . 0;
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config)?;
 
-      // "AliasCol must be unique among its siblings"
-      // Both AliasCol siblings report the error (each has a sibling AliasCol)
-      let unique_sibling_re = Regex::new(r"(?i)aliascol.*unique.*siblings") . unwrap();
-      let multiple_aliascols_errors: Vec<&BufferValidationError> = errors . iter()
+      // "AliasFolder must be unique among its siblings"
+      // Both AliasFolder siblings report the error (each has a sibling AliasFolder)
+      let unique_sibling_re = Regex::new(r"(?i)aliasFolder.*unique.*siblings") . unwrap();
+      let multiple_aliasfolders_errors: Vec<&BufferValidationError> = errors . iter()
         . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
                              if unique_sibling_re . is_match (msg)))
         . collect();
 
-      assert_eq!(multiple_aliascols_errors . len(), 2,
-                 "Should find 2 'AliasCol must be unique' errors (one per AliasCol)");
+      assert_eq!(multiple_aliasfolders_errors . len(), 2,
+                 "Should find 2 'AliasFolder must be unique' errors (one per AliasFolder)");
       Ok(())
 }
 
@@ -751,17 +751,17 @@ fn inactive_placeholder_does_not_collide_with_content () {
 }
 
 #[test]
-fn duplicate_members_of_defining_cols_pass_validation () {
-  // Defining cols (SubscribeeCol, OverriddenCol; aliases were always
+fn duplicate_members_of_defining_folders_pass_validation () {
+  // Defining folders (SubscribeeFolder, OverriddenFolder; aliases were always
   // exempt) silently deduplicate at emission instead of bouncing the
   // save (TODO/local-instruction-collection/3_plan.org).
   let input : &str =
     indoc! {"
       * (skg (node (id owner) (source main))) owner
-      ** (skg subscribeeCol)
+      ** (skg subscribeeFolder)
       *** (skg (node (id dup) (source main) indef)) dup
       *** (skg (node (id dup) (source main) indef)) dup
-      ** (skg overriddenCol)
+      ** (skg overriddenFolder)
       *** (skg (node (id dup2) (source main) indef)) dup2
       *** (skg (node (id dup2) (source main) indef)) dup2
     "};
@@ -773,16 +773,16 @@ fn duplicate_members_of_defining_cols_pass_validation () {
     "Test fixture should not have parse errors: {:?}",
     parsing_errors );
   let config : SkgConfig = validation_config ();
-  for col_id in partner_col_treeids (&viewforest) {
-    validate_local_structure (&viewforest, col_id, &config)
-      . expect ("duplicate members of a defining col should pass validation"); }}
+  for folder_id in partner_folder_treeids (&viewforest) {
+    validate_local_structure (&viewforest, folder_id, &config)
+      . expect ("duplicate members of a defining folder should pass validation"); }}
 
 #[test]
-fn duplicate_members_of_readonly_cols_are_still_rejected () {
+fn duplicate_members_of_readonly_folders_are_still_rejected () {
   let input : &str =
     indoc! {"
       * (skg (node (id owner) (source main))) owner
-      ** (skg hiddenCol)
+      ** (skg hiddenFolder)
       *** (skg (node (id dup) (source main) indef)) dup
       *** (skg (node (id dup) (source main) indef)) dup
     "};
@@ -794,23 +794,23 @@ fn duplicate_members_of_readonly_cols_are_still_rejected () {
     "Test fixture should not have parse errors: {:?}",
     parsing_errors );
   let config : SkgConfig = validation_config ();
-  for col_id in partner_col_treeids (&viewforest) {
+  for folder_id in partner_folder_treeids (&viewforest) {
     let error = validate_local_structure (
-        &viewforest, col_id, &config)
+        &viewforest, folder_id, &config)
       . expect_err (
-        "duplicate members of a read-only col should fail validation");
+        "duplicate members of a read-only folder should fail validation");
     assert!(
       error . message . contains ("must not have duplicate ActiveNode children"),
-      "Unexpected read-only-col validation error: {:?}",
+      "Unexpected read-only-folder validation error: {:?}",
       error ); }}
 
-fn partner_col_treeids (
+fn partner_folder_treeids (
   viewforest : &MpViewForest,
 ) -> Vec<ego_tree::NodeId> {
   viewforest . nodes ()
     . filter ( |node_ref| matches! (
         node_ref . value () . kind,
-        MpViewnodeKind::PartnerCol (_) ))
+        MpViewnodeKind::PartnerFolder (_) ))
     . map ( |node_ref| node_ref . id () )
     . collect () }
 

@@ -4,7 +4,7 @@ use skg::assert_metadata_eq;
 use skg::org_to_text::viewnode_to_text;
 use skg::types::misc::{ID, SkgConfig, SourceName};
 use skg::types::viewnode::{ ViewNode, ViewNodeKind, Vognode, ActiveNode, IndefOrDef, ViewNodeStats, default_activeNode };
-use skg::types::viewnode::QualCol;
+use skg::types::viewnode::QualFolder;
 use std::collections::HashMap;
 
 #[test]
@@ -47,13 +47,13 @@ fn test_viewnode_to_text_with_metadata () {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind        : ViewNodeKind::QualCol (
-      QualCol::Alias) };
+    kind        : ViewNodeKind::QualFolder (
+      QualFolder::Alias) };
   node . folded = true;
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
-    . expect ("AliasCol rendering never fails");
-  assert_metadata_eq! ( result, "* (skg folded aliasCol)\n" ); }
+    . expect ("AliasFolder rendering never fails");
+  assert_metadata_eq! ( result, "* (skg folded aliasFolder)\n" ); }
 
 #[test]
 fn test_viewnode_to_text_with_id_metadata () {

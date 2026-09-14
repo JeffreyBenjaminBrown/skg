@@ -1,6 +1,6 @@
 use crate::telescope::fold::fold_telescope_collecting_warnings;
 use crate::telescope::types::{
-  FoldWarning, Telescope, retain_owned_sections_when_pid_collides,
+  FoldWarning, Telescope, retain_owned_sections_when_pid_folderlides,
 };
 use crate::telescope::invariants::TelescopeViolation;
 use crate::dbs::filesystem::one_node::{
@@ -43,7 +43,7 @@ pub fn read_all_skg_files_from_sources (
 /// Two kinds arise here and nowhere else, because only here are a
 /// node's SECTION LIST and the config both in hand:
 /// - every 'FoldWarning' (wrapped as 'TelescopeViolation::Fold'),
-/// - 'IgnoredForeignPidCollision', where owned and non-owned files
+/// - 'IgnoredForeignPidFolderlision', where owned and non-owned files
 ///   use the same pid. The owned telescope wins before folding.
 pub fn read_all_skg_files_from_sources_collecting_violations (
   config: &SkgConfig
@@ -105,12 +105,12 @@ fn retain_owned_telescopes (
     let Some (sections) = sections_by_pid . remove (pid)
       else { continue; };
     let (retained, collision) =
-      retain_owned_sections_when_pid_collides (sections, config);
+      retain_owned_sections_when_pid_folderlides (sections, config);
     sections_by_pid . insert (pid . clone (), retained);
     if let Some (collision) = collision {
       violations . push ((
         pid . clone (),
-        TelescopeViolation::IgnoredForeignPidCollision {
+        TelescopeViolation::IgnoredForeignPidFolderlision {
           ignored_sources : collision . ignored_sources,
         } )); }}
   violations }

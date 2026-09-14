@@ -139,9 +139,9 @@ If the node already has a clone you own, `skg-fork-node` is rejected by
 the same monogamy rule (below); deepen the chain by forking the
 *overrider*, not the already-overridden node.
 
-## Unintegrated content: the subscribeeCol
+## Unintegrated content: the subscribeeFolder
 
-Because `C` subscribes to `N`, a generated **subscribeeCol** appears
+Because `C` subscribes to `N`, a generated **subscribeeFolder** appears
 under `C` listing `N` as a *subscribee-as-such*. Its content is exactly
 what you have **not** yet integrated: a subscribee-as-such shows only the
 children the subscriber (`C`) neither hides nor already contains. A fresh
@@ -173,7 +173,7 @@ instead, marked as standing in for the original:
 ** common objects with mystical associations
 *** eggy mysticism      «Oh» (drawn in place of Egg Man's "mystical")
 **** Which came first, the chicken or the egg?
-*** subscribeeCol
+*** subscribeeFolder
 **** mystical           (the subscribee-as-such; empty so far)
 ```
 
@@ -193,7 +193,7 @@ subscribee-as-such:
 ```
 *** eggy mysticism      «Oh»
 **** Which came first, the chicken or the egg?
-*** subscribeeCol
+*** subscribeeFolder
 **** mystical
 ***** Egg limpia (curanderismo)     (unintegrated)
 ***** The philosophical egg         (unintegrated)

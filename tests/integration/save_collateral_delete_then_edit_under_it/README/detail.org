@@ -6,13 +6,13 @@ fixtures than the earlir two similarly-named integration tests.)
 #+begin_example
   * 1
   ** 11
-  *** (aliasCol)
+  *** (aliasFolder)
   **** (alias) eleven
-  *** (subscribeeCol)
+  *** (subscribeeFolder)
   **** subee
-  ***** (HiddenInSubscribeeCol)
+  ***** (HiddenInSubscribeeFolder)
   ****** subee-1
-  **** (hiddenoutsideofsubscribeecol)
+  **** (hiddenOutsideOfSubscribeeFolder)
   ***** also-hidden
   * subee
   ** subee-1
@@ -167,8 +167,8 @@ ids:
 Constructed in two steps:
 
 1. Request =skg-request-single-root-content-view-from-id "1"=.
-   The server renders all scaffolding for node 11 (subscribeeCol,
-   hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol).
+   The server renders all scaffolding for node 11 (subscribeeFolder,
+   hiddenInSubscribeeFolder, hiddenOutsideOfSubscribeeFolder).
    This gives us a single-root view with root "1".
 
 2. Add an aliases view request to node 11 via
@@ -182,12 +182,12 @@ Constructed in two steps:
 
    Then save to register the multi-root view with the server.
    After the save response, the buffer is complete (including
-   the aliasCol and alias for node 11).
+   the aliasFolder and alias for node 11).
 
 ** Expected initial structure (titles)
 
 Scaffold rendering uses fixed titles ("it subscribes to these",
-=server/types/viewnode.rs=. Non-vognode collection headlines no
+=server/types/viewnode.rs=. Non-vognode folder headlines no
 longer carry explanatory titles; the client herald rules explain them.
 The expected =headline-titles= output is approximately:
 
@@ -261,27 +261,27 @@ Line 1 metadata should contain =(deleted (id 11) ...)=.
 ** Expected collateral buffer 1 after deletion
 
 Node 11 degrades to =DeletedNode=. Its scaffolds
-(subscribeeCol, hiddenInSubscribeeCol,
-hiddenOutsideOfSubscribeeCol) become =DeletedScaff=. The
-aliasCol also becomes =DeletedScaff=; its leaf child
+(subscribeeFolder, hiddenInSubscribeeFolder,
+hiddenOutsideOfSubscribeeFolder) become =DeletedScaff=. The
+aliasFolder also becomes =DeletedScaff=; its leaf child
 (the =alias= scaffold) becomes a childless =DeletedScaff=
-which the postorder pass detaches. So aliasCol and its
+which the postorder pass detaches. So aliasFolder and its
 alias disappear entirely.
 
 subee is a TrueNode under the (now =DeletedScaff=)
-subscribeeCol. =complete_viewtree= completes it normally,
+subscribeeFolder. =complete_viewtree= completes it normally,
 adding subee-1 as a real child. This is the "tricky" line.
 
 Expected headline-titles (approximately):
 #+begin_example
 ((1 . "1")
  (2 . "11")           ;; DeletedNode
- (3 . "")             ;; DeletedScaff (was subscribeeCol)
+ (3 . "")             ;; DeletedScaff (was subscribeeFolder)
  (4 . "subee")        ;; TrueNode, completed
  (5 . "subee-1")      ;; child from completion
- (5 . "")             ;; DeletedScaff (was hiddenInSubscribeeCol)
+ (5 . "")             ;; DeletedScaff (was hiddenInSubscribeeFolder)
  (6 . "subee-1")      ;; hidden node preserved
- (4 . "")             ;; DeletedScaff (was hiddenOutsideOfSubscribeeCol)
+ (4 . "")             ;; DeletedScaff (was hiddenOutsideOfSubscribeeFolder)
  (5 . "also-hidden")  ;; hidden node preserved
  (1 . "subee")        ;; standalone root, unaffected
  (2 . "subee-1"))     ;; its child
@@ -289,9 +289,9 @@ Expected headline-titles (approximately):
 
 Note: Childless DeletedNode stays in the tree (the postorder
 handler is a no-op for Deleted; only childless DeletedScaff
-is detached). The aliasCol scaffold becomes DeletedScaff;
+is detached). The aliasFolder scaffold becomes DeletedScaff;
 its leaf child (the =alias= scaffold) also becomes childless
-DeletedScaff and IS detached. So aliasCol and its alias
+DeletedScaff and IS detached. So aliasFolder and its alias
 disappear entirely.
 
 DeletedScaff has no title (renders as empty). The assertion
@@ -354,7 +354,7 @@ Expected headline-titles:
 * Phase 5: Add new-root under deletedScaff in buffer 1
 
 Insert =new-root= as a sibling of =subee= under the depth-3
-=DeletedScaff= (formerly =subscribeeCol=) in buffer 1. Source
+=DeletedScaff= (formerly =subscribeeFolder=) in buffer 1. Source
 metadata must be supplied explicitly (=(source main)=) because
 =DeletedScaff= has no source to inherit from.
 
@@ -508,7 +508,7 @@ gains subee-2 after phase 4's save).
 
 =DeletedScaff= nodes render via =deleted_scaff_metadata_to_string=
 (=server/org_to_text.rs=) which produces =(skg deletedScaffold)=
-with NO title. The scaffolds they replaced (subscribeeCol, etc.)
+with NO title. The scaffolds they replaced (subscribeeFolder, etc.)
 had titles like "it subscribes to these". After degradation,
 =deletedScaff= is an opaque tombstone — it renders as:
 

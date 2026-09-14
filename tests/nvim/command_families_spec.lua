@@ -91,7 +91,7 @@ describe('skg.modify_graph replacements', function ()
     '* (skg (node (id parent) (source public))) container',
     '** (skg (node (id child) (source public))) the leaf title',
     'leaf body',
-    '*** (skg aliasCol) scaffolding under it' }, '\n')
+    '*** (skg aliasFolder) scaffolding under it' }, '\n')
 
   it('replaces content with a link, from the body too', function ()
     buffer_with(container_and_leaf)
@@ -196,9 +196,9 @@ describe('skg.view_requests', function ()
 
   it('stamps the request atom and auto-saves', function ()
     buffer_with('* (skg (node (id n1))) title')
-    view_requests.show_collection_aliases()
+    view_requests.show_folderOf_aliases()
     assert.is_truthy(buffer_text():find(
-      '(viewRequests (col aliases))', 1, true))
+      '(viewRequests (folder aliases))', 1, true))
     assert.are.equal(1, saved_count)
     buffer_with('* (skg (node (id n2))) title')
     view_requests.show_paths_through_containers()

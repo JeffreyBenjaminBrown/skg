@@ -21,8 +21,8 @@ use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::viewnode::{
-  GraphNodeStats, ViewNodeStats, NodeEditRequest, ViewRequest, ColRelation,
-  Qual, QualCol, PartnerCol, PhantomDeleted, InactiveNode, PhantomUnknown,
+  GraphNodeStats, ViewNodeStats, NodeEditRequest, ViewRequest, FolderRelation,
+  Qual, QualFolder, PartnerFolder, PhantomDeleted, InactiveNode, PhantomUnknown,
   Birth, IndefOrDef, ParentIs,
 };
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
@@ -120,8 +120,8 @@ pub fn default_metadata() -> ViewnodeMetadata {
 /// This is the bridge between parsing (ViewnodeMetadata) and runtime (MpViewnode).
 /// Returns (MpViewnode, error, warning):
 /// - error if a Scaffold has a body;
-/// - warning if a col header (QualCol or PartnerCol) has nonempty
-///   title text, which the server discards: col headlines are
+/// - warning if a folder header (QualFolder or PartnerFolder) has nonempty
+///   title text, which the server discards: folder headlines are
 ///   titleless server-side (heralds supply their labels), so any
 ///   text there is a user edit that cannot be saved. Qual leaves
 ///   are exempt -- their title IS their data.
@@ -175,11 +175,11 @@ pub fn viewnode_from_metadata (
               title . clone (),
               maybeplaced_kind_error_label (non_vognode) ))
           } else { None };
-        let col_title_warning : Option<String> =
+        let folder_title_warning : Option<String> =
           if ! title . is_empty ()
             && matches! ( non_vognode,
-                          MpViewnodeKind::QualCol (_)
-                          | MpViewnodeKind::PartnerCol (_) )
+                          MpViewnodeKind::QualFolder (_)
+                          | MpViewnodeKind::PartnerFolder (_) )
           { Some ( format! (
               "Headline text on a {} is not saved; discarded: {:?}",
               maybeplaced_kind_error_label (non_vognode),
@@ -204,7 +204,7 @@ pub fn viewnode_from_metadata (
                               staged   : metadata . textchanged_staged,
                               unstaged : metadata . textchanged_unstaged }),
           other => other . clone () };
-        ( non_vognode_with_title, error, col_title_warning )
+        ( non_vognode_with_title, error, folder_title_warning )
       } else {
       // MpActiveNode
       { let indef_or_def : IndefOrDef =
@@ -272,12 +272,12 @@ fn maybeplaced_kind_error_label (
   kind : &MpViewnodeKind,
 ) -> String {
   match kind {
-    MpViewnodeKind::QualCol (col) =>
-      col . repr_in_client () . to_string (),
+    MpViewnodeKind::QualFolder (folder) =>
+      folder . repr_in_client () . to_string (),
     MpViewnodeKind::Qual (qual) =>
       qual . repr_in_client () . to_string (),
-    MpViewnodeKind::PartnerCol (partnerCol) =>
-      partnerCol . repr_in_client () . to_string (),
+    MpViewnodeKind::PartnerFolder (partnerFolder) =>
+      partnerFolder . repr_in_client () . to_string (),
     MpViewnodeKind::BufferRoot =>
       "forestRoot" . to_string (),
     MpViewnodeKind::DeadScaffold =>
@@ -417,30 +417,30 @@ pub fn parse_metadata_to_viewnodemd (
           "inactiveNode" => result . is_inactive_node = true,
           // Scaffold kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
           "alias"    => result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::Alias { text: String::new(), rel_source: None, rel_source_request: None, membership: MembershipAxes::default() } ) ),
-          "aliasCol" => result . non_vognode = Some (MpViewnodeKind::QualCol (QualCol::Alias)),
+          "aliasFolder" => result . non_vognode = Some (MpViewnodeKind::QualFolder (QualFolder::Alias)),
           "forestRoot" => result . non_vognode = Some (MpViewnodeKind::BufferRoot),
-          "hiddenInSubscribeeCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::HiddenInSubscribee)),
-          "hiddenOutsideOfSubscribeeCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee)),
-          "hiddenCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Hidden)),
-          "hiderCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Hider)),
-          "overriddenCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Overridden)),
-          "overriderCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Overrider)),
-          "subscriberCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Subscriber)),
-          "subscribeeCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Subscribee)),
+          "hiddenInSubscribeeFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)),
+          "hiddenOutsideOfSubscribeeFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee)),
+          "hiddenFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Hidden)),
+          "hiderFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Hider)),
+          "overriddenFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Overridden)),
+          "overriderFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Overrider)),
+          "subscriberFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Subscriber)),
+          "subscribeeFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)),
           "textChanged" =>
             result . non_vognode = Some (
               MpViewnodeKind::Qual (
                 Qual::TextChanged { staged: false, unstaged: false } ) ),
-          "idCol" =>
-            result . non_vognode = Some (MpViewnodeKind::QualCol (QualCol::ID)),
+          "idFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::QualFolder (QualFolder::ID)),
           "id" =>
             result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::ID { id: ID::default(), membership: MembershipAxes::default() } ) ),
           "deletedScaffold" =>
@@ -763,7 +763,7 @@ fn parse_editrequest_sexp (
 
 /// Parse the (viewRequests ...) s-expression and update viewRequests.
 /// Each request is either the bare atom 'definitiveView', or a nested
-/// '(col RELNAME)' / '(path ROLENAME)' form.
+/// '(folder RELNAME)' / '(path ROLENAME)' form.
 fn parse_viewrequests_sexp (
   items : &[Sexp],
   requests : &mut HashSet<ViewRequest>
@@ -780,10 +780,10 @@ fn parse_viewrequests_sexp (
         let head : String = atom_to_string ( &sub[0] ) ?;
         let arg  : String = atom_to_string ( &sub[1] ) ?;
         match head . as_str () {
-          "col"  => ViewRequest::Col (
-            ColRelation::from_relname (&arg)
+          "folder"  => ViewRequest::Folder (
+            FolderRelation::from_relname (&arg)
               . ok_or_else ( || format! (
-                "Invalid col relname: {}", arg )) ?),
+                "Invalid folder relname: {}", arg )) ?),
           "path" => ViewRequest::Path (
             RelationRole::from_rolename (&arg)
               . ok_or_else ( || format! (
@@ -792,6 +792,6 @@ fn parse_viewrequests_sexp (
             "Unknown view request form: ({} ...)", head )), } },
       _ => return Err (
         "Unexpected element in viewRequests (expected 'definitiveView' \
-         or '(col ...)' / '(path ...)')" . to_string () ), };
+         or '(folder ...)' / '(path ...)')" . to_string () ), };
     requests . insert (request); }
   Ok (( )) }

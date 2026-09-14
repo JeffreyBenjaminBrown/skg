@@ -3,13 +3,13 @@ The initial data looks like this:
 #+begin_example
   * 1
   ** 11
-  *** (aliasCol)
+  *** (aliasFolder)
   **** (alias) eleven
-  *** (subscribeeCol)
+  *** (subscribeeFolder)
   **** subee
-  ***** (HiddenInSubscribeeCol)
+  ***** (HiddenInSubscribeeFolder)
   ****** subee-1
-  **** (hiddenoutsideofsubscribeecol)
+  **** (hiddenOutsideOfSubscribeeFolder)
   ***** also-hidden
   * subee
   ** subee-1

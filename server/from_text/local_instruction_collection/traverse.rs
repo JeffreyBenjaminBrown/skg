@@ -16,13 +16,13 @@
 /// - each ID has at most one definitive instance
 ///   ('Multiple_Defining_Viewnodes');
 /// - same-ID instances have consistent toDelete values and sources;
-/// - col shapes are valid: each col holds only the child kinds it
-///   permits, each col is unique among its siblings, content members
+/// - folder shapes are valid: each folder holds only the child kinds it
+///   permits, each folder is unique among its siblings, content members
 ///   have distinct IDs per
-///   'nonignored_children_have_distinct_ids', and read-only-col
+///   'nonignored_children_have_distinct_ids', and read-only-folder
 ///   members have distinct IDs per
-///   'partnerCol_children_have_distinct_ids'. The defining cols
-///   (AliasCol, SubscribeeCol, OverriddenCol) may contain
+///   'partnerFolder_children_have_distinct_ids'. The defining folders
+///   (AliasFolder, SubscribeeFolder, OverriddenFolder) may contain
 ///   duplicates; emission dedups them silently.
 /// Collection performs no ancestry re-verification. On shapes that
 /// validation precludes, it stays total, emitting nothing rather
@@ -31,26 +31,26 @@
 /// DEFINITION: a vognode is *save-eligible* iff it is Active,
 /// definitive, lacks a Delete edit request, and is not in
 /// subscribee-as-such position. (Its position may be anywhere else --
-/// including as a member of a read-only col, where it is
-/// save-eligible for itself but invisible to the col's owner.)
+/// including as a member of a read-only folder, where it is
+/// save-eligible for itself but invisible to the folder's owner.)
 /// .
 /// DEFINITION: a vognode is *in subscribee-as-such position* iff it
-/// is an Active, parentIs=Affected direct child of a SubscribeeCol.
-/// A non-Affected child of a SubscribeeCol is not a member of the
-/// col, hence not shown *as* a subscribee: it is an ordinary
+/// is an Active, parentIs=Affected direct child of a SubscribeeFolder.
+/// A non-Affected child of a SubscribeeFolder is not a member of the
+/// folder, hence not shown *as* a subscribee: it is an ordinary
 /// self-writer parked there.
 
 use crate::from_text::local_instruction_collection::predicates::{
   active_child_counts_as_content,
   active_child_counts_as_visible_content,
-  member_counts_for_partnerCol };
+  member_counts_for_partnerFolder };
 use crate::from_text::local_instruction_collection::types::{
-  CollectedIntents, DefiningColOwner, LocalContext, NodeIntent_Local,
+  CollectedIntents, DefiningFolderOwner, LocalContext, NodeIntent_Local,
   HiddenOutsideEdit, SubscribeeTextClaim, SubscribeeVisibility };
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  NodeEditRequest, ParentIs, Qual, QualCol, PartnerCol, ActiveNode, ViewNode,
+  NodeEditRequest, ParentIs, Qual, QualFolder, PartnerFolder, ActiveNode, ViewNode,
   ViewNodeKind, Vognode, Phantom };
 
 use ego_tree::NodeRef;
@@ -76,15 +76,15 @@ fn visit (
     ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
       // An Inactive vognode is anonymous and emits nothing; its
       // membership is owned by the disk weave, not extraction. With no
-      // identity it owns no defining col, so (like a DeadScaffold) any
-      // col found under it stays silent.
+      // identity it owns no defining folder, so (like a DeadScaffold) any
+      // folder found under it stays silent.
       recurse_under_gnode (node_ref, None, None, collected),
     ViewNodeKind::Phantom (p) =>
       recurse_under_gnode (
         node_ref,
-        Some ( DefiningColOwner {
+        Some ( DefiningFolderOwner {
           // Carrying the phantom's identity (indefinitive, not
-          // save-eligible) keeps a SubscribeeCol found under a diff
+          // save-eligible) keeps a SubscribeeFolder found under a diff
           // phantom meaningful: its children stay in
           // subscribee-as-such position, so their title edits bounce
           // via text claims instead of silently becoming real edits.
@@ -99,26 +99,26 @@ fn visit (
       // stays total anyway.
       recurse_with_uniform_context (
         node_ref, &LocalContext::TopLevel, collected),
-    ViewNodeKind::QualCol (QualCol::Alias) =>
-      visit_aliascol (node_ref, context, collected),
-    // The two arms below are exactly the ColPolicy::WritableSet
-    // PartnerCols; the catch-all PartnerCol arm after them covers the
-    // ReadOnlySet and ReadOnlyFilter policies. If a new PartnerCol is
-    // added, 'PartnerCol::policy' says which group it joins.
-    ViewNodeKind::PartnerCol (PartnerCol::Subscribee) =>
-      visit_subscribeecol (node_ref, context, collected),
-    ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) =>
-      visit_hiddenoutsidecol (node_ref, context, collected),
-    ViewNodeKind::PartnerCol (PartnerCol::Overridden) =>
-      visit_overriddencol (node_ref, context, collected),
-    ViewNodeKind::QualCol (QualCol::ID)
+    ViewNodeKind::QualFolder (QualFolder::Alias) =>
+      visit_aliasFolder (node_ref, context, collected),
+    // The two arms below are exactly the FolderPolicy::WritableSet
+    // PartnerFolders; the catch-all PartnerFolder arm after them covers the
+    // ReadOnlySet and ReadOnlyFilter policies. If a new PartnerFolder is
+    // added, 'PartnerFolder::policy' says which group it joins.
+    ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee) =>
+      visit_subscribee_folder (node_ref, context, collected),
+    ViewNodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
+      visit_hiddenOutside_folder (node_ref, context, collected),
+    ViewNodeKind::PartnerFolder (PartnerFolder::Overridden) =>
+      visit_overridden_folder (node_ref, context, collected),
+    ViewNodeKind::QualFolder (QualFolder::ID)
       | ViewNodeKind::Qual (_)
-      | ViewNodeKind::PartnerCol (_) =>
-      // These are the read-only cols and the Qual leaves. Vognodes
+      | ViewNodeKind::PartnerFolder (_) =>
+      // These are the read-only folders and the Qual leaves. Vognodes
       // found inside them are self-writers; their membership in the
-      // col is never read.
+      // folder is never read.
       recurse_with_uniform_context (
-        node_ref, &LocalContext::UnderReadOnlyCol, collected), }}
+        node_ref, &LocalContext::UnderReadOnlyFolder, collected), }}
 
 fn visit_active_vognode (
   node_ref  : NodeRef<ViewNode>,
@@ -155,10 +155,10 @@ fn visit_active_vognode (
               body  : t . body() . cloned() } )) ?;
         if subscriber_is_definitive {
           // The at-most-one-writer-per-ID guard: only the
-          // SubscribeeCol under the definitive instance of a
+          // SubscribeeFolder under the definitive instance of a
           // subscriber may write its hide edits. The same subscriber
           // can recur indefinitively elsewhere with its own
-          // SubscribeeCol; without this guard those could emit
+          // SubscribeeFolder; without this guard those could emit
           // contradictory hide edits for one ID.
           collected . instructionMerge_intent (
             subscriber . clone(),
@@ -197,7 +197,7 @@ fn visit_active_vognode (
                 acquiree : acquiree . clone() } ) ?; }}},}}
   recurse_under_gnode (
     node_ref,
-    Some ( DefiningColOwner {
+    Some ( DefiningFolderOwner {
       id               : t . id . clone(),
       is_definitive,
       is_saveEligible } ),
@@ -205,36 +205,36 @@ fn visit_active_vognode (
     collected) }
 
 /// This recurses into a gnode-ish node's children. Vognode-ish
-/// children get 'UnderVognode'; defining-col children get
-/// 'UnderDefiningCol', carrying the owner's identity (when it has
-/// one); and read-only cols and Quals get 'UnderReadOnlyCol'.
+/// children get 'UnderVognode'; defining-folder children get
+/// 'UnderDefiningFolder', carrying the owner's identity (when it has
+/// one); and read-only folders and Quals get 'UnderReadOnlyFolder'.
 fn recurse_under_gnode (
   node_ref            : NodeRef<ViewNode>,
-  owner               : Option<DefiningColOwner>,
+  owner               : Option<DefiningFolderOwner>,
   parent_if_writeable : Option<ID>,
   collected           : &mut CollectedIntents,
 ) -> Result<(), String> {
   for child in node_ref . children() {
     let child_context : LocalContext =
       match &child . value() . kind {
-        ViewNodeKind::QualCol (QualCol::Alias)
-          // The two PartnerCols here are exactly the
-          // ColPolicy::WritableSet ones; the read-only policies fall
-          // to the UnderReadOnlyCol arm below.
-          | ViewNodeKind::PartnerCol (PartnerCol::Subscribee)
-          | ViewNodeKind::PartnerCol (PartnerCol::Overridden) =>
+        ViewNodeKind::QualFolder (QualFolder::Alias)
+          // The two PartnerFolders here are exactly the
+          // FolderPolicy::WritableSet ones; the read-only policies fall
+          // to the UnderReadOnlyFolder arm below.
+          | ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee)
+          | ViewNodeKind::PartnerFolder (PartnerFolder::Overridden) =>
           match &owner {
             Some (o) =>
-              LocalContext::UnderDefiningCol (o . clone()),
+              LocalContext::UnderDefiningFolder (o . clone()),
             None =>
               // The owner has no identity (it is a DeadScaffold), so
-              // the col will stay silent.
+              // the folder will stay silent.
               LocalContext::UnderVognode {
                 parent_if_writeable : None } },
-        ViewNodeKind::QualCol (QualCol::ID)
+        ViewNodeKind::QualFolder (QualFolder::ID)
           | ViewNodeKind::Qual (_)
-          | ViewNodeKind::PartnerCol (_) =>
-          LocalContext::UnderReadOnlyCol,
+          | ViewNodeKind::PartnerFolder (_) =>
+          LocalContext::UnderReadOnlyFolder,
         _ =>
           LocalContext::UnderVognode {
             parent_if_writeable : parent_if_writeable . clone() } };
@@ -250,12 +250,12 @@ fn recurse_with_uniform_context (
     visit (child, context, collected) ?; }
   Ok (( )) }
 
-fn visit_aliascol (
+fn visit_aliasFolder (
   node_ref  : NodeRef<ViewNode>,
   context   : &LocalContext,
   collected : &mut CollectedIntents,
 ) -> Result<(), String> {
-  if let LocalContext::UnderDefiningCol (owner) = context {
+  if let LocalContext::UnderDefiningFolder (owner) = context {
     if owner . is_saveEligible {
       let aliases : Vec<(String, Option<SourceName>)> = {
         let mut aliases : Vec<(String, Option<SourceName>)> = Vec::new();
@@ -268,31 +268,31 @@ fn visit_aliascol (
               aliases . push (( text . clone (),
                                 rel_source_request . clone () )); }} }
         aliases };
-      // The MSV semantics are: an absent col emits no intent, which
-      // lowers to Unspecified, while a present-but-empty col emits
+      // The MSV semantics are: an absent folder emits no intent, which
+      // lowers to Unspecified, while a present-but-empty folder emits
       // Specified(vec![]).
       collected . instructionMerge_intent (
         owner . id . clone(),
         NodeIntent_Local::SetAliases (aliases) ) ?; }}
   recurse_with_uniform_context (
-    node_ref, &LocalContext::UnderReadOnlyCol, collected) }
+    node_ref, &LocalContext::UnderReadOnlyFolder, collected) }
 
-fn visit_subscribeecol (
+fn visit_subscribee_folder (
   node_ref  : NodeRef<ViewNode>,
   context   : &LocalContext,
   collected : &mut CollectedIntents,
 ) -> Result<(), String> {
   match context {
-    LocalContext::UnderDefiningCol (owner) => {
+    LocalContext::UnderDefiningFolder (owner) => {
       if owner . is_saveEligible {
         collected . instructionMerge_intent (
           owner . id . clone(),
           NodeIntent_Local::SetSubscribesTo (
-            subscribeeCol_members (node_ref) )) ?; }
+            subscribeeFolder_members (node_ref) )) ?; }
       for child in node_ref . children() {
         let child_context : LocalContext =
           match &child . value() . kind {
-            ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) =>
+            ViewNodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
               LocalContext::HiddenOutsidePosition {
                 subscriber      : owner . id . clone(),
                 is_saveEligible : owner . is_saveEligible },
@@ -306,17 +306,17 @@ fn visit_subscribeecol (
         visit (child, &child_context, collected) ?; }
       Ok (( )) },
     _ =>
-      // The col has no identifiable owner. Validation precludes this
+      // The folder has no identifiable owner. Validation precludes this
       // shape; the traversal stays total and silent.
       recurse_with_uniform_context (
         node_ref,
         &LocalContext::UnderVognode { parent_if_writeable : None },
         collected), }}
 
-/// Collect the explicitly submitted visible-outside subset.  This col is a
+/// Collect the explicitly submitted visible-outside subset.  This folder is a
 /// derived filter rather than a direct relationship set, so its meaning is
 /// resolved only after ordinary subscribee visibility inference has run.
-fn visit_hiddenoutsidecol (
+fn visit_hiddenOutside_folder (
   node_ref  : NodeRef<ViewNode>,
   context   : &LocalContext,
   collected : &mut CollectedIntents,
@@ -329,7 +329,7 @@ fn visit_hiddenoutsidecol (
       for child in node_ref . children() {
         match &child . value() . kind {
           ViewNodeKind::Vognode (Vognode::Active (t))
-            if member_counts_for_partnerCol (t) => {
+            if member_counts_for_partnerFolder (t) => {
               if t . rel_source_request . is_some () {
                 return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relationship sources are derived." . to_string ()); }
               members . push (t . id . clone ()); },
@@ -342,20 +342,20 @@ fn visit_hiddenoutsidecol (
         subscriber . clone(),
         NodeIntent_Local::HiddenOutsideEdit (HiddenOutsideEdit { members }) ) ?; }}
   recurse_with_uniform_context (
-    node_ref, &LocalContext::UnderReadOnlyCol, collected)
+    node_ref, &LocalContext::UnderReadOnlyFolder, collected)
 }
 
-fn visit_overriddencol (
+fn visit_overridden_folder (
   node_ref  : NodeRef<ViewNode>,
   context   : &LocalContext,
   collected : &mut CollectedIntents,
 ) -> Result<(), String> {
-  if let LocalContext::UnderDefiningCol (owner) = context {
+  if let LocalContext::UnderDefiningFolder (owner) = context {
     if owner . is_saveEligible {
       collected . instructionMerge_intent (
         owner . id . clone(),
         NodeIntent_Local::SetOverrides (
-          partnerCol_members (node_ref) )) ?; }}
+          partnerFolder_members (node_ref) )) ?; }}
   recurse_with_uniform_context (
     node_ref,
     // The members are self-writers; their membership was read just
@@ -366,8 +366,8 @@ fn visit_overriddencol (
 /// As 'dedup_vector', but dedups members carrying sources by ID ALONE
 /// (first occurrence wins) rather than by the full (ID, source) pair: a
 /// duplicate ID with a DIFFERENT source request must still
-/// be silently dropped, matching the existing defining-col dedup
-/// policy ("duplicate defining-col members are silently deduped").
+/// be silently dropped, matching the existing defining-folder dedup
+/// policy ("duplicate defining-folder members are silently deduped").
 fn dedup_members_by_id (
   members : Vec<(ID, Option<SourceName>)>,
 ) -> Vec<(ID, Option<SourceName>)> {
@@ -378,23 +378,23 @@ fn dedup_members_by_id (
       result . push ((id, source)); }}
   result }
 
-/// This returns the members of an OverriddenCol: its Active
-/// children that pass the PartnerCol membership predicate, silently
+/// This returns the members of an OverriddenFolder: its Active
+/// children that pass the PartnerFolder membership predicate, silently
 /// deduplicated (by ID; see 'dedup_members_by_id'), preserving
 /// first-occurrence order. Each member is paired with its headline's
 /// explicit '(editRequest (relSource NAME))' request, if any (see
 /// 'NodeIntent_Local').  (Inactive
-/// children are NOT members here: the overriddenCol omits inactive
+/// children are NOT members here: the overriddenFolder omits inactive
 /// members from display, and the set-difference merge preserves
 /// them at save.  TODO/full-schema/9-2_source-set-safety.org.)
-fn partnerCol_members (
+fn partnerFolder_members (
   node_ref : NodeRef<ViewNode>,
 ) -> Vec<(ID, Option<SourceName>)> {
   let mut members : Vec<(ID, Option<SourceName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
       ViewNodeKind::Vognode (Vognode::Active (t))
-        if member_counts_for_partnerCol (t) =>
+        if member_counts_for_partnerFolder (t) =>
           members . push ((t . id . clone(),
                            t . rel_source_request . clone())),
       ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
@@ -403,8 +403,8 @@ fn partnerCol_members (
       _ => {}, }}
   dedup_members_by_id (members) }
 
-/// This returns the members of a SubscribeeCol: its Active children
-/// that pass the PartnerCol membership predicate, deduplicated (by
+/// This returns the members of a SubscribeeFolder: its Active children
+/// that pass the PartnerFolder membership predicate, deduplicated (by
 /// ID; see 'dedup_members_by_id'). Like 'content_members' (and for
 /// the same reason), inactive children contribute nothing:
 /// 'subscribes_to' is order-meaningful, but the disk merge ('weave')
@@ -413,14 +413,14 @@ fn partnerCol_members (
 /// Each member is paired with its headline's explicit
 /// '(editRequest (relSource NAME))' request, if any.
 #[allow(non_snake_case)]
-fn subscribeeCol_members (
+fn subscribeeFolder_members (
   node_ref : NodeRef<ViewNode>,
 ) -> Vec<(ID, Option<SourceName>)> {
   let mut members : Vec<(ID, Option<SourceName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
       ViewNodeKind::Vognode (Vognode::Active (t))
-        if member_counts_for_partnerCol (t) =>
+        if member_counts_for_partnerFolder (t) =>
           members . push ((t . id . clone(),
                            t . rel_source_request . clone())),
       ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>

@@ -105,7 +105,7 @@ describe('skg.metadata commands', function ()
     buffer_with(table.concat({
       '* (skg (node (id root))) root',
       '** (skg (node (id child))) child',
-      '** (skg aliasCol) aliases',
+      '** (skg aliasFolder) aliases',
       '*** some alias',
       '* (skg (node (id sibling))) sibling' }, '\n'))
     metadata.delete_recursive()
@@ -168,7 +168,7 @@ describe('skg.metadata commands', function ()
       '*** (skg (node (id public-under-mismatch) (source public))) public under mismatch',
       '** (skg (node (id link-child) (source public) (parentIs independent) (birth backpath linkSource))) link child',
       '*** (skg (node (id under-link) (source public))) under link',
-      '** (skg aliasCol) aliases',
+      '** (skg aliasFolder) aliases',
       '*** (skg (node (id under-scaffold) (source public))) under scaffold' },
       '\n'))
     local original = picker.prompt_for_source_change
@@ -229,17 +229,17 @@ describe('skg.metadata commands', function ()
 end)
 
 describe('skg.metadata keybinding surface', function ()
-  it('binds the collection and path commands distinctly', function ()
-    -- Mirrors test-skg-collection-and-path-keybindings: the
+  it('binds the folder and path commands distinctly', function ()
+    -- Mirrors test-skg-folder-and-path-keybindings: the
     -- UPPER/lower path letters select opposite roles.
     local keymaps = require('skg.keymaps')
     local by_lhs = {}
     for _, binding in ipairs(keymaps.content_view_bindings) do
       by_lhs[binding[1]] = binding[2]
     end
-    assert.are.equal('ShowCollectionAliases', by_lhs['ca'])
-    assert.are.equal('ShowCollectionOverrides', by_lhs['co'])
-    assert.are.equal('ShowCollectionSubscribes', by_lhs['cs'])
+    assert.are.equal('ShowFolderOfAliases', by_lhs['ca'])
+    assert.are.equal('ShowFolderOfOverrides', by_lhs['co'])
+    assert.are.equal('ShowFolderOfSubscribes', by_lhs['cs'])
     assert.are.equal('ShowPathsThroughContainers', by_lhs['pC'])
     assert.are.equal('ShowPathsThroughLinkSources', by_lhs['pL'])
     assert.are.equal('ShowPathsThroughLinkDests', by_lhs['pl'])

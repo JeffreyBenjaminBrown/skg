@@ -197,14 +197,14 @@ async fn test_bfs_limit_8_two_branches (
 
       Ok (( )) }
 
-// §5.5: content wins the budget race; a col (here a SubscribeeCol) fills WHOLE
+// §5.5: content wins the budget race; a folder (here a SubscribeeFolder) fills WHOLE
 // and is budget-NEUTRAL. Fixture: root r -> content chain c1 -> c2, and r also
 // subscribes to s1, s2. With budget = 3 (exactly the content chain r, c1, c2):
 // the chain fully expands (c2 is definitive, body and all), AND both subscribers
-// are shown (the col is whole), indefinitive. If the col had spent the budget,
+// are shown (the folder is whole), indefinitive. If the folder had spent the budget,
 // s1 and s2 would have eaten two of the three units and c2 would be left
 // indefinitive -- it is not, which is the guarantee this test pins. Subscribers
-// also sit one level deeper than content (r -> SubscribeeCol -> subscriber vs
+// also sit one level deeper than content (r -> SubscribeeFolder -> subscriber vs
 // r -> c1), so BFS-by-depth reaches content first regardless.
 async fn test_budget_content_beats_subscribers (
   config : &SkgConfig,
@@ -221,13 +221,13 @@ async fn test_budget_content_beats_subscribers (
       println!("content-vs-subscribers (budget 3):\n{}", result);
 
       let expected = indoc! {"* (skg (node (id r) (source main) (parentIs absent) (rels (contains (out 1)) (subscribes (out 2))))) r
-                              ** (skg subscribeeCol)
+                              ** (skg subscribeeFolder)
                               *** (skg (node (id s1) (source main) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)))) s1
                               *** (skg (node (id s2) (source main) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)))) s2
                               ** (skg (node (id c1) (source main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) c1
                               *** (skg (node (id c2) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) c2
                               "};
       assert_metadata_eq!(result, expected,
-                 "budget 3 expands the whole content chain; the SubscribeeCol is whole + budget-neutral");
+                 "budget 3 expands the whole content chain; the SubscribeeFolder is whole + budget-neutral");
 
       Ok (( )) }

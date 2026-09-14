@@ -10,7 +10,7 @@ use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
 use super::git::{ExistenceAxes, MembershipAxes};
-use super::viewnode::{ ViewNode, ViewNodeKind, ActiveNode, Vognode, Phantom, QualCol, Qual, PartnerCol, PhantomDeleted, InactiveNode, PhantomUnknown, GraphNodeStats, ViewNodeStats, Birth, IndefOrDef, ParentIs, };
+use super::viewnode::{ ViewNode, ViewNodeKind, ActiveNode, Vognode, Phantom, QualFolder, Qual, PartnerFolder, PhantomDeleted, InactiveNode, PhantomUnknown, GraphNodeStats, ViewNodeStats, Birth, IndefOrDef, ParentIs, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -36,9 +36,9 @@ pub struct MpViewnode {
 pub enum MpViewnodeKind {
   Vognode      (MpVognode),
   Phantom      (MpPhantom),
-  QualCol      (QualCol),
+  QualFolder      (QualFolder),
   Qual         (Qual),
-  PartnerCol   (PartnerCol),
+  PartnerFolder   (PartnerFolder),
   BufferRoot,
   DeadScaffold,
 }
@@ -137,12 +137,12 @@ impl TryFrom<MpViewnodeKind> for ViewNodeKind {
         Ok (ViewNodeKind::Phantom (Phantom::Deleted (d))),
       MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
         Ok (ViewNodeKind::Phantom (Phantom::Unknown (u))),
-      MpViewnodeKind::QualCol (c) =>
-        Ok (ViewNodeKind::QualCol (c)),
+      MpViewnodeKind::QualFolder (c) =>
+        Ok (ViewNodeKind::QualFolder (c)),
       MpViewnodeKind::Qual (q) =>
         Ok (ViewNodeKind::Qual (q)),
-      MpViewnodeKind::PartnerCol (r) =>
-        Ok (ViewNodeKind::PartnerCol (r)),
+      MpViewnodeKind::PartnerFolder (r) =>
+        Ok (ViewNodeKind::PartnerFolder (r)),
       MpViewnodeKind::BufferRoot =>
         Ok (ViewNodeKind::BufferRoot),
       MpViewnodeKind::DeadScaffold =>
@@ -199,12 +199,12 @@ impl From<ViewNodeKind> for MpViewnodeKind {
         MpViewnodeKind::Phantom (MpPhantom::Deleted (d)),
       ViewNodeKind::Phantom (Phantom::Unknown (u)) =>
         MpViewnodeKind::Phantom (MpPhantom::Unknown (u)),
-      ViewNodeKind::QualCol (c) =>
-        MpViewnodeKind::QualCol (c),
+      ViewNodeKind::QualFolder (c) =>
+        MpViewnodeKind::QualFolder (c),
       ViewNodeKind::Qual (q) =>
         MpViewnodeKind::Qual (q),
-      ViewNodeKind::PartnerCol (r) =>
-        MpViewnodeKind::PartnerCol (r),
+      ViewNodeKind::PartnerFolder (r) =>
+        MpViewnodeKind::PartnerFolder (r),
       ViewNodeKind::BufferRoot =>
         MpViewnodeKind::BufferRoot,
       ViewNodeKind::DeadScaffold =>
@@ -326,8 +326,8 @@ impl MpViewnode {
         &d . title,
       MpViewnodeKind::Qual (q) =>
         q . title (),
-      MpViewnodeKind::QualCol (_)
-        | MpViewnodeKind::PartnerCol (_)
+      MpViewnodeKind::QualFolder (_)
+        | MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::BufferRoot
         | MpViewnodeKind::DeadScaffold
         | MpViewnodeKind::Vognode (MpVognode::Inactive (_))
@@ -347,10 +347,10 @@ impl MpViewnode {
         format!("qual:id({})", id),
       MpViewnodeKind::Qual (Qual::TextChanged { .. }) =>
         "qual:textChanged" . to_string (),
-      MpViewnodeKind::QualCol (col) =>
-        format!("qualCol:{}", col . repr_in_client ()),
-      MpViewnodeKind::PartnerCol (partnerCol) =>
-        format!("partnerCol:{}", partnerCol . repr_in_client ()),
+      MpViewnodeKind::QualFolder (folder) =>
+        format!("qualFolder:{}", folder . repr_in_client ()),
+      MpViewnodeKind::PartnerFolder (partnerFolder) =>
+        format!("partnerFolder:{}", partnerFolder . repr_in_client ()),
       MpViewnodeKind::BufferRoot =>
         "forestRoot" . to_string (),
       MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
@@ -371,9 +371,9 @@ impl MpViewnode {
         => p . body (),
       MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
         d . body . as_ref(),
-      MpViewnodeKind::QualCol (_)
+      MpViewnodeKind::QualFolder (_)
         | MpViewnodeKind::Qual (_)
-        | MpViewnodeKind::PartnerCol (_)
+        | MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::BufferRoot
         | MpViewnodeKind::DeadScaffold
         | MpViewnodeKind::Vognode (MpVognode::Inactive (_))
@@ -394,9 +394,9 @@ impl MpViewnode {
         None,
       MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
         Some (&u . id),
-      MpViewnodeKind::QualCol (_)
+      MpViewnodeKind::QualFolder (_)
         | MpViewnodeKind::Qual (_)
-        | MpViewnodeKind::PartnerCol (_)
+        | MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::BufferRoot
         | MpViewnodeKind::DeadScaffold =>
         None, }}

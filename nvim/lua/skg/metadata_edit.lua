@@ -189,7 +189,7 @@ function M.cycle_values_for_field (field_name, field_value)
   if field_name == 'source' then
     return M.source_cycle_values(field_value) end
   if field_name == 'viewRequests' then
-    -- Only the bare-atom request is cycleable; (col X)/(path X) are
+    -- Only the bare-atom request is cycleable; (folder X)/(path X) are
     -- structured forms inserted by their dedicated commands.
     return { 'none (default)', 'definitiveView' } end
   return nil

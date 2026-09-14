@@ -389,7 +389,7 @@ fn backfill_parse_warnings (
 /// COMPLEX:
 /// - Validation must happen at many stages.
 /// - NodeMerges must follow the execution of other save instructions, because the user may have updated one of the nodes to be merged.
-/// - complete_viewforest is complex: it is one level-order BFS in which each node is completed at its own visit (content, cols, view requests, inline diff), then a postorder prune sweep removes the empty self-deletable nodes.
+/// - complete_viewforest is complex: it is one level-order BFS in which each node is completed at its own visit (content, folders, view requests, inline diff), then a postorder prune sweep removes the empty self-deletable nodes.
 pub async fn update_from_and_rerender_buffer (
   stream                      : &mut TcpStream,
   org_buffer_text             : &str,
@@ -586,7 +586,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         active_source_set,
         deleted_by_this_save_extra_ids,
         text_approved_pids ) ?;
-    { // Nonfatal parse warnings (e.g. discarded col headline text)
+    { // Nonfatal parse warnings (e.g. discarded folder headline text)
       // precede the completion-repair warnings.
       let mut warnings : Vec<String> = parse_warnings;
       warnings . extend ( response . warnings );
@@ -628,7 +628,7 @@ fn post_commit_hiddenoutside_warnings (
       { containing_subscribees . push (label (&subscribee_node . pid)); }}
     if ! containing_subscribees . is_empty () {
       warnings . push (format! (
-        "Saved hide for {}; its display moved to HiddenInSubscribeeCol under {}.",
+        "Saved hide for {}; its display moved to HiddenInSubscribeeFolder under {}.",
         label (member), containing_subscribees . join (", ") )); }}
   warnings
 }
