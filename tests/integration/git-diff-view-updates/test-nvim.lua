@@ -57,8 +57,8 @@ local function relation_from_sexp (sexp)
     metadata.sexp_cdr_at_path(sexp, { 'skg', 'node', 'affectsParent' })
   local rels_body =
     metadata.sexp_cdr_at_path(sexp, { 'skg', 'node', 'rels' })
-  local false = affectsParent_list and affectsParent_list[1] == INDEPENDENT
-  local graft_role = false
+  local independent = affectsParent_list and affectsParent_list[1] == INDEPENDENT
+  local graft_role = independent
     and graft_role_from_rels(rels_body) or nil
   if graft_role then return graft_role end
   if not affectsParent_list or affectsParent_list[1] == AFFECTED then

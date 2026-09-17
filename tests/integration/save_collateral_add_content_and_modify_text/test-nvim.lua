@@ -64,10 +64,10 @@ end
 local function relation_from_sexp (sexp)
   local affectsParent_list = sexp and metadata.sexp_cdr_at_path(
     sexp, { 'skg', 'node', 'affectsParent' }) or nil
-  local false = affectsParent_list ~= nil
+  local independent = affectsParent_list ~= nil
     and affectsParent_list[1] == sexpr.symbol('false')
   local graft_role = nil
-  if false then
+  if independent then
     graft_role = graft_role_from_rels(metadata.sexp_cdr_at_path(
       sexp, { 'skg', 'node', 'rels' }))
   end
