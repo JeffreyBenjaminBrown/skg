@@ -1,0 +1,450 @@
+#+TITLE: NoIndex and boolean properties -- discussion
+
+* The clarified meaning of =NoIndex=
+
+=NoIndex= means “skip this node in searches.”  I recommend making that
+precise as follows:
+
+** A =NoIndex= node cannot be a direct text-search result
+
+Its title, aliases, and body must not produce a search hit, regardless of
+whether the search uses ordinary terms, regexps, operators, body search, or a
+field-qualified query.  “All or nothing” should include aliases; they are
+searchable node text too.
+
+** =NoIndex= is not an access-control or secrecy feature
+
+The node remains in the graph, can be opened by ID, can be reached through
+relationships and links, can be exported, and can have its title resolved for
+display.  Its text can therefore still be visible outside a search result.
+
+That distinction should be documented in the UI.  Calling the on-disk tag
+=NoIndex= is fine, but the user-facing wording should be “Excluded from text
+search” rather than “not indexed.”  The latter suggests that no Tantivy data
+exists and can easily be mistaken for a confidentiality guarantee.
+
+** The Tantivy document should not be removed
+
+This is the strongest implementation pushback I have.  Tantivy is also a
+derived lookup store for exact-ID title and source resolution
+(see [[file:../../server/dbs/tantivy.rs][server/dbs/tantivy.rs]]).  Removing a =NoIndex= node's documents would
+break behavior unrelated to search.
+
+The clean contract is to retain its supporting documents, add a =no_index=
+term to them, and add a =MustNot no_index=true= clause around every text-search
+query.  This also covers field-qualified searches.  It is less fragile than
+trying to blank selected text fields while preserving the lookup fields.
+
+** One search-display choice remains
+
+Should a =NoIndex= node be allowed to appear as *supporting context* around a
+different node that did match -- for example as containerward ancestry in an
+enriched search buffer?
+
+I recommend yes.  It is not a hit, and retaining it makes the result
+understandable in its graph context.  Omitting it would make =NoIndex= a
+graph-view filtering rule as well as a search rule, substantially broadening
+the feature.  If “skip in searches” means “must occur nowhere in a search
+buffer,” that needs to be stated instead.
+
+The over-private-text search preflight should ignore =NoIndex= documents.
+Otherwise an excluded node could trigger a warning before a query even though
+it could never be a hit.
+
+* What happened to =HadId=
+
+It is still present.  On disk and in Rust it is
+=FileProperty::Had_ID_Before_Import= in the node's =misc= list
+([[file:../../server/types/nodes/complete.rs][server/types/nodes/complete.rs]]).  Org-roam import sets it, context ranking reads
+it, and Tantivy stores it as =had_id=.
+
+There is already another boolean-like file property:
+=FileProperty::Was_Overloaded=.  Thus adding =NoIndex= makes three stored
+flags, not two.
+
+This exposes a taxonomy decision:
+
+** Which flags belong in the boolprops view?
+
+If “all boolean properties of a graphnode” is literal, the view should contain
+=HadId=, =WasOverloaded=, and =NoIndex=.  If =WasOverloaded= is an internal
+import diagnostic that users should not see, the view is instead an explicit
+whitelist of user-facing properties and should be described that way.
+
+I recommend showing all three.  Hiding one member of the same persisted enum
+would make “all boolprops” misleading.
+
+** Which flags can be changed?
+
+=HadId= and =WasOverloaded= record provenance and should be read-only.
+=NoIndex= is a user setting and is mutable through
+=skg-set-boolprop-indexing=.
+
+This means “boolprop” describes a value, not a uniform editing interface.  The
+view should visually distinguish provenance from settings, or at least label
+the former clearly.
+
+** Should false properties be shown?
+
+The vision says the folder lists a headline for each property, which I read as
+showing every supported property with =true=/=false=, rather than showing only
+the tags that are present.
+
+I recommend that interpretation.  Showing only true tags would make the
+default =Indexed= state invisible and would make it harder to learn what can be
+controlled.  The order and display labels should be fixed, independent of the
+order in the on-disk =misc= vector.
+
+* Persistence and transformation semantics still need decisions
+
+** Storage
+
+The existing =misc: Vec<FileProperty>= is already the small-list bucket the
+vision remembers.  =NoIndex= can be another enum variant; absence means
+indexed, preserving all existing files.  The telescope writer stores =misc=
+on the home section, while loading folds properties from the telescope.
+
+This is workable, but the technical documentation currently defines =misc=
+as “Import provenance”
+([[file:../../docs/data-model_technical.org][docs/data-model_technical.org]]).  Adding a behavioral setting changes that
+contract and the comments/docs should say “node file properties” instead.
+
+** Node merge
+
+A merge can otherwise accidentally make excluded text searchable.  It copies
+the acquiree's aliases into the acquirer and moves the acquiree's title/body
+into a generated text-preserver node.  The current merge code does not combine
+the two =misc= lists
+([[file:../../server/nodeMerge/nodeMergeInstructionTriple.rs][server/nodeMerge/nodeMergeInstructionTriple.rs]]).
+
+I recommend the privacy-conservative rule:
+
+*** The merged acquirer is =NoIndex= if either input was =NoIndex=
+
+That prevents an acquiree's formerly excluded aliases from becoming search
+terms on an indexed acquirer.  The tradeoff is that merging an indexed node
+with a =NoIndex= node removes the combined node from search.
+
+*** The acquiree text-preserver inherits the acquiree's =NoIndex= value
+
+Otherwise the merge would expose exactly the title/body that =NoIndex= had
+excluded.
+
+If the conservative OR rule is too broad, the alternative requires
+per-alias/per-text indexing provenance or an explicit merge-time choice.  Both
+are much more machinery than a node-level boolean warrants.
+
+
+** Forking
+
+I recommend that a fork inherit =NoIndex=.  Forking copies text; silently
+making copied text searchable is surprising.  The user can explicitly turn
+indexing back on for the fork afterward.
+
+** Source moves and ordinary saves
+
+=NoIndex= should follow the graphnode across source moves and telescope
+unfolding.  A save with no boolprop edit must preserve every existing
+=FileProperty=.  Adding or removing =NoIndex= must not disturb =HadId= or
+=WasOverloaded=.
+
+* The setter's recursive meaning needs to be chosen
+
+“Recursively across the viewtree” is dangerous if it literally means every
+headline below point.  A subtree can contain alias/ID/property scaffolds,
+inbound partner folders, backpaths, and repeated occurrences of graphnodes.
+Applying =NoIndex= to an inbound subscriber merely because it is displayed
+under the current node would be surprising.
+
+I recommend matching =skg-set-source='s meaning of recursion:
+
+** Traverse only the true content subtree
+
+Include the root and active graphnodes reached through
+=affectsParent=true= content edges.  Prune folder/backpath/non-content
+branches.  This is narrower than =skg-delete-recursive=, so the vision's
+“like set-source and delete” does not currently identify one unambiguous
+behavior.
+
+** Apply one selected value uniformly
+
+Read the root's current state, prompt with =indexed= and =not indexed= using
+S-left/S-right cycling, and apply the selected resulting state to every target.
+Do not invert each descendant relative to its own state.
+
+** Deduplicate by graphnode ID
+
+If the same node occurs more than once in the traversed view, issue one change.
+
+** Skip write-protected occurrences loudly
+
+This should follow =skg-set-source=: do not stamp an edit that the save will
+ignore, continue through eligible descendants, and report the skipped IDs.
+If the root itself is write-protected, I would refuse immediately rather than
+reporting a successful zero-node change.
+
+** Do not autosave
+
+Again following source-setting and deletion, the command should stage metadata
+requests and tell the user to save.  This lets a recursive operation be
+reviewed and keeps it in the normal transactional save path.
+
+The remaining policy choice is foreign nodes.  I recommend refusing a
+boolprop change on a foreign node instead of treating it as an implicit fork:
+changing a search preference is not an edit to the foreign author's node, and
+forking an entire node as a side effect of that preference would be startling.
+
+* How the setter learns the current value needs a wire decision
+
+The current ActiveNode metadata does not carry =misc=.  Therefore the Emacs
+command cannot presently determine =NoIndex= at point the way
+=skg-set-source= can determine =source=.
+
+There are three possible designs:
+
+** Recommended: render user-facing boolprop state in ActiveNode metadata
+
+For example, render a display-state form containing only the true flags, while
+the actual change remains a save-only edit request.  Herald mode can hide the
+raw form.  Every occurrence then has enough state for an immediate prompt, and
+the save can validate that the request was based on a real ActiveNode.
+
+The display-state form itself must be treated as server-owned.  Hand-editing it
+should enter the same discard-confirmation path as editing the boolprops
+folder.
+
+** Alternative: add a read endpoint by node ID
+
+The command queries current boolprops, then stamps an edit request.  This keeps
+headline metadata smaller but adds a network round trip and a new request just
+to seed a two-value prompt.
+
+** Not recommended: require the boolprops folder to be visible
+
+That makes setting indexing depend on having first run a separate view command
+and saved.  It does not satisfy the envisioned at-point command well.
+
+The save-only request also needs its exact grammar decided.  It should express
+the desired state, not “toggle,” so retries are idempotent.  Something like
+=(editRequest (boolprop noIndex true))= is adequate, but the current model
+allows only one =NodeEditRequest= per occurrence.  Decide whether a boolprop
+request is mutually exclusive with delete/merge, or generalize edit requests
+to hold multiple nonconflicting operations.  I recommend explicit mutual
+exclusion for now: setting a property on a node being deleted or merged is
+ambiguous anyway.
+
+* DONE The boolprops view should reuse scaffold machinery
+
+The repository already models ID and alias folders as
+=QualFolder=/=Qual= variants.  Adding wholly separate top-level
+=ViewNodeKind::ViewPropsFolder= and =ViewNodeKind::BoolProp= variants would
+multiply exhaustive cases across parsing, rendering, ancestry, validation,
+reconciliation, diff mode, and source switching.
+
+I recommend adding a boolprops variant to the existing folder/qual scaffold
+families, with external atoms such as =boolpropsFolder= and
+=(boolprop noIndex true)=.  It still constitutes a new viewnode kind at the
+wire/domain level, while reusing the architecture intended for “a generated
+folder of facts about its grandparent.”
+
+Each leaf should carry a machine-readable property identity and value.  Do not
+infer either from editable headline text.  Headline text can then be a friendly
+server-generated label such as =Excluded from text search: false=.
+
+** DONE yes!
+
+* ONGOING “Not editable, but offer to save anyway” has a protocol consequence
+
+The current ordinary warnings are returned after a save has committed.  They
+cannot ask permission before discarding an edit.  To implement the vision
+literally, the server must detect a changed boolprops surface before commit and
+return a confirmation response; an approved retry then discards only those
+surface edits, applies all other valid edits, and re-renders the canonical
+properties.
+
+The comparison should cover folder/leaf insertion, deletion, reordering,
+headline/body edits, metadata edits, and value edits.  Declining should leave
+the user's buffer and graph untouched.
+
+I think this behavior is defensible, but it is appreciably more machinery than
+a normal warning.  The simpler alternative is a hard validation error telling
+the user to use =skg-set-boolprop-*=.  If “save anyway” is important, reuse the
+existing confirmation/retry pattern rather than committing first and warning
+after data has already been discarded.
+
+I do not recommend making Org regions mechanically read-only with text
+properties.  Those protections are easy to lose during redraws and awkward
+for subtree operations.  Semantic write protection, a write-protected herald,
+and server-side confirmation are the reliable layers.
+
+** ONGOING wasn't this already implemented?
+I could have sworn I implemented last week
+something that would detect edits to a writeprotected node
+(writeProtected was called indefinitive then)
+and gripe to the user about it.
+
+*** ONGOING Codex: detection exists; discard-and-continue does not
+
+You did implement it.  The save compares each previously rendered
+write-protected ActiveNode occurrence with the incoming occurrence in
+=server/from_text/write_protected_edits.rs=.  A changed title, source, content,
+alias folder, or writable partner folder produces
+=EditedWriteProtectedOccurrence=.
+
+The distinction I missed in my first wording is what happens next: the current
+implementation is a hard validation failure.  It commits nothing and tells the
+user to re-render and edit a definitive occurrence.  It does not offer an
+approved retry that discards the protected edit while preserving and saving
+the buffer's other edits.  Also, a boolprops folder under a definitive node is
+not itself a write-protected ActiveNode, so the existing comparison would need
+to be extended to cover that scaffold.
+
+The detection machinery and previous-view comparison are therefore reusable;
+only the “save anyway, discarding this part” continuation is new.  Do you still
+want that continuation, or should boolprops edits use the existing hard-error
+behavior?  I now recommend the hard error: it is already implemented and is
+safer than making “save anyway” selectively rewrite an edited buffer.
+
+**** TODO
+Ah. No, we can skip it. But be sure to (I think this is implemneted already)
+explain to the user what the bad edits were,
+giving both ID and title.
+
+* DONE Naming and command-surface pushback
+
+=collection= is retired vocabulary in this repository; the glossary says the
+old “col” name has been expunged in favor of “folder”
+([[file:../../glossary.md][glossary.md]]).  =viewprops= is also broader than a folder that contains
+only booleans.
+
+I recommend:
+
+** =skg-show-folderOf-boolprops=
+
+This follows the existing =skg-show-folderOf-aliases= family.  A shorter
+=skg-show-boolprops= would also be clear.  I would not introduce
+=skg-show-collection-boolprops=.
+
+** =boolpropsFolder= and =boolprop=
+
+These wire names say exactly what the scaffolds contain.
+
+** =skg-set-boolprop-indexing=
+
+The proposed setter is clear and leaves room for future property-specific
+commands.  Its prompt should say “Text-search inclusion,” with choices
+=indexed= and =not indexed=; the persisted implementation detail remains
+=NoIndex=.
+
+Two command-surface decisions remain: the key bindings, and whether Neovim
+must receive equivalent show/set commands in this implementation or only the
+editor-independent server/wire support.  Natural Emacs candidates are
+=C-c l b= for showing boolprops and =C-c s i= for setting indexing, but neither
+is implied by the vision.
+
+** DONE yes!
+
+* Decisions to settle before implementation
+
+** DONE Jeff speaking
+Where I marked it DONE with no comment I'm going with your recommendation.
+
+** DONE Does a =NoIndex= node remain visible as context around another search hit?
+
+Recommendation: yes.
+
+** DONE Does the boolprops folder show =WasOverloaded=?
+
+Recommendation: yes; otherwise define and document an explicit public-property
+whitelist.
+
+** DONE Are false properties shown as rows?
+
+Recommendation: yes.
+
+*** DONE no
+
+** DONE Are the merge and fork inheritance rules accepted?
+
+Recommendation: merge uses OR, the text-preserver inherits the acquiree's
+value, and a fork inherits the original's value.
+
+*** DONE
+I maybe should have explained the motivation.
+This is just to prevent annoying search results.
+For instance I have a lot of packing lists that might include a "shaver" node.
+Searching for "shaver" brings me to those,
+which are never what I want for when I search for "shaver".
+
+So it's not about privacy, just uncluttering a search. In the dcoumentation
+(docs/COMMANDS.org) for the new command we should explain that.
+
+Therefore the merge rule should use AND.
+Otherwise your recommendations I agree with:
+A text preserver inherits the acquiree's value,
+and a fork inherits its origin's value.
+
+**** Codex response
+
+Agreed.  With nuisance reduction rather than confidentiality as the invariant,
+AND is the coherent merge rule.  It can make a formerly excluded acquiree's
+aliases searchable through an indexed acquirer, but that follows from choosing
+the acquirer's useful searchability over preserving every pre-merge exclusion.
+
+** DONE Is recursive scope the true content subtree rather than every displayed descendant?
+
+Recommendation: true content subtree, deduplicated by ID, with one uniform
+chosen value.
+
+** DONE Are foreign and write-protected nodes refused/skipped rather than forked?
+
+Recommendation: refuse a foreign/root-write-protected target; skip and report
+write-protected descendants.
+
+** DONE How does Emacs read current state?
+
+Recommendation: server-owned boolprop state in ActiveNode metadata plus an
+idempotent save-only desired-state request.
+
+*** DONE Let's not mark it in the metadata.
+That surface is, to an ambitious user, user-facing,
+and I don't want to clutter it.
+Asking the server is fine.
+
+** DONE Is pre-commit “discard and save anyway” worth a confirmation round trip?
+
+Recommendation: yes if the requested UX is firm; otherwise use a hard save
+error, not a post-commit warning.
+
+** DONE What are the key bindings and Neovim scope?
+
+These are not specified yet.
+
+*** DONE C-c s x
+And explain in COMMANDS.org that the x stands for index.
+
+*** DONE yes, Neovim should get the same treatment as Emacs does
+
+* DONE Jeff adds
+** DONE Let's call it 'no search matching' instead.
+and clarify wherever we document it
+that it can even appear in search results,
+as a relative of a match.
+
+*** DONE Codex: which public names should this replace?
+
+“No search matching” captures the chosen semantics much better, including the
+fact that the node may still appear as context around somebody else's match.
+
+I need one naming boundary settled.  Should this rename all of the public
+concepts -- the persisted/wire property to =NoSearchMatching= and the command
+to =skg-set-boolprop-search-matching= -- or only the user-facing label while
+the property remains =NoIndex= and the command remains
+=skg-set-boolprop-indexing=?
+
+I recommend renaming the property and command too.  Keeping “index” in their
+names would preserve the exact ambiguity we are removing.  =C-c s x= can still
+be mnemonic for “exclude from search matching,” but COMMANDS.org should then
+say that rather than saying =x= stands for index.
+
+**** DONE all of them, yes

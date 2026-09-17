@@ -1,0 +1,680 @@
+#+title: Plan: no-search-matching and the boolprops surface
+#+startup: overview
+
+This is the implementation plan for [[file:1_vision.org][the vision]], as clarified in
+[[file:2_discussion.org][the discussion]].  The feature is named /no search matching/
+throughout.  =NoIndex= and “not indexed” do not become compatibility names:
+they were design vocabulary, not a shipped format.
+
+Each numbered item below is a narrow, testable implementation slice.  The
+order is deliberate: establish the persisted fact and search semantics first,
+then its save gesture, then the derived boolprops view, and only then the two
+clients.  The items do not authorize commits; if commits are requested later,
+they are natural commit boundaries.
+
+* Contract fixed by this plan
+
+** Meaning
+
+=NoSearchMatching= means that none of a graphnode's title, aliases, or body
+may make it a direct text-search match.  It applies to ordinary, body, regexp,
+operator, and field-qualified searches.
+
+It is not a secrecy boundary.  The node remains in the graph and in Tantivy,
+can be visited or resolved by ID, can be exported, and can appear in a search
+view as a relative of some other node that matched.  Keeping its Tantivy
+documents is load-bearing: exact-ID title/source lookup uses those documents.
+
+** Names and representations
+
+The following mapping is the one vocabulary registry used by persistence,
+view metadata, the endpoint, clients, heralds, and documentation.
+
+| Meaning | Rust/YAML =FileProperty= | wire atom | boolprops headline |
+|---------+--------------------------+-----------+--------------------|
+| had an ID before org-roam import | =Had_ID_Before_Import= | =hadId= | =Had ID before org-roam import= |
+| duplicate org-roam IDs were merged on import | =Was_Overloaded= | =wasOverloaded= | =Was overloaded during org-roam import= |
+| cannot directly match text search | =NoSearchMatching= | =noSearchMatching= | =No search matching= |
+
+Only true properties are rows.  Their canonical order is the table order,
+independent of the order of =misc= on disk.  An empty boolprops folder is
+therefore meaningful and remains visible.
+
+=Had_ID_Before_Import= and =Was_Overloaded= remain read-only provenance.
+=NoSearchMatching= is the only mutable property in this feature.
+
+** Exact metadata forms
+
+The show command adds a bare view request; boolprops is not a graph relation,
+so it should not be smuggled into =FolderRelation=:
+
+#+begin_src org
+  * (skg (node ... (viewRequests boolprops))) Owner
+#+end_src
+
+The fulfilled, server-owned surface is:
+
+#+begin_src org
+  * (skg (node ...)) Owner
+  ** (skg boolpropsFolder)
+  *** (skg (boolprop hadId)) Had ID before org-roam import
+  *** (skg (boolprop noSearchMatching)) No search matching
+#+end_src
+
+The example owner has two true properties; =wasOverloaded= is absent because
+it is false.  A boolprop's identity comes only from its metadata atom.  Its
+headline is a canonical display label, never the source of property identity.
+
+The one mutable request is idempotent and states the desired value:
+
+#+begin_src org
+  (editRequest (boolprop noSearchMatching true))
+  (editRequest (boolprop noSearchMatching false))
+#+end_src
+
+It is a save request on an ActiveNode, not an edit to the boolprops folder.
+Like the existing delete, merge, and relationship-source forms, it is removed
+from the rendered buffer only after a successful commit.
+
+** Transformation rules
+
+Ordinary saves and source moves preserve the whole =misc= vector unless a
+boolprop request explicitly changes =NoSearchMatching=.  Setting it true adds
+one copy if absent; setting it false removes every copy.  Neither operation
+reorders or alters the other properties.
+
+A merge gives the surviving acquirer =NoSearchMatching= only when both inputs
+had it: logical AND.  The acquirer's own provenance flags remain its own;
+acquiree provenance is not transferred to that identity.  The generated
+acquiree text-preserver inherits the acquiree's =NoSearchMatching= value but
+no import-provenance flags.
+
+A fork copies =NoSearchMatching= from its origin to the clone.  It does not
+copy =Had_ID_Before_Import= or =Was_Overloaded=, because the newly created
+clone itself has neither import history.
+
+* Implementation plan
+
+** 1. Make =FileProperty= the single property registry
+
+*** Add the persisted variant without migrating existing files
+
+Add =FileProperty::NoSearchMatching= in
+[[file:../../server/types/nodes/complete.rs][server/types/nodes/complete.rs]].  Its serde spelling is exactly
+=NoSearchMatching=.  Absence remains false, so old files already have the
+right default and need no rewrite.
+
+The =misc= field remains =Vec<FileProperty>=.  It is currently tiny, and both
+telescope folding and imports already deduplicate it.  Do not replace it with
+a set in this change: that would disturb YAML order and create unrelated file
+churn.
+
+*** Centralize public property behavior
+
+Give =FileProperty= helpers for canonical order, wire atom, display title,
+and mutability.  Parsing a property atom must go through the inverse helper
+and reject unknown atoms.  View generation, endpoint parsing, request parsing,
+and diagnostics must not grow independent match tables.
+
+Add helpers to test, set, and clear a property in =misc=.  They must treat the
+vector semantically as a set while preserving the relative order of other
+entries.  A true =NoSearchMatching= is appended when newly set; false removes
+all duplicates.
+
+*** Correct the data-model description
+
+Change =misc= from “import provenance” to “node file properties” in
+[[file:../../docs/data-model_technical.org][docs/data-model_technical.org]] and in the relevant comments in
+[[file:../../server/types/nodes/tantivy.rs][server/types/nodes/tantivy.rs]] and
+[[file:../../server/telescope/types.rs][server/telescope/types.rs]].  The two old members are provenance; the bucket
+itself no longer is.
+
+*** Prove the persistence boundary
+
+Extend file-I/O and telescope tests to cover absent-as-false, YAML spelling,
+round trip, home-section-only writing, defensive folding from a non-home
+section, deduplication, and preservation of the two existing flags.
+
+** 2. Exclude direct matches in Tantivy without removing documents
+
+*** Add a stored, indexed term to every document for the node
+
+Add a =no_search_matching= =STRING | STORED= field to the schema and to
+=TantivyIndex= in [[file:../../server/dbs/tantivy.rs][server/dbs/tantivy.rs]] and
+[[file:../../server/types/misc.rs][server/types/misc.rs]].
+
+[[file:../../server/dbs/tantivy/write.rs][server/dbs/tantivy/write.rs]] must write =true= or =false= on the primary
+title document and every alias document.  Keeping all the documents preserves
+=title_and_source_by_id=, =titles_by_ids=, exact ID queries, source filtering,
+context ranking, and the stored raw title.
+
+[[file:../../server/dbs/tantivy/context_update.rs][server/dbs/tantivy/context_update.rs]] reconstructs documents field by field; read and
+re-add =no_search_matching= there so a context refresh cannot silently make a
+node searchable.
+
+There is no Tantivy migration.  It is a derived store and normal startup or
+the rebuild command recreates its schema and documents.
+
+*** Put one mandatory exclusion around every text query
+
+In [[file:../../server/dbs/tantivy/search.rs][server/dbs/tantivy/search.rs]], wrap the completed text query in a
+BooleanQuery containing:
+
+#+begin_src text
+  MUST     <the ordinary/parser/regexp query>
+  MUST NOT no_search_matching:true
+#+end_src
+
+Add the existing =overPrivateText_telescope= exclusion as another =MUST NOT=
+when requested.  The no-search-matching clause is unconditional and outside
+all query construction, so regexp, operators, body search, and a user's
+field-qualified expression cannot bypass it.
+
+*** Narrow the over-private preflight, while preserving the release boundary
+
+=has_overPrivateText_telescope= should ask whether an over-private document
+exists that is /also eligible to match/:
+
+#+begin_src text
+  MUST     overPrivateText_telescope:true
+  MUST NOT no_search_matching:true
+#+end_src
+
+This prevents a node excluded from direct matching from causing a global
+preflight prompt.  It is safe only because search enrichment already calls
+=exclude_overPrivateText_nodes_from_viewforest= when the user has not approved
+over-private text.  Thus a no-search-matching, over-private ancestor may still
+occupy its contextual position, but it becomes a text-free inactive
+placeholder.  Preserve that second release check and add a regression so a
+future refactor cannot turn the narrower preflight into a text leak.
+
+*** Search tests
+
+Extend [[file:../../tests/tantivy.rs][tests/tantivy.rs]] and
+[[file:../../tests/serve_text_search_test.rs][tests/serve_text_search_test.rs]] with these cases:
+
+**** Direct matching is impossible through every text field and mode
+
+Cover title, alias, and body; literal, regexp, operators, and field-qualified
+syntax.  Put an ordinary node beside each excluded node to prove the query
+still returns eligible results.
+
+**** Non-search Tantivy uses still work
+
+Resolve the excluded node by exact ID, fetch its raw title and source, and run
+a context-origin update without losing the flag.
+
+**** Context remains context
+
+An excluded container does not become a direct hit, but enrichment may place
+it above a matching descendant.  Under a restricted source-set, an
+over-private excluded container is rendered text-free unless that text was
+explicitly approved.
+
+**** Saves are visible immediately
+
+After setting true, a formerly matching node disappears without restart;
+after setting false it returns.  This also exercises background index commit
+and reader reload behavior.
+
+** 3. Carry an idempotent property request through the save pipeline
+
+*** Extend =NodeEditRequest= and its wire parser
+
+Add a desired-state variant equivalent to
+=SetBoolProp { property: FileProperty, value: bool }= in
+[[file:../../server/types/viewnode.rs][server/types/viewnode.rs]].  Render and parse the exact metadata forms above in
+[[file:../../server/org_to_text.rs][server/org_to_text.rs]] and
+[[file:../../server/serve/parse_metadata_sexp.rs][server/serve/parse_metadata_sexp.rs]].
+
+Only =noSearchMatching= is accepted as mutable.  A hand-written request for
+=hadId= or =wasOverloaded= is a validation error explaining that provenance
+cannot be changed.  Reject repeated =editRequest= forms rather than letting a
+later parse silently replace an earlier request.
+
+The request is mutually exclusive with every other pending =editRequest= on
+that occurrence: delete, merge, and =relSource=.  A source-field edit itself
+may coexist with the boolprop request; moving the node and changing its search
+behavior in one transaction is well-defined.
+
+*** Add a property-intent side channel
+
+Add =SetBoolProp= to the local collector in
+[[file:../../server/from_text/local_instruction_collection/types.rs][server/from_text/local_instruction_collection/types.rs]] and emit it from
+[[file:../../server/from_text/local_instruction_collection/traverse.rs][server/from_text/local_instruction_collection/traverse.rs]].  It combines with the owner's
+ordinary title/body save, deduplicates identical desired states, and errors on
+conflicting desired states for one PID.  Delete and nodeMerge remain
+exclusive.
+
+Carry the desired property update through =NodeSaveIntent= in
+[[file:../../server/from_text/local_instruction_collection/lower.rs][server/from_text/local_instruction_collection/lower.rs]].  Keep it separate from the initially
+empty =misc= field until disk supplementation has restored the disk vector;
+then add or remove only =NoSearchMatching=.  Applying it earlier would cause
+=supplement_unspecified_fields_from_disk= to either overwrite the request or
+drop =Had_ID_Before_Import=/=Was_Overloaded=.
+
+Run the existing no-op filter after the update.  Requesting the already
+current value should produce no disk, graph, or Tantivy write, while the
+request still disappears from the view after the successful save.
+
+*** Keep the refusal load-bearing on the server
+
+Carry the set of property-edit target PIDs far enough to distinguish this
+gesture from ordinary text edits.  Before the foreign-edit path can interpret
+a change as an implicit fork, reject a boolprop request whose graphnode lives
+in a foreign source.  A request on a write-protected occurrence already fails
+at the edit-request validation boundary.  A property request without a saved
+graph ID fails with “save the node first”; the server-state endpoint has no
+current value for it.
+
+This enforcement is required even though both clients preflight the same
+conditions: metadata is user-editable and buffers can go stale.
+
+*** Consume only after commit
+
+Teach =ViewNode::consume_edit_request_after_save= about the new variant.
+Failed validation, a failed write, or a confirmation round trip must leave it
+in the buffer.  A successful no-op desired-state save counts as success and
+clears it.
+
+*** Save-path tests
+
+Cover request parse/render/consume, set and clear, preservation of both
+provenance flags, ordinary-save and source-move preservation, identical and
+conflicting duplicates, idempotent no-op, write-protected/foreign/unknown
+refusals, and conflicts with delete, merge, and =relSource=.
+
+** 4. Apply the settled merge and fork rules
+
+*** Node merge uses AND
+
+In [[file:../../server/nodeMerge/nodeMergeInstructionTriple.rs][server/nodeMerge/nodeMergeInstructionTriple.rs]], compute the two input values
+before mutating the acquirer.  The updated acquirer retains
+=NoSearchMatching= iff both values are true.  Its existing provenance flags
+are otherwise untouched.
+
+The generated text-preserver receives =NoSearchMatching= iff the acquiree had
+it.  It receives no import-provenance flags.
+
+Add a four-row truth-table test for the acquirer and explicit tests for the
+preserver and for preservation of the acquirer's other =misc= entries.
+
+*** Fork inherits only the behavioral property
+
+In [[file:../../server/from_text/fork.rs][server/from_text/fork.rs]], initialize the clone's =misc= with
+=NoSearchMatching= iff the origin has it.  Leave the clone's import-provenance
+flags empty.  Cover both true and false origins in the existing fork tests.
+
+** 5. Add boolprops to the existing scaffold families
+
+*** Extend the domain types, not =ViewNodeKind=
+
+Add =QualFolder::BoolProps= and a =Qual::BoolProp= payload carrying a parsed
+=FileProperty= identity and the submitted display title.  Do not add new
+top-level =ViewNodeKind= variants.
+
+Add =ViewRequest::BoolProps= with wire atom =boolprops=.  It is intentionally
+not =FolderRelation::BoolProps=: =FolderRelation= names graph relations and
+its request builds their active/passive folder pair, whereas this request
+builds one fact folder.
+
+Update parser, renderer, maybe-placed/placed conversion, =title()=,
+=repr_in_client()=, ancestry, source-switch cleanup, scaffold insertion,
+local save traversal, and the herald vocabulary.  A final compiler-guided
+exhaustiveness pass must be followed by
+=rg 'QualFolder::|Qual::|ViewRequest::'=, since wildcard matches will not be
+found by the compiler.
+
+*** Parse machine identity and display text separately
+
+Parse =(boolprop PROPERTY)= using the central property registry.  Preserve the
+headline text long enough for read-only validation; do not replace it with the
+canonical title during parsing.  A BoolProp has no children or body and must
+be under a BoolPropsFolder.  A BoolPropsFolder must be unique beneath an
+ActiveNode and may contain only BoolProps.
+
+The folder's canonical title is empty because its herald supplies the label.
+Both the folder and leaves receive a visible read-only =☮= herald.  The leaf
+herald should expose the property atom for diagnosis while the friendly
+headline explains it.
+
+*** Keep the folder out of save extraction
+
+Treat the folder and its leaves as =UnderReadOnlyFolder= in
+[[file:../../server/from_text/local_instruction_collection/traverse.rs][server/from_text/local_instruction_collection/traverse.rs]].  They emit no node or relationship
+intent.  Their only save-path effect is validation that their server-owned
+surface was not edited.
+
+** 6. Build and reconcile the boolprops folder
+
+*** Fulfill the view request
+
+Add a builder beside [[file:../../server/to_org/expand/aliases.rs][server/to_org/expand/aliases.rs]].  It resolves the owner to its
+canonical PID, reads the graph's =misc=, creates one BoolPropsFolder even when
+there are no true properties, then appends one BoolProp per true property in
+canonical order.  Finally it consumes =ViewRequest::BoolProps= using the
+normal view-request completion boundary.
+
+Dispatch it explicitly from
+[[file:../../server/to_org/expand/definitive.rs][server/to_org/expand/definitive.rs]].  It should work on an owned or foreign,
+definitive or write-protected ActiveNode because showing facts is not a graph
+mutation.
+
+*** Reconcile it on every later view update
+
+Add a boolprops reconciler beside the ID/Alias reconcilers and dispatch it
+from [[file:../../server/update_buffer/complete.rs][server/update_buffer/complete.rs]].  Its goal list is the graph's
+current true properties in canonical order.  A successful property save,
+collateral update, rerender, or external graph refresh must therefore add or
+remove the =noSearchMatching= leaf without requiring the show command again.
+
+Do not include BoolPropsFolder in =is_self_deletable_when_empty=.  In source
+switching, prune it and its facts when its owner becomes an InactiveNode, just
+like the other owner-specific qual folders; property state must not reveal a
+hidden graphnode.
+
+*** View tests
+
+Cover render/parse round trip, all three wire atoms and labels, true-only
+rows, canonical ordering despite disk order, stable empty folder, idempotent
+show requests, post-save add/remove reconciliation, source-set reduction,
+source-set restoration, deletion/dead-scaffold cleanup, and absence of save
+intents from the scaffold.
+
+** 7. Make edits to read-only surfaces fail with useful evidence
+
+*** Reuse the previous-render comparison, but add a boolprops surface diff
+
+The existing detector in
+[[file:../../server/from_text/write_protected_edits.rs][server/from_text/write_protected_edits.rs]] compares an incoming view with the
+server's last rendering.  Add a parallel comparison for each generated
+BoolPropsFolder, keyed by the owning ActiveNode occurrence rather than by
+editable headline text.
+
+Compare the complete canonical surface: folder presence, position, title and
+body; leaf count and order; property metadata; leaf headline and body; and
+insertions or deletions.  Retain parse-time title/body observations until this
+comparison runs instead of issuing the current discard-warning for folder
+headline text.  An added hand-written boolprops folder that was absent from
+the previous rendering is also an edit, not a shortcut around the show
+command.
+
+If no previous forest is available to an internal/direct save caller, compare
+against a canonical surface built from the graph rather than silently
+accepting it.
+
+*** Report owner ID, owner title, and the changes
+
+Add a structured =BoolPropsSurfaceEdited= validation error carrying:
+
+#+begin_src text
+  owner_id
+  owner_title
+  changes[]
+#+end_src
+
+Each change is concrete: for example “removed noSearchMatching,” “moved
+wasOverloaded from row 2 to row 1,” “changed noSearchMatching headline from X
+to Y,” “added body text to boolpropsFolder,” or “changed boolprop metadata from
+hadId to noSearchMatching.”  The formatted error says the surface is
+server-owned, no changes were saved, and =skg-set-boolprop-search-matching=
+is the command for the one mutable property.  It also states that the two
+provenance properties have no setter.
+
+This is a hard pre-commit validation failure.  Do not add the proposed
+“discard this edit and save the rest” confirmation protocol.
+
+*** Improve the existing write-protected diagnostic at the same boundary
+
+Jeff's ID-and-title requirement also exposes a limitation in the current
+=EditedWriteProtectedOccurrence(ID)= error: it has neither title nor a
+description of what differed.  Refactor it to carry the previous/canonical
+title and a field-level change list from the already-computed occurrence
+states.  The body-on-write-protected parse case should produce the same rich
+shape.  Keep one error per occurrence/owner, not one error per changed field.
+
+Tests must assert the human message contains both ID and title and identifies
+the edited fields.  Boolprops tests must cover add, delete, reorder, metadata,
+headline, and body edits and prove the graph and files remain untouched.
+
+** 8. Add the read-only =boolprop state= endpoint
+
+*** Protocol
+
+Add =RequestType::BoolPropState= and =TcpToClient::BoolPropState= in
+[[file:../../server/serve/protocol.rs][server/serve/protocol.rs]], with a handler beside =edge_source_info=.
+The request and successful response are:
+
+#+begin_src lisp
+  ((request . "boolprop state")
+   (id . "ID")
+   (property . "noSearchMatching"))
+
+  ((response-type boolprop-state)
+   (id "CANONICAL-PID")
+   (property "noSearchMatching")
+   (value "true")
+   (source "SOURCE")
+   (user-owned "true"))
+#+end_src
+
+Resolve extra IDs to the canonical PID.  Unknown IDs and property atoms return
+a tagged error.  The handler reads one runtime-generation snapshot and never
+mutates it.  It may report all three properties, although the setter requests
+only =noSearchMatching=; mutability remains a separate registry fact.
+
+=source= and =user-owned= let clients reject a foreign root before prompting.
+They are advisory.  Save-time ownership validation remains authoritative.
+
+*** Endpoint tests
+
+Cover true, false, both provenance properties, extra-ID canonicalization,
+unknown ID, unknown property, and owned/foreign sources.  Document the request
+and response in [[file:../../api-and-formats.md][api-and-formats.md]].
+
+** 9. Implement the Emacs gestures
+
+*** Show the folder
+
+Add =skg-show-folderOf-boolprops= to
+[[file:../../elisp/skg-request-views.el][elisp/skg-request-views.el]].  It stamps the bare =boolprops= view request and
+auto-saves like the other show-folder commands.  Bind it to =C-c l b= in
+[[file:../../elisp/skg-keymaps-and-aliases.el][elisp/skg-keymaps-and-aliases.el]].
+
+*** Set search matching
+
+Add =skg-set-boolprop-search-matching= in a focused request module and require
+it from [[file:../../elisp/skg-client.el][elisp/skg-client.el]].  Bind it to =C-c s x=; =x= means “exclude
+from search matching.”  With =C-u= it uses the recursive path.
+
+At point, require a saved ActiveNode with an ID.  Refuse immediately if the
+occurrence is write-protected, if another =editRequest= is already present, or
+if the state response says the source is foreign.  Ask the server for the
+current value, then use =skg--completing-read-with-cycle= with the choices
+=search matching= and =no search matching=, initially selecting the current
+one.  After the asynchronous response, verify the buffer and marker still
+exist and still name the same graphnode before prompting or editing.
+
+Stamp the desired-state request; do not save.  Choosing the current value may
+still stamp the idempotent request, which the server's no-op filter removes on
+save.  Tell the user to save.
+
+*** Recursive scope and failures
+
+The recursive walk includes the root and follows only ActiveNode children
+whose effective =affectsParent=true=.  Prune qual folders, partner folders,
+backpaths, independent children, inactive nodes, phantoms, and their
+descendants.  Apply the one selected resulting value uniformly; do not toggle
+each node relative to itself.
+
+Deduplicate saved nodes by graph PID.  Refuse if the root is foreign,
+write-protected, lacks a graph ID, or already has an edit request.  For
+descendants, skip and report those same conditions rather than aborting the
+eligible remainder.  A duplicate PID already successfully stamped is neither
+changed nor reported twice.  The summary reports requested count and lists
+skipped IDs with reasons in =*Messages*=.
+
+The endpoint is needed only for the root's initial value.  Descendants need no
+per-node round trip because the selected desired state is uniform and the
+server handles already-equal values as no-ops.
+
+*** Emacs tests
+
+Add ERT coverage for response parsing, stale marker/buffer protection,
+current-value prompt initialization, both choices, no autosave, request
+conflicts, root refusals, true-content pruning, PID deduplication, uniform
+recursive application, skipped-node reporting, and both key bindings.
+
+** 10. Give Neovim the same behavior
+
+*** Commands and transport
+
+Port the state request and setter behavior to a focused Lua module using the
+existing length-prefix response-handler and
+[[file:../../nvim/lua/skg/picker.lua][nvim/lua/skg/picker.lua]] cycling support.  Provide:
+
+#+begin_src text
+  :SkgShowFolderOfBoolprops
+  :SkgSetBoolpropSearchMatching
+  :SkgSetBoolpropSearchMatchingRecursive
+#+end_src
+
+The single and recursive commands share the traversal and stamping
+implementation; they differ only in scope.  Neovim has no Emacs prefix
+argument, so the second Ex command is the explicit recursive equivalent.
+
+*** Bindings
+
+Following the repository's existing Neovim translations, use:
+
+| Emacs | Neovim |
+|-------+---------|
+| =C-c l b= | =<localleader>cb= |
+| =C-c s x= | =<localleader>sx= |
+| =C-u C-c s x= | =<localleader>sX= |
+
+Add all three entries to the central command/binding registry in
+[[file:../../nvim/lua/skg/keymaps.lua][nvim/lua/skg/keymaps.lua]] and the show row to
+[[file:../../nvim/lua/skg/view_requests.lua][nvim/lua/skg/view_requests.lua]].
+
+*** Neovim tests
+
+Mirror the ERT behavioral cases in =tests/nvim/=, including the Ex command
+registry and localleader bindings.  Keep client tests transport-mocked; the
+Rust endpoint and end-to-end save/search tests own server behavior.
+
+** 11. Document the user contract and the wire contract
+
+*** User commands
+
+In [[file:../../docs/COMMANDS.org][docs/COMMANDS.org]] and
+[[file:../../docs/COMMANDS-nvim.org][docs/COMMANDS-nvim.org]], document the show and set commands, their recursive
+forms, keys, prompt, staged-until-save behavior, and foreign/write-protected
+handling.
+
+Use the motivating example: packing lists containing a “shaver” node are
+usually noise when searching for “shaver.”  Explain that no-search-matching
+prevents those packing-list nodes from matching through title, alias, or body,
+but they can still appear in the result buffer as a relative of the node that
+did match.  Say explicitly that this is search decluttering, not privacy or
+access control.
+
+*** Formats and vocabulary
+
+Update [[file:../../api-and-formats.md][api-and-formats.md]] with =NoSearchMatching= YAML, the
+=no_search_matching= Tantivy term, boolprop state endpoint, desired-state edit
+request, bare =boolprops= view request, and =boolpropsFolder=/=boolprop=
+metadata.
+
+Update [[file:../../glossary.md][glossary.md]] with no search matching, boolprops folder, BoolProp,
+and the read-only surface rule.  Do not introduce “collection,” =NoIndex=, or
+“not indexed” as aliases.
+
+** 12. Finish with an exhaustive integration and vocabulary audit
+
+*** End-to-end scenarios
+
+Add an integration fixture that:
+
+1. starts with a matching node that also has provenance properties;
+2. opens the boolprops folder and sees only its true rows;
+3. stages no-search-matching from each client and saves;
+4. observes the new row after rerender and no direct search hit;
+5. still resolves/opens the node by ID and sees it as context for another hit;
+6. stages search matching again, saves, and sees the hit return;
+7. attempts a folder edit and receives the ID/title/change diagnostic with no
+   disk mutation.
+
+Add focused integration coverage for recursive deduplication/skips if that
+cannot be expressed completely in client unit tests.
+
+*** Exhaustive source audit
+
+Run =rg= for =NoIndex=, =NoSearchMatching=, =FileProperty=, =misc=,
+=QualFolder::=, =Qual::=, =ViewRequest::=, =NodeEditRequest::=, all Tantivy
+document constructors, and every client command registry.  The audit is for
+wildcard arms and handwritten protocol vocabularies that Rust exhaustiveness
+cannot protect.
+
+* Test ladder
+
+Run focused tests after every numbered slice, per
+[[file:../../coding-advice/development-process.md][coding-advice/development-process.md]].  In particular, use targeted
+=cargo nextest run= filters for file I/O, Tantivy, search serving, save
+collection, merge/fork, parsing/rendering, reconciliation, source switching,
+and diagnostics.
+
+After the respective client slices, run:
+
+#+begin_src sh
+  bash bash/emacs-tests.sh
+  bash bash/nvim-tests.sh
+#+end_src
+
+Run the focused integration fixture for both clients.  Before declaring the
+feature complete, run the full serialized suite:
+
+#+begin_src sh
+  bash bash/all-tests.sh --no-sound
+#+end_src
+
+Inspect =tests/results/ALL.org= rather than trusting only the command's final
+line.
+
+* Corners revealed by planning
+
+** No semantic blocker remains
+
+The search, persistence, transformation, view, recursion, ownership, and
+read-only rules are sufficient to implement the feature.  The over-private
+context case looked dangerous at first, but the existing post-enrichment
+text-release filter makes the chosen narrower preflight safe; the plan pins
+that down with a regression test.
+
+** Three command/protocol defaults were not stated explicitly
+
+*** One =editRequest= means one of every kind
+
+The discussion explicitly made boolprop mutually exclusive with delete and
+merge, but =relSource= uses the same singular wire slot.  This plan therefore
+makes it mutually exclusive with =relSource= too; the root command refuses and
+recursive commands skip/report such an occurrence.  Supporting both at once
+would require changing =editRequest= from a sum to a collection and defining
+ordering/conflict semantics across the save pipeline.  I recommend the simple
+rule in this plan unless simultaneous property and relationship-source
+gestures are important.
+
+*** The show binding was never selected
+
+This plan chooses =C-c l b= and its current Neovim-convention translation
+=<localleader>cb=.  They are the unused, mnemonic slots beside the existing
+folder commands.
+
+*** Neovim needs an explicit recursive gesture
+
+Because Neovim has no =C-u= prefix convention, this plan chooses
+=:SkgSetBoolpropSearchMatchingRecursive= and =<localleader>sX=, mirroring the
+existing source setter.  Emacs keeps the requested =C-u C-c s x= interface.
+
+These defaults do not require architectural rework and need not block
+implementation.  Jeff only needs to respond if one of them is undesirable.
