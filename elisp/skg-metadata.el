@@ -739,7 +739,7 @@ command, but does not edit anything."
       (nreverse targets))))
 
 (defun skg--relationship-kind-matches-p (kind)
-  "Non-nil iff the headline at point is an true activeNode or Unknown whose
+  "Non-nil iff the headline at point is a true activeNode or Unknown whose
 relationship to its view-parent is of KIND, writable-and-collected
 from this position: for `contained', the view-parent must be a
 definitive activeNode not in subscribee-as-such position (an
@@ -794,7 +794,7 @@ position: an true activeNode member of a subscribeeFolder."
   "Non-nil iff the folder headline at point has a definitive activeNode
 anchor (its org-parent). An indefinitive anchor's writable folders are
 not collected at save (the folder owner is not save-eligible), so
-atoms on their members would be inert."
+atoms on their members have no effect."
   (save-excursion
     (and (org-up-heading-safe)
          (let ((anchor-sexp (skg--metadata-sexp-at-point-or-nil)))

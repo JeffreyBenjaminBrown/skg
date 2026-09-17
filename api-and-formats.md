@@ -1015,7 +1015,7 @@ Examples:
 
 ## Inactive-source nodes: omission, retention, and save preservation
 
-Under a restricted source-set, rendering OMITS nodes from inactive
+Under a restricted source-set, rendering omits nodes from inactive
 sources entirely -- content, subscribees, and every PartnerFolder's
 members alike. No placeholder appears, and omission is recursive: an
 omitted container's whole branch is omitted, active descendants
@@ -1028,8 +1028,8 @@ anchored weave) for `contains` and `subscribes_to`, set-difference
 for `overrides_view_of`. Edits to visible members, including
 deletions, are honored.
 
-The one place an inactive node still appears is RETENTION: when a
-source-set switch is applied to an OPEN view (an already-drawn
+The one place an inactive node still appears is retention: when a
+source-set switch is applied to an open view (an already-drawn
 buffer), an inactive node with active view-children stays on screen
 as an anonymous placeholder, so its active descendants are not
 orphaned:
@@ -1038,10 +1038,10 @@ orphaned:
 (skg inactiveNode)
 ```
 
-The placeholder is DATALESS by design: an inactive node's id, source,
+The placeholder is dataless by design: an inactive node's id, source,
 and title all describe content the user hid by restricting the
 source-set, so emitting any of it would leak. It carries no id or
-source and renders titleless. It is inert: it emits NO save intention
+source and renders titleless. It is inert: it emits no save intention
 (its membership in its parent's list is owned entirely by the disk
 merge, not the buffer), it is not a collateral re-render target, and
 editing its (empty) title/body is a buffer validation error. Its
@@ -1049,7 +1049,7 @@ active children remain fully editable. A de-novo render under a
 restricted set never produces one -- inactive members are omitted and
 their content is never expanded.
 
-Edits to inactive nodes themselves are SUPPRESSED at save, not
+Edits to inactive nodes themselves are *suppressed* at save, not
 fatal: any instruction that would write an inactive source is
 dropped and the save succeeds with the warning "Inactive nodes
 present in saved buffer remain unchanged in graph." An untouched
