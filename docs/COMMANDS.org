@@ -50,22 +50,25 @@ running, save or revert every open skg view.  Afterward, Skg refreshes only
 views which show a changed owner or the exact absent raw ID.
 ** C-c f : text search
 The 'f' is for 'find'.
-*** C-c f RET : skg-search
-Text search across titles and aliases, returning every
-matching node. "Rooty" nodes (roots, cycle members, link
+*** how search works
+**** the search ranking rules
+"Rooty" nodes (roots, cycle members, link
 dests, and nodes that had an org-roam ID before import)
 are bumped in the ranking via their context-origin multiplier.
-
-Prompts for search terms. All search axes take their conservative
-defaults: no per-token regex, titles only (no body), no Tantivy
-phrase and operator syntax.
-
-Under a restricted source-set, if the search index contains any overPrivateText
+**** how search treats data source restrictions
+If the source-set is restricted, if the search index contains any overPrivateText
 telescope (one whose selected title or body lies below home), Skg asks
 whether to include or exclude overPrivateText telescopes before running the query.
 Exclude filters them in Tantivy before matching; Include is permission
 for this search only. Under source-set =all= they are included without a
 prompt and the result carries a warning.
+*** C-c f RET : skg-search
+Text search across titles and aliases, returning every
+matching node.
+
+Prompts for search terms. All search axes take their conservative
+defaults: no per-token regex, titles only (no body), no Tantivy
+phrase and operator syntax.
 
 Run 'skg-goto' (below) from one of the links in the search
 results to open the view from that node.
