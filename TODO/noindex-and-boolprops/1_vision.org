@@ -1,0 +1,25 @@
+There used to be a 'had ID when imported from org-roam' property for each node, abbreviated to the symbols HadId (Rust) and had-id (Emacs). I'm not really finding much trace of that any more; did it move?
+
+But that's just a side question. My main request is to add another such tag. There used to be and might still be some kind of bucket for tags associated with each node. (For now a list would be efficient but if we ever have a lot we'll want sets.) I would like to introduce another called NoIndex. Most nodes will not have this, so the default, if there is no tag on this dimension associated associated with a node, should be that its text is indexed. (There is title and body text, but that level of granularity would be unnecessary; let's make it all-or-nothing.)
+
+We will need a method to allow the user to set the index behavior of the node.
+'skg-set-boolprop-indexing' should be like set-source and delete,
+in that the C-u prefix causes it to apply recursively across the viewtree.
+It should determine the value at the current node,
+and let the user cycle (with shift-arrows) among 'indexed' and 'not indexed'.
+
+We also, I realize now, need to give users a way of viewing
+these boolean properties of a node.
+'skg-show-collection-boolprops' seems good:
+all of these are boolean properties of a graphnode.
+It would create a new kind of node called a viewprops folder,
+which would list a headline for each property --
+so (assuming HadId still exists?) at most two values currently,
+but maybe more in the future.
+We'll therefore also need a new viewnode type called boolprop.
+
+The boolprops tree surface should not be editable.
+If they edit boolprops that way, warn them that their edits would be discarded,
+explain that they should use a 'skg-set-boolprop-*' command instead
+(there might be more later),
+and offer to save anyway, discarding the edit.

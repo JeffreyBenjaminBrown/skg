@@ -1,14 +1,22 @@
-* ONGOING TODO/incremental-validation/
+* TODO REMEMBER not to dirty the production skg's code.
+* ONGOING Permit removing a node from indexing.
+Like set-source, this should be applicable solo or recursive.
+* TODO how to square 'roots are important" & 'matching all words is important'?
+* re. codex
+** set default model
+■ Failed to save default model: config/batchWrite failed in TUI: config/batchWrite failed: failed to
+persist config.toml: failed to persist config at /home/ubuntu/.codex/config.toml (code -32603)
+** save to disk: how to fork a checkpoint
+Create your “orientation loaded” checkpoint once:
+
+/rename orientation-loaded
+
+Then whenever you want to start a new piece of work from exactly that point, while sitting in that checkpoint thread:
+
+/fork
+/rename whatever-this-task-is
 * next
-** urgent
-*** warn user if part of their saved changes would be discarded
-because indefinitive
-** language changes
-*** Introduce the term 'folder viewnode' instead of 'col'.
-*** "indefinitive" is user-facing and confusing
-"at peace"?
-and what's the similar term for independent of parent?
-*** Does make-content delete well?
+** Does make-content delete well?
 If the link it replaces with content has no other relationships
 beyond the one just removed from its parent --
 that is, if the link becomes an island --
@@ -51,15 +59,9 @@ barring an OR statement.
 *** staging should refresh views
 be it via magit, or via C-c t (a|A)
 *** sort backpaths most-public first
-** bugs
-*** mouse into buffers triggers errors
-*** bug in export to org-roam
+** bug in export to org-roam
 The 'exporter' node, the one that defines where to write the org file
 derived from its parent, might have multiple parents.
-*** Can't change a public node's content-child's source from pers-i to public
-e.g. at [[id:7764443d-777d-481e-b6d1-4eb2ebd1b7b3][quantum feeling experiences]] (public),
-there's a pers-i child.
-I want to make the child public but can't.
 ** for video
 *** TODO/command-name-echo.org
 A config option, for recording videos.
@@ -74,17 +76,14 @@ but divides it at spaces if point is interior to it.
 *** [[id:eb73db7a-acf4-4463-9398-f09279000337][org-mode : fold body and not children]]
 ** work through TODO/problems.org
 ** try neovim
-** DONE drop TypeDB
-Implemented by [[./TODO/ditch-typedb/2_plan.org][the graph-only refactor]]. The =.skg= files are authoritative;
-the Rust graph represents dangling references directly.
-* We could update viewstats in the background after save.
-Show 'rebuilding' in the modeline while rebuilding.
-Don't update a dirty buffer silentl; show 'stale' instead.
 * skg-show-definition
 Implement a function 'skg-define' that prompts for a phrase
 and brings them to the relevant line in
 docs/COMMANDS.org, or glossary.org, or types/../something.rs.
 Should cover terms like STALE from the modeline.
+* Update viewstats in the background after save.
+Show 'rebuilding' in the modeline while rebuilding.
+Don't update a dirty buffer silentl; show 'stale' instead.
 * Magit is dangerous!
 One key command can stage all changes,
 effectively erasing the work of a careful review
@@ -108,14 +107,14 @@ https://github.com/typedb/typeql/issues/434#issuecomment-5553099146
 This way I can really treat the public skg graph
 as the source of documentation truth.
 * TODO ? Is overrides unnecessary?
-* TODO BUG moving more private data to more public data
-It asks whether to publicize the relationship too, then doesn't.
-I try to repair with C-c s r, it doesn't work either.
 * DONE [[./TODO/refer-to-ids-not-buffer-names/it.org][BUG : Can't visit my cooking node]]
 after subscribing back to (but not overriding) cheese-man's cooking node
 * TODO BUG cycling TODO | DONE etc. hides text
 e.g. go to c02b9d3d-8857-4cf0-84b2-244b127160fc
 and try toggling that for one of its intermediate children
+* TODO What happened to the guard to prevent dirtying a second buffer?
+I made that change around <2026-09-11 Fri>,
+but now <2026-09-14 Mon> it's not warning me.
 * TODO handle the Oa test failure
 * TODO BUG cannot change editRequest from delete to none
 using the in metadata buffer.
