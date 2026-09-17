@@ -736,7 +736,7 @@ is now : id_to_pid_if_found
 ** TrueNode::is_removedhere_phantom (line 242)
    - True?: Yes.
    - Omits?: Nothing.
-** TrueNode::is_indefinitive (line 248)
+** TrueNode::is_writeProtected (line 248)
    - True?: Yes.
    - Omits?: Nothing.
 ** TrueNode::body (line 252)
@@ -811,11 +811,11 @@ is now : id_to_pid_if_found
 ** mk_unknown_viewnode (line 588)
    - True?: Yes.
    - Omits?: Nothing.
-** mk_indefinitive_viewnode (line 600)
+** mk_writeProtected_viewnode (line 600)
    - True?: Yes.
    - Omits?: Nothing.
-** mk_indefinitive_from_viewnode (line 615)
-   - True?: Partly. The function constructs an indefinitive ViewNode from an existing ViewNode, but it discards the body and edit_request — that loss-of-data is a side effect the name doesn't reveal.
+** mk_writeProtected_from_viewnode (line 615)
+   - True?: Partly. The function constructs a write-protected ViewNode from an existing ViewNode, but it discards the body and edit_request — that loss-of-data is a side effect the name doesn't reveal.
    - Omits?: The discard of body and edit_request.
 ** mk_viewnode (line 632)
    - True?: Yes (the doc-comment explicitly notes the GraphNodeStats/ViewNodeStats omission).
@@ -939,7 +939,7 @@ is now : id_to_pid_if_found
 ** insert_scaffold_as_child (line 143)
    - True?: Yes — name has the prepend bool param explicit.
    - Omits?: Nothing.
-** append_indefinitive_from_disk_as_child (line 160)
+** append_writeProtected_from_disk_as_child (line 160)
    - True?: Partly. If nodecomplete_and_viewnode_from_id returns None (id not found), the function silently substitutes an "Unknown" placeholder viewnode rather than erroring. The name says "from_disk" — a reader expects either a successful disk read or an error.
    - Omits?: The Unknown-fallback when the id is absent.
 ** collect_grandchild_aliases_for_viewnode (line 189)
@@ -1045,7 +1045,7 @@ is now : id_to_pid_if_found
    - True?: Partly. "Default" is misleading because two fields, birth (Birth::ContentOf) and viewStats/graphStats, encode meaningful defaults rather than null/zero values; this function is the canonical empty-buffer-state seed, not a Default impl analog.
    - Omits?: It omits that birth defaults to ContentOf rather than the more "nothing" choice of Independent.
 ** viewnode_from_metadata (line 94)
-   - True?: Partly. The function also synthesizes BufferValidationErrors for two cases (Scaffold-with-body and EditRequestOnIndefinitive); the name says "viewnode_from" but the function returns a tuple of (MpViewnode, Option<BufferValidationError>).
+   - True?: Partly. The function also synthesizes BufferValidationErrors for two cases (Scaffold-with-body and EditRequestOnWriteProtectedOccurrence); the name says "viewnode_from" but the function returns a tuple of (MpViewnode, Option<BufferValidationError>).
    - Omits?: It omits the validation-error generation that happens alongside conversion.
 ** parse_metadata_to_viewnodemd (line 180)
    - True?: Yes.
@@ -1232,7 +1232,7 @@ is now : id_to_pid_if_found
 
 * server/update_buffer/complete_preorder/truenode.rs
 ** complete_truenode_preorder (line 72)
-   - True?: Partly. The "complete" verb is honest at the level of the comment (seven phases) but the name conceals that this single function may mutate the node's kind to Deleted (via mutate_truenode_to_deletednode), clobber it as indefinitive, or short-circuit on phantom — i.e., "complete" sometimes means "rewrite".
+   - True?: Partly. The "complete" verb is honest at the level of the comment (seven phases) but the name conceals that this single function may mutate the node's kind to Deleted (via mutate_truenode_to_deletednode), clobber it as write-protected, or short-circuit on phantom — i.e., "complete" sometimes means "rewrite".
    - Omits?: It omits the in-place kind mutation paths and the clobber-and-stop behavior.
 ** clear_edit_request (line 158)
    - True?: Yes.
@@ -1624,15 +1624,15 @@ is now : id_to_pid_if_found
    - True?: Partly. As above, it also validates the title is non-empty (errors if so).
    - Omits?: It omits the empty-title error path.
 
-** makeIndefinitiveAndClobber (line 87)
+** makeWriteProtectedAndClobber (line 87)
    - True?: Yes.
    - Omits?: Nothing material; the "Clobber" word is explicit.
 
 ** complete_branch_minus_content (line 106)
-   - True?: Partly. The function also detects cycles, marks repeats indefinitive, mutates `visited`, and may add a SubscribeeCol branch. The "minus_content" qualifier is honest, but the name does not communicate the substantial side effects.
-   - Omits?: It omits the cycle detection, repeat-indefinitization, and SubscribeeCol-branch insertion side effects.
+   - True?: Partly. The function also detects cycles, marks repeats write-protected, mutates `visited`, and may add a SubscribeeCol branch. The "minus_content" qualifier is honest, but the name does not communicate the substantial side effects.
+   - Omits?: It omits the cycle detection, repeat-write-protection, and SubscribeeCol-branch insertion side effects.
 
-** make_indef_if_repeat_then_extend_defmap (line 132)
+** make_writeProtected_if_repeat_then_extend_defmap (line 132)
    - True?: Yes (the name explicitly describes both jobs).
    - Omits?: Nothing material.
 
@@ -1692,7 +1692,7 @@ is now : id_to_pid_if_found
    - True?: Yes.
    - Omits?: Nothing material.
 
-** truenode_in_tree_is_indefinitive (line 527)
+** truenode_in_tree_is_writeProtected (line 527)
    - True?: Partly. The function returns Ok(false) for Deleted and Unknown variants, and errors for Scaffolds; the name implies a TrueNode-only check.
    - Omits?: It omits the per-kind behavior (Deleted/Unknown silently false, Scaffold-> error).
 
@@ -1705,7 +1705,7 @@ is now : id_to_pid_if_found
    - Omits?: It omits the unchecked-completion caveat and the error-accumulation side effect.
 
 * server/to_org/complete/contents.rs
-** clobberIndefinitiveViewnode (line 16)
+** clobberWriteProtectedViewnode (line 16)
    - True?: Yes (the name is explicit about "clobber").
    - Omits?: Nothing material.
 
@@ -1715,11 +1715,11 @@ is now : id_to_pid_if_found
    - Omits?: Nothing material.
 
 ** maybe_add_subscribeeCol_branch (line 46)
-   - True?: Partly. Beyond adding the SubscribeeCol, the function also adds a HiddenOutsideOfSubscribeeCol grandchild, populates indefinitive subscribee children, and queries TypeDB for hidden content. The name "maybe add" undersells this.
+   - True?: Partly. Beyond adding the SubscribeeCol, the function also adds a HiddenOutsideOfSubscribeeCol grandchild, populates write-protected subscribee children, and queries TypeDB for hidden content. The name "maybe add" undersells this.
    - Omits?: It omits the TypeDB queries (`what_node_hides`, `what_nodes_contain`) and the HiddenOutsideOfSubscribeeCol scaffold insertion.
 
 ** maybe_add_hiddenInSubscribeeCol_branch (line 116)
-   - True?: Partly. Similar to above: the function queries TypeDB and populates the new col with indefinitive children loaded from disk. Also returns an explicit Err when called on a non-subscribee, despite the "maybe_" prefix.
+   - True?: Partly. Similar to above: the function queries TypeDB and populates the new col with write-protected children loaded from disk. Also returns an explicit Err when called on a non-subscribee, despite the "maybe_" prefix.
    - Omits?: It omits the TypeDB query, the disk-loaded child population, and the strict subscribee precondition.
 
 * server/to_org/expand/aliases.rs
@@ -1784,7 +1784,7 @@ is now : id_to_pid_if_found
    - True?: Partly. The function inserts children in *reverse* order (so prepending preserves original order); this isn't conveyed by the name.
    - Omits?: It omits the reverse-iteration prepending strategy.
 
-** prepend_indef_indep_child (line 342)
+** prepend_writeProtected_indep_child (line 342)
    - True?: Partly. The function falls back to an UnknownNode placeholder if the id can't be resolved, instead of erring or returning None.
    - Omits?: It omits the UnknownNode fallback path.
 
@@ -1798,14 +1798,14 @@ is now : id_to_pid_if_found
    - Omits?: It omits the request-removal mutation and the silent default for missing stats.
 
 ** execute_definitive_view_request (line 95)
-   - True?: Partly. The function does many things: indefinitize prior copies (and their full content subtrees), mark current node definitive, replace title/body from disk OR from git for removed nodes, expand BFS, possibly add a HiddenInSubscribeeCol branch, update the visited map. "Execute the request" is very generic for this.
-   - Omits?: It omits the cascade of indefinitization, the git/disk dispatch for removed nodes, and the subscribee handling.
+   - True?: Partly. The function does many things: write-protect prior copies (and their full content subtrees), mark current node definitive, replace title/body from disk OR from git for removed nodes, expand BFS, possibly add a HiddenInSubscribeeCol branch, update the visited map. "Execute the request" is very generic for this.
+   - Omits?: It omits the cascade of write-protection, the git/disk dispatch for removed nodes, and the subscribee handling.
 
 ** get_hidden_ids_if_subscribee (line 160)
    - True?: Yes (the conditional is named).
    - Omits?: Nothing material.
 
-** indefinitize_content_subtree (line 199)
+** write-protect_content_subtree (line 199)
    - True?: Yes (the doc comment also notes it removes from `visited`).
    - Omits?: It omits, from the bare name, that it also removes affected nodes from `visited`.
 
@@ -1885,8 +1885,8 @@ is now : id_to_pid_if_found
    - Omits?: Nothing material.
 
 ** collect_rels_to_children_from_generation (line 128)
-   - True?: Partly. The function silently skips indefinitive nodes (their children aren't collected); this filter is critical to correctness but invisible from the name.
-   - Omits?: It omits the indefinitive-node skip.
+   - True?: Partly. The function silently skips write-protected nodes (their children aren't collected); this filter is critical to correctness but invisible from the name.
+   - Omits?: It omits the write-protected-node skip.
 
 * server/to_org/render/truncate_after_node_in_gen.rs
 ** add_last_generation_and_truncate_some_of_previous (line 22)
@@ -1894,7 +1894,7 @@ is now : id_to_pid_if_found
    - Omits?: Nothing material.
 
 ** truncate_after_node_in_generation_in_tree (line 57)
-   - True?: Partly. Beyond truncation, the function re-renders truncated nodes via `makeIndefinitiveAndClobber` and removes their pids from `visited`.
+   - True?: Partly. Beyond truncation, the function re-renders truncated nodes via `makeWriteProtectedAndClobber` and removes their pids from `visited`.
    - Omits?: It omits the re-render side effect (clobber) and the `visited`-mutation.
 
 * server/from_text/buffer_to_viewnodes/uninterpreted.rs
@@ -1950,7 +1950,7 @@ is now : id_to_pid_if_found
    - Omits?: Nothing material.
 
 ** has_empty_title (line 259)
-   - True?: Partly. The function returns true only for *definitive*, *non-delete-marked* TrueNodes with empty title; an indefinitive empty-title node, or a delete-marked one, returns false. The name implies a pure title-emptiness check.
+   - True?: Partly. The function returns true only for *definitive*, *non-delete-marked* TrueNodes with empty title; a write-protected empty-title node, or a delete-marked one, returns false. The name implies a pure title-emptiness check.
    - Omits?: It omits the definitive-and-not-delete preconditions baked into the predicate.
 
 ** nonignored_children_have_distinct_ids (line 273)
@@ -2028,8 +2028,8 @@ is now : id_to_pid_if_found
    - Omits?: Nothing material; the doc comment lists what's deferred.
 
 ** maybe_instruction_from_treenode (line 84)
-   - True?: Partly. The function returns Some(Delete) or Some(Save) for definitive nodes only; indefinitive returns None. It also calls `collect_grandchild_aliases_for_viewnode` and `collect_subscribees`, doing nontrivial work to construct the Save.
-   - Omits?: It omits the indefinitive-skip and the substantial Save-construction logic.
+   - True?: Partly. The function returns Some(Delete) or Some(Save) for definitive nodes only; write-protected returns None. It also calls `collect_grandchild_aliases_for_viewnode` and `collect_subscribees`, doing nontrivial work to construct the Save.
+   - Omits?: It omits the write-protected-skip and the substantial Save-construction logic.
 
 ** collect_subscribees (line 121)
    - True?: Yes.

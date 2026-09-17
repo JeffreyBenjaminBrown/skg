@@ -10,7 +10,7 @@ use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
 use super::git::{ExistenceAxes, MembershipAxes};
-use super::viewnode::{ ViewNode, ViewNodeKind, ActiveNode, Vognode, Phantom, QualFolder, Qual, PartnerFolder, PhantomDeleted, InactiveNode, PhantomUnknown, GraphNodeStats, ViewNodeStats, Birth, IndefOrDef, AffectsParent, };
+use super::viewnode::{ ViewNode, ViewNodeKind, ActiveNode, Vognode, Phantom, QualFolder, Qual, PartnerFolder, PhantomDeleted, InactiveNode, PhantomUnknown, GraphNodeStats, ViewNodeStats, Birth, Editability, AffectsParent, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -81,7 +81,7 @@ impl TryFrom<MpActiveNode> for ActiveNode {
       existence      : u . existence,
       membership     : u . membership,
       not_in_git     : u . not_in_git,
-      indef_or_def   : u . indef_or_def,
+      editability   : u . editability,
     })
   }
 }
@@ -179,7 +179,7 @@ impl From<ActiveNode> for MpActiveNode {
       existence      : t . existence,
       membership     : t . membership,
       not_in_git     : t . not_in_git,
-      indef_or_def   : t . indef_or_def,
+      editability   : t . editability,
     }
   }
 }
@@ -294,7 +294,7 @@ impl Default for MpActiveNode {
       existence      : ExistenceAxes::default(),
       membership     : MembershipAxes::default(),
       not_in_git     : false,
-      indef_or_def   : IndefOrDef::Definitive {
+      editability   : Editability::Definitive {
         body         : None,
         edit_request : None },
     }

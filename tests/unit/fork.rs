@@ -159,14 +159,14 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
   assert! ( ! buf . contains ("(id N) (source owned2)"),
     "the clone-to-be must carry no id:\n{}", buf );
   // The original child: a LEVEL-2 headline ("** "), real id, foreign
-  // source, indef, independent, pO, original title.
+  // source, write-protected, independent, pO, original title.
   assert! ( lines . iter () . any ( |l|
       l . starts_with ("** (skg (node (id N) (source foreign)")
       && l . contains ("(affectsParent false)")
-      && l . contains ("indef")
+      && l . contains ("writeProtected")
       && l . contains ("parentOverrides")
       && l . ends_with ("N-original") ),
-    "original child (level-2, id/foreign/indef/independent/pO) missing:\n{}", buf ); }
+    "original child (level-2, id/foreign/writeProtected/independent/pO) missing:\n{}", buf ); }
 
 #[test]
 fn confirmation_buffer_shows_a_confirmed_source_as_settled () {

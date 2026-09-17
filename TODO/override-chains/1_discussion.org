@@ -224,7 +224,7 @@
      'ViewRequest::Fork' becomes a fork candidate /regardless of ownership
      or whether its text changed/. Build its 'ForkSpec' from the node's
      current graph/disk 'NodeComplete' (not from buffer text — the node may
-     be indefinitive in the view), via the existing 'build_fork_clone',
+     be write-protected in the view), via the existing 'build_fork_clone',
      which already sets =subscribes_to=[N]=, =overrides_view_of=[N]=, a
      shallow =contains= copy, a fresh pid, and an owned source. For an owned
      =N= this is identical to the foreign case.

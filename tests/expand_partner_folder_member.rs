@@ -3,7 +3,7 @@
 // Definitive expansion of a read-only PartnerFolder member
 // (TODO/full-schema/13_test-rel-matrix.org). Confirmed 2026-06-12:
 // expanding a subscriberFolder member behaves like expanding any
-// indefinitive node -- the member line stays a raw member, its own
+// write-protected node -- the member line stays a raw member, its own
 // content appears, and NO subscription-hides apply (those are scoped
 // to subscribees-as-such, the other direction).
 
@@ -62,18 +62,18 @@ fn expanding_subscriberFolder_member_is_plain_expansion
           config, Some (tantivy), &[ID::from ("N")], false )
  ?;
       assert! ( n_view . contains ("subscriberFolder")
-                && line_containing (&n_view, "(id S)") . contains (" indef"),
-        "N's view should show S as an indefinitive subscriberFolder \
+                && line_containing (&n_view, "(id S)") . contains (" writeProtected"),
+        "N's view should show S as a write-protected subscriberFolder \
          member:\n{}", n_view );
       // Request definitive expansion of the subscriberFolder member S.
-      // Since uniform-heralds the indefinitive member line carries
-      // 'indef (birthHerald ...)' (the old graphStats atom is gone), so
-      // we inject the definitiveView request right after 'indef'. S is
-      // the only indefinitive node in this view.
+      // Since uniform-heralds the write-protected member line carries
+      // 'write-protected (birthHerald ...)' (the old graphStats atom is gone), so
+      // we inject the definitiveView request right after 'writeProtected'. S is
+      // the only write-protected node in this view.
       let s_line : String =
         line_containing (&n_view, "(id S)") . to_string ();
       let s_line_expanded : String = s_line . replace (
-        " indef ", " indef (viewRequests definitiveView) " );
+        " writeProtected ", " writeProtected (viewRequests definitiveView) " );
       let expanded_request : String =
         n_view . replace (&s_line, &s_line_expanded);
       let saved : String =
@@ -82,7 +82,7 @@ fn expanding_subscriberFolder_member_is_plain_expansion
       // S stays a raw subscriberFolder member, now definitive...
       assert! ( saved . contains ("subscriberFolder"),
         "S should remain under the subscriberFolder:\n{}", saved );
-      assert! ( ! line_containing (&saved, "(id S)") . contains (" indef"),
+      assert! ( ! line_containing (&saved, "(id S)") . contains (" writeProtected"),
         "S should be definitive after expansion:\n{}", saved );
       // ...its own content appears...
       assert! ( saved . contains ("(id C)") && saved . contains ("content of S"),

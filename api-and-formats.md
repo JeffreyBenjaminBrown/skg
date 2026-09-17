@@ -52,7 +52,7 @@ So far there are these endpoints:
 
   - Phase 1, immediate: Server sends LP `((response-type
     search-results) (content "ORG") (warnings ("..." ...)))`.
-    Results are ordinary indefinitive non-content TrueNodes (not
+    Results are ordinary write-protected non-content TrueNodes (not
     special scaffold types). A no-match or error response has the same
     response type and a single `content` field.
 
@@ -87,7 +87,7 @@ So far there are these endpoints:
     (an `overrides_view_of` edge points at it, user-owned or
     foreign) and at least one overrider's source is active, the
     server returns, instead of a content view, an ordinary buffer
-    of indefinitive nodes: the requested node as root, each visible
+    of write-protected nodes: the requested node as root, each visible
     overrider an Independent child of what it overrides, following
     the relation recursively (all edges), each branch stopping with
     the `cycle` viewstat at the first repeated ID. The response
@@ -609,7 +609,7 @@ node participates in the membership represented by its visible parent:
   does not alter the parent's membership on save;
 - `(affectsParent na)` is rendered for view roots.
 
-The bare atom `hiddenBody` accompanies `indef` on an indefinitive
+The bare atom `hiddenBody` accompanies `writeProtected` on a write-protected
 node whose graph node HAS a body — one the rendering hides. Herald
 "B", hugging the ☮. Display-only: the parser accepts and discards it;
 the view regenerates it.
@@ -645,7 +645,7 @@ the atom, so a request is transient. Three request forms:
   the partners as inverted read-only children (each marked `(birth
   backpath ROLENAME)`). ROLENAME is one of the nine in
   `PARTNER_ROLE_VOCAB`. Emitted by the `C-c p` commands.
-- `definitiveView` — make an indefinitive, childless node editable.
+- `definitiveView` — make a write-protected, childless node editable.
 - `fork` — the explicit `skg-fork-node` gesture: clone this (owned)
   node into a private fork that overrides it. Consumed on the save path
   at fork detection (not during view completion), then dropped. Emitted
@@ -702,7 +702,7 @@ and the per-relation view-position flags (`containsParent`,
 ancestor-lettered tokens now. (A phantom, which has graphStats but no
 view position, still carries a counts-only `(rels ...)` from
 `assemble_counts_only`, and the bare `hiddenBody` atom documented above
-still rides an indefinitive node whose graph node has a hidden body.)
+still rides a write-protected node whose graph node has a hidden body.)
 
 `(viewStats ...)` still carries the position facts that are NOT
 relationship tokens (the same graph node can warrant different ones
@@ -1007,7 +1007,7 @@ Also at top level, for the TextChanged scaffold:
 Examples:
 ```
 (skg (node (id 7) (source main) (unstaged newX newM)))
-(skg (node (id 9) (source main) indef (staged removedM) (unstaged newM)))
+(skg (node (id 9) (source main) writeProtected (staged removedM) (unstaged newM)))
 (skg alias (staged newM))
 (skg id (unstaged removedM))
 (skg (textChanged staged unstaged))

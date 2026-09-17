@@ -26,12 +26,12 @@ end
 
 -- The fetched table should drive the lens engine end to end.
 local chunks = heralds.chunks_from_metadata(
-  '(skg (node (id 1) (source main) indef))')
+  '(skg (node (id 1) (source main) writeProtected))')
 local herald_text = chunks and heralds.chunks_text(chunks) or nil
 
 if herald_text and herald_text:find('☮', 1, true) then
   T.pass('PASS: Integration test successful!')
 else
-  T.fail('fetched table did not produce the indef herald: '
+  T.fail('fetched table did not produce the writeProtected herald: '
          .. tostring(herald_text))
 end

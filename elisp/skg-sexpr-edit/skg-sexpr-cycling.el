@@ -41,7 +41,7 @@ Returns the new value. If FIELD-VALUE is not in VALUES, starts at index 0."
 FIELD-VALUE is the current headline text, needed for source defaulting.
 Returns nil if the field is not cycleable."
   (cond
-   ((string= field-name "indef")
+   ((string= field-name "writeProtected")
    '("false (default)" "true"))
    ((string= field-name "affectsParent")
     '("true (default)" "false" "na"))

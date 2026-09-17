@@ -27,7 +27,7 @@
 // Expected result:
 //   * d            <-- was b, rewritten to d (first in doc order -> definitive)
 //   ** MERGED: b
-//   * d (indef)    <-- the original d root
+//   * d (write-protected)    <-- the original d root
 // (No (deleted ...) anywhere.)
 
 use indoc::indoc;

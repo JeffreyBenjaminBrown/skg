@@ -359,11 +359,11 @@ The nodes that subscribe to this node.
 *** <localleader>ps : :SkgShowPathsThroughSubscribees
 The nodes this node subscribes to.
 ** <localleader>s : setting node properties
-*** first some vocab: 'definitive' and 'indefinitive'
-A view of a node can be definitive or indefinitive.
+*** first some vocab: 'definitive' and 'write-protected'
+A view of a node can be definitive or write-protected.
 Typically the first place in the buffer that depicts a node
 is the definitive view of it. So that other views of that node
-cannot contradict it, they are 'indefinitive': Edits to them
+cannot contradict it, they are 'write-protected': Edits to them
 cannot affect the node they depict. They are also truncated --
 that is, shown without content --
 in order to prevent the view from becoming redundant and huge.
@@ -371,28 +371,28 @@ in order to prevent the view from becoming redundant and huge.
 Instead, use 'SetDefinitive' (<localleader>sd), below.
 That's because Skg has to make other instances of it
 (in this same buffer -- and maybe in the future other buffers too)
-indefinitive. That's because a buffer can only be saved
+write-protected. That's because a buffer can only be saved
 if it has at most one definitive instance of a node.
 Otherwise, two definitive nodes could contradict each other.
 
-This same caveat does not apply to making a node indefinitive.
-While there does exist a command for that ('SetIndefinitive')
+This same caveat does not apply to making a node write-protected.
+While there does exist a command for that ('SetWriteProtected')
 you can also 'do it yourself'
 by visiting a metadata buffer for the node ('ViewMetadata',
 <localleader>vm).
 *** <localleader>sd : :SkgSetDefinitive
 If you want to see the definitive view of that node
-from a place where it is currently shown in an indefinitive form,
+from a place where it is currently shown in a write-protected form,
 call this function. It will make the current definitive view
-(if it exists) indefinitive, and then draw a definitive view here.
-*** <localleader>si : :SkgSetIndefinitive
-This marks a node as 'indefinitive',
+(if it exists) write-protected, and then draw a definitive view here.
+*** <localleader>sw : :SkgSetWriteProtected
+This marks a node as 'write-protected',
 as described above.
 In brief, it means edits to its title, body or
   (more importantly) children
 will not affect it
   (although edits to its children will affect those children,
-  unless they are also indefinitive).
+  unless they are also write-protected).
 *** <localleader>ss : :SkgSetSource
 Changes the source of the node at point.
 The prompt starts with the current source as editable command-line
@@ -440,9 +440,9 @@ org-descendents. Its org-parent must be a definitive activeNode
 whose source is owned in =skgconfig.toml=.
 
 The command replaces the whole leaf with a same-level
-indefinitive activeNode for the link dest. The parent is
+write-protected activeNode for the link dest. The parent is
 definitive, so saving records the dest as content of the
-parent; the replacement child is indefinitive, so its own text is
+parent; the replacement child is write-protected, so its own text is
 not rewritten from the link label.
 *** <localleader>mf : :SkgFork
 Fork the node at point that you ALREADY own: create a private
@@ -527,7 +527,7 @@ When called from a node in a view of the graph,
 this switches to a view of the metadata of that node,
 with one field per org branch. ':w' (or <localleader>cc) commits
 the edited tree back into the source headline; ':bd!' cancels;
-S-Left / S-Right cycle a field's value (indef, affectsParent,
+S-Left / S-Right cycle a field's value (writeProtected, affectsParent,
 editRequest, source, ...).
 It's easy to edit this way.
 Note that some properties don't make sense to edit,
@@ -619,9 +619,9 @@ but also removes the node from the stack.
 This is the easiest way to give a node multiple containers --
 push it to the stack, then paste it as a node somewhere else.
 
-Inserts, at the cursor, an indefinitive view
+Inserts, at the cursor, a write-protected view
 of the node whose ID is at the top of the id stack.
-Its metadata includes only the ID and =indef=,
+Its metadata includes only the ID and =writeProtected=,
 and its title comes from the stack.
 Does not modify the stack or save.
 Saving will provide the rest of its metadata.

@@ -54,11 +54,11 @@ fn test_subscribee_folder_appears_for_subscribers(
       "* (skg (node (id 1) (source home) (affectsParent na) (rels (contains (out 4))) (viewStats (sourceHerald ⌂:home)))) 1
       ** (skg (node (id 11) (source home) (rels (contains (in 1 (ancestors 1)) (out 1)) (subscribes (out 1)) (birth contains)))) 11
       *** (skg subscribeeFolder)
-      **** (skg (node (id 11-sees) (source away) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)) (viewStats (sourceHerald ⌂:away)))) 11-sees
+      **** (skg (node (id 11-sees) (source away) writeProtected (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)) (viewStats (sourceHerald ⌂:away)))) 11-sees
       *** (skg (node (id 111) (source home) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 111
       ** (skg (node (id 12) (source home) (rels (contains (in 1 (ancestors 1))) (subscribes (out 1)) (birth contains)))) 12
       *** (skg subscribeeFolder)
-      **** (skg (node (id 12-sees) (source away) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)) (viewStats (sourceHerald ⌂:away)))) 12-sees
+      **** (skg (node (id 12-sees) (source away) writeProtected (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)) (viewStats (sourceHerald ⌂:away)))) 12-sees
       ** (skg (node (id 13) (source home) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
       ** (skg (node (id 14) (source home) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 14
       *** (skg (node (id 141) (source home) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 141

@@ -89,7 +89,7 @@ local expected_changed =
   .. ' (rels (contains (out 2))))) 1\n'
   .. '** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1)) (birth contains)))) 11\n'
   .. '*** (skg (node (id l-11) (source main) (affectsParent false)'
-  .. ' indef (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo)))) [[id:11][a link to 11]]\n'
+  .. ' writeProtected (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo)))) [[id:11][a link to 11]]\n'
   .. '** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 12\n'
 local expected_no_link = '* 1\n** 11\n** 12\n'
 local expected_with_link =

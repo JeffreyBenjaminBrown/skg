@@ -7,7 +7,7 @@
 ///                         [(source SOURCE)]
 ///                         [(affectsParent true|false|na)]
 ///                         [(birth backpath ROLENAME)]
-///                         [indef]   ; short for "indefinitive"
+///                         [writeProtected]   ; marks the occurrence write-protected
 ///                         [cycle]
 ///                         [(stats [containsParent]
 ///                                 [(containers N)]
@@ -23,7 +23,7 @@ use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::viewnode::{
   GraphNodeStats, ViewNodeStats, NodeEditRequest, ViewRequest, FolderRelation,
   Qual, QualFolder, PartnerFolder, PhantomDeleted, InactiveNode, PhantomUnknown,
-  Birth, IndefOrDef, AffectsParent,
+  Birth, Editability, AffectsParent,
 };
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::maybe_placed_viewnode::{
@@ -51,7 +51,7 @@ pub struct ViewnodeMetadata {
   pub source: Option<SourceName>,
   pub affectsParent: AffectsParent,
   pub birth: Birth,
-  pub indefinitive: bool,
+  pub writeProtected: bool,
   pub graphStats: GraphNodeStats,
   pub viewStats: ViewNodeStats,
   pub edit_request: Option<NodeEditRequest>,
@@ -78,7 +78,7 @@ pub struct ViewnodeMetadata {
   // dataless marker (see InactiveNode). It carries no id/source/etc.
   pub is_inactive_node : bool,
   // When true, this is a PhantomDiff. It carries the same fields as a
-  // node (id/source/indef/graphStats/diff axes), parsed via
+  // node (id/source/write-protected/graphStats/diff axes), parsed via
   // parse_node_sexp, but emits and is recognized by its own root atom
   // 'diffPhantom' rather than being inferred from the diff axes.
   pub is_diff_phantom : bool,
@@ -94,7 +94,7 @@ pub fn default_metadata() -> ViewnodeMetadata {
     source: None,
     affectsParent: AffectsParent::True,
     birth: Birth::Unremarkable,
-    indefinitive: false,
+    writeProtected: false,
     graphStats: GraphNodeStats::default(),
     viewStats: ViewNodeStats::default(),
     edit_request: None,
@@ -207,29 +207,29 @@ pub fn viewnode_from_metadata (
         ( non_vognode_with_title, error, folder_title_warning )
       } else {
       // MpActiveNode
-      { let indef_or_def : IndefOrDef =
-          if metadata . indefinitive
-          { IndefOrDef::Indefinitive }
+      { let editability : Editability =
+          if metadata . writeProtected
+          { Editability::WriteProtected }
           else
-          { IndefOrDef::Definitive {
+          { Editability::Definitive {
               body,
               edit_request : metadata . edit_request . clone () } };
-        // An edit_request on an indefinitive node has nowhere to live
-        // (IndefOrDef::Indefinitive carries none), so the user's
+        // An edit_request on a write-protected node has nowhere to live
+        // (Editability::WriteProtected carries none), so the user's
         // instruction to delete or merge would silently vanish. Emit a
         // validation error instead so the save is rejected with a
         // clear message. We can only report this when the id is
         // known; if it isn't, other validations cover the missing-id
         // case.
         let error : Option<BufferValidationError> =
-          if     metadata . indefinitive
+          if     metadata . writeProtected
               && metadata . edit_request . is_some ()
           { metadata . id . clone ()
-            . map ( BufferValidationError::EditRequestOnIndefinitive ) }
-          else if metadata . indefinitive
+            . map ( BufferValidationError::EditRequestOnWriteProtectedOccurrence ) }
+          else if metadata . writeProtected
                && metadata . rel_source_request . is_some ()
           { Some ( BufferValidationError::Other (
-              "Relationship-source request on an indefinitive node"
+              "Relationship-source request on a write-protected node"
               . to_string () )) }
           else { None };
         let t : MpActiveNode = MpActiveNode {
@@ -245,15 +245,15 @@ pub fn viewnode_from_metadata (
             existence        : metadata . activeNode_existence,
             membership       : metadata . activeNode_membership,
             not_in_git       : metadata . activeNode_not_in_git,
-            indef_or_def, };
+            editability, };
         let node_kind : MpViewnodeKind =
           if metadata . is_diff_phantom
           { // TODO/DONE/local-view-update/plan_v2.org §11: a phantom carries only the slim MpPhantomDiff. The
             // root atom 'diffPhantom' (not the diff axes) decides this, so a
             // live node carrying e.g. removedM stays a Vognode. The
-            // EditRequestOnIndefinitive validation above already fired if this
-            // phantom (indefinitive) carried an edit_request, so dropping
-            // indef_or_def/affectsParent/etc. here loses nothing.
+            // EditRequestOnWriteProtectedOccurrence validation above already fired if this
+            // phantom (write-protected) carried an edit_request, so dropping
+            // editability/affectsParent/etc. here loses nothing.
             MpViewnodeKind::Phantom (
               MpPhantom::Diff (
                 MpPhantomDiff::from_activeNode (t) )) }
@@ -327,7 +327,7 @@ pub fn parse_metadata_to_viewnodemd (
             parse_node_sexp ( &items[1..], &mut result ) ?; },
           "diffPhantom" => {
             // (diffPhantom ...) -- a moved/removed phantom in git-diff
-            // mode. Same field grammar as (node ...) (id/source/indef/
+            // mode. Same field grammar as (node ...) (id/source/write-protected/
             // graphStats/diff axes), but its own root atom so the client
             // and round-trip never infer phantom-ness from the diff axes.
             parse_node_sexp ( &items[1..], &mut result ) ?;
@@ -528,10 +528,10 @@ fn parse_node_sexp (
         let bare_value : String =
           atom_to_string (element) ?;
         match bare_value . as_str () {
-          // "indef" is short for "indefinitive". The server emits
-          // and accepts only the abbreviated form (see org_to_text.rs).
-          "indef" =>
-            metadata . indefinitive = true,
+          // A `writeProtected` marker makes this occurrence write-protected.
+          // The server emits and accepts this exact atom (see org_to_text.rs).
+          "writeProtected" =>
+            metadata . writeProtected = true,
           "hiddenBody" =>
             // Display-only (like rels/birthHerald): the view
             // regenerates it, so accept and discard.

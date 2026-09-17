@@ -83,7 +83,7 @@ fn visit (
       recurse_under_gnode (
         node_ref,
         Some ( DefiningFolderOwner {
-          // Carrying the phantom's identity (indefinitive, not
+          // Carrying the phantom's identity (write-protected, not
           // save-eligible) keeps a SubscribeeFolder found under a diff
           // phantom meaningful: its children stay in
           // subscribee-as-such position, so their title edits bounce
@@ -134,7 +134,7 @@ fn visit_active_vognode (
         Some (( subscriber, *subscriber_is_definitive )),
       _ => None };
   let is_definitive : bool =
-    ! t . is_indefinitive();
+    ! t . is_writeProtected();
   let has_delete_request : bool =
     matches!( t . edit_request(),
               Some (&NodeEditRequest::Delete));
@@ -144,7 +144,7 @@ fn visit_active_vognode (
     && subscribee_as_such_context . is_none();
   if is_definitive {
     // Emission happens only inside this block, because an
-    // indefinitive vognode emits nothing.
+    // write-protected vognode emits nothing.
     match subscribee_as_such_context {
       Some (( subscriber, subscriber_is_definitive )) => {
         collected . instructionMerge_intent (
@@ -157,7 +157,7 @@ fn visit_active_vognode (
           // The at-most-one-writer-per-ID guard: only the
           // SubscribeeFolder under the definitive instance of a
           // subscriber may write its hide edits. The same subscriber
-          // can recur indefinitively elsewhere with its own
+          // can recur write-protected elsewhere with its own
           // SubscribeeFolder; without this guard those could emit
           // contradictory hide edits for one ID.
           collected . instructionMerge_intent (

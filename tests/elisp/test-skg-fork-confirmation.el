@@ -135,7 +135,7 @@ parent's (source X) with each child's (id N)."
   (with-temp-buffer
     (insert "# FORK CONFIRMATION\n")
     (insert "* (skg (node (source owned2) (viewStats (sourceHerald ⌂:owned2)))) N-edited\n")
-    (insert "** (skg (node (id N) (source foreign) (affectsParent false) indef (rels \"aO\"))) N-original\n")
+    (insert "** (skg (node (id N) (source foreign) (affectsParent false) writeProtected (rels \"aO\"))) N-original\n")
     (org-mode)
     (should (equal (skg--fork-sources-from-confirmation-buffer)
                    '(("N" . "owned2"))))))
@@ -145,10 +145,10 @@ parent's (source X) with each child's (id N)."
 source to a later fork's child (parent-source resets on every level 1)."
   (with-temp-buffer
     (insert "* (skg (node (source ownedA))) A-edited\n")
-    (insert "** (skg (node (id N1) (source foreign) indef)) N1-original\n")
+    (insert "** (skg (node (id N1) (source foreign) writeProtected)) N1-original\n")
     ;; A stray/garbled level-1 headline with no skg metadata.
     (insert "* plain heading, no metadata\n")
-    (insert "** (skg (node (id N2) (source foreign) indef)) N2-original\n")
+    (insert "** (skg (node (id N2) (source foreign) writeProtected)) N2-original\n")
     (org-mode)
     ;; N1 -> ownedA; N2 must NOT inherit ownedA (its parent has no source).
     (should (equal (skg--fork-sources-from-confirmation-buffer)
@@ -162,7 +162,7 @@ ordinary-save refusal on C-x C-s."
   (let ((origin (generate-new-buffer "*fork-origin*")))
     (unwind-protect
         (let ((buf (skg--show-fork-confirmation
-                    "# FORK CONFIRMATION\n* (skg (node (source owned))) N-edited\n** (skg (node (id N) (source foreign) (affectsParent false) indef (rels \"aO\"))) N-original\n"
+                    "# FORK CONFIRMATION\n* (skg (node (source owned))) N-edited\n** (skg (node (id N) (source foreign) (affectsParent false) writeProtected (rels \"aO\"))) N-original\n"
                     origin)))
           (unwind-protect
               (with-current-buffer buf
@@ -201,7 +201,7 @@ clone) as the default, and writes the choice into the metadata."
     (insert "Some explanation.\n")
     (insert "# Suggested source for the clone below: owned2\n")
     (insert "* (skg (node (source PICK-A-SOURCE) (viewStats (sourceHerald ⌂:PICK-A-SOURCE)))) N-edited\n")
-    (insert "** (skg (node (id N) (source foreign) (affectsParent false) indef)) N-original\n")
+    (insert "** (skg (node (id N) (source foreign) (affectsParent false) writeProtected)) N-original\n")
     (org-mode)
     (let ((offered-defaults nil))
       (cl-letf (((symbol-function 'skg--owned-sources)
@@ -223,7 +223,7 @@ clone) as the default, and writes the choice into the metadata."
 saved metadata, so the server omitted the placeholder) prompts nothing."
   (with-temp-buffer
     (insert "* (skg (node (source owned2) (viewStats (sourceHerald ⌂:owned2)))) N-edited\n")
-    (insert "** (skg (node (id N) (source foreign) (affectsParent false) indef)) N-original\n")
+    (insert "** (skg (node (id N) (source foreign) (affectsParent false) writeProtected)) N-original\n")
     (org-mode)
     (cl-letf (((symbol-function 'skg--completing-read-with-cycle)
                (lambda (&rest _)
@@ -234,7 +234,7 @@ saved metadata, so the server omitted the placeholder) prompts nothing."
 (ert-deftest test-approve-fork-errors-when-origin-is-gone ()
   "skg-approve-fork refuses when the originating buffer is dead."
   (let ((origin (generate-new-buffer "*fork-origin-2*")))
-    (let ((buf (skg--show-fork-confirmation "* (skg (node (id N) (source foreign) indef)) N\n"
+    (let ((buf (skg--show-fork-confirmation "* (skg (node (id N) (source foreign) writeProtected)) N\n"
                                             origin)))
       (kill-buffer origin) ;; origin dies before approval
       (unwind-protect

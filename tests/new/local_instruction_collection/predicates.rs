@@ -10,7 +10,7 @@ use skg::from_text::local_instruction_collection::predicates::{
 use skg::types::git::Sign;
 use skg::types::misc::{ID, SourceName};
 use skg::types::viewnode::{
-  default_activeNode, NodeEditRequest, IndefOrDef, AffectsParent,
+  default_activeNode, NodeEditRequest, Editability, AffectsParent,
   ActiveNode };
 
 fn base_activeNode (
@@ -25,7 +25,7 @@ fn with_edit_request (
 ) -> ActiveNode {
   let mut t : ActiveNode =
     base_activeNode ();
-  t . indef_or_def = IndefOrDef::Definitive {
+  t . editability = Editability::Definitive {
     body         : None,
     edit_request : Some (edit_request) };
   t }

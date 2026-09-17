@@ -172,7 +172,7 @@ cannot acquire inconsistent policies in different layers:
 
 The SIX read-only folders (the `ReadOnlySet` four plus the `ReadOnlyFilter`
 two) carry the ☮ herald on their folder headline, meaning "this folder
-cannot be changed from here" — the same sense ☮ (`indef`) carries on a
+cannot be changed from here" — the same sense ☮ (`writeProtected`) carries on a
 node.  The two `WritableSet` folders and `aliasFolder` do not.  This is a
 herald-table fact only (`server/heralds.rs`), with no wire atom of its
 own: which folders are read-only is already known from the folder atom.
@@ -329,7 +329,7 @@ its immediate children.
 
 The OVERRIDE-CHOICE BUFFER (the "menu") is what a new single-root
 view of an overridden node returns: the node as root, each visible
-overrider an Independent indefinitive child of what it overrides,
+overrider an Independent write-protected child of what it overrides,
 all edges shown, foreign included. BYPASS
 ('(override-choice . "bypass")' on the request;
 'skg-goto-bypassOverride' in Emacs; automatic from magit buffers)

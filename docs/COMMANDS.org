@@ -351,11 +351,11 @@ The nodes that subscribe to this node.
 *** C-c p s : skg-show-paths-through-subscribees
 The nodes this node subscribes to.
 ** C-c s : setting node properties
-*** first some vocab: 'definitive' and 'indefinitive'
-A view of a node can be definitive or indefinitive.
+*** first some vocab: 'definitive' and 'write-protected'
+A view of a node can be definitive or write-protected.
 Typically the first place in the buffer that depicts a node
 is the definitive view of it. So that other views of that node
-cannot contradict it, they are 'indefinitive': Edits to them
+cannot contradict it, they are 'write-protected': Edits to them
 cannot affect the node they depict. They are also truncated --
 that is, shown without content --
 in order to prevent the view from becoming redundant and huge.
@@ -363,27 +363,27 @@ in order to prevent the view from becoming redundant and huge.
 Instead, use skg-set-definitive, below.
 That's because Skg has to make other instances of it
 (in this same buffer -- and maybe in the future other buffers too)
-indefinitive. That's because a buffer can only be saved
+write-protected. That's because a buffer can only be saved
 if it has at most one definitive instance of a node.
 Otherwise, two definitive nodes could contradict each other.
 
-This same caveat does not apply to making a node indefinitive.
-While there does exist a command for that (skg-set-indefinitive)
+This same caveat does not apply to making a node write-protected.
+While there does exist a command for that (skg-set-write-protected)
 you can also 'do it yourself'
 by visiting a metadata buffer for the node (skg-view-metadata).
 *** C-c s d : skg-set-definitive
 If you want to see the definitive view of that node
-from a place where it is currently shown in an indefinitive form,
+from a place where it is currently shown in a write-protected form,
 call this function. It will make the current definitive view
-(if it exists) indefinitive, and then draw a definitive view here.
-*** C-c s i : skg-set-indefinitive
-This marks a node as 'indefinitive',
+(if it exists) write-protected, and then draw a definitive view here.
+*** C-c s w : skg-set-write-protected
+This marks a node as 'write-protected',
 as described above.
 In brief, it means edits to its title, body or
   (more importantly) children
 will not affect it
   (although edits to its children will affect those children,
-  unless they are also indefinitive).
+  unless they are also write-protected).
 *** C-c s s : skg-set-source
 Changes the source of the node at point.
 The prompt starts with the current source as editable minibuffer text.
@@ -406,7 +406,7 @@ Two safeguards, shared with the recursive form below:
   Declining leaves them and notes that =C-c s R= can publicize them
   later. Edges already carrying an explicit source request
   already have a deliberate recording source and are never touched.
-- An indefinitive instance is NOT changed -- the save would
+- A write-protected instance is NOT changed -- the save would
   silently ignore its source edit -- and produces a loud WARNING,
   with the full ID list written to =*Messages*=.
 *** C-c s S : skg-set-source-recursive
@@ -414,7 +414,7 @@ Like 'skg-set-source', but it also
 changes the source of every content descendent of the node at point
 whose source matches the original source of the node at point.
 Only descendents for which AffectsParent=True are traversed.
-The stuck-relationship offer and the indefinitive warning described
+The stuck-relationship offer and the write-protected warning described
 under =C-c s s= apply here too, across the whole subtree.
 *** C-c s m : skg-set-merge-request
 (See [[./merging.org][the docs on merging]] for why would you merge two nodes,
@@ -516,7 +516,7 @@ default makes the save fail, naming that edge).
 
 The walk applies to, and recurses on, only viewchildren that affect
 their viewparents: affectsParent=true activeNodes, through the two
-writable folders. It prunes below indefinitive nodes and
+writable folders. It prunes below write-protected nodes and
 subscribee-as-such members (their org-children's edges are not
 collected at save), and prunes read-only folders and other scaffolds
 entirely.
@@ -545,9 +545,9 @@ org-descendents. Its org-parent must be a definitive activeNode
 whose source is owned in =skgconfig.toml=.
 
 The command replaces the whole leaf with a same-level
-indefinitive activeNode for the link dest. The parent is
+write-protected activeNode for the link dest. The parent is
 definitive, so saving records the dest as content of the
-parent; the replacement child is indefinitive, so its own text is
+parent; the replacement child is write-protected, so its own text is
 not rewritten from the link label.
 *** C-c m f : skg-fork-node
 Fork the node at point that you ALREADY own: create a private
@@ -723,9 +723,9 @@ but also removes the node from the stack.
 This is the easiest way to give a node multiple containers --
 push it to the stack, then paste it as a node somewhere else.
 
-Inserts, at the cursor, an indefinitive view
+Inserts, at the cursor, a write-protected view
 of the node whose ID is at the top of the id stack.
-Its metadata includes only the ID and =indef=,
+Its metadata includes only the ID and =writeProtected=,
 and its title comes from the stack.
 Does not modify the stack or save.
 Saving will provide the rest of its metadata.

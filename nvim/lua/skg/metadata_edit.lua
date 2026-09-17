@@ -180,7 +180,7 @@ end
 ---@param field_value string
 ---@return string[]|nil
 function M.cycle_values_for_field (field_name, field_value)
-  if field_name == 'indef' then
+  if field_name == 'writeProtected' then
     return { 'false (default)', 'true' } end
   if field_name == 'affectsParent' then
     return { 'true (default)', 'false', 'na' } end

@@ -73,7 +73,7 @@ an interactive command NAME that requests REQUEST-FORM and auto-saves."
 
 (defun skg-request-definitive-view ()
   "Edit metadata to request a definitive view for the headline at point.
-The node must be indefinitive and childless. Does NOT auto-save."
+The node must be write-protected and childless. Does NOT auto-save."
   (interactive)
   (save-excursion
     (org-back-to-heading t)

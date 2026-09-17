@@ -7,10 +7,10 @@ pub use super::super::common::*;
 pub const GIT_DIFF_VIEW: &str = "\
 * (skg (node (id 1) (source main))) 1
 ** (skg (node (id 11) (source main))) 11
-*** (skg (node (id gets-removed) (source main) indef (unstaged removedX removedM))) gets-removed
+*** (skg (node (id gets-removed) (source main) writeProtected (unstaged removedX removedM))) gets-removed
 *** (skg (node (id moves) (unstaged newM))) moves
 ** (skg (node (id 12) (source main))) 12
-*** (skg (node (id moves) (source main) indef (unstaged removedM))) moves
+*** (skg (node (id moves) (source main) writeProtected (unstaged removedM))) moves
 * (skg (node (id new) (source main))) new
 ";
 
@@ -89,16 +89,16 @@ pub fn setup_git_repo_with_added_subscribee_fixtures(
 }
 
 /// Expected when 11 is also a view root (TODO/fork-fixes.org, no git
-/// ghosts under indefinitive nodes): the copy of 11 under 1 draws
-/// indefinitive and so gets NO removed-member phantoms; the
+/// ghosts under write-protected nodes): the copy of 11 under 1 draws
+/// write-protected and so gets NO removed-member phantoms; the
 /// definitive root copy of 11 carries them.
-pub const GIT_DIFF_VIEW_INDEF_NO_GHOSTS: &str = "\
+pub const GIT_DIFF_VIEW_WRITE_PROTECTED_NO_GHOSTS: &str = "\
 * (skg (node (id 1) (source main))) 1
-** (skg (node (id 11) (source main) indef)) 11
+** (skg (node (id 11) (source main) writeProtected)) 11
 ** (skg (node (id 12) (source main))) 12
-*** (skg (node (id moves) (source main) indef (unstaged removedM))) moves
+*** (skg (node (id moves) (source main) writeProtected (unstaged removedM))) moves
 * (skg (node (id 11) (source main))) 11
-** (skg (node (id gets-removed) (source main) indef (unstaged removedX removedM))) gets-removed
+** (skg (node (id gets-removed) (source main) writeProtected (unstaged removedX removedM))) gets-removed
 ** (skg (node (id moves) (unstaged newM))) moves
 ";
 
@@ -106,9 +106,9 @@ pub const GIT_DIFF_VIEW_INDEF_NO_GHOSTS: &str = "\
 pub const GIT_DIFF_VIEW_STAGED: &str = "\
 * (skg (node (id 1) (source main))) 1
 ** (skg (node (id 11) (source main))) 11
-*** (skg (node (id gets-removed) (source main) indef (staged removedX removedM))) gets-removed
+*** (skg (node (id gets-removed) (source main) writeProtected (staged removedX removedM))) gets-removed
 *** (skg (node (id moves) (staged newM))) moves
 ** (skg (node (id 12) (source main))) 12
-*** (skg (node (id moves) (source main) indef (staged removedM))) moves
+*** (skg (node (id moves) (source main) writeProtected (staged removedM))) moves
 * (skg (node (id new) (source main))) new
 ";

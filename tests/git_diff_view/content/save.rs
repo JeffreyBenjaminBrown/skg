@@ -228,7 +228,7 @@ async fn test_diff_mode_as_subscribee_regenerates_phantom_children (
       assert_buffer_contains(
         &response . saved_view,
         "*** (skg (node (id 11) (source main))) 11\n\
-         **** (skg (node (id gets-removed) (source main) indef (unstaged removedX removedM))) gets-removed\n\
+         **** (skg (node (id gets-removed) (source main) writeProtected (unstaged removedX removedM))) gets-removed\n\
          **** (skg (node (id moves) (source main))) moves" );
       Ok (( )) }) }) . await
 }
@@ -267,7 +267,7 @@ async fn test_diff_mode_removed_subscribee_shows_removedM (
 
       assert_buffer_contains(
         &response . saved_view,
-        "*** (skg (node (id 22) (source main) indef (unstaged removedM))) 22" );
+        "*** (skg (node (id 22) (source main) writeProtected (unstaged removedM))) 22" );
       Ok (( )) }) }) . await
 }
 
@@ -303,7 +303,7 @@ async fn test_diff_mode_removed_subscribee_staged_shows_stagedM (
 
       assert_buffer_contains(
         &response . saved_view,
-        "*** (skg (node (id 22) (source main) indef (staged removedM))) 22" );
+        "*** (skg (node (id 22) (source main) writeProtected (staged removedM))) 22" );
       Ok (( )) }) }) . await
 }
 

@@ -32,7 +32,7 @@ source) as a removed-member phantom carrying the reserved source
 sentinel SourceName::not_found() = "NOT_FOUND"
 (server/types/misc.rs:133-142). The phantom renders fine:
 
-  *** (skg (node (id 8c24623a-...) (source NOT_FOUND) indef
+  *** (skg (node (id 8c24623a-...) (source NOT_FOUND) writeProtected
             (graphStats (containers 0)) (unstaged removedM)))
       TITLE NOT FOUND for ID 8c24623a-...
 
@@ -129,7 +129,7 @@ The chain:
  Minus.
 4. So the old-position phantom renders with (unstaged newM):
 
-   *** (skg (node (id 486e988b-...) (source decid) indef
+   *** (skg (node (id 486e988b-...) (source decid) writeProtected
              (unstaged newM))) scarf            <- old slot
    ...
    *** (skg (node (id 486e988b-...) (source decid)
@@ -140,7 +140,7 @@ The chain:
  diff_axes_require_phantom (server/types/viewnode.rs:455-466)
  requires membership.staged/unstaged == Minus or
  existence.unstaged == Minus. The old-position copy has only Plus
- (newM), so it parses as an ACTIVE indefinitive vognode, NOT a
+ (newM), so it parses as an ACTIVE write-protected vognode, NOT a
  phantom.
 6. nonignored_children_have_distinct_ids
  (server/from_text/buffer_to_viewnodes/local.rs:482+) counts every

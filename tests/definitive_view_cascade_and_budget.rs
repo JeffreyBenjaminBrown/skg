@@ -68,7 +68,7 @@ fn all_tests
 // Test: Definitive view with an ample budget -> everything expands.
 // §5.5 budget counts vognode EXPANSIONS (cost 1 each); the full subtree here is
 // 12 expansions (1,2,11,12,13,121,122,123,124,1211,1212,1221), so a budget of
-// 20 is ample and nothing is left indefinitive.
+// 20 is ample and nothing is left write-protected.
 // ===================================================
 async fn test_definitive_view_ample_budget (
   config : &SkgConfig,
@@ -77,7 +77,7 @@ async fn test_definitive_view_ample_budget (
       let input_org_text = indoc! {"
         * (skg (node (id 1) (source main))) 1
         ** (skg (node (id 11))) 11
-        ** (skg (node (id 12) indef (viewRequests definitiveView))) 12
+        ** (skg (node (id 12) writeProtected (viewRequests definitiveView))) 12
         ** (skg (node (id 13))) 13
         * (skg (node (id 2) (source main))) 2
       "};
@@ -135,7 +135,7 @@ async fn test_definitive_view_ample_budget (
 // ===================================================
 // §5.5 budget is granular: limit=5 spends its last unit on 1211 (1212 not
 // created); limit=6 affords both 1211 and 1212. Nodes whose DVR is reached
-// after the budget is spent are stripped to indefinitive. (No sibling-group
+// after the budget is spent are stripped to write-protected. (No sibling-group
 // padding: the two limits now differ by one created node.)
 
 async fn test_definitive_view_limit_5_or_6 (
@@ -145,7 +145,7 @@ async fn test_definitive_view_limit_5_or_6 (
       let input_org_text = indoc! {"
         * (skg (node (id 1) (source main))) 1
         ** (skg (node (id 11))) 11
-        ** (skg (node (id 12) indef (viewRequests definitiveView))) 12
+        ** (skg (node (id 12) writeProtected (viewRequests definitiveView))) 12
         ** (skg (node (id 13))) 13
         * (skg (node (id 2) (source main))) 2
       "};
@@ -190,26 +190,26 @@ async fn test_definitive_view_limit_5_or_6 (
       // The expansion order here is 1, 2, 11, 12, 13, 121, 122, ... A folder fills
       // WHOLE for free, so a node's whole content group is always drawn -- the
       // budget only governs how many of those children then EXPAND in turn; the
-      // rest stay indefinitive (visible, collapsed). Never a partial group.
+      // rest stay write-protected (visible, collapsed). Never a partial group.
       //
       // limit=5: expansions 1,2,11,12,13 spend the budget. 12 (the 4th) expanded
       // and drew its WHOLE group 121..124, but the budget hit 0 at 13, so when
-      // 121..124 are visited they stay indefinitive (none expands -> no gen-3).
+      // 121..124 are visited they stay write-protected (none expands -> no gen-3).
       let expected_5 = indoc! {"
         * (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 3))))) 1
         ** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
         ** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth contains)))) 12
         12 body
-        *** (skg (node (id 121) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1)) (out 2)) (birth contains)))) 121
-        *** (skg (node (id 122) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
-        *** (skg (node (id 123) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
-        *** (skg (node (id 124) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 124
+        *** (skg (node (id 121) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 2)) (birth contains)))) 121
+        *** (skg (node (id 122) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
+        *** (skg (node (id 123) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
+        *** (skg (node (id 124) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 124
         ** (skg (node (id 13) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
         * (skg (node (id 2) (source main) (affectsParent na))) 2
       "};
       // limit=6: one more expansion than limit=5 -- 121 (the 6th) now expands and
-      // draws its whole gen-3 group 1211,1212 (both then indefinitive, budget
-      // spent); 122..124 remain indefinitive.
+      // draws its whole gen-3 group 1211,1212 (both then write-protected, budget
+      // spent); 122..124 remain write-protected.
       let expected_6 = indoc! {"
         * (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 3))))) 1
         ** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
@@ -217,19 +217,19 @@ async fn test_definitive_view_limit_5_or_6 (
         12 body
         *** (skg (node (id 121) (source main) (rels (contains (in 1 (ancestors 1)) (out 2)) (birth contains)))) 121
         121 body
-        **** (skg (node (id 1211) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1211
-        **** (skg (node (id 1212) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1212
-        *** (skg (node (id 122) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
-        *** (skg (node (id 123) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
-        *** (skg (node (id 124) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 124
+        **** (skg (node (id 1211) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1211
+        **** (skg (node (id 1212) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1212
+        *** (skg (node (id 122) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
+        *** (skg (node (id 123) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
+        *** (skg (node (id 124) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 124
         ** (skg (node (id 13) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
         * (skg (node (id 2) (source main) (affectsParent na))) 2
       "};
 
       assert_metadata_eq!(result_5, expected_5,
-        "limit=5: 121 expands one gen-3 child (1211), rest indefinitive (§5.5)");
+        "limit=5: 121 expands one gen-3 child (1211), rest writeProtected (§5.5)");
       assert_metadata_eq!(result_6, expected_6,
-        "limit=6: 121 expands both gen-3 children, rest indefinitive (§5.5)");
+        "limit=6: 121 expands both gen-3 children, rest writeProtected (§5.5)");
 
       Ok (( )) }
 
@@ -238,7 +238,7 @@ async fn test_definitive_view_limit_5_or_6 (
 // ===================================================
 // Gen 2 has 4 children (121, 122, 123, 124).
 // Any limit from 1 to 4 hits the limit on the first generation,
-// so the sibling group is completed, all are indefinitive,
+// so the sibling group is completed, all are write-protected,
 // and the grandchild generation is not visited at all.
 
 async fn test_definitive_view_limit_1_to_4 (
@@ -248,7 +248,7 @@ async fn test_definitive_view_limit_1_to_4 (
       let input_org_text = indoc! {"
         * (skg (node (id 1) (source main))) 1
         ** (skg (node (id 11))) 11
-        ** (skg (node (id 12) indef (viewRequests definitiveView))) 12
+        ** (skg (node (id 12) writeProtected (viewRequests definitiveView))) 12
         ** (skg (node (id 13))) 13
         * (skg (node (id 2) (source main))) 2
       "};
@@ -290,41 +290,41 @@ async fn test_definitive_view_limit_1_to_4 (
       // §5.5: the budget counts vognode EXPANSIONS (cost 1 each), in BFS order:
       // 1, 2, 11, 12, 13, then 12's content 121..124, ... A view ROOT is never
       // truncated (the user opened it), so roots 1 and 2 always expand; other
-      // vognodes reached after the budget is spent are left indefinitive.
+      // vognodes reached after the budget is spent are left write-protected.
       //
       // limit=1: root 1 expands (budget 1->0) and draws its WHOLE group 11,12,13;
-      // all three are then indefinitive (budget spent), so 12 never expands and
+      // all three are then write-protected (budget spent), so 12 never expands and
       // none of 121.. is created. Root 2 still expands (root exemption).
       let expected_1 = indoc! {"
         * (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 3))))) 1
-        ** (skg (node (id 11) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
-        ** (skg (node (id 12) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1)) (out 4)) (birth contains)))) 12
-        ** (skg (node (id 13) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
+        ** (skg (node (id 11) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
+        ** (skg (node (id 12) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 4)) (birth contains)))) 12
+        ** (skg (node (id 13) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
         * (skg (node (id 2) (source main) (affectsParent na))) 2
       "};
       // hiddenBody marks only 12: the saved buffer drew 11 and 13
       // definitive with no body text, WIPING their bodies, while
-      // indefinitive 12 kept its body -- which this render hides.
+      // write-protected 12 kept its body -- which this render hides.
       // limit=4: expansions 1, 2, 11, 12 spend the budget. 12 (the 4th) drew its
-      // whole group 121..124, all indefinitive (budget spent); 13 is reached
-      // after the budget is gone, so it too is indefinitive.
+      // whole group 121..124, all write-protected (budget spent); 13 is reached
+      // after the budget is gone, so it too is write-protected.
       let expected_4 = indoc! {"
         * (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 3))))) 1
         ** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
         ** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth contains)))) 12
         12 body
-        *** (skg (node (id 121) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1)) (out 2)) (birth contains)))) 121
-        *** (skg (node (id 122) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
-        *** (skg (node (id 123) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
-        *** (skg (node (id 124) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 124
-        ** (skg (node (id 13) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
+        *** (skg (node (id 121) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 2)) (birth contains)))) 121
+        *** (skg (node (id 122) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
+        *** (skg (node (id 123) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
+        *** (skg (node (id 124) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 124
+        ** (skg (node (id 13) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
         * (skg (node (id 2) (source main) (affectsParent na))) 2
       "};
 
       assert_metadata_eq!(result_1, expected_1,
-        "limit=1 creates only the first gen-2 child, indefinitive (§5.5)");
+        "limit=1 creates only the first gen-2 child, writeProtected (§5.5)");
       assert_metadata_eq!(result_4, expected_4,
-        "limit=4 creates all four gen-2 children, all indefinitive (§5.5)");
+        "limit=4 creates all four gen-2 children, all writeProtected (§5.5)");
 
       Ok (( )) }
 
@@ -333,7 +333,7 @@ async fn test_definitive_view_limit_1_to_4 (
 // ===================================================
 // If node X is already definitive in the tree, and we request
 // definitive view on a second instance of X, the first should become
-// indefinitive.
+// write-protected.
 
 async fn test_definitive_view_conflicting (
   config : &SkgConfig,
@@ -345,8 +345,8 @@ async fn test_definitive_view_conflicting (
       let input_org_text = indoc! {"
         * (skg (node (id 1) (source main))) 1
         ** (skg (node (id 12))) 12
-        *** (skg (node (id 122) indef hiddenBody)) 122
-        * (skg (node (id 12) (source main) indef (viewRequests definitiveView))) 12 copy
+        *** (skg (node (id 122) writeProtected hiddenBody)) 122
+        * (skg (node (id 12) (source main) writeProtected (viewRequests definitiveView))) 12 copy
       "};
 
       let result = {
@@ -368,13 +368,13 @@ async fn test_definitive_view_conflicting (
       println!("Result with conflict:\n{}", result);
 
       let expected = indoc! {
-        // The first 12 (child of 1) should become indefinitive.
+        // The first 12 (child of 1) should become write-protected.
         // The second 12 (root with request) should be expanded.
         // NOTE: The first 12 redefines the children of 12 as [122]
         // rather than [121,122,123,124].
         "* (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 1))))) 1
-         ** (skg (node (id 12) (source main) indef (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 12
-         *** (skg (node (id 122) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
+         ** (skg (node (id 12) (source main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 12
+         *** (skg (node (id 122) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
          * (skg (node (id 12) (source main) (affectsParent na) (rels (contains (in 1) (out 1))))) 12
          ** (skg (node (id 122) (source main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
          122 body
@@ -383,7 +383,7 @@ async fn test_definitive_view_conflicting (
       "};
 
       assert_metadata_eq!(result, expected,
-        "First definitive instance should become indef when second requests definitive");
+        "First definitive instance should become write-protected when second requests definitive");
 
       Ok (( )) }
 
@@ -399,7 +399,7 @@ async fn test_definitive_view_with_cycle (
       // Node a has definitive request
       // a contains b contains a (cycle)
       let input_org_text = indoc! {"
-        * (skg (node (id cyc-a) (source main) indef (viewRequests definitiveView))) cyc-a
+        * (skg (node (id cyc-a) (source main) writeProtected (viewRequests definitiveView))) cyc-a
       "};
 
       let result = {
@@ -426,7 +426,7 @@ async fn test_definitive_view_with_cycle (
         cyc-a body
         ** (skg (node (id cyc-b) (source main) (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1))) (birth contains)))) cyc-b
         cyc-b body
-        *** (skg (node (id cyc-a) (source main) indef hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1))) (birth contains)) (viewStats cycle))) cyc-a
+        *** (skg (node (id cyc-a) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1))) (birth contains)) (viewStats cycle))) cyc-a
       "};
 
       assert_metadata_eq!(result, expected,
@@ -438,7 +438,7 @@ async fn test_definitive_view_with_cycle (
 // Test: Definitive view expansion detects repeats
 // ===================================================
 // If a node is already visited (definitive elsewhere), it should be
-// marked indef when encountered again during expansion.
+// marked write-protected when encountered again during expansion.
 
 async fn test_definitive_view_with_repeat (
   config : &SkgConfig,
@@ -446,7 +446,7 @@ async fn test_definitive_view_with_repeat (
 ) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
         * (skg (node (id 121) (source main))) 121
-        * (skg (node (id 12) (source main) indef (viewRequests definitiveView))) 12
+        * (skg (node (id 12) (source main) writeProtected (viewRequests definitiveView))) 12
       "};
 
       let result = {
@@ -468,14 +468,14 @@ async fn test_definitive_view_with_repeat (
       println!("Result with repeat:\n{}", result);
 
       let expected = indoc! {
-        // Upon saving, the indef view of node 12 had no effect, but the
+        // Upon saving, the write-protected view of node 12 had no effect, but the
         // definitive view of 121 (definitive in the *buffer*) deleted its
         // children at extraction. In the rerender, node 12's definitiveView
         // cascades (§5.3) a DVR onto its content child 121, which is Final
         // and so clobbers the Tentative bare root 121 (§5.2). So the bare
-        // root 121 is now indefinitive and 12's child 121 is the definitive
+        // root 121 is now write-protected and 12's child 121 is the definitive
         // occurrence (childless, since the save emptied 121's contains).
-        "* (skg (node (id 121) (source main) (affectsParent na) indef (rels (contains (in 1))))) 121
+        "* (skg (node (id 121) (source main) (affectsParent na) writeProtected (rels (contains (in 1))))) 121
          * (skg (node (id 12) (source main) (affectsParent na) (rels (contains (in 1) (out 4))))) 12
          12 body
          ** (skg (node (id 121) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121
@@ -490,7 +490,7 @@ async fn test_definitive_view_with_repeat (
       "};
 
       assert_metadata_eq!(result, expected,
-        "Definitive view should mark repeated nodes as indefinitive");
+        "Definitive view should mark repeated nodes as writeProtected");
 
       Ok (( )) }
 
@@ -503,7 +503,7 @@ async fn test_definitive_view_request_cleared (
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input_org_text = indoc! {"
-        * (skg (node (id 12) (source main) indef (viewRequests definitiveView))) 12
+        * (skg (node (id 12) (source main) writeProtected (viewRequests definitiveView))) 12
       "};
 
       let result = {
@@ -546,7 +546,7 @@ async fn test_definitive_view_request_cleared (
 // expansions: r, c1, c2. With limit=3 the chain fully expands (c2 definitive)
 // AND the AliasFolder shows BOTH aliases. The alias members are scaffolds, so they
 // cost nothing: were they charged, the 3 units could not also cover c2, which
-// would then be left indefinitive (verified: at limit=2 c2 *is* indefinitive
+// would then be left write-protected (verified: at limit=2 c2 *is* write-protected
 // while the AliasFolder stays whole). That c2 is definitive here is the guarantee
 // this test pins.
 async fn test_budget_aliasfolder_is_neutral (

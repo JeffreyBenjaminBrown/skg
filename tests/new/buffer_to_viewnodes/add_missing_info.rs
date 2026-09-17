@@ -52,13 +52,13 @@ async fn test_sourceless_folder_member_gets_graph_source (
 ) -> Result<(), Box<dyn Error>> {
   // 'root' is an extra_id of fixture node 'root-pid', whose source is
   // 'main'. The subscribee reference below carries neither source nor
-  // the primary id, and is indefinitive -- exactly the bare-paste shape
-  // (a link-stack paste yields an indefinitive node with only an id).
+  // the primary id, and is write-protected -- exactly the bare-paste shape
+  // (a link-stack paste yields a write-protected node with only an id).
   let input : &str =
     indoc! {"
             * (skg (node (id owner) (source main))) owner
             ** (skg subscribeeFolder)
-            *** (skg (node (id root) indef)) subscribee reference
+            *** (skg (node (id root) writeProtected)) subscribee reference
         "};
   let mut viewforest : MpViewForest =
     org_to_uninterpreted_viewforest (input) . unwrap() . 0;

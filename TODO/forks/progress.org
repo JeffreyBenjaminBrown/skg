@@ -325,7 +325,7 @@ All five plan steps landed in order, one (or two) commits each:
   tests/elisp/herald-rules.sexp.
 - *Step 4* (two-level buffer): 'build_fork_confirmation_buffer' emits the
   clone-to-be parent (edited title, editable source via a sourceHerald,
-  no id) over the original (real id, foreign source, indef,
+  no id) over the original (real id, foreign source, writeProtected,
   parentIs=independent, pO). To show the original honestly, 'ForkSpec.
   original_title' is now N's DISK title (threaded through ForkCandidate),
   not the edited buffer title. Unit test pins the two-level shape + pO.

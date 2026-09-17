@@ -12,7 +12,7 @@ fn all_tests
     |s| Box::pin ( async move {
       test_content_diff_with_moved_and_deleted_nodes (s) . await ?;
       test_content_diff_staged (s) . await ?;
-      test_no_ghosts_under_indefinitive_occurrence (s) . await ?;
+      test_no_ghosts_under_writeProtected_occurrence (s) . await ?;
       Ok (( )) } )) }
 
 async fn test_content_diff_with_moved_and_deleted_nodes (
@@ -38,12 +38,12 @@ async fn test_content_diff_with_moved_and_deleted_nodes (
   Ok(())
 }
 
-/// TODO/fork-fixes.org: no git ghosts under indefinitive nodes. The
+/// TODO/fork-fixes.org: no git ghosts under write-protected nodes. The
 /// same transition as above, but with 11 also a view ROOT, so the
-/// copy of 11 under 1 draws indefinitive. The removed-member
+/// copy of 11 under 1 draws write-protected. The removed-member
 /// phantoms of 11 must appear only under its definitive (root) copy;
-/// the indefinitive copy gets none.
-async fn test_no_ghosts_under_indefinitive_occurrence (
+/// the write-protected copy gets none.
+async fn test_no_ghosts_under_writeProtected_occurrence (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
@@ -51,7 +51,7 @@ async fn test_no_ghosts_under_indefinitive_occurrence (
   let repo_path = temp_dir . path();
   setup_git_repo_with_fixtures (repo_path)?;
   s . reset_with_source_path (
-    "test_no_ghosts_under_indefinitive_occurrence",
+    "test_no_ghosts_under_writeProtected_occurrence",
     repo_path ) ?;
   let (config, _tantivy)
     : (&SkgConfig, &mut TantivyIndex)
@@ -61,7 +61,7 @@ async fn test_no_ghosts_under_indefinitive_occurrence (
   let (actual, _pids, _) : (String, Vec<ID>, _) =
     multi_root_view(&config, None, &root_ids, true)?;
 
-  assert_buffer_contains(&actual, GIT_DIFF_VIEW_INDEF_NO_GHOSTS);
+  assert_buffer_contains(&actual, GIT_DIFF_VIEW_WRITE_PROTECTED_NO_GHOSTS);
   assert_eq!(
     // The removed child appears exactly once: under the definitive copy.
     actual . matches ("(id gets-removed)") . count (), 1,

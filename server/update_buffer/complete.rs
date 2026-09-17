@@ -18,7 +18,7 @@ use crate::update_buffer::util::detach_scaffold_transferring_focus;
 use crate::update_buffer::warnings::CompletionWarning;
 use crate::to_org::render::diff::process_activeNode_diff;
 use crate::types::tree::viewnode_nodecomplete::write_at_activeNode_in_tree;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerFolder, ViewRequest, IndefOrDef};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerFolder, ViewRequest, Editability};
 use crate::types::viewnode::{Vognode, Phantom, QualFolder};
 use super::reconcile::hiddeninsubscribee_folder::reconcile_hiddenInSubscribeeFolder_children;
 use super::reconcile::hiddenoutsideof_subscribeefolder::reconcile_hiddenoutsideSubscribeeFolder_children;
@@ -224,7 +224,7 @@ fn visit_normal_node (
   let mut cascade : bool = false; // node is Final -> hand DVRs to children
   // TODO/DONE/local-view-update/plan_v2.org §5.5: the budget counts vognode *expansions* (each costs 1, charged in
   // expand_true_content_at_activeNode); once it hits 0 every later vognode is left
-  // indefinitive -- a visible, collapsed headline. We never truncate a group
+  // write-protected -- a visible, collapsed headline. We never truncate a group
   // mid-way (whole groups already drawn keep all their members); we only stop
   // STARTING new expansions. EXCEPTION: a view root (child of the BufferRoot) is
   // the node the user explicitly opened, so it always expands -- never truncated.
@@ -233,13 +233,13 @@ fn visit_normal_node (
     && ! read_at_ancestor_in_tree ( tree, treeid, 1,
            |vn : &ViewNode| matches! ( &vn . kind, ViewNodeKind::BufferRoot ) )
          . unwrap_or (false) {
-    // Budget spent and this is not a view root: draw it indefinitive and expand
+    // Budget spent and this is not a view root: draw it write-protected and expand
     // nothing under it; strip any DVR so it is not treated as Final. The content
     // engine (settled) then clobbers+returns.
     write_at_activeNode_in_tree (
       tree, treeid,
       |t| { t . view_requests . remove (& ViewRequest::Definitive);
-            t . indef_or_def = IndefOrDef::Indefinitive; } )
+            t . editability = Editability::WriteProtected; } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
     settled = true;
   } else if had_dvr {
@@ -248,7 +248,7 @@ fn visit_normal_node (
       &context . runtime . config, context . defmap ) ? {
       DrawOutcome::Deferred => {
         // Deferred to an existing Final occurrence: the node is now
-        // indefinitive; the content engine (settled) will clobber+return.
+        // write-protected; the content engine (settled) will clobber+return.
         settled = true; }
       DrawOutcome::MadeFinal => {
         settled = true; cascade = true; } } }

@@ -1,6 +1,6 @@
-# Test Fixtures for affectsParent=false and indefinitive
+# Test Fixtures for affectsParent=false and writeProtected
 
-These fixtures test the interaction between `affectsParent=false` and `indefinitive` metadata flags during buffer saves.
+These fixtures test the interaction between `affectsParent=false` and `writeProtected` metadata flags during buffer saves.
 
 ## Initial State
 
@@ -21,7 +21,7 @@ The test simulates saving this buffer:
 
 ```org
 * (skg (node (id 1) (source main))) 1
-** (skg (node (id 2) (source main) (affectsParent false) indef)) 2
+** (skg (node (id 2) (source main) (affectsParent false) writeProtected)) 2
 *** (skg (node (id 4) (source main))) 4
 ```
 
@@ -30,7 +30,7 @@ The test simulates saving this buffer:
 After save:
 
 1. **Node 2** should have `contains = [3, 4]`
-   - Node 3 is retained (due to `indefinitive`)
+   - Node 3 is retained (due to `writeProtected`)
    - Node 4 is appended (new child in the buffer)
 
 2. **Node 1** should have `contains = []`
@@ -39,5 +39,5 @@ After save:
 
 This verifies that:
 - `affectsParent=false` prevents a child from updating its parent's contents
-- `indefinitive` allows appending to existing contents rather than replacing them
+- `writeProtected` allows appending to existing contents rather than replacing them
 - Both flags work correctly together through the full save pipeline

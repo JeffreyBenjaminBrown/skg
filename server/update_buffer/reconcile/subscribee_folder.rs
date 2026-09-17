@@ -31,7 +31,7 @@ struct SubscribeeFolderContext {
 ///
 /// WHAT IT DOES:
 /// - Error unless it's a SubscribeeFolder.
-/// - Read parent's skg ID and indefinitive flag.
+/// - Read parent's skg ID and write-protected flag.
 /// - Look up parent's subscribees.
 /// - If no subscribees: transfer focus if needed, then delete.
 /// - Reconcile the subscribee children from the graph.
@@ -84,9 +84,9 @@ pub fn reconcile_subscribeeFolder_children (
   // than clobbering them. This also refreshes a DEFINITIVE subscriber's
   // subscribeeFolder during a collateral rerender -- the latent staleness
   // subscribeeFolder-maybe-todo.org flagged (forks plan.org: "Collateral-rerender
-  // staleness fix"). The old gate (`if parent_indefinitive ||
+  // staleness fix"). The old gate (`if parent_write-protected ||
   // source_diffs.is_some()`) wrongly skipped a definitive subscriber outside
-  // diff mode; 'parent_indefinitive' is no longer read.
+  // diff mode; 'parent_write-protected' is no longer read.
   { // TODO/DONE/local-view-update/plan_v2.org §5.5: a folder fills its members WHOLE and is budget-neutral -- the owning
     // subscriber already spent its budget unit when it expanded, so drawing all
     // its subscribees here costs nothing and never truncates the group.

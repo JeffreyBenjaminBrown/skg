@@ -31,7 +31,7 @@ where F: FnOnce (&mut ActiveNode) -> R {
     |viewnode| { match &mut viewnode . kind {
       // TODO/DONE/local-view-update/plan_v2.org §11: a phantom is not an ActiveNode (it carries a slim PhantomDiff), so
       // this Normal-only mutator cannot apply to one (a phantom has no
-      // view_requests/indef_or_def/etc).
+      // view_requests/editability/etc).
       ViewNodeKind::Vognode (Vognode::Active (t))
         => Ok ( f (t) ),
       _ => Err ( "write_at_activeNode_in_tree: expected ActiveNode"

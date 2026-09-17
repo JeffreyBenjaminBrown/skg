@@ -64,22 +64,22 @@ describe('skg.sexpr.activenode_defaults expansion', function ()
   it('inserts all default fields into a minimal ActiveNode', function ()
     local headlines =
       expanded_headlines('(skg (node (id abc) (source jeff)))')
-    -- skg, node, id/abc, source/jeff, indef/false, affectsParent/true,
+    -- skg, node, id/abc, source/jeff, write-protected/false, affectsParent/true,
     -- birth/unremarkable, editRequest/none, viewRequests/none:
     -- each key AND each value is a separate headline.
     assert.are.equal(16, #headlines)
-    assert.is_not_nil(find_text(headlines, 'indef'))
+    assert.is_not_nil(find_text(headlines, 'writeProtected'))
     assert.is_not_nil(find_text(headlines, 'false (default)'))
     assert.is_not_nil(find_text(headlines, 'editRequest'))
     assert.is_not_nil(find_text(headlines, 'none (default)'))
   end)
 
-  it('shows a true child for a bare indef', function ()
+  it('shows a true child for a bare writeProtected', function ()
     local headlines =
-      expanded_headlines('(skg (node (id abc) (source jeff) indef))')
-    local indef_index = find_text(headlines, 'indef')
-    assert.is_not_nil(indef_index)
-    assert.are.equal('true', headlines[indef_index + 1].text)
+      expanded_headlines('(skg (node (id abc) (source jeff) writeProtected))')
+    local write_protected_index = find_text(headlines, 'writeProtected')
+    assert.is_not_nil(write_protected_index)
+    assert.are.equal('true', headlines[write_protected_index + 1].text)
   end)
 
   it('inserts true (default) when affectsParent is missing', function ()
@@ -93,14 +93,14 @@ describe('skg.sexpr.activenode_defaults expansion', function ()
 
   it('orders fields canonically', function ()
     local headlines = expanded_headlines(
-      '(skg (node (source jeff) (graphStats 42) (id abc) indef))')
+      '(skg (node (source jeff) (graphStats 42) (id abc) writeProtected))')
     local level_3 = {}
     for _, headline in ipairs(headlines) do
       if headline.level == 3 then
         table.insert(level_3, headline.text) end
     end
     assert.are.same(
-      { 'id', 'source', 'indef', 'affectsParent', 'birth',
+      { 'id', 'source', 'writeProtected', 'affectsParent', 'birth',
         'editRequest', 'viewRequests', 'graphStats' },
       level_3)
   end)
@@ -112,13 +112,13 @@ describe('skg.sexpr.activenode_defaults stripping', function ()
       round_trip('(skg (node (id abc) (source jeff)))'))
   end)
 
-  it('collapses indef=true to a bare atom', function ()
+  it('collapses writeProtected=true to a bare atom', function ()
     assert.are.same(
-      sexpr.read('(skg (node (id abc) (source jeff) indef))'),
+      sexpr.read('(skg (node (id abc) (source jeff) writeProtected))'),
       strip_to_sexp(table.concat({
         '* skg', '** node', '*** id', '**** abc',
         '*** source', '**** jeff',
-        '*** indef', '**** true',
+        '*** writeProtected', '**** true',
         '*** affectsParent', '**** true (default)',
         '*** birth', '**** unremarkable (default)',
         '*** editRequest', '**** none (default)',
@@ -130,17 +130,17 @@ describe('skg.sexpr.activenode_defaults stripping', function ()
       strip_to_sexp(table.concat({
         '* skg', '** node', '*** id', '**** abc',
         '*** source', '**** jeff',
-        '*** indef', '**** false',
+        '*** writeProtected', '**** false',
         '*** affectsParent', '**** true',
         '*** birth', '**** unremarkable',
         '*** editRequest', '**** none',
         '*** viewRequests', '**** none' }, '\n')))
   end)
 
-  it('round-trips a bare indef', function ()
+  it('round-trips a bare writeProtected', function ()
     assert.are.same(
-      sexpr.read('(skg (node (id abc) (source jeff) indef))'),
-      round_trip('(skg (node (id abc) (source jeff) indef))'))
+      sexpr.read('(skg (node (id abc) (source jeff) writeProtected))'),
+      round_trip('(skg (node (id abc) (source jeff) writeProtected))'))
   end)
 
   it('round-trips (editRequest delete)', function ()
@@ -196,7 +196,7 @@ describe('skg.sexpr.activenode_defaults stripping', function ()
     assert.are.same(sexpr.read('(skg (node (source only)))'),
       strip_to_sexp(table.concat({
         '* skg', '** node', '*** source', '**** only',
-        '*** indef', '*** affectsParent', '*** birth',
+        '*** writeProtected', '*** affectsParent', '*** birth',
         '*** editRequest', '*** viewRequests' }, '\n')))
   end)
 
@@ -282,7 +282,7 @@ describe('skg.sexpr.activenode_defaults real-world metadata', function ()
       .. ' (rels "C5 4(1,1)L")))')
     assert.is_not_nil(find_text(headlines, 'source'))
     assert.is_not_nil(find_text(headlines, 'public'))
-    assert.is_not_nil(find_text(headlines, 'indef'))
+    assert.is_not_nil(find_text(headlines, 'writeProtected'))
     assert.is_not_nil(find_text(headlines, 'affectsParent'))
     assert.is_not_nil(find_text(headlines, 'editRequest'))
     assert.is_not_nil(find_text(headlines, 'rels'))

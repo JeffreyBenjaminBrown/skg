@@ -1,14 +1,14 @@
 use super::*;
 use crate::types::git::MembershipAxes;
 use crate::types::viewnode::{
-  mk_indefinitive_viewnode, viewforest_root_viewnode,
+  mk_writeProtected_viewnode, viewforest_root_viewnode,
   Phantom, PhantomDeleted, Qual, QualFolder };
 
 fn sid (s : &str) -> ID { ID::from (s) }
 fn src () -> SourceName { SourceName::from ("main") }
 
 fn normal (title : &str, pi : AffectsParent) -> ViewNode {
-  mk_indefinitive_viewnode (sid (title), src (), title . to_string (), pi) }
+  mk_writeProtected_viewnode (sid (title), src (), title . to_string (), pi) }
 
 fn deleted (title : &str) -> ViewNode {
   ViewNode { focused : false, folded : false, body_folded : false,

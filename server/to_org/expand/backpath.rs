@@ -18,7 +18,7 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::tree::viewnode_nodecomplete::{ find_child_by_id, find_children_by_ids};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, AffectsParent, mk_indefinitive_from_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, AffectsParent, mk_writeProtected_from_viewnode, mk_unknown_viewnode };
 use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId,Tree};
@@ -224,7 +224,7 @@ fn integrate_linear_portion_of_path (
         Some (child_treeid) => child_treeid,
         None => {
           match
-            prepend_indef_indep_child_with_source_set (
+            prepend_writeProtected_indep_child_with_source_set (
                     tree, node_id, path_head, graph, config, birth
                     , active ) ?
           {
@@ -262,7 +262,7 @@ fn integrate_branches_in_node (
   { // Simplifies testing. Not necessary in production.
     branches_to_add . sort (); }
   for branch_id in branches_to_add {
-    prepend_indef_indep_child_with_source_set (
+    prepend_writeProtected_indep_child_with_source_set (
       tree, node_id, &branch_id, graph, config, birth
       , active ) ?; }
   Ok (( )) }
@@ -287,7 +287,7 @@ fn integrate_cycle_nodes (
     . collect ();
   { to_add . sort (); }
   for cycle_id in to_add {
-    prepend_indef_indep_child_with_source_set (
+    prepend_writeProtected_indep_child_with_source_set (
       tree, node_id, &cycle_id, graph, config, birth
       , active ) ?; }
   Ok (( )) }
@@ -339,7 +339,7 @@ fn attach_containerward_ancestries_for_birth_role (
 /// For each NodeId, look up its ActiveNode pid in the tree, fetch
 /// every such pid's containerward ancestry from the graph (in
 /// parallel via `ancestry_by_id_from_ids`), and prepend any
-/// `Inner`-shaped ancestry under that NodeId as indefinitive
+/// `Inner`-shaped ancestry under that NodeId as write-protected
 /// `Birth::Backpath(CONTAINER)` children. NodeIds that aren't ActiveNodes,
 /// or whose ancestry is `Root`/`Repeated`/`DepthTruncated`, are
 /// skipped.
@@ -401,7 +401,7 @@ fn attach_containerward_ancestries_from_map (
           tree, graph, config, active ) ?; }} }
   Ok (( )) }
 
-/// Recursively insert an AncestryTree as indefinitive
+/// Recursively insert an AncestryTree as write-protected
 /// Content subheadlines under the given parent.
 /// Iterates children in reverse so that prepending
 /// preserves the original order.
@@ -414,7 +414,7 @@ pub fn insert_containerward_ancestry_tree_recursive (
   active     : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
     let child_nid : NodeId = match
-      prepend_indef_indep_child_with_source_set (
+      prepend_writeProtected_indep_child_with_source_set (
         tree, parent_nid, node . id (),
         graph, config, Birth::Backpath (RelationRole::CONTAINER), active
       ) ?
@@ -429,7 +429,7 @@ pub fn insert_containerward_ancestry_tree_recursive (
         ) ?; } }
     Ok (()) }
 
-pub fn prepend_indef_indep_child (
+pub fn prepend_writeProtected_indep_child (
   tree          : &mut Tree<ViewNode>,
   parent_treeid : NodeId,
   child_skgid   : &ID,
@@ -442,7 +442,7 @@ pub fn prepend_indef_indep_child (
       graph, config, child_skgid
     ) ? {
       Some ((_nc, child_viewnode)) =>
-        mk_indefinitive_from_viewnode (
+        mk_writeProtected_from_viewnode (
           child_viewnode, AffectsParent::False, birth )
           . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
       None => mk_unknown_viewnode (child_skgid . clone ()), };
@@ -451,7 +451,7 @@ pub fn prepend_indef_indep_child (
     . prepend (viewnode) . id ();
   Ok (new_child_treeid) }
 
-pub fn prepend_indef_indep_child_with_source_set (
+pub fn prepend_writeProtected_indep_child_with_source_set (
   tree          : &mut Tree<ViewNode>,
   parent_treeid : NodeId,
   child_skgid   : &ID,
@@ -484,7 +484,7 @@ pub fn prepend_indef_indep_child_with_source_set (
             . unwrap_or (false);
           if ! source_active { return Ok (None); }}}}
   let new_child_treeid : NodeId =
-    prepend_indef_indep_child (
+    prepend_writeProtected_indep_child (
       tree, parent_treeid, child_skgid, graph, config, birth )
  ?;
   Ok (Some (new_child_treeid)) }

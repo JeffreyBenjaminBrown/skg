@@ -1,6 +1,6 @@
 -- PURPOSE: Utilities to parse and edit skg headline metadata, plus
 -- the user commands that reduce to metadata edits (delete,
--- set-indefinitive, set-source, merge requests, ...).
+-- set-write-protected, set-source, merge requests, ...).
 -- The Lua port of elisp/skg-metadata.el.
 --
 -- The elisp file's biggest hazard -- org-fold's fragility check
@@ -294,10 +294,10 @@ function M.node_affectsParent_content_of_p (metadata_sexp)
 end
 
 ---@param metadata_sexp any
----@return boolean does it carry the bare indef marker?
-function M.node_indefinitive_p (metadata_sexp)
+---@return boolean does it carry the bare write-protected marker?
+function M.node_write_protected_p (metadata_sexp)
   return compare.subtree_p(metadata_sexp,
-    { SKG, { NODE, sexpr.symbol('indef') } })
+    { SKG, { NODE, sexpr.symbol('writeProtected') } })
 end
 
 ---@return boolean has the headline at point no skg metadata?
@@ -369,9 +369,9 @@ function M.delete_recursive ()
     'This change will only be applied when you save the buffer.')
 end
 
----Mark the headline at point as indefinitive. Does NOT save.
-function M.set_indefinitive ()
-  M.edit_metadata_at_point(sexpr.read('(skg (node indef))'))
+---Mark the headline at point as write-protected. Does NOT save.
+function M.set_write_protected ()
+  M.edit_metadata_at_point(sexpr.read('(skg (node writeProtected))'))
 end
 
 ---Copy the visually-selected region to a new org buffer, stripping

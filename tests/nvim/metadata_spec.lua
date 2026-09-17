@@ -81,17 +81,17 @@ describe('skg.metadata commands', function ()
           vim.api.nvim_get_current_buf(), { force = true })
   end)
 
-  it('set_indefinitive adds indef to the node section', function ()
-    -- Mirrors test-skg-set-indefinitive's three cases.
+  it('set_write_protected adds writeProtected to the node section', function ()
+    -- Mirrors test-skg-set-write-protected's three cases.
     buffer_with('* (skg (node (id 1))) title')
-    metadata.set_indefinitive()
+    metadata.set_write_protected()
     local result = first_metadata_sexp()
-    assert.is_true(subtree_p(result, '(skg (node indef))'))
+    assert.is_true(subtree_p(result, '(skg (node writeProtected))'))
     assert.is_true(subtree_p(result, '(skg (node (id 1)))'))
     buffer_with('* plain title')
-    metadata.set_indefinitive()
+    metadata.set_write_protected()
     assert.is_true(subtree_p(first_metadata_sexp(),
-                             '(skg (node indef))'))
+                             '(skg (node writeProtected))'))
   end)
 
   it('delete marks the node for deletion', function ()

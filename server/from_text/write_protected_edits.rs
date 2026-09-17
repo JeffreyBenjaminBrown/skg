@@ -1,5 +1,5 @@
 //! Detect changes that a save would otherwise ignore because their owner is
-//! rendered indefinitively. The server keeps the last rendered `ViewForest`
+//! rendered write-protected. The server keeps the last rendered `ViewForest`
 //! for every open view, so this compares the incoming forest with that image
 //! rather than guessing from the graph (which cannot represent view-local
 //! folder occurrences).
@@ -29,13 +29,13 @@ enum OccurrencePathStep {
   DeadScaffold,
 }
 
-/// The parts of an indefinitive occurrence that save extraction does not read.
+/// The parts of a write-protected occurrence that save extraction does not read.
 /// Descendant vognodes deliberately do not contribute their own title/body
 /// here: a definitive descendant remains a self-writer even below an
-/// indefinitive ancestor. The occurrence's own folders do contribute,
+/// write-protected ancestor. The occurrence's own folders do contribute,
 /// because their owner emits no `SetContains` or defining-folder instruction.
 #[derive(Debug, PartialEq)]
-struct IndefinitiveOccurrence {
+struct WriteProtectedOccurrence {
   id       : ID,
   title    : String,
   source   : SourceName,
@@ -46,23 +46,23 @@ struct IndefinitiveOccurrence {
   hidden_outside : Option<Vec<ID>>,
 }
 
-struct LocatedIndefinitiveOccurrence {
+struct LocatedWriteProtectedOccurrence {
   node_id     : NodeId,
   parent_path : Vec<OccurrencePathStep>,
-  state       : IndefinitiveOccurrence,
+  state       : WriteProtectedOccurrence,
 }
 
-/// Reject edits to indefinitive occurrences that were present at the same
+/// Reject edits to write-protected occurrences that were present at the same
 /// location in the server's last rendering. An unmatched current occurrence
 /// is new, so it is allowed; its direct Active-node children are made
 /// Independent because that new occurrence cannot write a contains relation.
-pub fn errors_and_normalize_new_indefinitive_occurrences (
+pub fn errors_and_normalize_new_writeProtected_occurrences (
   current  : &mut ViewForest,
   previous : &ViewForest,
 ) -> Vec<BufferValidationError> {
-  let current_occurrences : Vec<LocatedIndefinitiveOccurrence> =
+  let current_occurrences : Vec<LocatedWriteProtectedOccurrence> =
     occurrences_in (current);
-  let previous_occurrences : Vec<LocatedIndefinitiveOccurrence> =
+  let previous_occurrences : Vec<LocatedWriteProtectedOccurrence> =
     occurrences_in (previous);
   let mut current_is_matched : Vec<bool> =
     vec! [false; current_occurrences . len ()];
@@ -93,11 +93,11 @@ pub fn errors_and_normalize_new_indefinitive_occurrences (
     if let Some (current_index) = chosen {
       current_is_matched [current_index] = true;
       previous_is_matched [previous_index] = true;
-      let current_occurrence : &LocatedIndefinitiveOccurrence =
+      let current_occurrence : &LocatedWriteProtectedOccurrence =
         & current_occurrences [current_index];
       if current_occurrence . state != previous_occurrence . state
          && reported . insert (current_occurrence . state . id . clone ())
-      { errors . push (BufferValidationError::EditedIndefinitive (
+      { errors . push (BufferValidationError::EditedWriteProtectedOccurrence (
           current_occurrence . state . id . clone ())); }} }
 
   // If an occurrence's ID itself changed, its parent path is the remaining
@@ -117,7 +117,7 @@ pub fn errors_and_normalize_new_indefinitive_occurrences (
     previous_is_matched [previous_index] = true;
     let id : ID = current_occurrences [current_index] . state . id . clone ();
     if reported . insert (id . clone ()) {
-      errors . push (BufferValidationError::EditedIndefinitive (id)); }}
+      errors . push (BufferValidationError::EditedWriteProtectedOccurrence (id)); }}
 
   let new_occurrence_ids : Vec<NodeId> = current_occurrences . iter ()
     . enumerate ()
@@ -130,8 +130,8 @@ pub fn errors_and_normalize_new_indefinitive_occurrences (
 
 fn occurrences_in (
   viewforest : &ViewForest,
-) -> Vec<LocatedIndefinitiveOccurrence> {
-  let mut occurrences : Vec<LocatedIndefinitiveOccurrence> = Vec::new ();
+) -> Vec<LocatedWriteProtectedOccurrence> {
+  let mut occurrences : Vec<LocatedWriteProtectedOccurrence> = Vec::new ();
   for root in viewforest . roots () {
     collect_occurrences (root, &[], &mut occurrences); }
   occurrences
@@ -140,17 +140,17 @@ fn occurrences_in (
 fn collect_occurrences (
   node        : NodeRef<ViewNode>,
   parent_path : &[OccurrencePathStep],
-  occurrences : &mut Vec<LocatedIndefinitiveOccurrence>,
+  occurrences : &mut Vec<LocatedWriteProtectedOccurrence>,
 ) {
   let mut own_path : Vec<OccurrencePathStep> = parent_path . to_vec ();
   own_path . push (path_step (node . value ()));
   if let ViewNodeKind::Vognode (Vognode::Active (active)) =
     &node . value () . kind
-  { if active . is_indefinitive () {
-    occurrences . push (LocatedIndefinitiveOccurrence {
+  { if active . is_writeProtected () {
+    occurrences . push (LocatedWriteProtectedOccurrence {
       node_id     : node . id (),
       parent_path : parent_path . to_vec (),
-      state       : IndefinitiveOccurrence {
+      state       : WriteProtectedOccurrence {
         id       : active . id . clone (),
         title    : active . title . clone (),
         source   : active . source . clone (),
@@ -292,43 +292,43 @@ mod tests {
   #[test]
   fn catches_title_content_and_writable_folder_edits_but_not_child_text () {
     let original = forest (indoc! {"
-      * (skg (node (id owner) (source main) indef)) owner
+      * (skg (node (id owner) (source main) writeProtected)) owner
       ** (skg (node (id content) (source main))) content
       ** (skg subscribeeFolder)
       *** (skg (node (id subscribee) (source main))) subscribee
     "});
     let mut child_text_changed = forest (indoc! {"
-      * (skg (node (id owner) (source main) indef (viewRequests definitiveView))) owner
+      * (skg (node (id owner) (source main) writeProtected (viewRequests definitiveView))) owner
       ** (skg (node (id content) (source main))) changed child text
       ** (skg subscribeeFolder)
       *** (skg (node (id subscribee) (source main))) subscribee
     "});
-    assert! (errors_and_normalize_new_indefinitive_occurrences (
+    assert! (errors_and_normalize_new_writeProtected_occurrences (
       &mut child_text_changed, &original) . is_empty ());
 
     let mut changed = forest (indoc! {"
-      * (skg (node (id owner) (source main) indef)) changed owner
+      * (skg (node (id owner) (source main) writeProtected)) changed owner
       ** (skg (node (id other) (source main))) other content
       ** (skg subscribeeFolder)
       *** (skg (node (id other-subscribee) (source main))) other subscribee
     "});
     assert_eq! (
-      errors_and_normalize_new_indefinitive_occurrences (
+      errors_and_normalize_new_writeProtected_occurrences (
         &mut changed, &original),
-      vec! [BufferValidationError::EditedIndefinitive (ID::from ("owner"))]);
+      vec! [BufferValidationError::EditedWriteProtectedOccurrence (ID::from ("owner"))]);
   }
 
   #[test]
-  fn allows_a_new_indefinitive_occurrence_and_parks_its_viewnode_children () {
+  fn allows_a_new_writeProtected_occurrence_and_parks_its_viewnode_children () {
     let original = forest (indoc! {"
       * (skg (node (id root) (source main))) root
     "});
     let mut current = forest (indoc! {"
       * (skg (node (id root) (source main))) root
-      ** (skg (node (id root) (source main) indef)) new self occurrence
+      ** (skg (node (id root) (source main) writeProtected)) new self occurrence
       *** (skg (node (id child) (source main))) child
     "});
-    assert! (errors_and_normalize_new_indefinitive_occurrences (
+    assert! (errors_and_normalize_new_writeProtected_occurrences (
       &mut current, &original) . is_empty ());
     let child = current . nodes () . find_map ( |node| match
       &node . value () . kind
@@ -339,13 +339,13 @@ mod tests {
   }
 
   #[test]
-  fn body_on_an_indefinitive_occurrence_is_a_parse_error () {
+  fn body_on_an_writeProtected_occurrence_is_a_parse_error () {
     let (_forest, errors, _warnings) = org_to_uninterpreted_viewforest (
       indoc! {"
-        * (skg (node (id owner) (source main) indef)) owner
+        * (skg (node (id owner) (source main) writeProtected)) owner
         body that would otherwise disappear
       "}) . unwrap ();
     assert_eq! (errors,
-      vec! [BufferValidationError::EditedIndefinitive (ID::from ("owner"))]);
+      vec! [BufferValidationError::EditedWriteProtectedOccurrence (ID::from ("owner"))]);
   }
 }

@@ -34,12 +34,12 @@ In a second buffer we have just two roots, 11 and subee,
 with none of the scaffolding.
 
 #+begin_example
-  * (indef) 11
+  * (writeProtected) 11
   * subee
   ** subee-1
 #+end_example
 
-From that buffer we remove 'indef' from 11's metadata,
+From that buffer we remove 'writeProtected' from 11's metadata,
 add a delete request to that metadata, and save.
 Now the first buffer should look like:
 
@@ -219,13 +219,13 @@ and call =skg-request-save-buffer= to register the view.
 Buffer content before save:
 
 #+begin_example
-  * (skg (node (id 11) (source main) indefinitive)) 11
+  * (skg (node (id 11) (source main) writeProtected)) 11
   * (skg (node (id subee) (source main))) subee
   ** (skg (node (id subee-1) (source main))) subee-1
 #+end_example
 
 After saving, the server completes the tree and sends back the
-response. Since 11 is indefinitive it generates no save
+response. Since 11 is writeProtected it generates no save
 instructions. subee and subee-1 are definitive and match the
 fixtures, so it's a no-op.
 
@@ -235,7 +235,7 @@ Assert: headline-titles include "11", "subee", "subee-1".
 * Phase 3: Delete 11 from buffer 2
 
 Edit buffer 2:
-- Remove =indefinitive= from 11's metadata
+- Remove =writeProtected= from 11's metadata
 - Add =(editRequest delete)= to 11's metadata
 - Save
 
@@ -374,7 +374,7 @@ Expected headline-titles (approximately):
 ((1 . "1")
  (2 . "11")           ;; DeletedNode
  (3 . "")             ;; DeletedScaff
- (4 . "subee")        ;; TrueNode (indefinitive)
+ (4 . "subee")        ;; TrueNode (writeProtected)
  (4 . "new-root")     ;; new TrueNode (now has UUID)
  (4 . "")             ;; DeletedScaff
  (5 . "also-hidden")  ;; hidden node preserved
@@ -529,13 +529,13 @@ expects =(skg (node ...))= structure.
 
 The prompt uses shorthand throughout: =** (deleted)= means a
 =DeletedNode=, =*** (deletedscaff)= means =DeletedScaff=,
-=* (indef) 11= means an indefinitive TrueNode, etc. None of these
+=* (writeProtected) 11= means a write-protected TrueNode, etc. None of these
 are the literal org-mode rendering.
 
 The actual rendering would be:
 - =(deleted)= → =(skg (deleted (id 11) (source main))) 11=
 - =(deletedscaff)= → =(skg deletedScaffold)= (no title)
-- =(indef) 11= → =(skg (node (id 11) (source main) indefinitive)) 11=
+- =(writeProtected) 11= → =(skg (node (id 11) (source main) writeProtected)) 11=
 
 ** Childless DeletedNode stays in tree (resolved)
 
@@ -578,16 +578,16 @@ could be upgraded to expect the new child "c" to appear.
 ** =skg-edit-metadata-at-point= for editing 11's metadata
 
 In buffer 2, we need to:
-1. Remove =indefinitive= from 11's metadata
+1. Remove =writeProtected= from 11's metadata
 2. Add =(editRequest delete)= to 11's metadata
 
 =skg-edit-metadata-at-point= merges sexp structures. It can ADD
-fields but it's unclear if it can REMOVE =indefinitive= (a bare
-atom, not a key-value pair). We may need to use =(DELETE indefinitive)=
+fields but it's unclear if it can REMOVE =writeProtected= (a bare
+atom, not a key-value pair). We may need to use =(DELETE writeProtected)=
 syntax (like =skg-remove-focused-marker= uses =(DELETE focused)=).
 
 So the two calls would be:
-1. =(skg-edit-metadata-at-point '(skg (DELETE indefinitive)))=
+1. =(skg-edit-metadata-at-point '(skg (DELETE writeProtected)))=
 2. =(skg-edit-metadata-at-point '(skg (node (editRequest delete))))=
 
 I should verify that these work before relying on them in the test.

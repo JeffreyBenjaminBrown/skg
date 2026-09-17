@@ -206,11 +206,11 @@ gesture (editing a foreign node forks it, with a save-time y/n
 confirmation buffer). Rewrite this section to the gesture model once the
 gesture sub-questions in that discussion are answered. Kept below only
 for the reasoning it records.
-The original N is shown as read-only/indefinitive content (under a
+The original N is shown as read-only/write-protected content (under a
 subscribeeCol, via override substitution, or as a foreign view root).
-'EditRequestOnIndefinitive' ('parse_metadata_sexp.rs:188-200') forbids
-attaching an edit request to an indefinitive node, and structurally an
-'IndefOrDef::Indefinitive' has nowhere to store one. So the request
+'EditRequestOnWriteProtectedOccurrence' ('parse_metadata_sexp.rs:188-200') forbids
+attaching an edit request to a write-protected node, and structurally a
+'Editability::WriteProtected' has nowhere to store one. So the request
 cannot ride on N. Two viable shapes:
 
 - *Recommended -- EditRequest::Fork(target) on a NEW owned headline.*
@@ -218,7 +218,7 @@ cannot ride on N. Two viable shapes:
   with '(editRequest (merge ACQUIREE))'; fork marks the *clone-to-be*
   (a new owned node, ID minted in 'add_missing_info') with
   '(editRequest (fork ORIGINAL))'. The new node is Definitive, so the
-  indefinitive guard never fires. On save, a fork-extraction phase --
+  write-protected guard never fires. On save, a fork-extraction phase --
   modeled on 'nodeMerge_instructions_from_pairs'
   ('server/nodeMerge/nodeMergeInstructionTriple.rs:101-140'), which
   already does an async disk fetch of the referenced node -- fetches N
@@ -519,11 +519,11 @@ place. Two hazards:
   the anomaly silently rather than flagging it.
   - TODO : Jeff : Please elaborate; I don't get it. If C overrides N,
     then shouldn't we see C in place of N both as the parent
-    and in place of N as the (indefinitive, because it's a repeat) child?
+    and in place of N as the (write-protected, because it's a repeat) child?
   - Claude : You're right -- it's normal cycle display, not a hazard;
     I withdraw it. If N self-contains, C (overriding N) is the root, and
     the child slot (C.contains still lists N) resolves N -> C, drawn as an
-    indefinitive repeat with the 'cycle' viewstat -- exactly "C as parent
+    write-protected repeat with the 'cycle' viewstat -- exactly "C as parent
     and C again as the repeat child". Storing raw IDs makes this
     automatic; nothing special is needed.
 - Decide whether the shallow copy stores the raw IDs (the current
@@ -542,7 +542,7 @@ relationships") specifies an *implicit* model: ANY edit to a foreign
 node forks it automatically. This plan instead recommends an *explicit*
 command ('skg-fork-node') for the first version, because the implicit
 path is blocked at two layers today -- a foreign-node edit is rejected
-outright at save, and foreign content shown read-only ('indefinitive')
+outright at save, and foreign content shown read-only ('write-protected')
 never even becomes an editable instruction an interceptor could catch
 -- and because silently minting a new node in the user's data on a
 stray keystroke is hard to undo. A conscious deviation from the stated
@@ -624,7 +624,7 @@ I don't remember ever answering.
 But now that I think I understand the question:
 Suppose a fork F is being substituted for S somewhere.
 Then F's source goes inactive.
-F should be (this is already coded) removed if indefinitive,
+F should be (this is already coded) removed if write-protected,
 left in place but marked inactive (and hence redacted)
 if it has children that need to be persisted in the view.
 Either way, it will no longer look like a child that affects its parent,
@@ -679,7 +679,7 @@ the overhaul. The function the old note named ('complete_subscribee_col_preorder
 is gone, but its replacement, 'reconcile_subscribee_col_children'
 ('server/update_buffer/reconcile/subscribee_col.rs'), computes the fresh
 goal-list from the graph (line ~52) and then only *applies* it inside
-'if context.parent_indefinitive || source_diffs.is_some()' (line ~74).
+'if context.parent_is_writeProtected || source_diffs.is_some()' (line ~74).
 So a DEFINITIVE subscriber in a NON-diff collateral rerender never
 reconciles its subscribeeCol children against the fresh list -- stale
 entries persist. Repro: open two views of a definitive subscriber S;

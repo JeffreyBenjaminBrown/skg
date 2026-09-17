@@ -205,7 +205,7 @@
          (titles (headline-titles buf-a)))
     (message "Buffer-a titles after diff-off: %S" titles)
     ;; a should contain b, b should contain e,f; f contains d.
-    ;; The exact indefinitive markers vary, so just check titles.
+    ;; The exact write-protected markers vary, so just check titles.
     (dolist (expected-title '("a" "b" "e, edited" "f" "d"))
       (unless (cl-find expected-title titles
                        :key (lambda (triple) (nth 2 triple))

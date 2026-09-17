@@ -106,13 +106,13 @@ function M.org_stars_for_node_insertion ()
   return '*'
 end
 
----Insert an indefinitive ActiveNode headline from ENTRY. If point is
+---Insert a write-protected ActiveNode headline from ENTRY. If point is
 ---already just after headline stars at the start of a line, insert
 ---only the metadata and title; otherwise insert a full same-level
 ---headline.
 ---@param entry table
 function M.insert_node_from_entry (entry)
-  local node_text = string.format('(skg (node (id %s) indef)) %s',
+  local node_text = string.format('(skg (node (id %s) writeProtected)) %s',
                                   entry[1], entry[2])
   local line = metadata.line_text()
   local col = vim.api.nvim_win_get_cursor(0)[2]

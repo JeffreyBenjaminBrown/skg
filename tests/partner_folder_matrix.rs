@@ -298,12 +298,12 @@ async fn denovo_readonly_render (
                  ("dn-ovr-a", "dn-ovr-b"),
                  ("dn-hider-a", "dn-hider-b"),
                  ("dn-hid-a", "dn-hid-b")] {
-    // members present, indefinitive, and in sorted-ID order
+    // members present, write-protected, and in sorted-ID order
     for id in [a, b] {
       let line : &str = line_containing (&buf, &format! ("(id {})", id));
-      if ! line . contains (" indef") {
+      if ! line . contains (" writeProtected") {
         fails . record (s, format! (
-          "member {} should render indefinitive: {}", id, line)); } }
+          "member {} should render writeProtected: {}", id, line)); } }
     fails . want_before (
       s, &buf, &format! ("(id {})", a), &format! ("(id {})", b) ); }
   Ok (( )) }
@@ -347,7 +347,7 @@ fn relationship_matrix
 
 //////////////////////////////////////////////////////////////
 // The Path view-request, '(viewRequests (path ROLENAME))': graft the
-// partners playing ROLENAME toward the node as inverted indefinitive
+// partners playing ROLENAME toward the node as inverted write-protected
 // children with a '(birth backpath ROLENAME)' marker. One generic
 // backpath engine serves all nine roles; these cover the seven new
 // ones (the container/linkSource roles keep their own golden tests).
@@ -511,9 +511,9 @@ async fn saveplan_nodes (
     buffer_to_validated_saveplan (buf, config, active)  ?;
   Ok (plan . define_nodes) }
 
-/// A fresh indefinitive public member line at the given indentation.
+/// A fresh write-protected public member line at the given indentation.
 fn member_line ( stars : usize, id : &str ) -> String {
-  format! ( "{} (skg (node (id {}) (source public) indef)) {}",
+  format! ( "{} (skg (node (id {}) (source public) writeProtected)) {}",
             "*" . repeat (stars), id, id ) }
 
 fn folder_member_stars ( buf : &str, any_member_fragment : &str ) -> usize {
@@ -726,7 +726,7 @@ fn buffer_save_rejects_second_user_owned_overrider
       let buffer : &str = indoc! {"
         * (skg (node (id mono-r2) (source public))) mono-r2
         ** (skg overriddenFolder)
-        *** (skg (node (id mono-target) (source public) indef)) mono-target
+        *** (skg (node (id mono-target) (source public) writeProtected)) mono-target
       "};
       let result : Result<SaveResponse, Box<dyn Error>> =
         save (buffer, config, tantivy, &graph) . await;

@@ -40,22 +40,22 @@ fn setup_overrides_fixtures_staged (
 const EXPECTED_UNSTAGED : &str = "\
 ** (skg overriddenFolder)
 *** (skg (node (id Z) (source main))) Z
-*** (skg (node (id W) (source main) indef (unstaged removedM))) W
+*** (skg (node (id W) (source main) writeProtected (unstaged removedM))) W
 *** (skg (node (id O) (source main) (unstaged newM))) O
 ** (skg hiddenFolder)
 *** (skg (node (id ha) (source main))) ha
-*** (skg (node (id hb) (source main) indef (unstaged removedM))) hb
+*** (skg (node (id hb) (source main) writeProtected (unstaged removedM))) hb
 *** (skg (node (id hc) (source main) (unstaged newM))) hc
 ";
 
 const EXPECTED_STAGED : &str = "\
 ** (skg overriddenFolder)
 *** (skg (node (id Z) (source main))) Z
-*** (skg (node (id W) (source main) indef (staged removedM))) W
+*** (skg (node (id W) (source main) writeProtected (staged removedM))) W
 *** (skg (node (id O) (source main) (staged newM))) O
 ** (skg hiddenFolder)
 *** (skg (node (id ha) (source main))) ha
-*** (skg (node (id hb) (source main) indef (staged removedM))) hb
+*** (skg (node (id hb) (source main) writeProtected (staged removedM))) hb
 *** (skg (node (id hc) (source main) (staged newM))) hc
 ";
 
@@ -136,15 +136,15 @@ async fn emptied_folders_still_render_in_diff_mode_de_novo (
       assert_buffer_contains ( &diff_view, "\
 * (skg (node (id E) (source main))) E
 ** (skg overriddenFolder)
-*** (skg (node (id EZ) (source main) indef (unstaged removedM))) EZ
+*** (skg (node (id EZ) (source main) writeProtected (unstaged removedM))) EZ
 ** (skg hiddenFolder)
-*** (skg (node (id EH) (source main) indef (unstaged removedM))) EH
+*** (skg (node (id EH) (source main) writeProtected (unstaged removedM))) EH
 * (skg (node (id EN) (source main))) EN
 ** (skg overriderFolder)
-*** (skg (node (id ER) (source main) indef (unstaged removedM))) ER
+*** (skg (node (id ER) (source main) writeProtected (unstaged removedM))) ER
 * (skg (node (id ES) (source main))) ES
 ** (skg subscribeeFolder)
-*** (skg (node (id EB) (source main) indef (unstaged removedM))) EB
+*** (skg (node (id EB) (source main) writeProtected (unstaged removedM))) EB
 " ); }
     { // Outside diff mode, the emptied folders still do not appear.
       let mut warnings : Vec<String> = Vec::new ();

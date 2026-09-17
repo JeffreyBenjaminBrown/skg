@@ -123,9 +123,9 @@ async fn pipeline_basic_mixed_tree (
             *** (skg (node (id grandchild) (source main))) grandchild
             ** (skg (node (id independent) (source main) (affectsParent false))) independent
             ** (skg subscribeeFolder)
-            *** (skg (node (id s1) (source main) indef)) s1
+            *** (skg (node (id s1) (source main) writeProtected)) s1
             ** (skg overriddenFolder)
-            *** (skg (node (id o1) (source main) indef)) o1
+            *** (skg (node (id o1) (source main) writeProtected)) o1
             * (skg (node (id explicit) (source main))) explicit
             ** (skg aliasFolder) aliases
             ** (skg subscribeeFolder)

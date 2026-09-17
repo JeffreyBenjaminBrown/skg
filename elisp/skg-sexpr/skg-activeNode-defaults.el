@@ -19,11 +19,11 @@
 
 (defconst skg-activeNode--canonical-field-order
   '("id" "source"
-    "indef" "affectsParent" "birth" "editRequest" "viewRequests")
+    "writeProtected" "affectsParent" "birth" "editRequest" "viewRequests")
   "Canonical order for node fields. Fields not in this list go last.")
 
 (defconst skg-activeNode--editable-defaults
-  '(("indef"  . "false (default)")
+  '(("writeProtected"  . "false (default)")
     ("affectsParent"      . "true (default)")
     ("birth"         . "unremarkable (default)")
     ("editRequest"   . "none (default)")
@@ -207,7 +207,7 @@ Returns the group, possibly with a value child added or modified."
   (cond
    ;; Bare boolean atom: expand to have 'true' child
    ((and (= (length group) 1)
-         (string= field-name "indef"))
+         (string= field-name "writeProtected"))
     (list (car group)
           (cons (1+ child-level) "true")))
    ;; Source field: mark with (default) if it matches
@@ -280,7 +280,7 @@ CHILD-LEVEL is the level of the field headline."
          (when (> (length group) 1)
            (string-trim (cdr (nth 1 group))))))
     (cond
-     ((string= field-name "indef") ;; Boolean field
+     ((string= field-name "writeProtected") ;; Boolean field
       (cond
        ((or (null value-text)
             (skg-activeNode--default-false-p value-text))

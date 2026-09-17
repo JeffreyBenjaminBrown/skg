@@ -45,12 +45,12 @@ call `skg-request-save-buffer' afterward."
         (outline-next-heading))))
   (message "This change will only be applied when you save the buffer."))
 
-(defun skg-set-indefinitive ()
-  "Mark the headline at point as indefinitive.
-Edits the metadata to include `indef` in the `node` section.
+(defun skg-set-write-protected ()
+  "Mark the headline at point as write-protected.
+Edits the metadata to include `writeProtected` in the `node` section.
 Does NOT save; call `skg-request-save-buffer' afterward."
   (interactive)
-  (skg-edit-metadata-at-point '(skg (node indef))))
+  (skg-edit-metadata-at-point '(skg (node writeProtected))))
 
 (defun skg-view-without-metadata ()
   "Copy the active region to a new org buffer, stripping skg metadata.
@@ -148,7 +148,7 @@ offers to publicize them in the same go by writing
 `skg-set-relationship-source-recursive' (C-c s R) can publicize them
 later.
 
-Indefinitive instances are NOT changed -- the save would silently
+Write-protected instances are NOT changed -- the save would silently
 ignore their source edits -- and produce a loud warning, with the
 full ID list in *Messages*.
 
@@ -178,18 +178,18 @@ Does NOT save; call `skg-request-save-buffer' afterward."
 (defun skg--set-source-and-handle-stuck-edges (old-source new-source recursive)
   "The body of `skg-set-source' once a real move is requested:
 analyze which content edges the move would leave stuck at more
-private sources, retarget the sources (skipping indefinitive
+private sources, retarget the sources (skipping write-protected
 instances), offer to publicize the stuck edges in the same go, and
-report -- loudly, when indefinitive instances were skipped."
+report -- loudly, when write-protected instances were skipped."
   (let* ((stuck ;; analyzed BEFORE any rewrite: it needs the old sources
           (skg--analyze-move-stuck-edges old-source new-source recursive))
          (change-result (if recursive
                             (skg--change-source-recursive old-source
                                                           new-source)
-                          (skg--change-source-at-point-unless-indefinitive
+                          (skg--change-source-at-point-unless-write-protected
                            new-source)))
          (changed-count (car change-result))
-         (indef-ids (cdr change-result))
+         (write-protected-ids (cdr change-result))
          (fixed-count
           (when (and stuck
                      (y-or-n-p
@@ -198,8 +198,8 @@ report -- loudly, when indefinitive instances were skipped."
                               (if (= (length stuck) 1) "" "s")
                               (if (= (length stuck) 1) "" "s"))))
             (skg--apply-stuck-edge-sources stuck))))
-    (dolist (id indef-ids)
-      (message "skg-set-source: indefinitive instance NOT changed (the save would ignore it): %s"
+    (dolist (id write-protected-ids)
+      (message "skg-set-source: write-protected instance NOT changed (the save would ignore it): %s"
                id))
     (message "%s"
              (concat
@@ -212,10 +212,10 @@ report -- loudly, when indefinitive instances were skipped."
                         fixed-count (if (= fixed-count 1) "" "s")))
                (stuck
                 " Relationships kept their old, more private sources; C-c s R can publicize them later."))
-              (when indef-ids
-                (format "  WARNING: %d indefinitive node%s NOT changed -- the save would silently ignore them. See *Messages* for the ID list."
-                        (length indef-ids)
-                        (if (= (length indef-ids) 1) "" "s")))))))
+              (when write-protected-ids
+                (format "  WARNING: %d write-protected node%s NOT changed -- the save would silently ignore them. See *Messages* for the ID list."
+                        (length write-protected-ids)
+                        (if (= (length write-protected-ids) 1) "" "s")))))))
 
 (defun skg--analyze-move-stuck-edges (old-source new-source recursive)
   "With point on the node a `skg-set-source' move starts from, and
@@ -225,7 +225,7 @@ default, as a list of (MARKER . SOURCE) -- MARKER at the child
 headline, SOURCE the edge's new default. Only edges without an
 existing `(relSource ...)' atom qualify: an atom-carrying edge was
 already leveled deliberately. The walk's root itself is always
-retargeted (unless indefinitive); its org-parent lies outside the
+retargeted (unless write-protected); its org-parent lies outside the
 move, so its source counts as unchanging. With RECURSIVE nil only
 the point node moves, so only its own edge and its direct
 children's edges are examined."
@@ -237,9 +237,9 @@ children's edges are examined."
               (when (skg--relationship-kind-matches-p 'contained)
                 (let* ((child-meta (skg--metadata-sexp-at-point-or-nil))
                        (child-source (skg--node-source child-meta))
-                       (child-moves ;; an indefinitive instance is skipped by the retargeting walk, so its source does not actually change
+                       (child-moves ;; a write-protected instance is skipped by the retargeting walk, so its source does not actually change
                         (and child-retargets-p
-                             (not (skg--node-indefinitive-p child-meta))))
+                             (not (skg--node-write-protected-p child-meta))))
                        (parent-source
                         (save-excursion
                           (org-up-heading-safe)
@@ -308,12 +308,12 @@ STUCK, then free the markers. Returns the number of requests written."
       (set-marker (car entry) nil))
     (length stuck)))
 
-(defun skg--change-source-at-point-unless-indefinitive (new-source)
+(defun skg--change-source-at-point-unless-write-protected (new-source)
   "Set the source at point to NEW-SOURCE, unless the instance is
-indefinitive -- the save would silently ignore that edit. Returns
-(CHANGED-COUNT . INDEF-IDS), matching `skg--change-source-recursive'."
+write-protected -- the save would silently ignore that edit. Returns
+(CHANGED-COUNT . WRITE-PROTECTED-IDS), matching `skg--change-source-recursive'."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))
-    (if (skg--node-indefinitive-p meta)
+    (if (skg--node-write-protected-p meta)
         (cons 0 (list (or (skg--node-id meta) "(no id)")))
       (cons (skg--change-source-at-point new-source) nil))))
 
@@ -580,7 +580,7 @@ floor check (see `apply_sticky_sources') is what validates each one.
 The walk starts at the node at point (inclusive: its own edge to
 its view-parent counts when it matches) and recurses only on
 viewchildren that affect their viewparents: affectsParent=true
-activeNodes and writable folders. It prunes below indefinitive nodes
+activeNodes and writable folders. It prunes below write-protected nodes
 and subscribee-as-such members (their org-children's edges are not
 collected at save), and prunes read-only folders and other scaffolds
 entirely.
@@ -682,7 +682,7 @@ explains the refusal; q aborts."
 subtree at point, the headline at point included, whose relationship
 to its view-parent is of KIND (`contained', `subscribee' or
 `overridden'; see `skg--relationship-kind-matches-p'). Recurses only
-where edits still affect the graph: it prunes below indefinitive
+where edits still affect the graph: it prunes below write-protected
 nodes and subscribee-as-such members, prunes non-true
 (affectsParent=false) nodes -- except the walk's root, which the
 user chose deliberately -- and prunes scaffolds other than the two
@@ -743,7 +743,7 @@ command, but does not edit anything."
 relationship to its view-parent is of KIND, writable-and-collected
 from this position: for `contained', the view-parent must be a
 definitive activeNode not in subscribee-as-such position (an
-indefinitive or subscribee-as-such parent's contains is not
+write-protected or subscribee-as-such parent's contains is not
 collected at save, so a relationship-source request under one would be
 inert); for `subscribee' and `overridden', the view-parent must be
 the matching writable folder with a definitive anchor."
@@ -757,7 +757,7 @@ the matching writable folder with a definitive anchor."
                   (cond
                    ((skg--activeNode-sexp-p parent-sexp)
                     (and (eq kind 'contained)
-                         (not (skg--node-indefinitive-p parent-sexp))
+                         (not (skg--node-write-protected-p parent-sexp))
                          (not (skg--subscribee-as-such-at-point-p))))
                    ((skg--scaffold-atom-present-p parent-sexp
                                                   'subscribeeFolder)
@@ -772,10 +772,10 @@ the matching writable folder with a definitive anchor."
 (defun skg--relSource-prune-below-p (metadata-sexp)
   "Non-nil iff the walk should not descend below the activeNode
 headline at point (with METADATA-SEXP its parsed metadata): an
-indefinitive node's contains is not collected at save, and a
+write-protected node's contains is not collected at save, and a
 subscribee-as-such member's org-children are hide/unhide signals,
 not writable edges."
-  (or (skg--node-indefinitive-p metadata-sexp)
+  (or (skg--node-write-protected-p metadata-sexp)
       (skg--subscribee-as-such-at-point-p)))
 
 (defun skg--subscribee-as-such-at-point-p ()
@@ -792,14 +792,14 @@ position: an true activeNode member of a subscribeeFolder."
 
 (defun skg--folder-anchor-definitive-p ()
   "Non-nil iff the folder headline at point has a definitive activeNode
-anchor (its org-parent). An indefinitive anchor's writable folders are
+anchor (its org-parent). A write-protected anchor's writable folders are
 not collected at save (the folder owner is not save-eligible), so
 atoms on their members have no effect."
   (save-excursion
     (and (org-up-heading-safe)
          (let ((anchor-sexp (skg--metadata-sexp-at-point-or-nil)))
            (and (skg--activeNode-sexp-p anchor-sexp)
-                (not (skg--node-indefinitive-p anchor-sexp)))))))
+                (not (skg--node-write-protected-p anchor-sexp)))))))
 
 (defun skg--scaffold-atom-present-p (metadata-sexp atom)
   "Non-nil iff METADATA-SEXP is a (skg ...) sexp carrying the bare ATOM."
@@ -859,24 +859,24 @@ Does NOT save; call `skg-request-save-buffer' afterward."
 
 (defun skg--change-source-recursive (old-source new-source)
   "Change OLD-SOURCE to NEW-SOURCE in this content subtree.
-Returns (CHANGED-COUNT . INDEF-IDS).  The root node is inclusive;
+Returns (CHANGED-COUNT . WRITE-PROTECTED-IDS).  The root node is inclusive;
 only descendents for which affectsParent=true are traversed.
-An indefinitive instance is NOT edited -- the save would silently
+A write-protected instance is NOT edited -- the save would silently
 ignore its source edit (see TODO/problems.org, \"skg-set-source
-silently no-ops on indefinitive instances\") -- and its ID is
-collected into INDEF-IDS instead, for the caller to warn about.
+silently no-ops on write-protected instances\") -- and its ID is
+collected into WRITE-PROTECTED-IDS instead, for the caller to warn about.
 Its org-descendents are still traversed: they are self-writers, so
-their source edits take effect even under an indefinitive parent."
+their source edits take effect even under a write-protected parent."
   (save-excursion
     (let* ((changed-count 0)
-           (indef-ids '())
+           (write-protected-ids '())
            (start-level (org-outline-level))
            (change-or-collect
             (lambda ()
               (let ((meta (skg--metadata-sexp-at-point-or-nil)))
-                (if (skg--node-indefinitive-p meta)
+                (if (skg--node-write-protected-p meta)
                     (push (or (skg--node-id meta) "(no id)")
-                          indef-ids)
+                          write-protected-ids)
                   (setq changed-count
                         (+ changed-count
                            (skg--change-source-at-point new-source))))))))
@@ -891,7 +891,7 @@ their source edits take effect even under an indefinitive parent."
             (when (equal (skg--node-source metadata-sexp) old-source)
               (funcall change-or-collect))
             (outline-next-heading))))
-      (cons changed-count (nreverse indef-ids)))))
+      (cons changed-count (nreverse write-protected-ids)))))
 
 (defun skg--goto-next-heading-after-subtree ()
   "Move to the next heading after the current subtree."
@@ -950,9 +950,9 @@ their source edits take effect even under an indefinitive parent."
         (when id-values
           (format "%s" (car id-values))))))
 
-(defun skg--node-indefinitive-p (metadata-sexp)
-  "Return non-nil if METADATA-SEXP has the bare ActiveNode indef marker."
-  (skg-sexp-subtree-p metadata-sexp '(skg (node indef))))
+(defun skg--node-write-protected-p (metadata-sexp)
+  "Return non-nil if METADATA-SEXP has the bare ActiveNode writeProtected marker."
+  (skg-sexp-subtree-p metadata-sexp '(skg (node writeProtected))))
 
 (defun skg--change-source-at-point (new-source)
   "Set the source at point to NEW-SOURCE.

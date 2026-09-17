@@ -64,10 +64,10 @@ const INPUT : &str = "\
 const EXPECTED_UNSTAGED : &str = "\
 * (skg (node (id N1) (source main))) N1
 ** (skg overriderFolder)
-*** (skg (node (id del-r) (source main) indef (unstaged removedX removedM))) del-r
+*** (skg (node (id del-r) (source main) writeProtected (unstaged removedX removedM))) del-r
 * (skg (node (id N2) (source main))) N2
 ** (skg overriderFolder)
-*** (skg (node (id edge-r) (source main) indef (unstaged removedM))) edge-r
+*** (skg (node (id edge-r) (source main) writeProtected (unstaged removedM))) edge-r
 * (skg (node (id N3) (source main))) N3
 ** (skg overriderFolder)
 *** (skg (node (id new-r) (source main) (unstaged newM))) new-r
@@ -76,22 +76,22 @@ const EXPECTED_UNSTAGED : &str = "\
 *** (skg (node (id newfile-r) (source main) (unstaged newX newM))) newfile-r
 * (skg (node (id SN) (source main))) SN
 ** (skg subscriberFolder)
-*** (skg (node (id del-s) (source main) indef (unstaged removedX removedM))) del-s
+*** (skg (node (id del-s) (source main) writeProtected (unstaged removedX removedM))) del-s
 *** (skg (node (id new-s) (source main) (unstaged newM))) new-s
 * (skg (node (id HN) (source main))) HN
 ** (skg hiderFolder)
-*** (skg (node (id edge-h) (source main) indef (unstaged removedM))) edge-h
+*** (skg (node (id edge-h) (source main) writeProtected (unstaged removedM))) edge-h
 *** (skg (node (id new-h) (source main) (unstaged newM))) new-h
 ";
 
 const EXPECTED_STAGED : &str = "\
-*** (skg (node (id del-r) (source main) indef (staged removedX removedM))) del-r
-*** (skg (node (id edge-r) (source main) indef (staged removedM))) edge-r
+*** (skg (node (id del-r) (source main) writeProtected (staged removedX removedM))) del-r
+*** (skg (node (id edge-r) (source main) writeProtected (staged removedM))) edge-r
 *** (skg (node (id new-r) (source main) (staged newM))) new-r
 *** (skg (node (id newfile-r) (source main) (staged newX newM))) newfile-r
-*** (skg (node (id del-s) (source main) indef (staged removedX removedM))) del-s
+*** (skg (node (id del-s) (source main) writeProtected (staged removedX removedM))) del-s
 *** (skg (node (id new-s) (source main) (staged newM))) new-s
-*** (skg (node (id edge-h) (source main) indef (staged removedM))) edge-h
+*** (skg (node (id edge-h) (source main) writeProtected (staged removedM))) edge-h
 *** (skg (node (id new-h) (source main) (staged newM))) new-h
 ";
 

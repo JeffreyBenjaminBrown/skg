@@ -4,8 +4,8 @@
 --
 -- Graph (at HEAD): a contains [b, c], b contains [c].
 --
--- Phase 1: Open view from a. Shows a -> {b -> c(indef), c}.
--- Phase 2: Delete the indefinitive c from under b and save.
+-- Phase 1: Open view from a. Shows a -> {b -> c(write-protected), c}.
+-- Phase 2: Delete the write-protected c from under b and save.
 --          b.skg is updated (contains: []).
 -- Phase 3: Toggle diff mode on.
 --          Under b, c appears as a removed-here phantom.
@@ -156,7 +156,7 @@ print('=== PHASE 1: Open view from a ===')
 content_view.request_single_root_content_view_from_id('a')
 local buf_a = T.wait_for_buffer('skg://a')
 T.check(buf_a, "buffer 'skg://a' was created")
--- a -> {b -> c(indef), c}.
+-- a -> {b -> c(write-protected), c}.
 assert_headline_titles(buf_a,
   { { 1, 'na', 'a' },
     { 2, 'true', 'b' },
@@ -166,19 +166,19 @@ assert_headline_titles(buf_a,
 
 print('=== PHASE 2: Remove c from under b and save ===')
 vim.api.nvim_set_current_buf(buf_a)
--- Find the indef c under b.
-local indef_c_line = nil
+-- Find the write-protected c under b.
+local write_protected_c_line = nil
 for line = 1, vim.api.nvim_buf_line_count(buf_a) do
   if metadata.outline_level(line) == 3 then
     local sexp = metadata.metadata_sexp_at_line_or_nil(line)
-    if sexp and metadata.node_indefinitive_p(sexp) then
-      indef_c_line = line
+    if sexp and metadata.node_write_protected_p(sexp) then
+      write_protected_c_line = line
       break
     end
   end
 end
-T.check(indef_c_line ~= nil, 'found indef c under b')
-vim.api.nvim_buf_set_lines(buf_a, indef_c_line - 1, indef_c_line, false, {})
+T.check(write_protected_c_line ~= nil, 'found writeProtected c under b')
+vim.api.nvim_buf_set_lines(buf_a, write_protected_c_line - 1, write_protected_c_line, false, {})
 
 -- Buffer should now be: a -> {b, c}
 assert_headline_titles(buf_a,

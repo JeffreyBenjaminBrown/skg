@@ -39,10 +39,10 @@ The collateral rerender of Buffer 2 should become:
 The concern is in 'complete_subscribee_col_preorder'. It reads the
 fresh 'subscribes_to' list and computes a goal list, but in non-diff
 mode it only reconciles the SubscribeeCol's children when the
-subscriber is indefinitive:
+subscriber is write-protected:
 
 #+begin_src text
-if parent_indefinitive || source_diffs.is_some() { reconcile children }
+if parent_is_writeProtected || source_diffs.is_some() { reconcile children }
 #+end_src
 
 That condition makes sense for the saved view: a definitive subscriber

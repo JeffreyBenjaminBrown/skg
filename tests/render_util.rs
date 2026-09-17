@@ -3,7 +3,7 @@
 use skg::assert_metadata_eq;
 use skg::org_to_text::viewnode_to_text;
 use skg::types::misc::{ID, SkgConfig, SourceName};
-use skg::types::viewnode::{ ViewNode, ViewNodeKind, Vognode, ActiveNode, IndefOrDef, ViewNodeStats, default_activeNode };
+use skg::types::viewnode::{ ViewNode, ViewNodeKind, Vognode, ActiveNode, Editability, ViewNodeStats, default_activeNode };
 use skg::types::viewnode::QualFolder;
 use std::collections::HashMap;
 
@@ -25,7 +25,7 @@ fn test_viewnode_to_text_no_metadata () {
 #[test]
 fn test_viewnode_to_text_with_body () {
   let t : ActiveNode = ActiveNode {
-    indef_or_def : IndefOrDef::Definitive {
+    editability : Editability::Definitive {
       body         : Some ( "Test body content" . to_string() ),
       edit_request : None },
     .. default_activeNode ( ID::from ("test"),
@@ -58,7 +58,7 @@ fn test_viewnode_to_text_with_metadata () {
 #[test]
 fn test_viewnode_to_text_with_id_metadata () {
   let t : ActiveNode = ActiveNode {
-    indef_or_def : IndefOrDef::Indefinitive,
+    editability : Editability::WriteProtected,
     .. default_activeNode ( ID::from ("test123"),
                           SourceName::from ("main"),
                           "Test Title" . to_string() ) };
@@ -70,7 +70,7 @@ fn test_viewnode_to_text_with_id_metadata () {
   let result : String =
     viewnode_to_text ( 3, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("ActiveNode rendering never fails");
-  assert_metadata_eq! ( result, "*** (skg (node (id test123) (source main) indef)) Test Title\n" ); }
+  assert_metadata_eq! ( result, "*** (skg (node (id test123) (source main) writeProtected)) Test Title\n" ); }
 
 #[test]
 fn test_metadata_ordering () {

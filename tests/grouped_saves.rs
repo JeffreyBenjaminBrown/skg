@@ -11,8 +11,8 @@ mod delete_strips_references_from_neighbors;
 #[path = "file_io.rs"]
 mod file_io;
 
-#[path = "indef_should_not_count_as_donotdelete.rs"]
-mod indef_should_not_count_as_donotdelete;
+#[path = "write_protected_should_not_count_as_donotdelete.rs"]
+mod write_protected_should_not_count_as_donotdelete;
 
 #[path = "merge.rs"]
 mod merge;

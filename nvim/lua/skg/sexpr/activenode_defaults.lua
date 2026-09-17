@@ -18,11 +18,11 @@ local M = {}
 ---Canonical order for node fields. Fields not in this list go last.
 M.canonical_field_order = {
   'id', 'source',
-  'indef', 'affectsParent', 'birth', 'editRequest', 'viewRequests' }
+  'writeProtected', 'affectsParent', 'birth', 'editRequest', 'viewRequests' }
 
 ---Editable field names mapped to their default value text.
 M.editable_defaults = {
-  { name = 'indef', default = 'false (default)' },
+  { name = 'writeProtected', default = 'false (default)' },
   { name = 'affectsParent', default = 'true (default)' },
   { name = 'birth', default = 'unremarkable (default)' },
   { name = 'editRequest', default = 'none (default)' },
@@ -197,7 +197,7 @@ function M.expand_and_reorder (children, child_level, default_source)
   return ordered
 end
 
----Expand GROUP for display: a bare 'indef' boolean gains a 'true'
+---Expand GROUP for display: a bare 'writeProtected' boolean gains a 'true'
 ---child; a source value matching DEFAULT_SOURCE gains ' (default)'.
 ---@param group table[]
 ---@param child_level integer
@@ -206,7 +206,7 @@ end
 ---@return table[]
 function M.maybe_expand_field (group, child_level, field_name,
                                default_source)
-  if #group == 1 and field_name == 'indef' then
+  if #group == 1 and field_name == 'writeProtected' then
     return { group[1], { level = child_level + 1, text = 'true' } } end
   if field_name == 'source' and default_source and #group == 2 then
     local value = vim.trim(group[2].text)
@@ -283,7 +283,7 @@ end
 function M.strip_one_field (group, field_name, child_level)
   local value_text = nil
   if #group > 1 then value_text = vim.trim(group[2].text) end
-  if field_name == 'indef' then
+  if field_name == 'writeProtected' then
     if value_text == nil or M.default_false_p(value_text) then
       return nil end
     if value_text == 'true' then

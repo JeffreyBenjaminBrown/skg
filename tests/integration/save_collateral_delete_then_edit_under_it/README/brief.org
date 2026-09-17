@@ -31,12 +31,12 @@ In a second buffer we have just two roots, 11 and subee,
 with none of the scaffolding:
 
 #+begin_example
-  * (indef) 11 ;; indefinite to avoid seeing its content
+  * (writeProtected) 11 ;; indefinite to avoid seeing its content
   * subee
   ** subee-1
 #+end_example
 
-From that buffer we remove 'indef' from 11's metadata,
+From that buffer we remove 'writeProtected' from 11's metadata,
 add a delete request to 11, and save.
 Now the first buffer should look like:
 

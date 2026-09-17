@@ -1,6 +1,6 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
-use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
+use crate::to_org::complete::contents::clobberWriteProtectedViewnode;
 use crate::to_org::complete::partner_folder::maybe_add_partnerFolder_branches;
 use crate::dbs::node_lookup::nodecomplete_graphFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
@@ -9,7 +9,7 @@ use crate::types::nodes::rust::NodeRust;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::write_at_activeNode_in_tree;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, IndefOrDef, AffectsParent, ActiveNode, mk_definitive_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, Editability, AffectsParent, ActiveNode, mk_definitive_viewnode, mk_unknown_viewnode };
 use crate::types::viewnode::{Vognode, Phantom};
 use crate::types::tree::forest::{ViewForest, tree_forest_root_ids};
 
@@ -111,9 +111,9 @@ pub(super) fn nodecomplete_and_viewnode_from_pid_and_source (
     nodecomplete . body . clone () );
   Ok (( nodecomplete, viewnode )) }
 
-/// Set node to indefinitive,
+/// Set node to write-protected,
 /// and reset title and source.
-pub(super) fn makeIndefinitiveAndClobber (
+pub(super) fn makeWriteProtectedAndClobber (
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
   graph   : &crate::dbs::in_rust_graph::InRustGraph,
@@ -121,9 +121,9 @@ pub(super) fn makeIndefinitiveAndClobber (
 ) -> Result < (), Box<dyn Error> > {
   write_at_activeNode_in_tree (
     tree, node_id,
-    |t| { t . indef_or_def = IndefOrDef::Indefinitive; }
+    |t| { t . editability = Editability::WriteProtected; }
     ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  clobberIndefinitiveViewnode ( tree, node_id, graph, config ) ?;
+  clobberWriteProtectedViewnode ( tree, node_id, graph, config ) ?;
   Ok (( )) }
 
 /// This function's callers add a pristine, out-of-context
@@ -142,10 +142,10 @@ pub fn complete_branch_minus_content (
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   detect_and_mark_cycle_v1 ( tree, node_id ) ?;
-  make_indef_if_repeat_then_extend_defmap (
+  make_writeProtected_if_repeat_then_extend_defmap (
     tree, node_id, visited ) ?;
-  if activeNode_in_tree_is_indefinitive ( tree, node_id )?
-  { clobberIndefinitiveViewnode (
+  if activeNode_in_tree_is_writeProtected ( tree, node_id )?
+  { clobberWriteProtectedViewnode (
       tree, node_id, graph, config ) ?; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "maybe_add_partnerFolder_branches" ). entered();
@@ -159,28 +159,28 @@ pub fn complete_branch_minus_content (
   Ok (( )) }
 
 /// Does only what it says -- in particular,
-/// does not clobber the node after making it indefinitive.
+/// does not clobber the node after making it write-protected.
 ///
 /// The two jobs in the name cannot be unbundled --
 /// we have to interleave extending the defmap
-/// with marking things indefinitive, because the defmap
-/// is how we know whether to mark something indefinitive.
-pub fn make_indef_if_repeat_then_extend_defmap (
+/// with marking things write-protected, because the defmap
+/// is how we know whether to mark something write-protected.
+pub fn make_writeProtected_if_repeat_then_extend_defmap (
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
   defMap  : &mut DefinitiveMap,
 ) -> Result<(), Box<dyn Error>> {
   let pid : ID = // Will error if node is a Scaffold.
     get_id_from_treenode ( tree, node_id ) ?;
-  let is_indefinitive : bool =
+  let is_writeProtected : bool =
     write_at_activeNode_in_tree (
       tree, node_id,
       |t| { if defMap . contains_key (&pid)
-               { // It's a repeat, so make it indefinitive.
-                 t . indef_or_def = IndefOrDef::Indefinitive; }
-             t . is_indefinitive () } )
+               { // It's a repeat, so make it write-protected.
+                 t . editability = Editability::WriteProtected; }
+             t . is_writeProtected () } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  if !is_indefinitive {
+  if !is_writeProtected {
     // Ordinary completed/saved definitive -> Tentative (TODO/DONE/local-view-update/plan_v2.org §5.2).
     defMap . insert ( pid, Finalizable::Tentative (node_id) ); }
   Ok (( )) }
@@ -251,7 +251,7 @@ pub fn mark_view_roots_parent_na (
 ///   claim is "C plays 'role' toward P" (e.g. CONTAINER -> C contains
 ///   P; LINK_SOURCE -> C's body/title links to P). Verified against the
 ///   in-Rust graph via 'relation_membership_is_real', keyed by the role.
-/// - 'AffectsParent::True' on child C with INDEFINITIVE ActiveNode
+/// - 'AffectsParent::True' on child C with WRITE_PROTECTED ActiveNode
 ///   parent P: claim is "C is part of P's content". Verified
 ///   against P's 'contains' in the in-Rust graph. Definitive parents are
 ///   skipped because the save just redefined their 'contains' to
@@ -297,7 +297,7 @@ pub fn validate_affectsParent_relationships (
         continue; }
       let affects_parent_claim_ok : bool = match child_tn . affectsParent {
         AffectsParent::True => {
-          if parent_tn . is_indefinitive () {
+          if parent_tn . is_writeProtected () {
             child_contained_by_parent (graph, &child_tn . id, &parent_tn . id)
           } else { // The definitive parent *defines* content, so cannot be incorrect.
             true }}
@@ -521,9 +521,9 @@ pub fn build_node_branch_minus_content (
 // Reading from NodeCompletes and ViewNodes, esp. in trees
 // ==============================================
 
-/// Check if an ActiveNode is indefinitive.
+/// Check if an ActiveNode is write-protected.
 /// Errs if given a Scaffold.
-pub fn activeNode_in_tree_is_indefinitive (
+pub fn activeNode_in_tree_is_writeProtected (
   tree   : &Tree<ViewNode>,
   treeid : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
@@ -532,13 +532,13 @@ pub fn activeNode_in_tree_is_indefinitive (
                            |viewnode| viewnode . kind . clone() )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   match node_kind {
-    ViewNodeKind::Vognode (Vognode::Active (t))   => Ok (t . is_indefinitive ()),
-    ViewNodeKind::Phantom (Phantom::Diff (p)) => Ok (p . is_indefinitive ()),
+    ViewNodeKind::Vognode (Vognode::Active (t))   => Ok (t . is_writeProtected ()),
+    ViewNodeKind::Phantom (Phantom::Diff (p)) => Ok (p . is_writeProtected ()),
     ViewNodeKind::Phantom (Phantom::Deleted (_))
       | ViewNodeKind::Vognode (Vognode::Inactive (_))
       | ViewNodeKind::Phantom (Phantom::Unknown (_)) => Ok (false),
     _                                                => Err (
-      "is_indefinitive: caller must pass a vognode" . into( )),
+      "is_writeProtected: caller must pass a vognode" . into( )),
   }}
 
 /// Collect all child tree NodeIds from a node.

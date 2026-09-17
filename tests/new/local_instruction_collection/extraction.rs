@@ -651,13 +651,13 @@ fn subscribee_hiderel_intent_uses_only_children (
        })]); }
 
 #[test]
-fn subscribee_hiderel_intent_ignores_indefinitive_subscribee (
+fn subscribee_hiderel_intent_ignores_writeProtected_subscribee (
 ) {
   let input : &str =
     indoc! {"
             * (skg (node (id subscriber) (source main))) subscriber
             ** (skg subscribeeFolder)
-            *** (skg (node (id subscribee) (source main) indef (viewRequests definitiveView))) subscribee
+            *** (skg (node (id subscribee) (source main) writeProtected (viewRequests definitiveView))) subscribee
             "};
 
   assert_eq!(
@@ -665,16 +665,16 @@ fn subscribee_hiderel_intent_ignores_indefinitive_subscribee (
     Vec::<(ID, SubscribeeVisibility)>::new()); }
 
 #[test]
-fn subscribee_hiderel_intent_ignores_indefinitive_subscriber (
+fn subscribee_hiderel_intent_ignores_writeProtected_subscriber (
 ) {
   // At-most-one-writer-per-ID (plan_v2 §6.1): even though the subscribee
   // here is definitive with visible content, its subscriber instance is
-  // indefinitive, so no hide/unhide edits are inferred for the subscriber
+  // write-protected, so no hide/unhide edits are inferred for the subscriber
   // -- those belong only to the SubscribeeFolder under the definitive
   // instance of that subscriber.
   let input : &str =
     indoc! {"
-            * (skg (node (id subscriber) (source main) indef (viewRequests definitiveView))) subscriber
+            * (skg (node (id subscriber) (source main) writeProtected (viewRequests definitiveView))) subscriber
             ** (skg subscribeeFolder)
             *** (skg (node (id subscribee) (source main))) subscribee
             **** (skg (node (id a) (source main))) a
@@ -993,7 +993,7 @@ async fn moving_subscribee_as_such_child_to_subscriber_does_not_hide (
                 ** (skg subscribeeFolder)
                 *** (skg (node (id e) (source foreign))) subscribee-e
                 **** (skg (node (id e2) (source foreign))) e2
-                ** (skg (node (id e1) (source foreign) indef)) e1
+                ** (skg (node (id e1) (source foreign) writeProtected)) e1
                 "};
       let instructions : Vec<DefineNode> =
         save_instructions_from_org_with_disk (
@@ -1552,13 +1552,13 @@ fn duplicate_members_of_defining_folders_are_silently_deduplicated (
             *** (skg alias) other
             *** (skg alias) echo
             ** (skg subscribeeFolder)
-            *** (skg (node (id s1) (source main) indef)) s1
-            *** (skg (node (id s2) (source main) indef)) s2
-            *** (skg (node (id s1) (source main) indef)) s1
+            *** (skg (node (id s1) (source main) writeProtected)) s1
+            *** (skg (node (id s2) (source main) writeProtected)) s2
+            *** (skg (node (id s1) (source main) writeProtected)) s1
             ** (skg overriddenFolder)
-            *** (skg (node (id o1) (source main) indef)) o1
-            *** (skg (node (id o2) (source main) indef)) o2
-            *** (skg (node (id o1) (source main) indef)) o1
+            *** (skg (node (id o1) (source main) writeProtected)) o1
+            *** (skg (node (id o2) (source main) writeProtected)) o2
+            *** (skg (node (id o1) (source main) writeProtected)) o1
         "};
   let viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);

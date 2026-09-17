@@ -24,7 +24,7 @@ use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff};
 use crate::types::misc::{ID, SourceName};
 use crate::types::phantom::title_for_phantom;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Vognode, AffectsParent, PartnerFolder, mk_indefinitive_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{ViewNode, ViewNodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
 
@@ -37,7 +37,7 @@ use std::io;
 /// folder's child (subscribee, hidden-in-subscribee, or
 /// hidden-outside-of-subscribees).
 ///
-/// `phantom: None` => normal indef child marked AffectsParent::True.
+/// `phantom: None` => normal write-protected child marked AffectsParent::True.
 /// `phantom: Some(axes)` => diff-view phantom marking removal.
 pub struct ChildData {
   pub source  : SourceName,
@@ -160,7 +160,7 @@ pub fn build_child_data (
 /// `complete_relevant_children_in_viewnodetree` with identical
 /// relevance/key/create closures. Phantom-flagged ChildData entries
 /// produce phantom viewnodes; non-phantom entries produce
-/// indefinitive viewnodes marked AffectsParent::True.
+/// write-protected viewnodes marked AffectsParent::True.
 pub fn reconcile_partnerFolder_children_against_goal_list (
   tree          : &mut Tree<ViewNode>,
   folder_node      : NodeId,
@@ -220,7 +220,7 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
           { u . rel_source = d . rel_source . clone (); }
           unknown
         } else { match d . phantom {
-          None => mk_indefinitive_viewnode ( id . clone (),
+          None => mk_writeProtected_viewnode ( id . clone (),
                                              d . source . clone (),
                                              d . title . clone (),
                                              AffectsParent::True ),
@@ -318,7 +318,7 @@ pub fn apply_membership_axes_to_folder_members (
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::types::viewnode::{mk_indefinitive_viewnode, Phantom};
+  use crate::types::viewnode::{mk_writeProtected_viewnode, Phantom};
 
   fn id (text : &str) -> ID { ID::from (text) }
   fn source (text : &str) -> SourceName { SourceName::from (text) }
@@ -331,7 +331,7 @@ mod tests {
       ViewNode { focused: false, folded: false, body_folded: false,
                  kind: ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee) });
     let folder : NodeId = tree . root () . id ();
-    let mut child : ViewNode = mk_indefinitive_viewnode (
+    let mut child : ViewNode = mk_writeProtected_viewnode (
       primary . clone (), source ("main"), "last seen" . to_string (),
       AffectsParent::True );
     child . focused = true;

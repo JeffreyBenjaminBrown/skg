@@ -44,7 +44,7 @@ fn herald_rules_sexp_quotes_strings () {
   assert! ( sexp . contains ( r#"(GREEN INTERC "" staged "staged:""# ),
             "labelled INTERC with quoted empty separator not found" );
   assert! ( sexp . contains ( r#"(GREEN aliasFolder "aliases")"# ));
-  assert! ( sexp . contains ( r#"(GREEN indef ABUT "☮")"# ));
+  assert! ( sexp . contains ( r#"(GREEN writeProtected ABUT "☮")"# ));
   { let mut depth : i64 = 0; // balanced parens (no parens occur inside the table's strings, so plain counting suffices)
     for c in sexp . chars () {
       match c { '(' => depth += 1,

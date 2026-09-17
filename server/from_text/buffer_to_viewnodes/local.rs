@@ -4,7 +4,7 @@
 
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpActiveNode, MpPhantomDiff};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
-use crate::types::viewnode::{NodeEditRequest, IndefOrDef, AffectsParent, PartnerFolder, Qual, QualFolder};
+use crate::types::viewnode::{NodeEditRequest, Editability, AffectsParent, PartnerFolder, Qual, QualFolder};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::viewnode_nodecomplete::{
   generation_includes_only,
@@ -396,7 +396,7 @@ fn validate_inactive_node (
 /// check; a phantom writes nothing and is ignored at save, so its source --
 /// which may be the NOT_FOUND sentinel for an unresolvable reference -- is
 /// inert and goes unchecked. (validate_activeNode also appends the
-/// definitive-title check; a phantom is title-exempt, being indefinitive.)
+/// definitive-title check; a phantom is title-exempt, being write-protected.)
 fn validate_gnode_identity_and_structure (
   tree       : &Tree<MpViewnode>,
   node_id    : NodeId,
@@ -443,7 +443,7 @@ fn validate_activeNode (
 /// Validate a phantom (TODO/DONE/local-view-update/plan_v2.org §11): the same
 /// identity and child-structure checks as an ActiveNode, minus the two
 /// ActiveNode-only rules. The definitive-title rule does not apply (a phantom is
-/// always indefinitive, hence exempt). The source-in-config rule does not
+/// always write-protected, hence exempt). The source-in-config rule does not
 /// apply either: a phantom writes nothing and is ignored at save, so its
 /// source -- possibly the NOT_FOUND sentinel for a reference that resolves to
 /// no source -- is inert.
@@ -482,10 +482,10 @@ pub fn has_valid_source (
     . is_some_and( |s| config . sources . contains_key (s) ) }
 
 /// A definitive node (not marked for deletion) must have a non-empty title.
-/// Nodes that are indefinitive or carry a delete request are exempt.
+/// Nodes that are write-protected or carry a delete request are exempt.
 fn has_empty_title ( t : &MpActiveNode ) -> bool {
   let is_definitive : bool =
-    matches! ( &t . indef_or_def, IndefOrDef::Definitive { .. } );
+    matches! ( &t . editability, Editability::Definitive { .. } );
   let is_delete : bool =
     matches! ( t . edit_request (),
                Some (&NodeEditRequest::Delete) );

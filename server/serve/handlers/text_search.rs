@@ -38,7 +38,7 @@ use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::source_sets::{ActiveSourceSet, search_ids_for_source_set_for_test as search_ids_for_source_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, AffectsParent, mk_indefinitive_viewnode};
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, AffectsParent, mk_writeProtected_viewnode};
 use crate::types::viewnode::{QualFolder, Qual};
 
 use ego_tree::{NodeId, NodeMut};
@@ -622,7 +622,7 @@ pub fn build_search_viewforest (
       let (_score, title) : &(f32, String) = sorted_matches [0];
       let result_treeid : NodeId =
         viewforest . append_root (
-          mk_indefinitive_viewnode (
+          mk_writeProtected_viewnode (
             (*id) . clone (),
             (*source) . clone (),
             title . clone (),

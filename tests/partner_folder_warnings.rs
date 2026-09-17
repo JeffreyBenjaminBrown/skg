@@ -92,7 +92,7 @@ async fn readonly_folder_repairs_warn_impl (
       let mut l : String =
         r_line
         . replace ("(id r)", "(id x)")
-        . replace (" indef", "");
+        . replace (" writeProtected", "");
       if l . ends_with (" r") {
         l . truncate (l . len () - 2);
         l . push_str (" x"); }
@@ -165,8 +165,8 @@ async fn failed_save_carries_warnings_with_errors (
       let buffer : &str = "\
 * (skg (node (id n) (source main))) n
 ** (skg subscriberFolder) leftover headline text
-*** (skg (node (id r) (source main) indef)) r
-*** (skg (node (id t) (source main) indef)) t
+*** (skg (node (id r) (source main) writeProtected)) r
+*** (skg (node (id t) (source main) writeProtected)) t
 ** (skg idFolder)
 *** (skg id) bogus-id
 ";

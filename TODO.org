@@ -2,12 +2,11 @@
 * next
 ** urgent
 *** warn user if part of their saved changes would be discarded
-because indefinitive
+because write-protected
 ** language changes
 *** DONE Introduce the term 'folder viewnode'.
-*** "indefinitive" is user-facing and confusing
-"at peace"?
-and what's the similar term for independent of parent?
+*** DONE Rename "indefinitive" to "write-protected"
+See [[file:TODO/DONE/rename-indef-to-writeprotected.org][the census, naming discussion, and migration record]].
 *** Does make-content delete well?
 If the link it replaces with content has no other relationships
 beyond the one just removed from its parent --
@@ -173,7 +172,7 @@ See, e.g.,
 * bug : not warning me when I make changes under an indeefinitive node
 Maybe that's in the spec but it's definitely bad.
 Should prevent save.
-Otherwise I save things under an indefinitive,
+Otherwise I save things under an write-protected,
 think it worked, and lose them.
 * bug ? Does skg-replace-link-with-content discard fold info?
 * bug : C-c G on an alias kills the buffer
@@ -212,8 +211,8 @@ it depends on why the node was drawn.
   * errors
   ** Collateral view search:sharing: No such file or directory (os error 2)
 *** But save seemed to work.
-* Warn the user if they changed an indefinitive source.
-Don't other kinds of edits to indefinitive nodes
+* Warn the user if they changed an write-protected source.
+Don't other kinds of edits to write-protected nodes
 already bork the save?
 * When staging a change in magit, should update any view with that node.
 Might be hard in the containment direction but at least
@@ -327,7 +326,7 @@ and are already caught by the umbrella heralds A, I, O, S, etc.
 ** convenience to user
 *** Warn the user when any change is discarded on save.
 This should in particular cover (it currently doesn't)
-whether a source was changed on an indefinitive node.
+whether a source was changed on an write-protected node.
 *** rewrite docs/COMMANDS.org
 Some new Claude-written passages assume too much of the reade
 *** a function to relabel link labels
@@ -589,7 +588,7 @@ Then skg can just restore the narrowed window so that it starts and ends at thos
 This isn't perfect, because there might be multiple headlines with the same IDs. If there are, screw it, skg should just report that duplicative IDs are interfering with its ability to save while narrowed, and let the user worry about it.
 ** having to start and stop the server is annoying
 ** some skg-request-* functions save, others don't
-** ? trying to delete an indef node should warn, not err
+** ? trying to delete an writeProtected node should warn, not err
 That is, the save should still succeed.
 * dogfooding
 ** commands to probe better
@@ -685,7 +684,7 @@ That is, the save should still succeed.
    server/to_org/definitive_branch.rs
    sharing more code with
    server/to_org/initial_view_bfs.rs
-** Appending from indef nodes moght be a misfeature.
+** Appending from writeProtected nodes moght be a misfeature.
 ** completeContents seems too long
 ** Birth could be generalized as RelToAncestor.
    It would need both a relation and a number of levels.
@@ -701,10 +700,10 @@ That is, the save should still succeed.
    Instead of returning a :-separated string,
    return a list of lists of propertized strings,
    which the calling function can decide how to concatenate.
-** Indefinitive nodes skip the visited-checking logic
+** Write-protected nodes skip the visited-checking logic
    when saving a buffer.
    This is not clearly a problem.
-** Maybe indefinitive nodes and repeated nodes should be merged.
+** Maybe write-protected nodes and repeated nodes should be merged.
 ** these integration tests could be merged
 focus-and-folded-markers
 fold-preservation

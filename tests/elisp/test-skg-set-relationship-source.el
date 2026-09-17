@@ -88,7 +88,7 @@ org-parent), relation = the folder's relation."
    (concat
     "* (skg (node (id anchor) (source public))) anchor\n"
     "** (skg subscribeeFolder)\n"
-    "*** (skg (node (id seen) (source public) indef)) seen\n")
+    "*** (skg (node (id seen) (source public) writeProtected)) seen\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -400,7 +400,7 @@ choices, so the prompt pre-fills with the default instead."
    "*** (skg (node (id b) (source public))) b\n"
    "** (skg (node (id c) (source public) (affectsParent false))) c\n"
    "*** (skg (node (id d) (source public))) d\n"
-   "** (skg (node (id e) (source public) indef)) e\n"
+   "** (skg (node (id e) (source public) writeProtected)) e\n"
    "*** (skg (node (id f) (source public))) f\n"
    "** (skg subscribeeFolder)\n"
    "*** (skg (node (id g) (source public))) g\n"
@@ -408,7 +408,7 @@ choices, so the prompt pre-fills with the default instead."
    "** (skg aliasFolder) aliases\n")
   "A view-root tree exercising the walk's qualification and pruning:
 true content (a, b), an false branch (c, d), an
-indefinitive-but-true member (e) over content (f), a
+write-protected-but-true member (e) over content (f), a
 subscribeeFolder member (g) over subscribee-as-such content (h), and an
 aliasFolder.")
 
@@ -423,7 +423,7 @@ aliasFolder.")
 (ert-deftest test-recursive-walk-contained ()
   "Kind `contained' hits true content children of definitive
 activeNode parents only: the root's own (na) edge is skipped, the
-false branch and everything below the indefinitive node and the
+false branch and everything below the write-protected node and the
 subscribee-as-such member are pruned, and folder members are untouched."
   (test--with-skg-content-view
    test--recursive-content-tree
@@ -523,13 +523,13 @@ member's content children are not reached."
        (should-not (string-match-p "relSource"
                                    (test--line-of-id id)))))))
 
-(ert-deftest test-recursive-walk-indefinitive-folder-anchor ()
-  "A writable folder under an INDEFINITIVE anchor is not collected at
+(ert-deftest test-recursive-walk-write-protected-folder-anchor ()
+  "A writable folder under an WRITE_PROTECTED anchor is not collected at
 save, so its members do not match -- whether the walk starts at the
-anchor (pruned below the indefinitive node) or at the folder itself
+anchor (pruned below the write-protected node) or at the folder itself
 (refused by the anchor-definitiveness check)."
   (let ((tree (concat
-               "* (skg (node (id anchor) (source public) indef)) anchor\n"
+               "* (skg (node (id anchor) (source public) writeProtected)) anchor\n"
                "** (skg subscribeeFolder)\n"
                "*** (skg (node (id g) (source public))) g\n")))
     (test--with-skg-content-view
@@ -643,7 +643,7 @@ window plumbing are stubbed as in the other handler tests."
          (when (get-buffer "*skg-relationship-kinds*")
            (kill-buffer "*skg-relationship-kinds*")))))))
 
-;; --- set-source stuck-edge offer and indefinitive warning ---
+;; --- set-source stuck-edge offer and write-protected warning ---
 ;; (Here rather than in test-skg-metadata.el because these need the
 ;; config harness: the stuck-edge analysis reads the privacy ladder.
 ;; In test--config-public-private-trusted the order is public,
@@ -729,14 +729,14 @@ no offer is made."
      (should (string-match-p "(source trusted)" (test--line-of-id "a")))
      (should-not (string-match-p "relSource" (test--line-of-id "a"))))))
 
-(ert-deftest test-set-source-recursive-warns-about-indefinitive ()
-  "An indefinitive matching instance is NOT edited; its ID goes to
+(ert-deftest test-set-source-recursive-warns-about-write-protected ()
+  "A write-protected matching instance is NOT edited; its ID goes to
 *Messages* and the summary carries a loud WARNING. Edges touching
 it are not offered (they cannot actually publicize)."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id r) (source private))) r\n"
-    "** (skg (node (id e) (source private) indef)) e\n"
+    "** (skg (node (id e) (source private) writeProtected)) e\n"
     "*** (skg (node (id f) (source private))) f\n")
    test--config-public-private-trusted
    (lambda ()
@@ -745,7 +745,7 @@ it are not offered (they cannot actually publicize)."
                 (lambda (_current) "public"))
                ((symbol-function 'y-or-n-p)
                 (lambda (_prompt)
-                  (error "Should not offer: both edges touch the indefinitive node"))))
+                  (error "Should not offer: both edges touch the write-protected node"))))
        (let ((msgs (cdr (test--messages-during
                          (lambda () (skg-set-source t))))))
          (should (seq-find (lambda (m)
@@ -809,10 +809,10 @@ rises. A child still more private than the new source is left alone."
      (should-not (string-match-p "relSource" (test--line-of-id "c")))
      (should (string-match-p "(source trusted)" (test--line-of-id "c"))))))
 
-(ert-deftest test-set-source-single-indefinitive-warns-and-skips ()
-  "A single move of an indefinitive instance edits nothing and warns."
+(ert-deftest test-set-source-single-write-protected-warns-and-skips ()
+  "A single move of a write-protected instance edits nothing and warns."
   (test--with-skg-content-view
-   "* (skg (node (id x) (source private) indef)) x\n"
+   "* (skg (node (id x) (source private) writeProtected)) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))

@@ -255,7 +255,7 @@ do
   local titles_a = headline_titles(buf_a)
   print('Buffer-a titles after diff-off: ' .. format_triples(titles_a))
   -- a should contain b, b should contain e,f; f contains d. The exact
-  -- indefinitive markers vary, so just check titles.
+  -- write-protected markers vary, so just check titles.
   for _, expected_title in ipairs({ 'a', 'b', 'e, edited', 'f', 'd' }) do
     local found = false
     for _, triple in ipairs(titles_a) do

@@ -145,8 +145,8 @@ pub(crate) fn process_activeNode_diff (
     &mut node_mut, tree_node_id, &added_membership_by_id );
   if matches! ( & node_mut . value () . kind,
                 ViewNodeKind::Vognode (Vognode::Active (t))
-                  if t . is_indefinitive () ) {
-    // TODO/fork-fixes.org: no git ghosts under an indefinitive node.
+                  if t . is_writeProtected () ) {
+    // TODO/fork-fixes.org: no git ghosts under a write-protected node.
     // It draws none of its worktree children, so a removed-member
     // phantom under it would show the node's DELETED children while
     // its kept children go unshown. Its definitive occurrence (or a

@@ -2,7 +2,7 @@
 //! TODO/full-schema/11_override-rendering-and-navigation.org): when
 //! a single-root content view names an overridden node, the server
 //! offers the chain of overriders instead of silently choosing.
-//! The menu is an ordinary Skg buffer of indefinitive nodes -- the
+//! The menu is an ordinary Skg buffer of write-protected nodes -- the
 //! requested node as root, each overrider drawn as an Independent
 //! child of what it overrides, following 'overrides_view_of' from
 //! overridden to overrider recursively, ALL edges including foreign
@@ -19,7 +19,7 @@ use crate::types::env::SkgEnv;
 use crate::types::misc::ID;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  AffectsParent, ViewNode, mk_indefinitive_viewnode};
+  AffectsParent, ViewNode, mk_writeProtected_viewnode};
 use crate::types::views_state::pids_from_viewforest;
 use crate::update_buffer::finish_viewforest;
 
@@ -56,7 +56,7 @@ pub(crate) fn override_menu_view_with_runtime (
   let mut viewforest : ViewForest = ViewForest::new ();
   let root_treeid : NodeId =
     viewforest . append_root (
-      mk_indefinitive_viewnode (
+      mk_writeProtected_viewnode (
         pid . clone (),
         root_node . source . clone (),
         root_node . title . clone (),
@@ -76,7 +76,7 @@ pub(crate) fn override_menu_view_with_runtime (
   Ok ( Some ((
     rendered, pids, viewforest . into_internal_tree () )) ) }
 
-/// Append, under 'treeid' (the viewnode for 'pid'), one indefinitive
+/// Append, under 'treeid' (the viewnode for 'pid'), one write-protected
 /// Independent child per visible overrider of 'pid', recursing into
 /// each overrider that is not already on the current path. A
 /// repeated ID is still drawn (so the stats pass can mark it
@@ -96,7 +96,7 @@ fn add_overrider_branches (
       let Some (mut node_mut) = viewforest . get_mut (treeid)
         else { continue; };
       node_mut . append (
-        mk_indefinitive_viewnode (
+        mk_writeProtected_viewnode (
           overrider . clone (),
           node . source . clone (),
           node . title . clone (),

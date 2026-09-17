@@ -1,13 +1,13 @@
 use super::*;
-use crate::types::viewnode::{mk_indefinitive_viewnode, viewforest_root_viewnode};
+use crate::types::viewnode::{mk_writeProtected_viewnode, viewforest_root_viewnode};
 
 fn active_affected (id_str : &str) -> ViewNode {
-  mk_indefinitive_viewnode (
+  mk_writeProtected_viewnode (
     ID::from (id_str), SourceName::from ("main"),
     id_str . to_string (), AffectsParent::True ) }
 
 fn active_independent (id_str : &str) -> ViewNode {
-  mk_indefinitive_viewnode (
+  mk_writeProtected_viewnode (
     ID::from (id_str), SourceName::from ("main"),
     id_str . to_string (), AffectsParent::False ) }
 

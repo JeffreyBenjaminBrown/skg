@@ -5,8 +5,8 @@
 /// in the same sweep) every:
 /// - InactiveNode leaf;
 /// - Qual leaf whose owning gnode (grandparent) is inactive;
-/// - indefinitive leaf partner (child of a PartnerFolder), active or
-///   inactive: an indefinitive partner defines nothing, and
+/// - write-protected leaf partner (child of a PartnerFolder), active or
+///   inactive: a write-protected partner defines nothing, and
 ///   completion regenerates current membership afterward;
 /// - empty QualFolder or PartnerFolder;
 /// - DeadScaffold leaf.
@@ -104,7 +104,7 @@ fn should_prune (
     ViewNodeKind::Qual (_) =>
       is_leaf && grandaffects_parent_inactive,
     ViewNodeKind::Vognode (Vognode::Active (t)) =>
-      is_leaf && affects_parent_partnerFolder && t . is_indefinitive (),
+      is_leaf && affects_parent_partnerFolder && t . is_writeProtected (),
     ViewNodeKind::QualFolder (QualFolder::ID)
       | ViewNodeKind::QualFolder (QualFolder::Alias)
       | ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee)

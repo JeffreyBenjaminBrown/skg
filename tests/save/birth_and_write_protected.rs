@@ -1,4 +1,4 @@
-// cargo test --test save birth_and_indefinitive
+// cargo test --test save birth_and_write_protected
 
 use skg::dbs::filesystem::one_node::nodecomplete_from_id;
 use skg::from_text::buffer_to_validated_saveplan;
@@ -14,14 +14,14 @@ use std::fs;
 use std::path::PathBuf;
 
 #[test]
-fn test_birth_and_indefinitive(
+fn test_birth_and_write_protected(
 ) -> Result<(), Box<dyn Error>> {
   let fixtures_path: PathBuf =
     PathBuf::from (
-      "tests/save/birth_and_indefinitive/fixtures" );
+      "tests/save/birth_and_write_protected/fixtures" );
   let backup_path: PathBuf =
     PathBuf::from (
-      "tests/save/birth_and_indefinitive/fixtures_backup" );
+      "tests/save/birth_and_write_protected/fixtures_backup" );
 
   // Backup fixtures
   if backup_path . exists () {
@@ -32,16 +32,16 @@ fn test_birth_and_indefinitive(
   let result : Result<(), Box<dyn Error>> =
     run_with_test_stores (
       "skg-test-affectsParent",
-      "tests/save/birth_and_indefinitive/fixtures",
+      "tests/save/birth_and_write_protected/fixtures",
       "/tmp/tantivy-test-affectsParent",
       |config, _tantivy| Box::pin ( async move {
         // Simulate user saving this org buffer:
-        // Node 1 contains node 2 (which has affectsParent=false and indef)
+        // Node 1 contains node 2 (which has affectsParent=false and write-protected)
         // Node 2 contains node 3 (already) and should contain node 4 (new)
         // Node 2 should NOT affect node 1 because affectsParent=false
         let org_text = indoc! {"
           * (skg (node (id 1) (source main))) 1
-          ** (skg (node (id 2) (source main) (affectsParent false) indef)) 2
+          ** (skg (node (id 2) (source main) (affectsParent false) writeProtected)) 2
           *** (skg (node (id 4) (source main))) 4
         "};
         let ( _viewforest, save_plan, _warnings ) =
@@ -53,7 +53,7 @@ fn test_birth_and_indefinitive(
           &[],
           config . clone(), )?;
 
-        { // verify indef is treated correctly
+        { // verify writeProtected is treated correctly
           let node2 : NodeComplete =
             nodecomplete_from_id(
               config, &ID("2" . to_string() ))
@@ -61,7 +61,7 @@ fn test_birth_and_indefinitive(
         assert_eq!(
           members_of (&node2 . contains),
           vec![ ID("3" . to_string()) ],
-          "Node 2 should only contain [3]. It might look like 4 was appended, but because node 2 is 'indefinitive', that node 4 child should be ignored by node 2." ); }
+          "Node 2 should only contain [3]. It might look like 4 was appended, but because node 2 is 'writeProtected', that node 4 child should be ignored by node 2." ); }
 
         { // verify affectsParent=false is treated correctly
           let node1 : NodeComplete =

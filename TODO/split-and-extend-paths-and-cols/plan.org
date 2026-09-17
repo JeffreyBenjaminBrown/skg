@@ -104,7 +104,7 @@ content view already serves it.)
      ('subscriberCol', 'overriderCol', 'hiderCol', 'hiddenCol',
      'hiddenInSubscribeeCol', 'hiddenOutsideOfSubscribeeCol') straight
      from their herald rules ('heralds.rs:187-202'). Meaning: "this
-     collection cannot be changed from here", the same sense ☮ ('indef')
+     collection cannot be changed from here", the same sense ☮ ('writeProtected')
      carries on member nodes. No new wire atom or parser change -- the
      atom already says which cols are read-only. (A lock 🔒 is a one-line
      swap; the conformance test pins atoms, not glyphs.)

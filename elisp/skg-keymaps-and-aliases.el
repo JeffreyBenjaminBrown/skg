@@ -138,7 +138,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c p s") #'skg-show-paths-through-subscribees))
   (progn;; properties
     (define-key map (kbd "C-c s d") #'skg-set-definitive)
-    (define-key map (kbd "C-c s i") #'skg-set-indefinitive)
+    (define-key map (kbd "C-c s w") #'skg-set-write-protected)
     (define-key map (kbd "C-c s m") #'skg-set-merge-request)
     (define-key map (kbd "C-c s r") #'skg-set-relationship-source)
     (define-key map (kbd "C-c s R") #'skg-set-relationship-source-recursive)

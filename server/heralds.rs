@@ -87,7 +87,7 @@ fn leaf (
 
 /// (COLOR label "☮ text") -- a read-only folder scaffold leaf: the ☮
 /// marker, a space, then its label text, meaning "this folder
-/// cannot be changed from here" -- the same sense ☮ ('indef') carries
+/// cannot be changed from here" -- the same sense ☮ ('writeProtected') carries
 /// on a node. (A lock 🔒 here is a one-line swap; the conformance test
 /// pins atoms, not the emitted glyph.) A macro, not a function, because
 /// 'concat!' needs 'text' as a literal to fold the ☮ and its trailing
@@ -167,7 +167,7 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///     compact tokens like "N→M" and "N{M" from sibling atoms).
 ///
 ///   * 'leaf_abut' -- the emitted token glues onto the preceding
-///     token with no space (used so the indefinitive marker "☮" sits
+///     token with no space (used so the write-protected marker "☮" sits
 ///     directly on its affectsParent glyph).
 ///
 /// WHY SOME RULES LOOK EMPTY OR REDUNDANT:
@@ -273,10 +273,10 @@ pub fn herald_rule_table () -> HeraldRule {
           vac ("na"),
           vac ("true"),
           leaf (Orange, "false", "⊥") ]),
-        // The server emits the abbreviated atom 'indef'
+        // The server emits the atom 'writeProtected'
         // (see org_to_text.rs); we match that here.
-        leaf_abut (Green, "indef", "☮"),
-        // Emitted only on an indefinitive node whose graph node has a
+        leaf_abut (Green, "writeProtected", "☮"),
+        // Emitted only on a write-protected node whose graph node has a
         // body -- one the rendering hides. ABUT so the B rides the ☮.
         leaf_abut (Green, "hiddenBody", "B"),
         // The relationship heralds are per-CHARACTER styled spans that
@@ -327,13 +327,13 @@ pub fn herald_rule_table () -> HeraldRule {
       // A PhantomDiff (a moved/removed node in git-diff mode) emits its
       // own root atom 'diffPhantom', not 'node'. Its grammar is the
       // strict subset of node's that phantomDiff_metadata_to_string can
-      // produce: id, source, indef, graphStats, the staged/unstaged diff
+      // produce: id, source, write-protected, graphStats, the staged/unstaged diff
       // axes, and notInGit -- never affectsParent/birth/viewStats/editRequest/
       // viewRequests.
       rule ("diffPhantom", vec! [
         vac ("id"),
         vac ("source"),
-        leaf_abut (Green, "indef", "☮"),
+        leaf_abut (Green, "writeProtected", "☮"),
         rule ("rels", vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
         interc (Some (Green), "", Some ("staged"), vec! [
           s ("staged:"),
@@ -428,7 +428,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     "deletedScaffold",
     // Keys inside node / diffPhantom / deleted / unknown forms:
     "id", "source",
-    "affectsParent", "indef", "hiddenBody", "notInGit",
+    "affectsParent", "writeProtected", "hiddenBody", "notInGit",
     // The assembled relationship-herald atom, a payload of styled spans
     // (server/herald_tokens.rs); its span sub-forms are value position,
     // consumed by the client's renderer, so they are not match atoms.

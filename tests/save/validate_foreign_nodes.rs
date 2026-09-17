@@ -26,8 +26,8 @@ fn all_tests
       s . reset_from_config ("test_modified_foreign_node_body_forks_with_default_source", CONFIG_PATH) ?;
       test_modified_foreign_node_body_forks_with_default_source (
         &s . config ) . await ?;
-      s . reset_from_config ("test_indefinitive_foreign_node_filtered", CONFIG_PATH) ?;
-      test_indefinitive_foreign_node_filtered (
+      s . reset_from_config ("test_writeProtected_foreign_node_filtered", CONFIG_PATH) ?;
+      test_writeProtected_foreign_node_filtered (
         &s . config ) . await ?;
       s . reset_from_config ("test_owned_node_unchanged_behavior", CONFIG_PATH) ?;
       test_owned_node_unchanged_behavior (
@@ -117,21 +117,21 @@ async fn test_modified_foreign_node_body_forks_with_default_source (
       Ok(())
     }
 
-async fn test_indefinitive_foreign_node_filtered (
+async fn test_writeProtected_foreign_node_filtered (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-      // Save buffer with indef foreign node
+      // Save buffer with write-protected foreign node
       let org_text: &str = indoc! {"
-        * (skg (node (id foreign3) (source foreign) indef)) Foreign indef node
+        * (skg (node (id foreign3) (source foreign) writeProtected)) Foreign write-protected node
       "};
       let result: Result<_, _> = buffer_to_validated_saveplan(
         org_text, config, None) ;
-      // Should succeed - indef foreign nodes are allowed but filtered
-      assert!(result . is_ok(), "Indefinitive foreign node should be allowed");
+      // Should succeed - write-protected foreign nodes are allowed but filtered
+      assert!(result . is_ok(), "WriteProtected foreign node should be allowed");
       let ( _viewforest, save_plan, _warnings ) = result?;
-      // Indefinitive foreign nodes should be filtered out (no append)
+      // WriteProtected foreign nodes should be filtered out (no append)
       assert_eq!(save_plan . define_nodes . len(), 0,
-                 "Indefinitive foreign nodes should be filtered out");
+                 "WriteProtected foreign nodes should be filtered out");
       Ok(())
     }
 

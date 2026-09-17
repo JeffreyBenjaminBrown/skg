@@ -51,9 +51,9 @@ fn ordinary_definitive_emissions () {
       ** (skg aliasFolder) aliases
       *** (skg alias) nickname
       ** (skg subscribeeFolder)
-      *** (skg (node (id s) (source main) indef)) s
+      *** (skg (node (id s) (source main) writeProtected)) s
       ** (skg overriddenFolder)
-      *** (skg (node (id o) (source main) indef)) o
+      *** (skg (node (id o) (source main) writeProtected)) o
       * (skg (node (id doomed) (source main) (editRequest delete))) doomed
       * (skg (node (id acquirer) (source main) (editRequest (merge acquiree)))) acquirer
       "} );
@@ -133,26 +133,26 @@ fn aliasfolder_under_subscribee_as_such_emits_nothing () {
   assert_eq!( entry (&collected, "e") . aliases, None ); }
 
 #[test]
-fn folders_under_toDelete_or_indefinitive_owners_emit_nothing () {
+fn folders_under_toDelete_or_writeProtected_owners_emit_nothing () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id doomed) (source main) (editRequest delete))) doomed
       ** (skg aliasFolder) aliases
       *** (skg alias) dead alias
       ** (skg subscribeeFolder)
-      *** (skg (node (id s) (source main) indef)) s
-      * (skg (node (id ghost) (source main) indef)) ghost
+      *** (skg (node (id s) (source main) writeProtected)) s
+      * (skg (node (id ghost) (source main) writeProtected)) ghost
       ** (skg aliasFolder) aliases
       *** (skg alias) ghost alias
       ** (skg overriddenFolder)
-      *** (skg (node (id o) (source main) indef)) o
+      *** (skg (node (id o) (source main) writeProtected)) o
       "} );
   { let doomed : &IntentsForOneId = entry (&collected, "doomed");
     assert!( doomed . delete );
     assert_eq!( doomed . aliases, None );
     assert_eq!( doomed . subscribes_to, None ); }
   assert!( collected . by_pid . get (&ID::from ("ghost")) . is_none(),
-           "an indefinitive vognode and its folders emit nothing" ); }
+           "a write-protected vognode and its folders emit nothing" ); }
 
 #[test]
 fn definitive_member_of_readonly_folder_emits_for_itself_only () {
@@ -229,22 +229,22 @@ fn definitive_node_inside_diff_phantom_subtree_emits () {
               "the phantom is not content of its parent" ); }
 
 #[test]
-fn indefinitive_subscribee_as_such_emits_nothing () {
+fn writeProtected_subscribee_as_such_emits_nothing () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id subscriber) (source main))) subscriber
       ** (skg subscribeeFolder)
-      *** (skg (node (id e) (source main) indef)) e
-      **** (skg (node (id under) (source main) indef)) under
+      *** (skg (node (id e) (source main) writeProtected)) e
+      **** (skg (node (id under) (source main) writeProtected)) under
       "} );
   assert!( collected . by_pid . get (&ID::from ("e")) . is_none() );
   assert_eq!( entry (&collected, "subscriber") . visibility, vec![] ); }
 
 #[test]
-fn definitive_subscribee_under_indefinitive_subscriber_claims_without_visibility () {
+fn definitive_subscribee_under_writeProtected_subscriber_claims_without_visibility () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id subscriber) (source main) indef)) subscriber
+      * (skg (node (id subscriber) (source main) writeProtected)) subscriber
       ** (skg subscribeeFolder)
       *** (skg (node (id e) (source main))) e
       **** (skg (node (id visible) (source main))) visible
@@ -255,7 +255,7 @@ fn definitive_subscribee_under_indefinitive_subscriber_claims_without_visibility
       title : "e" . to_string(),
       body  : None } ]);
   assert!( collected . by_pid . get (&ID::from ("subscriber")) . is_none(),
-           "no visibility intent reaches an indefinitive subscriber" ); }
+           "no visibility intent reaches a write-protected subscriber" ); }
 
 #[test]
 fn present_but_empty_folders_differ_from_absent_folders () {
@@ -288,13 +288,13 @@ fn duplicate_defining_folder_members_dedup_preserving_order () {
       *** (skg alias) other
       *** (skg alias) echo
       ** (skg subscribeeFolder)
-      *** (skg (node (id s1) (source main) indef)) s1
-      *** (skg (node (id s2) (source main) indef)) s2
-      *** (skg (node (id s1) (source main) indef)) s1
+      *** (skg (node (id s1) (source main) writeProtected)) s1
+      *** (skg (node (id s2) (source main) writeProtected)) s2
+      *** (skg (node (id s1) (source main) writeProtected)) s1
       ** (skg overriddenFolder)
-      *** (skg (node (id o1) (source main) indef)) o1
-      *** (skg (node (id o2) (source main) indef)) o2
-      *** (skg (node (id o1) (source main) indef)) o1
+      *** (skg (node (id o1) (source main) writeProtected)) o1
+      *** (skg (node (id o2) (source main) writeProtected)) o2
+      *** (skg (node (id o1) (source main) writeProtected)) o1
       "} );
   let owner : &IntentsForOneId = entry (&collected, "owner");
   assert_eq!( owner . aliases,

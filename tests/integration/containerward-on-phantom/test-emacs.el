@@ -2,8 +2,8 @@
 ;;;
 ;;; Graph (at HEAD):  a contains [b, c],  b contains [c].
 ;;;
-;;; Phase 1: Open view from a.  Shows a -> {b -> c(indef), c}.
-;;; Phase 2: Delete the indefinitive c from under b and save.
+;;; Phase 1: Open view from a.  Shows a -> {b -> c(write-protected), c}.
+;;; Phase 2: Delete the write-protected c from under b and save.
 ;;;          b.skg is updated (contains: []).
 ;;; Phase 3: Toggle diff mode on.
 ;;;          Under b, c appears as a removed-here phantom.
@@ -24,7 +24,7 @@
     (unless buf
       (message "✗ FAIL [phase 1]: buffer *a* not created")
       (kill-emacs 1))
-    ;; a -> {b -> c(indef), c}.
+    ;; a -> {b -> c(write-protected), c}.
     (assert-headline-titles
      buf
      '((1 na "a")
@@ -38,10 +38,10 @@
   (setq integration-test-phase "phase-2")
   (with-current-buffer "*a*"
     (let ((inhibit-read-only t))
-      ;; Find the indef c under b (the *** line)
+      ;; Find the write-protected c under b (the *** line)
       (goto-char (point-min))
-      (unless (re-search-forward "^\\*\\*\\* .*(skg.* indef\\b" nil t)
-        (message "✗ FAIL [phase 2]: could not find indef c under b")
+      (unless (re-search-forward "^\\*\\*\\* .*(skg.* writeProtected\\b" nil t)
+        (message "✗ FAIL [phase 2]: could not find writeProtected c under b")
         (message "  Buffer: %S" (buffer-substring-no-properties
                                   (point-min) (point-max)))
         (kill-emacs 1))

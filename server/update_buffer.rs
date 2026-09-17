@@ -34,7 +34,7 @@ use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_t
 use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_parent_na, validate_affectsParent_relationships, mark_orphans_under_dead_parents_false};
 use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
-use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{Editability, ViewNode, ViewNodeKind};
 use crate::types::viewnode::{Vognode, Phantom, QualFolder, Qual, ViewRequest};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 
@@ -389,8 +389,8 @@ pub fn render_initial_view (
   diff_mode : bool,
 ) -> Result<(ViewForest, Vec<String>), Box<dyn Error>> {
   // Build the stub roots. Its DefinitiveMap is discarded: view completion below uses
-  // a FRESH one, so each root is a first occurrence (make_indef_if_repeat treats
-  // any pid already in the map as a repeat and would wrongly indefinitize them).
+  // a FRESH one, so each root is a first occurrence (make_write-protected_if_repeat treats
+  // any pid already in the map as a repeat and would wrongly write-protect them).
   let mut stub_defmap : DefinitiveMap = DefinitiveMap::new ();
   let mut viewforest : ViewForest =
     crate::to_org::util::stub_viewforest_from_root_ids (
@@ -610,8 +610,8 @@ fn rewriteInPlace_viewnodes_whose_id_is_newly_extra (
       { t . id = new_pid;
         t . source = new_source;
         t . title = new_title;
-        if let IndefOrDef::Definitive { body, .. }
-        = &mut t . indef_or_def
+        if let Editability::Definitive { body, .. }
+        = &mut t . editability
         { *body = new_body; }} }}
   Ok (( )) }
 
@@ -781,7 +781,7 @@ fn fulfill_root_containerward_requests (
   Ok (( )) }
 
 /// For every RemovedHere phantom in the viewforest, fetch its containerward
-/// ancestry from the captured graph and insert it as indefinitive Content children.
+/// ancestry from the captured graph and insert it as write-protected Content children.
 /// Short-circuits when no RemovedHere phantoms exist.
 fn attach_containerward_ancestries_to_removedhere_phantoms (
   viewforest    : &mut ViewForest,

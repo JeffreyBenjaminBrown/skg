@@ -244,7 +244,7 @@ fn birth_relations (
 ) -> Vec<NodeRelation> {
   let mut rels : Vec<NodeRelation> = {
     // A backpath graft's birth is its role's relation, regardless of
-    // affectsParent (grafts are typically Independent/Indefinitive).
+    // affectsParent (grafts are typically Independent/WriteProtected).
     if let Birth::Backpath (role) = birth {
       vec![ role . relation ]
     } else if affectsParent != AffectsParent::True { Vec::new ()
@@ -284,7 +284,7 @@ fn birth_relations_for_folder (
       vec![ NodeRelation::HidesFromItsSubscriptions ], } }
 
 /// Sets hidden_body on the active vognode at treeid: true iff the node
-/// is drawn INDEFINITIVE here while its graph node has a body -- one
+/// is drawn WRITE_PROTECTED here while its graph node has a body -- one
 /// the rendering hides. Herald "B" on the ☮ (TODO/more.org). False
 /// without a graph handle (some tests): better no B than a wrong one.
 fn set_hidden_body (
@@ -297,7 +297,7 @@ fn set_hidden_body (
     let ViewNodeKind::Vognode (Vognode::Active (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
-    t . is_indefinitive ()
+    t . is_writeProtected ()
       && graph . map_or ( false, |g| {
            let pid : ID = g . pid_of (node_pid)
              . unwrap_or_else ( || node_pid . clone () );

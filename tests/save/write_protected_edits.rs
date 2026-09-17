@@ -1,4 +1,4 @@
-// cargo nextest run --test grouped_saves -E 'test(save::indefinitive_edits::)'
+// cargo nextest run --test grouped_saves -E 'test(save::write_protected_edits::)'
 
 use indoc::indoc;
 use skg::dbs::filesystem::one_node::nodecomplete_from_id;
@@ -18,29 +18,29 @@ use std::error::Error;
 use std::net::TcpStream;
 
 #[test]
-fn whitespace_only_body_under_indefinitive_is_not_an_edit () {
+fn whitespace_only_body_under_writeProtected_is_not_an_edit () {
   let input : &str =
-    "* (skg (node (id shown) (source main) indef)) shown\n\n";
+    "* (skg (node (id shown) (source main) writeProtected)) shown\n\n";
   let (_viewforest, parsing_errors, _warnings) =
     org_to_uninterpreted_viewforest (input) . unwrap ();
   assert! ( ! parsing_errors . iter () . any ( |error| matches! (
-    error, BufferValidationError::EditedIndefinitive (_)) ),
-    "Blank separator lines do not edit an indefinitive occurrence: {:?}",
+    error, BufferValidationError::EditedWriteProtectedOccurrence (_)) ),
+    "Blank separator lines do not edit a write-protected occurrence: {:?}",
     parsing_errors );
 }
 
 #[test]
-fn saving_an_edited_indefinitive_occurrence_is_rejected ()
+fn saving_an_edited_writeProtected_occurrence_is_rejected ()
   -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
-    "skg-test-indefinitive-edits",
-    "tests/save/birth_and_indefinitive/fixtures",
-    "/tmp/tantivy-test-indefinitive-edits",
+    "skg-test-write-protected-edits",
+    "tests/save/birth_and_write_protected/fixtures",
+    "/tmp/tantivy-test-write-protected-edits",
     |config, tantivy| Box::pin (async move {
-      saving_an_edited_indefinitive_occurrence_impl (config, tantivy) . await
+      saving_an_edited_writeProtected_occurrence_impl (config, tantivy) . await
     })) }
 
-async fn saving_an_edited_indefinitive_occurrence_impl (
+async fn saving_an_edited_writeProtected_occurrence_impl (
   config  : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -53,21 +53,21 @@ async fn saving_an_edited_indefinitive_occurrence_impl (
   let mut stream : TcpStream =
     TcpStream::connect (listener . local_addr ()?)?;
   let uri : Result<ViewUri, String> = Ok (
-    ViewUri::ContentView ("indefinitive-edits-test" . to_string ()));
+    ViewUri::ContentView ("write-protected-edits-test" . to_string ()));
   let rendered = indoc! {"
     * (skg (node (id 1) (source main))) 1
-    ** (skg (node (id 2) (source main) indef)) 2
+    ** (skg (node (id 2) (source main) writeProtected)) 2
   "};
   let first = update_from_and_rerender_buffer (
     &mut stream, rendered, config, tantivy, &graph, false,
     &uri, &mut views_state ) . await ?;
 
   // A second, newly inserted occurrence of node 1 is not an edit to a
-  // previously rendered indefinitive occurrence. It may therefore express
+  // previously rendered write-protected occurrence. It may therefore express
   // the root's new self-content relationship.
   let with_new_self_occurrence : String = first . saved_view . replacen (
     '\n',
-    "\n** (skg (node (id 1) (source main) indef)) new self occurrence\n",
+    "\n** (skg (node (id 1) (source main) writeProtected)) new self occurrence\n",
     1);
   let second = update_from_and_rerender_buffer (
     &mut stream, &with_new_self_occurrence, config, tantivy, &graph, false,
@@ -93,12 +93,12 @@ async fn saving_an_edited_indefinitive_occurrence_impl (
   let error = match result {
     Err (error) => error,
     Ok (_) => panic! (
-      "editing an open view's indefinitive occurrence must fail"), };
+      "editing an open view's write-protected occurrence must fail"), };
   let save_error = error . downcast_ref::<SaveError> ()
     . expect ("the rejection should be a SaveError");
   let SaveError::BufferValidationErrors { errors, .. } = save_error else {
     panic! ("expected BufferValidationErrors, got {:?}", save_error); };
   assert_eq! (errors,
-    &vec! [BufferValidationError::EditedIndefinitive ("2" . into ())]);
+    &vec! [BufferValidationError::EditedWriteProtectedOccurrence ("2" . into ())]);
   Ok (( ))
 }

@@ -7,7 +7,7 @@
 // refresh the OTHER (collateral) view's subscribeeFolder from the graph,
 // not leave it showing the old subscription. Before the fix,
 // reconcile_subscribeeFolder_children skipped a definitive subscriber
-// outside diff mode (the `parent_indefinitive || source_diffs.is_some()`
+// outside diff mode (the `parent_write-protected || source_diffs.is_some()`
 // gate), so the collateral subscribeeFolder kept stale members.
 //
 // Installs the explicit graph handle (the subscribee lookups read

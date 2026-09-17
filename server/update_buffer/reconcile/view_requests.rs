@@ -46,14 +46,14 @@ pub fn ensure_hiddenInFolder_under_definitive_subscribee (
     type_and_parent_type_consistent_with_subscribee (
       tree, node ) ?;
   if ! is_subscribee { return Ok (( )); }
-  let is_indefinitive : bool =
+  let is_writeProtected : bool =
     read_at_node_in_tree( tree, node,
       |vn : &ViewNode| match &vn . kind {
         ViewNodeKind::Vognode (Vognode::Active (t))
-          => t . is_indefinitive (),
+          => t . is_writeProtected (),
         _ => false } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
-  if is_indefinitive { return Ok (( )); }
+  if is_writeProtected { return Ok (( )); }
   maybe_add_hiddenInSubscribeeFolder_branch (
     tree, node, graph, config,
     active_source_set, source_diffs ) }

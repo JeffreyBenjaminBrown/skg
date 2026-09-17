@@ -108,7 +108,7 @@ produces -- as an overlay (never buffer text), colored tokens inside
 plain parens (TODO/more.org). Fields producing no herald get none."
   (skg-test-install-herald-rules)
   (with-temp-buffer
-    (insert "* skg\n** node\n*** source\n**** main\n*** indef\n"
+    (insert "* skg\n** node\n*** source\n**** main\n*** writeProtected\n"
             "*** affectsParent\n**** false\n")
     (org-mode)
     (skg-sexp-edit--decorate-with-heralds)
@@ -127,7 +127,7 @@ plain parens (TODO/more.org). Fields producing no herald get none."
                                           (1+ (line-end-position)))))))
                (and ov (substring-no-properties
                         (overlay-get ov 'after-string)))))))
-      (should (equal (funcall hint-on-line "*** indef") " (\u262e)"))
+      (should (equal (funcall hint-on-line "*** writeProtected") " (\u262e)"))
       (should (equal (funcall hint-on-line "**** false") " (\u22a5)"))
       (should-not (funcall hint-on-line "**** main"))
       (should-not (funcall hint-on-line "*** source"))

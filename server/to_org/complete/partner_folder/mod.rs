@@ -101,7 +101,7 @@ pub fn type_and_parent_type_consistent_with_subscribee (
        && affects_parent_subscribeeFolder ) }
 
 /// If appropriate, prepend a SubscribeeFolder child containing:
-/// - for each subscribee, an indefinitive Subscribee child
+/// - for each subscribee, a write-protected Subscribee child
 /// - if any hidden nodes are outside subscribee content,
 ///   a HiddenOutsideOfSubscribeeFolder
 pub fn maybe_add_subscribeeFolder_branch (
@@ -120,14 +120,14 @@ pub fn maybe_add_subscribeeFolder_branch (
     |vn| matches!( &vn . kind,
                     ViewNodeKind::Vognode (Vognode::Active (_))),
     "maybe_add_subscribeeFolder_branch: expected ActiveNode" ) ?;
-  { let is_indefinitive : bool =
+  { let is_writeProtected : bool =
       read_at_node_in_tree(
         tree, node_id,
         |vn| matches!( &vn . kind,
                         ViewNodeKind::Vognode (Vognode::Active (t))
-                        if t . is_indefinitive () ))
+                        if t . is_writeProtected () ))
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
-    if is_indefinitive { return Ok(( )); } }
+    if is_writeProtected { return Ok(( )); } }
   { // Pre-existing SubscribeeFolder children are reconciled by view completion (complete_nodes_in_level_order), which dispatches to 'reconcile_subscribeeFolder_children'.
     if unique_scaffold_child_of_viewnode (
       tree, node_id,
@@ -257,14 +257,14 @@ pub fn maybe_add_partnerFolder_branches (
     |vn| matches!( &vn . kind,
                     ViewNodeKind::Vognode (Vognode::Active (_) )),
     "maybe_add_partnerFolder_branches: expected ActiveNode" ) ?;
-  { let is_indefinitive : bool =
+  { let is_writeProtected : bool =
       read_at_node_in_tree(
         tree, node_id,
         |vn| matches!( &vn . kind,
                         ViewNodeKind::Vognode (Vognode::Active (t))
-                        if t . is_indefinitive () ) )
+                        if t . is_writeProtected () ) )
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
-    if is_indefinitive { return Ok(( )); } }
+    if is_writeProtected { return Ok(( )); } }
   maybe_add_subscribeeFolder_branch (
     tree, node_id, graph, config, active_source_set,
     source_diffs, false ) ?;

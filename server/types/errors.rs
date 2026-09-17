@@ -27,7 +27,7 @@ pub enum SaveError {
 pub enum BufferValidationError {
   Body_of_Scaffold               (String,   // Title from buffer
                                   String),  // Scaffold kind (e.g. "aliasFolder", "alias")
-  Multiple_Defining_Viewnodes     (ID), // For any given ID, at most one node with that ID can have indefinitive=false. (Its contents are intended to define those of the node.)
+  Multiple_Defining_Viewnodes     (ID), // For any given ID, at most one occurrence can be definitive. (Its contents are intended to define those of the node.)
   AmbiguousDeletion              (ID),
   DuplicatedContent              (ID), // A node has multiple Content children with the same ID
   InconsistentSources            (ID, HashSet<SourceName>), // Multiple viewnodes with same ID have different sources
@@ -56,8 +56,8 @@ pub enum BufferValidationError {
   MultipleDefinitiveRequestsForSameId    (ID), // Multiple definitive view requests for the same ID
   EmptyTitle                             (ID),
   LocalStructureViolation        (String, ID), // (error message, nearest ancestor ID)
-  EditRequestOnIndefinitive      (ID), // Indefinitive (read-only) nodes -- phantoms in particular -- cannot carry write instructions like (editRequest delete) or (editRequest (merge X)). The user must visit a definitive view of the node first.
-  EditedIndefinitive            (ID), // This occurrence was changed since the server rendered it, but an indefinitive occurrence emits no save instruction for the changed data.
+  EditRequestOnWriteProtectedOccurrence      (ID), // Write-protected (read-only) nodes -- phantoms in particular -- cannot carry write instructions like (editRequest delete) or (editRequest (merge X)). The user must visit a definitive view of the node first.
+  EditedWriteProtectedOccurrence            (ID), // This occurrence was changed since the server rendered it, but a write-protected occurrence emits no save instruction for the changed data.
   IDFolder_Edited                   (ID,       // owner of the IDFolder
                                   Vec<ID>,  // ids the buffer's IDFolder claims
                                   Vec<ID>), // the owner's real ids (pid + extra_ids); empty if the owner is not in the graph
@@ -98,7 +98,7 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "{} node should not have a body. Node title: '{}'",
                kind, title),
       BufferValidationError::Multiple_Defining_Viewnodes (id) =>
-        write!(f, "Multiple nodes with ID {:?} are marked as defining (indefinitive=false)", id),
+        write!(f, "Multiple occurrences of node {:?} are definitive", id),
       BufferValidationError::AmbiguousDeletion (id) =>
         write!(f, "Ambiguous deletion request for ID {:?}", id),
       BufferValidationError::DuplicatedContent (id) =>
@@ -142,10 +142,10 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Local structure violation at ID {:?}: {}", id, msg),
       BufferValidationError::IDFolder_Edited(owner, buffer_ids, real_ids) =>
         write!(f, "The idFolder under node {:?} was edited (buffer claims {:?}; real ids are {:?}). Reordering is fine, but IDs cannot be added, removed or edited through the buffer; edit the .skg file directly.", owner, buffer_ids, real_ids),
-      BufferValidationError::EditRequestOnIndefinitive (id) =>
-        write!(f, "Edit request on indefinitive (phantom) node {:?}. Phantoms are indefinitive; indefinitive nodes cannot carry write instructions. Visit a definitive view of the node first (C-c g RET).", id),
-      BufferValidationError::EditedIndefinitive (id) =>
-        write!(f, "The indefinitive occurrence of node {:?} was edited, but indefinitive occurrences are read-only and would discard that edit. Re-render, then edit a definitive occurrence instead.", id),
+      BufferValidationError::EditRequestOnWriteProtectedOccurrence (id) =>
+        write!(f, "Edit request on write-protected (phantom) node {:?}. Phantoms are write-protected; write-protected nodes cannot carry write instructions. Visit a definitive view of the node first (C-c g RET).", id),
+      BufferValidationError::EditedWriteProtectedOccurrence (id) =>
+        write!(f, "The write-protected occurrence of node {:?} was edited, but write-protected occurrences are read-only and would discard that edit. Re-render, then edit a definitive occurrence instead.", id),
       BufferValidationError::OverridesHere_Mismatch(carrier, original, effective) =>
         write!(f, "Node {:?} carries the marker (overridesHere {:?}), but it is not on the override chain of that original (which resolves to {:?}). The marker looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, original, effective),
       BufferValidationError::Other (msg) =>

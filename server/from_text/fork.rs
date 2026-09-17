@@ -223,7 +223,7 @@ pub const FORK_SOURCE_PLACEHOLDER : &str = "PICK-A-SOURCE";
 ///                           one-line suggestion comment the client
 ///                           offers as the prompt's default.
 ///   ** <original title>  -- the ORIGINAL N that C overrides: its real id,
-///                           real source, indefinitive,
+///                           real source, write-protected,
 ///                           affectsParent=false, marked "pO".
 ///
 /// The client shows this and asks the user to approve (re-save the
@@ -263,7 +263,7 @@ pub fn build_fork_confirmation_buffer (
       shown_source, shown_source,
       spec . clone . 0 . title ));
     out . push_str ( & format! (
-      "** (skg (node (id {}) (source {}) (affectsParent false) indef \
+      "** (skg (node (id {}) (source {}) (affectsParent false) writeProtected \
        (viewStats parentOverrides))) {}\n",
       spec . original_id . 0, spec . original_source,
       spec . original_title )); }

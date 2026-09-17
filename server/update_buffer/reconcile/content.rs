@@ -1,7 +1,7 @@
-use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
+use crate::to_org::complete::contents::clobberWriteProtectedViewnode;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::viewnode::{mk_inactive_viewnode, mk_unknown_viewnode};
-use crate::to_org::util::{DefinitiveMap, make_indef_if_repeat_then_extend_defmap};
+use crate::to_org::util::{DefinitiveMap, make_writeProtected_if_repeat_then_extend_defmap};
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::{
@@ -12,7 +12,7 @@ use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, PhantomDeleted, IndefOrDef,
+    ViewNode, ViewNodeKind, PhantomDeleted, Editability,
     AffectsParent, ViewRequest, mk_definitive_viewnode};
 use crate::types::viewnode::{Vognode, Phantom, PartnerFolder};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_source_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
@@ -60,9 +60,9 @@ struct ChildData {
 /// Finalizable state *before* calling this (via 'apply_definitive_draw_rule')
 /// and passes:
 /// - `settled`: the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule already ran for this node (it carried a
-///   ViewRequest::Definitive), so its map entry and indef/def are already
-///   correct -- skip 'make_indef_if_repeat_then_extend_defmap', which would
-///   otherwise indefinitize a just-made-Final node against its own entry.
+///   ViewRequest::Definitive), so its map entry and write-protected/def are already
+///   correct -- skip 'make_write-protected_if_repeat_then_extend_defmap', which would
+///   otherwise write-protect a just-made-Final node against its own entry.
 /// - `cascade`: this node is Final (DVR-made); per TODO/DONE/local-view-update/plan_v2.org §5.3 it hands a
 ///   ViewRequest::Definitive to each of its affected content children so the
 ///   BFS draws each Final (clobbering competing Tentative occurrences).
@@ -92,9 +92,9 @@ pub fn expand_true_content_at_activeNode (
     "expand_true_content_at_activeNode: expected Active vognode" ) ?;
   if ! settled {
     // A DVR node was already resolved by apply_definitive_draw_rule; running
-    // the dedup here would indefinitize it against its own (just-inserted)
+    // the dedup here would write-protect it against its own (just-inserted)
     // map entry. Ordinary nodes still dedup first-wins (Tentative).
-    make_indef_if_repeat_then_extend_defmap(
+    make_writeProtected_if_repeat_then_extend_defmap(
       tree, node, defmap ) ?; }
   let (pid, initial_source) : (ID, SourceName) =
     pid_and_source_from_treenode( tree, node,
@@ -102,14 +102,14 @@ pub fn expand_true_content_at_activeNode (
   // This content path produces the pure worktree view; the node's git diff
   // (axes, phantom flip, diff scaffolds) is applied by process_activeNode_diff at
   // the end of the node's BFS visit (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3).
-  { let is_indefinitive : bool =
+  { let is_writeProtected : bool =
       read_at_node_in_tree( tree, node,
         |vn : &ViewNode| match &vn . kind {
           ViewNodeKind::Vognode (Vognode::Active (t))
-            => t . is_indefinitive (),
+            => t . is_writeProtected (),
           _ => false } ) ?;
-    if is_indefinitive {
-      clobberIndefinitiveViewnode( tree, node, graph_snap, config ) ?;
+    if is_writeProtected {
+      clobberWriteProtectedViewnode( tree, node, graph_snap, config ) ?;
       return Ok (( )); }}
   if deleted_by_this_save_pids . contains (&pid) {
     mutate_activeNode_to_deletednode (
@@ -117,8 +117,8 @@ pub fn expand_true_content_at_activeNode (
     return Ok (( )); }
   // TODO/DONE/local-view-update/plan_v2.org §5.5: this vognode is definitive and about to expand -- draw its whole
   // content group, and (via the BFS) its folders. Each expansion costs ONE budget
-  // unit; an indefinitive node (returned above) costs nothing, and a folder fills
-  // for free. visit_normal_node already forced this node indefinitive if the
+  // unit; a write-protected node (returned above) costs nothing, and a folder fills
+  // for free. visit_normal_node already forced this node write-protected if the
   // budget was 0, so here it is > 0; saturating_sub is defensive.
   *node_budget = node_budget . saturating_sub (1);
   let nodecomplete : NodeComplete =
@@ -182,8 +182,8 @@ fn sync_activeNode_from_disk (
     tree, node,
     |t| { t . title = disk_title;
           t . source = disk_source;
-          if let IndefOrDef::Definitive { body, .. }
-            = &mut t . indef_or_def
+          if let Editability::Definitive { body, .. }
+            = &mut t . editability
             { *body = disk_body; }} ) ?;
   Ok (( )) }
 
@@ -250,7 +250,7 @@ fn reconcile_content_children (
                  . or_else ( || home_from_disk (id, config) ));
   // TODO/DONE/local-view-update/plan_v2.org §5.5: the content group is drawn WHOLE -- never truncated mid-group. The
   // budget is spent once per expanding vognode (in expand_true_content_at_activeNode),
-  // not per child, so a node either fully expands or is left indefinitive; we
+  // not per child, so a node either fully expands or is left write-protected; we
   // never create a silent partial sibling set.
   // A content child this save deleted stays here; at its own BFS visit it
   // becomes a PhantomDeleted whose folders generalized-orphan and deaden -- so no folder
@@ -472,7 +472,7 @@ fn content_goal_list (
 /// Reconcile the node's non-parentIgnored ActiveNode children
 /// against the goal list (content IDs, possibly interleaved with
 /// phantom IDs in diff view). Missing children are created as
-/// indefinitive ViewNodes or phantom ViewNodes as appropriate.
+/// write-protected ViewNodes or phantom ViewNodes as appropriate.
 fn complete_content_children (
   tree               : &mut Tree<ViewNode>,
   node               : NodeId,

@@ -119,8 +119,8 @@
             (concat "* (skg (node (id 1) (source main) (affectsParent na) (rels (contains (in 1) (out 3))))) 1\n"
                     "** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11\n"
                     "** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 12\n"
-                    "*** (skg (node (id 1) (source main) (affectsParent false) indef (rels (contains (in 1) (out 3 (ancestors 1))) (birth contains)) (viewStats cycle))) 1\n"
-                    "**** (skg (node (id 0) (source main) (affectsParent false) indef (rels (contains (out 1 (ancestors 1))) (birth contains)))) 0\n"
+                    "*** (skg (node (id 1) (source main) (affectsParent false) writeProtected (rels (contains (in 1) (out 3 (ancestors 1))) (birth contains)) (viewStats cycle))) 1\n"
+                    "**** (skg (node (id 0) (source main) (affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth contains)))) 0\n"
                     "*** (skg (node (id 121) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121\n"
                     "** (skg (node (id 13) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13\n")))
 

@@ -25,11 +25,11 @@
       (message "✗ FAIL: leaf-b search root is false during %s: %S"
                phase line)
       (kill-emacs 1))
-    (when (string-match-p "(affectsParent false) indef (rels (contains (out 1 (ancestors 1))) (birth contains))" line)
+    (when (string-match-p "(affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth contains))" line)
       (message "✗ FAIL: leaf-b search root is content during %s: %S"
                phase line)
       (kill-emacs 1))
-    (when (string-match-p "(affectsParent false) indef (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo))" line)
+    (when (string-match-p "(affectsParent false) writeProtected (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo))" line)
       (message "✗ FAIL: leaf-b search root is linksToParent during %s: %S"
                phase line)
       (kill-emacs 1))))

@@ -55,7 +55,7 @@ pub fn handle_source_set_request (
 /// RE-RENDERS open views in place rather than closing them.  Each
 /// view gets the convert-and-prune prepass (now-inactive Actives
 /// become InactiveNodes; childless inactive branches, quals of
-/// inactive owners, indefinitive partners, emptied folders and dead
+/// inactive owners, write-protected partners, emptied folders and dead
 /// scaffolds are pruned), then completion with PartnerFolder creation
 /// enabled, because a switch can also ACTIVATE sources, revealing
 /// members and folders.  Results stream via the rerender-all message

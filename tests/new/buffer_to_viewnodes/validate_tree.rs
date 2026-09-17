@@ -52,8 +52,8 @@ fn all_tests
       s . reset ("test_empty_title_rejected_for_definitive_node", fixtures) ?;
       test_empty_title_rejected_for_definitive_node (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_empty_title_allowed_for_indefinitive_and_delete", fixtures) ?;
-      test_empty_title_allowed_for_indefinitive_and_delete (
+      s . reset ("test_empty_title_allowed_for_writeProtected_and_delete", fixtures) ?;
+      test_empty_title_allowed_for_writeProtected_and_delete (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_definitive_request_with_only_non_content_children_is_allowed", fixtures) ?;
       test_definitive_request_with_only_non_content_children_is_allowed (
@@ -481,13 +481,13 @@ async fn test_empty_title_rejected_for_definitive_node (
                    "Empty title error should be for no-title"); }
       Ok(( )) }
 
-async fn test_empty_title_allowed_for_indefinitive_and_delete (
+async fn test_empty_title_allowed_for_writeProtected_and_delete (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let input: &str =
         indoc! {"
-                * (skg (node (id indef) (source main) indef))
+                * (skg (node (id writeProtected) (source main) writeProtected))
                 * (skg (node (id deleting) (source main) (editRequest delete)))
             "};
       let viewforest: MpViewForest =
@@ -505,21 +505,21 @@ async fn test_empty_title_allowed_for_indefinitive_and_delete (
                        if empty_title_re . is_match (msg)))
         . collect();
       assert_eq!(empty_title_errors . len(), 0,
-                 "Indefinitive and delete-requested nodes should not trigger empty title errors");
+                 "WriteProtected and delete-requested nodes should not trigger empty title errors");
       Ok(( )) }
 
 async fn test_definitive_request_with_only_non_content_children_is_allowed (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // A definitive view request on an indefinitive node whose children
+  // A definitive view request on a write-protected node whose children
   // are all NON-content (affectsParent != Affected) should be permitted: the
   // expansion would fill the node with content, and non-content
   // children (e.g. 'birth backpath container' ancestry stubs) don't conflict
   // with that. Only Container children would be clobbered.
       let input : &str =
         indoc! {"
-                * (skg (node (id parent) (source main) indef (viewRequests definitiveView))) parent
+                * (skg (node (id parent) (source main) writeProtected (viewRequests definitiveView))) parent
                 ** (skg (node (id ancestor) (source main) (affectsParent false))) non-content child
             "};
       let viewforest : MpViewForest =
@@ -545,7 +545,7 @@ async fn test_definitive_request_with_content_child_is_rejected (
   // DOES conflict with expansion, so the error should fire.
       let input : &str =
         indoc! {"
-                * (skg (node (id parent) (source main) indef (viewRequests definitiveView))) parent
+                * (skg (node (id parent) (source main) writeProtected (viewRequests definitiveView))) parent
                 ** (skg (node (id c) (source main))) content child
             "};
       let viewforest : MpViewForest =
@@ -566,17 +566,17 @@ async fn test_definitive_request_with_content_child_is_rejected (
       Ok (( )) }
 
 #[test]
-fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {
-  // A phantom (a diffPhantom, always indefinitive) marked for deletion
-  // cannot be saved: IndefOrDef::Indefinitive has no slot for an
+fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
+  // A phantom (a diffPhantom, always write-protected) marked for deletion
+  // cannot be saved: Editability::WriteProtected has no slot for an
   // edit_request, so the parser would silently drop the user's
-  // instruction. Instead we emit EditRequestOnIndefinitive so the save
+  // instruction. Instead we emit EditRequestOnWriteProtectedOccurrence so the save
   // is rejected with a clear message. (The error is raised before the
   // phantom-vs-vognode dispatch, so it fires on the diffPhantom path too.)
   let input_delete: &str =
     indoc! {"
       * (skg (node (id root) (source main))) parent
-      ** (skg (diffPhantom (id phantom) (source main) indef (unstaged removedM) (editRequest delete))) phantom child
+      ** (skg (diffPhantom (id phantom) (source main) writeProtected (unstaged removedM) (editRequest delete))) phantom child
     "};
   let (_viewforest, parsing_errors, _warnings)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
@@ -584,18 +584,18 @@ fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {
   let matching : Vec<&BufferValidationError> =
     parsing_errors . iter ()
     . filter ( |e| matches! (
-      e, BufferValidationError::EditRequestOnIndefinitive (id)
+      e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (id)
          if id . 0 == "phantom" ))
     . collect ();
   assert_eq! ( matching . len (), 1,
-    "(editRequest delete) on an indef node should produce exactly one EditRequestOnIndefinitive error. Parse errors: {:?}",
+    "(editRequest delete) on a write-protected node should produce exactly one EditRequestOnWriteProtectedOccurrence error. Parse errors: {:?}",
     parsing_errors );
 
-  // Same error for (editRequest (merge X)) on an indef node.
+  // Same error for (editRequest (merge X)) on a write-protected node.
   let input_merge: &str =
     indoc! {"
       * (skg (node (id root) (source main))) parent
-      ** (skg (node (id phantom) (source main) indef (editRequest (merge other)))) phantom child
+      ** (skg (node (id phantom) (source main) writeProtected (editRequest (merge other)))) phantom child
     "};
   let (_viewforest2, parsing_errors2, _warnings__viewforest2)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
@@ -603,11 +603,11 @@ fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {
   let matching2 : Vec<&BufferValidationError> =
     parsing_errors2 . iter ()
     . filter ( |e| matches! (
-      e, BufferValidationError::EditRequestOnIndefinitive (id)
+      e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (id)
          if id . 0 == "phantom" ))
     . collect ();
   assert_eq! ( matching2 . len (), 1,
-    "(editRequest (merge X)) on an indef node should also produce EditRequestOnIndefinitive. Parse errors: {:?}",
+    "(editRequest (merge X)) on a write-protected node should also produce EditRequestOnWriteProtectedOccurrence. Parse errors: {:?}",
     parsing_errors2 );
 
   // A definitive node with (editRequest delete) is legal -- no error.
@@ -620,8 +620,8 @@ fn test_edit_request_on_indefinitive_is_rejected_at_parse_time() {
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
     = org_to_uninterpreted_viewforest (input_definitive) . unwrap ();
   assert! ( ! parsing_errors3 . iter () . any ( |e|
-    matches! (e, BufferValidationError::EditRequestOnIndefinitive (_)) ),
-    "(editRequest delete) on a definitive node must not trigger EditRequestOnIndefinitive. Parse errors: {:?}",
+    matches! (e, BufferValidationError::EditRequestOnWriteProtectedOccurrence (_)) ),
+    "(editRequest delete) on a definitive node must not trigger EditRequestOnWriteProtectedOccurrence. Parse errors: {:?}",
     parsing_errors3 );
 }
 
@@ -759,11 +759,11 @@ fn duplicate_members_of_defining_folders_pass_validation () {
     indoc! {"
       * (skg (node (id owner) (source main))) owner
       ** (skg subscribeeFolder)
-      *** (skg (node (id dup) (source main) indef)) dup
-      *** (skg (node (id dup) (source main) indef)) dup
+      *** (skg (node (id dup) (source main) writeProtected)) dup
+      *** (skg (node (id dup) (source main) writeProtected)) dup
       ** (skg overriddenFolder)
-      *** (skg (node (id dup2) (source main) indef)) dup2
-      *** (skg (node (id dup2) (source main) indef)) dup2
+      *** (skg (node (id dup2) (source main) writeProtected)) dup2
+      *** (skg (node (id dup2) (source main) writeProtected)) dup2
     "};
   let (viewforest, parsing_errors, _warnings_viewforest)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)
@@ -783,8 +783,8 @@ fn duplicate_members_of_readonly_folders_are_still_rejected () {
     indoc! {"
       * (skg (node (id owner) (source main))) owner
       ** (skg hiddenFolder)
-      *** (skg (node (id dup) (source main) indef)) dup
-      *** (skg (node (id dup) (source main) indef)) dup
+      *** (skg (node (id dup) (source main) writeProtected)) dup
+      *** (skg (node (id dup) (source main) writeProtected)) dup
     "};
   let (viewforest, parsing_errors, _warnings_viewforest)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)

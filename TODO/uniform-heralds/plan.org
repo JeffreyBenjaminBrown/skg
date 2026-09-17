@@ -152,7 +152,7 @@ LOAD-BEARING for save extraction — see [[../../server/types/viewnode.rs][viewn
 'textChanged'; the staged/unstaged diff axes; 'notInGit'; 'editRequest'
 (delete / merge); 'viewRequests'; the deleted / unknown / inactive /
 deadScaffold placeholders; the read-only-col ☮ scaffold markers; and
-the col labels ("aliases", "subscribeeCol", ...). The node 'indef' ☮
+the col labels ("aliases", "subscribeeCol", ...). The node 'writeProtected' ☮
 stays, repositioned to lead so the birth herald sits right after it.
 
 * Implementation, in order
@@ -254,7 +254,7 @@ In [[../../server/heralds.rs][heralds.rs]]:
 
 - add rules for the new atoms (birth orange, ABUT so it hugs the ☮;
   per-relation blue; =Ak= / =Ik= blue);
-- reorder the 'node' rule so 'indef' (☮) leads and the birth herald
+- reorder the 'node' rule so 'writeProtected' (☮) leads and the birth herald
   follows it;
 - update the compile-time guards in 'emittable_metadata_atoms' (and the
   per-type guard fns) to the new vocabulary;

@@ -277,7 +277,7 @@ fn validate_view_roots (
 
 /// For each node in the viewforest, if it has a definitive view request,
 /// verify that:
-/// - The node is indefinitive.
+/// - The node is write-protected.
 /// - It has no content children (ActiveNode children with affectsParent ==
 ///   Container). Non-content children — containerward ancestry stubs,
 ///   link sources, scaffolds, etc. — don't block expansion:
@@ -301,8 +301,8 @@ fn validate_definitive_view_requests (
       = &viewnode . kind
       { if t . view_requests . contains (&ViewRequest::Definitive)
         { if let Some (id) = &t . id {
-          { // Must be indefinitive
-            if ! t . is_indefinitive ()
+          { // Must be write-protected
+            if ! t . is_writeProtected ()
             { errors . push( BufferValidationError::DefinitiveRequestOnDefinitiveNode(
               id . clone() )); }}
           { // Must have no content children.

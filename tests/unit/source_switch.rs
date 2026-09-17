@@ -2,7 +2,7 @@ use super::*;
 use crate::source_sets::SourceSetName;
 use crate::types::misc::{ID, SourceName};
 use crate::types::viewnode::{
-  mk_indefinitive_viewnode, mk_definitive_viewnode,
+  mk_writeProtected_viewnode, mk_definitive_viewnode,
   viewforest_root_viewnode, AffectsParent };
 
 use std::collections::BTreeSet;
@@ -17,8 +17,8 @@ fn def (id : &str, source : &str) -> ViewNode {
     ID::from (id), SourceName::from (source),
     id . to_string (), None ) }
 
-fn indef (id : &str, source : &str) -> ViewNode {
-  mk_indefinitive_viewnode (
+fn writeProtected (id : &str, source : &str) -> ViewNode {
+  mk_writeProtected_viewnode (
     ID::from (id), SourceName::from (source),
     id . to_string (), AffectsParent::True ) }
 
@@ -57,7 +57,7 @@ fn conversion_and_retention () {
     t . get (kept) . unwrap () . children () . count () == 1,
     "the active child survives under the retained node" ); }
 
-// All indefinitive leaf partners are pruned, active and inactive
+// All write-protected leaf partners are pruned, active and inactive
 // alike, and the emptied folder goes with them; a definitive partner
 // survives.
 #[test]
@@ -69,9 +69,9 @@ fn partners_and_folders_prune () {
   let emptied_folder : NodeId = t . get_mut (owner) . unwrap ()
     . append (folder (PartnerFolder::Subscriber)) . id ();
   t . get_mut (emptied_folder) . unwrap ()
-    . append (indef ("active-member", "public"));
+    . append (writeProtected ("active-member", "public"));
   t . get_mut (emptied_folder) . unwrap ()
-    . append (indef ("inactive-member", "private"));
+    . append (writeProtected ("inactive-member", "private"));
   let surviving_folder : NodeId = t . get_mut (owner) . unwrap ()
     . append (folder (PartnerFolder::Subscribee)) . id ();
   t . get_mut (surviving_folder) . unwrap ()

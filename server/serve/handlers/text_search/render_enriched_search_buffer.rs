@@ -5,7 +5,7 @@ use crate::dbs::in_rust_graph::ancestry::AncestryTree;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use crate::types::viewnode::{Birth, ViewNode, ViewNodeKind, AffectsParent, mk_indefinitive_viewnode_with_birth};
+use crate::types::viewnode::{Birth, ViewNode, ViewNodeKind, AffectsParent, mk_writeProtected_viewnode_with_birth};
 use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
@@ -47,7 +47,7 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
             viewforest, graph, tantivy_index, config, active ); } } } } }
 
 /// Recursively insert an AncestryTree and its children
-/// as indefinitive non-content ActiveNode children
+/// as write-protected non-content ActiveNode children
 /// under the given parent. Ancestry nodes are prepended.
 fn insert_containerward_ancestry_tree(
   node          : &AncestryTree,
@@ -96,7 +96,7 @@ enum OverrideDir {
 }
 
 /// Graft each result's override relatives -- BOTH directions -- as
-/// inverted read-only indefinitive org-descendants, so an overridden
+/// inverted read-only write-protected org-descendants, so an overridden
 /// node and the node(s) overriding it are navigable straight from the
 /// search results
 /// (TODO/override-ancestry-in-search-results.org). Each direction is
@@ -166,7 +166,7 @@ pub fn collect_override_relative_ids (
             stack . push ( rel ); }} }} }
   out }
 
-/// Append, under 'parent_nid', one indefinitive Independent child per
+/// Append, under 'parent_nid', one write-protected Independent child per
 /// override relative of 'pid' in direction 'dir', recursing into each
 /// relative not already on the path (cycle guard: a repeated id is
 /// still drawn, so the stats pass marks it 'cycle', but its branch
@@ -193,7 +193,7 @@ fn graft_override_chain (
   for rel in relatives {
     let Some (node) = graph . nodes . get (&rel) else { continue; };
     if ! active . contains_source (&node . source) { continue; }
-    let child : ViewNode = mk_indefinitive_viewnode_with_birth (
+    let child : ViewNode = mk_writeProtected_viewnode_with_birth (
       rel . clone (), node . source . clone (), node . title . clone (),
       AffectsParent::False, Birth::Backpath (birth_role) );
     let child_nid : NodeId = {
@@ -206,7 +206,7 @@ fn graft_override_chain (
       path . remove (&rel); }} }
 
 /// Looks up a node's title and source from Tantivy,
-/// prepends an indefinitive independent ActiveNode child
+/// prepends a write-protected independent ActiveNode child
 /// under the given parent.
 /// Returns the new child's NodeId.
 fn prepend_containing_child_from_tantivy (
@@ -223,11 +223,11 @@ fn prepend_containing_child_from_tantivy (
         if ! active . contains_source (&source) {
           return None;
         } else {
-          mk_indefinitive_viewnode_with_birth (
+          mk_writeProtected_viewnode_with_birth (
             node_id . clone (), source, title,
             AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER) ) }},
       None =>
-        mk_indefinitive_viewnode_with_birth (
+        mk_writeProtected_viewnode_with_birth (
           node_id . clone (), SourceName::from ("search"),
           node_id . as_str () . to_string (),
           AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER) ) };

@@ -7,7 +7,7 @@
 
 pub mod buffer_to_viewnodes;
 pub mod fork;
-pub mod indefinitive_edits;
+pub mod write_protected_edits;
 pub mod local_instruction_collection;
 pub mod supplement_from_disk;
 pub mod weave;
@@ -86,7 +86,7 @@ pub fn buffer_to_validated_saveplan_with_fork_sources_in_graph (
 
 /// As 'buffer_to_validated_saveplan_with_fork_sources_in_graph', while also
 /// comparing an open view's last server-rendered forest. This detects edits to
-/// data that an indefinitive occurrence would otherwise silently ignore.
+/// data that a write-protected occurrence would otherwise silently ignore.
 pub fn buffer_to_validated_saveplan_with_fork_sources_and_previous_view_in_graph (
   buffer_text : &str,
   graph       : &crate::dbs::in_rust_graph::InRustGraph,
@@ -139,8 +139,8 @@ pub fn buffer_to_validated_saveplan_with_fork_sources_and_previous_view_in_graph
         . map_err ( |e| SaveError::ParseError (e) ) ?;
   if let Some (previous) = previous_viewforest {
     let errors : Vec<BufferValidationError> =
-      indefinitive_edits
-      ::errors_and_normalize_new_indefinitive_occurrences (
+      write_protected_edits
+      ::errors_and_normalize_new_writeProtected_occurrences (
         &mut viewforest, previous );
     if ! errors . is_empty () {
       return Err ( SaveError::BufferValidationErrors {

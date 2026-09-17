@@ -41,10 +41,10 @@ local function assert_leaf_b_root_is_content (buf, phase)
   T.check(not line:find('(affectsParent false)', 1, true),
     'leaf-b search root is not false during ' .. phase)
   T.check(not line:find(
-            '(affectsParent false) indef (rels (contains (out 1 (ancestors 1))) (birth contains))', 1, true),
+            '(affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth contains))', 1, true),
     'leaf-b search root is not content-birthed during ' .. phase)
   T.check(not line:find(
-            '(affectsParent false) indef (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo))', 1, true),
+            '(affectsParent false) writeProtected (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo))', 1, true),
     'leaf-b search root is not linksToParent-birthed during ' .. phase)
 end
 

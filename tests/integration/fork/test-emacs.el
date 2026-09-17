@@ -39,14 +39,14 @@
         (test-fail "P's view does not show its foreign content N:\n%s"
                    (buffer-string)))
 
-      ;; 2. Make N definitive (drop its 'indef' marker) and edit its
+      ;; 2. Make N definitive (drop its 'writeProtected' marker) and edit its
       ;;    title -- the fork gesture.
       (goto-char (point-min))
       (unless (re-search-forward "^.*(id N) (source foreign).*$" nil t)
         (test-fail "could not find N's headline:\n%s" (buffer-string)))
       (let* ((line (match-string 0))
              (edited (replace-regexp-in-string
-                      " indef" ""
+                      " writeProtected" ""
                       (replace-regexp-in-string
                        "N-original" "N-edited" line))))
         (replace-match edited t t))

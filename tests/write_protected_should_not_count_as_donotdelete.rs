@@ -1,9 +1,9 @@
-// cargo nextest run --test grouped_saves -E 'test(indef_should_not_count_as_donotdelete::)'
+// cargo nextest run --test grouped_saves -E 'test(write_protected_should_not_count_as_donotdelete::)'
 //
 // Reproduces the bug Jeff hit: a buffer that has the same node
 // shown definitive-with-editRequest-delete in one place AND
-// indefinitive elsewhere triggers AmbiguousDeletion validation,
-// even though the indef view is read-only and shouldn't count as
+// write-protected elsewhere triggers AmbiguousDeletion validation,
+// even though the write-protected view is read-only and shouldn't count as
 // a "do not delete" stance.
 //
 // Fixture:
@@ -15,10 +15,10 @@
 //   * parent
 //   ** victim (editRequest delete)   <-- definitive, asks for delete
 //   ** via
-//   *** victim indef                 <-- indef view of the same node
+//   *** victim write-protected                 <-- write-protected view of the same node
 //
 // Expected: save succeeds and victim is deleted.
-// Currently: AmbiguousDeletion error -- the indef occurrence is
+// Currently: AmbiguousDeletion error -- the write-protected occurrence is
 // being treated as a "do not delete" stance, contradicting the
 // definitive editRequest-delete elsewhere.
 
@@ -34,18 +34,18 @@ use skg::types::misc::{SkgConfig, TantivyIndex};
 use skg::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
 
 #[test]
-fn test_indef_should_not_count_as_donotdelete
+fn test_write_protected_should_not_count_as_donotdelete
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
-    "skg-test-indef-not-donotdelete",
-    "tests/indef_should_not_count_as_donotdelete/fixtures",
-    "/tmp/tantivy-test-indef-not-donotdelete",
+    "skg-test-write-protected-not-donotdelete",
+    "tests/write_protected_should_not_count_as_donotdelete/fixtures",
+    "/tmp/tantivy-test-write-protected-not-donotdelete",
     |config, tantivy| Box::pin ( async move {
-      indef_should_not_count_as_donotdelete_impl (
+      write_protected_should_not_count_as_donotdelete_impl (
         config, tantivy ) . await
     } )) }
 
-async fn indef_should_not_count_as_donotdelete_impl (
+async fn write_protected_should_not_count_as_donotdelete_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -53,7 +53,7 @@ async fn indef_should_not_count_as_donotdelete_impl (
     * (skg (node (id parent) (source main))) parent
     ** (skg (node (id victim) (source main) (editRequest delete))) victim
     ** (skg (node (id via) (source main))) via
-    *** (skg (node (id victim) (source main) indef)) victim
+    *** (skg (node (id victim) (source main) writeProtected)) victim
   "};
   let graph : InRustGraphHandle =
     new_handle (InRustGraph::new ());

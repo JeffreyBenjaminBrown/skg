@@ -72,7 +72,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
             Root body content
             ** (skg folded (node (id child1))) child1
             Child1 body
-            * (skg (node (affectsParent na) indef)) independent root node
+            * (skg (node (affectsParent na) writeProtected)) independent root node
             ParentIgnores body
             * (skg (node (viewStats cycle))) cycling node
             This node has cycle flag
@@ -98,7 +98,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
     _ => panic!("expected ActiveNode") };
   assert_eq!(unrel_node . title(), "independent root node");
   assert_eq!(rel_t . affectsParent != AffectsParent::True, true);
-  assert_eq!(rel_t . is_indefinitive (), true);
+  assert_eq!(rel_t . is_writeProtected (), true);
   assert_eq!(unrel_node . body(), None);
 
   // Test cycling node
@@ -164,7 +164,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   assert_eq!(first_t . affectsParent != AffectsParent::True, false);
   assert_eq!(first_node . focused, false);
   assert_eq!(first_node . folded, false);
-  assert_eq!(first_t . is_indefinitive (), false);
+  assert_eq!(first_t . is_writeProtected (), false);
   assert_eq!(first_t . edit_request (), None);
 
   // Test second node - should have no body

@@ -63,19 +63,19 @@ const EXPECTED_UNSTAGED : &str = "\
 ***** (skg (node (id h1) (source main))) h1
 ***** (skg (node (id h2) (source main) (unstaged newM))) h2
 ***** (skg (node (id h3) (source main) (unstaged newM))) h3
-***** (skg (node (id h4) (source main) indef (unstaged removedM))) h4
+***** (skg (node (id h4) (source main) writeProtected (unstaged removedM))) h4
 **** (skg (node (id h5) (source main) (unstaged newM))) h5
-**** (skg (node (id h3) (source main) indef (unstaged removedM))) h3
-**** (skg (node (id h6) (source main) indef (unstaged removedM))) h6
+**** (skg (node (id h3) (source main) writeProtected (unstaged removedM))) h3
+**** (skg (node (id h6) (source main) writeProtected (unstaged removedM))) h6
 ";
 
 const EXPECTED_STAGED : &str = "\
 ***** (skg (node (id h2) (source main) (staged newM))) h2
 ***** (skg (node (id h3) (source main) (staged newM))) h3
-***** (skg (node (id h4) (source main) indef (staged removedM))) h4
+***** (skg (node (id h4) (source main) writeProtected (staged removedM))) h4
 **** (skg (node (id h5) (source main) (staged newM))) h5
-**** (skg (node (id h3) (source main) indef (staged removedM))) h3
-**** (skg (node (id h6) (source main) indef (staged removedM))) h6
+**** (skg (node (id h3) (source main) writeProtected (staged removedM))) h3
+**** (skg (node (id h6) (source main) writeProtected (staged removedM))) h6
 ";
 
 #[test]
@@ -169,10 +169,10 @@ async fn emptied_filter_folders_still_render_in_diff_mode (
         true, &Err (String::new ()), &mut views_state ) . await ?;
       assert_buffer_contains ( &response . saved_view, "\
 **** (skg hiddenInSubscribeeFolder)
-***** (skg (node (id x2) (source main) indef (unstaged removedM))) x2
+***** (skg (node (id x2) (source main) writeProtected (unstaged removedM))) x2
 **** (skg (node (id x2) (source main))) x2
 *** (skg hiddenOutsideOfSubscribeeFolder)
-**** (skg (node (id y2) (source main) indef (unstaged removedM))) y2
+**** (skg (node (id y2) (source main) writeProtected (unstaged removedM))) y2
 " ); }
     { // The same save outside diff mode creates neither folder.
       let mut views_state : ViewsState = ViewsState {

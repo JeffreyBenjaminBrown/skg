@@ -112,8 +112,8 @@ async fn expand_e_under (
       for (line_col, line) in lines_by_enclosing_folder (&de_novo) {
         if line_col == folder && line . contains ("(id E)") {
           out . push ( line . replace (
-            "indef",
-            "indef (viewRequests definitiveView)" )); }
+            "writeProtected",
+            "writeProtected (viewRequests definitiveView)" )); }
         else { out . push ( line . to_string () ); }}
       out . join ("\n") + "\n" };
   assert_ne! ( edited, de_novo,

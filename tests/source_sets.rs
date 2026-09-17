@@ -507,8 +507,8 @@ async fn inactive_placeholder_in_buffer_does_not_drive_contains (
         // buffer position, and writes no SaveNode for it.
         let reordered = indoc! {"
           * (skg (node (id root) (source public))) root
-          ** (skg (node (id active-a) (source public) indef)) active-a
-          ** (skg (node (id active-b) (source public) indef)) active-b
+          ** (skg (node (id active-a) (source public) writeProtected)) active-a
+          ** (skg (node (id active-b) (source public) writeProtected)) active-b
           ** (skg (inactiveNode (id private-a) (source private)))
         "};
         let instructions : Vec<DefineNode> =
@@ -531,8 +531,8 @@ async fn inactive_placeholder_in_buffer_does_not_drive_contains (
         // real invisible member (private-a) is still preserved.
         let stale = indoc! {"
           * (skg (node (id root) (source public))) root
-          ** (skg (node (id active-a) (source public) indef)) active-a
-          ** (skg (node (id active-b) (source public) indef)) active-b
+          ** (skg (node (id active-a) (source public) writeProtected)) active-a
+          ** (skg (node (id active-b) (source public) writeProtected)) active-b
           ** (skg (inactiveNode (id private-removed) (source private)))
         "};
         let instructions : Vec<DefineNode> =
@@ -602,7 +602,7 @@ async fn restricted_source_search_and_save_work_together_end_to_end (
         rendered );
       let edited_buffer = indoc! {"
         * (skg (node (id root) (source public))) root
-        ** (skg (node (id active-a) (source public) indef)) active-a
+        ** (skg (node (id active-a) (source public) writeProtected)) active-a
         ** (skg (node (id active-b) (source public))) active-b edited through restricted view
       "};
       let instructions : Vec<DefineNode> =
@@ -895,7 +895,7 @@ async fn stale_inactive_placeholders_under_folders_save_without_error (
         * (skg (node (id root) (source public))) root
         ** (skg subscriberFolder)
         *** (skg (inactiveNode (id private-a) (source private)))
-        ** (skg (node (id active-b) (source public) indef)) active-b
+        ** (skg (node (id active-b) (source public) writeProtected)) active-b
       "};
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
@@ -922,7 +922,7 @@ async fn inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to (
         * (skg (node (id root) (source public))) root
         ** (skg subscribeeFolder)
         *** (skg (inactiveNode (id private-a) (source private)))
-        *** (skg (node (id active-b) (source public) indef)) active-b
+        *** (skg (node (id active-b) (source public) writeProtected)) active-b
       "};
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
@@ -955,8 +955,8 @@ async fn weave_preserves_omitted_inactive_content_members (
         // anchored after active-a.
         let buffer = indoc! {"
           * (skg (node (id root) (source public))) root
-          ** (skg (node (id active-a) (source public) indef)) active-a
-          ** (skg (node (id active-b) (source public) indef)) active-b
+          ** (skg (node (id active-a) (source public) writeProtected)) active-a
+          ** (skg (node (id active-b) (source public) writeProtected)) active-b
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (
@@ -972,8 +972,8 @@ async fn weave_preserves_omitted_inactive_content_members (
         // invisible member with its anchor.
         let buffer = indoc! {"
           * (skg (node (id root) (source public))) root
-          ** (skg (node (id active-b) (source public) indef)) active-b
-          ** (skg (node (id active-a) (source public) indef)) active-a
+          ** (skg (node (id active-b) (source public) writeProtected)) active-b
+          ** (skg (node (id active-a) (source public) writeProtected)) active-a
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (
@@ -989,7 +989,7 @@ async fn weave_preserves_omitted_inactive_content_members (
         // reattaches leftward (here, to START's successor region).
         let buffer = indoc! {"
           * (skg (node (id root) (source public))) root
-          ** (skg (node (id active-b) (source public) indef)) active-b
+          ** (skg (node (id active-b) (source public) writeProtected)) active-b
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (
@@ -1027,7 +1027,7 @@ async fn restricted_save_preserves_invisible_override_targets (
         let unmodified = indoc! {"
           * (skg (node (id ovr-owner) (source public))) ovr-owner
           ** (skg overriddenFolder)
-          *** (skg (node (id ovr-visible) (source public) indef)) ovr-visible
+          *** (skg (node (id ovr-visible) (source public) writeProtected)) ovr-visible
         "};
         let instructions : Vec<DefineNode> =
           buffer_to_validated_saveplan (

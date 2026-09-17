@@ -73,7 +73,7 @@ is two levels:
   * <edited title>     ; the FORK-TO-BE (clone C): owned source [editable
                        ;   via C-c s s], the user's EDITED title, NO id.
   ** <original title>  ; the node C overrides (the original N): its REAL
-                       ;   id, REAL (foreign) source, indefinitive,
+                       ;   id, REAL (foreign) source, write-protected,
                        ;   parentIs=independent, marked "pO" (below).
 #+end_src
 

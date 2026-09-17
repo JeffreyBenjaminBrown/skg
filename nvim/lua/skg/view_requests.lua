@@ -46,7 +46,7 @@ for _, row in ipairs(command_rows) do
 end
 
 ---Request a definitive view for the headline at point (the node must
----be indefinitive and childless). Does NOT auto-save.
+---be write-protected and childless). Does NOT auto-save.
 function M.set_definitive ()
   local line = focus.owning_headline_line()
   if not line then error('Not on a headline') end

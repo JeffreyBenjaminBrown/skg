@@ -246,11 +246,11 @@ fn format_buffer_validation_error (
     BufferValidationError::LocalStructureViolation(msg, id) => {
       format!("Local structure violation:\n- ID: {}\n- {}\n",
               id . 0, msg) },
-    BufferValidationError::EditRequestOnIndefinitive (id) => {
-      format!("Edit request on an indefinitive (possibly a phantom) node:\n- ID: {}\n- Indefinitive nodes cannot carry write instructions.\n- To delete or merge this node, visit a definitive view of it first (C-c g RET).\n",
+    BufferValidationError::EditRequestOnWriteProtectedOccurrence (id) => {
+      format!("Edit request on a write-protected (possibly a phantom) node:\n- ID: {}\n- Write-protected nodes cannot carry write instructions.\n- To delete or merge this node, visit a definitive view of it first (C-c g RET).\n",
               id . 0) },
-    BufferValidationError::EditedIndefinitive (id) => {
-      format!("Edited indefinitive occurrence:\n- ID: {}\n- This occurrence changed since the server rendered it, but indefinitive occurrences do not write their own text or folders.\n- Re-render, then edit a definitive occurrence instead.\n",
+    BufferValidationError::EditedWriteProtectedOccurrence (id) => {
+      format!("Edited write-protected occurrence:\n- ID: {}\n- This occurrence changed since the server rendered it, but write-protected occurrences do not write their own text or folders.\n- Re-render, then edit a definitive occurrence instead.\n",
               id . 0) },
     BufferValidationError::Other (msg) => {
       format!("{}\n", msg) }, }}

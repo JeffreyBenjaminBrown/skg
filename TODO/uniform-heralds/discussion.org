@@ -170,7 +170,7 @@ LOAD-BEARING for save extraction, see [[../../server/types/viewnode.rs][viewnode
 (delete / merge), 'viewRequests', the deleted / unknown / inactive /
 deadScaffold placeholders, the read-only-col ☮ scaffold markers, and
 the col labels themselves ("aliases", "subscribeeCol", ...). The node
-'indef' ☮ stays but is repositioned to lead, so the birth herald can
+'writeProtected' ☮ stays but is repositioned to lead, so the birth herald can
 sit right after it.
 
 ** Implementation, in order
@@ -243,7 +243,7 @@ In order (the early "step 0" items first):
 
 5. Rule table + conformance + fixture. In [[../../server/heralds.rs][heralds.rs]]: add rules for
    the new atoms (birth orange, ABUT so it hugs the ☮; per-relation
-   blue), reorder the 'node' rule so 'indef' (☮) leads and the birth
+   blue), reorder the 'node' rule so 'writeProtected' (☮) leads and the birth
    herald follows, and update the compile-time guards in
    'emittable_metadata_atoms'. Regenerate the elisp fixture with
    =cargo run --bin emit-herald-rules > tests/elisp/herald-rules.sexp=.

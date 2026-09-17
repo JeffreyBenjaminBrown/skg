@@ -333,11 +333,11 @@ fn activeNode_metadata_to_string (
         parts . push ( "(affectsParent na)" . to_string () ),
       AffectsParent::False =>
         parts . push ( "(affectsParent false)" . to_string () ) }
-    if activeNode . is_indefinitive () {
-      // "indef" is short for "indefinitive" -- a read-only view of
-      // a node (see IndefOrDef in types/viewnode.rs). The metadata
+    if activeNode . is_writeProtected () {
+      // `writeProtected` means "write-protected" -- a read-only view of
+      // a node (see Editability in types/viewnode.rs). The metadata
       // sexp uses only this short form on both emission and parsing.
-      parts . push ( "indef" . to_string () );
+      parts . push ( "writeProtected" . to_string () );
       if activeNode . viewStats . hidden_body {
         // The rendering is hiding a body (herald "B" on the ☮).
         parts . push ( "hiddenBody" . to_string () ); }}
@@ -366,11 +366,11 @@ fn activeNode_metadata_to_string (
 /// Render metadata for a PhantomDiff (TODO/DONE/local-view-update/plan_v2.org §11). The root atom is
 /// `diffPhantom`, distinct from the `node` atom an ActiveNode emits, so the
 /// client can tell a moved/removed phantom apart from a live node without
-/// inferring it from the diff axes. A phantom is always indefinitive (so always
-/// emits `indef` and never a body, editRequest, or viewRequests) and its
+/// inferring it from the diff axes. A phantom is always write-protected (so always
+/// emits `writeProtected` and never a body, editRequest, or viewRequests) and its
 /// affectsParent is implicit Affected and birth Unremarkable (so neither atom
 /// appears, and graphStats is rendered as if Affected / Unremarkable). It
-/// carries no viewStats. What remains: id, source, indef, graphStats, the
+/// carries no viewStats. What remains: id, source, write-protected, graphStats, the
 /// staged/unstaged diff axes, and notInGit.
 fn phantomDiff_metadata_to_string (
   focused     : bool,
@@ -389,7 +389,7 @@ fn phantomDiff_metadata_to_string (
     parts . push ( format! ( "(source {})", phantom . source ));
     // affectsParent is implicit Affected and birth Unremarkable on a phantom, so
     // neither atom is emitted; both are passed as such to graphnodestats.
-    parts . push ( "indef" . to_string () );
+    parts . push ( "writeProtected" . to_string () );
     if let Some (s) = phantom_rels_atom (& phantom . graphStats)
     { parts . push (s); }
     { let mut atoms : Vec<&'static str> = Vec::new ();

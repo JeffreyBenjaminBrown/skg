@@ -19,7 +19,7 @@ use std::str::FromStr;
 /// decides the membership (per its relation and role). For other kinds of parent's,
 /// a node's AffectsParent has no effect.
 ///
-/// PITFALL: If a vognode is indefinitive, *none* of it children affect it,
+/// PITFALL: If a vognode is write-protected, *none* of it children affect it,
 /// just as edits to itself do not affect it,
 /// regardless of what the children might claim with their AffectsParent field.
 ///
@@ -83,7 +83,7 @@ pub enum Vognode {
 /// in how much they can still say about it.
 #[derive( Debug, Clone, PartialEq )]
 pub enum Phantom {
-  Diff    (PhantomDiff), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim PhantomDiff, not an ActiveNode -- a phantom is always indefinitive/bodyless and its affectsParent is never read or rendered, so it needs none of ActiveNode's affectsParent/birth/viewStats/view_requests/indef_or_def. See PhantomDiff_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
+  Diff    (PhantomDiff), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim PhantomDiff, not an ActiveNode -- a phantom is always write-protected/bodyless and its affectsParent is never read or rendered, so it needs none of ActiveNode's affectsParent/birth/viewStats/view_requests/editability. See PhantomDiff_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
   Deleted (PhantomDeleted), // Epistemically: No longer exists in the graph. Procedurally: Skg just watched the user delete this node (maybe from a different view), but for some reason (e.g. its view-descendents are interesting, or it is a root) had to retain an image of it here.
   // PITFALL: There is an exception. If Skg watches a user delete a node, while that user has a view of a foreign node that refers to the deleted node, that "foreigner's view" will show it as Unknown rather than Deleted. This is to maintain consistency with how that relationship to a nonexistent node will appear when viewed in later sessions.
   Unknown (PhantomUnknown), // Skg can't find it (and, unlike Deleted, does not know why). Can result from bad data, or from a reference to another user's node that has since been deleted.
@@ -208,7 +208,7 @@ pub struct ActiveNode_Generic < Id, Src > {
   /// True iff the node's source is not a git repo (or has no commits).
   /// A per-source fact, not an axis.
   pub not_in_git    : bool,
-  pub indef_or_def  : IndefOrDef,
+  pub editability  : Editability,
 }
 
 pub type PhantomDiff   = PhantomDiff_Generic < ID, SourceName >;
@@ -230,7 +230,7 @@ pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
 ///
 /// USED: as a read-only diff annotation. It depicts a removed member at its
 /// correct HEAD position among surviving siblings, decorated with per-stage diff
-/// atoms. Always indefinitive and bodyless (enforced by `normal_to_phantom` /
+/// atoms. Always write-protected and bodyless (enforced by `normal_to_phantom` /
 /// `mk_phantom_viewnode`); its affectsParent is never read or rendered (implicit
 /// Affected); a Normal child left under it is demoted to Independent.
 ///
@@ -240,8 +240,8 @@ pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
 /// and `source` (resolved via `title_for_phantom`; the source may be the
 /// SourceName NOT_FOUND sentinel) and `graphStats`, which IS rendered on
 /// phantoms. It needs NONE of ActiveNode's affectsParent / birth / viewStats /
-/// view_requests / indef_or_def (TODO/DONE/local-view-update/plan_v2.org §11 reduction; see §18): nothing
-/// reads a phantom's affectsParent, and every phantom is indefinitive.
+/// view_requests / editability (TODO/DONE/local-view-update/plan_v2.org §11 reduction; see §18): nothing
+/// reads a phantom's affectsParent, and every phantom is write-protected.
 #[derive( Debug, Clone, PartialEq )]
 pub struct PhantomDiff_Generic < Id, Src > {
   pub title      : String,
@@ -260,7 +260,7 @@ pub struct PhantomDiff_Generic < Id, Src > {
 impl < Id, Src > PhantomDiff_Generic < Id, Src > {
   /// Build a phantom payload from an ActiveNode, keeping only the phantom-relevant
   /// fields and discarding affectsParent / birth / viewStats / view_requests /
-  /// indef_or_def. Used when flipping an Active node to a phantom and by the
+  /// editability. Used when flipping an Active node to a phantom and by the
   /// placed<->maybe-placed conversions.
   pub fn from_activeNode ( t : ActiveNode_Generic < Id, Src > ) -> Self {
     PhantomDiff_Generic {
@@ -273,9 +273,9 @@ impl < Id, Src > PhantomDiff_Generic < Id, Src > {
       graphStats : t . graphStats,
     }}
 
-  /// A phantom is always indefinitive, hence never has a body.
+  /// A phantom is always write-protected, hence never has a body.
   pub fn body (&self) -> Option < &String > { None }
-  pub fn is_indefinitive (&self) -> bool { true }
+  pub fn is_writeProtected (&self) -> bool { true }
 
   /// True iff this node's diff axes require phantom display; for a correctly
   /// constructed phantom this holds, but some shared code asks regardless.
@@ -292,15 +292,15 @@ impl < Id, Src > PhantomDiff_Generic < Id, Src > {
 /// - A Definitive represents an editable view.
 ///   The user's changes to title, body and children
 ///   will be written to disk and the dbs when they save.
-/// - An Indefinitive represents a read-only view,
+/// - `WriteProtected` represents a read-only view,
 ///   in which case the body is not presented.
 ///   (TODO ? Maybe it should be.)
 #[derive( Debug, Clone, PartialEq )]
-pub enum IndefOrDef {
+pub enum Editability {
   Definitive {
     body         : Option < String >,
     edit_request : Option < NodeEditRequest >, },
-  Indefinitive, }
+  WriteProtected, }
 
 /// Containerward path statistics: how a node relates to the
 /// container hierarchy (path length, fork count, cycle detection).
@@ -371,7 +371,7 @@ pub struct ViewNodeStats {
   /// (the carrier's ID must equal the visibility-ungated
   /// 'resolve_override (N).effective').
   pub overridesHere         : Option<ID>,
-  /// True iff the node is drawn INDEFINITIVE here while its graph
+  /// True iff the node is drawn write-protected here while its graph
   /// node has a body -- a body the rendering hides. Herald "B",
   /// hugging the ☮ (TODO/more.org). Display-only, like the assembled
   /// herald strings; the parser accepts and discards it.
@@ -508,7 +508,7 @@ impl FolderRelation {
 /// Multiple view requests can be active simultaneously.
 /// - 'Folder(rel)' builds BOTH folders of the relation, populated from the graph.
 /// - 'Path(role)' builds the backpath for that one partner role.
-/// - 'Definitive' makes the (indefinitive) node editable.
+/// - 'Definitive' makes the (write-protected) node editable.
 /// - 'Fork' is the explicit 'skg-fork-node' gesture: clone this (owned)
 ///   node into a private fork that overrides it. Consumed on the save
 ///   path (fork detection), not during view completion.
@@ -555,21 +555,21 @@ impl < Id, Src > ActiveNode_Generic < Id, Src > {
     self . should_be_diffPhantom ()
     && self . existence . unstaged != Some (Sign::Minus) }
 
-  pub fn is_indefinitive (&self) -> bool {
-    matches! ( self . indef_or_def,
-               IndefOrDef::Indefinitive ) }
+  pub fn is_writeProtected (&self) -> bool {
+    matches! ( self . editability,
+               Editability::WriteProtected ) }
 
   pub fn body (&self) -> Option < &String > {
-    match &self . indef_or_def {
-      IndefOrDef::Definitive { body, .. } =>
+    match &self . editability {
+      Editability::Definitive { body, .. } =>
         body . as_ref(),
-      IndefOrDef::Indefinitive => None, }}
+      Editability::WriteProtected => None, }}
 
   pub fn edit_request (&self) -> Option < &NodeEditRequest > {
-    match &self . indef_or_def {
-      IndefOrDef::Definitive { edit_request, .. } =>
+    match &self . editability {
+      Editability::Definitive { edit_request, .. } =>
         edit_request . as_ref(),
-      IndefOrDef::Indefinitive => None, }}
+      Editability::WriteProtected => None, }}
 }
 
 impl ActiveNode {
@@ -728,8 +728,8 @@ impl ViewNode {
     match &mut self . kind {
       ViewNodeKind::Vognode (Vognode::Active (active)) => {
         active . rel_source_request = None;
-        if let IndefOrDef::Definitive { edit_request, .. } =
-          &mut active . indef_or_def
+        if let Editability::Definitive { edit_request, .. } =
+          &mut active . editability
         { *edit_request = None; }},
       ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
         unknown . rel_source_request = None,
@@ -743,15 +743,15 @@ impl ViewNode {
     if let ViewNodeKind::Vognode (Vognode::Active (t))
       = &self . kind
       { if t . should_be_diffPhantom ()
-        { // A phantom is ALWAYS indefinitive and renders no body (Jeff's
+        { // A phantom is ALWAYS write-protected and renders no body (Jeff's
           // TODO/DONE/local-view-update/progress.org §9 TODO): the diff view presumes git literacy (magit
           // shows the real node), and a phantom must never be a node's
           // definitive instance -- if Removed it has nothing to define, and if
           // RemovedHere "edit it here, where it isn't" is dangerously
           // confusing. So drop body/edit_request when flipping a (possibly
           // Definitive) Active node to a phantom. mk_phantom_viewnode already
-          // builds from an Indefinitive base, so now every phantom is
-          // indefinitive by construction.
+          // builds from a `WriteProtected` base, so now every phantom is
+          // write-protected by construction.
           let phantom : PhantomDiff =
             PhantomDiff::from_activeNode ( t . clone () );
           self . kind = ViewNodeKind::Phantom (
@@ -898,12 +898,12 @@ pub fn default_activeNode (
     existence      : ExistenceAxes::default(),
     membership     : MembershipAxes::default(),
     not_in_git     : false,
-    indef_or_def   : IndefOrDef::Definitive {
+    editability   : Editability::Definitive {
       body         : None,
       edit_request : None },
   }}
 
-/// Create an indefinitive phantom ViewNode with the given diff axes.
+/// Create a write-protected phantom ViewNode with the given diff axes.
 /// At least one membership axis or the unstaged-existence axis should be
 /// negative for this to be a real phantom; callers must ensure that.
 pub fn mk_phantom_viewnode (
@@ -914,17 +914,17 @@ pub fn mk_phantom_viewnode (
   membership : MembershipAxes,
 ) -> ViewNode {
   let mut viewnode : ViewNode =
-    mk_indefinitive_viewnode ( id, source, title, AffectsParent::True );
+    mk_writeProtected_viewnode ( id, source, title, AffectsParent::True );
   if let ViewNodeKind::Vognode (Vognode::Active (mut t)) = viewnode . kind
     { t . existence  = existence;
       t . membership = membership;
       viewnode . kind = ViewNodeKind::Phantom (
         Phantom::Diff ( PhantomDiff::from_activeNode (t) )); }
   else
-    // mk_indefinitive_viewnode always yields an Active vognode; if that ever
+    // mk_writeProtected_viewnode always yields an Active vognode; if that ever
     // changes, fail loudly rather than silently return a non-phantom.
     { unreachable! (
-        "mk_phantom_viewnode: mk_indefinitive_viewnode did not yield an Active vognode" ); }
+        "mk_phantom_viewnode: mk_writeProtected_viewnode did not yield an Active vognode" ); }
   viewnode }
 
 pub fn mk_definitive_viewnode (
@@ -937,7 +937,7 @@ pub fn mk_definitive_viewnode (
                             title,
                             AffectsParent::True,
                             Birth::Unremarkable,
-                            IndefOrDef::Definitive {
+                            Editability::Definitive {
                               body,
                               edit_request : None },
                             HashSet::new () ) } // view_requests
@@ -971,18 +971,18 @@ pub fn mk_inactive_viewnode (
       Vognode::Inactive ( InactiveNode ) ),
   }}
 
-/// Create an indefinitive ViewNode from disk data.
-/// Body is always None since indefinitive nodes don't have editable content.
-pub fn mk_indefinitive_viewnode (
+/// Create a write-protected ViewNode from disk data.
+/// Body is always None since write-protected nodes don't have editable content.
+pub fn mk_writeProtected_viewnode (
   id     : ID,
   source : SourceName,
   title  : String,
   affectsParent  : AffectsParent,
 ) -> ViewNode {
-  mk_indefinitive_viewnode_with_birth (
+  mk_writeProtected_viewnode_with_birth (
     id, source, title, affectsParent, Birth::Unremarkable ) }
 
-pub fn mk_indefinitive_viewnode_with_birth (
+pub fn mk_writeProtected_viewnode_with_birth (
   id       : ID,
   source   : SourceName,
   title    : String,
@@ -993,13 +993,13 @@ pub fn mk_indefinitive_viewnode_with_birth (
                             title,
                             affectsParent,
                             birth,
-                            IndefOrDef::Indefinitive,
+                            Editability::WriteProtected,
                             HashSet::new ( )) } // view_requests
 
-/// Convert a definitive ViewNode to indefinitive.
+/// Convert a definitive ViewNode to write-protected.
 /// Discards body and edit_request.
 /// Errors if the input is not an ActiveNode.
-pub fn mk_indefinitive_from_viewnode (
+pub fn mk_writeProtected_from_viewnode (
   mut viewnode : ViewNode,
   affectsParent    : AffectsParent,
   birth       : Birth,
@@ -1011,17 +1011,17 @@ pub fn mk_indefinitive_from_viewnode (
       // field added later) is preserved rather than silently reset.
       t . affectsParent = affectsParent;
       t . birth = birth;
-      t . indef_or_def = // discards body and edit_request
-        IndefOrDef::Indefinitive;
+      t . editability = // discards body and edit_request
+        Editability::WriteProtected;
       Ok (viewnode) },
     ViewNodeKind::Phantom (Phantom::Diff (p)) =>
       // A phantom carries none of the fields preserved above,
       // so it is rebuilt rather than mutated.
-      Ok ( mk_indefinitive_viewnode_with_birth (
+      Ok ( mk_writeProtected_viewnode_with_birth (
         p . id . clone (), p . source . clone (), p . title . clone (),
         affectsParent, birth )),
     _ => Err (
-      "mk_indefinitive_from_viewnode: expected ActiveNode"
+      "mk_writeProtected_from_viewnode: expected ActiveNode"
         . to_string () ) }}
 
 /// Create a ViewNode with *nearly* full metadata control.
@@ -1034,7 +1034,7 @@ pub fn mk_viewnode (
   title         : String,
   affectsParent      : AffectsParent,
   birth         : Birth,
-  indef_or_def  : IndefOrDef,
+  editability  : Editability,
   view_requests : HashSet < ViewRequest >,
 ) -> ViewNode {
   ViewNode { focused     : false,
@@ -1045,7 +1045,7 @@ pub fn mk_viewnode (
                  ActiveNode { affectsParent,
                             birth,
                             view_requests,
-                            indef_or_def,
+                            editability,
                             .. default_activeNode (
                               id, source, title ) } ) ) }}
 

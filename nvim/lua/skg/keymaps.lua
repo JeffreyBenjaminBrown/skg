@@ -85,7 +85,7 @@ M.commands = {
                                   desc = 'Graft the subscribees (auto-saves)' },
   SetDefinitive = { module = 'skg.view_requests', fn = 'set_definitive',
                     desc = 'Make this the editable view of its node' },
-  SetIndefinitive = { module = 'skg.metadata', fn = 'set_indefinitive',
+  SetWriteProtected = { module = 'skg.metadata', fn = 'set_write_protected',
                       desc = 'Make this view of its node read-only' },
   SetMergeRequest = { module = 'skg.metadata', fn = 'set_merge_request',
                       desc = 'Request merging another node into this one' },
@@ -128,7 +128,7 @@ M.commands = {
   PasteLink = { module = 'skg.linkstack', fn = 'paste_link',
                 desc = 'Insert a link to the top-of-stack node' },
   PasteNode = { module = 'skg.linkstack', fn = 'paste_node',
-                desc = 'Insert an indefinitive view of the top-of-stack node' },
+                desc = 'Insert a write-protected view of the top-of-stack node' },
   PopId = { module = 'skg.linkstack', fn = 'pop_id',
             desc = 'Paste the top-of-stack id and pop it' },
   PopLink = { module = 'skg.linkstack', fn = 'pop_link',
@@ -226,7 +226,7 @@ M.content_view_bindings = {
   { 'pS', 'ShowPathsThroughSubscribers' }, -- C-c p S
   { 'ps', 'ShowPathsThroughSubscribees' }, -- C-c p s
   { 'sd', 'SetDefinitive' },             -- C-c s d
-  { 'si', 'SetIndefinitive' },           -- C-c s i
+  { 'sw', 'SetWriteProtected' },          -- C-c s w
   { 'sm', 'SetMergeRequest' },           -- C-c s m
   { 'ss', 'SetSource' },                 -- C-c s s
   { 'sS', 'SetSourceRecursive' },        -- C-c s S
