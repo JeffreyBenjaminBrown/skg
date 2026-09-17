@@ -5,11 +5,11 @@
 // vision.org's R/E/G/H example: R subscribes to AND overrides E,
 // R hides H, E contains G and H. Extended with X overriding G, so
 // the no-cascade decision is observable:
-// - expanding E under the subscribeeCol applies R's hides (no H)
+// - expanding E under the subscribeeFolder applies R's hides (no H)
 //   and the GENERAL substitution rule (G draws as X, marked);
-// - expanding E under the overriddenCol applies neither: full
+// - expanding E under the overriddenFolder applies neither: full
 //   contains, raw G and raw H -- the user asked for the original.
-// The col members themselves (each E copy) always draw raw: cols
+// The folder members themselves (each E copy) always draw raw: folders
 // never substitute.
 
 use std::error::Error;
@@ -37,18 +37,18 @@ fn all_tests
       s . reset ("overridden_as_such_expansion_is_raw_and_unhidden", fixtures) ?;
       overridden_as_such_expansion_is_raw_and_unhidden (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("col_members_never_substitute", fixtures) ?;
-      col_members_never_substitute (
+      s . reset ("folder_members_never_substitute", fixtures) ?;
+      folder_members_never_substitute (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
-/// The lines of 'buf', each tagged with its nearest ENCLOSING col
-/// (by metadata atom; "" outside any col). Depth-aware: a col stops
+/// The lines of 'buf', each tagged with its nearest ENCLOSING folder
+/// (by metadata atom; "" outside any folder). Depth-aware: a folder stops
 /// enclosing once a line at its own depth or shallower appears, so
-/// a sibling following a nested col is attributed to the outer col,
+/// a sibling following a nested folder is attributed to the outer folder,
 /// not the nested one. Body lines (no stars) inherit the current
 /// attribution.
-fn lines_by_enclosing_col (
+fn lines_by_enclosing_folder (
   buf : &str,
 ) -> Vec<(&'static str, &str)> {
   let org_depth = |line : &str| -> usize {
@@ -59,18 +59,18 @@ fn lines_by_enclosing_col (
     let depth : usize = org_depth (line);
     if depth > 0 {
       while stack . last ()
-        . map_or (false, |(col_depth, _)| *col_depth >= depth)
+        . map_or (false, |(folder_depth, _)| *folder_depth >= depth)
       { stack . pop (); }}
     result . push ((
       stack . last () . map ( |(_, c)| *c ) . unwrap_or (""),
       line ));
     if depth > 0 {
-      if line . contains ("(skg subscribeeCol)")
-        { stack . push ((depth, "subscribeeCol")); }
-      else if line . contains ("(skg overriddenCol)")
-        { stack . push ((depth, "overriddenCol")); }
-      else if line . contains ("(skg hiddenInSubscribeeCol)")
-        { stack . push ((depth, "hiddenInSubscribeeCol")); }}}
+      if line . contains ("(skg subscribeeFolder)")
+        { stack . push ((depth, "subscribeeFolder")); }
+      else if line . contains ("(skg overriddenFolder)")
+        { stack . push ((depth, "overriddenFolder")); }
+      else if line . contains ("(skg hiddenInSubscribeeFolder)")
+        { stack . push ((depth, "hiddenInSubscribeeFolder")); }}}
   result }
 
 async fn save_and_rerender (
@@ -96,10 +96,10 @@ async fn save_and_rerender (
     "save must not error; got: {:?}", response . errors );
   Ok ( response . saved_view ) }
 
-/// Request a definitive view of the E copy under 'col' (by editing
+/// Request a definitive view of the E copy under 'folder' (by editing
 /// the de novo view's text), save, and return the rerendered view.
 async fn expand_e_under (
-  col     : &str,
+  folder     : &str,
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<String, Box<dyn Error>> {
@@ -109,15 +109,15 @@ async fn expand_e_under (
       &[ ID::from ("R") ], false ) ?;
   let edited : String =
     { let mut out : Vec<String> = Vec::new ();
-      for (line_col, line) in lines_by_enclosing_col (&de_novo) {
-        if line_col == col && line . contains ("(id E)") {
+      for (line_col, line) in lines_by_enclosing_folder (&de_novo) {
+        if line_col == folder && line . contains ("(id E)") {
           out . push ( line . replace (
-            "indef",
-            "indef (viewRequests definitiveView)" )); }
+            "writeProtected",
+            "writeProtected (viewRequests definitiveView)" )); }
         else { out . push ( line . to_string () ); }}
       out . join ("\n") + "\n" };
   assert_ne! ( edited, de_novo,
-    "the {} copy of E was found and given a request", col );
+    "the {} copy of E was found and given a request", folder );
   save_and_rerender (&edited, config, tantivy) . await }
 
 async fn subscribee_as_such_expansion_hides_and_substitutes (
@@ -127,25 +127,25 @@ async fn subscribee_as_such_expansion_hides_and_substitutes (
       (
         graph_handle_from_config (config) ? );
       let view : String =
-        expand_e_under ("subscribeeCol", config, tantivy)
+        expand_e_under ("subscribeeFolder", config, tantivy)
         . await ?;
       let tagged : Vec<(&str, &str)> =
-        lines_by_enclosing_col (&view);
+        lines_by_enclosing_folder (&view);
       assert! ( tagged . iter () . any ( |(c, l)|
-                  *c == "subscribeeCol"
+                  *c == "subscribeeFolder"
                   && l . contains ("(overridesHere G)")
                   && l . contains ("(id X)") ),
         "the general rule applies below a subscribee-as-such: \
          G draws as X, marked:\n{}", view );
       assert! ( ! tagged . iter () . any ( |(c, l)|
-                  *c == "subscribeeCol"
+                  *c == "subscribeeFolder"
                   && l . contains ("(id H)") ),
         "R's hides apply to the subscribee-as-such expansion; H \
-         appears only under the hiddenInSubscribeeCol:\n{}", view );
+         appears only under the hiddenInSubscribeeFolder:\n{}", view );
       assert! ( tagged . iter () . any ( |(c, l)|
-                  *c == "hiddenInSubscribeeCol"
+                  *c == "hiddenInSubscribeeFolder"
                   && l . contains ("(id H)") ),
-        "H shows in the hiddenInSubscribeeCol:\n{}", view );
+        "H shows in the hiddenInSubscribeeFolder:\n{}", view );
       Ok (( )) }
 
 async fn overridden_as_such_expansion_is_raw_and_unhidden (
@@ -155,18 +155,18 @@ async fn overridden_as_such_expansion_is_raw_and_unhidden (
       (
         graph_handle_from_config (config) ? );
       let view : String =
-        expand_e_under ("overriddenCol", config, tantivy)
+        expand_e_under ("overriddenFolder", config, tantivy)
         . await ?;
       let tagged : Vec<(&str, &str)> =
-        lines_by_enclosing_col (&view);
+        lines_by_enclosing_folder (&view);
       assert! ( tagged . iter () . any ( |(c, l)|
-                  *c == "overriddenCol"
+                  *c == "overriddenFolder"
                   && l . contains ("(id G)")
                   && ! l . contains ("overridesHere") ),
         "the bypass: G draws RAW (not as X) below an \
          overridden-as-such:\n{}", view );
       assert! ( tagged . iter () . any ( |(c, l)|
-                  *c == "overriddenCol"
+                  *c == "overriddenFolder"
                   && l . contains ("(id H)") ),
         "no hides apply: H draws below the overridden-as-such \
          (hides are scoped to subscriptions):\n{}", view );
@@ -174,7 +174,7 @@ async fn overridden_as_such_expansion_is_raw_and_unhidden (
         "X appears nowhere in this expansion:\n{}", view );
       Ok (( )) }
 
-async fn col_members_never_substitute (
+async fn folder_members_never_substitute (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -184,16 +184,16 @@ async fn col_members_never_substitute (
         multi_root_view (
           config, Some (tantivy),
           &[ ID::from ("R") ], false ) ?;
-      // R overrides E, yet both col copies of E draw raw: the
-      // subscribeeCol shows the graph fact "R subscribes to E" and
-      // the overriddenCol shows "R overrides E"; substituting
+      // R overrides E, yet both folder copies of E draw raw: the
+      // subscribeeFolder shows the graph fact "R subscribes to E" and
+      // the overriddenFolder shows "R overrides E"; substituting
       // inside either would obscure the fact displayed.
       let e_lines : Vec<&str> =
         view . lines ()
         . filter ( |l| l . contains ("(id E)") )
         . collect ();
       assert_eq! ( e_lines . len (), 2,
-        "E appears under both cols:\n{}", view );
+        "E appears under both folders:\n{}", view );
       assert! ( e_lines . iter () . all (
                   |l| ! l . contains ("overridesHere") ),
         "neither copy is substituted:\n{}", view );

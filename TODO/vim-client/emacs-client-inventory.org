@@ -112,7 +112,7 @@ formats headlines. The critical primitive 'skg-replace-current-line'
 (fragility-safe in-place line rewrite) and the metadata-merge command
 'skg-edit-metadata-at-point' (reads existing metadata, applies an edit s-exp via
 'skg-edit-nested-sexp', rewrites the line). Interactive commands:
-'skg-delete'/'skg-delete-recursive' (mark for deletion), 'skg-set-indefinitive',
+'skg-delete'/'skg-delete-recursive' (mark for deletion), 'skg-set-write-protected',
 'skg-set-source'/'skg-set-source-recursive' (with owned-source prompt + herald
 update), 'skg-set-merge-request', 'skg-view-without-metadata',
 'skg-beginning-of-line' (C-a toggle line-start↔title-start). Fork-stripping
@@ -147,7 +147,7 @@ siblings or children, jump to the max), 'skg-replace-content-with-link' (replace
 a subtree with an [[id:...][...]]-style link, guarding parent
 ownership/definitiveness, y-or-n-p if the title already has a link),
 'skg-replace-link-with-content' (replace a leaf that has exactly one id-link
-with an indefinitive ActiveNode). Link parsing/label reduction helpers. Depends
+with a write-protected ActiveNode). Link parsing/label reduction helpers. Depends
 on org, org-fold-core, skg-config, skg-metadata.
 
 *** skg-request-views.el
@@ -339,7 +339,7 @@ skg-sexpr-org-bijection, skg-activeNode-defaults, skg-sexpr-cycling, skg-state.
 
 *** skg-sexpr-edit/skg-sexpr-cycling.el
 S-left/S-right value cycling inside the metadata edit buffer, dispatched by
-parent headline name (indef, parentIs, editRequest, source, viewRequests).
+parent headline name (writeProtected, parentIs, editRequest, source, viewRequests).
 'merge' prompts for a target id. 'skg-sexp-edit-cycle-left'/'-right'.
 
 ** Heralds and readable-ids (display transforms)
@@ -404,7 +404,7 @@ ambiguity. *Deeply magit-bound — see section 8.*
 
 *** skg-view-new-empty.el / skg-view-org-ancestry.el
 'skg-view-new-empty' (C-c v e): prompt owned source, open a fresh
-indefinitive-root buffer. 'skg-view-org-ancestry' (C-c v o): open a new buffer
+write-protected-root buffer. 'skg-view-org-ancestry' (C-c v o): open a new buffer
 showing only the outline ancestry of the heading at point (pure org, no server).
 
 *** skg-test-utils.el
@@ -457,7 +457,7 @@ skg-diff-analysis-mode-map: search + goto + view + id-nav + stack.)
   C-c p S subscribers · C-c p s subscribees → skg-show-paths-through-*.
 
 ** Set node properties (C-c s)
-- C-c s d skg-set-definitive · C-c s i skg-set-indefinitive ·
+- C-c s d skg-set-definitive · C-c s w skg-set-write-protected ·
   C-c s m skg-set-merge-request · C-c s s skg-set-source ·
   C-c s S skg-set-source-recursive.
 
@@ -736,7 +736,7 @@ exists solely to work around org-fold's reveal-on-touch heuristic.
 - test-skg-compare-sexpr.el — skg-sexp-subtree-p matrix.
 - test-skg-edit-nested-sexp.el — DELETE/REPLACE/ENSURE/merge, nil/empty/
   mismatched targets.
-- test-skg-metadata.el — parse/reconstruct, set-indefinitive, strip-metadata,
+- test-skg-metadata.el — parse/reconstruct, set-write-protected, strip-metadata,
   view-without-metadata, set-source (+ herald update, recursive parentIs
   pruning), merge-request (bare id / link), minibuffer id-stack bindings,
   replace-content↔link (all guard paths), collection/path keybindings.

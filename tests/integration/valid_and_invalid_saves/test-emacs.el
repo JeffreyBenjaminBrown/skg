@@ -1,7 +1,7 @@
 ;;; Integration test for skg save error handling
 ;;; This script tests:
-;;; 1. Invalid save (duplicate ID without indefinitive) should show error buffer
-;;; 2. Valid save (with indefinitive) should work normally
+;;; 1. Invalid save (duplicate ID without write-protected) should show error buffer
+;;; 2. Valid save (with write-protected) should work normally
 ;;;
 ;;; NOTE: File system operations (backup/cleanup) are handled by run-test.sh
 
@@ -15,7 +15,7 @@
 
 (defun test-invalid-save ()
   "Test invalid save that should create error buffer."
-  (message "=== PHASE 1: Testing invalid save (duplicate ID without indefinitive) ===")
+  (message "=== PHASE 1: Testing invalid save (duplicate ID without writeProtected) ===")
 
   ;; Create the *skg-content-view* buffer with problematic content
   (with-current-buffer (get-buffer-create "*skg-content-view*")
@@ -77,14 +77,14 @@
 
 (defun test-valid-save ()
   "Test valid save after fixing the content."
-  (message "=== PHASE 2: Testing valid save (with indefinitive) ===")
+  (message "=== PHASE 2: Testing valid save (with writeProtected) ===")
 
   ;; Switch back to content view buffer and fix the content
   (with-current-buffer "*skg-content-view*"
     (goto-char (point-min))
     (search-forward "** (skg (node (id 1))) 1")
-    (replace-match "** (skg (node (id 1) indef)) 1")
-    (message "✓ Amended previously invalid content to use indefinitive, so it is now valid"))
+    (replace-match "** (skg (node (id 1) writeProtected)) 1")
+    (message "✓ Amended previously invalid content to use writeProtected, so it is now valid"))
 
   ;; Switch to buffer to make it current
   (switch-to-buffer "*skg-content-view*")
@@ -101,15 +101,15 @@
     (let ((updated-content (buffer-substring-no-properties (point-min) (point-max))))
       (message "Updated buffer content: %s" updated-content)
 
-      ;; Should contain cycle and indef markers
-      ;; Note: cycle and indef are inside (node ...)
+      ;; Should contain cycle and write-protected markers
+      ;; Note: cycle and write-protected are inside (node ...)
       (if (and (string-match-p "cycle" updated-content)
-               (string-match-p "\\bindef\\b" updated-content))
+               (string-match-p "\\bwriteProtected\\b" updated-content))
           (progn
-            (message "✓ PASS: Valid save worked and showed cycle indef"))
+            (message "✓ PASS: Valid save worked and showed cycle writeProtected"))
         (progn
-          (message "✗ FAIL: Expected cycle and indef markers not found")
-          (message "Expected to contain: 'cycle' and 'indef'")
+          (message "✗ FAIL: Expected cycle and writeProtected markers not found")
+          (message "Expected to contain: 'cycle' and 'writeProtected'")
           (message "Got: %s" updated-content)
           (kill-emacs 1)))))
   ;; §20.2(c): an invalid save must NOT leak lock/stream state that wedges the

@@ -38,7 +38,7 @@ struct ViewNodeLineCol {
 /// That function detects the majority of possible errors,
 /// but it can't detect them all because it uses a tree of MpViewnodes,
 /// which permit fewer kinds of invalid state than the raw text.
-/// (For instance, Alias and AliasCol cannot have bodies,
+/// (For instance, Alias and AliasFolder cannot have bodies,
 /// but they can in the raw text, and that's an error.)
 pub fn org_to_uninterpreted_nodes(
   input: &str
@@ -51,7 +51,7 @@ pub fn org_to_uninterpreted_nodes(
   Ok ( ( viewforest . into_internal_tree (), parsing_errors ) ) }
 
 /// The third element of the result is nonfatal parse warnings
-/// (e.g. discarded headline text on a col scaffold), destined for
+/// (e.g. discarded headline text on a folder scaffold), destined for
 /// 'SaveResponse.warnings'.
 pub fn org_to_uninterpreted_viewforest(
   input: &str
@@ -160,8 +160,8 @@ fn linecol_to_viewnode(
       parsed_metadata
     } else { // No metadata, so use defaults.
       default_metadata () };
-  let body_on_indefinitive : bool =
-    metadata . indefinitive
+  let body_on_writeProtected : bool =
+    metadata . writeProtected
     && body_text . as_ref () . is_some_and (
       |body| ! body . trim () . is_empty () );
   let ( viewnode, error_opt, warning_opt )
@@ -174,11 +174,11 @@ fn linecol_to_viewnode(
       "forestRoot metadata is internal and cannot appear in buffer text"
       . to_string () ); }
   let error_opt : Option<BufferValidationError> =
-    error_opt . or_else ( || if body_on_indefinitive {
+    error_opt . or_else ( || if body_on_writeProtected {
       Some (match metadata . id . clone () {
-        Some (id) => BufferValidationError::EditedIndefinitive (id),
+        Some (id) => BufferValidationError::EditedWriteProtectedOccurrence (id),
         None => BufferValidationError::Other (
-          "An indefinitive node has body text, which saving would discard. Add an ID and edit a definitive occurrence instead."
+          "A write-protected node has body text, which saving would discard. Add an ID and edit a definitive occurrence instead."
           . to_string ()), })
     } else { None } );
   Ok ( ( level, viewnode, error_opt, warning_opt ) ) }

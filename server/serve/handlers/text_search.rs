@@ -38,8 +38,8 @@ use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
 use crate::source_sets::{ActiveSourceSet, search_ids_for_source_set_for_test as search_ids_for_source_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ParentIs, mk_indefinitive_viewnode};
-use crate::types::viewnode::{QualCol, Qual};
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, AffectsParent, mk_writeProtected_viewnode};
+use crate::types::viewnode::{QualFolder, Qual};
 
 use ego_tree::{NodeId, NodeMut};
 use sexp::{Sexp, Atom};
@@ -545,7 +545,7 @@ pub fn group_matches_by_id (
 /// Builds a ViewForest representing the search results.
 /// Returns the viewforest and the ordered list of result IDs.
 ///
-/// Forest structure: each root is a search result, with AliasCol +
+/// Forest structure: each root is a search result, with AliasFolder +
 /// Alias children if aliases matched.
 /// The result ids to drop from the top level because a USER-OWNED
 /// result recursively overrides them: they will reappear as
@@ -622,29 +622,29 @@ pub fn build_search_viewforest (
       let (_score, title) : &(f32, String) = sorted_matches [0];
       let result_treeid : NodeId =
         viewforest . append_root (
-          mk_indefinitive_viewnode (
+          mk_writeProtected_viewnode (
             (*id) . clone (),
             (*source) . clone (),
             title . clone (),
-            ParentIs::Absent ) );
+            AffectsParent::NA ) );
       if sorted_matches . len () > 1 {
-        // We bury all but the best match in an AliasCol.
+        // We bury all but the best match in an AliasFolder.
         // PITFALL: The title might not be the best match,
         // in which case this makes it look like an alias.
-        let aliascol_id : NodeId = {
+        let aliasfolder_id : NodeId = {
           let mut result_mut : NodeMut<ViewNode> =
             viewforest . get_mut (result_treeid) . unwrap ();
           result_mut . append ( ViewNode {
             focused     : false,
             folded      : true,
             body_folded : false,
-            kind        : ViewNodeKind::QualCol (
-              QualCol::Alias ) } )
+            kind        : ViewNodeKind::QualFolder (
+              QualFolder::Alias ) } )
           . id () };
         for (_score, title) in sorted_matches . iter () . skip (1) {
-          let mut aliascol_mut : NodeMut<ViewNode> =
-            viewforest . get_mut (aliascol_id) . unwrap ();
-          aliascol_mut . append ( ViewNode {
+          let mut aliasfolder_mut : NodeMut<ViewNode> =
+            viewforest . get_mut (aliasfolder_id) . unwrap ();
+          aliasfolder_mut . append ( ViewNode {
             focused     : false,
             folded      : false,
             body_folded : false,

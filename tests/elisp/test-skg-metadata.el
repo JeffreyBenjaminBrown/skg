@@ -93,41 +93,41 @@ Returns the parsed s-expression or nil if not found."
             (list (intern id))))
    (test-skg--all-metadata-sexps)))
 
-(ert-deftest test-skg-set-indefinitive ()
-  "Test skg-set-indefinitive adds indefinitive to node section."
-  ;; Test adding indefinitive to headline with id
+(ert-deftest test-skg-set-write-protected ()
+  "Test skg-set-write-protected adds writeProtected to node section."
+  ;; Test adding write-protected to headline with id
   (with-temp-buffer
     (org-mode)
     (insert "* (skg (node (id 1))) title")
     (goto-char (point-min))
-    (skg-set-indefinitive)
+    (skg-set-write-protected)
     (let ((result (test-skg--extract-metadata-sexp)))
-      ;; Verify indefinitive is in node section
-      (should (skg-sexp-subtree-p result '(skg (node indef))))
+      ;; Verify write-protected is in node section
+      (should (skg-sexp-subtree-p result '(skg (node writeProtected))))
       ;; Verify id is preserved
       (should (skg-sexp-subtree-p result '(skg (node (id 1)))))))
 
-  ;; Test adding indefinitive to headline with existing node section
+  ;; Test adding write-protected to headline with existing node section
   (with-temp-buffer
     (org-mode)
     (insert "* (skg (node (id 2))) title")
     (goto-char (point-min))
-    (skg-set-indefinitive)
+    (skg-set-write-protected)
     (let ((result (test-skg--extract-metadata-sexp)))
-      ;; Verify indefinitive is in node section
-      (should (skg-sexp-subtree-p result '(skg (node indef))))
+      ;; Verify write-protected is in node section
+      (should (skg-sexp-subtree-p result '(skg (node writeProtected))))
       ;; Verify id is preserved
       (should (skg-sexp-subtree-p result '(skg (node (id 2)))))))
 
-  ;; Test adding indefinitive to headline with no metadata
+  ;; Test adding write-protected to headline with no metadata
   (with-temp-buffer
     (org-mode)
     (insert "* plain title")
     (goto-char (point-min))
-    (skg-set-indefinitive)
+    (skg-set-write-protected)
     (let ((result (test-skg--extract-metadata-sexp)))
-      ;; Verify indefinitive is in node section
-      (should (skg-sexp-subtree-p result '(skg (node indef)))))))
+      ;; Verify write-protected is in node section
+      (should (skg-sexp-subtree-p result '(skg (node writeProtected)))))))
 
 (ert-deftest test-skg-strip-metadata-from-org-text ()
   "Test stripping skg metadata from every headline in org text."
@@ -183,13 +183,13 @@ Returns the parsed s-expression or nil if not found."
   (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c s m"))
               'skg-set-merge-request)))
 
-(ert-deftest test-skg-collection-and-path-keybindings ()
-  "A sample of the C-c c (collections) and C-c p (paths) bindings.
+(ert-deftest test-skg-folder-and-path-keybindings ()
+  "A sample of the C-c l (folders) and C-c p (paths) bindings.
 The UPPER/lower path letters select opposite roles, so C-c p O and
 C-c p o must bind to distinct commands."
-  (dolist (pair '(("C-c c a" . skg-show-collection-aliases)
-                  ("C-c c o" . skg-show-collection-overrides)
-                  ("C-c c s" . skg-show-collection-subscribes)
+  (dolist (pair '(("C-c l a" . skg-show-folderOf-aliases)
+                  ("C-c l o" . skg-show-folderOf-overrides)
+                  ("C-c l s" . skg-show-folderOf-subscribes)
                   ("C-c p C" . skg-show-paths-through-containers)
                   ("C-c p L" . skg-show-paths-through-link-sources)
                   ("C-c p l" . skg-show-paths-through-link-dests)
@@ -296,20 +296,20 @@ C-c p o must bind to distinct commands."
                      "[[id:acquiree][Acquiree title]]"))
       (should (null skg-id-stack)))))
 
-(ert-deftest test-skg-set-source-recursive-prunes-non-content-parentIs ()
+(ert-deftest test-skg-set-source-recursive-prunes-non-content-affectsParent ()
   "Test recursive source change follows only container org relationships."
   (with-temp-buffer
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id root) (source public) (parentIs absent))) root\n"
+      "* (skg (node (id root) (source public) (affectsParent na))) root\n"
       "** (skg (node (id content-child) (source public))) content child\n"
       "*** (skg (node (id content-grandchild) (source public))) content grandchild\n"
       "** (skg (node (id mismatched-content) (source foreign))) mismatched content\n"
       "*** (skg (node (id public-under-mismatch) (source public))) public under mismatch\n"
-      "** (skg (node (id link-child) (source public) (parentIs independent) (birth backpath linkSource))) link child\n"
+      "** (skg (node (id link-child) (source public) (affectsParent false) (birth backpath linkSource))) link child\n"
       "*** (skg (node (id under-link) (source public))) under link\n"
-      "** (skg aliasCol) aliases\n"
+      "** (skg aliasFolder) aliases\n"
       "*** (skg (node (id under-scaffold) (source public))) under scaffold\n"))
     (goto-char (point-min))
     (cl-letf (((symbol-function 'skg--prompt-for-source-change)
@@ -352,9 +352,9 @@ C-c p o must bind to distinct commands."
       "* (skg (node (id r) (source public))) R\n"
       "** (skg (node (id p) (source public))) P\n"
       "body point starts here\n"
-      "*** (skg aliasCol) aliases\n"
-      "*** (skg (node (id c) (source public) indef)) child\n"
-      "** (skg (node (id p) (source public) indef)) P elsewhere\n"))
+      "*** (skg aliasFolder) aliases\n"
+      "*** (skg (node (id c) (source public) writeProtected)) child\n"
+      "** (skg (node (id p) (source public) writeProtected)) P elsewhere\n"))
     (goto-char (point-min))
     (search-forward "body point")
     (let ((save-count 0))
@@ -370,7 +370,7 @@ C-c p o must bind to distinct commands."
         (concat
          "* (skg (node (id r) (source public))) R\n"
          "** [[id:p][P]]\n"
-         "** (skg (node (id p) (source public) indef)) P elsewhere\n"))))))
+         "** (skg (node (id p) (source public) writeProtected)) P elsewhere\n"))))))
 
 (ert-deftest test-skg-replace-content-with-link-confirms-linked-headline ()
   "Test link-bearing headlines ask for confirmation and simplify labels."
@@ -461,13 +461,13 @@ C-c p o must bind to distinct commands."
                       :type 'user-error))
       (should (= save-count 0)))))
 
-(ert-deftest test-skg-replace-content-with-link-rejects-indef-container ()
-  "Test replacement fails under an indefinitive container."
+(ert-deftest test-skg-replace-content-with-link-rejects-write-protected-container ()
+  "Test replacement fails under a write-protected container."
   (with-temp-buffer
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (source public) indef)) R\n"
+      "* (skg (node (id r) (source public) writeProtected)) R\n"
       "** (skg (node (id p) (source public))) P\n"))
     (goto-char (point-min))
     (forward-line 1)
@@ -504,7 +504,7 @@ C-c p o must bind to distinct commands."
         (buffer-string)
         (concat
          "* (skg (node (id r) (source public))) R\n"
-         "** (skg (node (id p) indef (viewRequests definitiveView))) P\n"
+         "** (skg (node (id p) writeProtected (viewRequests definitiveView))) P\n"
          "** (skg (node (id s) (source public))) sibling\n"))))))
 
 (ert-deftest test-skg-replace-link-with-content-warns-for-existing-node ()
@@ -592,13 +592,13 @@ C-c p o must bind to distinct commands."
                       :type 'user-error))
       (should (= save-count 0)))))
 
-(ert-deftest test-skg-replace-link-with-content-rejects-indef-container ()
+(ert-deftest test-skg-replace-link-with-content-rejects-write-protected-container ()
   "Test replacement requires a definitive container."
   (with-temp-buffer
     (org-mode)
     (insert
      (concat
-      "* (skg (node (id r) (source public) indef)) R\n"
+      "* (skg (node (id r) (source public) writeProtected)) R\n"
       "** [[id:p][P]]\n"))
     (goto-char (point-min))
     (forward-line 1)

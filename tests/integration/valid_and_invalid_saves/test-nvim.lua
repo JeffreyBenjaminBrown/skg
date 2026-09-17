@@ -1,8 +1,8 @@
 -- Integration test for skg save error handling, nvim client.
 -- The Lua mirror of test-emacs.el in this directory:
--- 1. Invalid save (duplicate ID without indefinitive) should show an
+-- 1. Invalid save (duplicate ID without write-protected) should show an
 --    error buffer.
--- 2. Valid save (with indefinitive) should work normally, and must
+-- 2. Valid save (with write-protected) should work normally, and must
 --    not leave lock/stream state that wedges the next save.
 --
 -- NOTE: File system operations (backup/cleanup) are handled by
@@ -22,7 +22,7 @@ local original_content =
 
 local function test_invalid_save ()
   print('=== PHASE 1: Testing invalid save (duplicate ID without'
-       .. ' indefinitive) ===')
+       .. ' writeProtected) ===')
 
   local view_uri = buffer.generate_uuid()
   local content_buf = buffer.open_org_buffer_from_text(
@@ -65,12 +65,12 @@ local function test_invalid_save ()
 end
 
 local function test_valid_save (content_buf)
-  print('=== PHASE 2: Testing valid save (with indefinitive) ===')
+  print('=== PHASE 2: Testing valid save (with writeProtected) ===')
 
-  -- Fix up the previously-invalid child line: add 'indef'. Mirrors
+  -- Fix up the previously-invalid child line: add 'writeProtected'. Mirrors
   -- the elisp's search-forward + replace-match on the exact text.
   local old_child_line = '** (skg (node (id 1))) 1'
-  local new_child_line = '** (skg (node (id 1) indef)) 1'
+  local new_child_line = '** (skg (node (id 1) writeProtected)) 1'
   local lines = vim.api.nvim_buf_get_lines(content_buf, 0, -1, false)
   local found_line = nil
   for i, line in ipairs(lines) do
@@ -84,7 +84,7 @@ local function test_valid_save (content_buf)
   end
   vim.api.nvim_buf_set_lines(content_buf, found_line - 1, found_line,
                              false, { new_child_line })
-  print('Amended previously invalid content to use indefinitive, so'
+  print('Amended previously invalid content to use writeProtected, so'
        .. ' it is now valid')
 
   vim.api.nvim_set_current_buf(content_buf)
@@ -97,15 +97,15 @@ local function test_valid_save (content_buf)
   local updated_content = T.buffer_text(content_buf)
   print('Updated buffer content: ' .. updated_content)
 
-  -- Should contain cycle and indef markers (inside (node ...)).
+  -- Should contain cycle and write-protected markers (inside (node ...)).
   local has_cycle = updated_content:find('cycle', 1, true) ~= nil
-  local has_indef = updated_content:find('%f[%w]indef%f[%W]') ~= nil
-  if has_cycle and has_indef then
-    print('Valid save worked and showed cycle indef')
+  local has_write_protected = updated_content:find('%f[%w]writeProtected%f[%W]') ~= nil
+  if has_cycle and has_write_protected then
+    print('Valid save worked and showed cycle writeProtected')
   else
-    print('Expected to contain: "cycle" and "indef"')
+    print('Expected to contain: "cycle" and "writeProtected"')
     print('Got: ' .. updated_content)
-    T.fail('Expected cycle and indef markers not found')
+    T.fail('Expected cycle and writeProtected markers not found')
   end
 
   -- §20.2(c): an invalid save must NOT leak lock/stream state that

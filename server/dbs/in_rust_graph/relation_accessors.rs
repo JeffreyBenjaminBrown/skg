@@ -45,7 +45,7 @@ impl NodeRelation {
   /// NodeChanges, or None for a relation NodeChanges does not diff
   /// (textlinks are inferred from node text, not stored as a list).
   /// Membership-sign consumers (e.g. 'phantom_axes') call this with
-  /// the one relation their col represents, so a sign can never be
+  /// the one relation their folder represents, so a sign can never be
   /// read from a different relation that involves the same ID.
   pub fn diff_in_nodechanges<'a> (
     self,
@@ -190,7 +190,7 @@ impl RelationRole {
 
 /// Each row is (ROLENAME, RelationRole, glyph). The backpath triple is
 /// DERIVED from the RelationRole ('RelationRole::backpath_triple'), so
-/// it is not stored here. A col is named by its RELATION (spanning both
+/// it is not stored here. A folder is named by its RELATION (spanning both
 /// roles); a path and a birth are named by the one ROLE the grafted
 /// partner plays. 'Contains, Second' is absent (see the consts above).
 pub const PARTNER_ROLE_VOCAB
@@ -254,7 +254,7 @@ impl InRustGraph {
   /// surfaces gate: an inbound partner P of X is visible at the
   /// active set iff edge_source(P, R, X) is active -- private
   /// memberships must not surface through ancestry, backpaths, or
-  /// inbound cols when the content direction hides them
+  /// inbound folders when the content direction hides them
   /// (render-and-gating, 5_plan.org).
   pub fn edge_source (
     &self,
@@ -357,7 +357,7 @@ impl InRustGraph {
   ) -> Vec<ID> {
     // The inbound members are stored as a set, so their iteration order is
     // nondeterministic (run-to-run). Sort by ID so every consumer gets a stable
-    // order: a node's inbound PartnerCol (e.g. thousands of subscribers) then
+    // order: a node's inbound PartnerFolder (e.g. thousands of subscribers) then
     // renders the same way every time, rather than in an arbitrary shuffle.
     // Inbound relation order is user-irrelevant, unlike the outbound relations,
     // whose meaningful Vec order (e.g. a node's hides list) is left untouched.

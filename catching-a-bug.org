@@ -1,7 +1,7 @@
 * TODO (as Jeff) commit all data
 to free Codex to do this
 * the buffer before the buggy edit
-  * (skg (node (id 5b5a8369-a6e9-46b9-b9f5-02d8bd8c8800) (source pers-p) (parentIs absent) (rels (contains (out 3))) (viewStats (sourceHerald ⌂:pers-p)))) Priceless Festival
+  * (skg (node (id 5b5a8369-a6e9-46b9-b9f5-02d8bd8c8800) (source pers-p) (affectsParent na) (rels (contains (out 3))) (viewStats (sourceHerald ⌂:pers-p)))) Priceless Festival
   ** (skg (node (id 832c45b9-357d-4f30-bb39-d112af144012) (source pers-p) (rels (contains (in 1 (ancestors 1))) (birth contains)))) (more) logistics
   CC booking@pricelessfestival.org
   ~/priceless-festival/

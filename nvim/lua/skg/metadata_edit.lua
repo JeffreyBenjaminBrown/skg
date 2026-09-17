@@ -180,16 +180,16 @@ end
 ---@param field_value string
 ---@return string[]|nil
 function M.cycle_values_for_field (field_name, field_value)
-  if field_name == 'indef' then
+  if field_name == 'writeProtected' then
     return { 'false (default)', 'true' } end
-  if field_name == 'parentIs' then
-    return { 'affected (default)', 'independent', 'absent' } end
+  if field_name == 'affectsParent' then
+    return { 'true (default)', 'false', 'na' } end
   if field_name == 'editRequest' then
     return { 'none (default)', 'delete', 'merge' } end
   if field_name == 'source' then
     return M.source_cycle_values(field_value) end
   if field_name == 'viewRequests' then
-    -- Only the bare-atom request is cycleable; (col X)/(path X) are
+    -- Only the bare-atom request is cycleable; (folder X)/(path X) are
     -- structured forms inserted by their dedicated commands.
     return { 'none (default)', 'definitiveView' } end
   return nil

@@ -5,7 +5,7 @@ use crate::herald_tokens::{AncestorFlags, relationship_heralds_sexp};
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{
-  Birth, GraphNodeStats, ParentIs, PartnerCol, ViewNode, ViewNodeKind, Vognode };
+  Birth, GraphNodeStats, AffectsParent, PartnerFolder, ViewNode, ViewNodeKind, Vognode };
 use crate::update_buffer::ancestry::required_ancestor;
 use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet};
@@ -89,13 +89,13 @@ fn set_viewnodestats_recursive (
     { ancestor_ids . remove (pid); } } }
 
 /// What the active vognode at treeid is born of, and which ancestors to
-/// flag. The visible PARENT is a generation-1 ancestor (a scaffold col
-/// carries no flag); a col member additionally flags the col's
+/// flag. The visible PARENT is a generation-1 ancestor (a scaffold folder
+/// carries no flag); a folder member additionally flags the folder's
 /// required-ancestry gnodes (owner = the last entry) at their tree-gen
 /// distances.
 enum ParentKind {
   Gnode (ID),                 // an Active vognode parent
-  Col (PartnerCol, NodeId),   // a PartnerCol parent (its treeid)
+  Folder (PartnerFolder, NodeId),   // a PartnerFolder parent (its treeid)
   Other,
 }
 
@@ -110,12 +110,12 @@ fn set_herald_strings_in_viewnode (
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
-  let (gstats, parentIs, birth, overridesHere)
-    : (GraphNodeStats, ParentIs, Birth, bool) = {
+  let (gstats, affectsParent, birth, overridesHere)
+    : (GraphNodeStats, AffectsParent, Birth, bool) = {
     let ViewNodeKind::Vognode (Vognode::Active (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
-    ( t . graphStats . clone (), t . parentIs, t . birth,
+    ( t . graphStats . clone (), t . affectsParent, t . birth,
       t . viewStats . overridesHere . is_some () ) };
   let counts = match & gstats . rels {
     Some (c) => c . clone (),
@@ -130,7 +130,7 @@ fn set_herald_strings_in_viewnode (
       container_to_contents, content_to_containers,
       node_pid, &anc_pid, generation ); }
   let birth_rels : Vec<NodeRelation> =
-    birth_relations (&parent_kind, parentIs, birth, &flags,
+    birth_relations (&parent_kind, affectsParent, birth, &flags,
                      overridesHere);
   let rel_heralds : Option<String> = relationship_heralds_sexp (
     &counts, gstats . aliases, gstats . extra_ids, &flags, &birth_rels );
@@ -147,13 +147,13 @@ fn parent_kind_of (
   match & parent_ref . value () . kind {
     ViewNodeKind::Vognode (Vognode::Active (t)) =>
       ParentKind::Gnode ( t . id . clone () ),
-    ViewNodeKind::PartnerCol (col) =>
-      ParentKind::Col ( *col, parent_ref . id () ),
+    ViewNodeKind::PartnerFolder (folder) =>
+      ParentKind::Folder ( *folder, parent_ref . id () ),
     _ => ParentKind::Other, } }
 
 /// The (pid, generation) of each tracked ancestor: the visible parent
-/// gnode (gen 1), or -- for a col member -- the col's required-ancestry
-/// gnodes (gen i+2 for the i-th required ancestor, since the col itself
+/// gnode (gen 1), or -- for a folder member -- the folder's required-ancestry
+/// gnodes (gen i+2 for the i-th required ancestor, since the folder itself
 /// is gen 1). Scaffold ancestors in the chain carry no flag and are
 /// skipped.
 fn tracked_ancestors (
@@ -162,11 +162,11 @@ fn tracked_ancestors (
 ) -> Vec<(ID, usize)> {
   match parent_kind {
     ParentKind::Gnode (pid) => vec![ (pid . clone (), 1) ],
-    ParentKind::Col (_col, col_treeid) => {
+    ParentKind::Folder (_folder, folder_treeid) => {
       let mut out : Vec<(ID, usize)> = Vec::new ();
       let mut i : usize = 0;
       loop {
-        match required_ancestor (tree, *col_treeid, i) {
+        match required_ancestor (tree, *folder_treeid, i) {
           Ok (Some (anc_id)) => {
             if let Some (pid) = active_vognode_pid (tree, anc_id) {
               out . push ( (pid, i + 2) ); }
@@ -237,17 +237,17 @@ fn flag_ancestor_relations (
 /// is [Hides, Contains].
 fn birth_relations (
   parent_kind : &ParentKind,
-  parentIs    : ParentIs,
+  affectsParent    : AffectsParent,
   birth       : Birth,
   flags       : &AncestorFlags,
   overridesHere : bool, // whether the node is drawn in place of a node it overrides
 ) -> Vec<NodeRelation> {
   let mut rels : Vec<NodeRelation> = {
     // A backpath graft's birth is its role's relation, regardless of
-    // parentIs (grafts are typically Independent/Indefinitive).
+    // affectsParent (grafts are typically Independent/WriteProtected).
     if let Birth::Backpath (role) = birth {
       vec![ role . relation ]
-    } else if parentIs != ParentIs::Affected { Vec::new ()
+    } else if affectsParent != AffectsParent::True { Vec::new ()
     } else {
       match parent_kind {
         ParentKind::Gnode (_) =>
@@ -255,7 +255,7 @@ fn birth_relations (
           if flags . contains_in . contains (&1) {
             vec![ NodeRelation::Contains ]
           } else { Vec::new () },
-        ParentKind::Col (col, _) => birth_relations_for_col (*col),
+        ParentKind::Folder (folder, _) => birth_relations_for_folder (*folder),
         ParentKind::Other => Vec::new (), }}};
   if overridesHere
     && ! rels . contains (&NodeRelation::OverridesViewOf) {
@@ -265,26 +265,26 @@ fn birth_relations (
     rels . insert (0, NodeRelation::OverridesViewOf); }
   rels }
 
-fn birth_relations_for_col (
-  col : PartnerCol,
+fn birth_relations_for_folder (
+  folder : PartnerFolder,
 ) -> Vec<NodeRelation> {
-  match col {
-    PartnerCol::Subscribee | PartnerCol::Subscriber
-    | PartnerCol::Overridden | PartnerCol::Overrider
-    | PartnerCol::Hider | PartnerCol::Hidden =>
-      match col . relation_member_role () {
+  match folder {
+    PartnerFolder::Subscribee | PartnerFolder::Subscriber
+    | PartnerFolder::Overridden | PartnerFolder::Overrider
+    | PartnerFolder::Hider | PartnerFolder::Hidden =>
+      match folder . relation_member_role () {
         Some (role) => vec![ role . relation ],
         None => Vec::new (), },
-    // Filter cols: the subscriber-owner HIDES the member; a
+    // Filter folders: the subscriber-owner HIDES the member; a
     // HiddenInSubscribee member is also CONTAINED by the subscribee.
-    PartnerCol::HiddenInSubscribee =>
+    PartnerFolder::HiddenInSubscribee =>
       vec![ NodeRelation::HidesFromItsSubscriptions,
             NodeRelation::Contains ],
-    PartnerCol::HiddenOutsideOfSubscribee =>
+    PartnerFolder::HiddenOutsideOfSubscribee =>
       vec![ NodeRelation::HidesFromItsSubscriptions ], } }
 
 /// Sets hidden_body on the active vognode at treeid: true iff the node
-/// is drawn INDEFINITIVE here while its graph node has a body -- one
+/// is drawn WRITE_PROTECTED here while its graph node has a body -- one
 /// the rendering hides. Herald "B" on the ☮ (TODO/more.org). False
 /// without a graph handle (some tests): better no B than a wrong one.
 fn set_hidden_body (
@@ -297,7 +297,7 @@ fn set_hidden_body (
     let ViewNodeKind::Vognode (Vognode::Active (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
-    t . is_indefinitive ()
+    t . is_writeProtected ()
       && graph . map_or ( false, |g| {
            let pid : ID = g . pid_of (node_pid)
              . unwrap_or_else ( || node_pid . clone () );
@@ -311,13 +311,13 @@ fn set_hidden_body (
 /// 5_plan.org; see 'ViewNodeStats::rel_source' for the full contract).
 /// Computes the (owner, relation, target) triple that identifies the
 /// binding edge this position represents -- contains for an ordinary
-/// Gnode-parent content child; the col's relation for a simple
-/// PartnerCol member, oriented by which side owns the outbound edge
+/// Gnode-parent content child; the folder's relation for a simple
+/// PartnerFolder member, oriented by which side owns the outbound edge
 /// (see 'RelationRole::is_first_role') -- then compares the edge's
 /// actual source ('InRustGraph::edge_source') against its applicable
 /// relationship default. None on any of: no
-/// graph handle; parentIs != Affected or a backpath graft (not a
-/// genuine member here); a compound filter col
+/// graph handle; affectsParent != Affected or a backpath graft (not a
+/// genuine member here); a compound filter folder
 /// (HiddenInSubscribee / HiddenOutsideOfSubscribee: no single
 /// 'relation_member_role'); no recorded edge; unresolvable homes;
 /// or the source equalling the default.
@@ -330,36 +330,36 @@ fn set_rel_source (
   let rel_source : Option<SourceName> = 'compute : {
     let graph : &InRustGraph = match graph {
       Some (g) => g, None => break 'compute None, };
-    let (node_pid, parentIs, birth) : (ID, ParentIs, Birth) = {
+    let (node_pid, affectsParent, birth) : (ID, AffectsParent, Birth) = {
       let ViewNodeKind::Vognode (Vognode::Active (t)) =
         & tree . get (treeid) . unwrap () . value () . kind
       else { break 'compute None; };
-      ( t . collected_id (), t . parentIs, t . birth ) };
-    if parentIs != ParentIs::Affected
+      ( t . collected_id (), t . affectsParent, t . birth ) };
+    if affectsParent != AffectsParent::True
       || birth != Birth::Unremarkable {
-      // Not a genuine member of the collection at this position (a
-      // self-writer parked under a col, or a backpath graft): there
+      // Not a genuine member at this position (a
+      // self-writer parked under a folder, or a backpath graft): there
       // is no binding edge here to have a source at all.
       break 'compute None; }
     let (owner_pid, relation, target_pid) : (ID, NodeRelation, ID) =
       match parent_kind_of (tree, treeid) {
         ParentKind::Gnode (parent_pid) =>
           (parent_pid, NodeRelation::Contains, node_pid),
-        ParentKind::Col (col, col_treeid) => {
-          let Some (role) = col . relation_member_role ()
-          else { break 'compute None; }; // compound filter cols
+        ParentKind::Folder (folder, folder_treeid) => {
+          let Some (role) = folder . relation_member_role ()
+          else { break 'compute None; }; // compound filter folders
           let Some (anchor_pid) =
-            tree . get (col_treeid) . unwrap () . parent ()
+            tree . get (folder_treeid) . unwrap () . parent ()
             . and_then ( |p| active_vognode_pid (tree, p . id ()) )
           else { break 'compute None; };
           if role . is_first_role () {
             // This position's own node OWNS the outbound edge (e.g.
-            // a subscriberCol member, which itself subscribes to
-            // the col's anchor).
+            // a subscriberFolder member, which itself subscribes to
+            // the folder's anchor).
             (node_pid . clone (), role . relation, anchor_pid)
           } else {
-            // The col's anchor owns the outbound edge (e.g. a
-            // subscribeeCol member, which the anchor subscribes to).
+            // The folder's anchor owns the outbound edge (e.g. a
+            // subscribeeFolder member, which the anchor subscribes to).
             (anchor_pid, role . relation, node_pid . clone ())
           }},
         ParentKind::Other => break 'compute None, };

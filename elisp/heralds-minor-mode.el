@@ -52,7 +52,7 @@ server/heralds.rs.
 
 No client-side normalisation is needed: the ordinary-content herald is
 the orange birth herald the server assembles, `(node ... (birthHerald
-\"aC\") ..)', so omitted parentIs=affected content carries no parentIs
+\"aC\") ..)', so omitted affectsParent=true content carries no affectsParent
 herald of its own.")
 
 (defun heralds-install-rules (rules)
@@ -70,7 +70,7 @@ Tokens carry `skg-color' on character ranges (single-color tokens
 propertize the whole string; INTERC-built tokens carry per-segment
 colors). Tokens separated by a space, except tokens whose position
 0 has an `skg-abut' property are joined to the preceding token
-with no separator (used to glue e.g. ☮ onto its parentIs character).
+with no separator (used to glue e.g. ☮ onto its affectsParent character).
 Structural colons added by the transform (like `3:{' -> `3{') are
 stripped when either side is non-alphanumeric."
   (when tokens
@@ -281,7 +281,7 @@ Returns nil if METADATA-SEXP doesn't parse as an `(skg ...)' form."
 (defun heralds--splice-rel-spans (tokens rel-str)
   "Return TOKENS with the sentinel token replaced by REL-STR.
 When REL-STR is nil (no `(rels ...)' payload, so the sentinel should be
-absent anyway) any stray sentinel token is dropped."
+na anyway) any stray sentinel token is dropped."
   (when tokens
     (delq nil
           (mapcar
@@ -331,7 +331,7 @@ C/L blue, S/O/H purple."
 
 (defun heralds--rel-side (form side)
   "FORM is a relation form like (contains (in 2 (ancestors 1)) (out 1));
-return (COUNT . GENS) for SIDE (`in' or `out'), or nil if absent."
+return (COUNT . GENS) for SIDE (`in' or `out'), or nil if na."
   (let ((s (assq side (cdr form))))
     (when s
       (cons (or (cl-find-if #'integerp (cdr s)) 0)
@@ -423,7 +423,7 @@ A/I cyan. Tokens are ordered C L S O H A I and space-separated."
 Returns nil if parsing fails. The ordinary-content herald is now the
 orange birth herald the server assembles (an (skg (node ... (birthHerald
 \"aC\") ..)) form), so no client-side normalisation is needed: omitted
-'affected' membership simply has no parentIs herald of its own."
+'true' membership simply has no affectsParent herald of its own."
   (condition-case nil
       (car (read-from-string metadata-sexp))
     (error nil)))
@@ -456,7 +456,7 @@ a member on that side.")
 (defface heralds-orange-face
   '((t :foreground "white" :background "#d2691e"))
   "White-on-orange: the multi-contained containers count (the number
-before C), the parentIs-independent marker (⊥), and the \"unknown
+before C), the affectsParent-false marker (⊥), and the \"unknown
 node\" message.")
 
 (defface heralds-purple-face

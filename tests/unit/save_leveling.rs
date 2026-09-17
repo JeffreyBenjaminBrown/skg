@@ -693,10 +693,10 @@ fn relsource_requests_are_contextual_and_singular (
   }
   let (_, error, _) = crate::serve::parse_metadata_sexp::viewnode_from_metadata (
     &parse_metadata_to_viewnodemd (
-      "(skg (node (id n) (source public) indef (editRequest (relSource private))))" )
+      "(skg (node (id n) (source public) writeProtected (editRequest (relSource private))))" )
     . unwrap (), "N" . to_string (), None );
   assert! ( error . is_some (),
-            "indefinitive relationship-source request must be rejected" );
+            "write-protected relationship-source request must be rejected" );
 }
 
 #[test]

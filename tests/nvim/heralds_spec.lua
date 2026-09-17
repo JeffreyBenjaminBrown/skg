@@ -59,7 +59,7 @@ describe('skg.heralds', function ()
     -- renders as the C token 2aC: the multi-contains "2" (orange), the
     -- ancestor "a" (yellow), and the birth "C" (black-on-white).
     local buf = scratch_buffer_with({
-      'Line with (skg (node (id 123) (parentIs independent)'
+      'Line with (skg (node (id 123) (affectsParent false)'
       .. ' (rels (contains (in 2 (ancestors 1))) (birth contains))'
       .. ' (viewStats cycle) (editRequest delete))) text' })
     heralds.enable(buf)
@@ -74,7 +74,7 @@ describe('skg.heralds', function ()
       hl_of[chunk[1]] = chunk[2] end
     -- the sentinel placeholder must never leak into the display
     assert.is_falsy(text:find('__RELS_SPANS__', 1, true))
-    -- ⊥ (independent), the 2aC relationship token, ⟳ (cycle), delete
+    -- ⊥ (false), the 2aC relationship token, ⟳ (cycle), delete
     assert.is_truthy(text:find('⊥', 1, true))
     assert.is_truthy(text:find('2aC', 1, true))
     assert.is_truthy(text:find('⟳', 1, true))
@@ -89,24 +89,24 @@ describe('skg.heralds', function ()
 
   it('displays viewRequests as req:* heralds', function ()
     assert.is_truthy(
-      herald_text('(skg (node (id 1) (viewRequests (col aliases))))')
-      :find('req:col:?aliases'))
+      herald_text('(skg (node (id 1) (viewRequests (folder aliases))))')
+      :find('req:folder:?aliases'))
     assert.is_truthy(
       herald_text('(skg (node (id 2) (viewRequests (path container))))')
       :find('req:path:?container'))
     local many = herald_text(
-      '(skg (node (id 4) (viewRequests (col aliases)'
+      '(skg (node (id 4) (viewRequests (folder aliases)'
       .. ' (path container) (path linkSource))))')
-    assert.is_truthy(many:find('req:col:?aliases'))
+    assert.is_truthy(many:find('req:folder:?aliases'))
     assert.is_truthy(many:find('req:path:?container'))
     assert.is_truthy(many:find('req:path:?linkSource'))
   end)
 
   it('displays scaffold kinds', function ()
-    assert.is_truthy(herald_text('(skg aliasCol)'):find('aliases'))
+    assert.is_truthy(herald_text('(skg aliasFolder)'):find('aliases'))
     assert.is_truthy(herald_text('(skg alias)'):find('alias'))
     assert.is_truthy(
-      herald_text('(skg folded aliasCol)'):find('aliases'))
+      herald_text('(skg folded aliasFolder)'):find('aliases'))
     local changed = herald_text('(skg (textChanged staged unstaged))')
     assert.is_truthy(changed:find('text changed : staged', 1, true))
     assert.is_truthy(changed:find('text changed : unstaged', 1, true))

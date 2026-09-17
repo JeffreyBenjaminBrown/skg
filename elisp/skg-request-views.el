@@ -3,8 +3,8 @@
 ;;; Commands that request additional views by adding a (viewRequests ...)
 ;;; atom to the headline at point and saving, letting Rust fulfill the
 ;;; request during completion. Two families, both auto-saving (Q10):
-;;;   - COLLECTIONS, `skg-show-collection-*' : (col RELNAME), builds
-;;;     BOTH cols of the relation;
+;;;   - FOLDERS, `skg-show-folder-*' : (folder RELNAME), builds
+;;;     BOTH folders of the relation;
 ;;;   - PATHS, `skg-show-paths-through-*' : (path ROLENAME), the
 ;;;     backpath for that one partner role.
 ;;; (`skg-request-definitive-view', a different concept, is also here.)
@@ -16,7 +16,7 @@
 
 (defun skg--request-view-and-save (view-request)
   "Request VIEW-REQUEST for the headline at point, then save.
-VIEW-REQUEST is a request form -- (col RELNAME), (path ROLENAME),
+VIEW-REQUEST is a request form -- (folder RELNAME), (path ROLENAME),
 or the bare symbol definitiveView -- spliced into a (viewRequests ...)
 atom via `skg-edit-metadata-at-point'."
   (save-excursion
@@ -41,15 +41,15 @@ an interactive command NAME that requests REQUEST-FORM and auto-saves."
         rows)))
 
 (skg--define-view-request-commands
-  ;; Collections ('C-c c'): both cols of the relation.
-  (skg-show-collection-aliases    (col aliases)
-    "Show the aliases collection for the headline at point.")
-  (skg-show-collection-overrides  (col overrides)
-    "Show the override collections (overriddenCol + overriderCol).")
-  (skg-show-collection-hides      (col hides)
-    "Show the hide collections (hiderCol + hiddenCol).")
-  (skg-show-collection-subscribes (col subscribes)
-    "Show the subscription collections (subscribeeCol + subscriberCol).")
+  ;; Folders ('C-c l'): both folders of the relation.
+  (skg-show-folderOf-aliases    (folder aliases)
+    "Show the aliases folder for the headline at point.")
+  (skg-show-folderOf-overrides  (folder overrides)
+    "Show the override folders (overriddenFolder + overriderFolder).")
+  (skg-show-folderOf-hides      (folder hides)
+    "Show the hide folders (hiderFolder + hiddenFolder).")
+  (skg-show-folderOf-subscribes (folder subscribes)
+    "Show the subscription folders (subscribeeFolder + subscriberFolder).")
   ;; Paths ('C-c p'): the backpath for one partner role. UPPER = the
   ;; partner's active (first) role, lower = its passive (second) role.
   (skg-show-paths-through-containers   (path container)
@@ -73,7 +73,7 @@ an interactive command NAME that requests REQUEST-FORM and auto-saves."
 
 (defun skg-request-definitive-view ()
   "Edit metadata to request a definitive view for the headline at point.
-The node must be indefinitive and childless. Does NOT auto-save."
+The node must be write-protected and childless. Does NOT auto-save."
   (interactive)
   (save-excursion
     (org-back-to-heading t)

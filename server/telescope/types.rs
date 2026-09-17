@@ -71,7 +71,7 @@ pub enum TelescopeConstructionError {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IgnoredForeignPidCollision {
+pub struct IgnoredForeignPidFolderlision {
   pub ignored_sources : Vec<SourceName>,
 }
 
@@ -79,11 +79,11 @@ pub struct IgnoredForeignPidCollision {
 /// telescope and every non-owned same-pid section is ignored. A pid
 /// with no owned section remains an ordinary foreign telescope.
 /// Input order is preserved.
-pub fn retain_owned_sections_when_pid_collides (
+pub fn retain_owned_sections_when_pid_folderlides (
   sections : Vec<(SourceName, NodeFS)>,
   config   : &SkgConfig,
 ) -> ( Vec<(SourceName, NodeFS)>,
-       Option<IgnoredForeignPidCollision> ) {
+       Option<IgnoredForeignPidFolderlision> ) {
   let has_owned : bool = sections . iter ()
     . any ( |(source, _)| config . user_owns_source (source) );
   if ! has_owned {
@@ -95,9 +95,9 @@ pub fn retain_owned_sections_when_pid_collides (
       retained . push (( source, node_fs )); }
     else {
       ignored_sources . push (source); }}
-  let warning : Option<IgnoredForeignPidCollision> =
+  let warning : Option<IgnoredForeignPidFolderlision> =
     if ignored_sources . is_empty () { None }
-    else { Some ( IgnoredForeignPidCollision { ignored_sources } ) };
+    else { Some ( IgnoredForeignPidFolderlision { ignored_sources } ) };
   (retained, warning) }
 
 impl fmt::Display for TelescopeConstructionError {

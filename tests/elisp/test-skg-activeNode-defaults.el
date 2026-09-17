@@ -43,12 +43,12 @@
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines)))
     ;; Should have: skg, node, id : abc, source : jeff,
-    ;; indef : false (default), parentIs : affected (default),
+    ;; write-protected : false (default), affectsParent : true (default),
     ;; birth : unremarkable (default),
     ;; editRequest : none (default), viewRequests : none (default)
     (should (= (length headlines) 16)) ;; each key *and each value* is a separate headline
     ;; Check default fields are present
-    (should (cl-find "indef" headlines
+    (should (cl-find "writeProtected" headlines
                      :key #'cdr :test #'string=))
     (should (cl-find "false (default)" headlines
                      :key #'cdr :test #'string=))
@@ -58,38 +58,38 @@
                      :key #'cdr :test #'string=))))
 
 ;;
-;; Expand: sexp with 'indefinitive' present -> shows 'true' child
+;; Expand: sexp with 'writeProtected' present -> shows 'true' child
 ;;
 
-(ert-deftest test-expand-with-indefinitive ()
-  "Expanding a sexp with bare indefinitive shows 'true' child."
-  (let* ((sexp '(skg (node (id abc) (source jeff) indef)))
+(ert-deftest test-expand-with-write-protected ()
+  "Expanding a sexp with bare writeProtected shows 'true' child."
+  (let* ((sexp '(skg (node (id abc) (source jeff) writeProtected)))
          (org-text (sexp-to-org sexp))
          (expanded (skg-activeNode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
-         (indef-idx (cl-position "indef" headlines
+         (write-protected-idx (cl-position "writeProtected" headlines
                                  :key #'cdr :test #'string=)))
-    ;; The next headline after indefinitive should be "true"
-    (should indef-idx)
-    (should (string= (cdr (nth (1+ indef-idx) headlines)) "true"))))
+    ;; The next headline after write-protected should be "true"
+    (should write-protected-idx)
+    (should (string= (cdr (nth (1+ write-protected-idx) headlines)) "true"))))
 
 ;;
-;; Expand: sexp without parentIs -> inserts 'affected (default)' child
+;; Expand: sexp without affectsParent -> inserts 'true (default)' child
 ;;
 
-(ert-deftest test-expand-parentIs-default-inserted ()
-  "Expanding a sexp without parentIs inserts 'affected (default)'."
+(ert-deftest test-expand-affectsParent-default-inserted ()
+  "Expanding a sexp without affectsParent inserts 'true (default)'."
   (let* ((sexp '(skg (node (id abc) (source jeff))))
          (org-text (sexp-to-org sexp))
          (expanded (skg-activeNode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
          (headlines (org-to-sexp--extract-headlines lines))
-         (parentIs-idx (cl-position "parentIs" headlines
+         (affectsParent-idx (cl-position "affectsParent" headlines
                                  :key #'cdr :test #'string=)))
-    (should parentIs-idx)
-    (should (string= (cdr (nth (1+ parentIs-idx) headlines))
-                      "affected (default)"))))
+    (should affectsParent-idx)
+    (should (string= (cdr (nth (1+ affectsParent-idx) headlines))
+                      "true (default)"))))
 
 ;;
 ;; Strip: unmodified expanded org -> returns original sexp
@@ -105,21 +105,21 @@
     (should (equal result sexp))))
 
 ;;
-;; Strip: after cycling indefinitive to true -> sexp has bare 'indefinitive'
+;; Strip: after cycling write-protected to true -> sexp has bare 'writeProtected'
 ;;
 
-(ert-deftest test-strip-indefinitive-true ()
-  "Stripping indefinitive=true produces bare atom in sexp."
+(ert-deftest test-strip-write-protected-true ()
+  "Stripping writeProtected=true produces bare atom in sexp."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
                            "*** id\n"
                            "**** abc\n"
                            "*** source\n"
                            "**** jeff\n"
-                           "*** indef\n"
+                           "*** writeProtected\n"
                            "**** true\n"
-                           "*** parentIs\n"
-                           "**** affected (default)\n"
+                           "*** affectsParent\n"
+                           "**** true (default)\n"
                            "*** birth\n"
                            "**** unremarkable (default)\n"
                            "*** editRequest\n"
@@ -128,24 +128,24 @@
                            "**** none (default)"))
          (stripped (skg-activeNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
-    (should (equal result '(skg (node (id abc) (source jeff) indef))))))
+    (should (equal result '(skg (node (id abc) (source jeff) writeProtected))))))
 
 ;;
 ;; Strip: accepts bare 'false' (without '(default)') as the default value
 ;;
 
 (ert-deftest test-strip-bare-false ()
-  "Stripping accepts bare 'false' and 'affected' as default values."
+  "Stripping accepts bare 'false' and 'true' as default values."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
                            "*** id\n"
                            "**** abc\n"
                            "*** source\n"
                            "**** jeff\n"
-                           "*** indef\n"
+                           "*** writeProtected\n"
                            "**** false\n"
-                           "*** parentIs\n"
-                           "**** affected\n"
+                           "*** affectsParent\n"
+                           "**** true\n"
                            "*** birth\n"
                            "**** unremarkable\n"
                            "*** editRequest\n"
@@ -169,9 +169,9 @@
          (result (org-to-sexp stripped)))
     (should (equal result sexp))))
 
-(ert-deftest test-round-trip-with-indefinitive ()
-  "Round-trip: expand then strip preserves bare indefinitive."
-  (let* ((sexp '(skg (node (id abc) (source jeff) indef)))
+(ert-deftest test-round-trip-with-write-protected ()
+  "Round-trip: expand then strip preserves bare writeProtected."
+  (let* ((sexp '(skg (node (id abc) (source jeff) writeProtected)))
          (org-text (sexp-to-org sexp))
          (expanded (skg-activeNode-expand-defaults-in-org org-text))
          (stripped (skg-activeNode-strip-defaults-from-org expanded))
@@ -202,7 +202,7 @@
 
 (ert-deftest test-canonical-ordering ()
   "Fields appear in canonical order after expansion."
-  (let* ((sexp '(skg (node (source jeff) (graphStats 42) (id abc) indef)))
+  (let* ((sexp '(skg (node (source jeff) (graphStats 42) (id abc) writeProtected)))
          (org-text (sexp-to-org sexp))
          (expanded (skg-activeNode-expand-defaults-in-org org-text))
          (lines (split-string expanded "\n"))
@@ -211,10 +211,10 @@
                           (cl-remove-if-not
                            (lambda (hl) (= (car hl) 3))
                            headlines))))
-    ;; Order should be: id, source, indef, parentIs, birth,
+    ;; Order should be: id, source, write-protected, affectsParent, birth,
     ;; editRequest, viewRequests, graphStats
     (should (equal level-3
-                   '("id" "source" "indef" "parentIs"
+                   '("id" "source" "writeProtected" "affectsParent"
                      "birth" "editRequest" "viewRequests" "graphStats")))))
 
 ;;
@@ -238,23 +238,23 @@
                                (editRequest (merge XYZ))))))))
 
 ;;
-;; Strip: parentIs independent -> kept as (parentIs independent)
+;; Strip: affectsParent false -> kept as (affectsParent false)
 ;;
 
-(ert-deftest test-strip-parentIs-independent ()
-  "Stripping parentIs=independent keeps field and value."
+(ert-deftest test-strip-affectsParent-false ()
+  "Stripping affectsParent=false keeps field and value."
   (let* ((org-text (concat "* skg\n"
                            "** node\n"
                            "*** id\n"
                            "**** abc\n"
                            "*** source\n"
                            "**** jeff\n"
-                           "*** parentIs\n"
-                           "**** independent"))
+                           "*** affectsParent\n"
+                           "**** false"))
          (stripped (skg-activeNode-strip-defaults-from-org org-text))
          (result (org-to-sexp stripped)))
     (should (equal result
-                   '(skg (node (id abc) (source jeff) (parentIs independent)))))))
+                   '(skg (node (id abc) (source jeff) (affectsParent false)))))))
 
 ;;
 ;; Strip: viewRequests with actual values -> kept as-is
@@ -269,7 +269,7 @@
                            "*** source\n"
                            "**** jeff\n"
                            "*** viewRequests\n"
-                           "**** col\n"
+                           "**** folder\n"
                            "***** aliases\n"
                            "**** path\n"
                            "***** container"))
@@ -277,7 +277,7 @@
          (result (org-to-sexp stripped)))
     (should (equal result
                    '(skg (node (id abc) (source jeff)
-                               (viewRequests (col aliases) (path container))))))))
+                               (viewRequests (folder aliases) (path container))))))))
 
 ;;
 ;; Strip: the empty-node view skeleton (childless editable fields)
@@ -292,8 +292,8 @@ is dropped key-and-all, leaving (skg (node (source only)))."
                            "** node\n"
                            "*** source\n"
                            "**** only\n"
-                           "*** indef\n"
-                           "*** parentIs\n"
+                           "*** writeProtected\n"
+                           "*** affectsParent\n"
                            "*** birth\n"
                            "*** editRequest\n"
                            "*** viewRequests"))
@@ -439,8 +439,8 @@ preserves source and all fields."
     (should (cl-find "source" headlines :key #'cdr :test #'string=))
     (should (cl-find "public" headlines :key #'cdr :test #'string=))
     ;; All editable defaults must be present
-    (should (cl-find "indef" headlines :key #'cdr :test #'string=))
-    (should (cl-find "parentIs" headlines :key #'cdr :test #'string=))
+    (should (cl-find "writeProtected" headlines :key #'cdr :test #'string=))
+    (should (cl-find "affectsParent" headlines :key #'cdr :test #'string=))
     (should (cl-find "editRequest" headlines :key #'cdr :test #'string=))
     ;; the rels herald must be preserved
     (should (cl-find "rels" headlines :key #'cdr :test #'string=))))

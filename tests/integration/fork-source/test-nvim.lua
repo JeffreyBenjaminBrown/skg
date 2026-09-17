@@ -77,7 +77,7 @@ local n_line = goto_line_containing('(id N) (source foreign)',
 local n_line_text =
   vim.api.nvim_buf_get_lines(p_buf, n_line - 1, n_line, false)[1]
 local n_line_edited =
-  n_line_text:gsub(' indef', ''):gsub('N%-original', 'N-edited')
+  n_line_text:gsub(' writeProtected', ''):gsub('N%-original', 'N-edited')
 vim.api.nvim_buf_set_lines(p_buf, n_line - 1, n_line, false,
                            { n_line_edited })
 

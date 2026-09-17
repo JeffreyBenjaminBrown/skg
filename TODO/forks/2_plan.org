@@ -92,7 +92,7 @@ subscribee-as-such.
 
 ** Trigger and detection
 Editing a foreign node forks it. Only a *definitive* (editable) foreign
-node can be forked: an *indefinitive* one is read-only, so the user makes
+node can be forked: an *write-protected* one is read-only, so the user makes
 it definitive first (the definitive-view request, 'C-c s d'). Definitiveness
 is merely the prerequisite for editing; the trigger is the edit itself.
 Concretely, remove the rejection of foreign edits in
@@ -209,7 +209,7 @@ C stores N's child IDs raw. At render each child runs through
 - if a copied child is itself a node the user has forked, C shows that
   child's clone -- desirable, and visible via heralds;
 - if N contains itself (or a cycle through the copied IDs), the
-  resolver's cycle guard draws the repeat as an indefinitive cycle node
+  resolver's cycle guard draws the repeat as a write-protected cycle node
   -- normal cycle display, nothing special.
 
 ** One save: ordering and round-trip
@@ -230,7 +230,7 @@ already coded; it needs a test, not new logic.
 A definitive subscriber's 'subscribeeCol' is not refreshed from the graph
 during a collateral rerender. 'reconcile_subscribee_col_children'
 ('update_buffer/reconcile/subscribee_col.rs') computes the fresh goal
-list but only applies it under 'if parent_indefinitive ||
+list but only applies it under 'if parent_is_writeProtected ||
 source_diffs.is_some()' (line ~74), so a definitive subscriber in a
 non-diff collateral view keeps stale children. The guard is correct for
 the SAVED view (a definitive subscriber there is the source of truth for
@@ -259,9 +259,9 @@ and then restate the idea in plainer English.
   subscriber, holding the nodes it subscribes to. skg GENERATES it
   from the graph; the user does not type its membership. Its
   "children" are those subscribed nodes.
-- *definitive* vs *indefinitive* :: definitive = shown editable
-  (read-write); indefinitive = shown read-only. The SAME graph node
-  can be definitive in one view and indefinitive in another.
+- *definitive* vs *write-protected* :: definitive = shown editable
+  (read-write); write-protected = shown read-only. The SAME graph node
+  can be definitive in one view and write-protected in another.
 - *the saved view* vs *a collateral view* :: when you save a buffer,
   that buffer is "the saved view". Any OTHER open buffer that shares a
   node with it is "collateral". After a save, skg re-renders the saved
@@ -272,7 +272,7 @@ and then restate the idea in plainer English.
   per the current graph) and reconciles the on-screen collection
   against it -- adding missing members, dropping stale ones.
 - *stale* :: showing what the graph USED to say, not what it says now.
-- *the guard* :: the `if parent_indefinitive || source_diffs.is_some()`
+- *the guard* :: the `if parent_is_writeProtected || source_diffs.is_some()`
   condition that decides whether to actually apply the fresh goal list.
 - *source_diffs.is_some()* :: shorthand for "we are in git-diff mode".
 **** Plain English
@@ -285,7 +285,7 @@ it doesn't: B keeps the OLD list on screen. That stale list is the bug.
 Why: the function that refreshes a subscribeeCol
 ('reconcile_subscribee_col_children') always computes the fresh list
 from the graph, but only APPLIES it when the guard holds -- i.e. when
-the subscriber is read-only (indefinitive) OR we're in git-diff mode.
+the subscriber is read-only (write-protected) OR we're in git-diff mode.
 If the subscriber is editable (definitive) and we're not in diff mode,
 it skips applying and leaves whatever was already drawn.
 
@@ -314,7 +314,7 @@ If so we will have to correct them too.
 Whether there are source diffs is irrelevant; rerender should always
 correct containers to match what their owning vognode (in this case,
 the subscriber) actually shows on disk. Whether the owning vognode
-is indefinitive is also (for the children of Col scaffolds,
+is write-protected is also (for the children of Col scaffolds,
 not for the owning vognode itself) irrelevant -- the collection
 says "these things are in this relationship to the ownig vognode",
 and it should not lie.
@@ -463,7 +463,7 @@ for each N (validated owned + active, reusing validate_fork_specs).
 *** NEW QUESTION: the source field on each confirmation headline names
 the CLONE's target, not the original's real source. The buffer is a flat
 list with ONE headline per foreign node to be forked; each such headline
-reads '(skg (node (id N) (source OWNED-TARGET) indef)) <title>' -- i.e.
+reads '(skg (node (id N) (source OWNED-TARGET) writeProtected)) <title>' -- i.e.
 it shows the original's id but with the OWNED source the clone will land
 in (the original's real source is foreign). This is deliberate: it lets C-c s s (which rotates
 the '(source ...)' field among owned sources) set the clone target with
@@ -493,7 +493,7 @@ SHAPE -- per fork, two levels:
                       via C-c s s], the user's EDITED title, and NO id --
                       C does not exist yet)
   ** <original title> (the node C would OVERRIDE = the original N: its
-                       REAL id, its REAL (foreign) source, indefinitive,
+                       REAL id, its REAL (foreign) source, write-protected,
                        parentIs=independent, + a herald for the override)
 The clone-to-be parent carries the one editable thing (its source). The
 child shows the original with its true title + source, so you see exactly

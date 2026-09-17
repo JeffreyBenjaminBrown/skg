@@ -4,7 +4,7 @@
 // The rule under test ('owned_ancestor_sources_for_foreign_vognodes'):
 // a foreign node's clone inherits the source of its NEAREST vognode
 // ancestor, recorded only if that ancestor is an owned Active vognode.
-// The walk skips scaffolds (cols) but STOPS at the first vognode -- it
+// The walk skips scaffolds (folders) but STOPS at the first vognode -- it
 // never passes a foreign or inactive ancestor to reach a distant owned
 // one.
 
@@ -12,7 +12,7 @@ use super::*;
 use crate::types::misc::{SkgfileSource, members_of, members_at_source};
 use crate::types::nodes::complete::empty_node_complete;
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerCol,
+use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerFolder,
                              mk_definitive_viewnode};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -35,14 +35,14 @@ fn active (id : &str, source : &str) -> ViewNode {
   mk_definitive_viewnode (
     ID::from (id), SourceName::from (source), id . to_string (), None ) }
 
-fn subscribee_col () -> ViewNode {
+fn subscribee_folder () -> ViewNode {
   ViewNode { focused : false, folded : false, body_folded : false,
-             kind : ViewNodeKind::PartnerCol (PartnerCol::Subscribee) } }
+             kind : ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee) } }
 
 /// Build a forest exercising the three shapes:
 /// - owned2 P -> foreign F -> foreign N   (must infer NOTHING for N)
 /// - owned2 Q -> foreign M                (must infer owned2 for M)
-/// - owned1 R -> subscribeeCol -> foreign S  (col skipped: owned1 for S)
+/// - owned1 R -> subscribeeFolder -> foreign S  (folder skipped: owned1 for S)
 fn build_forest () -> ViewForest {
   let mut f : ViewForest = ViewForest::new ();
   let p : ego_tree::NodeId = f . append_root ( active ("P", "owned2") );
@@ -55,7 +55,7 @@ fn build_forest () -> ViewForest {
     f . get_mut (q) . unwrap () . append ( active ("M", "foreign") ) . id ();
   let r : ego_tree::NodeId = f . append_root ( active ("R", "owned1") );
   let rc : ego_tree::NodeId =
-    f . get_mut (r) . unwrap () . append ( subscribee_col () ) . id ();
+    f . get_mut (r) . unwrap () . append ( subscribee_folder () ) . id ();
   let _s : ego_tree::NodeId =
     f . get_mut (rc) . unwrap () . append ( active ("S", "foreign") ) . id ();
   f }
@@ -83,7 +83,7 @@ fn owned_N_still_infers_the_owned_source () {
 
 #[test]
 fn scaffold_ancestor_is_skipped () {
-  // owned1 R -> subscribeeCol -> foreign S: the col is a scaffold, so
+  // owned1 R -> subscribeeFolder -> foreign S: the folder is a scaffold, so
   // S's nearest VOGNODE ancestor is the owned R.
   let config : SkgConfig = config_two_owned_one_foreign ();
   let map = owned_ancestor_sources_for_foreign_vognodes (
@@ -159,14 +159,14 @@ fn confirmation_buffer_is_two_level_with_pO_on_the_child () {
   assert! ( ! buf . contains ("(id N) (source owned2)"),
     "the clone-to-be must carry no id:\n{}", buf );
   // The original child: a LEVEL-2 headline ("** "), real id, foreign
-  // source, indef, independent, pO, original title.
+  // source, write-protected, independent, pO, original title.
   assert! ( lines . iter () . any ( |l|
       l . starts_with ("** (skg (node (id N) (source foreign)")
-      && l . contains ("(parentIs independent)")
-      && l . contains ("indef")
+      && l . contains ("(affectsParent false)")
+      && l . contains ("writeProtected")
       && l . contains ("parentOverrides")
       && l . ends_with ("N-original") ),
-    "original child (level-2, id/foreign/indef/independent/pO) missing:\n{}", buf ); }
+    "original child (level-2, id/foreign/writeProtected/independent/pO) missing:\n{}", buf ); }
 
 #[test]
 fn confirmation_buffer_shows_a_confirmed_source_as_settled () {

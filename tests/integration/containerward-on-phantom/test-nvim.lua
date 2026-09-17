@@ -4,8 +4,8 @@
 --
 -- Graph (at HEAD): a contains [b, c], b contains [c].
 --
--- Phase 1: Open view from a. Shows a -> {b -> c(indef), c}.
--- Phase 2: Delete the indefinitive c from under b and save.
+-- Phase 1: Open view from a. Shows a -> {b -> c(write-protected), c}.
+-- Phase 2: Delete the write-protected c from under b and save.
 --          b.skg is updated (contains: []).
 -- Phase 3: Toggle diff mode on.
 --          Under b, c appears as a removed-here phantom.
@@ -59,28 +59,28 @@ local function graft_role_from_rels (rels_body)
 end
 
 ---Classify a headline's parsed metadata SEXP into a relation string: a
----graft role name, 'affected', or the literal parentIs symbol text
----(e.g. 'absent', 'independent'). Mirrors headline--relation-from-sexp.
+---graft role name, 'true', or the literal affectsParent symbol text
+---(e.g. 'na', 'false'). Mirrors headline--relation-from-sexp.
 ---@param sexp any|nil
 ---@return string
 local function relation_from_sexp (sexp)
-  local parentIs_list = sexp
-    and metadata.sexp_cdr_at_path(sexp, { 'skg', 'node', 'parentIs' })
+  local affectsParent_list = sexp
+    and metadata.sexp_cdr_at_path(sexp, { 'skg', 'node', 'affectsParent' })
     or nil
   local rels_body = sexp
     and metadata.sexp_cdr_at_path(sexp, { 'skg', 'node', 'rels' })
     or nil
-  local independent = parentIs_list ~= nil and parentIs_list[1] ~= nil
-    and parentIs_list[1] == sexpr.symbol('independent')
-  local graft_role = independent
+  local false = affectsParent_list ~= nil and affectsParent_list[1] ~= nil
+    and affectsParent_list[1] == sexpr.symbol('false')
+  local graft_role = false
     and graft_role_from_rels(rels_body)
     or nil
   if graft_role then return graft_role end
-  if parentIs_list == nil or #parentIs_list == 0
-     or parentIs_list[1] == sexpr.symbol('affected') then
-    return 'affected'
+  if affectsParent_list == nil or #affectsParent_list == 0
+     or affectsParent_list[1] == sexpr.symbol('true') then
+    return 'true'
   end
-  return sexpr.atom_text(parentIs_list[1])
+  return sexpr.atom_text(affectsParent_list[1])
 end
 
 ---Extract {depth, relation, title} triples for every headline in BUF.
@@ -156,35 +156,35 @@ print('=== PHASE 1: Open view from a ===')
 content_view.request_single_root_content_view_from_id('a')
 local buf_a = T.wait_for_buffer('skg://a')
 T.check(buf_a, "buffer 'skg://a' was created")
--- a -> {b -> c(indef), c}.
+-- a -> {b -> c(write-protected), c}.
 assert_headline_titles(buf_a,
-  { { 1, 'absent', 'a' },
-    { 2, 'affected', 'b' },
-    { 3, 'affected', 'c' },
-    { 2, 'affected', 'c' } },
+  { { 1, 'na', 'a' },
+    { 2, 'true', 'b' },
+    { 3, 'true', 'c' },
+    { 2, 'true', 'c' } },
   'phase 1: initial view')
 
 print('=== PHASE 2: Remove c from under b and save ===')
 vim.api.nvim_set_current_buf(buf_a)
--- Find the indef c under b.
-local indef_c_line = nil
+-- Find the write-protected c under b.
+local write_protected_c_line = nil
 for line = 1, vim.api.nvim_buf_line_count(buf_a) do
   if metadata.outline_level(line) == 3 then
     local sexp = metadata.metadata_sexp_at_line_or_nil(line)
-    if sexp and metadata.node_indefinitive_p(sexp) then
-      indef_c_line = line
+    if sexp and metadata.node_write_protected_p(sexp) then
+      write_protected_c_line = line
       break
     end
   end
 end
-T.check(indef_c_line ~= nil, 'found indef c under b')
-vim.api.nvim_buf_set_lines(buf_a, indef_c_line - 1, indef_c_line, false, {})
+T.check(write_protected_c_line ~= nil, 'found writeProtected c under b')
+vim.api.nvim_buf_set_lines(buf_a, write_protected_c_line - 1, write_protected_c_line, false, {})
 
 -- Buffer should now be: a -> {b, c}
 assert_headline_titles(buf_a,
-  { { 1, 'absent', 'a' },
-    { 2, 'affected', 'b' },
-    { 2, 'affected', 'c' } },
+  { { 1, 'na', 'a' },
+    { 2, 'true', 'b' },
+    { 2, 'true', 'c' } },
   'phase 2: after removing c from b')
 
 save.request_save_buffer()

@@ -1,6 +1,6 @@
 -- PURPOSE: Utilities to parse and edit skg headline metadata, plus
 -- the user commands that reduce to metadata edits (delete,
--- set-indefinitive, set-source, merge requests, ...).
+-- set-write-protected, set-source, merge requests, ...).
 -- The Lua port of elisp/skg-metadata.el.
 --
 -- The elisp file's biggest hazard -- org-fold's fragility check
@@ -116,7 +116,7 @@ end
 -- ── headline splitting and reconstruction ──────────────────────────
 
 ---Split HEADLINE_TEXT into { stars, metadata, title }, where metadata
----is the complete (skg ...) sexp text or '' when absent. Returns nil
+---is the complete (skg ...) sexp text or '' when na. Returns nil
 ---when HEADLINE_TEXT is not a headline. Handles nested parens.
 ---@param headline_text string
 ---@return table|nil
@@ -223,7 +223,7 @@ function M.metadata_sexp_at_line_or_nil (line_number)
   return ok and sexp or nil
 end
 
----The parsed metadata of the headline at point; errors if absent.
+---The parsed metadata of the headline at point; errors if na.
 ---@return any
 function M.current_headline_metadata_sexp ()
   if not M.at_heading_p() then error('Not on a headline') end
@@ -285,19 +285,19 @@ function M.node_id (metadata_sexp)
 end
 
 ---@param metadata_sexp any
----@return boolean implicit or explicit parentIs=affected?
-function M.node_parentIs_content_of_p (metadata_sexp)
+---@return boolean implicit or explicit affectsParent=true?
+function M.node_affectsParent_content_of_p (metadata_sexp)
   local values = M.sexp_cdr_at_path(metadata_sexp,
-                                    { 'skg', 'node', 'parentIs' })
+                                    { 'skg', 'node', 'affectsParent' })
   return values == nil
-         or values[1] == sexpr.symbol('affected')
+         or values[1] == sexpr.symbol('true')
 end
 
 ---@param metadata_sexp any
----@return boolean does it carry the bare indef marker?
-function M.node_indefinitive_p (metadata_sexp)
+---@return boolean does it carry the bare write-protected marker?
+function M.node_write_protected_p (metadata_sexp)
   return compare.subtree_p(metadata_sexp,
-    { SKG, { NODE, sexpr.symbol('indef') } })
+    { SKG, { NODE, sexpr.symbol('writeProtected') } })
 end
 
 ---@return boolean has the headline at point no skg metadata?
@@ -350,7 +350,7 @@ function M.delete ()
 end
 
 ---Mark the headline at point, and every activeNode org-descendant,
----for deletion. Non-activeNode descendants (phantoms, cols, ...) are
+---for deletion. Non-activeNode descendants (phantoms, folders, ...) are
 ---skipped. Does NOT save.
 function M.delete_recursive ()
   if not M.at_heading_p() then error('Not on a headline') end
@@ -369,9 +369,9 @@ function M.delete_recursive ()
     'This change will only be applied when you save the buffer.')
 end
 
----Mark the headline at point as indefinitive. Does NOT save.
-function M.set_indefinitive ()
-  M.edit_metadata_at_point(sexpr.read('(skg (node indef))'))
+---Mark the headline at point as write-protected. Does NOT save.
+function M.set_write_protected ()
+  M.edit_metadata_at_point(sexpr.read('(skg (node writeProtected))'))
 end
 
 ---Copy the visually-selected region to a new org buffer, stripping
@@ -428,7 +428,7 @@ end
 
 ---Prompt for and change the source of the node at point (S-arrows
 ---cycle owned sources; typed names accepted). With RECURSIVE, also
----changes every affected content descendant whose source matches. On
+---changes every true content descendant whose source matches. On
 ---a metadata-less headline, populates it minimally instead. Does NOT
 ---save.
 ---@param recursive boolean|nil
@@ -467,7 +467,7 @@ function M.set_source_recursive ()
 end
 
 ---Change OLD_SOURCE to NEW_SOURCE in this content subtree (root
----inclusive; only parentIs=affected descendants are traversed).
+---inclusive; only affectsParent=true descendants are traversed).
 ---@param old_source string
 ---@param new_source string
 ---@return integer changed node count
@@ -480,7 +480,7 @@ function M.change_source_recursive (old_source, new_source)
   while line and (M.outline_level(line) or 0) > start_level do
     local metadata = M.metadata_sexp_at_line_or_nil(line)
     if not (M.activeNode_sexp_p(metadata)
-            and M.node_parentIs_content_of_p(metadata)) then
+            and M.node_affectsParent_content_of_p(metadata)) then
       line = M.next_heading_after_subtree(line)
     else
       if M.node_source(metadata) == old_source then

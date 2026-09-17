@@ -8,7 +8,7 @@ use skg::nodeMerge::merge_nodes;
 use skg::test_utils::{run_with_shared_test_stores, tantivy_contains_id, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SourceName};
 use skg::types::tree::forest::ViewForest;
-use skg::types::viewnode::{NodeEditRequest, ViewNode, ViewNodeKind, Vognode, ActiveNode, IndefOrDef, viewforest_root_viewnode, default_activeNode};
+use skg::types::viewnode::{NodeEditRequest, ViewNode, ViewNodeKind, Vognode, ActiveNode, Editability, viewforest_root_viewnode, default_activeNode};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::NodeMerge;
 use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source;
@@ -28,7 +28,7 @@ fn mk_test_viewnode (
   edit_request : Option<NodeEditRequest>,
 ) -> ViewNode {
   let t : ActiveNode = ActiveNode {
-    indef_or_def : IndefOrDef::Definitive {
+    editability : Editability::Definitive {
       body         : None,
       edit_request },
     .. default_activeNode ( ID::from (id),

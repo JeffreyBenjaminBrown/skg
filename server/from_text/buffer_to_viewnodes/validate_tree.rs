@@ -6,7 +6,7 @@ use crate::dbs::in_rust_graph::override_resolution::{
 use crate::dbs::in_rust_graph::override_invariants::existing_user_owned_overrider_of;
 use crate::dbs::node_lookup::opt_nodecomplete_by_id;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::viewnode::{ParentIs, Qual, QualCol, ViewRequest};
+use crate::types::viewnode::{AffectsParent, Qual, QualFolder, ViewRequest};
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 use crate::types::tree::forest::MpViewForest;
@@ -26,7 +26,7 @@ use std::collections::HashSet;
 /// with 'org_to_uninterpreted_nodes',
 /// which runs earlier and detects a few errors that this one can't,
 /// because this one acts on a tree of MpViewnodes rather than raw text.
-/// (Namely, Alias and AliasCol should not have body text.)
+/// (Namely, Alias and AliasFolder should not have body text.)
 ///
 /// ASSUMES that in the viewforest:
 /// - IDs have been replaced with PIDs, per
@@ -48,7 +48,7 @@ pub fn find_buffer_errors_for_saving_in_graph (
   // they need to take the entire viewforest into account.
   // By contrast the second phase (local structure validation)
   // performs only local structural verifications:
-  // each ID belongs to an IDCol, etc.
+  // each ID belongs to an IDFolder, etc.
   let mut errors: Vec<BufferValidationError> = Vec::new();
   { // inconsistent instructions (deletion, defining containers, and sources)
     let (ambiguous_deletion_ids,
@@ -77,7 +77,7 @@ pub fn find_buffer_errors_for_saving_in_graph (
     viewforest, &mut errors);
   validate_fork_view_requests(
     viewforest, graph, config, &mut errors);
-  idCol_membership_errors (
+  idFolder_membership_errors (
     viewforest, graph, config, &mut errors ) ?;
   overridesHere_marker_errors (
     viewforest, graph, config, &mut errors );
@@ -109,22 +109,22 @@ pub fn find_buffer_errors_for_saving (
   find_buffer_errors_for_saving_in_graph (
     viewforest, &graph, config ) }
 
-/// Edits to an idCol's membership abort the save (decision from
+/// Edits to an idFolder's membership abort the save (decision from
 /// vision.org, via metaplan_2.org and
 /// TODO/full-schema/8_readonly-set-ergonomics.org): for each present
-/// idCol whose parent is an ActiveNode with an ID, the multiset of ID
+/// idFolder whose parent is an ActiveNode with an ID, the multiset of ID
 /// scaffolds beneath it must equal the owner's real ID list (pid
 /// plus extra_ids). Reordering passes (the rerender re-sorts
 /// anyway); adding, deleting or text-editing an ID scaffold fails,
 /// with a message naming the escape hatch (edit the .skg file
 /// directly). In diff mode, an ID entry whose membership axes mark
 /// it net-removed is git history, not a membership claim, and is
-/// excluded before comparing. An absent idCol means no opinion, as
-/// for other cols. Shapes that other validations reject (an idCol
+/// excluded before comparing. An absent idFolder means no opinion, as
+/// for other folders. Shapes that other validations reject (an idFolder
 /// without an ActiveNode parent, a parent without an ID) are skipped
 /// here rather than double-reported.
 #[allow(non_snake_case)]
-fn idCol_membership_errors (
+fn idFolder_membership_errors (
   viewforest : &MpViewForest,
   graph      : &InRustGraph,
   config     : &SkgConfig,
@@ -134,7 +134,7 @@ fn idCol_membership_errors (
     let node_ref = match edge {
       Edge::Open (node_ref)
         if matches! ( &node_ref . value () . kind,
-                      MpViewnodeKind::QualCol (QualCol::ID) )
+                      MpViewnodeKind::QualFolder (QualFolder::ID) )
         => node_ref,
       _ => continue };
     let owner : ID =
@@ -159,14 +159,14 @@ fn idCol_membership_errors (
       . map ( |nc| nc . all_ids () . cloned () . collect () );
     match real_ids {
       None =>
-        errors . push ( BufferValidationError::IDCol_Edited (
+        errors . push ( BufferValidationError::IDFolder_Edited (
           owner, buffer_ids, Vec::new () )),
       Some (real) => {
         let mut real_sorted : Vec<ID> = real . clone ();
         real_sorted . sort ();
         buffer_ids . sort ();
         if buffer_ids != real_sorted {
-          errors . push ( BufferValidationError::IDCol_Edited (
+          errors . push ( BufferValidationError::IDFolder_Edited (
             owner, buffer_ids, real )); }}, }}
   Ok (( )) }
 
@@ -277,8 +277,8 @@ fn validate_view_roots (
 
 /// For each node in the viewforest, if it has a definitive view request,
 /// verify that:
-/// - The node is indefinitive.
-/// - It has no content children (ActiveNode children with parentIs ==
+/// - The node is write-protected.
+/// - It has no content children (ActiveNode children with affectsParent ==
 ///   Container). Non-content children — containerward ancestry stubs,
 ///   link sources, scaffolds, etc. — don't block expansion:
 ///   they won't be clobbered by it.
@@ -301,8 +301,8 @@ fn validate_definitive_view_requests (
       = &viewnode . kind
       { if t . view_requests . contains (&ViewRequest::Definitive)
         { if let Some (id) = &t . id {
-          { // Must be indefinitive
-            if ! t . is_indefinitive ()
+          { // Must be write-protected
+            if ! t . is_writeProtected ()
             { errors . push( BufferValidationError::DefinitiveRequestOnDefinitiveNode(
               id . clone() )); }}
           { // Must have no content children.
@@ -310,7 +310,7 @@ fn validate_definitive_view_requests (
               node_ref . children () . any ( |child| matches! (
                 &child . value () . kind,
                 MpViewnodeKind::Vognode (MpVognode::Active (ct))
-                  if ct . parentIs == ParentIs::Affected ));
+                  if ct . affectsParent == AffectsParent::True ));
             if has_content_children
             { errors . push(
               BufferValidationError::DefinitiveRequestOnNodeWithContentChildren(

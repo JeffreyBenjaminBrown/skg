@@ -21,9 +21,9 @@ If a user tries to change the metadata manually to make something definitive,
 that save should be rejected; the only way to make a node definitive
 is to formally request it
 (see C-c l d : skg-local-definitive and
-     C-c l i : skg-local-indefinitive
+     C-c l i : skg-local-write-protected
 in docs/COMMANDS.org).
-A definitive view request should not just make indefinitive
+A definitive view request should not just make write-protected
 any prior definitive appearance of the node in *that* buffer,
 but also in all the other buffers.
 ** request

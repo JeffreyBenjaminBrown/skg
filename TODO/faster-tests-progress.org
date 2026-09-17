@@ -129,7 +129,7 @@
 * what's imperfect about what's done
   - Files with exactly ONE db-creating test were left on
     run_with_test_db (a single-test file gains nothing from sharing):
-    rebuild/sourceward_ancestry, save/birth_and_indefinitive,
+    rebuild/sourceward_ancestry, save/birth_and_write_protected,
     typedb/paths, typedb/search (its two sub-tests already shared one
     db), new/buffer_to_viewnodes/validate_tree/contradictory_instructions,
     file_io, idempotence, indef_should_not_count_as_donotdelete,

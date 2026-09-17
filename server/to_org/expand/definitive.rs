@@ -1,10 +1,10 @@
 use crate::source_sets::ActiveSourceSet;
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::backpath::build_and_integrate_path_view_then_drop_request;
-use crate::to_org::expand::col_request::build_and_integrate_col_then_drop_request;
-use crate::to_org::util::{ DefinitiveMap, Finalizable, get_id_from_treenode, makeIndefinitiveAndClobber, activeNode_in_tree_is_indefinitive };
+use crate::to_org::expand::folder_request::build_and_integrate_folder_then_drop_request;
+use crate::to_org::util::{ DefinitiveMap, Finalizable, get_id_from_treenode, makeWriteProtectedAndClobber, activeNode_in_tree_is_writeProtected };
 use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, ColRelation, IndefOrDef, ParentIs };
+use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, FolderRelation, Editability, AffectsParent };
 use crate::types::viewnode::Vognode;
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
@@ -24,12 +24,12 @@ pub fn execute_view_requests (
 ) -> Result < (), Box<dyn Error> > {
   for (node_id, request) in requests {
     match request {
-      ViewRequest::Col (ColRelation::Aliases) => {
+      ViewRequest::Folder (FolderRelation::Aliases) => {
         build_and_integrate_aliases_view_then_drop_request (
           viewforest, node_id, graph, config, errors )
  ?; },
-      ViewRequest::Col (rel) => {
-        build_and_integrate_col_then_drop_request (
+      ViewRequest::Folder (rel) => {
+        build_and_integrate_folder_then_drop_request (
           viewforest, node_id, graph, rel, config, errors,
           active_source_set ) ?; },
       ViewRequest::Path (role) => {
@@ -62,18 +62,18 @@ pub fn execute_view_requests (
 /// carries a 'ViewRequest::Definitive' (a user DVR, or a TODO/DONE/local-view-update/plan_v2.org §5.3 cascade DVR).
 pub enum DrawOutcome {
   /// An existing Final occurrence of this id won: the DVR was dropped and
-  /// the node left indefinitive. No content expansion should follow.
+  /// the node left write-protected. No content expansion should follow.
   Deferred,
   /// The node was made Final (and any prior Tentative occurrence of its id
-  /// indefinitized). The caller draws its content next via the TODO/DONE/local-view-update/plan_v2.org §5.3 cascade.
+  /// write-protectd). The caller draws its content next via the TODO/DONE/local-view-update/plan_v2.org §5.3 cascade.
   MadeFinal,
 }
 
 /// Apply the TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule for a node carrying
 /// 'ViewRequest::Definitive', WITHOUT expanding its content:
 /// - defer to an existing Final occurrence (drop the DVR, stay
-///   indefinitive) -> 'DrawOutcome::Deferred';
-/// - otherwise indefinitize any prior Tentative occurrence of the id, mark
+///   write-protected) -> 'DrawOutcome::Deferred';
+/// - otherwise write-protect any prior Tentative occurrence of the id, mark
 ///   this node Final (resyncing title/body from disk), register it in the map,
 ///   and clear the request -> 'DrawOutcome::MadeFinal'.
 /// Content drawing is the caller's job (the TODO/DONE/local-view-update/plan_v2.org §5.3 cascade), so the rule settles
@@ -91,25 +91,25 @@ pub fn apply_definitive_draw_rule (
   if let Some (&prior) = visited . get (& node_pid) {
     if prior . is_final () && prior . node_id () != node_id {
       // TODO/DONE/local-view-update/plan_v2.org §5.2: an existing Final occurrence wins; discard this DVR and make
-      // the node indefinitive. (Setting indefinitive matters for a TODO/DONE/local-view-update/plan_v2.org §5.3
+      // the node write-protected. (Setting write-protected matters for a TODO/DONE/local-view-update/plan_v2.org §5.3
       // cascade DVR landing on a freshly-created definitive child whose id
-      // is already Final elsewhere; for a user DVR on an already-indefinitive
+      // is already Final elsewhere; for a user DVR on an already-write-protected
       // node it is a no-op. The expand step then clobbers/refreshes it.)
       write_at_activeNode_in_tree (
         viewforest, node_id,
         |t| { t . view_requests . remove (& ViewRequest::Definitive);
-              t . indef_or_def = IndefOrDef::Indefinitive; } )
+              t . editability = Editability::WriteProtected; } )
         . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
       return Ok ( DrawOutcome::Deferred ); }
     if prior . node_id () != node_id {
-      indefinitize_content_subtree ( viewforest,
+      writeProtect_content_subtree ( viewforest,
                                      prior . node_id (),
                                      visited, graph, config ) ?; }}
   { // Remove request, mark definitive, replace title/body, add to visited.
     write_at_activeNode_in_tree (
       viewforest, node_id, |t| {
         t . view_requests . remove (& ViewRequest::Definitive);
-        t . indef_or_def = IndefOrDef::Definitive {
+        t . editability = Editability::Definitive {
           body         : None,
           edit_request : None }; } )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -120,13 +120,13 @@ pub fn apply_definitive_draw_rule (
   Ok ( DrawOutcome::MadeFinal ) }
 
 /// Does two things:
-/// - Mark a node, and its entire content subtree, as indefinitive.
+/// - Mark a node, and its entire content subtree, as write-protected.
 /// - Remove them from `visited`.
 /// Only recurses into non-ignored ActiveNode children;
 ///   ignored and scaffold children persist unchanged.
 /// TODO : This will need complication to properly handle
 ///   sharing-related nodes among the input node's descendents.
-fn indefinitize_content_subtree (
+fn writeProtect_content_subtree (
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
   visited : &mut DefinitiveMap,
@@ -137,22 +137,22 @@ fn indefinitize_content_subtree (
     : (ID, Vec <NodeId>) =
     { let node_ref : NodeRef < ViewNode > =
         tree . get (node_id) . ok_or (
-          "indefinitize_content_subtree: NodeId not in tree" ) ?;
+          "writeProtect_content_subtree: NodeId not in tree" ) ?;
       let node_pid : ID =
         get_id_from_treenode ( tree, node_id ) ?;
       let content_child_treeids : Vec < NodeId > =
         node_ref . children ()
         . filter ( |c| matches! ( &c . value() . kind,
                                   ViewNodeKind::Vognode (Vognode::Active (t))
-                                  if t . parentIs == ParentIs::Affected ))
+                                  if t . affectsParent == AffectsParent::True ))
         . map ( |c| c . id () )
         . collect ();
       (node_pid, content_child_treeids) };
-  if ! activeNode_in_tree_is_indefinitive ( tree, node_id ) ? {
+  if ! activeNode_in_tree_is_writeProtected ( tree, node_id ) ? {
     visited . remove (&node_pid);
-    makeIndefinitiveAndClobber ( tree, node_id, graph, config ) ?; }
+    makeWriteProtectedAndClobber ( tree, node_id, graph, config ) ?; }
   for child_treeid in content_child_treeids { // recurse
-    indefinitize_content_subtree (
+    writeProtect_content_subtree (
       tree, child_treeid, visited, graph, config ) ?; }
   Ok (( )) }
 
@@ -177,8 +177,8 @@ fn from_disk_replace_title_body_and_nodecomplete (
   write_at_activeNode_in_tree
     ( tree, node_id,
       |t| { t . title = title;
-            if let IndefOrDef::Definitive { body: ref mut b, .. }
-              = t . indef_or_def
+            if let Editability::Definitive { body: ref mut b, .. }
+              = t . editability
               { *b = body; }} )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   Ok (( )) }

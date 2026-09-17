@@ -3,7 +3,7 @@
 -- directory.
 --
 -- Buffer 1: multi-root view (scaffolded "1" + standalone subee root).
--- Buffer 2: manually constructed (indef 11 + subee + subee-1).
+-- Buffer 2: manually constructed (write-protected 11 + subee + subee-1).
 --
 -- Phase 4: delete 11 from buffer 2 -> 11 becomes DeletedNode,
 --   scaffolds become DeletedScaff in collateral buffer 1.
@@ -27,7 +27,7 @@ local sexpr = require('skg.sexpr.parse')
 ---(depth type title) triples for every headline in BUF that carries
 ---skg metadata; headlines without metadata are skipped. Type is
 ---derived from the second element of the (skg ...) form: node,
----deleted, deletedScaffold, aliasCol, etc. The port of
+---deleted, deletedScaffold, aliasFolder, etc. The port of
 ---save_collateral_break_cycle/test-helpers.el's
 ---headline-types-and-titles.
 ---@param buf integer
@@ -166,7 +166,7 @@ do
   local line_11 = nth_line_with_title(buf1, '11', 1)
   T.check(line_11, "phase 2: found node '11' in buffer 1")
   metadata.edit_metadata_at_line(line_11,
-    sexpr.read('(skg (node (viewRequests (col aliases))))'))
+    sexpr.read('(skg (node (viewRequests (folder aliases))))'))
 end
 vim.api.nvim_buf_set_lines(buf1, -1, -1, false, {
   '* (skg (node (id subee) (source main))) subee',
@@ -177,21 +177,21 @@ print('Buffer 1 after multi-root save:\n' .. T.buffer_text(buf1))
 assert_headline_types_and_titles(buf1,
   { { 1, 'node', '1' },
     { 2, 'node', '11' },
-    { 3, 'aliasCol', '' },
+    { 3, 'aliasFolder', '' },
     { 4, 'alias', 'eleven' },
-    { 3, 'hiddenCol', '' },
+    { 3, 'hiddenFolder', '' },
     { 4, 'node', 'subee-1' },
     { 4, 'node', 'also-hidden' },
-    { 3, 'subscribeeCol', '' },
+    { 3, 'subscribeeFolder', '' },
     { 4, 'node', 'subee' },
-    { 4, 'hiddenOutsideOfSubscribeeCol', '' },
+    { 4, 'hiddenOutsideOfSubscribeeFolder', '' },
     { 5, 'node', 'also-hidden' },
     { 1, 'node', 'subee' },
     { 2, 'node', 'subee-1' } },
   'phase 2: buffer 1 after multi-root save')
 
 print('=== PHASE 3: Create and save buffer 2 ===')
--- Create buffer 2 manually with two roots: indef 11 and subee.
+-- Create buffer 2 manually with two roots: write-protected 11 and subee.
 -- subee-1 must be supplied explicitly: the save pipeline's in-memory
 -- node map (built from save_instructions) gives subee empty contains,
 -- which takes priority over subee.skg on disk.
@@ -200,7 +200,7 @@ vim.api.nvim_buf_set_name(buf2, 'skg://skg-test-buf2')
 vim.bo[buf2].filetype = 'org'
 vim.b[buf2].skg_view_uri = require('skg.buffer').generate_uuid()
 vim.api.nvim_buf_set_lines(buf2, 0, -1, false, {
-  '* (skg (node (id 11) (source main) indef)) 11',
+  '* (skg (node (id 11) (source main) writeProtected)) 11',
   '* (skg (node (id subee) (source main))) subee',
   '** (skg (node (id subee-1) (source main))) subee-1' })
 vim.api.nvim_set_current_buf(buf2)
@@ -214,10 +214,10 @@ assert_headline_types_and_titles(buf2,
   'phase 3: buffer 2 initial')
 
 print('=== PHASE 4: Delete 11 from buffer 2 ===')
--- Remove indef, add editRequest delete, and save buffer 2.
+-- Remove write-protected, add editRequest delete, and save buffer 2.
 vim.api.nvim_set_current_buf(buf2)
 metadata.edit_metadata_at_line(1,
-  sexpr.read('(skg (node (DELETE indef) (editRequest delete)))'))
+  sexpr.read('(skg (node (DELETE writeProtected) (editRequest delete)))'))
 print('Buffer 2 after metadata edit:\n' .. T.buffer_text(buf2))
 require('skg.save').request_save_buffer()
 T.check(T.wait_for_response(15), 'phase 4: save response arrived')

@@ -1,32 +1,32 @@
 use super::*;
 
-// 'PartnerCol::policy' is the single source of truth for how each
-// col's membership relates to user edits; this pins the mapping.
+// 'PartnerFolder::policy' is the single source of truth for how each
+// folder's membership relates to user edits; this pins the mapping.
 #[test]
-fn partnerCol_policy_mapping () {
-  assert_eq! ( PartnerCol::Subscribee . policy (),
-               ColPolicy::WritableSet );
-  assert_eq! ( PartnerCol::Overridden . policy (),
-               ColPolicy::WritableSet );
-  assert_eq! ( PartnerCol::Subscriber . policy (),
-               ColPolicy::ReadOnlySet );
-  assert_eq! ( PartnerCol::Overrider . policy (),
-               ColPolicy::ReadOnlySet );
-  assert_eq! ( PartnerCol::Hider . policy (),
-               ColPolicy::ReadOnlySet );
-  assert_eq! ( PartnerCol::Hidden . policy (),
-               ColPolicy::ReadOnlySet );
-  assert_eq! ( PartnerCol::HiddenInSubscribee . policy (),
-               ColPolicy::ReadOnlyFilter );
-  assert_eq! ( PartnerCol::HiddenOutsideOfSubscribee . policy (),
-               ColPolicy::EditableFilter ); }
+fn partnerFolder_policy_mapping () {
+  assert_eq! ( PartnerFolder::Subscribee . policy (),
+               FolderPolicy::WritableSet );
+  assert_eq! ( PartnerFolder::Overridden . policy (),
+               FolderPolicy::WritableSet );
+  assert_eq! ( PartnerFolder::Subscriber . policy (),
+               FolderPolicy::ReadOnlySet );
+  assert_eq! ( PartnerFolder::Overrider . policy (),
+               FolderPolicy::ReadOnlySet );
+  assert_eq! ( PartnerFolder::Hider . policy (),
+               FolderPolicy::ReadOnlySet );
+  assert_eq! ( PartnerFolder::Hidden . policy (),
+               FolderPolicy::ReadOnlySet );
+  assert_eq! ( PartnerFolder::HiddenInSubscribee . policy (),
+               FolderPolicy::ReadOnlyFilter );
+  assert_eq! ( PartnerFolder::HiddenOutsideOfSubscribee . policy (),
+               FolderPolicy::EditableFilter ); }
 
 #[test]
 fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
   let mut active : ViewNode = mk_viewnode (
     ID::from ("active"), SourceName::from ("public"), "active" . into (),
-    ParentIs::Affected, Birth::Unremarkable,
-    IndefOrDef::Definitive {
+    AffectsParent::True, Birth::Unremarkable,
+    Editability::Definitive {
       body : None,
       edit_request : Some (NodeEditRequest::Delete) },
     [ViewRequest::Definitive] . into_iter () . collect () );

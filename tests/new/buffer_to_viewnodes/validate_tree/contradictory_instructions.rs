@@ -73,17 +73,17 @@ fn test_multiple_defining_containers() -> Result<(), Box<dyn Error>> {
     "tests/merge/merge_nodes/fixtures",
     "/tmp/tantivy-test-validate-multiple-def",
     |config, _tantivy| Box::pin(async move {
-      // Test input with multiple nodes having the same ID and indefinitive=false
+      // Test input with multiple nodes having the same ID and write-protected=false
       let input_with_multiple_defining_containers: &str =
         indoc! {"
                 * (skg (node (id duplicate))) First defining container
                 Regular node with shared ID
                 * (skg (node (id duplicate))) Second defining container
                 Another regular node with the same ID
-                * (skg (node (id duplicate) indef)) Repeated node (not defining)
-                This one is ok because indefinitive=true
-                * (skg (node (id duplicate) indef)) Might contain more (not defining)
-                This one is also ok because indefinitive=true
+                * (skg (node (id duplicate) writeProtected)) Repeated node (not defining)
+                This one is ok because writeProtected=true
+                * (skg (node (id duplicate) writeProtected)) Might contain more (not defining)
+                This one is also ok because writeProtected=true
                 * (skg (node (id unique))) Unique node
                 This one is fine
             "};

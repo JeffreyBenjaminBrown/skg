@@ -47,7 +47,7 @@ but from the graph itself.
 *** <localleader>dR : :SkgDeleteRecursive
 Same as Delete, but also marks every activeNode org-descendent
 of the node at point. Descendent headlines that are not activeNodes
-(phantoms, aliascol, id-col, etc.) are skipped.
+(phantoms, aliasFolder, id-folder, etc.) are skipped.
 
 Its own binding, not a prefix-arg variant -- nvim has no prefix-arg
 protocol to reuse here the way Emacs's C-u did. Call it directly as
@@ -312,30 +312,30 @@ there is skipped, not deleted, since 'git rm' would silently remove
 it. Review the script, then run it from the skg data root. Unlike
 most commands here, this one does not depend on the node at point;
 it reports moves across all sources.
-** <localleader>c : show a collection (both cols of a relation)
+** <localleader>c : show a folder (both folders of a relation)
 These commands don't edit the graph. Each inserts a request into the
 metadata of the node at point that, on save, causes the server to
-render the relation's collections (cols) into the view, POPULATED from
-the graph. Each builds BOTH cols of its relation. The read-only-col ☮
-marks a col you cannot change from here. Every command auto-saves.
-*** <localleader>ca : :SkgShowCollectionAliases
-The aliasCol -- other text you could search for to find this node
+render the relation's folder viewnodes into the view, POPULATED from
+the graph. Each builds BOTH folders of its relation. The read-only folder ☮
+marks a folder you cannot change from here. Every command auto-saves.
+*** <localleader>ca : :SkgShowFolderOfAliases
+The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:
 type an alias in and save.
-*** <localleader>co : :SkgShowCollectionOverrides
-The overriddenCol (the nodes this node overrides -- WRITABLE, shown
+*** <localleader>co : :SkgShowFolderOfOverrides
+The overriddenFolder (the nodes this node overrides -- WRITABLE, shown
 even when empty as an "add an override here" surface) and the
-overriderCol (the nodes that override this one -- read-only, ☮).
-*** <localleader>ch : :SkgShowCollectionHides
-The hiderCol and hiddenCol -- BOTH read-only (☮). Hiding is edited from
-a subscribee-as-such, never from these cols. On a node that neither
+overriderFolder (the nodes that override this one -- read-only, ☮).
+*** <localleader>ch : :SkgShowFolderOfHides
+The hiderFolder and hiddenFolder -- BOTH read-only (☮). Hiding is edited from
+a subscribee-as-such, never from these folders. On a node that neither
 hides nor is hidden, nothing appears.
-*** <localleader>cs : :SkgShowCollectionSubscribes
-The subscribeeCol (the nodes this node subscribes to -- WRITABLE, shown
-even when empty) and the subscriberCol (the nodes that subscribe to
+*** <localleader>cs : :SkgShowFolderOfSubscribes
+The subscribeeFolder (the nodes this node subscribes to -- WRITABLE, shown
+even when empty) and the subscriberFolder (the nodes that subscribe to
 this one -- read-only, ☮).
 ** <localleader>p : show a path (the backpath through one relation role)
-Like the collections, each inserts a request that, on save, grafts the
+Like the folders, each inserts a request that, on save, grafts the
 partners reached through one relation role as inverted, read-only
 children, climbing transitively until a fork, cycle, or root. UPPER =
 the partner's active (first) role; lower = its passive (second) role.
@@ -359,11 +359,11 @@ The nodes that subscribe to this node.
 *** <localleader>ps : :SkgShowPathsThroughSubscribees
 The nodes this node subscribes to.
 ** <localleader>s : setting node properties
-*** first some vocab: 'definitive' and 'indefinitive'
-A view of a node can be definitive or indefinitive.
+*** first some vocab: 'definitive' and 'write-protected'
+A view of a node can be definitive or write-protected.
 Typically the first place in the buffer that depicts a node
 is the definitive view of it. So that other views of that node
-cannot contradict it, they are 'indefinitive': Edits to them
+cannot contradict it, they are 'write-protected': Edits to them
 cannot affect the node they depict. They are also truncated --
 that is, shown without content --
 in order to prevent the view from becoming redundant and huge.
@@ -371,28 +371,28 @@ in order to prevent the view from becoming redundant and huge.
 Instead, use 'SetDefinitive' (<localleader>sd), below.
 That's because Skg has to make other instances of it
 (in this same buffer -- and maybe in the future other buffers too)
-indefinitive. That's because a buffer can only be saved
+write-protected. That's because a buffer can only be saved
 if it has at most one definitive instance of a node.
 Otherwise, two definitive nodes could contradict each other.
 
-This same caveat does not apply to making a node indefinitive.
-While there does exist a command for that ('SetIndefinitive')
+This same caveat does not apply to making a node write-protected.
+While there does exist a command for that ('SetWriteProtected')
 you can also 'do it yourself'
 by visiting a metadata buffer for the node ('ViewMetadata',
 <localleader>vm).
 *** <localleader>sd : :SkgSetDefinitive
 If you want to see the definitive view of that node
-from a place where it is currently shown in an indefinitive form,
+from a place where it is currently shown in a write-protected form,
 call this function. It will make the current definitive view
-(if it exists) indefinitive, and then draw a definitive view here.
-*** <localleader>si : :SkgSetIndefinitive
-This marks a node as 'indefinitive',
+(if it exists) write-protected, and then draw a definitive view here.
+*** <localleader>sw : :SkgSetWriteProtected
+This marks a node as 'write-protected',
 as described above.
 In brief, it means edits to its title, body or
   (more importantly) children
 will not affect it
   (although edits to its children will affect those children,
-  unless they are also indefinitive).
+  unless they are also write-protected).
 *** <localleader>ss : :SkgSetSource
 Changes the source of the node at point.
 The prompt starts with the current source as editable command-line
@@ -413,7 +413,7 @@ Save the view afterward (':w') to apply the move.
 Like 'SetSource', but it also
 changes the source of every content descendent of the node at point
 whose source matches the original source of the node at point.
-Only descendents for which ParentIs=Affected are traversed.
+Only descendents for which AffectsParent=True are traversed.
 *** <localleader>sm : :SkgSetMergeRequest
 (See [[./merging.org][the docs on merging]] for why would you merge two nodes,
 and what it means to do that.)
@@ -440,9 +440,9 @@ org-descendents. Its org-parent must be a definitive activeNode
 whose source is owned in =skgconfig.toml=.
 
 The command replaces the whole leaf with a same-level
-indefinitive activeNode for the link dest. The parent is
+write-protected activeNode for the link dest. The parent is
 definitive, so saving records the dest as content of the
-parent; the replacement child is indefinitive, so its own text is
+parent; the replacement child is write-protected, so its own text is
 not rewritten from the link label.
 *** <localleader>mf : :SkgFork
 Fork the node at point that you ALREADY own: create a private
@@ -527,7 +527,7 @@ When called from a node in a view of the graph,
 this switches to a view of the metadata of that node,
 with one field per org branch. ':w' (or <localleader>cc) commits
 the edited tree back into the source headline; ':bd!' cancels;
-S-Left / S-Right cycle a field's value (indef, parentIs,
+S-Left / S-Right cycle a field's value (writeProtected, affectsParent,
 editRequest, source, ...).
 It's easy to edit this way.
 Note that some properties don't make sense to edit,
@@ -619,9 +619,9 @@ but also removes the node from the stack.
 This is the easiest way to give a node multiple containers --
 push it to the stack, then paste it as a node somewhere else.
 
-Inserts, at the cursor, an indefinitive view
+Inserts, at the cursor, a write-protected view
 of the node whose ID is at the top of the id stack.
-Its metadata includes only the ID and =indef=,
+Its metadata includes only the ID and =writeProtected=,
 and its title comes from the stack.
 Does not modify the stack or save.
 Saving will provide the rest of its metadata.

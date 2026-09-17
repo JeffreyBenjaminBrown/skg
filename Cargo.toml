@@ -79,8 +79,8 @@ name = "git_diff_view"
 path = "tests/git_diff_view.rs"
 
 [[test]]
-name = "git_diff_view_partner_cols"
-path = "tests/git_diff_view_partner_cols.rs"
+name = "git_diff_view_partner_folders"
+path = "tests/git_diff_view_partner_folders.rs"
 
 [dependencies]
 arc-swap = "1"

@@ -1,5 +1,5 @@
 use crate::types::misc::{MSV, members_at_source};
-use crate::types::viewnode::{ mk_indefinitive_viewnode, mk_indefinitive_viewnode_with_birth };
+use crate::types::viewnode::{ mk_writeProtected_viewnode, mk_writeProtected_viewnode_with_birth };
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::dbs::in_rust_graph::add_to_inverse_indexes;
 use crate::types::viewnode::viewforest_root_viewnode;
@@ -49,12 +49,12 @@ fn graph_with (nodes: Vec<NodeRust>) -> InRustGraph {
     g . nodes . insert (n . pid . clone (), n); }
   g }
 
-fn parentIs_if_normal (
+fn affectsParent_if_normal (
   viewforest : &Tree<ViewNode>,
   nid    : NodeId,
-) -> ParentIs {
+) -> AffectsParent {
   match & viewforest . get (nid) . unwrap () . value () . kind {
-    ViewNodeKind::Vognode (Vognode::Active (t)) => t . parentIs,
+    ViewNodeKind::Vognode (Vognode::Active (t)) => t . affectsParent,
     _ => panic! ("expected ActiveNode") } }
 
 fn birth_if_normal (
@@ -76,16 +76,16 @@ fn linksto_false_claim_flipped_to_independent () {
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("P"), src (), "P" . to_string (),
+                              AffectsParent::True) ) . id ();
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
-    mk_indefinitive_viewnode_with_birth (
+    mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::Backpath (RelationRole::LINK_SOURCE)) ) . id ();
+      AffectsParent::False, Birth::Backpath (RelationRole::LINK_SOURCE)) ) . id ();
 
-  validate_parentIs_relationships (&mut viewforest, &graph);
+  validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (parentIs_if_normal (&viewforest, c_id), ParentIs::Independent,
+  assert_eq! (affectsParent_if_normal (&viewforest, c_id), AffectsParent::False,
     "LinksToParent claim with no backing textlink should flip to Independent");
 }
 
@@ -100,14 +100,14 @@ fn linksto_true_claim_preserved () {
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("P"), src (), "P" . to_string (),
+                              AffectsParent::True) ) . id ();
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
-    mk_indefinitive_viewnode_with_birth (
+    mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::Backpath (RelationRole::LINK_SOURCE)) ) . id ();
+      AffectsParent::False, Birth::Backpath (RelationRole::LINK_SOURCE)) ) . id ();
 
-  validate_parentIs_relationships (&mut viewforest, &graph);
+  validate_affectsParent_relationships (&mut viewforest, &graph);
 
   assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::LINK_SOURCE),
     "LinksToParent claim with a backing textlink must be preserved");
@@ -124,24 +124,24 @@ fn containerof_false_claim_flipped () {
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("P"), src (), "P" . to_string (),
+                              AffectsParent::True) ) . id ();
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
-    mk_indefinitive_viewnode_with_birth (
+    mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
+      AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
 
-  validate_parentIs_relationships (&mut viewforest, &graph);
+  validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (parentIs_if_normal (&viewforest, c_id), ParentIs::Independent);
+  assert_eq! (affectsParent_if_normal (&viewforest, c_id), AffectsParent::False);
 }
 
 #[test]
-fn orphan_under_dead_parent_demoted_member_under_col_kept () {
+fn orphan_under_dead_parent_demoted_member_under_folder_kept () {
   // §A (Jeff's invariant): an Affected Active node under a non-container
   // parent (Diff phantom / DeadScaffold) demotes to Independent; a legitimate
-  // col MEMBER (Affected Normal under a PartnerCol) is left untouched.
-  use crate::types::viewnode::{ mk_phantom_viewnode, PartnerCol };
+  // folder MEMBER (Affected Normal under a PartnerFolder) is left untouched.
+  use crate::types::viewnode::{ mk_phantom_viewnode, PartnerFolder };
   use crate::types::git::{ ExistenceAxes, MembershipAxes };
   let mut vf : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = vf . root () . id ();
@@ -150,29 +150,29 @@ fn orphan_under_dead_parent_demoted_member_under_col_kept () {
                           ExistenceAxes::default (), MembershipAxes::default () )
   ) . id ();
   let under_phantom : NodeId = vf . get_mut (phantom) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("A"), src (), "A" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("A"), src (), "A" . to_string (),
+                              AffectsParent::True) ) . id ();
   let dead : NodeId = vf . get_mut (root) . unwrap () . append (
     ViewNode { focused: false, folded: false, body_folded: false,
                kind: ViewNodeKind::DeadScaffold } ) . id ();
   let under_dead : NodeId = vf . get_mut (dead) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("B"), src (), "B" . to_string (),
-                              ParentIs::Affected) ) . id ();
-  let col : NodeId = vf . get_mut (root) . unwrap () . append (
+    mk_writeProtected_viewnode (id ("B"), src (), "B" . to_string (),
+                              AffectsParent::True) ) . id ();
+  let folder : NodeId = vf . get_mut (root) . unwrap () . append (
     ViewNode { focused: false, folded: false, body_folded: false,
-               kind: ViewNodeKind::PartnerCol (PartnerCol::Subscribee) } ) . id ();
-  let member : NodeId = vf . get_mut (col) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                              ParentIs::Affected) ) . id ();
+               kind: ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee) } ) . id ();
+  let member : NodeId = vf . get_mut (folder) . unwrap () . append (
+    mk_writeProtected_viewnode (id ("C"), src (), "C" . to_string (),
+                              AffectsParent::True) ) . id ();
 
-  mark_orphans_under_dead_parents_independent (&mut vf);
+  mark_orphans_under_dead_parents_false (&mut vf);
 
-  assert_eq! (parentIs_if_normal (&vf, under_phantom), ParentIs::Independent,
+  assert_eq! (affectsParent_if_normal (&vf, under_phantom), AffectsParent::False,
     "Affected child under a Diff phantom must demote to Independent");
-  assert_eq! (parentIs_if_normal (&vf, under_dead), ParentIs::Independent,
+  assert_eq! (affectsParent_if_normal (&vf, under_dead), AffectsParent::False,
     "Affected child under a DeadScaffold must demote to Independent");
-  assert_eq! (parentIs_if_normal (&vf, member), ParentIs::Affected,
-    "Affected member under a PartnerCol must stay Affected (legitimate membership)");
+  assert_eq! (affectsParent_if_normal (&vf, member), AffectsParent::True,
+    "Affected member under a PartnerFolder must stay Affected (legitimate membership)");
 }
 
 #[test]
@@ -190,21 +190,21 @@ fn containerof_via_merged_extra_id_preserved () {
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("P"), src (), "P" . to_string (),
+                              AffectsParent::True) ) . id ();
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
-    mk_indefinitive_viewnode_with_birth (
+    mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
+      AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
 
-  validate_parentIs_relationships (&mut viewforest, &graph);
+  validate_affectsParent_relationships (&mut viewforest, &graph);
 
   assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::CONTAINER),
     "Extra_id-aliased parent pid should still satisfy the claim");
 }
 
 #[test]
-fn containerof_view_parent_is_acquiree_preserved () {
+fn containerof_view_affects_parent_acquiree_preserved () {
   // Mirror of the prior test from the parent side: view tree has
   // parent_id = "P-old" (the pre-merge pid), which is now an
   // extra_id of "P". C's contains has "P" directly. Resolve both
@@ -216,14 +216,14 @@ fn containerof_view_parent_is_acquiree_preserved () {
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("P-old"), src (), "P" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("P-old"), src (), "P" . to_string (),
+                              AffectsParent::True) ) . id ();
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
-    mk_indefinitive_viewnode_with_birth (
+    mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
+      AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
 
-  validate_parentIs_relationships (&mut viewforest, &graph);
+  validate_affectsParent_relationships (&mut viewforest, &graph);
 
   assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::CONTAINER),
     "When view parent id is the acquiree pid, the claim should \
@@ -231,8 +231,8 @@ fn containerof_view_parent_is_acquiree_preserved () {
 }
 
 #[test]
-fn contentof_indefinitive_parent_false_claim_flipped () {
-  // Parent is indefinitive; its contains list does NOT include C.
+fn contentof_writeProtected_parent_false_claim_flipped () {
+  // Parent is write-protected; its contains list does NOT include C.
   // So C's Container claim is false.
   let graph : InRustGraph = graph_with (vec! [
     mk_node ("P", &[], &[], &[]),   // P.contains empty
@@ -241,15 +241,15 @@ fn contentof_indefinitive_parent_false_claim_flipped () {
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("P"), src (), "P" . to_string (),
+                              AffectsParent::True) ) . id ();
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("C"), src (), "C" . to_string (),
+                              AffectsParent::True) ) . id ();
 
-  validate_parentIs_relationships (&mut viewforest, &graph);
+  validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (parentIs_if_normal (&viewforest, c_id), ParentIs::Independent);
+  assert_eq! (affectsParent_if_normal (&viewforest, c_id), AffectsParent::False);
 }
 
 #[test]
@@ -267,18 +267,18 @@ fn contentof_definitive_parent_skipped () {
     mk_definitive_viewnode (id ("P"), src (),
                             "P" . to_string (), None) ) . id ();
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("C"), src (), "C" . to_string (),
+                              AffectsParent::True) ) . id ();
 
-  validate_parentIs_relationships (&mut viewforest, &graph);
+  validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (parentIs_if_normal (&viewforest, c_id), ParentIs::Affected,
+  assert_eq! (affectsParent_if_normal (&viewforest, c_id), AffectsParent::True,
     "Definitive parent: Container claim is never flipped here");
 }
 
 #[test]
 fn independent_always_preserved () {
-  // Independent parentIs is never touched.
+  // Independent affectsParent is never touched.
   let graph : InRustGraph = graph_with (vec! [
     mk_node ("P", &[], &[], &[]),
     mk_node ("C", &[], &[], &[]),
@@ -286,15 +286,15 @@ fn independent_always_preserved () {
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("P"), src (), "P" . to_string (),
+                              AffectsParent::True) ) . id ();
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                              ParentIs::Independent) ) . id ();
+    mk_writeProtected_viewnode (id ("C"), src (), "C" . to_string (),
+                              AffectsParent::False) ) . id ();
 
-  validate_parentIs_relationships (&mut viewforest, &graph);
+  validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (parentIs_if_normal (&viewforest, c_id), ParentIs::Independent);
+  assert_eq! (affectsParent_if_normal (&viewforest, c_id), AffectsParent::False);
 }
 
 #[test]
@@ -306,15 +306,15 @@ fn absent_under_visible_parent_becomes_container () {
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("P"), src (), "P" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("P"), src (), "P" . to_string (),
+                              AffectsParent::True) ) . id ();
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                              ParentIs::Absent) ) . id ();
+    mk_writeProtected_viewnode (id ("C"), src (), "C" . to_string (),
+                              AffectsParent::NA) ) . id ();
 
-  validate_parentIs_relationships (&mut viewforest, &graph);
+  validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (parentIs_if_normal (&viewforest, c_id), ParentIs::Affected);
+  assert_eq! (affectsParent_if_normal (&viewforest, c_id), AffectsParent::True);
 }
 
 // ===== 3x2 matrix: moving a {content, container, linksToParent}
@@ -345,14 +345,14 @@ fn moved_containerof_relationship_holds_preserved () {
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("p_new"), src (), "p_new" . to_string (),
+                              AffectsParent::True) ) . id ();
   let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
-    mk_indefinitive_viewnode_with_birth (
+    mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
+      AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
 
-  validate_parentIs_relationships (&mut viewforest, &graph);
+  validate_affectsParent_relationships (&mut viewforest, &graph);
 
   assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::CONTAINER),
     "Moved content child still contains its new parent — keep");
@@ -370,25 +370,25 @@ fn moved_containerof_relationship_broken_flipped () {
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("p_new"), src (), "p_new" . to_string (),
+                              AffectsParent::True) ) . id ();
   let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
-    mk_indefinitive_viewnode_with_birth (
+    mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
+      AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER)) ) . id ();
 
-  validate_parentIs_relationships (&mut viewforest, &graph);
+  validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (parentIs_if_normal (&viewforest, c_id), ParentIs::Independent,
+  assert_eq! (affectsParent_if_normal (&viewforest, c_id), AffectsParent::False,
     "Moved content child no longer contains new parent — flip");
 }
 
-// ---- container (indefinitive parent on both sides) -------------
+// ---- container (write-protected parent on both sides) -------------
 
 #[test]
-fn moved_contentof_indef_parent_relationship_holds_preserved () {
-  // Child C was content of an indefinitive p_old. Moved under
-  // indefinitive p_new. Test case: p_new.contains ALSO includes C.
+fn moved_contentof_writeProtected_parent_relationship_holds_preserved () {
+  // Child C was content of a write-protected p_old. Moved under
+  // write-protected p_new. Test case: p_new.contains ALSO includes C.
   let graph : InRustGraph = graph_with (vec! [
     mk_node ("p_old", &[], &["C"], &[]),
     mk_node ("p_new", &[], &["C"], &[]), // p_new really contains C
@@ -397,20 +397,20 @@ fn moved_contentof_indef_parent_relationship_holds_preserved () {
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("p_new"), src (), "p_new" . to_string (),
+                              AffectsParent::True) ) . id ();
   let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("C"), src (), "C" . to_string (),
+                              AffectsParent::True) ) . id ();
 
-  validate_parentIs_relationships (&mut viewforest, &graph);
+  validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (parentIs_if_normal (&viewforest, c_id), ParentIs::Affected,
-    "Moved container: indef p_new actually contains C — keep");
+  assert_eq! (affectsParent_if_normal (&viewforest, c_id), AffectsParent::True,
+    "Moved container: writeProtected p_new actually contains C — keep");
 }
 
 #[test]
-fn moved_contentof_indef_parent_relationship_broken_flipped () {
+fn moved_contentof_writeProtected_parent_relationship_broken_flipped () {
   // Same setup but p_new.contains does NOT include C.
   let graph : InRustGraph = graph_with (vec! [
     mk_node ("p_old", &[], &["C"], &[]),
@@ -420,16 +420,16 @@ fn moved_contentof_indef_parent_relationship_broken_flipped () {
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("p_new"), src (), "p_new" . to_string (),
+                              AffectsParent::True) ) . id ();
   let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("C"), src (), "C" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("C"), src (), "C" . to_string (),
+                              AffectsParent::True) ) . id ();
 
-  validate_parentIs_relationships (&mut viewforest, &graph);
+  validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (parentIs_if_normal (&viewforest, c_id), ParentIs::Independent,
-    "Moved container: indef p_new doesn't contain C — flip");
+  assert_eq! (affectsParent_if_normal (&viewforest, c_id), AffectsParent::False,
+    "Moved container: writeProtected p_new doesn't contain C — flip");
 }
 
 // ---- linksToParent ---------------------------------------------------
@@ -446,14 +446,14 @@ fn moved_linksto_relationship_holds_preserved () {
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("p_new"), src (), "p_new" . to_string (),
+                              AffectsParent::True) ) . id ();
   let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
-    mk_indefinitive_viewnode_with_birth (
+    mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::Backpath (RelationRole::LINK_SOURCE)) ) . id ();
+      AffectsParent::False, Birth::Backpath (RelationRole::LINK_SOURCE)) ) . id ();
 
-  validate_parentIs_relationships (&mut viewforest, &graph);
+  validate_affectsParent_relationships (&mut viewforest, &graph);
 
   assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::LINK_SOURCE),
     "Moved linksToParent: C still links to p_new — keep");
@@ -470,15 +470,15 @@ fn moved_linksto_relationship_broken_flipped () {
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
-    mk_indefinitive_viewnode (id ("p_new"), src (), "p_new" . to_string (),
-                              ParentIs::Affected) ) . id ();
+    mk_writeProtected_viewnode (id ("p_new"), src (), "p_new" . to_string (),
+                              AffectsParent::True) ) . id ();
   let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
-    mk_indefinitive_viewnode_with_birth (
+    mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      ParentIs::Independent, Birth::Backpath (RelationRole::LINK_SOURCE)) ) . id ();
+      AffectsParent::False, Birth::Backpath (RelationRole::LINK_SOURCE)) ) . id ();
 
-  validate_parentIs_relationships (&mut viewforest, &graph);
+  validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (parentIs_if_normal (&viewforest, c_id), ParentIs::Independent,
+  assert_eq! (affectsParent_if_normal (&viewforest, c_id), AffectsParent::False,
     "Moved linksToParent: C doesn't link to p_new — flip");
 }

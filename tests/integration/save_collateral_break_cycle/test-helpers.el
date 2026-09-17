@@ -9,7 +9,7 @@ graft relates OUTBOUND to a tracked ancestor: it has a relation with an
 (out ... (ancestors ...)) side. That relation names the role: contains
 -> container, textlinksTo -> linkSource, subscribes -> subscribee,
 overrides -> overrider, hides -> hider. Only meaningful for a node
-already known to be a graft (parentIs independent); an ordinary content
+already known to be a graft (affectsParent false); an ordinary content
 child can carry the same outbound ancestor (e.g. a cycle) yet is NOT a
 graft."
   (cl-loop for (rel . role) in '((contains    . container)
@@ -25,28 +25,28 @@ graft."
 
 (defun headline--relation-from-sexp (sexp)
   "Classify a parsed metadata SEXP using current parent/provenance vocab.
-Birth provenance is more specific than parentIs: a backpath graft (a node
-with (parentIs independent)) returns its ROLENAME from its (rels ...)
+Birth provenance is more specific than affectsParent: a backpath graft (a node
+with (affectsParent false)) returns its ROLENAME from its (rels ...)
 facts (e.g. `container', `linkSource'); otherwise the result is the
-explicit parentIs or the implicit `affected'."
-  (let* ((parentIs-list (when sexp
+explicit affectsParent or the implicit `true'."
+  (let* ((affectsParent-list (when sexp
                           (skg-sexp-cdr-at-path sexp
-                                                '(skg node parentIs))))
+                                                '(skg node affectsParent))))
          (rels-body (when sexp
                       (skg-sexp-cdr-at-path sexp '(skg node rels))))
-         (independent (eq (car parentIs-list) 'independent))
-         (graft-role (when independent
+         (false (eq (car affectsParent-list) 'false))
+         (graft-role (when false
                        (headline--graft-role-from-rels rels-body))))
     (cond
-     ;; A backpath graft: independent, with an outbound-ancestor herald.
+     ;; A backpath graft: false, with an outbound-ancestor herald.
      (graft-role graft-role)
-     ((or (not parentIs-list)
-          (eq (car parentIs-list) 'affected)) 'affected)
-     (t (car parentIs-list)))))
+     ((or (not affectsParent-list)
+          (eq (car affectsParent-list) 'true)) 'true)
+     (t (car affectsParent-list)))))
 
 (defun headline-structure (buffer)
   "Extract (depth relation id) triples from every headline in BUFFER.
-Depth is the number of asterisks. Relation is a parentIs or birth symbol;
+Depth is the number of asterisks. Relation is a affectsParent or birth symbol;
 see `headline--relation-from-sexp'.
 ID comes from the (skg (node (id X) ...)) metadata. Headlines
 without metadata are skipped."
@@ -145,7 +145,7 @@ PHASE-LABEL is used in log messages. Kills emacs with exit 1 on failure."
 (defun headline-types-and-titles (buffer)
   "Extract (depth type title) triples from every headline in BUFFER.
 Type is a symbol derived from the metadata:
-  node, deleted, deletedScaffold, subscribeeCol, etc.
+  node, deleted, deletedScaffold, subscribeeFolder, etc.
 For (skg (node ...)) the type is node; for (skg (deleted ...)) it is
 deleted; for (skg (deletedScaffold KIND)) it is deletedScaffold; and so on."
   (with-current-buffer buffer

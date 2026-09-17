@@ -43,7 +43,7 @@ payload -- (contains (in 2 (ancestors 1))), birth contains -- renders as
 the C token 2aC: the multi-contains \"2\" (orange), the ancestor \"a\"
 (yellow), and the birth \"C\" (black-on-white)."
   (with-temp-buffer
-    (insert "Line with (skg (node (id 123) (parentIs independent) (rels (contains (in 2 (ancestors 1))) (birth contains)) (viewStats cycle) (editRequest delete))) text")
+    (insert "Line with (skg (node (id 123) (affectsParent false) (rels (contains (in 2 (ancestors 1))) (birth contains)) (viewStats cycle) (editRequest delete))) text")
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
       (let* ( ( herald-start
@@ -86,11 +86,11 @@ the C token 2aC: the multi-contains \"2\" (orange), the ancestor \"a\"
 (ert-deftest test-heralds-viewrequests-display ()
   "Test that viewRequests are displayed as req:* heralds."
   (with-temp-buffer
-    ;; Test (col aliases) viewRequest
+    ;; Test (folder aliases) viewRequest
     (erase-buffer)
-    (insert "(skg (node (id 1) (viewRequests (col aliases))))")
+    (insert "(skg (node (id 1) (viewRequests (folder aliases))))")
     (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "req:col:.*aliases" result)))
+      (should (string-match "req:folder:.*aliases" result)))
 
     ;; Test (path container) viewRequest
     (erase-buffer)
@@ -106,18 +106,18 @@ the C token 2aC: the multi-contains \"2\" (orange), the ancestor \"a\"
 
     ;; Test multiple viewRequests
     (erase-buffer)
-    (insert "(skg (node (id 4) (viewRequests (col aliases) (path container) (path linkSource))))")
+    (insert "(skg (node (id 4) (viewRequests (folder aliases) (path container) (path linkSource))))")
     (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "req:col:.*aliases" result))
+      (should (string-match "req:folder:.*aliases" result))
       (should (string-match "req:path:.*container" result))
       (should (string-match "req:path:.*linkSource" result)))))
 
 (ert-deftest test-heralds-scaffold-display ()
   "Test that scaffold kinds are displayed correctly."
   (with-temp-buffer
-    ;; Test aliasCol
+    ;; Test aliasFolder
     (erase-buffer)
-    (insert "(skg aliasCol)")
+    (insert "(skg aliasFolder)")
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "aliases" result)))
 
@@ -127,9 +127,9 @@ the C token 2aC: the multi-contains \"2\" (orange), the ancestor \"a\"
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "alias" result)))
 
-    ;; Test aliasCol with folded
+    ;; Test aliasFolder with folded
     (erase-buffer)
-    (insert "(skg folded aliasCol)")
+    (insert "(skg folded aliasFolder)")
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "aliases" result)))
 

@@ -81,14 +81,14 @@ skg-config-dir is set and `skg--source-names' works."
                     '(:owner "owner" :member "kid"
                       :relation "contains"))))))
 
-(ert-deftest test-relationship-edge-writable-col-member ()
-  "A subscribeeCol member's edge: owner = the col's ANCHOR (its
-org-parent), relation = the col's relation."
+(ert-deftest test-relationship-edge-writable-folder-member ()
+  "A subscribeeFolder member's edge: owner = the folder's ANCHOR (its
+org-parent), relation = the folder's relation."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id anchor) (source public))) anchor\n"
-    "** (skg subscribeeCol)\n"
-    "*** (skg (node (id seen) (source public) indef)) seen\n")
+    "** (skg subscribeeFolder)\n"
+    "*** (skg (node (id seen) (source public) writeProtected)) seen\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
@@ -98,12 +98,12 @@ org-parent), relation = the col's relation."
                     '(:owner "anchor" :member "seen"
                       :relation "subscribes_to"))))))
 
-(ert-deftest test-relationship-edge-refuses-on-readonly-col-member ()
-  "Refuses (user-error) on a member of a read-only col."
+(ert-deftest test-relationship-edge-refuses-on-readonly-folder-member ()
+  "Refuses (user-error) on a member of a read-only folder."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (source public))) owner\n"
-    "** (skg subscriberCol)\n"
+    "** (skg subscriberFolder)\n"
     "*** (skg (node (id sub) (source public))) sub\n")
    test--config-public-private-trusted
    (lambda ()
@@ -113,7 +113,7 @@ org-parent), relation = the col's relation."
      (let ((err (should-error (skg--relationship-edge-at-point)
                               :type 'user-error)))
        (should (string-match-p "read-only" (cadr err)))
-       (should (string-match-p "subscriberCol" (cadr err)))))))
+       (should (string-match-p "subscriberFolder" (cadr err)))))))
 
 (ert-deftest test-relationship-edge-refuses-on-root ()
   "Refuses on a root headline: with no org-parent there is no edge."
@@ -131,11 +131,11 @@ org-parent), relation = the col's relation."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (source public))) owner\n"
-    "** (skg aliasCol) aliases\n")
+    "** (skg aliasFolder) aliases\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (search-forward "(skg aliasCol)" nil t)
+     (search-forward "(skg aliasFolder)" nil t)
      (beginning-of-line)
      (should-error (skg--relationship-edge-at-point)
                    :type 'user-error))))
@@ -155,7 +155,7 @@ org-parent), relation = the col's relation."
                  '("trusted"))))
 
 (ert-deftest test-relationship-source-choices-full-ladder-fallback ()
-  "With no default (or one absent from the ladder), the whole ladder
+  "With no default (or one na from the ladder), the whole ladder
 is offered; the server's save-time floor check backstops."
   (should (equal (skg--relationship-source-choices
                   '("public" "private") nil)
@@ -223,7 +223,7 @@ the displayed relSource fact; its message says the SAVED source survives
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (source public))) owner\n"
-    "** (skg aliasCol)\n"
+    "** (skg aliasFolder)\n"
     "*** (skg alias) nickname\n")
    test--config-public-private-trusted
    (lambda ()
@@ -245,14 +245,14 @@ the displayed relSource fact; its message says the SAVED source survives
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (source public))) owner\n"
-    "** (skg (unknown (id absent) (viewStats (relSource private))))\n")
+    "** (skg (unknown (id na) (viewStats (relSource private))))\n")
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
      (forward-line 1)
      (skg--apply-relationship-source-choice "trusted")
      (should (string-match-p
-              "(unknown (id absent) (viewStats (relSource private)) (editRequest (relSource trusted)))"
+              "(unknown (id na) (viewStats (relSource private)) (editRequest (relSource trusted)))"
               (test--buffer-line 2)))
      (skg--apply-relationship-source-choice
       skg--relationship-source-no-override)
@@ -279,7 +279,7 @@ the displayed relSource fact; its message says the SAVED source survives
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (source private))) owner\n"
-    "** (skg aliasCol)\n"
+    "** (skg aliasFolder)\n"
     "*** (skg alias) nickname\n")
    test--config-public-private-trusted
    (lambda ()
@@ -398,19 +398,19 @@ choices, so the prompt pre-fills with the default instead."
    "* (skg (node (id r) (source public))) r\n"
    "** (skg (node (id a) (source public))) a\n"
    "*** (skg (node (id b) (source public))) b\n"
-   "** (skg (node (id c) (source public) (parentIs independent))) c\n"
+   "** (skg (node (id c) (source public) (affectsParent false))) c\n"
    "*** (skg (node (id d) (source public))) d\n"
-   "** (skg (node (id e) (source public) indef)) e\n"
+   "** (skg (node (id e) (source public) writeProtected)) e\n"
    "*** (skg (node (id f) (source public))) f\n"
-   "** (skg subscribeeCol)\n"
+   "** (skg subscribeeFolder)\n"
    "*** (skg (node (id g) (source public))) g\n"
    "**** (skg (node (id h) (source public))) h\n"
-   "** (skg aliasCol) aliases\n")
+   "** (skg aliasFolder) aliases\n")
   "A view-root tree exercising the walk's qualification and pruning:
-affected content (a, b), an independent branch (c, d), an
-indefinitive-but-affected member (e) over content (f), a
-subscribeeCol member (g) over subscribee-as-such content (h), and an
-aliasCol.")
+true content (a, b), an false branch (c, d), an
+write-protected-but-true member (e) over content (f), a
+subscribeeFolder member (g) over subscribee-as-such content (h), and an
+aliasFolder.")
 
 (defun test--line-of-id (id)
   "Return the text of the buffer line whose metadata carries ID."
@@ -421,10 +421,10 @@ aliasCol.")
      (line-beginning-position) (line-end-position))))
 
 (ert-deftest test-recursive-walk-contained ()
-  "Kind `contained' hits affected content children of definitive
-activeNode parents only: the root's own (absent) edge is skipped, the
-independent branch and everything below the indefinitive node and the
-subscribee-as-such member are pruned, and col members are untouched."
+  "Kind `contained' hits true content children of definitive
+activeNode parents only: the root's own (na) edge is skipped, the
+false branch and everything below the write-protected node and the
+subscribee-as-such member are pruned, and folder members are untouched."
   (test--with-skg-content-view
    test--recursive-content-tree
    test--config-public-private-trusted
@@ -441,7 +441,7 @@ subscribee-as-such member are pruned, and col members are untouched."
                                      (test--line-of-id id))))))))
 
 (ert-deftest test-recursive-walk-subscribee ()
-  "Kind `subscribee' hits only subscribeeCol members, leaving content
+  "Kind `subscribee' hits only subscribeeFolder members, leaving content
 children and subscribee-as-such content untouched."
   (test--with-skg-content-view
    test--recursive-content-tree
@@ -476,12 +476,12 @@ own edge to its view-parent."
                                (test--line-of-id "b")))))))
 
 (ert-deftest test-recursive-walk-overridden-and-member-content ()
-  "An overriddenCol member matches kind `overridden'; the member's
+  "An overriddenFolder member matches kind `overridden'; the member's
 own content children (the member being definitive) match kind
-`contained' through the col."
+`contained' through the folder."
   (let ((tree (concat
                "* (skg (node (id anchor) (source public))) anchor\n"
-               "** (skg overriddenCol)\n"
+               "** (skg overriddenFolder)\n"
                "*** (skg (node (id o) (source public))) o\n"
                "**** (skg (node (id oc) (source public))) oc\n")))
     (test--with-skg-content-view
@@ -505,13 +505,13 @@ own content children (the member being definitive) match kind
        (should-not (string-match-p "relSource"
                                    (test--line-of-id "o")))))))
 
-(ert-deftest test-recursive-walk-prunes-readonly-col ()
-  "A read-only col's whole branch is pruned: even a definitive
+(ert-deftest test-recursive-walk-prunes-readonly-folder ()
+  "A read-only folder's whole branch is pruned: even a definitive
 member's content children are not reached."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (source public))) owner\n"
-    "** (skg subscriberCol)\n"
+    "** (skg subscriberFolder)\n"
     "*** (skg (node (id s) (source public))) s\n"
     "**** (skg (node (id sc) (source public))) sc\n")
    test--config-public-private-trusted
@@ -523,14 +523,14 @@ member's content children are not reached."
        (should-not (string-match-p "relSource"
                                    (test--line-of-id id)))))))
 
-(ert-deftest test-recursive-walk-indefinitive-col-anchor ()
-  "A writable col under an INDEFINITIVE anchor is not collected at
+(ert-deftest test-recursive-walk-write-protected-folder-anchor ()
+  "A writable folder under an WRITE_PROTECTED anchor is not collected at
 save, so its members do not match -- whether the walk starts at the
-anchor (pruned below the indefinitive node) or at the col itself
+anchor (pruned below the write-protected node) or at the folder itself
 (refused by the anchor-definitiveness check)."
   (let ((tree (concat
-               "* (skg (node (id anchor) (source public) indef)) anchor\n"
-               "** (skg subscribeeCol)\n"
+               "* (skg (node (id anchor) (source public) writeProtected)) anchor\n"
+               "** (skg subscribeeFolder)\n"
                "*** (skg (node (id g) (source public))) g\n")))
     (test--with-skg-content-view
      tree test--config-public-private-trusted
@@ -544,7 +544,7 @@ anchor (pruned below the indefinitive node) or at the col itself
      tree test--config-public-private-trusted
      (lambda ()
        (goto-char (point-min))
-       (search-forward "subscribeeCol")
+       (search-forward "subscribeeFolder")
        (beginning-of-line)
        (should (= 0 (skg--set-relationship-source-recursive-walk
                      'subscribee "trusted")))
@@ -643,7 +643,7 @@ window plumbing are stubbed as in the other handler tests."
          (when (get-buffer "*skg-relationship-kinds*")
            (kill-buffer "*skg-relationship-kinds*")))))))
 
-;; --- set-source stuck-edge offer and indefinitive warning ---
+;; --- set-source stuck-edge offer and write-protected warning ---
 ;; (Here rather than in test-skg-metadata.el because these need the
 ;; config harness: the stuck-edge analysis reads the privacy ladder.
 ;; In test--config-public-private-trusted the order is public,
@@ -729,14 +729,14 @@ no offer is made."
      (should (string-match-p "(source trusted)" (test--line-of-id "a")))
      (should-not (string-match-p "relSource" (test--line-of-id "a"))))))
 
-(ert-deftest test-set-source-recursive-warns-about-indefinitive ()
-  "An indefinitive matching instance is NOT edited; its ID goes to
+(ert-deftest test-set-source-recursive-warns-about-write-protected ()
+  "A write-protected matching instance is NOT edited; its ID goes to
 *Messages* and the summary carries a loud WARNING. Edges touching
 it are not offered (they cannot actually publicize)."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id r) (source private))) r\n"
-    "** (skg (node (id e) (source private) indef)) e\n"
+    "** (skg (node (id e) (source private) writeProtected)) e\n"
     "*** (skg (node (id f) (source private))) f\n")
    test--config-public-private-trusted
    (lambda ()
@@ -745,7 +745,7 @@ it are not offered (they cannot actually publicize)."
                 (lambda (_current) "public"))
                ((symbol-function 'y-or-n-p)
                 (lambda (_prompt)
-                  (error "Should not offer: both edges touch the indefinitive node"))))
+                  (error "Should not offer: both edges touch the write-protected node"))))
        (let ((msgs (cdr (test--messages-during
                          (lambda () (skg-set-source t))))))
          (should (seq-find (lambda (m)
@@ -809,10 +809,10 @@ rises. A child still more private than the new source is left alone."
      (should-not (string-match-p "relSource" (test--line-of-id "c")))
      (should (string-match-p "(source trusted)" (test--line-of-id "c"))))))
 
-(ert-deftest test-set-source-single-indefinitive-warns-and-skips ()
-  "A single move of an indefinitive instance edits nothing and warns."
+(ert-deftest test-set-source-single-write-protected-warns-and-skips ()
+  "A single move of a write-protected instance edits nothing and warns."
   (test--with-skg-content-view
-   "* (skg (node (id x) (source private) indef)) x\n"
+   "* (skg (node (id x) (source private) writeProtected)) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))

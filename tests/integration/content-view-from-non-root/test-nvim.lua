@@ -1,6 +1,6 @@
 -- Integration test: opening a content view of `child', whose parent
 -- contains it, should render the buffer with `parent' prepended as
--- the first child of `child' (Birth::ContainsParent indefinitive).
+-- the first child of `child' (Birth::ContainsParent write-protected).
 -- Because `child' is contained in the graph, the view-root is born as
 -- container; that default is implicit in emitted metadata.
 --
@@ -43,17 +43,17 @@ end
 T.check(root_line, string.format(
   'view-root not as expected; got:\n%s', text))
 
-T.check(not root_line:find('(parentIs independent)', 1, true),
+T.check(not root_line:find('(affectsParent false)', 1, true),
   string.format(
-    'contained view-root should be content, not independent; line: %s',
+    'contained view-root should be content, not false; line: %s',
     root_line))
 T.check(not root_line:find(
-    '(parentIs independent) indef (rels (contains (out 1 (ancestors 1))) (birth contains))', 1, true),
+    '(affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth contains))', 1, true),
   string.format(
     'contained view-root should be content, not content; line: %s',
     root_line))
 T.check(not root_line:find(
-    '(parentIs independent) indef (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo))', 1, true),
+    '(affectsParent false) writeProtected (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo))', 1, true),
   string.format(
     'contained view-root should be content, not line: %s', root_line))
 
@@ -69,11 +69,11 @@ T.check(parent_line, string.format(
   'no level-2 headline for parent; buffer:\n%s', text))
 
 T.check(parent_line:find(
-    '(parentIs independent) indef (rels (contains (out 1 (ancestors 1))) (birth contains))', 1, true) ~= nil,
+    '(affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth contains))', 1, true) ~= nil,
   string.format(
-    'parent is not (parentIs independent) indef (rels (contains (out 1 (ancestors 1))) (birth contains)); '
+    'parent is not (affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth contains)); '
     .. 'line: %s', parent_line))
-T.check(parent_line:find(' indef%f[%A]') ~= nil,
-  string.format('parent is not indefinitive; line: %s', parent_line))
+T.check(parent_line:find(' writeProtected%f[%A]') ~= nil,
+  string.format('parent is not writeProtected; line: %s', parent_line))
 
 T.pass('PASS: Integration test successful!')

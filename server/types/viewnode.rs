@@ -4,7 +4,7 @@
 ///   (That name might change once there are more clients. The only client so far is written in Emacs org-mode; hence the name.)
 /// Some 'ViewNode's correspond to whole graph nodes; these are 'Vognode's.
 /// Others encode information about neighboring tree nodes, such as
-/// aliases, IDs, and partner collections.
+/// aliases, IDs, and partner folders.
 
 use super::git::{ExistenceAxes, MembershipAxes, Sign};
 use super::misc::{ID, SourceName};
@@ -13,21 +13,21 @@ use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
 
-/// Whether this node participates in the collection represented by
-/// its visible parent. For an ordinary Vognode parent, that collection
-/// is the parent's content. For a PartnerCol parent, the PartnerCol
-/// decides the collection (per its relation and role). For other kinds of parent's,
-/// a node's ParentIs has no effect.
+/// Whether this node participates in the membership represented by
+/// its visible parent. For an ordinary Vognode parent, that membership
+/// is the parent's content. For a PartnerFolder parent, the PartnerFolder
+/// decides the membership (per its relation and role). For other kinds of parent's,
+/// a node's AffectsParent has no effect.
 ///
-/// PITFALL: If a vognode is indefinitive, *none* of it children affect it,
+/// PITFALL: If a vognode is write-protected, *none* of it children affect it,
 /// just as edits to itself do not affect it,
-/// regardless of what the children might claim with their ParentIs field.
+/// regardless of what the children might claim with their AffectsParent field.
 ///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ParentIs {
-  Affected,    // default: upon saving, this can affect its parent's collection
-  Independent, // upon saving, this cannot affect its parent
-  Absent,      // No (visible) parent. (BufferRoot is not visible.)
+pub enum AffectsParent {
+  True,  // this node affects its parent
+  False, // it doesn't
+  NA,    // It has no parent
 }
 
 /// Why a generated node was originally displayed under its visible parent.
@@ -63,9 +63,9 @@ pub struct ViewNode {
 pub enum ViewNodeKind {
   Vognode       (Vognode),
   Phantom       (Phantom),
-  QualCol       (QualCol),
+  QualFolder       (QualFolder),
   Qual          (Qual),
-  PartnerCol    (PartnerCol),
+  PartnerFolder    (PartnerFolder),
   BufferRoot,
   DeadScaffold,
 }
@@ -83,7 +83,7 @@ pub enum Vognode {
 /// in how much they can still say about it.
 #[derive( Debug, Clone, PartialEq )]
 pub enum Phantom {
-  Diff    (PhantomDiff), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim PhantomDiff, not an ActiveNode -- a phantom is always indefinitive/bodyless and its parentIs is never read or rendered, so it needs none of ActiveNode's parentIs/birth/viewStats/view_requests/indef_or_def. See PhantomDiff_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
+  Diff    (PhantomDiff), // Diff-only placeholder: absent from git worktree but present in git HEAD ("removed"), or still present in worktree but no longer a member of its parent ("removedHere"). Exists only in the diff view. TODO/DONE/local-view-update/plan_v2.org §11 payload reduction (2026-06-04): now carries a slim PhantomDiff, not an ActiveNode -- a phantom is always write-protected/bodyless and its affectsParent is never read or rendered, so it needs none of ActiveNode's affectsParent/birth/viewStats/view_requests/editability. See PhantomDiff_Generic + TODO/DONE/local-view-update/plan_v2.org §18.
   Deleted (PhantomDeleted), // Epistemically: No longer exists in the graph. Procedurally: Skg just watched the user delete this node (maybe from a different view), but for some reason (e.g. its view-descendents are interesting, or it is a root) had to retain an image of it here.
   // PITFALL: There is an exception. If Skg watches a user delete a node, while that user has a view of a foreign node that refers to the deleted node, that "foreigner's view" will show it as Unknown rather than Deleted. This is to maintain consistency with how that relationship to a nonexistent node will appear when viewed in later sessions.
   Unknown (PhantomUnknown), // Skg can't find it (and, unlike Deleted, does not know why). Can result from bad data, or from a reference to another user's node that has since been deleted.
@@ -107,7 +107,7 @@ pub enum Phantom {
 ///
 /// USED: inert -- it generates no save instructions and is excluded from its
 /// parent's contains list. It is never "completed", yet it retains its children
-/// (which `mark_orphans_under_dead_parents_independent` demotes to Independent)
+/// (which `mark_orphans_under_dead_parents_false` demotes to Independent)
 /// so the user's subtree under a vanished node survives. A childless Deleted is
 /// pruned by the postorder sweep (`is_self_deletable_when_empty`), and a Deleted
 /// may stand as a view root (validate_tree) so a deleted root still shows.
@@ -189,7 +189,7 @@ pub struct ActiveNode_Generic < Id, Src > {
   pub title         : String,
   pub id            : Id,
   pub source        : Src,
-  pub parentIs      : ParentIs,
+  pub affectsParent      : AffectsParent,
   pub birth         : Birth,
 
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
@@ -208,7 +208,7 @@ pub struct ActiveNode_Generic < Id, Src > {
   /// True iff the node's source is not a git repo (or has no commits).
   /// A per-source fact, not an axis.
   pub not_in_git    : bool,
-  pub indef_or_def  : IndefOrDef,
+  pub editability  : Editability,
 }
 
 pub type PhantomDiff   = PhantomDiff_Generic < ID, SourceName >;
@@ -230,8 +230,8 @@ pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
 ///
 /// USED: as a read-only diff annotation. It depicts a removed member at its
 /// correct HEAD position among surviving siblings, decorated with per-stage diff
-/// atoms. Always indefinitive and bodyless (enforced by `normal_to_phantom` /
-/// `mk_phantom_viewnode`); its parentIs is never read or rendered (implicit
+/// atoms. Always write-protected and bodyless (enforced by `normal_to_phantom` /
+/// `mk_phantom_viewnode`); its affectsParent is never read or rendered (implicit
 /// Affected); a Normal child left under it is demoted to Independent.
 ///
 /// DISTINCT INFO: it is the only phantom that carries the git-diff coordinates
@@ -239,9 +239,9 @@ pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
 /// it exists solely to show a change between git snapshots. It keeps a `title`
 /// and `source` (resolved via `title_for_phantom`; the source may be the
 /// SourceName NOT_FOUND sentinel) and `graphStats`, which IS rendered on
-/// phantoms. It needs NONE of ActiveNode's parentIs / birth / viewStats /
-/// view_requests / indef_or_def (TODO/DONE/local-view-update/plan_v2.org §11 reduction; see §18): nothing
-/// reads a phantom's parentIs, and every phantom is indefinitive.
+/// phantoms. It needs NONE of ActiveNode's affectsParent / birth / viewStats /
+/// view_requests / editability (TODO/DONE/local-view-update/plan_v2.org §11 reduction; see §18): nothing
+/// reads a phantom's affectsParent, and every phantom is write-protected.
 #[derive( Debug, Clone, PartialEq )]
 pub struct PhantomDiff_Generic < Id, Src > {
   pub title      : String,
@@ -259,8 +259,8 @@ pub struct PhantomDiff_Generic < Id, Src > {
 
 impl < Id, Src > PhantomDiff_Generic < Id, Src > {
   /// Build a phantom payload from an ActiveNode, keeping only the phantom-relevant
-  /// fields and discarding parentIs / birth / viewStats / view_requests /
-  /// indef_or_def. Used when flipping an Active node to a phantom and by the
+  /// fields and discarding affectsParent / birth / viewStats / view_requests /
+  /// editability. Used when flipping an Active node to a phantom and by the
   /// placed<->maybe-placed conversions.
   pub fn from_activeNode ( t : ActiveNode_Generic < Id, Src > ) -> Self {
     PhantomDiff_Generic {
@@ -273,9 +273,9 @@ impl < Id, Src > PhantomDiff_Generic < Id, Src > {
       graphStats : t . graphStats,
     }}
 
-  /// A phantom is always indefinitive, hence never has a body.
+  /// A phantom is always write-protected, hence never has a body.
   pub fn body (&self) -> Option < &String > { None }
-  pub fn is_indefinitive (&self) -> bool { true }
+  pub fn is_writeProtected (&self) -> bool { true }
 
   /// True iff this node's diff axes require phantom display; for a correctly
   /// constructed phantom this holds, but some shared code asks regardless.
@@ -292,15 +292,15 @@ impl < Id, Src > PhantomDiff_Generic < Id, Src > {
 /// - A Definitive represents an editable view.
 ///   The user's changes to title, body and children
 ///   will be written to disk and the dbs when they save.
-/// - An Indefinitive represents a read-only view,
+/// - `WriteProtected` represents a read-only view,
 ///   in which case the body is not presented.
 ///   (TODO ? Maybe it should be.)
 #[derive( Debug, Clone, PartialEq )]
-pub enum IndefOrDef {
+pub enum Editability {
   Definitive {
     body         : Option < String >,
     edit_request : Option < NodeEditRequest >, },
-  Indefinitive, }
+  WriteProtected, }
 
 /// Containerward path statistics: how a node relates to the
 /// container hierarchy (path length, fork count, cycle detection).
@@ -348,7 +348,7 @@ pub struct GraphNodeStats {
 
 /// View-specific statistics about a node.
 /// These depend on the node's position in the current view tree.
-/// `cycle` depends on ancestors; `parentIs*` depends on the specific parent.
+/// `cycle` depends on ancestors; `affectsParent*` depends on the specific parent.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewNodeStats {
   pub cycle             : bool,
@@ -371,15 +371,15 @@ pub struct ViewNodeStats {
   /// (the carrier's ID must equal the visibility-ungated
   /// 'resolve_override (N).effective').
   pub overridesHere         : Option<ID>,
-  /// True iff the node is drawn INDEFINITIVE here while its graph
+  /// True iff the node is drawn write-protected here while its graph
   /// node has a body -- a body the rendering hides. Herald "B",
   /// hugging the ☮ (TODO/more.org). Display-only, like the assembled
   /// herald strings; the parser accepts and discards it.
   pub hidden_body           : bool,
   /// Some(NAME) when the relationship instance this position's
   /// binding edge to its org-parent represents (=contains= for an
-  /// ordinary content child; the col's relation for a simple
-  /// PartnerCol member -- see 'PartnerCol::relation_member_role')
+  /// ordinary content child; the folder's relation for a simple
+  /// PartnerFolder member -- see 'PartnerFolder::relation_member_role')
   /// is recorded in a source that DIFFERS from that edge's DEFAULT
   /// (see the relationship-default policy in 'SkgConfig'). None when
   /// equal to the default:
@@ -387,8 +387,8 @@ pub struct ViewNodeStats {
   /// TODO/user-owned_autofork_chain/5_plan.org) -- the herald marks
   /// exactly the deliberately privatized edges. Also None: without a
   /// graph handle; for a node that is not genuinely a member here
-  /// (parentIs != Affected, or a backpath graft); and for the two
-  /// compound filter cols (HiddenInSubscribee /
+  /// (affectsParent != Affected, or a backpath graft); and for the two
+  /// compound filter folders (HiddenInSubscribee /
   /// HiddenOutsideOfSubscribee), which have no single
   /// 'relation_member_role' to read a source from.
   /// This is a display fact, unlike a requested replacement stored in
@@ -400,7 +400,7 @@ pub struct ViewNodeStats {
 }
 
 #[derive( Debug, Clone, Copy, PartialEq, Eq )]
-pub enum QualCol {
+pub enum QualFolder {
   ID,
   Alias,
 }
@@ -411,34 +411,37 @@ pub enum Qual {
           rel_source: Option<SourceName>,
           rel_source_request: Option<SourceName>,
           membership: MembershipAxes },
-  ID { id: ID, // an ID of grandparent (the parent being an IDCol)
+  ID { id: ID, // an ID of grandparent (the parent being an IDFolder)
        membership: MembershipAxes },
   TextChanged { staged: bool, unstaged: bool }, // Indicates title or body changed between stages. Visible in 'git diff mode'. Per-stage bools mark whether the change is staged (HEAD vs index) and/or unstaged (index vs worktree).
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PartnerCol {
+pub enum PartnerFolder {
   Subscribee, // Collects subscribees its parent subscribes to. Writeable.
   Subscriber, // Collects nodes that subscribe to its parent. Read-only (editable from the other side of the relationship).
   Overridden, // Collects nodes whose view its parent overrides. Writeable.
   Overrider, // Collects nodes that override its parent's view. Read-only (editable from the other side of the relationship).
   Hider, // Collects nodes that hide its parent. Read-only (editable from the other side of the relationship).
-  Hidden, // Collects nodes its parent hides. Read-only (but these relationships are editable from this side of the relationhip, within the parent's SubscribeeCol).
+  // This folder is not itself hidden. Its children represent the nodes hidden
+  // by the node represented by its parent. The relationships are read-only
+  // here, but editable within the parent's SubscribeeFolder.
+  Hidden,
   HiddenInSubscribee, // Child of a subscribee-as-such. Collects children of the subscribee that the subscriber hides. Read-only (but these relationships are editable by modifying the listed contents of the subscribee-as-such).
-  HiddenOutsideOfSubscribee, // Child of a SubscribeeCol. Collects things hidden by the SubscribeeCol's parent but absent from every subscribee's content. This derived filter is editable as an exclusive visible-outside subset; its hide sources remain derived. Shown after all Subscribees, under the same SubscribeeCol.
+  HiddenOutsideOfSubscribee, // Child of a SubscribeeFolder. Collects things hidden by the SubscribeeFolder's parent but absent from every subscribee's content. This derived filter is editable as an exclusive visible-outside subset; its hide sources remain derived. Shown after all Subscribees, under the same SubscribeeFolder.
 }
 
-/// How a PartnerCol's membership relates to user edits.
-/// Every layer that treats some PartnerCols differently from others
+/// How a PartnerFolder's membership relates to user edits.
+/// Every layer that treats some PartnerFolders differently from others
 /// (save extraction, reconciliation, herald metadata) should consult
-/// 'PartnerCol::policy' rather than matching on col variants, so the
+/// 'PartnerFolder::policy' rather than matching on folder variants, so the
 /// policies cannot drift apart per file.
 ///
 /// STALE-MEMBER RULE (uniform; decided 2026-06-10, superseding the
-/// discard policy once planned for the filter cols in
+/// discard policy once planned for the filter folders in
 /// TODO/full-schema/7_saving-readonly-cols.org): during
 /// reconciliation, a stale member that is a leaf is deleted, and one
-/// with children is demoted to parentIs=Independent, whatever the
+/// with children is demoted to affectsParent=false, whatever the
 /// policy. The policies differ in:
 /// - whether buffer membership is read at save extraction
 ///   ('WritableSet' and 'EditableFilter'),
@@ -446,12 +449,12 @@ pub enum PartnerCol {
 ///   from 'relation_member_role'; both filter policies from hide state),
 /// - goal-list order ('WritableSet': graph/disk order, which the
 ///   user's own save defines; 'ReadOnlySet': the view's current
-///   member order, then missing members appended; filter cols are
+///   member order, then missing members appended; filter folders are
 ///   derived),
 /// - whether repairs warn (the read-only policies, in the saved view).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ColPolicy {
-  WritableSet,    // Membership edits are graph edits. An absent col means no opinion; a present-but-empty col means an explicit empty set (see 'MSV').
+pub enum FolderPolicy {
+  WritableSet,    // Membership edits are graph edits. An absent folder means no opinion; a present-but-empty folder means an explicit empty set (see 'MSV').
   EditableFilter, // A visible derived subset is an explicit edit of that subset; source requests remain unsupported.
   ReadOnlySet,    // Membership is generated from the graph. User order is respected view-locally; membership edits are repaired, with a warning.
   ReadOnlyFilter, // Membership is derived from hide state rather than from a relation role. Repaired, with a warning.
@@ -465,53 +468,53 @@ pub enum NodeEditRequest {
   Delete, // request to delete this node
 }
 
-/// Which relation's collection a 'Col' view-request builds. A Col
-/// builds BOTH cols of its relation, so it is named by the RELATION
+/// Which relation's folders a 'Folder' view-request builds. A Folder
+/// builds BOTH folders of its relation, so it is named by the RELATION
 /// (relname), unlike a Path, which is named by a single partner ROLE.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ColRelation {
+pub enum FolderRelation {
   Aliases,
   Overrides,
   Hides,
   Subscribes,
 }
 
-impl ColRelation {
-  pub const ALL : [ColRelation; 4] = [
-    ColRelation::Aliases, ColRelation::Overrides,
-    ColRelation::Hides,   ColRelation::Subscribes ];
+impl FolderRelation {
+  pub const ALL : [FolderRelation; 4] = [
+    FolderRelation::Aliases, FolderRelation::Overrides,
+    FolderRelation::Hides,   FolderRelation::Subscribes ];
 
   pub fn relname (
     self,
   ) -> &'static str {
     match self {
-      ColRelation::Aliases    => "aliases",
-      ColRelation::Overrides  => "overrides",
-      ColRelation::Hides      => "hides",
-      ColRelation::Subscribes => "subscribes", } }
+      FolderRelation::Aliases    => "aliases",
+      FolderRelation::Overrides  => "overrides",
+      FolderRelation::Hides      => "hides",
+      FolderRelation::Subscribes => "subscribes", } }
 
   pub fn from_relname (
     s : &str,
-  ) -> Option<ColRelation> {
+  ) -> Option<FolderRelation> {
     match s {
-      "aliases"    => Some (ColRelation::Aliases),
-      "overrides"  => Some (ColRelation::Overrides),
-      "hides"      => Some (ColRelation::Hides),
-      "subscribes" => Some (ColRelation::Subscribes),
+      "aliases"    => Some (FolderRelation::Aliases),
+      "overrides"  => Some (FolderRelation::Overrides),
+      "hides"      => Some (FolderRelation::Hides),
+      "subscribes" => Some (FolderRelation::Subscribes),
       _            => None, } }
 }
 
 /// Requests for additional views related to a node.
 /// Multiple view requests can be active simultaneously.
-/// - 'Col(rel)' builds BOTH cols of the relation, populated from the graph.
+/// - 'Folder(rel)' builds BOTH folders of the relation, populated from the graph.
 /// - 'Path(role)' builds the backpath for that one partner role.
-/// - 'Definitive' makes the (indefinitive) node editable.
+/// - 'Definitive' makes the (write-protected) node editable.
 /// - 'Fork' is the explicit 'skg-fork-node' gesture: clone this (owned)
 ///   node into a private fork that overrides it. Consumed on the save
 ///   path (fork detection), not during view completion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ViewRequest {
-  Col  (ColRelation),
+  Folder (FolderRelation),
   Path (RelationRole),
   Definitive,
   Fork,
@@ -552,21 +555,21 @@ impl < Id, Src > ActiveNode_Generic < Id, Src > {
     self . should_be_diffPhantom ()
     && self . existence . unstaged != Some (Sign::Minus) }
 
-  pub fn is_indefinitive (&self) -> bool {
-    matches! ( self . indef_or_def,
-               IndefOrDef::Indefinitive ) }
+  pub fn is_writeProtected (&self) -> bool {
+    matches! ( self . editability,
+               Editability::WriteProtected ) }
 
   pub fn body (&self) -> Option < &String > {
-    match &self . indef_or_def {
-      IndefOrDef::Definitive { body, .. } =>
+    match &self . editability {
+      Editability::Definitive { body, .. } =>
         body . as_ref(),
-      IndefOrDef::Indefinitive => None, }}
+      Editability::WriteProtected => None, }}
 
   pub fn edit_request (&self) -> Option < &NodeEditRequest > {
-    match &self . indef_or_def {
-      IndefOrDef::Definitive { edit_request, .. } =>
+    match &self . editability {
+      Editability::Definitive { edit_request, .. } =>
         edit_request . as_ref(),
-      IndefOrDef::Indefinitive => None, }}
+      Editability::WriteProtected => None, }}
 }
 
 impl ActiveNode {
@@ -590,55 +593,55 @@ impl MpActiveNode {
     . or_else ( || self . id . clone () ) }
 }
 
-impl PartnerCol {
-  pub fn policy (self) -> ColPolicy {
+impl PartnerFolder {
+  pub fn policy (self) -> FolderPolicy {
     match self {
-      PartnerCol::Subscribee
-        | PartnerCol::Overridden
-        => ColPolicy::WritableSet,
-      PartnerCol::Subscriber
-        | PartnerCol::Overrider
-        | PartnerCol::Hider
-        | PartnerCol::Hidden
-        => ColPolicy::ReadOnlySet,
-      PartnerCol::HiddenInSubscribee
-        => ColPolicy::ReadOnlyFilter,
-      PartnerCol::HiddenOutsideOfSubscribee
-        => ColPolicy::EditableFilter,
+      PartnerFolder::Subscribee
+        | PartnerFolder::Overridden
+        => FolderPolicy::WritableSet,
+      PartnerFolder::Subscriber
+        | PartnerFolder::Overrider
+        | PartnerFolder::Hider
+        | PartnerFolder::Hidden
+        => FolderPolicy::ReadOnlySet,
+      PartnerFolder::HiddenInSubscribee
+        => FolderPolicy::ReadOnlyFilter,
+      PartnerFolder::HiddenOutsideOfSubscribee
+        => FolderPolicy::EditableFilter,
     } }
 
   pub fn repr_in_client (self) -> &'static str {
     match self {
-      PartnerCol::Subscribee                => "subscribeeCol",
-      PartnerCol::Subscriber                => "subscriberCol",
-      PartnerCol::Overridden                => "overriddenCol",
-      PartnerCol::Overrider                 => "overriderCol",
-      PartnerCol::Hider                     => "hiderCol",
-      PartnerCol::Hidden                    => "hiddenCol",
-      PartnerCol::HiddenInSubscribee        => "hiddenInSubscribeeCol",
-      PartnerCol::HiddenOutsideOfSubscribee => "hiddenOutsideOfSubscribeeCol",
+      PartnerFolder::Subscribee                => "subscribeeFolder",
+      PartnerFolder::Subscriber                => "subscriberFolder",
+      PartnerFolder::Overridden                => "overriddenFolder",
+      PartnerFolder::Overrider                 => "overriderFolder",
+      PartnerFolder::Hider                     => "hiderFolder",
+      PartnerFolder::Hidden                    => "hiddenFolder",
+      PartnerFolder::HiddenInSubscribee        => "hiddenInSubscribeeFolder",
+      PartnerFolder::HiddenOutsideOfSubscribee => "hiddenOutsideOfSubscribeeFolder",
     }}
 
-  pub fn from_client_string (s : &str) -> Option<PartnerCol> {
+  pub fn from_client_string (s : &str) -> Option<PartnerFolder> {
     match s {
-      "subscribeeCol"                => Some (PartnerCol::Subscribee),
-      "subscriberCol"                => Some (PartnerCol::Subscriber),
-      "overriddenCol"                => Some (PartnerCol::Overridden),
-      "overriderCol"                 => Some (PartnerCol::Overrider),
-      "hiderCol"                     => Some (PartnerCol::Hider),
-      "hiddenCol"                    => Some (PartnerCol::Hidden),
-      "hiddenInSubscribeeCol"        => Some (PartnerCol::HiddenInSubscribee),
-      "hiddenOutsideOfSubscribeeCol" => Some (PartnerCol::HiddenOutsideOfSubscribee),
+      "subscribeeFolder"                => Some (PartnerFolder::Subscribee),
+      "subscriberFolder"                => Some (PartnerFolder::Subscriber),
+      "overriddenFolder"                => Some (PartnerFolder::Overridden),
+      "overriderFolder"                 => Some (PartnerFolder::Overrider),
+      "hiderFolder"                     => Some (PartnerFolder::Hider),
+      "hiddenFolder"                    => Some (PartnerFolder::Hidden),
+      "hiddenInSubscribeeFolder"        => Some (PartnerFolder::HiddenInSubscribee),
+      "hiddenOutsideOfSubscribeeFolder" => Some (PartnerFolder::HiddenOutsideOfSubscribee),
       _                              => None,
     } }
 
 }
 
-impl QualCol {
+impl QualFolder {
   pub fn repr_in_client (self) -> &'static str {
     match self {
-      QualCol::Alias => "aliasCol",
-      QualCol::ID    => "idCol",
+      QualFolder::Alias => "aliasFolder",
+      QualFolder::ID    => "idFolder",
     } }
 
 }
@@ -698,12 +701,12 @@ impl Phantom {
 impl ViewRequest {
   /// The MATCH-position atoms the server can emit inside
   /// '(viewRequests ...)'. The RELNAME / ROLENAME arguments of the
-  /// '(col ...)' / '(path ...)' forms are VALUE-position (echoed by the
+  /// '(folder ...)' / '(path ...)' forms are VALUE-position (echoed by the
   /// herald's ANY/IT), so they are deliberately absent -- like IDs and
   /// counts elsewhere. Enumerated for the herald conformance test
   /// (server/heralds.rs).
   pub const EMITTABLE_MATCH_ATOMS : [&'static str; 3] =
-    [ "col", "path", "definitiveView" ];
+    [ "folder", "path", "definitiveView" ];
 }
 
 impl AsRef<ViewNode> for ViewNode {
@@ -725,8 +728,8 @@ impl ViewNode {
     match &mut self . kind {
       ViewNodeKind::Vognode (Vognode::Active (active)) => {
         active . rel_source_request = None;
-        if let IndefOrDef::Definitive { edit_request, .. } =
-          &mut active . indef_or_def
+        if let Editability::Definitive { edit_request, .. } =
+          &mut active . editability
         { *edit_request = None; }},
       ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
         unknown . rel_source_request = None,
@@ -740,15 +743,15 @@ impl ViewNode {
     if let ViewNodeKind::Vognode (Vognode::Active (t))
       = &self . kind
       { if t . should_be_diffPhantom ()
-        { // A phantom is ALWAYS indefinitive and renders no body (Jeff's
+        { // A phantom is ALWAYS write-protected and renders no body (Jeff's
           // TODO/DONE/local-view-update/progress.org §9 TODO): the diff view presumes git literacy (magit
           // shows the real node), and a phantom must never be a node's
           // definitive instance -- if Removed it has nothing to define, and if
           // RemovedHere "edit it here, where it isn't" is dangerously
           // confusing. So drop body/edit_request when flipping a (possibly
           // Definitive) Active node to a phantom. mk_phantom_viewnode already
-          // builds from an Indefinitive base, so now every phantom is
-          // indefinitive by construction.
+          // builds from a `WriteProtected` base, so now every phantom is
+          // write-protected by construction.
           let phantom : PhantomDiff =
             PhantomDiff::from_activeNode ( t . clone () );
           self . kind = ViewNodeKind::Phantom (
@@ -762,8 +765,8 @@ impl ViewNode {
         &d . title,
       ViewNodeKind::Qual (q) =>
         q . title (),
-      ViewNodeKind::QualCol (_)
-        | ViewNodeKind::PartnerCol (_)
+      ViewNodeKind::QualFolder (_)
+        | ViewNodeKind::PartnerFolder (_)
         | ViewNodeKind::BufferRoot
         | ViewNodeKind::DeadScaffold
         | ViewNodeKind::Phantom (Phantom::Unknown (_))
@@ -779,17 +782,17 @@ impl ViewNode {
       ViewNodeKind::Phantom (Phantom::Deleted (d)) => d . body . as_ref (),
       ViewNodeKind::Phantom (Phantom::Unknown (_))
         | ViewNodeKind::Vognode (Vognode::Inactive (_))
-        | ViewNodeKind::QualCol (_)
+        | ViewNodeKind::QualFolder (_)
         | ViewNodeKind::Qual (_)
-        | ViewNodeKind::PartnerCol (_)
+        | ViewNodeKind::PartnerFolder (_)
         | ViewNodeKind::BufferRoot
         | ViewNodeKind::DeadScaffold => None,
     }}
 
-  pub fn is_activeNode_and_parentIs_affected (&self) -> bool {
+  pub fn is_activeNode_and_affectsParent_true (&self) -> bool {
     match &self . kind {
       ViewNodeKind::Vognode (Vognode::Active (t)) =>
-        t . parentIs == ParentIs::Affected,
+        t . affectsParent == AffectsParent::True,
       _ => false,
     }}
 
@@ -802,7 +805,7 @@ impl ViewNode {
   /// The id of an Active vognode or a Diff phantom -- the two ActiveNode-ish kinds,
   /// which before the Vognode/Phantom split both lived in Vognode and were
   /// reached by `Vognode::normal_or_phantom_id`. None for everything else
-  /// (Inactive, Deleted/Unknown phantoms, cols, scaffolds, BufferRoot).
+  /// (Inactive, Deleted/Unknown phantoms, folders, scaffolds, BufferRoot).
   pub fn active_or_diff_phantom_id (&self) -> Option<&ID> {
     match &self . kind {
       ViewNodeKind::Vognode (Vognode::Active (t)) => Some (&t . id),
@@ -843,7 +846,7 @@ impl fmt::Display for ViewRequest {
     f : &mut fmt::Formatter<'_>
   ) -> fmt::Result {
     match self {
-      ViewRequest::Col  (rel)  => write! (f, "(col {})",  rel  . relname  ()),
+      ViewRequest::Folder  (rel)  => write! (f, "(folder {})",  rel  . relname  ()),
       ViewRequest::Path (role) => write! (f, "(path {})", role . rolename ()),
       ViewRequest::Definitive  => write! (f, "definitiveView"),
       ViewRequest::Fork        => write! (f, "fork"), } } }
@@ -886,7 +889,7 @@ pub fn default_activeNode (
     title,
     id,
     source,
-    parentIs       : ParentIs::Affected,
+    affectsParent       : AffectsParent::True,
     birth          : Birth::Unremarkable,
     graphStats     : GraphNodeStats::default(),
     viewStats      : ViewNodeStats::default(),
@@ -895,12 +898,12 @@ pub fn default_activeNode (
     existence      : ExistenceAxes::default(),
     membership     : MembershipAxes::default(),
     not_in_git     : false,
-    indef_or_def   : IndefOrDef::Definitive {
+    editability   : Editability::Definitive {
       body         : None,
       edit_request : None },
   }}
 
-/// Create an indefinitive phantom ViewNode with the given diff axes.
+/// Create a write-protected phantom ViewNode with the given diff axes.
 /// At least one membership axis or the unstaged-existence axis should be
 /// negative for this to be a real phantom; callers must ensure that.
 pub fn mk_phantom_viewnode (
@@ -911,17 +914,17 @@ pub fn mk_phantom_viewnode (
   membership : MembershipAxes,
 ) -> ViewNode {
   let mut viewnode : ViewNode =
-    mk_indefinitive_viewnode ( id, source, title, ParentIs::Affected );
+    mk_writeProtected_viewnode ( id, source, title, AffectsParent::True );
   if let ViewNodeKind::Vognode (Vognode::Active (mut t)) = viewnode . kind
     { t . existence  = existence;
       t . membership = membership;
       viewnode . kind = ViewNodeKind::Phantom (
         Phantom::Diff ( PhantomDiff::from_activeNode (t) )); }
   else
-    // mk_indefinitive_viewnode always yields an Active vognode; if that ever
+    // mk_writeProtected_viewnode always yields an Active vognode; if that ever
     // changes, fail loudly rather than silently return a non-phantom.
     { unreachable! (
-        "mk_phantom_viewnode: mk_indefinitive_viewnode did not yield an Active vognode" ); }
+        "mk_phantom_viewnode: mk_writeProtected_viewnode did not yield an Active vognode" ); }
   viewnode }
 
 pub fn mk_definitive_viewnode (
@@ -932,9 +935,9 @@ pub fn mk_definitive_viewnode (
 ) -> ViewNode { mk_viewnode ( id,
                             source,
                             title,
-                            ParentIs::Affected,
+                            AffectsParent::True,
                             Birth::Unremarkable,
-                            IndefOrDef::Definitive {
+                            Editability::Definitive {
                               body,
                               edit_request : None },
                             HashSet::new () ) } // view_requests
@@ -968,37 +971,37 @@ pub fn mk_inactive_viewnode (
       Vognode::Inactive ( InactiveNode ) ),
   }}
 
-/// Create an indefinitive ViewNode from disk data.
-/// Body is always None since indefinitive nodes don't have editable content.
-pub fn mk_indefinitive_viewnode (
+/// Create a write-protected ViewNode from disk data.
+/// Body is always None since write-protected nodes don't have editable content.
+pub fn mk_writeProtected_viewnode (
   id     : ID,
   source : SourceName,
   title  : String,
-  parentIs  : ParentIs,
+  affectsParent  : AffectsParent,
 ) -> ViewNode {
-  mk_indefinitive_viewnode_with_birth (
-    id, source, title, parentIs, Birth::Unremarkable ) }
+  mk_writeProtected_viewnode_with_birth (
+    id, source, title, affectsParent, Birth::Unremarkable ) }
 
-pub fn mk_indefinitive_viewnode_with_birth (
+pub fn mk_writeProtected_viewnode_with_birth (
   id       : ID,
   source   : SourceName,
   title    : String,
-  parentIs : ParentIs,
+  affectsParent : AffectsParent,
   birth    : Birth,
 ) -> ViewNode { mk_viewnode ( id,
                             source,
                             title,
-                            parentIs,
+                            affectsParent,
                             birth,
-                            IndefOrDef::Indefinitive,
+                            Editability::WriteProtected,
                             HashSet::new ( )) } // view_requests
 
-/// Convert a definitive ViewNode to indefinitive.
+/// Convert a definitive ViewNode to write-protected.
 /// Discards body and edit_request.
 /// Errors if the input is not an ActiveNode.
-pub fn mk_indefinitive_from_viewnode (
+pub fn mk_writeProtected_from_viewnode (
   mut viewnode : ViewNode,
-  parentIs    : ParentIs,
+  affectsParent    : AffectsParent,
   birth       : Birth,
 ) -> Result < ViewNode, String > {
   match &mut viewnode . kind {
@@ -1006,19 +1009,19 @@ pub fn mk_indefinitive_from_viewnode (
       // Mutate in place, so that every field not named here
       // (view_requests, diff axes, graphStats, viewStats, and any
       // field added later) is preserved rather than silently reset.
-      t . parentIs = parentIs;
+      t . affectsParent = affectsParent;
       t . birth = birth;
-      t . indef_or_def = // discards body and edit_request
-        IndefOrDef::Indefinitive;
+      t . editability = // discards body and edit_request
+        Editability::WriteProtected;
       Ok (viewnode) },
     ViewNodeKind::Phantom (Phantom::Diff (p)) =>
       // A phantom carries none of the fields preserved above,
       // so it is rebuilt rather than mutated.
-      Ok ( mk_indefinitive_viewnode_with_birth (
+      Ok ( mk_writeProtected_viewnode_with_birth (
         p . id . clone (), p . source . clone (), p . title . clone (),
-        parentIs, birth )),
+        affectsParent, birth )),
     _ => Err (
-      "mk_indefinitive_from_viewnode: expected ActiveNode"
+      "mk_writeProtected_from_viewnode: expected ActiveNode"
         . to_string () ) }}
 
 /// Create a ViewNode with *nearly* full metadata control.
@@ -1029,9 +1032,9 @@ pub fn mk_viewnode (
   id            : ID,
   source        : SourceName,
   title         : String,
-  parentIs      : ParentIs,
+  affectsParent      : AffectsParent,
   birth         : Birth,
-  indef_or_def  : IndefOrDef,
+  editability  : Editability,
   view_requests : HashSet < ViewRequest >,
 ) -> ViewNode {
   ViewNode { focused     : false,
@@ -1039,10 +1042,10 @@ pub fn mk_viewnode (
              body_folded : false,
              kind        : ViewNodeKind::Vognode (
                Vognode::Active (
-                 ActiveNode { parentIs,
+                 ActiveNode { affectsParent,
                             birth,
                             view_requests,
-                            indef_or_def,
+                            editability,
                             .. default_activeNode (
                               id, source, title ) } ) ) }}
 

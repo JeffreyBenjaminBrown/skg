@@ -319,13 +319,13 @@ Prompts for the link label, defaulting to the title."
     "*"))
 
 (defun skg--insert-node-from-entry (entry)
-  "Insert an indefinitive ActiveNode headline from ENTRY, an (id title) pair.
+  "Insert a write-protected ActiveNode headline from ENTRY, an (id title) pair.
 If point is already after headline stars at the start of a line,
 insert only the metadata and title.  Otherwise insert a full same-level
 headline."
   (let* (( id (car entry) )
          ( title (cadr entry) )
-         ( node-text (format "(skg (node (id %s) indef)) %s" id title)) )
+         ( node-text (format "(skg (node (id %s) writeProtected)) %s" id title)) )
     (if (save-excursion
           (let ((pos (point)))
             (beginning-of-line)
@@ -356,9 +356,9 @@ Prompts for the link label, defaulting to the title from the stack."
       (skg--insert-link-from-entry entry) )))
 
 (defun skg-paste-node ()
-  "Insert an indefinitive ActiveNode headline from the top of `skg-id-stack'.
+  "Insert a write-protected ActiveNode headline from the top of `skg-id-stack'.
 Does not modify the stack.  The inserted metadata contains the node ID
-and `indef`; the headline title comes from the stack entry."
+and `writeProtected`; the headline title comes from the stack entry."
   (interactive)
   (let (( entry (skg--id-stack-top-or-message) ))
     (when entry
@@ -382,8 +382,8 @@ Prompts for the link label, defaulting to the title from the stack."
       (skg--insert-link-from-entry entry) )))
 
 (defun skg-pop-node ()
-  "Pop the top of `skg-id-stack' and insert an indefinitive ActiveNode headline.
-The inserted metadata contains the node ID and `indef`; the headline
+  "Pop the top of `skg-id-stack' and insert a write-protected ActiveNode headline.
+The inserted metadata contains the node ID and `writeProtected`; the headline
 title comes from the stack entry."
   (interactive)
   (let (( entry (skg--id-stack-top-or-message) ))

@@ -57,14 +57,14 @@ M.commands = {
   GotoInGitParentAndCloseThis = { module = 'skg.goto_git',
                                   fn = 'goto_in_git_parent_and_close_this',
                                   desc = 'Goto in git parent, closing this buffer' },
-  ShowCollectionAliases = { module = 'skg.view_requests', fn = 'show_collection_aliases',
-                            desc = 'Request the alias collection (auto-saves)' },
-  ShowCollectionOverrides = { module = 'skg.view_requests', fn = 'show_collection_overrides',
-                              desc = 'Request the override collections (auto-saves)' },
-  ShowCollectionHides = { module = 'skg.view_requests', fn = 'show_collection_hides',
-                          desc = 'Request the hide collections (auto-saves)' },
-  ShowCollectionSubscribes = { module = 'skg.view_requests', fn = 'show_collection_subscribes',
-                               desc = 'Request the subscribe collections (auto-saves)' },
+  ShowFolderOfAliases = { module = 'skg.view_requests', fn = 'show_folderOf_aliases',
+                            desc = 'Request the alias folder (auto-saves)' },
+  ShowFolderOfOverrides = { module = 'skg.view_requests', fn = 'show_folderOf_overrides',
+                              desc = 'Request the override folders (auto-saves)' },
+  ShowFolderOfHides = { module = 'skg.view_requests', fn = 'show_folderOf_hides',
+                          desc = 'Request the hide folders (auto-saves)' },
+  ShowFolderOfSubscribes = { module = 'skg.view_requests', fn = 'show_folderOf_subscribes',
+                               desc = 'Request the subscribe folders (auto-saves)' },
   ShowPathsThroughContainers = { module = 'skg.view_requests', fn = 'show_paths_through_containers',
                                  desc = 'Graft the containment ancestry (auto-saves)' },
   ShowPathsThroughLinkSources = { module = 'skg.view_requests', fn = 'show_paths_through_link_sources',
@@ -85,7 +85,7 @@ M.commands = {
                                   desc = 'Graft the subscribees (auto-saves)' },
   SetDefinitive = { module = 'skg.view_requests', fn = 'set_definitive',
                     desc = 'Make this the editable view of its node' },
-  SetIndefinitive = { module = 'skg.metadata', fn = 'set_indefinitive',
+  SetWriteProtected = { module = 'skg.metadata', fn = 'set_write_protected',
                       desc = 'Make this view of its node read-only' },
   SetMergeRequest = { module = 'skg.metadata', fn = 'set_merge_request',
                       desc = 'Request merging another node into this one' },
@@ -128,7 +128,7 @@ M.commands = {
   PasteLink = { module = 'skg.linkstack', fn = 'paste_link',
                 desc = 'Insert a link to the top-of-stack node' },
   PasteNode = { module = 'skg.linkstack', fn = 'paste_node',
-                desc = 'Insert an indefinitive view of the top-of-stack node' },
+                desc = 'Insert a write-protected view of the top-of-stack node' },
   PopId = { module = 'skg.linkstack', fn = 'pop_id',
             desc = 'Paste the top-of-stack id and pop it' },
   PopLink = { module = 'skg.linkstack', fn = 'pop_link',
@@ -212,10 +212,10 @@ M.content_view_bindings = {
   { 'Gm', 'GotoInGitAndCloseThis' },     -- C-c G m
   { 'gM', 'GotoInGitParent' },           -- C-c g M
   { 'GM', 'GotoInGitParentAndCloseThis' }, -- C-c G M
-  { 'ca', 'ShowCollectionAliases' },     -- C-c c a
-  { 'co', 'ShowCollectionOverrides' },   -- C-c c o
-  { 'ch', 'ShowCollectionHides' },       -- C-c c h
-  { 'cs', 'ShowCollectionSubscribes' },  -- C-c c s
+  { 'ca', 'ShowFolderOfAliases' },
+  { 'co', 'ShowFolderOfOverrides' },
+  { 'ch', 'ShowFolderOfHides' },
+  { 'cs', 'ShowFolderOfSubscribes' },
   { 'pC', 'ShowPathsThroughContainers' }, -- C-c p C
   { 'pL', 'ShowPathsThroughLinkSources' }, -- C-c p L
   { 'pl', 'ShowPathsThroughLinkDests' }, -- C-c p l
@@ -226,7 +226,7 @@ M.content_view_bindings = {
   { 'pS', 'ShowPathsThroughSubscribers' }, -- C-c p S
   { 'ps', 'ShowPathsThroughSubscribees' }, -- C-c p s
   { 'sd', 'SetDefinitive' },             -- C-c s d
-  { 'si', 'SetIndefinitive' },           -- C-c s i
+  { 'sw', 'SetWriteProtected' },          -- C-c s w
   { 'sm', 'SetMergeRequest' },           -- C-c s m
   { 'ss', 'SetSource' },                 -- C-c s s
   { 'sS', 'SetSourceRecursive' },        -- C-c s S

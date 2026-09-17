@@ -1,14 +1,14 @@
 // cargo nextest run --test grouped_overrides -E 'test(collateral_subscribee_staleness::)'
 //
 // Regression for the collateral-rerender staleness flagged in
-// subscribeecol-maybe-todo.org and fixed for forks (plan.org:
+// subscribeeFolder-maybe-todo.org and fixed for forks (plan.org:
 // "Collateral-rerender staleness fix"). A DEFINITIVE subscriber open in
 // two views: changing its subscriptions in one view and saving must
-// refresh the OTHER (collateral) view's subscribeeCol from the graph,
+// refresh the OTHER (collateral) view's subscribeeFolder from the graph,
 // not leave it showing the old subscription. Before the fix,
-// reconcile_subscribee_col_children skipped a definitive subscriber
-// outside diff mode (the `parent_indefinitive || source_diffs.is_some()`
-// gate), so the collateral subscribeeCol kept stale members.
+// reconcile_subscribeeFolder_children skipped a definitive subscriber
+// outside diff mode (the `parent_write-protected || source_diffs.is_some()`
+// gate), so the collateral subscribeeFolder kept stale members.
 //
 // Installs the explicit graph handle (the subscribee lookups read
 // the captured graph), so it lives among the grouped_overrides installers.
@@ -72,7 +72,7 @@ fn drop_member_line ( buf : &str, fragment : &str ) -> String {
     . join ("\n") + "\n" }
 
 #[test]
-fn collateral_definitive_subscriber_subscribeeCol_refreshes
+fn collateral_definitive_subscriber_subscribeeFolder_refreshes
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
     "skg-test-collateral-subscribee-staleness",
@@ -87,15 +87,15 @@ fn collateral_definitive_subscriber_subscribeeCol_refreshes
       let a_uri : ViewUri = ViewUri::ContentView ("S-a" . into ());
       let b_uri : ViewUri = ViewUri::ContentView ("S-b" . into ());
 
-      // View A rooted at S: S is a definitive root, its subscribeeCol
+      // View A rooted at S: S is a definitive root, its subscribeeFolder
       // shows both subscribees M and N.
       let (a_view, a_pids, a_vf) =
         single_root_view (
           config, Some (tantivy), &ID::from ("S"), false ) ?;
-      assert! ( a_view . contains ("subscribeeCol")
+      assert! ( a_view . contains ("subscribeeFolder")
                 && a_view . contains ("(id M)")
                 && a_view . contains ("(id N)"),
-        "view A should show M and N in S's subscribeeCol:\n{}", a_view );
+        "view A should show M and N in S's subscribeeFolder:\n{}", a_view );
       views_state . open_views . register_view (
         &graph . load_full (), a_uri . clone (), a_vf, &a_pids );
 
@@ -106,11 +106,11 @@ fn collateral_definitive_subscriber_subscribeeCol_refreshes
           config, Some (tantivy), &ID::from ("S"), false ) ?;
       assert! ( b_view . contains ("(id M)")
                 && b_view . contains ("(id N)"),
-        "view B should show M and N in S's subscribeeCol:\n{}", b_view );
+        "view B should show M and N in S's subscribeeFolder:\n{}", b_view );
       views_state . open_views . register_view (
         &graph . load_full (), b_uri . clone (), b_vf, &b_pids );
 
-      // In view A, drop N from S's subscribeeCol (subscribes_to -> [M])
+      // In view A, drop N from S's subscribeeFolder (subscribes_to -> [M])
       // and save A.
       let edited_a : String = drop_member_line (&a_view, "(id N)");
       let (_response, collateral_views) =
@@ -119,16 +119,16 @@ fn collateral_definitive_subscriber_subscribeeCol_refreshes
           &mut views_state ) . await ?;
 
       // The collateral view B must refresh from the just-saved graph:
-      // its subscribeeCol now shows M but NOT N, even though S is
+      // its subscribeeFolder now shows M but NOT N, even though S is
       // DEFINITIVE there (the root) and diff mode is off. Before the
       // fix, B kept N stale.
       assert_eq! ( collateral_views . len (), 1,
         "exactly view B should be collateral: {:?}", collateral_views );
       let b_collateral : &str = &collateral_views[0];
       assert! ( b_collateral . contains ("(id M)"),
-        "M must remain in B's subscribeeCol:\n{}", b_collateral );
+        "M must remain in B's subscribeeFolder:\n{}", b_collateral );
       assert! ( ! b_collateral . contains ("(id N)"),
-        "N must be gone from B's subscribeeCol collaterally \
+        "N must be gone from B's subscribeeFolder collaterally \
          (definitive subscriber must refresh from the graph):\n{}",
         b_collateral );
       Ok (( )) } )) }

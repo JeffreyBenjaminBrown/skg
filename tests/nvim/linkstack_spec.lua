@@ -97,13 +97,13 @@ describe('skg.linkstack paste and pop', function ()
           vim.api.nvim_get_current_buf(), { force = true })
   end)
 
-  it('paste_node inserts an indefinitive node without popping',
+  it('paste_node inserts a write-protected node without popping',
      function ()
     state.id_stack = { { 'id-1', 'Title from stack' } }
     buffer_with('')
     linkstack.paste_node()
     assert.are.equal(
-      '* (skg (node (id id-1) indef)) Title from stack\n',
+      '* (skg (node (id id-1) writeProtected)) Title from stack\n',
       buffer_text())
     assert.are.same({ { 'id-1', 'Title from stack' } },
                     state.id_stack)
@@ -113,7 +113,7 @@ describe('skg.linkstack paste and pop', function ()
     state.id_stack = { { 'id-2', 'Second' }, { 'id-1', 'First' } }
     buffer_with('')
     linkstack.pop_node()
-    assert.are.equal('* (skg (node (id id-2) indef)) Second\n',
+    assert.are.equal('* (skg (node (id id-2) writeProtected)) Second\n',
                      buffer_text())
     assert.are.same({ { 'id-1', 'First' } }, state.id_stack)
   end)
@@ -125,7 +125,7 @@ describe('skg.linkstack paste and pop', function ()
     vim.api.nvim_win_set_cursor(0, { 1, 3 })
     linkstack.paste_node()
     assert.are.equal(
-      '** (skg (node (id id-1) indef)) Title from stack',
+      '** (skg (node (id id-1) writeProtected)) Title from stack',
       buffer_text())
   end)
 

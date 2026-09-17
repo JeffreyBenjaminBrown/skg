@@ -132,7 +132,7 @@ Point may be on the headline or in the body.  The leaf must have
 exactly one org bracket link in its title plus body, no
 org-descendents, and a definitive ActiveNode org-parent whose source
 is owned by the user.  The link must be an id link.  The leaf is
-replaced by an indefinitive same-level ActiveNode for the link
+replaced by a write-protected same-level ActiveNode for the link
 target, then the buffer is saved."
   (interactive)
   (org-back-to-heading t)
@@ -178,8 +178,8 @@ target, then the buffer is saved."
     (unless (member source (skg--owned-sources))
       (user-error "Cannot replace this branch with a link: container source is not owned: %s"
                   source))
-    (when (skg--node-indefinitive-p metadata-sexp)
-      (user-error "Cannot replace this branch with a link: container is indefinitive"))))
+    (when (skg--node-write-protected-p metadata-sexp)
+      (user-error "Cannot replace this branch with a link: container is write-protected"))))
 
 (defun skg--replace-current-subtree-with-link-headline (id title)
   "Replace the current org subtree with a headline linking to ID.
@@ -248,12 +248,12 @@ one link is not an id link."
     (nreverse links)))
 
 (defun skg--replace-current-leaf-with-linked-content (link)
-  "Replace the current leaf with an indefinitive ActiveNode for LINK."
+  "Replace the current leaf with a write-protected ActiveNode for LINK."
   (let* ((stars (nth 0 (skg-split-as-stars-metadata-title
                        (skg-get-current-headline-text))))
          (id (plist-get link :id))
          (label (or (plist-get link :label) id))
-         (replacement (format "%s(skg (node (id %s) indef (viewRequests definitiveView))) %s\n"
+         (replacement (format "%s(skg (node (id %s) writeProtected (viewRequests definitiveView))) %s\n"
                               stars id label))
          (start (line-beginning-position))
          (end (save-excursion

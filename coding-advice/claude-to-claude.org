@@ -115,13 +115,13 @@ There are three ways to test the code:
   - textlinks_to: org-roam style [[id:...]] hyperlinks
 
   The view system is ephemeral scaffolding rebuilt every save:
-  - ActiveNode: corresponds to an NodeComplete, can be Definitive (editable) or Indefinitive (read-only)
-  - Scaffold: display-only nodes; the relation collections are
-    PartnerCols (subscribeeCol, subscriberCol, overriddenCol, ...),
-    plus AliasCol, IDCol, etc. (see glossary.md, "PartnerCol")
+  - ActiveNode: corresponds to an NodeComplete, can be Definitive (editable) or Write-protected (read-only)
+  - Scaffold: display-only nodes; the relation folders are
+    PartnerFolders (subscribeeFolder, subscriberFolder, overriddenFolder, ...),
+    plus AliasFolder, IDFolder, etc. (see glossary.md, "PartnerFolder")
   - 'complete_viewforest' (server/update_buffer/complete.rs) is one
     level-order BFS used for both de novo views and post-save
-    rerendering; per-collection reconcilers add and reconcile the
+    rerendering; per-folder reconcilers add and reconcile the
     scaffolds. (The older two-DFS-pass 'complete_viewtree' is gone;
     see TODO/DONE/local-view-update/plan_v2.org.)
 

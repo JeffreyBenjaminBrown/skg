@@ -5,9 +5,9 @@
 ///   ActiveNodes: (skg [focused] [folded]
 ///                   (node [(id ID)]
 ///                         [(source SOURCE)]
-///                         [(parentIs affected|independent|absent)]
+///                         [(affectsParent true|false|na)]
 ///                         [(birth backpath ROLENAME)]
-///                         [indef]   ; short for "indefinitive"
+///                         [writeProtected]   ; marks the occurrence write-protected
 ///                         [cycle]
 ///                         [(stats [containsParent]
 ///                                 [(containers N)]
@@ -21,9 +21,9 @@ use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::viewnode::{
-  GraphNodeStats, ViewNodeStats, NodeEditRequest, ViewRequest, ColRelation,
-  Qual, QualCol, PartnerCol, PhantomDeleted, InactiveNode, PhantomUnknown,
-  Birth, IndefOrDef, ParentIs,
+  GraphNodeStats, ViewNodeStats, NodeEditRequest, ViewRequest, FolderRelation,
+  Qual, QualFolder, PartnerFolder, PhantomDeleted, InactiveNode, PhantomUnknown,
+  Birth, Editability, AffectsParent,
 };
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::maybe_placed_viewnode::{
@@ -49,9 +49,9 @@ pub struct ViewnodeMetadata {
   // ActiveNode fields (ignored if scaffold is Some)
   pub id: Option<ID>,
   pub source: Option<SourceName>,
-  pub parentIs: ParentIs,
+  pub affectsParent: AffectsParent,
   pub birth: Birth,
-  pub indefinitive: bool,
+  pub writeProtected: bool,
   pub graphStats: GraphNodeStats,
   pub viewStats: ViewNodeStats,
   pub edit_request: Option<NodeEditRequest>,
@@ -78,7 +78,7 @@ pub struct ViewnodeMetadata {
   // dataless marker (see InactiveNode). It carries no id/source/etc.
   pub is_inactive_node : bool,
   // When true, this is a PhantomDiff. It carries the same fields as a
-  // node (id/source/indef/graphStats/diff axes), parsed via
+  // node (id/source/write-protected/graphStats/diff axes), parsed via
   // parse_node_sexp, but emits and is recognized by its own root atom
   // 'diffPhantom' rather than being inferred from the diff axes.
   pub is_diff_phantom : bool,
@@ -92,9 +92,9 @@ pub fn default_metadata() -> ViewnodeMetadata {
     non_vognode: None,
     id: None,
     source: None,
-    parentIs: ParentIs::Affected,
+    affectsParent: AffectsParent::True,
     birth: Birth::Unremarkable,
-    indefinitive: false,
+    writeProtected: false,
     graphStats: GraphNodeStats::default(),
     viewStats: ViewNodeStats::default(),
     edit_request: None,
@@ -120,8 +120,8 @@ pub fn default_metadata() -> ViewnodeMetadata {
 /// This is the bridge between parsing (ViewnodeMetadata) and runtime (MpViewnode).
 /// Returns (MpViewnode, error, warning):
 /// - error if a Scaffold has a body;
-/// - warning if a col header (QualCol or PartnerCol) has nonempty
-///   title text, which the server discards: col headlines are
+/// - warning if a folder header (QualFolder or PartnerFolder) has nonempty
+///   title text, which the server discards: folder headlines are
 ///   titleless server-side (heralds supply their labels), so any
 ///   text there is a user edit that cannot be saved. Qual leaves
 ///   are exempt -- their title IS their data.
@@ -175,11 +175,11 @@ pub fn viewnode_from_metadata (
               title . clone (),
               maybeplaced_kind_error_label (non_vognode) ))
           } else { None };
-        let col_title_warning : Option<String> =
+        let folder_title_warning : Option<String> =
           if ! title . is_empty ()
             && matches! ( non_vognode,
-                          MpViewnodeKind::QualCol (_)
-                          | MpViewnodeKind::PartnerCol (_) )
+                          MpViewnodeKind::QualFolder (_)
+                          | MpViewnodeKind::PartnerFolder (_) )
           { Some ( format! (
               "Headline text on a {} is not saved; discarded: {:?}",
               maybeplaced_kind_error_label (non_vognode),
@@ -204,39 +204,39 @@ pub fn viewnode_from_metadata (
                               staged   : metadata . textchanged_staged,
                               unstaged : metadata . textchanged_unstaged }),
           other => other . clone () };
-        ( non_vognode_with_title, error, col_title_warning )
+        ( non_vognode_with_title, error, folder_title_warning )
       } else {
       // MpActiveNode
-      { let indef_or_def : IndefOrDef =
-          if metadata . indefinitive
-          { IndefOrDef::Indefinitive }
+      { let editability : Editability =
+          if metadata . writeProtected
+          { Editability::WriteProtected }
           else
-          { IndefOrDef::Definitive {
+          { Editability::Definitive {
               body,
               edit_request : metadata . edit_request . clone () } };
-        // An edit_request on an indefinitive node has nowhere to live
-        // (IndefOrDef::Indefinitive carries none), so the user's
+        // An edit_request on a write-protected node has nowhere to live
+        // (Editability::WriteProtected carries none), so the user's
         // instruction to delete or merge would silently vanish. Emit a
         // validation error instead so the save is rejected with a
         // clear message. We can only report this when the id is
         // known; if it isn't, other validations cover the missing-id
         // case.
         let error : Option<BufferValidationError> =
-          if     metadata . indefinitive
+          if     metadata . writeProtected
               && metadata . edit_request . is_some ()
           { metadata . id . clone ()
-            . map ( BufferValidationError::EditRequestOnIndefinitive ) }
-          else if metadata . indefinitive
+            . map ( BufferValidationError::EditRequestOnWriteProtectedOccurrence ) }
+          else if metadata . writeProtected
                && metadata . rel_source_request . is_some ()
           { Some ( BufferValidationError::Other (
-              "Relationship-source request on an indefinitive node"
+              "Relationship-source request on a write-protected node"
               . to_string () )) }
           else { None };
         let t : MpActiveNode = MpActiveNode {
             title,
             id               : metadata . id . clone (),
             source           : metadata . source . clone (),
-            parentIs         : metadata . parentIs,
+            affectsParent         : metadata . affectsParent,
             birth            : metadata . birth,
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
@@ -245,15 +245,15 @@ pub fn viewnode_from_metadata (
             existence        : metadata . activeNode_existence,
             membership       : metadata . activeNode_membership,
             not_in_git       : metadata . activeNode_not_in_git,
-            indef_or_def, };
+            editability, };
         let node_kind : MpViewnodeKind =
           if metadata . is_diff_phantom
           { // TODO/DONE/local-view-update/plan_v2.org §11: a phantom carries only the slim MpPhantomDiff. The
             // root atom 'diffPhantom' (not the diff axes) decides this, so a
             // live node carrying e.g. removedM stays a Vognode. The
-            // EditRequestOnIndefinitive validation above already fired if this
-            // phantom (indefinitive) carried an edit_request, so dropping
-            // indef_or_def/parentIs/etc. here loses nothing.
+            // EditRequestOnWriteProtectedOccurrence validation above already fired if this
+            // phantom (write-protected) carried an edit_request, so dropping
+            // editability/affectsParent/etc. here loses nothing.
             MpViewnodeKind::Phantom (
               MpPhantom::Diff (
                 MpPhantomDiff::from_activeNode (t) )) }
@@ -272,12 +272,12 @@ fn maybeplaced_kind_error_label (
   kind : &MpViewnodeKind,
 ) -> String {
   match kind {
-    MpViewnodeKind::QualCol (col) =>
-      col . repr_in_client () . to_string (),
+    MpViewnodeKind::QualFolder (folder) =>
+      folder . repr_in_client () . to_string (),
     MpViewnodeKind::Qual (qual) =>
       qual . repr_in_client () . to_string (),
-    MpViewnodeKind::PartnerCol (partnerCol) =>
-      partnerCol . repr_in_client () . to_string (),
+    MpViewnodeKind::PartnerFolder (partnerFolder) =>
+      partnerFolder . repr_in_client () . to_string (),
     MpViewnodeKind::BufferRoot =>
       "forestRoot" . to_string (),
     MpViewnodeKind::DeadScaffold =>
@@ -327,7 +327,7 @@ pub fn parse_metadata_to_viewnodemd (
             parse_node_sexp ( &items[1..], &mut result ) ?; },
           "diffPhantom" => {
             // (diffPhantom ...) -- a moved/removed phantom in git-diff
-            // mode. Same field grammar as (node ...) (id/source/indef/
+            // mode. Same field grammar as (node ...) (id/source/write-protected/
             // graphStats/diff axes), but its own root atom so the client
             // and round-trip never infer phantom-ness from the diff axes.
             parse_node_sexp ( &items[1..], &mut result ) ?;
@@ -417,30 +417,30 @@ pub fn parse_metadata_to_viewnodemd (
           "inactiveNode" => result . is_inactive_node = true,
           // Scaffold kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
           "alias"    => result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::Alias { text: String::new(), rel_source: None, rel_source_request: None, membership: MembershipAxes::default() } ) ),
-          "aliasCol" => result . non_vognode = Some (MpViewnodeKind::QualCol (QualCol::Alias)),
+          "aliasFolder" => result . non_vognode = Some (MpViewnodeKind::QualFolder (QualFolder::Alias)),
           "forestRoot" => result . non_vognode = Some (MpViewnodeKind::BufferRoot),
-          "hiddenInSubscribeeCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::HiddenInSubscribee)),
-          "hiddenOutsideOfSubscribeeCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee)),
-          "hiddenCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Hidden)),
-          "hiderCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Hider)),
-          "overriddenCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Overridden)),
-          "overriderCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Overrider)),
-          "subscriberCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Subscriber)),
-          "subscribeeCol" =>
-            result . non_vognode = Some (MpViewnodeKind::PartnerCol (PartnerCol::Subscribee)),
+          "hiddenInSubscribeeFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)),
+          "hiddenOutsideOfSubscribeeFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee)),
+          "hiddenFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Hidden)),
+          "hiderFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Hider)),
+          "overriddenFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Overridden)),
+          "overriderFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Overrider)),
+          "subscriberFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Subscriber)),
+          "subscribeeFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)),
           "textChanged" =>
             result . non_vognode = Some (
               MpViewnodeKind::Qual (
                 Qual::TextChanged { staged: false, unstaged: false } ) ),
-          "idCol" =>
-            result . non_vognode = Some (MpViewnodeKind::QualCol (QualCol::ID)),
+          "idFolder" =>
+            result . non_vognode = Some (MpViewnodeKind::QualFolder (QualFolder::ID)),
           "id" =>
             result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::ID { id: ID::default(), membership: MembershipAxes::default() } ) ),
           "deletedScaffold" =>
@@ -499,17 +499,17 @@ fn parse_node_sexp (
           "viewRequests" => {
             parse_viewrequests_sexp (
               &subitems[1..], &mut metadata . view_requests ) ?; },
-          "parentIs" => {
+          "affectsParent" => {
             if subitems . len () != 2 {
-              return Err ( "parentIs requires exactly one value" . to_string () ); }
+              return Err ( "affectsParent requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
-            metadata . parentIs = match value . as_str () {
-              "affected"    => ParentIs::Affected,
-              "independent" => ParentIs::Independent,
-              "absent"      => ParentIs::Absent,
+            metadata . affectsParent = match value . as_str () {
+              "true"  => AffectsParent::True,
+              "false" => AffectsParent::False,
+              "na"    => AffectsParent::NA,
               _ => return Err ( format! (
-                "Invalid parentIs value: {}", value )), }; },
+                "Invalid affectsParent value: {}", value )), }; },
           "staged" => {
             apply_axis_atoms_to_activeNode (
               &subitems[1..],
@@ -528,10 +528,10 @@ fn parse_node_sexp (
         let bare_value : String =
           atom_to_string (element) ?;
         match bare_value . as_str () {
-          // "indef" is short for "indefinitive". The server emits
-          // and accepts only the abbreviated form (see org_to_text.rs).
-          "indef" =>
-            metadata . indefinitive = true,
+          // A `writeProtected` marker makes this occurrence write-protected.
+          // The server emits and accepts this exact atom (see org_to_text.rs).
+          "writeProtected" =>
+            metadata . writeProtected = true,
           "hiddenBody" =>
             // Display-only (like rels/birthHerald): the view
             // regenerates it, so accept and discard.
@@ -763,7 +763,7 @@ fn parse_editrequest_sexp (
 
 /// Parse the (viewRequests ...) s-expression and update viewRequests.
 /// Each request is either the bare atom 'definitiveView', or a nested
-/// '(col RELNAME)' / '(path ROLENAME)' form.
+/// '(folder RELNAME)' / '(path ROLENAME)' form.
 fn parse_viewrequests_sexp (
   items : &[Sexp],
   requests : &mut HashSet<ViewRequest>
@@ -780,10 +780,10 @@ fn parse_viewrequests_sexp (
         let head : String = atom_to_string ( &sub[0] ) ?;
         let arg  : String = atom_to_string ( &sub[1] ) ?;
         match head . as_str () {
-          "col"  => ViewRequest::Col (
-            ColRelation::from_relname (&arg)
+          "folder"  => ViewRequest::Folder (
+            FolderRelation::from_relname (&arg)
               . ok_or_else ( || format! (
-                "Invalid col relname: {}", arg )) ?),
+                "Invalid folder relname: {}", arg )) ?),
           "path" => ViewRequest::Path (
             RelationRole::from_rolename (&arg)
               . ok_or_else ( || format! (
@@ -792,6 +792,6 @@ fn parse_viewrequests_sexp (
             "Unknown view request form: ({} ...)", head )), } },
       _ => return Err (
         "Unexpected element in viewRequests (expected 'definitiveView' \
-         or '(col ...)' / '(path ...)')" . to_string () ), };
+         or '(folder ...)' / '(path ...)')" . to_string () ), };
     requests . insert (request); }
   Ok (( )) }

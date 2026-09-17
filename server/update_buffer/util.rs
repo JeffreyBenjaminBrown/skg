@@ -1,4 +1,4 @@
-use crate::types::viewnode::{ParentIs, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{AffectsParent, ViewNode, ViewNodeKind};
 use crate::types::viewnode::Vognode;
 use crate::types::tree::generic::{with_node_mut, write_at_ancestor_in_tree};
 
@@ -31,30 +31,30 @@ where
   Ok( () ) }
 
 /// TODO/fork-fixes.org: a NEW hiddenInSubscribee or
-/// hiddenOutsideOfSubscribee col begins folded. Creation sites stamp
-/// 'folded' on the newborn col; this runs at the col's own BFS visit
+/// hiddenOutsideOfSubscribee folder begins folded. Creation sites stamp
+/// 'folded' on the newborn folder; this runs at the folder's own BFS visit
 /// (its members now reconciled in) and transfers the stamp: every
-/// child is marked folded and the col's own flag is cleared. That
+/// child is marked folded and the folder's own flag is cleared. That
 /// encoding is the client's (elisp/skg-org-fold.el): 'folded' on a
-/// headline means it is hidden inside its folded PARENT, so a col's
-/// collapse lives on its members -- left on the col itself it would
-/// instead fold the col's parent. A col PARSED from a buffer carries
+/// headline means it is hidden inside its folded PARENT, so a folder's
+/// collapse lives on its members -- left on the folder itself it would
+/// instead fold the folder's parent. A folder PARSED from a buffer carries
 /// 'folded' only when it sat inside a folded ancestor; its members
 /// then already carry the mark, so the transfer changes nothing.
-pub fn fold_members_of_newborn_col (
+pub fn fold_members_of_newborn_folder (
   tree : &mut Tree<ViewNode>,
-  col  : NodeId,
+  folder  : NodeId,
 ) -> Result<(), String> {
   let newborn : bool =
-    tree . get (col)
-    . ok_or ("fold_members_of_newborn_col: node not found") ?
+    tree . get (folder)
+    . ok_or ("fold_members_of_newborn_folder: node not found") ?
     . value () . folded;
   if ! newborn { return Ok (( )); }
-  with_node_mut ( tree, col,
+  with_node_mut ( tree, folder,
                   |mut n| { n . value () . folded = false; } )
     . map_err ( |e| -> String { e . into () } ) ?;
   treat_certain_children (
-    tree, col,
+    tree, folder,
     |_vn : &ViewNode| true,
     |vn : &mut ViewNode| { vn . folded = true; } ) }
 
@@ -95,8 +95,8 @@ where Predicate: Fn (&Node) -> bool {
 
 /// Detach a scaffold node, transferring focus to its parent first if
 /// the detached subtree contained the focused node. Used when a
-/// scaffold collapses (e.g. SubscribeeCol with no goal subscribees,
-/// HiddenInSubscribeeCol with no remaining hidden children).
+/// scaffold collapses (e.g. SubscribeeFolder with no goal subscribees,
+/// HiddenInSubscribeeFolder with no remaining hidden children).
 pub fn detach_scaffold_transferring_focus (
   tree : &mut Tree<ViewNode>,
   node : NodeId,
@@ -131,7 +131,7 @@ pub fn move_child_to_end<Node> (
 /// What 'complete_relevant_children' changed while reconciling: the
 /// orderkeys it created, demoted to Independent (stale branches),
 /// detached as stale leaves, and detached as duplicates. Callers
-/// that warn about repairs to read-only cols consume this
+/// that warn about repairs to read-only folders consume this
 /// ('CompletionWarning'); other callers ignore it.
 #[derive(Debug)]
 pub struct RepairSummary<Orderkey> {
@@ -174,10 +174,10 @@ where Relevant : Fn (&ViewNode) -> bool,
   let problem_discard_response =
     |n: &mut ViewNode| { n . focused = true; };
   // TODO/DONE/local-view-update/plan_v2.org §6.0 stale-member rule: a stale member (relevant child not in the goal)
-  // that is a Normal, parentIs=Affected *branch* (has children) is demoted to
+  // that is a Normal, affectsParent=true *branch* (has children) is demoted to
   // Independent so the user's subtree survives; a stale InactiveNode
   // *branch* is deadened to a DeadScaffold instead (it has no
-  // parentIs to demote; the orphan handling then preserves its
+  // affectsParent to demote; the orphan handling then preserves its
   // subtree as independent -- TODO/full-schema/9-2_source-set-safety.org);
   // everything else stale -- a leaf, a diff-phantom, a qual -- is
   // deleted by the reconciler. Returns true iff it kept the node.
@@ -191,7 +191,7 @@ where Relevant : Fn (&ViewNode) -> bool,
         let has_children : bool = n . children () . next () . is_some ();
         match &n . value () . kind {
           ViewNodeKind::Vognode (Vognode::Active (t))
-            if has_children && t . parentIs == ParentIs::Affected
+            if has_children && t . affectsParent == AffectsParent::True
             => StaleTreatment::Demote,
           ViewNodeKind::Vognode (Vognode::Inactive (_))
             if has_children
@@ -203,7 +203,7 @@ where Relevant : Fn (&ViewNode) -> bool,
           with_node_mut ( tree, node_id, |mut n| {
             if let ViewNodeKind::Vognode (Vognode::Active (t))
               = &mut n . value () . kind
-              { t . parentIs = ParentIs::Independent; } } )
+              { t . affectsParent = AffectsParent::False; } } )
             . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
           Ok (true) },
         StaleTreatment::Deaden => {
@@ -240,12 +240,12 @@ where Relevant : Fn (&ViewNode) -> bool,
 ///   true, runs problem_discard_response on the parent afterward.
 /// - Reorders remaining children: irrelevant first, then relevant in goal_list order.
 ///   Creates new children for any orderkeys missing from the original children.
-///   USER-FACING CONSEQUENCE for PartnerCols: an Independent (non-member)
-///   child a user parks inside a col is "irrelevant" here, so it is moved
+///   USER-FACING CONSEQUENCE for PartnerFolders: an Independent (non-member)
+///   child a user parks inside a folder is "irrelevant" here, so it is moved
 ///   ABOVE the generated members on save. This is deliberate -- the
 ///   membership is generated and ordered, so a parked note stays but is
 ///   visibly separated from the live membership. Documented in glossary.md
-///   ("PartnerCol") and docs/sharing-model.md.
+///   ("PartnerFolder") and docs/sharing-model.md.
 /// - Returns a RepairSummary of what it created, demoted and detached.
 pub fn complete_relevant_children
 <Node, Orderkey, Relevant, View, ProblemDiscard, ProblemResponse, DemoteInvalid> (

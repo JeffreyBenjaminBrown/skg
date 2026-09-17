@@ -1,5 +1,5 @@
-/// Git diff view tests for the OUTBOUND sharing cols (overriddenCol,
-/// hiddenCol): members removed since HEAD appear as phantoms carrying
+/// Git diff view tests for the OUTBOUND sharing folders (overriddenFolder,
+/// hiddenFolder): members removed since HEAD appear as phantoms carrying
 /// per-stage 'removedM', and members added since HEAD carry per-stage
 /// 'newM', all read from the owner's per-stage relation diff
 /// (TODO/full-schema/12-2_diff-mode-policy_discussion.org).
@@ -9,10 +9,10 @@
 /// leaf file exists unchanged on both sides, so all signs are
 /// membership-only (no X axes).
 ///
-/// Col-existence companions (every relation EMPTIED since HEAD, so
-/// in diff mode each col must still render, holding only phantoms):
+/// Folder-existence companions (every relation EMPTIED since HEAD, so
+/// in diff mode each folder must still render, holding only phantoms):
 /// E overrode [EZ] and hid [EH]; ER overrode [EN] (so EN's
-/// overriderCol is the inbound case); ES subscribed to [EB].
+/// overriderFolder is the inbound case); ES subscribed to [EB].
 
 use super::common::*;
 use skg::test_utils::{graph_handle_from_config, skg_env_from_parts};
@@ -38,24 +38,24 @@ fn setup_overrides_fixtures_staged (
     "tests/git_diff_view/overrides/fixtures/worktree" ) }
 
 const EXPECTED_UNSTAGED : &str = "\
-** (skg overriddenCol)
+** (skg overriddenFolder)
 *** (skg (node (id Z) (source main))) Z
-*** (skg (node (id W) (source main) indef (unstaged removedM))) W
+*** (skg (node (id W) (source main) writeProtected (unstaged removedM))) W
 *** (skg (node (id O) (source main) (unstaged newM))) O
-** (skg hiddenCol)
+** (skg hiddenFolder)
 *** (skg (node (id ha) (source main))) ha
-*** (skg (node (id hb) (source main) indef (unstaged removedM))) hb
+*** (skg (node (id hb) (source main) writeProtected (unstaged removedM))) hb
 *** (skg (node (id hc) (source main) (unstaged newM))) hc
 ";
 
 const EXPECTED_STAGED : &str = "\
-** (skg overriddenCol)
+** (skg overriddenFolder)
 *** (skg (node (id Z) (source main))) Z
-*** (skg (node (id W) (source main) indef (staged removedM))) W
+*** (skg (node (id W) (source main) writeProtected (staged removedM))) W
 *** (skg (node (id O) (source main) (staged newM))) O
-** (skg hiddenCol)
+** (skg hiddenFolder)
 *** (skg (node (id ha) (source main))) ha
-*** (skg (node (id hb) (source main) indef (staged removedM))) hb
+*** (skg (node (id hb) (source main) writeProtected (staged removedM))) hb
 *** (skg (node (id hc) (source main) (staged newM))) hc
 ";
 
@@ -65,9 +65,9 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-git-diff-overrides",
     |s| Box::pin ( async move {
-      outbound_cols_show_phantoms_and_newM_de_novo_unstaged (s) . await ?;
-      emptied_cols_still_render_in_diff_mode_de_novo (s) . await ?;
-      outbound_cols_show_phantoms_and_newM_de_novo_staged (s) . await ?;
+      outbound_folders_show_phantoms_and_newM_de_novo_unstaged (s) . await ?;
+      emptied_folders_still_render_in_diff_mode_de_novo (s) . await ?;
+      outbound_folders_show_phantoms_and_newM_de_novo_staged (s) . await ?;
       diff_mode_save_is_noop_and_regenerates_outbound_phantoms (s) . await ?;
       Ok (( )) } )) }
 
@@ -86,7 +86,7 @@ async fn run_overrides_view_test (
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
     let graph = graph_handle_from_config (&config)?;
-    // De novo PartnerCol creation reads this fixture-local graph.
+    // De novo PartnerFolder creation reads this fixture-local graph.
     let env : SkgEnv =
       skg_env_from_parts (&config, &tantivy, &graph);
     let mut warnings : Vec<String> = Vec::new ();
@@ -97,27 +97,27 @@ async fn run_overrides_view_test (
     assert_buffer_contains (&actual, expected);
     Ok (( )) }
 
-async fn outbound_cols_show_phantoms_and_newM_de_novo_unstaged (
+async fn outbound_folders_show_phantoms_and_newM_de_novo_unstaged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   run_overrides_view_test (
     s, "skg-test-git-diff-overrides-unstaged", false,
     EXPECTED_UNSTAGED ) . await }
 
-/// Col existence: in diff mode, a col whose worktree membership is
+/// Folder existence: in diff mode, a folder whose worktree membership is
 /// EMPTY but whose HEAD side is not still renders, holding only
-/// phantoms -- in a de novo render, for an outbound col
-/// (overriddenCol, hiddenCol), an inbound col (overriderCol, via the
-/// inverse scan), and the subscribeeCol.  Outside diff mode the
-/// emptied cols still do not appear.
-async fn emptied_cols_still_render_in_diff_mode_de_novo (
+/// phantoms -- in a de novo render, for an outbound folder
+/// (overriddenFolder, hiddenFolder), an inbound folder (overriderFolder, via the
+/// inverse scan), and the subscribeeFolder.  Outside diff mode the
+/// emptied folders still do not appear.
+async fn emptied_folders_still_render_in_diff_mode_de_novo (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   let temp_dir : TempDir = TempDir::new ()?;
   let repo_path : &Path = temp_dir . path ();
   setup_overrides_fixtures (repo_path)?;
   s . reset_with_source_path (
-    "emptied_cols_still_render_in_diff_mode_de_novo",
+    "emptied_folders_still_render_in_diff_mode_de_novo",
     repo_path ) ?;
   let (config, tantivy)
     : (&SkgConfig, &mut TantivyIndex)
@@ -135,30 +135,30 @@ async fn emptied_cols_still_render_in_diff_mode_de_novo (
           &env, &roots, true, None, &mut warnings ) ?;
       assert_buffer_contains ( &diff_view, "\
 * (skg (node (id E) (source main))) E
-** (skg overriddenCol)
-*** (skg (node (id EZ) (source main) indef (unstaged removedM))) EZ
-** (skg hiddenCol)
-*** (skg (node (id EH) (source main) indef (unstaged removedM))) EH
+** (skg overriddenFolder)
+*** (skg (node (id EZ) (source main) writeProtected (unstaged removedM))) EZ
+** (skg hiddenFolder)
+*** (skg (node (id EH) (source main) writeProtected (unstaged removedM))) EH
 * (skg (node (id EN) (source main))) EN
-** (skg overriderCol)
-*** (skg (node (id ER) (source main) indef (unstaged removedM))) ER
+** (skg overriderFolder)
+*** (skg (node (id ER) (source main) writeProtected (unstaged removedM))) ER
 * (skg (node (id ES) (source main))) ES
-** (skg subscribeeCol)
-*** (skg (node (id EB) (source main) indef (unstaged removedM))) EB
+** (skg subscribeeFolder)
+*** (skg (node (id EB) (source main) writeProtected (unstaged removedM))) EB
 " ); }
-    { // Outside diff mode, the emptied cols still do not appear.
+    { // Outside diff mode, the emptied folders still do not appear.
       let mut warnings : Vec<String> = Vec::new ();
       let (plain_view, _pids, _tree) =
         multi_root_view_via_env (
           &env, &roots, false, None, &mut warnings ) ?;
-      for col in [ "overriddenCol", "hiddenCol",
-                   "overriderCol", "subscribeeCol" ] {
-        assert! ( ! plain_view . contains (col),
+      for folder in [ "overriddenFolder", "hiddenFolder",
+                   "overriderFolder", "subscribeeFolder" ] {
+        assert! ( ! plain_view . contains (folder),
           "an empty {} must not render outside diff mode:\n{}",
-          col, plain_view ); }}
+          folder, plain_view ); }}
     Ok (( )) }
 
-async fn outbound_cols_show_phantoms_and_newM_de_novo_staged (
+async fn outbound_folders_show_phantoms_and_newM_de_novo_staged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   run_overrides_view_test (
@@ -168,7 +168,7 @@ async fn outbound_cols_show_phantoms_and_newM_de_novo_staged (
 /// A diff-mode save of a buffer holding the worktree members is a
 /// no-op for the relations, regenerates the phantoms (idempotence:
 /// saving the rendered result changes nothing further), and never
-/// collects a phantom as a writable-col member (saving the phantom
+/// collects a phantom as a writable-folder member (saving the phantom
 /// line must not re-add W to R's overrides_view_of).
 async fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
   s : &mut SharedStoreSession,
@@ -185,10 +185,10 @@ async fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
     let graph = graph_handle_from_config (&config)?;
     let input : &str = "\
 * (skg (node (id R) (source main))) R
-** (skg overriddenCol)
+** (skg overriddenFolder)
 *** (skg (node (id Z) (source main))) Z
 *** (skg (node (id O) (source main))) O
-** (skg hiddenCol)
+** (skg hiddenFolder)
 *** (skg (node (id ha) (source main))) ha
 *** (skg (node (id hc) (source main))) hc
 ";
@@ -217,7 +217,7 @@ async fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
       assert_eq! (
         members_msv (&r . overrides_view_of) . or_default () . to_vec (),
         vec! [ ID::from ("Z"), ID::from ("O") ],
-        "a phantom under a writable col is never collected: W must \
+        "a phantom under a writable folder is never collected: W must \
          not return to R's overrides_view_of" );
       assert_eq! (
         members_msv (&r . hides_from_its_subscriptions) . or_default () . to_vec (),

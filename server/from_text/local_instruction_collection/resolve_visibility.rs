@@ -5,13 +5,13 @@
 /// The policy, for subscriber R viewing subscribee E, is:
 /// .
 /// - If N is graph-content of subscribee E,
-///   and E has a view-child with ID N and ParentIs=Affected,
+///   and E has a view-child with ID N and AffectsParent=True,
 ///   then N is intended to be visible through this subscription,
 ///   so it is removed from the hides of subscriber R.
 /// - If N is graph-content of E, E has no view-child with ID N and
-///   ParentIs=Affected, and N is not graph-content of R after the
+///   AffectsParent=True, and N is not graph-content of R after the
 ///   save, then N is hidden from R.
-/// - If N is a ParentIs=Affected view-child of E but is not
+/// - If N is a AffectsParent=True view-child of E but is not
 ///   graph-content of E, then it is not a hiderel edit.
 ///   This does not touch it. The completion/rerender pipeline
 ///   will change it to Independent.

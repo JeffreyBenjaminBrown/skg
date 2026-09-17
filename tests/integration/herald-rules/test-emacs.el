@@ -27,13 +27,13 @@
           (kill-emacs 1))
       ;; The fetched table should drive the lens engine end to end.
       (let ((herald (heralds-from-metadata
-                     "(skg (node (id 1) (source main) indef))")))
+                     "(skg (node (id 1) (source main) writeProtected))")))
         (if (and herald (string-match-p "☮" herald))
             (progn
               (message "PASS: Integration test successful!")
               (kill-emacs 0))
           (progn
-            (message "FAIL: fetched table did not produce the indef herald: %S"
+            (message "FAIL: fetched table did not produce the writeProtected herald: %S"
                      herald)
             (kill-emacs 1)))))))
 

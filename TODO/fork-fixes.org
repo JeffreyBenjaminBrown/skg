@@ -182,16 +182,16 @@ survives the strip byte-identical.
 Added 'skg-strip-trailing-whitespace-from-bodies' to
 docs/COMMANDS.org, under "connection, reload, rebuild dbs", beside
 'skg-rebuild-dbs'.
-* DONE Don't insert git ghosts under indefinitive nodes.
+* DONE Don't insert git ghosts under write-protected nodes.
 ** Claude: done 2026-07-08.
 'process_activeNode_diff' (server/to_org/render/diff.rs) now skips
 removed-member phantom insertion when the node is drawn
-indefinitive: an indefinitive node draws none of its worktree
+write-protected: a write-protected node draws none of its worktree
 children, so a ghost under it would show the node's DELETED
 children while its kept children go unshown. Its definitive
 occurrence (or a wider view) still carries them. The node's own
 decorations (existence axes, textChanged, id/alias diff cols) are
-unchanged. Pinned by 'test_no_ghosts_under_indefinitive_occurrence'
+unchanged. Pinned by 'test_no_ghosts_under_writeProtected_occurrence'
 (tests/git_diff_view/content/view.rs), verified to fail without the
 fix.
 * DONE : tantivy operator grouping

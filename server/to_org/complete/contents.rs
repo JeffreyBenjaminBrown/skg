@@ -8,13 +8,13 @@ use crate::types::tree::viewnode_nodecomplete::{ pid_and_source_from_treenode, w
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
 
-/// PURPOSE: Given an indefinitive node N,
+/// PURPOSE: Given a write-protected node N,
 /// reads in-Rust-graph-or-disk to:
 /// - Reset title.
 /// - Reset source.
 ///
-/// EXPECTS: The input node is indefinitive.
-pub fn clobberIndefinitiveViewnode (
+/// EXPECTS: The input node is write-protected.
+pub fn clobberWriteProtectedViewnode (
   tree    : &mut Tree<ViewNode>,
   treeid  : NodeId,
   graph   : &InRustGraph,
@@ -23,7 +23,7 @@ pub fn clobberIndefinitiveViewnode (
 
   let (node_id, source) : (ID, SourceName) =
     pid_and_source_from_treenode (
-      tree, treeid, "clobberIndefinitiveViewnode" ) ?;
+      tree, treeid, "clobberWriteProtectedViewnode" ) ?;
   let nodecomplete : NodeComplete =
     nodecomplete_rustFirst_by_pid_and_source (
       graph, config, &node_id, &source ) ?;

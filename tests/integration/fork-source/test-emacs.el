@@ -49,7 +49,7 @@ the clone landed in the rotated source."
         (test-fail "could not find N's headline:\n%s" (buffer-string)))
       (let* ((line (match-string 0))
              (edited (replace-regexp-in-string
-                      " indef" ""
+                      " writeProtected" ""
                       (replace-regexp-in-string
                        "N-original" "N-edited" line))))
         (replace-match edited t t))

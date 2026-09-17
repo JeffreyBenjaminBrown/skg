@@ -6,8 +6,8 @@
 use crate::types::git::MembershipAxes;
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::MpVognode;
-use crate::types::viewnode::ParentIs;
-use crate::types::viewnode::{IndefOrDef, QualCol, Qual};
+use crate::types::viewnode::AffectsParent;
+use crate::types::viewnode::{Editability, QualFolder, Qual};
 use crate::types::misc::{ID, SourceName};
 use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
@@ -94,7 +94,7 @@ fn finish_missing_info_enrichment(
       Ok (( )) } )?;
   Ok (provenance) }
 
-pub fn absent_parentIs_under_visible_parent_becomes_isContainer (
+pub fn na_affectsParent_under_visible_parent_becomes_isContainer (
   viewforest : &mut MpViewForest,
 ) {
   let root_id : NodeId =
@@ -102,38 +102,38 @@ pub fn absent_parentIs_under_visible_parent_becomes_isContainer (
   let mut need_changing : Vec<NodeId> = Vec::new();
   for node_ref in viewforest . nodes() {
     // collect immuatable references to what needs changing
-    let parent_is_visible : bool =
+    let affects_parent_visible : bool =
       node_ref . parent()
       . map ( |p| p . id() != root_id )
       . unwrap_or (false);
-    if ! parent_is_visible { continue; }
+    if ! affects_parent_visible { continue; }
     if let MpViewnodeKind::Vognode (MpVognode::Active (t))
       = &node_ref . value() . kind
-      { if t . parentIs == ParentIs::Absent
+      { if t . affectsParent == AffectsParent::NA
         { need_changing . push (node_ref . id()); }}}
   for node_id in need_changing { // change them
     let mut node_mut : NodeMut<MpViewnode> =
       viewforest . get_mut (node_id) . unwrap();
     if let MpViewnodeKind::Vognode (MpVognode::Active (t))
       = &mut node_mut . value() . kind
-      { t . parentIs = ParentIs::Affected; }}}
+      { t . affectsParent = AffectsParent::True; }}}
 
 /// Make it a Qual::Alias if both:
 /// - it is an ActiveNode
-/// - its parent is an AliasCol
+/// - its parent is an AliasFolder
 fn make_alias_if_appropriate(
   node: &mut NodeMut<MpViewnode>
 ) -> Result<(), String> {
   if let MpViewnodeKind::Vognode (MpVognode::Active (_))
     = &node . value() . kind
   { // It is a real, normal gnode.
-    let parent_is_aliascol : bool =
+    let affects_parent_aliasFolder : bool =
       node . parent()
       . map(|mut p|
             matches!(&p . value() . kind,
-                     MpViewnodeKind::QualCol (QualCol::Alias)))
+                     MpViewnodeKind::QualFolder (QualFolder::Alias)))
       . unwrap_or (false);
-    if parent_is_aliascol { // Make it an Alias.
+    if affects_parent_aliasFolder { // Make it an Alias.
       let org : &mut MpViewnode = node . value();
       let MpViewnodeKind::Vognode (MpVognode::Active (t))
         : &MpViewnodeKind
@@ -173,7 +173,7 @@ fn inherit_parent_source_if_possible(
   Ok (false) }
 
 /// Look up, from the graph, the source of every sourceless,
-/// indefinitive ActiveNode that already carries an id (ids are pids
+/// write-protected ActiveNode that already carries an id (ids are pids
 /// here). Ids the graph does not know resolve to nothing and are
 /// omitted from the map, so those nodes fall through to
 /// parent-inheritance in the DFS.
@@ -189,7 +189,7 @@ fn sources_for_sourceless_ided_nodes_from_graph (
     . collect ()
 }
 
-/// Collect the ids of sourceless, INDEFINITIVE ActiveNodes that
+/// Collect the ids of sourceless, WRITE_PROTECTED ActiveNodes that
 /// already carry an id. Definitive nodes are excluded on purpose (see
 /// 'resolve_sources_for_sourceless_ided_nodes').
 fn collect_sourceless_active_ids (
@@ -199,20 +199,20 @@ fn collect_sourceless_active_ids (
   if let MpViewnodeKind::Vognode (MpVognode::Active (t))
     = &node_ref . value () . kind
     { if t . source . is_none ()
-         && matches! ( t . indef_or_def, IndefOrDef::Indefinitive )
+         && matches! ( t . editability, Editability::WriteProtected )
       { if let Some (id) = &t . id {
           ids . insert ( id . clone () ); }}}
   for child in node_ref . children () {
     collect_sourceless_active_ids ( child, ids ); }}
 
-/// If the node is a sourceless, INDEFINITIVE ActiveNode whose id the
+/// If the node is a sourceless, WRITE_PROTECTED ActiveNode whose id the
 /// graph resolved, set its source from 'source_of_id' (built before the
-/// DFS). This is how a bare col-member reference acquires the source of
+/// DFS). This is how a bare folder-member reference acquires the source of
 /// the existing node it names -- something
 /// 'inherit_parent_source_if_possible' cannot do, since the org-parent
 /// is a scaffold rather than an ActiveNode with a source. The
-/// indefinitive gate matches the collection above, so a definitive node
-/// sharing an id with an indefinitive one is never filled.
+/// write-protected gate matches the folder above, so a definitive node
+/// sharing an id with a write-protected one is never filled.
 fn fill_source_from_graph_map (
   node         : &mut NodeMut<MpViewnode>,
   source_of_id : &HashMap<ID, SourceName>,
@@ -220,7 +220,7 @@ fn fill_source_from_graph_map (
   if let MpViewnodeKind::Vognode (MpVognode::Active (t))
     = &mut node . value () . kind
   { if t . source . is_some ()
-       || ! matches! ( t . indef_or_def, IndefOrDef::Indefinitive )
+       || ! matches! ( t . editability, Editability::WriteProtected )
     { return; }
     let resolved : Option<SourceName> =
       t . id . as_ref ()

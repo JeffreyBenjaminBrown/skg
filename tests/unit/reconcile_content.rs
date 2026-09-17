@@ -186,8 +186,8 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
 }
 
 // review-2 §2.1 regression: a content goal id present only as a
-// parentIs=Independent child must still get ChildData pre-fetched.
-// complete_content_children counts only parentIs=Affected Normal children as
+// affectsParent=false child must still get ChildData pre-fetched.
+// complete_content_children counts only affectsParent=true Normal children as
 // "already present", so an Independent same-id child is sent to the create
 // closure; if build_child_creation_data skipped pre-fetching it (because it
 // collected the skip-set from ALL Normal children, Independent included), the
@@ -195,7 +195,7 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
 // present-set: an Independent same-id child must NOT be skipped.
 #[test]
 fn independent_same_id_child_is_prefetched () {
-  use crate::types::viewnode::{ mk_definitive_viewnode, ParentIs };
+  use crate::types::viewnode::{ mk_definitive_viewnode, AffectsParent };
   let goal : ID = id ("regression_independent_child");
   let mut tree : Tree<ViewNode> =
     Tree::new ( mk_definitive_viewnode (
@@ -205,7 +205,7 @@ fn independent_same_id_child_is_prefetched () {
     mk_definitive_viewnode (
       goal . clone (), source_name ("main"), "c" . to_string (), None );
   if let ViewNodeKind::Vognode (Vognode::Active (t)) = &mut child . kind
-    { t . parentIs = ParentIs::Independent; }
+    { t . affectsParent = AffectsParent::False; }
   tree . root_mut () . append (child);
   let config : SkgConfig =
     SkgConfig::dummyFromSources ( HashMap::new () );

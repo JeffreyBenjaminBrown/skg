@@ -3,7 +3,7 @@
 --
 -- Opens two buffers over a containment cycle (a contains b, b
 -- contains a), removes 'a' from b's children and saves. The
--- collateral a-view should lose the now-stale indefinitive 'a'
+-- collateral a-view should lose the now-stale write-protected 'a'
 -- underneath 'b', because complete_relevant_children discards
 -- children not in the parent's goal_list.
 --
@@ -50,26 +50,26 @@ local function graft_role_from_rels (rels_body)
 end
 
 ---Classify a parsed metadata SEXP's headline relation: a backpath
----graft's rolename, else the explicit parentIs, else 'affected'. The
+---graft's rolename, else the explicit affectsParent, else 'true'. The
 ---port of test-helpers.el's headline--relation-from-sexp.
 ---@param sexp any|nil
 ---@return string
 local function relation_from_sexp (sexp)
-  local parentIs_list = sexp and metadata.sexp_cdr_at_path(
-    sexp, { 'skg', 'node', 'parentIs' }) or nil
-  local independent = parentIs_list ~= nil
-    and parentIs_list[1] == sexpr.symbol('independent')
+  local affectsParent_list = sexp and metadata.sexp_cdr_at_path(
+    sexp, { 'skg', 'node', 'affectsParent' }) or nil
+  local false = affectsParent_list ~= nil
+    and affectsParent_list[1] == sexpr.symbol('false')
   local graft_role = nil
-  if independent then
+  if false then
     graft_role = graft_role_from_rels(metadata.sexp_cdr_at_path(
       sexp, { 'skg', 'node', 'rels' }))
   end
   if graft_role then return graft_role end
-  if parentIs_list == nil
-     or parentIs_list[1] == sexpr.symbol('affected') then
-    return 'affected'
+  if affectsParent_list == nil
+     or affectsParent_list[1] == sexpr.symbol('true') then
+    return 'true'
   end
-  return sexpr.atom_text(parentIs_list[1])
+  return sexpr.atom_text(affectsParent_list[1])
 end
 
 ---(depth relation id) triples for every headline in BUF that carries
@@ -133,11 +133,11 @@ require('skg.content_view').request_single_root_content_view_from_id('a')
 local buf_a = T.wait_for_buffer('skg://a')
 T.check(buf_a, 'Buffer skg://a was created')
 assert_headline_structure(buf_a,
-  { { 1, 'absent', 'a' },
+  { { 1, 'na', 'a' },
     { 2, 'container', 'b' },
     { 3, 'container', 'a' },
-    { 2, 'affected', 'b' },
-    { 3, 'affected', 'a' } },
+    { 2, 'true', 'b' },
+    { 3, 'true', 'a' } },
   'phase 1: buffer A initial')
 
 print('=== PHASE 2: Open buffer B ===')
@@ -145,11 +145,11 @@ require('skg.content_view').request_single_root_content_view_from_id('b')
 local buf_b = T.wait_for_buffer('skg://b')
 T.check(buf_b, 'Buffer skg://b was created')
 assert_headline_structure(buf_b,
-  { { 1, 'absent', 'b' },
+  { { 1, 'na', 'b' },
     { 2, 'container', 'a' },
     { 3, 'container', 'b' },
-    { 2, 'affected', 'a' },
-    { 3, 'affected', 'b' } },
+    { 2, 'true', 'a' },
+    { 3, 'true', 'b' } },
   'phase 2: buffer B initial')
 
 print("=== PHASE 3: Remove a from b's children, save ===")
@@ -168,11 +168,11 @@ T.check(vim.api.nvim_buf_is_valid(buf_a), 'Buffer A still exists')
 print('Buffer A content after collateral update: '
       .. T.buffer_text(buf_a))
 assert_headline_structure(buf_a,
-  { { 1, 'absent', 'a' },
+  { { 1, 'na', 'a' },
     -- was container; corrected after b dropped a:
-    { 2, 'independent', 'b' },
+    { 2, 'false', 'b' },
     { 3, 'container', 'a' },
-    { 2, 'affected', 'b' } },
+    { 2, 'true', 'b' } },
   'phase 4: buffer A after collateral update')
 
 T.pass('PASS: All phases completed successfully!')

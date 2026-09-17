@@ -47,7 +47,7 @@ local raw_buf = T.wait_for(function ()
 end, 10)
 T.check(raw_buf, 'bypass did not open a raw view of Z')
 local raw_content = T.buffer_text(raw_buf)
--- The raw view may legitimately show R in an overriderCol; that is
+-- The raw view may legitimately show R in an overriderFolder; that is
 -- fine either way (no assertion), mirroring the elisp test's
 -- permissive check.
 T.check(raw_content:find('cooking', 1, true),

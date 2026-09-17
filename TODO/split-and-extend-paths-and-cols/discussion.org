@@ -37,14 +37,14 @@
   'linkDest', plus a 'target' -> 'dest' rename as its own commit), Q2a
   fold-in (migrate, no legacy atoms), Q7 (parameterize 'Birth').
   ONE item left -- Q4: your "peace symbol" note rests on a misreading.
-  "☮" is the per-node 'indef' marker, NOT a read-only-collection mark,
+  "☮" is the per-node 'writeProtected' marker, NOT a read-only-collection mark,
   and it is load-bearing on some WRITABLE-col members (a
-  subscribee-as-such MUST be indefinitive), so it can't be removed from
+  subscribee-as-such MUST be write-protected), so it can't be removed from
   them. I corrected this under Q4 and proposed a distinct read-only-col
   marker. Close that one (pick a glyph) and I write 'plan.org'.
 
 * Round 4 — all settled; plan written (Claude)
-  Q4 closed: I fact-checked that 'indef'/☮ is emitted only on node-like
+  Q4 closed: I fact-checked that 'writeProtected'/☮ is emitted only on node-like
   vognodes/phantoms ('server/org_to_text.rs:344, 393'), never on a
   scaffold, so your unified "cannot be changed from here" reading holds.
   Decision: ☮ on the six read-only col scaffolds (a lock 🔒 stays a
@@ -70,7 +70,7 @@
     AliasCol. "Paths" = the backpath engine
     ('server/to_org/expand/backpath.rs'), which climbs a relation
     transitively (until a fork/cycle/root) and grafts the partners as
-    inverted, indefinitive, 'parentIs=independent' content children with
+    inverted, write-protected, 'parentIs=independent' content children with
     a 'birth' provenance marker.
   - The backpath engine is ALREADY relation-generic: the relation is a
     3-string parameter '(relation, input_role, output_role)' and the
@@ -280,9 +280,9 @@ the set of writeable and readonly cols is already documented
 (but please fact-check me).
 
 **** Claude (fact-check): the peace symbol does NOT mark read-only
-     I checked. "☮" is the herald for the 'indef' (indefinitive) atom,
+     I checked. "☮" is the herald for the 'writeProtected' (write-protected) atom,
      and it sits on col MEMBERS -- but on WRITABLE cols' members too
-     (subscribeeCol/overriddenCol members are made indefinitive exactly
+     (subscribeeCol/overriddenCol members are made write-protected exactly
      like subscriberCol members; 'to_org/complete/partner_col/child_data.rs').
      So "☮" does not distinguish read-only from writable. In fact NO
      herald marks a col read-only: all 8 col scaffolds render as plain
@@ -301,11 +301,11 @@ was to identify the readonly ones.
 It should not be on the writeable ones.
 
 ****** DONE Claude: ☮ can't be that marker — here's why, and the fix
-The catch: "☮" IS the 'indef' (indefinitive) marker, and indef is
+The catch: "☮" IS the 'writeProtected' (write-protected) marker, and the write-protected state is
 load-bearing on some WRITABLE-col members, so it cannot be removed
 from them without breaking save semantics. A subscribeeCol
 (writable) member is a subscribee-as-such, which MUST be
-indefinitive -- title/body edits to it are rejected and its
+write-protected -- title/body edits to it are rejected and its
 definition lives elsewhere ('docs/sharing-model.md'). So a
 writable col will ALWAYS carry ☮ on its members; ☮ therefore
 cannot mean "this collection is read-only."
@@ -316,8 +316,8 @@ Fix (recommended): give the SIX read-only col scaffolds
 (subscriberCol, overriderCol, hiderCol, hiddenCol,
 hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol) their own
 read-only herald on the col HEADLINE -- a distinct glyph, NOT ☮
-(which already means indef on members). That marks exactly the
-read-only collections, leaves indef semantics untouched, and is
+(which already means write-protected on members). That marks exactly the
+read-only collections, leaves write-protected semantics untouched, and is
 one new herald + rule rather than a per-member change.
 Pick a glyph: I suggest a lock (🔒) or a plain "ro". Reusing ☮ on
 the read-only SCAFFOLDS would clash with ☮-on-members and read as
@@ -325,12 +325,12 @@ ambiguous, so I'd avoid it.
 
 ******* DONE I don't think the collision is a problem.
 Although I do like the lock icon :)
-If indef is currently only used for vognodes,
+If 'writeProtected' is currently only used for vognodes,
 and never on collection nodes, then its meaning on a collection node
 will be clear. Its meaning in both cases is the same:
-"This (collection, vognode) cannot be chnaged from here."
+"This (collection, vognode) cannot be changed from here."
 ******** Claude: confirmed — your condition holds
-         Fact-checked: 'indef' is emitted in exactly two places, both
+         Fact-checked: 'writeProtected' is emitted in exactly two places, both
          node-like -- the 'node' form (vognodes) and the 'diffPhantom'
          form ('server/org_to_text.rs:344, 393'); NO collection/scaffold
          emits it, and the herald rule is nested under 'node'

@@ -6,7 +6,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::{
   org_to_uninterpreted_viewforest};
 use skg::from_text::buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest,
-  absent_parentIs_under_visible_parent_becomes_isContainer};
+  na_affectsParent_under_visible_parent_becomes_isContainer};
 use skg::test_utils::{run_with_shared_test_stores, compare_viewnode_trees_modulo_id, compare_viewnode_trees};
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, MpViewnodeKind, MpVognode};
@@ -14,7 +14,7 @@ use skg::types::misc::{SkgConfig, ID, SourceName, TantivyIndex};
 use skg::types::tree::forest::{
   MpViewForest,
   tree_forest_root_ids};
-use skg::types::viewnode::ParentIs;
+use skg::types::viewnode::AffectsParent;
 
 use ego_tree::Tree;
 
@@ -34,44 +34,44 @@ fn all_tests
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
       test_source_inheritance_multi_level (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_sourceless_col_member_gets_graph_source",
+      s . reset ("test_sourceless_folder_member_gets_graph_source",
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
-      test_sourceless_col_member_gets_graph_source (
+      test_sourceless_folder_member_gets_graph_source (
         &s . config ) . await ?;
       Ok (( )) } )) }
 
 /// Regression for TODO/DONE/BUG_reciprocal-subscribe.org: a subscribee
 /// pasted from the link stack arrives as a bare id under a
-/// 'subscribeeCol' scaffold, with no source. Its org-parent is a
+/// 'subscribeeFolder' scaffold, with no source. Its org-parent is a
 /// scaffold, so 'inherit_parent_source_if_possible' cannot supply a
 /// source; enrichment must resolve it from the graph by id instead.
 /// Before the fix this node stayed sourceless and the save was refused
 /// with "ActiveNode must have a source that exists in the config".
-async fn test_sourceless_col_member_gets_graph_source (
+async fn test_sourceless_folder_member_gets_graph_source (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   // 'root' is an extra_id of fixture node 'root-pid', whose source is
   // 'main'. The subscribee reference below carries neither source nor
-  // the primary id, and is indefinitive -- exactly the bare-paste shape
-  // (a link-stack paste yields an indefinitive node with only an id).
+  // the primary id, and is write-protected -- exactly the bare-paste shape
+  // (a link-stack paste yields a write-protected node with only an id).
   let input : &str =
     indoc! {"
             * (skg (node (id owner) (source main))) owner
-            ** (skg subscribeeCol)
-            *** (skg (node (id root) indef)) subscribee reference
+            ** (skg subscribeeFolder)
+            *** (skg (node (id root) writeProtected)) subscribee reference
         "};
   let mut viewforest : MpViewForest =
     org_to_uninterpreted_viewforest (input) . unwrap() . 0;
   add_missing_info_to_viewforest (
     &mut viewforest, &config) ?;
   let owner = viewforest . root() . first_child() . unwrap();
-  let col   = owner . first_child() . unwrap();
-  let member = col . first_child() . unwrap();
+  let folder   = owner . first_child() . unwrap();
+  let member = folder . first_child() . unwrap();
   match &member . value() . kind {
     MpViewnodeKind::Vognode (MpVognode::Active (t)) => {
       assert_eq! (
         t . source, Some (SourceName::from ("main")),
-        "Sourceless col member should inherit its source from the \
+        "Sourceless folder member should inherit its source from the \
          graph (node root-pid lives in source 'main'), not stay \
          sourceless." );
       assert_eq! (
@@ -99,7 +99,7 @@ async fn test_add_missing_info_logic (
   let with_missing_info: &str =
     indoc! {"
             * (skg (node (id root) (source main))) root
-            ** (skg aliasCol) aliases
+            ** (skg aliasFolder) aliases
             *** new alias
             *** (skg alias) preexisting alias
             ** no id
@@ -108,7 +108,7 @@ async fn test_add_missing_info_logic (
   let without_missing_info: &str =
     indoc! {"
             * (skg (node (id root-pid) (source main))) root
-            ** (skg aliasCol) aliases
+            ** (skg aliasFolder) aliases
             *** (skg alias) new alias
             *** (skg alias) preexisting alias
             ** (skg (node (id unpredictable) (source main))) no id
@@ -146,16 +146,16 @@ async fn test_add_missing_info_logic (
   Ok (( )) }
 
 #[test]
-fn test_absent_parentIs_under_visible_parent_becomes_isContainer () {
+fn test_na_affectsParent_under_visible_parent_becomes_isContainer () {
   let input : &str =
     indoc! {"
-            * (skg (node (id root) (source main) (parentIs absent))) root
-            ** (skg (node (id moved) (source main) (parentIs absent))) moved
+            * (skg (node (id root) (source main) (affectsParent na))) root
+            ** (skg (node (id moved) (source main) (affectsParent na))) moved
         "};
   let mut viewforest : MpViewForest =
     org_to_uninterpreted_viewforest (input) . unwrap() . 0;
 
-  absent_parentIs_under_visible_parent_becomes_isContainer (
+  na_affectsParent_under_visible_parent_becomes_isContainer (
     &mut viewforest );
 
   let root_node =
@@ -166,12 +166,12 @@ fn test_absent_parentIs_under_visible_parent_becomes_isContainer () {
   match &root_node . value() . kind {
     MpViewnodeKind::Vognode (
       MpVognode::Active (t)) =>
-      assert_eq! (t . parentIs, ParentIs::Absent),
+      assert_eq! (t . affectsParent, AffectsParent::NA),
     _ => panic! ("expected root ActiveNode") }
   match &moved_node . value() . kind {
     MpViewnodeKind::Vognode (
       MpVognode::Active (t)) =>
-      assert_eq! (t . parentIs, ParentIs::Affected),
+      assert_eq! (t . affectsParent, AffectsParent::True),
     _ => panic! ("expected moved ActiveNode") }
 }
 

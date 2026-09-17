@@ -312,7 +312,7 @@ pub fn refuse_delete_with_inactive_sections (
 ///   subscription (see 'hide_source'): a hide is only as public as
 ///   some subscription that makes it meaningful, else it leaks the
 ///   inference that a private subscription exists. Hides carry no
-///   explicit-source path: the col that displays them is read-only
+///   explicit-source path: the folder that displays them is read-only
 ///   (the set-relationship-source gesture refuses there).
 #[cfg(test)]
 pub(crate) fn apply_sticky_sources_in_graph (

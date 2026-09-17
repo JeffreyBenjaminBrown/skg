@@ -3,7 +3,7 @@
 // The override-choice buffer
 // (TODO/full-schema/11_override-rendering-and-navigation.org): a new
 // single-root view of an overridden node returns a menu -- the node
-// as root, each (visible) overrider an indefinitive Independent
+// as root, each (visible) overrider a write-protected Independent
 // child of what it overrides, all edges including foreign, branches
 // stopping at the first repeated ID with the cycle viewstat.
 //
@@ -28,7 +28,7 @@ use skg::to_org::render::override_menu::override_menu_view;
 use skg::types::env::SkgEnv;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::tree::forest::ViewForest;
-use skg::types::viewnode::{ParentIs, mk_indefinitive_viewnode};
+use skg::types::viewnode::{AffectsParent, mk_writeProtected_viewnode};
 use skg::types::misc::SourceName;
 use skg::types::views_state::{OpenViews, ViewUri};
 
@@ -103,7 +103,7 @@ async fn menu_shows_all_edges_with_override_ancestor_facts (
       { let (z_depth, z_line) =
           line_with_id (&menu, "Z") . expect ("Z is the root");
         assert_eq! (z_depth, 1, "{}", menu);
-        assert! ( z_line . contains ("(parentIs absent)"),
+        assert! ( z_line . contains ("(affectsParent na)"),
                   "{}", menu ); }
       for overrider in ["R", "F"] {
         let (depth, line) =
@@ -112,8 +112,8 @@ async fn menu_shows_all_edges_with_override_ancestor_facts (
               "{} overrides Z (foreign edges included):\n{}",
               overrider, menu ));
         assert_eq! ( depth, 2, "{}", menu );
-        assert! ( line . contains ("indef"), "{}", menu );
-        assert! ( line . contains ("(parentIs independent)"),
+        assert! ( line . contains ("writeProtected"), "{}", menu );
+        assert! ( line . contains ("(affectsParent false)"),
           "a menu child must not read as content (saving the menu \
            must not edit Z's contains):\n{}", menu );
         // The semantic herald wire says that the visible parent
@@ -262,7 +262,7 @@ async fn menu_still_offered_in_diff_mode (
       Ok (( )) }
 
 /// An open menu survives a diff-mode toggle intact: its generated
-/// indefinitive lines neither phantom nor duplicate (decoration like
+/// write-protected lines neither phantom nor duplicate (decoration like
 /// notInGit may appear; the shape -- depths and ids -- must not
 /// change).
 async fn open_menu_survives_diff_mode_toggle (
@@ -407,9 +407,9 @@ async fn handler_precedence_and_menu_dedup (
         let raw_forest : ViewForest = {
           let mut f : ViewForest = ViewForest::new ();
           f . append_root (
-            mk_indefinitive_viewnode (
+            mk_writeProtected_viewnode (
               ID::from ("Z"), SourceName::from ("main"),
-              "Z" . to_string (), ParentIs::Absent ));
+              "Z" . to_string (), AffectsParent::NA ));
           f };
         views_state . open_views . register_view (
           &graph . load_full (),

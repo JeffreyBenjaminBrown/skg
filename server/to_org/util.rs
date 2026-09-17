@@ -1,7 +1,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
-use crate::to_org::complete::contents::clobberIndefinitiveViewnode;
-use crate::to_org::complete::partner_col::maybe_add_partnerCol_branches;
+use crate::to_org::complete::contents::clobberWriteProtectedViewnode;
+use crate::to_org::complete::partner_folder::maybe_add_partnerFolder_branches;
 use crate::dbs::node_lookup::nodecomplete_graphFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
@@ -9,7 +9,7 @@ use crate::types::nodes::rust::NodeRust;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::write_at_activeNode_in_tree;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, IndefOrDef, ParentIs, ActiveNode, mk_definitive_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, Editability, AffectsParent, ActiveNode, mk_definitive_viewnode, mk_unknown_viewnode };
 use crate::types::viewnode::{Vognode, Phantom};
 use crate::types::tree::forest::{ViewForest, tree_forest_root_ids};
 
@@ -111,9 +111,9 @@ pub(super) fn nodecomplete_and_viewnode_from_pid_and_source (
     nodecomplete . body . clone () );
   Ok (( nodecomplete, viewnode )) }
 
-/// Set node to indefinitive,
+/// Set node to write-protected,
 /// and reset title and source.
-pub(super) fn makeIndefinitiveAndClobber (
+pub(super) fn makeWriteProtectedAndClobber (
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
   graph   : &crate::dbs::in_rust_graph::InRustGraph,
@@ -121,9 +121,9 @@ pub(super) fn makeIndefinitiveAndClobber (
 ) -> Result < (), Box<dyn Error> > {
   write_at_activeNode_in_tree (
     tree, node_id,
-    |t| { t . indef_or_def = IndefOrDef::Indefinitive; }
+    |t| { t . editability = Editability::WriteProtected; }
     ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  clobberIndefinitiveViewnode ( tree, node_id, graph, config ) ?;
+  clobberWriteProtectedViewnode ( tree, node_id, graph, config ) ?;
   Ok (( )) }
 
 /// This function's callers add a pristine, out-of-context
@@ -142,45 +142,45 @@ pub fn complete_branch_minus_content (
   active_source_set : Option<&ActiveSourceSet>,
 ) -> Result<(), Box<dyn Error>> {
   detect_and_mark_cycle_v1 ( tree, node_id ) ?;
-  make_indef_if_repeat_then_extend_defmap (
+  make_writeProtected_if_repeat_then_extend_defmap (
     tree, node_id, visited ) ?;
-  if activeNode_in_tree_is_indefinitive ( tree, node_id )?
-  { clobberIndefinitiveViewnode (
+  if activeNode_in_tree_is_writeProtected ( tree, node_id )?
+  { clobberWriteProtectedViewnode (
       tree, node_id, graph, config ) ?; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "maybe_add_partnerCol_branches" ). entered();
-    maybe_add_partnerCol_branches (
+      "maybe_add_partnerFolder_branches" ). entered();
+    maybe_add_partnerFolder_branches (
       tree, node_id, graph, config, active_source_set,
       // This birth path runs outside the diff-aware BFS (search
-      // results, ancestry attachment, stubs); diff-mode col
+      // results, ancestry attachment, stubs); diff-mode folder
       // existence is decided at each node's completion visit, which
       // passes the real diffs.
       &None ) } ?;
   Ok (( )) }
 
 /// Does only what it says -- in particular,
-/// does not clobber the node after making it indefinitive.
+/// does not clobber the node after making it write-protected.
 ///
 /// The two jobs in the name cannot be unbundled --
 /// we have to interleave extending the defmap
-/// with marking things indefinitive, because the defmap
-/// is how we know whether to mark something indefinitive.
-pub fn make_indef_if_repeat_then_extend_defmap (
+/// with marking things write-protected, because the defmap
+/// is how we know whether to mark something write-protected.
+pub fn make_writeProtected_if_repeat_then_extend_defmap (
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
   defMap  : &mut DefinitiveMap,
 ) -> Result<(), Box<dyn Error>> {
   let pid : ID = // Will error if node is a Scaffold.
     get_id_from_treenode ( tree, node_id ) ?;
-  let is_indefinitive : bool =
+  let is_writeProtected : bool =
     write_at_activeNode_in_tree (
       tree, node_id,
       |t| { if defMap . contains_key (&pid)
-               { // It's a repeat, so make it indefinitive.
-                 t . indef_or_def = IndefOrDef::Indefinitive; }
-             t . is_indefinitive () } )
+               { // It's a repeat, so make it write-protected.
+                 t . editability = Editability::WriteProtected; }
+             t . is_writeProtected () } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  if !is_indefinitive {
+  if !is_writeProtected {
     // Ordinary completed/saved definitive -> Tentative (TODO/DONE/local-view-update/plan_v2.org §5.2).
     defMap . insert ( pid, Finalizable::Tentative (node_id) ); }
   Ok (( )) }
@@ -227,7 +227,7 @@ pub fn stub_viewforest_from_root_ids (
   Ok (viewforest) }
 
 /// Mark forest-root ActiveNodes as having no parent in the view.
-pub fn mark_view_roots_parent_absent (
+pub fn mark_view_roots_parent_na (
   viewforest : &mut Tree<ViewNode>,
 ) {
   let root_ids : Vec<NodeId> =
@@ -238,7 +238,7 @@ pub fn mark_view_roots_parent_absent (
     let vn : &mut ViewNode = node_mut . value ();
     if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
       = vn . kind
-      { t . parentIs = ParentIs::Absent; }}}
+      { t . affectsParent = AffectsParent::NA; }}}
 
 /// Walk the view and correct any ActiveNode whose metadata claims a
 /// relationship to its parent that the actual graph doesn't support.
@@ -251,7 +251,7 @@ pub fn mark_view_roots_parent_absent (
 ///   claim is "C plays 'role' toward P" (e.g. CONTAINER -> C contains
 ///   P; LINK_SOURCE -> C's body/title links to P). Verified against the
 ///   in-Rust graph via 'relation_membership_is_real', keyed by the role.
-/// - 'ParentIs::Affected' on child C with INDEFINITIVE ActiveNode
+/// - 'AffectsParent::True' on child C with WRITE_PROTECTED ActiveNode
 ///   parent P: claim is "C is part of P's content". Verified
 ///   against P's 'contains' in the in-Rust graph. Definitive parents are
 ///   skipped because the save just redefined their 'contains' to
@@ -266,16 +266,16 @@ pub fn mark_view_roots_parent_absent (
 /// invariant that prepared graph publication has updated the in-Rust-graph
 /// graph before the rerender pass runs (see
 /// 'update_views_after_save').
-pub fn validate_parentIs_relationships (
+pub fn validate_affectsParent_relationships (
   viewforest : &mut Tree<ViewNode>,
   graph  : &InRustGraph,
 ) {
   // Collect correction targets in a read-only first pass so the
   // &mut Tree write phase doesn't need simultaneous read access.
   let mut to_independent : Vec<NodeId> = Vec::new ();
-    // these will be marked parentIs = independent
+    // these will be marked affectsParent = independent
   let mut to_affected : Vec<NodeId> = Vec::new ();
-    // these will be marked parentIs = affected
+    // these will be marked affectsParent = affected
   let mut to_unremarkable : Vec<NodeId> = Vec::new ();
     // these will be marked birth = unremarkable
   for edge in viewforest . root () . traverse () {
@@ -291,19 +291,19 @@ pub fn validate_parentIs_relationships (
           ViewNodeKind::Vognode (Vognode::Active (t)) => t,
           // A non-ActiveNode parent (BufferRoot, Scaffold, Deleted, DeletedScaff) is not a legitimate subject for any of these relational claims; skip without correcting.
           _ => continue };
-      if child_tn . parentIs == ParentIs::Absent {
+      if child_tn . affectsParent == AffectsParent::NA {
         // The child was a root, and the user gave it a parent, so let the parent contain it.
         to_affected . push ( child_ref . id () );
         continue; }
-      let parent_is_claim_ok : bool = match child_tn . parentIs {
-        ParentIs::Affected => {
-          if parent_tn . is_indefinitive () {
+      let affects_parent_claim_ok : bool = match child_tn . affectsParent {
+        AffectsParent::True => {
+          if parent_tn . is_writeProtected () {
             child_contained_by_parent (graph, &child_tn . id, &parent_tn . id)
           } else { // The definitive parent *defines* content, so cannot be incorrect.
             true }}
-        ParentIs::Independent => true,
-        ParentIs::Absent => false, };
-      if ! parent_is_claim_ok { to_independent . push ( child_ref . id () ); }
+        AffectsParent::False => true,
+        AffectsParent::NA => false, };
+      if ! affects_parent_claim_ok { to_independent . push ( child_ref . id () ); }
       let birth_claim_ok : bool = match child_tn . birth {
         Birth::Backpath (role) => {
           // The child plays 'role' toward the parent (the origin).
@@ -324,13 +324,13 @@ pub fn validate_parentIs_relationships (
       viewforest . get_mut (id) . unwrap ();
     if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
       = node_mut . value () . kind
-    { t . parentIs = ParentIs::Independent; } }
+    { t . affectsParent = AffectsParent::False; } }
   for id in to_affected {
     let mut node_mut : NodeMut<ViewNode> =
       viewforest . get_mut (id) . unwrap ();
     if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
       = node_mut . value () . kind
-    { t . parentIs = ParentIs::Affected; } }
+    { t . affectsParent = AffectsParent::True; } }
   for id in to_unremarkable {
     let mut node_mut : NodeMut<ViewNode> =
       viewforest . get_mut (id) . unwrap ();
@@ -339,28 +339,28 @@ pub fn validate_parentIs_relationships (
     { t . birth = Birth::Unremarkable; } } }
 
 /// Jeff's invariant (TODO/DONE/local-view-update/progress.org §11 thread): a *non-dead generalized orphan*
-/// must have ParentIs=Independent. A Active node whose PARENT is a
+/// must have AffectsParent=False. A Active node whose PARENT is a
 /// non-container -- a Diff phantom, a Deleted, or a DeadScaffold -- is exactly
 /// that: it survives (is not itself dead) but its container is gone, so its
-/// =Affected= claim (that it is part of that parent's collection) cannot hold.
+/// =Affected= claim (that it is part of that parent's membership) cannot hold.
 /// Demote it to Independent so it renders as its own graph-contains root rather
 /// than claiming to affect a parent that no longer contains anything.
 ///
 /// Scope, deliberately narrow:
 /// - PARENT is Diff phantom / Deleted / DeadScaffold -> demote an Affected child.
-/// - PARENT is a Col (QualCol / PartnerCol): the child is a legitimate col
-///   MEMBER; Affected is correct -> leave. (A col whose own ancestry broke is
+/// - PARENT is a Folder (QualFolder / PartnerFolder): the child is a legitimate folder
+///   MEMBER; Affected is correct -> leave. (A folder whose own ancestry broke is
 ///   deadened to DeadScaffold first, and then THIS pass catches its members.)
-/// - PARENT is an Active vognode: handled by validate_parentIs_relationships.
+/// - PARENT is an Active vognode: handled by validate_affectsParent_relationships.
 /// - PARENT is BufferRoot: the child is a forest root, handled by
-///   mark_view_roots_parent_absent.
+///   mark_view_roots_parent_na.
 /// Belt-and-suspenders: most cases are already demoted during the BFS
 /// (mark_erroneous_content_children_as_indep for content children;
-/// dispose_orphaned_col_child for a deadened col's members). This final pass
+/// dispose_orphaned_folder_child for a deadened folder's members). This final pass
 /// GUARANTEES the invariant for any survivor those miss (e.g. a removedHere
 /// phantom's content children), in both the post-save and de-novo paths. Purely
 /// structural -- no graph read.
-pub fn mark_orphans_under_dead_parents_independent (
+pub fn mark_orphans_under_dead_parents_false (
   viewforest : &mut Tree<ViewNode>,
 ) {
   let mut targets : Vec<NodeId> = Vec::new ();
@@ -369,21 +369,21 @@ pub fn mark_orphans_under_dead_parents_independent (
       let is_affected_normal : bool =
         matches! ( & child_ref . value () . kind,
           ViewNodeKind::Vognode (Vognode::Active (t))
-            if t . parentIs == ParentIs::Affected );
+            if t . affectsParent == AffectsParent::True );
       if ! is_affected_normal { continue; }
-      let parent_is_non_container : bool =
+      let affects_parent_non_container : bool =
         child_ref . parent () . map_or ( false, |p|
           matches! ( & p . value () . kind,
             ViewNodeKind::Phantom (Phantom::Diff (_))
               | ViewNodeKind::Phantom (Phantom::Deleted (_))
               | ViewNodeKind::DeadScaffold ) );
-      if parent_is_non_container { targets . push ( child_ref . id () ); }}}
+      if affects_parent_non_container { targets . push ( child_ref . id () ); }}}
   for id in targets {
     let mut node_mut : NodeMut<ViewNode> =
       viewforest . get_mut (id) . unwrap ();
     if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
       = node_mut . value () . kind
-    { t . parentIs = ParentIs::Independent; } } }
+    { t . affectsParent = AffectsParent::False; } } }
 
 /// Does 'parent's 'contains' list include 'child' (modulo extra_id
 /// aliasing on either side)? The inverse of "child contains parent".
@@ -521,9 +521,9 @@ pub fn build_node_branch_minus_content (
 // Reading from NodeCompletes and ViewNodes, esp. in trees
 // ==============================================
 
-/// Check if an ActiveNode is indefinitive.
+/// Check if an ActiveNode is write-protected.
 /// Errs if given a Scaffold.
-pub fn activeNode_in_tree_is_indefinitive (
+pub fn activeNode_in_tree_is_writeProtected (
   tree   : &Tree<ViewNode>,
   treeid : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
@@ -532,13 +532,13 @@ pub fn activeNode_in_tree_is_indefinitive (
                            |viewnode| viewnode . kind . clone() )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   match node_kind {
-    ViewNodeKind::Vognode (Vognode::Active (t))   => Ok (t . is_indefinitive ()),
-    ViewNodeKind::Phantom (Phantom::Diff (p)) => Ok (p . is_indefinitive ()),
+    ViewNodeKind::Vognode (Vognode::Active (t))   => Ok (t . is_writeProtected ()),
+    ViewNodeKind::Phantom (Phantom::Diff (p)) => Ok (p . is_writeProtected ()),
     ViewNodeKind::Phantom (Phantom::Deleted (_))
       | ViewNodeKind::Vognode (Vognode::Inactive (_))
       | ViewNodeKind::Phantom (Phantom::Unknown (_)) => Ok (false),
     _                                                => Err (
-      "is_indefinitive: caller must pass a vognode" . into( )),
+      "is_writeProtected: caller must pass a vognode" . into( )),
   }}
 
 /// Collect all child tree NodeIds from a node.
@@ -581,4 +581,4 @@ where T: AsMut<ViewNode>,
 
 #[cfg(test)]
 #[path = "../../tests/unit/to_org_util.rs"]
-mod validate_parentIs_relationships_tests;
+mod validate_affectsParent_relationships_tests;

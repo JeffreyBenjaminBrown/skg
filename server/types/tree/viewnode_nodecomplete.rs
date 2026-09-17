@@ -5,8 +5,8 @@ use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{members_of, ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, ActiveNode, ParentIs };
-use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual, PartnerCol};
+    ViewNode, ViewNodeKind, ActiveNode, AffectsParent };
+use crate::types::viewnode::{Vognode, Phantom, QualFolder, Qual, PartnerFolder};
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind };
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
@@ -31,7 +31,7 @@ where F: FnOnce (&mut ActiveNode) -> R {
     |viewnode| { match &mut viewnode . kind {
       // TODO/DONE/local-view-update/plan_v2.org §11: a phantom is not an ActiveNode (it carries a slim PhantomDiff), so
       // this Normal-only mutator cannot apply to one (a phantom has no
-      // view_requests/indef_or_def/etc).
+      // view_requests/editability/etc).
       ViewNodeKind::Vognode (Vognode::Active (t))
         => Ok ( f (t) ),
       _ => Err ( "write_at_activeNode_in_tree: expected ActiveNode"
@@ -112,7 +112,7 @@ pub fn pids_for_subscriber_and_its_subscribees (
         members_of ( nodecomplete . subscribes_to . or_default() ) )) }
 
 /// Extract PIDs for a Subscribee and its grandparent (the subscriber).
-/// Expects: subscriber -> SubscribeeCol -> Subscribee (this node)
+/// Expects: subscriber -> SubscribeeFolder -> Subscribee (this node)
 pub fn pid_for_subscribee_and_its_subscriber_grandparent (
   tree    : &Tree<ViewNode>,
   node_id : NodeId,
@@ -125,14 +125,14 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
       "pid_for_subscribee_and_its_subscriber_grandparent: node not found" ) ?;
   let parent_ref : NodeRef < ViewNode > =
     node_ref . parent ()
-    . ok_or ("Subscribee has no parent (SubscribeeCol)") ?;
+    . ok_or ("Subscribee has no parent (SubscribeeFolder)") ?;
   if ! matches! ( &parent_ref . value () . kind,
-                  ViewNodeKind::PartnerCol (PartnerCol::Subscribee)) {
-    return Err ( "Subscribee's parent is not a SubscribeeCol" .
+                  ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee)) {
+    return Err ( "Subscribee's parent is not a SubscribeeFolder" .
                  into () ); }
   let grandparent_ref : NodeRef < ViewNode > =
     parent_ref . parent ()
-    . ok_or ("SubscribeeCol has no parent (subscriber)") ?;
+    . ok_or ("SubscribeeFolder has no parent (subscriber)") ?;
   let (subscriber_id, subscriber_source) : (ID, SourceName) =
     pid_and_source_from_treenode (
       tree, grandparent_ref . id (),
@@ -155,41 +155,41 @@ pub fn insert_scaffold_as_child (
       folded      : false,
       body_folded : false,
       kind        : scaffold_kind };
-  let col_id : NodeId = with_node_mut (
+  let folder_id : NodeId = with_node_mut (
     tree, parent_id,
     |mut parent_mut| {
       if prepend { parent_mut . prepend (viewnode) . id () }
       else       { parent_mut . append  (viewnode) . id () } } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-  Ok (col_id) }
+  Ok (folder_id) }
 
 /// Collect aliases for a node:
-/// - find the unique AliasCol child (error if multiple)
-/// - for each Alias child of the AliasCol, collect its title
+/// - find the unique AliasFolder child (error if multiple)
+/// - for each Alias child of the AliasFolder, collect its title
 /// Duplicates are removed (preserving order of first occurrence).
-/// Returns None ("no opinion") if no AliasCol found.
-/// Returns Some(vec) if AliasCol found, even if empty.
+/// Returns None ("no opinion") if no AliasFolder found.
+/// Returns Some(vec) if AliasFolder found, even if empty.
 pub fn collect_grandchild_aliases_for_viewnode (
   tree: &Tree<ViewNode>,
   node_id: NodeId,
 ) -> Result<MSV<String>, String> {
-  let alias_col_id : Option<NodeId> =
+  let alias_folder_id : Option<NodeId> =
     unique_scaffold_child_of_viewnode (
-      tree, node_id, &ViewNodeKind::QualCol (QualCol::Alias) )
+      tree, node_id, &ViewNodeKind::QualFolder (QualFolder::Alias) )
     . map_err ( |e| e . to_string() ) ?;
-  match alias_col_id {
+  match alias_folder_id {
     None => Ok (MSV::Unspecified),
-    Some (col_id) => {
+    Some (folder_id) => {
       let aliases : Vec<String> = {
-        let col_ref : NodeRef<ViewNode> =
-          tree . get (col_id) . expect ("collect_grandchild_aliases_for_viewnode: AliasCol not found");
+        let folder_ref : NodeRef<ViewNode> =
+          tree . get (folder_id) . expect ("collect_grandchild_aliases_for_viewnode: AliasFolder not found");
         let mut aliases : Vec<String> = Vec::new();
-        for alias_child in col_ref . children() {
+        for alias_child in folder_ref . children() {
           { // check for invalid state
             if ! matches!(&alias_child . value() . kind,
                           ViewNodeKind::Qual (Qual::Alias { .. } )) {
               return Err ( format! (
-                "AliasCol has non-Alias child with kind: {:?}",
+                "AliasFolder has non-Alias child with kind: {:?}",
                 alias_child . value() . kind )); }}
           aliases . push(
             alias_child . value() . title() . to_string() ); }
@@ -232,7 +232,7 @@ pub fn find_children_by_ids (
 /// Check if all nodes at the specified generation satisfy the predicate.
 /// Returns true if the generation is empty (vacuously true).
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes ActiveNodes with parentIs != Affected.
+/// If skip_non_content, excludes ActiveNodes with affectsParent != Affected.
 pub fn generation_includes_only<F> (
   tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
@@ -248,7 +248,7 @@ where F: Fn (&MpViewnode) -> bool
 
 /// Check if the generation is nonempty and all nodes satisfy the predicate.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes ActiveNodes with parentIs != Affected.
+/// If skip_non_content, excludes ActiveNodes with affectsParent != Affected.
 pub fn generation_exists_and_includes<F> (
   tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
@@ -266,7 +266,7 @@ where F: Fn (&MpViewnode) -> bool
 
 /// Check if the specified generation is empty.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes ActiveNodes with parentIs != Affected.
+/// If skip_non_content, excludes ActiveNodes with affectsParent != Affected.
 pub fn generation_does_not_exist (
   tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
@@ -281,7 +281,7 @@ pub fn generation_does_not_exist (
 /// Positive generation = descendants (1 = children, 2 = grandchildren, etc.)
 /// Generation 0 returns just the node itself.
 /// If 'skip_non_content' is true and generation > 0,
-///   then we exclude ActiveNodes with parentIs != Affected.
+///   then we exclude ActiveNodes with affectsParent != Affected.
 fn collect_generation (
   tree               : &Tree<MpViewnode>,
   node_id            : NodeId,
@@ -311,11 +311,11 @@ fn collect_generation (
           next_gen . extend(
             n . children()
               . filter(|c| !skip_non_content ||
-                          // TODO/DONE/local-view-update/plan_v2.org §11: a phantom has no parentIs and is implicitly
+                          // TODO/DONE/local-view-update/plan_v2.org §11: a phantom has no affectsParent and is implicitly
                           // Affected (content), so it is never filtered here.
                           !matches!(&c . value() . kind,
                                     MpViewnodeKind::Vognode (MpVognode::Active (t))
-                                    if t . parentIs != ParentIs::Affected ))
+                                    if t . affectsParent != AffectsParent::True ))
               . map(|c| c . id()) ); }}
       current_gen = next_gen; }
     current_gen } }

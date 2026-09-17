@@ -30,7 +30,7 @@
 //   ** d
 //   *** MERGED: b
 // (The first d is expected to be definitive since a's subtree is
-// visited first in document order; the second d indefinitive.)
+// visited first in document order; the second d write-protected.)
 
 use indoc::indoc;
 use std::error::Error;
@@ -140,7 +140,7 @@ async fn merge_acquiree_in_sibling_subtree_impl (
 
   // 4. The MERGED: b preserver should appear somewhere in the view.
   //    Exactly one of the two d occurrences (a's and c's) is
-  //    definitive; the other is indefinitive and won't expand its
+  //    definitive; the other is write-protected and won't expand its
   //    contents. DefinitiveMap picks the first in document order.
   if ! view . contains ("MERGED: b") {
     failures . push (

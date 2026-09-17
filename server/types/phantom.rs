@@ -48,7 +48,7 @@ pub fn phantom_axes (
   child_source  : &SourceName,
   parent_id     : &ID,
   parent_source : &SourceName,
-  relation      : NodeRelation, // the relation the caller's col represents
+  relation      : NodeRelation, // the relation the caller's folder represents
   source_diffs  : Option<&HashMap<SourceName, SourceDiff>>,
 ) -> (ExistenceAxes, MembershipAxes) {
   // Existence: the child's own file-level status in each stage.
@@ -61,7 +61,7 @@ pub fn phantom_axes (
 
   // Membership: the child's presence in the parent's list for the
   // NAMED relation, in each stage. New(id) -> Plus; Removed(id) ->
-  // Minus. Exactly one relation diff is read -- the col's own -- so
+  // Minus. Exactly one relation diff is read -- the folder's own -- so
   // a phantom's stage label can never come from a DIFFERENT relation
   // that happens to involve the same ID (one owner can bear the same
   // ID in two relations, changed in different stages).
@@ -92,7 +92,7 @@ pub fn phantom_axes (
   // file is not listed as Modified in either stage map (no
   // NodeChanges exists -- e.g. its source_diff is absent entirely),
   // yet the caller's goal-list computation still found a
-  // HEAD-side-only member; (b) a filter col, whose DERIVED membership
+  // HEAD-side-only member; (b) a filter folder, whose DERIVED membership
   // can change while no single input relation's diff names the child
   // (its three-snapshot comparison supplies exact labels instead, and
   // bypasses this function).

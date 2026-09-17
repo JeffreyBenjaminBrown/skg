@@ -5,20 +5,20 @@
 /// in the same sweep) every:
 /// - InactiveNode leaf;
 /// - Qual leaf whose owning gnode (grandparent) is inactive;
-/// - indefinitive leaf partner (child of a PartnerCol), active or
-///   inactive: an indefinitive partner defines nothing, and
+/// - write-protected leaf partner (child of a PartnerFolder), active or
+///   inactive: a write-protected partner defines nothing, and
 ///   completion regenerates current membership afterward;
-/// - empty QualCol or PartnerCol;
+/// - empty QualFolder or PartnerFolder;
 /// - DeadScaffold leaf.
 /// What survives includes active nodes, inactive nodes with
 /// surviving children (the retained case), and definitive partners
-/// (the user may be mid-edit inside them).  Completion (run with col
-/// creation enabled) then rebuilds cols and members for the new
+/// (the user may be mid-edit inside them).  Completion (run with folder
+/// creation enabled) then rebuilds folders and members for the new
 /// active set.
 
 use crate::source_sets::ActiveSourceSet;
 use crate::types::viewnode::{
-  mk_inactive_viewnode, PartnerCol, QualCol, ViewNode, ViewNodeKind,
+  mk_inactive_viewnode, PartnerFolder, QualFolder, ViewNode, ViewNodeKind,
   Vognode };
 use crate::update_buffer::util::subtree_satisfies;
 
@@ -87,12 +87,12 @@ fn should_prune (
     . ok_or ("should_prune: node not found") ?;
   let is_leaf : bool =
     ! node_ref . has_children ();
-  let parent_is_partner_col : bool =
+  let affects_parent_partnerFolder : bool =
     node_ref . parent ()
     . map ( |p| matches! ( &p . value () . kind,
-                           ViewNodeKind::PartnerCol (_) ))
+                           ViewNodeKind::PartnerFolder (_) ))
     . unwrap_or (false);
-  let grandparent_is_inactive : bool =
+  let grandaffects_parent_inactive : bool =
     node_ref . parent ()
     . and_then ( |p| p . parent () )
     . map ( |gp| matches! ( &gp . value () . kind,
@@ -102,20 +102,20 @@ fn should_prune (
     ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
       is_leaf,
     ViewNodeKind::Qual (_) =>
-      is_leaf && grandparent_is_inactive,
+      is_leaf && grandaffects_parent_inactive,
     ViewNodeKind::Vognode (Vognode::Active (t)) =>
-      is_leaf && parent_is_partner_col && t . is_indefinitive (),
-    ViewNodeKind::QualCol (QualCol::ID)
-      | ViewNodeKind::QualCol (QualCol::Alias)
-      | ViewNodeKind::PartnerCol (PartnerCol::Subscribee)
-      | ViewNodeKind::PartnerCol (PartnerCol::Subscriber)
-      | ViewNodeKind::PartnerCol (PartnerCol::Overridden)
-      | ViewNodeKind::PartnerCol (PartnerCol::Overrider)
-      | ViewNodeKind::PartnerCol (PartnerCol::Hider)
-      | ViewNodeKind::PartnerCol (PartnerCol::Hidden)
-      | ViewNodeKind::PartnerCol (PartnerCol::HiddenInSubscribee)
-      | ViewNodeKind::PartnerCol (PartnerCol::HiddenOutsideOfSubscribee) =>
-      is_leaf, // empty col (children, if any, were pruned first)
+      is_leaf && affects_parent_partnerFolder && t . is_writeProtected (),
+    ViewNodeKind::QualFolder (QualFolder::ID)
+      | ViewNodeKind::QualFolder (QualFolder::Alias)
+      | ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee)
+      | ViewNodeKind::PartnerFolder (PartnerFolder::Subscriber)
+      | ViewNodeKind::PartnerFolder (PartnerFolder::Overridden)
+      | ViewNodeKind::PartnerFolder (PartnerFolder::Overrider)
+      | ViewNodeKind::PartnerFolder (PartnerFolder::Hider)
+      | ViewNodeKind::PartnerFolder (PartnerFolder::Hidden)
+      | ViewNodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)
+      | ViewNodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
+      is_leaf, // empty folder (children, if any, were pruned first)
     ViewNodeKind::DeadScaffold =>
       is_leaf,
     ViewNodeKind::Phantom (_)

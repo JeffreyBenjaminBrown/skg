@@ -9,7 +9,7 @@
 /// inline (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3). After view completion, the shared finish_viewforest
 /// tail (server/update_buffer.rs, TODO/DONE/local-view-update/plan_v2.org §20.3)
 /// attaches containerward ancestry (roots + removed-here phantoms),
-/// marks/validates parentIs, sets graph/view stats, applies the source set,
+/// marks/validates affectsParent, sets graph/view stats, applies the source set,
 /// and renders to string.
 
 use crate::types::tree::forest::ViewForest;

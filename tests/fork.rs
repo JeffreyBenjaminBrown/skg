@@ -6,7 +6,7 @@
 // contains, subscribes to N and overrides N; N itself is untouched.
 //
 // Installs the explicit graph handle (override substitution and
-// subscribeeCol content read it), so it belongs among the
+// subscribeeFolder content read it), so it belongs among the
 // grouped_overrides installers.
 
 use std::error::Error;
@@ -36,12 +36,12 @@ use skg::types::views_state::OpenViews;
 /// A foreign node N (title "N-original", contains [N1, N2]) lives under
 /// an OWNED container P. The buffer makes N definitive and edits its
 /// title to "N-edited" -- a real change, so saving forks N. (N's
-/// children stay indefinitive foreign content.)
+/// children stay write-protected foreign content.)
 const FORK_BUFFER : &str = indoc! {"
   * (skg (node (id P) (source owned))) P-container
   ** (skg (node (id N) (source foreign))) N-edited
-  *** (skg (node (id N1) (source foreign) indef)) N1
-  *** (skg (node (id N2) (source foreign) indef)) N2
+  *** (skg (node (id N1) (source foreign) writeProtected)) N1
+  *** (skg (node (id N2) (source foreign) writeProtected)) N2
   "};
 
 /// A foreign node N opened as a bare ROOT -- no owned ancestor to infer
@@ -49,8 +49,8 @@ const FORK_BUFFER : &str = indoc! {"
 /// must then default to the user's first owned source.
 const FORK_ROOT_BUFFER : &str = indoc! {"
   * (skg (node (id N) (source foreign))) N-edited
-  ** (skg (node (id N1) (source foreign) indef)) N1
-  ** (skg (node (id N2) (source foreign) indef)) N2
+  ** (skg (node (id N1) (source foreign) writeProtected)) N1
+  ** (skg (node (id N2) (source foreign) writeProtected)) N2
   "};
 
 /// Case 1 of TODO/fork-fixes.org: a BARE new headline (no metadata at
@@ -60,8 +60,8 @@ const FORK_ROOT_BUFFER : &str = indoc! {"
 /// new node rides that fork, adopting the clone's source.
 const FORK_WITH_BARE_NEW_CHILD_BUFFER : &str = indoc! {"
   * (skg (node (id N) (source foreign))) N-original
-  ** (skg (node (id N1) (source foreign) indef)) N1
-  ** (skg (node (id N2) (source foreign) indef)) N2
+  ** (skg (node (id N1) (source foreign) writeProtected)) N1
+  ** (skg (node (id N2) (source foreign) writeProtected)) N2
   ** Can I add to this?
   "};
 
@@ -70,8 +70,8 @@ const FORK_WITH_BARE_NEW_CHILD_BUFFER : &str = indoc! {"
 /// must stay rejected.
 const FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER : &str = indoc! {"
   * (skg (node (id N) (source foreign))) N-original
-  ** (skg (node (id N1) (source foreign) indef)) N1
-  ** (skg (node (id N2) (source foreign) indef)) N2
+  ** (skg (node (id N1) (source foreign) writeProtected)) N1
+  ** (skg (node (id N2) (source foreign) writeProtected)) N2
   ** (skg (node (source foreign))) Can I add to this?
   "};
 
@@ -81,7 +81,7 @@ const FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER : &str = indoc! {"
 /// snapshot.
 const EXPLICIT_FORK_BUFFER : &str = indoc! {"
   * (skg (node (id P) (source owned) (viewRequests fork))) P-container
-  ** (skg (node (id N) (source foreign) indef)) N
+  ** (skg (node (id N) (source foreign) writeProtected)) N
   "};
 
 /// An explicit fork request on a brand-new (id-less) headline: enrichment
@@ -394,8 +394,8 @@ async fn explicit_new_child_source_confirms_clone_source (
 ) -> Result<(), Box<dyn Error>> {
   let buffer : &str = indoc! {"
     * (skg (node (id N) (source foreign))) N-original
-    ** (skg (node (id N1) (source foreign) indef)) N1
-    ** (skg (node (id N2) (source foreign) indef)) N2
+    ** (skg (node (id N1) (source foreign) writeProtected)) N1
+    ** (skg (node (id N2) (source foreign) writeProtected)) N2
     ** (skg (node (source owned2))) Can I add to this?
     "};
   let ( _vf, save_plan, _w ) = buffer_to_validated_saveplan (
@@ -688,8 +688,8 @@ async fn fork_fixture_files (
   Ok (( )) }
 
 /// Round-trip: after the fork, reopening P draws the clone in N's
-/// place, carrying (overridesHere N), with both an overriddenCol and a
-/// subscribeeCol listing N. The load-bearing property: P's stored
+/// place, carrying (overridesHere N), with both an overriddenFolder and a
+/// subscribeeFolder listing N. The load-bearing property: P's stored
 /// 'contains' is NOT rewritten to the clone -- it still lists N, so the
 /// marker round-trips and a save never silently re-points containers at
 /// the clone. (That the clone's subscribee-as-such view of N starts
@@ -721,10 +721,10 @@ async fn fork_round_trip (
     p_view );
   assert! ( p_view . contains (& format! ("(id {})", clone_id . 0)),
     "the drawn substitute must be the clone {}:\n{}", clone_id . 0, p_view );
-  assert! ( p_view . contains ("subscribeeCol"),
-    "the clone (a subscriber of N) shows a subscribeeCol:\n{}", p_view );
-  assert! ( p_view . contains ("overriddenCol"),
-    "the clone (an overrider of N) shows an overriddenCol:\n{}", p_view );
+  assert! ( p_view . contains ("subscribeeFolder"),
+    "the clone (a subscriber of N) shows a subscribeeFolder:\n{}", p_view );
+  assert! ( p_view . contains ("overriddenFolder"),
+    "the clone (an overrider of N) shows an overriddenFolder:\n{}", p_view );
 
   // The load-bearing round-trip: P's stored contains was NOT rewritten
   // to the clone; it still lists N (the marker collected N, not C).

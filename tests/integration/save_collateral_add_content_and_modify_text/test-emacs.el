@@ -31,11 +31,11 @@
       (kill-emacs 1))
     (assert-headline-structure
      buf
-     '((1 absent "a")
+     '((1 na "a")
        (2 container "b")
        (3 container "a")
-       (2 affected       "b")
-       (3 affected       "a"))
+       (2 true       "b")
+       (3 true       "a"))
      "phase 1: buffer A initial")))
 
 (defun phase-2-open-buffer-b ()
@@ -50,11 +50,11 @@
       (kill-emacs 1))
     (assert-headline-structure
      buf
-     '((1 absent "b")
+     '((1 na "b")
        (2 container "a")
        (3 container "b")
-       (2 affected       "a")
-       (3 affected       "b"))
+       (2 true       "a")
+       (3 true       "b"))
      "phase 2: buffer B initial")))
 
 (defun phase-3-edit-and-save ()
@@ -65,11 +65,11 @@
     ;; Verify pre-edit structure
     (assert-headline-titles
      buf
-     '((1 absent "b")
+     '((1 na "b")
        (2 container "a")
        (3 container "b")
-       (2 affected       "a")
-       (3 affected       "b"))
+       (2 true       "a")
+       (3 true       "b"))
      "phase 3: buffer B before edit")
     (with-current-buffer buf
       ;; Change a's title on line 4 (the definitive a):
@@ -86,12 +86,12 @@
     ;; Verify post-edit structure
     (assert-headline-titles
      buf
-     '((1 absent "b")
+     '((1 na "b")
        (2 container "a")
        (3 container "b")
-       (2 affected       "Node a was given this longer title")
-       (3 affected       "b")
-       (3 affected       "c"))
+       (2 true       "Node a was given this longer title")
+       (3 true       "b")
+       (3 true       "c"))
      "phase 3: buffer B after edit")
     (with-current-buffer buf
       (skg-request-save-buffer))
@@ -107,12 +107,12 @@
       (kill-emacs 1))
     (assert-headline-titles
      buf
-     '((1 absent "b")
+     '((1 na "b")
        (2 container "Node a was given this longer title")
        (3 container "b")
-       (2 affected       "Node a was given this longer title")
-       (3 affected       "b")
-       (3 affected       "c"))
+       (2 true       "Node a was given this longer title")
+       (3 true       "b")
+       (3 true       "c"))
      "phase 4: buffer B after save")
     (with-current-buffer buf ;; Verify the line for c has its title and an ID
       (goto-char (point-min))
@@ -150,12 +150,12 @@ and the new child c."
                (buffer-substring-no-properties (point-min) (point-max))))
     (assert-headline-titles
      buf
-     '((1 absent "Node a was given this longer title")
+     '((1 na "Node a was given this longer title")
        (2 container "b")
        (3 container "Node a was given this longer title")
-       (2 affected       "b")
-       (3 affected       "Node a was given this longer title")
-       (2 affected       "c"))
+       (2 true       "b")
+       (3 true       "Node a was given this longer title")
+       (2 true       "c"))
      "phase 5: buffer A after collateral update")))
 
 (defun run-all-tests ()

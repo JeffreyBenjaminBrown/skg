@@ -59,7 +59,7 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
         // warning attached, containment preserved.
         let buffer = indoc! {"
           * (skg (node (id root) (source public))) root
-          ** (skg (node (id active-b) (source public) indef)) active-b
+          ** (skg (node (id active-b) (source public) writeProtected)) active-b
           ** (skg (node (id private-a) (source private))) edited private title
         "};
         let (_viewforest, plan, warnings) =
@@ -81,7 +81,7 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
         // instruction before suppression looks, so no warning.
         let buffer = indoc! {"
           * (skg (node (id root) (source public))) root
-          ** (skg (node (id active-b) (source public) indef)) active-b
+          ** (skg (node (id active-b) (source public) writeProtected)) active-b
           ** (skg (node (id private-a) (source private))) private title must not leak
           private body must not leak
         "};

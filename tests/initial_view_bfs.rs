@@ -62,11 +62,11 @@ async fn test_bfs_limit_across_multiple_trees (
       // §5.5 node budget: the budget counts vognode EXPANSIONS (cost 1 each), in
       // level order; a whole child group is always drawn (never truncated
       // mid-group), and once the budget hits 0 every later vognode is left
-      // indefinitive (visible, collapsed -- graphStats(contents N) still shows it
+      // write-protected (visible, collapsed -- graphStats(contents N) still shows it
       // has hidden content). View roots are never truncated. limit=7 expansions:
       // 1,2,3,11,12,13,21. So 12 drew its whole gen-3 group 121..123 (all then
-      // indefinitive); 22,23,31,32,33 are reached after the budget is spent and
-      // stay indefinitive.
+      // write-protected); 22,23,31,32,33 are reached after the budget is spent and
+      // stay write-protected.
 
       let mut test_config = config . clone();
       test_config . initial_node_limit = 7;
@@ -83,24 +83,24 @@ async fn test_bfs_limit_across_multiple_trees (
 
       println!("BFS multi-tree limit result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 3))))) 1
+      let expected = indoc! {"* (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 3))))) 1
                               ** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
                               ** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 12
-                              *** (skg (node (id 121) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121
-                              *** (skg (node (id 122) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 122
-                              *** (skg (node (id 123) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
+                              *** (skg (node (id 121) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121
+                              *** (skg (node (id 122) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 122
+                              *** (skg (node (id 123) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
                               ** (skg (node (id 13) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
-                              * (skg (node (id 2) (source main) (parentIs absent) (rels (contains (out 3))))) 2
+                              * (skg (node (id 2) (source main) (affectsParent na) (rels (contains (out 3))))) 2
                               ** (skg (node (id 21) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 21
-                              ** (skg (node (id 22) (source main) indef (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 22
-                              ** (skg (node (id 23) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 23
-                              * (skg (node (id 3) (source main) (parentIs absent) (rels (contains (out 3))))) 3
-                              ** (skg (node (id 31) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 31
-                              ** (skg (node (id 32) (source main) indef (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 32
-                              ** (skg (node (id 33) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 33
+                              ** (skg (node (id 22) (source main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 22
+                              ** (skg (node (id 23) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 23
+                              * (skg (node (id 3) (source main) (affectsParent na) (rels (contains (out 3))))) 3
+                              ** (skg (node (id 31) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 31
+                              ** (skg (node (id 32) (source main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 32
+                              ** (skg (node (id 33) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 33
                               "};
       assert_metadata_eq!(result, expected,
-                 "BFS truncates by the §5.5 budget, leaving whole groups indefinitive");
+                 "BFS truncates by the §5.5 budget, leaving whole groups writeProtected");
 
       Ok (( )) }
 
@@ -110,8 +110,8 @@ async fn test_bfs_limit_9_three_branches (
 ) -> Result<(), Box<dyn Error>> {
       // §5.5 node budget, limit=9 (cost 1 per expansion): expansions are
       // 1,2,3,11,12,13,21,22,23. So roots 1 and 2 fully expand (12 and 22 each
-      // draw their whole gen-3 group, indefinitive); root 3 is reached after the
-      // budget is spent, so 31,32,33 stay indefinitive. (Contrast limit=7, which
+      // draw their whole gen-3 group, write-protected); root 3 is reached after the
+      // budget is spent, so 31,32,33 stay write-protected. (Contrast limit=7, which
       // runs out one root sooner.)
 
       let mut test_config = config . clone();
@@ -129,27 +129,27 @@ async fn test_bfs_limit_9_three_branches (
 
       println!("BFS limit=9 three branches result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 3))))) 1
+      let expected = indoc! {"* (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 3))))) 1
                               ** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
                               ** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 12
-                              *** (skg (node (id 121) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121
-                              *** (skg (node (id 122) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 122
-                              *** (skg (node (id 123) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
+                              *** (skg (node (id 121) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121
+                              *** (skg (node (id 122) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 122
+                              *** (skg (node (id 123) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
                               ** (skg (node (id 13) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
-                              * (skg (node (id 2) (source main) (parentIs absent) (rels (contains (out 3))))) 2
+                              * (skg (node (id 2) (source main) (affectsParent na) (rels (contains (out 3))))) 2
                               ** (skg (node (id 21) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 21
                               ** (skg (node (id 22) (source main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 22
-                              *** (skg (node (id 221) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 221
-                              *** (skg (node (id 222) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 222
-                              *** (skg (node (id 223) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 223
+                              *** (skg (node (id 221) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 221
+                              *** (skg (node (id 222) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 222
+                              *** (skg (node (id 223) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 223
                               ** (skg (node (id 23) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 23
-                              * (skg (node (id 3) (source main) (parentIs absent) (rels (contains (out 3))))) 3
-                              ** (skg (node (id 31) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 31
-                              ** (skg (node (id 32) (source main) indef (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 32
-                              ** (skg (node (id 33) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 33
+                              * (skg (node (id 3) (source main) (affectsParent na) (rels (contains (out 3))))) 3
+                              ** (skg (node (id 31) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 31
+                              ** (skg (node (id 32) (source main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 32
+                              ** (skg (node (id 33) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 33
                               "};
       assert_metadata_eq!(result, expected,
-                 "BFS limit=9 fully expands the first two roots; the third stays indefinitive");
+                 "BFS limit=9 fully expands the first two roots; the third stays write-protected");
 
       Ok (( )) }
 
@@ -160,7 +160,7 @@ async fn test_bfs_limit_8_two_branches (
       // §5.5 node budget, limit=8, roots [1,2] (cost 1 per expansion): expansions
       // are 1,2,11,12,13,21,22,23 -- both roots fully expand their gen-2. 12 and
       // 22 each draw their whole gen-3 group (121..123, 221..223), all left
-      // indefinitive (budget spent by then). Whole groups, never a partial set.
+      // write-protected (budget spent by then). Whole groups, never a partial set.
 
       let mut test_config = config . clone();
       test_config . initial_node_limit = 8;
@@ -177,34 +177,34 @@ async fn test_bfs_limit_8_two_branches (
 
       println!("BFS limit=8 two branches result:\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id 1) (source main) (parentIs absent) (rels (contains (out 3))))) 1
+      let expected = indoc! {"* (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 3))))) 1
                               ** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
                               ** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 12
-                              *** (skg (node (id 121) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121
-                              *** (skg (node (id 122) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 122
-                              *** (skg (node (id 123) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
+                              *** (skg (node (id 121) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121
+                              *** (skg (node (id 122) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 122
+                              *** (skg (node (id 123) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
                               ** (skg (node (id 13) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
-                              * (skg (node (id 2) (source main) (parentIs absent) (rels (contains (out 3))))) 2
+                              * (skg (node (id 2) (source main) (affectsParent na) (rels (contains (out 3))))) 2
                               ** (skg (node (id 21) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 21
                               ** (skg (node (id 22) (source main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 22
-                              *** (skg (node (id 221) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 221
-                              *** (skg (node (id 222) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 222
-                              *** (skg (node (id 223) (source main) indef (rels (contains (in 1 (ancestors 1))) (birth contains)))) 223
+                              *** (skg (node (id 221) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 221
+                              *** (skg (node (id 222) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 222
+                              *** (skg (node (id 223) (source main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 223
                               ** (skg (node (id 23) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 23
                               "};
       assert_metadata_eq!(result, expected,
-                 "BFS limit=8 fully expands both roots' gen-2; gen-3 groups whole + indefinitive");
+                 "BFS limit=8 fully expands both roots' gen-2; gen-3 groups whole + writeProtected");
 
       Ok (( )) }
 
-// §5.5: content wins the budget race; a col (here a SubscribeeCol) fills WHOLE
+// §5.5: content wins the budget race; a folder (here a SubscribeeFolder) fills WHOLE
 // and is budget-NEUTRAL. Fixture: root r -> content chain c1 -> c2, and r also
 // subscribes to s1, s2. With budget = 3 (exactly the content chain r, c1, c2):
 // the chain fully expands (c2 is definitive, body and all), AND both subscribers
-// are shown (the col is whole), indefinitive. If the col had spent the budget,
+// are shown (the folder is whole), write-protected. If the folder had spent the budget,
 // s1 and s2 would have eaten two of the three units and c2 would be left
-// indefinitive -- it is not, which is the guarantee this test pins. Subscribers
-// also sit one level deeper than content (r -> SubscribeeCol -> subscriber vs
+// write-protected -- it is not, which is the guarantee this test pins. Subscribers
+// also sit one level deeper than content (r -> SubscribeeFolder -> subscriber vs
 // r -> c1), so BFS-by-depth reaches content first regardless.
 async fn test_budget_content_beats_subscribers (
   config : &SkgConfig,
@@ -220,14 +220,14 @@ async fn test_budget_content_beats_subscribers (
 
       println!("content-vs-subscribers (budget 3):\n{}", result);
 
-      let expected = indoc! {"* (skg (node (id r) (source main) (parentIs absent) (rels (contains (out 1)) (subscribes (out 2))))) r
-                              ** (skg subscribeeCol)
-                              *** (skg (node (id s1) (source main) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)))) s1
-                              *** (skg (node (id s2) (source main) indef (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)))) s2
+      let expected = indoc! {"* (skg (node (id r) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2))))) r
+                              ** (skg subscribeeFolder)
+                              *** (skg (node (id s1) (source main) writeProtected (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)))) s1
+                              *** (skg (node (id s2) (source main) writeProtected (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)))) s2
                               ** (skg (node (id c1) (source main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) c1
                               *** (skg (node (id c2) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) c2
                               "};
       assert_metadata_eq!(result, expected,
-                 "budget 3 expands the whole content chain; the SubscribeeCol is whole + budget-neutral");
+                 "budget 3 expands the whole content chain; the SubscribeeFolder is whole + budget-neutral");
 
       Ok (( )) }

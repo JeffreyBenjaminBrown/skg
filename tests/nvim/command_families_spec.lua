@@ -91,7 +91,7 @@ describe('skg.modify_graph replacements', function ()
     '* (skg (node (id parent) (source public))) container',
     '** (skg (node (id child) (source public))) the leaf title',
     'leaf body',
-    '*** (skg aliasCol) scaffolding under it' }, '\n')
+    '*** (skg aliasFolder) scaffolding under it' }, '\n')
 
   it('replaces content with a link, from the body too', function ()
     buffer_with(container_and_leaf)
@@ -123,14 +123,14 @@ describe('skg.modify_graph replacements', function ()
     assert.is_truthy(tostring(err):find('not owned', 1, true))
   end)
 
-  it('rejects an indefinitive container', function ()
+  it('rejects a write-protected container', function ()
     buffer_with(table.concat({
-      '* (skg (node (id parent) (source public) indef)) container',
+      '* (skg (node (id parent) (source public) writeProtected)) container',
       '** (skg (node (id child) (source public))) leaf' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 2, 0 })
     local ok, err = pcall(modify_graph.replace_content_with_link)
     assert.is_false(ok)
-    assert.is_truthy(tostring(err):find('indefinitive', 1, true))
+    assert.is_truthy(tostring(err):find('write-protected', 1, true))
   end)
 
   it('replaces a link with content, warning about existing nodes',
@@ -147,7 +147,7 @@ describe('skg.modify_graph replacements', function ()
     vim.notify = original_notify
     assert.are.equal(table.concat({
       '* (skg (node (id parent) (source public))) container',
-      '** (skg (node (id target) indef (viewRequests'
+      '** (skg (node (id target) writeProtected (viewRequests'
       .. ' definitiveView))) target label' }, '\n'), buffer_text())
     local warned = false
     for _, msg in ipairs(notified) do
@@ -196,9 +196,9 @@ describe('skg.view_requests', function ()
 
   it('stamps the request atom and auto-saves', function ()
     buffer_with('* (skg (node (id n1))) title')
-    view_requests.show_collection_aliases()
+    view_requests.show_folderOf_aliases()
     assert.is_truthy(buffer_text():find(
-      '(viewRequests (col aliases))', 1, true))
+      '(viewRequests (folder aliases))', 1, true))
     assert.are.equal(1, saved_count)
     buffer_with('* (skg (node (id n2))) title')
     view_requests.show_paths_through_containers()
@@ -207,7 +207,7 @@ describe('skg.view_requests', function ()
   end)
 
   it('set_definitive stamps without saving', function ()
-    buffer_with('* (skg (node (id n3) indef)) title')
+    buffer_with('* (skg (node (id n3) writeProtected)) title')
     view_requests.set_definitive()
     assert.is_truthy(buffer_text():find(
       '(viewRequests definitiveView)', 1, true))
@@ -249,9 +249,9 @@ describe('skg.metadata_edit', function ()
     local edit_buf = vim.api.nvim_get_current_buf()
     assert.is_truthy(vim.api.nvim_buf_get_name(edit_buf)
                      :find('metadata%-edit'))
-    -- Flip indef's value to true, then commit.
+    -- Flip write-protected's value to true, then commit.
     for line = 1, vim.api.nvim_buf_line_count(edit_buf) do
-      if metadata.line_text(line):match('^%*+ indef$') then
+      if metadata.line_text(line):match('^%*+ writeProtected$') then
         vim.api.nvim_buf_set_lines(edit_buf, line, line + 1, false,
                                    { '**** true' })
         break
@@ -260,7 +260,7 @@ describe('skg.metadata_edit', function ()
     metadata_edit.commit(edit_buf)
     assert.are.equal(source_buf, vim.api.nvim_get_current_buf())
     assert.are.equal(
-      '* (skg (node (id abc) (source public) indef)) my title',
+      '* (skg (node (id abc) (source public) writeProtected)) my title',
       buffer_text())
   end)
 
@@ -286,13 +286,13 @@ describe('skg.metadata_edit', function ()
   it('cycles field values by their parent field', function ()
     buffer_with(table.concat({
       metadata_edit.help_text, '',
-      '* skg', '** node', '*** parentIs',
-      '**** affected (default)' }, '\n'))
+      '* skg', '** node', '*** affectsParent',
+      '**** true (default)' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 6, 0 })
     metadata_edit.cycle(1)
-    assert.are.equal('**** independent', metadata.line_text(6))
+    assert.are.equal('**** false', metadata.line_text(6))
     metadata_edit.cycle(-1)
-    assert.are.equal('**** affected (default)', metadata.line_text(6))
+    assert.are.equal('**** true (default)', metadata.line_text(6))
   end)
 end)
 

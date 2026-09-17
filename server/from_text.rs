@@ -7,7 +7,7 @@
 
 pub mod buffer_to_viewnodes;
 pub mod fork;
-pub mod indefinitive_edits;
+pub mod write_protected_edits;
 pub mod local_instruction_collection;
 pub mod supplement_from_disk;
 pub mod weave;
@@ -24,7 +24,7 @@ use crate::types::tree::forest::{MpViewForest, ViewForest};
 use buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use buffer_to_viewnodes::add_missing_info::{
   add_missing_info_to_viewforest_in_graph,
-  absent_parentIs_under_visible_parent_becomes_isContainer,
+  na_affectsParent_under_visible_parent_becomes_isContainer,
   EnrichmentProvenance};
 use fork::{
   CloneSourceInputs,
@@ -52,7 +52,7 @@ use crate::types::save::ForkSpec;
 /// - non-nodeMerge plus nodeMerge plan: cross-plan source-move/nodeMerge policy.
 ///
 /// Returns the saved view, the plan derived from it, and nonfatal
-/// parse warnings (e.g. discarded col headline text, destined for
+/// parse warnings (e.g. discarded folder headline text, destined for
 /// 'SaveResponse.warnings'). View and plan are
 /// kept apart (TODO/DONE/local-view-update/plan_v2.org §11): the graph-mutation
 /// step consumes only the SavePlan; the rerender step consumes the ViewForest
@@ -86,7 +86,7 @@ pub fn buffer_to_validated_saveplan_with_fork_sources_in_graph (
 
 /// As 'buffer_to_validated_saveplan_with_fork_sources_in_graph', while also
 /// comparing an open view's last server-rendered forest. This detects edits to
-/// data that an indefinitive occurrence would otherwise silently ignore.
+/// data that a write-protected occurrence would otherwise silently ignore.
 pub fn buffer_to_validated_saveplan_with_fork_sources_and_previous_view_in_graph (
   buffer_text : &str,
   graph       : &crate::dbs::in_rust_graph::InRustGraph,
@@ -115,7 +115,7 @@ pub fn buffer_to_validated_saveplan_with_fork_sources_and_previous_view_in_graph
       add_missing_info_to_viewforest_in_graph (
         & mut maybePlaced_viewforest, graph )
       } . map_err (SaveError::DatabaseError) ?;
-  absent_parentIs_under_visible_parent_becomes_isContainer (
+  na_affectsParent_under_visible_parent_becomes_isContainer (
     &mut maybePlaced_viewforest );
   { // If saving is impossible, don't.
     let mut validation_errors : Vec<BufferValidationError> =
@@ -139,8 +139,8 @@ pub fn buffer_to_validated_saveplan_with_fork_sources_and_previous_view_in_graph
         . map_err ( |e| SaveError::ParseError (e) ) ?;
   if let Some (previous) = previous_viewforest {
     let errors : Vec<BufferValidationError> =
-      indefinitive_edits
-      ::errors_and_normalize_new_indefinitive_occurrences (
+      write_protected_edits
+      ::errors_and_normalize_new_writeProtected_occurrences (
         &mut viewforest, previous );
     if ! errors . is_empty () {
       return Err ( SaveError::BufferValidationErrors {

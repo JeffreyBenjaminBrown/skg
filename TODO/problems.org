@@ -101,7 +101,7 @@
    - 'parentIs': a parked (independent) child is not a member of the
      parent's collection, so the written '(relSource ...)' atom is
      inert (extraction only reads the atom off collected members);
-   - the parent's definitiveness: under an indefinitive parent the
+   - the parent's definitiveness: under a write-protected parent the
      contains list is not collected, so the atom is inert there too.
    Inert atoms are harmless to the data but lie to the user: the
    command reports "Save to apply" and the save applies nothing.
@@ -141,12 +141,12 @@
    'assert_buffer_contains' (tests/git_diff_view/common.rs) matches
    each expected line by star depth, title, and PARENTHESIZED
    metadata fragments only ('extract_metadata_fragments'). Bare
-   atoms -- 'folded', 'focused', 'indef', 'bodyFolded' -- are
+   atoms -- 'folded', 'focused', 'writeProtected', 'bodyFolded' -- are
    invisible to it, in both directions: an expected atom missing
    from the actual line, or a stray atom appearing in it, cannot
    fail these tests. Found 2026-07-08 while adding the
    begin-folded rule for hidden cols: a probe atom inserted into an
-   expected line still passed. Regressions in fold/focus/indef
+   expected line still passed. Regressions in fold/focus/writeProtected
    marking on diff views are therefore unpinned by that suite
    (tests elsewhere, e.g. tests/hidden_from_subscriptions.rs, use
    exact assert_eq! and do pin them). Suggested fix: also compare

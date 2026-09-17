@@ -149,7 +149,7 @@ uses, so the hint matches what the content view would show."
 
 (defun skg-sexp-edit--nest-label-path (labels)
   "Nest LABELS (title strings, outermost first) into an object sexp:
-the labels skg, node, indef become (skg (node indef))."
+the labels skg, node, writeProtected become (skg (node writeProtected))."
   (let* (( syms (mapcar #'intern labels) )
          ( acc (car (last syms)) ))
     (dolist (label (reverse (butlast syms)))

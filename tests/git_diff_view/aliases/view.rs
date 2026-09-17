@@ -1,13 +1,13 @@
 /// Tests for git diff view - aliases-list changes.
 /// A node's `aliases` change between HEAD and worktree should surface an
-/// AliasCol scaffold with per-alias diff markers -- emitted by the diff
-/// overlay (render/diff.rs prepend_aliascol_with_children), the alias mirror
-/// of the IDCol diff.
+/// AliasFolder scaffold with per-alias diff markers -- emitted by the diff
+/// overlay (render/diff.rs prepend_aliasfolder_with_children), the alias mirror
+/// of the IDFolder diff.
 
 use super::common::*;
 
 #[test]
-fn test_aliases_diff_shows_alias_col_scaffold()
+fn test_aliases_diff_shows_alias_folder_scaffold()
   -> Result<(), Box<dyn Error>>
 {
   let test_name = "skg-test-git-diff-aliases";
@@ -36,7 +36,7 @@ fn test_aliases_diff_shows_alias_col_scaffold()
 /// Regression for TODO/more.org, "aliases should be merged, not
 /// added": saving a diff-mode buffer that ALREADY shows its aliases
 /// (any rendered diff view does) must not duplicate them. The bug:
-/// process_activeNode_diff prepended a SECOND AliasCol without
+/// process_activeNode_diff prepended a SECOND AliasFolder without
 /// checking for the one the buffer carried, and both then reconciled
 /// to the full alias list.
 #[test]
@@ -76,8 +76,8 @@ fn test_saving_a_diff_view_with_aliases_shown_does_not_duplicate_them()
       assert_eq! ( count, 1,
         "alias {:?} must appear exactly once, appears {} times:\n{}",
         alias, count, saved ); }
-    assert_eq! ( saved . matches ("aliasCol") . count (), 1,
-      "exactly one aliasCol must survive the re-save:\n{}", saved );
+    assert_eq! ( saved . matches ("aliasFolder") . count (), 1,
+      "exactly one aliasFolder must survive the re-save:\n{}", saved );
 
     cleanup_test_stores(test_name, Some(Path::new (tantivy_folder))
                     ) . await?;

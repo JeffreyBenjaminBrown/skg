@@ -18,7 +18,7 @@ use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
 use crate::types::phantom::title_for_phantom;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, mk_phantom_viewnode };
-use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual};
+use crate::types::viewnode::{Vognode, Phantom, QualFolder, Qual};
 use crate::types::tree::viewnode_nodecomplete::pid_and_source_from_treenode;
 use crate::dbs::in_rust_graph::InRustGraph;
 
@@ -29,7 +29,7 @@ use std::path::PathBuf;
 /// Decorate a active vognode and generate any diff-only children
 /// implied by staged and unstaged NodeCompleteDiffs. Called inline per Normal
 /// node at its own BFS visit (for both de-novo and post-save), TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3:
-/// the node flips to a phantom here and its cols then self-deaden via their own
+/// the node flips to a phantom here and its folders then self-deaden via their own
 /// generalized-orphan check at their later visits.
 pub(crate) fn process_activeNode_diff (
   mut node_mut                   : NodeMut<ViewNode>,
@@ -77,7 +77,7 @@ pub(crate) fn process_activeNode_diff (
       ViewNodeKind::Phantom (Phantom::Diff (_)) );
   // For an Added or Deleted file we don't read node_changes
   // (the comparison is degenerate). NewHere/RemovedHere on children
-  // and IDcol/textChanged scaffolds only apply to Modified files.
+  // and IDFolder/textChanged scaffolds only apply to Modified files.
   let staged_changes   : Option<&NodeChanges> =
     staged   . and_then ( |d| match d . status {
       GitDiffStatus::Modified => d . node_changes . as_ref (),
@@ -100,34 +100,34 @@ pub(crate) fn process_activeNode_diff (
           Qual::TextChanged {
             staged   : staged_text,
             unstaged : unstaged_text } ) } ); }
-  // The IDCol/AliasCol diff scaffolds are cols, so if this node flipped to a
-  // phantom they would be generalized orphans (a col requires a Active-vognode
+  // The IDFolder/AliasFolder diff scaffolds are folders, so if this node flipped to a
+  // phantom they would be generalized orphans (a folder requires a Active-vognode
   // ancestor) and get deadened + pruned at their own BFS visit -- i.e. emitted
   // here only to be destroyed before render. Skip creating them on a flipped
   // node: same final tree, without the wasted work. (The node's id/alias
   // sub-diffs are noise on a removed node anyway.)
   if ! node_flipped_to_phantom {
-    // Emit an EMPTY IDCol / AliasCol when this node's id-list / alias-list
+    // Emit an EMPTY IDFolder / AliasFolder when this node's id-list / alias-list
     // changed. Their per-id / per-alias children (each carrying its membership
-    // axes) are filled when the BFS later reaches the col, by
-    // reconcile_id_col_children / reconcile_alias_col_children -- the single
+    // axes) are filled when the BFS later reaches the folder, by
+    // reconcile_idFolder_children / reconcile_aliasFolder_children -- the single
     // place that derives them from the per-stage diff. So we only DECIDE here
     // (cheaply: did any entry get added or removed?), and do not duplicate the
-    // per-stage merge. A col the node ALREADY carries (the buffer being
+    // per-stage merge. A folder the node ALREADY carries (the buffer being
     // completed can hold one -- e.g. a prior diff render, saved back) is
-    // reused, never doubled: a second col would also reconcile to the full
+    // reused, never doubled: a second folder would also reconcile to the full
     // list, duplicating every entry in the view (TODO/more.org, "aliases
     // should be merged, not added").
     if list_diff_has_change (
          staged_changes   . map ( |c| c . ids_diff . as_slice () ),
          unstaged_changes . map ( |c| c . ids_diff . as_slice () ) )
-      && ! has_qualcol_child ( &mut node_mut, tree_node_id, QualCol::ID ) {
-      prepend_empty_diff_col ( &mut node_mut, QualCol::ID ); }
+      && ! has_qualFolder_child ( &mut node_mut, tree_node_id, QualFolder::ID ) {
+      prepend_empty_diff_folder ( &mut node_mut, QualFolder::ID ); }
     if list_diff_has_change (
          staged_changes   . map ( |c| c . aliases_diff . as_slice () ),
          unstaged_changes . map ( |c| c . aliases_diff . as_slice () ) )
-      && ! has_qualcol_child ( &mut node_mut, tree_node_id, QualCol::Alias ) {
-      prepend_empty_diff_col ( &mut node_mut, QualCol::Alias ); } }
+      && ! has_qualFolder_child ( &mut node_mut, tree_node_id, QualFolder::Alias ) {
+      prepend_empty_diff_folder ( &mut node_mut, QualFolder::Alias ); } }
   // Per-stage contains diff for the parent, split into position-specific
   // membership axes. A REORDERED id appears in one stage as both Removed (its
   // old slot) and New (its new slot); a single MembershipAxes keyed by id
@@ -145,8 +145,8 @@ pub(crate) fn process_activeNode_diff (
     &mut node_mut, tree_node_id, &added_membership_by_id );
   if matches! ( & node_mut . value () . kind,
                 ViewNodeKind::Vognode (Vognode::Active (t))
-                  if t . is_indefinitive () ) {
-    // TODO/fork-fixes.org: no git ghosts under an indefinitive node.
+                  if t . is_writeProtected () ) {
+    // TODO/fork-fixes.org: no git ghosts under a write-protected node.
     // It draws none of its worktree children, so a removed-member
     // phantom under it would show the node's DELETED children while
     // its kept children go unshown. Its definitive occurrence (or a
@@ -192,8 +192,8 @@ fn phantom_insertion_plan (
 
 /// True iff either stage's list-field diff actually added or removed an entry
 /// (an Unchanged-only diff is no change). The cheap decision used to emit an
-/// empty diff col; reconcile_id_col_children / reconcile_alias_col_children
-/// then fills the col from the same per-stage diff.
+/// empty diff folder; reconcile_idFolder_children / reconcile_aliasFolder_children
+/// then fills the folder from the same per-stage diff.
 fn list_diff_has_change<T> (
   staged   : Option<&[Diff_Item<T>]>,
   unstaged : Option<&[Diff_Item<T>]>,
@@ -204,31 +204,31 @@ fn list_diff_has_change<T> (
         Diff_Item::New (_) | Diff_Item::Removed (_) ) )) };
   changed (staged) || changed (unstaged) }
 
-/// True iff the node already has a child QualCol of KIND.
-fn has_qualcol_child (
+/// True iff the node already has a child QualFolder of KIND.
+fn has_qualFolder_child (
   node_mut     : &mut NodeMut<ViewNode>,
   tree_node_id : NodeId,
-  kind         : QualCol,
+  kind         : QualFolder,
 ) -> bool {
   let node_ref : NodeRef<ViewNode> =
     node_mut . tree () . get (tree_node_id) . unwrap ();
   node_ref . children () . any ( |c| matches! (
     & c . value () . kind,
-    ViewNodeKind::QualCol (k) if *k == kind )) }
+    ViewNodeKind::QualFolder (k) if *k == kind )) }
 
-/// Prepend an EMPTY QualCol diff scaffold (an IDCol or AliasCol). Its per-entry
+/// Prepend an EMPTY QualFolder diff scaffold (an IDFolder or AliasFolder). Its per-entry
 /// children -- each carrying its membership axes -- are filled when the BFS
-/// reaches the col, by reconcile_id_col_children / reconcile_alias_col_children.
-fn prepend_empty_diff_col (
+/// reaches the folder, by reconcile_idFolder_children / reconcile_aliasFolder_children.
+fn prepend_empty_diff_folder (
   node_mut : &mut NodeMut<ViewNode>,
-  kind     : QualCol,
+  kind     : QualFolder,
 ) {
   node_mut . prepend (
     ViewNode {
       focused     : false,
       folded      : false,
       body_folded : false,
-      kind        : ViewNodeKind::QualCol (kind) } ); }
+      kind        : ViewNodeKind::QualFolder (kind) } ); }
 
 /// For each existing child in the worktree's contains list, copy any
 /// per-stage ADDITION (Plus) axes from the added-membership map, so a member
@@ -306,7 +306,7 @@ fn insert_phantoms_for_missing_contains (
     // source can't be determined -- e.g. a contains pointer at HEAD to a
     // node whose .skg file was deleted by an earlier commit and so exists
     // in no source -- fall back to the NOT_FOUND sentinel rather than
-    // aborting the whole render (matching the PartnerCol removed-member
+    // aborting the whole render (matching the PartnerFolder removed-member
     // path; TODO/DONE/local-view-update/plan_v2.org §7.6).
     let child_source : SourceName =
       find_source_with_optional_tantivy (

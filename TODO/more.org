@@ -107,10 +107,10 @@ a typed/pasted ID, so it needs nothing from the buffer it is called
 in. (The nvim client binds per-buffer; I left it alone since "buffer
 type" is an Emacs concern -- say the word if you want a global nvim
 mapping too.)
-* DONE If indefinitive, add a B to that symbol where body is hidden.
+* DONE If write-protected, add a B to that symbol where body is hidden.
 ** Claude : done
-An indefinitive node whose graph node has a body now carries the bare
-atom 'hiddenBody' right after 'indef'; the herald table renders it as
+A write-protected node whose graph node has a body now carries the bare
+atom 'hiddenBody' right after 'writeProtected'; the herald table renders it as
 a green "B" ABUTted onto the ☮. Computed in the viewnodestats pass
 from the in-Rust graph; display-only (the parser accepts and discards
 it, like rels/birthHerald). Updating the exact-output render tests

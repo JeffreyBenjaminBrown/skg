@@ -81,17 +81,17 @@ describe('skg.metadata commands', function ()
           vim.api.nvim_get_current_buf(), { force = true })
   end)
 
-  it('set_indefinitive adds indef to the node section', function ()
-    -- Mirrors test-skg-set-indefinitive's three cases.
+  it('set_write_protected adds writeProtected to the node section', function ()
+    -- Mirrors test-skg-set-write-protected's three cases.
     buffer_with('* (skg (node (id 1))) title')
-    metadata.set_indefinitive()
+    metadata.set_write_protected()
     local result = first_metadata_sexp()
-    assert.is_true(subtree_p(result, '(skg (node indef))'))
+    assert.is_true(subtree_p(result, '(skg (node writeProtected))'))
     assert.is_true(subtree_p(result, '(skg (node (id 1)))'))
     buffer_with('* plain title')
-    metadata.set_indefinitive()
+    metadata.set_write_protected()
     assert.is_true(subtree_p(first_metadata_sexp(),
-                             '(skg (node indef))'))
+                             '(skg (node writeProtected))'))
   end)
 
   it('delete marks the node for deletion', function ()
@@ -105,7 +105,7 @@ describe('skg.metadata commands', function ()
     buffer_with(table.concat({
       '* (skg (node (id root))) root',
       '** (skg (node (id child))) child',
-      '** (skg aliasCol) aliases',
+      '** (skg aliasFolder) aliases',
       '*** some alias',
       '* (skg (node (id sibling))) sibling' }, '\n'))
     metadata.delete_recursive()
@@ -158,17 +158,17 @@ describe('skg.metadata commands', function ()
     assert.is_false(subtree_p(result, '(skg (node (source public)))'))
   end)
 
-  it('set_source_recursive prunes non-content parentIs', function ()
-    -- Mirrors test-skg-set-source-recursive-prunes-non-content-parentIs.
+  it('set_source_recursive prunes non-content affectsParent', function ()
+    -- Mirrors test-skg-set-source-recursive-prunes-non-content-affectsParent.
     buffer_with(table.concat({
-      '* (skg (node (id root) (source public) (parentIs absent))) root',
+      '* (skg (node (id root) (source public) (affectsParent na))) root',
       '** (skg (node (id content-child) (source public))) content child',
       '*** (skg (node (id content-grandchild) (source public))) content grandchild',
       '** (skg (node (id mismatched-content) (source foreign))) mismatched content',
       '*** (skg (node (id public-under-mismatch) (source public))) public under mismatch',
-      '** (skg (node (id link-child) (source public) (parentIs independent) (birth backpath linkSource))) link child',
+      '** (skg (node (id link-child) (source public) (affectsParent false) (birth backpath linkSource))) link child',
       '*** (skg (node (id under-link) (source public))) under link',
-      '** (skg aliasCol) aliases',
+      '** (skg aliasFolder) aliases',
       '*** (skg (node (id under-scaffold) (source public))) under scaffold' },
       '\n'))
     local original = picker.prompt_for_source_change
@@ -229,17 +229,17 @@ describe('skg.metadata commands', function ()
 end)
 
 describe('skg.metadata keybinding surface', function ()
-  it('binds the collection and path commands distinctly', function ()
-    -- Mirrors test-skg-collection-and-path-keybindings: the
+  it('binds the folder and path commands distinctly', function ()
+    -- Mirrors test-skg-folder-and-path-keybindings: the
     -- UPPER/lower path letters select opposite roles.
     local keymaps = require('skg.keymaps')
     local by_lhs = {}
     for _, binding in ipairs(keymaps.content_view_bindings) do
       by_lhs[binding[1]] = binding[2]
     end
-    assert.are.equal('ShowCollectionAliases', by_lhs['ca'])
-    assert.are.equal('ShowCollectionOverrides', by_lhs['co'])
-    assert.are.equal('ShowCollectionSubscribes', by_lhs['cs'])
+    assert.are.equal('ShowFolderOfAliases', by_lhs['ca'])
+    assert.are.equal('ShowFolderOfOverrides', by_lhs['co'])
+    assert.are.equal('ShowFolderOfSubscribes', by_lhs['cs'])
     assert.are.equal('ShowPathsThroughContainers', by_lhs['pC'])
     assert.are.equal('ShowPathsThroughLinkSources', by_lhs['pL'])
     assert.are.equal('ShowPathsThroughLinkDests', by_lhs['pl'])
@@ -281,7 +281,7 @@ describe('skg.metadata editing helpers', function ()
       '* (skg value) 4' }, '\n'), buffer_text())
   end)
 
-  it('leaves metadata alone when the key is absent', function ()
+  it('leaves metadata alone when the key is na', function ()
     -- "Alone" up to normalization: reconstruction orders kv-pairs
     -- before bare values, exactly as the elisp expectations show
     -- (input '(skg value (k v))' comes back '(skg (k v) value)').
@@ -301,7 +301,7 @@ describe('skg.metadata editing helpers', function ()
       '* (skg (k v)) 4' }, '\n'), buffer_text())
   end)
 
-  it('leaves metadata alone when the value is absent', function ()
+  it('leaves metadata alone when the value is na', function ()
     buffer_with(example_data)
     apply_to_all_lines(metadata.delete_value_from_metadata,
                        'nonexistent')

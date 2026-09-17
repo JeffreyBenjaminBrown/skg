@@ -5,7 +5,7 @@
 // even if the parent ignores it.
 
 use skg::types::misc::{ ID, SourceName, SkgConfig, SkgfileSource };
-use skg::types::viewnode::{ ParentIs, ViewNode, ViewNodeKind, viewforest_root_viewnode, mk_definitive_viewnode, mk_indefinitive_viewnode };
+use skg::types::viewnode::{ AffectsParent, ViewNode, ViewNodeKind, viewforest_root_viewnode, mk_definitive_viewnode, mk_writeProtected_viewnode };
 use skg::types::viewnode::Vognode;
 use skg::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
 use skg::dbs::in_rust_graph::InRustGraph;
@@ -34,7 +34,7 @@ fn two_source_config () -> SkgConfig {
   SkgConfig::dummyFromSources (sources) }
 
 /// When a node N has the same source as its nearest activeNode ancestor,
-/// even if N is marked parentIs=Independent,
+/// even if N is marked affectsParent=false,
 /// sourceAtBoundary should be false.
 #[test]
 fn source_inheritance_across_non_content_same_source () {
@@ -50,11 +50,11 @@ fn source_inheritance_across_non_content_same_source () {
       "node A" . to_string (),
       None );
     viewforest . root_mut () . append (vn) . id () };
-  { let vn : ViewNode = mk_indefinitive_viewnode (
+  { let vn : ViewNode = mk_writeProtected_viewnode (
       ID::from ("b"),
       SourceName::from ("pub"),
       "node B" . to_string (),
-      ParentIs::Independent );
+      AffectsParent::False );
     viewforest . get_mut (a_id) . unwrap () . append (vn); }
   set_viewnodestats_in_viewforest (
     &mut viewforest,
@@ -64,7 +64,7 @@ fn source_inheritance_across_non_content_same_source () {
     &config,
     None );
   // B has same source as A, so sourceAtBoundary should be false,
-  // even though B has parentIs != Affected.
+  // even though B has affectsParent != Affected.
   let b_ref =
     viewforest . get (a_id) . unwrap ()
     . first_child () . unwrap ();
@@ -75,7 +75,7 @@ fn source_inheritance_across_non_content_same_source () {
             "Same source across non-content boundary \
              should NOT be at boundary" ); }
 
-/// When a non-content child (parentIs != Affected) has a different source
+/// When a non-content child (affectsParent != Affected) has a different source
 /// from its nearest activeNode ancestor,
 /// sourceAtBoundary should be true.
 #[test]
@@ -92,11 +92,11 @@ fn source_inheritance_across_non_content_different_source () {
       "node A" . to_string (),
       None );
     viewforest . root_mut () . append (vn) . id () };
-  { let vn : ViewNode = mk_indefinitive_viewnode (
+  { let vn : ViewNode = mk_writeProtected_viewnode (
       ID::from ("b"),
       SourceName::from ("priv"),
       "node B" . to_string (),
-      ParentIs::Independent );
+      AffectsParent::False );
     viewforest . get_mut (a_id) . unwrap () . append (vn); }
   set_viewnodestats_in_viewforest (
     &mut viewforest,

@@ -32,10 +32,10 @@ use crate::types::misc::{ID, SourceName, SkgConfig};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
 use crate::types::tree::forest::ViewForest;
-use crate::to_org::util::{mark_view_roots_parent_absent, validate_parentIs_relationships, mark_orphans_under_dead_parents_independent};
+use crate::to_org::util::{mark_view_roots_parent_na, validate_affectsParent_relationships, mark_orphans_under_dead_parents_false};
 use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
-use crate::types::viewnode::{IndefOrDef, ViewNode, ViewNodeKind};
-use crate::types::viewnode::{Vognode, Phantom, QualCol, Qual, ViewRequest};
+use crate::types::viewnode::{Editability, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{Vognode, Phantom, QualFolder, Qual, ViewRequest};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 
 use ego_tree::{Tree, NodeId, NodeMut};
@@ -218,8 +218,8 @@ pub fn update_views_after_save (
         Some (&mut repair_warnings),
         false ) } ?;
   context . warnings . extend (
-    // Repairs the completion pass made to read-only PartnerCols in
-    // the saved view, batched per (col, owner).
+    // Repairs the completion pass made to read-only PartnerFolders in
+    // the saved view, batched per (folder, owner).
     render_completion_warnings (&repair_warnings) );
   let mut collateral_views : Vec<RenderedCollateralView> = Vec::new ();
   for curi in &collateral_uris {
@@ -372,15 +372,15 @@ pub(crate) fn find_collateral_view_uris (
 /// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): build a DE-NOVO (initial) content view by running the ONE
 /// post-save view completion (complete_viewforest) over a stub forest of the
 /// requested roots. View completion
-/// creates each fresh node's PartnerCols (create_partnerCols_for_fresh_nodes
-/// = true), expands content, reconciles cols, and applies the TODO/DONE/local-view-update/plan_v2.org §5.5 node budget.
+/// creates each fresh node's PartnerFolders (create_partnerFolders_for_fresh_nodes
+/// = true), expands content, reconciles folders, and applies the TODO/DONE/local-view-update/plan_v2.org §5.5 node budget.
 /// When diff_mode, the git diff is computed inline by view completion (per node,
 /// at its BFS visit, via process_activeNode_diff) -- the same path post-save uses.
 /// The caller (multi_root_view_via_env) then adds containerward ancestry and
 /// stats.
 /// Returns the completed viewforest plus any warning strings the
 /// render itself produced -- today only compound-override-chain
-/// notices. (Col-repair warnings stay silent for de novo renders;
+/// notices. (Folder-repair warnings stay silent for de novo renders;
 /// see the warning-sink filtering at the bottom.)
 pub fn render_initial_view (
   runtime   : &RuntimeGeneration,
@@ -389,8 +389,8 @@ pub fn render_initial_view (
   diff_mode : bool,
 ) -> Result<(ViewForest, Vec<String>), Box<dyn Error>> {
   // Build the stub roots. Its DefinitiveMap is discarded: view completion below uses
-  // a FRESH one, so each root is a first occurrence (make_indef_if_repeat treats
-  // any pid already in the map as a repeat and would wrongly indefinitize them).
+  // a FRESH one, so each root is a first occurrence (make_write-protected_if_repeat treats
+  // any pid already in the map as a repeat and would wrongly write-protect them).
   let mut stub_defmap : DefinitiveMap = DefinitiveMap::new ();
   let mut viewforest : ViewForest =
     crate::to_org::util::stub_viewforest_from_root_ids (
@@ -414,8 +414,8 @@ pub fn render_initial_view (
   let mut errors : Vec<String> = Vec::new ();
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): de-novo diff is computed INLINE by view completion, exactly
   // like post-save -- compute the real diffs here and feed them via source_diffs
-  // (which drives the inline process_activeNode_diff and the diff-aware QualCol /
-  // PartnerCol reconcilers).
+  // (which drives the inline process_activeNode_diff and the diff-aware QualFolder /
+  // PartnerFolder reconcilers).
   let real_diffs : Option<HashMap<SourceName, SourceDiff>> =
     if diff_mode { Some ( compute_diff_for_every_source (&runtime . config) ) }
     else         { None };
@@ -435,7 +435,7 @@ pub fn render_initial_view (
     deleted_by_this_save_extra_ids : &HashMap::new (),
     active_source_set              : active,
     node_budget                    : runtime . config . initial_node_limit,
-    create_partnerCols_for_fresh_nodes : true,
+    create_partnerFolders_for_fresh_nodes : true,
     diff_tantivy_index : if diff_mode { Some (&runtime . tantivy_index) }
                          else         { None },
     warning_sink : Some (&mut sink), };
@@ -452,7 +452,7 @@ pub fn rerender_view (
   viewforest    : &mut ViewForest,
   context       : &mut RerenderAfterSaveContext<'_>,
   warning_sink  : Option<&mut Vec<CompletionWarning>>, // Some only for the view the user just saved.
-  create_partnerCols : bool, // false post-save (cols round-trip from the buffer); true for the source-switch rerender, where pruning removed them and the new set decides which return.
+  create_partnerFolders : bool, // false post-save (folders round-trip from the buffer); true for the source-switch rerender, where pruning removed them and the new set decides which return.
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
   { tracing::debug!("rerender_view: starting");
@@ -462,8 +462,8 @@ pub fn rerender_view (
     let mut completion_context : CompletionContext = CompletionContext {
       defmap                         : &mut defmap,
       // The real per-source diffs drive ALL diff inline: process_activeNode_diff
-      // (content axes + phantom flip + TextChanged/IDCol/AliasCol) and the
-      // diff-aware QualCol / PartnerCol reconcilers, each at its own BFS visit
+      // (content axes + phantom flip + TextChanged/IDFolder/AliasFolder) and the
+      // diff-aware QualFolder / PartnerFolder reconcilers, each at its own BFS visit
       // (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3). The content reconcile itself stays worktree-only.
       source_diffs                   : &context . source_diffs,
       runtime                        : &context . runtime,
@@ -474,12 +474,12 @@ pub fn rerender_view (
       deleted_by_this_save_extra_ids : &context . deleted_by_this_save_extra_ids,
       active_source_set              : context . active_source_set,
       node_budget                    : context . runtime . config . initial_node_limit,
-      // Post-save (and rerender-all) reuse the saved buffer's PartnerCols and
+      // Post-save (and rerender-all) reuse the saved buffer's PartnerFolders and
       // pass false: re-creating them would change the buffer and break the save
       // round-trip (TODO/DONE/local-view-update/plan_v2.org §18). The
-      // source-switch rerender passes true: its prune removed the cols, and the
+      // source-switch rerender passes true: its prune removed the folders, and the
       // new set decides which return.
-      create_partnerCols_for_fresh_nodes : create_partnerCols,
+      create_partnerFolders_for_fresh_nodes : create_partnerFolders,
       // Post-save: phantom sources resolve via the deleted-id map + disk scan
       // (the de-novo path passes the tantivy index instead).
       diff_tantivy_index : None,
@@ -513,14 +513,14 @@ pub fn rerender_view (
 ///     post-save roots come from the saved buffer WITHOUT the request, so a save
 ///     never re-generates the containerward (it round-trips as ordinary content).
 ///   - attaches containerward ancestry to every removed-here phantom,
-///   - marks view-root and orphan parentIs,
-///   - validates parentIs against the captured graph (the de-novo path could
+///   - marks view-root and orphan affectsParent,
+///   - validates affectsParent against the captured graph (the de-novo path could
 ///     skip it for speed, but running it in both keeps the tails one),
 ///   - computes graph- then view-node stats,
 ///   - applies the active source set, and renders to a buffer string.
-/// Step order is immaterial between the parentIs marks and graphnodestats:
-/// parentIs is a view property and graphnodestats reads only the in-Rust graph,
-/// never parentIs, so the final state is identical either way.
+/// Step order is immaterial between the affectsParent marks and graphnodestats:
+/// affectsParent is a view property and graphnodestats reads only the in-Rust graph,
+/// never affectsParent, so the final state is identical either way.
 pub fn finish_viewforest (
   viewforest        : &mut ViewForest,
   graph             : &InRustGraph,
@@ -535,15 +535,15 @@ pub fn finish_viewforest (
       "attach_containerward_ancestries_to_removedhere_phantoms" ). entered();
     attach_containerward_ancestries_to_removedhere_phantoms (
       viewforest, graph, config, active_source_set ) ? ; }
-  mark_view_roots_parent_absent ( viewforest );
+  mark_view_roots_parent_na ( viewforest );
   // §A (Jeff's invariant): an Active survivor left under a non-container parent
   // (a phantom / Deleted / DeadScaffold) is a non-dead generalized orphan and
   // must become Independent.
-  mark_orphans_under_dead_parents_independent ( viewforest );
-  // Correct any parentIs markers whose claimed relation to the parent doesn't
+  mark_orphans_under_dead_parents_false ( viewforest );
+  // Correct any affectsParent markers whose claimed relation to the parent doesn't
   // hold in the captured graph (e.g. user moved a birth=linksToParent node
   // under a new parent it doesn't link to).
-  validate_parentIs_relationships ( viewforest, graph );
+  validate_affectsParent_relationships ( viewforest, graph );
   let ( container_to_contents, content_to_containers ) =
     match active_source_set {
       Some (active) =>
@@ -610,8 +610,8 @@ fn rewriteInPlace_viewnodes_whose_id_is_newly_extra (
       { t . id = new_pid;
         t . source = new_source;
         t . title = new_title;
-        if let IndefOrDef::Definitive { body, .. }
-        = &mut t . indef_or_def
+        if let Editability::Definitive { body, .. }
+        = &mut t . editability
         { *body = new_body; }} }}
   Ok (( )) }
 
@@ -628,7 +628,7 @@ fn strip_stale_diff_state (
 
 /// Strip every stale diff phantom from the viewforest, REGARDLESS of its
 /// relation to its parent (Jeff's TODO/DONE/local-view-update/progress.org §9 TODO): a phantom anywhere
-/// but a forest root is removed, whatever its parentIs. Disposal depends on
+/// but a forest root is removed, whatever its affectsParent. Disposal depends on
 /// whether it has children:
 ///   - childless phantom -> detached (deleted) and its branch pruned;
 ///   - phantom WITH children -> demoted to DeadScaffold, so any real user
@@ -638,12 +638,12 @@ fn strip_stale_diff_state (
 /// Exception: a forest root (top-level view node) is NOT stripped -- stripping
 /// it would empty the view, and unlike a content phantom the diff overlay does
 /// not regenerate a root. (This is the only surviving relation-to-parent test;
-/// it is about tree position and regeneration, not parentIs.)
+/// it is about tree position and regeneration, not affectsParent.)
 ///
-/// Previously this stripped only content phantoms (parentIs == Affected),
+/// Previously this stripped only content phantoms (affectsParent == Affected),
 /// preserving Independent/Absent ones. But a phantom dragged out of position
 /// is a confusing lie -- it claims a node is missing somewhere it never was --
-/// so we now drop it too; parentIs is no longer read here at all.
+/// so we now drop it too; affectsParent is no longer read here at all.
 ///
 /// PITFALL:
 /// Beware, ye who would preserve phantom nodes across save-buffer ops:
@@ -686,13 +686,13 @@ fn remove_branches_that_git_marked_removed (
   Ok (( )) }
 
 /// Remove scaffolds that exist only to display diff information:
-/// TextChanged and IDCol.
+/// TextChanged and IDFolder.
 /// These are regenerated from scratch by 'process_activeNode_diff' (the inline
 /// per-node diff) at each node's BFS visit, so stale ones must be stripped first.
-/// AliasCol is NOT removed: it may have been requested by the user
+/// AliasFolder is NOT removed: it may have been requested by the user
 /// (not just injected by diff mode), and tracking which case applies
 /// is not worth the complexity. Phantom Alias children (injected by
-/// diff mode) are cleaned up by reconcile_alias_col_children during the postorder
+/// diff mode) are cleaned up by reconcile_aliasFolder_children during the postorder
 /// pass: its goal list won't include them, so they are detached.
 fn remove_diff_only_scaffolds (
   viewforest : &mut ViewForest
@@ -706,7 +706,7 @@ fn remove_diff_only_scaffolds (
       let is_diff_scaffold : bool =
         matches! ( &node . value() . kind,
           ViewNodeKind::Qual (Qual::TextChanged { .. }) |
-          ViewNodeKind::QualCol (QualCol::ID) );
+          ViewNodeKind::QualFolder (QualFolder::ID) );
       if is_diff_scaffold {
         node . detach();
         Ok (false) // pruned — don't recurse into detached children
@@ -714,7 +714,7 @@ fn remove_diff_only_scaffolds (
   Ok (( )) }
 
 /// Clear diff metadata from all ActiveNodes in the viewforest.
-/// Diff-only scaffolds (TextChanged, IDCol) are
+/// Diff-only scaffolds (TextChanged, IDFolder) are
 /// removed by 'remove_diff_only_scaffolds' before this runs.
 fn clear_diff_metadata (
   viewforest : &mut ViewForest
@@ -781,7 +781,7 @@ fn fulfill_root_containerward_requests (
   Ok (( )) }
 
 /// For every RemovedHere phantom in the viewforest, fetch its containerward
-/// ancestry from the captured graph and insert it as indefinitive Content children.
+/// ancestry from the captured graph and insert it as write-protected Content children.
 /// Short-circuits when no RemovedHere phantoms exist.
 fn attach_containerward_ancestries_to_removedhere_phantoms (
   viewforest    : &mut ViewForest,

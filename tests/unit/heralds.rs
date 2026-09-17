@@ -4,10 +4,10 @@ use std::collections::HashSet;
 
 /// Atoms that legitimately appear in the rule table although the
 /// server never emits them:
-/// - "affected" is accepted by the parser but left implicit by the
+/// - "true" is accepted by the parser but left implicit by the
 ///   serializer; its vacuous rule documents that.
 const ACCEPTED_NOT_EMITTED_ATOMS : [&str; 1] =
-  [ "affected" ];
+  [ "true" ];
 
 // The required core of the herald migration: every metadata atom the
 // server can emit has a rule, and every rule names a live atom.
@@ -43,8 +43,8 @@ fn herald_rules_sexp_quotes_strings () {
   assert! ( sexp . starts_with ("(skg ") );
   assert! ( sexp . contains ( r#"(GREEN INTERC "" staged "staged:""# ),
             "labelled INTERC with quoted empty separator not found" );
-  assert! ( sexp . contains ( r#"(GREEN aliasCol "aliases")"# ));
-  assert! ( sexp . contains ( r#"(GREEN indef ABUT "☮")"# ));
+  assert! ( sexp . contains ( r#"(GREEN aliasFolder "aliases")"# ));
+  assert! ( sexp . contains ( r#"(GREEN writeProtected ABUT "☮")"# ));
   { let mut depth : i64 = 0; // balanced parens (no parens occur inside the table's strings, so plain counting suffices)
     for c in sexp . chars () {
       match c { '(' => depth += 1,

@@ -129,9 +129,9 @@ function M.check_container (container_sexp)
   if not is_owned then
     error('Cannot replace this branch with a link:'
           .. ' container source is not owned: ' .. source) end
-  if metadata.node_indefinitive_p(container_sexp) then
+  if metadata.node_write_protected_p(container_sexp) then
     error('Cannot replace this branch with a link:'
-          .. ' container is indefinitive') end
+          .. ' container is write-protected') end
 end
 
 -- ── replace content with link ──────────────────────────────────────
@@ -212,7 +212,7 @@ function M.replace_link_with_content ()
   local split = metadata.split_as_stars_metadata_title(
     metadata.line_text(line))
   local replacement = string.format(
-    '%s(skg (node (id %s) indef (viewRequests definitiveView))) %s',
+    '%s(skg (node (id %s) writeProtected (viewRequests definitiveView))) %s',
     split.stars, link.id, link.label or link.id)
   vim.api.nvim_buf_set_lines(0, line - 1, M.subtree_end(line), false,
                              { replacement })

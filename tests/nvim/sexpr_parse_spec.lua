@@ -123,7 +123,7 @@ describe('skg.sexpr.parse printing', function ()
     round_trips('((response-type "titles-by-ids") (content '
                 .. '((3861db2c-aaaa . "title one") (deadbeef . "two"))))')
     round_trips('(skg (node (id 7) (source main) (unstaged newX newM)))')
-    round_trips('(skg (node (id 9) (source main) indef '
+    round_trips('(skg (node (id 9) (source main) writeProtected '
                 .. '(staged removedM) (unstaged newM)))')
     round_trips('(skg alias (staged newM))')
     round_trips('(skg (textChanged staged unstaged))')

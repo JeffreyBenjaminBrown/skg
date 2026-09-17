@@ -52,7 +52,7 @@ So far there are these endpoints:
 
   - Phase 1, immediate: Server sends LP `((response-type
     search-results) (content "ORG") (warnings ("..." ...)))`.
-    Results are ordinary indefinitive non-content TrueNodes (not
+    Results are ordinary write-protected non-content TrueNodes (not
     special scaffold types). A no-match or error response has the same
     response type and a single `content` field.
 
@@ -87,7 +87,7 @@ So far there are these endpoints:
     (an `overrides_view_of` edge points at it, user-owned or
     foreign) and at least one overrider's source is active, the
     server returns, instead of a content view, an ordinary buffer
-    of indefinitive nodes: the requested node as root, each visible
+    of write-protected nodes: the requested node as root, each visible
     overrider an Independent child of what it overrides, following
     the relation recursively (all edges), each branch stopping with
     the `cycle` viewstat at the first repeated ID. The response
@@ -510,8 +510,8 @@ So far there are these endpoints:
        is re-rendered in place under the new set: nodes whose source
        became inactive are converted and pruned (an inactive node
        with active view-children is retained, read-only), and
-       PartnerCols regenerate per the new set, so widening the set
-       reveals members and cols.
+       PartnerFolders regenerate per the new set, so widening the set
+       reveals members and folders.
   - Behavior: The active source-set is per Emacs TCP connection. It
     defaults from `skgconfig.toml`, resets on reconnect, and is not
     written back to the config. Changing it requires confirmation in
@@ -600,16 +600,16 @@ if and only if it adheres to the following:
   - Extra whitespace is ignored.
   - Keys and values should contain no whitespace.
 
-Inside a `(node ...)` form, `(parentIs ...)` describes whether the
-node participates in the collection represented by its visible parent:
+Inside a `(node ...)` form, `(affectsParent ...)` describes whether the
+node participates in the membership represented by its visible parent:
 
-- omitted `parentIs` means `affected`;
-- `(parentIs affected)` is accepted but normally omitted when rendered;
-- `(parentIs independent)` means the node is preserved/displayed but
-  does not alter the parent's collection on save;
-- `(parentIs absent)` is rendered for view roots.
+- omitted `affectsParent` means `true`;
+- `(affectsParent true)` is accepted but normally omitted when rendered;
+- `(affectsParent false)` means the node is preserved/displayed but
+  does not alter the parent's membership on save;
+- `(affectsParent na)` is rendered for view roots.
 
-The bare atom `hiddenBody` accompanies `indef` on an indefinitive
+The bare atom `hiddenBody` accompanies `writeProtected` on a write-protected
 node whose graph node HAS a body — one the rendering hides. Herald
 "B", hugging the ☮. Display-only: the parser accepts and discards it;
 the view regenerates it.
@@ -636,16 +636,16 @@ the view regenerates it.
 the server fulfills each request during view completion and then drops
 the atom, so a request is transient. Three request forms:
 
-- `(col RELNAME)` — build BOTH cols of the relation, populated from the
+- `(folder RELNAME)` — build BOTH folders of the relation, populated from the
   graph. RELNAME is `aliases`, `overrides`, `hides`, or `subscribes`.
-  The writable col (`overriddenCol` / `subscribeeCol` / `aliasCol`)
+  The writable folder (`overriddenFolder` / `subscribeeFolder` / `aliasFolder`)
   appears even when empty (its editable "add here" surface); an empty
-  read-only col is pruned. Emitted by the `C-c c` commands.
+  read-only folder is pruned. Emitted by the `C-c l` commands.
 - `(path ROLENAME)` — build the backpath for one partner role, grafting
   the partners as inverted read-only children (each marked `(birth
   backpath ROLENAME)`). ROLENAME is one of the nine in
   `PARTNER_ROLE_VOCAB`. Emitted by the `C-c p` commands.
-- `definitiveView` — make an indefinitive, childless node editable.
+- `definitiveView` — make a write-protected, childless node editable.
 - `fork` — the explicit `skg-fork-node` gesture: clone this (owned)
   node into a private fork that overrides it. Consumed on the save path
   at fork detection (not during view completion), then dropped. Emitted
@@ -681,7 +681,7 @@ Each graph relation contributes at most one token of the shape
   node points to (its contents, the nodes it overrides, ...).
 - a lowercase letter flags a tracked ANCESTOR that is a member on that
   side: `a` = visible org-parent, `b` = grandparent, ... (counting all
-  viewnodes, col scaffolds included). So an ordinary content child
+  viewnodes, folder scaffolds included). So an ordinary content child
   reads `aC` ("my parent contains me"); a containerward-ancestry graft
   reads `...Ca` ("I contain my parent", e.g. `1C8a`); a node its parent
   overrides reads `aO`, one that overrides its parent `Oa`. When a
@@ -702,7 +702,7 @@ and the per-relation view-position flags (`containsParent`,
 ancestor-lettered tokens now. (A phantom, which has graphStats but no
 view position, still carries a counts-only `(rels ...)` from
 `assemble_counts_only`, and the bare `hiddenBody` atom documented above
-still rides an indefinitive node whose graph node has a hidden body.)
+still rides a write-protected node whose graph node has a hidden body.)
 
 `(viewStats ...)` still carries the position facts that are NOT
 relationship tokens (the same graph node can warrant different ones
@@ -714,7 +714,7 @@ under different parents):
 - `(relSource NAME)` — herald red "~NAME", drawn immediately before
   the ⌂ source herald; the recording source of the RELATIONSHIP this
   headline represents (the `contains` edge to a content child, or
-  the col's relation for a PartnerCol member), when its privacy was
+  the folder's relation for a PartnerFolder member), when its privacy was
   deliberately raised above the edge's default. This is an observed,
   recomputed display fact: save never consumes it as an instruction.
 - `(editRequest (relSource NAME))` — herald red "request:~NAME".
@@ -741,12 +741,12 @@ under the active source-set, it draws R instead -- transitively (a
 user-owned chain D overrides C overrides N is legal and resolves to
 the last visible link), cycle-guarded, and never in diff mode.
 Existing viewnodes are never rewritten (closing and reopening
-normalizes), and only content substitutes: PartnerCol members,
+normalizes), and only content substitutes: PartnerFolder members,
 view roots, search results, ancestry insertions and phantoms always
 draw the raw node. Moreover, the immediate children of ANY overridden
-node drawn raw -- a PartnerCol member, a view root (bypass-opened or
+node drawn raw -- a PartnerFolder member, a view root (bypass-opened or
 otherwise), or the overridden-as-such (an Affected child of an
-overriddenCol) -- also draw raw: the user is looking at the original,
+overriddenFolder) -- also draw raw: the user is looking at the original,
 so its children are the original's, not the overrider's. This is one
 level deep -- substitution resumes at the grandchildren -- and it is
 strict: a node whose only overrider is invisible under the active
@@ -759,7 +759,7 @@ stands for. The marker is LOAD-BEARING at save: wherever it
 appears, extraction collects N rather than the carrying node's own
 ID, so a container's contains list round-trips to the original
 instead of being rewritten to the overrider. Edits to the drawn
-node itself (title, body, cols) still save to the drawn node.
+node itself (title, body, folders) still save to the drawn node.
 A buffer whose marker the server would not have drawn (the carrier
 is not on N's user-owned override chain -- the ownership-gated,
 visibility-UNGATED walk out of N) aborts the save with an
@@ -947,8 +947,8 @@ and right before another whitespace and the node's title.
 The metadata grammar (which keys are recognized and how they're
 parsed) lives in `server/serve/parse_metadata_sexp.rs`. The
 in-memory types those keys correspond to are in
-`server/types/viewnode.rs` (`TrueNode`, `ViewNodeKind`, `QualCol`,
-`Qual`, `PartnerCol`)
+`server/types/viewnode.rs` (`TrueNode`, `ViewNodeKind`, `QualFolder`,
+`Qual`, `PartnerFolder`)
 and `server/types/git.rs` (`ExistenceAxes`, `MembershipAxes`, `Sign`).
 
 Metadata is not WYSIWYG; its appearance in the client
@@ -956,12 +956,12 @@ is determined by `elisp/heralds-minor-mode`, whose rule table is
 served by Rust (see "Herald rules" above; the table lives in
 `server/heralds.rs`).
 
-PartnerCol scaffolds are represented in Rust as
-`ViewNodeKind::PartnerCol (PartnerCol)`, but their external metadata
+PartnerFolder scaffolds are represented in Rust as
+`ViewNodeKind::PartnerFolder (PartnerFolder)`, but their external metadata
 remains the established bare scaffold atom:
-`subscribeeCol`, `subscriberCol`, `overriddenCol`, `overriderCol`,
-`hiderCol`, `hiddenCol`, `hiddenInSubscribeeCol`, or
-`hiddenOutsideOfSubscribeeCol`.
+`subscribeeFolder`, `subscriberFolder`, `overriddenFolder`, `overriderFolder`,
+`hiderFolder`, `hiddenFolder`, `hiddenInSubscribeeFolder`, or
+`hiddenOutsideOfSubscribeeFolder`.
 
 ## Diff-related metadata
 
@@ -975,23 +975,23 @@ Inside a `(node ...)` form (TrueNodes):
   of bare atoms drawn from `{newX, removedX, newM, removedM}`. `X` =
   existence (the node's `.skg` file appeared/disappeared in this
   stage); `M` = membership (the node's appearance at this position in
-  its parent's collection appeared/disappeared in this stage).
+  its parent's membership appeared/disappeared in this stage).
 - bare atom `notInGit` if the node's source is not a git repo.
 
-PartnerCol members carry the same axes, in both directions, for
-every col: a member removed since HEAD appears as a phantom with
+PartnerFolder members carry the same axes, in both directions, for
+every folder: a member removed since HEAD appears as a phantom with
 per-stage `removedM`; a member added since HEAD carries per-stage
 `newM`; `X` axes describe the member's own file as usual. For an
-outbound col (subscribeeCol, overriddenCol, hiddenCol) the signs
-come from the owner's relation diff; for an inbound col
-(subscriberCol, overriderCol, hiderCol) from the members' files'
+outbound folder (subscribeeFolder, overriddenFolder, hiddenFolder) the signs
+come from the owner's relation diff; for an inbound folder
+(subscriberFolder, overriderFolder, hiderFolder) from the members' files'
 diffs (the inverse scan), with phantoms appended after the real
-members in sorted-ID order; for the filter cols
-(hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol) from comparing
-the derived membership at HEAD, index and worktree. A col whose
+members in sorted-ID order; for the filter folders
+(hiddenInSubscribeeFolder, hiddenOutsideOfSubscribeeFolder) from comparing
+the derived membership at HEAD, index and worktree. A folder whose
 worktree membership is empty but whose HEAD-side membership is not
 still renders in diff mode, holding only phantoms. Phantoms define
-nothing: saving a buffer ignores them, and a writable col's phantom
+nothing: saving a buffer ignores them, and a writable folder's phantom
 is never collected as a member.
 
 At top level inside `(skg ...)` (Scaffolds for Alias / ID):
@@ -1007,7 +1007,7 @@ Also at top level, for the TextChanged scaffold:
 Examples:
 ```
 (skg (node (id 7) (source main) (unstaged newX newM)))
-(skg (node (id 9) (source main) indef (staged removedM) (unstaged newM)))
+(skg (node (id 9) (source main) writeProtected (staged removedM) (unstaged newM)))
 (skg alias (staged newM))
 (skg id (unstaged removedM))
 (skg (textChanged staged unstaged))
@@ -1015,8 +1015,8 @@ Examples:
 
 ## Inactive-source nodes: omission, retention, and save preservation
 
-Under a restricted source-set, rendering OMITS nodes from inactive
-sources entirely -- content, subscribees, and every PartnerCol's
+Under a restricted source-set, rendering omits nodes from inactive
+sources entirely -- content, subscribees, and every PartnerFolder's
 members alike. No placeholder appears, and omission is recursive: an
 omitted container's whole branch is omitted, active descendants
 included (they stay reachable by search or direct visit).
@@ -1028,8 +1028,8 @@ anchored weave) for `contains` and `subscribes_to`, set-difference
 for `overrides_view_of`. Edits to visible members, including
 deletions, are honored.
 
-The one place an inactive node still appears is RETENTION: when a
-source-set switch is applied to an OPEN view (an already-drawn
+The one place an inactive node still appears is retention: when a
+source-set switch is applied to an open view (an already-drawn
 buffer), an inactive node with active view-children stays on screen
 as an anonymous placeholder, so its active descendants are not
 orphaned:
@@ -1038,10 +1038,10 @@ orphaned:
 (skg inactiveNode)
 ```
 
-The placeholder is DATALESS by design: an inactive node's id, source,
+The placeholder is dataless by design: an inactive node's id, source,
 and title all describe content the user hid by restricting the
 source-set, so emitting any of it would leak. It carries no id or
-source and renders titleless. It is inert: it emits NO save intention
+source and renders titleless. It is inert: it emits no save intention
 (its membership in its parent's list is owned entirely by the disk
 merge, not the buffer), it is not a collateral re-render target, and
 editing its (empty) title/body is a buffer validation error. Its
@@ -1049,7 +1049,7 @@ active children remain fully editable. A de-novo render under a
 restricted set never produces one -- inactive members are omitted and
 their content is never expanded.
 
-Edits to inactive nodes themselves are SUPPRESSED at save, not
+Edits to inactive nodes themselves are *suppressed* at save, not
 fatal: any instruction that would write an inactive source is
 dropped and the save succeeds with the warning "Inactive nodes
 present in saved buffer remain unchanged in graph." An untouched

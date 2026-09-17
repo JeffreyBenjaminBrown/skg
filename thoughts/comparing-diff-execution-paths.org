@@ -36,16 +36,16 @@ If =node_changes.text_changed= is true:
 - PREPENDS a =Scaffold::TextChanged= child.
 - Does NOT check whether one already exists.
 
-*** 4. IDCol scaffold with ID children (INSERTS nodes)
+*** 4. IDFolder scaffold with ID children (INSERTS nodes)
 
 If =node_changes.ids_diff= contains any non-Unchanged entry:
-- PREPENDS a =Scaffold::IDCol= child.
+- PREPENDS a =Scaffold::IDFolder= child.
 - APPENDS =Scaffold::ID { id, diff }= grandchildren to it,
   one per entry in =ids_diff=, with:
   - =Unchanged= → =diff: None=
   - =New= → =diff: Some(FieldDiffStatus::New)=
   - =Removed= → =diff: Some(FieldDiffStatus::Removed)=
-- Does NOT check whether an IDCol already exists.
+- Does NOT check whether an IDFolder already exists.
 
 *** 5. Content-children diff (MODIFIES + INSERTS nodes)
 
@@ -72,9 +72,9 @@ For each =Removed= entry in =contains_diff=:
 
 ** What diff.rs does NOT do
 
-- Does not handle AliasCol diffs (no =Scaffold::Alias { diff }= children).
-- Does not handle subscribee diffs (SubscribeeCol, HiddenInSubscribeeCol,
-  HiddenOutsideOfSubscribeeCol).
+- Does not handle AliasFolder diffs (no =Scaffold::Alias { diff }= children).
+- Does not handle subscribee diffs (SubscribeeFolder, HiddenInSubscribeeFolder,
+  HiddenOutsideOfSubscribeeFolder).
 - Does not use a diff-aware goal list — it just looks at whichever
   children happen to already exist and marks/inserts around them.
 
@@ -102,7 +102,7 @@ When =source_diffs= is =Some=:
   calls =itemlist_and_removedset_from_diff(nc.contains_diff)=.
   The goal list interleaves worktree IDs with removed IDs so that
   removed children appear in their original position.
-- For subscribee nodes (children of a SubscribeeCol):
+- For subscribee nodes (children of a SubscribeeFolder):
   additionally filters by grandparent's =hides_from_its_subscriptions=,
   comparing HEAD hidden list vs worktree hidden list, then computes
   an interleaved diff of the visible content.
@@ -137,22 +137,22 @@ from being marked as erroneous.
 - If =text_changed=: INSERTS =Scaffold::TextChanged= (only if absent,
   checked via =unique_scaffold_child=).
 - If =ids_diff= has non-Unchanged entries: INSERTS empty
-  =Scaffold::IDCol= (only if absent).
+  =Scaffold::IDFolder= (only if absent).
 - If =aliases_diff= has non-Unchanged entries: INSERTS empty
-  =Scaffold::AliasCol= (only if absent).
+  =Scaffold::AliasFolder= (only if absent).
 
-The IDCol and AliasCol are inserted EMPTY here. They get populated
+The IDFolder and AliasFolder are inserted EMPTY here. They get populated
 later in the postorder pass.
 
 **** TODO It feels like something's missing.
 
-     SubscribeeCol?
+     SubscribeeFolder?
 
-** Preorder pass: =complete_subscribee_col_preorder=
+** Preorder pass: =complete_subscribee_folder_preorder=
 
-File: =update_buffer/complete_parent_first/subscribee_col.rs=
+File: =update_buffer/complete_parent_first/subscribee_folder.rs=
 
-Called for every =Scaffold::SubscribeeCol=.
+Called for every =Scaffold::SubscribeeFolder=.
 
 *** Diff-aware subscribee goal list
 
@@ -170,11 +170,11 @@ list. Phantom subscribees are created via =mk_phantom_viewnode= with
 status =Removed= or =RemovedHere= (checked against
 =sourcediff.deleted_nodes=).
 
-** Postorder pass: =completeIDCol=
+** Postorder pass: =completeIDFolder=
 
-File: =update_buffer/complete_child_first/id_col.rs=
+File: =update_buffer/complete_child_first/id_folder.rs=
 
-Called for every =Scaffold::IDCol=. Populates it with
+Called for every =Scaffold::IDFolder=. Populates it with
 =Scaffold::ID { id, diff }= children.
 
 *** Diff-aware ID children
@@ -185,21 +185,21 @@ If =NodeChanges= exists, iterates =nc.ids_diff=:
 - =New(id)= → =Scaffold::ID { id, diff: Some(FieldDiffStatus::New) }=
 - =Removed(id)= → =Scaffold::ID { id, diff: Some(FieldDiffStatus::Removed) }=
 
-** Postorder pass: =completeAliasCol=
+** Postorder pass: =completeAliasFolder=
 
-File: =update_buffer/complete_child_first/aliascol.rs=
+File: =update_buffer/complete_child_first/aliasFolder.rs=
 
 NOT diff-aware. Creates =Scaffold::Alias { text, diff: None }=
 children from worktree aliases. Does not consult =source_diffs= at
-all. (The preorder pass creates the empty AliasCol scaffold when
+all. (The preorder pass creates the empty AliasFolder scaffold when
 aliases have changed, but the postorder populates it without diff
 markers.)
 
 *** TODO It should be diff-aware.
 
-** Postorder pass: =complete_hiddeninsubscribee_col=
+** Postorder pass: =complete_hiddeninsubscribee_folder=
 
-File: =update_buffer/complete_child_first/hiddeninsubscribee_col.rs=
+File: =update_buffer/complete_child_first/hiddenInSubscribee_folder.rs=
 
 Reconciles hidden children that are content of the subscribee.
 
@@ -213,9 +213,9 @@ Produces phantom children for removed items.
 READS =t.diff.is_none()= when marking erroneous children (same
 pattern as =mark_erroneous_content_children_as_parent_ignores=).
 
-** Postorder pass: =complete_hiddenoutsideofsubscribeecol=
+** Postorder pass: =complete_hiddenoutsideofsubscribeefolder=
 
-File: =update_buffer/complete_child_first/hiddenoutsideof_subscribeecol.rs=
+File: =update_buffer/complete_child_first/hiddenoutsideof_subscribeefolder.rs=
 
 Reconciles hidden children NOT in any subscribee's content.
 
@@ -238,10 +238,10 @@ READS =t.diff.is_none()= when marking erroneous children.
 | Set =t.diff = NewHere= on children   | yes           | yes            |
 | Insert phantom content children      | yes           | yes            |
 | Insert =TextChanged= scaffold        | yes           | yes            |
-| Insert =IDCol= scaffold              | yes           | yes            |
-| Populate IDCol with ID children      | yes           | yes            |
-| Insert =AliasCol= scaffold           | no            | yes            |
-| Populate AliasCol with Alias{diff}   | no            | yes            |
+| Insert =IDFolder= scaffold              | yes           | yes            |
+| Populate IDFolder with ID children      | yes           | yes            |
+| Insert =AliasFolder= scaffold           | no            | yes            |
+| Populate AliasFolder with Alias{diff}   | no            | yes            |
 | Diff-aware content goal list         | no            | yes            |
 | Diff-aware subscribee goal list      | no            | yes            |
 | Diff-aware hidden-in-subscribee list | no            | yes            |
@@ -258,12 +258,12 @@ Both paths insert it. diff.rs does so unconditionally (prepend).
 complete checks =unique_scaffold_child= first. If complete runs
 before diff.rs, diff.rs will add a duplicate.
 
-** IDCol scaffold + ID children
+** IDFolder scaffold + ID children
 
-Both paths insert an IDCol. diff.rs prepends it already populated
-with ID children. complete's preorder inserts an empty IDCol (checked
+Both paths insert an IDFolder. diff.rs prepends it already populated
+with ID children. complete's preorder inserts an empty IDFolder (checked
 for uniqueness), then the postorder populates it. If complete runs
-first, diff.rs will add a second, fully-populated IDCol.
+first, diff.rs will add a second, fully-populated IDFolder.
 
 ** Phantom content children
 

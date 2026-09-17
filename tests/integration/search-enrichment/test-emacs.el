@@ -21,15 +21,15 @@
       (message "✗ FAIL: leaf-b search root not found during %s" phase)
       (message "Buffer content:\n%s" content)
       (kill-emacs 1))
-    (when (string-match-p "(parentIs independent)" line)
-      (message "✗ FAIL: leaf-b search root is independent during %s: %S"
+    (when (string-match-p "(affectsParent false)" line)
+      (message "✗ FAIL: leaf-b search root is false during %s: %S"
                phase line)
       (kill-emacs 1))
-    (when (string-match-p "(parentIs independent) indef (rels (contains (out 1 (ancestors 1))) (birth contains))" line)
+    (when (string-match-p "(affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth contains))" line)
       (message "✗ FAIL: leaf-b search root is content during %s: %S"
                phase line)
       (kill-emacs 1))
-    (when (string-match-p "(parentIs independent) indef (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo))" line)
+    (when (string-match-p "(affectsParent false) writeProtected (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo))" line)
       (message "✗ FAIL: leaf-b search root is linksToParent during %s: %S"
                phase line)
       (kill-emacs 1))))

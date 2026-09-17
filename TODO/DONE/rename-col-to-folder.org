@@ -1,0 +1,622 @@
+#+TITLE: Audit for renaming collection / col viewnodes to folder
+
+* Scope and proposed rule
+This audits the active code, tests, fixtures, protocol, clients, and prose for
+the language change recorded in =TODO.org=: “folder viewnode” instead of
+“col”.  The intended mechanical rule is:
+
+** collection, when it means the folder viewnode concept
+-> folder
+
+** col, when it abbreviates the folder viewnode concept
+-> folder
+
+Case and separators should follow the surrounding language: =PartnerCol= ->
+=PartnerFolder=, =partner_col= -> =partner_folder=, =partnerCol= ->
+=partnerFolder=, and =partner-col= -> =partner-folder=.
+
+I excluded =TODO/= (apart from this new report), =my-dot-claude/=,
+=data/**/*.skg=, generated and hidden state, =_burying/=, every =abandoned/=
+directory, =docs/orphaned/=, =docs/OVERVIEW-old.org=, and =org-exports/=.
+I did inspect the active source, both clients, tests (including test =.skg=
+fixtures), tools, top-level documentation, =docs/=, =coding-advice/=,
+=windows/=, =example-data/=, and non-obsolete =thoughts/= material.
+
+The existing filesystem sense of “folder” (data folder, owned folder,
+Tantivy folder, and so on) remains unchanged.  It is distinguishable from a
+folder / scaffold viewnode by context.
+
+* Public and serialized vocabulary
+These are compatibility boundaries, so server, Emacs, Neovim, integration
+tests, fixture buffers, and the protocol documentation should change in one
+synchronized slice.  The project advice argues against leaving legacy aliases
+unless Jeff explicitly wants a compatibility window.
+
+** =(col RELNAME)=
+-> =(folder RELNAME)=
+
+This includes parsing, rendering/cycling metadata, all four view-request
+commands, examples, and descriptions.  =RELNAME= remains =aliases=,
+=overrides=, =hides=, or =subscribes=.
+
+** =aliasCol=
+-> =aliasFolder=
+
+** =idCol=
+-> =idFolder=
+
+** =subscribeeCol=
+-> =subscribeeFolder=
+
+** =subscriberCol=
+-> =subscriberFolder=
+
+** =overriddenCol=
+-> =overriddenFolder=
+
+** =overriderCol=
+-> =overriderFolder=
+
+** =hiderCol=
+-> =hiderFolder=
+
+** =hiddenCol=
+-> =hiddenFolder=
+
+*** TODO by its definition lets add a comment
+that it's not a folder that's hidden;
+it is a viewnode whose children represent nodes hidden by the node its parent represents.
+
+** =hiddenInSubscribeeCol=
+-> =hiddenInSubscribeeFolder=
+
+** =hiddenOutsideOfSubscribeeCol=
+-> =hiddenOutsideOfSubscribeeFolder=
+
+** Emacs command family
+*** =skg-show-collection-aliases=
+-> =skg-show-folderOf-aliases=
+*** =skg-show-collection-overrides=
+-> =skg-show-folderOf-overrides=
+*** =skg-show-collection-hides=
+-> =skg-show-folderOf-hides=
+*** =skg-show-collection-subscribes=
+-> =skg-show-folderOf-subscribes=
+
+The corresponding symbols in =elisp/skg-request-views.el= and key bindings in
+=elisp/skg-keymaps-and-aliases.el= change together.  The keys =C-c c ...= do
+not themselves contain terminology and need not change unless a mnemonic
+change is desired.
+**** TODO let's change the command prefix to C-c l
+
+** Neovim function family
+*** =show_collection_aliases=
+-> =show_folderOf_aliases=
+*** =show_collection_overrides=
+-> =show_folderOf_overrides=
+*** =show_collection_hides=
+-> =show_folderOf_hides=
+*** =show_collection_subscribes=
+-> =show_folderOf_subscribes=
+
+** Neovim command family
+*** =SkgShowCollectionAliases=
+-> =SkgShowFolderOfAliases=
+*** =SkgShowCollectionOverrides=
+-> =SkgShowFolderOfOverrides=
+*** =SkgShowCollectionHides=
+-> =SkgShowFolderOfHides=
+*** =SkgShowCollectionSubscribes=
+-> =SkgShowFolderOfSubscribes=
+
+The Lua key-table keys =ShowCollectionAliases=,
+=ShowCollectionOverrides=, =ShowCollectionHides=, and
+=ShowCollectionSubscribes= likewise become =ShowFolderOf...=.  The existing
+=<localleader>c...= bindings can remain.
+
+* Rust types and enum variants
+** =QualCol=
+-> =QualFolder=
+
+** =ViewNodeKind::QualCol=
+-> =ViewNodeKind::QualFolder=
+
+** =PartnerCol=
+-> =PartnerFolder=
+
+** =ViewNodeKind::PartnerCol=
+-> =ViewNodeKind::PartnerFolder=
+
+The eight payload variants (=Subscribee=, =Subscriber=, =Overridden=,
+=Overrider=, =Hider=, =Hidden=, =HiddenInSubscribee=, and
+=HiddenOutsideOfSubscribee=) can keep their names; their enclosing type gives
+the folder meaning.
+
+** =ColPolicy=
+-> =FolderPolicy=
+
+** =ColRelation=
+-> =FolderRelation=
+
+** =ViewRequest::Col=
+-> =ViewRequest::Folder=
+
+** =LocalContext::UnderDefiningCol=
+-> =LocalContext::UnderDefiningFolder=
+
+** =LocalContext::UnderReadOnlyCol=
+-> =LocalContext::UnderReadOnlyFolder=
+
+** =DefiningColOwner=
+-> =DefiningFolderOwner=
+
+** =SubscribeeColContext=
+-> =SubscribeeFolderContext=
+
+** =CompletionWarning::ColRepair=
+-> =CompletionWarning::FolderRepair=
+
+** =BufferValidationError::IDCol_Edited=
+-> =BufferValidationError::IDFolder_Edited=
+
+This error name is also rendered into user-visible/tested text, including the
+lower-camel =idCol= in its explanatory message.
+
+* Conceptual type names found in comments and prose
+Some of these are not standalone Rust declarations today, but they recur as
+names for the modeled viewnode kinds and should migrate just as real types do.
+
+** =AliasCol=
+-> =AliasFolder=
+
+** =IDCol=
+-> =IDFolder=
+
+** =SubscribeeCol=
+-> =SubscribeeFolder=
+
+** =SubscriberCol=
+-> =SubscriberFolder=
+
+** =OverriddenCol=
+-> =OverriddenFolder=
+
+** =HiddenInSubscribeeCol=
+-> =HiddenInSubscribeeFolder=
+
+** =HiddenOutsideOfSubscribeeCol=
+-> =HiddenOutsideOfSubscribeeFolder=
+
+** =PartnerCols=
+-> =PartnerFolders=
+
+** =RoleCols=
+-> =RoleFolders=
+
+The glossary says “role col” and “relation col” are retired names, but active
+comments still contain =RoleCols=.  Rename rather than preserve that residue.
+
+* Production functions
+The following are the declaration-level names found in active server code.
+Calls and imports follow each declaration mechanically.
+
+** parsing and local validation
+*** =validate_aliascol=
+-> =validate_aliasfolder=
+*** =validate_subscribeecol=
+-> =validate_subscribeefolder=
+*** =validate_hidden_in_subscribee_col=
+-> =validate_hiddenInSubscribee_folder=
+*** =validate_hidden_outside_of_subscribee_col=
+-> =validate_hiddenOutsideOfSubscribee_folder=
+*** =validate_relation_col=
+-> =validate_relation_folder=
+*** =validate_idcol=
+-> =validate_idFolder=
+*** =idCol_membership_errors=
+-> =idFolder_membership_errors=
+*** =partnerCol_children_have_distinct_ids=
+-> =partnerFolder_children_have_distinct_ids=
+*** =qualcol_metadata_to_string=
+-> =qualFolder_metadata_to_string=
+
+** save-intent traversal
+*** =visit_aliascol=
+-> =visit_aliasFolder=
+*** =visit_subscribeecol=
+-> =visit_subscribee_folder=
+*** =visit_hiddenoutsidecol=
+-> =visit_hiddenOutside_folder=
+*** =visit_overriddencol=
+-> =visit_overridden_folder=
+*** =partnerCol_members=
+-> =partnerFolder_members=
+*** =subscribeeCol_members=
+-> =subscribeeFolder_members=
+*** =member_counts_for_partnerCol=
+-> =member_counts_for_partnerFolder=
+
+** construction and expansion
+*** =build_and_integrate_col_then_drop_request=
+-> =build_and_integrate_folder_then_drop_request=
+*** =build_and_integrate_col=
+-> =build_and_integrate_folder=
+*** =maybe_add_subscribeeCol_branch=
+-> =maybe_add_subscribeeFolder_branch=
+*** =maybe_add_partnerCol_branches=
+-> =maybe_add_partnerFolder_branches=
+*** =maybe_add_one_partnerCol=
+-> =maybe_add_one_partnerFolder=
+*** =maybe_add_hiddenInSubscribeeCol_branch=
+-> =maybe_add_hiddenInSubscribeeFolder_branch=
+*** =goal_list_for_outbound_col=
+-> =goal_list_for_outbound_folder=
+*** =goal_list_for_hiddeninsubscribee_col=
+-> =goal_list_for_hiddenInSubscribee_folder=
+*** =goal_list_for_hiddenoutsideof_subscribeecol=
+-> =goal_list_for_hiddenOutsideOfSubscribee_folder=
+*** =inverse_scan_for_inbound_col=
+-> =inverse_scan_for_inbound_folder=
+*** =reconcile_partnerCol_children_against_goal_list=
+-> =reconcile_partnerFolder_children_against_goal_list=
+*** =reconcile_partnerCol_children_against_goal_list_with_deleted_extra_ids=
+-> =reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds=
+*** =apply_membership_axes_to_col_members=
+-> =apply_membership_axes_to_folder_members=
+*** =mark_goal_children_as_collectionBranch_members=
+-> =mark_goal_children_as_folder_members=
+
+“Collection branch” is not otherwise a named type.  =folder_members= says what
+the function actually establishes without inventing =FolderBranch=.
+
+** update and reconciliation
+*** =reconcile_alias_col_children=
+-> =reconcile_aliasFolder_children=
+*** =reconcile_id_col_children=
+-> =reconcile_idFolder_children=
+*** =reconcile_partnerCol_children=
+-> =reconcile_partnerFolder_children=
+*** =reconcile_subscribee_col_children=
+-> =reconcile_subscribeeFolder_children=
+*** =reconcile_hiddenin_subscribee_col_children=
+-> =reconcile_hiddenInSubscribeeFolder_children=
+*** =reconcile_hiddenoutside_subscribee_col_children=
+-> =reconcile_hiddenoutsideSubscribeeFolder_children=
+*** =read_subscribee_col_context=
+-> =read_subscribeeFolder_context=
+*** =ensure_hiddenoutsideofsubscribeecol_is_last=
+-> =ensure_hiddenOutsideOfSubscribeeFolder_is_last=
+*** =ensure_hiddenin_col_under_definitive_subscribee=
+-> =ensure_hiddenInFolder_under_definitive_subscribee=
+*** =reconcile_hiddenin_cols=
+-> =reconcile_hiddenIn_folders=
+*** =is_col_kind=
+-> =is_folder_kind=
+*** =col_is_generalized_orphan=
+-> =folder_is_generalized_orphan=
+*** =deaden_generalized_orphan_col=
+-> =deaden_generalized_orphan_folder=
+*** =dispose_orphaned_col_child=
+-> =dispose_orphaned_folder_child=
+*** =fold_members_of_newborn_col=
+-> =fold_members_of_newborn_folder=
+*** =birth_relations_for_col=
+-> =birth_relations_for_folder=
+
+** rendering and herald helpers
+*** =has_qualcol_child=
+-> =has_qualFolder_child=
+*** =prepend_empty_diff_col=
+-> =prepend_empty_diff_folder=
+*** =qual_and_col_atoms=
+-> =qual_and_folder_atoms=
+* TODO let's add 'col' to the glossary
+explaining (in case a spelunker finds it
+in old docs or the knowledge graph)
+that it's what we used to call folder viewnodes,
+and has been expunged from production code.
+* Production fields, locals, constants, and guards
+These are lower-level names but should not be left behind.  Apply the same
+case-preserving rule to singular/plural forms.
+
+** =create_partnerCols=
+-> =create_partnerFolders=
+** =create_partnerCols_for_fresh_nodes=
+-> =create_partnerFolders_for_fresh_nodes=
+** =all_partnerCols=
+-> =all_partnerFolders=
+** =all_qualCols=
+-> =all_qualFolders=
+** =partnerCol_guard=
+-> =partnerFolder_guard=
+** =qualCol_guard=
+-> =qualFolder_guard=
+** =parent_is_aliascol=
+-> =parent_is_aliasFolder=
+** =parent_is_partner_col=
+-> =parent_is_partnerFolder=
+** =parent_is_raw_drawing_col=
+-> =parent_is_raw_drawing_folder=
+** =parent_is_subscribee_col=
+-> =parent_is_subscribeeFolder=
+** =is_aliascol=
+-> =is_aliasFolder=
+** =is_col=
+-> =is_folder=
+** =col_node= / =col_nid= / =col_id= / =col_treeid= / =col_ref= / =col_mut=
+-> corresponding =folder_...= names
+** =col_depth= / =col_line= / =col_member_stars= / =col_title_warning=
+-> corresponding =folder_...= names
+** =current_col= / =new_col= / =target_col= / =surviving_col= / =emptied_col=
+-> corresponding =..._folder= names where these denote viewnode folders
+** =filter_cols= / =writable_*Col= / =readonly_col= / =inbound_col= / =outbound_col=
+-> =filter_folders= / =writable_*Folder= / =readonly_folder= /
+=inbound_folder= / =outbound_folder=
+** alias, ID, subscribee, and hidden-folder local families
+Rename =aliascol_*=, =alias_col_*=, =idcol_*=, =id_col_*=,
+=subscribee_col_*=, =hidden_col_*=, =hidden_outside_col_*=, and
+=hiddeninsubscribee_col= with the matching =folder= spelling.
+
+* Files and modules
+Directory/module renames require fixing =mod= declarations and imports.
+
+** =server/to_org/complete/partner_col/=
+-> =server/to_org/complete/partner_folder/=
+** =server/to_org/expand/col_request.rs=
+-> =server/to_org/expand/folder_request.rs=
+** =server/update_buffer/reconcile/aliascol.rs=
+-> =server/update_buffer/reconcile/aliasfolder.rs=
+** =server/update_buffer/reconcile/id_col.rs=
+-> =server/update_buffer/reconcile/id_folder.rs=
+** =server/update_buffer/reconcile/partner_col.rs=
+-> =server/update_buffer/reconcile/partner_folder.rs=
+** =server/update_buffer/reconcile/subscribee_col.rs=
+-> =server/update_buffer/reconcile/subscribee_folder.rs=
+** =server/update_buffer/reconcile/hiddeninsubscribee_col.rs=
+-> =server/update_buffer/reconcile/hiddeninsubscribee_folder.rs=
+** =server/update_buffer/reconcile/hiddenoutsideof_subscribeecol.rs=
+-> =server/update_buffer/reconcile/hiddenoutsideof_subscribeefolder.rs=
+
+The mixed =subscribeecol= spelling should become the unambiguous
+=subscribeefolder=, not =subscribefolder=.
+
+Existing spelling slips in comments and diagnostics, =IDcol= and
+=SubsribeeCol=, should land directly on =IDFolder= and =SubscribeeFolder=
+rather than preserving the slips.
+
+* Tests and fixtures
+Test identifiers, module declarations, assertion text, literal rendered
+buffers, snapshots, and fixture READMEs are part of the rename.  Test =.skg=
+files are in scope; only =data/**/*.skg= was excluded.
+
+** test/module paths
+*** =tests/collateral_partner_col.rs=
+-> =tests/collateral_partner_folder.rs=
+*** =tests/collateral_partner_col/=
+-> =tests/collateral_partner_folder/=
+*** =tests/expand_partner_col_member.rs=
+-> =tests/expand_partner_folder_member.rs=
+*** =tests/expand_partner_col_member/=
+-> =tests/expand_partner_folder_member/=
+*** =tests/git_diff_view_partner_cols.rs=
+-> =tests/git_diff_view_partner_folders.rs=
+*** =tests/git_diff_view/filter_cols/=
+-> =tests/git_diff_view/filter_folders/=
+*** =tests/partner_col_matrix.rs=
+-> =tests/partner_folder_matrix.rs=
+*** =tests/partner_col_matrix/=
+-> =tests/partner_folder_matrix/=
+*** =tests/partner_col_order.rs=
+-> =tests/partner_folder_order.rs=
+*** =tests/partner_col_order/=
+-> =tests/partner_folder_order/=
+*** =tests/partner_col_warnings.rs=
+-> =tests/partner_folder_warnings.rs=
+*** =tests/partner_col_warnings/=
+-> =tests/partner_folder_warnings/=
+*** =tests/rebuild/complete_aliascol.rs=
+-> =tests/rebuild/complete_aliasfolder.rs=
+*** =tests/rebuild/complete_aliascol/=
+-> =tests/rebuild/complete_aliasfolder/=
+*** =tests/subscribee_col.rs=
+-> =tests/subscribee_folder.rs=
+*** =tests/subscribee_col/=
+-> =tests/subscribee_folder/=
+*** =tests/subscribee_col_empty_persists.rs=
+-> =tests/subscribee_folder_empty_persists.rs=
+*** =tests/subscribee_col_empty_persists/=
+-> =tests/subscribee_folder_empty_persists/=
+*** =tests/unit/reconcile_partner_col.rs=
+-> =tests/unit/reconcile_partner_folder.rs=
+*** =tests/hidden_from_subscriptions/fixtures-every-kind-of-col/=
+-> =tests/hidden_from_subscriptions/fixtures-every-kind-of-folder/=
+
+Fixture directories nested under those paths move with their parent.  Other
+fixture trees contain literal folder atoms and need content edits without path
+renames, especially =tests/git_diff_view/=,
+=tests/hidden_from_subscriptions/=, =tests/integration/=, and =tests/elisp/=.
+
+** test-only types and constants
+*** =ColSpec=
+-> =FolderSpec=
+*** =READONLY_COLS=
+-> =READONLY_FOLDERS=
+
+** test function/name families
+Rename every test identifier carrying =aliascol= / =alias_col=, =idcol= /
+=id_col=, =partnerCol= / =partner_col=, =subscribeeCol= /
+=subscribee_col=, =subscriberCol= / =subscriber_col=, =hiddenCol= /
+=hidden_col=, =hiddenin...col=, =hiddenoutside...col=, =readonly_col=,
+=writable_...Col=, =inbound_cols=, =outbound_cols=, =filter_cols=, or
+=defining_col=.  Notable families include:
+
+*** =test_reconcile_alias_col_children...=
+-> =test_reconcile_alias_folder_children...=
+*** =test_delete_id_col_scaffold_respawns...=
+-> =test_delete_id_folder_scaffold_respawns...=
+*** =empty_subscribee_col_persists...=
+-> =empty_subscribee_folder_persists...=
+*** =readonly_col_order_is_preserved...=
+-> =readonly_folder_order_is_preserved...=
+*** =readonly_col_repairs_warn...=
+-> =readonly_folder_repairs_warn...=
+*** =*_cols_show_phantoms_and_newM_...=
+-> =*_folders_show_phantoms_and_newM_...=
+*** =emptied_filter_cols_still_render_in_diff_mode=
+-> =emptied_filter_folders_still_render_in_diff_mode=
+*** =col_members_never_substitute=
+-> =folder_members_never_substitute=
+*** =warnings_batch_per_col_and_owner=
+-> =warnings_batch_per_folder_and_owner=
+*** =catches_title_content_and_writable_collection_edits_but_not_child_text=
+-> =catches_title_content_and_writable_folder_edits_but_not_child_text=
+
+* Documentation rewrite
+The following active prose files contain the domain terminology and should be
+reviewed rather than blindly substituted:
+
+** =glossary.md=
+Rewrite the “col is short for collection” and “PartnerCol” sections around
+“folder viewnode” and =PartnerFolder=.  This is the canonical terminology
+change and should probably define why “folder” is not a filesystem folder.
+Update the read-only-set, subscribee-as-such, col-policy, global graph handle,
+ordering, and local-instruction-collection cross-reference passages.
+
+** =api-and-formats.md=
+Update the view-request form, metadata atom list, =ParentIs= description,
+diff membership language, source-set behavior, and all type references.  This
+file makes the wire break explicit: =(folder RELNAME)= and =*Folder= atoms.
+
+** =docs/COMMANDS.org=
+Change “show a collection,” command names, folder atom examples, read-only
+folder explanations, source-edit refusal text, and “the col's relation.”
+
+** =docs/COMMANDS-nvim.org=
+Make the parallel changes for Neovim commands and descriptions.
+
+** =docs/sharing-model.md=
+Rewrite generated/read-only “collections” as folder viewnodes/read-only
+folders, plus =subscriberFolder=, =overriderFolder=, =hiderFolder=, and the
+=overriddenFolder= substitution example.
+
+** =docs/forks.md=
+Rename the subscribee-folder section, examples, and explanations.
+
+** =coding-advice/claude-to-claude.org=
+Update the architectural summary of scaffolds, =PartnerFolder= examples, and
+“per-folder reconcilers.”  Preserve “local instruction collection”: that is a
+different operation.
+
+** =jeff-should-weigh-in-on.org=
+Rename the live =hiderCol= reference to =hiderFolder=.
+
+** =TODO.org=
+This top-level file is not the excluded =TODO/= directory.  Its live language
+change and behavior notes already mix “folder,” “col,” =overriddenCol=, and
+=aliascol=.  Normalize those live headings/examples to the final folder names.
+
+** =thoughts/type-system-critique.org=
+Update the active conceptual examples =AliasCol= and =IDCol=.
+
+** =thoughts/comparing-diff-execution-paths.org=
+If this note is still live rather than historical, update its many type,
+function, module-path, and table references.  It describes older paths and
+names (for example =Scaffold::IDCol=), so this is the one inspected file whose
+status Jeff may prefer to mark obsolete instead of modernizing.
+
+** test documentation
+Update the README and Org prose under =tests/git_diff_view/ids/=,
+=tests/hidden_from_subscriptions/=,
+=tests/integration/save_collateral_delete_then_edit_under_it/=, and
+=tests/subscribee_col/= (after that directory becomes
+=tests/subscribee_folder/=).
+
+** prose phrases to rewrite consistently
+*** alias collection node / alias collection scaffold
+-> alias folder node / alias folder scaffold
+*** partner collection / partner collection viewnode
+-> partner folder / partner folder viewnode
+*** relation collection / org-collection
+-> relation folder / org folder viewnode
+*** collection view
+-> folder view
+*** collection scaffold / col scaffold
+-> folder scaffold
+*** collection headline / col headline
+-> folder headline
+*** collection atom / col atom
+-> folder atom
+*** collection member / col member
+-> folder member
+*** collection owner / col owner / col anchor
+-> folder owner / folder anchor
+*** defining col / writable col / read-only col / filter col
+-> defining folder / writable folder / read-only folder / filter folder
+*** inbound col / outbound col
+-> inbound folder / outbound folder
+*** col policy / col relation / col request
+-> folder policy / folder relation / folder request
+
+Some prose currently says that a normal node child “participates in the
+collection represented by its visible parent.”  A literal substitution would
+incorrectly imply that every content parent is a folder viewnode.  Prefer
+“participates in the membership represented by its visible parent,” then
+explain separately that a =PartnerFolder= represents relation membership.
+
+* Similar strings that should not be renamed
+These were included in the textual audit and deliberately separated from the
+folder-viewnode migration.
+
+** =std::collections= and Rust =.collect()=
+Ordinary language/library operations, not folder viewnodes.
+
+** =collect_*=, =CollectedIntents=, and =lower_collected_intents=
+These mean gathering values.  Keep them.
+
+** local instruction collection
+Keep =server/from_text/local_instruction_collection/=, its test directory and
+modules, the glossary entry, and prose references.  It names the save
+pipeline's act of accumulating intents, not a scaffold viewnode.
+
+** completion collection
+Keep Neovim picker's =current_completion_collection=,
+=completing_read_with_cycle(..., collection, ...)=, and Emacs completion API
+arguments.  They are candidate sequences.
+
+** =CollectionPair= / =CollectionReport= in =tools/validate-org-roam-import=
+Keep unless a broader ordinary-English cleanup is desired.  Here a collection
+is a paired org/data corpus being compared, not a viewnode folder.
+
+** ordinary English “a collection of ...”
+Keep generic uses such as “a collection of =.skg= files,” “a collection of
+documents,” “a collection of paths,” “a collection of atomic functions,” and
+“whole collections of notes.”  They do not name the folder-viewnode concept.
+
+** =ViewNodeLineCol=, =divide_into_viewNodeLineCols=, and =linecol_to_viewnode=
+This =Col= means a collection/group of source lines, not a domain col.  It
+should not become =ViewNodeLineFolder=.  A separate clarity cleanup could use
+=ViewNodeLines=, =divide_into_viewNodeLines=, and =viewNodeLines_to_viewnode=,
+but it is not required by this migration.
+
+** cursor/source columns
+Keep Lua/Rust names such as =col=, =start_col=, =end_col=, =title_col=,
+=point_column=, and =target_column= when they are numeric text coordinates.
+
+** prefixes that merely contain the letters “col”
+Keep =collateral=, =collision= / =collide=, =color=, =collapse=, =colon=,
+and =protocol= names and prose.
+
+** references to excluded historical paths
+Active comments sometimes cite paths beneath =TODO/= whose filenames contain
+=col= or =cols=.  Because this audit and migration leave =TODO/= untouched,
+keep those path components verbatim so the links do not break; only rewrite
+the surrounding active prose when it uses the domain term.
+
+* Verification census for the eventual implementation
+After the compiler-guided rename and focused client tests, search the audited
+surface for the old public atoms, =(col ...)=, command families, type names,
+domain compounds containing =col=, and domain uses of “collection.”  Any
+remaining hit should fall into the explicit non-target list above or an
+excluded historical/generated path.  Then run Rust all-target checks, the
+Rust suite, Emacs tests, Neovim tests, and integration tests because this
+crosses the serialized protocol and both clients.

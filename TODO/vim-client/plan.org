@@ -190,7 +190,7 @@ live smoke tests throughout. Progress and how-deviations are recorded in
   change), the org substrate per Q2 (filetype, folding, TAB cycling),
   keymaps.lua per Q4.
 - Metadata commands: metadata.lua (split/reconstruct/replace-line,
-  delete, set-indefinitive, set-source ± recursive, merge-request,
+  delete, set-write-protected, set-source ± recursive, merge-request,
   view-without-metadata, beginning-of-line toggle), focus.lua, folds.lua.
 - The save pipeline: lock.lua, save.lua (markers out, four-handler
   stream, fork-confirmation buffer + approve/decline, point/scroll

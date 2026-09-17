@@ -208,7 +208,7 @@ async fn test_diff_mode_as_subscribee_regenerates_phantom_children (
     |config, tantivy, _repo_path| { Box::pin(async move {
       let input = "\
 * (skg (node (id 1) (source main))) 1
-** (skg subscribeeCol)
+** (skg subscribeeFolder)
 *** (skg (node (id 11) (source main))) 11
 **** (skg (node (id moves) (unstaged newM))) moves
 ";
@@ -228,7 +228,7 @@ async fn test_diff_mode_as_subscribee_regenerates_phantom_children (
       assert_buffer_contains(
         &response . saved_view,
         "*** (skg (node (id 11) (source main))) 11\n\
-         **** (skg (node (id gets-removed) (source main) indef (unstaged removedX removedM))) gets-removed\n\
+         **** (skg (node (id gets-removed) (source main) writeProtected (unstaged removedX removedM))) gets-removed\n\
          **** (skg (node (id moves) (source main))) moves" );
       Ok (( )) }) }) . await
 }
@@ -249,7 +249,7 @@ async fn test_diff_mode_removed_subscribee_shows_removedM (
     |config, tantivy, _repo_path| { Box::pin(async move {
       let input = "\
 * (skg (node (id 1) (source main))) 1
-** (skg subscribeeCol)
+** (skg subscribeeFolder)
 *** (skg (node (id 11) (source main))) 11
 ";
 
@@ -267,7 +267,7 @@ async fn test_diff_mode_removed_subscribee_shows_removedM (
 
       assert_buffer_contains(
         &response . saved_view,
-        "*** (skg (node (id 22) (source main) indef (unstaged removedM))) 22" );
+        "*** (skg (node (id 22) (source main) writeProtected (unstaged removedM))) 22" );
       Ok (( )) }) }) . await
 }
 
@@ -285,7 +285,7 @@ async fn test_diff_mode_removed_subscribee_staged_shows_stagedM (
     |config, tantivy, _repo_path| { Box::pin(async move {
       let input = "\
 * (skg (node (id 1) (source main))) 1
-** (skg subscribeeCol)
+** (skg subscribeeFolder)
 *** (skg (node (id 11) (source main))) 11
 ";
 
@@ -303,11 +303,11 @@ async fn test_diff_mode_removed_subscribee_staged_shows_stagedM (
 
       assert_buffer_contains(
         &response . saved_view,
-        "*** (skg (node (id 22) (source main) indef (staged removedM))) 22" );
+        "*** (skg (node (id 22) (source main) writeProtected (staged removedM))) 22" );
       Ok (( )) }) }) . await
 }
 
-/// The added direction for an outbound col: a subscribee newly added
+/// The added direction for an outbound folder: a subscribee newly added
 /// to the subscriber's subscribes_to renders PRESENT with
 /// (unstaged newM), mirroring content's mark_membership rule.
 async fn test_diff_mode_added_subscribee_shows_newM (
@@ -321,7 +321,7 @@ async fn test_diff_mode_added_subscribee_shows_newM (
     |config, tantivy, _repo_path| { Box::pin(async move {
       let input = "\
 * (skg (node (id 1) (source main))) 1
-** (skg subscribeeCol)
+** (skg subscribeeFolder)
 *** (skg (node (id 11) (source main))) 11
 *** (skg (node (id 22) (source main))) 22
 ";
@@ -350,7 +350,7 @@ async fn test_diff_mode_added_subscribee_shows_newM (
 /// phantom should report '(staged removedX removedM)' instead of
 /// '(unstaged removedX removedM)' -- guards phantom_axes' per-stage
 /// attribution on the save-rerender path, mirroring
-/// ids::save::test_delete_id_col_scaffold_respawns_staged.
+/// ids::save::test_delete_id_folder_scaffold_respawns_staged.
 async fn test_delete_removed_node_respawns_staged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>

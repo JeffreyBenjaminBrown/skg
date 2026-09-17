@@ -109,7 +109,7 @@ fn test_foreign_node_modification_errors(
     {
       let buffer_with_errors: &str = indoc! {"
         * (skg (node (id ext-1) (source ext))) ext-1
-        ** (skg aliasCol) aliases         # edit to aliases (set to empty)
+        ** (skg aliasFolder) aliases         # edit to aliases (set to empty)
         * (skg (node (id ext-2) (source ext))) ext-2-edited           # edit to title
         * (skg (node (id ext-3) (source ext))) ext-3
         new body                                               # edit to body
@@ -289,13 +289,13 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
     {
       let buffer_with_inconsistent_sources: &str = indoc! {"
         * (skg (node (id pub-1) (source public))) pub-1                # definitive instance with 'public'
-        * (skg (node (id pub-1) (source private) indef)) pub-1  # indef instance with 'private'
+        * (skg (node (id pub-1) (source private) writeProtected)) pub-1  # write-protected instance with 'private'
       "};
 
       let buffer_text: String =
         strip_org_comments (buffer_with_inconsistent_sources);
 
-      // This should fail during validation (before indefinitives are filtered)
+      // This should fail during validation (before write-protected_occurrences are filtered)
       let result = buffer_to_validated_saveplan(
         &buffer_text,
         &config,

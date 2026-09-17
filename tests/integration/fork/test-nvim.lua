@@ -61,14 +61,14 @@ vim.api.nvim_set_current_buf(p_buf)
 T.check(T.buffer_text(p_buf):find('(id N)', 1, true),
         "P's view does not show its foreign content N")
 
--- 2. Make N definitive (drop its 'indef' marker) and edit its title
+-- 2. Make N definitive (drop its 'writeProtected' marker) and edit its title
 --    -- the fork gesture.
 local n_line = goto_line_containing('(id N) (source foreign)',
   "could not find N's headline")
 local n_line_text =
   vim.api.nvim_buf_get_lines(p_buf, n_line - 1, n_line, false)[1]
 local n_line_edited =
-  n_line_text:gsub(' indef', ''):gsub('N%-original', 'N-edited')
+  n_line_text:gsub(' writeProtected', ''):gsub('N%-original', 'N-edited')
 vim.api.nvim_buf_set_lines(p_buf, n_line - 1, n_line, false,
                            { n_line_edited })
 

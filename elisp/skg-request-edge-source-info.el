@@ -18,7 +18,7 @@ relationship kind and a source and applies the source throughout the
 subtree at point.
 
 The headline at point represents one edge: `contains' for a content
-child, the col's relation for a writable PartnerCol member. This
+child, the folder's relation for a writable PartnerFolder member. This
 command asks the server for the edge's DEFAULT source and its CURRENT
 source, then
 prompts -- with both tab-completion and S-left/S-right cycling,
@@ -37,7 +37,7 @@ more private endpoint's home more public), choose the default source
 itself; once saved at the default, the display fact and its red ~herald
 stop being rendered.
 
-Refuses on read-only col members (the edge belongs to the other
+Refuses on read-only folder members (the edge belongs to the other
 end) and on root headlines (no edge). Like other metadata edits,
 this only modifies the buffer; it does NOT save. Call
 `skg-request-save-buffer' afterward. The server re-validates at

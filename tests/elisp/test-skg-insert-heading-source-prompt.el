@@ -331,8 +331,8 @@ and shows the title under a `title' group."
                      (2 . "node")
                      (3 . "source")
                      (4 . "only")
-                     (3 . "indef")
-                     (3 . "parentIs")
+                     (3 . "writeProtected")
+                     (3 . "affectsParent")
                      (3 . "birth")
                      (3 . "editRequest")
                      (3 . "viewRequests"))))))
@@ -372,7 +372,7 @@ in place and opens the empty-node view: source pre-filled, others childless."
                                (point-min) (point-max))))
                  (should (string-match-p "^\\*\\*\\* source\n\\*\\*\\*\\* only$"
                                          content))
-                 (should (string-match-p "^\\*\\*\\* indef$" content))
+                 (should (string-match-p "^\\*\\*\\* writeProtected$" content))
                  (should (string-match-p "^\\*\\*\\* viewRequests$" content))
                  ;; childless: no value lines under the editable fields.
                  (should-not (string-match-p "^\\*\\*\\*\\* false" content))
@@ -400,10 +400,10 @@ in place and opens the empty-node view: source pre-filled, others childless."
                   (buffer-substring-no-properties
                    (point-min) (point-max)))))))))
 
-;; Round-trip: a field the user populates survives; the rest stay absent.
+;; Round-trip: a field the user populates survives; the rest stay na.
 
-(ert-deftest test-edit-metadata-empty-commit-with-indef ()
-  "Populating indef=true in the view yields (skg (node (source only) indef)),
+(ert-deftest test-edit-metadata-empty-commit-with-write-protected ()
+  "Populating writeProtected=true in the view yields (skg (node (source only) writeProtected)),
 while the untouched fields contribute no keys."
   (test--with-skg-content-view
    "* a new node\n"
@@ -412,16 +412,16 @@ while the untouched fields contribute no keys."
      (let ((source-buffer (current-buffer)))
        (skg-edit-metadata)
        (with-current-buffer (test--skg-edit-buffer)
-         ;; Simulate the user adding a level-4 child under indef and
+         ;; Simulate the user adding a level-4 child under write-protected and
          ;; cycling it to true.
          (goto-char (point-min))
-         (re-search-forward "^\\*\\*\\* indef$" nil t)
+         (re-search-forward "^\\*\\*\\* writeProtected$" nil t)
          (end-of-line)
          (insert "\n**** true")
          (skg-sexp-edit--commit))
        (with-current-buffer source-buffer
          (should (string-match-p
-                  "^\\* (skg (node (source only) indef)) a new node$"
+                  "^\\* (skg (node (source only) writeProtected)) a new node$"
                   (buffer-substring-no-properties
                    (point-min) (point-max)))))))))
 

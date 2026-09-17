@@ -204,17 +204,17 @@ mod tests {
   #[test]
   fn multiline_buffer_with_several_headlines () {
     let a : &str = concat! (
-      "* (skg (node (id 1) (source main) (parentIs absent))) one\n",
-      "** (skg (node (id 2) (source main) indef)) two\n" );
+      "* (skg (node (id 1) (source main) (affectsParent na))) one\n",
+      "** (skg (node (id 2) (source main) writeProtected)) two\n" );
     let b : &str = concat! (
-      "* (skg (node (parentIs absent) (source main) (id 1))) one\n",
-      "** (skg (node (source main) indef (id 2))) two\n" );
+      "* (skg (node (affectsParent na) (source main) (id 1))) one\n",
+      "** (skg (node (source main) writeProtected (id 2))) two\n" );
     assert_eq! ( canonicalize_metadata_ordering (a),
                  canonicalize_metadata_ordering (b) );
     // bullets / depth are non-metadata and stay significant
     let c : &str = concat! (
-      "* (skg (node (parentIs absent) (source main) (id 1))) one\n",
-      "*** (skg (node (source main) indef (id 2))) two\n" );
+      "* (skg (node (affectsParent na) (source main) (id 1))) one\n",
+      "*** (skg (node (source main) writeProtected (id 2))) two\n" );
     assert_ne! ( canonicalize_metadata_ordering (a),
                  canonicalize_metadata_ordering (c) ); }
 

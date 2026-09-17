@@ -1,0 +1,693 @@
+#+TITLE: Rename “indefinitive”: census, naming decision, and migration
+#+DATE: 2026-09-14
+
+* Decision
+
+On 2026-09-17 Jeff chose =write-protected=.  The code/format spelling is
+=writeProtected=.  Positive =definitive= booleans and definitive-view names
+remain unchanged.
+
+* Migration result
+
+The active repository now uses =write-protected= in prose, =writeProtected=
+for the rendered metadata atom and compound Rust identifiers, and
+=Editability::WriteProtected= for the payload-free enum case.  The old
+=indef= atom and old client commands have no compatibility aliases.  The
+explicit client bindings moved from =C-c s i= to =C-c s w= in Emacs and from
+=<localleader>si= to =<localleader>sw= in Neovim.
+
+Production code, clients, tests and fixtures, living documentation, and
+current TODO material were migrated.  Archived/imported TODOs, buried code,
+and =thoughts/= retain their historically accurate vocabulary.  The requested
+report filename also retains “indef” because it is the record of this rename.
+
+Verification after the migration:
+
+- =cargo check --all-targets=;
+- all 610 Rust tests;
+- all 319 Emacs tests;
+- the full Neovim test suite;
+- all 34 integration tests;
+- =git diff --check=; and
+- an old-spelling search across the active surface, whose only remaining
+  match is the completed TODO entry linking to this report.
+
+* Rationale
+
+Do not promote =inert= to the new technical term.
+
+It has two defects.  First, the repository already uses “inert” for phantoms,
+inactive-source placeholders, ineffective metadata, and branches that emit no
+save intention.  A reader would reasonably apply the new formal definition to
+those existing uses.  Second, it overstates the behavior: the occurrence can
+still be collected by its parent, can host definitive descendants, can accept
+a definitive-view request, and can be refreshed from the graph.  It is not
+generally inert; it is protected from being used to write its represented
+node.
+
+The final ranking was:
+
+1. =write-protected=;
+2. =shielded=;
+3. =write-shielded=;
+4. =nondefining=;
+5. =write-disabled=.
+
+=Write-protected= was the recommendation.  It is conventional, names the exact
+direction of the restriction, does not imply that the occurrence has no other
+effect, and currently has no collision in the repository.  It is longer than
+=shielded=, but the local naming guidance explicitly prefers clear, verbose
+names.
+
+The migration was not a global textual replacement.  It was a coordinated
+rename across an internal Rust model, rendered buffer metadata, two client
+command surfaces, error messages, tests, and documentation.
+
+* Candidate brainstorm
+
+** Write-protected
+
+This is the most literal candidate.  In ordinary computing language, a
+write-protected thing can still be read, displayed, copied, traversed, and
+used as input; the protection only prevents writes through it.  That matches
+the occurrence unusually well.
+
+It also produces serviceable names:
+
+#+begin_example
+write-protected occurrence
+writeProtected
+WriteProtected
+is_writeProtected
+mk_writeProtected_viewnode
+skg-set-write-protected
+SkgSetWriteProtected
+#+end_example
+
+The small wrinkle is perspective.  The occurrence is not itself immune to
+change—it is refreshed from the graph.  Rather, it is barred as a write path
+to the represented graph node.  “Write-protected occurrence” is nevertheless
+a familiar shorthand for exactly that directionality.
+
+** Shielded
+
+=Shielded= is the best single-word candidate.  It is vivid, pleasant, absent
+from the current repository, and—unlike =inert=—allows the object to have
+effects while being protected from a particular incoming force.
+
+Its weakness is that the force is implicit.  A new reader must learn “shielded
+from writes through this occurrence”, and may instead guess privacy shielding,
+source visibility, deletion protection, or shielding from graph refreshes.
+Those are all meaningful concerns in Skg.  Names such as =is_shielded= also
+lose the relevant object unless their immediate context supplies it.
+
+I would happily use =shielded= in user-facing prose if Jeff values the metaphor
+over literalness, but =write-protected= is safer in code and format metadata.
+
+** Write-shielded
+
+This combines Jeff’s appealing metaphor with the missing qualifier.  It is
+unique, directional, and hard to confuse with the existing generic uses of
+“inert”:
+
+#+begin_example
+write-shielded occurrence
+writeShielded
+WriteShielded
+is_writeShielded
+#+end_example
+
+The cost is that =write-shielded= is coined terminology rather than a familiar
+computing phrase.  A reader will understand it, but may wonder why the ordinary
+=write-protected= was not used.  I rank it below =shielded= because it combines
+the length of a literal term with the learning cost of a metaphor.
+
+** Nondefining
+
+This names the behavior from Skg’s own model: a definitive occurrence defines
+the node; a nondefining occurrence does not.  It avoids claiming that the
+occurrence has no other effects, and it forms a conceptually tidy contrast:
+
+#+begin_example
+definitive occurrence / nondefining occurrence
+DefinitionMode::Definitive / DefinitionMode::Nondefining
+#+end_example
+
+It is precise for someone who already understands “define”, but less helpful
+to a user encountering a rejected edit.  It is also still a negative term and
+does not naturally convey protection or read-only presentation.  It improves
+on =indefinitive= without escaping the basic “not the positive case” pattern.
+
+** Write-disabled
+
+=Write-disabled= is explicit and collision-free.  It says that this route’s
+write capability is switched off while leaving other behavior unconstrained.
+
+It sounds more like a mutable configuration bit than a kind of view.  In
+particular, =set-write-disabled= sounds as though another command should
+=set-write-enabled=, while the actual positive gesture is semantically richer:
+request the definitive occurrence.  I prefer =write-protected=.
+
+** Read-only
+
+=Read-only= is probably the term a new user would understand fastest, and the
+current documentation already uses it to explain =indefinitive=.  It does not
+imply causal inertness: a read-only filesystem entry can still be named,
+copied, and traversed.
+
+It is a poor unique technical term in this repository.  =read-only= and
+=readonly= already appear roughly 940 times, especially for six folder kinds,
+phantoms, scaffolds, collections, sources, and UI behavior.  Some of those
+things share the broad property but not this ActiveNode state.  Promoting it
+would recreate the collision problem that ruled out =inert=.
+
+It remains excellent explanatory prose: “a write-protected occurrence is the
+read-only view of a live node.”
+
+** Unwritable or unwriteable
+
+Both directly deny writes, but the spelling itself is a distraction
+(=unwritable= is conventional; Jeff’s =unwriteable= is also readily
+understood).  More importantly, the word can suggest an accidental failure or
+permissions problem rather than a deliberate view state.  It reads awkwardly
+as a command: “set this occurrence unwritable”.
+
+** No-write or non-writing
+
+These are commendably blunt.  =Non-writing occurrence= describes the outgoing
+save behavior better than =inert=, while =no-write= works as a compact metadata
+atom.
+
+They are awkward as general prose and identifiers.  =NoWrite= looks like a
+policy flag, and “make this view non-writing” is less idiomatic than “make this
+view write-protected”.  They also emphasize that the occurrence emits nothing,
+whereas Jeff’s “invulnerable” framing emphasizes why edits cannot change the
+node.  That makes them accurate internal comments, not my choice for the
+canonical term.
+
+** Protected, guarded, sealed, locked, frozen
+
+All convey invulnerability but omit its scope.
+
+=Protected= and =guarded= invite privacy or validation interpretations.
+=Locked= suggests concurrency, ownership, or a temporary lock that must be
+released.  =Frozen= suggests a snapshot that cannot refresh.  =Sealed= suggests
+an object whose definition is permanently closed.  Skg has source privacy,
+save validation, refresh, and an operation that requests the definitive view,
+so each wrong implication is plausible rather than merely theoretical.
+
+Adding =write-= repairs most of these, but =write-protected= is the established
+phrase.
+
+** Display-only, view-only, observational
+
+These describe presentation rather than protection.  They make it too easy to
+infer that the occurrence is structurally irrelevant or that nothing beneath
+it can write.  =Display-only= also already describes several non-ActiveNode
+types.  =Observational= is precise in some programming contexts but sounds
+academic here.
+
+** Mention, reference, mirror, replica
+
+These recast the occurrence as a kind of representation.  =Mention= is
+especially tempting because existing design notes call the current state a
+“read-only mention”.  But Skg already has links, references, repeated
+occurrences, and graph membership; =reference= or =mention= could be mistaken
+for one of those relationships.  =Mirror= and =replica= suggest a copied object
+with stronger synchronization or identity claims than the view provides.
+
+** Non-authoritative or derived
+
+These correctly say that the occurrence is not the source of truth.  They do
+not quite name the operative rule: a derived or non-authoritative value can
+still be an accepted source of proposed changes.  Moreover, every rendered
+view is in some sense derived from the graph, including a definitive one before
+the user edits it.
+
+** Invulnerable or write-immune
+
+=Invulnerable= is memorable but much broader than the actual protection.
+=Write-immune= narrows it and is collision-free, but sounds biological and is
+less conventional than =write-protected=.  Neither gives better names to the
+commands or metadata.
+
+** A deliberately asymmetric pair is fine
+
+The best negative term need not be a morphological opposite of =definitive=.
+The two words answer different useful questions:
+
+- =definitive=: may this occurrence define the graph node?
+- =write-protected=: may edits travel through this occurrence to that node?
+
+Trying to force lexical symmetry produced =indefinitive= in the first place.
+The code can still expose positive booleans such as =is_definitive= wherever
+that is the fact a branch needs.
+
+* The semantic target, independent of its eventual name
+
+** The positive definition
+
+The target ActiveNode occurrence is a read-only presentation of a live graph
+node.  It has no body, cannot carry an edit request, and emits no save
+instructions for its own title, body, contains list, aliases, subscriptions,
+or overrides.  Its displayed data is regenerated from authoritative state.
+
+That definition should replace explanations phrased merely as “not
+definitive”.
+
+** It does not protect the whole subtree from writes
+
+This is the most important documentation edge case.  Definitive descendants
+under such an occurrence remain self-writers.  The save traversal recurses
+through the occurrence even though the occurrence itself emits nothing.
+
+Accordingly, avoid statements such as “a write-protected branch is ignored on
+save”.  Say “the write-protected occurrence emits nothing” or name the particular owned
+collection that is not collected.
+
+** It is not necessarily irrelevant to its parent
+
+Such a live node can still be load-bearing as a member displayed under a
+definitive parent: the parent can collect the child’s ID into its own
+relationship list.  The proposed term describes its inability to serve as a
+writer of its own node, not every way its identity can participate in
+surrounding structure.
+
+This is analogous to the existing comment about an Unknown phantom: the
+placeholder is inert as a node, while its raw ID can still be membership data.
+
+** It is not the same as inactive
+
+=InactiveNode= already means an anonymous placeholder retained after a source
+becomes inactive.  It is inert everywhere and contains no node data.  By
+contrast, the target ActiveNode represents a live, active graph node and displays
+its ID, source, and title.
+
+The words are visually close.  Documentation and comments should therefore
+prefer the full phrases “write-protected ActiveNode occurrence” and “inactive-source
+placeholder” wherever the distinction is in play.
+
+** Phantoms are save-inert, but are not the renamed state variant
+
+The code already calls Diff, Deleted, and Unknown phantoms “inert on save”.
+Those uses are semantically sound, but are one reason not to adopt =inert= as
+the formal term.  Phantoms are separate =ViewNodeKind= variants, and most
+Phantom kinds do not carry the ActiveNode editability field at all.
+
+Existing generic uses can then remain ordinary English.  Where precision is
+valuable, comments can still say “save-inert phantom”, “emits no save
+intention”, or the exact behavior without implying the renamed ActiveNode
+state.
+
+* Census
+
+** Method and scope
+
+This pre-change census used case-insensitive =git grep= over tracked files on
+2026-09-14, before adding this report.
+“Occurrences” below count every substring match, including prose and larger
+identifiers such as =mk_indefinitive_viewnode=.  Generated files outside Git
+and the unrelated untracked files present in the worktree were not counted.
+
+There are 1,161 =indefinitive= substring occurrences in 179 tracked files.
+There are 865 occurrences of the standalone word in 165 files.  The paired
+standalone word =definitive= occurs 1,074 times in 177 files; it is deliberately
+not the wholesale target of this rename.
+
+#+CAPTION: Exhaustive partition of the 1,161 =indefinitive= substring matches
+| Surface                                  | Occurrences | Files |
+|------------------------------------------+-------------+-------|
+| Rust under =server/=                     |         224 |    33 |
+| Emacs Lisp under =elisp/=                |          36 |     5 |
+| Neovim Lua under =nvim/=                 |          12 |     5 |
+| Tests and fixtures under =tests/=        |         256 |    53 |
+| Living docs                              |          37 |     4 |
+| Current TODO material                    |         128 |    19 |
+| Archived/imported TODO material          |         413 |    56 |
+| Buried obsolete source                   |          48 |     1 |
+| =thoughts/=                              |           6 |     2 |
+| Coding advice                            |           1 |     1 |
+|------------------------------------------+-------------+-------|
+| Total                                    |       1,161 |   179 |
+
+“Living docs” here are =api-and-formats.md=, =glossary.md=,
+=docs/COMMANDS.org=, and =docs/COMMANDS-nvim.org=.  “Archived/imported” means
+=TODO/DONE/= and =TODO/from-dot-claude/=.  The “current TODO” row is the rest
+of =TODO/= plus =TODO.org=.
+
+** Related spellings are separate migration surfaces
+
+The short metadata atom =indef= occurred 651 times in 130 tracked files.  Much
+of that was expected-output text in tests, but the atom was a documented and
+user-editable buffer-format token.  Before the migration, the parser accepted
+only =indef=, and the renderer emitted only =indef=.
+
+=definitiveView= occurs 85 times in 42 tracked files.  It asks completion to
+turn a write-protected childless occurrence into the definitive occurrence.
+Its name remains accurate and should not change.
+
+The standalone English word =inert= already occurs 42 times in 23 tracked
+files.  Active code uses it for phantoms, inactive-source placeholders, and
+metadata or branches that emit no save intention.  This preexisting use is
+one of the reasons to reject =inert= as the new formal name.
+
+** Rust production code
+
+The 224 matches span 33 files.  The semantic center is
+=server/types/viewnode.rs=:
+
+- =IndefOrDef::Definitive { body, edit_request } | Indefinitive=;
+- the =indef_or_def= field;
+- =is_indefinitive=;
+- =mk_indefinitive_viewnode= and its =_with_birth= form;
+- =mk_indefinitive_from_viewnode=.
+
+This enum is not merely a two-valued flag.  Its =Definitive= variant owns the
+body and edit request, while the other variant cannot contain them.  That is a
+useful representational invariant and should survive the rename.
+
+Parsing and rendering form a format boundary:
+
+- =server/serve/parse_metadata_sexp.rs= parses =indef= into the current
+  =indefinitive: bool= intermediate field;
+- =server/org_to_text.rs= renders =indef= for write-protected live nodes and Diff
+  phantoms;
+- =server/heralds.rs= maps that atom to the ☮ herald.
+
+Save semantics are concentrated in
+=server/from_text/indefinitive_edits.rs= and
+=server/from_text/local_instruction_collection/=.  The former detects edits
+to previously rendered read-only occurrences; the latter makes only
+definitive occurrences emit their own intents while continuing through
+write-protected ones.
+
+The remaining Rust matches are constructors, predicates, render/completion
+rules, reconciliation, validation, errors, test helpers embedded in modules,
+and comments.  All 33 production files containing the long term are:
+
+#+begin_example
+server/from_text.rs
+server/from_text/buffer_to_viewnodes/add_missing_info.rs
+server/from_text/buffer_to_viewnodes/local.rs
+server/from_text/buffer_to_viewnodes/uninterpreted.rs
+server/from_text/buffer_to_viewnodes/validate_tree.rs
+server/from_text/buffer_to_viewnodes/validate_tree/contradictory_instructions.rs
+server/from_text/fork.rs
+server/from_text/indefinitive_edits.rs
+server/from_text/local_instruction_collection/traverse.rs
+server/heralds.rs
+server/org_to_text.rs
+server/serve/handlers/source_sets.rs
+server/serve/handlers/text_search.rs
+server/serve/handlers/text_search/render_enriched_search_buffer.rs
+server/serve/parse_metadata_sexp.rs
+server/to_org/complete/contents.rs
+server/to_org/complete/partner_folder/child_data.rs
+server/to_org/complete/partner_folder/mod.rs
+server/to_org/expand/backpath.rs
+server/to_org/expand/definitive.rs
+server/to_org/render/diff.rs
+server/to_org/render/override_menu.rs
+server/to_org/util.rs
+server/types/errors.rs
+server/types/save.rs
+server/types/viewnode.rs
+server/update_buffer.rs
+server/update_buffer/complete.rs
+server/update_buffer/reconcile/content.rs
+server/update_buffer/reconcile/subscribee_folder.rs
+server/update_buffer/reconcile/view_requests.rs
+server/update_buffer/source_switch.rs
+server/update_buffer/viewnodestats.rs
+#+end_example
+
+** Client production code
+
+The Emacs surface is five files and 36 matches:
+
+#+begin_example
+elisp/skg-id-search.el
+elisp/skg-keymaps-and-aliases.el
+elisp/skg-metadata.el
+elisp/skg-modify-graph.el
+elisp/skg-request-views.el
+#+end_example
+
+The user-visible command is =skg-set-indefinitive=, currently bound to
+=C-c s i=.  Predicates and source-edit safety logic also use the long term.
+If =write-protected= wins, =C-c s w= is the mnemonic replacement; retaining
+=C-c s i= would instead favor compatibility and muscle memory.
+
+The Neovim surface is five files and 12 matches:
+
+#+begin_example
+nvim/lua/skg/keymaps.lua
+nvim/lua/skg/linkstack.lua
+nvim/lua/skg/metadata.lua
+nvim/lua/skg/modify_graph.lua
+nvim/lua/skg/view_requests.lua
+#+end_example
+
+Its public names include =SkgSetIndefinitive= and =set_indefinitive=, with
+=<localleader>si=.  As in Emacs, =<localleader>sw= would match the leading
+candidate, while keeping =si= would be a compatibility choice.
+
+Both clients also know the literal metadata atom.  Searching only for the
+long word is therefore insufficient verification.
+
+** User-facing prose and errors
+
+The paired command manuals contain most living prose.  The introductory
+definition, warnings about discarded edits, renamed command sections,
+insertion commands, and descriptions of traversal pruning all need deliberate
+rewrites rather than mechanical substitution.
+
+=api-and-formats.md= names read-only search/menu nodes, =hiddenBody= behavior,
+and the =definitiveView= transition.  =glossary.md= uses the old term for an
+override-choice child.  =coding-advice/claude-to-claude.org= has one live
+architectural summary and should change too, even though it is outside the
+four living product docs counted in that row.
+
+User-facing Rust errors have variants =EditRequestOnIndefinitive= and
+=EditedIndefinitive= and explicitly tell the user to visit a definitive view.
+Emacs also emits warnings that source changes on these occurrences would be
+ignored.  These are high-value places for the new word because they are where
+the current terminology is most likely to obstruct a user.
+
+** Tests, fixtures, and filenames
+
+The 256 test matches span 53 files.  They cover more than spelling: rendering,
+parsing, ignored edits, birth metadata, completion budgets, repeated nodes,
+source changes, foreign-node validation, both clients, and integration
+round-trips.
+
+Tracked paths that themselves contain the abbreviation or old term are:
+
+#+begin_example
+server/from_text/indefinitive_edits.rs
+tests/indef_should_not_count_as_donotdelete.rs
+tests/indef_should_not_count_as_donotdelete/fixtures/
+tests/save/birth_and_indefinitive.rs
+tests/save/birth_and_indefinitive/fixtures/
+tests/save/indefinitive_edits.rs
+#+end_example
+
+Their module declarations, =#[path]= attributes, fixture paths, and focused
+test-command comments must move together.  Expected Org metadata throughout
+the suite must change from =indef= to whichever new atom is chosen.
+
+** Historical material
+
+Archived/imported TODOs and buried obsolete code account for 461 matches,
+about forty percent of the total.  They should not receive a blind historical
+rewrite.  Old plans often quote identifiers that really existed at the time;
+changing those quotations would make the record less accurate and can break
+links between prose and old commits.
+
+Current TODO material is different: update documents that still guide future
+work or name current symbols.  In particular, =TODO/one-definitive-view/= and
+=TODO/lying-names.org= discuss current implementation names.  This TODO entry
+in =TODO.org= can be marked done or replaced by a link here when the migration
+lands.
+
+Afterward, a repository-wide search will still find the old word in history.
+The useful completion criterion is zero matches in production code, clients,
+tests, living docs, and current plans—not falsifying archived design records.
+
+* Chosen code vocabulary
+
+** Preserve booleans that already state the positive fact
+
+Keep =is_definitive= and =subscriber_is_definitive= as booleans.  Do not
+replace them with a two-case enum merely to expose the new term.  Local
+=is_indefinitive: bool= variables become =is_writeProtected: bool= when the
+negative fact is what their control flow actually asks.
+
+** Preserve the payload-carrying enum, but name the concept
+
+Rename =IndefOrDef= to =Editability=:
+
+#+begin_src rust
+pub enum Editability {
+  Definitive {
+    body         : Option<String>,
+    edit_request : Option<NodeEditRequest>,
+  },
+  WriteProtected,
+}
+#+end_src
+
+Rename the =indef_or_def= field to =editability=.  This is preferable to
+=DefinitiveOrWriteProtected= because the type then says what axis it
+represents, while the variants say its values.  It is also preferable to flattening the state
+into a boolean plus optional payloads, which would admit combinations that the
+present enum rules out.
+
+This does not conflict with the preference to keep genuine =definitive=
+booleans as booleans: this particular value is not merely a boolean; it owns
+state in one case.
+
+** Mechanical identifier families
+
+Use these transformations consistently:
+
+| Old                                       | New                                              |
+|-------------------------------------------+--------------------------------------------------|
+| =IndefOrDef::Indefinitive=                | =Editability::WriteProtected=                    |
+| =IndefOrDef::Definitive=                  | =Editability::Definitive=                        |
+| =indef_or_def=                            | =editability=                                    |
+| =is_indefinitive=                         | =is_writeProtected=                              |
+| =mk_indefinitive_viewnode=                | =mk_writeProtected_viewnode=                     |
+| =mk_indefinitive_viewnode_with_birth=     | =mk_writeProtected_viewnode_with_birth=          |
+| =mk_indefinitive_from_viewnode=           | =mk_writeProtected_from_viewnode=                 |
+| =IndefinitiveOccurrence=                  | =WriteProtectedOccurrence=                       |
+| =LocatedIndefinitiveOccurrence=           | =LocatedWriteProtectedOccurrence=                |
+| =EditedIndefinitive=                      | =EditedWriteProtectedOccurrence=                 |
+| =EditRequestOnIndefinitive=               | =EditRequestOnWriteProtectedOccurrence=          |
+| =skg--node-indefinitive-p=                | =skg--node-write-protected-p=                    |
+| =skg-set-indefinitive=                    | =skg-set-write-protected=                        |
+| =node_indefinitive_p=                     | =node_write_protected_p=                         |
+| =set_indefinitive= / =SkgSetIndefinitive= | =set_write_protected= / =SkgSetWriteProtected=   |
+| =parent_indefinitive=                     | =parent_is_writeProtected=                       |
+
+Mixed-purpose names deserve a readability pass rather than letter-for-letter
+replacement.  For example, =make_indef_if_repeat_then_extend_defmap= can
+become =make_writeProtected_if_repeat_then_extend_defmap= as an initial
+migration, but the existing documentation already admits that it bundles two
+jobs.  Do not
+expand this terminology change into a redesign; record any better structural
+rename separately.
+
+** Format and commands
+
+Change the rendered/parser atom from =indef= to
+=writeProtected= and update the herald rules and metadata editors in the same
+change.  The atom is visible in Org buffers and in the documented API, so
+leaving =indef= would leave the most puzzling abbreviation in front of users.
+
+Do not change =definitiveView=, =skg-request-definitive-view=,
+=set_definitive=, =SkgSetDefinitive=, =DefinitiveMap=, or
+=apply_definitive_draw_rule=.  They still name the positive operation or
+positive state accurately.
+
+Rename the explicit “make read-only” commands to =skg-set-write-protected= and
+=SkgSetWriteProtected=.  The mnemonic bindings are =C-c s w= and
+=<localleader>sw=.
+
+* Compatibility judgment
+
+=indef= is buffer-view metadata, not canonical =.skg= graph storage.  The
+server and both in-repository clients can therefore make a synchronized hard
+cut to =writeProtected= without a graph-data migration.
+
+The migration makes the clean break: no parser or command aliases.  The
+repository guidance disfavors gratuitous legacy compatibility, and aliases
+would keep the discarded vocabulary alive indefinitely.  No =.skg= file
+rewrite is indicated by the code or format documentation.
+
+* Suggested implementation boundary
+
+** One coherent change, with reviewable slices
+
+The format atom, server model, clients, and expected renderings must agree at
+the endpoint.  Within that change, the safest order is:
+
+*** Rename the Rust state and behavior vocabulary
+
+Rename the enum, field, constructors, predicates, validation errors, module,
+and production comments.  Preserve behavior.  Existing =is_definitive=
+booleans remain untouched except for comments that mention the old term.
+
+*** Switch the buffer metadata atom
+
+Change parser, renderer, herald rules, and metadata/default-field editors from
+=indef= to the selected atom.  Update parser/render unit tests immediately so
+this boundary stays internally consistent.
+
+*** Rename both client command surfaces
+
+Change Emacs and Neovim functions/commands, descriptions, predicates, and
+tests.  Decide the keybinding separately and preserve all definitive-view
+names.
+
+*** Move test modules and fixtures, then update expectations
+
+Rename the paths listed in the census and their declarations.  Replace literal
+metadata in current test inputs and expected output.  Read nearby prose so
+=indefinitively= and noun phrases become natural English.
+
+*** Update living docs and current plans
+
+Define the chosen occurrence term once in each command manual, carry the
+subtree and parent-membership caveats into save documentation, update the
+protocol atom, and update current TODOs that cite live symbols.  Leave archived
+plans and buried obsolete code as historical records.
+
+* Verification
+
+The migration is successful when all of the following are true:
+
+** Semantic tests remain green
+
+Run the focused save tests for edited write-protected occurrences and birth
+metadata, the parser/render tests, definitive-view cascade/budget tests, client
+metadata tests, and the existing Emacs/Neovim command-family tests.  Then run
+the full Rust and client suites because the literal atom appears broadly in
+fixtures.
+
+** The format round-trips only the new atom
+
+Test that the new atom parses and re-renders as itself, a definitive node omits
+the atom, write-protected nodes reject body/edit instructions as before, and a
+=definitiveView= request still promotes a write-protected childless node.
+
+If compatibility is deliberately supported, add one isolated test that
+=indef= parses with the chosen warning while rendering only the new atom.  Do
+not let old spellings remain scattered through ordinary fixtures.
+
+** Search checks cover all spellings
+
+Search production code, clients, tests, living docs, and current TODOs for all
+of:
+
+#+begin_example
+indefinitive
+Indefinitive
+indef
+IndefOrDef
+indef_or_def
+#+end_example
+
+Any survivor should be either an intentional compatibility test or a quoted
+historical name with an explanation.  Search for the selected term as well and
+review its uses for accidental overclaiming; a green compiler cannot establish
+that the prose remains precise.
+
+* Bottom line
+
+The rename was worthwhile and mostly mechanical once the word was chosen.  Do
+not use =inert=: its existing technical collisions and its implication of no
+effects are both misleading.  The chosen pair is =definitive /
+write-protected=; =definitive / shielded= was the strongest shorter and more
+metaphorical alternative.  Both are clearer than =definitive /
+indefinitive=, and =write-protected= carries the least semantic debt.

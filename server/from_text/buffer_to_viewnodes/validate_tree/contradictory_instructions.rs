@@ -22,9 +22,9 @@ enum WhetherToDelete {
 /// - There's a node with 'toDelete' true,
 ///   but another node with the same ID that has 'toDelete' false.
 /// - Two nodes with the same ID 'define their contents'
-///   (i.e. their 'indefinitive' fields are both false).
+///   (i.e. their 'writeProtected' fields are both false).
 /// - Two nodes with the same ID have different sources,
-///   even if some are indefinitive.
+///   even if some are write-protected.
 /// .
 /// STRATEGY:
 /// Builds a map from IDs to sets of WhetherToDelete.
@@ -84,7 +84,7 @@ fn collect_instructions(
     if let MpViewnodeKind::Vognode (MpVognode::Active (t))
       = &viewnode . kind
     { if let Some (id) = &t . id {
-        if ! t . is_indefinitive () { // indef nodes contribute no instructions
+        if ! t . is_writeProtected () { // write-protected nodes contribute no instructions
           let delete_instruction : WhetherToDelete =
             if matches!(t . edit_request (),
                         Some (&NodeEditRequest::Delete)) {

@@ -72,9 +72,9 @@ If anything blocks your progress that needs my attention, ping me.
 * DONE improve search
   Should not be readonly except for a near-instant.
   Need not use special search result nodes;
-  ordinary indef nodes will do.
+  ordinary write-protected nodes will do.
   Don't need the SearchResultCol either;
-  just make all the search results indefinitive truenode roots
+  just make all the search results write-protected truenode roots
   (i.e. first-level children of the invisible buffer root node).
   This means scores are not shown --
   but the search results are still sorted that way.
@@ -102,7 +102,7 @@ These are new names that I want to use for some (most) functions in docs/COMMAND
 *** skg-id-push <- skg-push-to-linkstack
 *** skg-delete <- skg-set-metadata-delete
     Let's also modify this function to explain to the user at the end, 'this change will only be applied when you save the buffer'.
-*** skg-show-indefinitive <- skg-set-metadata-indefinitive
+*** skg-show-write-protected <- skg-set-metadata-write-protected
 *** skg-show-definitive <- skg-definitive-view
 *** skg-show-aliases <- skg-branch-aliases
 *** skg-show-containerward <- skg-branch-containerward
@@ -146,7 +146,7 @@ These are new names that I want to use for some (most) functions in docs/COMMAND
     ** (skg (node (id 47cc3148-d9f8-4843-9cc3-905b2f9e9259) (source public))) [[id:1cd8051b-95ee-4f73-a05e-624200b52c90][the feeling of forcing it]]
     ** (skg (node (id 5020e623-f323-42b9-86ec-a26fd463e3c2) (source public) (graphStats (linksIn 1)))) Is silence motivating?
       Turning off {music, podcasts, recorded content from others} really makes me want to work. Perhaps by undistracting me from discomfort.
-    *** (skg (node (id 7b52eb18-91c5-4f83-be4f-40ff8a918541) (source public) (parentIs independent) indefinitive (graphStats (containers 0) (contents 54) (linksIn 18) aliasing) (viewStats cycle notInParent containsParent))) motivation | ambition | voluntarity | intention | purpose
+    *** (skg (node (id 7b52eb18-91c5-4f83-be4f-40ff8a918541) (source public) (parentIs independent) write-protected (graphStats (containers 0) (contents 54) (linksIn 18) aliasing) (viewStats cycle notInParent containsParent))) motivation | ambition | voluntarity | intention | purpose
   When I put point at the start of the last of those lines
     (the one with id 7b52eb18-91c5-4f83-be4f-40ff8a918541)
   invoke skg-next-id, and then invoke skg-view-from-node,
@@ -155,7 +155,7 @@ These are new names that I want to use for some (most) functions in docs/COMMAND
     "Reverting buffer ‘skg.log’"
 * DONE report graphnodestats for search results
 * importing from org-roam does not seem to update indices
-* the user should be able to write 'indef' in metadata
+* the user should be able to write 'writeProtected' in metadata
 * the skg metadata view should show "ABSENT fieldname"
   next to absent fields
   and let the user cycle between those states

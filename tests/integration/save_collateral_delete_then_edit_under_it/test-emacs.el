@@ -1,7 +1,7 @@
 ;;; Integration test for delete-then-edit-under-deleted collateral updates
 ;;;
 ;;; Buffer 1: multi-root view (scaffolded "1" + standalone subee root).
-;;; Buffer 2: manually constructed (indef 11 + subee + subee-1).
+;;; Buffer 2: manually constructed (write-protected 11 + subee + subee-1).
 ;;;
 ;;; Phase 4: delete 11 from buffer 2 → 11 becomes DeletedNode,
 ;;;   scaffolds become DeletedScaff in collateral buffer 1.
@@ -72,7 +72,7 @@ contains to [], overwriting subee.skg on disk."
     ;; Add aliases view request to node 11.
     (goto-nth-headline-with-title "11" 1)
     (skg-edit-metadata-at-point
-     '(skg (node (viewRequests (col aliases)))))
+     '(skg (node (viewRequests (folder aliases)))))
     ;; Append standalone subee root with child.
     (goto-char (point-max))
     (unless (bolp) (insert "\n"))
@@ -88,21 +88,21 @@ contains to [], overwriting subee.skg on disk."
      buf
      '((1 node "1")
        (2 node "11")
-       (3 aliasCol "")
+       (3 aliasFolder "")
        (4 alias "eleven")
-       (3 hiddenCol "")
+       (3 hiddenFolder "")
        (4 node "subee-1")
        (4 node "also-hidden")
-       (3 subscribeeCol "")
+       (3 subscribeeFolder "")
        (4 node "subee")
-       (4 hiddenOutsideOfSubscribeeCol "")
+       (4 hiddenOutsideOfSubscribeeFolder "")
        (5 node "also-hidden")
        (1 node "subee")
        (2 node "subee-1"))
      "phase 2: buffer 1 after multi-root save")))
 
 (defun phase-3-open-buffer-2 ()
-  "Create buffer 2 manually with two roots: indef 11 and subee.
+  "Create buffer 2 manually with two roots: writeProtected 11 and subee.
 subee-1 must be supplied explicitly: the save pipeline's in-memory
 node map (built from save_instructions) gives subee empty contains,
 which takes priority over subee.skg on disk."
@@ -113,7 +113,7 @@ which takes priority over subee.skg on disk."
       (erase-buffer)
       (org-mode)
       (setq skg-view-uri (org-id-uuid))
-      (insert "* (skg (node (id 11) (source main) indef)) 11\n")
+      (insert "* (skg (node (id 11) (source main) writeProtected)) 11\n")
       (insert "* (skg (node (id subee) (source main))) subee\n")
       (insert "** (skg (node (id subee-1) (source main))) subee-1")
       (skg-request-save-buffer))
@@ -129,14 +129,14 @@ which takes priority over subee.skg on disk."
      "phase 3: buffer 2 initial")))
 
 (defun phase-4-delete-11-from-buffer-2 ()
-  "Remove indef, add editRequest delete to 11, and save buffer 2."
+  "Remove writeProtected, add editRequest delete to 11, and save buffer 2."
   (message "=== PHASE 4: Delete 11 from buffer 2 ===")
   (setq integration-test-phase "phase-4-delete-11")
   (with-current-buffer "*skg-test-buf2*"
     (goto-char (point-min))
     (skg-edit-metadata-at-point
-     ;; Remove 'indef' and add 'editRequest delete'.
-     '(skg (node (DELETE indef) (editRequest delete))))
+     ;; Remove 'writeProtected' and add 'editRequest delete'.
+     '(skg (node (DELETE writeProtected) (editRequest delete))))
     (message "Buffer 2 after metadata edit:\n%s"
              (buffer-substring-no-properties (point-min) (point-max)))
     (skg-request-save-buffer))

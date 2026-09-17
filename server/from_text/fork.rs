@@ -28,7 +28,7 @@ use std::collections::{HashMap, HashSet};
 /// vognode. A fork's clone C must live in an owned source; the foreign
 /// node N's own source is read-only, so C inherits from N's IMMEDIATE
 /// container context -- the nearest vognode ancestor reached by skipping
-/// only scaffolds (cols, etc.). The walk STOPS at that nearest vognode
+/// only scaffolds (folders, etc.). The walk STOPS at that nearest vognode
 /// ancestor and never passes it: if the ancestor is foreign (or
 /// inactive), nothing is inferred (the source then defaults, or the user
 /// sets it in the confirmation buffer). Inferring a distant owned node
@@ -62,7 +62,7 @@ pub fn owned_ancestor_sources_for_foreign_vognodes (
           // never an owned source): infer nothing.
           break,
         _ =>
-          // A scaffold (col, etc.): skip it and keep walking rootward.
+          // A scaffold (folder, etc.): skip it and keep walking rootward.
           { current = parent; }} }}
   map }
 
@@ -108,7 +108,7 @@ pub fn new_foreign_nodes_adopting_clone_sources (
         ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
           break,
         _ =>
-          // A scaffold (col, etc.): skip it and keep walking rootward.
+          // A scaffold (folder, etc.): skip it and keep walking rootward.
           { current = parent; }} }}
   map }
 
@@ -223,8 +223,8 @@ pub const FORK_SOURCE_PLACEHOLDER : &str = "PICK-A-SOURCE";
 ///                           one-line suggestion comment the client
 ///                           offers as the prompt's default.
 ///   ** <original title>  -- the ORIGINAL N that C overrides: its real id,
-///                           real source, indefinitive,
-///                           parentIs=independent, marked "pO".
+///                           real source, write-protected,
+///                           affectsParent=false, marked "pO".
 ///
 /// The client shows this and asks the user to approve (re-save the
 /// origin with the chosen sources) or decline (kill the buffer),
@@ -263,7 +263,7 @@ pub fn build_fork_confirmation_buffer (
       shown_source, shown_source,
       spec . clone . 0 . title ));
     out . push_str ( & format! (
-      "** (skg (node (id {}) (source {}) (parentIs independent) indef \
+      "** (skg (node (id {}) (source {}) (affectsParent false) writeProtected \
        (viewStats parentOverrides))) {}\n",
       spec . original_id . 0, spec . original_source,
       spec . original_title )); }

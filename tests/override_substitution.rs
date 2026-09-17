@@ -207,8 +207,8 @@ async fn extraction_honors_the_marker (
         // strongest form.
         let buffer = indoc! {"
           * (skg (node (id P) (source main))) P
-          ** (skg (node (id R) (source main) (viewStats (overridesHere N)) indef)) R
-          ** (skg (node (id M) (source main) indef)) M
+          ** (skg (node (id R) (source main) (viewStats (overridesHere N)) writeProtected)) R
+          ** (skg (node (id M) (source main) writeProtected)) M
         "};
         assert! (
           opt_saved_node_by_id (
@@ -219,7 +219,7 @@ async fn extraction_honors_the_marker (
       { // Deleting the drawn child deletes the original member.
         let buffer = indoc! {"
           * (skg (node (id P) (source main))) P
-          ** (skg (node (id M) (source main) indef)) M
+          ** (skg (node (id M) (source main) writeProtected)) M
         "};
         assert_eq! (
           members_of ( & saved_node_by_id (
@@ -229,8 +229,8 @@ async fn extraction_honors_the_marker (
       { // Reordering the drawn child positions the original.
         let buffer = indoc! {"
           * (skg (node (id P) (source main))) P
-          ** (skg (node (id M) (source main) indef)) M
-          ** (skg (node (id R) (source main) (viewStats (overridesHere N)) indef)) R
+          ** (skg (node (id M) (source main) writeProtected)) M
+          ** (skg (node (id R) (source main) (viewStats (overridesHere N)) writeProtected)) R
         "};
         assert_eq! (
           members_of ( & saved_node_by_id (
@@ -241,9 +241,9 @@ async fn extraction_honors_the_marker (
         let buffer = indoc! {"
           * (skg (node (id Q) (source main))) Q
           ** (skg (node (id P) (source main))) P
-          *** (skg (node (id M) (source main) indef)) M
+          *** (skg (node (id M) (source main) writeProtected)) M
           ** (skg (node (id P2) (source main))) P2
-          *** (skg (node (id R) (source main) (viewStats (overridesHere N)) indef)) R
+          *** (skg (node (id R) (source main) (viewStats (overridesHere N)) writeProtected)) R
         "};
         let instructions : Vec<DefineNode> =
           define_nodes_from (buffer, config) . await ?;
@@ -257,8 +257,8 @@ async fn extraction_honors_the_marker (
         let buffer = indoc! {"
           * (skg (node (id P) (source main))) P
           ** (skg (node (id R) (source main) (viewStats (overridesHere N)))) R-edited
-          *** (skg (node (id W) (source main) indef)) W
-          ** (skg (node (id M) (source main) indef)) M
+          *** (skg (node (id W) (source main) writeProtected)) W
+          ** (skg (node (id M) (source main) writeProtected)) M
         "};
         let instructions : Vec<DefineNode> =
           define_nodes_from (buffer, config) . await ?;
@@ -275,8 +275,8 @@ async fn extraction_honors_the_marker (
         // (a noop, like the marked equivalent above).
         let buffer = indoc! {"
           * (skg (node (id P) (source main))) P
-          ** (skg (node (id N) (source main) indef)) N
-          ** (skg (node (id M) (source main) indef)) M
+          ** (skg (node (id N) (source main) writeProtected)) N
+          ** (skg (node (id M) (source main) writeProtected)) M
         "};
         assert! (
           opt_saved_node_by_id (
@@ -285,7 +285,7 @@ async fn extraction_honors_the_marker (
       { // Tamper: a marker the server would not have drawn aborts.
         let buffer = indoc! {"
           * (skg (node (id P) (source main))) P
-          ** (skg (node (id M) (source main) (viewStats (overridesHere W)) indef)) M
+          ** (skg (node (id M) (source main) (viewStats (overridesHere W)) writeProtected)) M
         "};
         match define_nodes_from (buffer, config) . await {
           Err (SaveError::BufferValidationErrors { errors, .. }) => {
@@ -299,9 +299,9 @@ async fn extraction_honors_the_marker (
         // the original, so no phantom hide of N is inferred.
         let buffer = indoc! {"
           * (skg (node (id S) (source main))) S
-          ** (skg subscribeeCol)
+          ** (skg subscribeeFolder)
           *** (skg (node (id E) (source main))) E
-          **** (skg (node (id R) (source main) (viewStats (overridesHere N)) indef)) R
+          **** (skg (node (id R) (source main) (viewStats (overridesHere N)) writeProtected)) R
         "};
         let instructions : Vec<DefineNode> =
           define_nodes_from (buffer, config) . await ?;
@@ -589,7 +589,7 @@ async fn chain_half_visible_keeps_the_original (
       { // A marker on a node NOT on N's chain is rejected.
         let buffer = indoc! {"
           * (skg (node (id P) (source main))) P
-          ** (skg (node (id D) (source other) (viewStats (overridesHere P)) indef)) D
+          ** (skg (node (id D) (source other) (viewStats (overridesHere P)) writeProtected)) D
         "};
         match define_nodes_from (buffer, config) . await {
           Err (SaveError::BufferValidationErrors { errors, .. }) =>

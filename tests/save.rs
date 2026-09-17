@@ -3,11 +3,11 @@
 #[path = "save/none_node_fields_are_noops.rs"]
 mod none_node_fields_are_noops;
 
-#[path = "save/birth_and_indefinitive.rs"]
-mod birth_and_indefinitive;
+#[path = "save/birth_and_write_protected.rs"]
+mod birth_and_write_protected;
 
-#[path = "save/indefinitive_edits.rs"]
-mod indefinitive_edits;
+#[path = "save/write_protected_edits.rs"]
+mod write_protected_edits;
 
 #[path = "save/validate_foreign_nodes.rs"]
 mod validate;

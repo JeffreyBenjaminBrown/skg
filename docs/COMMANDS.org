@@ -34,7 +34,7 @@ but from the graph itself.
 *** C-u C-c <backspace> : skg-delete-recursive
 Same as skg-delete, but also marks every activeNode org-descendent
 of the node at point. Descendent headlines that are not activeNodes
-(phantoms, aliascol, id-col, etc.) are skipped.
+(phantoms, aliasFolder, id-folder, etc.) are skipped.
 
 Prefix-arg variant of skg-delete; callable directly via M-x
 as skg-delete-recursive.
@@ -307,30 +307,30 @@ detected); a file still present there is skipped, not deleted, since
 'git rm' would silently remove it. Review the script, then run it from
 the skg data root. Unlike most commands here, this one does not depend
 on the node at point; it reports moves across all sources.
-** C-c c : show a collection (both cols of a relation)
+** C-c l : show a folder (both folders of a relation)
 These commands don't edit the graph. Each inserts a request into the
 metadata of the node at point that, on save, causes the server to
-render the relation's collections (cols) into the view, POPULATED from
-the graph. Each builds BOTH cols of its relation. The read-only-col ☮
-marks a col you cannot change from here. Every command auto-saves.
-*** C-c c a : skg-show-collection-aliases
-The aliasCol -- other text you could search for to find this node
+render the relation's folder viewnodes into the view, POPULATED from
+the graph. Each builds BOTH folders of its relation. The read-only folder ☮
+marks a folder you cannot change from here. Every command auto-saves.
+*** C-c l a : skg-show-folderOf-aliases
+The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:
 type an alias in and save.
-*** C-c c o : skg-show-collection-overrides
-The overriddenCol (the nodes this node overrides -- WRITABLE, shown
+*** C-c l o : skg-show-folderOf-overrides
+The overriddenFolder (the nodes this node overrides -- WRITABLE, shown
 even when empty as an "add an override here" surface) and the
-overriderCol (the nodes that override this one -- read-only, ☮).
-*** C-c c h : skg-show-collection-hides
-The hiderCol and hiddenCol -- BOTH read-only (☮). Hiding is edited from
-a subscribee-as-such, never from these cols. On a node that neither
+overriderFolder (the nodes that override this one -- read-only, ☮).
+*** C-c l h : skg-show-folderOf-hides
+The hiderFolder and hiddenFolder -- BOTH read-only (☮). Hiding is edited from
+a subscribee-as-such, never from these folders. On a node that neither
 hides nor is hidden, nothing appears.
-*** C-c c s : skg-show-collection-subscribes
-The subscribeeCol (the nodes this node subscribes to -- WRITABLE, shown
-even when empty) and the subscriberCol (the nodes that subscribe to
+*** C-c l s : skg-show-folderOf-subscribes
+The subscribeeFolder (the nodes this node subscribes to -- WRITABLE, shown
+even when empty) and the subscriberFolder (the nodes that subscribe to
 this one -- read-only, ☮).
 ** C-c p : show a path (the backpath through one relation role)
-Like the collections, each inserts a request that, on save, grafts the
+Like the folders, each inserts a request that, on save, grafts the
 partners reached through one relation role as inverted, read-only
 children, climbing transitively until a fork, cycle, or root. UPPER =
 the partner's active (first) role; lower = its passive (second) role.
@@ -354,11 +354,11 @@ The nodes that subscribe to this node.
 *** C-c p s : skg-show-paths-through-subscribees
 The nodes this node subscribes to.
 ** C-c s : setting node properties
-*** first some vocab: 'definitive' and 'indefinitive'
-A view of a node can be definitive or indefinitive.
+*** first some vocab: 'definitive' and 'write-protected'
+A view of a node can be definitive or write-protected.
 Typically the first place in the buffer that depicts a node
 is the definitive view of it. So that other views of that node
-cannot contradict it, they are 'indefinitive': Edits to them
+cannot contradict it, they are 'write-protected': Edits to them
 cannot affect the node they depict. They are also truncated --
 that is, shown without content --
 in order to prevent the view from becoming redundant and huge.
@@ -366,27 +366,27 @@ in order to prevent the view from becoming redundant and huge.
 Instead, use skg-set-definitive, below.
 That's because Skg has to make other instances of it
 (in this same buffer -- and maybe in the future other buffers too)
-indefinitive. That's because a buffer can only be saved
+write-protected. That's because a buffer can only be saved
 if it has at most one definitive instance of a node.
 Otherwise, two definitive nodes could contradict each other.
 
-This same caveat does not apply to making a node indefinitive.
-While there does exist a command for that (skg-set-indefinitive)
+This same caveat does not apply to making a node write-protected.
+While there does exist a command for that (skg-set-write-protected)
 you can also 'do it yourself'
 by visiting a metadata buffer for the node (skg-view-metadata).
 *** C-c s d : skg-set-definitive
 If you want to see the definitive view of that node
-from a place where it is currently shown in an indefinitive form,
+from a place where it is currently shown in a write-protected form,
 call this function. It will make the current definitive view
-(if it exists) indefinitive, and then draw a definitive view here.
-*** C-c s i : skg-set-indefinitive
-This marks a node as 'indefinitive',
+(if it exists) write-protected, and then draw a definitive view here.
+*** C-c s w : skg-set-write-protected
+This marks a node as 'write-protected',
 as described above.
 In brief, it means edits to its title, body or
   (more importantly) children
 will not affect it
   (although edits to its children will affect those children,
-  unless they are also indefinitive).
+  unless they are also write-protected).
 *** C-c s s : skg-set-source
 Changes the source of the node at point.
 The prompt starts with the current source as editable minibuffer text.
@@ -409,15 +409,15 @@ Two safeguards, shared with the recursive form below:
   Declining leaves them and notes that =C-c s R= can publicize them
   later. Edges already carrying an explicit source request
   already have a deliberate recording source and are never touched.
-- An indefinitive instance is NOT changed -- the save would
+- A write-protected instance is NOT changed -- the save would
   silently ignore its source edit -- and produces a loud WARNING,
   with the full ID list written to =*Messages*=.
 *** C-c s S : skg-set-source-recursive
 Like 'skg-set-source', but it also
 changes the source of every content descendent of the node at point
 whose source matches the original source of the node at point.
-Only descendents for which ParentIs=Affected are traversed.
-The stuck-relationship offer and the indefinitive warning described
+Only descendents for which AffectsParent=True are traversed.
+The stuck-relationship offer and the write-protected warning described
 under =C-c s s= apply here too, across the whole subtree.
 *** C-c s m : skg-set-merge-request
 (See [[./merging.org][the docs on merging]] for why would you merge two nodes,
@@ -432,8 +432,8 @@ The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the merge.
 *** C-c s r : skg-set-relationship-source
 Sets the recording source of the relationship instance the headline at
-point represents -- =contains= for a content child, the col's
-relation for a writable PartnerCol member, or the alias membership
+point represents -- =contains= for a content child, the folder's
+relation for a writable PartnerFolder member, or the alias membership
 for an alias headline. An Unknown placeholder in one of those writable
 positions is supported too: it carries only its raw relationship member ID,
 never a node edit. (Formerly
@@ -473,9 +473,9 @@ The no-override choice removes the request, which means "no opinion":
 a saved edge keeps its saved source (sticky). It does NOT reset the
 edge to its default -- to reach the default, choose it.
 
-Refuses with an error when point is on a member of a read-only col
-(subscriberCol, overriderCol, hiderCol, hiddenCol,
-hiddenInSubscribeeCol, hiddenOutsideOfSubscribeeCol): the
+Refuses with an error when point is on a member of a read-only folder
+(subscriberFolder, overriderFolder, hiderFolder, hiddenFolder,
+hiddenInSubscribeeFolder, hiddenOutsideOfSubscribeeFolder): the
 relationship belongs to the other end there, so setting its source
 from this side would be meaningless. Also refuses on a root
 headline, which represents no edge.
@@ -503,9 +503,9 @@ relations are the level-1 headlines, and each level-2 headline is a
 role the view-CHILD would play in that relation toward its
 view-parent. Only three roles are settable from the child's
 position -- =contained= (ordinary content), =subscribee= (a
-subscribeeCol member) and =overridden= (an overriddenCol member);
+subscribeeFolder member) and =overridden= (an overriddenFolder member);
 RET on any other role explains why its edge cannot be set from
-there (read-only cols belong to the other end; textlinks carry no
+there (read-only folders belong to the other end; textlinks carry no
 independent source; hide sources are derived at save). RET picks a
 role; q aborts.
 
@@ -518,10 +518,10 @@ validates each edge (an offered source more public than some edge's
 default makes the save fail, naming that edge).
 
 The walk applies to, and recurses on, only viewchildren that affect
-their viewparents: parentIs=affected activeNodes, through the two
-writable cols. It prunes below indefinitive nodes and
+their viewparents: affectsParent=true activeNodes, through the two
+writable folders. It prunes below write-protected nodes and
 subscribee-as-such members (their org-children's edges are not
-collected at save), and prunes read-only cols and other scaffolds
+collected at save), and prunes read-only folders and other scaffolds
 entirely.
 
 This is the gesture for republicizing a subtree's relationship
@@ -548,9 +548,9 @@ org-descendents. Its org-parent must be a definitive activeNode
 whose source is owned in =skgconfig.toml=.
 
 The command replaces the whole leaf with a same-level
-indefinitive activeNode for the link dest. The parent is
+write-protected activeNode for the link dest. The parent is
 definitive, so saving records the dest as content of the
-parent; the replacement child is indefinitive, so its own text is
+parent; the replacement child is write-protected, so its own text is
 not rewritten from the link label.
 *** C-c m f : skg-fork-node
 Fork the node at point that you ALREADY own: create a private
@@ -726,9 +726,9 @@ but also removes the node from the stack.
 This is the easiest way to give a node multiple containers --
 push it to the stack, then paste it as a node somewhere else.
 
-Inserts, at the cursor, an indefinitive view
+Inserts, at the cursor, a write-protected view
 of the node whose ID is at the top of the id stack.
-Its metadata includes only the ID and =indef=,
+Its metadata includes only the ID and =writeProtected=,
 and its title comes from the stack.
 Does not modify the stack or save.
 Saving will provide the rest of its metadata.

@@ -21,11 +21,11 @@
       (kill-emacs 1))
     (assert-headline-titles
      buf
-     '((1 absent "a")
-       (2 affected    "b")
-       (3 affected    "c")
-       (3 affected    "d")
-       (3 affected    "e"))
+     '((1 na "a")
+       (2 true    "b")
+       (3 true    "c")
+       (3 true    "d")
+       (3 true    "e"))
      "phase 1: view-a initial")))
 
 ;; ─── Phase 2: Open view-b ───────────────────────────────────
@@ -40,14 +40,14 @@
       (message "✗ FAIL [phase 2]: buffer *b* not created")
       (kill-emacs 1))
     ;; multi_root_view prepends b's containerward ancestry (a) as
-    ;; b's first child before the definitive affected children (c, d, e).
+    ;; b's first child before the definitive true children (c, d, e).
     (assert-headline-titles
      buf
-     '((1 absent "b")
+     '((1 na "b")
        (2 container "a")
-       (2 affected       "c")
-       (2 affected       "d")
-       (2 affected       "e"))
+       (2 true       "c")
+       (2 true       "d")
+       (2 true       "e"))
      "phase 2: view-b initial")))
 
 ;; ─── Phase 3: Edit view-b and save ─────────────────────────
@@ -86,10 +86,10 @@
     ;; c should be gone (deleted). d should appear under f.
     (assert-headline-titles
      buf
-     '((1 absent "b")
-       (2 affected   "e, edited")
-       (2 affected   "f")
-       (3 affected   "d"))
+     '((1 na "b")
+       (2 true   "e, edited")
+       (2 true   "f")
+       (3 true   "d"))
      "phase 4: view-b after save")))
 
 ;; ─── Phase 5: Toggle diff mode on ──────────────────────────
@@ -195,17 +195,17 @@
   (let ((buf-b (get-buffer "*b*")))
     (assert-headline-titles
      buf-b
-     '((1 absent "b")
-       (2 affected   "e, edited")
-       (2 affected   "f")
-       (3 affected   "d"))
+     '((1 na "b")
+       (2 true   "e, edited")
+       (2 true   "f")
+       (3 true   "d"))
      "phase 11: view-b clean"))
   ;; view-a should have no diff/phantom nodes
   (let* ((buf-a (get-buffer "*a*"))
          (titles (headline-titles buf-a)))
     (message "Buffer-a titles after diff-off: %S" titles)
     ;; a should contain b, b should contain e,f; f contains d.
-    ;; The exact indefinitive markers vary, so just check titles.
+    ;; The exact write-protected markers vary, so just check titles.
     (dolist (expected-title '("a" "b" "e, edited" "f" "d"))
       (unless (cl-find expected-title titles
                        :key (lambda (triple) (nth 2 triple))

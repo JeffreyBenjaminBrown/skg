@@ -3,9 +3,9 @@ use crate::types::git::MembershipAxes;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ViewNode, ViewNodeKind, Vognode, Phantom, Qual, QualCol, ActiveNode, PhantomDiff,
+  ViewNode, ViewNodeKind, Vognode, Phantom, Qual, QualFolder, ActiveNode, PhantomDiff,
   PhantomDeleted, PhantomUnknown, NodeEditRequest, GraphNodeStats,
-  ParentIs,
+  AffectsParent,
 };
 
 use ego_tree::{NodeRef, Tree};
@@ -138,18 +138,18 @@ pub fn viewnode_to_string (
   config   : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   match &viewnode . kind {
-    ViewNodeKind::QualCol (col) =>
-      qualcol_metadata_to_string (
+    ViewNodeKind::QualFolder (folder) =>
+      qualFolder_metadata_to_string (
         viewnode . focused, viewnode . folded,
-        viewnode . body_folded, col ),
+        viewnode . body_folded, folder ),
     ViewNodeKind::Qual (qual) =>
       qual_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, qual ),
-    ViewNodeKind::PartnerCol (partnerCol) =>
+    ViewNodeKind::PartnerFolder (partnerFolder) =>
       Ok ( non_vognode_atom_metadata_to_string (
         viewnode . focused, viewnode . folded,
-        viewnode . body_folded, partnerCol . repr_in_client () ) ),
+        viewnode . body_folded, partnerFolder . repr_in_client () ) ),
     ViewNodeKind::BufferRoot =>
       Err ( "viewnode_to_string: BufferRoot should never be rendered" . into () ),
     ViewNodeKind::DeadScaffold =>
@@ -190,14 +190,14 @@ fn non_vognode_atom_metadata_to_string (
   parts . push (atom . to_string ());
   parts . join (" ") }
 
-fn qualcol_metadata_to_string (
+fn qualFolder_metadata_to_string (
   focused     : bool,
   folded      : bool,
   body_folded : bool,
-  col         : &QualCol,
+  folder         : &QualFolder,
 ) -> Result < String, Box<dyn Error> > {
   Ok ( non_vognode_atom_metadata_to_string (
-    focused, folded, body_folded, col . repr_in_client () ) ) }
+    focused, folded, body_folded, folder . repr_in_client () ) ) }
 
 fn qual_metadata_to_string (
   focused     : bool,
@@ -325,19 +325,19 @@ fn activeNode_metadata_to_string (
       vec! [ "node" . to_string () ];
     parts . push ( format! ( "(id {})", activeNode . id . 0 ));
     parts . push ( format! ( "(source {})", activeNode . source ));
-    // ParentIs::Affected is left implicit because it is the default
+    // AffectsParent::True is left implicit because it is the default
     // membership relation.
-    match activeNode . parentIs {
-      ParentIs::Affected => {},
-      ParentIs::Absent =>
-        parts . push ( "(parentIs absent)" . to_string () ),
-      ParentIs::Independent =>
-        parts . push ( "(parentIs independent)" . to_string () ) }
-    if activeNode . is_indefinitive () {
-      // "indef" is short for "indefinitive" -- a read-only view of
-      // a node (see IndefOrDef in types/viewnode.rs). The metadata
+    match activeNode . affectsParent {
+      AffectsParent::True => {},
+      AffectsParent::NA =>
+        parts . push ( "(affectsParent na)" . to_string () ),
+      AffectsParent::False =>
+        parts . push ( "(affectsParent false)" . to_string () ) }
+    if activeNode . is_writeProtected () {
+      // `writeProtected` means "write-protected" -- a read-only view of
+      // a node (see Editability in types/viewnode.rs). The metadata
       // sexp uses only this short form on both emission and parsing.
-      parts . push ( "indef" . to_string () );
+      parts . push ( "writeProtected" . to_string () );
       if activeNode . viewStats . hidden_body {
         // The rendering is hiding a body (herald "B" on the ☮).
         parts . push ( "hiddenBody" . to_string () ); }}
@@ -366,11 +366,11 @@ fn activeNode_metadata_to_string (
 /// Render metadata for a PhantomDiff (TODO/DONE/local-view-update/plan_v2.org §11). The root atom is
 /// `diffPhantom`, distinct from the `node` atom an ActiveNode emits, so the
 /// client can tell a moved/removed phantom apart from a live node without
-/// inferring it from the diff axes. A phantom is always indefinitive (so always
-/// emits `indef` and never a body, editRequest, or viewRequests) and its
-/// parentIs is implicit Affected and birth Unremarkable (so neither atom
+/// inferring it from the diff axes. A phantom is always write-protected (so always
+/// emits `writeProtected` and never a body, editRequest, or viewRequests) and its
+/// affectsParent is implicit Affected and birth Unremarkable (so neither atom
 /// appears, and graphStats is rendered as if Affected / Unremarkable). It
-/// carries no viewStats. What remains: id, source, indef, graphStats, the
+/// carries no viewStats. What remains: id, source, write-protected, graphStats, the
 /// staged/unstaged diff axes, and notInGit.
 fn phantomDiff_metadata_to_string (
   focused     : bool,
@@ -387,9 +387,9 @@ fn phantomDiff_metadata_to_string (
       vec! [ "diffPhantom" . to_string () ];
     parts . push ( format! ( "(id {})", phantom . id . 0 ));
     parts . push ( format! ( "(source {})", phantom . source ));
-    // parentIs is implicit Affected and birth Unremarkable on a phantom, so
+    // affectsParent is implicit Affected and birth Unremarkable on a phantom, so
     // neither atom is emitted; both are passed as such to graphnodestats.
-    parts . push ( "indef" . to_string () );
+    parts . push ( "writeProtected" . to_string () );
     if let Some (s) = phantom_rels_atom (& phantom . graphStats)
     { parts . push (s); }
     { let mut atoms : Vec<&'static str> = Vec::new ();
@@ -455,7 +455,7 @@ fn phantomUnknown_metadata_to_string (
   parts . join (" ") }
 
 /// Render an inactive placeholder as the bare atom 'inactiveNode',
-/// like the other dataless scaffold markers (aliasCol, subscribeeCol,
+/// like the other dataless scaffold markers (aliasFolder, subscribeeFolder,
 /// ...). It carries no id/source/etc. -- those describe content the
 /// user hid by restricting the source-set, so emitting them would leak
 /// (see InactiveNode).

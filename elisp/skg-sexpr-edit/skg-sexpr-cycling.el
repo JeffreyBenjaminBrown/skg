@@ -41,17 +41,17 @@ Returns the new value. If FIELD-VALUE is not in VALUES, starts at index 0."
 FIELD-VALUE is the current headline text, needed for source defaulting.
 Returns nil if the field is not cycleable."
   (cond
-   ((string= field-name "indef")
+   ((string= field-name "writeProtected")
    '("false (default)" "true"))
-   ((string= field-name "parentIs")
-    '("affected (default)" "independent" "absent"))
+   ((string= field-name "affectsParent")
+    '("true (default)" "false" "na"))
    ((string= field-name "editRequest")
     '("none (default)" "delete" "merge"))
    ((string= field-name "source") ;; from the config
     (skg-sexp-edit--source-cycle-values field-value))
    ((string= field-name "viewRequests")
     ;; Only the bare-atom request 'definitiveView' is field-cycleable.
-    ;; The '(col RELNAME)' / '(path ROLENAME)' requests are structured
+    ;; The '(folder RELNAME)' / '(path ROLENAME)' requests are structured
     ;; forms, inserted via their dedicated commands, not by cycling.
     '("none (default)"
       "definitiveView"))))
