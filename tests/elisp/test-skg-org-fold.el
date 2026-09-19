@@ -122,3 +122,69 @@ moves to the headline start; a bodyless headline is left alone."
       (beginning-of-line)
       (skg-org-body-toggle)
       (should (org-at-heading-p)))))
+
+(ert-deftest test-skg-org-body-toggle-opens-a-folded-headline-one-level ()
+  "A fully folded headline opens its body and immediate children only."
+  (with-temp-buffer
+    (org-mode)
+    (insert "* parent\nparent body\n** first child\nfirst child body\n*** grandchild\ngrandchild body\n** second child\nsecond child body\n* sibling\n")
+    (goto-char (point-min))
+    (org-fold-hide-subtree)
+
+    (skg-org-body-toggle)
+    (should-not (invisible-p
+                 (save-excursion (forward-line 1) (point))))
+    (should-not (invisible-p
+                 (save-excursion
+                   (search-forward "** first child")
+                   (line-beginning-position))))
+    (should (invisible-p
+             (save-excursion
+               (search-forward "first child body")
+               (line-beginning-position))))
+    (should (invisible-p
+             (save-excursion
+               (search-forward "*** grandchild")
+               (line-beginning-position))))
+    (should-not (invisible-p
+                 (save-excursion
+                   (search-forward "** second child")
+                   (line-beginning-position))))
+
+    (skg-org-body-toggle)
+    (should (invisible-p
+             (save-excursion (forward-line 1) (point))))
+    (should-not (invisible-p
+                 (save-excursion
+                   (search-forward "** first child")
+                   (line-beginning-position))))
+
+    (skg-org-body-toggle)
+    (should-not (invisible-p
+                 (save-excursion (forward-line 1) (point))))
+    (should-not (invisible-p
+                 (save-excursion
+                   (search-forward "** first child")
+                   (line-beginning-position))))))
+
+(ert-deftest test-skg-org-body-toggle-opens-a-folded-bodyless-headline ()
+  "A folded bodyless headline still reveals its immediate children."
+  (with-temp-buffer
+    (org-mode)
+    (insert "* parent\n** child\nchild body\n*** grandchild\n* sibling\n")
+    (goto-char (point-min))
+    (org-fold-hide-subtree)
+
+    (skg-org-body-toggle)
+    (should-not (invisible-p
+                 (save-excursion
+                   (search-forward "** child")
+                   (line-beginning-position))))
+    (should (invisible-p
+             (save-excursion
+               (search-forward "child body")
+               (line-beginning-position))))
+    (should (invisible-p
+             (save-excursion
+               (search-forward "*** grandchild")
+               (line-beginning-position))))))
