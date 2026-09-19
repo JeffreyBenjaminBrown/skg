@@ -3,8 +3,7 @@
 Read [[file:to-save-tokens.org][the token-conservation advice]] and apply it throughout the task.
 Before a tool call, identify the unresolved question it will settle. Work one
 narrow, tested slice at a time; use focused reads and tests; do not duplicate
-an investigation that another agent owns. See also
-[[file:../codex-thinking/token-discipline.org][the recorded drift and prevention rules]].
+an investigation that another agent owns.
 ** Edit conservatively
 Do not alter Git configuration, credentials, index, branches, or commits
 unless explicitly asked. Do not gratuitously rename things or add legacy

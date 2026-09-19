@@ -592,12 +592,12 @@ If the original headline title already contains a link, the
 command asks "Are you sure?" before proceeding.
 ** C-c v : view changes, local (to a specific node)
 *** C-c v b : skg-org-body-toggle
-Toggles the visibility of the body of the headline at point:
-checks whether the body is visible, then delegates to
-'outline-hide-entry' or 'outline-show-entry'. Works from the
-headline or from inside its body; called from the body, point
-moves to the start of the headline. A bodyless headline is left
-alone.
+Toggles the visibility of the body of the headline at point without
+hiding its children. If the whole headline is folded, the command
+shows its body and immediate children, but leaves each child's entry
+folded. Works from the headline or from inside its body; called from
+the body, point moves to the start of the headline. A bodyless
+headline is left alone unless its children need to be revealed.
 *** C-c v m : skg-view-metadata
 When called from a node in a view of the graph,
 this switches to a view of the metadata of that node,
