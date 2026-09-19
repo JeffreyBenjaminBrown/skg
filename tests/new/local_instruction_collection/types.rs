@@ -6,6 +6,7 @@ use skg::from_text::local_instruction_collection::types::{
   CollectedIntents, IntentsForOneId, NodeIntent_Local,
   SubscribeeTextClaim, SubscribeeVisibility };
 use skg::types::misc::{ID, SourceName};
+use skg::types::nodes::complete::FileProperty;
 
 fn title_intent (
   title : &str,
@@ -79,6 +80,27 @@ fn delete_excludes_other_exclusive_slots () {
       ID::from ("a"), delete_intent () ) . unwrap();
     assert!( acc . by_pid . get (&ID::from ("a")) . unwrap()
              . delete ); }}
+
+#[test]
+fn boolprop_and_node_merge_are_mutually_exclusive () {
+  let boolprop : NodeIntent_Local =
+    NodeIntent_Local::SetBoolProp {
+      property : FileProperty::NoSearchMatching,
+      value    : true };
+  let node_merge : NodeIntent_Local =
+    NodeIntent_Local::NodeMerge {
+      acquiree : ID::from ("b") };
+  for (first, second) in [
+    (boolprop . clone(), node_merge . clone()),
+    (node_merge . clone(), boolprop . clone()) ] {
+    let mut acc : CollectedIntents =
+      CollectedIntents::new();
+    acc . instructionMerge_intent (
+      ID::from ("a"), first ) . unwrap();
+    let error : String = acc . instructionMerge_intent (
+      ID::from ("a"), second ) . unwrap_err();
+    assert!( error . contains (
+      "Cannot combine nodeMerge and property requests") ); }}
 
 #[test]
 fn combineable_intents_always_combine () {

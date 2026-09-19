@@ -19,11 +19,65 @@ use std::collections::HashSet;
 
 /// This could be extended.
 /// A .skg file can have any number of associated FileProperties.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FileProperty {
   Had_ID_Before_Import, // Node had an :ID: property before org-roam import.
   Was_Overloaded, // Multiple org-roam nodes used the same ID (as an ID, not in a link). This guards against a bug in my org-roam data (I can't say it's a bug in org-roam; I don't know.) The importer merges their content into a single node with the ID that was overloaded in org-roam.
+  NoSearchMatching, // Title, aliases and body cannot produce a direct text-search match. This is search decluttering, not access control.
 }
+
+impl FileProperty {
+  /// Stable display order for the generated properties folder.  Disk order is
+  /// deliberately independent: `misc` remains a small, byte-stable vector.
+  pub const ALL : [FileProperty; 3] = [
+    FileProperty::Had_ID_Before_Import,
+    FileProperty::Was_Overloaded,
+    FileProperty::NoSearchMatching,
+  ];
+
+  pub fn wire_name (self) -> &'static str {
+    match self {
+      FileProperty::Had_ID_Before_Import => "hadId",
+      FileProperty::Was_Overloaded       => "wasOverloaded",
+      FileProperty::NoSearchMatching     => "noSearchMatching",
+    } }
+
+  pub fn from_wire_name (name : &str) -> Option<FileProperty> {
+    Self::ALL . into_iter ()
+      . find (|property| property . wire_name () == name) }
+
+  pub fn herald_text (self) -> &'static str {
+    match self {
+      FileProperty::Had_ID_Before_Import =>
+        "☮ had ID before org-roam import",
+      FileProperty::Was_Overloaded =>
+        "☮ was overloaded during org-roam import",
+      FileProperty::NoSearchMatching =>
+        "☮ no search matching",
+    } }
+
+  pub fn is_mutable (self) -> bool {
+    matches! (self, FileProperty::NoSearchMatching) }
+}
+
+pub fn file_property_is_true (
+  misc     : &[FileProperty],
+  property : FileProperty,
+) -> bool {
+  misc . contains (&property) }
+
+/// Set one property without perturbing the other entries' relative order.
+/// True adds one copy at the end iff absent; false removes every copy so old,
+/// hand-edited duplicate vectors are repaired by an explicit clear gesture.
+pub fn set_file_property (
+  misc     : &mut Vec<FileProperty>,
+  property : FileProperty,
+  value    : bool,
+) {
+  if value {
+    if ! misc . contains (&property) { misc . push (property); }
+  } else {
+    misc . retain (|candidate| *candidate != property); }}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct NodeComplete {

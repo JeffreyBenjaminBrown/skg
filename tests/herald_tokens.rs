@@ -16,7 +16,7 @@ fn emit (
   f     : &AncestorFlags,
   birth : &[NodeRelation],
 ) -> Option<String> {
-  relationship_heralds_sexp (c, al, ex, f, birth) }
+  relationship_heralds_sexp (c, al, ex, 0, f, birth) }
 
 #[test]
 fn contains_birth () {
@@ -123,6 +123,16 @@ fn aliases_and_extra_ids () {
     emit (&c, 3, 1, &AncestorFlags::default (), &[]) . as_deref (),
     Some ("(rels (contains (in 2) (out 5)) (aliases 3) (extraIds 1))") );
 }
+
+#[test]
+fn true_properties_are_counted_and_zero_is_omitted () {
+  assert_eq! (
+    relationship_heralds_sexp (
+      &counts (), 0, 0, 2, &AncestorFlags::default (), &[])
+      . as_deref (),
+    Some ("(rels (properties 2))") );
+  assert_eq! (emit (&counts (), 0, 0, &AncestorFlags::default (), &[]),
+              None); }
 
 #[test]
 fn nothing_to_say_is_none () {

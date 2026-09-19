@@ -8,6 +8,7 @@
 
 use super::git::{ExistenceAxes, MembershipAxes, Sign};
 use super::misc::{ID, SourceName};
+use super::nodes::complete::FileProperty;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use std::collections::HashSet;
 use std::fmt;
@@ -341,6 +342,7 @@ pub struct RelationCounts {
 pub struct GraphNodeStats {
   pub aliases   : usize, // number of aliases (-> Ak)
   pub extra_ids : usize, // number of extra IDs from merging (-> Ik)
+  pub properties : usize, // number of logically true file properties (-> Pk)
   /// The directional member counts, or None for a node without stats
   /// (e.g. a sourceless reference). Feeds the token grammar.
   pub rels      : Option<RelationCounts>,
@@ -399,10 +401,11 @@ pub struct ViewNodeStats {
   pub rel_source            : Option<SourceName>,
 }
 
-#[derive( Debug, Clone, Copy, PartialEq, Eq )]
+#[derive( Debug, Clone, PartialEq, Eq, Hash )]
 pub enum QualFolder {
   ID,
   Alias,
+  BoolProps { title : String, body : Option<String> },
 }
 
 #[derive( Debug, Clone, PartialEq )]
@@ -413,6 +416,12 @@ pub enum Qual {
           membership: MembershipAxes },
   ID { id: ID, // an ID of grandparent (the parent being an IDFolder)
        membership: MembershipAxes },
+  /// A true file-level boolean property of the node's grandparent.
+  BoolProp {
+    property : FileProperty,
+    title    : String,
+    body     : Option<String>,
+  },
   TextChanged { staged: bool, unstaged: bool }, // Indicates title or body changed between stages. Visible in 'git diff mode'. Per-stage bools mark whether the change is staged (HEAD vs index) and/or unstaged (index vs worktree).
 }
 
@@ -466,6 +475,7 @@ pub enum FolderPolicy {
 pub enum NodeEditRequest {
   NodeMerge (ID), // The node with this request is the acquirer. The node with the ID that this request specifies is the acquiree.
   Delete, // request to delete this node
+  SetBoolProp { property : FileProperty, value : bool },
 }
 
 /// Which relation's folders a 'Folder' view-request builds. A Folder
@@ -516,6 +526,7 @@ impl FolderRelation {
 pub enum ViewRequest {
   Folder (FolderRelation),
   Path (RelationRole),
+  BoolProps,
   Definitive,
   Fork,
 }
@@ -638,11 +649,28 @@ impl PartnerFolder {
 }
 
 impl QualFolder {
-  pub fn repr_in_client (self) -> &'static str {
+  pub fn boolprops () -> QualFolder {
+    QualFolder::BoolProps { title : String::new (), body : None } }
+
+  pub fn is_boolprops (&self) -> bool {
+    matches! (self, QualFolder::BoolProps { .. }) }
+
+  pub fn repr_in_client (&self) -> &'static str {
     match self {
       QualFolder::Alias => "aliasFolder",
       QualFolder::ID    => "idFolder",
+      QualFolder::BoolProps { .. } => "propertiesFolder",
     } }
+
+  pub fn title (&self) -> &str {
+    match self {
+      QualFolder::BoolProps { title, .. } => title,
+      QualFolder::Alias | QualFolder::ID => "", } }
+
+  pub fn body (&self) -> Option<&String> {
+    match self {
+      QualFolder::BoolProps { body, .. } => body . as_ref (),
+      QualFolder::Alias | QualFolder::ID => None, } }
 
 }
 
@@ -651,6 +679,7 @@ impl Qual {
     match self {
       Qual::Alias { .. }       => "alias",
       Qual::ID { .. }          => "id",
+      Qual::BoolProp { .. }    => "property",
       Qual::TextChanged { .. } => "textChanged",
     } }
 
@@ -658,8 +687,14 @@ impl Qual {
     match self {
       Qual::Alias { text, .. } => text,
       Qual::ID    { id, .. }   => id,
+      Qual::BoolProp { title, .. } => title,
       Qual::TextChanged { .. } => "",
     } }
+
+  pub fn body (&self) -> Option<&String> {
+    match self {
+      Qual::BoolProp { body, .. } => body . as_ref (),
+      _ => None, } }
 }
 
 impl Vognode {
@@ -705,8 +740,8 @@ impl ViewRequest {
   /// herald's ANY/IT), so they are deliberately absent -- like IDs and
   /// counts elsewhere. Enumerated for the herald conformance test
   /// (server/heralds.rs).
-  pub const EMITTABLE_MATCH_ATOMS : [&'static str; 3] =
-    [ "folder", "path", "definitiveView" ];
+  pub const EMITTABLE_MATCH_ATOMS : [&'static str; 4] =
+    [ "folder", "path", "properties", "definitiveView" ];
 }
 
 impl AsRef<ViewNode> for ViewNode {
@@ -765,8 +800,8 @@ impl ViewNode {
         &d . title,
       ViewNodeKind::Qual (q) =>
         q . title (),
-      ViewNodeKind::QualFolder (_)
-        | ViewNodeKind::PartnerFolder (_)
+      ViewNodeKind::QualFolder (folder) => folder . title (),
+      ViewNodeKind::PartnerFolder (_)
         | ViewNodeKind::BufferRoot
         | ViewNodeKind::DeadScaffold
         | ViewNodeKind::Phantom (Phantom::Unknown (_))
@@ -780,10 +815,10 @@ impl ViewNode {
       ViewNodeKind::Vognode (Vognode::Active (t)) => t . body (),
       ViewNodeKind::Phantom (Phantom::Diff (p)) => p . body (),
       ViewNodeKind::Phantom (Phantom::Deleted (d)) => d . body . as_ref (),
+      ViewNodeKind::QualFolder (folder) => folder . body (),
+      ViewNodeKind::Qual (qual) => qual . body (),
       ViewNodeKind::Phantom (Phantom::Unknown (_))
         | ViewNodeKind::Vognode (Vognode::Inactive (_))
-        | ViewNodeKind::QualFolder (_)
-        | ViewNodeKind::Qual (_)
         | ViewNodeKind::PartnerFolder (_)
         | ViewNodeKind::BufferRoot
         | ViewNodeKind::DeadScaffold => None,
@@ -822,6 +857,8 @@ impl fmt::Display for NodeEditRequest {
     match self {
       NodeEditRequest::NodeMerge (id) => write!(f, "(merge {})", id . 0),
       NodeEditRequest::Delete    => write!(f, "toDelete"),
+      NodeEditRequest::SetBoolProp { property, value } => write! (
+        f, "(property {} {})", property . wire_name (), value),
     }} }
 
 impl FromStr for NodeEditRequest {
@@ -848,6 +885,7 @@ impl fmt::Display for ViewRequest {
     match self {
       ViewRequest::Folder  (rel)  => write! (f, "(folder {})",  rel  . relname  ()),
       ViewRequest::Path (role) => write! (f, "(path {})", role . rolename ()),
+      ViewRequest::BoolProps   => write! (f, "properties"),
       ViewRequest::Definitive  => write! (f, "definitiveView"),
       ViewRequest::Fork        => write! (f, "fork"), } } }
 
@@ -860,6 +898,7 @@ impl Default for GraphNodeStats {
     GraphNodeStats {
       aliases   : 0,
       extra_ids : 0,
+      properties : 0,
       rels      : None,
     }} }
 

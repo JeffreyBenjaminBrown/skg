@@ -50,6 +50,8 @@ an interactive command NAME that requests REQUEST-FORM and auto-saves."
     "Show the hide folders (hiderFolder + hiddenFolder).")
   (skg-show-folderOf-subscribes (folder subscribes)
     "Show the subscription folders (subscribeeFolder + subscriberFolder).")
+  (skg-show-folderOf-properties properties
+    "Show the read-only properties folder for the node at point.")
   ;; Paths ('C-c p'): the backpath for one partner role. UPPER = the
   ;; partner's active (first) role, lower = its passive (second) role.
   (skg-show-paths-through-containers   (path container)

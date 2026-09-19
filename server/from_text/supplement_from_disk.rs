@@ -17,7 +17,8 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::opt_nodecomplete_by_id;
 use crate::types::misc::{ID, MSV, MemberAtSource, RelationshipMemberKey, SkgConfig, SourceName, members_of, members_at_source};
 use crate::types::phantom::home_from_disk;
-use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
+use crate::types::nodes::complete::{
+  NodeComplete, empty_node_complete, set_file_property};
 use crate::types::save::{DefineNode, SaveNode, SourceMove};
 use std::collections::HashMap;
 use std::error::Error;
@@ -130,8 +131,11 @@ fn supplement_saveintent_from_disk (
       // default every time).
       let requested_relationship_sources : RequestedRelationshipSources =
         from_buffer . requested_relationship_sources ();
-      let supplemented : NodeComplete =
+      let boolprop_request = from_buffer . boolprop_request;
+      let mut supplemented : NodeComplete =
         from_buffer . into_nodecomplete ();
+      if let Some ((property, value)) = boolprop_request {
+        set_file_property (&mut supplemented . misc, property, value); }
       let empty_disk : NodeComplete = NodeComplete {
         pid    : supplemented . pid    . clone (),
         source : supplemented . source . clone (),
@@ -151,6 +155,7 @@ fn supplement_saveintent_from_disk (
         &members_of (&disk_node . contains));
       let requested_relationship_sources : RequestedRelationshipSources =
         from_buffer . requested_relationship_sources ();
+      let boolprop_request = from_buffer . boolprop_request;
       let from_buffer : NodeComplete =
         from_buffer . into_nodecomplete();
       let canonicalized : NodeComplete =
@@ -160,9 +165,11 @@ fn supplement_saveintent_from_disk (
                              &canonicalized . source,
                              &disk_node . source) ?;
       let supplemented : NodeComplete = {
-        let supplemented : NodeComplete =
+        let mut supplemented : NodeComplete =
           supplement_unspecified_fields_from_disk (
             canonicalized, &disk_node);
+        if let Some ((property, value)) = boolprop_request {
+          set_file_property (&mut supplemented . misc, property, value); }
         let supplemented : NodeComplete =
           match restricted_source_set {
             None => supplemented,

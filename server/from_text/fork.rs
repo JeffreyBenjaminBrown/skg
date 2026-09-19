@@ -16,7 +16,8 @@ use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName, members_of, members_at_source};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::{
+  FileProperty, NodeComplete, file_property_is_true};
 use crate::types::save::{ForkSpec, SaveNode};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewNodeKind, Vognode};
@@ -374,7 +375,12 @@ pub fn build_fork_clone (
         . cloned () . collect () )),
     overrides_view_of : MSV::Specified ( members_at_source (
       &clone_source, vec! [ buffer_node . pid . clone () ] )),
-    misc          : Vec::new (),
+    // The clone preserves the original node's search-matching choice, but
+    // importer provenance flags do not describe the newly-created clone.
+    misc          : if file_property_is_true (
+      &buffer_node . misc, FileProperty::NoSearchMatching)
+      { vec![FileProperty::NoSearchMatching] }
+      else { Vec::new () },
     source        : clone_source,
   };
   ForkSpec {

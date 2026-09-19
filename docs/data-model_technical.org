@@ -28,7 +28,7 @@ derived text links.
 | =subscribes_to= | =MSV<MemberAtSource<ID>>= | Nodes whose content this node follows, with edge sources. |
 | =hides_from_its_subscriptions= | =MSV<MemberAtSource<ID>>= | Nodes suppressed when reached through this node's subscriptions, with edge sources. |
 | =overrides_view_of= | =MSV<MemberAtSource<ID>>= | Nodes for which this node may substitute during recursive rendering, with edge sources. |
-| =misc= | =Vec<FileProperty>= | Import provenance: currently =Had_ID_Before_Import= and =Was_Overloaded=. |
+| =misc= | =Vec<FileProperty>= | Node file properties: import provenance (=Had_ID_Before_Import=, =Was_Overloaded=) and behavior settings such as =NoSearchMatching=. |
 | =textlinks_to= | =Vec<ID>= on =NodeRust= | Outbound Org =id:= links parsed from title/body text.  Derived rather than serialized as a graph field. |
 
 =MSV<T>= means “maybe specified vector.”  =Unspecified= says a file or edit

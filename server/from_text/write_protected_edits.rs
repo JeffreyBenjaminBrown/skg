@@ -8,8 +8,12 @@ use crate::from_text::local_instruction_collection::predicates::{
   active_child_counts_as_content, member_counts_for_partnerFolder};
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, SourceName};
+use crate::types::nodes::complete::FileProperty;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{PartnerFolder, Qual, QualFolder, Phantom, ViewNode, ViewNodeKind, Vognode};
+use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::node_lookup::nodecomplete_from_graph;
+use crate::types::nodes::complete::file_property_is_true;
 
 use ego_tree::{NodeId, NodeRef};
 use std::collections::HashSet;
@@ -24,6 +28,7 @@ enum OccurrencePathStep {
   QualFolder (QualFolder),
   Alias,
   ID,
+  BoolProp,
   TextChanged,
   PartnerFolder (PartnerFolder),
   DeadScaffold,
@@ -60,6 +65,8 @@ pub fn errors_and_normalize_new_writeProtected_occurrences (
   current  : &mut ViewForest,
   previous : &ViewForest,
 ) -> Vec<BufferValidationError> {
+  let mut errors : Vec<BufferValidationError> =
+    boolprops_surface_errors (current, previous);
   let current_occurrences : Vec<LocatedWriteProtectedOccurrence> =
     occurrences_in (current);
   let previous_occurrences : Vec<LocatedWriteProtectedOccurrence> =
@@ -69,7 +76,6 @@ pub fn errors_and_normalize_new_writeProtected_occurrences (
   let mut previous_is_matched : Vec<bool> =
     vec! [false; previous_occurrences . len ()];
   let mut reported : HashSet<ID> = HashSet::new ();
-  let mut errors : Vec<BufferValidationError> = Vec::new ();
 
   // First preserve exact occurrence identity (same parent path and ID),
   // preferring an unchanged duplicate if more than one candidate exists.
@@ -97,8 +103,12 @@ pub fn errors_and_normalize_new_writeProtected_occurrences (
         & current_occurrences [current_index];
       if current_occurrence . state != previous_occurrence . state
          && reported . insert (current_occurrence . state . id . clone ())
-      { errors . push (BufferValidationError::EditedWriteProtectedOccurrence (
-          current_occurrence . state . id . clone ())); }} }
+      { errors . push (BufferValidationError::EditedWriteProtectedOccurrence {
+          id      : previous_occurrence . state . id . clone (),
+          title   : previous_occurrence . state . title . clone (),
+          changes : write_protected_changes (
+            &previous_occurrence . state, &current_occurrence . state),
+        }); }} }
 
   // If an occurrence's ID itself changed, its parent path is the remaining
   // stable location signal. Pair unmatched old/current occurrences there.
@@ -115,9 +125,15 @@ pub fn errors_and_normalize_new_writeProtected_occurrences (
       else { continue; };
     current_is_matched [current_index] = true;
     previous_is_matched [previous_index] = true;
-    let id : ID = current_occurrences [current_index] . state . id . clone ();
+    let id : ID = previous_occurrence . state . id . clone ();
     if reported . insert (id . clone ()) {
-      errors . push (BufferValidationError::EditedWriteProtectedOccurrence (id)); }}
+      errors . push (BufferValidationError::EditedWriteProtectedOccurrence {
+        id,
+        title   : previous_occurrence . state . title . clone (),
+        changes : write_protected_changes (
+          &previous_occurrence . state,
+          &current_occurrences [current_index] . state),
+      }); }}
 
   let new_occurrence_ids : Vec<NodeId> = current_occurrences . iter ()
     . enumerate ()
@@ -126,6 +142,234 @@ pub fn errors_and_normalize_new_writeProtected_occurrences (
     . collect ();
   make_direct_active_children_independent (current, &new_occurrence_ids);
   errors
+}
+
+fn write_protected_changes (
+  previous : &WriteProtectedOccurrence,
+  current  : &WriteProtectedOccurrence,
+) -> Vec<String> {
+  let mut changes : Vec<String> = Vec::new ();
+  if previous . id != current . id { changes . push (format! (
+    "changed ID from {} to {}", previous . id, current . id)); }
+  if previous . title != current . title { changes . push (format! (
+    "changed title from {:?} to {:?}", previous . title, current . title)); }
+  if previous . source != current . source { changes . push (format! (
+    "changed source from {} to {}", previous . source, current . source)); }
+  if previous . content != current . content {
+    changes . push ("changed content membership" . to_string ()); }
+  if previous . aliases != current . aliases {
+    changes . push ("changed aliases" . to_string ()); }
+  if previous . subscribes != current . subscribes {
+    changes . push ("changed subscriptions" . to_string ()); }
+  if previous . overrides != current . overrides {
+    changes . push ("changed overrides" . to_string ()); }
+  if previous . hidden_outside != current . hidden_outside {
+    changes . push ("changed hidden subscription content" . to_string ()); }
+  if changes . is_empty () {
+    changes . push ("changed occurrence identity or placement" . to_string ()); }
+  changes
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct BoolPropsFolderSurface {
+  title          : String,
+  body           : Option<String>,
+  rows           : Vec<(FileProperty, String, Option<String>)>,
+  other_children : Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+struct LocatedBoolPropsSurface {
+  owner_id    : ID,
+  owner_title : String,
+  owner_path  : Vec<OccurrencePathStep>,
+  folders     : Vec<BoolPropsFolderSurface>,
+}
+
+fn boolprops_surfaces_in (forest : &ViewForest) -> Vec<LocatedBoolPropsSurface> {
+  let mut result : Vec<LocatedBoolPropsSurface> = Vec::new ();
+  for root in forest . roots () {
+    collect_boolprops_surfaces (root, &[], &mut result); }
+  result
+}
+
+fn collect_boolprops_surfaces (
+  node        : NodeRef<ViewNode>,
+  parent_path : &[OccurrencePathStep],
+  result      : &mut Vec<LocatedBoolPropsSurface>,
+) {
+  let mut own_path : Vec<OccurrencePathStep> = parent_path . to_vec ();
+  own_path . push (path_step (node . value ()));
+  if let ViewNodeKind::Vognode (Vognode::Active (owner)) = &node . value () . kind {
+    let folders : Vec<BoolPropsFolderSurface> = node . children ()
+      . filter_map (|child| {
+        let ViewNodeKind::QualFolder (QualFolder::BoolProps {
+          title, body }) = &child . value () . kind
+        else { return None; };
+        let mut rows : Vec<(FileProperty, String, Option<String>)> = Vec::new ();
+        let mut other_children : Vec<String> = Vec::new ();
+        for leaf in child . children () {
+          match &leaf . value () . kind {
+            ViewNodeKind::Qual (Qual::BoolProp {
+              property, title, body }) =>
+              rows . push ((*property, title . clone (), body . clone ())),
+            other => other_children . push (format! ("{:?}", other)), } }
+        Some (BoolPropsFolderSurface {
+          title : title . clone (), body : body . clone (),
+          rows, other_children }) })
+      . collect ();
+    result . push (LocatedBoolPropsSurface {
+      owner_id    : owner . id . clone (),
+      owner_title : owner . title . clone (),
+      owner_path  : parent_path . to_vec (),
+      folders, }); }
+  for child in node . children () {
+    collect_boolprops_surfaces (child, &own_path, result); }
+}
+
+fn boolprops_surface_errors (
+  current  : &ViewForest,
+  previous : &ViewForest,
+) -> Vec<BufferValidationError> {
+  let current_surfaces = boolprops_surfaces_in (current);
+  let previous_surfaces = boolprops_surfaces_in (previous);
+  let mut errors : Vec<BufferValidationError> = Vec::new ();
+  for before in &previous_surfaces {
+    let Some (after) = current_surfaces . iter () . find (|surface|
+      surface . owner_id == before . owner_id
+      && surface . owner_path == before . owner_path)
+    else { continue; };
+    // Like an aliases or backpath branch, this is an optional projection:
+    // deleting the whole folder dismisses it from the view and says nothing
+    // about the owner's properties.  A retained folder is still
+    // server-owned, so edits within it remain validation errors.
+    if ! before . folders . is_empty () && after . folders . is_empty () {
+      continue; }
+    if before . folders == after . folders { continue; }
+    let changes : Vec<String> = boolprops_surface_changes (
+      &before . folders, &after . folders);
+    errors . push (BufferValidationError::BoolPropsSurfaceEdited {
+      owner_id    : before . owner_id . clone (),
+      owner_title : before . owner_title . clone (),
+      changes, }); }
+  for after in &current_surfaces {
+    if after . folders . is_empty () { continue; }
+    let existed_before = previous_surfaces . iter () . any (|surface|
+      surface . owner_id == after . owner_id
+      && surface . owner_path == after . owner_path);
+    if ! existed_before {
+      errors . push (BufferValidationError::BoolPropsSurfaceEdited {
+        owner_id    : after . owner_id . clone (),
+        owner_title : after . owner_title . clone (),
+        changes     : vec!["added propertiesFolder" . to_string ()], }); }
+  }
+  errors
+}
+
+/// Direct/internal save callers may have no last-rendered forest.  In that
+/// case validate every present properties folder against graph state.  Absence
+/// is fine (the user never requested the view); presence must be canonical.
+pub fn boolprops_surface_errors_against_graph (
+  current : &ViewForest,
+  graph   : &InRustGraph,
+) -> Vec<BufferValidationError> {
+  let mut errors : Vec<BufferValidationError> = Vec::new ();
+  for surface in boolprops_surfaces_in (current) {
+    if surface . folders . is_empty () { continue; }
+    let Some (node) = nodecomplete_from_graph (graph, &surface . owner_id)
+    else { continue; };
+    let expected_rows : Vec<(FileProperty, String, Option<String>)> =
+      FileProperty::ALL
+      . into_iter ()
+      . filter (|property| file_property_is_true (&node . misc, *property))
+      . map (|property| (property, String::new (), None))
+      . collect ();
+    let expected = vec![BoolPropsFolderSurface {
+      title    : String::new (),
+      body     : None,
+      rows     : expected_rows,
+      other_children : Vec::new (), }];
+    if surface . folders != expected {
+      errors . push (BufferValidationError::BoolPropsSurfaceEdited {
+        owner_id    : node . pid . clone (),
+        owner_title : node . title . clone (),
+        changes     : boolprops_surface_changes (
+          &expected, &surface . folders), }); }
+  }
+  errors
+}
+
+fn boolprops_surface_changes (
+  before : &[BoolPropsFolderSurface],
+  after  : &[BoolPropsFolderSurface],
+) -> Vec<String> {
+  if before . is_empty () && ! after . is_empty () {
+    return vec!["added propertiesFolder" . to_string ()]; }
+  if ! before . is_empty () && after . is_empty () {
+    return vec!["removed propertiesFolder" . to_string ()]; }
+  if before . len () != after . len () {
+    return vec![format! ("changed propertiesFolder count from {} to {}",
+                         before . len (), after . len ())]; }
+  let mut changes : Vec<String> = Vec::new ();
+  for (old_folder, new_folder) in before . iter () . zip (after) {
+    if old_folder . title != new_folder . title {
+      changes . push (format! (
+        "changed propertiesFolder headline from {:?} to {:?}",
+        old_folder . title, new_folder . title)); }
+    describe_body_change (
+      &mut changes, "propertiesFolder", &old_folder . body, &new_folder . body);
+    if old_folder . other_children != new_folder . other_children {
+      changes . push ("changed non-property children in propertiesFolder"
+                      . to_string ()); }
+    for property in FileProperty::ALL {
+      let old = old_folder . rows . iter ()
+        . position (|(p, _, _)| *p == property);
+      let new = new_folder . rows . iter ()
+        . position (|(p, _, _)| *p == property);
+      match (old, new) {
+        (Some (_), None) => changes . push (format! (
+          "removed {}", property . wire_name ())),
+        (None, Some (_)) => changes . push (format! (
+          "added {}", property . wire_name ())),
+        (Some (old_pos), Some (new_pos)) => {
+          if old_pos != new_pos { changes . push (format! (
+            "moved {} from row {} to row {}", property . wire_name (),
+            old_pos + 1, new_pos + 1)); }
+          let old_title = &old_folder . rows [old_pos] . 1;
+          let new_title = &new_folder . rows [new_pos] . 1;
+          if old_title != new_title { changes . push (format! (
+            "changed {} headline from {:?} to {:?}",
+            property . wire_name (), old_title, new_title)); } },
+        (None, None) => (), } }
+    for (property, _, old_body) in &old_folder . rows {
+      if let Some ((_, _, new_body)) = new_folder . rows . iter ()
+        . find (|(candidate, _, _)| candidate == property)
+      { describe_body_change (
+          &mut changes, property . wire_name (), old_body, new_body); } }
+    for (index, ((old_property, _, _), (new_property, _, _))) in
+      old_folder . rows . iter () . zip (&new_folder . rows) . enumerate ()
+    { if old_property != new_property { changes . push (format! (
+        "changed property metadata in row {} from {} to {}", index + 1,
+        old_property . wire_name (), new_property . wire_name ())); } }
+  }
+  if changes . is_empty () {
+    changes . push ("changed properties rows" . to_string ()); }
+  changes
+}
+
+fn describe_body_change (
+  changes : &mut Vec<String>,
+  label   : &str,
+  before  : &Option<String>,
+  after   : &Option<String>,
+) {
+  if before == after { return; }
+  let description = match (before, after) {
+    (None, Some (_)) => format! ("added body text to {}", label),
+    (Some (_), None) => format! ("removed body text from {}", label),
+    (Some (_), Some (_)) => format! ("changed body text on {}", label),
+    (None, None) => return, };
+  changes . push (description);
 }
 
 fn occurrences_in (
@@ -179,11 +423,13 @@ fn path_step (
     ViewNodeKind::Phantom (Phantom::Unknown (phantom)) =>
       OccurrencePathStep::UnknownPhantom (phantom . id . clone ()),
     ViewNodeKind::QualFolder (folder) =>
-      OccurrencePathStep::QualFolder (*folder),
+      OccurrencePathStep::QualFolder (folder . clone ()),
     ViewNodeKind::Qual (Qual::Alias { .. }) =>
       OccurrencePathStep::Alias,
     ViewNodeKind::Qual (Qual::ID { .. }) =>
       OccurrencePathStep::ID,
+    ViewNodeKind::Qual (Qual::BoolProp { .. }) =>
+      OccurrencePathStep::BoolProp,
     ViewNodeKind::Qual (Qual::TextChanged { .. }) =>
       OccurrencePathStep::TextChanged,
     ViewNodeKind::PartnerFolder (folder) =>
@@ -312,10 +558,12 @@ mod tests {
       ** (skg subscribeeFolder)
       *** (skg (node (id other-subscribee) (source main))) other subscribee
     "});
-    assert_eq! (
-      errors_and_normalize_new_writeProtected_occurrences (
-        &mut changed, &original),
-      vec! [BufferValidationError::EditedWriteProtectedOccurrence (ID::from ("owner"))]);
+    let errors = errors_and_normalize_new_writeProtected_occurrences (
+      &mut changed, &original);
+    assert! (matches! (&errors[..],
+      [BufferValidationError::EditedWriteProtectedOccurrence {
+        id, title, changes }] if id == &ID::from ("owner")
+          && title == "owner" && changes . len () >= 2));
   }
 
   #[test]
@@ -345,7 +593,71 @@ mod tests {
         * (skg (node (id owner) (source main) writeProtected)) owner
         body that would otherwise disappear
       "}) . unwrap ();
-    assert_eq! (errors,
-      vec! [BufferValidationError::EditedWriteProtectedOccurrence (ID::from ("owner"))]);
+    assert! (matches! (&errors[..],
+      [BufferValidationError::EditedWriteProtectedOccurrence {
+        id, title, changes }] if id == &ID::from ("owner")
+          && title == "owner" && changes == &vec!["added body text" . to_string ()]));
+  }
+
+  #[test]
+  fn boolprops_surface_edits_report_owner_identity_and_concrete_changes () {
+    let original = forest (indoc! {"
+      * (skg (node (id owner) (source main))) Owner title
+      ** (skg propertiesFolder)
+      *** (skg (property hadId))
+      *** (skg (property noSearchMatching))
+    "});
+    let mut changed = forest (indoc! {"
+      * (skg (node (id owner) (source main))) Owner title
+      ** (skg propertiesFolder) edited folder headline
+      added folder body
+      *** (skg (property noSearchMatching)) renamed
+      added leaf body
+      *** (skg (property wasOverloaded))
+    "});
+    let errors = errors_and_normalize_new_writeProtected_occurrences (
+      &mut changed, &original);
+    assert! (matches! (&errors[..],
+      [BufferValidationError::BoolPropsSurfaceEdited {
+        owner_id, owner_title, changes }]
+      if owner_id == &ID::from ("owner")
+        && owner_title == "Owner title"
+        && changes . iter () . any (|c| c . contains ("removed hadId"))
+        && changes . iter () . any (|c| c . contains ("added wasOverloaded"))
+        && changes . iter () . any (|c| c . contains ("headline"))
+        && changes . iter () . any (|c| c == "added body text to propertiesFolder")
+        && changes . iter () . any (|c| c == "added body text to noSearchMatching")));
+  }
+
+  #[test]
+  fn deleting_the_properties_projection_is_inert () {
+    let original = forest (indoc! {"
+      * (skg (node (id owner) (source main))) Owner title
+      ** (skg propertiesFolder)
+      *** (skg (property noSearchMatching))
+    "});
+    let mut without_projection = forest (indoc! {"
+      * (skg (node (id owner) (source main))) Owner title
+    "});
+    assert! (errors_and_normalize_new_writeProtected_occurrences (
+      &mut without_projection, &original) . is_empty ());
+  }
+
+  #[test]
+  fn deleting_an_optional_sibling_does_not_make_the_properties_surface_edited () {
+    let original = forest (indoc! {"
+      * (skg (node (id owner) (source main))) Owner title
+      ** (skg aliasFolder) aliases
+      *** (skg alias) Another name
+      ** (skg propertiesFolder)
+      *** (skg (property noSearchMatching))
+    "});
+    let mut without_alias_projection = forest (indoc! {"
+      * (skg (node (id owner) (source main))) Owner title
+      ** (skg propertiesFolder)
+      *** (skg (property noSearchMatching))
+    "});
+    assert! (errors_and_normalize_new_writeProtected_occurrences (
+      &mut without_alias_projection, &original) . is_empty ());
   }
 }

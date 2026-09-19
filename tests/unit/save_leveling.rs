@@ -12,7 +12,8 @@ use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::{
   ID, MSV, MemberAtSource, SkgConfig, SkgfileSource, SourceName,
   SourceSetName};
-use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
+use crate::types::nodes::complete::{
+  FileProperty, NodeComplete, empty_node_complete};
 use crate::types::save::{DefineNode, SaveNode};
 
 use std::collections::HashMap;
@@ -81,6 +82,48 @@ fn sticky_preserves_disk_sources_and_default_takes_more_private_home (
   assert_eq! ( resolved . contains, vec! [
     pm ("private", "old"),    // STICKY: the disk's privatization survives
     pm ("private", "fresh") ] ); // DEFAULT: more private of the homes
+}
+
+#[test]
+fn boolprop_requests_apply_after_disk_misc_restore_and_survive_source_moves (
+) {
+  let config : SkgConfig = config_with_order (&["public", "private"]);
+  for (disk_no_search, request, expected) in [
+    (false, Some (true), vec![
+      FileProperty::Had_ID_Before_Import,
+      FileProperty::Was_Overloaded,
+      FileProperty::NoSearchMatching]),
+    (true, Some (false), vec![
+      FileProperty::Had_ID_Before_Import,
+      FileProperty::Was_Overloaded]),
+    (true, None, vec![
+      FileProperty::Had_ID_Before_Import,
+      FileProperty::Was_Overloaded,
+      FileProperty::NoSearchMatching]),
+  ] {
+    let mut disk : NodeComplete = node_at ("node", "public");
+    disk . misc = vec![
+      FileProperty::Had_ID_Before_Import,
+      FileProperty::Was_Overloaded];
+    if disk_no_search {
+      disk . misc . push (FileProperty::NoSearchMatching); }
+    let graph : InRustGraph = graph_from (&[disk . clone ()]);
+    let mut buffer = disk;
+    buffer . source = SourceName::from ("private");
+    buffer . title = "edited" . to_string ();
+    let mut intent = NodeIntent::graph_save_from_nodecomplete (buffer);
+    if let NodeIntent::Save (save) = &mut intent {
+      // This is the production buffer shape: misc is not textually carried.
+      save . misc = Vec::new ();
+      save . boolprop_request = request . map (|value|
+        (FileProperty::NoSearchMatching, value)); }
+    let planned = build_diskSupplemented_defineNodes (
+      vec![intent], &graph, &config, None) . unwrap ();
+    let DefineNode::Save (SaveNode (saved)) = &planned . instructions [0]
+      else { panic! ("expected SaveNode"); };
+    assert_eq! (&saved . misc, &expected);
+    assert_eq! (planned . source_moves . len (), 1);
+  }
 }
 
 #[test]
@@ -697,6 +740,55 @@ fn relsource_requests_are_contextual_and_singular (
     . unwrap (), "N" . to_string (), None );
   assert! ( error . is_some (),
             "write-protected relationship-source request must be rejected" );
+}
+
+#[test]
+fn boolprop_requests_parse_round_trip_and_reject_read_only_properties (
+) {
+  use crate::org_to_text::viewnode_to_string;
+  use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
+  use crate::types::nodes::complete::FileProperty;
+  use crate::types::viewnode::{
+    default_activeNode, ActiveNode, NodeEditRequest, ViewNode,
+    ViewNodeKind, Vognode};
+
+  for value in [false, true] {
+    let mut active : ActiveNode = default_activeNode (
+      ID::new ("n"), SourceName::from ("public"), "N" . to_string () );
+    if let crate::types::viewnode::Editability::Definitive {
+      edit_request, .. } = &mut active . editability
+    { *edit_request = Some (NodeEditRequest::SetBoolProp {
+        property : FileProperty::NoSearchMatching,
+        value, }); }
+    else { unreachable! (); }
+    let mut node : ViewNode = ViewNode {
+      focused     : false,
+      folded      : false,
+      body_folded : false,
+      kind        : ViewNodeKind::Vognode (Vognode::Active (active)), };
+    let config : SkgConfig = config_with_order (&["public"]);
+    let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
+    assert! ( rendered . contains (&format! (
+      "(editRequest (property noSearchMatching {}))", value)) );
+    let parsed = parse_metadata_to_viewnodemd (
+      &format! ("(skg {})", rendered)) . unwrap ();
+    assert_eq! ( parsed . edit_request,
+      Some (NodeEditRequest::SetBoolProp {
+        property : FileProperty::NoSearchMatching, value }) );
+    node . consume_edit_request_after_save ();
+    let ViewNodeKind::Vognode (Vognode::Active (active)) = &node . kind
+      else { unreachable! (); };
+    assert_eq! (active . edit_request (), None); }
+
+  for malformed in [
+    "(skg (node (id n) (editRequest (property nope true))))",
+    "(skg (node (id n) (editRequest (property noSearchMatching maybe))))",
+    "(skg (node (id n) (editRequest (property hadId true))))",
+    "(skg (node (id n) (editRequest (property wasOverloaded false))))",
+  ] {
+    assert! ( parse_metadata_to_viewnodemd (malformed) . is_err (),
+              "malformed/read-only property request was accepted: {}",
+              malformed ); }
 }
 
 #[test]

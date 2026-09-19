@@ -1,4 +1,4 @@
-#+title: Plan: no-search-matching and the boolprops surface
+#+title: Plan: no-search-matching and the properties surface
 #+startup: overview
 
 This is the implementation plan for [[file:1_vision.org][the vision]], as clarified in
@@ -8,7 +8,7 @@ they were design vocabulary, not a shipped format.
 
 Each numbered item below is a narrow, testable implementation slice.  The
 order is deliberate: establish the persisted fact and search semantics first,
-then its save gesture, then the derived boolprops view, and only then the two
+then its save gesture, then the derived properties view, and only then the two
 clients.  The items do not authorize commits; if commits are requested later,
 they are natural commit boundaries.
 
@@ -30,14 +30,14 @@ documents is load-bearing: exact-ID title/source lookup uses those documents.
 The following mapping is the one vocabulary registry used by persistence,
 view metadata, the endpoint, clients, heralds, and documentation.
 
-| Meaning | Rust/YAML =FileProperty= | wire atom | boolprops headline |
+| Meaning | Rust/YAML =FileProperty= | wire atom | properties headline |
 |---------+--------------------------+-----------+--------------------|
 | had an ID before org-roam import | =Had_ID_Before_Import= | =hadId= | =Had ID before org-roam import= |
 | duplicate org-roam IDs were merged on import | =Was_Overloaded= | =wasOverloaded= | =Was overloaded during org-roam import= |
 | cannot directly match text search | =NoSearchMatching= | =noSearchMatching= | =No search matching= |
 
 Only true properties are rows.  Their canonical order is the table order,
-independent of the order of =misc= on disk.  An empty boolprops folder is
+independent of the order of =misc= on disk.  An empty properties folder is
 therefore meaningful and remains visible.
 
 =Had_ID_Before_Import= and =Was_Overloaded= remain read-only provenance.
@@ -45,41 +45,49 @@ therefore meaningful and remains visible.
 
 ** Exact metadata forms
 
-The show command adds a bare view request; boolprops is not a graph relation,
+The show command adds a bare view request; properties is not a graph relation,
 so it should not be smuggled into =FolderRelation=:
 
 #+begin_src org
-  * (skg (node ... (viewRequests boolprops))) Owner
+  * (skg (node ... (viewRequests properties))) Owner
 #+end_src
 
 The fulfilled, server-owned surface is:
 
 #+begin_src org
   * (skg (node ...)) Owner
-  ** (skg boolpropsFolder)
-  *** (skg (boolprop hadId)) Had ID before org-roam import
-  *** (skg (boolprop noSearchMatching)) No search matching
+  ** (skg propertiesFolder)
+  *** (skg (property hadId))
+  *** (skg (property noSearchMatching))
 #+end_src
 
 The example owner has two true properties; =wasOverloaded= is absent because
-it is false.  A boolprop's identity comes only from its metadata atom.  Its
-headline is a canonical display label, never the source of property identity.
+it is false.  A property's identity comes only from its metadata atom.  Its
+Org title is empty; the herald supplies the friendly visible label.
 
 The one mutable request is idempotent and states the desired value:
 
 #+begin_src org
-  (editRequest (boolprop noSearchMatching true))
-  (editRequest (boolprop noSearchMatching false))
+  (editRequest (property noSearchMatching true))
+  (editRequest (property noSearchMatching false))
 #+end_src
 
-It is a save request on an ActiveNode, not an edit to the boolprops folder.
+It is a save request on an ActiveNode, not an edit to the properties folder.
 Like the existing delete, merge, and relationship-source forms, it is removed
 from the rendered buffer only after a successful commit.
+
+** Property-count herald
+
+A graphnode with =K > 0= logically true file properties contributes
+=(properties K)= to its semantic =rels= metadata.  Both clients render that as
+the cyan action herald =Pk=, after =Ak= and =Ik=.  Zero is omitted.  Count
+distinct =FileProperty= values rather than raw =misc= entries so legacy
+duplicates cannot inflate the herald.
 
 ** Transformation rules
 
 Ordinary saves and source moves preserve the whole =misc= vector unless a
-boolprop request explicitly changes =NoSearchMatching=.  Setting it true adds
+property request explicitly changes =NoSearchMatching=.  Setting it true adds
 one copy if absent; setting it false removes every copy.  Neither operation
 reorders or alters the other properties.
 
@@ -234,7 +242,7 @@ later parse silently replace an earlier request.
 
 The request is mutually exclusive with every other pending =editRequest= on
 that occurrence: delete, merge, and =relSource=.  A source-field edit itself
-may coexist with the boolprop request; moving the node and changing its search
+may coexist with the property request; moving the node and changing its search
 behavior in one transaction is well-defined.
 
 *** Add a property-intent side channel
@@ -261,7 +269,7 @@ request still disappears from the view after the successful save.
 
 Carry the set of property-edit target PIDs far enough to distinguish this
 gesture from ordinary text edits.  Before the foreign-edit path can interpret
-a change as an implicit fork, reject a boolprop request whose graphnode lives
+a change as an implicit fork, reject a property request whose graphnode lives
 in a foreign source.  A request on a write-protected occurrence already fails
 at the edit-request validation boundary.  A property request without a saved
 graph ID fails with “save the node first”; the server-state endpoint has no
@@ -305,7 +313,7 @@ In [[file:../../server/from_text/fork.rs][server/from_text/fork.rs]], initialize
 =NoSearchMatching= iff the origin has it.  Leave the clone's import-provenance
 flags empty.  Cover both true and false origins in the existing fork tests.
 
-** 5. Add boolprops to the existing scaffold families
+** 5. Add properties to the existing scaffold families
 
 *** Extend the domain types, not =ViewNodeKind=
 
@@ -313,7 +321,7 @@ Add =QualFolder::BoolProps= and a =Qual::BoolProp= payload carrying a parsed
 =FileProperty= identity and the submitted display title.  Do not add new
 top-level =ViewNodeKind= variants.
 
-Add =ViewRequest::BoolProps= with wire atom =boolprops=.  It is intentionally
+Add =ViewRequest::BoolProps= with wire atom =properties=.  It is intentionally
 not =FolderRelation::BoolProps=: =FolderRelation= names graph relations and
 its request builds their active/passive folder pair, whereas this request
 builds one fact folder.
@@ -327,9 +335,9 @@ found by the compiler.
 
 *** Parse machine identity and display text separately
 
-Parse =(boolprop PROPERTY)= using the central property registry.  Preserve the
-headline text long enough for read-only validation; do not replace it with the
-canonical title during parsing.  A BoolProp has no children or body and must
+Parse =(property PROPERTY)= using the central property registry.  Preserve any
+headline text long enough for read-only validation; the canonical title is
+empty, because the herald carries the label.  A BoolProp has no children or body and must
 be under a BoolPropsFolder.  A BoolPropsFolder must be unique beneath an
 ActiveNode and may contain only BoolProps.
 
@@ -345,7 +353,7 @@ Treat the folder and its leaves as =UnderReadOnlyFolder= in
 intent.  Their only save-path effect is validation that their server-owned
 surface was not edited.
 
-** 6. Build and reconcile the boolprops folder
+** 6. Build and reconcile the properties folder
 
 *** Fulfill the view request
 
@@ -362,7 +370,7 @@ mutation.
 
 *** Reconcile it on every later view update
 
-Add a boolprops reconciler beside the ID/Alias reconcilers and dispatch it
+Add a properties reconciler beside the ID/Alias reconcilers and dispatch it
 from [[file:../../server/update_buffer/complete.rs][server/update_buffer/complete.rs]].  Its goal list is the graph's
 current true properties in canonical order.  A successful property save,
 collateral update, rerender, or external graph refresh must therefore add or
@@ -383,7 +391,7 @@ intents from the scaffold.
 
 ** 7. Make edits to read-only surfaces fail with useful evidence
 
-*** Reuse the previous-render comparison, but add a boolprops surface diff
+*** Reuse the previous-render comparison, but add a properties surface diff
 
 The existing detector in
 [[file:../../server/from_text/write_protected_edits.rs][server/from_text/write_protected_edits.rs]] compares an incoming view with the
@@ -391,13 +399,17 @@ server's last rendering.  Add a parallel comparison for each generated
 BoolPropsFolder, keyed by the owning ActiveNode occurrence rather than by
 editable headline text.
 
-Compare the complete canonical surface: folder presence, position, title and
-body; leaf count and order; property metadata; leaf headline and body; and
-insertions or deletions.  Retain parse-time title/body observations until this
-comparison runs instead of issuing the current discard-warning for folder
-headline text.  An added hand-written boolprops folder that was absent from
-the previous rendering is also an edit, not a shortcut around the show
-command.
+When the folder remains present, compare the complete canonical surface:
+folder title and body; leaf count and order; property metadata; leaf headline
+and body; and row insertions or deletions.  Retain parse-time title/body
+observations until this comparison runs instead of issuing the current
+discard-warning for folder headline text.  An added hand-written properties
+folder that was absent from the previous rendering is also an edit, not a
+shortcut around the show command.  Deleting the entire folder is different:
+like deleting an aliases or backpath branch, it safely dismisses an optional
+projection and expresses no property change.  Its absolute sibling position
+is likewise not part of the protected surface, because deleting another inert
+view branch can shift it.
 
 If no previous forest is available to an internal/direct save caller, compare
 against a canonical surface built from the graph rather than silently
@@ -415,9 +427,9 @@ Add a structured =BoolPropsSurfaceEdited= validation error carrying:
 
 Each change is concrete: for example “removed noSearchMatching,” “moved
 wasOverloaded from row 2 to row 1,” “changed noSearchMatching headline from X
-to Y,” “added body text to boolpropsFolder,” or “changed boolprop metadata from
+to Y,” “added body text to propertiesFolder,” or “changed property metadata from
 hadId to noSearchMatching.”  The formatted error says the surface is
-server-owned, no changes were saved, and =skg-set-boolprop-search-matching=
+server-owned, no changes were saved, and =skg-set-property-search-matching=
 is the command for the one mutable property.  It also states that the two
 provenance properties have no setter.
 
@@ -434,10 +446,12 @@ states.  The body-on-write-protected parse case should produce the same rich
 shape.  Keep one error per occurrence/owner, not one error per changed field.
 
 Tests must assert the human message contains both ID and title and identifies
-the edited fields.  Boolprops tests must cover add, delete, reorder, metadata,
-headline, and body edits and prove the graph and files remain untouched.
+the edited fields.  Properties tests must cover add, delete, reorder, metadata,
+headline, and body edits and prove the graph and files remain untouched.  They
+must also prove that deleting the entire properties branch is accepted and
+that deleting another optional sibling does not create a false movement error.
 
-** 8. Add the read-only =boolprop state= endpoint
+** 8. Add the read-only =property state= endpoint
 
 *** Protocol
 
@@ -446,11 +460,11 @@ Add =RequestType::BoolPropState= and =TcpToClient::BoolPropState= in
 The request and successful response are:
 
 #+begin_src lisp
-  ((request . "boolprop state")
+  ((request . "property state")
    (id . "ID")
    (property . "noSearchMatching"))
 
-  ((response-type boolprop-state)
+  ((response-type property-state)
    (id "CANONICAL-PID")
    (property "noSearchMatching")
    (value "true")
@@ -476,14 +490,14 @@ and response in [[file:../../api-and-formats.md][api-and-formats.md]].
 
 *** Show the folder
 
-Add =skg-show-folderOf-boolprops= to
-[[file:../../elisp/skg-request-views.el][elisp/skg-request-views.el]].  It stamps the bare =boolprops= view request and
-auto-saves like the other show-folder commands.  Bind it to =C-c l b= in
+Add =skg-show-folderOf-properties= to
+[[file:../../elisp/skg-request-views.el][elisp/skg-request-views.el]].  It stamps the bare =properties= view request and
+auto-saves like the other show-folder commands.  Bind it to =C-c l p= in
 [[file:../../elisp/skg-keymaps-and-aliases.el][elisp/skg-keymaps-and-aliases.el]].
 
 *** Set search matching
 
-Add =skg-set-boolprop-search-matching= in a focused request module and require
+Add =skg-set-property-search-matching= in a focused request module and require
 it from [[file:../../elisp/skg-client.el][elisp/skg-client.el]].  Bind it to =C-c s x=; =x= means “exclude
 from search matching.”  With =C-u= it uses the recursive path.
 
@@ -534,9 +548,9 @@ existing length-prefix response-handler and
 [[file:../../nvim/lua/skg/picker.lua][nvim/lua/skg/picker.lua]] cycling support.  Provide:
 
 #+begin_src text
-  :SkgShowFolderOfBoolprops
-  :SkgSetBoolpropSearchMatching
-  :SkgSetBoolpropSearchMatchingRecursive
+  :SkgShowFolderOfProperties
+  :SkgSetPropertySearchMatching
+  :SkgSetPropertySearchMatchingRecursive
 #+end_src
 
 The single and recursive commands share the traversal and stamping
@@ -549,7 +563,7 @@ Following the repository's existing Neovim translations, use:
 
 | Emacs | Neovim |
 |-------+---------|
-| =C-c l b= | =<localleader>cb= |
+| =C-c l p= | =<localleader>cp= |
 | =C-c s x= | =<localleader>sx= |
 | =C-u C-c s x= | =<localleader>sX= |
 
@@ -582,11 +596,11 @@ access control.
 *** Formats and vocabulary
 
 Update [[file:../../api-and-formats.md][api-and-formats.md]] with =NoSearchMatching= YAML, the
-=no_search_matching= Tantivy term, boolprop state endpoint, desired-state edit
-request, bare =boolprops= view request, and =boolpropsFolder=/=boolprop=
+=no_search_matching= Tantivy term, property state endpoint, desired-state edit
+request, bare =properties= view request, and =propertiesFolder=/=property=
 metadata.
 
-Update [[file:../../glossary.md][glossary.md]] with no search matching, boolprops folder, BoolProp,
+Update [[file:../../glossary.md][glossary.md]] with no search matching, properties folder, Property,
 and the read-only surface rule.  Do not introduce “collection,” =NoIndex=, or
 “not indexed” as aliases.
 
@@ -597,7 +611,7 @@ and the read-only surface rule.  Do not introduce “collection,” =NoIndex=, o
 Add an integration fixture that:
 
 1. starts with a matching node that also has provenance properties;
-2. opens the boolprops folder and sees only its true rows;
+2. opens the properties folder and sees only its true rows;
 3. stages no-search-matching from each client and saves;
 4. observes the new row after rerender and no direct search hit;
 5. still resolves/opens the node by ID and sees it as context for another hit;
@@ -655,7 +669,7 @@ that down with a regression test.
 
 *** One =editRequest= means one of every kind
 
-The discussion explicitly made boolprop mutually exclusive with delete and
+The discussion explicitly made a property request mutually exclusive with delete and
 merge, but =relSource= uses the same singular wire slot.  This plan therefore
 makes it mutually exclusive with =relSource= too; the root command refuses and
 recursive commands skip/report such an occurrence.  Supporting both at once
@@ -666,14 +680,14 @@ gestures are important.
 
 *** The show binding was never selected
 
-This plan chooses =C-c l b= and its current Neovim-convention translation
-=<localleader>cb=.  They are the unused, mnemonic slots beside the existing
+This plan chooses =C-c l p= and its current Neovim-convention translation
+=<localleader>cp=.  They are the unused, mnemonic slots beside the existing
 folder commands.
 
 *** Neovim needs an explicit recursive gesture
 
 Because Neovim has no =C-u= prefix convention, this plan chooses
-=:SkgSetBoolpropSearchMatchingRecursive= and =<localleader>sX=, mirroring the
+=:SkgSetPropertySearchMatchingRecursive= and =<localleader>sX=, mirroring the
 existing source setter.  Emacs keeps the requested =C-u C-c s x= interface.
 
 These defaults do not require architectural rework and need not block

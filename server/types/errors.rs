@@ -57,7 +57,18 @@ pub enum BufferValidationError {
   EmptyTitle                             (ID),
   LocalStructureViolation        (String, ID), // (error message, nearest ancestor ID)
   EditRequestOnWriteProtectedOccurrence      (ID), // Write-protected (read-only) nodes -- phantoms in particular -- cannot carry write instructions like (editRequest delete) or (editRequest (merge X)). The user must visit a definitive view of the node first.
-  EditedWriteProtectedOccurrence            (ID), // This occurrence was changed since the server rendered it, but a write-protected occurrence emits no save instruction for the changed data.
+  EditedWriteProtectedOccurrence {
+    id      : ID,
+    title   : String,
+    changes : Vec<String>,
+  }, // This occurrence was changed since the server rendered it, but a write-protected occurrence emits no save instruction for the changed data.
+  BoolPropsSurfaceEdited {
+    owner_id    : ID,
+    owner_title : String,
+    changes     : Vec<String>,
+  },
+  BoolPropEditOnForeignNode                 (ID, SourceName),
+  BoolPropEditOnUnknownNode                 (ID),
   IDFolder_Edited                   (ID,       // owner of the IDFolder
                                   Vec<ID>,  // ids the buffer's IDFolder claims
                                   Vec<ID>), // the owner's real ids (pid + extra_ids); empty if the owner is not in the graph
@@ -144,8 +155,18 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "The idFolder under node {:?} was edited (buffer claims {:?}; real ids are {:?}). Reordering is fine, but IDs cannot be added, removed or edited through the buffer; edit the .skg file directly.", owner, buffer_ids, real_ids),
       BufferValidationError::EditRequestOnWriteProtectedOccurrence (id) =>
         write!(f, "Edit request on write-protected (phantom) node {:?}. Phantoms are write-protected; write-protected nodes cannot carry write instructions. Visit a definitive view of the node first (C-c g RET).", id),
-      BufferValidationError::EditedWriteProtectedOccurrence (id) =>
-        write!(f, "The write-protected occurrence of node {:?} was edited, but write-protected occurrences are read-only and would discard that edit. Re-render, then edit a definitive occurrence instead.", id),
+      BufferValidationError::EditedWriteProtectedOccurrence {
+        id, title, changes } =>
+        write!(f, "The write-protected occurrence of node {:?} ({:?}) was edited ({}) but is read-only. Re-render, then edit a definitive occurrence instead.",
+               id, title, changes . join ("; ")),
+      BufferValidationError::BoolPropsSurfaceEdited {
+        owner_id, owner_title, changes } =>
+        write!(f, "The properties surface under node {:?} ({:?}) was edited: {}. It is server-owned and no changes were saved. Use skg-set-property-search-matching for noSearchMatching; provenance properties have no setter.",
+               owner_id, owner_title, changes . join ("; ")),
+      BufferValidationError::BoolPropEditOnForeignNode (id, source) =>
+        write! (f, "Cannot change properties of node {:?} from foreign source '{}'; this gesture never creates an implicit fork.", id, source),
+      BufferValidationError::BoolPropEditOnUnknownNode (id) =>
+        write! (f, "Cannot change properties of unsaved or unknown node {:?}; save the node first.", id),
       BufferValidationError::OverridesHere_Mismatch(carrier, original, effective) =>
         write!(f, "Node {:?} carries the marker (overridesHere {:?}), but it is not on the override chain of that original (which resolves to {:?}). The marker looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, original, effective),
       BufferValidationError::Other (msg) =>

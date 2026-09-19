@@ -133,7 +133,8 @@ fn set_herald_strings_in_viewnode (
     birth_relations (&parent_kind, affectsParent, birth, &flags,
                      overridesHere);
   let rel_heralds : Option<String> = relationship_heralds_sexp (
-    &counts, gstats . aliases, gstats . extra_ids, &flags, &birth_rels );
+    &counts, gstats . aliases, gstats . extra_ids, gstats . properties,
+    &flags, &birth_rels );
   if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . rel_heralds = rel_heralds; } }

@@ -249,8 +249,19 @@ fn format_buffer_validation_error (
     BufferValidationError::EditRequestOnWriteProtectedOccurrence (id) => {
       format!("Edit request on a write-protected (possibly a phantom) node:\n- ID: {}\n- Write-protected nodes cannot carry write instructions.\n- To delete or merge this node, visit a definitive view of it first (C-c g RET).\n",
               id . 0) },
-    BufferValidationError::EditedWriteProtectedOccurrence (id) => {
-      format!("Edited write-protected occurrence:\n- ID: {}\n- This occurrence changed since the server rendered it, but write-protected occurrences do not write their own text or folders.\n- Re-render, then edit a definitive occurrence instead.\n",
+    BufferValidationError::EditedWriteProtectedOccurrence {
+      id, title, changes } => {
+      format!("Edited write-protected occurrence:\n- ID: {}\n- Title: {}\n- Changes: {}\n- This occurrence is read-only; no changes were saved.\n- Re-render, then edit a definitive occurrence instead.\n",
+              id . 0, title, changes . join ("; ")) },
+    BufferValidationError::BoolPropsSurfaceEdited {
+      owner_id, owner_title, changes } => {
+      format!("Edited server-owned properties surface:\n- Owner ID: {}\n- Owner title: {}\n- Changes: {}\n- No changes were saved. Use skg-set-property-search-matching for noSearchMatching. HadId and WasOverloaded are provenance and have no setter.\n",
+              owner_id . 0, owner_title, changes . join ("; ")) },
+    BufferValidationError::BoolPropEditOnForeignNode (id, source) => {
+      format!("Cannot change a property on a foreign node:\n- ID: {}\n- Source: {}\n- Property changes never create an implicit fork. Visit an owned node instead.\n",
+              id . 0, source) },
+    BufferValidationError::BoolPropEditOnUnknownNode (id) => {
+      format!("Cannot change a property on an unsaved or unknown node:\n- ID: {}\n- Save the node first, then run the property setter.\n",
               id . 0) },
     BufferValidationError::Other (msg) => {
       format!("{}\n", msg) }, }}

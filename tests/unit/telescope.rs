@@ -9,11 +9,12 @@
 //! - the silent-leak guard: no member ever changes source.
 
 use super::fold::{FoldedNode, fold_sections, nodecomplete_from_fold};
-use super::types::{FoldWarning, ListItem, SectionSlices};
+use super::types::{FoldWarning, ListItem, SectionSlices, Telescope};
 use super::unfold::{UnfoldInput, unfold_node};
 use crate::types::misc::{
   ID, MemberAtSource, SkgConfig, SkgfileSource, SourceName,
 };
+use crate::types::nodes::complete::FileProperty;
 
 use proptest::prelude::*;
 use std::collections::HashMap;
@@ -118,6 +119,38 @@ fn unfold_then_fold (
           folded . overrides_view_of . as_deref ()
           . unwrap_or (&[]), } );
   fold_sections ( &sections, &identity_resolve ) }
+
+#[test]
+fn file_properties_write_at_home_and_fold_defensively_from_all_sections () {
+  let home = SourceName::from ("S0");
+  let private = SourceName::from ("S2");
+  let misc = vec![
+    FileProperty::Had_ID_Before_Import,
+    FileProperty::NoSearchMatching];
+  let contains = vec![MemberAtSource::at_source (
+    private . clone (), ID::from ("child"))];
+  let mut sections = unfold_node (&UnfoldInput {
+    pid: &ID::from ("p"), extra_ids: &[], misc: &misc,
+    title: Some ("title"), body: None, home: &home,
+    aliases: &[], contains: &contains, subscribes_to: &[],
+    hides_from_its_subscriptions: &[], overrides_view_of: &[],
+  }, &telescope_config ()) . unwrap () . into_sections ();
+  assert_eq! (sections . first () . unwrap () . 1 . misc, misc);
+  assert! (sections . iter () . skip (1)
+    . all (|(_, section)| section . misc . is_empty ()));
+
+  let private_section = sections . iter_mut ()
+    . find (|(source, _)| source == &private) . unwrap ();
+  private_section . 1 . misc = vec![
+    FileProperty::NoSearchMatching,
+    FileProperty::Was_Overloaded];
+  let telescope = Telescope::try_new (
+    ID::from ("p"), sections, &telescope_config ()) . unwrap ();
+  assert_eq! (telescope . misc (), vec![
+    FileProperty::Had_ID_Before_Import,
+    FileProperty::NoSearchMatching,
+    FileProperty::Was_Overloaded]);
+}
 
 proptest! {
   #![proptest_config (ProptestConfig::with_cases (512))]

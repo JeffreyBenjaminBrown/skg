@@ -107,6 +107,7 @@ fn should_prune (
       is_leaf && affects_parent_partnerFolder && t . is_writeProtected (),
     ViewNodeKind::QualFolder (QualFolder::ID)
       | ViewNodeKind::QualFolder (QualFolder::Alias)
+      | ViewNodeKind::QualFolder (QualFolder::BoolProps { .. })
       | ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee)
       | ViewNodeKind::PartnerFolder (PartnerFolder::Subscriber)
       | ViewNodeKind::PartnerFolder (PartnerFolder::Overridden)

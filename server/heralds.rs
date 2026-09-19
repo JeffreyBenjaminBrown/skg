@@ -19,6 +19,7 @@
 /// nested RULE. The special label ANY matches any leaf; IT echoes
 /// the matched value(s).
 
+use crate::types::nodes::complete::FileProperty;
 use crate::types::viewnode::{PartnerFolder, Qual, QualFolder, ViewRequest};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -233,6 +234,12 @@ pub fn herald_rule_table () -> HeraldRule {
             "These override the view of it."),
       leaf (Green, QualFolder::ID . repr_in_client (), "IDs"),
       leaf (Green, "id", "ID"), // Qual::ID
+      leaf_ro! (Green, QualFolder::boolprops () . repr_in_client (),
+                "properties"),
+      crule (Green, "property", FileProperty::ALL . into_iter ()
+        . map (|property| rule (
+          property . wire_name (), vec! [s (property . herald_text ())]))
+        . collect ()),
       crule (Green, "textChanged", vec! [
         s ("text changed : "),
         leaf (Red, "staged",   "staged"),
@@ -306,10 +313,21 @@ pub fn herald_rule_table () -> HeraldRule {
           crule (Red, "merge", vec! [
             any ( vec! [ s ("merge:"), RuleChild::It ] ) ]),
           crule (Red, "relSource", vec! [
-            any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]),
+            any (vec! [ s ("request:~"), RuleChild::It ]) ]),
+          crule (Red, "property", vec! [
+            // A property request is flat metadata:
+            //   (property noSearchMatching true|false)
+            // Matching the literal boolean child lets the existing rule
+            // language render the desired user-facing state as one token.
+            // noSearchMatching is currently the only mutable property, and
+            // the save parser rejects every other property in this position.
+            vac (FileProperty::NoSearchMatching . wire_name ()),
+            rule ("true",  vec! [s ("request:no search matching")]),
+            rule ("false", vec! [s ("request:search matching")]) ]) ]),
         crule (Green, "viewRequests", vec! [
           rule ("folder",  vec! [ any (vec! [ s ("req:folder:"),  RuleChild::It ]) ]),
           rule ("path", vec! [ any (vec! [ s ("req:path:"), RuleChild::It ]) ]),
+          rule ("properties", vec! [ s ("req:properties") ]),
           rule ("definitiveView", vec! [ s ("req:definitive") ]) ]),
         interc (Some (Green), "", Some ("staged"), vec! [
           s ("staged:"),
@@ -435,9 +453,14 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     "rels",
     "viewStats", "editRequest", "viewRequests",
     "staged", "unstaged",
-    // NodeEditRequest atoms:
-    "delete", "merge",
+    // NodeEditRequest atoms. The property form's name and desired value
+    // are matched literally so its herald can describe the complete state
+    // change rather than echoing two context-free arguments.
+    "delete", "merge", "property", "true", "false",
   ];
+  // Property-row heralds match every public wire name.  Keeping this derived
+  // from the registry makes adding a property a conformance-checked change.
+  atoms . extend (FileProperty::ALL . map (FileProperty::wire_name));
   atoms . extend ( graphstats_atoms () );
   atoms . extend ( viewstats_atoms () );
   atoms . extend ( affectsParent_emitted_atoms () );
@@ -454,9 +477,10 @@ fn graphstats_atoms () -> Vec<&'static str> {
   use crate::types::viewnode::GraphNodeStats;
   fn guard ( g : GraphNodeStats ) {
     let GraphNodeStats {
-      aliases : _,   // -> Ak, inside the rels string
-      extra_ids : _, // -> Ik, inside the rels string
-      rels : _,      // -> the relationship tokens, inside birthHerald/rels
+      aliases : _,    // -> Ak, inside semantic rels metadata
+      extra_ids : _,  // -> Ik, inside semantic rels metadata
+      properties : _, // -> Pk, inside semantic rels metadata
+      rels : _,       // -> relationship facts inside semantic rels metadata
     } = g; }
   let _ = guard;
   vec! [] }
@@ -513,17 +537,22 @@ fn qual_and_folder_atoms () -> Vec<&'static str> {
     PartnerFolder::Hider, PartnerFolder::Hidden,
     PartnerFolder::HiddenInSubscribee,
     PartnerFolder::HiddenOutsideOfSubscribee ];
-  fn qualFolder_guard ( c : QualFolder ) { // ditto
-    match c { QualFolder::ID | QualFolder::Alias => () }}
+  fn qualFolder_guard ( c : &QualFolder ) { // ditto
+    match c {
+      QualFolder::ID | QualFolder::Alias
+        | QualFolder::BoolProps { .. } => () }}
   let _ = qualFolder_guard;
-  let all_qualFolders : [QualFolder; 2] = [ QualFolder::ID, QualFolder::Alias ];
-  let all_qual_atoms : [&'static str; 3] = {
+  let all_qualFolders : [QualFolder; 3] = [
+    QualFolder::ID, QualFolder::Alias, QualFolder::boolprops () ];
+  for c in &all_qualFolders { qualFolder_guard (c); }
+  let all_qual_atoms : [&'static str; 4] = {
     fn qual_guard ( q : &Qual ) { // ditto
       match q {
         Qual::Alias { .. } | Qual::ID { .. } | Qual::TextChanged { .. }
+          | Qual::BoolProp { .. }
           => () }}
     let _ = qual_guard;
-    [ "alias", "id", "textChanged" ] };
+    [ "alias", "id", "textChanged", "property" ] };
   let mut out : Vec<&'static str> = Vec::new ();
   out . extend ( all_partnerFolders . iter ()
                  . map ( |c| c . repr_in_client () ) );

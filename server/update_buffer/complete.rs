@@ -193,6 +193,10 @@ fn dispatch_node_update (
       super::reconcile::id_folder::reconcile_idFolder_children (
         treeid, tree, &context . runtime . graph,
         context . source_diffs, &context . runtime . config ) ?,
+    ViewNodeKind::QualFolder (QualFolder::BoolProps { .. }) =>
+      super::reconcile::boolprops_folder::reconcile_boolprops_folder_children (
+        tree, treeid, &context . runtime . graph,
+        &context . runtime . config ) ?,
     _ => {
       // No-op for: Inactive (an anonymous placeholder -- it carries no
       // identity, and flipping it to a "DELETED" marker would leak that

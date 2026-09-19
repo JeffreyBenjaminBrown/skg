@@ -19,6 +19,7 @@
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, SourceName};
 use crate::types::errors::BufferValidationError;
+use crate::types::nodes::complete::FileProperty;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::viewnode::{
   GraphNodeStats, ViewNodeStats, NodeEditRequest, ViewRequest, FolderRelation,
@@ -169,14 +170,19 @@ pub fn viewnode_from_metadata (
             body,
           } ) ), None, None )
       } else if let Some ( ref non_vognode ) = metadata . non_vognode {
+        let is_boolprops_folder = matches! (non_vognode,
+          MpViewnodeKind::QualFolder (QualFolder::BoolProps { .. }));
+        let is_boolprop = matches! (non_vognode,
+          MpViewnodeKind::Qual (Qual::BoolProp { .. }));
         let error : Option<BufferValidationError> =
-          if body . is_some () {
+          if body . is_some () && ! is_boolprops_folder && ! is_boolprop {
             Some ( BufferValidationError::Body_of_Scaffold (
               title . clone (),
               maybeplaced_kind_error_label (non_vognode) ))
           } else { None };
         let folder_title_warning : Option<String> =
           if ! title . is_empty ()
+            && ! is_boolprops_folder
             && matches! ( non_vognode,
                           MpViewnodeKind::QualFolder (_)
                           | MpViewnodeKind::PartnerFolder (_) )
@@ -199,6 +205,14 @@ pub fn viewnode_from_metadata (
             MpViewnodeKind::Qual (Qual::ID {
                               id: title . clone () . into (),
                               membership: metadata . scaffold_membership }),
+          MpViewnodeKind::Qual (Qual::BoolProp { property, .. }) =>
+            MpViewnodeKind::Qual (Qual::BoolProp {
+              property : *property,
+              title    : title . clone (),
+              body     : body . clone () }),
+          MpViewnodeKind::QualFolder (QualFolder::BoolProps { .. }) =>
+            MpViewnodeKind::QualFolder (QualFolder::BoolProps {
+              title : title . clone (), body : body . clone () }),
           MpViewnodeKind::Qual (Qual::TextChanged { .. }) =>
             MpViewnodeKind::Qual (Qual::TextChanged {
                               staged   : metadata . textchanged_staged,
@@ -392,6 +406,16 @@ pub fn parse_metadata_to_viewnodemd (
             let _kind_str : String =
               atom_to_string ( &items[1] ) ?;
             result . is_dead_scaffold = true; },
+          "property" => {
+            if items . len () != 2 {
+              return Err ("property requires exactly one property name"
+                          . to_string ()); }
+            let name : String = atom_to_string (&items[1]) ?;
+            let property : FileProperty = FileProperty::from_wire_name (&name)
+              . ok_or_else (|| format! ("Unknown property: {}", name)) ?;
+            result . non_vognode = Some (MpViewnodeKind::Qual (
+              Qual::BoolProp {
+                property, title: String::new (), body: None })); },
           // Note: "alias" as a list like (alias "string") is no longer supported.
           // Use bare "alias" atom instead - the alias string comes from headline title.
           // Legacy format detection - reject with helpful error
@@ -418,6 +442,8 @@ pub fn parse_metadata_to_viewnodemd (
           // Scaffold kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
           "alias"    => result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::Alias { text: String::new(), rel_source: None, rel_source_request: None, membership: MembershipAxes::default() } ) ),
           "aliasFolder" => result . non_vognode = Some (MpViewnodeKind::QualFolder (QualFolder::Alias)),
+          "propertiesFolder" => result . non_vognode = Some (
+            MpViewnodeKind::QualFolder (QualFolder::boolprops ())),
           "forestRoot" => result . non_vognode = Some (MpViewnodeKind::BufferRoot),
           "hiddenInSubscribeeFolder" =>
             result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)),
@@ -748,6 +774,29 @@ fn parse_editrequest_sexp (
         } else {
           return Err ( format! ( "Unknown editRequest key: {}", key )); }
       },
+      Sexp::List (subitems) if subitems . len () == 3 => {
+        let key : String = atom_to_string (&subitems [0]) ?;
+        if key != "property" {
+          return Err ( format! (
+            "Unknown three-part editRequest key: {}", key )); }
+        let property_name : String = atom_to_string (&subitems [1]) ?;
+        let property : FileProperty =
+          FileProperty::from_wire_name (&property_name)
+          . ok_or_else (|| format! (
+            "Unknown property: {}", property_name )) ?;
+        if ! property . is_mutable () {
+          return Err ( format! (
+            "Property {} is read-only provenance and cannot be changed",
+            property_name )); }
+        let value_name : String = atom_to_string (&subitems [2]) ?;
+        let value : bool = match value_name . as_str () {
+          "true"  => true,
+          "false" => false,
+          _ => return Err ( format! (
+            "Property value must be true or false, got: {}", value_name )), };
+        metadata . edit_request = Some (
+          NodeEditRequest::SetBoolProp { property, value });
+      },
       Sexp::Atom (_) => {
         let bare_value : String =
           atom_to_string (element) ?;
@@ -774,6 +823,7 @@ fn parse_viewrequests_sexp (
         let atom : String = atom_to_string (request_element) ?;
         if atom == "definitiveView" { ViewRequest::Definitive }
         else if atom == "fork" { ViewRequest::Fork }
+        else if atom == "properties" { ViewRequest::BoolProps }
         else { return Err ( format! (
           "Invalid view request atom: {}", atom )); } },
       Sexp::List (sub) if sub . len () == 2 => {
