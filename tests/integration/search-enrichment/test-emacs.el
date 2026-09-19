@@ -55,7 +55,12 @@
     (with-current-buffer buf
       (assert-leaf-b-root-is-content
        (buffer-substring-no-properties (point-min) (point-max))
-       "immediate search results"))
+       "immediate search results")
+      (unless (string-match-p
+               "(source \"Mr Cheese\")"
+               (buffer-substring-no-properties (point-min) (point-max)))
+        (message "✗ FAIL: spaced source name was not quoted in phase 1")
+        (kill-emacs 1)))
     (message "✓ search buffer created")
     (setq integration-test-phase "phase1-done"))
 

@@ -598,7 +598,9 @@ if and only if it adheres to the following:
 - whitespace
   - Whitespace separates all elements.
   - Extra whitespace is ignored.
-  - Keys and values should contain no whitespace.
+  - Keys and bare values should contain no whitespace. A value that contains
+    whitespace is represented as a quoted string atom; server-rendered source
+    names and source-derived herald values use this form automatically.
 
 Inside a `(node ...)` form, `(affectsParent ...)` describes whether the
 node participates in the membership represented by its visible parent:

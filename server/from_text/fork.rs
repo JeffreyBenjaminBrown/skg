@@ -13,6 +13,7 @@
 use crate::dbs::in_rust_graph::override_invariants::existing_user_owned_overrider_of;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::org_to_text::metadata_value_atom;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName, members_of, members_at_source};
@@ -259,13 +260,15 @@ pub fn build_fork_confirmation_buffer (
           spec . clone . 0 . source ));
         FORK_SOURCE_PLACEHOLDER };
     out . push_str ( & format! (
-      "* (skg (node (source {}) (viewStats (sourceHerald ⌂:{})))) {}\n",
-      shown_source, shown_source,
+      "* (skg (node (source {}) (viewStats (sourceHerald {})))) {}\n",
+      metadata_value_atom (shown_source),
+      metadata_value_atom (&format! ("⌂:{}", shown_source)),
       spec . clone . 0 . title ));
     out . push_str ( & format! (
       "** (skg (node (id {}) (source {}) (affectsParent false) writeProtected \
        (viewStats parentOverrides))) {}\n",
-      spec . original_id . 0, spec . original_source,
+      spec . original_id . 0,
+      metadata_value_atom (&spec . original_source),
       spec . original_title )); }
   out }
 

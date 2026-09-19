@@ -57,6 +57,8 @@ search.request_text_search('bravo', false, false, false)
 local buf = T.wait_for_buffer(buffer.search_buffer_name('bravo'))
 T.check(buf ~= nil, 'search buffer never created')
 assert_leaf_b_root_is_content(buf, 'immediate search results')
+T.check(T.buffer_text(buf):find('(source "Mr Cheese")', 1, true) ~= nil,
+  'spaced source name is quoted in phase 1')
 print('search buffer created')
 
 -- PHASE 2: wait for enrichment to add "container alpha".
