@@ -112,6 +112,10 @@ fn stored_outbound_accessor_retains_unresolved_raw_members () {
         relSource : SourceName::from ("main"), },
     ] );
   assert_eq! (
+    graph . outbound_ids_for_relation_gated (
+      &ID::from ("owner"), NodeRelation::Contains, None ),
+    vec![ ID::from ("known-extra"), ID::from ("absent-raw") ] );
+  assert_eq! (
     graph . outbound_pids_for_relation_gated (
       &ID::from ("owner"), NodeRelation::Contains, None ),
     vec![ID::from ("known")] ); }

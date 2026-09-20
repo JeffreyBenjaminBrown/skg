@@ -3,7 +3,7 @@
 use crate::to_org::util::get_id_from_treenode;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{members_of, ID, MSV, SkgConfig, SourceName};
+use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, ActiveNode, AffectsParent };
 use crate::types::viewnode::{Vognode, Phantom, QualFolder, Qual, PartnerFolder};
@@ -93,23 +93,6 @@ pub fn unique_scaffold_child_of_viewnode (
     scaffold_kind,
     |child : &ViewNode| Some (&child . kind))
   . map_err (|e| -> Box<dyn Error> { e . into() }) }
-
-/// Extract PIDs for the subscriber and its subscribees.
-pub fn pids_for_subscriber_and_its_subscribees (
-  tree    : &Tree<ViewNode>,
-  node_id : NodeId,
-  graph   : &InRustGraph,
-  config  : &SkgConfig,
-) -> Result < ( ID, Vec < ID > ),
-              Box<dyn Error> > {
-  let (pid, source) : (ID, SourceName) =
-    pid_and_source_from_treenode (
-      tree, node_id, "pids_for_subscriber_and_its_subscribees" ) ?;
-  let nodecomplete : NodeComplete =
-    nodecomplete_rustFirst_by_pid_and_source (
-      graph, config, &pid, &source ) ?;
-  Ok (( nodecomplete . pid . clone (),
-        members_of ( nodecomplete . subscribes_to . or_default() ) )) }
 
 /// Extract PIDs for a Subscribee and its grandparent (the subscriber).
 /// Expects: subscriber -> SubscribeeFolder -> Subscribee (this node)

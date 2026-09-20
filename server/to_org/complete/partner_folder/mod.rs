@@ -25,7 +25,6 @@ use crate::types::viewnode::Vognode;
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::{
   insert_scaffold_as_child,
-  pids_for_subscriber_and_its_subscribees,
   pid_for_subscribee_and_its_subscriber_grandparent,
   unique_scaffold_child_of_viewnode };
 
@@ -133,18 +132,19 @@ pub fn maybe_add_subscribeeFolder_branch (
       tree, node_id,
       &ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee) )? . is_some ()
     { return Ok (( )); }}
-  let ( subscriber_pid, subscribee_ids ) : ( ID, Vec < ID > ) =
-    pids_for_subscriber_and_its_subscribees (
-      tree, node_id, graph, config ) ?;
-  let subscriber_source : SourceName =
+  let ( subscriber_pid, subscriber_source ) : (ID, SourceName) =
     read_at_node_in_tree (
       tree, node_id,
       |vn| match &vn . kind {
         ViewNodeKind::Vognode (Vognode::Active (t))
-          => Some ( t . source . clone () ),
+          => Some (( graph . pid_of (&t . id)
+                       . unwrap_or_else (|| t . id . clone ()),
+                     t . source . clone () )),
         _ => None } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
     . ok_or ("maybe_add_subscribeeFolder_branch: expected ActiveNode") ?;
+  let subscribee_ids : Vec<ID> = graph . outbound_ids_for_relation_gated (
+    &subscriber_pid, NodeRelation::Subscribes, active_source_set );
   let subscribee_ids : Vec<ID> =
     // TODO/full-schema/9-2_source-set-safety.org: inactive
     // subscribees are omitted at de novo creation (no retained
