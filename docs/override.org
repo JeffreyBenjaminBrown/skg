@@ -143,12 +143,13 @@ overrider is drawable, it draws =N=.  A monogamy violation makes the
 resolver refuse to choose a branch; a cycle makes it abandon
 substitution and return the originally requested node.
 
-Substitution is disabled in diff mode.  It also does not rewrite
-existing viewnodes: closing and reopening a normal view produces the
-fresh normalized rendering.
+Substitution is disabled in diff mode.  Ordinary completion does not rewrite
+an existing raw viewnode merely because an overrider is now visible; closing
+and reopening a normal view produces the fresh normalized rendering.  The
+buffer whose save creates a fork has the post-save exceptions described below.
 
-The following positions always begin with the raw node rather than an
-automatic substitute:
+In an ordinary de-novo rendering, the following positions begin with the raw
+node rather than an automatic substitute:
 
 - content-view roots;
 - search-result roots and enrichment grafts;
@@ -159,6 +160,29 @@ When a node with a user-owned overrider is deliberately drawn raw, its
 immediate content children are also drawn raw.  Substitution resumes at
 the grandchildren.  This one-level rule makes the raw node show its own
 children rather than its overrider's interpretation of them.
+
+** The just-saved fork buffer
+
+Once an approved save creates fork =K= from origin =F=, the buffer that made
+the edit must not continue to show editable =F=: editing it again would request
+another fork.  The post-save update therefore makes two saved-view-only
+exceptions to the usual preservation of existing raw viewnodes:
+
+1. A level-one =F= named by one of this save's exact =ForkSpec=s is rewritten
+   to =K=.
+2. An existing recursive-content occurrence of =F= in the saved forest may be
+   replaced by its newly visible substitute =K=.
+
+Both replacements carry =(overridesHere F)=.  The root case is not ordinary
+recursive-content substitution; it is the one-time identity transition of the
+view which performed the fork.  After completing that forest, the server
+stores it under the same view URI and recomputes the open-view root index, so
+the buffer is thereafter registered as rooted at =K= rather than =F=.
+
+Collateral rerenders do not apply either saved-view exception.  They retain
+their existing raw positions while ordinary reconciliation refreshes their
+content and stats.  A later independent direct visit to =F= still opens raw
+=F=, in accordance with the exact-visit rule.
 
 ** The =overridesHere= marker
 
@@ -286,6 +310,8 @@ not perform interactive override substitution.
 - [[file:server/dbs/in_rust_graph/override_resolution.rs][owned override substitution]]
 - [[file:server/dbs/in_rust_graph/override_invariants.rs][owned monogamy and cycle invariants]]
 - [[file:server/update_buffer/reconcile/content.rs][substitution and raw/as-such completion]]
+- [[file:server/update_buffer.rs][saved-view fork replacement and collateral rerendering]]
+- [[file:server/types/views_state.rs][open-view root registration]]
 - [[file:server/types/viewnode.rs][folder policies and =overridesHere= collection]]
 - [[file:server/to_org/expand/folder_request.rs][on-demand folder construction]]
 - [[file:server/serve/handlers/text_search.rs][search suppression]]

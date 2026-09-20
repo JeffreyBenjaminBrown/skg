@@ -773,18 +773,28 @@ recursive content, and a user-owned overrider R of N is visible
 under the active source-set, it draws R instead -- transitively (a
 user-owned chain D overrides C overrides N is legal and resolves to
 the last visible link), cycle-guarded, and never in diff mode.
-Existing viewnodes are never rewritten (closing and reopening
-normalizes), and only content substitutes: PartnerFolder members,
-view roots, search results, ancestry insertions and phantoms always
-draw the raw node. Moreover, the immediate children of ANY overridden
-node drawn raw -- a PartnerFolder member, a view root (bypass-opened or
-otherwise), or the overridden-as-such (an Affected child of an
-overriddenFolder) -- also draw raw: the user is looking at the original,
-so its children are the original's, not the overrider's. This is one
-level deep -- substitution resumes at the grandchildren -- and it is
-strict: a node whose only overrider is invisible under the active
-source-set is "overridden but drawn raw" too, so its children draw
-raw as well.
+Ordinary completion does not rewrite an existing raw viewnode merely because
+an overrider is visible (closing and reopening normalizes). In a de-novo
+render, only content substitutes: PartnerFolder members, view roots, search
+results, ancestry insertions and phantoms begin as the raw node.
+
+The buffer whose approved save creates a fork is the post-save exception. A
+root named by one of that save's exact `ForkSpec`s is rewritten from origin F
+to clone K, and an existing recursive-content occurrence in the saved forest
+may likewise be replaced by its newly visible substitute. Both carry
+`(overridesHere F)`. The completed forest remains under the same view URI, and
+the open-view root index is recomputed from it, so that buffer is thereafter
+registered as rooted at K. Collateral rerenders do not perform these
+replacements; they retain their existing raw positions. A later independent
+single-root request for F still opens raw F.
+
+Moreover, the immediate children of ANY overridden node drawn raw -- a
+PartnerFolder member, a view root, or the overridden-as-such (an Affected
+child of an overriddenFolder) -- also draw raw: the user is looking at the
+original, so its children are the original's, not the overrider's. This is one
+level deep -- substitution resumes at the grandchildren -- and it is strict:
+a node whose only overrider is invisible under the active source-set is
+"overridden but drawn raw" too, so its children draw raw as well.
 
 A substituted viewnode carries the keyed viewStats form
 `(overridesHere N)` -- herald red "Oh" -- naming the original it
