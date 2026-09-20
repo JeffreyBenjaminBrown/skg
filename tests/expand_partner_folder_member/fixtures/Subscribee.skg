@@ -1,0 +1,6 @@
+pid: Subscribee
+title: Subscribee
+subscribes_to:
+- SubscribeeLeaf
+contains:
+- SubscribeeHidden

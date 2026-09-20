@@ -1,0 +1,4 @@
+pid: Hidden
+title: Hidden
+subscribes_to:
+- HiddenLeaf

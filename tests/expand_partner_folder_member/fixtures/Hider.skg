@@ -1,0 +1,6 @@
+pid: Hider
+title: Hider
+subscribes_to:
+- HiderLeaf
+hides_from_its_subscriptions:
+- N

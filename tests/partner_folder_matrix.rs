@@ -4,7 +4,8 @@
 // (TODO/full-schema/13_test-rel-matrix.org). ONE test function builds
 // ONE database of mutually independent subgraphs (IDs prefixed by
 // scenario), then runs the matrix scenarios serially against it: de
-// novo rendering of the read-only folders, and -- per folder -- save after
+// novo omission of unrequested read-only folders, and -- after explicit
+// folder requests, per folder -- save after
 // reorder, insertion of a non-member, deletion of a member, plus the
 // writable folders' membership edits and the restricted-set omission.
 // Scenario failures ACCUMULATE: every mismatch is collected and the
@@ -123,6 +124,28 @@ async fn save (
     &mut stream, buf, config, tantivy, graph, false,
     &Err ( String::new () ), &mut views_state ) . await }
 
+async fn render_with_requested_relation_folders (
+  root    : &str,
+  relation : &str,
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+  graph   : &InRustGraphHandle,
+) -> Result<String, Box<dyn Error>> {
+  let initial : String = render (root, config) . await ?;
+  let request : String = initial . replace (
+    "(affectsParent na)",
+    &format! (
+      "(affectsParent na) (viewRequests (folder {}))", relation ) );
+  let response : SaveResponse =
+    save (&request, config, tantivy, graph) . await ?;
+  if ! response . errors . is_empty () {
+    return Err (format! (
+      "{} folder request for {} failed: {:?}",
+      relation, root, response . errors )
+      . into ()); }
+  Ok (response . saved_view)
+}
+
 /// Swap the two whole lines that carry these metadata fragments.
 fn swap_lines ( buf : &str, a : &str, b : &str ) -> String {
   let a_line : String = line_containing (buf, a) . to_string ();
@@ -155,6 +178,7 @@ fn intruder_with_child (
 
 struct FolderSpec {
   atom     : &'static str, // e.g. "subscriberFolder"
+  relation : &'static str,
   owner    : &'static str,
   member_a : &'static str, // sorts before member_b
   member_b : &'static str,
@@ -163,15 +187,19 @@ struct FolderSpec {
 
 const READONLY_FOLDERS : [FolderSpec; 4] = [
   FolderSpec { atom : "subscriberFolder", owner : "roSub-owner",
+            relation : "subscribes",
             member_a : "roSub-a", member_b : "roSub-b",
             intruder : "roSub-x" },
   FolderSpec { atom : "overriderFolder", owner : "roOvr-owner",
+            relation : "overrides",
             member_a : "roOvr-a", member_b : "roOvr-b",
             intruder : "roOvr-x" },
   FolderSpec { atom : "hiderFolder", owner : "roHider-owner",
+            relation : "hides",
             member_a : "roHider-a", member_b : "roHider-b",
             intruder : "roHider-x" },
   FolderSpec { atom : "hiddenFolder", owner : "roHidden-owner",
+            relation : "hides",
             member_a : "roHidden-a", member_b : "roHidden-b",
             intruder : "roHidden-x" },
 ];
@@ -182,7 +210,8 @@ async fn readonly_reorder (
   tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   let scenario : String = format! ("{}/reorder", spec . atom);
-  let buf : String = render (spec . owner, config) . await ?;
+  let buf : String = render_with_requested_relation_folders (
+    spec . owner, spec . relation, config, tantivy, graph ) . await ?;
   let swapped : String = swap_lines (
     &buf,
     &format! ("(id {})", spec . member_a),
@@ -213,7 +242,8 @@ async fn readonly_insert (
   tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   let scenario : String = format! ("{}/insert", spec . atom);
-  let buf : String = render (spec . owner, config) . await ?;
+  let buf : String = render_with_requested_relation_folders (
+    spec . owner, spec . relation, config, tantivy, graph ) . await ?;
   let member_b_line : String =
     line_containing (&buf, &format! ("(id {})", spec . member_b))
     . to_string ();
@@ -253,7 +283,8 @@ async fn readonly_delete (
   tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   let scenario : String = format! ("{}/delete", spec . atom);
-  let buf : String = render (spec . owner, config) . await ?;
+  let buf : String = render_with_requested_relation_folders (
+    spec . owner, spec . relation, config, tantivy, graph ) . await ?;
   let member_a_line : String =
     line_containing (&buf, &format! ("(id {})", spec . member_a))
     . to_string ();
@@ -282,10 +313,10 @@ async fn readonly_delete (
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
-// De-novo render of the four read-only folders on one owner
+// De-novo omission of the four unrequested read-only folders
 //////////////////////////////////////////////////////////////
 
-async fn denovo_readonly_render (
+async fn denovo_omits_unrequested_readonly_folders (
   fails : &mut Fails,
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
@@ -293,19 +324,7 @@ async fn denovo_readonly_render (
   let buf : String = render ("dn-owner", config) . await ?;
   for atom in ["subscriberFolder", "overriderFolder",
                "hiderFolder", "hiddenFolder"] {
-    fails . want_contains (s, &buf, &format! ("(skg {})", atom)); }
-  for (a, b) in [("dn-sub-a", "dn-sub-b"),
-                 ("dn-ovr-a", "dn-ovr-b"),
-                 ("dn-hider-a", "dn-hider-b"),
-                 ("dn-hid-a", "dn-hid-b")] {
-    // members present, write-protected, and in sorted-ID order
-    for id in [a, b] {
-      let line : &str = line_containing (&buf, &format! ("(id {})", id));
-      if ! line . contains (" writeProtected") {
-        fails . record (s, format! (
-          "member {} should render writeProtected: {}", id, line)); } }
-    fails . want_before (
-      s, &buf, &format! ("(id {})", a), &format! ("(id {})", b) ); }
+    fails . want_absent (s, &buf, &format! ("(skg {})", atom)); }
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
@@ -324,7 +343,8 @@ fn relationship_matrix
         graph_handle_from_config (config) ?;
       let mut fails : Fails = Fails::new ();
 
-      denovo_readonly_render (&mut fails, config) . await ?;
+      denovo_omits_unrequested_readonly_folders (
+        &mut fails, config ) . await ?;
       for spec in &READONLY_FOLDERS {
         readonly_reorder (
           &mut fails, spec, config, tantivy, &graph) . await ?;
@@ -334,9 +354,10 @@ fn relationship_matrix
           &mut fails, spec, config, tantivy, &graph) . await ?;
       }
       writable_subscribeeFolder (&mut fails, config) . await ?;
-      writable_overriddenFolder (&mut fails, config) . await ?;
+      writable_overriddenFolder (
+        &mut fails, config, tantivy, &graph ) . await ?;
       hiddenFolder_delete_does_not_unhide (
-        &mut fails, config) . await ?;
+        &mut fails, config, tantivy, &graph ) . await ?;
       omission_scenarios (&mut fails, config) . await ?;
       folder_request_scenarios (
         &mut fails, config, tantivy, &graph) . await ?;
@@ -576,8 +597,11 @@ fn override_set ( n : &NodeComplete ) -> Vec<ID> {
 async fn writable_overriddenFolder (
   fails : &mut Fails,
   config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+  graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
-  let buf : String = render ("wOvr-owner", config) . await ?;
+  let buf : String = render_with_requested_relation_folders (
+    "wOvr-owner", "overrides", config, tantivy, graph ) . await ?;
   let stars : usize = folder_member_stars (&buf, "(id wOvr-a)");
   { // reorder is harmless: order-free set unchanged
     let s : &str = "overriddenFolder/reorder";
@@ -627,9 +651,12 @@ async fn writable_overriddenFolder (
 async fn hiddenFolder_delete_does_not_unhide (
   fails : &mut Fails,
   config : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+  graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   let s : &str = "hiddenFolder/no-unhide-on-disk";
-  let buf : String = render ("roHidden-owner", config) . await ?;
+  let buf : String = render_with_requested_relation_folders (
+    "roHidden-owner", "hides", config, tantivy, graph ) . await ?;
   let a_line : String =
     line_containing (&buf, "(id roHidden-a)") . to_string ();
   let edited : String = buf . replace (&format! ("{}\n", a_line), "");
@@ -664,7 +691,8 @@ async fn omission_scenarios (
       multi_root_view_with_source_set (
         config, None, &[ID::from ("omSub-owner")],
         false, &active ) ?;
-    fails . want_contains (s, &buf, "(id omSub-active)");
+    fails . want_absent (s, &buf, "subscriberFolder");
+    fails . want_absent (s, &buf, "omSub-active");
     fails . want_absent (s, &buf, "omSub-inactive"); }
   { // writable subscribeeFolder: inactive omitted from render, but the
     // restricted save weaves it back into subscribes_to.

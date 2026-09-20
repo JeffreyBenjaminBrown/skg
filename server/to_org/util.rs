@@ -1,7 +1,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
 use crate::to_org::complete::contents::clobberWriteProtectedViewnode;
-use crate::to_org::complete::partner_folder::maybe_add_partnerFolder_branches;
+use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_branches;
 use crate::dbs::node_lookup::nodecomplete_graphFirst_by_pid_and_source;
 use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
 use crate::types::nodes::complete::NodeComplete;
@@ -148,8 +148,8 @@ pub fn complete_branch_minus_content (
   { clobberWriteProtectedViewnode (
       tree, node_id, graph, config ) ?; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "maybe_add_partnerFolder_branches" ). entered();
-    maybe_add_partnerFolder_branches (
+      "maybe_add_default_partnerFolder_branches" ). entered();
+    maybe_add_default_partnerFolder_branches (
       tree, node_id, graph, config, active_source_set,
       // This birth path runs outside the diff-aware BFS (search
       // results, ancestry attachment, stubs); diff-mode folder

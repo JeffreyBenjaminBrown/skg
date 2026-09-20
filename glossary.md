@@ -183,14 +183,13 @@ that is a leaf is deleted; one with children is demoted to
 `affectsParent=false` so the user keeps any subtree they built under
 it; duplicates are deleted; missing graph members are restored.
 
-**Folder scaffolds read the process-global graph handle.**  De-novo
-rendering of a node's folders (all the read-only folders, and the outbound
-`hiddenFolder`/`overriddenFolder`) consults `snapshot_global`, not the
-render environment's own in-Rust graph; only the `subscribeeFolder` is
-built from the owner's outbound edges alone.  Production always has
-the handle installed, but a test harness that renders without it will
-see those folders silently missing (see `tests/partner_folder_matrix.rs`,
-which installs the handle in its render-heavy function).
+**Default presentation is intentionally narrow.** A definitive node gets a
+nonempty `subscribeeFolder` automatically. The other top-level relation
+folders require an explicit folder request, even when their herald counts say
+they would be nonempty. The same rule applies when a member of any
+PartnerFolder is expanded definitively. A subscribee-as-such also gets its
+nonempty `hiddenInSubscribeeFolder`; this is the filter specific to how that
+subscriber sees the subscribee.
 
 **Independent children jump above the members.**  An `Independent`
 (non-member) child parked inside any folder is reordered above the

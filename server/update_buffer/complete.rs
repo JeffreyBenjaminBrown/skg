@@ -12,7 +12,7 @@ use crate::types::env::RuntimeGeneration;
 use crate::types::git::SourceDiff;
 use crate::types::misc::{ID, SourceName, TantivyIndex};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, read_at_ancestor_in_tree};
-use crate::to_org::complete::partner_folder::maybe_add_partnerFolder_branches;
+use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_branches;
 use crate::update_buffer::ancestry::{ folder_is_generalized_orphan, deaden_generalized_orphan_folder, is_folder_kind};
 use crate::update_buffer::util::detach_scaffold_transferring_focus;
 use crate::update_buffer::warnings::CompletionWarning;
@@ -56,12 +56,12 @@ pub(super) struct CompletionContext<'a> {
   /// diff scaffold is created regardless of the budget.
   pub(super) node_budget                    : usize,
   /// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): true only for a DE-NOVO (initial) render driven through
-  /// view completion. When set, a fresh CONTENT node (parent is not a PartnerFolder)
-  /// gets its PartnerFolders created at its visit, the way
+  /// view completion. When set, each fresh definitive node gets its default
+  /// PartnerFolders created at its visit, the way
   /// build_node_branch_minus_content does at node birth.
-  /// FALSE for post-save rerender, where PartnerFolders are already present in
-  /// the saved buffer and re-creating them would change the buffer and break the
-  /// save round-trip (TODO/DONE/local-view-update/plan_v2.org §18). So post-save stays byte-identical.
+  /// FALSE for post-save rerender, where existing PartnerFolders round-trip
+  /// from the saved buffer. A node made definitive by a request still gets its
+  /// defaults independently of this flag.
   pub(super) create_partnerFolders_for_fresh_nodes : bool,
   /// TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the tantivy index for the inline diff's phantom-source
   /// resolution. None on the post-save path (the deleted-id map + disk scan
@@ -270,30 +270,24 @@ fn visit_normal_node (
       |vn : &ViewNode| matches! ( &vn . kind,
         ViewNodeKind::Vognode (Vognode::Active (_)) ) ) ?;
   if ! still_normal { return Ok (( )); }
-  // Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): for a DE-NOVO render, create this node's PartnerFolders the
-  // way build_node_branch_minus_content does at node birth, so the one view
-  // completion can expand a bare stub. Only CONTENT nodes/roots get them (a PartnerFolder
-  // MEMBER is rendered bare), so gate on "parent is not a PartnerFolder";
-  // maybe_add_partnerFolder_branches is itself idempotent + skips empties. OFF
-  // for post-save (flag false), keeping that path byte-identical.
-  if context . create_partnerFolders_for_fresh_nodes {
-    let affects_parent_partnerFolder : bool =
-      read_at_ancestor_in_tree ( tree, treeid, 1,
-        |vn : &ViewNode| matches! ( &vn . kind,
-          ViewNodeKind::PartnerFolder (_) ) )
-      . unwrap_or (false);
-    if ! affects_parent_partnerFolder {
-      maybe_add_partnerFolder_branches (
-        tree, treeid, &context . runtime . graph,
-        &context . runtime . config,
-        context . active_source_set,
-        context . source_diffs ) ?; } }
+  // Create the default folders when this node is first presented as
+  // definitive: on a de-novo render, or when a definitive-view request has
+  // just expanded an existing occurrence.  Folder members are included;
+  // hid*/overrid*-as-such nodes get the same defaults as ordinary nodes, and
+  // the subscribee-specific HiddenIn folder is added by the pass below.
+  if context . create_partnerFolders_for_fresh_nodes || had_dvr {
+    maybe_add_default_partnerFolder_branches (
+      tree, treeid, &context . runtime . graph,
+      &context . runtime . config,
+      context . active_source_set,
+      context . source_diffs ) ?; }
   // Remaining view requests (Aliases / Containerward / Sourceward); the
   // Definitive request was already consumed by apply_definitive_draw_rule.
   super::reconcile::view_requests::execute_activeNode_view_requests (
     treeid, tree, &context . runtime . graph,
     &context . runtime . config,
-    context . errors, context . active_source_set ) ?;
+    context . errors, context . active_source_set,
+    context . source_diffs ) ?;
   // Ensure a definitive subscribee's HiddenInSubscribeeFolder exists; the BFS
   // reconciles it on reaching it.
   super::reconcile::view_requests::ensure_hiddenInFolder_under_definitive_subscribee (

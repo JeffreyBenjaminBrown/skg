@@ -641,11 +641,22 @@ the view regenerates it.
 the server fulfills each request during view completion and then drops
 the atom, so a request is transient. Three request forms:
 
+A definitive node's default presentation includes its nonempty
+`subscribeeFolder`, but no other top-level relation folder. This applies both
+to ordinary positions and to nodes expanded as members of relation folders.
+A definitive subscribee-as-such additionally includes its nonempty
+`hiddenInSubscribeeFolder`; `hiddenOutsideOfSubscribeeFolder`, when nonempty,
+is part of the subscriber's `subscribeeFolder`. Use a folder request for the
+other relation folders; their potential contents remain advertised by the
+node's heralds.
+
 - `(folder RELNAME)` — build BOTH folders of the relation, populated from the
   graph. RELNAME is `aliases`, `overrides`, `hides`, or `subscribes`.
   The writable folder (`overriddenFolder` / `subscribeeFolder` / `aliasFolder`)
   appears even when empty (its editable "add here" surface); an empty
-  read-only folder is pruned. Emitted by the `C-c l` commands.
+  read-only folder is pruned. In diff mode, removed members count as content,
+  so a requested folder containing only removed-member phantoms still appears.
+  Emitted by the `C-c l` commands.
 - `(path ROLENAME)` — build the backpath for one partner role, grafting
   the partners as inverted read-only children (each marked `(birth
   backpath ROLENAME)`). ROLENAME is one of the nine in

@@ -309,6 +309,9 @@ metadata of the node at point that, on save, causes the server to
 render the relation's folder viewnodes into the view, POPULATED from
 the graph. Each builds BOTH folders of its relation. The read-only folder ☮
 marks a folder you cannot change from here. Every command auto-saves.
+Without such a request, a definitive node shows only its nonempty
+subscribeeFolder (plus the nonempty hiddenInSubscribeeFolder on a definitive
+subscribee-as-such); the heralds advertise other nonempty relations.
 *** <localleader>ca : :SkgShowFolderOfAliases
 The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:

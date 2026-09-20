@@ -372,8 +372,9 @@ pub(crate) fn find_collateral_view_uris (
 /// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): build a DE-NOVO (initial) content view by running the ONE
 /// post-save view completion (complete_viewforest) over a stub forest of the
 /// requested roots. View completion
-/// creates each fresh node's PartnerFolders (create_partnerFolders_for_fresh_nodes
-/// = true), expands content, reconciles folders, and applies the TODO/DONE/local-view-update/plan_v2.org §5.5 node budget.
+/// creates each fresh node's default PartnerFolders
+/// (create_partnerFolders_for_fresh_nodes = true), expands content, reconciles
+/// folders, and applies the TODO/DONE/local-view-update/plan_v2.org §5.5 node budget.
 /// When diff_mode, the git diff is computed inline by view completion (per node,
 /// at its BFS visit, via process_activeNode_diff) -- the same path post-save uses.
 /// The caller (multi_root_view_via_env) then adds containerward ancestry and
@@ -474,11 +475,9 @@ pub fn rerender_view (
       deleted_by_this_save_extra_ids : &context . deleted_by_this_save_extra_ids,
       active_source_set              : context . active_source_set,
       node_budget                    : context . runtime . config . initial_node_limit,
-      // Post-save (and rerender-all) reuse the saved buffer's PartnerFolders and
-      // pass false: re-creating them would change the buffer and break the save
-      // round-trip (TODO/DONE/local-view-update/plan_v2.org §18). The
-      // source-switch rerender passes true: its prune removed the folders, and the
-      // new set decides which return.
+      // Post-save (and rerender-all) reuse the saved buffer's PartnerFolders
+      // and pass false. The source-switch rerender passes true: its prune
+      // removed the folders, and the new set decides which defaults return.
       create_partnerFolders_for_fresh_nodes : create_partnerFolders,
       // Post-save: phantom sources resolve via the deleted-id map + disk scan
       // (the de-novo path passes the tantivy index instead).
