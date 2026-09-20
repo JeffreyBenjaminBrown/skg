@@ -69,6 +69,10 @@ pub(super) struct CompletionContext<'a> {
   /// resolution. None on the post-save path (the deleted-id map + disk scan
   /// suffice); Some on the de-novo path.
   pub(super) diff_tantivy_index : Option<&'a TantivyIndex>,
+  /// Replace an already-present raw content member with its newly visible
+  /// overrider. This is true only for the view whose edit created the override;
+  /// ordinary collateral rerenders retain their existing raw positions.
+  pub(super) substitute_existing_content_overrides : bool,
   /// Some only when this completion serves the view the user just
   /// saved: read-only PartnerFolder reconcilers report their repairs
   /// here, and the save response surfaces them as warnings. None for
@@ -277,10 +281,10 @@ fn visit_normal_node (
     context . deleted_by_this_save_extra_ids,
     context . active_source_set,
     settled, cascade, &mut context . node_budget,
-    context . source_diffs . is_none () ) ?; // substitution is off in diff mode: diff surfaces show raw graph facts
-  // The steps below apply only while the node is still an Active vognode:
-  // content reconcile may have converted it to Deleted (a node this save
-  // deleted). The flip to a Diff phantom happens at the END of this visit
+    context . source_diffs . is_none (), // substitution is off in diff mode: diff surfaces show raw graph facts
+    context . substitute_existing_content_overrides ) ?;
+  // The steps below apply only while the node is still an Active vognode.
+  // The flip to a Diff phantom happens at the END of this visit
   // (process_activeNode_diff, below), after content + folders + view requests.
   let still_normal : bool =
     read_at_node_in_tree ( tree, treeid,

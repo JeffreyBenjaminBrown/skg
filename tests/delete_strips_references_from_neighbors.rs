@@ -236,11 +236,10 @@ async fn delete_preserves_foreign_referencer (
   let response = update_from_and_rerender_buffer (
     &mut stream, input_org_text, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state ) . await ?;
-  assert! (response . saved_view . contains (
-    "(unknown (id victim-alt))"),
-    "the already-open foreign relationship must immediately retain its raw \
-     extra ID as Unknown after deleting the owned primary (with no redundant \
-     default-source fact): {}",
+  let saved_root : &str = response . saved_view . lines () . next ()
+    . ok_or ("the saved view must not be empty") ?;
+  assert! (saved_root . contains ("(overridesHere cheese)"),
+    "the buffer whose foreign root was forked must immediately show the fork: {}",
     response . saved_view );
   assert_eq! ( fs::read (&foreign_path) ?, foreign_before,
     "deleting an owned target must not rewrite foreign data" );
@@ -258,7 +257,8 @@ async fn delete_preserves_foreign_referencer (
   let (fresh_view, _, _) = single_root_view (
     config, Some (tantivy), &ID::from ("cheese"), false ) ?;
   assert! (fresh_view . contains ("(unknown (id victim-alt))"),
-    "the immediate Unknown must agree with a fresh render: {}", fresh_view);
+    "the raw foreign original must retain its extra ID as Unknown after the \
+     owned primary is deleted: {}", fresh_view);
   Ok (( )) }
 
 async fn delete_in_foreign_subscribee_rerenders_as_unknown (
@@ -278,13 +278,14 @@ async fn delete_in_foreign_subscribee_rerenders_as_unknown (
     "}, config, tantivy, &graph, false,
     &Err (String::new ()), &mut views_state ) . await ?;
   assert! (response . errors . is_empty (), "{:?}", response . errors);
-  assert! (response . saved_view . contains ("(unknown (id victim-alt))"),
-    "a retained foreign subscribee must become its raw extra ID immediately: {}",
+  assert! (response . saved_view . contains ("(overridesHere subscriber)"),
+    "the buffer whose foreign root was forked must immediately show the fork: {}",
     response . saved_view);
   let (fresh, _, _) = single_root_view (
     config, Some (tantivy), &ID::from ("subscriber"), false ) ?;
   assert! (fresh . contains ("(unknown (id victim-alt))"),
-    "immediate subscribee rerender must match a fresh render: {}", fresh);
+    "the raw foreign subscribee must retain the deleted node's extra ID as \
+     Unknown: {}", fresh);
   Ok (( ))
 }
 
@@ -305,23 +306,15 @@ async fn delete_in_foreign_overridden_rerenders_as_unknown (
     "}, config, tantivy, &graph, false,
     &Err (String::new ()), &mut views_state ) . await ?;
   assert! (response . errors . is_empty (), "{:?}", response . errors);
-  assert! (response . saved_view . contains ("(unknown (id victim-alt))"),
-    "a retained foreign override must become its raw extra ID immediately: {}",
+  assert! (response . saved_view . contains ("(overridesHere overrider)"),
+    "the buffer whose foreign root was forked must immediately show the fork: {}",
     response . saved_view);
-  // Reopen the serialized view with a new graph handle, which exercises the
-  // restart path without relying on the content-only default to request this
-  // on-demand folder.
-  let fresh_graph : InRustGraphHandle = graph_handle_from_config (config) ?;
-  let mut restarted_views : ViewsState = ViewsState {
-    diff_mode_enabled : false, open_views : OpenViews::new (), };
-  let restart_listener = std::net::TcpListener::bind ("127.0.0.1:0") ?;
-  let mut restart_stream = TcpStream::connect (restart_listener . local_addr () ?) ?;
-  let restarted = update_from_and_rerender_buffer (
-    &mut restart_stream, &response . saved_view, config, tantivy,
-    &fresh_graph, false, &Err (String::new ()), &mut restarted_views ) . await ?;
-  assert! (restarted . saved_view . contains ("(unknown (id victim-alt))"),
-    "the restarted overridden view must retain the raw Unknown: {}",
-    restarted . saved_view);
+  let original : NodeComplete = nodecomplete_from_pid_and_source (
+    config, ID::from ("overrider"), &SourceName::from ("foreign")) ?;
+  assert! (members_msv (&original . overrides_view_of)
+           . into_vec ()
+           . contains (&ID::from ("victim-alt")),
+    "the foreign original's raw override relationship must survive deletion");
   Ok (( ))
 }
 

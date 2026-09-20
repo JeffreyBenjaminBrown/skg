@@ -3,7 +3,7 @@
 -- open owned P (whose content is foreign N); make N definitive and
 -- edit its title; save -> a fork-confirmation buffer appears and
 -- nothing commits; approve -> the clone is created (overriding N) and
--- drawn in N's place when P re-renders.
+-- immediately drawn in N's place when P re-renders.
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(40)
@@ -92,37 +92,19 @@ local clone_line = goto_line_starting_with('* (skg (node (source ',
 metadata.change_source_at_line(clone_line, 'owned')
 save.approve_fork()
 
--- 6. The fork commits: when P's saved view re-renders, N is now
---    overridden and subscribed (its graphStats say so). (The saved
---    view still draws N raw -- existing viewnodes are not rewritten;
---    substitution shows on a fresh open, below.)
--- The clone committed: N now has one subscriber and one overrider. N
--- also contains N1,N2 and is contained by P, so its rels carry
--- (contains ...) and (birth contains) too -- match the two
+-- 6. The fork commits and P immediately replaces N with the clone.
+-- The clone itself now carries its two outbound relationships. Match the
 -- commit-signal facts as substrings, not the whole rels form.
 local committed = T.wait_for(function ()
   local buf = buffer_showing('P')
   if not buf then return false end
   local s = T.buffer_text(buf)
-  return s:find('(subscribes (in 1))', 1, true)
-     and s:find('(overrides (in 1))', 1, true)
+  return s:find('(subscribes (out 1))', 1, true)
+     and s:find('(overrides (out 1))', 1, true)
+     and s:find('(overridesHere N)', 1, true)
+     and s:find('N-edited', 1, true)
 end, 10)
 T.check(committed, 'the fork did not commit after approval')
-print('fork committed (N is now overridden and subscribed)')
-
--- 7. Reopen P fresh: override substitution now draws the clone in N's
---    place, carrying (overridesHere N).
-do
-  local live_p_buf = buffer_showing('P')
-  if live_p_buf then
-    vim.api.nvim_buf_delete(live_p_buf, { force = true }) end
-end
-content_view.request_single_root_content_view_from_id('P')
-local substituted = T.wait_for(function ()
-  local buf = buffer_showing('P')
-  return buf and T.buffer_text(buf):find('(overridesHere N)', 1, true)
-end, 10)
-T.check(substituted, "the clone was not drawn in N's place on reopen")
-print("on reopen, the clone is drawn in N's place with (overridesHere N)")
+print('fork committed and immediately replaced N with its clone')
 
 T.pass('PASS: Fork integration test successful!')

@@ -167,7 +167,8 @@ fn prepare_rerender_views_where (
         &mut viewforest,
         &mut context,
         None, // streamed rerenders repair silently.
-        create_partnerFolders
+        create_partnerFolders,
+        false
       ) } )
     { Ok (text) => {
         rendered_views . push ( PreparedView {

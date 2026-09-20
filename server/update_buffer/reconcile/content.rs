@@ -81,6 +81,7 @@ pub fn expand_true_content_at_activeNode (
   cascade                        : bool,
   node_budget                    : &mut usize,
   substitution_enabled           : bool, // false in diff mode: diff surfaces show raw graph facts.
+  substitute_existing_content_overrides : bool,
 ) -> Result<(), Box<dyn Error>> {
   // Phantoms are diff placeholders; this pass mutates and expands
   // real content nodes.
@@ -129,7 +130,8 @@ pub fn expand_true_content_at_activeNode (
     deleted_since_head_pid_src_map,
     deleted_by_this_save_extra_ids,
     active_source_set,
-    substitution_enabled ) ?;
+    substitution_enabled,
+    substitute_existing_content_overrides ) ?;
   if cascade {
     attach_cascade_dvrs_to_affected_content( tree, node ) ?; }
   order_children_as_scaffolds_then_ignored_then_content(
@@ -195,6 +197,7 @@ fn reconcile_content_children (
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   active_source_set              : Option<&ActiveSourceSet>,
   substitution_enabled           : bool,
+  substitute_existing_content_overrides : bool,
 ) -> Result<(), Box<dyn Error>> {
   // Resolve each id through the in-Rust-graph extra_id map so that an
   // id appearing in a node's 'contains' after merging into another
@@ -263,6 +266,10 @@ fn reconcile_content_children (
     // precedent).
     substitution_enabled
     && ! is_overridden_drawn_raw (tree, node, config, graph_snap) ?;
+  if substitute_existing_content_overrides {
+    replace_raw_content_children_with_visible_overriders (
+      tree, node, config, graph_snap, active_source_set,
+      substitution_for_children ) ?; }
   complete_content_children(
     tree, node, &apparent_content_ids, &relationship_sources,
     &nodecomplete . source, config, graph_snap,
@@ -274,6 +281,63 @@ fn reconcile_content_children (
   convert_nonmember_unknown_children_to_dead(
     tree, node, &apparent_content_ids ) ?;
   Ok (( )) }
+
+/// Replace already-rendered raw content children whose newly committed
+/// overrides now make another node their visible substitute.  Reconciliation
+/// otherwise recognizes the raw child by its membership ID and retains it,
+/// which would leave an implicit fork editable as its foreign original until
+/// the view were reopened.
+///
+/// The replacement retains the tree position and wrapper state (focus and
+/// folds), while its `overridesHere` marker keeps the parent's membership
+/// attached to the original ID on the next save.
+fn replace_raw_content_children_with_visible_overriders (
+  tree                 : &mut Tree<ViewNode>,
+  node                 : NodeId,
+  config               : &SkgConfig,
+  graph_snap           : &Arc<InRustGraph>,
+  active_source_set    : Option<&ActiveSourceSet>,
+  substitution_enabled : bool,
+) -> Result<(), Box<dyn Error>> {
+  if ! substitution_enabled { return Ok (()); }
+  let substitutions : Vec<(NodeId, ID, NodeComplete)> = {
+    let node_ref = tree . get (node)
+      . ok_or ("replace_raw_content_children_with_visible_overriders: node not found") ?;
+    let mut result : Vec<(NodeId, ID, NodeComplete)> = Vec::new ();
+    for child in node_ref . children () {
+      let ViewNodeKind::Vognode (Vognode::Active (active)) =
+        &child . value () . kind else { continue; };
+      if active . affectsParent != AffectsParent::True
+         || active . viewStats . overridesHere . is_some ()
+      { continue; }
+      let original : ID = active . id . clone ();
+      let effective : ID = resolve_override (
+        config, graph_snap, active_source_set, &original ) . effective;
+      if effective == original { continue; }
+      let source : SourceName = graph_snap . pid_and_source (&effective)
+        . map (|(_pid, source)| source)
+        . ok_or_else (|| format! (
+          "replace_raw_content_children_with_visible_overriders: no source for overrider {}",
+          effective . 0 )) ?;
+      let overrider : NodeComplete = nodecomplete_rustFirst_by_pid_and_source (
+        graph_snap, config, &effective, &source ) ?;
+      result . push ((child . id (), original, overrider));
+    }
+    result };
+  for (child, original, overrider) in substitutions {
+    write_at_activeNode_in_tree (
+      tree, child,
+      |active| {
+        active . id = overrider . pid . clone ();
+        active . source = overrider . source . clone ();
+        active . title = overrider . title . clone ();
+        if let Editability::Definitive { body, .. } = &mut active . editability
+        { *body = overrider . body . clone (); }
+        active . viewStats . overridesHere = Some (original);
+      }) . map_err (|e| -> Box<dyn Error> { e . into () }) ?;
+  }
+  Ok (())
+}
 
 /// TODO/DONE/local-view-update/plan_v2.org §6.5: an Unknown content placeholder (a dangling reference the parent kept
 /// rather than failing the whole view) that is *no longer a member* of the

@@ -20,6 +20,7 @@ use skg::dbs::in_rust_graph::{
   InRustGraphHandle};
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::from_text::buffer_to_validated_saveplan_with_fork_sources;
+use skg::org_to_text::viewforest_to_string;
 use skg::serve::ViewsState;
 use skg::source_sets::{ActiveSourceSet, SourceSetName};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
@@ -31,7 +32,7 @@ use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex, members_of};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, ForkSpec, SaveNode};
-use skg::types::views_state::OpenViews;
+use skg::types::views_state::{OpenViews, ViewUri};
 
 /// A foreign node N (title "N-original", contains [N1, N2]) lives under
 /// an OWNED container P. The buffer makes N definitive and edits its
@@ -162,6 +163,9 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("fork_round_trip", fixtures) ?;
       fork_round_trip (
+        &s . config, &mut s . tantivy ) . await ?;
+      s . reset ("fork_collateral_rerender_without_substitution", fixtures) ?;
+      fork_collateral_rerender_without_substitution (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("fork_monogamy", fixtures) ?;
       fork_monogamy (
@@ -370,6 +374,15 @@ async fn fork_no_owned_ancestor_defaults (
   assert_eq! ( c . source, SourceName::from ("owned"),
     "with no owned ancestor and no user-set source, the clone defaults to \
      the first owned source (alphabetically 'owned'); got {:?}", c . source );
+  let root_line : &str = response . saved_view . lines () . next ()
+    . ok_or ("the saved root view must not be empty") ?;
+  assert! ( root_line . contains (&format! ("(id {})", c . pid . 0))
+            && root_line . contains ("(overridesHere N)"),
+    "the buffer that forked root N must immediately show its clone in N's place:\n{}",
+    response . saved_view );
+  assert! ( ! root_line . contains ("(id N)"),
+    "the saved buffer must not leave the fork origin as its root:\n{}",
+    response . saved_view );
   Ok (( )) }
 
 /// The user-set clone source (the 'fork-sources' transport) overrides
@@ -768,4 +781,48 @@ async fn fork_round_trip (
   let p_disk : NodeComplete = node_from_disk (config, "P") ?;
   assert_eq! ( members_of (& p_disk . contains), vec! [ ID::from ("N") ],
     "P's contains must still point at N, not the clone {}", clone_id . 0 );
+  Ok (( )) }
+
+/// An ordinary collateral rerender retains a raw original while refreshing
+/// its relationship heralds. Editing P as well as forking N makes the second
+/// P view collateral through the normal changed-PID path; no fork-specific
+/// invalidation or rendering path participates.
+async fn fork_collateral_rerender_without_substitution (
+  config  : &SkgConfig,
+  tantivy : &mut TantivyIndex,
+) -> Result<(), Box<dyn Error>> {
+  let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
+  let ( _text, pids, p_view ) = single_root_view (
+    config, Some (tantivy), &ID::from ("P"), false ) ?;
+  let saved_uri : ViewUri = ViewUri::ContentView ("saved-P" . to_string ());
+  let collateral_uri : ViewUri = ViewUri::SearchView (
+    "P before fork" . to_string ());
+  let mut views_state : ViewsState = ViewsState {
+    diff_mode_enabled : false, open_views : OpenViews::new () };
+  let graph_snap = graph . load_full ();
+  views_state . open_views . register_view (
+    &graph_snap, saved_uri . clone (), p_view . clone (), &pids );
+  views_state . open_views . register_view (
+    &graph_snap, collateral_uri . clone (), p_view, &pids );
+
+  let mut stream : std::net::TcpStream = mk_test_tcp_stream ();
+  let buffer : String = FORK_BUFFER . replace ("P-container", "P-edited");
+  let response = update_from_and_rerender_buffer (
+    &mut stream, &buffer, config, tantivy, &graph, false,
+    &Ok (saved_uri), &mut views_state ) . await ?;
+  assert! ( response . saved_view . contains ("(overridesHere N)"),
+    "the saved view must substitute the clone:\n{}", response . saved_view );
+
+  let collateral = views_state . open_views
+    . viewuri_to_view (&collateral_uri)
+    .ok_or ("the collateral view must remain open") ?;
+  let collateral_text : String = viewforest_to_string (collateral, config) ?;
+  assert! ( collateral_text . contains ("(id N)"),
+    "the collateral view must retain raw N:\n{}", collateral_text );
+  assert! ( ! collateral_text . contains ("(overridesHere N)"),
+    "the collateral view must not substitute the clone:\n{}", collateral_text );
+  assert! ( collateral_text . contains ("(subscribes (in 1))")
+            && collateral_text . contains ("(overrides (in 1))"),
+    "the raw original must show its new inbound relationship heralds:\n{}",
+    collateral_text );
   Ok (( )) }

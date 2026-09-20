@@ -29,7 +29,7 @@ use crate::to_org::util::DefinitiveMap;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::views_state::ViewUri;
 use crate::types::misc::{ID, SourceName, SkgConfig};
-use crate::types::save::{DefineNode, SaveNode};
+use crate::types::save::{DefineNode, ForkSpec, SaveNode};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
 use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_parent_na, validate_affectsParent_relationships, mark_orphans_under_dead_parents_false};
@@ -158,6 +158,7 @@ pub fn update_views_after_save (
   active_source_set           : Option<&ActiveSourceSet>,
   deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
   text_approved_pids        : &HashSet<ID>,
+  fork_specs                  : &[ForkSpec],
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut context : RerenderAfterSaveContext =
     // Snapshot the in-Rust graph once for this save's rerender pass.
@@ -171,6 +172,7 @@ pub fn update_views_after_save (
         env, runtime, diff_mode_enabled, &define_nodes,
         deleted_by_this_save_extra_ids, active_source_set ) };
   let mut saved_view_mut : ViewForest = saved_view;
+  replace_saved_view_fork_roots (&mut saved_view_mut, fork_specs) ?;
   // The graph mutation has committed, so every `(editRequest ...)` in the
   // submitted view is now consumed input. Clear all request carriers at this
   // one boundary before completion can echo any of them into the response.
@@ -216,7 +218,8 @@ pub fn update_views_after_save (
         &mut saved_view_mut,
         &mut context,
         Some (&mut repair_warnings),
-        false ) } ?;
+        false,
+        true ) } ?;
   context . warnings . extend (
     // Repairs the completion pass made to read-only PartnerFolders in
     // the saved view, batched per (folder, owner).
@@ -227,7 +230,6 @@ pub fn update_views_after_save (
       curi . clone (), views_state, &mut context )
     { Ok (rendered) => collateral_views . push (rendered),
       Err (e) => context . errors . push (e), }}
-
   // Everything textual is now staged in memory. Decide before changing the
   // open-view registry, narrowing locks, or streaming the first view.
   let mut release_candidates : Vec<ID> =
@@ -307,6 +309,43 @@ fn active_ids_in_viewforest (
     .collect ()
 }
 
+/// A root is intentionally rendered raw when the user ordinarily opens an
+/// overridden node.  The buffer which *created* a fork is the exception: once
+/// the save commits, continuing to show its foreign root would make the next
+/// edit attempt another fork.  Replace only roots named by this save's exact
+/// ForkSpecs; content occurrences are handled by content reconciliation.
+fn replace_saved_view_fork_roots (
+  viewforest : &mut ViewForest,
+  fork_specs : &[ForkSpec],
+) -> Result<(), Box<dyn Error>> {
+  if fork_specs . is_empty () { return Ok (()); }
+  let root_ids : Vec<NodeId> = viewforest . root_ids ();
+  for root_id in root_ids {
+    let original : Option<ID> =
+      viewforest . get (root_id) . and_then (|root| match
+        &root . value () . kind {
+          ViewNodeKind::Vognode (Vognode::Active (active)) =>
+            Some (active . id . clone ()),
+          _ => None, });
+    let Some (original) = original else { continue; };
+    let Some (spec) = fork_specs . iter ()
+      . find (|spec| spec . original_id == original)
+    else { continue; };
+    let clone = & spec . clone . 0;
+    let mut root = viewforest . get_mut (root_id)
+      . ok_or ("replace_saved_view_fork_roots: root not found") ?;
+    if let ViewNodeKind::Vognode (Vognode::Active (active)) =
+      &mut root . value () . kind
+    { active . id = clone . pid . clone ();
+      active . source = clone . source . clone ();
+      active . title = clone . title . clone ();
+      if let Editability::Definitive { body, .. } = &mut active . editability
+      { *body = clone . body . clone (); }
+      active . view_requests . remove (&ViewRequest::Fork);
+      active . viewStats . overridesHere = Some (original); }}
+  Ok (())
+}
+
 fn rerender_collateral_view (
   uri         : ViewUri,
   views_state : &ViewsState,
@@ -331,6 +370,7 @@ fn rerender_collateral_view (
         &mut viewforest,
         context,
         None, // Collateral views repair silently.
+        false,
         false
       ) . map_err (
         |e| format!( "Collateral view {}: {}",
@@ -342,9 +382,8 @@ fn rerender_collateral_view (
   }) }
 
 /// Given the saved ViewUri and DefineNodes,
-/// return the URIs of other views whose viewforests
-/// contain any changed PID. Includes search views --
-/// they are just as editable as other kinds.
+/// return the URIs of other views whose viewforests contain any changed PID.
+/// Includes search views -- they are just as editable as other kinds.
 pub(crate) fn find_collateral_view_uris (
   saved_uri    : &ViewUri,
   define_nodes : &[DefineNode],
@@ -353,10 +392,8 @@ pub(crate) fn find_collateral_view_uris (
   let changed_pids : HashSet<ID> =
     define_nodes . iter ()
     . filter_map ( |instr| match instr {
-      DefineNode::Save ( SaveNode (n)) =>
-        Some ( n . pid . clone () ),
-      DefineNode::Delete (dn) =>
-        Some ( dn . id . clone () ) } )
+      DefineNode::Save ( SaveNode (n)) => Some (n . pid . clone ()),
+      DefineNode::Delete (dn) => Some (dn . id . clone ()) } )
     . collect ();
   tracing::debug!(
     "find_collateral_view_uris: {} changed PIDs, {} views in ViewsState",
@@ -438,6 +475,7 @@ pub fn render_initial_view (
     create_partnerFolders_for_fresh_nodes : true,
     diff_tantivy_index : if diff_mode { Some (&runtime . tantivy_index) }
                          else         { None },
+    substitute_existing_content_overrides : false,
     warning_sink : Some (&mut sink), };
   complete_viewforest ( &mut viewforest, &mut context ) ?;
   // De-novo rendering REPAIRS silently: the sink's ColRepairs do not
@@ -453,6 +491,7 @@ pub fn rerender_view (
   context       : &mut RerenderAfterSaveContext<'_>,
   warning_sink  : Option<&mut Vec<CompletionWarning>>, // Some only for the view the user just saved.
   create_partnerFolders : bool, // false post-save (folders round-trip from the buffer); true for the source-switch rerender, where pruning removed them and the new set decides which return.
+  substitute_existing_content_overrides : bool, // true only for the view whose edit created the override.
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
   { tracing::debug!("rerender_view: starting");
@@ -483,6 +522,7 @@ pub fn rerender_view (
       // Post-save: phantom sources resolve via the deleted-id map + disk scan
       // (the de-novo path passes the tantivy index instead).
       diff_tantivy_index : None,
+      substitute_existing_content_overrides,
       warning_sink, };
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "complete_viewforest" ). entered();

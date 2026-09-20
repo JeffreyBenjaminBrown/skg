@@ -585,7 +585,8 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         views_state,
         active_source_set,
         deleted_by_this_save_extra_ids,
-        text_approved_pids ) ?;
+        text_approved_pids,
+        &fork_specs ) ?;
     { // Nonfatal parse warnings (e.g. discarded folder headline text)
       // precede the completion-repair warnings.
       let mut warnings : Vec<String> = parse_warnings;
