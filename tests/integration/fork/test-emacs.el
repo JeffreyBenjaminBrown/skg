@@ -175,7 +175,7 @@
     ;; 6. Fresh graph-derived views verify all three nodes independently:
     ;; F still contains O and now has one incoming subscriber/overrider;
     ;; K subscribes to/overrides F and contains N; N contains O.
-    (skg-request-single-root-content-view-from-id "F" nil t)
+    (skg-request-single-root-content-view-from-id "F")
     (let ((f-buf
            (skg-test-wait-for (lambda () (fork-test--root-buffer "F")) 10)))
       (unless f-buf (test-fail "fresh F view never appeared"))
