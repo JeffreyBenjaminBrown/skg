@@ -14,20 +14,9 @@ Then whenever you want to start a new piece of work from exactly that point, whi
 
 /fork
 /rename whatever-this-task-is
+* ONGOING TODO/one-hop-collateral-neighborhood/
 * next
 ** for video
-*** TODO Collateral buffer updates should use a one-hop neighborhood.
-Collateral buffer updates should use a one-hop neighborhood
-of each collateral (but not the saved) buffer.
-(This problem is already noted in TODO/problems.org, I think --
-definitely somewhere besides TODO.org.)
-The saved buffer data checked should (probably already does)
-include the union of the saved buffer's IDs before and after save.
-The one-hop neighborhood of the collateral buffers
-need, I think, only include what the collateral buffer included
-before the save, because any new nodes that buffer gains
-will have been new nodes saved in the saved buffer,
-and their heralds will be redrawn from scratch.
 *** change how link heralds look
 **** tone down the yellow "a = parent" herald
 same yellow but 1/4 as bright
@@ -59,6 +48,22 @@ Could put a second minibuffer line,
 that reads if anything (key sequence -> command),
 leaving a trail for five seconds or until interrupted.
 ** bugs
+*** TODO bugs in make-link / make-content
+**** TODO bug: making a link into content gives an unavailable view error
+***** what I did
+****** Searched 'sharing'. Visited the top result.
+****** Saw a link to 'understanding & sharing' in its content.
+****** Made that link into content.
+****** Visited the now-orphaned link. Deleted it. Saved.
+****** Got this error.
+  * errors
+  ** Collateral view search:sharing: No such file or directory (os error 2)
+****** But save seemed to work.
+**** TODO BUG :: make-content cleanup -> collateral view not found
+***** the bug
+Change a link relationship into an ordinary content relationship. This orphans the linking node. Visit the linking node. If it is an island (ignoring its out-link), delete it. The save works, but a (warning?) buffer complains that some collateral buffer does not exist.
+***** a test case
+Try it on either child of [[id:31b4c38c-5885-4895-ae33-85cb4fb93b86][immaturity]].
 *** org import of aliases with quotation marks
   * AWS AMI ("Amazon Machine Image")
   **
@@ -80,22 +85,6 @@ think it worked, and lose them.
 *** bug : C-c G on an alias kills the buffer
 intending to replace it, but can't replace it.
 There are likely other viewnode kinds for which this happens.
-*** bugs in make-link / make-content
-**** TODO bug: making a link into content gives an unavailable view error
-***** what I did
-****** Searched 'sharing'. Visited the top result.
-****** Saw a link to 'understanding & sharing' in its content.
-****** Made that link into content.
-****** Visited the now-orphaned link. Deleted it. Saved.
-****** Got this error.
-  * errors
-  ** Collateral view search:sharing: No such file or directory (os error 2)
-****** But save seemed to work.
-**** TODO BUG :: make-content cleanup -> collateral view not found
-***** the bug
-Change a link relationship into an ordinary content relationship. This orphans the linking node. Visit the linking node. If it is an island (ignoring its out-link), delete it. The save works, but a (warning?) buffer complains that some collateral buffer does not exist.
-***** a test case
-Try it on either child of [[id:31b4c38c-5885-4895-ae33-85cb4fb93b86][immaturity]].
 ** behavior changes
 *** text search across containment paths
 *** making a link into content
