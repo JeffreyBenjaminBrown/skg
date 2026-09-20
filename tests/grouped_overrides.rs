@@ -34,11 +34,8 @@ mod inactive_suppression;
 #[path = "overridden_as_such.rs"]
 mod overridden_as_such;
 
-#[path = "override_menu.rs"]
-mod override_menu;
-
-#[path = "override_search_ancestry.rs"]
-mod override_search_ancestry;
+#[path = "overrideward_view_subtree.rs"]
+mod overrideward_view_subtree;
 
 #[path = "override_substitution.rs"]
 mod override_substitution;

@@ -91,7 +91,7 @@ pub fn enriched_search_buffer_for_source_set_for_test (
     tantivy_index,
     config,
     active );
-  render_enriched_search_buffer::insert_override_ancestries_into_search_view (
+  render_enriched_search_buffer::insert_overrideward_view_subtrees (
     &mut viewforest,
     graph,
     search_results,
@@ -353,7 +353,7 @@ fn spawn_enrichment_thread (
       for tree in ancestry_by_id . values () {
         collect_ids_from_ancestry_node ( tree, &mut id_set ); }
       id_set . extend (
-        render_enriched_search_buffer::collect_override_relative_ids (
+        render_enriched_search_buffer::collect_overrideward_view_subtree_ids (
           &runtime . graph, &ids_clone, &active_clone ) );
       id_set . into_iter () . collect () };
     let graphnodestats : AllGraphNodeStats =

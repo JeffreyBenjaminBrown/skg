@@ -296,12 +296,6 @@ function M.goto_id_near_point ()
   end
 end
 
----Compatibility alias for goto_id_near_point. Ordinary visits now
----always open the requested node itself.
-function M.goto_bypass_override ()
-  M.goto_id_near_point()
-end
-
 ---Open a content view for ID, prompting when not given.
 ---@param id string|nil
 function M.goto_by_id (id)

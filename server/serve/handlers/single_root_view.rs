@@ -1,7 +1,6 @@
 use crate::types::env::SkgEnv;
 use crate::serve::ViewsState;
 use crate::to_org::render::content_view::multi_root_view_via_runtime;
-use crate::to_org::render::override_menu::override_menu_view_with_runtime;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
@@ -10,10 +9,8 @@ use crate::serve::handlers::text_release::{
   decide as decide_text_release};
 use crate::serve::util::{
   view_uri_from_request,
-  value_from_request_sexp,
   send_response_with_length_prefix,
   format_buffer_response_sexp,
-  format_override_menu_response_sexp,
   tag_sexp_response,
   tag_text_response};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
@@ -91,100 +88,12 @@ pub fn handle_single_root_view_request (
             & tag_sexp_response (
               TcpToClient::ContentView, &switch_sexp ));
           return; }
-      let show_override_menu : bool =
-        // Ordinary visits open the requested root raw.  The legacy
-        // override-choice tree is available only when explicitly
-        // requested; "bypass" remains accepted for old clients and
-        // means the same thing as omitting this field. Recursive
-        // content beneath the raw root still follows substitution.
-        match value_from_request_sexp ("override-choice", request) {
-          Err (_)  => false,
-          Ok (v) => match v . as_str () {
-            "menu"   => true,
-            "bypass" => false,
-            other => {
-              let response_sexp : String =
-                format_buffer_response_sexp (
-                  &String::new (),
-                  &vec! [format! (
-                    "Unknown override-choice value: {} (expected \"menu\" or \"bypass\")",
-                    other )],
-                  &[] );
-              send_response_with_length_prefix (
-                stream,
-                & tag_sexp_response (
-                  TcpToClient::ContentView, &response_sexp ));
-              return; }}};
-      let pid : ID = // the menu is per resolved node, extra-IDs included
-        runtime . graph . pid_of (&node_id)
-        . unwrap_or_else ( || node_id . clone () );
-      let menu_uri : ViewUri =
-        ViewUri::OverrideMenu ( pid . 0 . clone () );
-      if show_override_menu
-        && views_state . open_views . views
-        . contains_key (&menu_uri)
-        { // One menu per node: a second request switches to it.
-          let switch_sexp : String =
-            Sexp::List ( vec! [
-              Sexp::List ( vec! [
-                Sexp::Atom ( Atom::S (
-                  "switch-to-view" . to_string () )),
-                Sexp::Atom ( Atom::S (
-                  menu_uri . repr_in_client () )) ] ) ] )
-            . to_string ();
-          send_response_with_length_prefix (
-            stream,
-            & tag_sexp_response (
-              TcpToClient::ContentView, &switch_sexp ));
-          return; }
       let approved_overPrivateText_pids =
         approved_pids_from_request (request);
       let response : String =
       { let _span : tracing::span::EnteredSpan =
           tracing::info_span!( "single_root_view" ). entered();
         block_on ( async {
-            // The override-choice buffer is opt-in. Ordinary visits
-            // proceed directly to the raw single-root render below.
-            match if ! show_override_menu { Ok (None) }
-                  else { override_menu_view_with_runtime (
-                           env, &runtime, &pid,
-                           Some (active_source_set) ) }
-            { Ok ( Some ((menu_content, menu_pids, menu_forest)) ) => {
-                let release = decide_text_release (
-                  "override-menu",
-                  active_source_set,
-                  &menu_pids,
-                  &runtime . graph,
-                  &approved_overPrivateText_pids );
-                if matches! (
-                  release, TextReleaseDecision::Challenge { .. } ) {
-                  return challenge_response (&release) . unwrap (); }
-                views_state . open_views . register_view (
-                  &runtime . graph,
-                  menu_uri . clone (),
-                  menu_forest,
-                  &menu_pids );
-                let mut warnings : Vec<String> = Vec::new ();
-                if let TextReleaseDecision::AllowWithWarning {
-                  warning,
-                } = release {
-                  warnings . push (warning); }
-                return tag_sexp_response (
-                  TcpToClient::ContentView,
-                  & format_override_menu_response_sexp (
-                    &menu_content,
-                    &menu_uri,
-                    "The requested node is overridden. Choose a destination.",
-                    &warnings ) ); },
-              Ok (None) => {}, // not overridden (visibly): render normally
-              Err (e) => {
-                return tag_sexp_response (
-                  TcpToClient::ContentView,
-                  & format_buffer_response_sexp (
-                    &String::new (),
-                    &[ format! (
-                        "Error generating override menu: {}", e ) ],
-                    &[] ) ); }}
             let mut render_warnings : Vec<String> = Vec::new ();
             match multi_root_view_via_runtime (
               &runtime,

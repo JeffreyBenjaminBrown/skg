@@ -695,7 +695,7 @@
   section (semantic wire + rule-table retirement), so fixing it now and
   again in phase 2 is wasted. Fold the api-and-formats.md herald rewrite
   into phase 2. The merge's one CODE/TEST semantic conflict --
-  override_search_ancestry.rs asserting =(birthHerald)= / "aO" -- WAS
+  overrideward_view_subtree.rs asserting =(birthHerald)= / "aO" -- WAS
   reconciled to the semantic form as part of the merge.
 * Problems confirmed while planning TypeDB removal (2026-09-12)
 ** Hidden edges participate in path and ancestry topology

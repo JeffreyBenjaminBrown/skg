@@ -1,9 +1,9 @@
-// cargo nextest run --test grouped_overrides -E 'test(override_search_ancestry::)'
+// cargo nextest run --test grouped_overrides -E 'test(overrideward_view_subtree::)'
 //
-// Override ancestry + suppression in search results
+// Overrideward view-subtrees + suppression in search results
 // (TODO/override-ancestry-in-search-results.org).
 //
-// Fixture (tests/override_search_ancestry/fixtures): owned source
+// Fixture (tests/overrideward_view_subtree/fixtures): owned source
 // "main" holds U, which overrides foreign F, which overrides foreign
 // G; foreign M1 and M2 mutually override; foreign B overrides foreign
 // E. Ownership is by location -- "main" lives under owned/, so it is
@@ -21,8 +21,8 @@ use skg::org_to_text::viewforest_to_string;
 use skg::serve::handlers::text_search::{
   MatchGroups, build_search_viewforest, suppressed_result_ids};
 use skg::serve::handlers::text_search::render_enriched_search_buffer::{
-  collect_override_relative_ids,
-  insert_override_ancestries_into_search_view};
+  collect_overrideward_view_subtree_ids,
+  insert_overrideward_view_subtrees};
 use skg::source_sets::{
   ActiveSourceSet, SourceSetName, apply_source_set_to_viewforest};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
@@ -44,11 +44,11 @@ fn hit (
 #[test]
 fn all_tests () -> Result<(), Box<dyn Error>> {
   run_with_shared_test_stores (
-    "skg-test-override-search-ancestry",
+    "skg-test-overrideward-view-subtree",
     |s| Box::pin ( async move {
       s . reset_from_config (
-        "override_search_ancestry",
-        "tests/override_search_ancestry/fixtures/skgconfig.toml"
+        "overrideward_view_subtree",
+        "tests/overrideward_view_subtree/fixtures/skgconfig.toml"
         ) ?;
       let active : ActiveSourceSet =
         ActiveSourceSet::named (
@@ -69,7 +69,7 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
 /// override birth herald -- overrides inbound from the gen-1 ancestor
 /// (the parent overrides it), birth = overrides -- which only renders
 /// because the pre-fetch now includes the override-relative ids
-/// ('collect_override_relative_ids').
+/// ('collect_overrideward_view_subtree_ids').
 async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
   graph  : &InRustGraph,
   config : &SkgConfig,
@@ -95,14 +95,15 @@ async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
     let mut ids : HashSet<ID> =
       search_results . iter () . cloned () . collect ();
     ids . extend (
-      collect_override_relative_ids ( &graph, &search_results, active ) );
+      collect_overrideward_view_subtree_ids (
+        &graph, &search_results, active ) );
     ids . into_iter () . collect () };
   let stats : AllGraphNodeStats =
     fetch_all_graphnodestats_with_source_set (
       &graph, &all_ids, Some (active) ) ?;
   // Phase 2: graft, then the same stats/herald/render passes as
   // handle_snapshot_response.
-  insert_override_ancestries_into_search_view (
+  insert_overrideward_view_subtrees (
     &mut viewforest, &graph, &search_results, active );
   let root_id : NodeId = viewforest . root () . id ();
   set_metadata_relationships_in_node_recursive (
@@ -181,7 +182,7 @@ fn override_relatives_graft_as_descendants (
     . into_iter () . collect ();
   let (mut viewforest, results) =
     build_search_viewforest ( "cooking", &matches, &HashSet::new () );
-  insert_override_ancestries_into_search_view (
+  insert_overrideward_view_subtrees (
     &mut viewforest, graph, &results, active );
   let tree : Tree<ViewNode> = viewforest . into_internal_tree ();
   let u : NodeRef<ViewNode> =

@@ -16,7 +16,6 @@ use std::collections::{HashMap, HashSet};
 pub enum ViewUri {
   ContentView  (String), // UUID
   SearchView   (String), // query
-  OverrideMenu (String), // the requested (overridden) node's PID. One menu per node: requesting it again switches to the open menu. Deliberately not a ContentView, so an open menu never hijacks 'content_view_uri_for_root_id' -- a raw view of the node and its menu can coexist.
 }
 
 /// Per-connection view bookkeeping. Each entry in 'views' is a
@@ -51,14 +50,11 @@ impl ViewUri {
   pub fn repr_in_client ( &self ) -> String {
     match self {
       ViewUri::ContentView  (s) => s . clone (),
-      ViewUri::SearchView   (q) => format! ("search:{}", q),
-      ViewUri::OverrideMenu (p) => format! ("override-menu:{}", p) } }
+      ViewUri::SearchView   (q) => format! ("search:{}", q) } }
   /// Parse a client string to a ViewUri.
   pub fn from_client_string ( s : String ) -> ViewUri {
     if let Some (query) = s . strip_prefix ("search:") {
       ViewUri::SearchView ( query . to_string () )
-    } else if let Some (pid) = s . strip_prefix ("override-menu:") {
-      ViewUri::OverrideMenu ( pid . to_string () )
     } else {
       ViewUri::ContentView (s) } }
 }
@@ -89,7 +85,7 @@ impl OpenViews {
       . map ( |vs| &vs . viewforest ) }
 
   /// Returns the first (if any exists) CONTENT buffer (not a search
-  /// view, not an override menu) for which the ID is a root
+  /// view) for which the ID is a root
   /// (level-1 headline).
   pub fn content_view_uri_for_root_id (
     &self,

@@ -59,59 +59,43 @@ So far there are these endpoints:
   - Phase 2, enrichment: A three-message sequence:
     1. Rust sends LP response-type "request-snapshot" with `(("content" "TERMS"))` — asking Emacs for a snapshot of the search buffer matching those terms.
     2. Emacs replies with `((request . "snapshot response") (terms . "TERMS"))\n` followed by `Content-Length: N\r\n\r\n<buffer text>` — the current buffer contents, including any unsaved user edits. Emacs sets the buffer to readonly before sending.
-    3. Rust parses the snapshot, inserts containerward ancestry and graphnodestats, and sends LP response-type "search-enrichment" with `(("terms" "TERMS") ("content" "ORG") ("warnings" (...)))`. Emacs replaces the buffer and exits readonly.
+    3. Rust parses the snapshot, inserts containerward ancestry,
+       overrideward view-subtrees, and graphnodestats, and sends LP
+       response-type "search-enrichment" with `(("terms" "TERMS")
+       ("content" "ORG") ("warnings" (...)))`. Emacs replaces the
+       buffer and exits readonly.
     - Enrichment uses the same active source-set as the original
       search. Containerward ancestry truncates before inactive
       containers.
+    - Each result's overrideward view-subtree contains its visible
+      override relatives in both directions: what it overrides and what
+      overrides it. Each direction is recursive and cycle-guarded. These
+      nodes are write-protected non-content descendants. A matching node
+      recursively overridden by a user-owned result is suppressed at the
+      top level because it reappears in that result's subtree.
 
 ## Single root content tree view from ID
   - Request: `((request . "single root content view")
     (id . "NODE_ID") (view-uri . "URI")
-    (override-choice . "CHOICE")
     (allow-overPrivateText-telescopes "PID" ...))`
-    - `override-choice` is optional. An absent field opens the requested
-      node raw. `"menu"` explicitly requests the legacy override-choice
-      tree; `"bypass"` is a compatibility synonym for the default raw view.
   - Response: LP `((response-type content-view) (content "...")
     (errors ("..." ...)) (warnings ("..." ...)))`. The document
     structure is detailed below, under `Single root content tree view`.
     Under a restricted source-set, a response involving an overPrivateText
     telescope instead returns LP `overPrivateText-telescope-confirmation` with
-    `(operation single-root-view)` or `(operation override-menu)`, the
-    exact PIDs, and a text-free prompt. An approved retry carries those
+    `(operation single-root-view)`, the exact PIDs, and a text-free
+    prompt. An approved retry carries those
     exact PIDs in `allow-overPrivateText-telescopes`; approval is not cached.
     Source-set `all` returns the ordinary response with a warning.
   - If `NODE_ID` resolves to an inactive source, the server refuses the
     request with a human-readable message and does not open a buffer.
     Following a link to an inactive-source node behaves the same way.
-  - The explicit override-choice menu: when `override-choice` is `"menu"`
-    and the requested node is overridden
-    (an `overrides_view_of` edge points at it, user-owned or
-    foreign) and at least one overrider's source is active, the
-    server returns, instead of a content view, an ordinary buffer
-    of write-protected nodes: the requested node as root, each visible
-    overrider an Independent child of what it overrides, following
-    the relation recursively (all edges), each branch stopping with
-    the `cycle` viewstat at the first repeated ID. The response
-    then carries two extra fields:
-    `((content "...") (view-uri "override-menu:PID")
-      (to-minibuffer "The requested node is overridden. Choose a destination.")
-      (errors ()) (warnings (...)))`.
-    The client must adopt the supplied `view-uri` (the server
-    registers the menu under it; one menu per node, deduped) and
-    show `to-minibuffer` via the echo area only -- never buffer
-    text, never a popped window.
-    Ordinary visits never select this path. Precedence for an explicit
-    menu request: an open content view rooted at the node wins (the
-    usual `(switch-to-view ...)` reply); a second menu request
-    switches to the open menu; the menu appears in diff mode too.
-  - An absent `override-choice` (or the legacy `"bypass"` value) opens the
-    requested node itself, drawn raw. Because the raw root
+  - The requested node opens as itself, drawn raw. Because the raw root
     is an overridden node drawn raw, its immediate children also draw
     raw (one level); substitution resumes at the grandchildren. See
-    "Override substitution" below. Search-result enrichment, requested
-    override folders, and override paths remain the ordinary surfaces for
-    inspecting override facts.
+    "Override substitution" below. Override facts can be inspected in
+    search results' overrideward view-subtrees and in explicitly requested
+    override folders and paths.
 
 ## Save buffer
   - Request: First `((request . "save buffer") (view-uri . "URI") (point-lines-below-focused-headline . "N") (point-column . "C") (point-screen-lines-below-window-start . "M"))\n`, then `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` is the buffer content (`LENGTH` bytes).

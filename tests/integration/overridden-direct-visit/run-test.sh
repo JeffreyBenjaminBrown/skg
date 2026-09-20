@@ -4,7 +4,7 @@
 # This script:
 # - Starts an independent skg server with test config
 # - Uses Emacs and nvim to visit an overridden node and require the raw root
-#   without an independent override-menu sibling
+#   without an independent overrider sibling
 # - Exercises same-title nodes from different sources; the Emacs client also
 #   revisits the raw view through switch-to-view and checks close/reopen lifecycle
 

@@ -151,12 +151,6 @@ sides of point are ambiguous: it says so and visits nothing."
         (skg-request-single-root-content-view-from-id id)))
      (t (message "No ID found on this line")) )))
 
-(defun skg-goto-bypassOverride ()
-  "Compatibility alias for `skg-goto'.
-Ordinary visits now always open the requested node itself."
-  (interactive)
-  (skg-goto))
-
 (defun skg-goto-by-id (id)
   "Open a content view for ID, prompting when called interactively. (skg-goto is usually more convenient.)"
   (interactive "sNode ID: ")

@@ -14,8 +14,7 @@ local function raw_view_buffer_showing (id)
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) then
       local uri = vim.b[buf].skg_view_uri
-      if uri and not uri:match('^override%-menu:')
-         and T.buffer_text(buf):find(needle, 1, true) then
+      if uri and T.buffer_text(buf):find(needle, 1, true) then
         return buf
       end
     end
@@ -36,6 +35,6 @@ T.check(raw_content:find('cooking', 1, true),
         "raw view lacks Z's title")
 T.check(not raw_content:match('\n%*%* %(skg %(node %(id R%).-affectsParent false'),
         'ordinary visit injected overrider R as an independent sibling')
-print('ordinary visit opened raw Z without an override-menu sibling')
+print('ordinary visit opened raw Z without an overrider sibling')
 
 T.pass('PASS: Integration test successful!')

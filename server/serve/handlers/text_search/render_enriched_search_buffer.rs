@@ -104,7 +104,7 @@ enum OverrideDir {
 /// and cycle-guarded. Reads the in-Rust graph (override edges are
 /// direct index lookups); a relative whose override EDGE is
 /// relSource-hidden, or whose own source is inactive, is skipped.
-pub fn insert_override_ancestries_into_search_view (
+pub fn insert_overrideward_view_subtrees (
   viewforest     : &mut Tree<ViewNode>,
   graph          : &InRustGraph,
   search_results : &[ID],
@@ -128,7 +128,7 @@ pub fn insert_override_ancestries_into_search_view (
         node_id, *node_nid, dir, graph,
         viewforest, active, &mut path ); }} }
 
-/// Every id that 'insert_override_ancestries_into_search_view' would
+/// Every id that 'insert_overrideward_view_subtrees' would
 /// graft under the given results -- the override-relative closure in
 /// both directions, gated identically to the graft. The enrichment
 /// thread unions these into the graphStats pre-fetch so the grafted
@@ -137,7 +137,7 @@ pub fn insert_override_ancestries_into_search_view (
 /// grafts do not exist yet when the pre-fetch runs). MUST stay in sync
 /// with 'graft_override_chain' (same directions, same gated accessors,
 /// same node-source gate). Returns empty without a graph handle.
-pub fn collect_override_relative_ids (
+pub fn collect_overrideward_view_subtree_ids (
   graph          : &InRustGraph,
   search_results : &[ID],
   active         : &ActiveSourceSet,

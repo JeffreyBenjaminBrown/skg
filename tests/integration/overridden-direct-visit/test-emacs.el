@@ -45,11 +45,6 @@
           (test-fail
            "ordinary visit injected overrider R as an independent sibling:\n%s"
            content))))
-    (when (string-prefix-p
-           "override-menu:"
-           (buffer-local-value 'skg-view-uri public-buf))
-      (test-fail "ordinary visit was registered as an override menu"))
-
     ;; Opening same-titled R must not overwrite Z's raw view.
     (skg-request-single-root-content-view-from-id "R")
     (setq cheese-buf
@@ -69,11 +64,6 @@
       (test-fail "unexpected public buffer name: %s" (buffer-name public-buf)))
     (unless (equal (buffer-name cheese-buf) "*cooking* <Cheese>")
       (test-fail "unexpected Cheese buffer name: %s" (buffer-name cheese-buf)))
-    (when (string-prefix-p
-           "override-menu:"
-           (buffer-local-value 'skg-view-uri public-buf))
-      (test-fail "opening R changed Z's raw-view URI"))
-
     ;; A repeat visit receives switch-to-view and displays the old raw view.
     (skg-request-single-root-content-view-from-id "Z")
     (unless (skg-test-wait-for

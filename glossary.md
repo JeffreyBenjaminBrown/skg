@@ -327,10 +327,10 @@ expansion applies neither the owner's hides nor substitution to
 its immediate children.
 
 An ordinary single-root visit always opens the requested node itself,
-drawn raw. Override facts appear in enriched search results and in
-explicitly requested override folders and paths. The protocol retains
-an opt-in OVERRIDE-CHOICE BUFFER (`(override-choice . "menu")`) for
-compatibility, but ordinary clients do not request it.
+drawn raw. In enriched search results, each result has an OVERRIDEWARD
+VIEW-SUBTREE containing its visible override relatives in both
+directions. Override facts also appear in explicitly requested override
+folders and paths.
 
 ## "subscribee as such"
 

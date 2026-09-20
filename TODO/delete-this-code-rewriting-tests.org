@@ -146,7 +146,6 @@
    run them via M-x, so they aren't obviously dead. Confirm before any go.
    - skg-active-source-set     [skg-request-source-sets.el]
    - skg-connection-end        [skg-client.el]
-   - skg-goto-bypassOverride   [skg-id-search.el]
    - skg-list-source-sets      [skg-request-source-sets.el]
    - skg-rebuild-dbs           [skg-request-rebuild-dbs.el]
 
