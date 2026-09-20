@@ -1,0 +1,12 @@
+* TODO vision : Updates should apply to a collateral buffer's one-hop neighborhood.
+Collateral buffer updates should use a one-hop neighborhood
+of each collateral (but not the saved) buffer.
+(This problem is already noted in TODO/problems.org, I think --
+definitely somewhere besides TODO.org.)
+The saved buffer data checked should (probably already does)
+include the union of the saved buffer's IDs before and after save.
+The one-hop neighborhood of the collateral buffers
+need, I think, only include what the collateral buffer included
+before the save, because any new nodes that buffer gains
+will have been new nodes saved in the saved buffer,
+and their heralds will be redrawn from scratch.
