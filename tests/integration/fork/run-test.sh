@@ -2,11 +2,11 @@
 
 # Integration test for the fork gesture and its confirmation stage.
 # - Starts an independent skg server with an OWNED + a FOREIGN source.
-# - Emacs opens the owned container P (whose content is the foreign N),
-#   makes N definitive, edits its title, and saves.
+# - Emacs opens foreign F as a root and structurally edits its content;
+#   Neovim exercises the simpler foreign-child-under-owned-P gesture.
 # - The save returns a fork-confirmation buffer (nothing committed).
-# - Emacs approves; the clone is created (overrides N) and drawn in N's
-#   place in the re-rendered P.
+# - Approval creates the clone and immediately substitutes it into the
+#   buffer where the gesture occurred, including when the origin is a root.
 
 set -e
 

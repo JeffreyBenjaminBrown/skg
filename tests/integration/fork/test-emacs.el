@@ -1,8 +1,8 @@
-;;; Integration test for the fork gesture and its confirmation stage.
-;;; Open owned P (whose content is foreign N); make N definitive and
-;;; edit its title; save -> a fork-confirmation buffer appears and
-;;; nothing commits; approve -> the clone is created (overriding N) and
-;;; drawn in N's place when P re-renders.
+;;; Integration test for a structural fork gesture in Emacs.
+;;; Open foreign F as the view root; insert a new content node N and
+;;; move F's existing content O beneath N.  Approve the fork and verify
+;;; the resulting F/K/N/O graph, that the same buffer immediately has K
+;;; as its root, and the absence of an Emacs-visible save failure.
 
 (load-file "../../../elisp/skg-init.el")
 (load-file "../test-wait.el")
@@ -24,104 +24,199 @@
                                   (point-min) (point-max)))))))
    (buffer-list)))
 
+(defun fork-test--root-buffer (id)
+  "Return a live skg view buffer whose first headline is ID."
+  (seq-find
+   (lambda (b)
+     (and (buffer-live-p b)
+          (with-current-buffer b
+            (and (boundp 'skg-view-uri) skg-view-uri
+                 (save-excursion
+                   (goto-char (point-min))
+                   (let ((line (buffer-substring-no-properties
+                                (line-beginning-position)
+                                (line-end-position))))
+                     (string-match-p
+                      (regexp-quote (format "(id %s)" id)) line)))))))
+   (buffer-list)))
+
+(defun fork-test--line-containing (needle)
+  "Return the current buffer's whole line containing NEEDLE, or nil."
+  (save-excursion
+    (goto-char (point-min))
+    (when (search-forward needle nil t)
+      (buffer-substring-no-properties
+       (line-beginning-position) (line-end-position)))))
+
 (defun integration-test-fork ()
-  "Drive the edit -> confirm -> approve -> fork flow end to end."
-  (message "Starting fork integration test...")
-  (let ((test-port (getenv "SKG_TEST_PORT")))
-    (when test-port (setq skg-port (string-to-number test-port))))
+  "Drive the structural edit -> confirm -> approve -> fork flow."
+  (message "Starting structural fork integration test...")
+  (let ((test-port (getenv "SKG_TEST_PORT"))
+        (k-id nil)
+        (n-id nil)
+        (fork-buffer nil))
+    (when test-port (setq skg-port (string-to-number test-port)))
 
-  ;; 1. Open the owned container P; its content is the foreign node N.
-  (skg-request-single-root-content-view-from-id "P")
-  (let ((p-buf (skg-test-wait-for (lambda () (fork-test--buffer-showing "P")) 10)))
-    (unless p-buf (test-fail "P's view never appeared"))
-    (with-current-buffer p-buf
-      (unless (string-match-p "(id N)" (buffer-string))
-        (test-fail "P's view does not show its foreign content N:\n%s"
+    ;; 1. Open foreign F itself, with its existing child O visible.
+    (skg-request-single-root-content-view-from-id "F")
+    (setq fork-buffer
+           (skg-test-wait-for
+            (lambda () (fork-test--root-buffer "F")) 10))
+    (unless fork-buffer (test-fail "F's root view never appeared"))
+    (with-current-buffer fork-buffer
+      (unless (string-match-p "(id O)" (buffer-string))
+        (test-fail "F's view does not expose its existing child O:\n%s"
+                   (buffer-string))))
+
+    ;; 2. Insert bare N under F, and move the existing O headline from
+    ;; F to N.  The bare node must inherit the eventual clone source.
+    (with-current-buffer fork-buffer
+      (goto-char (point-min))
+      (unless (re-search-forward "^\\*\\* .*?(id O).*$" nil t)
+        (test-fail "could not find O directly under F:\n%s"
                    (buffer-string)))
-
-      ;; 2. Make N definitive (drop its 'writeProtected' marker) and edit its
-      ;;    title -- the fork gesture.
+      (let ((o-line (buffer-substring-no-properties
+                     (line-beginning-position) (line-end-position))))
+        (delete-region (line-beginning-position)
+                       (min (point-max) (1+ (line-end-position))))
+        (goto-char (point-min))
+        (forward-line 1)
+        (insert "** N-new\n"
+                "*** "
+                (replace-regexp-in-string "^\\*+ " "" o-line)
+                "\n"))
       (goto-char (point-min))
-      (unless (re-search-forward "^.*(id N) (source foreign).*$" nil t)
-        (test-fail "could not find N's headline:\n%s" (buffer-string)))
-      (let* ((line (match-string 0))
-             (edited (replace-regexp-in-string
-                      " writeProtected" ""
-                      (replace-regexp-in-string
-                       "N-original" "N-edited" line))))
-        (replace-match edited t t))
+      (skg-request-save-buffer))
 
-      ;; 3. Save -> fork-confirmation (nothing committed).
-      (skg-request-save-buffer)))
+    ;; 3. The confirmation names F; choose the owned source and approve.
+    (let ((confirm-buf
+           (skg-test-wait-for
+            (lambda () (get-buffer "*SKG Fork Confirmation*")) 10)))
+      (unless confirm-buf (test-fail "no fork-confirmation buffer appeared"))
+      (with-current-buffer confirm-buf
+        (unless (string-match-p "(id F)" (buffer-string))
+          (test-fail "confirmation buffer does not list F:\n%s"
+                     (buffer-string)))
+        (goto-char (point-min))
+        (unless (re-search-forward "^\\* (skg (node (source " nil t)
+          (test-fail "could not find clone-to-be source headline:\n%s"
+                     (buffer-string)))
+        (beginning-of-line)
+        (skg--change-source-at-point "owned")
+        (skg-approve-fork)))
 
-  ;; 4. The confirmation buffer appears and lists N.
-  (let ((confirm-buf (skg-test-wait-for
-                      (lambda () (get-buffer "*SKG Fork Confirmation*")) 10)))
-    (unless confirm-buf (test-fail "no fork-confirmation buffer appeared"))
-    (with-current-buffer confirm-buf
-      (unless (string-match-p "(id N)" (buffer-string))
-        (test-fail "confirmation buffer does not list N:\n%s" (buffer-string)))
-      (unless (string-match-p "Fork confirmation" (buffer-string))
-        (test-fail "confirmation buffer lacks its header:\n%s" (buffer-string)))
-      (message "✓ fork-confirmation buffer lists N")
+    ;; 4. Approval must finish cleanly.  In particular, the checked
+    ;; telescope writer must not reject N with a home/first-section mismatch.
+    (let ((result-buf
+           (skg-test-wait-for
+            (lambda ()
+              (let ((buf (get-buffer "*SKG Fork Result*")))
+                (and buf
+                     (with-current-buffer buf
+                       (and (string-match-p "save \\(successful\\|failed\\)"
+                                            (buffer-string))
+                            buf)))))
+            10)))
+      (unless result-buf
+        (test-fail "fork approval produced no terminal result"))
+      (with-current-buffer result-buf
+        (unless (string-match-p "Fork confirmed; save successful\\."
+                                (buffer-string))
+          (test-fail "Emacs received a failed structural-fork save:\n%s"
+                     (buffer-string))))
+      (let ((error-buf
+             (get-buffer "*SKG Save Errors - Inconsistencies Found*")))
+        (when error-buf
+          (test-fail "Emacs displayed a save-error buffer:\n%s"
+                     (with-current-buffer error-buf (buffer-string))))))
 
-      ;; 5. Pick the clone's source (required), then approve.
+    ;; 5. The exact buffer used for the gesture immediately replaces root F
+    ;; with K.  K contains N, and N contains O.
+    (unless
+        (skg-test-wait-for
+         (lambda ()
+           (and (buffer-live-p fork-buffer)
+                (with-current-buffer fork-buffer
+                  (save-excursion
+                    (goto-char (point-min))
+                    (and (string-match-p "(overridesHere F)"
+                                         (buffer-substring-no-properties
+                                          (line-beginning-position)
+                                          (line-end-position)))
+                         (string-match-p "N-new" (buffer-string)))))))
+         10)
+      (test-fail "F's original buffer did not replace root F with K:\n%s"
+                 (if (buffer-live-p fork-buffer)
+                     (with-current-buffer fork-buffer (buffer-string))
+                   "<buffer was killed>")))
+    (with-current-buffer fork-buffer
       (goto-char (point-min))
-      (re-search-forward "^\\* (skg (node (source ")
-      (beginning-of-line)
-      (skg--change-source-at-point "owned")
-      (skg-approve-fork)))
+      (let ((k-line (buffer-substring-no-properties
+                     (line-beginning-position) (line-end-position))))
+          (unless (and k-line
+                       (string-match "(id \\([^ )]+\\))" k-line)
+                       (string-match-p "(overridesHere F)" k-line)
+                       (string-match-p "(subscribes (out 1))" k-line)
+                       (string-match-p "(overrides (out 1))" k-line))
+            (test-fail "K lacks its expected F relationships:\n%s"
+                       (buffer-string)))
+        (setq k-id (match-string 1 k-line)))
+      (unless (re-search-forward
+               "^\\*\\* .*?(id \\([^ )]+\\)).* N-new$" nil t)
+        (test-fail "K does not contain the new N:\n%s" (buffer-string)))
+      (setq n-id (match-string 1))
+      (unless (re-search-forward "^\\*\\*\\* .*?(id O).* O-original$"
+                                 nil t)
+        (test-fail "N does not contain O:\n%s" (buffer-string)))
+      (goto-char (point-min))
+      (when (re-search-forward "^\\*\\* .*?(id O).* O-original$" nil t)
+        (test-fail "K still contains O directly:\n%s" (buffer-string))))
 
-  ;; 6. The fork commits: when P's saved view re-renders, N is now
-  ;;    overridden and subscribed (its graphStats say so). (The saved
-  ;;    view still draws N raw -- existing viewnodes are not rewritten;
-  ;;    substitution shows on a fresh open, below.)
-  (let ((committed (skg-test-wait-for
-                    (lambda ()
-                      (let ((p-buf (fork-test--buffer-showing "P")))
-                        (and p-buf
-                             (with-current-buffer p-buf
-                               ;; The clone committed: N now has one
-                               ;; subscriber and one overrider. N also
-                               ;; contains N1,N2 and is contained by P,
-                               ;; so its rels carry (contains ...) and
-                               ;; (birth contains) too -- match the two
-                               ;; commit-signal facts as substrings, not
-                               ;; the whole rels form.
-                               (let ((s (buffer-string)))
-                                 (and (string-match-p "(subscribes (in 1))" s)
-                                      (string-match-p "(overrides (in 1))" s)))))))
-                    10)))
-    (unless committed
-      (let ((p-buf (fork-test--buffer-showing "P")))
-        (test-fail "the fork did not commit after approval:\n%s"
-                   (if p-buf (with-current-buffer p-buf (buffer-string)) "<no P buffer>"))))
-    (message "✓ fork committed (N is now overridden and subscribed)"))
+    ;; 6. Fresh graph-derived views verify all three nodes independently:
+    ;; F still contains O and now has one incoming subscriber/overrider;
+    ;; K subscribes to/overrides F and contains N; N contains O.
+    (skg-request-single-root-content-view-from-id "F" nil t)
+    (let ((f-buf
+           (skg-test-wait-for (lambda () (fork-test--root-buffer "F")) 10)))
+      (unless f-buf (test-fail "fresh F view never appeared"))
+      (with-current-buffer f-buf
+        (let ((f-line (buffer-substring-no-properties
+                       (line-beginning-position) (line-end-position))))
+          (unless (and (string-match-p "(subscribes (in 1))" f-line)
+                       (string-match-p "(overrides (in 1))" f-line)
+                       (string-match-p "(contains (out 1))" f-line))
+            (test-fail "F's post-fork graph relationships are wrong:\n%s"
+                       (buffer-string))))))
 
-  ;; 7. Reopen P fresh: override substitution now draws the clone in N's
-  ;;    place, carrying (overridesHere N).
-  (let ((p-buf (fork-test--buffer-showing "P")))
-    (when (buffer-live-p p-buf) (kill-buffer p-buf)))
-  (skg-request-single-root-content-view-from-id "P")
-  (let ((substituted (skg-test-wait-for
-                      (lambda ()
-                        (let ((p-buf (fork-test--buffer-showing "P")))
-                          (and p-buf
-                               (with-current-buffer p-buf
-                                 (string-match-p "(overridesHere N)"
-                                                 (buffer-string))))))
-                      10)))
-    (unless substituted
-      (let ((p-buf (fork-test--buffer-showing "P")))
-        (test-fail "the clone was not drawn in N's place on reopen:\n%s"
-                   (if p-buf (with-current-buffer p-buf (buffer-string)) "<no P buffer>"))))
-    (message "✓ on reopen, the clone is drawn in N's place with (overridesHere N)"))
+    ;; The original buffer is now K's registered root view; reuse it rather
+    ;; than issuing a request which would merely switch back to the same view.
+    (let ((k-buf fork-buffer))
+      (unless (and (buffer-live-p k-buf)
+                   (eq k-buf (fork-test--root-buffer k-id)))
+        (test-fail "the fork buffer is not registered as K's root view"))
+      (with-current-buffer k-buf
+        (unless (and (string-match-p "F-original" (buffer-string))
+                     (string-match-p "^\\*\\* .* N-new$" (buffer-string))
+                     (not (string-match-p "^\\*\\* .*?(id O).* O-original$"
+                                          (buffer-string))))
+          (test-fail "K is not F-with-N-in-place-of-O:\n%s"
+                     (buffer-string)))))
 
-  (message "PASS: Fork integration test successful!")
-  (kill-emacs 0))
+    (skg-request-single-root-content-view-from-id n-id)
+    (let ((n-buf
+           (skg-test-wait-for (lambda () (fork-test--root-buffer n-id)) 10)))
+      (unless n-buf (test-fail "fresh N view never appeared"))
+      (with-current-buffer n-buf
+        (unless (string-match-p "^\\*\\* .*?(id O).* O-original$"
+                                (buffer-string))
+          (test-fail "N's graph view does not contain O:\n%s"
+                     (buffer-string)))))
 
-(run-at-time 40 nil (lambda ()
-                      (message "TIMEOUT: fork integration test timed out!")
+    (message "PASS: Structural fork integration test successful!")
+    (kill-emacs 0)))
+
+(run-at-time 60 nil (lambda ()
+                      (message "TIMEOUT: structural fork integration test timed out!")
                       (kill-emacs 1)))
 
 (integration-test-fork)
