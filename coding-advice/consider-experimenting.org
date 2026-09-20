@@ -1,0 +1,11 @@
+* Run experiments if appropriate
+
+Your coding need not be limited to production and tests.
+When you're using a new language feature,
+or implementing a tricky algorithm,
+or otherwise treading unfamiliar waters,
+sometimes writing a throwaway experiment can answer a question
+much quicker than reasoning about the code.
+
+Maybe the experiment will deserve to be promoted to test status,
+but even if that's not true, it can still be valuable.

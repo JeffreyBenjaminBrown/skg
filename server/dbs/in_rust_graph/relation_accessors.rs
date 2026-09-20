@@ -248,6 +248,22 @@ impl InRustGraph {
           || set . contains_source (&member . relSource), } )
       . collect () }
 
+  /// Raw outbound member IDs whose relSource is in the active set. Unlike the
+  /// PID-oriented accessor, this retains unresolved stored IDs so rendering
+  /// can preserve them as Unknown placeholders.
+  pub fn outbound_ids_for_relation_gated (
+    &self,
+    pid      : &ID,
+    relation : NodeRelation,
+    active   : Option<&crate::source_sets::ActiveSourceSet>,
+  ) -> Vec<ID> {
+    if relation == NodeRelation::TextlinksTo {
+      return self . outbound_ids_for_relation (pid, relation); }
+    self . outbound_rel_partners_for_relation_gated (
+      pid, relation, active ) . into_iter ()
+      . map ( |member| member . member )
+      . collect () }
+
   /// The relSource of the relationship from OWNER to TARGET under RELATION,
   /// read from the owner's outbound list. None when no such relationship
   /// exists. This is how INBOUND
@@ -306,11 +322,9 @@ impl InRustGraph {
     relation : NodeRelation,
     active   : Option<&crate::source_sets::ActiveSourceSet>,
   ) -> Vec<ID> {
-    if relation == NodeRelation::TextlinksTo {
-      return self . outbound_pids_for_relation (pid, relation); }
-    self . outbound_rel_partners_for_relation_gated (
+    self . outbound_ids_for_relation_gated (
       pid, relation, active ) . iter ()
-      . filter_map ( |member| self . pid_of (&member . member) )
+      . filter_map ( |member| self . pid_of (member) )
       . collect () }
 
   /// Inbound partners whose EDGES to this node are visible at the

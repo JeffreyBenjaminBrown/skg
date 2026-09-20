@@ -9,12 +9,12 @@ UTF-8 is a variable-width encoding: ASCII characters (U+0000 to
 U+007F) use 1 byte; others use 2, 3, or 4 bytes. The number of
 bytes is determined by the leading bits of the first byte:
 
-| First byte pattern | Bytes | Range |
-|--------------------+-------+-------|
-| 0xxxxxxx | 1 | ASCII |
-| 110xxxxx | 2 | Latin, Greek, Cyrillic, ... |
-| 1110xxxx | 3 | CJK, most symbols, ⌂, ⤊, ↻ |
-| 11110xxx | 4 | Emoji, rare scripts |
+| First byte pattern | Bytes | Range                       |
+|--------------------+-------+-----------------------------|
+|           0xxxxxxx |     1 | ASCII                       |
+|           110xxxxx |     2 | Latin, Greek, Cyrillic, ... |
+|           1110xxxx |     3 | CJK, most symbols, ⌂, ⤊, ↻  |
+|           11110xxx |     4 | Emoji, rare scripts         |
 
 Continuation bytes always start with =10xxxxxx=. This is how
 the decoder knows where characters start and end.
