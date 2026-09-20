@@ -30,7 +30,7 @@ For a task, start with the smallest relevant local source:
 ** [[file:../README.org][README.org]] for a concise project map and entry points.
 ** [[file:../api-and-formats.md][api-and-formats.md]] for protocol, view metadata, configuration, and file-format contracts.
 ** [[file:../glossary.md][glossary.md]] and [[file:../docs/data-model.org][docs/data-model.org]] for domain vocabulary and semantics.
-** [[file:development-process.md][coding-advice/development-process.md]], [[file:common-gotchas.md][common-gotchas.md]], and [[file:docker.org][docker.org]] for testing, runtime, and environment constraints.
+** all of this coding-advice/ except its maybe-obsolete/ subfolder
 ** The relevant implementation, callers, tests, and focused documentation for the requested behavior.
 
 Do not read all documentation or TODO material as onboarding; it's too much.

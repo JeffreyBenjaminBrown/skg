@@ -1,0 +1,23 @@
+Edits to plans and docs, I often describe simply as 'plans' or 'docs'.
+But edits to code warrant longer descriptions:
+first a title that gives an overview,
+and then maybe a detail, of maybe a few paragraphs.
+
+The detail is not a box to check;
+its purpose is to make a reader's life easier.
+If it says "tested this, tested that, tested the other thing ..."
+it's just more work -- if the reader cares, they'll have to read the tests anyway,
+and each test should have such a header comment already.
+If the commit implemented a set of features that are already described
+in one place in the codebase, a mere reference to where (including line number)
+is enough.
+The only case where a detail is really needed, I think,
+is where the changes were to disparate things,
+and there was no reason to document the set of changes as a coherent object in the codebase.
+Bugfixes are especially like this.
+Documenting a history of bugs in the codebase would harm readability for no benefit;
+that's what the git history is for.
+But there are probably other casees that deserve a detail, too.
+
+Lately (today is <2026-09-20 Sun>) the codebase has not been following this style,
+but I want to start.
