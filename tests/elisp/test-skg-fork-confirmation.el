@@ -179,6 +179,46 @@ ordinary-save refusal on C-x C-s."
             (kill-buffer buf)))
       (when (buffer-live-p origin) (kill-buffer origin)))))
 
+(ert-deftest test-approve-fork-replaces-confirmation-pane-with-result ()
+  "Approval leaves the confirmation window showing a truthful result buffer."
+  (let ((origin (generate-new-buffer "*fork-result-origin*"))
+        (result-name "*SKG Fork Result*")
+        confirm confirm-window called)
+    (unwind-protect
+        (save-window-excursion
+          (when (get-buffer result-name) (kill-buffer result-name))
+          (setq confirm
+                (skg--show-fork-confirmation
+                 "* (skg (node (source owned))) N-edited\n** (skg (node (id N) (source foreign) writeProtected)) N-original\n"
+                 origin))
+          (setq confirm-window (get-buffer-window confirm t))
+          (should (window-live-p confirm-window))
+          (cl-letf (((symbol-function 'skg-request-save-buffer)
+                     (lambda (&rest args) (setq called args))))
+            (with-current-buffer confirm
+              (let ((noninteractive t))
+                (skg-approve-fork))))
+          (let ((result (get-buffer result-name)))
+            (should-not (buffer-live-p confirm))
+            (should (buffer-live-p result))
+            (should (eq (window-buffer confirm-window) result))
+            (with-current-buffer result
+              (should (string-match-p
+                       "Fork confirmed; saving\\.\\.\\."
+                       (buffer-string))))
+            (should (equal called '(t (("N" . "owned")))))
+            (skg--finish-pending-fork-result
+             origin "((content \"saved\") (errors ()) (warnings ()))")
+            (with-current-buffer result
+              (should (string-match-p
+                       "Fork confirmed; save successful\\."
+                       (buffer-string))))
+            (with-current-buffer origin
+              (should-not skg--pending-fork-result))))
+      (when (buffer-live-p confirm) (kill-buffer confirm))
+      (when (get-buffer result-name) (kill-buffer result-name))
+      (when (buffer-live-p origin) (kill-buffer origin)))))
+
 (ert-deftest test-fork-confirmation-does-not-mutate-shared-mode-map ()
   "The buffer-local key overrides must not leak into the shared
 skg-content-view-mode-map (which would break C-x C-s in real views)."

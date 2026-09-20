@@ -296,7 +296,8 @@ which would trigger overlay modification-hooks if still present."
       (progn
         (skg--unlock-all-save-locked)
         (with-current-buffer save-buffer
-          (skg-handle-save-sexp payload)))
+          (skg-handle-save-sexp payload))
+        (skg--finish-pending-fork-result save-buffer payload))
     (skg--unlock-all-save-locked)) )
 
 (defconst skg-fork-source-placeholder "PICK-A-SOURCE"
@@ -317,6 +318,11 @@ leaves things untouched.")
 origin's fork atom. `skg-approve-fork' sets it before killing this
 buffer, because its re-save still needs the atom to commit the fork.")
 
+(defvar-local skg--pending-fork-result nil
+  "On a fork's origin buffer, (RESULT-BUFFER . FORK-COUNT) while the
+approved re-save is pending.  The save-result handler turns that buffer
+into a durable success/failure message.")
+
 (defun skg--fork-confirmation-on-kill ()
   "`kill-buffer-hook' for a fork-confirmation buffer: dismissing it
 WITHOUT approving strips the lingering (viewRequests fork) atom from the
@@ -329,6 +335,78 @@ idempotent, so a redundant call after a decline is a harmless no-op."
     (when (buffer-live-p skg--fork-origin-buffer)
       (with-current-buffer skg--fork-origin-buffer
         (skg-strip-fork-requests-in-buffer)))))
+
+(defun skg--write-fork-result (buffer headline &optional details)
+  "Write HEADLINE and optional DETAILS into read-only org BUFFER."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert "* " headline "\n")
+        (when details
+          (insert details)
+          (unless (string-suffix-p "\n" details) (insert "\n")))
+        (skg--org-mode-with-options)
+        (goto-char (point-min))
+        (set-buffer-modified-p nil)
+        (read-only-mode 1)))))
+
+(defun skg--replace-fork-confirmation-with-result
+    (confirmation origin fork-count)
+  "Replace every window showing CONFIRMATION with a pending result buffer.
+Record that buffer and FORK-COUNT on ORIGIN, then kill CONFIRMATION."
+  (let* ((result (get-buffer-create "*SKG Fork Result*"))
+         (noun (if (= fork-count 1) "Fork" "Forks"))
+         (windows (get-buffer-window-list confirmation nil t)))
+    (skg--write-fork-result
+     result (format "%s confirmed; saving..." noun))
+    (dolist (window windows)
+      (when (window-live-p window)
+        (set-window-buffer window result)))
+    (with-current-buffer origin
+      (setq skg--pending-fork-result (cons result fork-count)))
+    (let ((kill-buffer-query-functions nil))
+      (kill-buffer confirmation))
+    result))
+
+(defun skg--finish-pending-fork-result (save-buffer payload)
+  "Update SAVE-BUFFER's pending fork-result pane from save-result PAYLOAD."
+  (when (buffer-live-p save-buffer)
+    (let ((pending
+           (buffer-local-value 'skg--pending-fork-result save-buffer)))
+      (when pending
+        (with-current-buffer save-buffer
+          (setq skg--pending-fork-result nil))
+        (let* ((result (car pending))
+               (fork-count (cdr pending))
+               (noun (if (= fork-count 1) "Fork" "Forks")))
+          (when (buffer-live-p result)
+            (condition-case err
+                (let* ((response (read payload))
+                       (errors (cadr (assoc 'errors response)))
+                       (warnings (cadr (assoc 'warnings response))))
+                  (cond
+                   ((skg--message-list-nonempty-p errors)
+                    (skg--write-fork-result
+                     result (format "%s confirmed; save failed." noun)
+                     (skg-errors-and-warnings-to-org-string
+                      errors warnings)))
+                   ((skg--message-list-nonempty-p warnings)
+                    (skg--write-fork-result
+                     result
+                     (format "%s confirmed; save successful with warnings."
+                             noun)
+                     (skg-errors-and-warnings-to-org-string nil warnings)))
+                   (t
+                    (skg--write-fork-result
+                     result
+                     (format "%s confirmed; save successful." noun)))))
+              (error
+               (skg--write-fork-result
+                result
+                (format "%s confirmed; could not read the save result."
+                        noun)
+                (format "%S" err))))))))))
 
 (defun skg--fork-confirmation-handler (save-buffer payload)
   "Handle a `fork-confirmation' LP message: the save edited foreign
@@ -596,8 +674,9 @@ child's id N -- the key by which the server applies the chosen source."
 (defun skg-approve-fork ()
   "Approve the forks listed in this *SKG Fork Confirmation* buffer:
 extract each clone's chosen source, re-save the originating buffer with
-the forks approved (carrying those sources), then kill the confirmation
-buffer.
+the forks approved (carrying those sources), and replace the confirmation
+pane with a result buffer.  The result changes from \"saving\" to the
+server-confirmed success or failure when the approved save finishes.
 
 Interactively, first prompts for any clone source still at
 `skg-fork-source-placeholder' (as the confirmation handler already did
@@ -620,8 +699,8 @@ hand (C-c s s)."
     ;; The atom must survive to the re-save (which commits the fork; the
     ;; server then drops it on re-render), so suppress the kill-hook strip.
     (setq skg--fork-suppress-strip-on-kill t)
-    (let ((kill-buffer-query-functions nil))
-      (kill-buffer (current-buffer)))
+    (skg--replace-fork-confirmation-with-result
+     (current-buffer) origin (length fork-sources))
     (with-current-buffer origin
       (skg-request-save-buffer t fork-sources))))
 
