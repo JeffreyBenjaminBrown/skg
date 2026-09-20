@@ -63,6 +63,8 @@ M.commands = {
                           desc = 'Request the hide folders (auto-saves)' },
   ShowFolderOfSubscribes = { module = 'skg.view_requests', fn = 'show_folderOf_subscribes',
                                desc = 'Request the subscribe folders (auto-saves)' },
+  ShowFolderOfProperties = { module = 'skg.view_requests', fn = 'show_folderOf_properties',
+                             desc = 'Request the properties folder (auto-saves)' },
   ShowPathsThroughContainers = { module = 'skg.view_requests', fn = 'show_paths_through_containers',
                                  desc = 'Graft the containment ancestry (auto-saves)' },
   ShowPathsThroughLinkSources = { module = 'skg.view_requests', fn = 'show_paths_through_link_sources',
@@ -91,6 +93,11 @@ M.commands = {
                 desc = "Change the node's source (in-buffer; save applies)" },
   SetSourceRecursive = { module = 'skg.metadata', fn = 'set_source_recursive',
                          desc = 'Change source here and in matching descendants' },
+  SetPropertySearchMatching = { module = 'skg.boolprop', fn = 'set_search_matching',
+                                desc = 'Stage search matching for this node' },
+  SetPropertySearchMatchingRecursive = { module = 'skg.boolprop',
+                                         fn = 'set_search_matching_recursive',
+                                         desc = 'Stage search matching through true content' },
   ReplaceLinkWithContent = { module = 'skg.modify_graph', fn = 'replace_link_with_content',
                              desc = 'Turn the link at point into content (saves)' },
   Fork = { module = 'skg.view_requests', fn = 'fork_node',
@@ -214,6 +221,7 @@ M.content_view_bindings = {
   { 'co', 'ShowFolderOfOverrides' },
   { 'ch', 'ShowFolderOfHides' },
   { 'cs', 'ShowFolderOfSubscribes' },
+  { 'cp', 'ShowFolderOfProperties' },
   { 'pC', 'ShowPathsThroughContainers' }, -- C-c p C
   { 'pL', 'ShowPathsThroughLinkSources' }, -- C-c p L
   { 'pl', 'ShowPathsThroughLinkDests' }, -- C-c p l
@@ -228,6 +236,8 @@ M.content_view_bindings = {
   { 'sm', 'SetMergeRequest' },           -- C-c s m
   { 'ss', 'SetSource' },                 -- C-c s s
   { 'sS', 'SetSourceRecursive' },        -- C-c s S
+  { 'sx', 'SetPropertySearchMatching' },
+  { 'sX', 'SetPropertySearchMatchingRecursive' },
   { 'mc', 'ReplaceLinkWithContent' },    -- C-c m c
   { 'mf', 'Fork' },                      -- C-c m f
   { 'ml', 'ReplaceContentWithLink' },    -- C-c m l

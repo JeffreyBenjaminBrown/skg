@@ -66,6 +66,14 @@ prompt and the result carries a warning.
 Text search across titles and aliases, returning every
 matching node.
 
+A node with the =NoSearchMatching= property will not be found
+(will not be a "hit") through
+its title, aliases, or body in any search mode. It may still appear as graph
+context around another hit and can still be opened by ID. This is a
+decluttering preference, not privacy or access control. For example, a packing
+list can mention “shaver” without that packing list itself matching a search
+for shaver.
+
 Prompts for search terms. All search axes take their conservative
 defaults: no per-token regex, titles only (no body), no Tantivy
 phrase and operator syntax.
@@ -324,6 +332,14 @@ hides nor is hidden, nothing appears.
 The subscribeeFolder (the nodes this node subscribes to -- WRITABLE, shown
 even when empty) and the subscriberFolder (the nodes that subscribe to
 this one -- read-only, ☮).
+*** C-c l p : skg-show-folderOf-properties
+Shows the read-only =propertiesFolder=. It lists only true node-file
+properties as titleless rows whose heralds carry their labels, in canonical
+order, and remains visible when none are true.
+=Had ID before org-roam import= and =Was overloaded during org-roam import=
+are provenance; =No search matching= is the user setting. Edit none of these
+generated rows directly. Delete the whole folder branch to dismiss this
+optional view; doing so does not change any property.
 ** C-c p : show a path (the backpath through one relation role)
 Like the folders, each inserts a request that, on save, grafts the
 partners reached through one relation role as inverted, read-only
@@ -414,6 +430,16 @@ whose source matches the original source of the node at point.
 Only descendents for which AffectsParent=True are traversed.
 The stuck-relationship offer and the write-protected warning described
 under =C-c s s= apply here too, across the whole subtree.
+*** C-c s x : skg-set-property-search-matching
+Prompts between =search matching= and =no search matching=, with shift-arrow
+cycling, and stages an idempotent request on the saved active node at point.
+It refuses foreign and write-protected nodes and conflicts with another
+=editRequest=. It does not save; save the view to apply it.
+
+With =C-u=, the selected value is applied uniformly to the true-content
+subtree only. Scaffolds, backpaths, independent children, inactive nodes, and
+phantoms are pruned. Repeated PIDs are changed once; ineligible descendants
+are skipped and reported in =*Messages*=.
 *** C-c s m : skg-set-merge-request
 (See [[./merging.org][the docs on merging]] for why would you merge two nodes,
 and what it means to do that.)

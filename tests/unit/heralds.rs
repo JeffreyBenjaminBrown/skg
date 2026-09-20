@@ -2,13 +2,6 @@ use super::*;
 
 use std::collections::HashSet;
 
-/// Atoms that legitimately appear in the rule table although the
-/// server never emits them:
-/// - "true" is accepted by the parser but left implicit by the
-///   serializer; its vacuous rule documents that.
-const ACCEPTED_NOT_EMITTED_ATOMS : [&str; 1] =
-  [ "true" ];
-
 // The required core of the herald migration: every metadata atom the
 // server can emit has a rule, and every rule names a live atom.
 // Coverage only -- labels and colors are presentation, free to drift
@@ -26,8 +19,7 @@ fn herald_rules_cover_the_emittable_vocabulary () {
             missing_rules );
   let dead_rules : Vec<&&str> =
     table . iter ()
-    . filter ( |atom| ! emittable . contains (**atom)
-               && ! ACCEPTED_NOT_EMITTED_ATOMS . contains (atom) )
+    . filter ( |atom| ! emittable . contains (**atom) )
     . collect ();
   assert! ( dead_rules . is_empty (),
             "herald rules matching atoms the server cannot emit: {:?}",

@@ -367,6 +367,17 @@ So far there are these endpoints:
     in `apply_sticky_relSources` stays load-bearing, since buffers go
     stale and the request is plain text.
 
+## Property state
+  - Request: `((request . "property state") (id . "ID")
+    (property . "noSearchMatching"))`.
+  - Response: `((response-type property-state) (id "CANONICAL-PID")
+    (property "noSearchMatching") (value "true") (source "SOURCE")
+    (user-owned "true"))`. Extra IDs resolve to the canonical PID. Unknown IDs
+    or property atoms return `(error "...")` under the same response type.
+  - The endpoint is read-only and may report `hadId`, `wasOverloaded`, or
+    `noSearchMatching`. Ownership is advisory; save-time validation remains
+    authoritative.
+
 ## Strip body whitespace
   - Request: ((request . "strip body whitespace"))
   - Response: LP response-type "strip-body-whitespace" with
@@ -623,7 +634,7 @@ the view regenerates it.
 `(viewRequests ...)` carries client→server REQUESTS for extra views
 (unlike `birth` and the stats below, which are server→client). On save
 the server fulfills each request during view completion and then drops
-the atom, so a request is transient. Three request forms:
+the atom, so a request is transient. Request forms:
 
 A definitive node's default presentation includes its nonempty
 `subscribeeFolder`, but no other top-level relation folder. This applies both
@@ -646,6 +657,12 @@ node's heralds.
   backpath ROLENAME)`). ROLENAME is one of the nine in
   `PARTNER_ROLE_VOCAB`. Emitted by the `C-c p` commands.
 - `definitiveView` — make a write-protected, childless node editable.
+- `properties` — add one read-only `propertiesFolder`, retained even when empty.
+  Its true-only rows use `(property hadId)`, `(property wasOverloaded)`, and
+  `(property noSearchMatching)` metadata in that order. Rows have no Org title;
+  their friendly visible label comes from the herald. Deleting the entire
+  folder dismisses this optional projection and has no persistence meaning;
+  edits within a retained folder are rejected rather than silently ignored.
 - `fork` — the explicit `skg-fork-node` gesture: clone this (owned)
   node into a private fork that overrides it. Consumed on the save path
   at fork detection (not during view completion), then dropped. Emitted
@@ -655,20 +672,18 @@ node's heralds.
 
 Generated display facts decorate a `(node ...)` (never save intent;
 the client renders them as heralds via the rule table in
-`server/heralds.rs`; see "Herald rules"). Since the uniform-herald
-refactor, the graph-wide counts and the view-position RELATIONSHIP
-facts are assembled into two compact token strings rather than emitted
-as individual atoms:
+`server/heralds.rs`; see "Herald rules"). Graph-wide counts and
+view-position relationship facts are emitted in one semantic `(rels ...)`
+form. It contains per-relation `in`/`out` facts and, when nonzero,
+`(aliases K)`, `(extraIds K)`, and `(properties K)`. `(birth RELNAME...)`
+records the relation(s) that explain why the node was drawn here.
 
-- `(birthHerald "STRING")` — orange, hugging the ☮; the token(s) for
-  the relation(s) that explain why this node was drawn here (its
-  "birth"). Absent for roots and parked nodes.
-- `(rels "STRING")` — blue; the remaining relationship tokens plus the
-  action tokens `Ak` (k aliases) and `Ik` (k extra IDs).
-
-Both strings are assembled by the token grammar in
-`server/herald_tokens.rs` (the single source of truth), from
+The form is assembled in `server/herald_tokens.rs` from
 `GraphNodeStats` and `ViewNodeStats` (`server/types/viewnode.rs`).
+Clients render the relationship facts as blue tokens, the birth relation
+token in orange hugging the ☮, and the action counts as cyan `Ak`, `Ik`, and
+`Pk`. Thus `P3` means that the node has three true file properties; `P0` is
+omitted.
 Each graph relation contributes at most one token of the shape
 `[inNum][inLetters] X [outNum][outLetters]`:
 
@@ -693,8 +708,9 @@ Each graph relation contributes at most one token of the shape
 
 This replaces the retired per-atom scheme. There is no longer a
 `(graphStats ...)` sexp on an active node: its counts fold into the
-strings above (`overriding`/`subscribing`/`hiding` become the `O`/`S`/
-`H` tokens; `aliasing`/`extraIDs` become the `Ak`/`Ik` action tokens),
+form above (`overriding`/`subscribing`/`hiding` become the `O`/`S`/
+`H` tokens; `aliasing`/`extraIDs`/true properties become the
+`Ak`/`Ik`/`Pk` action tokens),
 and the per-relation view-position flags (`containsParent`,
 `overridesParent`/`parentOverrides`, `subscribesParent`/
 `parentSubscribes`, `hidesParent`/`parentHides`, `grandparentOverrides`/
@@ -730,6 +746,23 @@ under different parents):
   expose a flat/nested display `relSource` fact and put write intent only
   under `editRequest`; copying a fact is harmless while copying a request
   deliberately requests it at the destination.
+- `(editRequest (property noSearchMatching true|false))` — an idempotent
+  save-only desired-state request. The provenance properties `hadId` and
+  `wasOverloaded` are read-only and rejected here. A successful save consumes
+  the request; a failed save leaves it in the buffer. Herald view presents the
+  request as one red semantic state: `request:no search matching` for `true`,
+  or `request:search matching` for `false`.
+
+## Node file properties
+
+The YAML `misc` list stores `Had_ID_Before_Import`, `Was_Overloaded`, and
+`NoSearchMatching` using those exact spellings. Absence means false.
+`NoSearchMatching` keeps the node's Tantivy documents for ID/title/source
+lookup but marks every title/alias document with indexed, stored
+`no_search_matching=true`; every text query adds a mandatory exclusion. It
+therefore blocks direct title, alias, body, regexp, operator, and
+field-qualified matches, but is not an access-control boundary and does not
+remove graph context.
 - `(overridesHere N)` — herald red "Oh"; the load-bearing
   substitution marker, documented in the next subsection.
 

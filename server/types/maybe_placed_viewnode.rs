@@ -326,8 +326,8 @@ impl MpViewnode {
         &d . title,
       MpViewnodeKind::Qual (q) =>
         q . title (),
-      MpViewnodeKind::QualFolder (_)
-        | MpViewnodeKind::PartnerFolder (_)
+      MpViewnodeKind::QualFolder (folder) => folder . title (),
+      MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::BufferRoot
         | MpViewnodeKind::DeadScaffold
         | MpViewnodeKind::Vognode (MpVognode::Inactive (_))
@@ -345,6 +345,8 @@ impl MpViewnode {
         format!("qual:alias({})", text),
       MpViewnodeKind::Qual (Qual::ID { id, .. }) =>
         format!("qual:id({})", id),
+      MpViewnodeKind::Qual (Qual::BoolProp { property, .. }) =>
+        format!("qual:property({})", property . wire_name ()),
       MpViewnodeKind::Qual (Qual::TextChanged { .. }) =>
         "qual:textChanged" . to_string (),
       MpViewnodeKind::QualFolder (folder) =>
@@ -371,9 +373,9 @@ impl MpViewnode {
         => p . body (),
       MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
         d . body . as_ref(),
-      MpViewnodeKind::QualFolder (_)
-        | MpViewnodeKind::Qual (_)
-        | MpViewnodeKind::PartnerFolder (_)
+      MpViewnodeKind::QualFolder (folder) => folder . body (),
+      MpViewnodeKind::Qual (qual) => qual . body (),
+      MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::BufferRoot
         | MpViewnodeKind::DeadScaffold
         | MpViewnodeKind::Vognode (MpVognode::Inactive (_))

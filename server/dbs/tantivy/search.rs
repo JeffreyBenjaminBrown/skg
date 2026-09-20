@@ -64,13 +64,15 @@ pub fn search_index (
     } else {
       build_parser_query (
         tantivy_index, query_text, opts . operators, opts . body ) ? };
+  let mut clauses : Vec<(Occur, Box<dyn Query>)> = vec! [
+    (Occur::Must, text_query),
+    (Occur::MustNot, no_search_matching_query (tantivy_index)),
+  ];
+  if opts . exclude_overPrivateText_telescope {
+    clauses . push ((
+      Occur::MustNot, overPrivateText_telescope_query (tantivy_index) )); }
   let query : Box<dyn Query> =
-    if opts . exclude_overPrivateText_telescope {
-      Box::new ( BooleanQuery::new ( vec! [
-        (Occur::Must, text_query),
-        (Occur::MustNot, overPrivateText_telescope_query (tantivy_index)),
-      ] ) )
-    } else { text_query };
+    Box::new ( BooleanQuery::new (clauses) );
   Ok (( {
     let best_matches : Vec < ( f32, tantivy::DocAddress ) > =
       searcher . search (
@@ -87,8 +89,12 @@ pub fn has_overPrivateText_telescope (
 ) -> Result<bool, Box<dyn std::error::Error>> {
   tantivy_index . reader . reload () ?;
   let searcher : Searcher = tantivy_index . reader . searcher ();
+  let query : BooleanQuery = BooleanQuery::new (vec! [
+    (Occur::Must, overPrivateText_telescope_query (tantivy_index)),
+    (Occur::MustNot, no_search_matching_query (tantivy_index)),
+  ]);
   let matches = searcher . search (
-    &* overPrivateText_telescope_query (tantivy_index),
+    &query,
     &TopDocs::with_limit (1) . order_by_score () ) ?;
   Ok (! matches . is_empty ())
 }
@@ -99,6 +105,15 @@ fn overPrivateText_telescope_query (
   Box::new ( TermQuery::new (
     Term::from_field_text (
       tantivy_index . overPrivateText_telescope_field, "true" ),
+    schema::IndexRecordOption::Basic ) )
+}
+
+fn no_search_matching_query (
+  tantivy_index : &TantivyIndex,
+) -> Box<dyn Query> {
+  Box::new ( TermQuery::new (
+    Term::from_field_text (
+      tantivy_index . no_search_matching_field, "true" ),
     schema::IndexRecordOption::Basic ) )
 }
 

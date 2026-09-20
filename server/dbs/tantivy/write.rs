@@ -6,7 +6,7 @@
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::dbs::tantivy::background_writer::lock_tantivy_writes;
 use crate::types::misc::{ID, SourceName, TantivyIndex};
-use crate::types::nodes::complete::FileProperty;
+use crate::types::nodes::complete::{FileProperty, file_property_is_true};
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::textlinks::replace_each_link_with_its_label;
 
@@ -137,6 +137,10 @@ fn create_documents_from_node (
           raw_title_for_this_doc,
         tantivy_index . overPrivateText_telescope_field =>
           if node . overPrivateText_telescope { "true" } else { "false" },
+        tantivy_index . no_search_matching_field =>
+          if file_property_is_true (
+            &node . misc, FileProperty::NoSearchMatching )
+          { "true" } else { "false" },
         tantivy_index . source_field =>
           doc_source . as_str(),
         tantivy_index . context_origin_type_field =>

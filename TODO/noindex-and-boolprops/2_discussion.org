@@ -339,7 +339,7 @@ commands.  Its prompt should say “Text-search inclusion,” with choices
 Two command-surface decisions remain: the key bindings, and whether Neovim
 must receive equivalent show/set commands in this implementation or only the
 editor-independent server/wire support.  Natural Emacs candidates are
-=C-c l b= for showing boolprops and =C-c s i= for setting indexing, but neither
+=C-c l p= for showing properties and =C-c s i= for setting indexing, but neither
 is implied by the vision.
 
 ** DONE yes!

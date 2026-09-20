@@ -81,13 +81,20 @@ rather than via `unload-feature'."
             skg-view-new-empty
             skg-org-fold
             skg-request-file-path
+            skg-request-herald-rules
             skg-request-diff-analysis
+            skg-request-delete-references-to-absent-node
+            skg-request-edge-source-info
+            skg-request-boolprop-state
             skg-request-export-org
             skg-request-git-diff-mode
+            skg-request-rebuild-ephemeral-data-stores
             skg-request-rerender-all-views
             skg-request-save
             skg-request-single-root-content-view
             skg-request-source-sets
+            skg-request-stage-moves
+            skg-request-strip-body-whitespace
             skg-request-text-search
             skg-request-verify-connection
             skg-search-make-link

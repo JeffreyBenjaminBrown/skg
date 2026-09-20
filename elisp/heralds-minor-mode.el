@@ -395,7 +395,7 @@ outbound ancestor-letters-only side. FORM = (textlinksTo (in TOTAL
 string, or nil if there is none / it produces nothing. Coloring: group
 base (C/L blue, S/O/H purple), the reason-for-being token black-on-white,
 ancestor letters black-on-yellow, the contains inbound count>1 orange,
-A/I cyan. Tokens are ordered C L S O H A I and space-separated."
+A/I/P cyan. Tokens are ordered C L S O H A I P and space-separated."
   (let ((rels (heralds--find-rels sexp)))
     (when rels
       (let ((birth (cdr (assq 'birth (cdr rels))))
@@ -414,6 +414,9 @@ A/I cyan. Tokens are ordered C L S O H A I and space-separated."
                         tokens)))
         (let ((i (cadr (assq 'extraIds (cdr rels)))))
           (when i (push (propertize (format "I%d" i) 'face 'heralds-cyan-face)
+                        tokens)))
+        (let ((p (cadr (assq 'properties (cdr rels)))))
+          (when p (push (propertize (format "P%d" p) 'face 'heralds-cyan-face)
                         tokens)))
         (setq tokens (nreverse tokens))
         (when tokens (mapconcat #'identity tokens " "))))))

@@ -2,6 +2,7 @@ use crate::source_sets::ActiveSourceSet;
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::backpath::build_and_integrate_path_view_then_drop_request;
 use crate::to_org::expand::folder_request::build_and_integrate_folder_then_drop_request;
+use crate::to_org::expand::boolprops::build_and_integrate_boolprops_then_drop_request;
 use crate::to_org::util::{ DefinitiveMap, Finalizable, get_id_from_treenode, makeWriteProtectedAndClobber, activeNode_in_tree_is_writeProtected };
 use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::git::SourceDiff;
@@ -43,6 +44,9 @@ pub fn execute_view_requests (
         build_and_integrate_path_view_then_drop_request (
           viewforest, node_id, graph, role, config, errors,
           active_source_set ) ?; },
+      ViewRequest::BoolProps => {
+        build_and_integrate_boolprops_then_drop_request (
+          viewforest, node_id, graph, config, errors ) ?; },
       ViewRequest::Definitive =>
         // View completion (dispatch_node_update) settles every Definitive
         // request at the node's own visit (apply_definitive_draw_rule, the TODO/DONE/local-view-update/plan_v2.org §5.2

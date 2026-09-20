@@ -68,6 +68,11 @@ matching node. "Rooty" nodes (roots, cycle members, link
 dests, and nodes that had an org-roam ID before import)
 are bumped in the ranking via their context-origin multiplier.
 
+A node with =NoSearchMatching= cannot be a direct title, alias, or body hit
+in any search mode. It may still appear as context for another hit and remains
+openable by ID. This is decluttering, not privacy. A packing list mentioning
+“shaver,” for example, can be excluded while the shaver node still matches.
+
 Prompts for search terms. All search axes take their conservative
 defaults: no per-token regex, titles only (no body), no Tantivy
 phrase and operator syntax.
@@ -328,6 +333,12 @@ hides nor is hidden, nothing appears.
 The subscribeeFolder (the nodes this node subscribes to -- WRITABLE, shown
 even when empty) and the subscriberFolder (the nodes that subscribe to
 this one -- read-only, ☮).
+*** <localleader>cp : :SkgShowFolderOfProperties
+Shows the read-only, true-only properties folder as titleless rows whose
+heralds carry their labels, in canonical order.
+The empty folder is retained. Import provenance rows have no setter; use the
+search-matching command below for =No search matching=. Delete the whole
+folder branch to dismiss this optional view without changing any property.
 ** <localleader>p : show a path (the backpath through one relation role)
 Like the folders, each inserts a request that, on save, grafts the
 partners reached through one relation role as inverted, read-only
@@ -408,6 +419,15 @@ Like 'SetSource', but it also
 changes the source of every content descendent of the node at point
 whose source matches the original source of the node at point.
 Only descendents for which AffectsParent=True are traversed.
+*** <localleader>sx : :SkgSetPropertySearchMatching
+Prompts between =search matching= and =no search matching= and stages the
+desired state without saving. Foreign/write-protected/unsaved roots and an
+existing =editRequest= are refused.
+*** <localleader>sX : :SkgSetPropertySearchMatchingRecursive
+Applies one selected state uniformly through the true-content subtree,
+deduplicating PIDs and reporting ineligible descendants. It prunes scaffolds,
+backpaths, independent branches, inactive nodes, and phantoms. Save with
+=:w= afterward.
 *** <localleader>sm : :SkgSetMergeRequest
 (See [[./merging.org][the docs on merging]] for why would you merge two nodes,
 and what it means to do that.)

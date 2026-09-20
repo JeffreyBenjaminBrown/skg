@@ -240,6 +240,8 @@ fn qual_metadata_to_string (
     Qual::ID { membership, .. } => {
       parts . push ( "id" . to_string () );
       append_membership_stage_forms (&mut parts, membership); }
+    Qual::BoolProp { property, .. } =>
+      parts . push ( format! ("(property {})", property . wire_name ()) ),
   }
   Ok ( parts . join (" ")) }
 
@@ -305,7 +307,10 @@ fn activeNode_metadata_to_string (
       activeNode . edit_request () . map ( | edit_req | {
         let edit_str : String = match edit_req {
           NodeEditRequest::NodeMerge (id) => format! ( "(merge {})", id . 0 ),
-          NodeEditRequest::Delete => "delete" . to_string () };
+          NodeEditRequest::Delete => "delete" . to_string (),
+          NodeEditRequest::SetBoolProp { property, value } =>
+            format! ( "(property {} {})",
+              property . wire_name (), value ) };
         format! ( "(editRequest {})", edit_str ) } ) }
     fn view_requests ( activeNode : & ActiveNode
                      ) -> Option < String > {
@@ -510,7 +515,7 @@ fn phantom_rels_atom (
 ) -> Option < String > {
   gs . rels . as_ref () . and_then ( |counts|
     relationship_heralds_sexp (
-      counts, gs . aliases, gs . extra_ids,
+      counts, gs . aliases, gs . extra_ids, gs . properties,
       &AncestorFlags::default (), &[] ) ) }
 
 fn org_bullet ( level: usize ) -> String {

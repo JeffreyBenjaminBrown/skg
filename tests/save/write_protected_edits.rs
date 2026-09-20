@@ -11,11 +11,56 @@ use skg::test_utils::update_from_and_rerender_buffer_test
 use skg::serve::ViewsState;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::{members_of, ID, SkgConfig, TantivyIndex};
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::nodes::complete::{
+  NodeComplete, FileProperty, file_property_is_true};
 use skg::types::views_state::{OpenViews, ViewUri};
 
 use std::error::Error;
 use std::net::TcpStream;
+
+#[test]
+fn deleting_the_properties_folder_is_accepted_and_inert (
+) -> Result<(), Box<dyn Error>> {
+  run_with_test_stores (
+    "skg-test-properties-folder-deletion",
+    "tests/save/properties_folder_deletion/fixtures",
+    "/tmp/tantivy-test-properties-folder-deletion",
+    |config, tantivy| Box::pin (async move {
+      let graph : InRustGraphHandle = graph_handle_from_config (config)?;
+      let mut views_state : ViewsState = ViewsState {
+        diff_mode_enabled : false,
+        open_views        : OpenViews::new (), };
+      let listener : std::net::TcpListener =
+        std::net::TcpListener::bind ("127.0.0.1:0")?;
+      let mut stream : TcpStream =
+        TcpStream::connect (listener . local_addr ()?)?;
+      let uri : Result<ViewUri, String> = Ok (
+        ViewUri::ContentView ("properties-folder-deletion-test" . to_string ()));
+      let with_properties = indoc! {"
+        * (skg (node (id brie) (source main))) brie
+        ** (skg propertiesFolder)
+        *** (skg (property noSearchMatching))
+      "};
+      let first = update_from_and_rerender_buffer (
+        &mut stream, with_properties, config, tantivy, &graph, false,
+        &uri, &mut views_state ) . await ?;
+      assert! (first . errors . is_empty ());
+      assert! (first . saved_view . contains ("propertiesFolder"));
+
+      let without_properties =
+        "* (skg (node (id brie) (source main))) brie\n";
+      let second = update_from_and_rerender_buffer (
+        &mut stream, without_properties, config, tantivy, &graph, false,
+        &uri, &mut views_state ) . await ?;
+      assert! (second . errors . is_empty ());
+      assert! (! second . saved_view . contains ("propertiesFolder"));
+      let saved : NodeComplete =
+        nodecomplete_from_id (config, &ID::from ("brie"))?;
+      assert! (file_property_is_true (
+        &saved . misc, FileProperty::NoSearchMatching),
+        "dismissing the projection must not clear the property");
+      Ok (( ))
+    })) }
 
 #[test]
 fn whitespace_only_body_under_writeProtected_is_not_an_edit () {
@@ -24,7 +69,7 @@ fn whitespace_only_body_under_writeProtected_is_not_an_edit () {
   let (_viewforest, parsing_errors, _warnings) =
     org_to_uninterpreted_viewforest (input) . unwrap ();
   assert! ( ! parsing_errors . iter () . any ( |error| matches! (
-    error, BufferValidationError::EditedWriteProtectedOccurrence (_)) ),
+    error, BufferValidationError::EditedWriteProtectedOccurrence { .. }) ),
     "Blank separator lines do not edit a write-protected occurrence: {:?}",
     parsing_errors );
 }
@@ -98,7 +143,9 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
     . expect ("the rejection should be a SaveError");
   let SaveError::BufferValidationErrors { errors, .. } = save_error else {
     panic! ("expected BufferValidationErrors, got {:?}", save_error); };
-  assert_eq! (errors,
-    &vec! [BufferValidationError::EditedWriteProtectedOccurrence ("2" . into ())]);
+  assert! (matches! (&errors[..],
+    [BufferValidationError::EditedWriteProtectedOccurrence {
+      id, title, changes }] if id == &ID::from ("2")
+        && title == "2" && changes . iter () . any (|c| c . contains ("title"))));
   Ok (( ))
 }

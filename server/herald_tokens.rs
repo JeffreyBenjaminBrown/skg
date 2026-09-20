@@ -17,6 +17,7 @@
 //!                  (out (ancestors GEN...)))                   ; no count out
 //!     (aliases  K)
 //!     (extraIds K)
+//!     (properties K)
 //!     (birth RELNAME...))
 //! GEN is a generation distance: 1 = visible parent, 2 = grandparent,
 //! ... `in` = "N nodes RELATION it"; `out` = "it RELATIONs N nodes".
@@ -142,7 +143,7 @@ fn links_sexp (
   Some ( format! ("(textlinksTo {})", inner . join (" ")) ) }
 
 /// Emit the semantic `(rels ...)` form for a node from its member
-/// counts, alias/extra-id counts, ancestor flags, and birth relations.
+/// counts, alias/extra-id/property counts, ancestor flags, and birth relations.
 /// None when there is nothing to say. Relations are emitted in a fixed
 /// order for a stable wire, but order is not meaningful (the client
 /// re-orders; the tests canonicalize).
@@ -150,6 +151,7 @@ pub fn relationship_heralds_sexp (
   counts    : &RelationCounts,
   aliases   : usize,
   extra_ids : usize,
+  properties : usize,
   flags     : &AncestorFlags,
   birth     : &[NodeRelation],
 ) -> Option<String> {
@@ -171,6 +173,8 @@ pub fn relationship_heralds_sexp (
     counts . hides, &flags . hides_out) { parts . push (s); }
   if aliases   > 0 { parts . push ( format! ("(aliases {})",  aliases) ); }
   if extra_ids > 0 { parts . push ( format! ("(extraIds {})", extra_ids) ); }
+  if properties > 0 {
+    parts . push ( format! ("(properties {})", properties) ); }
   if ! birth . is_empty () {
     let names : Vec<&str> = birth . iter () . map ( |&r| relation_key (r) ) . collect ();
     parts . push ( format! ("(birth {})", names . join (" ")) ); }

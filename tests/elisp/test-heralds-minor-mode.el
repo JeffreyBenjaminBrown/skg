@@ -112,6 +112,39 @@ the C token 2aC: the multi-contains \"2\" (orange), the ancestor \"a\"
       (should (string-match "req:path:.*container" result))
       (should (string-match "req:path:.*linkSource" result)))))
 
+(ert-deftest test-heralds-property-count-display ()
+  "True file properties are summarized as one cyan Pn herald."
+  (let ((result (heralds-from-metadata
+                 "(skg (node (id 1) (rels (properties 2))))")))
+    (should (equal (substring-no-properties result) "P2"))
+    (should (eq (get-text-property 0 'face result)
+                'heralds-cyan-face))))
+
+(ert-deftest test-heralds-property-rows-are-friendly-and-colon-free ()
+  "Property-row heralds carry the whole titleless row label."
+  (dolist (case '((hadId "☮ had ID before org-roam import")
+                  (wasOverloaded "☮ was overloaded during org-roam import")
+                  (noSearchMatching "☮ no search matching")))
+    (let ((result (heralds-from-metadata
+                   (format "(skg (property %s))" (car case)))))
+      (should (equal (substring-no-properties result) (cadr case)))
+      (should-not (string-match-p ":" result))
+      (should (eq (get-text-property 0 'face result)
+                  'heralds-green-face)))))
+
+(ert-deftest test-heralds-property-request-displays-one-semantic-state ()
+  "A property edit request is one state change, not one herald per argument."
+  (dolist (case '((true  "request:no search matching")
+                  (false "request:search matching")))
+    (let ((result
+           (heralds-from-metadata
+            (format
+             "(skg (node (id 1) (editRequest (property noSearchMatching %s))))"
+             (car case)))))
+      (should (equal (substring-no-properties result) (cadr case)))
+      (should (eq (get-text-property 0 'face result)
+                  'heralds-red-face)))))
+
 (ert-deftest test-heralds-scaffold-display ()
   "Test that scaffold kinds are displayed correctly."
   (with-temp-buffer

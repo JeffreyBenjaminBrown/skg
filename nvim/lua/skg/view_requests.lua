@@ -30,6 +30,7 @@ local command_rows = {
   { 'show_folderOf_overrides', '(folder overrides)' },
   { 'show_folderOf_hides', '(folder hides)' },
   { 'show_folderOf_subscribes', '(folder subscribes)' },
+  { 'show_folderOf_properties', 'properties' },
   { 'show_paths_through_containers', '(path container)' },
   { 'show_paths_through_link_sources', '(path linkSource)' },
   { 'show_paths_through_link_dests', '(path linkDest)' },

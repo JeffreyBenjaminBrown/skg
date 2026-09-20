@@ -394,6 +394,26 @@ Headline is a term from org-mode. It refers to a line that begins with some aste
 
 # Terms specific to Tantivy
 
+## no search matching
+
+A node-file boolean property (`NoSearchMatching` in YAML,
+`noSearchMatching` on the wire) that prevents the node's title, aliases, and
+body from producing a direct text-search hit. The node remains indexed for
+exact-ID lookup and may appear as context around another hit. It is search
+decluttering, not privacy.
+
+## properties folder and Property
+
+`propertiesFolder` is a generated, read-only scaffold under a graphnode. Its
+`(property PROPERTY)` leaves list the node's true file properties in canonical
+order. Each leaf is titleless because its herald supplies the visible label.
+The folder stays visible when empty. Edits within a retained folder are
+rejected before save, but deleting the entire folder safely dismisses the
+optional projection and changes no property. `noSearchMatching` is changed
+through the dedicated setter, while the two org-roam import provenance
+properties have no setter. A node with `n` true properties has the cyan `Pn`
+herald; no property herald is shown at zero.
+
 ## Document
 
 A Tantivy association. In my case, from a title or alias to an ID.

@@ -10,7 +10,8 @@
 
 use super::*;
 use crate::types::misc::{SkgfileSource, members_of, rel_partners_at_relSource};
-use crate::types::nodes::complete::empty_node_complete;
+use crate::types::nodes::complete::{
+  FileProperty, empty_node_complete};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerFolder,
                              mk_definitive_viewnode};
@@ -187,3 +188,24 @@ fn confirmation_buffer_shows_a_confirmed_source_as_settled () {
     "no placeholder source when every source is confirmed:\n{}", buf );
   assert! ( ! buf . contains ("# Suggested source"),
     "no suggestion comment when every source is confirmed:\n{}", buf ); }
+
+#[test]
+fn fork_clone_preserves_only_the_search_matching_property () {
+  for no_search_matching in [false, true] {
+    let mut misc = vec![
+      FileProperty::Had_ID_Before_Import,
+      FileProperty::Was_Overloaded];
+    if no_search_matching {
+      misc . insert (1, FileProperty::NoSearchMatching); }
+    let buffer_node : NodeComplete = NodeComplete {
+      source : SourceName::from ("foreign"),
+      pid    : ID::from ("N"),
+      misc,
+      .. empty_node_complete () };
+    let spec : ForkSpec = build_fork_clone (
+      &buffer_node, "N", &[], SourceName::from ("owned2"), false );
+    assert_eq! (
+      spec . clone . 0 . misc,
+      if no_search_matching { vec![FileProperty::NoSearchMatching] }
+      else { Vec::new () } ); }
+}

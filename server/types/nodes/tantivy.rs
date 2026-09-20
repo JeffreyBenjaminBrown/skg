@@ -1,8 +1,9 @@
 //! NodeTantivy: what Tantivy indexes.
 //!
 //! Title, aliases, and body for full-text search. No relations.
-//! Includes 'misc' because 'Had_ID_Before_Import' feeds the
-//! context-ranking score multiplier (see [[../../../server/context.rs][context.rs]]).
+//! Includes node file properties because 'Had_ID_Before_Import' feeds the
+//! context-ranking score multiplier and 'NoSearchMatching' feeds Tantivy's
+//! mandatory direct-match exclusion.
 
 use crate::types::misc::{ID, MSV, RelPartner, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};

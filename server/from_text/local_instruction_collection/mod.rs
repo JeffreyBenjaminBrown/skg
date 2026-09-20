@@ -39,10 +39,12 @@ use types::CollectedIntents;
 use validate_text_claims::validate_text_claims;
 
 use std::error::Error;
+use std::collections::HashSet;
 
 pub struct NonmergeSavePlan {
   pub define_nodes : Vec<DefineNode>,
   pub source_moves : Vec<SourceMove>,
+  pub boolprop_targets : HashSet<ID>,
   pub warnings     : Vec<String>, // nonfatal, destined for SaveResponse.warnings (e.g. inactive-node rewrite suppression)
   pub post_commit_notice_candidates : Vec<PostCommitNoticeCandidate>,
 }
@@ -63,6 +65,10 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
     collect_instructions_locally (viewforest)
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   validate_text_claims (&collected, graph, config) ?;
+  let boolprop_targets : HashSet<ID> = collected . by_pid . iter ()
+    . filter_map ( |(pid, entry)|
+      entry . boolprop . map ( |_| pid . clone () ) )
+    . collect ();
   let nodeMerge_acquisitions : Vec<(ID, ID)> =
     nodeMerge_pairs (&collected);
   let (resolved, post_commit_notice_candidates)
@@ -109,6 +115,7 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
   Ok (( NonmergeSavePlan {
           define_nodes,
           source_moves,
+          boolprop_targets,
           warnings,
           post_commit_notice_candidates },
         nodeMerge_acquisitions )) }
@@ -151,3 +158,55 @@ fn filter_wouldbe_noop_defineNodes (
              kept {} of {} instructions ({} unchanged filtered out)",
             filtered . len(), initial_count, removed_count);
   filtered }
+
+#[cfg(test)]
+mod property_noop_filter_tests {
+  use super::*;
+  use crate::types::misc::SourceName;
+  use crate::types::nodes::complete::{
+    FileProperty, NodeComplete, empty_node_complete};
+
+  fn node (
+    pid  : &str,
+    misc : Vec<FileProperty>,
+  ) -> NodeComplete {
+    NodeComplete {
+      pid    : ID::from (pid),
+      source : SourceName::from ("main"),
+      title  : pid . to_string (),
+      misc,
+      .. empty_node_complete () }}
+
+  #[test]
+  fn property_only_changes_survive_the_noop_filter () {
+    let disk_nodes : Vec<NodeComplete> = ["root", "left", "right"]
+      . into_iter ()
+      . map (|pid| node (pid, Vec::new ()))
+      . collect ();
+    let graph = InRustGraph::from_nodecompletes (&disk_nodes);
+    let requested : Vec<DefineNode> = disk_nodes . iter ()
+      . cloned ()
+      . map (|mut candidate| {
+        candidate . misc . push (FileProperty::NoSearchMatching);
+        DefineNode::Save (SaveNode (candidate)) })
+      . collect ();
+    let kept = filter_wouldbe_noop_defineNodes (&graph, requested);
+    assert_eq! (kept . len (), 3,
+      "property-only saves must not be discarded as unchanged");
+
+    let unchanged : Vec<DefineNode> = disk_nodes . into_iter ()
+      . map (|candidate| DefineNode::Save (SaveNode (candidate)))
+      . collect ();
+    assert! (filter_wouldbe_noop_defineNodes (&graph, unchanged) . is_empty ());
+  }
+
+  #[test]
+  fn clearing_the_only_property_survives_the_noop_filter () {
+    let disk = node (
+      "root", vec![FileProperty::NoSearchMatching]);
+    let graph = InRustGraph::from_nodecompletes (&[disk . clone ()]);
+    let cleared = node ("root", Vec::new ());
+    assert_eq! (filter_wouldbe_noop_defineNodes (
+      &graph, vec![DefineNode::Save (SaveNode (cleared))]) . len (), 1);
+  }
+}

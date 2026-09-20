@@ -166,7 +166,7 @@ fn linecol_to_viewnode(
       |body| ! body . trim () . is_empty () );
   let ( viewnode, error_opt, warning_opt )
     : ( MpViewnode, Option<BufferValidationError>, Option<String> )
-    = viewnode_from_metadata ( &metadata, title, body_text );
+    = viewnode_from_metadata ( &metadata, title . clone (), body_text );
   if matches! (
     &viewnode . kind,
     MpViewnodeKind::BufferRoot)
@@ -176,7 +176,10 @@ fn linecol_to_viewnode(
   let error_opt : Option<BufferValidationError> =
     error_opt . or_else ( || if body_on_writeProtected {
       Some (match metadata . id . clone () {
-        Some (id) => BufferValidationError::EditedWriteProtectedOccurrence (id),
+        Some (id) => BufferValidationError::EditedWriteProtectedOccurrence {
+          id,
+          title   : title . clone (),
+          changes : vec!["added body text" . to_string ()], },
         None => BufferValidationError::Other (
           "A write-protected node has body text, which saving would discard. Add an ID and edit a definitive occurrence instead."
           . to_string ()), })

@@ -17,6 +17,7 @@ use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::delete_references_to_absent_node::handle_delete_references_to_absent_node_request;
 use crate::serve::handlers::diff_analysis::handle_diff_analysis_request_with_source_set;
 use crate::serve::handlers::relSource_info::handle_relSource_info_request;
+use crate::serve::handlers::boolprop_state::handle_boolprop_state_request;
 use crate::serve::handlers::export_to_org::handle_export_to_org_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_source_set;
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
@@ -210,6 +211,9 @@ fn handle_emacs (
               &mut stream, &runtime . config ),
           Ok (RequestType::RelSourceInfo) =>
             handle_relSource_info_request (
+              &mut stream, &request_header, &env ),
+          Ok (RequestType::BoolPropState) =>
+            handle_boolprop_state_request (
               &mut stream, &request_header, &env ),
           Ok (RequestType::ListSourceSets)
           | Ok (RequestType::ActiveSourceSet)

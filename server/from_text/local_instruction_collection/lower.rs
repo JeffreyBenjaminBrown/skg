@@ -56,6 +56,7 @@ pub struct NodeSaveIntent {
   pub hides_from_its_subscriptions : MSV<ID>,
   pub overrides_view_of : MSV<(ID, Option<SourceName>)>,
   pub misc              : Vec<FileProperty>,
+  pub boolprop_request  : Option<(FileProperty, bool)>,
 }
 
 /// Sources the buffer explicitly requested via '(editRequest
@@ -160,6 +161,7 @@ impl NodeIntent {
         members_msv (&node . hides_from_its_subscriptions),
       overrides_view_of            : no_explicit_msv (&node . overrides_view_of),
       misc                         : node . misc,
+      boolprop_request             : None,
     }) }
 
   pub fn save_intent (
@@ -348,6 +350,7 @@ pub fn lower_collected_intents (
       || leftover . subscribes_to . is_some()
       || leftover . overrides     . is_some()
       || leftover . node_merge    . is_some()
+      || leftover . boolprop      . is_some()
     { return Err ( format!(
         "lower_collected_intents: entry for {} has field intents but no title/body",
         pid )); }}
@@ -389,6 +392,7 @@ fn lower_one_entry (
         overrides_view_of            :
           msv_from_slot (entry . overrides),
         misc                         : Vec::new(),
+        boolprop_request             : entry . boolprop,
       })) }} }
 
 fn msv_from_slot<T> (

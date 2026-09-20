@@ -15,7 +15,7 @@ use skg::dbs::tantivy::search::{
 use skg::dbs::tantivy::write::update_index_with_nodes;
 use skg::types::misc::{ID, MSV, SourceName, TantivyIndex, rel_partners_at_relSource_msv};
 use skg::types::nodes::tantivy::NodeTantivy;
-use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
+use skg::types::nodes::complete::{FileProperty, NodeComplete, empty_node_complete};
 
 #[test]
 fn test_many_tantivy_things (
@@ -414,6 +414,91 @@ fn test_search_body_axis (
     assert_eq! ( top_id, "recipe",
                  "body search should find the recipe node" ); }
   Ok (( )) }
+
+#[test]
+fn no_search_matching_excludes_title_alias_and_body_in_every_query_mode (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let mut excluded : NodeComplete = empty_node_complete ();
+  excluded . pid = ID::new ("excluded");
+  excluded . title = "shaver titletoken" . to_string ();
+  excluded . aliases = rel_partners_at_relSource_msv (
+    &excluded . source,
+    MSV::Specified (vec!["shaver aliastoken" . to_string ()]) );
+  excluded . body = Some ("shaver bodytoken" . to_string ());
+  excluded . misc = vec![FileProperty::NoSearchMatching];
+
+  let mut ordinary : NodeComplete = empty_node_complete ();
+  ordinary . pid = ID::new ("ordinary");
+  ordinary . title = "shaver ordinarytoken" . to_string ();
+
+  let (index, _) = wipe_then_init_tantivy_db (
+    &[excluded . clone (), ordinary],
+    Path::new ("/tmp/tantivy-test-no-search-matching") ) ?;
+
+  let cases : [(&str, SearchOptions); 6] = [
+    ("titletoken", SearchOptions::default ()),
+    ("aliastoken", SearchOptions::default ()),
+    ("bodytoken", SearchOptions {
+      body: true, .. SearchOptions::default () }),
+    ("title.*", SearchOptions {
+      regex: true, .. SearchOptions::default () }),
+    ("shaver AND titletoken", SearchOptions {
+      operators: true, .. SearchOptions::default () }),
+    ("title_or_alias:titletoken", SearchOptions {
+      operators: true, .. SearchOptions::default () }),
+  ];
+  for (terms, opts) in cases {
+    let (matches, _searcher) = search_index (&index, terms, &opts) ?;
+    assert! (matches . is_empty (),
+      "excluded node matched query {:?} with options {:?}", terms, opts); }
+
+  let (matches, searcher) = search_index (
+    &index, "ordinarytoken", &SearchOptions::default ()) ?;
+  assert_eq! (matches . len (), 1);
+  let document : TantivyDocument = searcher . doc (matches [0] . 1) ?;
+  assert_eq! (
+    document . get_first (index . id_field)
+      . and_then (|value| value . as_str ()),
+    Some ("ordinary"));
+  assert_eq! (
+    title_and_source_by_id (&index, &ID::new ("excluded"))
+      . map (|(title, _)| title),
+    Some ("shaver titletoken" . to_string ()),
+    "supporting Tantivy documents remain available to exact-ID lookup");
+
+  excluded . misc . clear ();
+  update_index_with_nodes (&[NodeTantivy::from (&excluded)], &index) ?;
+  let (matches, _) = search_index (
+    &index, "titletoken", &SearchOptions::default ()) ?;
+  assert_eq! (matches . len (), 1,
+    "clearing the property must become searchable without restart");
+  excluded . misc . push (FileProperty::NoSearchMatching);
+  update_index_with_nodes (&[NodeTantivy::from (&excluded)], &index) ?;
+  let (matches, _) = search_index (
+    &index, "titletoken", &SearchOptions::default ()) ?;
+  assert! (matches . is_empty (),
+    "setting the property must stop matching without restart");
+  Ok (( ))
+}
+
+#[test]
+fn no_search_matching_overPrivateText_does_not_trigger_search_preflight (
+) -> Result<(), Box<dyn std::error::Error>> {
+  let mut node : NodeComplete = empty_node_complete ();
+  node . pid = ID::new ("excluded-private");
+  node . title = "private excluded" . to_string ();
+  node . overPrivateText_telescope = true;
+  node . misc = vec![FileProperty::NoSearchMatching];
+  let (index, _) = wipe_then_init_tantivy_db (
+    &[node . clone ()],
+    Path::new ("/tmp/tantivy-test-no-search-private") ) ?;
+  assert! (! has_overPrivateText_telescope (&index) ?);
+
+  node . misc . clear ();
+  update_index_with_nodes (&[NodeTantivy::from (&node)], &index) ?;
+  assert! (has_overPrivateText_telescope (&index) ?);
+  Ok (( ))
+}
 
 #[test]
 fn overPrivateText_telescope_filter_runs_inside_the_search_query (

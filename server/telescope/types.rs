@@ -194,7 +194,7 @@ impl Telescope {
           extra_ids . push ( e . clone () ); }} }
     extra_ids }
 
-  /// Every unrecognized file property any section carries, first
+  /// Every file property any section carries, first
   /// occurrence first. Unioned defensively, like 'extra_ids'.
   pub fn misc (
     &self,

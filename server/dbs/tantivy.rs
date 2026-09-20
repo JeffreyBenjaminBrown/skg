@@ -47,6 +47,8 @@ pub(crate) fn tantivy_index_from_index (
     schema . get_field ("raw_title") ?;
   let overPrivateText_telescope_field : schema::Field =
     schema . get_field ("overPrivateText_telescope") ?;
+  let no_search_matching_field : schema::Field =
+    schema . get_field ("no_search_matching") ?;
   let source_field : schema::Field =
     schema . get_field ("source") ?;
   let context_origin_type_field : schema::Field =
@@ -64,6 +66,7 @@ pub(crate) fn tantivy_index_from_index (
     title_or_alias_field,
     raw_title_field,
     overPrivateText_telescope_field,
+    no_search_matching_field,
     source_field,
     context_origin_type_field,
     is_title_field,
@@ -80,6 +83,8 @@ pub(crate) fn tantivy_index_from_index (
 ///                          textlink syntax that 'title_or_alias' strips.
 /// - "overPrivateText_telescope":      STRING | STORED — "true" when title or body
 ///                          was selected below the node's home.
+/// - "no_search_matching":  STRING | STORED — "true" when this
+///                          document must not directly match text search.
 /// - "source":              STRING | STORED — the source name.
 /// - "context_origin_type": STRING | STORED — Root/CycleMember/Target/…
 /// - "is_title":            STRING | STORED — "true" for the primary title,
@@ -104,6 +109,8 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
     "raw_title", schema::STRING | schema::STORED);
   schema_builder . add_text_field(
     "overPrivateText_telescope", schema::STRING | schema::STORED);
+  schema_builder . add_text_field(
+    "no_search_matching", schema::STRING | schema::STORED);
   schema_builder . add_text_field(
     "source", schema::STRING | schema::STORED);
   schema_builder . add_text_field(

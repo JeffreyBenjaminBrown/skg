@@ -340,7 +340,7 @@ end
 ---or nil if there is none / it produces nothing. Coloring: group base
 ---(C/L blue, S/O/H purple), the reason-for-being token black-on-white,
 ---ancestor letters black-on-yellow, the contains inbound count>1 orange,
----A/I cyan. Tokens ordered C L S O H A I, space-separated.
+---A/I/P cyan. Tokens ordered C L S O H A I P, space-separated.
 ---@param sexp any
 ---@return table[]|nil
 function M.render_rel_facts (sexp)
@@ -375,6 +375,11 @@ function M.render_rel_facts (sexp)
   local extra = assq(rels, 'extraIds')
   if extra then
     add_token({ { 'I' .. tostring(first_number(extra)), 'SkgHeraldCyan' } })
+  end
+  local properties = assq(rels, 'properties')
+  if properties then
+    add_token({ { 'P' .. tostring(first_number(properties)),
+                  'SkgHeraldCyan' } })
   end
   if #chunks == 0 then return nil end
   return chunks

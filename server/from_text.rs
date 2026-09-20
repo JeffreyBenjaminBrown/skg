@@ -146,12 +146,36 @@ pub fn buffer_to_validated_saveplan_with_fork_sources_and_previous_view_in_graph
       return Err ( SaveError::BufferValidationErrors {
         errors,
         warnings : parsing_warnings, } ); }}
+  else {
+    let errors = write_protected_edits
+      ::boolprops_surface_errors_against_graph (&viewforest, graph);
+    if ! errors . is_empty () {
+      return Err ( SaveError::BufferValidationErrors {
+        errors,
+        warnings : parsing_warnings, } ); }}
   let ( nonmerge_plan, nodeMerge_acquisitions )
     : ( NonmergeSavePlan, Vec<(ID, ID)> )
     = crate::from_text::local_instruction_collection
       ::extract_nonmergeSavePlan_locally_in_graph (
         &viewforest, graph, config, restricted_source_set )
  . map_err (SaveError::DatabaseError) ?;
+  { // A boolean-property preference is never an implicit-fork gesture.
+    // Validate while its side-channel identity is still available; the
+    // ordinary foreign-write filter below sees only supplemented SaveNodes.
+    let mut errors : Vec<BufferValidationError> = Vec::new ();
+    for target in &nonmerge_plan . boolprop_targets {
+      match graph . pid_and_source (target) {
+        None => errors . push (
+          BufferValidationError::BoolPropEditOnUnknownNode (
+            target . clone () )),
+        Some ((_pid, source)) if ! config . user_owns_source (&source) =>
+          errors . push (
+            BufferValidationError::BoolPropEditOnForeignNode (
+              target . clone (), source )),
+        Some (_) => {}, }}
+    if ! errors . is_empty () {
+      return Err (SaveError::BufferValidationErrors {
+        errors, warnings : parsing_warnings . clone (), }); }}
   let nodeMerge_instructions : Vec<NodeMerge> =
     // NodeMerge extraction only plans mutations; it does not mutate the saved
     // viewforest. After a successful commit, the common edit-request
