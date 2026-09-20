@@ -24,7 +24,7 @@ struct HiddenInContext {
   subscribee_source   : SourceName,
   subscribee_contains : Vec<ID>,
   subscriber_hides    : Vec<ID>,
-  relationship_sources : HashMap<ID, SourceName>,
+  relSources : HashMap<ID, SourceName>,
 }
 
 /// HiddenInSubscribeeFolder completion (called at this folder's own BFS visit).
@@ -90,7 +90,7 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
       tree, node,
       &goal_list, &removed_ids, &axes_for_removed,
       source_diffs, deleted_since_head_pid_src_map,
-      &context . relationship_sources, runtime ) ?;
+      &context . relSources, runtime ) ?;
   let summary =
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       // TODO/DONE/local-view-update/plan_v2.org §6.0: a HiddenInSubscribeeFolder child that becomes stale (e.g. the user
@@ -130,7 +130,7 @@ fn read_hiddenin_context (
   let (subscriber_pid, subscriber_source) : (ID, SourceName) =
     pid_and_source_from_required_ancestor(
       tree, node, 2, kind . caller_label () ) ?;
-  // Edge-source gating (render-and-gating, 5_plan.org): these are the
+  // relSource gating (render-and-gating, 5_plan.org): these are the
   // subscribee's and subscriber's own outbound lists (contains,
   // hides_from_its_subscriptions), read here to compute a DERIVED
   // membership for a third node (the HiddenInSubscribeeFolder) -- like
@@ -147,21 +147,21 @@ fn read_hiddenin_context (
         &runtime . graph, &runtime . config,
         &subscribee_pid, &subscribee_source ) ?;
     subscribee_nodecomplete . contains . iter ()
-      . filter ( |m| source_active (& m . source) )
+      . filter ( |m| source_active (& m . relSource) )
       . map ( |m| m . member . clone () )
       . collect () };
-  let (subscriber_hides, relationship_sources) : (Vec<ID>, HashMap<ID, SourceName>) = {
+  let (subscriber_hides, relSources) : (Vec<ID>, HashMap<ID, SourceName>) = {
     let subscriber_nodecomplete : NodeComplete =
       nodecomplete_rustFirst_by_pid_and_source (
         &runtime . graph, &runtime . config,
         &subscriber_pid, &subscriber_source ) ?;
     let members = subscriber_nodecomplete . hides_from_its_subscriptions
       . or_default () . iter ()
-      . filter ( |m| source_active (& m . source) )
+      . filter ( |m| source_active (& m . relSource) )
       . collect::<Vec<_>> ();
     ( members . iter () . map ( |m| m . member . clone () ) . collect (),
-      members . iter () . filter ( |m| m . source != subscriber_source )
-        . map ( |m| (m . member . clone (), m . source . clone ()) )
+      members . iter () . filter ( |m| m . relSource != subscriber_source )
+        . map ( |m| (m . member . clone (), m . relSource . clone ()) )
         . collect () ) };
   Ok (HiddenInContext {
     subscriber_pid,
@@ -170,4 +170,4 @@ fn read_hiddenin_context (
     subscribee_source,
     subscribee_contains,
     subscriber_hides,
-    relationship_sources }) }
+    relSources }) }

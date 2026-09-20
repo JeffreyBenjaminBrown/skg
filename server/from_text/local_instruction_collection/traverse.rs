@@ -270,11 +270,11 @@ fn visit_aliasFolder (
         let mut seen : HashSet<String> = HashSet::new ();
         for child in node_ref . children() {
           if let ViewNodeKind::Qual (Qual::Alias {
-            text, rel_source_request, .. })
+            text, relSource_request, .. })
             = &child . value() . kind
           { if seen . insert (text . clone ()) {
               aliases . push (( text . clone (),
-                                rel_source_request . clone () )); }} }
+                                relSource_request . clone () )); }} }
         aliases };
       // The MSV semantics are: an absent folder emits no intent, which
       // lowers to Unspecified, while a present-but-empty folder emits
@@ -338,12 +338,12 @@ fn visit_hiddenOutside_folder (
         match &child . value() . kind {
           ViewNodeKind::Vognode (Vognode::Active (t))
             if member_counts_for_partnerFolder (t) => {
-              if t . rel_source_request . is_some () {
-                return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relationship sources are derived." . to_string ()); }
+              if t . relSource_request . is_some () {
+                return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relSources are derived." . to_string ()); }
               members . push (t . id . clone ()); },
           ViewNodeKind::Phantom (Phantom::Unknown (unknown)) => {
-            if unknown . rel_source_request . is_some () {
-              return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relationship sources are derived." . to_string ()); }
+            if unknown . relSource_request . is_some () {
+              return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relSources are derived." . to_string ()); }
             members . push (unknown . id . clone ()); },
           _ => {}, }}
       collected . instructionMerge_intent (
@@ -404,10 +404,10 @@ fn partnerFolder_members (
       ViewNodeKind::Vognode (Vognode::Active (t))
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . id . clone(),
-                           t . rel_source_request . clone())),
+                           t . relSource_request . clone())),
       ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
           members . push ((unknown . id . clone(),
-                           unknown . rel_source_request . clone())),
+                           unknown . relSource_request . clone())),
       _ => {}, }}
   dedup_members_by_id (members) }
 
@@ -430,10 +430,10 @@ fn subscribeeFolder_members (
       ViewNodeKind::Vognode (Vognode::Active (t))
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . id . clone(),
-                           t . rel_source_request . clone())),
+                           t . relSource_request . clone())),
       ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
           members . push ((unknown . id . clone(),
-                           unknown . rel_source_request . clone())),
+                           unknown . relSource_request . clone())),
       _ => {}, }}
   dedup_members_by_id (members) }
 
@@ -466,13 +466,13 @@ fn content_members (
             // collected_id, not id: a drawn overrider stands for
             // the original member it was drawn in place of.
             t . collected_id (),
-            t . rel_source_request . clone() )); }},
+            t . relSource_request . clone() )); }},
       ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
         // An Unknown is inert as a node, but its raw ID is load-bearing
         // membership data at a structured relationship position. `None` asks
         // disk supplementation to keep an existing destination source sticky.
         contents . push (( unknown . id . clone(),
-                           unknown . rel_source_request . clone() )),
+                           unknown . relSource_request . clone() )),
       _ => {}, }}
   contents }
 

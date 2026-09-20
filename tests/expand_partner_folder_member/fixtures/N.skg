@@ -1,2 +1,9 @@
 pid: N
 title: N
+subscribes_to:
+- Subscribee
+overrides_view_of:
+- Overridden
+hides_from_its_subscriptions:
+- Hidden
+- SubscribeeHidden

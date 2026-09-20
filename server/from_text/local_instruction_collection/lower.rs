@@ -20,8 +20,8 @@
 use crate::from_text::local_instruction_collection::types::{
   CollectedIntents, HiddenOutsideEdit, IntentsForOneId, SubscribeeVisibility };
 use crate::types::misc::{
-  ID, MSV, MemberAtSource, SourceName, members_msv, members_of,
-  members_at_source, members_at_source_msv };
+  ID, MSV, RelPartner, SourceName, members_msv, members_of,
+  rel_partners_at_relSource, rel_partners_at_relSource_msv };
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 
@@ -44,10 +44,10 @@ pub struct NodeSaveIntent {
   // contains / subscribes_to / overrides_view_of pair each member
   // with an Option<SourceName>: Some when the buffer's headline
   // carried an '(editRequest (relSource NAME))' request (see
-  // 'ActiveNode_Generic::rel_source_request', 'NodeIntent_Local'); None means
-  // "derive" (sticky-else-default). 'requested_relationship_sources' extracts the
+  // 'ActiveNode_Generic::relSource_request', 'NodeIntent_Local'); None means
+  // "derive" (sticky-else-default). 'requested_relSources' extracts the
   // Some entries into a side-channel BEFORE 'into_nodecomplete'
-  // discards them, for 'apply_sticky_sources' to validate against
+  // discards them, for 'apply_sticky_relSources' to validate against
   // each edge's floor.
   pub contains          : MSV<(ID, Option<SourceName>)>,
   pub extra_ids         : Vec<ID>,
@@ -61,19 +61,19 @@ pub struct NodeSaveIntent {
 
 /// Sources the buffer explicitly requested via '(editRequest
 /// (relSource NAME))', keyed by member
-/// ID, one map per relation that carries per-member sources (hides is
+/// ID, one map per relation that carries per-member relSources (hides is
 /// absent: it is inferred, and the folder that shows it is read-only --
-/// the set-relationship-source gesture refuses there). Threaded
+/// the set-relSource gesture refuses there). Threaded
 /// separately from
-/// NodeComplete because NodeComplete's 'MemberAtSource::source' is a
+/// NodeComplete because NodeComplete's 'RelPartner::source' is a
 /// plain SourceName with no "was this explicit" flag, and gets
-/// unconditionally resolved by 'apply_sticky_sources' -- this is the
+/// unconditionally resolved by 'apply_sticky_relSources' -- this is the
 /// side-channel that tells that pass which members carry a real,
 /// user-requested source to validate against the default
 /// floor, rather than deriving normally (render-and-gating,
 /// TODO/user-owned_autofork_chain/5_plan.org).
 #[derive(Clone, Debug, Default)]
-pub struct RequestedRelationshipSources {
+pub struct RequestedRelSources {
   pub contains          : HashMap<ID, SourceName>,
   pub aliases           : HashMap<String, SourceName>,
   pub subscribes_to     : HashMap<ID, SourceName>,
@@ -135,7 +135,7 @@ impl NodeIntent {
     // Preserves the MSV Unspecified/Specified distinction, unlike a
     // plain 'or_default()' round-trip.
     fn no_explicit_msv (
-      msv : &MSV<MemberAtSource<ID>>,
+      msv : &MSV<RelPartner<ID>>,
     ) -> MSV<(ID, Option<SourceName>)> {
       match msv {
         MSV::Unspecified   => MSV::Unspecified,
@@ -199,10 +199,10 @@ impl NodeSaveIntent {
 
   /// The sources the buffer explicitly requested (its headlines'
   /// '(relSource NAME)' atoms), read out BEFORE 'into_nodecomplete'
-  /// discards the Option<SourceName> payload. See 'RequestedRelationshipSources'.
-  pub fn requested_relationship_sources (
+  /// discards the Option<SourceName> payload. See 'RequestedRelSources'.
+  pub fn requested_relSources (
     &self,
-  ) -> RequestedRelationshipSources {
+  ) -> RequestedRelSources {
     fn collect (
       list : &[(ID, Option<SourceName>)],
     ) -> HashMap<ID, SourceName> {
@@ -210,7 +210,7 @@ impl NodeSaveIntent {
         . filter_map ( |(id, source)| source . clone ()
                        . map ( |s| (id . clone (), s) ) )
         . collect () }
-    RequestedRelationshipSources {
+    RequestedRelSources {
       contains          : collect (self . contains . or_default ()),
       aliases           : self . aliases . or_default () . iter ()
         . filter_map ( |(text, source)| source . clone ()
@@ -228,7 +228,7 @@ impl NodeSaveIntent {
       title                        : self . title,
       overPrivateText_telescope               : false,
       aliases                      :
-        members_at_source_msv (
+        rel_partners_at_relSource_msv (
           &source,
           match self . aliases {
             MSV::Unspecified => MSV::Unspecified,
@@ -241,14 +241,14 @@ impl NodeSaveIntent {
       body                         :
         crate::types::nodes::complete::normalize_body ( self . body ),
       contains                     :
-        members_at_source (
+        rel_partners_at_relSource (
           &source, ids_only (self . contains . or_default ()) ),
       subscribes_to                :
-        members_at_source_msv (&source, ids_only_msv (self . subscribes_to)),
+        rel_partners_at_relSource_msv (&source, ids_only_msv (self . subscribes_to)),
       hides_from_its_subscriptions :
-        members_at_source_msv (&source, self . hides_from_its_subscriptions),
+        rel_partners_at_relSource_msv (&source, self . hides_from_its_subscriptions),
       overrides_view_of            :
-        members_at_source_msv (&source, ids_only_msv (self . overrides_view_of)),
+        rel_partners_at_relSource_msv (&source, ids_only_msv (self . overrides_view_of)),
       misc                         : self . misc,
     };
     node . normalize_ids ();

@@ -14,7 +14,7 @@
 //! subcommand both call it.
 
 use crate::source_sets::ActiveSourceSet;
-use crate::types::misc::{ID, MemberAtSource};
+use crate::types::misc::{ID, RelPartner};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::textlinks::replace_each_link_with_its_label;
 
@@ -279,7 +279,7 @@ fn discover_roots (
   for parent in &sorted {
     let marker_children : Vec<String> =
       parent . contains . iter ()
-      . filter ( |m| edge_active (m, active) )
+      . filter ( |m| relSource_is_active (m, active) )
       . map ( |m| &m . member )
       . filter_map ( |cid|
         marker_target . get (
@@ -410,7 +410,7 @@ fn collect_events (
     // pop (and thus render) in forward order.
     let mut kids : Vec<ID> = Vec::new ();
     for member in node . contains . iter () {
-      if ! edge_active (member, active) { continue; } // the EDGE's
+      if ! relSource_is_active (member, active) { continue; } // the EDGE's
         // source is inactive: the visible fold omits it, even when
         // the child's home is active.
       let cpid : ID = resolve_pid (&member . member, alias_to_pid);
@@ -627,13 +627,13 @@ fn node_active (
   active . is_all () || active . contains_source (&node . source) }
 
 /// Whether an EDGE is visible under the active set: its recorded
-/// recording source must be active. (The visible fold = active
+/// relSource must be active. (The visible fold = active
 /// sections' lists only.)
-fn edge_active (
-  member : &MemberAtSource<ID>,
+fn relSource_is_active (
+  member : &RelPartner<ID>,
   active : &ActiveSourceSet,
 ) -> bool {
-  active . is_all () || active . contains_source (&member . source) }
+  active . is_all () || active . contains_source (&member . relSource) }
 
 fn anchor_text (
   node : &NodeComplete,

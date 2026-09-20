@@ -13,11 +13,11 @@ use skg::save::update_fs_from_saveinstructions;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::nodes::fs::NodeFS;
 use skg::types::misc::{
-  ID, MSV, MemberAtSource, SkgConfig, SkgfileSource, SourceName,
-  members_at_source_msv,
+  ID, MSV, RelPartner, SkgConfig, SkgfileSource, SourceName,
+  rel_partners_at_relSource_msv,
 };
 use skg::types::save::{DefineNode, SaveNode};
-use skg::test_utils::set_source_retagging_member_sources;
+use skg::test_utils::set_source_retagging_relSources;
 use skg::test_utils::{run_with_test_stores, nodecomplete_example};
 
 const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
@@ -68,7 +68,7 @@ fn test_node_io() {
 
   // Write the example node to a file
   let mut example : NodeComplete = nodecomplete_example();
-  set_source_retagging_member_sources ( &mut example, &SourceName::from ("output") );
+  set_source_retagging_relSources ( &mut example, &SourceName::from ("output") );
   write_nodecomplete_to_source ( &example, &config )
     . unwrap ();
 
@@ -76,7 +76,7 @@ fn test_node_io() {
   let read_node : NodeComplete = nodecomplete_from_pid_and_source (
     &config, example . pid . clone(), &SourceName::from ("output") ) . unwrap ();
   let mut reversed = reverse_some_of_node (&read_node);
-  set_source_retagging_member_sources ( &mut reversed, &SourceName::from ("output") );
+  set_source_retagging_relSources ( &mut reversed, &SourceName::from ("output") );
   reversed . pid = ID::new ("reversed");
 
   write_nodecomplete_to_source(&reversed, &config) . unwrap();
@@ -130,7 +130,7 @@ fn verify_body_not_needed() {
     "/tmp/file_io_test/example.skg" ) . unwrap();
   let mut node = nodecomplete_from_pid_and_source (
     &config, ID::new ("example"), &SourceName::from ("output") ) . unwrap();
-  set_source_retagging_member_sources ( &mut node, &SourceName::from ("output") );
+  set_source_retagging_relSources ( &mut node, &SourceName::from ("output") );
   node . body = None; // mutate it
   node . pid = ID::new ("no_unindexed"); // match pid to filename
   write_nodecomplete_to_source(
@@ -160,7 +160,7 @@ pub fn reverse_some_of_node(node: &NodeComplete) -> NodeComplete {
   // to show reading from and writing to disk work;
   // there's no other reason anyone would want to do this.
   let reversed_contains = {
-    let mut v : Vec<MemberAtSource<ID>> = node . contains . clone();
+    let mut v : Vec<RelPartner<ID>> = node . contains . clone();
     v . reverse();
     v };
   let reversed_subscribes_to = match node . subscribes_to . clone() {
@@ -208,7 +208,7 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
   { test_node . title = "Title with two textlinks: [[(id textlink1][First) TextLink]] and [[(id textlink2][Second) TextLink]]"
       . to_string();
     test_node . source = SourceName::from ("temp");
-    test_node . aliases = members_at_source_msv (
+    test_node . aliases = rel_partners_at_relSource_msv (
       &test_node . source,
       MSV::Specified(vec![ "alias 1" . to_string(),
                            "alias 2" . to_string() ]));

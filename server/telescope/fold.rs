@@ -1,5 +1,5 @@
 //! The FOLD: sections (per-source slices, most public first) -> the
-//! node's effective lists of members at sources. Total and deterministic: junk
+//! node's effective lists of relation partners. Total and deterministic: junk
 //! degrades to 'FoldWarning's, never errors (see types.rs).
 //!
 //! Semantics, per ordered relation: the fold THROUGH source k is
@@ -18,13 +18,13 @@
 //! public occurrence, with a warning.
 
 use crate::telescope::types::{FoldWarning, ListItem, SectionSlices, Telescope};
-use crate::types::misc::{ID, MSV, MemberAtSource, SourceName};
+use crate::types::misc::{ID, MSV, RelPartner, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 use std::collections::HashMap;
 use std::io;
 
-/// The fold of one node's sections, as effective lists of members at sources plus
+/// The fold of one node's sections, as effective lists of relation partners plus
 /// title/body text. Field names mirror 'NodeComplete'.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FoldedNode {
@@ -36,11 +36,11 @@ pub struct FoldedNode {
   // None = NO section mentioned the field (lowers to
   // MSV::Unspecified); contains has no such distinction, like
   // NodeComplete's.
-  pub aliases                      : Option<Vec<MemberAtSource<String>>>,
-  pub contains                     : Vec<MemberAtSource<ID>>,
-  pub subscribes_to                : Option<Vec<MemberAtSource<ID>>>,
-  pub hides_from_its_subscriptions : Option<Vec<MemberAtSource<ID>>>,
-  pub overrides_view_of            : Option<Vec<MemberAtSource<ID>>>,
+  pub aliases                      : Option<Vec<RelPartner<String>>>,
+  pub contains                     : Vec<RelPartner<ID>>,
+  pub subscribes_to                : Option<Vec<RelPartner<ID>>>,
+  pub hides_from_its_subscriptions : Option<Vec<RelPartner<ID>>>,
+  pub overrides_view_of            : Option<Vec<RelPartner<ID>>>,
 }
 
 /// THE fold entry point: one telescope on disk -> the effective
@@ -101,8 +101,8 @@ pub fn nodecomplete_from_fold (
     || folded . body_source . as_ref ()
        .map ( |source| source != &home )
        .unwrap_or (false);
-  let msv = |o : Option<Vec<MemberAtSource<ID>>>|
-  -> MSV<MemberAtSource<ID>> {
+  let msv = |o : Option<Vec<RelPartner<ID>>>|
+  -> MSV<RelPartner<ID>> {
     match o {
       None     => MSV::Unspecified,
       Some (v) => MSV::Specified (v), }};
@@ -199,12 +199,12 @@ pub fn fold_sections (
       // but members are strings, deduped verbatim.
       let mut seen : std::collections::HashSet<String> =
         std::collections::HashSet::new ();
-      let mut out : Vec<MemberAtSource<String>> = Vec::new ();
+      let mut out : Vec<RelPartner<String>> = Vec::new ();
       for (source, s) in sections {
         if let Some (aliases) = &s . aliases {
           for a in aliases {
             if seen . insert ( a . clone () ) {
-              out . push ( MemberAtSource::at_source (
+              out . push ( RelPartner::at_relSource (
                 source . clone (), a . clone () )); }
             else {
               // No per-alias id to report; reuse DuplicateMember with
@@ -221,8 +221,8 @@ fn fold_ordered (
   slice_of : impl Fn (&SectionSlices) -> Option<&[ListItem]>,
   resolve  : &dyn Fn (&ID) -> ID,
   warnings : &mut Vec<FoldWarning>,
-) -> Vec<MemberAtSource<ID>> {
-  let mut effective : Vec<MemberAtSource<ID>> = Vec::new ();
+) -> Vec<RelPartner<ID>> {
+  let mut effective : Vec<RelPartner<ID>> = Vec::new ();
   let mut any_section_yet : bool = false;
   for (source, s) in sections {
     let Some (items) = slice_of (s) else { continue; };
@@ -279,12 +279,12 @@ fn fold_ordered (
         warnings . push ( FoldWarning::DuplicateMember {
           member : id . clone () } );
         false }};
-    let mut next : Vec<MemberAtSource<ID>> =
+    let mut next : Vec<RelPartner<ID>> =
       Vec::with_capacity ( effective . len ()
                            + prepend . len () );
     for id in prepend {
       if keep (&id, warnings) {
-        next . push ( MemberAtSource::at_source (
+        next . push ( RelPartner::at_relSource (
           source . clone (), id )); }}
     for m in effective {
       let key : ID = resolve ( &m . member );
@@ -292,7 +292,7 @@ fn fold_ordered (
       if let Some (queue) = queues . remove (&key) {
         for id in queue {
           if keep (&id, warnings) {
-            next . push ( MemberAtSource::at_source (
+            next . push ( RelPartner::at_relSource (
               source . clone (), id )); }} }}
     effective = next; }
   effective }
@@ -304,15 +304,15 @@ fn fold_unordered (
   slice_of : impl Fn (&SectionSlices) -> Option<&[ID]>,
   resolve  : &dyn Fn (&ID) -> ID,
   warnings : &mut Vec<FoldWarning>,
-) -> Vec<MemberAtSource<ID>> {
+) -> Vec<RelPartner<ID>> {
   let mut seen : std::collections::HashSet<ID> =
     std::collections::HashSet::new ();
-  let mut out : Vec<MemberAtSource<ID>> = Vec::new ();
+  let mut out : Vec<RelPartner<ID>> = Vec::new ();
   for (source, s) in sections {
     let Some (members) = slice_of (s) else { continue; };
     for id in members {
       if seen . insert ( resolve (id) ) {
-        out . push ( MemberAtSource::at_source (
+        out . push ( RelPartner::at_relSource (
           source . clone (), id . clone () ));
       } else {
         warnings . push ( FoldWarning::DuplicateMember {

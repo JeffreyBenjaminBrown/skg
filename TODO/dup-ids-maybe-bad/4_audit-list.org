@@ -197,7 +197,7 @@
 
    Negative inventory -- initialized endpoints that do not return graph
    title/body text -- needs no text-release challenge: verify/close/shutdown,
-   list/current source-set, edge-source-info, get-file-path, herald rules,
+   list/current source-set, relSource-info, get-file-path, herald rules,
    rebuild, strip-body-whitespace, and stage-moves. Their replies contain
    status, source/path metadata, presentation rules, or a staging script,
    not protected title/body text. Save lock messages and the Hoist and

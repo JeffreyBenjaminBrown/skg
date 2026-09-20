@@ -463,9 +463,9 @@ fn content_members (
   node . children () . filter_map ( |child| match &child . value () . kind {
     ViewNodeKind::Vognode (Vognode::Active (active))
       if active_child_counts_as_content (active) =>
-        Some ((active . collected_id (), active . rel_source_request . clone ())),
+        Some ((active . collected_id (), active . relSource_request . clone ())),
     ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
-      Some ((unknown . id . clone (), unknown . rel_source_request . clone ())),
+      Some ((unknown . id . clone (), unknown . relSource_request . clone ())),
     _ => None,
   }) . collect ()
 }
@@ -476,9 +476,9 @@ fn aliases (
   node . children () . find ( |child| matches! (
     &child . value () . kind, ViewNodeKind::QualFolder (QualFolder::Alias)))
     . map ( |alias_folder| alias_folder . children () . filter_map ( |alias| {
-      let ViewNodeKind::Qual (Qual::Alias { text, rel_source_request, .. }) =
+      let ViewNodeKind::Qual (Qual::Alias { text, relSource_request, .. }) =
         &alias . value () . kind else { return None; };
-      Some ((text . clone (), rel_source_request . clone ()))
+      Some ((text . clone (), relSource_request . clone ()))
     }) . collect () )
 }
 
@@ -492,9 +492,9 @@ fn partner_members (
       match &member . value () . kind {
         ViewNodeKind::Vognode (Vognode::Active (active))
           if member_counts_for_partnerFolder (active) =>
-            Some ((active . id . clone (), active . rel_source_request . clone ())),
+            Some ((active . id . clone (), active . relSource_request . clone ())),
         ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
-          Some ((unknown . id . clone (), unknown . rel_source_request . clone ())),
+          Some ((unknown . id . clone (), unknown . relSource_request . clone ())),
         _ => None,
       }
     }) . collect () )

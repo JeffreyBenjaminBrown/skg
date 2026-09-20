@@ -4,7 +4,7 @@
 //! derived fields), plus textlinks_to — derived from body parsing at
 //! NodeRust construction time.
 
-use crate::types::misc::{ID, MSV, MemberAtSource, SourceName};
+use crate::types::misc::{ID, MSV, RelPartner, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::textlinks::textlinks_from_node;
 
@@ -15,12 +15,12 @@ pub struct NodeRust {
   pub extra_ids                    : Vec<ID>,
   pub title                        : String,
   pub overPrivateText_telescope               : bool,
-  pub aliases                      : MSV<MemberAtSource<String>>,
+  pub aliases                      : MSV<RelPartner<String>>,
   pub body                         : Option<String>,
-  pub contains                     : Vec<MemberAtSource<ID>>,
-  pub subscribes_to                : MSV<MemberAtSource<ID>>,
-  pub hides_from_its_subscriptions : MSV<MemberAtSource<ID>>,
-  pub overrides_view_of            : MSV<MemberAtSource<ID>>,
+  pub contains                     : Vec<RelPartner<ID>>,
+  pub subscribes_to                : MSV<RelPartner<ID>>,
+  pub hides_from_its_subscriptions : MSV<RelPartner<ID>>,
+  pub overrides_view_of            : MSV<RelPartner<ID>>,
   pub misc                         : Vec<FileProperty>,
   // PITFALL: derived from the text.
   // Parsed from title+body via 'textlinks_from_node' during

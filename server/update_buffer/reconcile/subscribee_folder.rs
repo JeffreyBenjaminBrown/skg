@@ -7,7 +7,7 @@ use crate::to_org::complete::partner_folder::goal_list::{goal_list_for_outbound_
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::phantom::phantom_axes;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::misc::{ID, MemberAtSource, SourceName};
+use crate::types::misc::{ID, RelPartner, SourceName};
 use crate::types::tree::generic::{read_at_node_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child_of_viewnode, insert_scaffold_as_child};
 use crate::update_buffer::ancestry::required_ancestor;
@@ -23,7 +23,7 @@ struct SubscribeeFolderContext {
   parent_pid             : ID,
   parent_source          : SourceName,
   worktree_subscribees   : Vec<ID>,
-  relationship_sources   : HashMap<ID, SourceName>,
+  relSources   : HashMap<ID, SourceName>,
 }
 
 /// SubscribeeFolder completion. Called at this folder's own visit in the level-order
@@ -102,7 +102,7 @@ pub fn reconcile_subscribeeFolder_children (
         tree, node,
         &goal_list, &removed_ids, &axes_for_removed,
         source_diffs, deleted_since_head_pid_src_map,
-        &context . relationship_sources, runtime ) ?;
+        &context . relSources, runtime ) ?;
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       tree, node, kind,
       &goal_list, &child_data, deleted_by_this_save_extra_ids ) ?;
@@ -141,8 +141,8 @@ fn read_subscribeeFolder_context (
         _ => None } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
     . ok_or ("reconcile_subscribeeFolder_children: parent is not an ActiveNode") ?;
-  let worktree_members : Vec<MemberAtSource<ID>> =
-    // Edge-source gating (render-and-gating, 5_plan.org): this is the
+  let worktree_members : Vec<RelPartner<ID>> =
+    // relSource gating (render-and-gating, 5_plan.org): this is the
     // OWNER's own outbound list (like 'contains' in
     // reconcile/content.rs), so a subscription recorded at an
     // inactive level must not appear here even though the
@@ -154,24 +154,24 @@ fn read_subscribeeFolder_context (
               . filter ( |m| match active_source_set {
                   None      => true,
                   Some (a)  => a . is_all ()
-                    || a . contains_source (& m . source) } )
+                    || a . contains_source (& m . relSource) } )
               . cloned ()
               . collect () )
       . unwrap_or_default ();
   let worktree_subscribees : Vec<ID> =
     worktree_members . iter () . map ( |m| m . member . clone () ) . collect ();
-  let relationship_sources : HashMap<ID, SourceName> =
+  let relSources : HashMap<ID, SourceName> =
     worktree_members . into_iter ()
       // An unresolved destination has no home of its own, so the
       // relationship default is the subscriber's home.  Only retain an
       // off-default fact for the Unknown's display metadata.
-      . filter ( |m| m . source != parent_source )
-      . map ( |m| (m . member, m . source) ) . collect ();
+      . filter ( |m| m . relSource != parent_source )
+      . map ( |m| (m . member, m . relSource) ) . collect ();
   Ok (SubscribeeFolderContext {
     parent_pid,
     parent_source,
     worktree_subscribees,
-    relationship_sources }) }
+    relSources }) }
 
 fn ensure_hiddenOutsideOfSubscribeeFolder_is_last (
   tree : &mut Tree<ViewNode>,

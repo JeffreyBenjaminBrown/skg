@@ -5,7 +5,7 @@ use skg::dbs::in_rust_graph::override_invariants::{
   validate_affected_override_invariants,
   validate_override_invariants,
 };
-use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, members_at_source};
+use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, rel_partners_at_relSource};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::save::{DefineNode, DeleteNode, SaveNode};
 
@@ -46,7 +46,7 @@ fn node (
       MSV::Unspecified
     } else {
       MSV::Specified (
-        members_at_source (
+        rel_partners_at_relSource (
           &node . source,
           overrides . iter ()
           . map ( |id| ID::from (*id) )

@@ -59,7 +59,7 @@ pub struct ID ( pub String );
 /// Comparison identity for a stored structured-relationship member.
 /// Resolvable IDs compare by their canonical PID (so primary and extra IDs
 /// remain one node); an unresolved raw ID compares byte-for-byte.  This key is
-/// never serialization data: callers keep the original `MemberAtSource.member`
+/// never serialization data: callers keep the original `RelPartner.member`
 /// when an edge is retained or rewritten.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum RelationshipMemberKey {
@@ -107,62 +107,62 @@ impl From<SkgfileSourceToml> for SkgfileSource {
       user_owns_it : false, // derived later; see the field's comment
     }}}
 
-/// A member of a node's relationship list, tagged with the
-/// relationship instance's recording SOURCE: the source whose telescope
-/// section records this edge. The source is about the EDGE, not the
-/// member node (a public node can be a private member). Default
-/// source comes from the applicable relationship-default rule;
-/// 'skg-set-relationship-source' may move its privacy anywhere at
-/// least as private as that default;
+/// One entry in a node's relationship list: the member and the
+/// relationship instance's relSource (the source whose telescope
+/// section records the relationship). The relSource is about the
+/// RELATIONSHIP, not the member node (a public node can be a private
+/// member). Its default comes from the applicable relSource rule;
+/// 'skg-set-relSource' may move its privacy anywhere at least as
+/// private as that default;
 /// renormalization never lowers its privacy (the sticky rule). See
 /// TODO/user-owned_autofork_chain/5_plan.org and
 /// BUG-and-fix_make-edge-more-public.org.
 ///
-/// Every value records the source whose section contains it.
+/// Every value records the relSource whose section contains it.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct MemberAtSource<T> {
-  pub source : SourceName,
-  pub member : T,
+pub struct RelPartner<T> {
+  pub relSource : SourceName,
+  pub member    : T,
 }
 
-impl<T> MemberAtSource<T> {
-  pub fn at_source (
-    source : SourceName,
-    member : T,
-  ) -> MemberAtSource<T> {
-    MemberAtSource { source, member }}}
+impl<T> RelPartner<T> {
+  pub fn at_relSource (
+    relSource : SourceName,
+    member    : T,
+  ) -> RelPartner<T> {
+    RelPartner { relSource, member }}}
 
-/// Tag every member of a list with one recording source.
-pub fn members_at_source<T> (
-  source  : &SourceName,
-  members : Vec<T>,
-) -> Vec<MemberAtSource<T>> {
+/// Tag every member of a list with one relSource.
+pub fn rel_partners_at_relSource<T> (
+  relSource : &SourceName,
+  members   : Vec<T>,
+) -> Vec<RelPartner<T>> {
   members . into_iter ()
-    . map ( |m| MemberAtSource::at_source (
-      source . clone (), m ) )
+    . map ( |m| RelPartner::at_relSource (
+      relSource . clone (), m ) )
     . collect () }
 
-/// The values in a list of members at sources, sources dropped.
+/// The values in a list of relation partners, sources dropped.
 pub fn members_of<T : Clone> (
-  list : &[MemberAtSource<T>],
+  list : &[RelPartner<T>],
 ) -> Vec<T> {
   list . iter ()
     . map ( |m| m . member . clone () )
     . collect () }
 
-/// 'members_at_source' lifted over MSV.
-pub fn members_at_source_msv<T> (
-  source : &SourceName,
-  msv    : MSV<T>,
-) -> MSV<MemberAtSource<T>> {
+/// 'rel_partners_at_relSource' lifted over MSV.
+pub fn rel_partners_at_relSource_msv<T> (
+  relSource : &SourceName,
+  msv       : MSV<T>,
+) -> MSV<RelPartner<T>> {
   match msv {
     MSV::Unspecified     => MSV::Unspecified,
     MSV::Specified (v)   =>
-      MSV::Specified ( members_at_source (source, v) ), }}
+      MSV::Specified ( rel_partners_at_relSource (relSource, v) ), }}
 
 /// 'members_of' lifted over MSV.
 pub fn members_msv<T : Clone> (
-  msv : &MSV<MemberAtSource<T>>,
+  msv : &MSV<RelPartner<T>>,
 ) -> MSV<T> {
   match msv {
     MSV::Unspecified     => MSV::Unspecified,
@@ -197,7 +197,7 @@ pub struct SkgConfig {
   // which loses it). Filled at parse time by the config loaders; empty
   // for dummy/test configs, where the config-order helpers fall back to
   // alphabetical. LOAD-BEARING: declaration order is the privacy order
-  // (most public first); the fold, the edge-source defaults, the
+  // (most public first); the fold, the relSource defaults, the
   // validators, and prefix source-sets all read it, through the
   // comparison chokepoint methods below ('ordered_sources',
   // 'source_position', 'is_strictly_more_public', 'more_private_of',
@@ -568,7 +568,7 @@ impl SkgConfig {
       _                      => false, }}
 
   /// The more private of the two (the later in the privacy order);
-  /// 'b' on a tie. This is the edge-source default rule's core: a
+  /// 'b' on a tie. This is the relSource default rule's core: a
   /// relationship instance normally defaults to the source of the more private
   /// of its two endpoints' homes.
   pub fn more_private_of (
@@ -578,12 +578,12 @@ impl SkgConfig {
   ) -> SourceName {
     if self . is_strictly_more_public (&b, &a) { a } else { b }}
 
-  /// The default recording source for a writable node-to-node
+  /// The default relSource for a writable node-to-node
   /// relationship. Between owned nodes, use the more-private home.
   /// From an owned owner to a foreign member, use the owner's home:
   /// Skg may expose the foreign ID there, but never proposes writing
   /// a relationship into the foreign source.
-  pub fn relationship_default_source (
+  pub fn default_relSource (
     &self,
     owner_home : &SourceName,
     member_home : &SourceName,

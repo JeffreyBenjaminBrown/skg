@@ -13,7 +13,7 @@ use skg::dbs::tantivy::escape::{escape_tantivy_intra_word, escape_tantivy_litera
 use skg::dbs::tantivy::search::{
   SearchOptions, has_overPrivateText_telescope, search_index};
 use skg::dbs::tantivy::write::update_index_with_nodes;
-use skg::types::misc::{ID, MSV, SourceName, TantivyIndex, members_at_source_msv};
+use skg::types::misc::{ID, MSV, SourceName, TantivyIndex, rel_partners_at_relSource_msv};
 use skg::types::nodes::tantivy::NodeTantivy;
 use skg::types::nodes::complete::{FileProperty, NodeComplete, empty_node_complete};
 
@@ -183,17 +183,17 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let mut apple  = empty_node . clone();
   { apple . pid      = ID::new ("apple");
     apple . title    =               "eat apple" . to_string();
-    apple . aliases  = members_at_source_msv ( & apple . source, MSV::Specified(vec![    "munch apple" . to_string(),
+    apple . aliases  = rel_partners_at_relSource_msv ( & apple . source, MSV::Specified(vec![    "munch apple" . to_string(),
                                     "chomp apple" . to_string() ])); }
   let mut banana = empty_node . clone();
   { banana . pid     = ID::new ("banana");
     banana . title   =               "eat banana" . to_string();
-    banana . aliases = members_at_source_msv ( & banana . source, MSV::Specified(vec![    "chomp banana" . to_string(),
+    banana . aliases = rel_partners_at_relSource_msv ( & banana . source, MSV::Specified(vec![    "chomp banana" . to_string(),
                                     "throw banana" . to_string()])); }
   let mut kiwi   = empty_node . clone();
   { kiwi . pid       = ID::new ("kiwi");
     kiwi . title     =               "eat kiwi" . to_string();
-    kiwi . aliases   = members_at_source_msv ( & kiwi . source, MSV::Specified(vec![    "munch kiwi" . to_string()])); }
+    kiwi . aliases   = rel_partners_at_relSource_msv ( & kiwi . source, MSV::Specified(vec![    "munch kiwi" . to_string()])); }
   let nodes = vec![apple, banana, kiwi];
 
   // Create Tantivy index - use a separate directory to avoid conflicts with test_many_tantivy_things
@@ -421,7 +421,7 @@ fn no_search_matching_excludes_title_alias_and_body_in_every_query_mode (
   let mut excluded : NodeComplete = empty_node_complete ();
   excluded . pid = ID::new ("excluded");
   excluded . title = "shaver titletoken" . to_string ();
-  excluded . aliases = members_at_source_msv (
+  excluded . aliases = rel_partners_at_relSource_msv (
     &excluded . source,
     MSV::Specified (vec!["shaver aliastoken" . to_string ()]) );
   excluded . body = Some ("shaver bodytoken" . to_string ());
@@ -511,7 +511,7 @@ fn overPrivateText_telescope_filter_runs_inside_the_search_query (
   overPrivateText . pid = ID::new ("overPrivateText");
   overPrivateText . title = "shared privacy term" . to_string ();
   overPrivateText . overPrivateText_telescope = true;
-  overPrivateText . aliases = members_at_source_msv (
+  overPrivateText . aliases = rel_partners_at_relSource_msv (
     &SourceName::from ("main"),
     MSV::Specified (vec! ["dirty alias secret" . to_string ()]) );
   let (index, _) = wipe_then_init_tantivy_db (
@@ -785,7 +785,7 @@ fn test_title_by_id_returns_title_not_alias (
   let mut node = empty_node . clone ();
   { node . pid     = ID::new ("node-with-aliases");
     node . title   =               "The Real Title" . to_string ();
-    node . aliases = members_at_source_msv ( & node . source, MSV::Specified (vec![   "Alias One" . to_string (),
+    node . aliases = rel_partners_at_relSource_msv ( & node . source, MSV::Specified (vec![   "Alias One" . to_string (),
                                    "Alias Two" . to_string () ])); }
   let nodes : Vec<NodeComplete> = vec![node];
   let index_dir : &str =

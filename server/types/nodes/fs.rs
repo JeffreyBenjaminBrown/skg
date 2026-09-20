@@ -25,7 +25,7 @@
 use serde::{Serialize, Deserialize};
 
 use crate::telescope::types::{ListItem, SectionSlices};
-use crate::types::misc::{ID, MSV, SourceName, members_at_source, members_at_source_msv};
+use crate::types::misc::{ID, MSV, SourceName, rel_partners_at_relSource, rel_partners_at_relSource_msv};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::complete::FileProperty;
 
@@ -111,21 +111,21 @@ impl NodeFS {
       title                        :
         self . title . unwrap_or_default (),
       overPrivateText_telescope               : false,
-      aliases                      : members_at_source_msv (
+      aliases                      : rel_partners_at_relSource_msv (
         &source,
         if self . aliases . is_empty () { MSV::Unspecified }
         else { MSV::Specified ( self . aliases ) } ),
       pid                          : self . pid,
       extra_ids                    : self . extra_ids,
       body                         : self . body,
-      contains                     : members_at_source (
+      contains                     : rel_partners_at_relSource (
         &source, members_only ( self . contains ) ),
-      subscribes_to                : members_at_source_msv (
+      subscribes_to                : rel_partners_at_relSource_msv (
         &source, msv_ids ( members_only ( self . subscribes_to ) ) ),
-      hides_from_its_subscriptions : members_at_source_msv (
+      hides_from_its_subscriptions : rel_partners_at_relSource_msv (
         &source,
         msv_ids ( self . hides_from_its_subscriptions ) ),
-      overrides_view_of            : members_at_source_msv (
+      overrides_view_of            : rel_partners_at_relSource_msv (
         &source, msv_ids ( self . overrides_view_of ) ),
       misc                         : self . misc,
       source,

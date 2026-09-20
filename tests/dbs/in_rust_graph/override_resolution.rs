@@ -4,7 +4,7 @@ use skg::dbs::in_rust_graph::override_resolution::{
   resolve_override,
 };
 use skg::source_sets::{ActiveSourceSet, SourceSetName};
-use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, members_at_source};
+use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, rel_partners_at_relSource};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
 use std::collections::HashMap;
@@ -50,7 +50,7 @@ fn node (
       MSV::Unspecified
     } else {
       MSV::Specified (
-        members_at_source (
+        rel_partners_at_relSource (
           &node . source,
           overrides . iter ()
           . map ( |id| ID::from (*id) )

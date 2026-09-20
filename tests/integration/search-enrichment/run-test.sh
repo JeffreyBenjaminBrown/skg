@@ -32,7 +32,7 @@ port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
 
 [[sources]]
-name = "main"
+name = "Mr Cheese"
 path = "$TEST_DIR/data/owned/skg-data"
 EOF
 

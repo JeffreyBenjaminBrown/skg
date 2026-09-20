@@ -12,7 +12,7 @@ use crate::to_org::complete::partner_folder::goal_list::{
 use crate::to_org::complete::partner_folder::inverse_scan::inverse_scan_for_inbound_folder;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
-use crate::types::misc::{ID, MemberAtSource, SourceName};
+use crate::types::misc::{ID, RelPartner, SourceName};
 use crate::source_sets::ActiveSourceSet;
 use crate::types::phantom::{phantom_axes, home_from_disk};
 use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
@@ -63,11 +63,11 @@ pub fn reconcile_partnerFolder_children (
       . or_else ( || home_from_disk (id, &runtime . config) ) };
   let outbound : bool = // the folder shows a list in the OWNER's file
     owner_role . is_first_role ();
-  let raw_outbound_members : Vec<MemberAtSource<ID>> = if outbound {
+  let raw_outbound_members : Vec<RelPartner<ID>> = if outbound {
     // Preserve an unresolved ID through this outbound surface.  The old
     // canonical-PID accessor is still right for inverse/read-only folders, but
     // would erase an Unknown from the writable OverriddenFolder.
-    graph_snap . outbound_members_at_sources_for_relation_gated (
+    graph_snap . outbound_rel_partners_for_relation_gated (
       &owner_pid, member_role . relation, active_source_set )
   } else { Vec::new () };
   let inbound_scan : HashMap<ID, MembershipAxes> =
@@ -179,18 +179,18 @@ pub fn reconcile_partnerFolder_children (
   // vognode already spent its budget unit when it expanded, so drawing all the
   // relation members here costs nothing and never truncates the group. (The
   // budget bounds how many vognodes EXPAND, not how big one group is.)
-  let relationship_sources : HashMap<ID, SourceName> =
+  let relSources : HashMap<ID, SourceName> =
     raw_outbound_members . iter ()
       . filter (|member| graph_snap . pid_of (&member . member) . is_none ())
-      . filter (|member| member . source != owner_source)
-      . map (|member| (member . member . clone (), member . source . clone ()))
+      . filter (|member| member . relSource != owner_source)
+      . map (|member| (member . member . clone (), member . relSource . clone ()))
       . collect ();
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
       tree, node,
       &goal_list, &removed_ids, axes_for_removed,
       source_diffs, deleted_since_head_pid_src_map,
-      &relationship_sources, runtime ) ?;
+      &relSources, runtime ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §6.0/§16: the reconciler deletes a stale member that is a view-leaf and
   // demotes one that is a branch, so a read-only PartnerFolder
   // drops a stale leaf member instead of preserving it.

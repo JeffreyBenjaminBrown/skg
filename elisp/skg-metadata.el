@@ -145,7 +145,7 @@ without an explicit gesture; see
 TODO/MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org),
 offers to publicize them in the same go by writing
 `(editRequest (relSource ...))' requests; declining leaves them and mentions that
-`skg-set-relationship-source-recursive' (C-c s R) can publicize them
+`skg-set-relSource-recursive' (C-c s R) can publicize them
 later.
 
 Write-protected instances are NOT changed -- the save would silently
@@ -197,7 +197,7 @@ report -- loudly, when write-protected instances were skipped."
                               (length stuck)
                               (if (= (length stuck) 1) "" "s")
                               (if (= (length stuck) 1) "" "s"))))
-            (skg--apply-stuck-edge-sources stuck))))
+            (skg--apply-stuck-relSources stuck))))
     (dolist (id write-protected-ids)
       (message "skg-set-source: write-protected instance NOT changed (the save would ignore it): %s"
                id))
@@ -224,7 +224,7 @@ the move would leave stuck in a more private source than their new
 default, as a list of (MARKER . SOURCE) -- MARKER at the child
 headline, SOURCE the edge's new default. Only edges without an
 existing `(relSource ...)' atom qualify: an atom-carrying edge was
-already leveled deliberately. The walk's root itself is always
+already assigned a deliberate relSource. The walk's root itself is always
 retargeted (unless write-protected); its org-parent lies outside the
 move, so its source counts as unchanging. With RECURSIVE nil only
 the point node moves, so only its own edge and its direct
@@ -288,7 +288,7 @@ default cannot be computed (a source unknown to the config -- the
 save validates anyway), or when the edge's default does not become
 more public. The four arguments are the endpoints' sources before
 and after the move."
-  (unless (skg--relationship-source-requested-value)
+  (unless (skg--relSource-requested-value)
     (let ((old-default (skg--more-private-of-sources
                         parent-eff-old child-eff-old))
           (new-default (skg--more-private-of-sources
@@ -298,13 +298,13 @@ and after the move."
                                                      old-default))
         new-default))))
 
-(defun skg--apply-stuck-edge-sources (stuck)
-  "Write a relationship-source request at each (MARKER . SOURCE) in
+(defun skg--apply-stuck-relSources (stuck)
+  "Write a relSource request at each (MARKER . SOURCE) in
 STUCK, then free the markers. Returns the number of requests written."
   (save-excursion
     (dolist (entry stuck)
       (goto-char (car entry))
-      (skg--apply-relationship-source-choice (cdr entry))
+      (skg--apply-relSource-choice (cdr entry))
       (set-marker (car entry) nil))
     (length stuck)))
 
@@ -339,14 +339,14 @@ or nil when SOURCE is nil or names no configured source."
   (and source
        (seq-position (skg--source-names) source #'string=)))
 
-(defconst skg--relationship-source-unsupported-folder-atoms
+(defconst skg--relSource-unsupported-folder-atoms
   '(subscriberFolder overriderFolder hiderFolder hiddenFolder
     hiddenInSubscribeeFolder hiddenOutsideOfSubscribeeFolder)
-  "The PartnerFolder scaffold atoms where an explicit relationship-source
+  "The PartnerFolder scaffold atoms where an explicit relSource
 request is unsupported from this side.  HiddenOutside membership is
 editable as a derived filter, but hide sources are still derived and
 cannot carry this request.
-`skg-set-relationship-source' refuses on a member of one of these:
+`skg-set-relSource' refuses on a member of one of these:
 the edge belongs to the other end, so setting its source here would
 be meaningless.")
 
@@ -359,7 +359,7 @@ from this side, each mapped to its relation's wire name
 relation_accessors.rs). The folder's org-parent (the anchor) owns the
 outbound edge to each member.")
 
-(defun skg--relationship-edge-at-point ()
+(defun skg--rel-at-point ()
   "Classify the relationship edge the headline at point represents.
 Returns a plist (:owner OWNER-ID :member MEMBER-ID :relation NAME):
 for a content child, the org-parent contains the node at point; for
@@ -387,7 +387,7 @@ member of a read-only folder, or with an ID missing."
              (and (consp parent-sexp)
                   (seq-find (lambda (atom)
                               (memq atom (cdr parent-sexp)))
-                            skg--relationship-source-unsupported-folder-atoms))))
+                            skg--relSource-unsupported-folder-atoms))))
         (when readonly-atom
           (user-error
            "Cannot set the relationship's source from this read-only %s position"
@@ -420,7 +420,7 @@ member of a read-only folder, or with an ID missing."
          (t (user-error
              "The parent headline is neither a node nor a writable folder")))))))
 
-(defun skg--relationship-source-current-value ()
+(defun skg--relSource-current-value ()
   "Return the displayed `(relSource NAME)' fact at point, if any."
   (let* ((metadata (or (skg--metadata-sexp-at-point-or-nil) '(skg)))
          (alias-p (memq 'alias (cdr metadata)))
@@ -433,7 +433,7 @@ member of a read-only folder, or with an ID missing."
     (when values
       (format "%s" (car values)))))
 
-(defun skg--relationship-source-requested-value ()
+(defun skg--relSource-requested-value ()
   "Return the pending `(editRequest (relSource NAME))' value at point."
   (let* ((metadata (or (skg--metadata-sexp-at-point-or-nil) '(skg)))
          (alias-p (memq 'alias (cdr metadata)))
@@ -461,8 +461,8 @@ member of a read-only folder, or with an ID missing."
        (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
          (and metadata (memq 'alias (cdr metadata))))))
 
-(defun skg--relationship-source-choices (ladder default)
-  "The source-name menu for `skg-set-relationship-source': the tail
+(defun skg--relSource-choices (ladder default)
+  "The source-name menu for `skg-set-relSource': the tail
 of LADDER (the configured sources, most public first) starting at
 DEFAULT -- exactly the sources the save's default floor can accept.
 When DEFAULT is nil or na from LADDER, the whole LADDER (the
@@ -470,23 +470,23 @@ server's save-time floor check backstops any stale offer)."
   (or (and default (member default ladder))
       ladder))
 
-(defconst skg--relationship-source-no-override
+(defconst skg--relSource-no-override
   "(no override: follow sticky-else-default)"
   "The menu entry that REMOVES the pending `(editRequest (relSource ...))' request instead of
 setting one. For an edge already on disk this means the SAVED source
 survives (sticky); it does NOT mean \"reset to the default\". To
-lower an edge's privacy to its default, choose the default source
+lower an edge's privacy to its default, choose the default relSource
 explicitly.")
 
-(defun skg--apply-relationship-source-choice (choice)
+(defun skg--apply-relSource-choice (choice)
   "Apply CHOICE -- a source name, or
-`skg--relationship-source-no-override' -- to the headline at point.
+`skg--relSource-no-override' -- to the headline at point.
 Edits only the buffer; returns a message string describing what the
 next save will do with the edge."
   (when (skg--node-edit-request-at-point-p)
-    (user-error "Cannot request a relationship source where delete or merge is pending"))
-  (if (equal choice skg--relationship-source-no-override)
-      (if (skg--relationship-source-requested-value)
+    (user-error "Cannot request a relSource where delete or merge is pending"))
+  (if (equal choice skg--relSource-no-override)
+      (if (skg--relSource-requested-value)
           (progn
             (cond
              ((skg--alias-headline-p)
@@ -516,7 +516,7 @@ next save will do with the edge."
         (skg-edit-metadata-at-point '(skg (node (editRequest))))
         (skg-edit-metadata-at-point
          `(skg (node (editRequest (ENSURE (relSource ,(intern choice)))))))))
-      (format "Relationship source set to '%s'. Save to apply."
+      (format "relSource set to '%s'. Save to apply."
               choice))))
 
 (defconst skg--relationship-kind-menu-tree
@@ -527,9 +527,9 @@ next save will do with the edge."
       "The view-parent contains the node: ordinary content. Sets the source of each parent-contains-child edge."))
     ("textlinks_to"
      ("source" nil
-      "Textlinks are inferred from body text; they carry no false recording source, so there is nothing to set.")
+      "Textlinks are inferred from body text; they carry no false relSource, so there is nothing to set.")
      ("dest" nil
-      "Textlinks are inferred from body text; they carry no false recording source, so there is nothing to set."))
+      "Textlinks are inferred from body text; they carry no false relSource, so there is nothing to set."))
     ("subscribes"
      ("subscriber" nil
       "A subscriberFolder member: the subscribes edge belongs to the member (the subscriber), not to the view-parent. Read-only from here.")
@@ -546,7 +546,7 @@ next save will do with the edge."
      ("overridden" overridden
       "A member of the view-parent's overriddenFolder. Sets the source of each anchor-overrides-view-of-member edge.")))
   "The relationship-kind menu for
-`skg-set-relationship-source-recursive': one entry per node-node
+`skg-set-relSource-recursive': one entry per node-node
 relation in docs/data-model_technical.org, each listing its two roles as
 (ROLE-NAME KIND-OR-NIL DESCRIPTION). ROLE-NAME is the role the
 VIEW-CHILD would play toward its view-parent. KIND-OR-NIL is the
@@ -559,8 +559,8 @@ explains why the edge cannot be set from that position.")
   "The continuation `skg--select-relationship-kind' stores in its
 menu buffer, called with the chosen kind symbol.")
 
-(defun skg-set-relationship-source-recursive ()
-  "Set the recording source of every matching relationship edge in the
+(defun skg-set-relSource-recursive ()
+  "Set the relSource of every matching relationship edge in the
 subtree at point.
 
 First presents an org-menu of the schema's five node-node relations
@@ -573,9 +573,9 @@ RET on any other role explains why it cannot be set from there.
 
 Then prompts for a source over the whole ladder, plus the
 no-override choice that instead REMOVES existing `(relSource ...)'
-atoms. Unlike `skg-set-relationship-source', no per-edge default is
+atoms. Unlike `skg-set-relSource', no per-edge default is
 fetched: the subtree's edges have different defaults, so the save's
-floor check (see `apply_sticky_sources') is what validates each one.
+floor check (see `apply_sticky_relSources') is what validates each one.
 
 The walk starts at the node at point (inclusive: its own edge to
 its view-parent counts when it matches) and recurses only on
@@ -595,25 +595,25 @@ NOT save. Call `skg-request-save-buffer' afterward."
     (skg--select-relationship-kind
      (lambda (kind)
        (unless (buffer-live-p buffer)
-         (user-error "skg: buffer vanished before the relationship-source prompt"))
+         (user-error "skg: buffer vanished before the relSource prompt"))
        (with-current-buffer buffer
          (save-excursion
            (goto-char marker)
            (let* ((ladder (skg--source-names))
                   (choices (append ladder
-                                   (list skg--relationship-source-no-override)))
+                                   (list skg--relSource-no-override)))
                   (choice (skg--completing-read-with-cycle
                            (format "Source for every '%s' edge in the subtree (S-left/right cycle; the save validates each edge's floor): "
                                    kind)
                            choices nil t nil nil nil nil choices))
-                  (count (skg--set-relationship-source-recursive-walk
+                  (count (skg--set-relSource-recursive-walk
                           kind choice)))
              (message "%s"
                       (if (equal choice
-                                 skg--relationship-source-no-override)
+                                 skg--relSource-no-override)
                           (format "Override removed on %d '%s' edge%s: on save each keeps its saved (sticky) source, or its default if new. Save to apply."
                                   count kind (if (= count 1) "" "s"))
-                        (format "Relationship source set to '%s' on %d '%s' edge%s. Save to apply."
+                        (format "relSource set to '%s' on %d '%s' edge%s. Save to apply."
                                 choice count kind
                                 (if (= count 1) "" "s")))))))))))
 
@@ -676,9 +676,9 @@ explains the refusal; q aborts."
         (kill-buffer))
       (funcall continuation kind)))))
 
-(defun skg--set-relationship-source-recursive-walk (kind choice)
+(defun skg--set-relSource-recursive-walk (kind choice)
   "Apply CHOICE (a source name, or
-`skg--relationship-source-no-override') to every headline in the
+`skg--relSource-no-override') to every headline in the
 subtree at point, the headline at point included, whose relationship
 to its view-parent is of KIND (`contained', `subscribee' or
 `overridden'; see `skg--relationship-kind-matches-p'). Recurses only
@@ -687,22 +687,22 @@ nodes and subscribee-as-such members, prunes non-true
 (affectsParent=false) nodes -- except the walk's root, which the
 user chose deliberately -- and prunes scaffolds other than the two
 writable folders. Returns the number of edges true."
-  (let ((targets (skg--relationship-source-recursive-targets kind)))
+  (let ((targets (skg--relSource-recursive-targets kind)))
     ;; Do not let a late conflict leave earlier targets edited.  This
     ;; preflight is deliberately before the first metadata rewrite.
     (dolist (marker targets)
       (save-excursion
         (goto-char marker)
         (when (skg--node-edit-request-at-point-p)
-          (user-error "Cannot request a relationship source where delete or merge is pending"))))
+          (user-error "Cannot request a relSource where delete or merge is pending"))))
     (dolist (marker targets)
       (save-excursion
         (goto-char marker)
-        (skg--apply-relationship-source-choice choice))
+        (skg--apply-relSource-choice choice))
       (set-marker marker nil))
     (length targets)))
 
-(defun skg--relationship-source-recursive-targets (kind)
+(defun skg--relSource-recursive-targets (kind)
   "Return markers for the writable relationship targets below point.
 The traversal mirrors the extraction-aware walk used by the recursive
 command, but does not edit anything."
@@ -744,7 +744,7 @@ relationship to its view-parent is of KIND, writable-and-collected
 from this position: for `contained', the view-parent must be a
 definitive activeNode not in subscribee-as-such position (an
 write-protected or subscribee-as-such parent's contains is not
-collected at save, so a relationship-source request under one would be
+collected at save, so a relSource request under one would be
 inert); for `subscribee' and `overridden', the view-parent must be
 the matching writable folder with a definitive anchor."
   (let ((meta (skg--metadata-sexp-at-point-or-nil)))

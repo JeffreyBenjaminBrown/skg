@@ -287,8 +287,8 @@ pub(crate) fn prepare_nodecomplete_telescope (
 
 /// The two shapes 'write_nodecomplete_telescope' refuses, because
 /// writing either would publish or destroy the node's text. Both
-/// are unreachable through skg's own saves -- 'apply_sticky_sources'
-/// clamps every recording source to at least the owner's home, so no save
+/// are unreachable through skg's own saves -- 'apply_sticky_relSources'
+/// clamps every relSource to at least the owner's home, so no save
 /// creates a section more public than the home -- and arrive only
 /// from hand-edited files, a pull, or a foreign overlay.
 ///

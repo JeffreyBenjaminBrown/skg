@@ -283,39 +283,14 @@ end
 
 -- ── goto ───────────────────────────────────────────────────────────
 
----Should a goto from the current buffer bypass the override-choice
----menu? True in git-status buffers (a readable-ID jump from git
----should land on the original raw node). Detected by filetype, the
----analog of elisp's major-mode name check for magit.
----@return boolean
-function M.bypass_override_here_p ()
-  local ft = vim.bo.filetype
-  return ft:sub(1, 6) == 'Neogit' or ft:sub(1, 6) == 'neogit'
-         or ft == 'git' or ft == 'diff'
-end
-
----Open a content view for the nearest ID on the current line. From a
----git buffer this bypasses the override-choice menu; elsewhere,
----visiting an overridden node offers the menu.
+---Open a content view for the nearest ID on the current line. The
+---requested node itself is the raw root; recursive content may still
+---use override substitution.
 function M.goto_id_near_point ()
   local result = M.nearest_id()
   if result then
     vim.notify('Visiting node: ' .. result.id)
-    content_view.request_single_root_content_view_from_id(
-      result.id, M.bypass_override_here_p())
-  else
-    vim.notify('No ID found on this line')
-  end
-end
-
----Like goto, but always bypass the override-choice menu: the escape
----hatch to the original node.
-function M.goto_bypass_override ()
-  local result = M.nearest_id()
-  if result then
-    vim.notify('Visiting node (bypassing overriders): ' .. result.id)
-    content_view.request_single_root_content_view_from_id(
-      result.id, true)
+    content_view.request_single_root_content_view_from_id(result.id)
   else
     vim.notify('No ID found on this line')
   end

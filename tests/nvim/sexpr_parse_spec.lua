@@ -53,7 +53,7 @@ describe('skg.sexpr.parse reading atoms', function ()
 
   it('accepts multibyte and punctuation-bearing atoms', function ()
     assert.are.equal('⌂:public', read1('⌂:public').name)
-    assert.are.equal('override-menu:PID', read1('override-menu:PID').name)
+    assert.are.equal('search:terms', read1('search:terms').name)
     assert.are.equal("don't", read1("don't").name)
   end)
 

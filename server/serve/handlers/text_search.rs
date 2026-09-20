@@ -91,7 +91,7 @@ pub fn enriched_search_buffer_for_source_set_for_test (
     tantivy_index,
     config,
     active );
-  render_enriched_search_buffer::insert_override_ancestries_into_search_view (
+  render_enriched_search_buffer::insert_overrideward_view_subtrees (
     &mut viewforest,
     graph,
     search_results,
@@ -353,7 +353,7 @@ fn spawn_enrichment_thread (
       for tree in ancestry_by_id . values () {
         collect_ids_from_ancestry_node ( tree, &mut id_set ); }
       id_set . extend (
-        render_enriched_search_buffer::collect_override_relative_ids (
+        render_enriched_search_buffer::collect_overrideward_view_subtree_ids (
           &runtime . graph, &ids_clone, &active_clone ) );
       id_set . into_iter () . collect () };
     let graphnodestats : AllGraphNodeStats =
@@ -512,7 +512,7 @@ pub fn group_matches_by_id (
               . unwrap_or ("") );
         if let Some (a) = active {
           // Per-DOCUMENT source filtering, BEFORE grouping: an
-          // alias document carries the ALIAS's recording source as
+          // alias document carries the ALIAS's relSource as
           // its source, so a restricted search must drop it here
           // -- a private alias of a public node must neither match
           // nor shift ranking (dbs-and-search, 5_plan.org). The
@@ -553,7 +553,7 @@ pub fn group_matches_by_id (
 /// (TODO/override-ancestry-in-search-results.org, "Suppression"). A
 /// FOREIGN overrider never suppresses -- so a pure-foreign mutual
 /// override shows both, and a "boring" foreign overrider does not hide
-/// the node it overrides. Reachability follows edge-source-visible
+/// the node it overrides. Reachability follows relSource-visible
 /// outbound overrides, matching what the graft will actually draw.
 /// Only search hits ('matches_by_id' keys) are ever suppressed. A
 /// user-owned overrider that matched the query but ranks past the
@@ -650,7 +650,7 @@ pub fn build_search_viewforest (
             body_folded : false,
             kind        : ViewNodeKind::Qual (Qual::Alias {
                 text       : title . clone (),
-                rel_source : None,
-                rel_source_request : None,
+                relSource : None,
+                relSource_request : None,
                 membership : MembershipAxes::default () } ) } ); }} }
   (viewforest, search_results) }

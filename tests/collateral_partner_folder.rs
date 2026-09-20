@@ -90,16 +90,28 @@ fn collateral_partner_folder_update_and_warning_scoping
       let n_uri : ViewUri = ViewUri::ContentView ("collat-N" . into ());
       let s_uri : ViewUri = ViewUri::ContentView ("collat-S" . into ());
 
-      // Render N (subscriberFolder shows S) and register it as the view
-      // that will be updated collaterally.
-      let (n_view, n_pids, n_vf) =
+      // Render N, explicitly request its subscription folders, and save it
+      // under the URI that will be updated collaterally.  subscriberFolder
+      // is no longer part of the default presentation.
+      let (n_view, _n_pids, _n_vf) =
         single_root_view (
           config, Some (tantivy), &ID::from ("N"), false ) ?;
+      let n_folder_request : String = n_view . replace (
+        "(affectsParent na)",
+        "(affectsParent na) (viewRequests (folder subscribes))" );
+      let (n_response, initial_collateral) =
+        save_and_read_collateral (
+          &n_folder_request, &n_uri, config, tantivy, &graph,
+          &mut views_state ) . await ?;
+      assert! ( n_response . errors . is_empty (),
+        "N's folder request should save cleanly: {:?}", n_response . errors );
+      assert! ( initial_collateral . is_empty (),
+        "opening N should not update a collateral view: {:?}",
+        initial_collateral );
+      let n_view : String = n_response . saved_view;
       assert! ( n_view . contains ("subscriberFolder")
                 && n_view . contains ("(id S)"),
         "N's view should show S in a subscriberFolder:\n{}", n_view );
-      views_state . open_views . register_view (
-        &graph . load_full (), n_uri . clone (), n_vf, &n_pids );
 
       // Render S (subscribeeFolder shows N) and register it as the saved
       // view.

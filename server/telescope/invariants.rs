@@ -15,7 +15,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::telescope::types::FoldWarning;
-use crate::types::misc::{ID, MSV, MemberAtSource, SkgConfig, SourceName};
+use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SourceName};
 use crate::types::nodes::rust::NodeRust;
 
 use std::collections::HashSet;
@@ -25,17 +25,17 @@ use std::path::Path;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TelescopeViolation {
-  /// THE leak shape: a relationship instance recorded at a source
+  /// THE leak shape: a relationship instance whose relSource is
   /// more public than its target's home, so the (more public) file
   /// names an ID whose node is more private -- exactly what the
-  /// telescope exists to prevent. Repair: move the membership's source
-  /// to the target's home or beyond ('skg-set-relationship-source',
+  /// telescope exists to prevent. Repair: move the membership's relSource
+  /// to the target's home or beyond ('skg-set-relSource',
   /// C-c s r). NOTE the git caveat: the leaking file's
   /// history already contains the ID; repair only stops the
   /// bleeding.
   LeakShapedMember {
     relation    : &'static str,
-    source      : SourceName,
+    relSource   : SourceName,
     member      : ID,
     member_home : SourceName,
   },
@@ -44,16 +44,16 @@ pub enum TelescopeViolation {
   /// privacy ceiling.
   AbsentTargetLeakShapedMember {
     relation   : &'static str,
-    source     : SourceName,
+    relSource  : SourceName,
     member     : ID,
     owner_home : SourceName,
   },
-  /// An edge whose source names no configured source: its section
+  /// An edge whose relSource names no configured source: its section
   /// could never be written. Arises only from junk or a config
   /// that lost a source.
-  UnconfiguredSource {
+  UnconfiguredRelSource {
     relation : &'static str,
-    source   : SourceName,
+    relSource: SourceName,
     member   : ID,
   },
   /// Non-owned sections used the same pid as at least one owned
@@ -76,20 +76,20 @@ impl fmt::Display for TelescopeViolation {
   ) -> fmt::Result {
     match self {
       TelescopeViolation::LeakShapedMember {
-        relation, source, member, member_home } =>
+        relation, relSource, member, member_home } =>
         write! ( f,
-          "leak-shaped {} member: edge at source '{}' names '{}', whose home '{}' is more private. Move the membership with skg-set-relationship-source (C-c s r). The leaking file's git history already contains the ID.",
-          relation, source, member, member_home ),
-      TelescopeViolation::UnconfiguredSource {
-        relation, source, member } =>
+          "leak-shaped {} member: relationship at relSource '{}' names '{}', whose home '{}' is more private. Move the membership with skg-set-relSource (C-c s r). The leaking file's git history already contains the ID.",
+          relation, relSource, member, member_home ),
+      TelescopeViolation::UnconfiguredRelSource {
+        relation, relSource, member } =>
         write! ( f,
-          "{} member '{}' carries source '{}', which is not configured",
-          relation, member, source ),
+          "{} member '{}' carries relSource '{}', which is not configured",
+          relation, member, relSource ),
       TelescopeViolation::AbsentTargetLeakShapedMember {
-        relation, source, member, owner_home } =>
+        relation, relSource, member, owner_home } =>
         write! ( f,
-          "leak-shaped {} member with absent target: edge at source '{}' names '{}'; because the target is absent, privacy is judged against the extant owner's home '{}'. Move the membership with skg-set-relationship-source (C-c s r).",
-          relation, source, member, owner_home ),
+          "leak-shaped {} member with absent target: relationship at relSource '{}' names '{}'; because the target is absent, privacy is judged against the extant owner's home '{}'. Move the membership with skg-set-relSource (C-c s r).",
+          relation, relSource, member, owner_home ),
       TelescopeViolation::IgnoredForeignPidFolderlision {
         ignored_sources } =>
         write! ( f,
@@ -112,12 +112,12 @@ pub fn telescope_violations_of (
     graph . nodes . get (pid) else { return Vec::new (); };
   let mut violations : Vec<TelescopeViolation> = Vec::new ();
   let mut check = |relation : &'static str,
-                   members  : &[MemberAtSource<ID>]| {
+                   members  : &[RelPartner<ID>]| {
     for m in members {
-      if config . source_position ( &m . source ) . is_none () {
-        violations . push ( TelescopeViolation::UnconfiguredSource {
+      if config . source_position ( &m . relSource ) . is_none () {
+        violations . push ( TelescopeViolation::UnconfiguredRelSource {
           relation,
-          source : m . source . clone (),
+          relSource : m . relSource . clone (),
           member : m . member . clone (), } );
         continue; }
       let target_home : Option<SourceName> =
@@ -126,24 +126,24 @@ pub fn telescope_violations_of (
         . map ( |n| n . source . clone () );
       let privacy_ceiling : &SourceName = target_home . as_ref ()
         . unwrap_or (&node . source);
-      if config . is_strictly_more_public ( &m . source, privacy_ceiling ) {
+      if config . is_strictly_more_public ( &m . relSource, privacy_ceiling ) {
         match target_home {
           Some (home) =>
           violations . push ( TelescopeViolation::LeakShapedMember {
             relation,
-            source      : m . source . clone (),
+            relSource   : m . relSource . clone (),
             member      : m . member . clone (),
             member_home : home, } ),
           None =>
             violations . push (
               TelescopeViolation::AbsentTargetLeakShapedMember {
                 relation,
-                source     : m . source . clone (),
+                relSource  : m . relSource . clone (),
                 member     : m . member . clone (),
                 owner_home : node . source . clone (),
               }), }} }};
   check ("contains", &node . contains);
-  let msv = |m : &MSV<MemberAtSource<ID>>| -> Vec<MemberAtSource<ID>> {
+  let msv = |m : &MSV<RelPartner<ID>>| -> Vec<RelPartner<ID>> {
     m . or_default () . to_vec () };
   check ("subscribes_to",
          & msv ( &node . subscribes_to ));

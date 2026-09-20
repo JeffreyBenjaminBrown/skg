@@ -21,7 +21,7 @@ struct HiddenOutsideContext {
   subscriber_pid      : ID,
   subscriber_source   : SourceName,
   subscriber_hides    : Vec<ID>,
-  relationship_sources : HashMap<ID, SourceName>,
+  relSources : HashMap<ID, SourceName>,
   subscribees         : Vec<ID>,
 }
 
@@ -92,7 +92,7 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
       tree, node,
       &goal_list, &removed_ids, &axes_for_removed,
       source_diffs, deleted_since_head_pid_src_map,
-      &context . relationship_sources, runtime ) ?;
+      &context . relSources, runtime ) ?;
   let summary =
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       // TODO/DONE/local-view-update/plan_v2.org §6.0: a stale member of this read-only folder is removed when a view-leaf
@@ -129,7 +129,7 @@ fn read_hiddenoutside_context (
     nodecomplete_rustFirst_by_pid_and_source (
       &runtime . graph, &runtime . config,
       &subscriber_pid, &subscriber_source ) ?;
-  // Edge-source gating (render-and-gating, 5_plan.org): both are the
+  // relSource gating (render-and-gating, 5_plan.org): both are the
   // subscriber's own outbound lists (hides_from_its_subscriptions,
   // subscribes_to); a membership recorded in an inactive source must
   // not feed this derived folder.
@@ -139,24 +139,24 @@ fn read_hiddenoutside_context (
   let wt_subscriber_hide_members =
     wt_subscriber_nodecomplete . hides_from_its_subscriptions
     . or_default () . iter ()
-    . filter ( |m| source_active (& m . source) )
+    . filter ( |m| source_active (& m . relSource) )
     . collect::<Vec<_>> ();
   let wt_subscriber_hides : Vec<ID> = wt_subscriber_hide_members . iter ()
     . map ( |m| m . member . clone () ) . collect ();
-  let relationship_sources : HashMap<ID, SourceName> =
+  let relSources : HashMap<ID, SourceName> =
     wt_subscriber_hide_members . iter ()
-    . filter ( |m| m . source != subscriber_source )
-    . map ( |m| (m . member . clone (), m . source . clone ()) )
+    . filter ( |m| m . relSource != subscriber_source )
+    . map ( |m| (m . member . clone (), m . relSource . clone ()) )
     . collect ();
   let wt_subscribees : Vec<ID> =
     wt_subscriber_nodecomplete . subscribes_to
     . or_default () . iter ()
-    . filter ( |m| source_active (& m . source) )
+    . filter ( |m| source_active (& m . relSource) )
     . map ( |m| m . member . clone () )
     . collect ();
   Ok (HiddenOutsideContext {
     subscriber_pid,
     subscriber_source,
     subscriber_hides : wt_subscriber_hides,
-    relationship_sources,
+    relSources,
     subscribees      : wt_subscribees }) }

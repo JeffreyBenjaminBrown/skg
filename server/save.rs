@@ -16,7 +16,7 @@ use crate::dbs::in_rust_graph::{
 use crate::dbs::tantivy::background_writer::{enqueue_tantivy_write, lock_tantivy_writes, TantivyWriteTask};
 use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_status, delete_nodes_by_id_from_index};
 use crate::types::env::MutationGate;
-use crate::types::misc::{ID, MSV, MemberAtSource, SkgConfig, TantivyIndex};
+use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, TantivyIndex};
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::nodes::rust::NodeRust;
 use crate::types::nodes::tantivy::NodeTantivy;
@@ -413,9 +413,9 @@ pub(crate) fn nodecomplete_from_noderust (
   }}
 
 fn remove_from_msv (
-  msv : &MSV<MemberAtSource<ID>>,
+  msv : &MSV<RelPartner<ID>>,
   exclude : &HashSet<ID>
-) -> MSV<MemberAtSource<ID>> {
+) -> MSV<RelPartner<ID>> {
   match msv {
     MSV::Unspecified => MSV::Unspecified,
     MSV::Specified (v) => MSV::Specified (

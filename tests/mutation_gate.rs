@@ -18,7 +18,7 @@ use skg::dbs::tantivy::background_writer::{
 };
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::types::env::new_mutation_gate;
-use skg::types::misc::{ID, MemberAtSource, SourceName};
+use skg::types::misc::{ID, RelPartner, SourceName};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::nodes::rust::NodeRust;
 use skg::types::save::{DefineNode, DeleteNode, SaveNode};
@@ -136,7 +136,7 @@ fn shared_mutation_gate_serializes_snapshot_capture_and_preserves_both_writes ()
 #[test]
 fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
   let mut owner = node ("owner", "owner", "main");
-  owner . contains = vec! [ MemberAtSource::at_source (
+  owner . contains = vec! [ RelPartner::at_relSource (
     SourceName::from ("main"), ID::from ("acquiree")) ];
   let initial = vec! [
     owner . clone (),
@@ -181,7 +181,7 @@ fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
       let mut observer = node ("observer", "observer", "main");
       // The request still names the acquiree.  Applying against the
       // post-merge snapshot must canonicalize its inverse entry.
-      observer . contains = vec! [ MemberAtSource::at_source (
+      observer . contains = vec! [ RelPartner::at_relSource (
         SourceName::from ("main"), ID::from ("acquiree")) ];
       publish_from_snapshot (
         &handle, &snapshot, &DefineNode::Save (SaveNode (observer))); };

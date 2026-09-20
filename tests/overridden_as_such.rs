@@ -107,16 +107,23 @@ async fn expand_e_under (
     multi_root_view (
       config, Some (tantivy),
       &[ ID::from ("R") ], false ) ?;
+  let view_with_folder : String =
+    if folder == "overriddenFolder" {
+      let request : String = de_novo . replace (
+        "(affectsParent na)",
+        "(affectsParent na) (viewRequests (folder overrides))" );
+      save_and_rerender (&request, config, tantivy) . await ?
+    } else { de_novo };
   let edited : String =
     { let mut out : Vec<String> = Vec::new ();
-      for (line_col, line) in lines_by_enclosing_folder (&de_novo) {
+      for (line_col, line) in lines_by_enclosing_folder (&view_with_folder) {
         if line_col == folder && line . contains ("(id E)") {
           out . push ( line . replace (
             "writeProtected",
             "writeProtected (viewRequests definitiveView)" )); }
         else { out . push ( line . to_string () ); }}
       out . join ("\n") + "\n" };
-  assert_ne! ( edited, de_novo,
+  assert_ne! ( edited, view_with_folder,
     "the {} copy of E was found and given a request", folder );
   save_and_rerender (&edited, config, tantivy) . await }
 
@@ -180,10 +187,15 @@ async fn folder_members_never_substitute (
 ) -> Result<(), Box<dyn Error>> {
       (
         graph_handle_from_config (config) ? );
-      let (view, _pids, _tree) =
+      let (de_novo, _pids, _tree) =
         multi_root_view (
           config, Some (tantivy),
           &[ ID::from ("R") ], false ) ?;
+      let request : String = de_novo . replace (
+        "(affectsParent na)",
+        "(affectsParent na) (viewRequests (folder overrides))" );
+      let view : String =
+        save_and_rerender (&request, config, tantivy) . await ?;
       // R overrides E, yet both folder copies of E draw raw: the
       // subscribeeFolder shows the graph fact "R subscribes to E" and
       // the overriddenFolder shows "R overrides E"; substituting

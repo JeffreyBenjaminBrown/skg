@@ -215,25 +215,16 @@ a bare UUID, or a .skg filename
 will open a new view from the ID it finds there,
 or go to the view of it that was already open if that exists.
 
-If the node is overridden, this opens the override-choice menu
-instead -- the node as root, its overriders beneath it -- and
-explains so in the echo area; run Goto on the overrider you
-want, or GotoBypassOverride to open the original. From a neogit
-buffer or a plain git-diff buffer (=skg://git-diff/...=), Goto
-bypasses the menu automatically (a readable-ID jump lands on the
-raw node).
+The requested node itself is always the raw root. Recursive content
+below it can still use override substitution. Override facts remain
+visible in enriched search results and through the override folder
+and path commands.
 
 If you're not sure whether the cursor is on something visitable
 (a link or a node's metadata),
 use IdNext and IdPrev (the ]i / [i motions, or <localleader>in /
 <localleader>ip)
 to identify where those are.
-*** :SkgGotoBypassOverride
-Like Goto, but if the node is overridden, opens the node
-itself instead of the override-choice menu. The escape hatch from
-the menu (or from anywhere) to the original node. Recursive
-content beneath the opened node still draws overriders in place
-of what they override.
 *** <localleader>GG : :SkgGotoAndCloseThis
 Like Goto, but also closes the buffer it was called from.
 *** <localleader>gb : :SkgGotoBiggestBranch
@@ -323,6 +314,9 @@ metadata of the node at point that, on save, causes the server to
 render the relation's folder viewnodes into the view, POPULATED from
 the graph. Each builds BOTH folders of its relation. The read-only folder ☮
 marks a folder you cannot change from here. Every command auto-saves.
+Without such a request, a definitive node shows only its nonempty
+subscribeeFolder (plus the nonempty hiddenInSubscribeeFolder on a definitive
+subscribee-as-such); the heralds advertise other nonempty relations.
 *** <localleader>ca : :SkgShowFolderOfAliases
 The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:

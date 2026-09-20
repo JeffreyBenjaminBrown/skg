@@ -27,7 +27,7 @@ use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::git::{GitDiffStatus, MembershipAxes, NodeCompleteDiff, Sign, SourceDiff};
 use crate::types::list::Diff_Item;
-use crate::types::misc::{ID, MemberAtSource, SourceName};
+use crate::types::misc::{ID, RelPartner, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 
 use std::collections::HashMap;
@@ -41,13 +41,13 @@ use std::path::PathBuf;
 /// goal list as a phantom; a present member's Plus signs become its
 /// 'newM' marks.
 ///
-/// 'active': edge-source gating (render-and-gating, 5_plan.org). A
+/// 'active': relSource gating (render-and-gating, 5_plan.org). A
 /// Deleted/Added file's before/after NodeComplete carries full
-/// MemberAtSource values, so those two stages gate on the specific
-/// edge's source -- a phantom "used to link here" must not surface
+/// RelPartner values, so those two stages gate on the specific
+/// edge's relSource -- a phantom "used to link here" must not surface
 /// from a membership recorded outside the active set. The Modified
 /// stage cannot: 'NodeChanges' diff lists have their sources stripped
-/// (the historical 'leveled-lists' work item deferred this; still true
+/// (the historical relation-partner work item deferred this; still true
 /// here), so a Modified-file sign is emitted regardless of source. None = ungated
 /// (every stage counts), matching every other gated accessor here.
 pub fn inverse_scan_for_inbound_folder (
@@ -112,27 +112,27 @@ fn member_and_sign_for_owner (
       Some ((member, sign)) },
     GitDiffStatus::Deleted => {
       let before : &NodeComplete = ncd . before_node . as_ref () ?;
-      match outbound_member_source_of_nodecomplete (before, relation, owner) {
-        Some (source) if source_is_active (active, &source) =>
+      match outbound_member_relSource_of_nodecomplete (before, relation, owner) {
+        Some (relSource) if source_is_active (active, &relSource) =>
           Some (( before . pid . clone (), Sign::Minus )),
         _ => None } },
     GitDiffStatus::Added => {
       let after : &NodeComplete = ncd . after_node . as_ref () ?;
-      match outbound_member_source_of_nodecomplete (after, relation, owner) {
-        Some (source) if source_is_active (active, &source) =>
+      match outbound_member_relSource_of_nodecomplete (after, relation, owner) {
+        Some (relSource) if source_is_active (active, &relSource) =>
           Some (( after . pid . clone (), Sign::Plus )),
         _ => None } } } }
 
-/// The SOURCE of nc's outbound 'relation' edge to 'target', if nc's
+/// The relSource of nc's outbound 'relation' edge to 'target', if nc's
 /// list names it. Sibling of 'outbound_ids_of_nodecomplete' below,
-/// but keeps the MemberAtSource's source instead of dropping it, so
-/// Deleted/Added-stage signs can be edge-source gated.
-fn outbound_member_source_of_nodecomplete (
+/// but keeps the RelPartner's relSource instead of dropping it, so
+/// Deleted/Added-stage signs can be relSource gated.
+fn outbound_member_relSource_of_nodecomplete (
   nc       : &NodeComplete,
   relation : NodeRelation,
   target   : &ID,
 ) -> Option<SourceName> {
-  let members_at_sources : &[MemberAtSource<ID>] = match relation {
+  let rel_partners : &[RelPartner<ID>] = match relation {
     NodeRelation::Contains =>
       & nc . contains,
     NodeRelation::Subscribes =>
@@ -146,9 +146,9 @@ fn outbound_member_source_of_nodecomplete (
       // (see 'outbound_ids_of_nodecomplete'); this scan never fires
       // for them from a Deleted/Added stage.
       return None, };
-  members_at_sources . iter ()
+  rel_partners . iter ()
     . find ( |m| & m . member == target )
-    . map ( |m| m . source . clone () ) }
+    . map ( |m| m . relSource . clone () ) }
 
 /// Plus-only -> Plus; Minus-only -> Minus; both -> None (the
 /// cross-source-move cancellation); no signs -> None.

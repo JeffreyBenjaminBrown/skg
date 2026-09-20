@@ -1,0 +1,6 @@
+pid: Overrider
+title: Overrider
+subscribes_to:
+- OverriderLeaf
+overrides_view_of:
+- N

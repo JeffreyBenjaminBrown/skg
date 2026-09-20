@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::git::NodeChanges;
 use crate::types::list::Diff_Item;
-use crate::types::misc::{ID, MemberAtSource, RelationshipMemberKey, SourceName, members_of};
+use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, SourceName, members_of};
 use crate::types::nodes::rust::NodeRust;
 
 /// The five stored outbound relationship types and their endpoint roles.
@@ -218,18 +218,18 @@ impl InRustGraph {
       None => RelationshipMemberKey::UnresolvedRawId (raw_member . clone ()), } }
 
   /// Stored outbound members for one relationship. Unlike the PID-oriented
-  /// accessors, this preserves an unresolved raw ID and its recording source.
+  /// accessors, this preserves an unresolved raw ID and its relSource.
   /// Callers that require a current graph node should keep using the existing
   /// canonical-PID accessors instead.
-  pub fn outbound_members_at_sources_for_relation_gated (
+  pub fn outbound_rel_partners_for_relation_gated (
     &self,
     pid      : &ID,
     relation : NodeRelation,
     active   : Option<&crate::source_sets::ActiveSourceSet>,
-  ) -> Vec<MemberAtSource<ID>> {
+  ) -> Vec<RelPartner<ID>> {
     let Some (node) = self . nodes . get (pid) else {
       return Vec::new (); };
-    let members : Vec<MemberAtSource<ID>> = match relation {
+    let members : Vec<RelPartner<ID>> = match relation {
       NodeRelation::Contains =>
         node . contains . clone (),
       NodeRelation::Subscribes =>
@@ -245,18 +245,18 @@ impl InRustGraph {
       . filter ( |member| match active {
         None => true,
         Some (set) => set . is_all ()
-          || set . contains_source (&member . source), } )
+          || set . contains_source (&member . relSource), } )
       . collect () }
 
-  /// The SOURCE of the edge from OWNER to TARGET under RELATION, read
-  /// from the owner's outbound list (where every edge's source
-  /// lives). None when no such edge exists. This is how INBOUND
+  /// The relSource of the relationship from OWNER to TARGET under RELATION,
+  /// read from the owner's outbound list. None when no such relationship
+  /// exists. This is how INBOUND
   /// surfaces gate: an inbound partner P of X is visible at the
-  /// active set iff edge_source(P, R, X) is active -- private
+  /// active set iff relSource(P, R, X) is active -- private
   /// memberships must not surface through ancestry, backpaths, or
   /// inbound folders when the content direction hides them
   /// (render-and-gating, 5_plan.org).
-  pub fn edge_source (
+  pub fn relSource (
     &self,
     owner    : &ID,
     relation : NodeRelation,
@@ -264,7 +264,7 @@ impl InRustGraph {
   ) -> Option<SourceName> {
     let target_key : ID = self . pid_of (target) ? ;
     let node : &NodeRust = self . nodes . get (owner) ? ;
-    let members_at_sources : Vec<MemberAtSource<ID>> = match relation {
+    let rel_partners : Vec<RelPartner<ID>> = match relation {
       NodeRelation::Contains =>
         node . contains . clone (),
       NodeRelation::Subscribes =>
@@ -278,27 +278,27 @@ impl InRustGraph {
         // their source is the owner's home by construction.
         return self . nodes . get (owner)
           . map ( |n| n . source . clone () ), };
-    members_at_sources . iter ()
+    rel_partners . iter ()
       . find ( |m| self . pid_of ( &m . member )
                . as_ref () == Some (&target_key) )
-      . map ( |m| m . source . clone () ) }
+      . map ( |m| m . relSource . clone () ) }
 
-  /// The recording source of one exact, stored outbound member ID.
-  /// Unlike 'edge_source', this deliberately does not canonicalize the
+  /// The relSource of one exact, stored outbound member ID.
+  /// Unlike 'relSource', this deliberately does not canonicalize the
   /// target: an unresolved raw ID has no PID, but is still a real stored
   /// relationship member and can be edited from an Unknown placeholder.
-  pub fn edge_source_for_stored_member (
+  pub fn relSource_for_stored_member (
     &self,
     owner    : &ID,
     relation : NodeRelation,
     raw_member : &ID,
   ) -> Option<SourceName> {
-    self . outbound_members_at_sources_for_relation_gated (
+    self . outbound_rel_partners_for_relation_gated (
       owner, relation, None ) . into_iter ()
       . find ( |member| &member . member == raw_member )
-      . map ( |member| member . source ) }
+      . map ( |member| member . relSource ) }
 
-  /// Outbound members whose EDGE source is in the active set: the
+  /// Outbound members whose relSource is in the active set: the
   /// visible fold of one relation. Pass None for the full fold.
   pub fn outbound_pids_for_relation_gated (
     &self,
@@ -308,13 +308,13 @@ impl InRustGraph {
   ) -> Vec<ID> {
     if relation == NodeRelation::TextlinksTo {
       return self . outbound_pids_for_relation (pid, relation); }
-    self . outbound_members_at_sources_for_relation_gated (
+    self . outbound_rel_partners_for_relation_gated (
       pid, relation, active ) . iter ()
       . filter_map ( |member| self . pid_of (&member . member) )
       . collect () }
 
   /// Inbound partners whose EDGES to this node are visible at the
-  /// active set (see 'edge_source'). Pass None for all of them.
+  /// active set (see 'relSource'). Pass None for all of them.
   pub fn inbound_pids_for_relation_gated (
     &self,
     pid      : &ID,
@@ -326,7 +326,7 @@ impl InRustGraph {
       . filter ( |partner| match active {
         None => true,
         Some (a) => a . is_all ()
-          || self . edge_source (partner, relation, pid)
+          || self . relSource (partner, relation, pid)
              . map ( |source| a . contains_source (&source) )
              . unwrap_or (false) } )
       . collect () }
@@ -375,9 +375,9 @@ impl InRustGraph {
   ) -> Vec<ID> {
     self . other_member_pids_gated (pid, role, None) }
 
-  /// 'other_member_pids' with edge-source gating: partners whose
+  /// 'other_member_pids' with relSource gating: partners whose
   /// EDGE is above the active prefix are omitted, in both
-  /// directions (see 'edge_source').
+  /// directions (see 'relSource').
   pub fn other_member_pids_gated (
     &self,
     pid    : &ID,
@@ -400,9 +400,9 @@ impl InRustGraph {
     self . relation_membership_is_visible (
       owner_pid, member_pid, member_role, None ) }
 
-  /// 'relation_membership_is_real' with edge-source gating: an edge
-  /// whose recording source is outside the active prefix does not count
-  /// as a membership (see 'edge_source'). Pass None to ask about the
+  /// 'relation_membership_is_real' with relSource gating: an edge
+  /// whose relSource is outside the active prefix does not count
+  /// as a membership (see 'relSource'). Pass None to ask about the
   /// full fold.
   pub fn relation_membership_is_visible (
     &self,

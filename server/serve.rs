@@ -16,7 +16,7 @@ use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::delete_references_to_absent_node::handle_delete_references_to_absent_node_request;
 use crate::serve::handlers::diff_analysis::handle_diff_analysis_request_with_source_set;
-use crate::serve::handlers::edge_source_info::handle_edge_source_info_request;
+use crate::serve::handlers::relSource_info::handle_relSource_info_request;
 use crate::serve::handlers::boolprop_state::handle_boolprop_state_request;
 use crate::serve::handlers::export_to_org::handle_export_to_org_request;
 use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_source_set;
@@ -32,7 +32,7 @@ use crate::serve::handlers::single_root_view::handle_single_root_view_request;
 use crate::serve::handlers::source_sets::handle_source_set_request;
 use crate::serve::handlers::stage_moves::handle_stage_moves_request;
 use crate::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
-use crate::serve::handlers::text_search::render_enriched_search_buffer::{insert_containerward_ancestries_into_search_view, insert_override_ancestries_into_search_view};
+use crate::serve::handlers::text_search::render_enriched_search_buffer::{insert_containerward_ancestries_into_search_view, insert_overrideward_view_subtrees};
 use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
 use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request_with_source_set;
 use crate::serve::protocol::{RequestType, TcpToClient};
@@ -209,8 +209,8 @@ fn handle_emacs (
           Ok (RequestType::StageMoves) =>
             handle_stage_moves_request (
               &mut stream, &runtime . config ),
-          Ok (RequestType::EdgeSourceInfo) =>
-            handle_edge_source_info_request (
+          Ok (RequestType::RelSourceInfo) =>
+            handle_relSource_info_request (
               &mut stream, &request_header, &env ),
           Ok (RequestType::BoolPropState) =>
             handle_boolprop_state_request (
@@ -343,7 +343,7 @@ fn handle_snapshot_response (
     &mut viewforest, &runtime . graph, &payload . search_results,
     &payload . ancestry_by_id, &runtime . tantivy_index,
     &runtime . config, active_source_set );
-  insert_override_ancestries_into_search_view (
+  insert_overrideward_view_subtrees (
     &mut viewforest, &runtime . graph, &payload . search_results,
     active_source_set );
   { let root_treeid : NodeId =

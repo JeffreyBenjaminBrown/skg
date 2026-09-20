@@ -122,8 +122,8 @@ pub fn handle_save_buffer_request (
   let fork_approved : bool =
     // Forking is gated on confirmation: the first save returns a
     // fork-confirmation buffer, and the client re-issues the save with
-    // this field once the user approves (mirroring the override-menu's
-    // (override-choice . "bypass") field on a re-issued view request).
+    // this field once the user approves (the same retry shape used by
+    // other request-scoped confirmations).
     fork_approved_from_request (request);
   let fork_sources : HashMap<ID, SourceName> =
     // The per-fork clone sources the user chose in the confirmation

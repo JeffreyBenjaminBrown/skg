@@ -2,8 +2,8 @@
 //! in its place? Follows user-owned 'overrides_view_of' edges from
 //! overridden to overrider, transitively, with a seen-set cycle
 //! guard. Foreign override edges never participate in substitution;
-//! they are display-only facts (folders, heralds, the override-choice
-//! buffer).
+//! they are display-only facts (search enrichment, folders, heralds,
+//! and paths).
 //!
 //! Two gates, applied per edge:
 //! - OWNERSHIP is set-independent: an edge is followed only if its

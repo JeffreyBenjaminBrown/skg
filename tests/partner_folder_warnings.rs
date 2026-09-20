@@ -9,8 +9,9 @@
 // - a non-member parked as Affected with a subtree is demoted to
 //   independent, with a warning.
 //
-// Fixture: r and t subscribe to n (so n's view has a SubscriberFolder);
-// x is an unrelated node the test parks inside that folder.
+// Fixture: r and t subscribe to n; the test explicitly asks for n's
+// subscription folders. x is an unrelated node the test parks inside that
+// folder.
 
 use std::error::Error;
 use std::net::TcpStream;
@@ -76,11 +77,17 @@ async fn readonly_folder_repairs_warn_impl (
   let graph : InRustGraphHandle =
     (
       graph_handle_from_config (config) ? );
-  let (complete_buffer, _pids, _tree)
+  let (initial_buffer, _pids, _tree)
     : (String, Vec<ID>, _) =
     multi_root_view (
       config, Some (tantivy),
       &[ ID ("n" . to_string ()) ], false ) ?;
+  let folder_request : String = initial_buffer . replace (
+    "(affectsParent na)",
+    "(affectsParent na) (viewRequests (folder subscribes))" );
+  let complete_buffer : String =
+    save_buffer (&folder_request, config, tantivy, &graph)
+    . await ? . saved_view;
   let edited : String = {
     let r_line : String =
       line_containing (&complete_buffer, "(id r)") . to_string ();

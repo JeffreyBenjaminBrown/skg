@@ -9,7 +9,16 @@ use crate::types::viewnode::{
 };
 
 use ego_tree::{NodeRef, Tree};
+use sexp::{Atom, Sexp};
 use std::error::Error;
+
+/// Render a metadata value as one S-expression atom. Most IDs and source
+/// names print in the familiar bare form; values containing whitespace or
+/// other S-expression syntax are quoted and escaped by the `sexp` crate.
+pub(crate) fn metadata_value_atom (
+  value : &str,
+) -> String {
+  Sexp::Atom ( Atom::S (value . to_string ()) ) . to_string () }
 
 /// PURPOSE: Render a view forest to org-mode text.
 /// Each forest root starts at level 1.
@@ -210,13 +219,15 @@ fn qual_metadata_to_string (
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   match qual {
-    Qual::Alias { rel_source, rel_source_request, membership, .. } => {
+    Qual::Alias { relSource, relSource_request, membership, .. } => {
       parts . push ( "alias" . to_string () );
-      if let Some (source) = rel_source {
-        parts . push ( format! ("(relSource {})", source) ); }
-      if let Some (source) = rel_source_request {
+      if let Some (source) = relSource {
         parts . push ( format! (
-          "(editRequest (relSource {}))", source) ); }
+          "(relSource {})", metadata_value_atom (source) ) ); }
+      if let Some (source) = relSource_request {
+        parts . push ( format! (
+          "(editRequest (relSource {}))",
+          metadata_value_atom (source) ) ); }
       append_membership_stage_forms (&mut parts, membership); }
     Qual::TextChanged { staged, unstaged } => {
       let mut tags : Vec<&'static str> = Vec::new ();
@@ -274,21 +285,25 @@ fn activeNode_metadata_to_string (
         parts . push ( format! ("(overridesHere {})",
                                  original . 0 )); }
       if let Some (ref source) =
-        activeNode . viewStats . rel_source {
-        parts . push ( format! ("(relSource {})", source )); }
+        activeNode . viewStats . relSource {
+        parts . push ( format! (
+          "(relSource {})", metadata_value_atom (source) )); }
       if activeNode . viewStats . sourceAtBoundary {
         if let Some (src_config)
         = config . sources . get ( &activeNode . source )
-        { parts . push ( format! ("(sourceHerald ⌂:{})",
-                                  src_config . herald_label () )); }}
+        { parts . push ( format! (
+            "(sourceHerald {})",
+            metadata_value_atom (
+              & format! ("⌂:{}", src_config . herald_label ()) ) ) ); }}
       if parts . is_empty () { None }
       else { Some ( format! (
                "(viewStats {})", parts . join (" ") )) }}
     fn edit_request ( activeNode : & ActiveNode
                     ) -> Option < String > {
-      if let Some (source) = &activeNode . rel_source_request {
+      if let Some (source) = &activeNode . relSource_request {
         return Some ( format! (
-          "(editRequest (relSource {}))", source) ); }
+          "(editRequest (relSource {}))",
+          metadata_value_atom (source) ) ); }
       activeNode . edit_request () . map ( | edit_req | {
         let edit_str : String = match edit_req {
           NodeEditRequest::NodeMerge (id) => format! ( "(merge {})", id . 0 ),
@@ -329,7 +344,8 @@ fn activeNode_metadata_to_string (
     let mut parts : Vec < String > =
       vec! [ "node" . to_string () ];
     parts . push ( format! ( "(id {})", activeNode . id . 0 ));
-    parts . push ( format! ( "(source {})", activeNode . source ));
+    parts . push ( format! (
+      "(source {})", metadata_value_atom (&activeNode . source) ));
     // AffectsParent::True is left implicit because it is the default
     // membership relation.
     match activeNode . affectsParent {
@@ -391,7 +407,8 @@ fn phantomDiff_metadata_to_string (
     let mut parts : Vec < String > =
       vec! [ "diffPhantom" . to_string () ];
     parts . push ( format! ( "(id {})", phantom . id . 0 ));
-    parts . push ( format! ( "(source {})", phantom . source ));
+    parts . push ( format! (
+      "(source {})", metadata_value_atom (&phantom . source) ));
     // affectsParent is implicit Affected and birth Unremarkable on a phantom, so
     // neither atom is emitted; both are passed as such to graphnodestats.
     parts . push ( "writeProtected" . to_string () );
@@ -430,9 +447,10 @@ fn phantomDeleted_metadata_to_string (
   if focused     { parts . push ( "focused"    . to_string () ); }
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  parts . push ( format! ( "(deleted (id {}) (source {}))",
-                            deleted_node . id . 0,
-                            deleted_node . source ));
+  parts . push ( format! (
+    "(deleted (id {}) (source {}))",
+    deleted_node . id . 0,
+    metadata_value_atom (&deleted_node . source) ));
   parts . join (" ") }
 
 /// Render metadata for an PhantomUnknown:
@@ -450,12 +468,12 @@ fn phantomUnknown_metadata_to_string (
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   let mut unknown_parts : Vec<String> = vec! [
     format! ("(id {})", unknown_node . id . 0) ];
-  if let Some (source) = &unknown_node . rel_source {
+  if let Some (source) = &unknown_node . relSource {
     unknown_parts . push ( format! (
-      "(viewStats (relSource {}))", source) ); }
-  if let Some (source) = &unknown_node . rel_source_request {
+      "(viewStats (relSource {}))", metadata_value_atom (source)) ); }
+  if let Some (source) = &unknown_node . relSource_request {
     unknown_parts . push ( format! (
-      "(editRequest (relSource {}))", source) ); }
+      "(editRequest (relSource {}))", metadata_value_atom (source)) ); }
   parts . push ( format! ( "(unknown {})", unknown_parts . join (" ") ) );
   parts . join (" ") }
 

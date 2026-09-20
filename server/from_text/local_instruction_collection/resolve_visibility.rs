@@ -131,7 +131,7 @@ fn apply_hiddenoutside_edits (
       else { continue; };
       for member in &subscribee . contains {
         if restricted_source_set . map_or (
-          true, |active| active . contains_source (&member . source))
+          true, |active| active . contains_source (&member . relSource))
         { inside . insert (key (&member . member)); }} }
 
     // The replacement domain is intentionally built from disk, rather than
@@ -141,7 +141,7 @@ fn apply_hiddenoutside_edits (
       subscriber_from_disk . hides_from_its_subscriptions . or_default ()
       . iter ()
       . filter (|member| restricted_source_set . map_or (
-        true, |active| active . contains_source (&member . source)))
+        true, |active| active . contains_source (&member . relSource)))
       .map (|member| key (&member . member))
       .filter (|member_key| ! inside . contains (member_key))
       .collect ();

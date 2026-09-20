@@ -12,7 +12,7 @@
 /// titleless in its worktree) and appeared in EXACTLY one other
 /// (titled in the worktree, absent or titleless in HEAD). Titleless
 /// section creations and deletions move individual relationships
-/// between recording sources; they are not node moves, and stage as
+/// between relSources; they are not node moves, and stage as
 /// ordinary edits.
 ///
 /// A move is AUTO-STAGED only when it is a pure delete/create pair:

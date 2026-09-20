@@ -6,9 +6,9 @@
 // keep their buffer order, and the order survives a further
 // unchanged save. The order never reaches disk; it is view-local.
 //
-// Fixture: r and t both subscribe to n, so a view of n shows a
-// SubscriberFolder whose de-novo member order is sorted by ID (r, t).
-// The test swaps them in the buffer and saves.
+// Fixture: r and t both subscribe to n.  The test explicitly requests n's
+// subscription folders, whose initial member order is sorted by ID (r, t),
+// then swaps them in the buffer and saves.
 
 use std::error::Error;
 use std::net::TcpStream;
@@ -84,11 +84,16 @@ async fn readonly_folder_order_is_preserved_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let (complete_buffer, _pids, _tree)
+  let (initial_buffer, _pids, _tree)
     : (String, Vec<ID>, _) =
     multi_root_view (
       config, Some (tantivy),
       &[ ID ("n" . to_string ()) ], false ) ?;
+  let folder_request : String = initial_buffer . replace (
+    "(affectsParent na)",
+    "(affectsParent na) (viewRequests (folder subscribes))" );
+  let complete_buffer : String =
+    save_and_rerender (&folder_request, config, tantivy) . await ?;
   assert_member_order (
     &complete_buffer, "(id r)", "(id t)", "de novo (sorted)" );
   let swapped : String = {

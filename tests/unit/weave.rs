@@ -24,17 +24,17 @@ fn sdm (disk : &[&str], buffer : &[&str]) -> Vec<&'static str> {
   set_difference_merge ( &disk, vis, &buffer ) }
 
 #[test]
-fn active_relationship_source_makes_an_unknown_member_visible () {
+fn active_relSource_makes_an_unknown_member_visible () {
   use crate::source_sets::{ActiveSourceSet, SourceSetName};
-  use crate::types::misc::{ID, MemberAtSource, SkgConfig, SourceName};
+  use crate::types::misc::{ID, RelPartner, SkgConfig, SourceName};
   use std::collections::{BTreeSet, HashMap};
   let active = ActiveSourceSet {
     name: SourceSetName::from ("main"),
     sources: BTreeSet::from ([SourceName::from ("main")]) };
   let config = SkgConfig::dummyFromSources (HashMap::new ());
-  let unknown_at_main = MemberAtSource::at_source (
+  let unknown_at_main = RelPartner::at_relSource (
     SourceName::from ("main"), ID::from ("absent"));
-  let unknown_at_private = MemberAtSource::at_source (
+  let unknown_at_private = RelPartner::at_relSource (
     SourceName::from ("private"), ID::from ("absent"));
   assert! (relationship_member_is_visible (
     &crate::dbs::in_rust_graph::InRustGraph::new (),

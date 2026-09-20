@@ -60,17 +60,17 @@ fn insert_containerward_ancestry_tree(
   active        : &ActiveSourceSet,
 ) {
   if ! active . is_all () {
-    // Edge-source gating (render-and-gating, 5_plan.org): a private
+    // relSource gating (render-and-gating, 5_plan.org): a private
     // MEMBERSHIP must not surface through enrichment ancestry even
     // when both nodes are public. The edge's owner is the
     // container (this ancestry step).
-    let edge_visible : bool =
-      graph . edge_source (
+    let rel_is_visible : bool =
+      graph . relSource (
         node . id (), NodeRelation::Contains, contained_id )
       . map ( |source| active . contains_source (&source) )
       . unwrap_or (true); // unknown edge: fall through to the
                           // node-source gate below, as before
-    if ! edge_visible { return; }}
+    if ! rel_is_visible { return; }}
   let child_nid : NodeId = match
     prepend_containing_child_from_tantivy (
       node . id (), parent_nid,
@@ -103,8 +103,8 @@ enum OverrideDir {
 /// its own one-directional chain hanging under the result, recursive
 /// and cycle-guarded. Reads the in-Rust graph (override edges are
 /// direct index lookups); a relative whose override EDGE is
-/// edge-source-hidden, or whose own source is inactive, is skipped.
-pub fn insert_override_ancestries_into_search_view (
+/// relSource-hidden, or whose own source is inactive, is skipped.
+pub fn insert_overrideward_view_subtrees (
   viewforest     : &mut Tree<ViewNode>,
   graph          : &InRustGraph,
   search_results : &[ID],
@@ -128,7 +128,7 @@ pub fn insert_override_ancestries_into_search_view (
         node_id, *node_nid, dir, graph,
         viewforest, active, &mut path ); }} }
 
-/// Every id that 'insert_override_ancestries_into_search_view' would
+/// Every id that 'insert_overrideward_view_subtrees' would
 /// graft under the given results -- the override-relative closure in
 /// both directions, gated identically to the graft. The enrichment
 /// thread unions these into the graphStats pre-fetch so the grafted
@@ -137,7 +137,7 @@ pub fn insert_override_ancestries_into_search_view (
 /// grafts do not exist yet when the pre-fetch runs). MUST stay in sync
 /// with 'graft_override_chain' (same directions, same gated accessors,
 /// same node-source gate). Returns empty without a graph handle.
-pub fn collect_override_relative_ids (
+pub fn collect_overrideward_view_subtree_ids (
   graph          : &InRustGraph,
   search_results : &[ID],
   active         : &ActiveSourceSet,

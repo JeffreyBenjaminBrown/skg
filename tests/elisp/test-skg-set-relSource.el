@@ -1,10 +1,10 @@
-;;; test-skg-set-relationship-source.el --- Tests for skg-set-relationship-source
+;;; test-skg-set-relSource.el --- Tests for skg-set-relSource
 ;;;
-;;; skg-set-relationship-source (C-c s r; formerly
+;;; skg-set-relSource (C-c s r; formerly
 ;;; skg-privatize-relationship, see
 ;;; BUG-and-fix_make-edge-more-public.org) classifies the edge the
 ;;; headline at point represents, asks the server for that edge's
-;;; (default, current) recording sources, and offers the sources at least
+;;; (default, current) relSources, and offers the sources at least
 ;;; as private as the default plus a no-override choice. These tests
 ;;; cover the pure pieces (edge classification, menu slicing, choice
 ;;; application) and the response handler with the network and
@@ -17,7 +17,7 @@
 (require 'skg-buffer)
 (require 'skg-metadata)
 (require 'skg-config)
-(require 'skg-request-edge-source-info)
+(require 'skg-request-relSource-info)
 
 (defvar test--config-public-private-trusted
   (concat "[[sources]]\n"
@@ -64,9 +64,9 @@ skg-config-dir is set and `skg--source-names' works."
     (buffer-substring-no-properties
      (line-beginning-position) (line-end-position))))
 
-;; --- Edge classification: skg--relationship-edge-at-point ---
+;; --- Edge classification: skg--rel-at-point ---
 
-(ert-deftest test-relationship-edge-content-child ()
+(ert-deftest test-rel-content-child ()
   "A content child's edge: owner = org-parent, relation = contains."
   (test--with-skg-content-view
    (concat
@@ -77,11 +77,11 @@ skg-config-dir is set and `skg--source-names' works."
      (goto-char (point-min))
      (search-forward "(id kid)" nil t)
      (beginning-of-line)
-     (should (equal (skg--relationship-edge-at-point)
+     (should (equal (skg--rel-at-point)
                     '(:owner "owner" :member "kid"
                       :relation "contains"))))))
 
-(ert-deftest test-relationship-edge-writable-folder-member ()
+(ert-deftest test-rel-writable-folder-member ()
   "A subscribeeFolder member's edge: owner = the folder's ANCHOR (its
 org-parent), relation = the folder's relation."
   (test--with-skg-content-view
@@ -94,11 +94,11 @@ org-parent), relation = the folder's relation."
      (goto-char (point-min))
      (search-forward "(id seen)" nil t)
      (beginning-of-line)
-     (should (equal (skg--relationship-edge-at-point)
+     (should (equal (skg--rel-at-point)
                     '(:owner "anchor" :member "seen"
                       :relation "subscribes_to"))))))
 
-(ert-deftest test-relationship-edge-refuses-on-readonly-folder-member ()
+(ert-deftest test-rel-refuses-on-readonly-folder-member ()
   "Refuses (user-error) on a member of a read-only folder."
   (test--with-skg-content-view
    (concat
@@ -110,23 +110,23 @@ org-parent), relation = the folder's relation."
      (goto-char (point-min))
      (search-forward "(id sub)" nil t)
      (beginning-of-line)
-     (let ((err (should-error (skg--relationship-edge-at-point)
+     (let ((err (should-error (skg--rel-at-point)
                               :type 'user-error)))
        (should (string-match-p "read-only" (cadr err)))
        (should (string-match-p "subscriberFolder" (cadr err)))))))
 
-(ert-deftest test-relationship-edge-refuses-on-root ()
+(ert-deftest test-rel-refuses-on-root ()
   "Refuses on a root headline: with no org-parent there is no edge."
   (test--with-skg-content-view
    "* (skg (node (id x) (source public))) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (let ((err (should-error (skg--relationship-edge-at-point)
+     (let ((err (should-error (skg--rel-at-point)
                               :type 'user-error)))
        (should (string-match-p "Root headline" (cadr err)))))))
 
-(ert-deftest test-relationship-edge-refuses-off-activeNode ()
+(ert-deftest test-rel-refuses-off-activeNode ()
   "Refuses on a scaffold headline (no (node ...) form)."
   (test--with-skg-content-view
    (concat
@@ -137,59 +137,59 @@ org-parent), relation = the folder's relation."
      (goto-char (point-min))
      (search-forward "(skg aliasFolder)" nil t)
      (beginning-of-line)
-     (should-error (skg--relationship-edge-at-point)
+     (should-error (skg--rel-at-point)
                    :type 'user-error))))
 
-;; --- Menu slicing: skg--relationship-source-choices ---
+;; --- Menu slicing: skg--relSource-choices ---
 
-(ert-deftest test-relationship-source-choices-slices-at-default ()
+(ert-deftest test-relSource-choices-slices-at-default ()
   "The menu is the ladder's tail from the default onward."
-  (should (equal (skg--relationship-source-choices
+  (should (equal (skg--relSource-choices
                   '("public" "private" "trusted") "private")
                  '("private" "trusted")))
-  (should (equal (skg--relationship-source-choices
+  (should (equal (skg--relSource-choices
                   '("public" "private" "trusted") "public")
                  '("public" "private" "trusted")))
-  (should (equal (skg--relationship-source-choices
+  (should (equal (skg--relSource-choices
                   '("public" "private" "trusted") "trusted")
                  '("trusted"))))
 
-(ert-deftest test-relationship-source-choices-full-ladder-fallback ()
+(ert-deftest test-relSource-choices-full-ladder-fallback ()
   "With no default (or one na from the ladder), the whole ladder
 is offered; the server's save-time floor check backstops."
-  (should (equal (skg--relationship-source-choices
+  (should (equal (skg--relSource-choices
                   '("public" "private") nil)
                  '("public" "private")))
-  (should (equal (skg--relationship-source-choices
+  (should (equal (skg--relSource-choices
                   '("public" "private") "unknown")
                  '("public" "private"))))
 
-;; --- Choice application: skg--apply-relationship-source-choice ---
+;; --- Choice application: skg--apply-relSource-choice ---
 
-(ert-deftest test-apply-relationship-source-sets-atom ()
+(ert-deftest test-apply-relSource-sets-atom ()
   "Choosing a source writes the (relSource NAME) atom."
   (test--with-skg-content-view
    "* (skg (node (id x) (source public))) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (skg--apply-relationship-source-choice "trusted")
+     (skg--apply-relSource-choice "trusted")
      (should (string-match-p "(relSource trusted)"
                              (test--buffer-line 1))))))
 
-(ert-deftest test-apply-relationship-source-preserves-existing-viewstats ()
+(ert-deftest test-apply-relSource-preserves-existing-viewstats ()
   "Setting relSource must not disturb a pre-existing viewStats sibling."
   (test--with-skg-content-view
    "* (skg (node (id x) (source public) (viewStats cycle))) x\n"
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (skg--apply-relationship-source-choice "public")
+     (skg--apply-relSource-choice "public")
      (should (string-match-p "cycle" (test--buffer-line 1)))
      (should (string-match-p "(relSource public)"
                              (test--buffer-line 1))))))
 
-(ert-deftest test-apply-relationship-source-removes-override ()
+(ert-deftest test-apply-relSource-removes-override ()
   "The no-override choice removes only a pending request, preserving
 the displayed relSource fact; its message says the SAVED source survives
 (sticky), not that anything resets to the default."
@@ -198,14 +198,14 @@ the displayed relSource fact; its message says the SAVED source survives
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (let ((msg (skg--apply-relationship-source-choice
-                 skg--relationship-source-no-override)))
+     (let ((msg (skg--apply-relSource-choice
+                 skg--relSource-no-override)))
        (should (string-match-p "sticky" msg))
        (should-not (string-match-p "editRequest" (test--buffer-line 1)))
        (should (string-match-p "(viewStats (relSource private))"
                                (test--buffer-line 1)))))))
 
-(ert-deftest test-apply-relationship-source-remove-without-atom-is-noop ()
+(ert-deftest test-apply-relSource-remove-without-atom-is-noop ()
   "The no-override choice without an atom changes nothing."
   (test--with-skg-content-view
    "* (skg (node (id x) (source public))) x\n"
@@ -213,13 +213,13 @@ the displayed relSource fact; its message says the SAVED source survives
    (lambda ()
      (goto-char (point-min))
      (let ((before (test--buffer-line 1))
-           (msg (skg--apply-relationship-source-choice
-                 skg--relationship-source-no-override)))
+           (msg (skg--apply-relSource-choice
+                 skg--relSource-no-override)))
        (should (string-match-p "nothing to remove" msg))
        (should (equal (test--buffer-line 1) before))))))
 
-(ert-deftest test-apply-relationship-source-on-alias-uses-flat-metadata ()
-  "Alias source intent is a flat scaffold editRequest, not node viewStats."
+(ert-deftest test-apply-relSource-on-alias-uses-flat-metadata ()
+  "Alias relSource intent is a flat scaffold editRequest, not node viewStats."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (source public))) owner\n"
@@ -229,18 +229,18 @@ the displayed relSource fact; its message says the SAVED source survives
    (lambda ()
      (goto-char (point-min))
      (forward-line 2)
-     (skg--apply-relationship-source-choice "trusted")
+     (skg--apply-relSource-choice "trusted")
      (should (string-match-p
               "(skg alias (editRequest (relSource trusted)))"
               (test--buffer-line 3)))
      (should-not (string-match-p "viewStats" (test--buffer-line 3)))
-     (should (equal (skg--relationship-source-requested-value) "trusted"))
-     (skg--apply-relationship-source-choice
-      skg--relationship-source-no-override)
+     (should (equal (skg--relSource-requested-value) "trusted"))
+     (skg--apply-relSource-choice
+      skg--relSource-no-override)
      (should (equal (test--buffer-line 3)
                     "*** (skg alias) nickname")))))
 
-(ert-deftest test-apply-relationship-source-on-unknown-keeps-fact-separate ()
+(ert-deftest test-apply-relSource-on-unknown-keeps-fact-separate ()
   "An Unknown content member stores intent under its own editRequest."
   (test--with-skg-content-view
    (concat
@@ -250,17 +250,17 @@ the displayed relSource fact; its message says the SAVED source survives
    (lambda ()
      (goto-char (point-min))
      (forward-line 1)
-     (skg--apply-relationship-source-choice "trusted")
+     (skg--apply-relSource-choice "trusted")
      (should (string-match-p
               "(unknown (id na) (viewStats (relSource private)) (editRequest (relSource trusted)))"
               (test--buffer-line 2)))
-     (skg--apply-relationship-source-choice
-      skg--relationship-source-no-override)
+     (skg--apply-relSource-choice
+      skg--relSource-no-override)
      (should (string-match-p "(viewStats (relSource private))"
                              (test--buffer-line 2)))
      (should-not (string-match-p "editRequest" (test--buffer-line 2))))))
 
-(ert-deftest test-recursive-relationship-source-preflights-edit-conflicts ()
+(ert-deftest test-recursive-relSource-preflights-edit-conflicts ()
   "A delete/merge target aborts the recursive operation before any write."
   (test--with-skg-content-view
    (concat
@@ -271,7 +271,7 @@ the displayed relSource fact; its message says the SAVED source survives
    (lambda ()
      (goto-char (point-min))
      (should-error
-      (skg--set-relationship-source-recursive-walk 'contained "trusted"))
+      (skg--set-relSource-recursive-walk 'contained "trusted"))
      (should-not (string-match-p "relSource" (test--buffer-line 2))))))
 
 (ert-deftest test-alias-command-derives-default-locally ()
@@ -295,17 +295,17 @@ the displayed relSource fact; its message says the SAVED source survives
                  ((symbol-function 'process-send-string)
                   (lambda (&rest _)
                     (ert-fail "alias command must not contact edge endpoint"))))
-         (skg--set-relationship-source-at-point))
+         (skg--set-relSource-at-point))
        (should (equal seen-choices
                       (list "private" "trusted"
-                            skg--relationship-source-no-override)))
+                            skg--relSource-no-override)))
        (should (string-match-p "(relSource trusted)"
                                (test--buffer-line 3)))))))
 
 ;; --- The response handler, network and minibuffer stubbed ---
 
 (defun test--run-info-handler (payload choice-fn)
-  "Run `skg--set-relationship-source-from-info' on PAYLOAD against
+  "Run `skg--set-relSource-from-info' on PAYLOAD against
 the buffer at point, with `run-at-time' made synchronous and
 `completing-read' (which `skg--completing-read-with-cycle' wraps)
 stubbed by CHOICE-FN, which receives (PROMPT CHOICES PREFILL) --
@@ -319,9 +319,9 @@ choice."
                (lambda (prompt choices &optional _pred _req init
                         _hist _def _inherit)
                  (funcall choice-fn prompt choices init))))
-      (skg--set-relationship-source-from-info buffer marker payload))))
+      (skg--set-relSource-from-info buffer marker payload))))
 
-(ert-deftest test-relationship-source-handler-slices-and-applies ()
+(ert-deftest test-relSource-handler-slices-and-applies ()
   "A (default, current) reply offers the slice from the default plus
 the no-override entry, pre-fills the minibuffer with the current
 source, and applies the selection."
@@ -336,19 +336,19 @@ source, and applies the selection."
      (beginning-of-line)
      (let (seen-choices seen-prefill)
        (test--run-info-handler
-        "((response-type edge-source-info) (default \"private\") (current \"trusted\"))"
+        "((response-type relSource-info) (default \"private\") (current \"trusted\"))"
         (lambda (_prompt choices prefill)
           (setq seen-choices choices
                 seen-prefill prefill)
           "private"))
        (should (equal seen-choices
                       (list "private" "trusted"
-                            skg--relationship-source-no-override)))
+                            skg--relSource-no-override)))
        (should (equal seen-prefill "trusted"))
        (should (string-match-p "(relSource private)"
                                (test--buffer-line 2)))))))
 
-(ert-deftest test-relationship-source-handler-more-public-current-prefills-default ()
+(ert-deftest test-relSource-handler-more-public-current-prefills-default ()
   "A legacy CURRENT more public than the default is not among the
 choices, so the prompt pre-fills with the default instead."
   (test--with-skg-content-view
@@ -362,13 +362,13 @@ choices, so the prompt pre-fills with the default instead."
      (beginning-of-line)
      (let (seen-prefill)
        (test--run-info-handler
-        "((response-type edge-source-info) (default \"private\") (current \"public\"))"
+        "((response-type relSource-info) (default \"private\") (current \"public\"))"
         (lambda (_prompt _choices prefill)
           (setq seen-prefill prefill)
-          skg--relationship-source-no-override))
+          skg--relSource-no-override))
        (should (equal seen-prefill "private"))))))
 
-(ert-deftest test-relationship-source-handler-error-offers-full-ladder ()
+(ert-deftest test-relSource-handler-error-offers-full-ladder ()
   "An error reply falls back to the full ladder (plus no-override)."
   (test--with-skg-content-view
    (concat
@@ -381,17 +381,17 @@ choices, so the prompt pre-fills with the default instead."
      (beginning-of-line)
      (let (seen-choices)
        (test--run-info-handler
-        "((response-type edge-source-info) (error \"member 'kid' is not in the graph\"))"
+        "((response-type relSource-info) (error \"member 'kid' is not in the graph\"))"
         (lambda (_prompt choices _def)
           (setq seen-choices choices)
-          skg--relationship-source-no-override))
+          skg--relSource-no-override))
        (should (equal seen-choices
                       (list "public" "private" "trusted"
-                            skg--relationship-source-no-override)))
+                            skg--relSource-no-override)))
        (should-not (string-match-p "relSource"
                                    (test--buffer-line 2)))))))
 
-;; --- The recursive walk: skg--set-relationship-source-recursive-walk ---
+;; --- The recursive walk: skg--set-relSource-recursive-walk ---
 
 (defvar test--recursive-content-tree
   (concat
@@ -430,7 +430,7 @@ subscribee-as-such member are pruned, and folder members are untouched."
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (let ((count (skg--set-relationship-source-recursive-walk
+     (let ((count (skg--set-relSource-recursive-walk
                    'contained "trusted")))
        (should (= count 3)) ;; a, b, e
        (dolist (id '("a" "b" "e"))
@@ -448,7 +448,7 @@ children and subscribee-as-such content untouched."
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (let ((count (skg--set-relationship-source-recursive-walk
+     (let ((count (skg--set-relSource-recursive-walk
                    'subscribee "private")))
        (should (= count 1)) ;; g
        (should (string-match-p "(relSource private)"
@@ -467,7 +467,7 @@ own edge to its view-parent."
      (goto-char (point-min))
      (search-forward "(id a)")
      (beginning-of-line)
-     (let ((count (skg--set-relationship-source-recursive-walk
+     (let ((count (skg--set-relSource-recursive-walk
                    'contained "trusted")))
        (should (= count 2)) ;; a and b
        (should (string-match-p "(relSource trusted)"
@@ -488,7 +488,7 @@ own content children (the member being definitive) match kind
      tree test--config-public-private-trusted
      (lambda ()
        (goto-char (point-min))
-       (should (= 1 (skg--set-relationship-source-recursive-walk
+       (should (= 1 (skg--set-relSource-recursive-walk
                      'overridden "private")))
        (should (string-match-p "(relSource private)"
                                (test--line-of-id "o")))
@@ -498,7 +498,7 @@ own content children (the member being definitive) match kind
      tree test--config-public-private-trusted
      (lambda ()
        (goto-char (point-min))
-       (should (= 1 (skg--set-relationship-source-recursive-walk
+       (should (= 1 (skg--set-relSource-recursive-walk
                      'contained "private")))
        (should (string-match-p "(relSource private)"
                                (test--line-of-id "oc")))
@@ -517,7 +517,7 @@ member's content children are not reached."
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (should (= 0 (skg--set-relationship-source-recursive-walk
+     (should (= 0 (skg--set-relSource-recursive-walk
                    'contained "trusted")))
      (dolist (id '("s" "sc"))
        (should-not (string-match-p "relSource"
@@ -536,7 +536,7 @@ anchor (pruned below the write-protected node) or at the folder itself
      tree test--config-public-private-trusted
      (lambda ()
        (goto-char (point-min))
-       (should (= 0 (skg--set-relationship-source-recursive-walk
+       (should (= 0 (skg--set-relSource-recursive-walk
                      'subscribee "trusted")))
        (should-not (string-match-p "relSource"
                                    (test--line-of-id "g")))))
@@ -546,7 +546,7 @@ anchor (pruned below the write-protected node) or at the folder itself
        (goto-char (point-min))
        (search-forward "subscribeeFolder")
        (beginning-of-line)
-       (should (= 0 (skg--set-relationship-source-recursive-walk
+       (should (= 0 (skg--set-relSource-recursive-walk
                      'subscribee "trusted")))
        (should-not (string-match-p "relSource"
                                    (test--line-of-id "g")))))))
@@ -562,8 +562,8 @@ the subtree, while preserving display facts."
    test--config-public-private-trusted
    (lambda ()
      (goto-char (point-min))
-     (should (= 2 (skg--set-relationship-source-recursive-walk
-                   'contained skg--relationship-source-no-override)))
+     (should (= 2 (skg--set-relSource-recursive-walk
+                   'contained skg--relSource-no-override)))
      (dolist (id '("a" "b"))
        (should-not (string-match-p "editRequest"
                                    (test--line-of-id id)))))))
@@ -617,7 +617,7 @@ does neither."
     (when (get-buffer "*skg-relationship-kinds*")
       (kill-buffer "*skg-relationship-kinds*"))))
 
-(ert-deftest test-set-relationship-source-recursive-end-to-end ()
+(ert-deftest test-set-relSource-recursive-end-to-end ()
   "The full command: menu choice, source prompt, walk. Point and
 window plumbing are stubbed as in the other handler tests."
   (test--with-skg-content-view
@@ -632,7 +632,7 @@ window plumbing are stubbed as in the other handler tests."
                         (lambda (buffer &rest _) (set-buffer buffer)))
                        ((symbol-function 'completing-read)
                         (lambda (&rest _) "trusted")))
-               (skg-set-relationship-source-recursive)
+               (skg-set-relSource-recursive)
                (test--choose-menu-role "** contained"))
              (with-current-buffer view-buffer
                (dolist (id '("a" "b" "e"))
@@ -826,4 +826,4 @@ rises. A child still more private than the new source is left alone."
      (should-not (string-match-p "(source public)"
                                  (test--line-of-id "x"))))))
 
-(provide 'test-skg-set-relationship-source)
+(provide 'test-skg-set-relSource)

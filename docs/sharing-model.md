@@ -45,7 +45,7 @@ Two invariants keep owned overrides coherent, checked both when you save and whe
 
 Because a chain can be longer than one link, the node Skg draws for an overridden `N` is the end of the chain of *visible* user-owned overriders out of `N`. Under a restricted source-set that hides the chain's end, the drawn node is a *middle* of the chain; its `overridesHere N` marker is still honest, and the save still round-trips `N` into the container's contains.
 
-When you ask for a brand-new single-root view of a node that is overridden (by anyone), Skg does not choose for you: it opens an *override-choice menu* — the requested node as root, each visible overrider beneath what it overrides — and explains so in the minibuffer. Pick the overrider you want, or bypass the menu (`skg-goto-bypassOverride`) to open the original node itself, drawn raw.
+When you ask for a brand-new single-root view, Skg opens the requested node itself, drawn raw. It does not insert overriders as independent children. Override facts remain visible in enriched search results and through explicitly requested override folders and paths; automatic substitution applies only when the overridden node occurs as recursive content.
 
 ## The read-only folders: who subscribes to, overrides, or hides this node
 

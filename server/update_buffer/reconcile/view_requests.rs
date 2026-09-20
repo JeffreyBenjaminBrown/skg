@@ -19,6 +19,7 @@ pub fn execute_activeNode_view_requests (
   config             : &SkgConfig,
   errors             : &mut Vec<String>,
   active_source_set  : Option<&ActiveSourceSet>,
+  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
     tree, node,
@@ -31,7 +32,7 @@ pub fn execute_activeNode_view_requests (
   if ! requests . is_empty() {
     execute_view_requests(
       tree, requests, graph, config, errors,
-      active_source_set ) ?; }
+      active_source_set, source_diffs ) ?; }
   Ok(( )) }
 
 pub fn ensure_hiddenInFolder_under_definitive_subscribee (

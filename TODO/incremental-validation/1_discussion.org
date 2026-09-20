@@ -36,12 +36,12 @@ while checking only the entries an ordinary save could have changed on the
 save-time path.  See
 =server/dbs/in_rust_graph/internal_index_validation.rs:23=.
 ** the possible 'telescope provenance/privacy violations'
-There are two: No edge source, and edge source impossibly public.
+There are two: No relSource, and relSource impossibly public.
 There are also nonfatal warnings.
 *** at length
 For an already-folded graph, there are two:
 
-- =UnconfiguredSource=: a relationship says it was recorded at a source that
+- =UnconfiguredRelSource=: a relationship has a relSource that
   is not in the current configuration.  Such an edge could not be unfolded
   back into a writable telescope section.
 - =LeakShapedMember=: a relationship is recorded in a source more public than
@@ -577,7 +577,7 @@ freshly-built graph and discards it before the incremental graph is published.
 
 ** Telescope provenance/privacy: incremental warnings
 
-=telescope_violations_of= reports unconfigured relationship sources and edges
+=telescope_violations_of= reports unconfigured relSources and edges
 recorded more publicly than their target's home.  By design these are warnings,
 never load/save refusals, because valid independent saves and pulls can create
 them (=server/telescope/invariants.rs:1=).
@@ -894,7 +894,7 @@ expose an explicit full audit for diagnostics.
 
 Fix the absent-target privacy gap as part of this stage.  Extend
 =telescope_violations_of= so that an unresolved relationship member uses the
-/owner's/ home as its privacy ceiling: if the member's recording source is more
+/owner's/ home as its privacy ceiling: if the member's relSource is more
 public than the extant owner's home, emit a new, explicit telescope warning
 (rather than silently accepting it because the target has no known home).  A
 resolved member continues to use the target's home as its ceiling.  Apply this

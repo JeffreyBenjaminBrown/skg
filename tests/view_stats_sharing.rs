@@ -155,11 +155,16 @@ async fn sharing_view_stats_appear_and_roundtrip (
 ) -> Result<(), Box<dyn Error>> {
       (
         graph_handle_from_config (config) ? );
-      let (de_novo, _pids, _tree)
+      let (initial, _pids, _tree)
         : (String, Vec<ID>, _) =
         multi_root_view (
           config, Some (tantivy),
           &[ ID ("R" . to_string ()) ], false ) ?;
+      let folder_request : String = initial . replace (
+        "(affectsParent na)",
+        "(affectsParent na) (viewRequests (folder overrides))" );
+      let de_novo : String =
+        save_and_rerender (&folder_request, config, tantivy) . await ?;
       assert_sharing_stats_in_view_of_R (&de_novo, "de novo");
       let saved : String = // The save parses the buffer, so this also pins the parse arms.
         save_and_rerender (&de_novo, config, tantivy) . await ?;

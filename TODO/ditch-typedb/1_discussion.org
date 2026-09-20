@@ -23,7 +23,7 @@ one data representation afterward.  The intended target is:
 | Component      | Responsibility                                      | Durable? |
 |----------------+-----------------------------------------------------+----------|
 | '.skg' files   | Authoritative user data and privacy-telescope facts | yes      |
-| 'InRustGraph'  | Identity, relationships, edge sources, graph reads  | no       |
+| 'InRustGraph'  | Identity, relationships, relSources, graph reads  | no       |
 | Tantivy        | Disposable full-text and regex search index         | no       |
 
 That separation is healthy.  TypeDB and 'InRustGraph' overlap; Tantivy
@@ -45,9 +45,9 @@ but make that an explicit decision at the end.
 
 The typed accessors in
 [[../../server/dbs/in_rust_graph/relation_accessors.rs][relation_accessors.rs]]
-also know the recording source of structured edges and can gate both
+also know the relSource of structured edges and can gate both
 directions by an active source-set.  TypeDB deliberately stores the
-full fold without edge recording sources.  It cannot answer that
+full fold without edge relSources.  It cannot answer that
 privacy question.  In that respect TypeDB is not only redundant but
 strictly less faithful than the Rust graph.
 
@@ -136,7 +136,7 @@ The refactor should finish with these statements true:
    otherwise set-like results are deterministically sorted.
 7. Source-set-aware rendering gates the relationship by its recording
    source as well as gating its endpoint nodes by their homes.
-8. Unresolved raw relationship members and their recording sources are
+8. Unresolved raw relationship members and their relSources are
    preserved.  Removing TypeDB must not turn supported dangling
    references into automatic deletion or make them invisible.
 9. The Rust pre-write validators enforce every constraint Skg relied
@@ -243,7 +243,7 @@ walks 'contained_by' without an active source-set.  Their rendering
 callers pass the active set only later, while inserting resolved nodes.
 
 That late check is stronger than it first appears.  Both backpath
-rendering and search-ancestry enrichment check the exact edge source as
+rendering and search-ancestry enrichment check the exact relSource as
 well as the endpoint node's home before grafting a node.  With the
 servers running, all five tests in 'tests/leak_battery.rs' pass,
 including the case where two public nodes are joined only by a private
@@ -330,7 +330,7 @@ at different times.
   accessor where an unresolved member must render.
 - Containerward ancestry and all nine backpath roles: implement one
   synchronous traversal over a caller-supplied snapshot, preserving
-  cycle/fork/depth semantics and edge-source gating.
+  cycle/fork/depth semantics and relSource gating.
 - Graph-node statistics: move the already-authoritative in-Rust
   implementation, remove unused 'db_name'/'driver' parameters, and
   retain source-set gating.
@@ -598,7 +598,7 @@ work is intended to erase.
 - The privacy leak battery covers content, all PartnerCols, paths,
   ordinary/search ancestry, and graph-node stats with public endpoints
   joined by a private edge.
-- Dangling structured members retain raw ID plus edge source and render
+- Dangling structured members retain raw ID plus relSource and render
   as Unknown where the UI supports them.
 - Delete propagation preserves foreign telescopes and scrubs only the
   owned structured references it is allowed to write.

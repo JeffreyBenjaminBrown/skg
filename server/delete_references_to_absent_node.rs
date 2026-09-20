@@ -6,7 +6,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::save::nodecomplete_from_noderust;
-use crate::types::misc::{ID, MemberAtSource, MSV, SkgConfig, SourceName};
+use crate::types::misc::{ID, RelPartner, MSV, SkgConfig, SourceName};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::textlinks::textlinks_from_text;
 
@@ -34,7 +34,7 @@ pub struct StructuralOccurrence {
   pub owner_title  : String,
   pub field        : StructuredField,
   pub raw_id       : ID,
-  pub relation_source : SourceName,
+  pub relSource : SourceName,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -73,7 +73,7 @@ impl Preview {
       rows . push (format! ("S{}{}{}{}{}{}",
         encode (&o . owner_pid . 0), encode (&o . owner_source . 0),
         encode (&o . owner_title), encode (o . field . label ()),
-        encode (&o . raw_id . 0), encode (&o . relation_source . 0))); }
+        encode (&o . raw_id . 0), encode (&o . relSource . 0))); }
     for o in &self . text_links {
       rows . push (format! ("T{}{}{:?}:{}{}",
         encode (&o . owner_pid . 0), encode (&o . owner_source . 0),
@@ -95,7 +95,7 @@ pub fn preview_warning_org (
     text . push_str ("** Structured relationships to remove\n");
     for o in &preview . structural {
       text . push_str (&format! ("- {} / {} / {} (source {})\n",
-        o . owner_pid, o . field . label (), o . raw_id, o . relation_source)); }}
+        o . owner_pid, o . field . label (), o . raw_id, o . relSource)); }}
   if ! preview . text_links . is_empty () {
     text . push_str ("** Text links left unchanged\n");
     for o in &preview . text_links {
@@ -113,7 +113,7 @@ pub fn result_org (
   for occurrence in &preview . structural {
     result . push_str (&format! ("- {}: {} in source {}\n",
       occurrence . owner_pid, occurrence . field . label (),
-      occurrence . relation_source)); }
+      occurrence . relSource)); }
   result
 }
 
@@ -130,7 +130,7 @@ pub fn preview (
   let mut result : Preview = Preview { raw_id : raw_id . clone (), ..Preview::default () };
   for node in graph . nodes . values () {
     if ! config . user_owns_source (&node . source) { continue; }
-    let mut record = |field : StructuredField, members : &[MemberAtSource<ID>]| {
+    let mut record = |field : StructuredField, members : &[RelPartner<ID>]| {
       for member in members . iter () . filter (|m| &m . member == raw_id) {
         result . structural . push (StructuralOccurrence {
           owner_pid       : node . pid . clone (),
@@ -138,7 +138,7 @@ pub fn preview (
           owner_title     : node . title . clone (),
           field,
           raw_id          : raw_id . clone (),
-          relation_source : member . source . clone (), }); }};
+          relSource : member . relSource . clone (), }); }};
     record (StructuredField::Contains, &node . contains);
     record (StructuredField::SubscribesTo, node . subscribes_to . or_default ());
     record (StructuredField::HidesFromItsSubscriptions,
@@ -151,8 +151,8 @@ pub fn preview (
       record_text_links (&mut result . text_links, node, raw_id, TextField::Body,
                          body); }}
   result . structural . sort_by (|a, b|
-    (&a . owner_pid, a . field, &a . relation_source)
-      . cmp (&(&b . owner_pid, b . field, &b . relation_source)));
+    (&a . owner_pid, a . field, &a . relSource)
+      . cmp (&(&b . owner_pid, b . field, &b . relSource)));
   result . text_links . sort_by (|a, b|
     (&a . owner_pid, a . field, a . line, &a . label)
       . cmp (&(&b . owner_pid, b . field, b . line, &b . label)));
@@ -182,7 +182,7 @@ fn record_text_links (
 }
 
 /// Build one verbatim SaveNode per owned affected telescope.  It removes only
-/// exact raw-ID matches and preserves all list order, recording sources, and
+/// exact raw-ID matches and preserves all list order, relSources, and
 /// MSV shapes.  The caller must use the same fresh snapshot it previewed.
 pub fn rewrite (
   graph  : &InRustGraph,
@@ -211,9 +211,9 @@ pub fn rewrite (
 }
 
 fn remove_exact (
-  members : &MSV<MemberAtSource<ID>>,
+  members : &MSV<RelPartner<ID>>,
   raw_id  : &ID,
-) -> MSV<MemberAtSource<ID>> {
+) -> MSV<RelPartner<ID>> {
   match members {
     MSV::Unspecified => MSV::Unspecified,
     MSV::Specified (members) => MSV::Specified (
@@ -230,8 +230,8 @@ mod tests {
   use std::path::PathBuf;
 
   fn id (text : &str) -> ID { ID::from (text) }
-  fn member (source : &str, raw : &str) -> MemberAtSource<ID> {
-    MemberAtSource::at_source (SourceName::from (source), id (raw)) }
+  fn member (source : &str, raw : &str) -> RelPartner<ID> {
+    RelPartner::at_relSource (SourceName::from (source), id (raw)) }
 
   fn config () -> SkgConfig {
     let source = |name : &str, owned : bool| SkgfileSource {

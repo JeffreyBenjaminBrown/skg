@@ -67,7 +67,7 @@
    source. Save resolution, metadata, and the advisory source-info request
    now use that same rule. Alias 'relSource' is carried in metadata and
    round-trips; its current/default value is derived locally because an
-   alias is not a graph edge and the edge-source endpoint needs two node
+   alias is not a graph edge and the relSource endpoint needs two node
    ids.
 
    Commit '4660c433' completed the live 'level' to 'source' vocabulary
@@ -81,7 +81,7 @@
    Neovim documentation and appended the August disk-reader and
    text-response audit to '4_audit-list.org'. This included the minor
    terminology note Jeff left in the plan: the existing
-   'skg-set-relationship-source' name is broader in practice when it acts
+   'skg-set-relSource' name is broader in practice when it acts
    on an alias.
 
    Commit '80e13e5c' moved the three recap findings to
@@ -144,7 +144,7 @@
    owned/foreign selection, fold/unfold and filesystem round-trips, writer
    preflight and refusal, save leveling and Hoist, source sets, Tantivy,
    search, title lookup, export, diff analysis, and raw protocol behavior.
-   Focused Emacs relationship-source tests passed 32/32; the corresponding
+   Focused Emacs relSource tests passed 32/32; the corresponding
    Neovim confirmation and metadata tests also passed.
 
 ** Pre-existing test and fixture corrections
@@ -185,7 +185,7 @@
 
   - pid '6652685e-472e-4c07-a456-fbc3432b1dbf': its 'contains' relationship
     moved from 'personal-proc' to a new telescope section in
-    'personal-most', using 'skg-set-relationship-source' and save;
+    'personal-most', using 'skg-set-relSource' and save;
   - pid '33d5cd4e-8a0c-48f0-85c2-467db86e1862': the duplicate public alias
     was removed.
 

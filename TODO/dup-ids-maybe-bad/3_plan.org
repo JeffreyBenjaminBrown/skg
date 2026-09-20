@@ -239,7 +239,7 @@
    in server/telescope/invariants.rs and docs/telescopes.md ("What
    leaks, and what migration fixes"). The replacement guidance for a
    leak-shaped membership is the per-edge gesture that still exists,
-   'skg-set-relationship-source'. Regenerate the affected
+   'skg-set-relSource'. Regenerate the affected
    tests/integration/*/data/telescope-warnings.org artifacts.
 
 ** 11. Give the telescope a type
@@ -330,7 +330,7 @@
 
   How reachable the shape is: not by any path this code writes. Every
   save clamps every level to at least the owner's home
-  ('apply_sticky_levels'), so skg does not create it. It arrives only
+  ('apply_sticky_relSources'), so skg does not create it. It arrives only
   from hand-edited files, from a pull, or from a foreign overlay. That
   is why REFUSE is tolerable as an interim: the nodes it blocks are
   already broken.

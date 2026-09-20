@@ -59,56 +59,43 @@ So far there are these endpoints:
   - Phase 2, enrichment: A three-message sequence:
     1. Rust sends LP response-type "request-snapshot" with `(("content" "TERMS"))` — asking Emacs for a snapshot of the search buffer matching those terms.
     2. Emacs replies with `((request . "snapshot response") (terms . "TERMS"))\n` followed by `Content-Length: N\r\n\r\n<buffer text>` — the current buffer contents, including any unsaved user edits. Emacs sets the buffer to readonly before sending.
-    3. Rust parses the snapshot, inserts containerward ancestry and graphnodestats, and sends LP response-type "search-enrichment" with `(("terms" "TERMS") ("content" "ORG") ("warnings" (...)))`. Emacs replaces the buffer and exits readonly.
+    3. Rust parses the snapshot, inserts containerward ancestry,
+       overrideward view-subtrees, and graphnodestats, and sends LP
+       response-type "search-enrichment" with `(("terms" "TERMS")
+       ("content" "ORG") ("warnings" (...)))`. Emacs replaces the
+       buffer and exits readonly.
     - Enrichment uses the same active source-set as the original
       search. Containerward ancestry truncates before inactive
       containers.
+    - Each result's overrideward view-subtree contains its visible
+      override relatives in both directions: what it overrides and what
+      overrides it. Each direction is recursive and cycle-guarded. These
+      nodes are write-protected non-content descendants. A matching node
+      recursively overridden by a user-owned result is suppressed at the
+      top level because it reappears in that result's subtree.
 
 ## Single root content tree view from ID
   - Request: `((request . "single root content view")
     (id . "NODE_ID") (view-uri . "URI")
-    (override-choice . "CHOICE")
     (allow-overPrivateText-telescopes "PID" ...))`
-    - `override-choice` is optional; values are "menu" (the default)
-      and "bypass". See "the override-choice menu" below.
   - Response: LP `((response-type content-view) (content "...")
     (errors ("..." ...)) (warnings ("..." ...)))`. The document
     structure is detailed below, under `Single root content tree view`.
     Under a restricted source-set, a response involving an overPrivateText
     telescope instead returns LP `overPrivateText-telescope-confirmation` with
-    `(operation single-root-view)` or `(operation override-menu)`, the
-    exact PIDs, and a text-free prompt. An approved retry carries those
+    `(operation single-root-view)`, the exact PIDs, and a text-free
+    prompt. An approved retry carries those
     exact PIDs in `allow-overPrivateText-telescopes`; approval is not cached.
     Source-set `all` returns the ordinary response with a warning.
   - If `NODE_ID` resolves to an inactive source, the server refuses the
     request with a human-readable message and does not open a buffer.
     Following a link to an inactive-source node behaves the same way.
-  - The override-choice menu: when the requested node is overridden
-    (an `overrides_view_of` edge points at it, user-owned or
-    foreign) and at least one overrider's source is active, the
-    server returns, instead of a content view, an ordinary buffer
-    of write-protected nodes: the requested node as root, each visible
-    overrider an Independent child of what it overrides, following
-    the relation recursively (all edges), each branch stopping with
-    the `cycle` viewstat at the first repeated ID. The response
-    then carries two extra fields:
-    `((content "...") (view-uri "override-menu:PID")
-      (to-minibuffer "The requested node is overridden. Choose a destination.")
-      (errors ()) (warnings (...)))`.
-    The client must adopt the supplied `view-uri` (the server
-    registers the menu under it; one menu per node, deduped) and
-    show `to-minibuffer` via the echo area only -- never buffer
-    text, never a popped window.
-    Precedence: an open content view rooted at the node wins (the
-    usual `(switch-to-view ...)` reply); a second menu request
-    switches to the open menu; the menu appears in diff mode too.
-  - `(override-choice . "bypass")` skips the menu and opens the
-    requested node itself, drawn raw. Because the bypass-opened root
+  - The requested node opens as itself, drawn raw. Because the raw root
     is an overridden node drawn raw, its immediate children also draw
     raw (one level); substitution resumes at the grandchildren. See
-    "Override substitution" below. Emacs sends bypass from magit
-    buffers (readable-ID jumps land on the raw node) and from the
-    command `skg-goto-bypassOverride`, the menu's escape hatch.
+    "Override substitution" below. Override facts can be inspected in
+    search results' overrideward view-subtrees and in explicitly requested
+    override folders and paths.
 
 ## Save buffer
   - Request: First `((request . "save buffer") (view-uri . "URI") (point-lines-below-focused-headline . "N") (point-column . "C") (point-screen-lines-below-window-start . "M"))\n`, then `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` is the buffer content (`LENGTH` bytes).
@@ -294,7 +281,7 @@ So far there are these endpoints:
     absent or titleless in its worktree) and appeared in EXACTLY one
     other (titled in the worktree, absent or titleless in HEAD).
     Titleless section creations and deletions move individual
-    relationships between recording sources; they are not node
+    relationships between relSources; they are not node
     moves, and stage as ordinary edits. An ID whose title vanished
     from, or appeared in, more
     than one source has more than one candidate (old, new) pair and
@@ -357,27 +344,27 @@ So far there are these endpoints:
     not rewrite `.skg` files. Failure leaves the old generation live. Success
     closes existing views and recomputes context rankings for search.
 
-## Edge source info
-  - Request: ((request . "edge source info") (owner . "ID")
+## relSource info
+  - Request: ((request . "relSource info") (owner . "ID")
     (member . "ID") (relation . "contains")) — relation is one of
     `contains`, `subscribes_to`, `overrides_view_of`: the three
     relations an explicit `(editRequest (relSource ...))` request can name.
-  - Response: LP response-type "edge-source-info" with
+  - Response: LP response-type "relSource-info" with
     `((default "NAME") (current "NAME"))`. `(current ...)` is absent
     when the graph records no such exact raw edge (e.g. one typed into a
     buffer and not yet saved). An unresolved member is valid: it uses
     the owner's home as its default and may still report an exact raw
-    stored edge source. On failure, `((error "..."))` — e.g. an owner
+    stored relSource. On failure, `((error "..."))` — e.g. an owner
     the graph does not know.
   - Behavior: between owned endpoints, `default` is the more-private
     home. From an owned owner to a foreign member, `default` is the
     owner's home regardless of privacy order; this deliberately
     exposes the member ID and relationship to that owned source's
     readers, while avoiding any proposed foreign write. `current` is
-    the edge's recording source.
-    `skg-set-relationship-source` uses the reply to offer only
+    the edge's relSource.
+    `skg-set-relSource` uses the reply to offer only
     sources the save can accept. Advisory: the save-time floor check
-    in `apply_sticky_sources` stays load-bearing, since buffers go
+    in `apply_sticky_relSources` stays load-bearing, since buffers go
     stale and the request is plain text.
 
 ## Property state
@@ -609,7 +596,9 @@ if and only if it adheres to the following:
 - whitespace
   - Whitespace separates all elements.
   - Extra whitespace is ignored.
-  - Keys and values should contain no whitespace.
+  - Keys and bare values should contain no whitespace. A value that contains
+    whitespace is represented as a quoted string atom; server-rendered source
+    names and source-derived herald values use this form automatically.
 
 Inside a `(node ...)` form, `(affectsParent ...)` describes whether the
 node participates in the membership represented by its visible parent:
@@ -647,11 +636,22 @@ the view regenerates it.
 the server fulfills each request during view completion and then drops
 the atom, so a request is transient. Request forms:
 
+A definitive node's default presentation includes its nonempty
+`subscribeeFolder`, but no other top-level relation folder. This applies both
+to ordinary positions and to nodes expanded as members of relation folders.
+A definitive subscribee-as-such additionally includes its nonempty
+`hiddenInSubscribeeFolder`; `hiddenOutsideOfSubscribeeFolder`, when nonempty,
+is part of the subscriber's `subscribeeFolder`. Use a folder request for the
+other relation folders; their potential contents remain advertised by the
+node's heralds.
+
 - `(folder RELNAME)` — build BOTH folders of the relation, populated from the
   graph. RELNAME is `aliases`, `overrides`, `hides`, or `subscribes`.
   The writable folder (`overriddenFolder` / `subscribeeFolder` / `aliasFolder`)
   appears even when empty (its editable "add here" surface); an empty
-  read-only folder is pruned. Emitted by the `C-c l` commands.
+  read-only folder is pruned. In diff mode, removed members count as content,
+  so a requested folder containing only removed-member phantoms still appears.
+  Emitted by the `C-c l` commands.
 - `(path ROLENAME)` — build the backpath for one partner role, grafting
   the partners as inverted read-only children (each marked `(birth
   backpath ROLENAME)`). ROLENAME is one of the nine in
@@ -728,21 +728,21 @@ under different parents):
 - `(sourceHerald ⌂:LABEL)` — the node sits at a source boundary (a
   root, or a source differing from its nearest truenode ancestor);
 - `(relSource NAME)` — herald red "~NAME", drawn immediately before
-  the ⌂ source herald; the recording source of the RELATIONSHIP this
+  the ⌂ source herald; the relSource of the RELATIONSHIP this
   headline represents (the `contains` edge to a content child, or
   the folder's relation for a PartnerFolder member), when its privacy was
   deliberately raised above the edge's default. This is an observed,
   recomputed display fact: save never consumes it as an instruction.
 - `(editRequest (relSource NAME))` — herald red "request:~NAME".
-  This is the sole explicit relationship-source request, written by
-  `skg-set-relationship-source` (C-c s r) and consumed at save, where
+  This is the sole explicit relSource request, written by
+  `skg-set-relSource` (C-c s r) and consumed at save, where
   the server enforces the floor (an offered source more
   public than the edge's default is a save error; a source at the
   default or more private is honored, which is how a stuck edge's
   privacy is lowered; a legacy or hand-authored edge whose DISK
   source already sits more public than the default may be held or
   made more private, never made still more public). Absent means the
-  edge sits at its default source. Alias and Unknown headlines likewise
+  edge sits at its default relSource. Alias and Unknown headlines likewise
   expose a flat/nested display `relSource` fact and put write intent only
   under `editRequest`; copying a fact is harmless while copying a request
   deliberately requests it at the destination.
@@ -945,7 +945,7 @@ Fields:
   Home section only, by convention.
 - `body`: An optional string, perhaps with newlines. Home only.
 - `aliases`: Optional list of strings. Each section may contribute
-  aliases; an alias's recording source is its section's source.
+  aliases; an alias's relSource is its section's source.
 - `contains`, `subscribes_to`: Ordered relations. ONE flat YAML
   sequence per relation, one entry per line:
   - `- ID` — a member recorded at this section's source. Identical
@@ -960,7 +960,7 @@ Fields:
     warning, and duplicate anchors concatenate in file order).
 - `hides_from_its_subscriptions`, `overrides_view_of`: Unordered
   relations; plain lists of IDs. The effective list is the union
-  across sections; each entry's recording source is its section's
+  across sections; each entry's relSource is its section's
   source.
 
 The FOLD of all same-pid sections (most public first) yields the

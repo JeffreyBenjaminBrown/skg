@@ -5,7 +5,7 @@
 //! One node = one ID = one telescope: a set of same-ID .skg files,
 //! at most one per source ("sections"). Every relationship instance
 //! is recorded in exactly one section, whose source is the edge's
-//! recording source. On disk each ordered relation is ONE flat sequence of
+//! relSource. On disk each ordered relation is ONE flat sequence of
 //! items -- members and anchors -- whose role (base list vs
 //! placement) follows from WHICH section holds it, not from its
 //! shape: the most public section mentioning a relation holds its

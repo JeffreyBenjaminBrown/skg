@@ -1,5 +1,5 @@
-/// Git diff view tests for the OUTBOUND sharing folders (overriddenFolder,
-/// hiddenFolder): members removed since HEAD appear as phantoms carrying
+/// Git diff view tests for explicitly requested OUTBOUND sharing folders
+/// (overriddenFolder, hiddenFolder): members removed since HEAD appear as phantoms carrying
 /// per-stage 'removedM', and members added since HEAD carry per-stage
 /// 'newM', all read from the owner's per-stage relation diff
 /// (TODO/full-schema/12-2_diff-mode-policy_discussion.org).
@@ -65,9 +65,9 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-git-diff-overrides",
     |s| Box::pin ( async move {
-      outbound_folders_show_phantoms_and_newM_de_novo_unstaged (s) . await ?;
-      emptied_folders_still_render_in_diff_mode_de_novo (s) . await ?;
-      outbound_folders_show_phantoms_and_newM_de_novo_staged (s) . await ?;
+      requested_outbound_folders_show_phantoms_and_newM_unstaged (s) . await ?;
+      emptied_requested_folders_still_render_in_diff_mode (s) . await ?;
+      requested_outbound_folders_show_phantoms_and_newM_staged (s) . await ?;
       diff_mode_save_is_noop_and_regenerates_outbound_phantoms (s) . await ?;
       Ok (( )) } )) }
 
@@ -90,34 +90,50 @@ async fn run_overrides_view_test (
     let env : SkgEnv =
       skg_env_from_parts (&config, &tantivy, &graph);
     let mut warnings : Vec<String> = Vec::new ();
-    let (actual, _pids, _tree) =
+    let (initial, _pids, _tree) =
       multi_root_view_via_env (
         &env, &[ ID::from ("R") ], true, None, &mut warnings
       ) ?;
-    assert_buffer_contains (&actual, expected);
+    assert! ( ! initial . contains ("overriddenFolder")
+              && ! initial . contains ("hiddenFolder"),
+      "unrequested exotic folders should be absent from the initial diff \
+       view:\n{}", initial );
+    let request : String = initial . replace (
+      "(affectsParent na)",
+      "(affectsParent na) (viewRequests (folder overrides) \
+       (folder hides))" );
+    let mut views_state : ViewsState = ViewsState {
+      diff_mode_enabled : true,
+      open_views        : OpenViews::new (), };
+    let rendered = {
+      let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
+      update_from_and_rerender_buffer (
+        &mut stream, &request, &config, &tantivy, &graph,
+        true, &Err (String::new ()), &mut views_state ) . await ? };
+    assert_buffer_contains (&rendered . saved_view, expected);
     Ok (( )) }
 
-async fn outbound_folders_show_phantoms_and_newM_de_novo_unstaged (
+async fn requested_outbound_folders_show_phantoms_and_newM_unstaged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   run_overrides_view_test (
     s, "skg-test-git-diff-overrides-unstaged", false,
     EXPECTED_UNSTAGED ) . await }
 
-/// Folder existence: in diff mode, a folder whose worktree membership is
-/// EMPTY but whose HEAD side is not still renders, holding only
-/// phantoms -- in a de novo render, for an outbound folder
+/// Folder existence: in diff mode, a requested folder whose worktree
+/// membership is EMPTY but whose HEAD side is not still renders, holding only
+/// phantoms -- for an outbound folder
 /// (overriddenFolder, hiddenFolder), an inbound folder (overriderFolder, via the
 /// inverse scan), and the subscribeeFolder.  Outside diff mode the
 /// emptied folders still do not appear.
-async fn emptied_folders_still_render_in_diff_mode_de_novo (
+async fn emptied_requested_folders_still_render_in_diff_mode (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   let temp_dir : TempDir = TempDir::new ()?;
   let repo_path : &Path = temp_dir . path ();
   setup_overrides_fixtures (repo_path)?;
   s . reset_with_source_path (
-    "emptied_folders_still_render_in_diff_mode_de_novo",
+    "emptied_requested_folders_still_render_in_diff_mode",
     repo_path ) ?;
   let (config, tantivy)
     : (&SkgConfig, &mut TantivyIndex)
@@ -130,10 +146,32 @@ async fn emptied_folders_still_render_in_diff_mode_de_novo (
     let roots : [ID; 3] =
       [ ID::from ("E"), ID::from ("EN"), ID::from ("ES") ];
     { let mut warnings : Vec<String> = Vec::new ();
-      let (diff_view, _pids, _tree) =
+      let (initial_diff_view, _pids, _tree) =
         multi_root_view_via_env (
           &env, &roots, true, None, &mut warnings ) ?;
-      assert_buffer_contains ( &diff_view, "\
+      assert! ( ! initial_diff_view . contains ("overriddenFolder")
+                && ! initial_diff_view . contains ("hiddenFolder")
+                && ! initial_diff_view . contains ("overriderFolder"),
+        "emptied exotic folders should require requests even in diff mode:\n{}",
+        initial_diff_view );
+      let request : String = initial_diff_view
+        . replace (
+          "(id E) (source main) (affectsParent na)",
+          "(id E) (source main) (affectsParent na) \
+           (viewRequests (folder overrides) (folder hides))" )
+        . replace (
+          "(id EN) (source main) (affectsParent na)",
+          "(id EN) (source main) (affectsParent na) \
+           (viewRequests (folder overrides))" );
+      let mut views_state : ViewsState = ViewsState {
+        diff_mode_enabled : true,
+        open_views        : OpenViews::new (), };
+      let response = {
+        let (mut stream, _keepalive) = mk_test_tcp_stream_pair ();
+        update_from_and_rerender_buffer (
+          &mut stream, &request, &config, &tantivy, &graph,
+          true, &Err (String::new ()), &mut views_state ) . await ? };
+      assert_buffer_contains ( &response . saved_view, "\
 * (skg (node (id E) (source main))) E
 ** (skg overriddenFolder)
 *** (skg (node (id EZ) (source main) writeProtected (unstaged removedM))) EZ
@@ -158,7 +196,7 @@ async fn emptied_folders_still_render_in_diff_mode_de_novo (
           folder, plain_view ); }}
     Ok (( )) }
 
-async fn outbound_folders_show_phantoms_and_newM_de_novo_staged (
+async fn requested_outbound_folders_show_phantoms_and_newM_staged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   run_overrides_view_test (

@@ -1,8 +1,6 @@
 -- Coverage for skg.content_view against the loopback fake server:
--- the normal open, the switch-to-view redirect, the server-supplied
--- view-uri override (the override-menu path), and the error/warning
--- display. Mirrors the response-handling halves of
--- tests/elisp/test-skg-override-bypass.el (the request-string cases)
+-- the normal open, the switch-to-view redirect, and the error/warning
+-- display. Mirrors the response-handling halves of the Emacs request tests
 -- and test-skg-warning-channel.el (the content-view channel).
 
 package.path = package.path -- (helpers live beside the specs)
@@ -17,15 +15,7 @@ describe('skg.content_view request strings', function ()
     assert.are.equal(
       '((request . "single root content view") (id . "abc")'
       .. ' (view-uri . "uri-1"))\n',
-      content_view.request_string('abc', 'uri-1', nil))
-  end)
-
-  it('adds override-choice bypass only when asked', function ()
-    -- Mirrors test-skg-override-bypass.el's request-shape cases.
-    assert.are.equal(
-      '((request . "single root content view") (id . "abc")'
-      .. ' (view-uri . "uri-1") (override-choice . "bypass"))\n',
-      content_view.request_string('abc', 'uri-1', true))
+      content_view.request_string('abc', 'uri-1'))
   end)
 
   it('carries only the overPrivateText telescope pids approved on retry', function ()
@@ -34,7 +24,7 @@ describe('skg.content_view request strings', function ()
       .. ' (view-uri . "uri-1")'
       .. ' (allow-overPrivateText-telescopes "pid-a" "pid-b"))\n',
       content_view.request_string(
-        'abc', 'uri-1', nil, { 'pid-a', 'pid-b' }))
+        'abc', 'uri-1', { 'pid-a', 'pid-b' }))
   end)
 end)
 
@@ -79,27 +69,6 @@ describe('skg.content_view responses', function ()
     assert.are.equal('* (skg (node (id abc))) served title',
       vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1])
     assert.is_truthy(vim.b[buf].skg_view_uri)
-  end)
-
-  it('adopts the server-supplied view uri (the override menu path)',
-     function ()
-    serve_content(
-      '((response-type content-view)'
-      .. ' (content "* (skg (node (id abc))) pick an overrider")'
-      .. ' (view-uri "override-menu:abc")'
-      .. ' (to-minibuffer "The requested node is overridden.'
-      .. ' Choose a destination.")'
-      .. ' (errors ()) (warnings ()))')
-    local notified = nil
-    local original_notify = vim.notify
-    vim.notify = function (msg) notified = msg end
-    content_view.request_single_root_content_view_from_id('abc')
-    vim.wait(2000, function ()
-      return buffer.find_buffer_by_uri('override-menu:abc') ~= nil
-    end, 10)
-    vim.notify = original_notify
-    assert.is_truthy(buffer.find_buffer_by_uri('override-menu:abc'))
-    assert.is_truthy(tostring(notified):find('overridden'))
   end)
 
   it('switches to an already-open view instead of duplicating',

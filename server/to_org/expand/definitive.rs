@@ -5,6 +5,7 @@ use crate::to_org::expand::folder_request::build_and_integrate_folder_then_drop_
 use crate::to_org::expand::boolprops::build_and_integrate_boolprops_then_drop_request;
 use crate::to_org::util::{ DefinitiveMap, Finalizable, get_id_from_treenode, makeWriteProtectedAndClobber, activeNode_in_tree_is_writeProtected };
 use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::git::SourceDiff;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, FolderRelation, Editability, AffectsParent };
 use crate::types::viewnode::Vognode;
 use crate::types::nodes::complete::NodeComplete;
@@ -13,6 +14,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::tree::viewnode_nodecomplete::{write_at_activeNode_in_tree, pid_and_source_from_treenode};
 
 use ego_tree::{Tree, NodeId, NodeRef};
+use std::collections::HashMap;
 use std::error::Error;
 
 pub fn execute_view_requests (
@@ -22,6 +24,7 @@ pub fn execute_view_requests (
   config        : &SkgConfig,
   errors        : &mut Vec < String >,
   active_source_set : Option<&ActiveSourceSet>,
+  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   for (node_id, request) in requests {
     match request {
@@ -32,7 +35,7 @@ pub fn execute_view_requests (
       ViewRequest::Folder (rel) => {
         build_and_integrate_folder_then_drop_request (
           viewforest, node_id, graph, rel, config, errors,
-          active_source_set ) ?; },
+          active_source_set, source_diffs ) ?; },
       ViewRequest::Path (role) => {
         // Relation-generic: every partner role routes through the one
         // backpath engine (container, linkSource, and the seven new

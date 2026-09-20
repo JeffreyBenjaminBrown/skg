@@ -13,9 +13,10 @@
 use crate::dbs::in_rust_graph::override_invariants::existing_user_owned_overrider_of;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::org_to_text::metadata_value_atom;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, MSV, SkgConfig, SourceName, members_of, members_at_source};
+use crate::types::misc::{ID, MSV, SkgConfig, SourceName, members_of, rel_partners_at_relSource};
 use crate::types::nodes::complete::{
   FileProperty, NodeComplete, file_property_is_true};
 use crate::types::save::{ForkSpec, SaveNode};
@@ -260,13 +261,15 @@ pub fn build_fork_confirmation_buffer (
           spec . clone . 0 . source ));
         FORK_SOURCE_PLACEHOLDER };
     out . push_str ( & format! (
-      "* (skg (node (source {}) (viewStats (sourceHerald ⌂:{})))) {}\n",
-      shown_source, shown_source,
+      "* (skg (node (source {}) (viewStats (sourceHerald {})))) {}\n",
+      metadata_value_atom (shown_source),
+      metadata_value_atom (&format! ("⌂:{}", shown_source)),
       spec . clone . 0 . title ));
     out . push_str ( & format! (
       "** (skg (node (id {}) (source {}) (affectsParent false) writeProtected \
        (viewStats parentOverrides))) {}\n",
-      spec . original_id . 0, spec . original_source,
+      spec . original_id . 0,
+      metadata_value_atom (&spec . original_source),
       spec . original_title )); }
   out }
 
@@ -363,17 +366,17 @@ pub fn build_fork_clone (
     pid           : ID ( uuid::Uuid::new_v4 () . to_string () ),
     extra_ids     : Vec::new (),
     body          : buffer_node . body . clone (),
-    contains      : members_at_source (
+    contains      : rel_partners_at_relSource (
       &clone_source, buffer_contains_ids . clone () ),
-    subscribes_to : MSV::Specified ( members_at_source (
+    subscribes_to : MSV::Specified ( rel_partners_at_relSource (
       &clone_source, vec! [ buffer_node . pid . clone () ] )),
-    hides_from_its_subscriptions : MSV::Specified ( members_at_source (
+    hides_from_its_subscriptions : MSV::Specified ( rel_partners_at_relSource (
       &clone_source,
       // The children the forking edit deleted.
       disk_contains . iter ()
         . filter ( |id| ! buffer_contains_ids . contains (id) )
         . cloned () . collect () )),
-    overrides_view_of : MSV::Specified ( members_at_source (
+    overrides_view_of : MSV::Specified ( rel_partners_at_relSource (
       &clone_source, vec! [ buffer_node . pid . clone () ] )),
     // The clone preserves the original node's search-matching choice, but
     // importer provenance flags do not describe the newly-created clone.

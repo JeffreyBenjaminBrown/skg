@@ -38,7 +38,7 @@ title/body-only edits in the `.skg` sections. Noninteractive and
 maintenance writers have no implicit Hoist answer and refuse. Every
 relationship edge (a `contains`
 membership, a subscription, a hide, an override) carries its own
-recording source: the source of the section that records it.
+relSource: the source of the section that records it.
 
 Reading the node **folds** the sections, most public first, into one
 effective node. Under a restricted source-set you see the **visible
@@ -72,7 +72,7 @@ changed.
 
 ## Where new relationships land: the sticky-else-default rule
 
-When you save, each relationship edge keeps the source it already had
+When you save, each relationship edge keeps the relSource it already had
 on disk (**sticky**), unless an `(editRequest (relSource ...))` request explicitly
 names another source at least as private as the edge's default. A NEW
 edge between owned nodes defaults to the more-private endpoint home —
@@ -82,7 +82,7 @@ home, regardless of the foreign home: Skg never proposes writing the
 foreign source. This deliberately exposes the foreign node's ID and
 the relationship to readers of the owned source. An explicit
 An explicit request may select any configured, owned source at least as private
-as that owner home. Every recording source is clamped to be no more
+as that owner home. Every relSource is clamped to be no more
 public than the owner's home (a section more public than the home
 would imply a title-less public face). Hides floor higher:
 a hide reveals that you hide something, so it must be at least as
@@ -91,10 +91,10 @@ explains it.
 
 ## Setting a relationship's source
 
-`skg-set-relationship-source` (`C-c s r`, see `docs/COMMANDS.org`;
-formerly `skg-privatize-relationship`) sets the recording source of the
+`skg-set-relSource` (`C-c s r`, see `docs/COMMANDS.org`;
+formerly `skg-privatize-relationship`) sets the relSource of the
 relationship the headline at point represents. It asks the server
-for the edge's default and current sources (the "edge source info"
+for the edge's default and current relSources (the "relSource info"
 endpoint, see `api-and-formats.md`) and offers the sources at least
 as private as the default. An edge sitting more private than its default is
 marked with a red `~NAME` herald and a display `(relSource NAME)` fact;
@@ -125,7 +125,7 @@ Two things are documented inexpressibles, by design:
 
 - **Private textlinks.** A textlink lives in the body, and the body
   lives in the home section. A link in a public body is public;
-  there is no per-link recording source. Keep the sentence in a
+  there is no per-link relSource. Keep the sentence in a
   private child instead.
 - **Moving a relationship more public than its default.** As above:
   a relationship may move to a more-private source, never to one
@@ -138,7 +138,7 @@ membership". It can arrive from a hand edit or a pull, and it is what
 this model exists to prevent. The server warns about these
 (`telescope-warnings.org` in your data root) rather than erroring: a
 pull must never brick a source. Repair one with
-`skg-set-relationship-source` (`C-c s r`), which moves the
+`skg-set-relSource` (`C-c s r`), which moves the
 membership into the right section. What no repair can fix: if a
 public repo ever *committed* a leaked ID, its git history still holds
 it; rewriting history is manual.

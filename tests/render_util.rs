@@ -2,10 +2,12 @@
 
 use skg::assert_metadata_eq;
 use skg::org_to_text::viewnode_to_text;
-use skg::types::misc::{ID, SkgConfig, SourceName};
+use skg::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
+use skg::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
 use skg::types::viewnode::{ ViewNode, ViewNodeKind, Vognode, ActiveNode, Editability, ViewNodeStats, default_activeNode };
 use skg::types::viewnode::QualFolder;
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 #[test]
 fn test_viewnode_to_text_no_metadata () {
@@ -71,6 +73,42 @@ fn test_viewnode_to_text_with_id_metadata () {
     viewnode_to_text ( 3, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
     . expect ("ActiveNode rendering never fails");
   assert_metadata_eq! ( result, "*** (skg (node (id test123) (source main) writeProtected)) Test Title\n" ); }
+
+#[test]
+fn source_name_with_whitespace_is_one_round_trippable_atom () {
+  let source : SourceName = SourceName::from ("Mr Cheese");
+  let mut active_node : ActiveNode =
+    default_activeNode (
+      ID::from ("cheese-node"), source . clone (),
+      "Cooking" . to_string () );
+  active_node . viewStats . sourceAtBoundary = true;
+  let node : ViewNode = ViewNode {
+    focused     : false,
+    folded      : false,
+    body_folded : false,
+    kind : ViewNodeKind::Vognode (Vognode::Active (active_node)) };
+  let config = SkgConfig::dummyFromSources (HashMap::from ([
+    ( source . clone (), SkgfileSource {
+        name         : source,
+        abbreviation : None,
+        path         : PathBuf::from ("cheese"),
+        user_owns_it : false } ) ]));
+  let rendered : String =
+    viewnode_to_text (1, &node, &config)
+    . expect ("ActiveNode rendering never fails");
+  assert_eq! (
+    rendered,
+    "* (skg (node (id cheese-node) (source \"Mr Cheese\") (viewStats (sourceHerald \"⌂:Mr Cheese\")))) Cooking\n" );
+  let metadata = parse_metadata_to_viewnodemd (
+    rendered
+      . split_once (" Cooking")
+      . expect ("rendered headline has title") . 0
+      . strip_prefix ("* ")
+      . expect ("rendered headline has bullet") )
+    . expect ("quoted source should parse");
+  assert_eq! (
+    metadata . source, Some (SourceName::from ("Mr Cheese")) );
+}
 
 #[test]
 fn test_metadata_ordering () {

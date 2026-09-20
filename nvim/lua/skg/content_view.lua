@@ -14,22 +14,15 @@ local state = require('skg.state')
 local M = {}
 
 ---The request sexp string for a single-root content view of NODE_ID.
----When BYPASS_OVERRIDE, the request carries (override-choice .
----"bypass").
 ---@param node_id string
 ---@param view_uri string
----@param bypass_override boolean|nil
 ---@param approved_pids string[]|nil
 ---@return string
-function M.request_string (node_id, view_uri, bypass_override,
-                           approved_pids)
+function M.request_string (node_id, view_uri, approved_pids)
   local request = {
     sexpr.pair(sexpr.symbol('request'), 'single root content view'),
     sexpr.pair(sexpr.symbol('id'), node_id),
     sexpr.pair(sexpr.symbol('view-uri'), view_uri) }
-  if bypass_override then
-    table.insert(request,
-      sexpr.pair(sexpr.symbol('override-choice'), 'bypass')) end
   if approved_pids and #approved_pids > 0 then
     local approval = { sexpr.symbol('allow-overPrivateText-telescopes') }
     for _, pid in ipairs(approved_pids) do
@@ -39,13 +32,9 @@ function M.request_string (node_id, view_uri, bypass_override,
 end
 
 ---Ask the server for a single-root content view of NODE_ID.
----When BYPASS_OVERRIDE, an overridden node opens itself instead of
----the override-choice menu (recursive content beneath the root still
----substitutes).
+---The server opens the requested node itself.
 ---@param node_id string
----@param bypass_override boolean|nil
 function M.request_single_root_content_view_from_id (node_id,
-                                                     bypass_override,
                                                      approved_pids,
                                                      existing_view_uri)
   local view_uri = existing_view_uri or buffer.generate_uuid()
@@ -69,18 +58,17 @@ function M.request_single_root_content_view_from_id (node_id,
         payload.string_list(payload.field(response, 'pids'))
       if vim.fn.confirm(prompt, '&Include\n&Decline', 2) == 1 then
         M.request_single_root_content_view_from_id(
-          node_id, bypass_override, pids, view_uri) end
+          node_id, pids, view_uri) end
     end, false)
   state.lp_reset()
   client.send_string(
     M.request_string(
-      node_id, view_uri, bypass_override, approved_pids))
+      node_id, view_uri, approved_pids))
 end
 
 ---Handle a content-view response: either a (switch-to-view URI)
 ---redirect to an already-open buffer, or content plus errors and
----warnings. VIEW_URI is the client-generated uuid; the server may
----override it (it does for override-choice menus).
+---warnings. VIEW_URI is the client-generated uuid.
 ---@param payload_text string
 ---@param response any
 ---@param view_uri string
@@ -107,17 +95,11 @@ function M.handle_content_view (payload_text, response, view_uri)
     local errors = payload.string_list(payload.field(response, 'errors'))
     local warnings =
       payload.string_list(payload.field(response, 'warnings'))
-    local to_minibuffer = payload.field_text(response, 'to-minibuffer')
-    local server_uri = payload.field_text(response, 'view-uri')
-    local effective_uri = server_uri or view_uri
     if content_text and content_text ~= '' then
       buffer.open_org_buffer_from_text(
         content_text,
         buffer.content_view_buffer_name(content_text),
-        effective_uri) end
-    if to_minibuffer then
-      -- Echo area only -- never buffer text, never a popped window.
-      vim.notify(to_minibuffer) end
+        view_uri) end
     local has_errors = #errors > 0
     local has_warnings = #warnings > 0
     if has_errors or has_warnings then

@@ -10,7 +10,7 @@ use crate::dbs::in_rust_graph::internal_index_validation::{
   LocalIndexValidation, validate_local_internal_indexes,
 };
 use crate::types::misc::{
-  ID, MSV, SkgConfig, SkgfileSource, SourceName, members_at_source,
+  ID, MSV, SkgConfig, SkgfileSource, SourceName, rel_partners_at_relSource,
 };
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
@@ -46,14 +46,14 @@ fn changed_edge_fixture (
   unrelated_count : usize,
 ) -> (InRustGraph, InRustGraph, Vec<DefineNode>, GraphChangeSet) {
   let mut old_owner : NodeComplete = node ("owner");
-  old_owner . contains = members_at_source (
+  old_owner . contains = rel_partners_at_relSource (
     &SourceName::from ("main"), vec![ID::from ("old")]);
   let mut base_nodes : Vec<NodeComplete> = vec![old_owner];
   base_nodes . extend ((0..unrelated_count)
     . map (|i| node (&format! ("unrelated-{i}"))));
   let base : InRustGraph = InRustGraph::from_nodecompletes (&base_nodes);
   let mut final_owner : NodeComplete = node ("owner");
-  final_owner . contains = members_at_source (
+  final_owner . contains = rel_partners_at_relSource (
     &SourceName::from ("main"), vec![ID::from ("new")]);
   let definitions : Vec<DefineNode> =
     vec![DefineNode::Save (SaveNode (final_owner))];
@@ -322,7 +322,7 @@ fn local_index_check_catches_an_omitted_insertion () {
 #[test]
 fn local_index_check_catches_an_omitted_canonical_migration () {
   let mut owner : NodeComplete = node ("owner");
-  owner . contains = members_at_source (
+  owner . contains = rel_partners_at_relSource (
     &SourceName::from ("main"), vec![ID::from ("future")]);
   let base : InRustGraph = InRustGraph::from_nodecompletes (&[owner]);
   let mut target : NodeComplete = node ("target");
@@ -383,11 +383,11 @@ fn merge_override_collision_names_participants_and_both_repairs () {
   n2 . title = "Acquiree title" . to_string ();
   let mut r1 : NodeComplete = node ("R1");
   r1 . title = "Existing overrider title" . to_string ();
-  r1 . overrides_view_of = MSV::Specified (members_at_source (
+  r1 . overrides_view_of = MSV::Specified (rel_partners_at_relSource (
     &source, vec![ID::from ("N1")]));
   let mut r2 : NodeComplete = node ("R2");
   r2 . title = "Redirected overrider title" . to_string ();
-  r2 . overrides_view_of = MSV::Specified (members_at_source (
+  r2 . overrides_view_of = MSV::Specified (rel_partners_at_relSource (
     &source, vec![ID::from ("N2")]));
   let base : Arc<InRustGraph> = Arc::new (
     InRustGraph::from_nodecompletes (&[n1 . clone (), n2, r1, r2]));

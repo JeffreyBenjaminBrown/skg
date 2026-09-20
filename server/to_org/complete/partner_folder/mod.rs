@@ -75,7 +75,7 @@ fn build_initial_render_child_data (
     resolved . insert (
       primary_pid,
       ChildData { source, title, phantom : None, unknown,
-                  rel_source : None } ); }
+                  relSource : None } ); }
   Ok ((goal, resolved)) }
 
 /// Check if a node's type and parent type are consistent with being a Subscribee.
@@ -171,7 +171,7 @@ pub fn maybe_add_subscribeeFolder_branch (
 
   let hidden_outside_content : HashSet < ID > = {
     // hidden IDs that are outside all subscribee content. Read
-    // edge-source-GATED from the captured graph: hides and memberships
+    // relSource-GATED from the captured graph: hides and memberships
     // recorded outside the active prefix must not shape this derived folder.
     let r_hides : HashSet < ID > =
           graph . outbound_pids_for_relation_gated (
@@ -241,10 +241,11 @@ pub fn maybe_add_subscribeeFolder_branch (
       &goal, &data ) ?; }
   Ok (( )) }
 
-/// Handle maybe_add_subscribeeFolder_branch separately,
-/// and then run maybe_add_one_partnerFolder
-/// for the other kinds of PartnerFolders.
-pub fn maybe_add_partnerFolder_branches (
+/// Add the PartnerFolders that a definitive node shows without an explicit
+/// Folder view request.  Only a nonempty SubscribeeFolder is part of that
+/// initial presentation; the other relation folders are available through
+/// `(viewRequests (folder ...))` when their heralds indicate they are useful.
+pub fn maybe_add_default_partnerFolder_branches (
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
   graph   : &InRustGraph,
@@ -256,7 +257,7 @@ pub fn maybe_add_partnerFolder_branches (
     tree, node_id,
     |vn| matches!( &vn . kind,
                     ViewNodeKind::Vognode (Vognode::Active (_) )),
-    "maybe_add_partnerFolder_branches: expected ActiveNode" ) ?;
+    "maybe_add_default_partnerFolder_branches: expected ActiveNode" ) ?;
   { let is_writeProtected : bool =
       read_at_node_in_tree(
         tree, node_id,
@@ -268,15 +269,6 @@ pub fn maybe_add_partnerFolder_branches (
   maybe_add_subscribeeFolder_branch (
     tree, node_id, graph, config, active_source_set,
     source_diffs, false ) ?;
-  for kind in [
-    PartnerFolder::Subscriber,
-    PartnerFolder::Overridden,
-    PartnerFolder::Overrider,
-    PartnerFolder::Hider,
-    PartnerFolder::Hidden,
-  ] { maybe_add_one_partnerFolder (
-        tree, node_id, kind, config, graph,
-        active_source_set, source_diffs, false ) ?; }
   Ok (( )) }
 
 /// Add a generated PartnerFolder for `node_id` if it would
@@ -384,7 +376,7 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
   let ( _visible, hidden_in_content )
     : ( HashSet < ID >, HashSet < ID > )
     = {
-      // Edge-source-GATED from the captured graph: hides and memberships
+      // relSource-GATED from the captured graph: hides and memberships
       // outside the active prefix must not shape this derived folder.
       {
         let subscriber_hides : HashSet<ID> =

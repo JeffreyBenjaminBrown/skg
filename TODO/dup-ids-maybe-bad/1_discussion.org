@@ -388,7 +388,7 @@ one we have stopped arguing about; none of them are coded yet.
     not a shape to search past.
 
     What I verified: the save path ALREADY enforces this for owned
-    data, without naming it. 'apply_sticky_levels'
+    data, without naming it. 'apply_sticky_relSources'
     (server/from_text/supplement_from_disk.rs) clamps every level to
     at least the owner's home --
 

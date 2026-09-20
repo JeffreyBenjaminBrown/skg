@@ -63,7 +63,7 @@ fn set_viewnodestats_recursive (
         tree, treeid, &node_pid, graph, active,
         container_to_contents, content_to_containers );
       set_hidden_body (tree, treeid, &node_pid, graph);
-      set_rel_source (tree, treeid, graph, config);
+      set_relSource (tree, treeid, graph, config);
       Some (node_pid)
     } else { None };
   let was_new : bool =
@@ -188,7 +188,7 @@ fn active_vognode_pid (
 /// relation it is a member of on each side relative to 'node_pid'.
 /// Contains membership is read from the source-filtered containment
 /// maps; the other four relations from the in-Rust graph. Every flag
-/// is EDGE-SOURCE gated: an edge recorded outside the active prefix
+/// is relSource gated: an edge recorded outside the active prefix
 /// must not tint an ancestor herald in a more public view (it would
 /// reveal the very relationship the user privatized). The contains
 /// gate needs the graph (the maps carry no levels); without one
@@ -203,22 +203,22 @@ fn flag_ancestor_relations (
   anc_pid               : &ID,
   generation            : usize,
 ) {
-  let contains_edge_visible = |owner : &ID, target : &ID| -> bool {
+  let contains_rel_is_visible = |owner : &ID, target : &ID| -> bool {
     match (graph, active) {
       (Some (g), Some (a)) if ! a . is_all () =>
-        g . edge_source (owner, NodeRelation::Contains, target)
+        g . relSource (owner, NodeRelation::Contains, target)
           . map ( |source| a . contains_source (&source) )
           . unwrap_or (false),
       _ => true }};
   // Contains, via the maps. inbound: ancestor contains node.
   if content_to_containers . get (node_pid)
     . map_or (false, |s| s . contains (anc_pid))
-    && contains_edge_visible (anc_pid, node_pid) {
+    && contains_rel_is_visible (anc_pid, node_pid) {
     flags . record (NodeRelation::Contains, true, generation); }
   // outbound: node contains ancestor.
   if container_to_contents . get (node_pid)
     . map_or (false, |s| s . contains (anc_pid))
-    && contains_edge_visible (node_pid, anc_pid) {
+    && contains_rel_is_visible (node_pid, anc_pid) {
     flags . record (NodeRelation::Contains, false, generation); }
   let graph = match graph { Some (g) => g, None => return, };
   for rel in GRAPH_RELATIONS {
@@ -308,27 +308,27 @@ fn set_hidden_body (
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . hidden_body = hidden_body; }}
 
-/// Sets rel_source on the active vognode at treeid (render-and-gating,
-/// 5_plan.org; see 'ViewNodeStats::rel_source' for the full contract).
+/// Sets relSource on the active vognode at treeid (render-and-gating,
+/// 5_plan.org; see 'ViewNodeStats::relSource' for the full contract).
 /// Computes the (owner, relation, target) triple that identifies the
 /// binding edge this position represents -- contains for an ordinary
 /// Gnode-parent content child; the folder's relation for a simple
 /// PartnerFolder member, oriented by which side owns the outbound edge
 /// (see 'RelationRole::is_first_role') -- then compares the edge's
-/// actual source ('InRustGraph::edge_source') against its applicable
+/// actual source ('InRustGraph::relSource') against its applicable
 /// relationship default. None on any of: no
 /// graph handle; affectsParent != Affected or a backpath graft (not a
 /// genuine member here); a compound filter folder
 /// (HiddenInSubscribee / HiddenOutsideOfSubscribee: no single
 /// 'relation_member_role'); no recorded edge; unresolvable homes;
 /// or the source equalling the default.
-fn set_rel_source (
+fn set_relSource (
   tree   : &mut Tree<ViewNode>,
   treeid : NodeId,
   graph  : Option<&InRustGraph>,
   config : &SkgConfig,
 ) {
-  let rel_source : Option<SourceName> = 'compute : {
+  let relSource : Option<SourceName> = 'compute : {
     let graph : &InRustGraph = match graph {
       Some (g) => g, None => break 'compute None, };
     let (node_pid, affectsParent, birth) : (ID, AffectsParent, Birth) = {
@@ -365,7 +365,7 @@ fn set_rel_source (
           }},
         ParentKind::Other => break 'compute None, };
     let source : SourceName =
-      match graph . edge_source (&owner_pid, relation, &target_pid) {
+      match graph . relSource (&owner_pid, relation, &target_pid) {
         Some (l) => l, None => break 'compute None, };
     let default : SourceName = {
       let owner_home : Option<SourceName> =
@@ -374,17 +374,17 @@ fn set_rel_source (
         graph . pid_and_source (&target_pid) . map ( |(_, s)| s );
       match (owner_home, target_home) {
         (Some (a), Some (b)) =>
-          config . relationship_default_source (&a, &b),
+          config . default_relSource (&a, &b),
         _ => break 'compute None, }};
     if source == default { None } else { Some (source) } };
   if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
-  { t . viewStats . rel_source = rel_source; }}
+  { t . viewStats . relSource = relSource; }}
 
 #[cfg(test)]
 mod relationship_default_tests {
   use super::*;
-  use crate::types::misc::{MemberAtSource, SkgfileSource};
+  use crate::types::misc::{RelPartner, SkgfileSource};
   use crate::types::nodes::complete::{empty_node_complete, NodeComplete};
   use crate::types::viewnode::{
     mk_definitive_viewnode, viewforest_root_viewnode};
@@ -412,7 +412,7 @@ mod relationship_default_tests {
     owner . pid = ID::new ("owner");
     owner . title = "owner" . to_string ();
     owner . source = SourceName::from ("public");
-    owner . contains = vec! [ MemberAtSource::at_source (
+    owner . contains = vec! [ RelPartner::at_relSource (
       SourceName::from ("public"), ID::new ("member") ) ];
     let mut member : NodeComplete = empty_node_complete ();
     member . pid = ID::new ("member");
@@ -432,12 +432,12 @@ mod relationship_default_tests {
         ID::new ("member"), SourceName::from ("foreign"),
         "member" . to_string (), None ) ) . id ();
 
-    set_rel_source (
+    set_relSource (
       &mut tree, member_treeid, Some (&graph), &config );
     let ViewNodeKind::Vognode (Vognode::Active (rendered_member)) =
       & tree . get (member_treeid) . unwrap () . value () . kind
     else { panic! ("member should be active"); };
-    assert_eq! ( rendered_member . viewStats . rel_source, None,
+    assert_eq! ( rendered_member . viewStats . relSource, None,
       "the owner-home default must not render a fake relSource override" );
   }
 }

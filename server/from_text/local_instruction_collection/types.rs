@@ -59,7 +59,7 @@ pub struct DefiningFolderOwner {
 /// 'SetContains' / 'SetSubscribesTo' / 'SetOverrides' pair each
 /// member with an Option<SourceName>: Some when the position's
 /// headline carried an explicit '(editRequest (relSource NAME))'
-/// request (the 'skg-set-relationship-source' gesture), None meaning
+/// request (the 'skg-set-relSource' gesture), None meaning
 /// "derive" (the usual
 /// sticky-else-default rule). 'server/from_text/supplement_from_disk.rs'
 /// validates the explicit sources against each edge's DEFAULT floor

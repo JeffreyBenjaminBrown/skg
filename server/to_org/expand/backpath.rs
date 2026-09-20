@@ -467,7 +467,7 @@ pub fn prepend_writeProtected_indep_child_with_source_set (
         . or_else (|| crate::types::phantom::home_from_disk (child_skgid, config))
       { if ! active . contains_source (&source)
         { return Ok (None); }} }
-    // Edge-source gating (render-and-gating, 5_plan.org): the partner
+    // relSource gating (render-and-gating, 5_plan.org): the partner
     // NODE's source (above) is not enough -- the EDGE grafting it
     // here can be recorded in a more private source than either
     // endpoint's home (a private reading-list membership between two
@@ -475,11 +475,11 @@ pub fn prepend_writeProtected_indep_child_with_source_set (
     // whatever sits at 'parent_treeid' (the origin, for the first
     // hop; a previously-grafted partner, for a later hop or an
     // ancestry step), so the edge and its owner are derivable.
-    // The captured graph is the authoritative home of edge recording sources.
+    // The captured graph is the authoritative home of edge relSources.
     if let Birth::Backpath (role) = birth {
       if let Ok (parent_pid) = get_id_from_treenode (tree, parent_treeid) {
           let source_active : bool =
-            backpath_edge_source (graph, &parent_pid, child_skgid, role)
+            backpath_relSource (graph, &parent_pid, child_skgid, role)
             . map ( |source| active . contains_source (&source) )
             . unwrap_or (false);
           if ! source_active { return Ok (None); }}}}
@@ -489,7 +489,7 @@ pub fn prepend_writeProtected_indep_child_with_source_set (
  ?;
   Ok (Some (new_child_treeid)) }
 
-/// The source of the edge grafting 'partner' at backpath role 'role'
+/// The relSource of the edge grafting 'partner' at backpath role 'role'
 /// toward 'origin' (the node the partner is being attached under).
 /// 'role' names the role the PARTNER plays (per RelationRole's doc:
 /// "output_role is THIS (partner) role") -- the inverse of
@@ -498,14 +498,14 @@ pub fn prepend_writeProtected_indep_child_with_source_set (
 /// FIRST position (e.g. CONTAINER), the partner owns the edge (an
 /// inbound partner of origin, in the "someone else's outbound list
 /// names me" sense); otherwise origin owns it.
-fn backpath_edge_source (
+fn backpath_relSource (
   graph   : &InRustGraph,
   origin  : &ID,
   partner : &ID,
   role    : RelationRole,
 ) -> Option<SourceName> {
   if role . is_first_role () {
-    graph . edge_source ( partner, role . relation, origin )
+    graph . relSource ( partner, role . relation, origin )
   } else {
-    graph . edge_source ( origin, role . relation, partner )
+    graph . relSource ( origin, role . relation, partner )
   } }
