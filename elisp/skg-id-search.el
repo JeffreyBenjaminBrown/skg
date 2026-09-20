@@ -135,19 +135,10 @@ nil (no ID on the line), or `ambiguous' (IDs on both sides of point)."
           (funcall id-of (car right)))
          (t 'ambiguous)))))
 
-(defun skg--bypass-override-here-p ()
-  "Whether a goto from the current buffer should bypass the
-override-choice menu. True in magit buffers: a readable-ID jump
-from magit should land on the original raw node
-\(TODO/full-schema/11_override-rendering-and-navigation.org).
-Detected by major-mode name so magit need not be loaded."
-  (string-prefix-p "magit-" (symbol-name major-mode)))
-
 (defun skg-goto ()
   "Open a content view for the nearest ID on the current line.
-From a magit buffer this bypasses the override-choice menu (the
-jump lands on the original raw node); elsewhere, visiting an
-overridden node offers the menu. In a raw .skg file, IDs on both
+The requested node itself is the raw root. Recursive content may
+still use override substitution. In a raw .skg file, IDs on both
 sides of point are ambiguous: it says so and visits nothing."
   (interactive)
   (let (( result (skg-nearest-id) ))
@@ -157,24 +148,14 @@ sides of point are ambiguous: it says so and visits nothing."
      (result
       (let (( id (car result) ))
         (message "Visiting node: %s" id)
-        (skg-request-single-root-content-view-from-id
-         id nil (skg--bypass-override-here-p))))
+        (skg-request-single-root-content-view-from-id id)))
      (t (message "No ID found on this line")) )))
 
 (defun skg-goto-bypassOverride ()
-  "Like `skg-goto', but always bypass the override-choice menu:
-open the nearest ID itself, even if it is overridden. The escape
-hatch from the menu (and from anywhere) to the original node."
+  "Compatibility alias for `skg-goto'.
+Ordinary visits now always open the requested node itself."
   (interactive)
-  (let (( result (skg-nearest-id) ))
-    (cond
-     ((eq result 'ambiguous)
-      (message "Point sits between IDs; move onto (or nearer to) one."))
-     (result
-      (let (( id (car result) ))
-        (message "Visiting node (bypassing overriders): %s" id)
-        (skg-request-single-root-content-view-from-id id nil t)))
-     (t (message "No ID found on this line")) )))
+  (skg-goto))
 
 (defun skg-goto-by-id (id)
   "Open a content view for ID, prompting when called interactively. (skg-goto is usually more convenient.)"

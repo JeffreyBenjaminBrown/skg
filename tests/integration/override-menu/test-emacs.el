@@ -1,8 +1,7 @@
-;;; Integration test for the override-choice menu fetch path.
-;;; Visiting overridden Z yields the menu buffer (registered under
-;;; the server-assigned "override-menu:Z" URI, showing the overrider
-;;; R).  Z and R deliberately share the title "cooking", come from
-;;; different sources, and subscribe to each other.
+;;; Regression test: an ordinary visit to overridden Z opens Z raw.
+;;; It must not inject overrider R as an independent sibling. Z and R
+;;; deliberately share the title "cooking", come from different
+;;; sources, and subscribe to each other.
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
@@ -13,28 +12,45 @@
   (apply #'message (concat "✗ FAIL: " message) args)
   (kill-emacs 1))
 
-(defun integration-test-override-menu ()
-  "Keep same-title menu and overrider views distinct, then revisit Z."
-  (message "Starting override-menu integration test...")
+(defun integration-test-overridden-direct-visit ()
+  "Keep same-title raw views distinct, then revisit Z."
+  (message "Starting overridden direct-visit integration test...")
   (let ((test-port (getenv "SKG_TEST_PORT")))
     (when test-port
       (setq skg-port (string-to-number test-port))
       (message "Using test port: %d" skg-port)))
-  (let (menu-buf cheese-buf reopened-menu)
+  (let (public-buf cheese-buf reopened-public)
     (skg-request-single-root-content-view-from-id "Z")
-    (setq menu-buf
+    (setq public-buf
           (skg-test-wait-for
-           (lambda () (skg-find-buffer-by-uri "override-menu:Z")) 10))
-    (unless menu-buf
-      (test-fail "no buffer with the override-menu:Z URI appeared"))
-    (with-current-buffer menu-buf
+           (lambda ()
+             (seq-find
+              (lambda (buf)
+                (with-current-buffer buf
+                  (and (boundp 'skg-view-uri) skg-view-uri
+                       (equal skg-contentView-initialRoot-source
+                              "public"))))
+              (buffer-list)))
+           10))
+    (unless public-buf
+      (test-fail "raw public view of Z did not open"))
+    (with-current-buffer public-buf
       (let ((content (buffer-substring-no-properties
                       (point-min) (point-max))))
-        (unless (and (string-match-p (regexp-quote "(id Z)") content)
-                     (string-match-p (regexp-quote "(id R)") content))
-          (test-fail "menu lacks Z or its overrider R:\n%s" content))))
+        (unless (string-match-p (regexp-quote "(id Z)") content)
+          (test-fail "raw view lacks requested root Z:\n%s" content))
+        (when (string-match-p
+               "^\\*\\* (skg (node (id R).*affectsParent false"
+               content)
+          (test-fail
+           "ordinary visit injected overrider R as an independent sibling:\n%s"
+           content))))
+    (when (string-prefix-p
+           "override-menu:"
+           (buffer-local-value 'skg-view-uri public-buf))
+      (test-fail "ordinary visit was registered as an override menu"))
 
-    ;; Opening same-titled R must not overwrite Z's menu.
+    ;; Opening same-titled R must not overwrite Z's raw view.
     (skg-request-single-root-content-view-from-id "R")
     (setq cheese-buf
           (skg-test-wait-for
@@ -49,34 +65,43 @@
            10))
     (unless cheese-buf
       (test-fail "same-titled Cheese view did not open"))
-    (unless (equal (buffer-name menu-buf) "*cooking* <public>")
-      (test-fail "unexpected public buffer name: %s" (buffer-name menu-buf)))
+    (unless (equal (buffer-name public-buf) "*cooking* <public>")
+      (test-fail "unexpected public buffer name: %s" (buffer-name public-buf)))
     (unless (equal (buffer-name cheese-buf) "*cooking* <Cheese>")
       (test-fail "unexpected Cheese buffer name: %s" (buffer-name cheese-buf)))
-    (unless (equal (buffer-local-value 'skg-view-uri menu-buf)
-                   "override-menu:Z")
-      (test-fail "opening R changed Z's menu URI"))
+    (when (string-prefix-p
+           "override-menu:"
+           (buffer-local-value 'skg-view-uri public-buf))
+      (test-fail "opening R changed Z's raw-view URI"))
 
-    ;; A repeat visit receives switch-to-view and must display the old menu.
+    ;; A repeat visit receives switch-to-view and displays the old raw view.
     (skg-request-single-root-content-view-from-id "Z")
     (unless (skg-test-wait-for
              (lambda ()
-               (eq (window-buffer (selected-window)) menu-buf))
+               (eq (window-buffer (selected-window)) public-buf))
              10)
-      (test-fail "revisiting Z did not display its existing menu buffer"))
+      (test-fail "revisiting Z did not display its existing raw buffer"))
     (message "✓ same-title views remained distinct and Z was revisited")
 
     ;; Killing both views must close both server registrations.
-    (kill-buffer menu-buf)
+    (kill-buffer public-buf)
     (kill-buffer cheese-buf)
     (skg-request-single-root-content-view-from-id "Z")
-    (setq reopened-menu
+    (setq reopened-public
           (skg-test-wait-for
-           (lambda () (skg-find-buffer-by-uri "override-menu:Z")) 10))
-    (unless (and reopened-menu (not (eq reopened-menu menu-buf)))
-      (test-fail "Z's menu did not reopen after both views were closed"))
-    (kill-buffer reopened-menu)
-    (message "✓ close-view lifecycle allowed the menu to reopen"))
+           (lambda ()
+             (seq-find
+              (lambda (buf)
+                (with-current-buffer buf
+                  (and (boundp 'skg-view-uri) skg-view-uri
+                       (equal skg-contentView-initialRoot-source
+                              "public"))))
+              (buffer-list)))
+           10))
+    (unless (and reopened-public (not (eq reopened-public public-buf)))
+      (test-fail "Z's raw view did not reopen after both views were closed"))
+    (kill-buffer reopened-public)
+    (message "✓ close-view lifecycle allowed the raw view to reopen"))
   (message "PASS: Integration test successful!")
   (kill-emacs 0))
 
@@ -86,4 +111,4 @@
                       (kill-emacs 1)))
 
 ;; Run the test
-(integration-test-override-menu)
+(integration-test-overridden-direct-visit)

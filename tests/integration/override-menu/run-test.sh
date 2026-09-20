@@ -1,13 +1,12 @@
 #!/bin/bash
 
-# Integration test for the override-choice menu and its bypass.
+# Integration regression for direct visits to overridden nodes.
 # This script:
 # - Starts an independent skg server with test config
-# - Uses Emacs to visit an overridden node (expects the menu, under
-#   the server-assigned "override-menu:Z" URI, with the minibuffer
-#   notice delivered via the to-minibuffer field)
+# - Uses Emacs and nvim to visit an overridden node and require the raw root
+#   without an independent override-menu sibling
 # - Exercises same-title nodes from different sources; the Emacs client also
-#   revisits the menu through switch-to-view and checks close/reopen lifecycle
+#   revisits the raw view through switch-to-view and checks close/reopen lifecycle
 
 set -e  # Exit on any error
 
@@ -17,7 +16,7 @@ PROJECT_ROOT="$(cd "$TEST_DIR/../../.." && pwd)"
 # Source common test library
 source "$TEST_DIR/../test-lib.sh"
 
-echo "=== SKG Override Menu Integration Test ==="
+echo "=== SKG Overridden Direct Visit Integration Test ==="
 echo "Test directory: $TEST_DIR"
 echo "Project root: $PROJECT_ROOT"
 

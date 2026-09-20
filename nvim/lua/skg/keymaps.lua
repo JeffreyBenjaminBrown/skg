@@ -41,7 +41,7 @@ M.commands = {
   GotoAndCloseThis = { module = 'skg.id_search', fn = 'goto_and_close_this',
                        desc = 'Goto, closing the buffer left behind' },
   GotoBypassOverride = { module = 'skg.id_search', fn = 'goto_bypass_override',
-                         desc = 'Goto the node itself, skipping the override menu' },
+                         desc = 'Compatibility alias for Goto' },
   GotoBiggestBranch = { module = 'skg.modify_graph', fn = 'goto_biggest_branch',
                         desc = 'Jump to the biggest sibling/child branch' },
   GotoById = { module = 'skg.id_search', fn = 'goto_by_id',

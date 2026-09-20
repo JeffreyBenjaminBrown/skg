@@ -327,13 +327,11 @@ the position that always shows the original; its definitive
 expansion applies neither the owner's hides nor substitution to
 its immediate children.
 
-The OVERRIDE-CHOICE BUFFER (the "menu") is what a new single-root
-view of an overridden node returns: the node as root, each visible
-overrider an Independent write-protected child of what it overrides,
-all edges shown, foreign included. BYPASS
-('(override-choice . "bypass")' on the request;
-'skg-goto-bypassOverride' in Emacs; automatic from magit buffers)
-skips the menu and opens the requested node itself.
+An ordinary single-root visit always opens the requested node itself,
+drawn raw. Override facts appear in enriched search results and in
+explicitly requested override folders and paths. The protocol retains
+an opt-in OVERRIDE-CHOICE BUFFER (`(override-choice . "menu")`) for
+compatibility, but ordinary clients do not request it.
 
 ## "subscribee as such"
 

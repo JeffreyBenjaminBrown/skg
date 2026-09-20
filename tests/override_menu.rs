@@ -221,9 +221,8 @@ fn shape_signature (
         ( org_depth (l), id ) } )
     . collect () }
 
-/// Stage 11 decided the override-choice menu appears in diff mode
-/// too; stage 12-2 pins it: visiting an overridden node with
-/// diff_mode_enabled still yields the menu, not a content view.
+/// An explicitly requested override-choice tree remains available in
+/// diff mode; ordinary visits are raw in every mode.
 async fn menu_still_offered_in_diff_mode (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
@@ -248,14 +247,15 @@ async fn menu_still_offered_in_diff_mode (
           handle_single_root_view_request (
             &mut server,
             "((request . \"single root content view\") \
-              (id . \"Z\") (view-uri . \"diff-menu-uuid\"))",
+              (id . \"Z\") (view-uri . \"diff-menu-uuid\") \
+              (override-choice . \"menu\"))",
             &env, &mut views_state, &active ); } ); } );
       let response : String = {
         let mut reader : std::io::BufReader<TcpStream> =
           std::io::BufReader::new (client);
         read_lp_message ( &mut reader ) ? };
       assert! ( response . contains ("override-menu:Z"),
-        "diff mode still offers the menu:\n{}", response );
+        "diff mode honors an explicit menu request:\n{}", response );
       assert! ( response . contains (
           "The requested node is overridden" ),
         "{}", response );
@@ -291,7 +291,8 @@ async fn open_menu_survives_diff_mode_toggle (
             handle_single_root_view_request (
               &mut server,
               "((request . \"single root content view\") \
-                (id . \"Z\") (view-uri . \"toggle-menu-uuid\"))",
+                (id . \"Z\") (view-uri . \"toggle-menu-uuid\") \
+                (override-choice . \"menu\"))",
               &env, &mut views_state, &active ); } ); } );
         let mut reader : std::io::BufReader<TcpStream> =
           std::io::BufReader::new (client);
@@ -368,6 +369,11 @@ async fn handler_precedence_and_menu_dedup (
         format! ( "((request . \"single root content view\") \
                     (id . \"{}\") (view-uri . \"test-uuid-{}\"))",
                   id, id ) };
+      let menu_request_for = |id : &str| -> String {
+        format! ( "((request . \"single root content view\") \
+                    (id . \"{}\") (view-uri . \"menu-uuid-{}\") \
+                    (override-choice . \"menu\"))",
+                  id, id ) };
       let respond = |views_state : &mut ViewsState,
                      request : &str| -> String {
         let (mut server, client) =
@@ -382,21 +388,36 @@ async fn handler_precedence_and_menu_dedup (
         let mut reader : std::io::BufReader<TcpStream> =
           std::io::BufReader::new (client);
         read_lp_message ( &mut reader ) . unwrap () };
-      { // Visiting overridden Z yields the menu, registered under
-        // its dedicated URI, with the minibuffer notice.
+      { // Ordinary visits open the requested node raw, even when it
+        // is overridden. Override facts belong in search enrichment
+        // and requested folders/paths, not as surprise root siblings.
         let response : String =
           respond (&mut views_state, &request_for ("Z"));
-        assert! ( response . contains ("override-menu:Z"),
+        assert! ( response . contains ("(id Z)"),
                   "{}", response );
-        assert! ( response . contains (
-            "The requested node is overridden" ),
+        assert! ( ! response . contains ("override-menu")
+                  && ! response . contains ("to-minibuffer"),
+          "ordinary visit must not become an override menu:\n{}",
+          response );
+        assert! ( views_state . open_views . views . contains_key (
+            &ViewUri::ContentView ("test-uuid-Z" . to_string ())),
+          "ordinary visit is registered under the client URI" ); }
+      views_state . open_views . unregister_view (
+        &ViewUri::ContentView ("test-uuid-Z" . to_string ()));
+      { // The legacy override tree remains available only by an
+        // explicit protocol request.
+        let response : String =
+          respond (&mut views_state, &menu_request_for ("Z"));
+        assert! ( response . contains ("override-menu:Z"),
           "{}", response );
+        assert! ( response . contains (
+            "The requested node is overridden" ), "{}", response );
         assert! ( views_state . open_views . views . contains_key (
             &ViewUri::OverrideMenu ("Z" . to_string ())),
           "the menu is a registered view" ); }
-      { // A second request switches to the open menu.
+      { // A second explicit request switches to the open menu.
         let response : String =
-          respond (&mut views_state, &request_for ("Z"));
+          respond (&mut views_state, &menu_request_for ("Z"));
         assert! ( response . contains ("switch-to-view"),
                   "{}", response );
         assert! ( response . contains ("override-menu:Z"),
@@ -434,7 +455,7 @@ async fn handler_precedence_and_menu_dedup (
               "test-uuid-PLAIN" . to_string ()))
           . expect ("normal views register under the client URI")
           . pids; }
-      { // Bypass: the overridden node itself opens, no menu.
+      { // The old bypass field remains a raw-view compatibility alias.
         views_state . open_views . unregister_view (
           &ViewUri::ContentView ("raw-z-uuid" . to_string ()));
         let bypass_request : String =

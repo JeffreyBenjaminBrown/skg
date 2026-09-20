@@ -76,8 +76,8 @@ pub fn handle_single_root_view_request (
       if let Some (existing_uri)
         = views_state . open_views
           . content_view_uri_for_root_id ( &node_id )
-        { // An open raw view of the node beats the menu: this check
-          // runs first, so following a link lands in the open buffer.
+        { // Following a link to a root that is already open lands in
+          // that ordinary content buffer.
           let switch_sexp : String =
             Sexp::List ( vec! [
               Sexp::List ( vec! [
@@ -91,17 +91,17 @@ pub fn handle_single_root_view_request (
             & tag_sexp_response (
               TcpToClient::ContentView, &switch_sexp ));
           return; }
-      let bypass_menu : bool =
-        // The optional (override-choice . "menu" | "bypass") field,
-        // defaulting to menu. Bypass surfaces (magit jumps,
-        // skg-goto-bypassOverride) skip the menu and open the
-        // requested root raw; recursive content beneath it still
-        // follows the substitution rules.
+      let show_override_menu : bool =
+        // Ordinary visits open the requested root raw.  The legacy
+        // override-choice tree is available only when explicitly
+        // requested; "bypass" remains accepted for old clients and
+        // means the same thing as omitting this field. Recursive
+        // content beneath the raw root still follows substitution.
         match value_from_request_sexp ("override-choice", request) {
-          Err (_)  => false, // absent: the default, menu
+          Err (_)  => false,
           Ok (v) => match v . as_str () {
-            "menu"   => false,
-            "bypass" => true,
+            "menu"   => true,
+            "bypass" => false,
             other => {
               let response_sexp : String =
                 format_buffer_response_sexp (
@@ -120,7 +120,7 @@ pub fn handle_single_root_view_request (
         . unwrap_or_else ( || node_id . clone () );
       let menu_uri : ViewUri =
         ViewUri::OverrideMenu ( pid . 0 . clone () );
-      if ! bypass_menu
+      if show_override_menu
         && views_state . open_views . views
         . contains_key (&menu_uri)
         { // One menu per node: a second request switches to it.
@@ -143,12 +143,9 @@ pub fn handle_single_root_view_request (
       { let _span : tracing::span::EnteredSpan =
           tracing::info_span!( "single_root_view" ). entered();
         block_on ( async {
-            // The override-choice buffer: a NEW single-root view of
-            // an overridden node offers the chain of overriders
-            // instead of silently choosing. Offered in diff mode
-            // too (decided 2026-06-11): the menu is navigation, not
-            // decoration, and it presents raw graph facts.
-            match if bypass_menu { Ok (None) }
+            // The override-choice buffer is opt-in. Ordinary visits
+            // proceed directly to the raw single-root render below.
+            match if ! show_override_menu { Ok (None) }
                   else { override_menu_view_with_runtime (
                            env, &runtime, &pid,
                            Some (active_source_set) ) }

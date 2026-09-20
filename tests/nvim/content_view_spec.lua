@@ -1,6 +1,6 @@
 -- Coverage for skg.content_view against the loopback fake server:
 -- the normal open, the switch-to-view redirect, the server-supplied
--- view-uri override (the override-menu path), and the error/warning
+-- view-uri override (a specialized-response path), and the error/warning
 -- display. Mirrors the response-handling halves of
 -- tests/elisp/test-skg-override-bypass.el (the request-string cases)
 -- and test-skg-warning-channel.el (the content-view channel).
@@ -20,7 +20,7 @@ describe('skg.content_view request strings', function ()
       content_view.request_string('abc', 'uri-1', nil))
   end)
 
-  it('adds override-choice bypass only when asked', function ()
+  it('can add the legacy override-choice bypass field', function ()
     -- Mirrors test-skg-override-bypass.el's request-shape cases.
     assert.are.equal(
       '((request . "single root content view") (id . "abc")'
@@ -81,7 +81,7 @@ describe('skg.content_view responses', function ()
     assert.is_truthy(vim.b[buf].skg_view_uri)
   end)
 
-  it('adopts the server-supplied view uri (the override menu path)',
+  it('adopts a server-supplied view uri',
      function ()
     serve_content(
       '((response-type content-view)'

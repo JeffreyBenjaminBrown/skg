@@ -14,8 +14,8 @@ local state = require('skg.state')
 local M = {}
 
 ---The request sexp string for a single-root content view of NODE_ID.
----When BYPASS_OVERRIDE, the request carries (override-choice .
----"bypass").
+---When BYPASS_OVERRIDE, the request carries the legacy-compatible
+---(override-choice . "bypass") field.
 ---@param node_id string
 ---@param view_uri string
 ---@param bypass_override boolean|nil
@@ -39,9 +39,8 @@ function M.request_string (node_id, view_uri, bypass_override,
 end
 
 ---Ask the server for a single-root content view of NODE_ID.
----When BYPASS_OVERRIDE, an overridden node opens itself instead of
----the override-choice menu (recursive content beneath the root still
----substitutes).
+---BYPASS_OVERRIDE is retained for compatibility with older servers.
+---The current server opens the requested node itself by default.
 ---@param node_id string
 ---@param bypass_override boolean|nil
 function M.request_single_root_content_view_from_id (node_id,
@@ -79,8 +78,8 @@ end
 
 ---Handle a content-view response: either a (switch-to-view URI)
 ---redirect to an already-open buffer, or content plus errors and
----warnings. VIEW_URI is the client-generated uuid; the server may
----override it (it does for override-choice menus).
+---warnings. VIEW_URI is the client-generated uuid; a specialized
+---server response may override it.
 ---@param payload_text string
 ---@param response any
 ---@param view_uri string

@@ -11,7 +11,7 @@
                                                       &optional approved-pids)
   "The request sexp string for a single root content view of CLEAN-ID.
 When BYPASS-OVERRIDE is non-nil, the request carries
-\(override-choice . \"bypass\")."
+\(override-choice . \"bypass\") for compatibility with older servers."
   (concat (prin1-to-string
            (append
             `((request . "single root content view")
@@ -30,9 +30,9 @@ When BYPASS-OVERRIDE is non-nil, the request carries
 Registers a response handler in the dispatch map.
 Optional TCP-PROC allows reusing an existing connection.
 When BYPASS-OVERRIDE is non-nil, the request carries
-\(override-choice . \"bypass\"): if NODE-ID is overridden, the
-server opens the node itself instead of the override-choice menu.
-\(Recursive content beneath the root still substitutes.)
+\(override-choice . \"bypass\") for compatibility with older servers.
+The current server opens NODE-ID itself by default; recursive content
+beneath the root may still substitute.
 APPROVED-PIDS and VIEW-URI preserve an overPrivateText-telescope approval retry.
 STALE-URI-RETRY-P is an internal guard that prevents repeated recovery."
   (interactive "sNode ID: ")
@@ -135,7 +135,7 @@ retry."
           (let* ((content-value (cadr (assoc 'content response)))
                  (errors-list (cadr (assoc 'errors response)))
                  (warnings-list (cadr (assoc 'warnings response)))
-                 (server-uri ;; The server may override the client-generated URI; it does for override-choice menus, registered under "override-menu:PID". PITFALL: the server's sexp printer leaves space-free strings unquoted, so this can arrive as a symbol; normalize to a string.
+                 (server-uri ;; Some specialized responses can override the client-generated URI. PITFALL: the server's sexp printer leaves space-free strings unquoted, so this can arrive as a symbol; normalize to a string.
                   (let ((u (cadr (assoc 'view-uri response))))
                     (when u (format "%s" u))))
                  (effective-uri (or server-uri view-uri))

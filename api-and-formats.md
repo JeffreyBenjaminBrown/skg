@@ -69,8 +69,9 @@ So far there are these endpoints:
     (id . "NODE_ID") (view-uri . "URI")
     (override-choice . "CHOICE")
     (allow-overPrivateText-telescopes "PID" ...))`
-    - `override-choice` is optional; values are "menu" (the default)
-      and "bypass". See "the override-choice menu" below.
+    - `override-choice` is optional. An absent field opens the requested
+      node raw. `"menu"` explicitly requests the legacy override-choice
+      tree; `"bypass"` is a compatibility synonym for the default raw view.
   - Response: LP `((response-type content-view) (content "...")
     (errors ("..." ...)) (warnings ("..." ...)))`. The document
     structure is detailed below, under `Single root content tree view`.
@@ -83,7 +84,8 @@ So far there are these endpoints:
   - If `NODE_ID` resolves to an inactive source, the server refuses the
     request with a human-readable message and does not open a buffer.
     Following a link to an inactive-source node behaves the same way.
-  - The override-choice menu: when the requested node is overridden
+  - The explicit override-choice menu: when `override-choice` is `"menu"`
+    and the requested node is overridden
     (an `overrides_view_of` edge points at it, user-owned or
     foreign) and at least one overrider's source is active, the
     server returns, instead of a content view, an ordinary buffer
@@ -99,16 +101,17 @@ So far there are these endpoints:
     registers the menu under it; one menu per node, deduped) and
     show `to-minibuffer` via the echo area only -- never buffer
     text, never a popped window.
-    Precedence: an open content view rooted at the node wins (the
+    Ordinary visits never select this path. Precedence for an explicit
+    menu request: an open content view rooted at the node wins (the
     usual `(switch-to-view ...)` reply); a second menu request
     switches to the open menu; the menu appears in diff mode too.
-  - `(override-choice . "bypass")` skips the menu and opens the
-    requested node itself, drawn raw. Because the bypass-opened root
+  - An absent `override-choice` (or the legacy `"bypass"` value) opens the
+    requested node itself, drawn raw. Because the raw root
     is an overridden node drawn raw, its immediate children also draw
     raw (one level); substitution resumes at the grandchildren. See
-    "Override substitution" below. Emacs sends bypass from magit
-    buffers (readable-ID jumps land on the raw node) and from the
-    command `skg-goto-bypassOverride`, the menu's escape hatch.
+    "Override substitution" below. Search-result enrichment, requested
+    override folders, and override paths remain the ordinary surfaces for
+    inspecting override facts.
 
 ## Save buffer
   - Request: First `((request . "save buffer") (view-uri . "URI") (point-lines-below-focused-headline . "N") (point-column . "C") (point-screen-lines-below-window-start . "M"))\n`, then `Content-Length: LENGTH\r\n\r\nPAYLOAD`, where `PAYLOAD` is the buffer content (`LENGTH` bytes).
