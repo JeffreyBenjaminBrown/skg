@@ -1,9 +1,8 @@
-* TODO REMEMBER not to dirty the production skg's code.
-* ONGOING Permit removing a node from indexing.
-Like set-source, this should be applicable solo or recursive.
-* TODO how to square 'roots are important" & 'matching all words is important'?
-* re. codex
-** set default model
+* REMEMBER
+** not to dirty the production skg's code.
+** to set the model
+* ought, might
+** set the default Codex model
 ■ Failed to save default model: config/batchWrite failed in TUI: config/batchWrite failed: failed to
 persist config.toml: failed to persist config at /home/ubuntu/.codex/config.toml (code -32603)
 ** save to disk: how to fork a checkpoint
@@ -16,27 +15,89 @@ Then whenever you want to start a new piece of work from exactly that point, whi
 /fork
 /rename whatever-this-task-is
 * next
-If the link it replaces with content has no other relationships
-beyond the one just removed from its parent --
-that is, if the link becomes an island --
-it should be deleted.
-But not if it retains other relationships, in or out,
-including non-content relationships.
+** for video
+*** TODO Collateral buffer updates should use a one-hop neighborhood.
+Collateral buffer updates should use a one-hop neighborhood
+of each collateral (but not the saved) buffer.
+(This problem is already noted in TODO/problems.org, I think --
+definitely somewhere besides TODO.org.)
+The saved buffer data checked should (probably already does)
+include the union of the saved buffer's IDs before and after save.
+The one-hop neighborhood of the collateral buffers
+need, I think, only include what the collateral buffer included
+before the save, because any new nodes that buffer gains
+will have been new nodes saved in the saved buffer,
+and their heralds will be redrawn from scratch.
+*** change how link heralds look
+**** tone down the yellow "a = parent" herald
+same yellow but 1/4 as bright
+**** don't show full H or O stats in herald
+Just a * on either side if there is action on that side.
+**** simplify link kherald
+<body, children or multiple links in headline> / <total links>
+Make the first the "interesting stat" font,
+currently white on an orange background like for multiple containers.
+(Is that used anywhere else? Should it be?)
+if the first would be zero, omit it and the slash.
+**** make the content herald of asubscribee-as-such resemble link heralds
+C<unintegrated>/<all>
+Unintegrated gets the interesting-stat font.
+Unintegrated and slash are omitted if unintegrated = 0.
+**** document all these changes wherever heralds are documented for the user
+and review that documentation to make sure it is accurate.
+If it doesn't exist, make it; if it's outside of docs/,
+collect it there.
+**** The entire overrides herald should get the interesting font.
+*** AWAITS navigate point through herald (overlay)
+walk point through the herald string normally
+treat it as one character
+Shortcut to jump tokens treats it as one from outside,
+but divides it at spaces if point is interior to it.
+*** AWAITS TODO/command-name-echo.org
+A config option, for recording videos.
+Could put a second minibuffer line,
+that reads if anything (key sequence -> command),
+leaving a trail for five seconds or until interrupted.
+** bugs
+*** org import of aliases with quotation marks
+  * AWS AMI ("Amazon Machine Image")
+  **
+  *** AMI (\
+  *** Amazon
+  *** Machine
+  *** Image\")"
+*** skg-goto should not change both buffers if the window is split
+*** changing editRequest from delete to none in metadata buffer
+works, but leaves a red DELETE herald in the metadata buffer.
+*** bug : nested links
+See, e.g.,
+[[id:3c5b0fad-1559-42a4-bcaf-eb7c466cc4f8][[[id:758119b6-2b1e-428b-9664-d7b8a4b63ca1][Markets can aim [[id:2208f9f5-43be-49d4-99c0-d803f8c3e44e][selfishness]] toward social efficiency.]]]]
+*** bug : not warning me when I make changes under an indeefinitive node
+Maybe that's in the spec but it's definitely bad.
+Should prevent save.
+Otherwise I save things under an write-protected,
+think it worked, and lose them.
+*** bug : C-c G on an alias kills the buffer
+intending to replace it, but can't replace it.
+There are likely other viewnode kinds for which this happens.
+*** bugs in make-link / make-content
+**** TODO bug: making a link into content gives an unavailable view error
+***** what I did
+****** Searched 'sharing'. Visited the top result.
+****** Saw a link to 'understanding & sharing' in its content.
+****** Made that link into content.
+****** Visited the now-orphaned link. Deleted it. Saved.
+****** Got this error.
+  * errors
+  ** Collateral view search:sharing: No such file or directory (os error 2)
+****** But save seemed to work.
+**** TODO BUG :: make-content cleanup -> collateral view not found
+***** the bug
+Change a link relationship into an ordinary content relationship. This orphans the linking node. Visit the linking node. If it is an island (ignoring its out-link), delete it. The save works, but a (warning?) buffer complains that some collateral buffer does not exist.
+***** a test case
+Try it on either child of [[id:31b4c38c-5885-4895-ae33-85cb4fb93b86][immaturity]].
 ** behavior changes
-*** Don't show overriddenFolder etc. by default.
-**** request for Claude
-The default view of a node should include
-nonempty alias and subscribee subfolder nodes,
-but not the more exotic subfolder types;
-those need to be asked for.
-
-The treatment of a subscribee-as-such is not the default:
-its org-content includes a hiddenHere viewnode,
-and ought to include (if it would be nonempty) a subscribees viewnode.
-The first part of that is already implemented;
-the latter might not be.
-
-Any other -as-such nodes should receive the default treatment.
+*** text search across containment paths
 *** making a link into content
 **** should rewrite edges, including text links, that pointed to the node with the link
 That is, suppose node C (container)
@@ -48,31 +109,39 @@ orphans the link that went from S to L.
 
 This is probably true of other relationships to L, too.
 **** should offer to delete it
+**** ?
+If the link it replaces with content has no other relationships
+beyond the one just removed from its parent --
+that is, if the link becomes an island --
+it should be deleted.
+But not if it retains other relationships, in or out,
+including non-content relationships.
 *** Each save should incrementally update the magit map from id to title
-*** TODO the content herald for a subscribee should count unintegated content, not all of it
-or both somehow
+**** TODO But how to square 'roots are important" & 'matching all words is important'?
+***** where to find them documented
+Yes—these rules are user-facing documented in docs/COMMANDS.org:51.
+
+  The most complete parts are:
+
+  - Text matching, options, literals, Tantivy syntax, and regex semantics (docs/COMMANDS.org:66)
+  - Ranking formula and graph-role multipliers (docs/COMMANDS.org:183): BM25 × text-term coverage × context-origin multiplier.
+  - The graph roles are explicitly listed: Root 100×, CycleMember ~32×, Dest 10×, HadID 10×, MultiContained ~3.2×; everything else 1×. It also says these only rerank—every match is returned.
+
+  The Neovim-facing equivalent is docs/COMMANDS-nvim.org:63. The API-level synopsis is api-and-formats.md:26.
+
+  For implementation authority, see server/context.rs:1 (how graph-origin types are assigned) and server/serve/handlers/text_search.rs:448 (the combined ranking calculation).
 *** matching all words should be much more highly valued
 In fact maybe they should all require presence,
 barring an OR statement.
-*** when creating a fork, immediately replace with the overerider
 *** staging should refresh views
 be it via magit, or via C-c t (a|A)
 *** sort backpaths most-public first
-** bug in export to org-roam
+*** BUG cycling TODO | DONE etc. hides text
+e.g. go to c02b9d3d-8857-4cf0-84b2-244b127160fc
+and try toggling that for one of its intermediate children.
+**** bug in export to org-roam
 The 'exporter' node, the one that defines where to write the org file
 derived from its parent, might have multiple parents.
-** for video
-*** TODO/command-name-echo.org
-A config option, for recording videos.
-Could put a second minibuffer line,
-that reads if anything (key sequence -> command),
-leaving a trail for five seconds or until interrupted.
-*** navigate point through herald (overlay)
-walk point through the herald string normally
-treat it as one character
-Shortcut to jump tokens treats it as one from outside,
-but divides it at spaces if point is interior to it.
-*** [[id:eb73db7a-acf4-4463-9398-f09279000337][org-mode : fold body and not children]]
 ** work through TODO/problems.org
 ** try neovim
 * skg-show-definition
@@ -106,30 +175,13 @@ https://github.com/typedb/typeql/issues/434#issuecomment-5553099146
 This way I can really treat the public skg graph
 as the source of documentation truth.
 * TODO ? Is overrides unnecessary?
-* DONE [[./TODO/refer-to-ids-not-buffer-names/it.org][BUG : Can't visit my cooking node]]
-after subscribing back to (but not overriding) cheese-man's cooking node
-* TODO BUG cycling TODO | DONE etc. hides text
-e.g. go to c02b9d3d-8857-4cf0-84b2-244b127160fc
-and try toggling that for one of its intermediate children
 * TODO What happened to the guard to prevent dirtying a second buffer?
 I made that change around <2026-09-11 Fri>,
 but now <2026-09-14 Mon> it's not warning me.
 * TODO handle the Oa test failure
-* TODO BUG cannot change editRequest from delete to none
-using the in metadata buffer.
-If one does, the resulting metadata is invalid
-(and also the experience of doing it is awkward).
 * TODO show containment ancestries under removed-here phantoms
-* TODO BUG skg-goto should not change both buffers if the window is split
 * TODO BUG ? Shouldn't skg-rebuild sound the choir when it completes?
 Did my audio app steal it?
-* BUG: org import of aliases with quotation marks
-  * AWS AMI ("Amazon Machine Image")
-  **
-  *** AMI (\
-  *** Amazon
-  *** Machine
-  *** Image\")"
 * TODO obsolete elisp macros
 ../elisp/skg-state.el: Warning: ‘when-let’ is an obsolete macro (as of 31.1); use ‘when-let*’ or ‘and-let*’ instead. [3 times]
 ../elisp/skg-length-prefix.el: Warning: ‘if-let’ is an obsolete macro (as of 31.1); use ‘if-let*’ instead.
@@ -165,17 +217,6 @@ the two links could show it's there to unfold,
 which causes them both to light up (revealing the other one).
 * Graphstats is no longer used by active nodes, but it is for phantoms.
 Probably shouldn't be used for phantoms either.
-* bug : nested links
-See, e.g.,
-[[id:3c5b0fad-1559-42a4-bcaf-eb7c466cc4f8][[[id:758119b6-2b1e-428b-9664-d7b8a4b63ca1][Markets can aim [[id:2208f9f5-43be-49d4-99c0-d803f8c3e44e][selfishness]] toward social efficiency.]]]]
-* bug : not warning me when I make changes under an indeefinitive node
-Maybe that's in the spec but it's definitely bad.
-Should prevent save.
-Otherwise I save things under an write-protected,
-think it worked, and lose them.
-* bug ? Does skg-replace-link-with-content discard fold info?
-* bug : C-c G on an alias kills the buffer
-intending to replace it, but can't replace it.
 * need to be able to commit all changes from buffer
 not just all new nodes
 for big low-stakes nodes, like my notes from the CA driver's manual
@@ -200,16 +241,6 @@ it should say 'link source targets unknown node'.
 Etc. for the other relationships --
 it depends on why the node was drawn.
 * Put graphnode stats on links, describing the target.
-* bug: making a link into content gives an unavailable view error
-** what I did
-*** Searched 'sharing'. Visited the top result.
-*** Saw a link to 'understanding & sharing' in its content.
-*** Made that link into content.
-*** Visited the now-orphaned link. Deleted it. Saved.
-*** Got this error.
-  * errors
-  ** Collateral view search:sharing: No such file or directory (os error 2)
-*** But save seemed to work.
 * Warn the user if they changed an write-protected source.
 Don't other kinds of edits to write-protected nodes
 already bork the save?
@@ -232,11 +263,6 @@ takes a minibuffer command
 ** override an overrider
 ** view them
 ** ? mutual fork
-* AWAITS BUG :: make-content cleanup -> collateral view not found
-** the bug
-Change a link relationship into an ordinary content relationship. This orphans the linking node. Visit the linking node. If it is an island (ignoring its out-link), delete it. The save works, but a (warning?) buffer complains that some collateral buffer does not exist.
-** a test case
-Try it on either child of [[id:31b4c38c-5885-4895-ae33-85cb4fb93b86][immaturity]].
 * DONE Warn the user when they make dead links.
 * DONE If viewing an overrider-as-such, frontload the O herald.
 Identical to how other birth-rels are frontloaded.
@@ -293,16 +319,6 @@ Git review after reshaping it is hell.
 ***** [[id:9c5619e5-81ad-4a67-9705-e4761bdd6839][skg]]
 ***** [[id:627da2c2-2f34-46ac-a6d3-9c625c4ff31d][AI]]
 ***** [[id:001d7913-c431-461c-92ae-a6a39394856c][processing]]
-*** containsParent is a viewstat, not just an isParent value?
-Seems good to use two heralds of the same shape, like "}}",
-but one is the color of isParent and the other the color of viewStats.
-*** bug : graphnodestats are not recalculated in collateral buffers
-*** bugfix : strip last empty line from buffer on save
-Or strip pure-whitespace bodies.
-*** Bug ? Saving doesn't regenerate heralds if there were no changes?
-*** suppressed container count rule for subscribees-as-such is wrong
-It suppresses 1, should suppress 0.
-Maybe simplify the rule: always suppress 1 and nothing else.
 *** [[./TODO/incremental-init-might-be-broken.org]]
 *** to be more sure of the git diff analysis
 Have independent code count the number of disappeared files,
@@ -332,7 +348,6 @@ Some new Claude-written passages assume too much of the reade
 The label could be a special string like ":skg default label:".
 That is, the target got a better title, and you would like
 everything that uses the default title to switch to the new one.
-*** text search across containment paths
 *** the diff report should
 **** explain the maximum badness in each category
 **** DONE include empty top-level categories
@@ -351,12 +366,6 @@ A command to reverse the direction of a contains relationship
 would make it easy to clean such data -- run from a child,
 it makes the child contain its parent,
 and removes the child from the parent.
-*** Why is search slow?
-Try a search that was big -- backup my data.
-The view update or the ranking might swamp the other's cost.
-*** show content roots of all modified nodes
-*** each new root view should be drawn with a link sources ancestry
-that is, linksource-ancestry as view-descendents
 *** recursive git rm for removed nodes
 ** convenience to coder
 *** I want my config data to be in git.
@@ -391,13 +400,8 @@ for a,b integers and X one of the five relations (C,L,S,O,H).
 ** DONE remap C-c C-o during Skg
 in skg buffers
 ** DONE show the herald it is responsible for next to each field in the metadata
-** IDs should not be writeable in the metadata view
-And what about extra-ids?
 ** Is it a misfeature to let config_path differ from data_root?
 Why would you split up your skg stuff?
-* bugs
-** making a node multicontained does not update its container count
-in the buffer it was copied from
 * maybe
 ** a way to present more nodes on one line
 Just triple the relationship character and color it differently.
