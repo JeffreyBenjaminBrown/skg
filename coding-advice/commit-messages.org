@@ -19,5 +19,9 @@ Documenting a history of bugs in the codebase would harm readability for no bene
 that's what the git history is for.
 But there are probably other casees that deserve a detail, too.
 
+Once you write a detail, decide whether it deserves to be part of the codebase itself.
+If so, put it there (probably editing it to better fit its context),
+and then just reference it in the commit message.
+
 Lately (today is <2026-09-20 Sun>) the codebase has not been following this style,
 but I want to start.
