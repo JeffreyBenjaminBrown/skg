@@ -39,7 +39,7 @@ only when the current task points to it.
 The external knowledge graph is optional background material, not required
 orientation: the repository's code and local documentation contain the
 operative information for implementation.
-* How to communicate and maintain knowledge
+* How to communicate and maintain knowledge with me
 For a response longer than a couple of paragraphs, prefer an Org file in the
 repository and link to it. Note that an org file uniformly of depth 2,
 with bullets inside the bodies, is a weird LLM smell.

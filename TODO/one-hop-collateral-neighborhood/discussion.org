@@ -1,4 +1,4 @@
-* TODO vision : Updates should apply to a collateral buffer's one-hop neighborhood.
+* vision : Updates should apply to a collateral buffer's one-hop neighborhood.
 Collateral buffer updates should use a one-hop neighborhood
 of each collateral (but not the saved) buffer.
 (This problem is already noted in TODO/problems.org, I think --
@@ -10,3 +10,399 @@ need, I think, only include what the collateral buffer included
 before the save, because any new nodes that buffer gains
 will have been new nodes saved in the saved buffer,
 and their heralds will be redrawn from scratch.
+
+* Codex review: decisions about neighborhood semantics, refreshes, and edit safety
+  Reviewed against the current code on 2026-09-20. The relationship-count
+  bug is recorded in [[file:../problems.org::*Collateral graphStats can go stale when only a node's relationships change][problems.org]]. This is a useful correction, but the
+  spec needs to distinguish the nodes already in a collateral view from
+  the graph snapshot used to find their neighbors.
+** Jeff's notation
+Anywhere I marked 'DONE' I'm going with your recommendation,
+or if it's not a recommendation I'm just agreeing.
+*** Codex: understood
+    I'll treat as an accepted decision, not as a claim that the
+    corresponding implementation exists. These replies leave your task
+    states and the final acceptance-cases TODO for you to manage.
+** Architecture: keep the old collateral membership, but examine both graph snapshots
+   I agree that selection should start with the collateral view's existing
+   nodes. There is no need to render every candidate view just to discover
+   whether it should be rendered. However, using only the pre-save graph
+   to obtain those nodes' neighbors misses added relationships; using only
+   the post-save graph misses removed relationships.
+*** Counterexample: adding an incoming edge
+    Another buffer displays B. Saving A adds A.contains = [B], where A
+    was not previously adjacent to B. B's old graph neighborhood does not
+    contain A, yet B's container count must change. A can be either an
+    existing node or a newly created one. Removing the edge gives the
+    converse example: the post-save neighborhood no longer contains A.
+*** Recommended selection rule
+    Let C be the active IDs in an existing collateral view, W the nodes
+    written or deleted by the save, and N_before / N_after the one-hop
+    neighbors in the corresponding graph snapshots. Select that view if:
+
+    #+begin_example
+    W intersects (C union N_before(C) union N_after(C)).
+    #+end_example
+
+    Include C itself, so ordinary title/body edits still propagate.
+    Exclude the saved view from this selection; it already rerenders.
+    This is a rule for one-hop dependencies, not a proof that every
+    possible rendering dependency is covered.
+*** The explanation about newly displayed nodes is too restrictive
+    A collateral view can gain an already-existing graph node. For
+    example, adding an existing B to A.contains can expose B and B's
+    existing descendants when A's collateral view is completed. Those
+    descendants need not occur in the saved buffer. The stronger reason
+    no second selection pass is needed is that, once selected, the whole
+    view completes and computes its stats from the post-save graph.
+** Architecture: use the save's actual effects, not all IDs appearing in its buffer
+   'find_collateral_view_uris' in [[file:../../server/update_buffer.rs][update_buffer.rs]] currently uses
+   Save/Delete IDs from 'define_nodes'. It does not use a union of the
+   saved buffer's old and new IDs. The handler adds delete cleanup,
+   approved fork clones, and merge definitions before calling it.
+
+   I recommend retaining an effects-based set W and ensuring it covers
+   all final writes, deletions, and source changes, including generated
+   operations. A buffer-membership union can both refresh unnecessarily
+   for unchanged nodes and miss effects outside the submitted view.
+   Old and new identity resolution still matters: retain deleted IDs,
+   resolve extra IDs in the appropriate snapshot, and account for merges
+   that turn an old PID into an extra ID of another node.
+*** Keep view membership separate from graph dependencies
+    Do not put neighbor IDs into 'ViewState.pids'. Its current invariant
+    is the IDs of active nodes actually in the view. Compute the
+    neighborhood separately, initially on demand, using the captured old
+    runtime and the published new runtime. This avoids introducing a
+    dependency cache that becomes stale whenever an unseen neighbor changes.
+*** Decide whether the asymmetry is semantic or an implementation requirement
+    With adjacency defined in both directions, intersecting W with each
+    view's neighborhood is equivalent to intersecting each view's IDs
+    with W plus W's old/new neighbors, provided identities are normalized
+    consistently. The latter can compute an affected-ID set once per save.
+    I recommend allowing either implementation; neither entails recursively
+    expanding both sides or changing how the saved view renders.
+**** DONE
+Good point about the symmetry. Computing W's neighborhood once
+seems clearly more efficient. Why do you say 'allow either
+implementation' -- allow who? We're the only developers,
+and I don't see why we should implement more than one of them.
+***** Codex: choose one implementation, expanding W once
+I meant to leave the implementation choice to us when writing the
+code; I did not mean to implement both. That was unnecessarily
+noncommittal. Let's compute W's neighborhood once in each graph
+snapshot, union the results, and intersect that set with each
+collateral view's IDs. Keep the per-view formulation only as a
+way to explain and test the intended behavior.
+
+This avoids repeating traversal for overlapping views. It is not
+universally cheaper for every graph shape, but it is the sensible
+default here. Your monotone override extension below preserves the
+symmetry: reversing a wholly overriderward path gives a wholly
+overriddenward path.
+** Architecture: define which relationships count as a hop
+   I recommend both directions of all five stored relations: contains,
+   textlinks_to, subscribes, hides_from_its_subscriptions, and
+   overrides_view_of. Reuse [[file:../../server/dbs/in_rust_graph/relation_accessors.rs][the relation accessors]]. Containment alone
+   would leave other relation counts and collections stale.
+
+   Even a title/body edit with unchanged edges can affect a neighbor:
+   [[file:../../server/dbs/in_rust_graph/stats.rs][link_split]] classifies incoming links using the linking node's text and
+   whether it has content. Therefore selection cannot consider only
+   nodes whose relationship lists changed.
+*** Prefer conservative invalidation and preserve visibility checks at rendering
+    Initially I would include neighbors regardless of source visibility.
+    That can select extra views, but avoids missing dependencies when a
+    node or relationship changes source. The existing active-source and
+    text-release gates must still control what is rendered and streamed.
+    Neighborhood membership itself must not authorize exposing text.
+** UI: fix the locking contract together with selection
+   This is the dangerous omission. Emacs locks all views initially, but
+   'uris_of_views_to_lock' in [[file:../../server/serve/handlers/save_buffer.rs][save_buffer.rs]] immediately narrows that
+   to views sharing an old saved-view PID. A newly selected neighbor view
+   could thus be unlocked while the save runs, accept an edit, and then
+   have that edit replaced by 'collateral-view'. 'save-relax-lock' only
+   unlocks; it does not relock newly discovered targets.
+
+   Even expanding the early lock to old neighbors is insufficient: the
+   incoming text can introduce an arbitrary existing node or a new edge.
+   The early message is sent before that text is read.
+*** Recommended choice: keep all views locked until selection is known
+    Have the early message retain all open views, then narrow to the
+    chosen collateral set once it is available. The required invariant
+    is that every eventual replacement target stays locked continuously
+    from request submission until replacement or termination.
+    This increases the time unrelated buffers are locked. Moving the
+    narrowing earlier than rendering is a separate optimization; preserve
+    the existing confirmation and text-release behavior while doing so.
+**** DONE
+Yes, let's move the narrowing to as early as can be done naturally,
+as a separate commit.
+***** Codex: narrow after preparation and conflict checking, before applying the save
+Agreed: keep that change in its own implementation commit. The
+dirty-buffer rule below makes us compute the affected set before
+writing anything, so that is also the natural place to narrow.
+
+[[file:../../server/save.rs][The save code]] already constructs a validated final candidate graph
+before applying filesystem changes. Expose that preparation result
+to the request handler, including all generated writes and merge
+effects. Under the existing mutation gate, use the old and
+candidate graphs to select collateral views and check conflicts.
+Once that succeeds, send the narrower lock set, then apply the
+same prepared save and render. Do not prepare a second save whose
+effects could differ from the set we checked.
+
+Keep protocol messages in the handler, not in the graph-preparation
+code. The saved view and all replacement targets remain locked;
+terminal errors and confirmation responses must still release
+locks. Retain the existing text-release gates before streaming
+content. Sending a URI-only lock update does not release that text.
+*** Decide whether the existing dirty-buffer warning remains acceptable
+    [[file:../../elisp/skg-request-save.el][The client]] already asks before saving when other Skg buffers have
+    unsaved edits, and proceeding permits collateral replacement. More
+    collateral targets make that choice more consequential, even if only
+    a herald needed updating. I recommend retaining this explicit policy
+    for the bounded fix if you still want it. If you instead want dirty
+    views preserved, that needs a defined deferred-refresh or conflict
+    workflow; silently skipping them would leave stale views indefinitely.
+**** DONE
+You say 'proceeding permits collateral replacement'.
+Do you mean that proceeding
+causes those dirty buffers to be modified as collateral?
+Neither outcome seems obviously good to me:
+Updating a dirty buffer can lose edits,
+and not updating it can allow its later save to clobber something.
+
+I think a safe rule would be:
+Check if the neighborhoods overlap. If not, saving is fine;
+the other dirty buffer(s) won't be modified.
+If they do, just don't permit the save.
+But this will frustrate the user,
+so they need some way of extracting their unsaved changes from the buffer,
+in a way that will make them easier to reapply later.
+Maybe we could repurpose the git diff view for this?
+Does that convey all the information they might need?
+They could run 'skg-show-unsaved-changes' on each dirty buffer but one,
+and then close them all except for that one,
+and then safely save the one they didn't close.
+***** Codex: yes, replacement can discard their edits; reject conflicts before writing
+      Yes. If a dirty buffer is selected as collateral, the current
+      handler replaces its entire text from the server's viewforest and
+      marks it clean. The server does not have that buffer's unsaved
+      edits. Your objection is right, and supersedes my suggestion to
+      retain the warning-and-proceed policy.
+****** Define overlap using the save's effects and the dirty view's dependencies
+I recommend rejecting when an affected-ID set computed from W
+intersects another dirty view's relevant IDs. That uses the same
+mostly one-hop relation as collateral selection. Intersecting two
+expanded neighborhoods is more conservative: A and B could both
+link to X without either buffer depending on the other's edits.
+We need not block that case merely because X is a common neighbor.
+
+However, the server's registered view is insufficient for this
+check. A dirty buffer may have acquired an existing node, link,
+or override marker since its last render. The client must report
+which buffers are dirty and provide their current dependency
+information, in addition to the registered baseline. Include IDs
+removed by local edits as well as newly referenced ones. A missing
+or unparseable dependency description must cause a conservative
+refusal, not be treated as an empty set.
+
+Perform the check against the prepared candidate before disk
+writes, graph publication, or index updates. Return the conflicting
+buffer names/URIs and useful shared IDs so the refusal is actionable.
+Sending only dirty URIs would protect current replacement targets,
+but would miss dependencies introduced by unsaved edits.
+****** Keep the dirty-buffer check valid while applying the save
+Capture dirty-buffer state while the client's initial locks are
+held. Keep those dirty buffers locked through the terminal response,
+even when they pass the conflict check, so their checked dependencies
+cannot change mid-save. The early narrowing can still free unrelated
+clean views. This slightly qualifies the earlier "exact collateral
+set" lock contract: locks also protect the conflict check's inputs.
+
+This is safety within the dependency model we define. A mostly
+one-hop neighborhood alone is not a proof against every stale-save
+case, especially placeholders or dependencies not represented by
+active IDs. A complete guarantee would also require baseline/version
+validation of what a save reads or overwrites. We should not describe
+the overlap check as solving that broader problem without the audit.
+******* when you say it's not a proof
+can you think of something that could slip by it?
+******** Codex: I do not currently have a counterexample to the revised rule
+With the additions we have agreed on, I cannot give you a
+concrete save sequence that passes the check and then loses
+edits. My statement that a complete guarantee "would also
+require baseline/version validation" was too strong. I retract
+that requirement; I have not established a need for it here.
+
+The qualifications matter: use all actual save effects, both
+graph snapshots, full monotone override reachability, and the
+dirty buffer's baseline plus current references. Keep that
+buffer locked while checking and applying the save.
+********* The examples I mentioned do not establish a remaining hole
+An override's original ID can be absent from the active-ID
+set, but the override traversal can reach it, and we also
+agreed to collect references in override markers.
+
+An ID introduced by an unsaved edit is absent from the server's
+registered view, but collecting current dirty-buffer references
+expressly handles that case.
+
+Unknown/deleted placeholders do not themselves write nodes on
+save. Their exclusion from active IDs therefore does not, by
+itself, demonstrate a lost-update problem. Where an active
+parent holds the relationship, the parent's ID and the old/new
+neighborhood provide another route to detecting a change.
+I have not found a placeholder example that defeats those
+checks under our revised proposal.
+********* Proceed with the agreed rule, without adding a versioning system
+The useful implementation obligation is concrete: every node
+that a dirty buffer would overwrite, or whose state determines
+how its edits are interpreted, must be covered by its collected
+IDs and their defined neighborhood. For direct competing edits
+to a node, including the seed IDs themselves catches the conflict;
+relationship changes and override chains have the additional
+coverage we specified.
+
+I checked the subscription/filter-folder and herald code while
+looking for a counterexample; I did not find one there. That is
+bounded code review, not an exhaustive proof. It is sufficient
+reason to proceed with focused regression cases, rather than
+make an unspecified risk block the design. If implementation
+exposes a missed dependency, we should show its exact save
+sequence and fix that dependency before broadening the design.
+****** Reuse diff presentation, but not the Git baseline or the existing toggle
+[[file:../../elisp/skg-request-git-diff-mode.el][The existing Git diff toggle]] compares HEAD and saved worktree data,
+rerenders views, and explicitly refuses dirty buffers. Unsaved edits
+are absent from those inputs. It therefore cannot serve as the
+extraction command as it stands.
+
+'skg-show-unsaved-changes' should compare the exact last clean text
+delivered to this buffer with its current edited text. Comparing
+against a newly rendered graph view could misattribute other saves
+or rendering changes to the user's edits. Shared text-diff display
+machinery is useful; a semantic graph-diff summary can be added,
+but should not be the only retained representation.
+****** Preserve an edit record before closing the buffer
+I recommend a detached recovery document containing the complete
+baseline and edited text, plus a readable diff and the original
+view/source-set context. Preserve IDs and metadata, node order,
+new nodes without IDs, and pending edit/view requests. Raw snapshots
+remain useful even if the user has left a temporarily invalid buffer
+that the save parser cannot interpret. Extraction must not run a
+save or execute those requests.
+
+The document should survive closing the original view and should
+be written to a user-chosen local file before treating the edits
+as safely archived. Keep it outside the live Skg view registry so
+it cannot itself receive collateral updates or be saved as a graph
+view. Merely displaying a disposable diff buffer is not enough.
+
+Your proposed workflow then works for manual reapplication:
+archive the other dirty views, close them, save the remaining
+view, reopen fresh views, and reapply the archived changes there.
+The old edited snapshot is evidence, not a buffer to submit whole
+after the graph has changed. Automatic reapplication would need
+a three-way merge/conflict UI; I recommend leaving that out of
+this command's first version.
+******* DONE
+Agreed, and we should tell the user the document was created,
+and where.
+** UI: refresh the existing view, without automatically expanding its neighborhood
+   I interpret the proposal as changing which buffers receive the normal
+   whole-view rerender, including collection reconciliation and heralds.
+   It should not request that every one-hop neighbor become visible.
+   I recommend this interpretation. A herald-only update would be a
+   different feature, requiring targeted patches and rules for collections
+   whose membership also changed.
+** Scope decision: one-hop correctness or complete dependency tracking?
+   One hop is a reasonable bounded improvement, but it should not promise
+   that all collateral views are always current. [[file:../../server/dbs/in_rust_graph/override_resolution.rs][Override resolution]]
+   follows chains of arbitrary length; view membership records the drawn
+   active IDs, not every intermediate dependency. Unknown and inactive
+   placeholders are also deliberately excluded by 'pids_from_viewforest'.
+
+   Decide whether refreshing changes behind those dependencies belongs
+   here. I recommend keeping this task focused on active-node one-hop
+   dependencies and recording the boundary explicitly. Complete freshness
+   would require a separate dependency audit, potentially recording IDs
+   read during rendering, rather than choosing an arbitrary larger radius.
+*** Let's take a full override neighborhood.
+So one hop along the other relationships,
+but extend the neighborhood along the override axis
+for as far as it can go monotonically.
+
+Override is a very rare relationship, and not a bushy one --
+most chains will be length 1 -- so this is affordable.
+
+What I mean by monotone is:
+Given a view V, we extend first in the overriderward direction
+as far as possible to get V',
+and then we extend V in the overriddenward direction to get V'',
+and then we union V' and V''.
+Stated differently, while extending along one direction,
+we don't double back into the other direction.
+
+In the code then we should call this a "mostly one-hop neighborhood",
+and define that in the glossary.
+**** Codex: adopt monotone override reachability, with two boundaries made explicit
+     Agreed on the name 'mostly one-hop neighborhood' and on documenting
+     it in the glossary when implementing. For each graph snapshot and
+     seed set S, I read your rule as:
+
+     #+begin_example
+     M(S) = S
+            union ordinary one-hop neighbors of S in either direction
+            union all overriderward nodes reachable from S
+            union all overriddenward nodes reachable from S.
+     #+end_example
+
+     "Ordinary" here means the four non-override relations. The two
+     override walks start separately from S; neither starts from the
+     other's result. Compute M_before(W) and M_after(W) separately and
+     union them. Do not walk a graph made by unioning old and new edges:
+     that could invent a path present in neither snapshot.
+***** Do not silently compose ordinary hops with override walks
+      The formula above does not follow an ordinary edge and then an
+      override chain, or the reverse. Those mixed paths are a broader
+      neighborhood. I recommend the literal separate union above, with
+      mixed paths explicitly excluded from the glossary definition.
+      If the intent is to extend override chains from every ordinary
+      neighbor too, that needs a different formula; doing that in only
+      one order would also invalidate the symmetry argument above.
+***** Traverse branches and guard cycles even if ordinary usage is a short chain
+      I agree that short, rare chains make this practical. But
+      [[file:../../server/dbs/in_rust_graph/override_invariants.rs][the invariants]] restrict user-owned overriders; a node can override
+      multiple targets, and foreign override facts do not have the same
+      monogamy/cycle guarantees. Our accepted ungated neighborhood
+      includes those facts, so the traversal must handle branching.
+
+      Use a separate visited set for each direction and traverse every
+      reachable branch. Sharing the visited set between directions could
+      suppress a necessary traversal. No depth cap or silent truncation:
+      visited sets ensure termination, and cost is proportional to the
+      override subgraph actually reached. Use relation accessors rather
+      than 'resolve_override', which deliberately applies ownership and
+      visibility rules for choosing a displayed substitute.
+
+      This extends selection. It does not by itself establish that every
+      already-substituted node reconciles correctly after an intermediate
+      override edge changes; implementation tests should check the resulting
+      displayed node as well as whether its view was selected.
+** Acceptance cases that should constrain implementation
+*** Both edge addition and removal update a view showing only the other endpoint
+    Include creation/deletion of the edge-owning node, and each relation
+    type. Neither endpoint needs to be displayed in the other buffer.
+*** Identity and metadata changes reach affected views
+    Cover extra-ID references, merge acquirees, source moves, and a
+    text-only edit that changes a neighbor's surprising-link herald.
+*** Newly exposed existing nodes render correctly in one completion pass
+    Add an existing subtree through a saved relationship; check its
+    freshly displayed descendants and heralds without another save.
+*** Lock coverage holds throughout the message sequence
+    Test a view that shares no old saved-view PID but becomes collateral,
+    and a newly introduced relationship absent from the old neighborhood.
+    Check that rejected/failed saves and confirmation responses unlock.
+*** The boundary stays narrow and safe
+    Preserve direct-overlap and search-view refreshes, avoid selecting an
+    unrelated view, and retain active-source/text-release restrictions.
