@@ -129,13 +129,13 @@ fn same_session_surviving_content_membership_becomes_unknown () {
   active . focused = true;
   active . folded = true;
   let child : NodeId = tree . root_mut () . append (active) . id ();
-  let mut relationship_sources : HashMap<ID, SourceName> = HashMap::new ();
-  relationship_sources . insert (ghost . clone (), source_name ("private"));
+  let mut relSources : HashMap<ID, SourceName> = HashMap::new ();
+  relSources . insert (ghost . clone (), source_name ("private"));
   let graph_snap : std::sync::Arc<InRustGraph> =
     std::sync::Arc::new (InRustGraph::new ());
 
   normalize_relationship_backed_content_unknowns (
-    &mut tree, parent, &[ghost . clone ()], &relationship_sources,
+    &mut tree, parent, &[ghost . clone ()], &relSources,
     &source_name ("main"), &graph_snap, &HashMap::new () ) . unwrap ();
 
   let rendered = tree . get (child) . unwrap () . value ();
@@ -144,9 +144,9 @@ fn same_session_surviving_content_membership_becomes_unknown () {
   match &rendered . kind {
     ViewNodeKind::Phantom (Phantom::Unknown (unknown)) => {
       assert_eq! (unknown . id, ghost);
-      assert_eq! (unknown . rel_source,
+      assert_eq! (unknown . relSource,
                   Some (source_name ("private")));
-      assert_eq! (unknown . rel_source_request, None); },
+      assert_eq! (unknown . relSource_request, None); },
     other => panic! ("surviving relationship must render Unknown, got {other:?}"), }
 }
 
@@ -162,8 +162,8 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
     primary . clone (), source_name ("main"), "last seen" . to_string (), None );
   active . focused = true;
   let child : NodeId = tree . root_mut () . append (active) . id ();
-  let mut relationship_sources : HashMap<ID, SourceName> = HashMap::new ();
-  relationship_sources . insert (raw_extra . clone (), source_name ("foreign"));
+  let mut relSources : HashMap<ID, SourceName> = HashMap::new ();
+  relSources . insert (raw_extra . clone (), source_name ("foreign"));
   let graph_snap : std::sync::Arc<InRustGraph> =
     std::sync::Arc::new (InRustGraph::new ());
   let mut deleted_extra_ids : HashMap<ID, HashSet<ID>> = HashMap::new ();
@@ -171,7 +171,7 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
     primary, [raw_extra . clone ()] . into_iter () . collect ());
 
   normalize_relationship_backed_content_unknowns (
-    &mut tree, parent, &[raw_extra . clone ()], &relationship_sources,
+    &mut tree, parent, &[raw_extra . clone ()], &relSources,
     &source_name ("main"), &graph_snap, &deleted_extra_ids ) . unwrap ();
 
   let rendered = tree . get (child) . unwrap () . value ();
@@ -181,7 +181,7 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
     ViewNodeKind::Phantom (Phantom::Unknown (unknown)) => {
       assert_eq! (unknown . id, raw_extra,
         "the retained on-disk spelling, not the deleted primary, is rendered");
-      assert_eq! (unknown . rel_source, Some (source_name ("foreign"))); },
+      assert_eq! (unknown . relSource, Some (source_name ("foreign"))); },
     other => panic! ("surviving extra-id relationship must be Unknown, got {other:?}"), }
 }
 
@@ -210,12 +210,12 @@ fn independent_same_id_child_is_prefetched () {
   let config : SkgConfig =
     SkgConfig::dummyFromSources ( HashMap::new () );
   let no_deletes : HashMap<ID, SourceName> = HashMap::new ();
-  let no_relationship_sources : HashMap<ID, SourceName> = HashMap::new ();
+  let no_relSources : HashMap<ID, SourceName> = HashMap::new ();
   let graph_snap : std::sync::Arc<InRustGraph> =
     std::sync::Arc::new ( InRustGraph::new () );
   let data : HashMap<ID, ChildData> =
     build_child_creation_data (
-      &tree, parent, &[ goal . clone () ], &no_relationship_sources,
+      &tree, parent, &[ goal . clone () ], &no_relSources,
       &config, &graph_snap,
       &no_deletes, None, false )
       . unwrap ();

@@ -131,10 +131,10 @@ fn test_source_move_updates_collateral_view_metadata (
   Ok (( )) }
 
 #[test]
-fn successful_save_consumes_relationship_source_edit_request (
+fn successful_save_consumes_relSource_edit_request (
 ) -> Result<(), Box<dyn Error>> {
   let test_name : &str =
-    "skg-test-consume-relationship-source-edit-request";
+    "skg-test-consume-relSource-edit-request";
   let temp_dir : TempDir = TempDir::new () ?;
   copy_dir_all (
     Path::new ("tests/move_source/fixtures"), temp_dir . path () ) ?;
@@ -163,7 +163,7 @@ fn successful_save_consumes_relationship_source_edit_request (
       &mut stream, &save_input, &config, &tantivy, &graph, false,
       &Err (String::new ()), &mut views_state ) . await ?;
     assert! (response . errors . is_empty (),
-      "relationship-source save should succeed: {:?}", response . errors);
+      "relSource save should succeed: {:?}", response . errors);
     Result::<_, Box<dyn Error>>::Ok (response . saved_view)
   } ) ?;
 
@@ -171,7 +171,7 @@ fn successful_save_consumes_relationship_source_edit_request (
     . find (|line| line . contains ("(id b)"))
     . unwrap_or_else (|| panic! ("rerender omitted b:\n{}", saved));
   assert! (b_line . contains ("(relSource private)"),
-    "the completed edge source remains as display state:\n{}", b_line);
+    "the completed relSource remains as display state:\n{}", b_line);
   assert! (!saved . contains ("(editRequest"),
     "a successful rerender must not echo consumed edit requests:\n{}", saved);
 

@@ -109,7 +109,7 @@ conventional numeric suffix.
 
 Refactor the =switch-to-view= arm of 'skg-handle-content-view-sexp' into a
 small helper scheduled with a zero-delay timer, following the established
-pattern in 'skg--set-relationship-source-from-info'.  Recheck that the buffer
+pattern in 'skg--set-relSource-from-info'.  Recheck that the buffer
 is live in the timer callback, then use 'pop-to-buffer' to select and display
 it.  This covers the ordinary raw-content shortcut and the one-menu-per-node
 shortcut uniformly.

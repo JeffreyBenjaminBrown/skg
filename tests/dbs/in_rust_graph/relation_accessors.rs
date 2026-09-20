@@ -4,7 +4,7 @@ use skg::dbs::in_rust_graph::relation_accessors::{
   NodeRelation,
   RelationRole,
 };
-use skg::types::misc::{ID, MSV, MemberAtSource, RelationshipMemberKey, SourceName, members_at_source};
+use skg::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SourceName, rel_partners_at_relSource};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
 fn node (
@@ -23,17 +23,17 @@ fn node (
     extra_ids . iter () . map ( |id| ID::from (*id) ) . collect ();
   node . subscribes_to =
     if subscribes . is_empty () { MSV::Unspecified }
-    else { MSV::Specified ( members_at_source (
+    else { MSV::Specified ( rel_partners_at_relSource (
       &node . source,
       subscribes . iter () . map ( |id| ID::from (*id) ) . collect ())) };
   node . hides_from_its_subscriptions =
     if hides . is_empty () { MSV::Unspecified }
-    else { MSV::Specified ( members_at_source (
+    else { MSV::Specified ( rel_partners_at_relSource (
       &node . source,
       hides . iter () . map ( |id| ID::from (*id) ) . collect ())) };
   node . overrides_view_of =
     if overrides . is_empty () { MSV::Unspecified }
-    else { MSV::Specified ( members_at_source (
+    else { MSV::Specified ( rel_partners_at_relSource (
       &node . source,
       overrides . iter () . map ( |id| ID::from (*id) ) . collect ())) };
   node }
@@ -89,27 +89,27 @@ fn stored_outbound_accessor_retains_unresolved_raw_members () {
   let mut owner : NodeComplete = node (
     "owner", &[], &[], &[], &[]);
   owner . contains = vec! [
-    MemberAtSource {
+    RelPartner {
       member : ID::from ("known-extra"),
-      source : SourceName::from ("main"), },
-    MemberAtSource {
+      relSource : SourceName::from ("main"), },
+    RelPartner {
       member : ID::from ("absent-raw"),
-      source : SourceName::from ("main"), },
+      relSource : SourceName::from ("main"), },
   ];
   let graph : InRustGraph = InRustGraph::from_nodecompletes (&[
     owner,
     node ("known", &["known-extra"], &[], &[], &[]),
   ]);
   assert_eq! (
-    graph . outbound_members_at_sources_for_relation_gated (
+    graph . outbound_rel_partners_for_relation_gated (
       &ID::from ("owner"), NodeRelation::Contains, None ),
     vec! [
-      MemberAtSource {
+      RelPartner {
         member : ID::from ("known-extra"),
-        source : SourceName::from ("main"), },
-      MemberAtSource {
+        relSource : SourceName::from ("main"), },
+      RelPartner {
         member : ID::from ("absent-raw"),
-        source : SourceName::from ("main"), },
+        relSource : SourceName::from ("main"), },
     ] );
   assert_eq! (
     graph . outbound_pids_for_relation_gated (

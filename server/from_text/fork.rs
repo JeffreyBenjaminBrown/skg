@@ -16,7 +16,7 @@ use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
 use crate::org_to_text::metadata_value_atom;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, MSV, SkgConfig, SourceName, members_of, members_at_source};
+use crate::types::misc::{ID, MSV, SkgConfig, SourceName, members_of, rel_partners_at_relSource};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::save::{ForkSpec, SaveNode};
 use crate::types::tree::forest::ViewForest;
@@ -365,17 +365,17 @@ pub fn build_fork_clone (
     pid           : ID ( uuid::Uuid::new_v4 () . to_string () ),
     extra_ids     : Vec::new (),
     body          : buffer_node . body . clone (),
-    contains      : members_at_source (
+    contains      : rel_partners_at_relSource (
       &clone_source, buffer_contains_ids . clone () ),
-    subscribes_to : MSV::Specified ( members_at_source (
+    subscribes_to : MSV::Specified ( rel_partners_at_relSource (
       &clone_source, vec! [ buffer_node . pid . clone () ] )),
-    hides_from_its_subscriptions : MSV::Specified ( members_at_source (
+    hides_from_its_subscriptions : MSV::Specified ( rel_partners_at_relSource (
       &clone_source,
       // The children the forking edit deleted.
       disk_contains . iter ()
         . filter ( |id| ! buffer_contains_ids . contains (id) )
         . cloned () . collect () )),
-    overrides_view_of : MSV::Specified ( members_at_source (
+    overrides_view_of : MSV::Specified ( rel_partners_at_relSource (
       &clone_source, vec! [ buffer_node . pid . clone () ] )),
     misc          : Vec::new (),
     source        : clone_source,

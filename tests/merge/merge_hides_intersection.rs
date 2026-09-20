@@ -14,7 +14,7 @@
 
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_pairs;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
-use skg::types::misc::{ID, MemberAtSource};
+use skg::types::misc::{ID, RelPartner};
 use skg::types::save::NodeMerge;
 
 use std::error::Error;
@@ -33,7 +33,7 @@ fn all_tests
           &graph_handle_from_config (&s . config)? . load_full (),
            &s . config ) ?;
       assert_eq! ( merges . len (), 1 );
-      let hides : &[MemberAtSource<ID>] =
+      let hides : &[RelPartner<ID>] =
         merges[0] . updated_acquirer . 0
         . hides_from_its_subscriptions . or_default ();
       assert! ( ! hides . iter () . any (|m| m . member == ID::from ("x")),

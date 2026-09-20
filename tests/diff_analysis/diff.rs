@@ -2,7 +2,7 @@ use skg::diff_analysis::diff::diff_snapshots;
 use skg::diff_analysis::types::{
   DiffReport, GraphSnapshot, NodeBucket, NodeDiffReport, RelationshipDiff,
   SnapshotPair, ValueSetDiff};
-use skg::types::misc::{ID, MSV, SourceName, members_at_source};
+use skg::types::misc::{ID, MSV, SourceName, rel_partners_at_relSource};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
 use std::collections::{BTreeSet, HashMap};
@@ -30,7 +30,7 @@ fn node (
   node . title = title . to_string ();
   node . source = source ("main");
   node . contains =
-    members_at_source (
+    rel_partners_at_relSource (
       &node . source,
       contains . iter () . map ( |x| id (x) ) . collect () );
   node
@@ -131,16 +131,16 @@ fn lost_container_reports_current_existing_containers () {
 fn backward_subscribee_reports_current_existing_related_nodes () {
   let mut old : NodeComplete =
     node ("old", "Old", &[]);
-  old . subscribes_to = MSV::Specified (members_at_source (&old . source, vec! [id ("target")]));
+  old . subscribes_to = MSV::Specified (rel_partners_at_relSource (&old . source, vec! [id ("target")]));
   let mut stay : NodeComplete =
     node ("stay", "Stay", &[]);
-  stay . subscribes_to = MSV::Specified (members_at_source (&stay . source, vec! [id ("target")]));
+  stay . subscribes_to = MSV::Specified (rel_partners_at_relSource (&stay . source, vec! [id ("target")]));
   let mut stay_after : NodeComplete =
     node ("stay", "Stay", &[]);
-  stay_after . subscribes_to = MSV::Specified (members_at_source (&stay_after . source, vec! [id ("target")]));
+  stay_after . subscribes_to = MSV::Specified (rel_partners_at_relSource (&stay_after . source, vec! [id ("target")]));
   let mut new : NodeComplete =
     node ("new", "New", &[]);
-  new . subscribes_to = MSV::Specified (members_at_source (&new . source, vec! [id ("target")]));
+  new . subscribes_to = MSV::Specified (rel_partners_at_relSource (&new . source, vec! [id ("target")]));
   let report : DiffReport =
     report_for (
       vec! [ old, stay, node ("target", "Target", &[]) ],
@@ -296,11 +296,11 @@ fn aliases_use_set_diff () {
   let mut before_node : NodeComplete =
     node ("a", "A", &[]);
   before_node . aliases =
-    MSV::Specified (members_at_source (&before_node . source, vec! ["old".to_string ()]));
+    MSV::Specified (rel_partners_at_relSource (&before_node . source, vec! ["old".to_string ()]));
   let mut after_node : NodeComplete =
     node ("a", "A", &[]);
   after_node . aliases =
-    MSV::Specified (members_at_source (&after_node . source, vec! ["new".to_string ()]));
+    MSV::Specified (rel_partners_at_relSource (&after_node . source, vec! ["new".to_string ()]));
   let report : DiffReport =
     report_for (vec! [before_node], vec! [after_node]);
   let reports : HashMap<ID, &NodeDiffReport> =

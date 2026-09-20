@@ -205,7 +205,7 @@ pub fn herald_rule_table () -> HeraldRule {
       vac ("bodyFolded"),
       leaf (Green, QualFolder::Alias . repr_in_client (), "aliases"),
       leaf (Green, "alias", "alias"), // Qual::Alias
-      // An alias's stored relationship source is a display fact.  A
+      // An alias's stored relSource is a display fact.  A
       // requested replacement lives under editRequest below, so the
       // two values can be rendered side by side without conflation.
       crule (Red, "relSource", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
@@ -473,7 +473,7 @@ fn viewstats_atoms () -> Vec<&'static str> {
       rel_heralds : _,      // -> the node-level rels atom (semantic sexp)
       overridesHere : _,    // keyed form (a viewStats sub-form)
       hidden_body : _,      // -> the node-level hiddenBody atom
-      rel_source : _,       // -> the relSource display-fact atom and herald
+      relSource : _,       // -> the relSource display-fact atom and herald
     } = v; }
   let _ = guard;
   vec! [ "cycle", "sourceHerald", "overridesHere", "relSource" ] }

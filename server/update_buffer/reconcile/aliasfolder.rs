@@ -52,9 +52,9 @@ pub fn reconcile_aliasFolder_children (
     nodecomplete_rustFirst_by_pid_and_source (
       graph, config, &parent_pid, &parent_source )
     . map_err ( |_| "reconcile_aliasFolder_children: parent NodeComplete not found" ) ?;
-  let alias_sources : HashMap<String, SourceName> =
+  let alias_relSources : HashMap<String, SourceName> =
     parent_nodecomplete . aliases . or_default () . iter ()
-    .map ( |alias| (alias . member . clone (), alias . source . clone ()) )
+    .map ( |alias| (alias . member . clone (), alias . relSource . clone ()) )
     .collect ();
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
@@ -94,12 +94,12 @@ pub fn reconcile_aliasFolder_children (
       folded      : false,
       body_folded : false,
       kind : ViewNodeKind::Qual (Qual::Alias { text : text . clone(),
-                                               rel_source : alias_sources
+                                               relSource : alias_relSources
                                                  . get (text)
-                                                 . and_then ( |source|
-                                                   if source == &parent_nodecomplete . source { None }
-                                                   else { Some (source . clone ()) } ),
-                                               rel_source_request : None,
+                                                 . and_then ( |relSource|
+                                                   if relSource == &parent_nodecomplete . source { None }
+                                                   else { Some (relSource . clone ()) } ),
+                                               relSource_request : None,
                                                membership } ), })};
   complete_relevant_children_in_viewnodetree(
     tree,

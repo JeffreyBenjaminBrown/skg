@@ -294,7 +294,7 @@ So far there are these endpoints:
     absent or titleless in its worktree) and appeared in EXACTLY one
     other (titled in the worktree, absent or titleless in HEAD).
     Titleless section creations and deletions move individual
-    relationships between recording sources; they are not node
+    relationships between relSources; they are not node
     moves, and stage as ordinary edits. An ID whose title vanished
     from, or appeared in, more
     than one source has more than one candidate (old, new) pair and
@@ -357,27 +357,27 @@ So far there are these endpoints:
     not rewrite `.skg` files. Failure leaves the old generation live. Success
     closes existing views and recomputes context rankings for search.
 
-## Edge source info
-  - Request: ((request . "edge source info") (owner . "ID")
+## relSource info
+  - Request: ((request . "relSource info") (owner . "ID")
     (member . "ID") (relation . "contains")) — relation is one of
     `contains`, `subscribes_to`, `overrides_view_of`: the three
     relations an explicit `(editRequest (relSource ...))` request can name.
-  - Response: LP response-type "edge-source-info" with
+  - Response: LP response-type "relSource-info" with
     `((default "NAME") (current "NAME"))`. `(current ...)` is absent
     when the graph records no such exact raw edge (e.g. one typed into a
     buffer and not yet saved). An unresolved member is valid: it uses
     the owner's home as its default and may still report an exact raw
-    stored edge source. On failure, `((error "..."))` — e.g. an owner
+    stored relSource. On failure, `((error "..."))` — e.g. an owner
     the graph does not know.
   - Behavior: between owned endpoints, `default` is the more-private
     home. From an owned owner to a foreign member, `default` is the
     owner's home regardless of privacy order; this deliberately
     exposes the member ID and relationship to that owned source's
     readers, while avoiding any proposed foreign write. `current` is
-    the edge's recording source.
-    `skg-set-relationship-source` uses the reply to offer only
+    the edge's relSource.
+    `skg-set-relSource` uses the reply to offer only
     sources the save can accept. Advisory: the save-time floor check
-    in `apply_sticky_sources` stays load-bearing, since buffers go
+    in `apply_sticky_relSources` stays load-bearing, since buffers go
     stale and the request is plain text.
 
 ## Strip body whitespace
@@ -714,21 +714,21 @@ under different parents):
 - `(sourceHerald ⌂:LABEL)` — the node sits at a source boundary (a
   root, or a source differing from its nearest truenode ancestor);
 - `(relSource NAME)` — herald red "~NAME", drawn immediately before
-  the ⌂ source herald; the recording source of the RELATIONSHIP this
+  the ⌂ source herald; the relSource of the RELATIONSHIP this
   headline represents (the `contains` edge to a content child, or
   the folder's relation for a PartnerFolder member), when its privacy was
   deliberately raised above the edge's default. This is an observed,
   recomputed display fact: save never consumes it as an instruction.
 - `(editRequest (relSource NAME))` — herald red "request:~NAME".
-  This is the sole explicit relationship-source request, written by
-  `skg-set-relationship-source` (C-c s r) and consumed at save, where
+  This is the sole explicit relSource request, written by
+  `skg-set-relSource` (C-c s r) and consumed at save, where
   the server enforces the floor (an offered source more
   public than the edge's default is a save error; a source at the
   default or more private is honored, which is how a stuck edge's
   privacy is lowered; a legacy or hand-authored edge whose DISK
   source already sits more public than the default may be held or
   made more private, never made still more public). Absent means the
-  edge sits at its default source. Alias and Unknown headlines likewise
+  edge sits at its default relSource. Alias and Unknown headlines likewise
   expose a flat/nested display `relSource` fact and put write intent only
   under `editRequest`; copying a fact is harmless while copying a request
   deliberately requests it at the destination.
@@ -914,7 +914,7 @@ Fields:
   Home section only, by convention.
 - `body`: An optional string, perhaps with newlines. Home only.
 - `aliases`: Optional list of strings. Each section may contribute
-  aliases; an alias's recording source is its section's source.
+  aliases; an alias's relSource is its section's source.
 - `contains`, `subscribes_to`: Ordered relations. ONE flat YAML
   sequence per relation, one entry per line:
   - `- ID` — a member recorded at this section's source. Identical
@@ -929,7 +929,7 @@ Fields:
     warning, and duplicate anchors concatenate in file order).
 - `hides_from_its_subscriptions`, `overrides_view_of`: Unordered
   relations; plain lists of IDs. The effective list is the union
-  across sections; each entry's recording source is its section's
+  across sections; each entry's relSource is its section's
   source.
 
 The FOLD of all same-pid sections (most public first) yields the

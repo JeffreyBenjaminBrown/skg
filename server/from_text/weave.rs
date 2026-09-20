@@ -3,7 +3,7 @@
 /// see (TODO/full-schema/9-2_source-set-safety.org).
 ///
 /// VOCABULARY (shared by both functions):
-/// - A disk member is VISIBLE iff its relationship source is active
+/// - A disk member is VISIBLE iff its relSource is active
 ///   and, when it resolves, its node home is active too.  An
 ///   unresolvable raw member has no home, so an active relationship
 ///   source makes it visible as an Unknown and lets the user delete it.
@@ -20,7 +20,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::source_sets::ActiveSourceSet;
-use crate::types::misc::{ID, MemberAtSource, SkgConfig, SourceName};
+use crate::types::misc::{ID, RelPartner, SkgConfig, SourceName};
 use crate::types::phantom::home_from_disk;
 
 use std::collections::{HashMap, HashSet};
@@ -44,17 +44,17 @@ pub fn member_is_visible (
     Some (src) => active . contains_source (&src),
     None       => false, }}
 
-/// Visibility of a structured relationship occurrence.  Its recording source
+/// Visibility of a structured relationship occurrence.  Its relSource
 /// gates first.  A resolved member also needs an active home; an unresolved
 /// raw member has no home and is deliberately visible whenever its relationship
 /// source is active, so the user can retain or remove the Unknown occurrence.
 pub fn relationship_member_is_visible (
   graph  : &InRustGraph,
-  member : &MemberAtSource<ID>,
+  member : &RelPartner<ID>,
   config : &SkgConfig,
   active : &ActiveSourceSet,
 ) -> bool {
-  if ! active . contains_source (&member . source) { return false; }
+  if ! active . contains_source (&member . relSource) { return false; }
   let home : Option<SourceName> = graph
     . pid_and_source (&member . member)
     . map (|(_pid, source)| source)

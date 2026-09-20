@@ -1,4 +1,4 @@
-//! The UNFOLD: a node's effective lists of members at sources ->
+//! The UNFOLD: a node's effective lists of relation partners ->
 //! per-source sections. Placements are DERIVED, never stored in
 //! memory: a source-s run is a maximal streak of source-s members, anchored to
 //! the nearest preceding STRICTLY more public member (or joining the
@@ -7,14 +7,14 @@
 //! not change, so an unchanged section serializes byte-identically
 //! (the no-cosmetic-rewrites rule).
 //!
-//! fold(unfold(x)) == x for every list of members at sources (pinned by the
+//! fold(unfold(x)) == x for every list of relation partners (pinned by the
 //! property suite in tests/unit/telescope.rs).
 
 use crate::telescope::types::{
   ListItem, SectionSlices, Telescope, TelescopeConstructionError,
 };
 use crate::types::misc::{
-  ID, MemberAtSource, SkgConfig, SourceName,
+  ID, RelPartner, SkgConfig, SourceName,
 };
 use crate::types::nodes::complete::FileProperty;
 use crate::types::nodes::fs::{NodeFS, nodefs_from_section};
@@ -30,11 +30,11 @@ pub struct UnfoldInput<'a> {
   pub title                        : Option<&'a str>,
   pub body                         : Option<&'a str>,
   pub home                         : &'a SourceName,
-  pub aliases                      : &'a [MemberAtSource<String>],
-  pub contains                     : &'a [MemberAtSource<ID>],
-  pub subscribes_to                : &'a [MemberAtSource<ID>],
-  pub hides_from_its_subscriptions : &'a [MemberAtSource<ID>],
-  pub overrides_view_of            : &'a [MemberAtSource<ID>],
+  pub aliases                      : &'a [RelPartner<String>],
+  pub contains                     : &'a [RelPartner<ID>],
+  pub subscribes_to                : &'a [RelPartner<ID>],
+  pub hides_from_its_subscriptions : &'a [RelPartner<ID>],
+  pub overrides_view_of            : &'a [RelPartner<ID>],
 }
 
 /// A complete on-disk telescope prepared by the unfold boundary.
@@ -117,12 +117,12 @@ pub fn unfold_node (
         sections . insert (
           source . clone (), SectionSlices::default () ); }};
     note ( input . home );
-    for m in input . contains          { note ( &m . source ); }
-    for m in input . subscribes_to     { note ( &m . source ); }
+    for m in input . contains          { note ( &m . relSource ); }
+    for m in input . subscribes_to     { note ( &m . relSource ); }
     for m in input . hides_from_its_subscriptions
-                                       { note ( &m . source ); }
-    for m in input . overrides_view_of { note ( &m . source ); }
-    for m in input . aliases           { note ( &m . source ); }}
+                                       { note ( &m . relSource ); }
+    for m in input . overrides_view_of { note ( &m . relSource ); }
+    for m in input . aliases           { note ( &m . relSource ); }}
   { // title/body text live in the home section
     let home : &mut SectionSlices =
       sections . get_mut ( input . home )
@@ -145,7 +145,7 @@ pub fn unfold_node (
     section . aliases = {
       let mine : Vec<String> =
         input . aliases . iter ()
-        . filter ( |m| &m . source == source )
+        . filter ( |m| &m . relSource == source )
         . map ( |m| m . member . clone () )
         . collect ();
       if mine . is_empty () { None } else { Some (mine) }}; }
@@ -179,33 +179,33 @@ pub fn unfold_node (
     complete_sections, config ) }
 
 /// One ordered relation's slice for SOURCE: maximal streaks of
-/// members at that source, each anchored to the nearest preceding strictly
+/// partners with that relSource, each anchored to the nearest preceding strictly
 /// more public member; a streak with none joins the prepend. The
 /// most public source mentioning the relation yields an anchor-free base by
 /// construction (nothing precedes its members more publicly ONLY
 /// when it is first -- middle sources can and do anchor). Returns
 /// None when the source has no members of this relation.
 fn unfold_ordered (
-  effective      : &[MemberAtSource<ID>],
+  effective      : &[RelPartner<ID>],
   source         : &SourceName,
   is_more_public : &dyn Fn (&SourceName, &SourceName) -> bool,
 ) -> Option<Vec<ListItem>> {
-  if ! effective . iter () . any ( |m| &m . source == source ) {
+  if ! effective . iter () . any ( |m| &m . relSource == source ) {
     return None; }
   let is_base : bool = { // the most public source mentioning the relation?
     let mut most_public : Option<&SourceName> = None;
     for m in effective {
       match most_public {
-        None => { most_public = Some ( &m . source ); }
+        None => { most_public = Some ( &m . relSource ); }
         Some (mp) => {
-          if is_more_public ( &m . source, mp ) {
-            most_public = Some ( &m . source ); }} }}
+          if is_more_public ( &m . relSource, mp ) {
+            most_public = Some ( &m . relSource ); }} }}
     most_public == Some (source) };
   let mut items : Vec<ListItem> = Vec::new ();
   let mut last_anchor_emitted : Option<ID> = None;
   let mut last_more_public : Option<ID> = None;
   for m in effective {
-    if &m . source == source {
+    if &m . relSource == source {
       match &last_more_public {
         None => {} // prepend: emit the member with no anchor first
         Some (a) => {
@@ -214,19 +214,19 @@ fn unfold_ordered (
             items . push ( ListItem::Anchor { anchor : a . clone () });
             last_anchor_emitted = Some ( a . clone () ); }} }
       items . push ( ListItem::Member ( m . member . clone () ));
-    } else if is_more_public ( &m . source, source ) {
+    } else if is_more_public ( &m . relSource, source ) {
       last_more_public = Some ( m . member . clone () ); }}
   Some (items) }
 
 /// One unordered relation's slice for SOURCE: just its members, in
 /// effective order. None when empty.
 fn unfold_unordered (
-  effective : &[MemberAtSource<ID>],
+  effective : &[RelPartner<ID>],
   source    : &SourceName,
 ) -> Option<Vec<ID>> {
   let mine : Vec<ID> =
     effective . iter ()
-    . filter ( |m| &m . source == source )
+    . filter ( |m| &m . relSource == source )
     . map ( |m| m . member . clone () )
     . collect ();
   if mine . is_empty () { None } else { Some (mine) }}

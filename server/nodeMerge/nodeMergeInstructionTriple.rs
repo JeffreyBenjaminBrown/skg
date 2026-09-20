@@ -4,7 +4,7 @@ use crate::from_text::local_instruction_collection::lower::nodeMerge_pairs;
 use crate::from_text::local_instruction_collection::traverse::collect_instructions_locally;
 use crate::from_text::local_instruction_collection::types::CollectedIntents;
 use crate::types::save::{NodeMerge, SaveNode, DeleteNode};
-use crate::types::misc::{MSV, MemberAtSource, SkgConfig, SourceName, ID, members_of, members_at_source};
+use crate::types::misc::{MSV, RelPartner, SkgConfig, SourceName, ID, members_of, rel_partners_at_relSource};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::list::dedup_vector;
 use crate::types::tree::forest::ViewForest;
@@ -119,27 +119,27 @@ fn three_nodeMerged_nodecompletes(
       acquiree_from_disk . extra_ids . clone() );
     updated_acquirer . extra_ids =
       dedup_vector (combined_extra_ids); }
-  // Combining lists of members at sources (5_plan.org, work item interactions;
+  // Combining lists of relation partners (5_plan.org, work item interactions;
   // "fold both, concatenate acquiree-after-acquirer, dedup,
-  // unfold"): recording sources are PRESERVED, so a merge cannot silently
+  // unfold"): relSources are PRESERVED, so a merge cannot silently
   // de-privatize an edge. On a member both sides carry, the more
   // PRIVATE source wins (the safe tie-break); every source clamps at
   // the acquirer's home, since no section may be more public than
   // its home.
-  let combine_members_at_sources =
-    |lists : &[&[MemberAtSource<ID>]]| -> Vec<MemberAtSource<ID>> {
+  let combine_rel_partners =
+    |lists : &[&[RelPartner<ID>]]| -> Vec<RelPartner<ID>> {
       let home : &SourceName = & updated_acquirer . source;
-      let mut out : Vec<MemberAtSource<ID>> = Vec::new ();
+      let mut out : Vec<RelPartner<ID>> = Vec::new ();
       for list in lists {
         for m in *list {
           let source : SourceName = config . more_private_of (
-            m . source . clone (), home . clone () );
+            m . relSource . clone (), home . clone () );
           match out . iter_mut ()
             . find ( |o| o . member == m . member ) {
             Some (existing) => {
-              existing . source = config . more_private_of (
-                existing . source . clone (), source ); }
-            None => out . push ( MemberAtSource::at_source (
+              existing . relSource = config . more_private_of (
+                existing . relSource . clone (), source ); }
+            None => out . push ( RelPartner::at_relSource (
               source, m . member . clone () )), }} }
       out };
   let new_contains : Vec<ID> = {
@@ -152,8 +152,8 @@ fn three_nodeMerged_nodecompletes(
       members_of (& acquiree_from_disk . contains) );
     dedup_vector (combined) };
   updated_acquirer . contains = {
-    let mut combined : Vec<MemberAtSource<ID>> = combine_members_at_sources (
-      & [ & members_at_source ( & updated_acquirer . source,
+    let mut combined : Vec<RelPartner<ID>> = combine_rel_partners (
+      & [ & rel_partners_at_relSource ( & updated_acquirer . source,
                             vec! [ acquiree_text_preserver . pid . clone() ] ),
           & acquirer_from_disk . contains,
           & acquiree_from_disk . contains ] );
@@ -164,25 +164,25 @@ fn three_nodeMerged_nodecompletes(
     combined };
   { // Union aliases (parallel to extra_ids): a merged node should
     // still be findable by the acquiree's old aliases.
-    let mut combined : Vec<MemberAtSource<String>> = Vec::new ();
+    let mut combined : Vec<RelPartner<String>> = Vec::new ();
     for list in [ acquirer_from_disk . aliases . or_default (),
                   acquiree_from_disk . aliases . or_default () ] {
       for m in list {
         let source : SourceName = config . more_private_of (
-          m . source . clone (),
+          m . relSource . clone (),
           updated_acquirer . source . clone () );
         match combined . iter_mut ()
           . find ( |o| o . member == m . member ) {
           Some (existing) => {
-            existing . source = config . more_private_of (
-              existing . source . clone (), source ); }
-          None => combined . push ( MemberAtSource::at_source (
+            existing . relSource = config . more_private_of (
+              existing . relSource . clone (), source ); }
+          None => combined . push ( RelPartner::at_relSource (
             source, m . member . clone () )), }} }
     updated_acquirer . aliases =
       MSV::Specified (combined); }
   { // Combine subscribes_to
     updated_acquirer . subscribes_to =
-      MSV::Specified ( combine_members_at_sources (
+      MSV::Specified ( combine_rel_partners (
         & [ acquirer_from_disk . subscribes_to . or_default (),
             acquiree_from_disk . subscribes_to . or_default () ] )); }
   { // Combine hides_from_its_subscriptions, filtering to hide
@@ -193,7 +193,7 @@ fn three_nodeMerged_nodecompletes(
     // member's hide never silences the other's view. ("Something
     // like the intersection": exactly the intersection when both
     // members could see the id through some subscribee.)
-    let mut combined : Vec<MemberAtSource<ID>> = combine_members_at_sources (
+    let mut combined : Vec<RelPartner<ID>> = combine_rel_partners (
       & [ acquirer_from_disk . hides_from_its_subscriptions
             . or_default (),
           acquiree_from_disk . hides_from_its_subscriptions
@@ -206,7 +206,7 @@ fn three_nodeMerged_nodecompletes(
       MSV::Specified (combined); }
   { // Combine overrides_view_of
     updated_acquirer . overrides_view_of =
-      MSV::Specified ( combine_members_at_sources (
+      MSV::Specified ( combine_rel_partners (
         & [ acquirer_from_disk . overrides_view_of . or_default (),
             acquiree_from_disk . overrides_view_of . or_default () ] )); }
   Ok (updated_acquirer) }

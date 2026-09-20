@@ -557,7 +557,7 @@ Extend =TelescopeViolation= with a distinct absent-target privacy warning.  In
 - if a member resolves to an extant target, keep using the target's home as
   the privacy ceiling;
 - if it does not resolve, use the extant owner's home as the ceiling; and
-- warn if the relationship's recording source is strictly more public than
+- warn if the relationship's relSource is strictly more public than
   that ceiling.
 
 Use the same primitive in full startup/rebuild reports and incremental save

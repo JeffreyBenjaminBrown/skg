@@ -205,7 +205,7 @@
    'skg-migrate-to-telescopes' was a one-user, one-time migration and had
    already served its purpose. Its code is preserved in the graveyard with
    resurrection notes; the live protocol/client/docs no longer advertise
-   it. Per-edge repair now points to 'skg-set-relationship-source'.
+   it. Per-edge repair now points to 'skg-set-relSource'.
 
 ** The load boundary has a 'Telescope' value and an audit artifact
 
@@ -464,7 +464,7 @@ discussion, flattened
    levels can preserve that section and the write loop will write it,
    because the loop has no per-level 'user_owns_source' check.
 
-   The writer should validate every output level before writing the first
+   The writer should validate every output relSource before writing the first
    file, then reject or otherwise preserve foreign sections without
    mutation. A test should mirror the existing foreign-home test with an
    owned home and a foreign non-home section.
@@ -473,7 +473,7 @@ discussion, flattened
 Suppose a user has sources U (public), R (private) and F (foreign),
 and let nodes u, r and f have their home in each respectively.
 If the user saves a buffer in which r is an ordinary content child of u,
-and the user does not explicitly set a different relationship source,
+and the user does not explicitly set a different relSource,
 am I correct that the u-contains-r relationship
 is stored in the R layer of the representation of u?
 If not, what happens?
@@ -500,8 +500,8 @@ contains member. Someone with only U therefore does not learn r's ID or
 the relationship.
 
 There are two qualifications. If that edge already exists, its disk level
-is sticky in the absence of an explicit level, so it retains that level
-rather than necessarily moving to R. An explicit relationship source can
+is sticky in the absence of an explicit relSource, so it retains that level
+rather than necessarily moving to R. An explicit relSource can
 move it, subject to the privacy floor.
 
 For u containing foreign f, current code does not implement your proposed
@@ -527,17 +527,17 @@ data it is also the section that contains title and body.
 Your proposed edge-default rule does not entirely cover the parent
 writer problem. It prevents this particular kind of newly created edge
 from producing an F section, but a sticky old edge, a hand-authored
-explicit level, an alias or other future levelled datum, or already
+explicit relSource, an alias or other future relation partner, or already
 malformed disk data can still leave a foreign non-home section. The writer
 therefore still needs to preflight every output section and refuse before
-writing anything if any output level is unowned. That independent guard
+writing anything if any output relSource is unowned. That independent guard
 makes the ownership promise true for every caller and avoids partial
 writes.
 
 *** ONGOING J to C
 "but a sticky old edge,
-a hand-authored explicit level,
-an alias or other future levelled datum
+a hand-authored explicit relSource,
+an alias or other future relation partner
 ... can still leave a foreign non-home section"
 
 Please walk me through what you mean by each of those three cases.
@@ -545,19 +545,19 @@ Please walk me through what you mean by each of those three cases.
 *** TODO (C to J)
 
 All three begin with an owned node u whose home is U and some foreign
-source F. The writer unfolds each levelled member into the section named
-by that member's level. At present it validates only u's home, so anything
-that survives with level F sends the write loop to F/u.pid.skg.
+source F. The writer unfolds each relation partner into the section named
+by that partner's relSource. At present it validates only u's home, so anything
+that survives with relSource F sends the write loop to F/u.pid.skg.
 
 1. Sticky old edge. Suppose u's on-disk telescope already says, in its F
    section, that u contains x. That file might have arrived in a pull or
    hand edit, or survived from older behavior. The buffer does not ask to
-   move the edge. 'apply_sticky_levels' therefore preserves its disk level
+   move the edge. 'apply_sticky_relSources' therefore preserves its disk relSource
    F. Unfolding puts it back in F and the writer attempts to rewrite that
    foreign file. "Old" means already on disk; it does not mean that age
    itself makes the edge dangerous.
 
-2. Hand-authored explicit level. '(relSource F)' is load-bearing buffer
+2. Hand-authored explicit relSource. '(relSource F)' is load-bearing buffer
    text. A user can type it rather than choosing a source through the
    Emacs gesture. Save-time validation checks its privacy floor but does
    not currently check ownership. When F is an acceptable privacy level,
@@ -565,26 +565,26 @@ that survives with level F sends the write loop to F/u.pid.skg.
    the server must validate the atom even if the UI normally emits it --
    and why privacy validation alone is not enough.
 
-3. Alias (or a future levelled field). Aliases have levels too, but no
+3. Alias (or a future relationship field). Aliases have relSources too, but no
    '(relSource ...)' gesture. An alias already read from u's F section is
    sticky by its text, so an otherwise unrelated save of u preserves the
    alias at F and unfolds it back into that foreign section. "Future
-   levelled datum" means any later field that can carry a section level
+   relationship field" means any later field that can carry a relSource
    could repeat this route if its own code forgets ownership checking.
 
 The first and third cases require pre-existing malformed/foreign overlay
 data; the second can be requested by buffer text today. A single preflight
 over every unfolded output section covers all three, plus future fields,
-without relying on each levelling rule to remember ownership separately.
+without relying on each relSource rule to remember ownership separately.
 
 *** DONE J to C
 I didn't understand the first paragraph:
 "All three begin with an owned node u whose home is U and some foreign
-source F. The writer unfolds each levelled member into the section named
-by that member's level. At present it validates only u's home, so anything
-that survives with level F sends the write loop to F/u.pid.skg."
+source F. The writer unfolds each relation partner into the section named
+by that partner's relSource. At present it validates only u's home, so anything
+that survives with relSource F sends the write loop to F/u.pid.skg."
 
-Please define 'unfold', 'levelled member', and 'survive'.
+Please define 'unfold', 'relation partner', and 'survive'.
 
 *** DONE (C to J)
 
@@ -597,20 +597,20 @@ Please define 'unfold', 'levelled member', and 'survive'.
   in-memory node and split its data by privacy source, producing the
   section contents to write back to U/u.pid.skg, R/u.pid.skg, and so on.
 
-A 'levelled member' is one item that carries both its value and the source
-where it belongs. In the Rust type 'PrivaciedMember<T>', 'member' is the
+A relation partner is one item that carries both its value and the source
+where it belongs. In the Rust type 'RelPartner<T>', 'member' is the
 value -- for example, child x's ID in u's contains list, or an alias string
--- and 'level' is a source name such as U, R, or F. During unfold, level R
+-- and 'relSource' is a source name such as U, R, or F. During unfold, relSource R
 means "put this item in u's R section."
 
 'Survive' was vague shorthand and I should not have used it. I meant that,
-after buffer parsing, supplementation from disk, sticky/default level
-resolution, and validation, the item still has level F when the writer
-starts. Nothing dropped it, moved it to an owned level, or rejected the
+after buffer parsing, supplementation from disk, sticky/default relSource
+resolution, and validation, the item still has relSource F when the writer
+starts. Nothing dropped it, moved it to an owned relSource, or rejected the
 save. The problematic sequence is therefore:
 
 1. u is an owned node whose home is U.
-2. One of u's members reaches the writer tagged 'level = F'.
+2. One of u's members reaches the writer tagged 'relSource = F'.
 3. Unfold places that member in the proposed F section of u.
 4. The current writer checks that U is owned, but not that F is owned, and
    attempts to write F/u.pid.skg.
@@ -618,102 +618,23 @@ save. The problematic sequence is therefore:
 The proposed all-output preflight rejects at step 4 before writing any
 section.
 
-*** ONGOING J to C : levelled member feels like bad language
-'Level' could mean way too many things.
-Is that in the repo already?
-Wouldn't 'sourced member' be better?
-If so, let's change it everywhere to that.
+*** DONE J and C: final relSource vocabulary
 
-*** ONGOING (C to J)
+Use =relSource= for the source at which a relationship or alias entry is
+stored. The Rust representation is:
 
-The exact phrase "levelled member" was not established vocabulary before
-this recap; I introduced it here. There is one pre-existing code comment
-saying "leveled members," but the repository normally says "leveled
-list," "edge level," or "relationship source." The Rust type itself is
-'PrivaciedMember<T> { level, member }'. In fact,
-[[../DONE/privacy-telescope/5_plan.org]] records an earlier deliberate
-rename from 'LeveledMember' to 'PrivaciedMember'. The glossary nevertheless
-defines "privacy level" and the 'level' field, so "leveled" is widespread
-in comments, documentation, locals, and tests even though it is not the
-type's name.
+#+begin_src rust
+RelPartner<T> {
+  member: T,
+  relSource: SourceName,
+}
+#+end_src
 
-"Sourced member" is better than "levelled member" in ordinary discussion,
-especially because the user-facing metadata is already 'relSource'. My
-only reservation is that "sourced" can sound like the source/home of the
-member node, whereas this value names the source that records the
-relationship instance. "Member at source" or "source-tagged member" is
-unambiguous in prose.
-
-A genuine everywhere-change should be explicit about whether it is only
-terminology or also Rust vocabulary. The internally consistent code rename
-would be something like:
-
-  'PrivaciedMember<T> { level, member }'
-  -> 'MemberAtSource<T> { source, member }'
-
-and would update helpers, variables, comments, the glossary, docs, and
-tests. I prefer 'MemberAtSource' to 'SourcedMember' because it states
-exactly what the pair means. It is a broad but mostly mechanical rename and
-should be its own commit; it should not be mixed with the behavioral task
-of adding alias 'relSource' metadata. I have not performed either task.
-
-*** ONGOING J to C
-I agree, MemberAtSource is better yet.
-Let's also rename
-'edge level' -> 'edge source',
-and maybe 'leveled list' -> 'list of sourced pairs'.
-I'm not sure about that second one, though.
-Can you provide here a list of links (formatted so I can follow them from Emacs)
-to places that say some variant of 'leveled list'?
-
-*** TODO (C to J)
-
-Yes. I searched case-insensitively for singular, plural, and hyphenated
-American/British spellings of "leveled list," excluding this recap. There
-are 23 occurrences in 11 files. These are Org 'file:' links with line
-searches, so 'org-open-at-point' should follow them from Emacs.
-
-**** Live Rust comments
-
-- [[file:../../server/nodeMerge/nodeMergeInstructionTriple.rs::183][server/nodeMerge/nodeMergeInstructionTriple.rs:183]] -- "Combining LEVELED lists".
-- [[file:../../server/test_utils.rs::604][server/test_utils.rs:604]] -- the historical 'leveled-lists' work-item name.
-- [[file:../../server/telescope/fold.rs::2][server/telescope/fold.rs:2]] and
-  [[file:../../server/telescope/fold.rs::27][server/telescope/fold.rs:27]] -- "effective leveled lists".
-- [[file:../../server/telescope/unfold.rs::1][server/telescope/unfold.rs:1]],
-  [[file:../../server/telescope/unfold.rs::10][server/telescope/unfold.rs:10]], and
-  [[file:../../server/telescope/unfold.rs::18][server/telescope/unfold.rs:18]] -- the unfold and round-trip descriptions.
-- [[file:../../server/to_org/complete/partner_col/goal_list.rs::134][server/to_org/complete/partner_col/goal_list.rs:134]] -- "leveled-list change".
-- [[file:../../server/to_org/complete/partner_col/inverse_scan.rs::50][server/to_org/complete/partner_col/inverse_scan.rs:50]] -- the 'leveled-lists' work item.
-- [[file:../../server/types/misc.rs::110][server/types/misc.rs:110]] and
-  [[file:../../server/types/misc.rs::138][server/types/misc.rs:138]] -- the work-item name and "members of a leveled list".
-
-**** Tests
-
-- [[file:../../tests/unit/telescope.rs::3][tests/unit/telescope.rs:3]],
-  [[file:../../tests/unit/telescope.rs::33][tests/unit/telescope.rs:33]], and
-  [[file:../../tests/unit/telescope.rs::49][tests/unit/telescope.rs:49]] -- round-trip/property-test descriptions.
-
-**** Historical privacy-telescope records
-
-- [[file:../DONE/privacy-telescope/progress.org::11][TODO/DONE/privacy-telescope/progress.org:11]] and
-  [[file:../DONE/privacy-telescope/progress.org::31][TODO/DONE/privacy-telescope/progress.org:31]].
-- [[file:../DONE/privacy-telescope/4_discussion.org::412][TODO/DONE/privacy-telescope/4_discussion.org:412]].
-- [[file:../DONE/privacy-telescope/5_plan.org::46][TODO/DONE/privacy-telescope/5_plan.org:46]],
-  [[file:../DONE/privacy-telescope/5_plan.org::136][line 136]],
-  [[file:../DONE/privacy-telescope/5_plan.org::228][line 228]],
-  [[file:../DONE/privacy-telescope/5_plan.org::316][line 316]],
-  [[file:../DONE/privacy-telescope/5_plan.org::518][line 518]], and
-  [[file:../DONE/privacy-telescope/5_plan.org::768][line 768]].
-
-After seeing the inventory, I would use "source-tagged member list" or
-"list of members at sources," not "list of sourced pairs." The latter
-loses the important fact that each pair is one relationship/alias member.
-I would update the live comments and tests, but preserve the literal
-'leveled-lists' labels in the DONE records where they name a historical
-work item and commit. A short parenthetical can give the new term there
-without rewriting the project history.
-
-*** TODO J to C : let's go with 'list of members at sources'
+Use "relation partner" for one value and "list of relation partners"
+for a collection. =RelPartner= makes clear that the whole value is not merely
+a source; its named fields also avoid the positional ambiguity of a tuple.
+Live code, docs, tests, and active plans use this vocabulary. Literal names
+in =TODO/DONE= remain historical.
 *** TODO J to C : Let's make the relSource metadata work on aliases, too.
 
 ** Product choice: REFUSE, HOIST, or COLLAPSE
@@ -780,7 +701,7 @@ unknown metadata forms, illegal internal markers, and impossible Org
 headline jumps. Tree validation then checks structural and semantic
 claims such as contradictory definitions/sources, illegal column shapes,
 tampered IDs and override markers, and invalid view requests. Later stages
-validate relationship-source floors, foreign-node edits/creation, source
+validate relSource floors, foreign-node edits/creation, source
 moves, forks, and override invariants. An error aborts plan construction;
 the write phase is not entered.
 
@@ -797,7 +718,7 @@ alternative.
 There is no credible claim that every conceivable malicious buffer has
 been proved safe, but there is a substantial tested validation boundary.
 The foreign-section case above is a known hole after that boundary: the
-buffer can be syntactically valid yet yield an output level the user does
+buffer can be syntactically valid yet yield an output relSource the user does
 not own. The proposed writer preflight closes that hole independently of
 buffer validation.
 
@@ -1002,7 +923,7 @@ enforcement.
      at 'pers-p' to node
      'f0a77ca4-2371-423b-af9c-c07d2cfae4f2', whose home is the more-private
      'pers-m'. Re-level that edge to at least 'pers-m', preferably through
-     'skg-set-relationship-source' so the normal save rules do the work.
+     'skg-set-relSource' so the normal save rules do the work.
 
    I did not edit either data file.
 

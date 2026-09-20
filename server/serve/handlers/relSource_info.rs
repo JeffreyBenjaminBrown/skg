@@ -1,11 +1,11 @@
-//! 'edge source info' (BUG-and-fix_make-edge-more-public.org): given
+//! `relSource info` (BUG-and-fix_make-edge-more-public.org): given
 //! one relationship edge -- owner id, member id, and the relation
-//! between them -- reply with the edge's DEFAULT source and its
-//! CURRENT source (when the graph records the edge). The client's
-//! 'skg-set-relationship-source' gesture uses this to offer only
+//! between them -- reply with the edge's default relSource and its
+//! current relSource (when the graph records the edge). The client's
+//! 'skg-set-relSource' gesture uses this to offer only
 //! sources the save's default floor can accept, instead of the whole
 //! ladder. The reply is advisory: the save-time floor check in
-//! 'apply_sticky_sources' stays load-bearing, since buffers go stale
+//! 'apply_sticky_relSources' stays load-bearing, since buffers go stale
 //! and the '(editRequest (relSource ...))' request is plain text anyone can type.
 
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
@@ -18,26 +18,26 @@ use crate::types::misc::{ID, SourceName};
 
 use std::net::TcpStream;
 
-pub fn handle_edge_source_info_request (
+pub fn handle_relSource_info_request (
   stream  : &mut TcpStream,
   request : &str,
   env     : &SkgEnv,
 ) {
   let response : String =
-    match edge_source_info_response_body (request, env) {
+    match relSource_info_response_body (request, env) {
       Ok  (body) => body,
       Err (msg)  => format! (
         "(error {})", quoted (&msg) ) };
   send_response_with_length_prefix ( stream, & format! (
     "((response-type {}) {})",
-    TcpToClient::EdgeSourceInfo . repr_in_client (),
+    TcpToClient::RelSourceInfo . repr_in_client (),
     response )); }
 
 /// The payload fields of a successful reply:
 /// '(default "NAME") (current "NAME")', with '(current ...)' absent
 /// when the graph records no such edge (e.g. one just typed into a
 /// buffer and not yet saved).
-fn edge_source_info_response_body (
+fn relSource_info_response_body (
   request : &str,
   env     : &SkgEnv,
 ) -> Result<String, String> {
@@ -49,7 +49,7 @@ fn edge_source_info_response_body (
   let relation : NodeRelation = relation_from_client_string (
     & value_from_request_sexp ("relation", request) ? ) ?;
   let (default, current) : (SourceName, Option<SourceName>) =
-    edge_source_info (
+    relSource_info (
       &runtime . graph, &runtime . config,
       &owner, &member, relation ) ?;
   let mut body : String = format! (
@@ -59,12 +59,12 @@ fn edge_source_info_response_body (
       " (current {})", quoted ( & source . 0 ))); }
   Ok (body) }
 
-/// One edge's (default source, current source). Between owned nodes,
+/// One edge's (default relSource, current relSource). Between owned nodes,
 /// the default is the more private endpoint home. From an owned
 /// owner to a foreign or unresolved member, it is the owner's home.
-/// The current source is None when the graph records no such exact raw
+/// The current relSource is None when the graph records no such exact raw
 /// member.  This lets an Unknown placeholder edit a stored dangling edge.
-pub fn edge_source_info (
+pub fn relSource_info (
   graph    : &crate::dbs::in_rust_graph::InRustGraph,
   config   : &crate::types::misc::SkgConfig,
   owner    : &ID,
@@ -80,16 +80,16 @@ pub fn edge_source_info (
     // An unresolved destination has no home to make this edge more
     // private, so its writable relationship defaults to the owner's home.
     . unwrap_or_else ( || owner_home . clone () );
-  let default : SourceName = config . relationship_default_source (
+  let default : SourceName = config . default_relSource (
     &owner_home, &member_home );
   let current : Option<SourceName> =
-    graph . edge_source_for_stored_member ( &owner_pid, relation, member );
+    graph . relSource_for_stored_member ( &owner_pid, relation, member );
   Ok (( default, current )) }
 
 /// The three relations an explicit '(editRequest (relSource ...))'
 /// request can name
-/// (matching 'RequestedRelationshipSources'). Hides and textlinks have no
-/// explicit-source path, so asking about them is an error.
+/// (matching 'RequestedRelSources'). Hides and textlinks have no
+/// explicit-relSource path, so asking about them is an error.
 fn relation_from_client_string (
   s : &str,
 ) -> Result<NodeRelation, String> {
@@ -98,7 +98,7 @@ fn relation_from_client_string (
     "subscribes_to"     => Ok (NodeRelation::Subscribes),
     "overrides_view_of" => Ok (NodeRelation::OverridesViewOf),
     other => Err ( format! (
-      "unsupported relation '{}': the explicit-source path covers \
+      "unsupported relation '{}': the explicit-relSource path covers \
        contains, subscribes_to and overrides_view_of", other )), }}
 
 fn quoted (
@@ -115,5 +115,5 @@ fn quoted (
   result }
 
 #[cfg(test)]
-#[path = "../../../tests/unit/edge_source_info.rs"]
+#[path = "../../../tests/unit/relSource_info.rs"]
 mod tests;

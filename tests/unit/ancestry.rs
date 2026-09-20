@@ -28,8 +28,8 @@ fn alias_qual (text : &str) -> ViewNode {
   ViewNode { focused : false, folded : false, body_folded : false,
     kind : ViewNodeKind::Qual (Qual::Alias {
       text : text . to_string (),
-      rel_source : None,
-      rel_source_request : None,
+      relSource : None,
+      relSource_request : None,
       membership : MembershipAxes::default () }) } }
 
 fn child (

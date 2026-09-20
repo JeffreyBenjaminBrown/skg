@@ -112,11 +112,11 @@ fn related_nodes_from_graph_gated (
         let target_is_active = graph . pid_and_source (partner)
           . map (|(_, source)| set . contains_source (&source))
           . unwrap_or (false);
-        let edge_source = if origin_is_first_role {
-          graph . edge_source (origin, relation, partner)
+        let relSource = if origin_is_first_role {
+          graph . relSource (origin, relation, partner)
         } else {
-          graph . edge_source (partner, relation, origin) };
-        target_is_active && edge_source
+          graph . relSource (partner, relation, origin) };
+        target_is_active && relSource
           . map (|source| set . contains_source (&source))
           . unwrap_or (false) } })
     . collect ()

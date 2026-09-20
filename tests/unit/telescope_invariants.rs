@@ -8,8 +8,8 @@ use super::{TelescopeViolation, affected_telescope_warnings,
             validate_all_telescopes};
 use crate::dbs::in_rust_graph::{InRustGraph, apply_definenodes_to_inRustGraph};
 use crate::types::misc::{
-  ID, MSV, MemberAtSource, SkgConfig, SkgfileSource, SourceName,
-  members_at_source};
+  ID, MSV, RelPartner, SkgConfig, SkgfileSource, SourceName,
+  rel_partners_at_relSource};
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
 
@@ -56,10 +56,10 @@ fn leak_shaped_member_is_caught_and_honest_shapes_are_not (
   let public_child  : NodeComplete = node_at ("open", "public");
   container . contains = vec! [
     // honest: public member in the public source
-    MemberAtSource::at_source ( SourceName::from ("public"),
+    RelPartner::at_relSource ( SourceName::from ("public"),
                           ID::new ("open") ),
     // THE LEAK: private-homed member recorded in the public source
-    MemberAtSource::at_source ( SourceName::from ("public"),
+    RelPartner::at_relSource ( SourceName::from ("public"),
                           ID::new ("secret") ) ];
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes (
@@ -81,7 +81,7 @@ fn private_membership_of_a_public_member_is_fine (
   let mut container : NodeComplete = node_at ("container", "private");
   let public_child  : NodeComplete = node_at ("open", "public");
   container . contains = vec! [
-    MemberAtSource::at_source ( SourceName::from ("private"),
+    RelPartner::at_relSource ( SourceName::from ("private"),
                           ID::new ("open") ) ];
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes (
@@ -98,7 +98,7 @@ fn leak_check_resolves_extra_ids (
   let mut private_child : NodeComplete = node_at ("secret", "private");
   private_child . extra_ids = vec! [ ID::new ("old-name") ];
   container . contains = vec! [
-    MemberAtSource::at_source ( SourceName::from ("public"),
+    RelPartner::at_relSource ( SourceName::from ("public"),
                           ID::new ("old-name") ) ];
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes (
@@ -117,10 +117,10 @@ fn unconfigured_source_and_msv_relations_are_covered (
   let target : NodeComplete = node_at ("t", "private");
   node . subscribes_to = MSV::Specified ( vec! [
     // leak via a non-contains relation
-    MemberAtSource::at_source ( SourceName::from ("public"),
+    RelPartner::at_relSource ( SourceName::from ("public"),
                           ID::new ("t") ) ] );
   node . hides_from_its_subscriptions = MSV::Specified (
-    members_at_source ( & SourceName::from ("nonexistent-source"),
+    rel_partners_at_relSource ( & SourceName::from ("nonexistent-source"),
                     vec! [ ID::new ("t") ] ));
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes ( & [ node, target ] );
@@ -132,13 +132,13 @@ fn unconfigured_source_and_msv_relations_are_covered (
     v, TelescopeViolation::LeakShapedMember {
       relation : "subscribes_to", .. } )));
   assert! ( violations . iter () . any ( |v| matches! (
-    v, TelescopeViolation::UnconfiguredSource { .. } )));
+    v, TelescopeViolation::UnconfiguredRelSource { .. } )));
 }
 
 #[test]
 fn absent_targets_use_owner_home_for_all_four_relationships () {
   let config : SkgConfig = two_source_config ();
-  let member : MemberAtSource<ID> = MemberAtSource::at_source (
+  let member : RelPartner<ID> = RelPartner::at_relSource (
     SourceName::from ("public"), ID::from ("absent"));
   let mut owner : NodeComplete = node_at ("owner", "private");
   owner . contains = vec![member . clone ()];
@@ -166,13 +166,13 @@ fn absent_targets_use_owner_home_for_all_four_relationships () {
 #[test]
 fn absent_target_at_or_below_owner_home_is_not_a_warning () {
   let config : SkgConfig = two_source_config ();
-  for (owner_home, edge_source) in [
+  for (owner_home, relSource) in [
     ("private", "private"),
     ("public", "private"),
   ] {
     let mut owner : NodeComplete = node_at ("owner", owner_home);
-    owner . contains = vec![MemberAtSource::at_source (
-      SourceName::from (edge_source), ID::from ("absent"))];
+    owner . contains = vec![RelPartner::at_relSource (
+      SourceName::from (relSource), ID::from ("absent"))];
     let graph : InRustGraph = InRustGraph::from_nodecompletes (&[owner]);
     assert! (telescope_violations_of (
       &config, &graph, &ID::from ("owner")) . is_empty ()); }
@@ -181,12 +181,12 @@ fn absent_target_at_or_below_owner_home_is_not_a_warning () {
 fn owner_with_relation (
   relation    : usize,
   owner_home  : &str,
-  edge_source : &str,
+  relSource : &str,
   target      : &str,
 ) -> NodeComplete {
   let mut owner : NodeComplete = node_at ("owner", owner_home);
-  let members : Vec<MemberAtSource<ID>> = vec![MemberAtSource::at_source (
-    SourceName::from (edge_source), ID::from (target))];
+  let members : Vec<RelPartner<ID>> = vec![RelPartner::at_relSource (
+    SourceName::from (relSource), ID::from (target))];
   match relation {
     0 => owner . contains = members,
     1 => owner . subscribes_to = MSV::Specified (members),
@@ -212,7 +212,7 @@ fn affected_owner_derivation_covers_warning_changes_exhaustively () {
   let config : SkgConfig = two_source_config ();
   for relation in 0..4 {
     for action in 0..5 {
-      for (owner_home, edge_source) in [
+      for (owner_home, relSource) in [
         ("private", "public"), ("private", "private"),
         ("public", "private"),
       ] {
@@ -222,7 +222,7 @@ fn affected_owner_derivation_covers_warning_changes_exhaustively () {
           _     => "N2",
         };
         let owner : NodeComplete = owner_with_relation (
-          relation, owner_home, edge_source, raw_target);
+          relation, owner_home, relSource, raw_target);
         let mut target : NodeComplete = node_at ("T", "public");
         target . extra_ids = vec![ID::from ("E")];
         let mut base_nodes : Vec<NodeComplete> = vec![owner, target . clone ()];

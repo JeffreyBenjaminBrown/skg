@@ -2,7 +2,7 @@ use crate::dbs::node_lookup::nodecomplete_from_graph;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
 use crate::types::git::MembershipAxes;
-use crate::types::misc::{ID, MemberAtSource, SkgConfig, SourceName};
+use crate::types::misc::{ID, RelPartner, SkgConfig, SourceName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest, FolderRelation};
 use crate::types::viewnode::{QualFolder, Qual};
@@ -58,7 +58,7 @@ pub fn build_and_integrate_aliases (
     nodecomplete_from_graph (graph, &node_id_val);
   let home : Option<SourceName> =
     node . as_ref () . map ( |node| node . source . clone () );
-  let aliases : Vec<MemberAtSource<String>> = node
+  let aliases : Vec<RelPartner<String>> = node
     . map ( |node| node . aliases . or_default () . to_vec () )
     . unwrap_or_default ();
   let aliasfolder_id : ego_tree::NodeId =
@@ -69,11 +69,11 @@ pub fn build_and_integrate_aliases (
       tree, aliasfolder_id,
       ViewNodeKind::Qual (
         Qual::Alias { text: alias . member . clone (),
-                      rel_source: home . as_ref ()
+                      relSource: home . as_ref ()
                         .and_then ( |home|
-                          if &alias . source == home { None }
-                          else { Some (alias . source . clone ()) } ),
-                      rel_source_request: None,
+                          if &alias . relSource == home { None }
+                          else { Some (alias . relSource . clone ()) } ),
+                      relSource_request: None,
                       membership: MembershipAxes::default () } ),
       false ) ?; }
   Ok (( )) }

@@ -219,12 +219,12 @@ fn qual_metadata_to_string (
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   match qual {
-    Qual::Alias { rel_source, rel_source_request, membership, .. } => {
+    Qual::Alias { relSource, relSource_request, membership, .. } => {
       parts . push ( "alias" . to_string () );
-      if let Some (source) = rel_source {
+      if let Some (source) = relSource {
         parts . push ( format! (
           "(relSource {})", metadata_value_atom (source) ) ); }
-      if let Some (source) = rel_source_request {
+      if let Some (source) = relSource_request {
         parts . push ( format! (
           "(editRequest (relSource {}))",
           metadata_value_atom (source) ) ); }
@@ -283,7 +283,7 @@ fn activeNode_metadata_to_string (
         parts . push ( format! ("(overridesHere {})",
                                  original . 0 )); }
       if let Some (ref source) =
-        activeNode . viewStats . rel_source {
+        activeNode . viewStats . relSource {
         parts . push ( format! (
           "(relSource {})", metadata_value_atom (source) )); }
       if activeNode . viewStats . sourceAtBoundary {
@@ -298,7 +298,7 @@ fn activeNode_metadata_to_string (
                "(viewStats {})", parts . join (" ") )) }}
     fn edit_request ( activeNode : & ActiveNode
                     ) -> Option < String > {
-      if let Some (source) = &activeNode . rel_source_request {
+      if let Some (source) = &activeNode . relSource_request {
         return Some ( format! (
           "(editRequest (relSource {}))",
           metadata_value_atom (source) ) ); }
@@ -463,10 +463,10 @@ fn phantomUnknown_metadata_to_string (
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   let mut unknown_parts : Vec<String> = vec! [
     format! ("(id {})", unknown_node . id . 0) ];
-  if let Some (source) = &unknown_node . rel_source {
+  if let Some (source) = &unknown_node . relSource {
     unknown_parts . push ( format! (
       "(viewStats (relSource {}))", metadata_value_atom (source)) ); }
-  if let Some (source) = &unknown_node . rel_source_request {
+  if let Some (source) = &unknown_node . relSource_request {
     unknown_parts . push ( format! (
       "(editRequest (relSource {}))", metadata_value_atom (source)) ); }
   parts . push ( format! ( "(unknown {})", unknown_parts . join (" ") ) );

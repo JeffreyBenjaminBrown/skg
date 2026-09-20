@@ -13,7 +13,7 @@
 //! 'source'), then serialize the 'NodeFS'. This way the type
 //! system enforces that 'source' never appears in YAML.
 
-use crate::types::misc::{ID, MSV, MemberAtSource, SourceName};
+use crate::types::misc::{ID, MSV, RelPartner, SourceName};
 
 use std::collections::HashSet;
 
@@ -37,18 +37,18 @@ pub struct NodeComplete {
   /// Precise title/body-text sources remain a fold/save-time fact; runtime
   /// release decisions intentionally use this coarse flag.
   pub overPrivateText_telescope: bool,
-  pub aliases: MSV<MemberAtSource<String>>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.) Each alias carries the source of the telescope section that records it.
+  pub aliases: MSV<RelPartner<String>>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.) Each alias carries its relSource.
   pub source: SourceName, // source name, inferred from file location and SkgConfig
   pub pid: ID, // Primary ID. Determines filename, graph identity, Tantivy key, and map key. Never changes.
   pub extra_ids: Vec<ID>, // Extra IDs accumulated through nodeMerges. Usually empty.
   pub body: Option<String>, // Not indexed by the structural graph. The body is all text (if any) between the preceding org headline, to which it belongs, and the next (if there is a next).
 
   // Each relationship member carries the privacy LEVEL of the edge
-  // (see 'MemberAtSource'). List order is fold order.
-  pub contains                     : Vec<MemberAtSource<ID>>, // See docs/data-model_technical.org.
-  pub subscribes_to                : MSV<MemberAtSource<ID>>, // See docs/data-model_technical.org.
-  pub hides_from_its_subscriptions : MSV<MemberAtSource<ID>>, // See docs/data-model_technical.org.
-  pub overrides_view_of            : MSV<MemberAtSource<ID>>, // See docs/data-model_technical.org.
+  // (see 'RelPartner'). List order is fold order.
+  pub contains                     : Vec<RelPartner<ID>>, // See docs/data-model_technical.org.
+  pub subscribes_to                : MSV<RelPartner<ID>>, // See docs/data-model_technical.org.
+  pub hides_from_its_subscriptions : MSV<RelPartner<ID>>, // See docs/data-model_technical.org.
+  pub overrides_view_of            : MSV<RelPartner<ID>>, // See docs/data-model_technical.org.
 
   pub misc: Vec<FileProperty>,
 }

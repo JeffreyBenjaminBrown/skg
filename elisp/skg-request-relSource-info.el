@@ -1,19 +1,19 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: `skg-set-relationship-source' -- request the recording source
+;;; PURPOSE: `skg-set-relSource' -- request the relSource
 ;;; of one relationship edge, informed by the server's
-;;; 'edge source info' endpoint
+;;; 'relSource info' endpoint
 ;;; (BUG-and-fix_make-edge-more-public.org). The buffer-local
 ;;; helpers it drives live in skg-metadata.el.
 
 (require 'skg-length-prefix)
 (require 'skg-metadata)
 
-(defun skg-set-relationship-source (&optional recursive)
-  "Set the recording source of the relationship or alias at point.
+(defun skg-set-relSource (&optional recursive)
+  "Set the relSource of the relationship or alias at point.
 
 With a prefix argument RECURSIVE, instead run
-`skg-set-relationship-source-recursive', which prompts for a
+`skg-set-relSource-recursive', which prompts for a
 relationship kind and a source and applies the source throughout the
 subtree at point.
 
@@ -26,14 +26,14 @@ like the other source dialogs -- over the sources at least as
 private as the default (more public ones could leak an endpoint's
 ID and would be rejected at save), plus a no-override choice. The
 minibuffer starts pre-filled with a pending request when one is
-offerable, else the current source or default, so RET preserves the
+offerable, else the current relSource or default, so RET preserves the
 most specific available choice.
 
 Choosing a source writes an `(editRequest (relSource SOURCE))'
 metadata request. The no-override choice removes that request, which on save means the edge
 keeps its saved source (sticky), NOT that it resets to its default.
 To lower an edge's privacy to its default (e.g. after making the
-more private endpoint's home more public), choose the default source
+more private endpoint's home more public), choose the default relSource
 itself; once saved at the default, the display fact and its red ~herald
 stop being rendered.
 
@@ -45,11 +45,11 @@ save time, so a stale or hand-typed source more public than the
 edge's default is still rejected there."
   (interactive "P")
   (if recursive
-      (skg-set-relationship-source-recursive)
-    (skg--set-relationship-source-at-point)))
+      (skg-set-relSource-recursive)
+    (skg--set-relSource-at-point)))
 
-(defun skg--set-relationship-source-at-point ()
-  "The single-edge path of `skg-set-relationship-source': classify
+(defun skg--set-relSource-at-point ()
+  "The single-edge path of `skg-set-relSource': classify
 the edge at point, ask the server for its (default, current) sources,
 and prompt from the reply."
   (let ((buffer (current-buffer))
@@ -61,33 +61,33 @@ and prompt from the reply."
                               (org-up-heading-safe))
                    (user-error "Alias has no owning node headline"))
                  (skg--current-node-source)))
-              (current (skg--relationship-source-current-value)))
-          (skg--set-relationship-source-from-info
+              (current (skg--relSource-current-value)))
+          (skg--set-relSource-from-info
            buffer marker
-           (format "((response-type edge-source-info) (default %S)%s)"
+           (format "((response-type relSource-info) (default %S)%s)"
                    default
                    (if current
                        (format " (current %S)" current)
                      ""))))
-      (let ((edge (skg--relationship-edge-at-point)))
+      (let ((edge (skg--rel-at-point)))
         (skg-register-response-handler
-         'edge-source-info
+         'relSource-info
          (lambda (_tcp-proc payload)
-           (skg--set-relationship-source-from-info buffer marker payload))
+           (skg--set-relSource-from-info buffer marker payload))
          t)
         (skg-lp-reset)
         (process-send-string
          (skg-tcp-connect-to-rust)
          (concat
           (prin1-to-string
-           `((request . "edge source info")
+           `((request . "relSource info")
              (owner . ,(plist-get edge :owner))
              (member . ,(plist-get edge :member))
              (relation . ,(plist-get edge :relation))))
           "\n"))))))
 
-(defun skg--set-relationship-source-from-info (buffer marker payload)
-  "Handle the edge-source-info response for `skg-set-relationship-source'.
+(defun skg--set-relSource-from-info (buffer marker payload)
+  "Handle the relSource-info response for `skg-set-relSource'.
 Parses PAYLOAD, then prompts and applies the choice at MARKER in
 BUFFER. The prompt runs from a zero-delay timer so the minibuffer
 opens outside the network process filter."
@@ -100,19 +100,19 @@ opens outside the network process filter."
      0 nil
      (lambda ()
        (if (not (buffer-live-p buffer))
-           (message "skg: buffer vanished before the relationship-source prompt")
+           (message "skg: buffer vanished before the relSource prompt")
          (with-current-buffer buffer
            (save-excursion
              (goto-char marker)
              (when err
-               (message "edge source info: %s -- offering every source; the save will validate."
+               (message "relSource info: %s -- offering every source; the save will validate."
                         err))
              (let* ((ladder (skg--source-names))
-                    (requested (skg--relationship-source-requested-value))
-                    (choices (append (skg--relationship-source-choices
+                    (requested (skg--relSource-requested-value))
+                    (choices (append (skg--relSource-choices
                                       ladder default)
-                                     (list skg--relationship-source-no-override)))
-                    (prompt (concat "Relationship source (S-left/right cycle"
+                                     (list skg--relSource-no-override)))
+                    (prompt (concat "relSource (S-left/right cycle"
                                     (when default
                                       (format "; default %s" default))
                                     (when current
@@ -132,7 +132,7 @@ opens outside the network process filter."
                              prompt choices nil t prefill nil nil nil
                              choices)))
                (message "%s"
-                        (skg--apply-relationship-source-choice
+                        (skg--apply-relSource-choice
                          choice))))))))))
 
-(provide 'skg-request-edge-source-info)
+(provide 'skg-request-relSource-info)

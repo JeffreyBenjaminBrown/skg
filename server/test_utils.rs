@@ -12,7 +12,7 @@ use crate::serve::ViewsState;
 use crate::serve::handlers::save_buffer::{SaveResponse, update_from_and_rerender_buffer};
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
 use crate::types::views_state::ViewUri;
-use crate::types::misc::{MSV, SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName, members_at_source, members_at_source_msv, MemberAtSource};
+use crate::types::misc::{MSV, SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName, rel_partners_at_relSource, rel_partners_at_relSource_msv, RelPartner};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::maybe_placed_viewnode::{ MpViewnode, MpViewnodeKind };
@@ -457,28 +457,28 @@ pub async fn update_from_and_rerender_buffer_with_fork_sources_test (
 
 /// Move NODE to SOURCE: set its home AND retag every relationship
 /// member and alias to that source. Under the historical
-/// 'leveled-lists' work item, the invariant was member source == home, so any
+/// relation-partner work, the invariant was relSource == home, so any
 /// test that reassigns a node's source must go through this, or the
 /// telescope write would emit sections at the old source. The real
-/// source-move rule (which member sources follow a home move) is owned by
+/// source-move rule (which member relSources follow a home move) is owned by
 /// work item save-leveling.
-pub fn set_source_retagging_member_sources (
+pub fn set_source_retagging_relSources (
   node  : &mut NodeComplete,
   source : &SourceName,
 ) {
   node . source = source . clone ();
   for m in node . contains . iter_mut () {
-    m . source = source . clone (); }
-  let retag_msv = |msv : &mut MSV<MemberAtSource<ID>>| {
+    m . relSource = source . clone (); }
+  let retag_msv = |msv : &mut MSV<RelPartner<ID>>| {
     if let MSV::Specified (v) = msv {
       for m in v . iter_mut () {
-        m . source = source . clone (); }} };
+        m . relSource = source . clone (); }} };
   retag_msv ( &mut node . subscribes_to );
   retag_msv ( &mut node . hides_from_its_subscriptions );
   retag_msv ( &mut node . overrides_view_of );
   if let MSV::Specified (v) = &mut node . aliases {
     for m in v . iter_mut () {
-      m . source = source . clone (); }} }
+      m . relSource = source . clone (); }} }
 
 /// Verify the published graph's inverse indexes after a mutation.
 pub fn audit_inrustgraph_or_panic (
@@ -730,11 +730,11 @@ pub fn nodecomplete_example () -> NodeComplete {
     extra_ids: vec![],
     body: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),
-    contains: members_at_source ( &source,
+    contains: rel_partners_at_relSource ( &source,
                     vec![ ID::new ("1"),
                           ID::new ("2"),
                           ID::new ("3")] ),
-    subscribes_to: members_at_source_msv ( &source,
+    subscribes_to: rel_partners_at_relSource_msv ( &source,
                     MSV::Specified(vec![ID::new ("11"),
                              ID::new ("12"),
                              ID::new ("13")])),

@@ -405,10 +405,10 @@ Two safeguards, shared with the recursive form below:
   more-private sources (the sticky rule never moves an edge's
   privacy without an explicit gesture), the command says so and
   offers to publicize them in the same go, by writing the same
-  =(editRequest (relSource ...))= requests 'skg-set-relationship-source' would.
+  =(editRequest (relSource ...))= requests 'skg-set-relSource' would.
   Declining leaves them and notes that =C-c s R= can publicize them
   later. Edges already carrying an explicit source request
-  already have a deliberate recording source and are never touched.
+  already have a deliberate relSource and are never touched.
 - A write-protected instance is NOT changed -- the save would
   silently ignore its source edit -- and produces a loud WARNING,
   with the full ID list written to =*Messages*=.
@@ -430,8 +430,8 @@ and edits the acquirer's metadata to request a merge.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the merge.
-*** C-c s r : skg-set-relationship-source
-Sets the recording source of the relationship instance the headline at
+*** C-c s r : skg-set-relSource
+Sets the relSource of the relationship instance the headline at
 point represents -- =contains= for a content child, the folder's
 relation for a writable PartnerFolder member, or the alias membership
 for an alias headline. An Unknown placeholder in one of those writable
@@ -441,18 +441,18 @@ never a node edit. (Formerly
 privacy in both directions, see
 =BUG-and-fix_make-edge-more-public.org=.)
 
-For a node-to-node edge, the command asks the server for its DEFAULT
-source and CURRENT source (the
-"edge source info" endpoint), then prompts -- with both
+For a node-to-node edge, the command asks the server for its default
+relSource and current relSource (the
+"relSource info" endpoint), then prompts -- with both
 tab-completion and S-left/S-right cycling, like the other source
 dialogs -- over the sources at least as private as the default (more
 public ones could leak an endpoint's ID and would be rejected at
 save), plus a no-override choice. The minibuffer starts pre-filled
-with a pending request when it is offerable, else the current source
+with a pending request when it is offerable, else the current relSource
 or default, so RET keeps the most specific available choice. If the server cannot resolve the edge
 (e.g. a node not yet saved), every source is offered and the save's
 floor check backstops. For an alias, its default is its owner's home
-and the current source is read directly from the alias metadata, so
+and the current relSource is read directly from the alias metadata, so
 no synthetic graph edge or broader endpoint is needed.
 
 For an edge from an owned owner to a foreign member, the default is
@@ -483,7 +483,7 @@ headline, which represents no edge.
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the change.
 
-Note that the name 'skg-set-relationship-source' is somewhat misleading.
+Note that the name 'skg-set-relSource' is somewhat misleading.
 Normally, by 'relationship' we mean
 'a relationship between two nodes in the graph'.
 But for this command we need to broaden the definition to
@@ -491,9 +491,9 @@ But for this command we need to broaden the definition to
 (which might be an alias) to what its parent represents (a node in the graph)'.
 
 With a prefix argument (=C-u C-c s r=) it instead runs
-'skg-set-relationship-source-recursive', described next.
-*** C-c s R : skg-set-relationship-source-recursive
-Like 'skg-set-relationship-source', but applied throughout the
+'skg-set-relSource-recursive', described next.
+*** C-c s R : skg-set-relSource-recursive
+Like 'skg-set-relSource', but applied throughout the
 subtree at point (the node at point's own edge to its view-parent
 included). Also reachable as =C-u C-c s r=.
 

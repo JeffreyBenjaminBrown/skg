@@ -114,14 +114,14 @@ cross-node validator.
 | relation/role declarations for contains, textlinks, subscribes, hides, overrides | graph-domain =NodeRelation=/role API and parsed relation fields | type-system for shape; validator for cross-node facts | all-role forward/inverse tests |
 | node/source/extra entity plays declarations | typed node fields and config source map | type-system + graph constructor | malformed-role parsing tests |
 | TypeDB binary relation endpoints | graph relation accessors and constructor | type-system/validator | raw/dangling member tests |
-| no schema representation of edge recording source | stored member provenance plus active-source gates | hard semantic invariant | inactive-edge topology tests |
+| no schema representation of edge relSource | stored member provenance plus active-source gates | hard semantic invariant | inactive-edge topology tests |
 | no schema override monogamy/cycle rule | =override_invariants= | hard save/startup error for owned edges | monogamy, chain, cycle tests |
 | no schema telescope rule | telescope validator | hard/warning according to existing invariant | telescope suite |
 | no schema inverse-index equivalence rule | pure =InRustGraph= index validator | test/debug invariant | construction/update/delete equivalence suite |
 
 Before deleting =schema.tql=, link each “required proof” to a concrete Rust
 test/module and write the technical-doc explanation.  Retain raw dangling IDs
-and recorded sources: the validator must not turn their intentional tolerance
+and relSources: the validator must not turn their intentional tolerance
 into a fatal schema imitation.
 
 * Test classification

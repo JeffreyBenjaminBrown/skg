@@ -73,7 +73,7 @@ The one mutable request is idempotent and states the desired value:
 #+end_src
 
 It is a save request on an ActiveNode, not an edit to the boolprops folder.
-Like the existing delete, merge, and relationship-source forms, it is removed
+Like the existing delete, merge, and relSource forms, it is removed
 from the rendered buffer only after a successful commit.
 
 ** Transformation rules
@@ -442,7 +442,7 @@ headline, and body edits and prove the graph and files remain untouched.
 *** Protocol
 
 Add =RequestType::BoolPropState= and =TcpToClient::BoolPropState= in
-[[file:../../server/serve/protocol.rs][server/serve/protocol.rs]], with a handler beside =edge_source_info=.
+[[file:../../server/serve/protocol.rs][server/serve/protocol.rs]], with a handler beside =relSource_info=.
 The request and successful response are:
 
 #+begin_src lisp
@@ -661,7 +661,7 @@ makes it mutually exclusive with =relSource= too; the root command refuses and
 recursive commands skip/report such an occurrence.  Supporting both at once
 would require changing =editRequest= from a sum to a collection and defining
 ordering/conflict semantics across the save pipeline.  I recommend the simple
-rule in this plan unless simultaneous property and relationship-source
+rule in this plan unless simultaneous property and relSource
 gestures are important.
 
 *** The show binding was never selected

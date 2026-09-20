@@ -48,9 +48,9 @@
     the owned node's home. An explicit 'relSource' may make it more private
     only by choosing a configured, owned source at or below that home.
   - Aliases round-trip 'relSource' metadata and use the same explicit,
-    sticky, then default source resolution as other members at sources.
-  - The code says 'MemberAtSource { source, member }', 'edge source', and
-    'list of members at sources'. The old live 'level' vocabulary is gone;
+    sticky, then default relSource resolution as other relation partners.
+  - The code says 'RelPartner { relSource, member }', 'relSource', and
+    'list of relation partners'. The old live 'level' vocabulary is gone;
     literal names of historical work items remain historical.
   - Unfolding returns a checked telescope-shaped value rather than a bare
     vector, so both directions have named boundaries and the round-trip
@@ -176,7 +176,7 @@
    The foreign-pid selection rule makes an owned telescope's retained
    sections all owned. The general writer ownership preflight nevertheless
    remains mandatory; it defends hand-authored 'relSource', configuration
-   changes, new callers, and future members at sources.
+   changes, new callers, and future relation partners.
 
 * Implementation order
 
@@ -248,34 +248,29 @@
    - the report lists the pid and all ignored sources deterministically;
    - one-pid fallback and 'home_from_disk' agree with bulk initialization.
 
-** Adopt the final source vocabulary
+** DONE Adopt the final source vocabulary
 
    Make the broad mechanical rename before new behavior multiplies the old
    names.
 
-   - 'PrivaciedMember<T> { level, member }'
-     becomes 'MemberAtSource<T> { source, member }'. Rename its constructor
-     and helpers so they read in that vocabulary; do not leave legacy type
-     aliases.
-   - Rename variables and live functions that mean the recording source,
-     including 'edge_level' to 'edge_source', 'ExplicitLevels' to
-     'ExplicitSources', and the 'edge level info' request/response/file/test
-     family to 'edge source info'. The wire strings change too; this is a
+   - Use 'RelPartner<T> { relSource, member }'. Its constructor and helpers
+     use the same vocabulary; do not leave legacy type aliases.
+   - Variables and live functions that mean the relSource use 'relSource'.
+     Explicit requests are collected in 'RequestedRelSources', and the
+     request/response/file/test family is named 'relSource info'. This is a
      repo-only protocol with no compatibility aliases.
    - In comments, tests, API documentation, and the glossary, use "list of
-     members at sources" for the collection and "member at source" for one
+     relation partners" for the collection and "relation partner" for one
      item. Reserve "privacy order" for ordering the sources.
    - Rename privacy-sensitive locals such as 'level' when they carry a
      'SourceName'. Do not rename unrelated tree depth, headline level, log
      level, or mathematical level variables.
-   - Preserve literal 'leveled-lists' labels where they name a historical
-     work item or commit under 'TODO/DONE'. A parenthetical can give the
-     current term without rewriting history.
+   - Preserve literal historical labels only under 'TODO/DONE'. A
+     parenthetical can give the current term without rewriting history.
 
    Use the occurrence list in [[./6_recap.org]] as the initial checklist,
-   then finish with repository-wide searches for 'PrivaciedMember',
-   'edge_level', 'edge level', and variants of 'leveled list'. Compile and
-   run the source/fold/edge-source tests before proceeding.
+   then finish with repository-wide searches for competing names. Compile
+   and run the source/fold/relSource tests before proceeding.
 
 ** Give unfolding a checked result type
 
@@ -291,7 +286,7 @@
      an embedded pid mismatch, and any order inversion.
    - Change 'unfold_node' to return 'Result<UnfoldedTelescope, ...>'. It must
      no longer sort unconfigured junk after every configured source; an
-     unconfigured member source is an error at the boundary.
+     unconfigured relSource is an error at the boundary.
    - Give the filesystem writer read-only/consuming accessors rather than a
      public vector. Adapt the org-roam importer and tests through that same
      boundary.
@@ -300,7 +295,7 @@
      writer's next preflight is what makes a value writable by this user.
    - State and test the round-trip law using the named boundaries:
      unfolding a valid effective node and folding the resulting telescope
-     recovers the same title, body, lists of members at sources, pid, extra
+     recovers the same title, body, lists of relation partners, pid, extra
      IDs, and misc properties, aside from explicitly irrelevant
      serialization distinctions.
 
@@ -335,7 +330,7 @@
 ** Default new owned-to-foreign relationships to the owner
 
    Update the source resolution used by both save validation and the
-   'edge source info' advisory endpoint.
+   'relSource info' advisory endpoint.
 
    - For a new edge between two owned nodes, keep the existing default: the
      more-private endpoint home.
@@ -361,27 +356,27 @@
 
 ** Make alias 'relSource' load-bearing
 
-   Aliases are also members at sources. Give them the same explicit/sticky/
+   Aliases are also relation partners. Give them the same explicit/sticky/
    default path without pretending their text is a node ID.
 
-   - Extend 'Qual::Alias' with 'rel_source: Option<SourceName>'. Render it as
+   - Extend 'Qual::Alias' with 'relSource: Option<SourceName>'. Render it as
      the same '(viewStats (relSource NAME))' metadata shape used on node
      headlines, and teach metadata parsing to attach the parsed value to an
      alias rather than discarding it.
    - Collect aliases as '(text, Option<SourceName>)' in
-     'NodeSaveIntent'. Add the explicit values to 'ExplicitSources' keyed by
-     alias text before lowering to 'MemberAtSource<String>'.
-   - Resolve an alias source in order: explicit request; existing source for
+     'NodeSaveIntent'. Add the explicit values to 'RequestedRelSources' keyed by
+     alias text before lowering to 'RelPartner<String>'.
+   - Resolve an alias relSource in order: explicit request; existing relSource for
      the same alias text; owner home. Validate that an explicit source is
      configured and not more public than the owner home. The writer's
      all-output check remains the ownership backstop.
    - Render 'relSource' when an alias is away from its default, just as an
      edge does. Suppress it at the default after a successful save.
-   - Extend 'skg-set-relationship-source' at an alias headline. The alias
+   - Extend 'skg-set-relSource' at an alias headline. The alias
      path can derive its default from the owning node's home and its current
-     value from alias metadata, so it need not lie to the edge-source
+     value from alias metadata, so it need not lie to the relSource
      endpoint with a fake member ID. Update the command's prose to say that
-     it edits a relationship or alias member source. The recursive command
+     it edits a relationship or alias relSource. The recursive command
      remains relationship-only.
    - Add equivalent parsing/rendering support in any Neovim metadata
      manipulation that can preserve or edit the atom. A client that cannot
@@ -455,7 +450,7 @@
      'NodeComplete', 'NodeRust', and stored Tantivy text to a
      'TcpToClient' response or output file.
 
-   Pure path, source-set, source-list, connection, and relationship-source
+   Pure path, source-set, source-list, connection, and relSource
    responses contain no title/body text and need no gate. Record this negative
    audit in the implementation progress document so a later reviewer can
    see why each request type was included or excluded.
@@ -514,7 +509,7 @@
    - The approved retry carries the exact approved pids. Reread and
      reclassify; newly overPrivateText or changed candidates challenge again.
    - Run the normal buffer validation, foreign-node validation,
-     member-at-source validation, full unfolded-output ownership check,
+     RelPartner validation, full unfolded-output ownership check,
      and serialization preflight before the first write. Confirmation is
      permission for publication, not permission to bypass another rule.
    - Write the selected title and selected body into home. Rewriting the
@@ -596,7 +591,7 @@
      default, alias 'relSource', and the final source vocabulary.
    - Describe every new/renamed wire request and response exactly, including
      length prefixing, retry fields, terminal save ordering, and
-     noninteractive behavior. Remove the old 'edge level info' protocol;
+     noninteractive behavior. Document only the 'relSource info' protocol;
      do not document an alias the code does not accept.
    - Update warning text and fixtures to use the commands and names that
      actually exist after the rename.
@@ -623,7 +618,7 @@
 
   - telescope constructor, fold/unfold property, multi-source load, and
     diff-snapshot tests after boundary changes;
-  - save-leveling, writer refusal/atomic-preflight, edge-source info, alias
+  - save-leveling, writer refusal/atomic-preflight, relSource info, alias
     extraction, and filesystem round-trip tests after save changes;
   - source-set, Tantivy, search, titles-by-ids, export, diff analysis, and
     raw-protocol tests after the text-release gate;
@@ -849,7 +844,7 @@
    ('contains', 'subscribes_to', and 'overrides_view_of'); define "more
    private" as any configured OWNED source at or below the owner's home;
    reject an explicit foreign source; retain an existing source only while
-   it remains configured and owned. Make the advisory 'edge source info'
+   it remains configured and owned. Make the advisory 'relSource info'
    endpoint compute the identical rule.
 
    The recap's example named 'contains' and did not explicitly settle those
@@ -863,19 +858,19 @@
 
    Supplied here:
 
-   - add 'rel_source: Option<SourceName>' to 'Qual::Alias';
+   - add 'relSource: Option<SourceName>' to 'Qual::Alias';
    - use the existing '(viewStats (relSource NAME))' wire shape;
-   - carry explicit alias sources through 'NodeSaveIntent' and
-     'ExplicitSources', keyed by alias text;
+   - carry explicit alias relSources through 'NodeSaveIntent' and
+     'RequestedRelSources', keyed by alias text;
    - resolve explicit, else sticky-by-text, else owner home;
    - validate the owner home as the privacy floor;
-   - extend the single-item 'skg-set-relationship-source' gesture to alias
+   - extend the single-item 'skg-set-relSource' gesture to alias
      headlines while leaving its recursive form relationship-only;
    - derive alias default/current information locally instead of inventing
-     a fake edge or broadening the edge-source endpoint.
+     a fake edge or broadening the relSource endpoint.
 
    None of that representation or UI was settled in the recap. Alternatives
-   include a new alias-specific command, a newly generalized "member source
+   include a new alias-specific command, a newly generalized "relSource
    info" endpoint, or renaming the existing gesture to cover both kinds.
    I chose the smallest protocol extension that round-trips the already
    chosen 'relSource' atom, though the command's relationship-specific name
@@ -884,7 +879,7 @@
 **** DONE document the terminology abuse in COMMANDS.org
 Here's a verbatim passage to append there once the feature lands:
 
-"Note that the name 'skg-set-relationship-source' is somewhat misleading.
+"Note that the name 'skg-set-relSource' is somewhat misleading.
 Normally, by 'relationship' we mean
 'a relationship between two nodes in the graph'.
 But for this command we need to broaden the definition to
@@ -893,8 +888,8 @@ But for this command we need to broaden the definition to
 
 *** Protocol renames and client parity
 
-   Settled beforehand: rename 'edge level' to 'edge source' everywhere and
-   use no legacy support for the repo-only rename.
+   Settled beforehand: use 'relSource' everywhere and provide no legacy
+   support for the repo-only rename.
 
    Supplied here: include the request string, response tag, handler/file
    names, and tests in that break; require both Emacs and Neovim to handle
@@ -916,7 +911,7 @@ But for this command we need to broaden the definition to
    body fallbacks, source-set-switch streams, saved/collateral rerenders,
    readable-ID title responses, and maintenance/batch paths that can emit or
    rewrite title/body text. Challenge before registering a view or beginning a
-   rerender stream; leave path/source/connection/relationship-source
+   rerender stream; leave path/source/connection/relSource
    responses outside because they contain no title/body text.
 
    Much of this follows necessarily from the privacy invariant, but the

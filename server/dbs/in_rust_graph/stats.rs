@@ -82,7 +82,7 @@ pub fn fetch_all_graphnodestats_with_source_set (
 /// In-Rust-graph implementation. Every field is computed from NodeRust
 /// and the inverse indexes, without I/O.
 ///
-/// Edge-source gating (render-and-gating, 5_plan.org): counts and the
+/// relSource gating (render-and-gating, 5_plan.org): counts and the
 /// container/content maps use the gated accessors
 /// ('outbound_pids_for_relation_gated' / 'inbound_pids_for_relation_gated'),
 /// not the raw NodeRust lists / inverse indexes -- a membership

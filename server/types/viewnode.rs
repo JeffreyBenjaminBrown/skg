@@ -152,9 +152,9 @@ pub struct PhantomDeleted {
 pub struct PhantomUnknown {
   pub id                 : ID,
   /// Display-only fact about this occurrence's binding relationship.
-  pub rel_source         : Option<SourceName>,
-  /// A pending relationship-source change, consumed only by save.
-  pub rel_source_request : Option<SourceName>,
+  pub relSource         : Option<SourceName>,
+  /// A pending relSource change, consumed only by save.
+  pub relSource_request : Option<SourceName>,
 }
 
 /// An anonymous "something from an inactive source is/was here"
@@ -196,8 +196,8 @@ pub struct ActiveNode_Generic < Id, Src > {
   pub graphStats    : GraphNodeStats,
   pub viewStats     : ViewNodeStats,
   /// A requested source for this occurrence's binding relationship. Unlike
-  /// `viewStats.rel_source`, this is save intent.
-  pub rel_source_request : Option<SourceName>,
+  /// `viewStats.relSource`, this is save intent.
+  pub relSource_request : Option<SourceName>,
 
   pub view_requests : HashSet < ViewRequest >,
   /// Per-stage diff state for the node's '.skg' file existence.
@@ -392,11 +392,11 @@ pub struct ViewNodeStats {
   /// HiddenOutsideOfSubscribee), which have no single
   /// 'relation_member_role' to read a source from.
   /// This is a display fact, unlike a requested replacement stored in
-  /// 'ActiveNode_Generic::rel_source_request'.  Save extraction never
+  /// 'ActiveNode_Generic::relSource_request'.  Save extraction never
   /// treats this value as an instruction.
   /// Herald: red "~NAME" immediately before the ⌂ sourceHerald
   /// (server/heralds.rs).
-  pub rel_source            : Option<SourceName>,
+  pub relSource            : Option<SourceName>,
 }
 
 #[derive( Debug, Clone, Copy, PartialEq, Eq )]
@@ -408,8 +408,8 @@ pub enum QualFolder {
 #[derive( Debug, Clone, PartialEq )]
 pub enum Qual {
   Alias { text: String, // an alias for the node's grandparent
-          rel_source: Option<SourceName>,
-          rel_source_request: Option<SourceName>,
+          relSource: Option<SourceName>,
+          relSource_request: Option<SourceName>,
           membership: MembershipAxes },
   ID { id: ID, // an ID of grandparent (the parent being an IDFolder)
        membership: MembershipAxes },
@@ -727,14 +727,14 @@ impl ViewNode {
   ) {
     match &mut self . kind {
       ViewNodeKind::Vognode (Vognode::Active (active)) => {
-        active . rel_source_request = None;
+        active . relSource_request = None;
         if let Editability::Definitive { edit_request, .. } =
           &mut active . editability
         { *edit_request = None; }},
       ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
-        unknown . rel_source_request = None,
-      ViewNodeKind::Qual (Qual::Alias { rel_source_request, .. }) =>
-        *rel_source_request = None,
+        unknown . relSource_request = None,
+      ViewNodeKind::Qual (Qual::Alias { relSource_request, .. }) =>
+        *relSource_request = None,
       _ => {}, }}
 
   pub fn normal_to_phantom (
@@ -871,7 +871,7 @@ impl Default for ViewNodeStats {
       rel_heralds       : None,
       overridesHere     : None,
       hidden_body       : false,
-      rel_source        : None,
+      relSource        : None,
     }} }
 
 //
@@ -893,7 +893,7 @@ pub fn default_activeNode (
     birth          : Birth::Unremarkable,
     graphStats     : GraphNodeStats::default(),
     viewStats      : ViewNodeStats::default(),
-    rel_source_request : None,
+    relSource_request : None,
     view_requests  : HashSet::new(),
     existence      : ExistenceAxes::default(),
     membership     : MembershipAxes::default(),
@@ -956,8 +956,8 @@ pub fn mk_unknown_viewnode (
     kind        : ViewNodeKind::Phantom (
       Phantom::Unknown ( PhantomUnknown {
         id,
-        rel_source         : None,
-        rel_source_request : None,
+        relSource         : None,
+        relSource_request : None,
       } ) ),
   }}
 

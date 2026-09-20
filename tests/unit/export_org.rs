@@ -4,7 +4,7 @@
 
 use super::*;
 use crate::source_sets::{ActiveSourceSet, SourceSetName};
-use crate::types::misc::{ID, SourceName, members_at_source};
+use crate::types::misc::{ID, SourceName, rel_partners_at_relSource};
 use crate::types::nodes::complete::empty_node_complete;
 
 use std::collections::BTreeSet;
@@ -23,7 +23,7 @@ fn node (
   n . title    = title . to_string ();
   n . body     = body . map ( |s| s . to_string () );
   n . source   = SourceName::from ("main");
-  n . contains = members_at_source (
+  n . contains = rel_partners_at_relSource (
     & n . source,
     contains . iter () . map ( |c| ID::from (*c) ) . collect () );
   n }
@@ -255,7 +255,7 @@ fn marker_child_is_excluded_from_content () {
 }
 
 //
-// Edge-source gating (visible fold)
+// relSource gating (visible fold)
 //
 
 #[test]
@@ -266,9 +266,9 @@ fn private_source_edge_is_omitted_from_restricted_export () {
   // priv's home is active.
   let mut root : NodeComplete =
     node ("r", "Root", None, &["ma"]);
-  root . contains . push ( MemberAtSource::at_source (
+  root . contains . push ( RelPartner::at_relSource (
     SourceName::from ("main"), ID::from ("pub") ));
-  root . contains . push ( MemberAtSource::at_source (
+  root . contains . push ( RelPartner::at_relSource (
     SourceName::from ("private"), ID::from ("priv") ));
   let nodes : Vec<NodeComplete> = vec! [
     root,

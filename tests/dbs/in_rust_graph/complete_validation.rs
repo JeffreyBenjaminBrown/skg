@@ -6,7 +6,7 @@ use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::override_invariants::OverrideInvariantViolation;
 use skg::telescope::invariants::TelescopeViolation;
 use skg::types::misc::{
-  ID, MSV, MemberAtSource, SkgConfig, SkgfileSource, SourceName,
+  ID, MSV, RelPartner, SkgConfig, SkgfileSource, SourceName,
 };
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::save::{DefineNode, SaveNode};
@@ -89,8 +89,8 @@ fn repeated_ids_of_one_owner_are_normalized_not_rejected () {
 fn unknown_home_is_hard_but_edge_provenance_is_a_warning () {
   let mut owner = node ("owner", "public");
   owner . contains = vec![
-    MemberAtSource::at_source (
-      SourceName::from ("unconfigured-edge-source"), ID::from ("dangling")),
+    RelPartner::at_relSource (
+      SourceName::from ("unconfigured-relSource"), ID::from ("dangling")),
   ];
   let unknown_home = node ("unknown-home", "unconfigured-home");
   let report = validate_complete_graph (&config (), &[owner, unknown_home]);
@@ -99,7 +99,7 @@ fn unknown_home_is_hard_but_edge_provenance_is_a_warning () {
       if pid == &ID::from ("unknown-home"))));
   assert! (report . warnings . iter () . any (|(pid, warning)|
     pid == &ID::from ("owner") && matches! (
-      warning, TelescopeViolation::UnconfiguredSource { member, .. }
+      warning, TelescopeViolation::UnconfiguredRelSource { member, .. }
         if member == &ID::from ("dangling"))));
   // The unresolved member itself is retained, not diagnosed as an error.
   assert! (report . graph . contained_by . contains_key (&ID::from ("dangling")));
@@ -108,7 +108,7 @@ fn unknown_home_is_hard_but_edge_provenance_is_a_warning () {
 #[test]
 fn configured_dangling_members_are_tolerated_without_warning () {
   let mut owner = node ("owner", "public");
-  owner . subscribes_to = MSV::Specified (vec![MemberAtSource::at_source (
+  owner . subscribes_to = MSV::Specified (vec![RelPartner::at_relSource (
     SourceName::from ("public"), ID::from ("absent"))]);
   let report = validate_complete_graph (&config (), &[owner]);
   assert! (report . is_valid ());
@@ -123,7 +123,7 @@ fn canonical_entry_includes_override_monogamy_and_telescope_orientation () {
   let mut b = node ("b", "public");
   for overrider in [&mut a, &mut b] {
     overrider . overrides_view_of = MSV::Specified (vec![
-      MemberAtSource::at_source (
+      RelPartner::at_relSource (
         SourceName::from ("public"), ID::from ("target")),
     ]); }
   let report = validate_complete_graph (&config (), &[target, a, b]);

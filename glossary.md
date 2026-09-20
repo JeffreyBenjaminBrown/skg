@@ -28,14 +28,14 @@ section exists for a PID, the entire owned telescope is retained and all
 same-PID foreign sections are ignored (with a deterministic warning and no
 filesystem edit). A telescope with no owned section remains wholly foreign.
 
-## privacy order and recording source
+## privacy order and relSource
 
 The position of a source in the config's privacy order (most public
 first) is its privacy level. Live code does not use "level" for the
 value carried by an edge: every relationship member carries its
-**recording source**, the source whose section records it. In code
-that is `MemberAtSource { source, member }`; a collection of them is
-a **list of members at sources**. "More private" = later in the
+**relSource**, the source whose section records it. In code
+that is `RelPartner { relSource, member }`; a collection of them is
+a **list of relation partners**. "More private" = later in the
 privacy order.
 
 ## fold (visible vs full), unfold
@@ -59,19 +59,19 @@ never go stale in memory.
 
 ## sticky rule (sticky-else-default)
 
-Where a relationship edge's recording source comes from at save time:
-an edge already on disk keeps its source (**sticky**); a new edge
+Where a relationship edge's relSource comes from at save time:
+an edge already on disk keeps its relSource (**sticky**); a new edge
 between owned nodes defaults to the more-private endpoint home. A new
 edge from an owned owner to a foreign member defaults to the owner's
 home, deliberately making the foreign ID and relationship visible at
-that owned source without proposing a foreign write. Every recording
-source is clamped to be no more public than the owner's home. Hides
+that owned source without proposing a foreign write. Every relSource is
+clamped to be no more public than the owner's home. Hides
 floor higher (at least the most public subscription explaining them). A
-`(relSource NAME)` atom (the `skg-set-relationship-source` gesture)
+`(relSource NAME)` atom (the `skg-set-relSource` gesture)
 overrides sticky with any source at least as private as the edge's
 DEFAULT — raising privacy, or moving a stuck source back to the
 default; a more-public choice is a save error. A legacy or
-hand-authored edge whose disk source already sits more public than
+hand-authored edge whose disk relSource already sits more public than
 its default may be held or made more private, never made still more
 public. See `server/from_text/supplement_from_disk.rs`.
 

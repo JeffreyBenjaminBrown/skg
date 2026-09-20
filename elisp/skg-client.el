@@ -15,7 +15,7 @@
 (require 'skg-request-herald-rules)
 (require 'skg-request-diff-analysis)
 (require 'skg-request-delete-references-to-absent-node)
-(require 'skg-request-edge-source-info)
+(require 'skg-request-relSource-info)
 (require 'skg-request-export-org)
 (require 'skg-request-git-diff-mode)
 (require 'skg-request-rebuild-ephemeral-data-stores)

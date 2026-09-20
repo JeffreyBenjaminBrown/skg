@@ -292,7 +292,7 @@ warnings.  Hard errors cover duplicate primary IDs, duplicate extra IDs,
 PID/extra collisions, unconfigured node homes, override topology, and internal
 index coherence.  Typed node fields make malformed relationship roles
 structurally impossible; every relationship member retains its recording
-source.  Unconfigured edge sources and leak-shaped orientation remain repair
+source.  Unconfigured relSources and leak-shaped orientation remain repair
 warnings, while configured dangling IDs are deliberately retained and accepted.
 
 Startup (incremental and full), manual rebuild, and defensive TypeDB rebuild
@@ -415,7 +415,7 @@ double publication must be deleted before the Phase 2 gate.
 ** DONE 2.2 Thread one snapshot through every operation
 
 Request entry points for rendering, source sets, text search, save, rebuild,
-edge-source lookup, and update-buffer now capture and retain an explicit
+relSource lookup, and update-buffer now capture and retain an explicit
 generation.  Nested rendering/reconciliation contexts carry that generation
 instead of reloading it.  Next: remove every remaining production
 =snapshot_global= consumer.  Where a TypeDB facade currently selects the Rust
@@ -431,7 +431,7 @@ new config, graph, or index.  Title lookup likewise accepts an explicit graph.
 
 The production save parser now receives the captured graph through local
 instruction collection, visibility resolution, restricted-source weaving,
-sticky relationship-source selection, fork validation, buffer marker
+sticky relSource selection, fork validation, buffer marker
 validation, dead-link warnings, and post-commit warnings.  Compatibility
 wrappers for direct tests still load the global and are explicitly
 transitional; production calls the =*_in_graph= forms.

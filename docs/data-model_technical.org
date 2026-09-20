@@ -23,18 +23,18 @@ derived text links.
 | =title= | =String= | Folded node title. |
 | =body= | =Option<String>= | Folded body text.  Leading and trailing whitespace-only lines are normalized away; a body with no remaining content is =None=. |
 | =overPrivateText_telescope= | =bool= | True when the selected title or body came from a section below the home source.  Release decisions use this conservative folded fact. |
-| =aliases= | =MSV<MemberAtSource<String>>= | Search aliases and the source at which each is recorded. |
-| =contains= | =Vec<MemberAtSource<ID>>= | Ordered content children and each edge's recording source. |
-| =subscribes_to= | =MSV<MemberAtSource<ID>>= | Nodes whose content this node follows, with edge sources. |
-| =hides_from_its_subscriptions= | =MSV<MemberAtSource<ID>>= | Nodes suppressed when reached through this node's subscriptions, with edge sources. |
-| =overrides_view_of= | =MSV<MemberAtSource<ID>>= | Nodes for which this node may substitute during recursive rendering, with edge sources. |
+| =aliases= | =MSV<RelPartner<String>>= | Search aliases and the source at which each is recorded. |
+| =contains= | =Vec<RelPartner<ID>>= | Ordered content children and each edge's relSource. |
+| =subscribes_to= | =MSV<RelPartner<ID>>= | Nodes whose content this node follows, with relSources. |
+| =hides_from_its_subscriptions= | =MSV<RelPartner<ID>>= | Nodes suppressed when reached through this node's subscriptions, with relSources. |
+| =overrides_view_of= | =MSV<RelPartner<ID>>= | Nodes for which this node may substitute during recursive rendering, with relSources. |
 | =misc= | =Vec<FileProperty>= | Import provenance: currently =Had_ID_Before_Import= and =Was_Overloaded=. |
 | =textlinks_to= | =Vec<ID>= on =NodeRust= | Outbound Org =id:= links parsed from title/body text.  Derived rather than serialized as a graph field. |
 
 =MSV<T>= means “maybe specified vector.”  =Unspecified= says a file or edit
 has no opinion about the field; =Specified([])= explicitly supplies an empty
 value.  This distinction is load-bearing while telescope sections and partial
-save instructions are reconciled.  =MemberAtSource<T>= attaches the privacy
+save instructions are reconciled.  =RelPartner<T>= attaches the privacy
 source where an alias or edge is recorded.  The order of list-valued fields is
 preserved.
 
@@ -54,8 +54,8 @@ that hand-authored or temporarily incomplete graphs remain representable.
 | =textlinks_to= | source | destination | Plain Org ID links derived from text. |
 
 Home source and extra-ID ownership are node properties, not separate runtime
-relationship entities.  Edge recording source remains part of every stored
-=MemberAtSource= and participates in source-set/privacy gating.
+relationship entities.  Edge relSource remains part of every stored
+=RelPartner= and participates in source-set/privacy gating.
 
 * Hard validation constraints
 

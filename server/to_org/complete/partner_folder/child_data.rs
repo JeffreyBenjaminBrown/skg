@@ -47,7 +47,7 @@ pub struct ChildData {
   /// node.  It is rendered as an Unknown, never as a title-less active
   /// fallback.
   pub unknown : bool,
-  pub rel_source : Option<SourceName>,
+  pub relSource : Option<SourceName>,
 }
 
 /// Build a map from child ID to ChildData for the create-child
@@ -71,7 +71,7 @@ pub fn build_child_data (
                                      -> (ExistenceAxes, MembershipAxes),
   source_diffs                   : &Option<HashMap<SourceName, SourceDiff>>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  relationship_sources           : &HashMap<ID, SourceName>,
+  relSources           : &HashMap<ID, SourceName>,
   runtime                        : &RuntimeGeneration,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
   let existing_children : HashMap<ID, (SourceName, String)> = {
@@ -107,14 +107,14 @@ pub fn build_child_data (
                                     title   : child_title,
                                     phantom : Some (axes),
                                     unknown : false,
-                                    rel_source : None } );
+                                    relSource : None } );
     } else {
       match SkgEnv::find_source_in_generation (
         runtime, child_skgid, deleted_since_head_pid_src_map) {
         None => { result . insert ( child_skgid . clone (),
           ChildData { source: SourceName::not_found (), title: String::new (),
                       phantom: None, unknown: true,
-                      rel_source: relationship_sources . get (child_skgid) . cloned () } ); },
+                      relSource: relSources . get (child_skgid) . cloned () } ); },
         Some (child_src) => {
           // `find_source` deliberately falls back through Tantivy.  During a
           // same-save rerender that index can still name a just-deleted node;
@@ -129,20 +129,20 @@ pub fn build_child_data (
                                             title   : t . clone (),
                                             phantom : None,
                                             unknown : false,
-                                            rel_source : None } );
+                                            relSource : None } );
             } else {
               result . insert ( child_skgid . clone (),
                                 ChildData { source  : skg . source . clone (),
                                             title   : skg . title . clone (),
                                             phantom : None,
                                             unknown : false,
-                                            rel_source : None } ); },
+                                            relSource : None } ); },
             Err (e) if e . downcast_ref::<io::Error> ()
               . is_some_and (|io_error| io_error . kind () == io::ErrorKind::NotFound) => {
               result . insert ( child_skgid . clone (),
                 ChildData { source: SourceName::not_found (), title: String::new (),
                             phantom: None, unknown: true,
-                            rel_source: relationship_sources . get (child_skgid) . cloned () } ); },
+                            relSource: relSources . get (child_skgid) . cloned () } ); },
             Err (e) => return Err (e),
           }
         }
@@ -217,7 +217,7 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
           let mut unknown : ViewNode = mk_unknown_viewnode (id . clone ());
           if let ViewNodeKind::Phantom (
             crate::types::viewnode::Phantom::Unknown (u)) = &mut unknown . kind
-          { u . rel_source = d . rel_source . clone (); }
+          { u . relSource = d . relSource . clone (); }
           unknown
         } else { match d . phantom {
           None => mk_writeProtected_viewnode ( id . clone (),
@@ -267,12 +267,12 @@ fn normalize_relationship_backed_partner_unknowns (
             . is_some_and (|data| data . unknown)))
         . expect ("normalization predicate found an unknown raw member")
         . clone () };
-      let rel_source : Option<SourceName> = child_data . get (&id)
-        . and_then (|data| data . rel_source . clone ());
+      let relSource : Option<SourceName> = child_data . get (&id)
+        . and_then (|data| data . relSource . clone ());
       vn . kind = ViewNodeKind::Phantom (
         crate::types::viewnode::Phantom::Unknown (
           crate::types::viewnode::PhantomUnknown {
-            id, rel_source, rel_source_request: None })); })
+            id, relSource, relSource_request: None })); })
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }
 
@@ -339,7 +339,7 @@ mod tests {
     let mut child_data : HashMap<ID, ChildData> = HashMap::new ();
     child_data . insert ( raw_extra . clone (), ChildData {
       source: SourceName::not_found (), title: String::new (), phantom: None,
-      unknown: true, rel_source: Some (source ("foreign")) } );
+      unknown: true, relSource: Some (source ("foreign")) } );
     let mut deleted_extra_ids : HashMap<ID, HashSet<ID>> = HashMap::new ();
     deleted_extra_ids . insert (
       primary, [raw_extra . clone ()] . into_iter () . collect ());
@@ -354,7 +354,7 @@ mod tests {
     match &rendered . kind {
       ViewNodeKind::Phantom (Phantom::Unknown (unknown)) => {
         assert_eq! (unknown . id, raw_extra);
-        assert_eq! (unknown . rel_source, Some (source ("foreign"))); },
+        assert_eq! (unknown . relSource, Some (source ("foreign"))); },
       other => panic! ("expected raw extra member as Unknown, got {other:?}"), }
   }
 }

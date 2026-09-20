@@ -223,7 +223,7 @@ startup-recovery behavior.  Do not add rollback machinery casually.
 - Primary IDs are unique; extra IDs resolve to at most one primary node; and a
   primary/extra namespace collision is either rejected or resolved by the
   documented primary-wins rule at every call site.
-- Dangling relationship member IDs and their recorded sources remain raw and
+- Dangling relationship member IDs and their relSources remain raw and
   round-trippable; lack of a target node does not erase them.
 
 ** Relationship semantics and privacy
@@ -234,7 +234,7 @@ startup-recovery behavior.  Do not add rollback machinery casually.
 - Inbound results derived from indexes are sorted deterministically before
   presentation or comparison.
 - Every edge retains both the member ID and the source recorded on that member.
-- Visibility requires both gates: the edge's recorded source must be active,
+- Visibility requires both gates: the edge's relSource must be active,
   and a resolved target node's home source must be active.
 - Source-set filtering happens while traversing the graph, not only while
   rendering results.  Hidden edges must not affect path length, first-fork
@@ -249,7 +249,7 @@ the constraints that TypeDB never enforced:
 - identity uniqueness and primary/extra resolution rules;
 - one configured home source per complete node;
 - well-formed typed binary relationships and known roles;
-- correct relationship-member source provenance;
+- correct relationship-member relSource provenance;
 - raw dangling members preserved without manufacturing nodes;
 - override monogamy, permitted orientation, and cycle rejection;
 - telescope constraints and source visibility rules;
@@ -735,7 +735,7 @@ Replace TypeDB lookup functions with pure operations over one captured graph:
 - container IDs of a PID;
 - related nodes for every relationship role;
 - outbound member order and deterministically sorted inbound members;
-- edge recorded source and resolved node-home source;
+- relSource and resolved node-home source;
 - source/name/count queries derivable from config/graph; and
 - contains/subscriber/hider/overrider/textlink statistics.
 
@@ -751,7 +751,7 @@ first nonlinearity/fork rules, bulk stats, and deterministic ordering.
 
 Apply active-source gates at neighbor enumeration.  An edge whose recorded
 source is inactive is absent from topology.  A resolvable member whose home is
-inactive is also absent.  A dangling member retains its recorded source and is
+inactive is also absent.  A dangling member retains its relSource and is
 included/excluded according to the established dangling-node semantics.  The
 renderer's existing gate remains in place.
 

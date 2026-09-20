@@ -7,7 +7,7 @@ use skg::source_sets::ActiveSourceSet;
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::test_utils::read_lp_message;
 use skg::types::git::SourceDiff;
-use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, SourceSetName, TantivyIndex, members_at_source_msv};
+use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, SourceSetName, TantivyIndex, rel_partners_at_relSource_msv};
 use skg::types::nodes::complete::{empty_node_complete, NodeComplete};
 
 use std::collections::{BTreeSet, HashMap};
@@ -29,7 +29,7 @@ fn titles_by_ids_handler_sends_parseable_titles (
   node . source =
     SourceName::from ("main");
   node . aliases =
-    members_at_source_msv ( & node . source, MSV::Specified (vec!["Alias One" . to_string ()]) );
+    rel_partners_at_relSource_msv ( & node . source, MSV::Specified (vec!["Alias One" . to_string ()]) );
   let mut spaced_title_node : NodeComplete =
     empty_node_complete ();
   spaced_title_node . pid =

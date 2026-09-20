@@ -138,7 +138,7 @@ pub fn three_snapshots_of_relation_list (
 /// The outbound list a NodeComplete holds for a relation, sources
 /// dropped.  (The inverse scan has a private sibling; this one serves
 /// the three-snapshot reconstruction.)
-/// NOTE: was '&'a [ID]' before the historical 'leveled-lists' change;
+/// NOTE: was '&'a [ID]' before the historical relation-partner change;
 /// a borrow can no longer be returned once the sources must be stripped, so this
 /// now returns an owned 'Vec<ID>' (its one caller already called
 /// '.to_vec()' on the result, so nothing downstream changed).

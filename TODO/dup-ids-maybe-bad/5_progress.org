@@ -28,7 +28,7 @@
    'home_from_disk' into a single 'exists()' walk with no file reads
    and no title check. The draft plan had it reading each section
    looking for a title. Better still, checking the rule found that
-   the save path ALREADY enforces it, unnamed: 'apply_sticky_levels'
+   the save path ALREADY enforces it, unnamed: 'apply_sticky_relSources'
    clamps every level -- relations, hides, aliases -- to at least the
    owner's home, and its own comment calls a more-public section "the
    'extends on the other side' junk shape".
@@ -156,7 +156,7 @@
 
 ** 'skg-migrate-to-telescopes' is gone from the live code
 
-   Its guidance role passed to 'skg-set-relationship-source', which
+   Its guidance role passed to 'skg-set-relSource', which
    repairs one edge at a time. If a wholesale re-leveling is ever
    wanted again, the code is at
    _burying/not_using/obsolete/migrate-to-telescopes/.

@@ -1,6 +1,6 @@
 //! Property suite for the telescope fold/unfold pair. The
 //! load-bearing laws (5_plan.org, section-format-and-fold):
-//! - fold(unfold(x)) == x for every list of members at sources ("round-trip");
+//! - fold(unfold(x)) == x for every list of relation partners ("round-trip");
 //! - unfold(fold(sections)) is idempotent from the first application
 //!   (unfold output is canonical);
 //! - every member's source survives both directions;
@@ -12,7 +12,7 @@ use super::fold::{FoldedNode, fold_sections, nodecomplete_from_fold};
 use super::types::{FoldWarning, ListItem, SectionSlices};
 use super::unfold::{UnfoldInput, unfold_node};
 use crate::types::misc::{
-  ID, MemberAtSource, SkgConfig, SkgfileSource, SourceName,
+  ID, RelPartner, SkgConfig, SkgfileSource, SourceName,
 };
 
 use proptest::prelude::*;
@@ -54,29 +54,29 @@ fn identity_resolve (
 ) -> ID {
   id . clone () }
 
-/// An arbitrary list of members at sources with UNIQUE members: up to N
+/// An arbitrary list of relation partners with UNIQUE members: up to N
 /// members, each at a random source in the universe. Uniqueness matters
 /// because the fold dedups (with warnings), which round-trip inputs
 /// must not trigger.
-fn arb_members_at_sources (
+fn arb_rel_partners (
   max_len : usize,
-) -> impl Strategy<Value = Vec<MemberAtSource<ID>>> {
+) -> impl Strategy<Value = Vec<RelPartner<ID>>> {
   proptest::collection::vec ( 0usize..4, 0..max_len )
     . prop_map ( |sources| {
       let universe : Vec<SourceName> = source_universe ();
       sources . into_iter () . enumerate ()
-        . map ( |(i, l)| MemberAtSource::at_source (
+        . map ( |(i, l)| RelPartner::at_relSource (
           universe [l] . clone (),
           ID ( format! ("id{}", i) )))
         . collect () } ) }
 
-/// Wrap ordered lists of members at sources (and nothing else) into an
+/// Wrap ordered lists of relation partners (and nothing else) into an
 /// UnfoldInput-shaped FoldedNode for the round-trip tests.
 fn folded_from_lists (
   home     : &SourceName,
-  contains : Vec<MemberAtSource<ID>>,
-  subs     : Vec<MemberAtSource<ID>>,
-  hides    : Vec<MemberAtSource<ID>>,
+  contains : Vec<RelPartner<ID>>,
+  subs     : Vec<RelPartner<ID>>,
+  hides    : Vec<RelPartner<ID>>,
 ) -> FoldedNode {
   FoldedNode {
     title                        : Some ("t" . to_string ()),
@@ -124,20 +124,20 @@ proptest! {
 
   #[test]
   fn round_trip_ordered_and_unordered (
-    contains in arb_members_at_sources (12),
-    subs_raw in arb_members_at_sources (6),
-    hides_raw in arb_members_at_sources (6),
+    contains in arb_rel_partners (12),
+    subs_raw in arb_rel_partners (6),
+    hides_raw in arb_rel_partners (6),
   ) {
     // distinct id spaces so the three lists cannot collide
-    let subs : Vec<MemberAtSource<ID>> =
+    let subs : Vec<RelPartner<ID>> =
       subs_raw . into_iter ()
-      . map ( |m| MemberAtSource::at_source (
-        m . source, ID ( format! ("s-{}", m . member . 0 ))))
+      . map ( |m| RelPartner::at_relSource (
+        m . relSource, ID ( format! ("s-{}", m . member . 0 ))))
       . collect ();
-    let hides : Vec<MemberAtSource<ID>> =
+    let hides : Vec<RelPartner<ID>> =
       hides_raw . into_iter ()
-      . map ( |m| MemberAtSource::at_source (
-        m . source, ID ( format! ("h-{}", m . member . 0 ))))
+      . map ( |m| RelPartner::at_relSource (
+        m . relSource, ID ( format! ("h-{}", m . member . 0 ))))
       . collect ();
     let home : SourceName = SourceName::from ("S0");
     let folded : FoldedNode =
@@ -153,9 +153,9 @@ proptest! {
       // which unordered relations deliberately lack, so the fold's
       // output order is CANONICAL (source-major). The law is
       // set-equality with sources intact.
-      let sort = |v : Option<&Vec<MemberAtSource<ID>>>|
-      -> Vec<MemberAtSource<ID>> {
-        let mut v : Vec<MemberAtSource<ID>> =
+      let sort = |v : Option<&Vec<RelPartner<ID>>>|
+      -> Vec<RelPartner<ID>> {
+        let mut v : Vec<RelPartner<ID>> =
           v . cloned () . unwrap_or_default ();
         v . sort_by ( |a, b| a . member . cmp ( &b . member ));
         v };
@@ -170,7 +170,7 @@ proptest! {
 
   #[test]
   fn unfold_is_canonical (
-    contains in arb_members_at_sources (12),
+    contains in arb_rel_partners (12),
   ) {
     // unfold . fold . unfold == unfold  (sections are a normal form)
     let home : SourceName = SourceName::from ("S0");
@@ -202,18 +202,18 @@ proptest! {
 
   #[test]
   fn no_member_ever_changes_source ( // the silent-leak guard
-    contains in arb_members_at_sources (12),
+    contains in arb_rel_partners (12),
   ) {
     let home : SourceName = SourceName::from ("S0");
     let folded : FoldedNode = folded_from_lists (
       &home, contains . clone (), Vec::new (), Vec::new ());
     let (refolded, _) = unfold_then_fold (&folded);
     for m in &contains {
-      let found : Option<&MemberAtSource<ID>> =
+      let found : Option<&RelPartner<ID>> =
         refolded . contains . iter ()
         . find ( |n| n . member == m . member );
       prop_assert_eq! (
-        found . map ( |n| &n . source ), Some ( &m . source ),
+        found . map ( |n| &n . relSource ), Some ( &m . relSource ),
         "member {:?} changed source", m . member );
     }
   }

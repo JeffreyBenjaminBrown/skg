@@ -75,7 +75,7 @@ fn build_initial_render_child_data (
     resolved . insert (
       primary_pid,
       ChildData { source, title, phantom : None, unknown,
-                  rel_source : None } ); }
+                  relSource : None } ); }
   Ok ((goal, resolved)) }
 
 /// Check if a node's type and parent type are consistent with being a Subscribee.
@@ -171,7 +171,7 @@ pub fn maybe_add_subscribeeFolder_branch (
 
   let hidden_outside_content : HashSet < ID > = {
     // hidden IDs that are outside all subscribee content. Read
-    // edge-source-GATED from the captured graph: hides and memberships
+    // relSource-GATED from the captured graph: hides and memberships
     // recorded outside the active prefix must not shape this derived folder.
     let r_hides : HashSet < ID > =
           graph . outbound_pids_for_relation_gated (
@@ -384,7 +384,7 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
   let ( _visible, hidden_in_content )
     : ( HashSet < ID >, HashSet < ID > )
     = {
-      // Edge-source-GATED from the captured graph: hides and memberships
+      // relSource-GATED from the captured graph: hides and memberships
       // outside the active prefix must not shape this derived folder.
       {
         let subscriber_hides : HashSet<ID> =

@@ -42,11 +42,11 @@ struct ChildData {
   source : SourceName,
   body   : Option<String>,
   kind   : ContentReality,
-  /// The exact stored source of an unresolved relationship member.
+  /// The exact stored relSource of an unresolved relationship member.
   /// Known children derive their display facts from their graph node;
   /// an Unknown has no home, so only this retained edge fact can draw
   /// its optional relSource herald.
-  relationship_source : Option<SourceName>,
+  relSource : Option<SourceName>,
   /// Some(R) = override substitution applies: draw R, marked
   /// '(overridesHere goal-id)', in place of the goal member. The
   /// title/source/body above are then R's. Only ContentReality::Real
@@ -211,23 +211,23 @@ fn reconcile_content_children (
   // 'pid_and_source_from_id'; this makes the rerender consistent.)
   let content_members = nodecomplete . contains . iter ()
     . filter ( |m| match active_source_set {
-      // Edge-source gating (render-and-gating, 5_plan.org): a
+      // relSource gating (render-and-gating, 5_plan.org): a
       // membership whose SOURCE is inactive is invisible here even
       // when the member node itself is active -- the private
       // reading-list case. Node-source omission still happens
       // below, in omit_inactive_members.
       None => true,
       Some (a) => a . is_all ()
-        || a . contains_source ( &m . source ) } )
+        || a . contains_source ( &m . relSource ) } )
     . collect::<Vec<_>> ();
   let content_ids : Vec<ID> = content_members . iter ()
     . map ( |m| graph_snap . pid_of ( &m . member )
                  . unwrap_or_else ( || m . member . clone () ))
     . collect ();
-  let relationship_sources : HashMap<ID, SourceName> = content_members . iter ()
+  let relSources : HashMap<ID, SourceName> = content_members . iter ()
     .map ( |m| ( graph_snap . pid_of ( &m . member )
                   . unwrap_or_else ( || m . member . clone () ),
-                  m . source . clone () ))
+                  m . relSource . clone () ))
     . collect ();
   let is_sub : bool = is_subscribee (tree, node) ?;
   // TODO/DONE/local-view-update/plan_v2.org §6.1: a definitive subscribee-as-such regenerates its content as
@@ -269,7 +269,7 @@ fn reconcile_content_children (
     substitution_enabled
     && ! is_overridden_drawn_raw (tree, node, config, graph_snap) ?;
   complete_content_children(
-    tree, node, &apparent_content_ids, &relationship_sources,
+    tree, node, &apparent_content_ids, &relSources,
     &nodecomplete . source, config, graph_snap,
     deleted_since_head_pid_src_map, deleted_by_this_save_extra_ids,
     active_source_set,
@@ -439,7 +439,7 @@ fn content_goal_list (
       ids . into_iter ()
         . map ( |id| graph_snap . pid_of (&id) . unwrap_or (id) )
         . collect () };
-    // Edge-source gating (render-and-gating, 5_plan.org): a member
+    // relSource gating (render-and-gating, 5_plan.org): a member
     // the grandparent-subscriber HIDES or CONTAINS only in a source
     // outside the active set must not subtract the subscribee's
     // content here -- else a privately-contained/-hidden member
@@ -454,13 +454,13 @@ fn content_goal_list (
       resolve_pids (
         grandparent_nodecomplete . hides_from_its_subscriptions
         . or_default () . iter ()
-        . filter ( |m| source_active (& m . source) )
+        . filter ( |m| source_active (& m . relSource) )
         . map ( |m| m . member . clone () )
         . collect () );
     let subscriber_contains : Vec<ID> =
       resolve_pids (
         grandparent_nodecomplete . contains . iter ()
-        . filter ( |m| source_active (& m . source) )
+        . filter ( |m| source_active (& m . relSource) )
         . map ( |m| m . member . clone () )
         . collect () );
     Ok ( setlike_vector_subtraction (
@@ -477,7 +477,7 @@ fn complete_content_children (
   tree               : &mut Tree<ViewNode>,
   node               : NodeId,
   goal_list          : &[ID],
-  relationship_sources : &HashMap<ID, SourceName>,
+  relSources : &HashMap<ID, SourceName>,
   owner_home         : &SourceName,
   config             : &SkgConfig,
   graph_snap         : &Arc<InRustGraph>,
@@ -488,11 +488,11 @@ fn complete_content_children (
 ) -> Result<(), Box<dyn Error>> {
   let child_data : HashMap<ID, ChildData> =
     build_child_creation_data(
-      tree, node, goal_list, relationship_sources, config, graph_snap,
+      tree, node, goal_list, relSources, config, graph_snap,
       deleted_since_head_pid_src_map, active_source_set,
       substitution_enabled ) ?;
   normalize_relationship_backed_content_unknowns (
-    tree, node, goal_list, relationship_sources, owner_home, graph_snap,
+    tree, node, goal_list, relSources, owner_home, graph_snap,
     deleted_by_this_save_extra_ids ) ?;
   // The RepairSummary is dropped: content is not a generated
   // folder, so its reconciliation is not a "repair" to warn about.
@@ -560,7 +560,7 @@ fn complete_content_children (
           let mut unknown : ViewNode = mk_unknown_viewnode ( id . clone() );
           if let ViewNodeKind::Phantom (Phantom::Unknown (u)) =
             &mut unknown . kind
-          { u . rel_source = d . relationship_source . clone ()
+          { u . relSource = d . relSource . clone ()
               . filter ( |source| source != owner_home ); }
           unknown } } ) },
   ) . map ( |_summary| () ) ?;
@@ -577,7 +577,7 @@ fn normalize_relationship_backed_content_unknowns (
   tree                 : &mut Tree<ViewNode>,
   node                 : NodeId,
   goal_list            : &[ID],
-  relationship_sources : &HashMap<ID, SourceName>,
+  relSources : &HashMap<ID, SourceName>,
   owner_home           : &SourceName,
   graph_snap           : &Arc<InRustGraph>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
@@ -606,9 +606,9 @@ fn normalize_relationship_backed_content_unknowns (
         . expect ("normalization predicate found a raw member") . clone ();
       vn . kind = ViewNodeKind::Phantom (Phantom::Unknown (
         crate::types::viewnode::PhantomUnknown {
-          rel_source: relationship_sources . get (&id) . cloned ()
+          relSource: relSources . get (&id) . cloned ()
             . filter (|source| source != owner_home),
-          rel_source_request: None,
+          relSource_request: None,
           id })); })
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }
@@ -698,7 +698,7 @@ fn build_child_creation_data (
   tree               : &Tree<ViewNode>,
   node               : NodeId,
   goal_list          : &[ID],
-  relationship_sources : &HashMap<ID, SourceName>,
+  relSources : &HashMap<ID, SourceName>,
   config             : &SkgConfig,
   graph_snap         : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
@@ -756,8 +756,8 @@ fn build_child_creation_data (
                         source : SourceName::not_found (),
                         body   : None,
                         kind   : ContentReality::Unknown,
-                        relationship_source:
-                          relationship_sources . get (id) . cloned (),
+                        relSource:
+                          relSources . get (id) . cloned (),
                         drawn_id : None } );
           continue; } };
     if active_source_set
@@ -771,7 +771,7 @@ fn build_child_creation_data (
                                  source: child_source,
                                  body: None,
                                  kind: ContentReality::Inactive,
-                                 relationship_source: None,
+                                 relSource: None,
                                  drawn_id : None } );
       continue; }
     let drawn_id : Option<ID> =
@@ -805,7 +805,7 @@ fn build_child_creation_data (
                                source: skg . source . clone(),
                                body: skg . body . clone(),
                                kind: ContentReality::Real,
-                               relationship_source: None,
+                               relSource: None,
                                drawn_id } ); }
   Ok (result) }
 
