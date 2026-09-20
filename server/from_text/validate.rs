@@ -4,7 +4,7 @@ use crate::dbs::node_lookup::opt_nodecomplete_by_id;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{
-  ID, MSV, MemberAtSource, SkgConfig, SourceName, members_of};
+  ID, MSV, RelPartner, SkgConfig, SourceName, members_of};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, ForkSpec, NodeMerge, SourceMove};
 use crate::types::nodes::complete::NodeComplete;
 
@@ -221,22 +221,22 @@ fn finalize_foreign_policy_instructions(
 /// home), and the checked writer correctly rejects it.
 ///
 /// Preserve members explicitly recorded at any OTHER source. Only facts whose
-/// source equals the inherited home are part of this implicit adoption.
+/// relSource equals the inherited home are part of this implicit adoption.
 fn rehome_inherited_new_node (
   node       : &mut NodeComplete,
   new_source : &SourceName,
 ) {
   fn retag<T> (
-    members    : &mut [MemberAtSource<T>],
+    members    : &mut [RelPartner<T>],
     old_source : &SourceName,
     new_source : &SourceName,
   ) {
     for member in members {
-      if member . source == *old_source {
-        member . source = new_source . clone (); }} }
+      if member . relSource == *old_source {
+        member . relSource = new_source . clone (); }} }
 
   fn retag_msv<T> (
-    members    : &mut MSV<MemberAtSource<T>>,
+    members    : &mut MSV<RelPartner<T>>,
     old_source : &SourceName,
     new_source : &SourceName,
   ) {

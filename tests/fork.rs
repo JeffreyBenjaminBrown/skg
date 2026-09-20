@@ -556,7 +556,7 @@ async fn fork_new_parent_adopts_relationship_sources (
     "the new parent must adopt the clone's source");
   assert_eq! (members_of (&new_parent . contains), vec![ID::from ("N1")]);
   assert! (new_parent . contains . iter ()
-           . all (|member| member . source == clone_source),
+           . all (|member| member . relSource == clone_source),
     "the new parent's inherited relationships must adopt the clone source: {:?}",
     new_parent . contains);
   Ok (( )) }
