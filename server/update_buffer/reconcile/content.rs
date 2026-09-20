@@ -75,7 +75,6 @@ pub fn expand_true_content_at_activeNode (
   config             : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  deleted_by_this_save_pids      : &HashSet<ID>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
   active_source_set              : Option<&ActiveSourceSet>,
   settled                        : bool,
@@ -111,10 +110,6 @@ pub fn expand_true_content_at_activeNode (
     if is_writeProtected {
       clobberWriteProtectedViewnode( tree, node, graph_snap, config ) ?;
       return Ok (( )); }}
-  if deleted_by_this_save_pids . contains (&pid) {
-    mutate_activeNode_to_deletednode (
-      tree, node, &pid, &initial_source ) ?;
-    return Ok (( )); }
   // TODO/DONE/local-view-update/plan_v2.org §5.5: this vognode is definitive and about to expand -- draw its whole
   // content group, and (via the BFS) its folders. Each expansion costs ONE budget
   // unit; a write-protected node (returned above) costs nothing, and a folder fills
@@ -303,7 +298,7 @@ fn convert_nonmember_unknown_children_to_dead (
     |vn : &mut ViewNode| { vn . kind = ViewNodeKind::DeadScaffold; },
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
-fn mutate_activeNode_to_deletednode (
+pub(in crate::update_buffer) fn mutate_activeNode_to_deletednode (
   tree   : &mut Tree<ViewNode>,
   node   : NodeId,
   pid    : &ID,

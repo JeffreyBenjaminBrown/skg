@@ -17,14 +17,16 @@ use crate::update_buffer::ancestry::{ folder_is_generalized_orphan, deaden_gener
 use crate::update_buffer::util::detach_scaffold_transferring_focus;
 use crate::update_buffer::warnings::CompletionWarning;
 use crate::to_org::render::diff::process_activeNode_diff;
-use crate::types::tree::viewnode_nodecomplete::write_at_activeNode_in_tree;
+use crate::types::tree::viewnode_nodecomplete::{
+  pid_and_source_from_treenode, write_at_activeNode_in_tree};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerFolder, ViewRequest, Editability};
 use crate::types::viewnode::{Vognode, Phantom, QualFolder};
 use super::reconcile::hiddeninsubscribee_folder::reconcile_hiddenInSubscribeeFolder_children;
 use super::reconcile::hiddenoutsideof_subscribeefolder::reconcile_hiddenoutsideSubscribeeFolder_children;
 use super::reconcile::partner_folder::reconcile_partnerFolder_children;
 use super::reconcile::subscribee_folder::reconcile_subscribeeFolder_children;
-use super::reconcile::content::expand_true_content_at_activeNode;
+use super::reconcile::content::{
+  expand_true_content_at_activeNode, mutate_activeNode_to_deletednode};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -218,6 +220,18 @@ fn visit_normal_node (
   treeid  : NodeId,
   context : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
+  // Same-save deletion is an occurrence-wide state transition, not content
+  // reconciliation. Do it before definitive arbitration, budget handling, or
+  // write-protected refresh: all of those paths may consult the post-save
+  // graph, where the node is necessarily absent. This also ensures every
+  // indefinitive/read-only image becomes Deleted rather than Unknown.
+  let (pid, source) : (ID, SourceName) =
+    pid_and_source_from_treenode (
+      tree, treeid, "visit_normal_node deletion preflight" ) ?;
+  if context . deleted_by_this_save_pids . contains (&pid) {
+    mutate_activeNode_to_deletednode (
+      tree, treeid, &pid, &source ) ?;
+    return Ok (( )); }
   let had_dvr : bool =
     read_at_node_in_tree ( tree, treeid,
       |vn : &ViewNode| match &vn . kind {
@@ -260,7 +274,6 @@ fn visit_normal_node (
     treeid, tree, context . defmap,
     &context . runtime . config, context . graph_snap,
     context . deleted_since_head_pid_src_map,
-    context . deleted_by_this_save_pids,
     context . deleted_by_this_save_extra_ids,
     context . active_source_set,
     settled, cascade, &mut context . node_budget,

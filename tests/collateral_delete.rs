@@ -20,7 +20,8 @@ use skg::test_utils::{
   run_with_test_stores, graph_handle_from_config,
   read_all_lp_messages};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
-use skg::to_org::render::content_view::single_root_view;
+use skg::to_org::render::content_view::{
+  multi_root_view, single_root_view};
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::views_state::{OpenViews, ViewUri};
@@ -76,6 +77,23 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
           &graph . load_full (),
           ViewUri::SearchView ("to X" . into ()), vf3, &pids3 ); }
 
+      { // An indefinitive image is not search-specific. A normal
+        // multi-root content view can contain the same PID more than
+        // once; the later occurrence is write-protected. Every image
+        // of a node deleted by this save must become Deleted before
+        // completion tries to refresh it from the post-delete graph.
+        let (view, pids, vf) =
+          multi_root_view (
+            config, Some (tantivy),
+            &[ID::from ("L"), ID::from ("L")], false ) ?;
+        assert! ( view . contains ("writeProtected"),
+          "duplicate-root content view should contain an indefinitive L:\n{}",
+          view );
+        views_state . open_views . register_view (
+          &graph . load_full (),
+          ViewUri::ContentView (
+            "collat-del-indefinitive-L" . into ()), vf, &pids ); }
+
       // A second view of L alone; register it, then save it with L
       // marked for deletion.
       let (_l_view, l_pids, l_vf) =
@@ -98,6 +116,14 @@ fn deleting_a_node_present_in_another_view_reports_no_errors
       assert! ( response . errors . is_empty (),
         "deleting L must not error, even with L visible in P's open view; got {:?}\ncollateral stream: {:?}",
         response . errors, msgs );
+      let indefinitive_update : &String = msgs . iter ()
+        . find ( |msg| msg . contains ("response-type collateral-view")
+                       && msg . contains ("collat-del-indefinitive-L") )
+        . expect ("indefinitive collateral view should be rerendered");
+      assert_eq! (
+        indefinitive_update . matches ("(deleted (id L)") . count (), 2,
+        "both the definitive and indefinitive images must become DeletedNode: {}",
+        indefinitive_update );
       Ok (( )) } )) }
 
 /// TODO/more.org, "Warn the user when they make dead links": a saved
