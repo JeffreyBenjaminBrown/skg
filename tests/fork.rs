@@ -65,6 +65,16 @@ const FORK_WITH_BARE_NEW_CHILD_BUFFER : &str = indoc! {"
   ** Can I add to this?
   "};
 
+/// The structural fork gesture: insert a bare new parent under foreign N,
+/// then move old content N1 beneath it. The new node and its inherited
+/// `contains N1` edge must both adopt the clone's owned source.
+const FORK_WITH_NEW_PARENT_FOR_OLD_CHILD_BUFFER : &str = indoc! {"
+  * (skg (node (id N) (source foreign))) N-original
+  ** New parent
+  *** (skg (node (id N1) (source foreign) writeProtected)) N1
+  ** (skg (node (id N2) (source foreign) writeProtected)) N2
+  "};
+
 /// Same shape, but the new node EXPLICITLY claims the foreign source:
 /// a deliberate attempt to create a node in a read-only source, which
 /// must stay rejected.
@@ -164,6 +174,9 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("fork_from_bare_new_child_plan", fixtures) ?;
       fork_from_bare_new_child_plan (
+        &s . config ) . await ?;
+      s . reset ("fork_new_parent_adopts_relationship_sources", fixtures) ?;
+      fork_new_parent_adopts_relationship_sources (
         &s . config ) . await ?;
       s . reset ("fork_from_bare_new_child_commits", fixtures) ?;
       fork_from_bare_new_child_commits (
@@ -509,6 +522,30 @@ async fn fork_from_bare_new_child_plan (
     "the new node must adopt the clone's source" );
   assert_eq! ( new_node . pid, clone . contains [2] . member,
     "the clone's last child must be the new node" );
+  Ok (( )) }
+
+async fn fork_new_parent_adopts_relationship_sources (
+  config : &SkgConfig,
+) -> Result<(), Box<dyn Error>> {
+  let ( _vf, save_plan, _warnings ) = buffer_to_validated_saveplan (
+    FORK_WITH_NEW_PARENT_FOR_OLD_CHILD_BUFFER, config, None ) ?;
+  let clone_source : SourceName =
+    save_plan . fork_specs . first ()
+    . expect ("structural edit must fork N")
+    . clone . 0 . source . clone ();
+  let new_parent : &NodeComplete =
+    save_plan . define_nodes . iter ()
+    . find_map ( |dn| match dn {
+        DefineNode::Save (SaveNode (n)) if n . title == "New parent" => Some (n),
+        _ => None } )
+    . expect ("the new parent must survive as a Save instruction");
+  assert_eq! (new_parent . source, clone_source,
+    "the new parent must adopt the clone's source");
+  assert_eq! (members_of (&new_parent . contains), vec![ID::from ("N1")]);
+  assert! (new_parent . contains . iter ()
+           . all (|member| member . source == clone_source),
+    "the new parent's inherited relationships must adopt the clone source: {:?}",
+    new_parent . contains);
   Ok (( )) }
 
 /// TODO/fork-fixes.org Case 1, committed: the approved save creates

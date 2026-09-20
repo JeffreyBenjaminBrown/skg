@@ -3,7 +3,8 @@ use crate::source_sets::ActiveSourceSet;
 use crate::dbs::node_lookup::opt_nodecomplete_by_id;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, MSV, SkgConfig, SourceName, members_of};
+use crate::types::misc::{
+  ID, MSV, MemberAtSource, SkgConfig, SourceName, members_of};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, ForkSpec, NodeMerge, SourceMove};
 use crate::types::nodes::complete::NodeComplete;
 
@@ -196,7 +197,7 @@ fn finalize_foreign_policy_instructions(
         match (instruction, clone_source) {
           ( DefineNode::Save (SaveNode (mut node)),
             Some (clone_source) ) => {
-            node . source = clone_source . clone();
+            rehome_inherited_new_node (&mut node, clone_source);
             kept . push (DefineNode::Save (SaveNode (node))); }
           ( DefineNode::Save (SaveNode (node)), None ) =>
             errors . push (
@@ -211,6 +212,46 @@ fn finalize_foreign_policy_instructions(
                 d . source . clone() )), }},
       _ => kept . push (instruction), }}
   if errors . is_empty() { Ok (kept) } else { Err (errors) }}
+
+/// A bare new node beneath a foreign node initially inherits that foreign
+/// source everywhere: as its home and as the default recording source of its
+/// relationship members. When the node rides the parent's fork, adoption must
+/// therefore rehome both. Changing only `node.source` manufactures a mixed
+/// telescope whose old-home section is foreign (or can sort before the new
+/// home), and the checked writer correctly rejects it.
+///
+/// Preserve members explicitly recorded at any OTHER source. Only facts whose
+/// source equals the inherited home are part of this implicit adoption.
+fn rehome_inherited_new_node (
+  node       : &mut NodeComplete,
+  new_source : &SourceName,
+) {
+  fn retag<T> (
+    members    : &mut [MemberAtSource<T>],
+    old_source : &SourceName,
+    new_source : &SourceName,
+  ) {
+    for member in members {
+      if member . source == *old_source {
+        member . source = new_source . clone (); }} }
+
+  fn retag_msv<T> (
+    members    : &mut MSV<MemberAtSource<T>>,
+    old_source : &SourceName,
+    new_source : &SourceName,
+  ) {
+    if let MSV::Specified (members) = members {
+      retag (members, old_source, new_source); }}
+
+  let old_source : SourceName = node . source . clone ();
+  node . source = new_source . clone ();
+  retag (&mut node . contains, &old_source, new_source);
+  retag_msv (&mut node . aliases, &old_source, new_source);
+  retag_msv (&mut node . subscribes_to, &old_source, new_source);
+  retag_msv (
+    &mut node . hides_from_its_subscriptions, &old_source, new_source);
+  retag_msv (&mut node . overrides_view_of, &old_source, new_source);
+}
 
 fn source_is_foreign(
   config: &SkgConfig,
