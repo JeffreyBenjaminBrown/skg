@@ -10,8 +10,8 @@
   store references resolve against the host store at runtime).
 
 * The host/container split -- this shapes what you can do
-  You (Claude) are inside the container. =nix=, =nix-instantiate=, and
-  =docker= are NOT installed here; they run on the HOST, driven by Jeff.
+  You are inside the container. =nix=, =nix-instantiate=, and
+  =docker= are not installed here; they run on the host, driven by Jeff.
   You cannot build, load, or run the image yourself, and you cannot
   evaluate Nix. Consequences you must plan around:
 
@@ -40,11 +40,11 @@
   - Native build deps are already present (=gcc=, =gnumake=, =cmake=,
     =pkg-config=, =openssl=, alsa/pipewire/dbus/glib, etc.), so
     =cargo build= of skg's C-linked crates works out of the box.
-  - Editors: =emacs= (with magit) -- the current skg client lives in
-    =elisp/=. =nvim= (with nvim-orgmode + its org tree-sitter parser,
-    plus neogit and diffview) is baked in as of the latest image, for the
-    planned vim client (see =../vim-client-flavor.org=). Note: a container
-    started from an older image will not have =nvim= yet.
+  - Editors: =emacs= (with magit) runs the Skg client in =elisp/=.
+    =nvim= (with nvim-orgmode + its org tree-sitter parser, plus neogit
+    and diffview) runs the client in =nvim/=; see [[file:../nvim/README.org][its README]].
+    Both clients are implemented and tested. An older container image
+    may lack =nvim=; check installed tools before running its tests.
   - Everyday tools: =git=, =rg=, =fd=, =jq=, =bat=, =tmux=, etc.
   - The skg server itself is NOT baked into the image -- it is compiled
     at runtime from the mounted source (=cargo run --bin skg=). So skg's
@@ -55,14 +55,15 @@
     Skg TCP port lands directly on the host and is shared
     across all the containers. Jeff usually runs ~3 containers at once
     (two dev, one prod), each launched with its OWN =skgconfig.toml= that
-    picks distinct TCP port(s), db name, and data/tantivy folders so they
+    picks distinct TCP port(s) and data/tantivy folders so they
     do not clobber each other's traffic or data. There is therefore NO
     fixed skg API port -- never hardcode or assume one; read the
-    =skgconfig.toml= the running server was started with. See
-    =development-process.md= for isolating instances.
-  - =bash/start-servers.sh= brings up an Skg server and
-    =bash/stop-servers.sh= tears it down. =bash/all-tests.sh= manages the
-    isolated servers used by the full suite; Rust tests are service-free.
+    =skgconfig.toml= the running server was started with. Follow
+    [[file:../tests/integration/test-lib.sh][the integration harness]] for isolated test instances and cleanup.
+  - [[file:../bash/start-servers.sh][start-servers.sh]] brings up an Skg server.
+    [[file:../bash/all-tests.sh][all-tests.sh]] runs the full suite, including both clients;
+    the integration harness manages isolated servers. Rust tests are
+    service-free. Never run tests against the user's live data or server.
   - Source of truth is the =.skg= files on disk. The in-Rust graph and Tantivy
     are derived and rebuilt from disk on startup. Any change that
     correctly lands on the filesystem is recoverable.

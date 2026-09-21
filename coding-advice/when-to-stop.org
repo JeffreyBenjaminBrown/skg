@@ -1,32 +1,43 @@
-I won't review until the plan is executed.
-Please continue, and only stop to report if things go sideways:
-- reasons to stop
-  - architectural decisions we didn't anticipate
-  - stumper mysteries
+* Scope of these rules
+When I ask you to execute a plan or implement a change, continue until
+the agreed work and verification are complete. I won't review an execution
+assignment until the plan is executed, unless something goes sideways.
 
-A stumper mystery presents as at least one goal from the plan
-that you don't see how to do, or not without doing something ugly.
+A request only for a review, diagnosis, discussion, or plan is complete
+when you deliver that result. Do not begin implementation merely because
+the resulting plan contains work to do. When planning, use the decision
+criteria below to identify what I ought to weigh in on.
 
-Note that the reasons to stop do not include deviations from the plan on
-*how* to achieve the plan's goals.
-Those deviations should be recorded, in progress.org
-(leave the original plan as is)
-but -- because I trust you -- do not constitute reason to stop.
+* Reasons to stop during execution
+** An architectural decision we did not anticipate
+Stop when completing the goal requires a material choice outside the
+agreed design. Explain the concrete consequences and recommend an option.
+** A stumper mystery
+This means at least one goal from the plan that you don't see how to
+achieve, or cannot achieve without doing something ugly.
+* Resolve ordinary implementation choices yourself
+Deviations from the plan on *how* to achieve its goals are not reasons to
+stop. Record meaningful deviations in progress.org, leaving the original
+plan as is, and continue. I trust you to make those choices.
 
-When you do stop, report what's new in progress.org,
-divided into these categories:
-- 'what's done and went well',
-- "Changes to the plan's envisioned order."
-- 'what's imperfect about what's done,"
-  Don't include things just because they are missing now but part of the plan.
-- "choices determining the future"
+If a question turns out to be trivial, do not stop for it. If you are
+uncertain but the choice is easy to reverse, use your best judgment.
+If there are no substantive questions and agreed work remains, keep going.
+Once the work and verification are complete, report completion.
 
-If you have no questions for me, do not stop. Keep your report in progress.org,
-but then return to executing more of the plan.
+* Reporting a substantive stop
+Report what's new in the task's progress.org under these headlines:
+** What's done and went well
+** Changes to the plan's envisioned order
+** What's imperfect about what's done
+Do not list work merely because it is unfinished but still part of the plan.
+** Choices determining the future
 
-Even if you do have questions for me,
-after writing them, you might decide that they are trivial.
-Do not stop in that case, either.
-If you are uncertain of the answer to a question,
-but the choice would not be hard to reverse later,
-then just go with what seems best to you.
+* A stop report does not require a continuous ledger
+Create or update progress.org when a substantive stop needs that report,
+or when recording a meaningful implementation deviation. This instruction
+already authorizes that concise report; do not ask permission to write it.
+
+Ordinary execution does not require a chronological ledger, dashboard, or
+ongoing bookkeeping at every step. Those are optional workflows described
+in [[file:optional-workflows.org]], and require the agreement specified there.

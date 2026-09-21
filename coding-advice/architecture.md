@@ -6,18 +6,28 @@ Note that the above documents, this document, and any other documentation might 
 
 # What this program does.
 
-Skg is for manipulating a knowledge graph. The bulk of the logic is performed by the server, written in Rust, found in server/. The client is written in Emacs, found in elisp/. The user's data is stored on disk, in a collection of '.skg' files, which are all valid YAML (but not vice-versa). When the program stops, those files are the only record of the user's data.
+Skg is for manipulating a knowledge graph. The bulk of the logic is performed
+by the Rust server in `server/`. The Emacs Lisp client lives in `elisp/`, and
+the Neovim Lua client in `nvim/`. Both use the same server protocol. The user's
+canonical data is stored in `.skg` files, which are valid YAML (but not every
+YAML file is an Skg file). The graph and search index can be rebuilt from them.
 
 At startup the server reads every configured `.skg` file, validates an
 immutable in-Rust graph, and rebuilds Tantivy from the same nodes. The graph is
 the runtime graph store; Tantivy is only the derived full-text index.
 
-The idea is for the user to view and edit the graph using org-mode in Emacs.
-When Emacs asks for a "view" of the data, Rust sends a whole buffer of text to
-Emacs. When the user saves the data, Emacs sends the whole buffer back. Saving
+The user views and edits the graph as Org text in Emacs or Neovim.
+When a client asks for a view, Rust sends a whole buffer of text.
+When the user saves, the client sends the whole buffer back. Saving
 updates the authoritative files, publishes a validated graph generation,
-queues the Tantivy update, and sends an updated buffer to Emacs.
+queues the Tantivy update, and sends updated views to the client.
 
-Most headlines are 'content' -- that is, they correspond to something in the graph. If they are new, they won't have an ID, but once they are saved, they will. The ID is one kind of 'metadata' that can precede a headline. There are some others, as detailed in the `OrgNodeMetadata`. Of these, the most interesting is 'node_type'.
-
-The default type of an org node is 'content'. Content nodes cause Rust to change the contents of the graph upon saving. But there can be other kinds. So far [EDIT: This is very out of date; there are lots of others now.] the only other one implemented is an 'alias' node. Its org-children are aliases that become associated with the 'alias' node's parent. Thus an 'alias' node does not dictate content; rather, it influences the data within the 'content' node that is its org-parent.
+View nodes are not all graph nodes. Active and inactive vognodes represent
+current graph nodes; phantoms represent missing or historical occurrences;
+folders and qualifiers carry relationships, aliases, IDs, or properties.
+New editable nodes may lack an ID until save preparation assigns one.
+Editability, view-node kind, and relationship context determine how text is
+interpreted on save; not every displayed headline is an instruction to write
+a graph node. See [the view-node types](../server/types/viewnode.rs) and
+[the metadata parser](../server/serve/parse_metadata_sexp.rs) for the current
+representation, and the API document for its wire format.
