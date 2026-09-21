@@ -207,6 +207,60 @@ pub const PARTNER_ROLE_VOCAB
 ];
 
 impl InRustGraph {
+  /// IDs whose rendered relationship context can change when any seed changes.
+  /// Ordinary relations contribute one hop in either direction. Override
+  /// relations instead contribute complete, independently visited walks in
+  /// each direction, beginning only at the seeds.
+  pub fn update_relevant_neighborhood (
+    &self,
+    seeds : impl IntoIterator<Item = ID>,
+  ) -> HashSet<ID> {
+    let seed_ids : HashSet<ID> = seeds . into_iter ()
+      . map (|id| self . pid_of (&id) . unwrap_or (id))
+      . collect ();
+    let mut result : HashSet<ID> = seed_ids . clone ();
+    for seed in &seed_ids {
+      for relation in [
+        NodeRelation::Contains,
+        NodeRelation::TextlinksTo,
+        NodeRelation::Subscribes,
+        NodeRelation::HidesFromItsSubscriptions,
+      ] {
+        result . extend (
+          self . outbound_ids_for_relation (seed, relation)
+            . into_iter ()
+            . map (|id| self . pid_of (&id) . unwrap_or (id)));
+        result . extend (
+          self . inbound_pids_for_relation (seed, relation)); }}
+    result . extend (self . override_walk_from_seeds (
+      &seed_ids, BinaryRolePosition::First));
+    result . extend (self . override_walk_from_seeds (
+      &seed_ids, BinaryRolePosition::Second));
+    result
+  }
+
+  fn override_walk_from_seeds (
+    &self,
+    seeds         : &HashSet<ID>,
+    seed_position : BinaryRolePosition,
+  ) -> HashSet<ID> {
+    let mut visited : HashSet<ID> = seeds . clone ();
+    let mut pending : Vec<ID> = seeds . iter () . cloned () . collect ();
+    while let Some (node) = pending . pop () {
+      let next : Vec<ID> = match seed_position {
+        BinaryRolePosition::First =>
+          self . outbound_ids_for_relation (
+            &node, NodeRelation::OverridesViewOf),
+        BinaryRolePosition::Second =>
+          self . inbound_pids_for_relation (
+            &node, NodeRelation::OverridesViewOf), };
+      for raw_id in next {
+        let id : ID = self . pid_of (&raw_id) . unwrap_or (raw_id);
+        if visited . insert (id . clone ()) {
+          pending . push (id); }} }
+    visited
+  }
+
   /// Comparison identity for a relationship member without mutating its raw
   /// stored spelling.  See `RelationshipMemberKey` for the two cases.
   pub fn relationship_member_key (

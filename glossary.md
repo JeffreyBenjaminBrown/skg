@@ -2,6 +2,18 @@ Some terms and abbreviations used in this code.
 
 # Terms and abbreviations specific to Skg
 
+## update-relevant neighborhood
+
+For a set of IDs in one graph snapshot, the **update-relevant
+neighborhood** contains the IDs themselves, their immediate neighbors in
+both directions along `contains`, `textlinks_to`, `subscribes`, and
+`hides_from_its_subscriptions`, and every node reachable by each of the
+two monotonic override walks. The overriderward and overriddenward walks
+start independently at the original IDs, never reverse direction, and
+never continue from an ordinary neighbor. Thus it includes no mixed
+ordinary/override path and no two-hop ordinary path. Saves compute this
+neighborhood independently in the before and after graph snapshots.
+
 ## "telescope" = privacy telescope
 
 In code and comments the short form "telescope" always means the

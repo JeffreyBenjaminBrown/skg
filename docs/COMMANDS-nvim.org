@@ -14,13 +14,11 @@ in which you request more data,
 such as a node's ancestors, or the nodes that link to it.
 Since views can overlap,
 saving one open view can change another.
-For this reason the client will warn you
-if you have unsaved edits in one view
-and begin to edit another one.
-It won't stop you, but the results could be bad.
-If you try to save while another skg buffer already has unsaved
-edits, you also get a 'Save anyway?' confirmation before the
-request is sent.
+You may edit several views at once. On save, Skg checks the other dirty
+views' last clean text and current text against every graph identity the
+prepared save can affect. A conflict is a hard refusal before any write;
+the error names the views and IDs. Missing or malformed baseline data is
+also refused conservatively. There is no "save anyway" choice.
 
 ':w' is the BufWriteCmd on every skg view buffer, so plain saving
 works as expected; ':SkgSave' does the same thing as an explicit
@@ -39,6 +37,19 @@ a successful save under a restricted source-set would rerender text from
 an overPrivateText telescope, Skg asks for a second, request-scoped approval. Decline
 leaves the save committed but sends no new view text and changes no
 open-view registry entry.
+** :SkgShowUnsavedChanges : archive edits for manual recovery
+Prompts for a local Org file, writes a detached recovery document, opens
+it, and reports its actual path. The document contains context, lossless
+JSON strings for the clean baseline and current text, and a readable
+unified diff. It does not save graph data, close or clean the source view,
+or register the archive as a live view.
+
+When a save is refused, archive the relevant dirty views, close those live
+views, save the remaining view, reopen fresh views, and manually reapply
+the intended edits. Do not save an entire stale archived snapshot over the
+newer graph. If dirty search results were enriched, the archive labels that
+the diff also includes enrichment presentation and is not a semantic patch
+of user intent alone.
 ** <localleader>dd : deletion
 ***     <localleader>dd : :SkgDelete
 Marks the node at point for deletion from the graph.

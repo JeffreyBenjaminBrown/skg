@@ -1,6 +1,6 @@
 -- PURPOSE: skg view buffers: creation from server text, naming, the
 -- view-uri registry, close-view notification, and the
--- unsaved-elsewhere warning. The Lua port of elisp/skg-buffer.el.
+-- clean-baseline bookkeeping. The Lua port of elisp/skg-buffer.el.
 --
 -- Where Emacs used a derived major mode plus a permanent-local
 -- 'skg-view-uri', an skg view buffer here is: filetype org (so the
@@ -117,6 +117,22 @@ function M.all_skg_buffers ()
   return result
 end
 
+---@param buf integer
+---@return string exact logical buffer text, including a represented final newline
+function M.text (buf)
+  return table.concat(
+    vim.api.nvim_buf_get_lines(buf, 0, -1, false), '\n')
+end
+
+---Record the normalized text from a successful server replacement.
+---@param buf integer
+function M.capture_clean_baseline (buf)
+  vim.b[buf].skg_clean_baseline = M.text(buf)
+  vim.b[buf].skg_clean_baseline_context =
+    'source-set unavailable; git diff mode unavailable'
+  vim.b[buf].skg_search_enrichment_includes_user_edits = false
+end
+
 -- ── lifecycle ──────────────────────────────────────────────────────
 
 ---Find-or-create the buffer named BUFFER_NAME, fill it with ORG_TEXT,
@@ -140,11 +156,11 @@ function M.open_org_buffer_from_text (org_text, buffer_name, view_uri)
     vim.api.nvim_buf_set_name(buf, buffer_name)
   end
   vim.bo[buf].modifiable = true
-  M.disarm_first_change_warning(buf) -- this rewrite is not a user edit
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                              vim.split(org_text, '\n'))
   M.configure_view_buffer(buf, uri)
   vim.bo[buf].modified = false
+  M.capture_clean_baseline(buf)
   vim.api.nvim_set_current_buf(buf)
   vim.api.nvim_win_set_cursor(0, { 1, 0 })
   return buf
@@ -166,7 +182,6 @@ function M.configure_view_buffer (buf, uri)
   vim.bo[buf].autoindent = false
   heralds.enable(buf)
   require('skg.keymaps').attach_content_view(buf)
-  M.arm_first_change_warning(buf)
   do -- The skg fold model, on every window that shows this buffer.
     local folds = require('skg.folds')
     for _, win in ipairs(vim.api.nvim_list_wins()) do
@@ -193,49 +208,6 @@ function M.configure_view_buffer (buf, uri)
         else vim.notify('skg: save is not available: '
                         .. tostring(save)) end
       end })
-  end
-end
-
----Warn (once per redraw) if another skg buffer has unsaved edits when
----this one is first modified -- saving is ill-defined when multiple
----buffers have unsaved edits. The analog of first-change-hook, built
----on nvim_buf_attach because the TextChanged/BufModifiedSet autocmds
----do not fire for API-driven edits. Server-driven redraws disarm
----first (see disarm_first_change_warning) so only user edits warn.
----@param buf integer
-function M.arm_first_change_warning (buf)
-  vim.b[buf].skg_first_change_armed = true
-  if vim.b[buf].skg_first_change_attached then return end
-  vim.b[buf].skg_first_change_attached = true
-  vim.api.nvim_buf_attach(buf, false, {
-    on_lines = function ()
-      if not vim.api.nvim_buf_is_valid(buf) then return true end
-      if vim.b[buf].skg_first_change_armed then
-        vim.b[buf].skg_first_change_armed = false
-        vim.schedule(function ()
-          M.warn_if_other_buffer_modified(buf) end)
-      end
-    end })
-end
-
----Suppress the first-change warning while skg itself rewrites BUF.
----Callers re-arm via arm_first_change_warning after the rewrite.
----@param buf integer
-function M.disarm_first_change_warning (buf)
-  vim.b[buf].skg_first_change_armed = false
-end
-
----@param buf integer the buffer being edited
-function M.warn_if_other_buffer_modified (buf)
-  for _, other in ipairs(vim.api.nvim_list_bufs()) do
-    if other ~= buf and vim.api.nvim_buf_is_valid(other)
-       and vim.b[other].skg_view_uri ~= nil
-       and vim.bo[other].modified then
-      vim.notify(
-        'WARNING: Another skg buffer has unsaved modifications.'
-        .. ' Saving is ill-defined when multiple buffers have'
-        .. ' unsaved edits.')
-      return end
   end
 end
 

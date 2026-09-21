@@ -8,35 +8,18 @@
 (require 'skg-buffer)
 (require 'skg-lock-buffers)
 
-(defun skg--confirm-save-despite-other-unsaved ()
-  "plan_v2 §8.4: if other skg buffers have unsaved edits that this save's
-collateral rerenders might overwrite, warn loudly and ask before sending.
-Signals an error (aborting the save) if the user declines. Skipped in
-batch mode (`noninteractive'), where there is no user to ask -- and the
-over-warning is the accepted tradeoff (narrowing to the truly-affected set
-would need the slow SavePlan we don't have yet)."
-  (when (not noninteractive)
-    (let ((others (skg--other-unsaved-skg-buffers)))
-      (when others
-        (unless (yes-or-no-p
-                 (format
-                  "DANGER: %d other skg buffer(s) have unsaved edits (%s) this save may overwrite. Save anyway? "
-                  (length others)
-                  (mapconcat #'buffer-name others ", ")))
-          (error "Save aborted: other skg buffers have unsaved edits"))))))
-
 (defun skg-request-save-buffer (&optional fork-approved fork-sources
                                           hoist-approved-pids
                                           text-approved-pids)
   "Send the current buffer contents to Rust for processing.
 Before sending, adds 'folded' markers to folded headlines and 'focused' marker to current headline.
 The server sends three LP messages around the save:
-  1. save-lock: early, broad lock (every buffer sharing a pid).
-  2. save-relax-lock: narrows the lock to the exact collateral set once
-     the SavePlan is known, plus a collateral-view per rerendered buffer.
+  1. save-lock: acknowledges the client's early broad lock.
+  2. save-relax-lock: narrows the lock once the checked save inputs and
+     collateral set are known, plus a collateral-view per rerendered buffer.
   3. save-result: the saved buffer's final content (+ errors/warnings).
-All skg buffers are locked immediately; non-collateral buffers are
-unlocked as save-lock / save-relax-lock / collateral-view arrive.
+All skg buffers are locked immediately.  The broad acknowledgement does not
+unlock client-only views; save-relax-lock is the first narrowing point.
 
 If the save edited any FOREIGN node, the server reads that as a request
 to fork (clone) it and -- unless FORK-APPROVED is non-nil -- replies with
@@ -45,7 +28,23 @@ nothing. `skg--fork-confirmation-handler' then shows the confirmation
 buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
 `skg-decline-fork'."
   (interactive)
-  (skg--confirm-save-despite-other-unsaved)
+  (unless skg-view-uri
+    (error "Cannot save: skg-view-uri is nil in buffer '%s' (content-view-mode=%s). Re-open the view."
+           (buffer-name)
+           (if (derived-mode-p 'skg-content-view-mode) "on" "off")))
+  (skg--begin-stream "save")
+  (skg--lock-all-skg-buffers)
+  (condition-case err
+      (skg--send-save-buffer
+       fork-approved fork-sources hoist-approved-pids text-approved-pids)
+    (error
+     (skg--cancel-locally-failed-save)
+     (signal (car err) (cdr err)))))
+
+(defun skg--send-save-buffer (fork-approved fork-sources
+                                            hoist-approved-pids
+                                            text-approved-pids)
+  "Serialize and send a save after the stream guard and locks are held."
   (when (org-before-first-heading-p)
     ;; Rather than complain, save as if point were at the first headline.
     (goto-char (point-min))
@@ -56,13 +55,16 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
            (looking-at "\\*+ (skg")))
         (save-point-position
          (skg--current-save-point-position)))
-    (let ((skg--buffer-warned_two-dirty-buffers_since-last-looked-here t))
-      (skg-add-folded-markers)
-      (skg-add-focused-marker))
     (let* ((tcp-proc (skg-tcp-connect-to-rust))
            (save-buffer (current-buffer))
            (saved-uri skg-view-uri)
-           (buffer-contents (buffer-string))
+           (buffer-contents
+            (skg--snapshot-with-save-markers focused-had-metadata))
+           (other-view-snapshots
+            (skg--other-view-save-snapshots save-buffer))
+           (wire-content
+            (skg--serialize-save-envelope
+             buffer-contents other-view-snapshots))
            (request-s-exp (concat (prin1-to-string
                                    (skg--save-request-sexp
                                     skg-view-uri
@@ -72,41 +74,18 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
                                     hoist-approved-pids
                                     text-approved-pids))
                                   "\n"))
-           (content-bytes (encode-coding-string buffer-contents 'utf-8))
+           (content-bytes (encode-coding-string wire-content 'utf-8))
            (content-length (length content-bytes))
            (header (format "Content-Length: %d\r\n\r\n" content-length)))
-      (let ((skg--buffer-warned_two-dirty-buffers_since-last-looked-here t))
-        (progn ;; Rust needs these markers, but the user doesn't.
-          (skg-remove-focused-marker)
-          (skg-remove-folded-markers))
-        (unless focused-had-metadata
-          (skg-strip-bare-skg-at-focused-headline)))
-
-      (unless skg-view-uri
-        ;; Guard: refuse to save when skg-view-uri is nil.
-        ;; A nil view-uri causes an unfiltered save (all instructions
-        ;; included in a save plan even if unchanged) AND the server won't update
-        ;; its in-Rust graph, so the work is both slow and wasted.
-        (error "Cannot save: skg-view-uri is nil in buffer '%s' (content-view-mode=%s). Re-open the view."
-               (buffer-name)
-               (if (derived-mode-p 'skg-content-view-mode) "on" "off")))
-
-      (skg--begin-stream "save")
-
-      ;; Lock ALL skg content-view buffers immediately, before sending.
-      ;; This eliminates the race window between the send and the
-      ;; server's early response.
-      (skg--lock-all-skg-buffers)
-
       ;; Register handlers in the dispatch map
       (skg-register-response-handler
        'save-lock
        (lambda (_tcp-proc payload)
-         (skg--save-lock-handler saved-uri payload))
+         (skg--broad-save-lock-handler payload))
        t)
-      ;; save-relax-lock: same shape/handling as save-lock, but with the
-      ;; EXACT collateral view set (post-SavePlan), so buffers locked early that
-      ;; aren't actually collateral get unlocked. The saved buffer stays
+      ;; save-relax-lock carries the post-preparation keep-set: collateral
+      ;; targets plus dirty conflict-check inputs. Buffers locked early that
+      ;; are absent can unlock. The saved buffer stays
       ;; locked (skg--unlock-non-collateral-buffers keeps saved-uri) until
       ;; save-result. Registered NON-one-shot (like collateral-view) so it does
       ;; NOT add to skg-lp--pending-count: an *invalid* save errors before the
@@ -116,7 +95,7 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
       (skg-register-response-handler
        'save-relax-lock
        (lambda (_tcp-proc payload)
-         (skg--save-lock-handler saved-uri payload))
+         (skg--save-relax-lock-handler saved-uri payload))
        nil)
       (skg-register-response-handler
        'collateral-view
@@ -163,7 +142,84 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
 
       ;; Send the length-prefixed buffer contents
       (process-send-string tcp-proc header)
-      (process-send-string tcp-proc buffer-contents))))
+      (process-send-string tcp-proc wire-content))))
+
+(defun skg--serialize-save-envelope (saved-buffer other-view-snapshots)
+  "Serialize SAVED-BUFFER and OTHER-VIEW-SNAPSHOTS for the Rust server."
+  ;; Emacs prints its empty list as the atom `nil', while the Rust protocol
+  ;; requires an explicit list for other-views.  Serialize that one empty
+  ;; value as `()'.  Ignore user printer limits: truncation would corrupt the
+  ;; protocol rather than merely shorten display output.
+  (let ((print-length nil)
+        (print-level nil))
+    (concat
+     "((saved-buffer " (prin1-to-string saved-buffer) ") "
+     "(other-views "
+     (if other-view-snapshots
+         (prin1-to-string other-view-snapshots)
+       "()")
+     "))")))
+
+(defun skg--snapshot-with-save-markers (focused-had-metadata)
+  "Return current text with transient save markers, restoring the buffer.
+FOCUSED-HAD-METADATA records whether marker removal can leave a bare skg
+form.  The saved buffer's lock is suspended only during this synchronous
+internal edit; it is restored before any request is sent."
+  (let ((was-save-locked skg--save-lock-overlay)
+        snapshot)
+    (when was-save-locked
+      (skg--unlock-after-save))
+    (unwind-protect
+        (progn
+          (skg-add-folded-markers)
+          (skg-add-focused-marker)
+          ;; Text properties are an Emacs presentation concern.  If retained,
+          ;; `prin1-to-string' emits #("..." ...) syntax, which is not part of
+          ;; the shared S-expression protocol and is parsed as extra fields by
+          ;; the Rust reader.
+          (setq snapshot
+                (buffer-substring-no-properties (point-min) (point-max))))
+      (skg-remove-focused-marker)
+      (skg-remove-folded-markers)
+      (unless focused-had-metadata
+        (skg-strip-bare-skg-at-focused-headline))
+      (when was-save-locked
+        (skg--lock-for-save)))
+    snapshot))
+
+(defun skg--other-view-save-snapshots (saved-buffer)
+  "Return the structured states of every live view except SAVED-BUFFER."
+  (let (result)
+    (dolist (buffer (buffer-list) (nreverse result))
+      (when (and (not (eq buffer saved-buffer))
+                 (buffer-local-value 'skg-view-uri buffer))
+        (with-current-buffer buffer
+          (push
+           (if (buffer-modified-p)
+               `((view-uri ,skg-view-uri)
+                 (dirty true)
+                 (baseline ,(if (stringp skg-clean-baseline)
+                                `(present ,(substring-no-properties
+                                            skg-clean-baseline))
+                              'unavailable))
+                 (current ,(buffer-substring-no-properties
+                            (point-min) (point-max))))
+             `((view-uri ,skg-view-uri) (dirty false)))
+           result))))))
+
+(defun skg--cancel-locally-failed-save ()
+  "Unwind handlers, pending counts, stream state and locks after local failure."
+  (dolist (response-type '(save-lock save-result))
+    (when (assoc response-type skg-response-handler-map)
+      (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count)))))
+  (dolist (response-type
+           '(save-lock save-relax-lock collateral-view save-result
+             fork-confirmation telescope-hoist-confirmation
+             overPrivateText-telescope-confirmation))
+    (setq skg-response-handler-map
+          (assoc-delete-all response-type skg-response-handler-map)))
+  (skg--end-stream)
+  (skg--unlock-all-save-locked))
 
 (defun skg--save-request-sexp (view-uri save-point-position
                                         &optional fork-approved fork-sources
@@ -232,22 +288,35 @@ before the add/remove cycle."
     (when (looking-at "\\(\\*+ \\)(skg) ")
       (replace-match "\\1"))))
 
-(defun skg--save-lock-handler (saved-uri payload)
-  "Handle the save-lock LP message (tagged with response-type).
-Unlocks non-collateral buffers."
+(defun skg--broad-save-lock-handler (payload)
+  "Validate a broad save-lock acknowledgement without narrowing locks."
   (condition-case err
       (let* ((response (read payload))
              (lock-entry (assoc 'lock-views response)))
-        (when lock-entry
-          (let ((collateral-uris (cadr lock-entry)))
-            (skg--unlock-non-collateral-buffers
-             saved-uri collateral-uris))))
+        (unless (and lock-entry (listp (cadr lock-entry)))
+          (error "Malformed broad save-lock payload")))
     (error
-     ;; Keep the saved buffer locked until save-result (unlocking everything
-     ;; here would let the user edit it during the rest of the pipeline, and the
-     ;; subsequent erase+insert would silently drop those edits); free the rest.
-     (skg--unlock-non-collateral-buffers saved-uri nil)
-     (skg-log 'error 'save "save-lock handler error: %S" err)) ))
+     ;; A malformed acknowledgement cannot safely authorize any unlock.
+     (skg-log 'error 'save "broad save-lock handler error: %S" err)) ))
+
+(defun skg--save-relax-lock-handler (saved-uri payload)
+  "Narrow broad save locks to SAVED-URI and the URIs in PAYLOAD."
+  (condition-case err
+      (let* ((response (read payload))
+             (lock-entry (assoc 'lock-views response)))
+        (unless (and lock-entry (listp (cadr lock-entry)))
+          (error "Malformed save-relax-lock payload"))
+        (skg--unlock-non-collateral-buffers
+         saved-uri
+         (mapcar (lambda (uri)
+                   (cond ((stringp uri) uri)
+                         ((symbolp uri) (symbol-name uri))
+                         (t (error "Malformed lock view URI: %S" uri))))
+                 (cadr lock-entry))))
+    (error
+     ;; Retain every lock: an incomplete or malformed keep-set cannot safely
+     ;; identify a buffer whose checked contents are no longer needed.
+     (skg-log 'error 'save "save-relax-lock handler error: %S" err)) ))
 
 (defun skg--apply-streamed-view-update (payload log-category handler-name)
   "Apply one streamed view update from PAYLOAD: unlock and replace the buffer for
@@ -799,8 +868,7 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
   "Replace the current buffer contents with NEW-CONTENT from Rust.
 After inserting content, folds marked headlines, removes fold markers,
 moves point to focused headline, and removes focus marker."
-  (let ((inhibit-read-only t)
-        (skg--buffer-warned_two-dirty-buffers_since-last-looked-here t))
+  (let ((inhibit-read-only t))
     (erase-buffer)
     (insert new-content)
     (;; PITFALL: `erase-buffer' does NOT remove overlays — they collapse
@@ -825,9 +893,8 @@ moves point to focused headline, and removes focus marker."
       (skg-fold-marked-headlines)
       (skg-remove-folded-markers))
     (skg--restore-save-point-position save-point-position)
-    (set-buffer-modified-p nil))
-  (setq skg--buffer-warned_two-dirty-buffers_since-last-looked-here nil)
-  (skg--install-two-dirty-buffer-warning-hooks)
+    (set-buffer-modified-p nil)
+    (skg--capture-clean-baseline))
   (message "Buffer updated with processed content from Rust"))
 
 (defun skg--restore-save-point-position (save-point-position)

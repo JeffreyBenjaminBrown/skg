@@ -1,3 +1,24 @@
+* One-hop collateral safety and dirty-state problems fixed (2026-09-21)
+** Search enrichment could mark unsaved edits clean
+   Both clients now remember whether the phase-one snapshot was dirty.
+   Enrichment preserves that dirty flag and the earlier clean baseline; only
+   enrichment of a clean snapshot establishes a new baseline. Recovery output
+   labels presentation changes mixed with user edits, and client tests cover
+   both dirty and clean enrichment.
+** Early collateral locking could release client-only and newly affected views
+   Both clients broadly lock every local view before snapshotting. The initial
+   =save-lock= is acknowledgement only. After prepared-save conflict checking,
+   =save-relax-lock= retains the saved view, collateral targets, and every
+   dirty input examined (including unregistered views); malformed narrowing
+   retains all locks. Unit and live Emacs/Neovim lifecycle tests inspect both
+   intermediate boundaries.
+** Collateral graph statistics went stale across neighboring relationship edits
+   Selection now uses the union of the prepared write identities'
+   update-relevant neighborhoods in the independent before and candidate graph
+   snapshots. The neighborhood includes one ordinary hop and monotonic override
+   walks in both directions. Pipeline coverage verifies a title-only surprising
+   text-link change rerenders a view containing only the affected endpoint.
+
 * Further completed entries cleared from TODO/problems.org (reviewed 2026-09-13)
 ** api-and-formats.md misdescribed the verify-connection response (fixed)
    Commit =4c0c8243= audited the protocol release boundaries.  The API

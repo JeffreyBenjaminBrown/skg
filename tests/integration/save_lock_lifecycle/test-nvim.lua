@@ -15,11 +15,8 @@
 --   skg://solo -- truly NON-COLLATERAL to saving a (its pid set is
 --                 {solo}).
 --
--- NOTE: this asserts the post-settle end state (every view unlocked,
--- and the non-collateral one genuinely editable). It deliberately
--- does NOT assert the mid-stream timing -- "saved buffer stays locked
--- UNTIL save-result" (section 20.2b) -- which is not observable
--- deterministically from a headless nvim test.
+-- Wrapping the response handlers observes both intermediate boundaries
+-- synchronously, before the next framed message can be dispatched.
 --
 -- File system operations (backup/cleanup) are handled by run-test.sh.
 
@@ -31,6 +28,8 @@ local save = require('skg.save')
 local lock = require('skg.lock')
 
 local view_bufs = {}
+local saw_broad_lock = false
+local saw_relaxed_lock = false
 
 local function phase_1_open_three_views ()
   print('=== PHASE 1: Open three overlapping views ===')
@@ -57,6 +56,26 @@ local function phase_2_edit_and_save_a ()
   vim.api.nvim_buf_set_lines(buf, 0, 1, false, { first_line .. ' edited' })
   vim.api.nvim_win_set_cursor(0, { 1, #(first_line .. ' edited') })
   print('Buffer skg://a after edit:\n' .. T.buffer_text(buf))
+  local original_broad = save.broad_save_lock_handler
+  save.broad_save_lock_handler = function (response)
+    original_broad(response)
+    for _, id in ipairs({ 'a', 'b', 'solo' }) do
+      T.check(vim.b[view_bufs[id]].skg_save_locked == true,
+              'broad save-lock retained skg://' .. id)
+    end
+    saw_broad_lock = true
+  end
+  local original_relax = save.save_relax_lock_handler
+  save.save_relax_lock_handler = function (saved_uri, response)
+    original_relax(saved_uri, response)
+    T.check(vim.b[view_bufs.a].skg_save_locked == true,
+            'saved view remains locked after relaxation')
+    T.check(vim.b[view_bufs.b].skg_save_locked == true,
+            'collateral view remains locked after relaxation')
+    T.check(vim.b[view_bufs.solo].skg_save_locked ~= true,
+            'unrelated clean view unlocks at relaxation')
+    saw_relaxed_lock = true
+  end
   save.request_save_buffer()
   T.check(T.wait_for_response(), 'save response for a arrived')
 end
@@ -71,6 +90,8 @@ local function phase_3_verify_locks_released ()
       '[section 20.2a]: lock.stream_in_progress still set after'
       .. ' save: %s', tostring(lock.stream_in_progress)))
   end
+  T.check(saw_broad_lock and saw_relaxed_lock,
+          'both intermediate lock messages were observed')
 
   for _, spec in ipairs({
     { name = 'solo', role = 'non-collateral' },

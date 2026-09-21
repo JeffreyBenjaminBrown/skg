@@ -119,21 +119,16 @@ describe('skg.buffer lifecycle and registry', function ()
     vim.api.nvim_buf_delete(file_buf, { force = true })
   end)
 
-  it('warns when another view has unsaved edits', function ()
-    local warned = nil
-    local original_notify = vim.notify
-    vim.notify = function (msg) warned = msg end
+  it('captures clean baselines and allows multiple dirty views', function ()
     local first = buffer.open_org_buffer_from_text(
       '* one', 'skg://one', 'uri-one')
+    assert.are.equal('* one', vim.b[first].skg_clean_baseline)
     vim.api.nvim_buf_set_lines(first, 1, 1, false, { 'edited' })
     assert.is_true(vim.bo[first].modified)
     local second = buffer.open_org_buffer_from_text(
       '* two', 'skg://two', 'uri-two')
-    warned = nil
     vim.api.nvim_buf_set_lines(second, 1, 1, false, { 'edit two' })
-    vim.wait(200, function () return warned ~= nil end, 10)
-    vim.notify = original_notify
-    assert.is_truthy(warned)
-    assert.is_truthy(tostring(warned):find('unsaved modifications'))
+    assert.is_true(vim.bo[second].modified)
+    assert.is_true(vim.bo[first].modified)
   end)
 end)

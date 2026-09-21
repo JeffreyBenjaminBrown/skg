@@ -22,14 +22,14 @@ use crate::serve::handlers::text_release::{
   TextReleaseDecision, challenge_response, decide,
 };
 use crate::serve::protocol::TcpToClient;
-use crate::serve::util::{ format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
+use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::source_sets::{ActiveSourceSet, apply_source_set_to_viewforest};
 use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids_with_source_set;
 use crate::to_org::util::DefinitiveMap;
 use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
 use crate::types::views_state::ViewUri;
 use crate::types::misc::{ID, SourceName, SkgConfig};
-use crate::types::save::{DefineNode, ForkSpec, SaveNode};
+use crate::types::save::{DefineNode, ForkSpec};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
 use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_parent_na, validate_affectsParent_relationships, mark_orphans_under_dead_parents_false};
@@ -150,6 +150,7 @@ pub fn update_views_after_save (
   stream                      : &mut std::net::TcpStream,
   saved_view                  : ViewForest,
   define_nodes                : Vec<DefineNode>,
+  collateral_uris             : Vec<ViewUri>,
   diff_mode_enabled           : bool,
   env                         : &SkgEnv,
   runtime                     : Arc<RuntimeGeneration>,
@@ -182,10 +183,6 @@ pub fn update_views_after_save (
       "rewriteInPlace_viewnodes_whose_id_is_newly_extra" ). entered();
     rewriteInPlace_viewnodes_whose_id_is_newly_extra (
       &mut saved_view_mut, &context . graph_snap ) ? };
-  let collateral_uris : Vec<ViewUri> =
-    if let Ok (uri) = viewuri_from_request_result {
-      find_collateral_view_uris (uri, &define_nodes, views_state)
-    } else { Vec::new () };
   // Gate the forests' existing active nodes before rendering, so even a
   // rendering error cannot echo protected title/body text. A second decision
   // below covers nodes introduced by completion/expansion.
@@ -231,7 +228,7 @@ pub fn update_views_after_save (
     { Ok (rendered) => collateral_views . push (rendered),
       Err (e) => context . errors . push (e), }}
   // Everything textual is now staged in memory. Decide before changing the
-  // open-view registry, narrowing locks, or streaming the first view.
+  // open-view registry or streaming the first view.
   let mut release_candidates : Vec<ID> =
     active_ids_in_viewforest (&saved_view_mut);
   for collateral in &collateral_views {
@@ -259,25 +256,6 @@ pub fn update_views_after_save (
   if let Ok (uri) = viewuri_from_request_result {
     views_state . open_views . update_view (
       &context . graph_snap, uri, saved_view_mut);
-    // TODO/DONE/local-view-update/plan_v2.org §8.1 step 3: relax the early (broad) lock to the EXACT collateral
-    // set now that the SavePlan is known. Emacs keeps saved + these locked and
-    // unlocks everything else it locked early, so the user can edit truly-
-    // unaffected buffers during the rest of the pipeline. Symmetric with the
-    // save-lock message; sent before the collateral-view stream.
-    send_response_with_length_prefix (
-      stream,
-      & tag_sexp_response (
-        TcpToClient::SaveRelaxLock,
-        & format_lock_views_sexp ( &collateral_uris )));
-    if collateral_uris . is_empty () {
-      tracing::debug!("update_views_after_save: no collateral views");
-    } else {
-      tracing::info!(
-        "update_views_after_save: {} collateral view(s): {:?}",
-        collateral_uris . len (),
-        collateral_uris . iter ()
-          . map ( |u| u . repr_in_client () )
-          . collect::<Vec<_>> ()); }
     for rendered in collateral_views {
       views_state . open_views . update_view (
         &context . graph_snap,
@@ -380,31 +358,6 @@ fn rerender_collateral_view (
     text,
     viewforest,
   }) }
-
-/// Given the saved ViewUri and DefineNodes,
-/// return the URIs of other views whose viewforests contain any changed PID.
-/// Includes search views -- they are just as editable as other kinds.
-pub(crate) fn find_collateral_view_uris (
-  saved_uri    : &ViewUri,
-  define_nodes : &[DefineNode],
-  views_state  : &ViewsState,
-) -> Vec<ViewUri> {
-  let changed_pids : HashSet<ID> =
-    define_nodes . iter ()
-    . filter_map ( |instr| match instr {
-      DefineNode::Save ( SaveNode (n)) => Some (n . pid . clone ()),
-      DefineNode::Delete (dn) => Some (dn . id . clone ()) } )
-    . collect ();
-  tracing::debug!(
-    "find_collateral_view_uris: {} changed PIDs, {} views in ViewsState",
-    changed_pids . len (),
-    views_state . open_views . views . len ());
-  let uris : HashSet<ViewUri> =
-    changed_pids . iter ()
-    . flat_map ( |pid| views_state . open_views . views_containing (pid) )
-    . filter ( |uri| uri != saved_uri )
-    . collect ();
-  uris . into_iter () . collect () }
 
 /// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): build a DE-NOVO (initial) content view by running the ONE
 /// post-save view completion (complete_viewforest) over a stub forest of the

@@ -69,8 +69,8 @@ impl RequestType {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TcpToClient {
   ContentView,
-  SaveLock, // Sent before the expensive save pipeline. Lists collateral view URIs so Emacs can lock those buffers against edits while the save is in progress.
-  SaveRelaxLock, // Sent after the SavePlan is computed and the graph updated, before the collateral-view stream. Lists the now-narrowed still-locked set (the EXACT collateral set), symmetric with SaveLock, so Emacs unlocks every buffer it locked early that turned out not to be collateral. Lets the user edit those during the rest of the pipeline (TODO/DONE/local-view-update/plan_v2.org §8.1).
+  SaveLock, // Sent before the expensive save pipeline. Acknowledges the clients' broad lock of all local views; its server-known URI list does not authorize narrowing.
+  SaveRelaxLock, // Sent after preparation and the dirty-view conflict check, before mutation. Lists collateral targets plus every dirty conflict-check input. The client also retains the saved view, and may unlock unrelated clean views.
   SaveResult,
   ForkConfirmation, // Terminal message of a save that found fork candidates and was not pre-approved: a read-only buffer listing the foreign nodes about to be forked, for the user to approve (re-issue the save with (fork-approved . "true")) or decline. Sent after SaveLock, in place of SaveResult; nothing is committed.
   TelescopeHoistConfirmation, // Terminal message of a save whose current disk inputs select title/body below home. Carries only pid/home pairs and a publication warning; an approved retry carries the exact pids. Nothing is committed.

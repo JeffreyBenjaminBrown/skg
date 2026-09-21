@@ -73,6 +73,8 @@ end
 
 ---Tear down connection and handler state between specs.
 function M.reset_client_state ()
+  require('skg.lock').end_stream()
+  require('skg.lock').unlock_all_save_locked()
   local state = require('skg.state')
   state.close_connection()
   state.response_handler_map = {}
