@@ -69,6 +69,7 @@ headline documenting `skg-search-interactive'."
                                               &optional overPrivateText-choice)
   "Request a text search from the Rust server.
 REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
+  (skg--begin-stream "search enrichment")
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
          (clean-terms (if (stringp search-terms)
                           (substring-no-properties search-terms)
@@ -97,7 +98,9 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
      ;; Register phase 2 handler for search results 'enriched' with containerward paths and graphnodestats. Persists until fired or replaced.
      'search-enrichment
      (lambda (_tcp-proc payload)
-       (skg--display-search-enrichment payload))
+       (unwind-protect
+           (skg--display-search-enrichment payload)
+         (skg--end-stream)))
      t)
     (skg-register-response-handler
      ;; Rust asks for a snapshot of the search buffer so it can
@@ -128,6 +131,7 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
                            (concat prompt " (No means exclude.) "))
                           "include"
                         "exclude")))
+         (skg--end-stream)
          (skg--request-text-search
           clean-terms regex body operators choice)))
      nil)
@@ -157,6 +161,7 @@ kill-buffer-hook to send close-view to the server."
           (heralds-minor-mode)
           (goto-char (point-min)))
         (setq skg-view-uri view-uri)
+        (skg--capture-clean-baseline)
         (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
         (run-hooks 'skg--search-buffer-setup-hook)
         (switch-to-buffer (current-buffer)) ))
@@ -186,8 +191,10 @@ Exits readonly after replacing content."
       (let ((buf (get-buffer (skg-search-buffer-name terms))))
         (when (buffer-live-p buf)
           (with-current-buffer buf
-            (let ((old-point (point)))
-              (skg--replace-search-content content)
+            (let ((old-point (point))
+                  (snapshot-was-dirty
+                   skg--search-snapshot-was-dirty))
+              (skg--replace-search-content content snapshot-was-dirty)
               (goto-char (min old-point (point-max))))
             (setq buffer-read-only nil)
             (message "Search results enriched.") )) ))
@@ -209,6 +216,7 @@ Exits readonly after replacing content."
                 (get-buffer (skg-search-buffer-name terms)))))
     (when (and buf (buffer-live-p buf))
       (with-current-buffer buf
+        (setq skg--search-snapshot-was-dirty (buffer-modified-p))
         (setq buffer-read-only t)
         (message "Enriching search results...")
         (let* ((buffer-contents (buffer-string))
@@ -226,9 +234,10 @@ Exits readonly after replacing content."
           (process-send-string tcp-proc header)
           (process-send-string tcp-proc buffer-contents))))))
 
-(defun skg--replace-search-content (content)
+(defun skg--replace-search-content (content &optional preserve-modified)
   "Replace current buffer text with CONTENT, trimmed, with trailing newline.
-Clears modified flag.
+PRESERVE-MODIFIED keeps the prior clean baseline and marks the enriched
+snapshot dirty because it contains unsaved user edits.
 Callers that do additional buffer work (e.g. org-mode setup)
 should bind inhibit-read-only themselves, since the buffer
 may already be read-only from a previous search."
@@ -237,6 +246,11 @@ may already be read-only from a previous search."
     (insert (string-trim content))
     (when (> (length content) 0)
       (insert "\n")))
-  (set-buffer-modified-p nil))
+  (if preserve-modified
+      (progn
+        (setq skg--search-enrichment-includes-user-edits t)
+        (set-buffer-modified-p t))
+    (set-buffer-modified-p nil)
+    (skg--capture-clean-baseline)))
 
 (provide 'skg-request-text-search)

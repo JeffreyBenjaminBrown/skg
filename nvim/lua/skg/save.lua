@@ -38,29 +38,6 @@ function M.other_unsaved_skg_buffers (buf)
   return result
 end
 
----If other skg buffers have unsaved edits this save's collateral
----rerenders might overwrite, warn loudly and ask before sending;
----errors (aborting the save) if the user declines. Skipped when no UI
----is attached (the analog of elisp's noninteractive), where there is
----no user to ask.
----@param buf integer
-function M.confirm_save_despite_other_unsaved (buf)
-  if #vim.api.nvim_list_uis() == 0 then return end
-  local others = M.other_unsaved_skg_buffers(buf)
-  if #others == 0 then return end
-  local names = {}
-  for _, other in ipairs(others) do
-    table.insert(names, vim.api.nvim_buf_get_name(other)) end
-  local choice = vim.fn.confirm(
-    string.format(
-      'DANGER: %d other skg buffer(s) have unsaved edits (%s) this'
-      .. ' save may overwrite. Save anyway?',
-      #others, table.concat(names, ', ')),
-    '&Yes\n&No', 2)
-  if choice ~= 1 then
-    error('Save aborted: other skg buffers have unsaved edits') end
-end
-
 ---Send the current buffer to the server. Before sending, 'folded'
 ---and 'focused' markers are added (for the wire) and then removed
 ---from what the user sees. If the save edited any FOREIGN node the
@@ -75,7 +52,6 @@ function M.request_save_buffer (fork_approved, fork_sources,
                                 hoist_approved_pids,
                                 text_approved_pids)
   local save_buf = vim.api.nvim_get_current_buf()
-  M.confirm_save_despite_other_unsaved(save_buf)
   local saved_uri = vim.b[save_buf].skg_view_uri
   if not saved_uri then
     -- A nil view-uri causes an unfiltered save AND the server won't
@@ -83,32 +59,38 @@ function M.request_save_buffer (fork_approved, fork_sources,
     error(string.format(
       "Cannot save: view uri is nil in buffer '%s'. Re-open the view.",
       vim.api.nvim_buf_get_name(save_buf))) end
+  lock.begin_stream('save')
+  lock.lock_all_skg_buffers()
+  local ok, err = pcall(
+    M.send_save_buffer, save_buf, saved_uri, fork_approved, fork_sources,
+    hoist_approved_pids, text_approved_pids)
+  if not ok then
+    M.cancel_locally_failed_save()
+    error(err) end
+end
+
+---Serialize and send a save after the stream guard and locks are held.
+function M.send_save_buffer (save_buf, saved_uri, fork_approved, fork_sources,
+                             hoist_approved_pids, text_approved_pids)
   local focused_line = focus.owning_headline_line()
   local focused_had_metadata = focused_line ~= nil
     and metadata.line_text(focused_line):match('^%*+ %(skg') ~= nil
   local save_point_position = M.current_save_point_position()
-  folds.add_folded_markers()
-  focus.add_focused_marker()
-  local buffer_contents = table.concat(
-    vim.api.nvim_buf_get_lines(save_buf, 0, -1, false), '\n')
+  local buffer_contents = M.snapshot_with_save_markers(
+    save_buf, focused_had_metadata)
+  local wire_content = sexpr.to_string({
+    { sexpr.symbol('saved-buffer'), buffer_contents },
+    { sexpr.symbol('other-views'),
+      M.other_view_save_snapshots(save_buf) },
+  })
   local request_line =
     M.save_request_string(saved_uri, save_point_position,
                           fork_approved, fork_sources,
                           hoist_approved_pids,
                           text_approved_pids)
-  do -- The server needs these markers, but the user doesn't.
-    focus.remove_focused_marker()
-    folds.remove_folded_markers()
-    if not focused_had_metadata then
-      M.strip_bare_skg_at_headline(focus.owning_headline_line()) end
-  end
-  lock.begin_stream('save')
-  -- Lock ALL skg view buffers before sending, eliminating the race
-  -- window between the send and the server's early response.
-  lock.lock_all_skg_buffers()
   state.register_response_handler('save-lock',
     function (_payload_text, response)
-      M.save_lock_handler(saved_uri, response)
+      M.broad_save_lock_handler(response)
     end, true)
   -- save-relax-lock: same handling, but with the EXACT collateral set
   -- (post-SavePlan). Registered NON-one-shot so it does not add to
@@ -117,7 +99,7 @@ function M.request_save_buffer (fork_approved, fork_sources,
   -- save-result removes it.
   state.register_response_handler('save-relax-lock',
     function (_payload_text, response)
-      M.save_lock_handler(saved_uri, response)
+      M.save_relax_lock_handler(saved_uri, response)
     end, false)
   state.register_response_handler('collateral-view',
     function (payload_text, response)
@@ -151,8 +133,78 @@ function M.request_save_buffer (fork_approved, fork_sources,
   state.lp_reset()
   client.send_string(request_line)
   client.send_string(string.format('Content-Length: %d\r\n\r\n',
-                                   #buffer_contents))
-  client.send_string(buffer_contents)
+                                   #wire_content))
+  client.send_string(wire_content)
+end
+
+---Return the current text with transient save markers, restoring the buffer.
+---The save lock is synchronously suspended only for the client's internal
+---marker edits and restored before any request is sent.
+---@param save_buf integer
+---@param focused_had_metadata boolean
+---@return string
+function M.snapshot_with_save_markers (save_buf, focused_had_metadata)
+  local was_save_locked = vim.b[save_buf].skg_save_locked == true
+  if was_save_locked then vim.bo[save_buf].modifiable = true end
+  local ok, result = pcall(function ()
+    folds.add_folded_markers()
+    focus.add_focused_marker()
+    return buffer.text(save_buf)
+  end)
+  -- Cleanup is best-effort even when marker insertion or capture failed.
+  pcall(focus.remove_focused_marker)
+  pcall(folds.remove_folded_markers)
+  if not focused_had_metadata then
+    pcall(M.strip_bare_skg_at_headline, focus.owning_headline_line()) end
+  if was_save_locked then vim.bo[save_buf].modifiable = false end
+  if not ok then error(result) end
+  return result
+end
+
+---@param save_buf integer
+---@return table[]
+function M.other_view_save_snapshots (save_buf)
+  local result = {}
+  for _, other in ipairs(vim.api.nvim_list_bufs()) do
+    local uri = vim.api.nvim_buf_is_valid(other)
+                and vim.b[other].skg_view_uri or nil
+    if other ~= save_buf and uri then
+      local entry = {
+        { sexpr.symbol('view-uri'), uri },
+        { sexpr.symbol('dirty'),
+          sexpr.symbol(vim.bo[other].modified and 'true' or 'false') },
+      }
+      if vim.bo[other].modified then
+        local baseline = vim.b[other].skg_clean_baseline
+        table.insert(entry, {
+          sexpr.symbol('baseline'),
+          type(baseline) == 'string'
+            and { sexpr.symbol('present'), baseline }
+            or sexpr.symbol('unavailable'),
+        })
+        table.insert(entry, {
+          sexpr.symbol('current'), buffer.text(other),
+        })
+      end
+      table.insert(result, entry)
+    end
+  end
+  return result
+end
+
+function M.cancel_locally_failed_save ()
+  for _, response_type in ipairs({ 'save-lock', 'save-result' }) do
+    if state.response_handler_map[response_type] then
+      state.lp_pending_count = math.max(0, state.lp_pending_count - 1) end
+  end
+  for _, response_type in ipairs({
+      'save-lock', 'save-relax-lock', 'collateral-view', 'save-result',
+      'fork-confirmation', 'telescope-hoist-confirmation',
+      'overPrivateText-telescope-confirmation' }) do
+    state.response_handler_map[response_type] = nil
+  end
+  lock.end_stream()
+  lock.unlock_all_save_locked()
 end
 
 ---The save-buffer request line.
@@ -224,21 +276,34 @@ function M.strip_bare_skg_at_headline (line_number)
   end
 end
 
----Handle save-lock / save-relax-lock: unlock buffers not in the
----collateral set (the saved buffer stays locked until save-result).
----@param saved_uri string
+---Validate the broad save-lock acknowledgement without narrowing locks.
 ---@param response any
-function M.save_lock_handler (saved_uri, response)
+function M.broad_save_lock_handler (response)
   local ok, err = pcall(function ()
     local lock_views = payload.field(response, 'lock-views')
-    if lock_views ~= nil then
-      lock.unlock_non_collateral_buffers(
-        saved_uri, payload.string_list(lock_views)) end
+    if lock_views == nil then error('missing lock-views') end
+    payload.string_list(lock_views)
   end)
   if not ok then
-    -- Keep the saved buffer locked until save-result; free the rest.
-    lock.unlock_non_collateral_buffers(saved_uri, nil)
-    log.log('error', 'save', 'save-lock handler error: %s',
+    -- A malformed acknowledgement cannot safely authorize any unlock.
+    log.log('error', 'save', 'broad save-lock handler error: %s',
+            tostring(err))
+  end
+end
+
+---Narrow broad locks to SAVED_URI and the URIs in RESPONSE.
+---@param saved_uri string
+---@param response any
+function M.save_relax_lock_handler (saved_uri, response)
+  local ok, err = pcall(function ()
+    local lock_views = payload.field(response, 'lock-views')
+    if lock_views == nil then error('missing lock-views') end
+    lock.unlock_non_collateral_buffers(
+      saved_uri, payload.string_list(lock_views))
+  end)
+  if not ok then
+    -- Retain every lock when the keep-set cannot be trusted.
+    log.log('error', 'save', 'save-relax-lock handler error: %s',
             tostring(err))
   end
 end
@@ -339,7 +404,6 @@ end
 ---@param save_point_position table|nil
 function M.replace_buffer_with_new_content (buf, new_content,
                                             save_point_position)
-  buffer.disarm_first_change_warning(buf)
   vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false,
                              vim.split(new_content, '\n'))
@@ -365,7 +429,7 @@ function M.replace_buffer_with_new_content (buf, new_content,
     vim.api.nvim_buf_call(buf, act_on_markers)
   end
   vim.bo[buf].modified = false
-  buffer.arm_first_change_warning(buf)
+  buffer.capture_clean_baseline(buf)
   vim.notify('Buffer updated with processed content from Rust')
 end
 

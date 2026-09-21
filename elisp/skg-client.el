@@ -21,6 +21,7 @@
 (require 'skg-request-git-diff-mode)
 (require 'skg-request-rebuild-ephemeral-data-stores)
 (require 'skg-request-rerender-all-views)
+(require 'skg-recovery)
 (require 'skg-request-save)
 (require 'skg-request-source-sets)
 (require 'skg-request-stage-moves)

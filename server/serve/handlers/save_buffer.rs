@@ -7,7 +7,7 @@ use crate::git_ops::diff::compute_diff_for_source;
 use crate::git_ops::read_repo::{open_repo, head_is_merge_commit};
 use crate::save::{
   apply_delete_propagation_cleanup,
-  update_graph_including_nodeMerges_under_mutation_gate,
+  PreparedSave, prepare_save_under_mutation_gate,
 };
 use crate::serve::ViewsState;
 use crate::source_sets::ActiveSourceSet;
@@ -22,6 +22,9 @@ use crate::serve::handlers::telescope_hoist::{
 };
 use crate::serve::handlers::text_release::{
   approved_pids_from_request as text_approved_pids_from_request,
+};
+use crate::serve::handlers::save_dependencies::{
+  SaveAffectedIds, dirty_view_conflicts, format_conflict_error,
 };
 use crate::serve::util::{
   view_uri_from_request,
@@ -74,6 +77,19 @@ pub struct SaveResponse {
   /// Fully tagged overPrivateText-telescope-confirmation response produced after the
   /// save's rerenders have been staged but before text or view-state release.
   pub text_release_confirmation : Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClientViewSnapshot {
+  pub uri      : ViewUri,
+  pub dirty    : bool,
+  pub baseline : Option<String>,
+  pub current  : Option<String>,
+}
+
+struct SaveRequestEnvelope {
+  saved_buffer : String,
+  other_views  : Vec<ClientViewSnapshot>,
 }
 
 #[derive(Clone)]
@@ -147,14 +163,17 @@ pub fn handle_save_buffer_request (
     send_response_with_length_prefix (
       stream,
       & tag_sexp_response ( TcpToClient::SaveLock, &lock_sexp )); }
-  match read_length_prefixed_content (reader) {
-    Ok (initial_buffer_content) => {
+  match read_length_prefixed_content (reader)
+    .and_then (|content| parse_save_request_envelope (
+      &content, viewuri_from_request_result . as_ref () . ok ()))
+  {
+    Ok (envelope) => {
       { let _span : tracing::span::EnteredSpan = tracing::info_span!(
           "update_from_and_rerender_buffer" ). entered();
         match block_on(
           update_from_and_rerender_buffer_with_approvals (
             stream,
-            & initial_buffer_content,
+            & envelope . saved_buffer,
             env,
             views_state . diff_mode_enabled,
             &viewuri_from_request_result,
@@ -163,7 +182,8 @@ pub fn handle_save_buffer_request (
             fork_approved,
             &fork_sources,
             &hoist_approved_pids,
-            &text_approved_pids ))
+            &text_approved_pids,
+            &envelope . other_views ))
         { Ok (mut save_response) => {
             save_response . save_point_position =
               save_point_position . clone ();
@@ -229,7 +249,7 @@ pub fn handle_save_buffer_request (
                   TcpToClient::SaveResult, &response_sexp )); }} }}; }
     Err (err) => {
       let error_msg : String =
-        format! ("Error reading buffer content: {}", err );
+        format! ("Error reading save payload: {}", err );
       tracing::error! ( "{}", error_msg );
       let response_sexp : String =
         empty_response_sexp (
@@ -241,6 +261,153 @@ pub fn handle_save_buffer_request (
         stream,
         & tag_sexp_response (
           TcpToClient::SaveResult, &response_sexp )); }} }
+
+fn parse_save_request_envelope (
+  content   : &str,
+  saved_uri : Option<&ViewUri>,
+) -> Result<SaveRequestEnvelope, Box<dyn Error>> {
+  let parsed : Sexp = sexp::parse (content)
+    .map_err (|error| format! ("Malformed save envelope: {}", error)) ?;
+  let fields : &[Sexp] = sexp_list (&parsed, "save envelope") ?;
+  let saved_buffer_value : &Sexp = unique_field (
+    fields, "saved-buffer", "save envelope") ?;
+  let saved_buffer : String = sexp_atom_string (
+    saved_buffer_value, "saved-buffer") ?;
+  let other_views_value : &Sexp = unique_field (
+    fields, "other-views", "save envelope") ?;
+  let other_view_entries : &[Sexp] = sexp_list (
+    other_views_value, "other-views") ?;
+  let mut other_views : Vec<ClientViewSnapshot> = Vec::new ();
+  let mut seen_uris : HashSet<ViewUri> = HashSet::new ();
+  for entry in other_view_entries {
+    let entry_fields : &[Sexp] = sexp_list (entry, "other view") ?;
+    let uri : ViewUri = ViewUri::from_client_string (sexp_atom_string (
+      unique_field (entry_fields, "view-uri", "other view") ?,
+      "other view-uri") ?);
+    if saved_uri == Some (&uri) {
+      return Err (format! (
+        "Malformed save envelope: saved URI {} appears in other-views",
+        uri . repr_in_client ()) . into ()); }
+    if ! seen_uris . insert (uri . clone ()) {
+      return Err (format! (
+        "Malformed save envelope: duplicate other view URI {}",
+        uri . repr_in_client ()) . into ()); }
+    let dirty_text : String = sexp_atom_string (
+      unique_field (entry_fields, "dirty", "other view") ?, "dirty") ?;
+    let dirty : bool = match dirty_text . as_str () {
+      "true"  => true,
+      "false" => false,
+      _ => return Err (format! (
+        "Malformed save envelope: dirty must be true or false for {}",
+        uri . repr_in_client ()) . into ()), };
+    let baseline_field : Option<&Sexp> = optional_unique_field (
+      entry_fields, "baseline", "other view") ?;
+    let current_field : Option<&Sexp> = optional_unique_field (
+      entry_fields, "current", "other view") ?;
+    let (baseline, current) : (Option<String>, Option<String>) = if dirty {
+      let baseline : Option<String> = parse_baseline (
+        baseline_field . ok_or_else (|| format! (
+          "Malformed save envelope: dirty view {} has no baseline field",
+          uri . repr_in_client ())) ?) ?;
+      let current : String = sexp_atom_string (
+        current_field . ok_or_else (|| format! (
+          "Malformed save envelope: dirty view {} has no current text",
+          uri . repr_in_client ())) ?, "current") ?;
+      (baseline, Some (current))
+    } else {
+      if baseline_field . is_some () || current_field . is_some () {
+        return Err (format! (
+          "Malformed save envelope: clean view {} carries dirty snapshots",
+          uri . repr_in_client ()) . into ()); }
+      (None, None)
+    };
+    for field in entry_fields {
+      let (key, _) : (&str, &Sexp) = field_pair (field, "other view") ?;
+      if ! ["view-uri", "dirty", "baseline", "current"] . contains (&key) {
+        return Err (format! (
+          "Malformed save envelope: unknown other-view field {}", key)
+          . into ()); }}
+    other_views . push (ClientViewSnapshot {
+      uri, dirty, baseline, current, }); }
+  for field in fields {
+    let (key, _) : (&str, &Sexp) = field_pair (field, "save envelope") ?;
+    if ! ["saved-buffer", "other-views"] . contains (&key) {
+      return Err (format! (
+        "Malformed save envelope: unknown field {}", key) . into ()); }}
+  Ok (SaveRequestEnvelope { saved_buffer, other_views })
+}
+
+fn parse_baseline (
+  value : &Sexp,
+) -> Result<Option<String>, Box<dyn Error>> {
+  match value {
+    Sexp::Atom (Atom::S (status)) if status == "unavailable" => Ok (None),
+    Sexp::List (items) if items . len () == 2 => {
+      let status : String = sexp_atom_string (&items [0], "baseline status") ?;
+      if status != "present" {
+        return Err ("Malformed save envelope: baseline wrapper must begin with present" . into ()); }
+      Ok (Some (sexp_atom_string (&items [1], "baseline text") ?)) }
+    _ => Err ("Malformed save envelope: baseline must be unavailable or (present TEXT)" . into ()), }
+}
+
+fn unique_field<'a> (
+  fields  : &'a [Sexp],
+  key     : &str,
+  context : &str,
+) -> Result<&'a Sexp, Box<dyn Error>> {
+  optional_unique_field (fields, key, context) ? . ok_or_else (||
+    format! ("Malformed {}: missing {}", context, key) . into ())
+}
+
+fn optional_unique_field<'a> (
+  fields  : &'a [Sexp],
+  key     : &str,
+  context : &str,
+) -> Result<Option<&'a Sexp>, Box<dyn Error>> {
+  let mut matches : Vec<&Sexp> = Vec::new ();
+  for field in fields {
+    let (candidate, value) : (&str, &Sexp) = field_pair (field, context) ?;
+    if candidate == key { matches . push (value); }}
+  match matches . as_slice () {
+    []      => Ok (None),
+    [value] => Ok (Some (*value)),
+    _       => Err (format! (
+      "Malformed {}: duplicate {}", context, key) . into ()), }
+}
+
+fn field_pair<'a> (
+  value   : &'a Sexp,
+  context : &str,
+) -> Result<(&'a str, &'a Sexp), Box<dyn Error>> {
+  let items : &[Sexp] = sexp_list (value, context) ?;
+  if items . len () != 2 {
+    return Err (format! (
+      "Malformed {}: each field must contain a key and value", context)
+      . into ()); }
+  let key : &str = match &items [0] {
+    Sexp::Atom (Atom::S (key)) => key,
+    _ => return Err (format! (
+      "Malformed {}: field key must be an atom", context) . into ()), };
+  Ok ((key, &items [1]))
+}
+
+fn sexp_list<'a> (
+  value   : &'a Sexp,
+  context : &str,
+) -> Result<&'a [Sexp], Box<dyn Error>> {
+  match value {
+    Sexp::List (items) => Ok (items),
+    _ => Err (format! ("Malformed {}: expected a list", context) . into ()), }
+}
+
+fn sexp_atom_string (
+  value   : &Sexp,
+  context : &str,
+) -> Result<String, Box<dyn Error>> {
+  match value {
+    Sexp::Atom (Atom::S (text)) => Ok (text . clone ()),
+    _ => Err (format! ("Malformed {}: expected text", context) . into ()), }
+}
 
 /// Create an s-expression with nil content and an error message.
 fn empty_response_sexp (
@@ -424,7 +591,7 @@ pub async fn update_from_and_rerender_buffer_with_hoist_approval (
     stream, org_buffer_text, env, diff_mode_enabled,
     viewuri_from_request_result, views_state, active_source_set,
     fork_approved, fork_sources, hoist_approved_pids,
-    &HashSet::new () ) . await
+    &HashSet::new (), &[] ) . await
 }
 
 pub async fn update_from_and_rerender_buffer_with_approvals (
@@ -439,6 +606,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
   fork_sources                 : &HashMap<ID, SourceName>,
   hoist_approved_pids         : &HashSet<ID>,
   text_approved_pids        : &HashSet<ID>,
+  other_views               : &[ClientViewSnapshot],
 ) -> Result<SaveResponse, Box<dyn Error>> {
   // Save-plan construction reads the current files and graph.  Hold the sole
   // writer gate from before those reads through publication, or two requests
@@ -537,24 +705,51 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       . chain ( nodeMerges . iter ()
                 . flat_map ( |nodeMerge| nodeMerge . to_vec () ))
     . collect () };
-  let deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>> =
-  { // update the graph. Context origin types (for search ranking) are
-    // computed from the post-save in-Rust graph and written inside the
-    // single Tantivy index pass, so there is no separate context pass.
+  let prepared_save : PreparedSave =
+  { // Prepare every graph/filesystem phase while the writer gate is held.
     let _span : tracing::span::EnteredSpan = tracing::info_span!(
-      "update_graph_including_nodeMerges" ). entered();
-    update_graph_including_nodeMerges_under_mutation_gate (
+      "prepare_save" ). entered();
+    prepare_save_under_mutation_gate (
       nonmerge_defineNodes . clone(),
       &nodeMerges,
       &source_moves,
-      (*runtime . config) . clone(),
-      &mut working_tantivy,
+      &runtime . config,
       &working_graph,
       hoist_approved_pids )
     // Warnings always accompany errors: a post-parse validation
     // failure (e.g. the override-invariant check) back-fills the
     // save's parse-time warnings, which the error itself did not see.
     . map_err ( |e| backfill_parse_warnings (e, &parse_warnings) ) ? };
+  let affected_ids : SaveAffectedIds =
+    SaveAffectedIds::from_prepared (&prepared_save);
+  let dirty_conflicts = dirty_view_conflicts (
+    other_views, views_state, &affected_ids,
+    prepared_save . graph_before_save (),
+    prepared_save . final_candidate ())
+    .map_err (|message| -> Box<dyn Error> {
+      Box::new (SaveError::BufferValidationErrors {
+        errors : vec![crate::types::errors::BufferValidationError::Other (
+          message)],
+        warnings : parse_warnings . clone (), }) }) ?;
+  if ! dirty_conflicts . is_empty () {
+    return Err (Box::new (SaveError::BufferValidationErrors {
+      errors : vec![crate::types::errors::BufferValidationError::Other (
+        format_conflict_error (&dirty_conflicts))],
+      warnings : parse_warnings, })); }
+  let collateral_uris : Vec<ViewUri> = viewuri_from_request_result . as_ref ()
+    .map (|saved_uri| affected_ids . collateral_view_uris (
+      saved_uri, views_state,
+      prepared_save . graph_before_save (),
+      prepared_save . final_candidate ()))
+    .unwrap_or_default ();
+  let deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>> =
+  { // Apply the already-checked preparation. Context origin types are
+    // computed from the post-save graph in the ordinary apply path.
+    let _span : tracing::span::EnteredSpan = tracing::info_span!(
+      "apply_prepared_save" ). entered();
+    prepared_save . apply (
+      (*runtime . config) . clone (), &mut working_tantivy, &working_graph )
+    .map_err ( |e| backfill_parse_warnings (e, &parse_warnings) ) ? };
   let published = env . runtime . publish (
     runtime . config . clone (), working_graph . load_full (), working_tantivy);
   // Rerender reads the newly published graph but performs no authoritative
@@ -578,6 +773,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
         stream,
         viewforest,
         define_nodes,
+        collateral_uris,
         diff_mode_enabled,
         env,
         published . clone (),

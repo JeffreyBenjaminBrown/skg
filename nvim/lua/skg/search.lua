@@ -6,6 +6,7 @@
 local buffer = require('skg.buffer')
 local client = require('skg.client')
 local heralds = require('skg.heralds')
+local lock = require('skg.lock')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
 local sexpr = require('skg.sexpr.parse')
@@ -82,6 +83,7 @@ end
 ---@param operators boolean
 function M.request_text_search (search_terms, regex, body, operators,
                                 overPrivateText_choice)
+  lock.begin_stream('search enrichment')
   local request_form = {
     sexpr.pair(sexpr.symbol('request'), 'text search'),
     sexpr.pair(sexpr.symbol('terms'), search_terms),
@@ -100,7 +102,9 @@ function M.request_text_search (search_terms, regex, body, operators,
     end, true)
   state.register_response_handler('search-enrichment',
     function (_payload_text, response)
-      M.display_search_enrichment(response)
+      local ok, err = pcall(M.display_search_enrichment, response)
+      lock.end_stream()
+      if not ok then error(err) end
     end, true)
   state.register_response_handler('request-snapshot',
     function (_payload_text, response)
@@ -123,6 +127,7 @@ function M.request_text_search (search_terms, regex, body, operators,
         'Include overPrivateText telescopes in this search?'
       local choice = vim.fn.confirm(
         prompt, '&Include\n&Exclude', 2) == 1 and 'include' or 'exclude'
+      lock.end_stream()
       M.request_text_search(
         search_terms, regex, body, operators, choice)
     end, false)
@@ -158,7 +163,8 @@ function M.display_search_enrichment (response)
   local buf = buffer.find_buffer_by_uri('search:' .. terms)
   if not buf then return end
   vim.bo[buf].modifiable = true
-  buffer.disarm_first_change_warning(buf)
+  local snapshot_was_dirty =
+    vim.b[buf].skg_search_snapshot_was_dirty == true
   local cursor_saved = nil
   for _, win in ipairs(vim.api.nvim_list_wins()) do
     if vim.api.nvim_win_get_buf(win) == buf then
@@ -173,8 +179,13 @@ function M.display_search_enrichment (response)
     pcall(vim.api.nvim_win_set_cursor, cursor_saved[1],
           { math.min(cursor[1], line_count), cursor[2] })
   end
-  vim.bo[buf].modified = false
-  buffer.arm_first_change_warning(buf)
+  if snapshot_was_dirty then
+    vim.b[buf].skg_search_enrichment_includes_user_edits = true
+    vim.bo[buf].modified = true
+  else
+    vim.bo[buf].modified = false
+    buffer.capture_clean_baseline(buf)
+  end
   heralds.enable(buf)
   vim.notify('Search results enriched.')
   M.display_warnings(
@@ -197,6 +208,7 @@ function M.handle_snapshot_request (response)
   local terms = payload.field_text(response, 'content')
   local buf = terms and buffer.find_buffer_by_uri('search:' .. terms)
   if not buf then return end
+  vim.b[buf].skg_search_snapshot_was_dirty = vim.bo[buf].modified
   vim.bo[buf].modifiable = false
   vim.notify('Enriching search results...')
   local contents = table.concat(

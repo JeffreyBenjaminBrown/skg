@@ -23,6 +23,8 @@ local M = {}
 M.commands = {
   Save = { module = 'skg.save', fn = 'request_save_buffer',
            desc = 'Save the view; the server rebuilds it' },
+  ShowUnsavedChanges = { module = 'skg.recovery', fn = 'show_unsaved_changes',
+                         desc = 'Archive this view baseline and unsaved text' },
   Delete = { module = 'skg.metadata', fn = 'delete',
              desc = 'Mark the node at point for deletion' },
   DeleteRecursive = { module = 'skg.metadata', fn = 'delete_recursive',

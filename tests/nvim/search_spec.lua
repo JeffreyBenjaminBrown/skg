@@ -11,6 +11,7 @@ local helpers = dofile(
 local buffer = require('skg.buffer')
 local search = require('skg.search')
 local search_make_link = require('skg.search_make_link')
+local sexpr = require('skg.sexpr.parse')
 
 describe('skg.search', function ()
   local server
@@ -91,6 +92,30 @@ describe('skg.search', function ()
     assert.is_truthy(text:find('first result enriched', 1, true))
     -- Read-only was dropped again after enrichment.
     assert.is_true(vim.bo[buf].modifiable)
+  end)
+
+  it('dirty enrichment preserves the clean baseline and dirty flag',
+     function ()
+    local buf = buffer.open_org_buffer_from_text(
+      '* clean\n', buffer.search_buffer_name('dirty'), 'search:dirty')
+    local baseline = vim.b[buf].skg_clean_baseline
+    vim.api.nvim_buf_set_lines(buf, 1, 1, false, { 'user edit' })
+    vim.b[buf].skg_search_snapshot_was_dirty = true
+    search.display_search_enrichment(sexpr.read(
+      '((terms "dirty") (content "* enriched\\nuser edit") (warnings ()))'))
+    assert.is_true(vim.bo[buf].modified)
+    assert.are.equal(baseline, vim.b[buf].skg_clean_baseline)
+    assert.is_true(vim.b[buf].skg_search_enrichment_includes_user_edits)
+  end)
+
+  it('clean enrichment establishes a new clean baseline', function ()
+    local buf = buffer.open_org_buffer_from_text(
+      '* clean\n', buffer.search_buffer_name('clean'), 'search:clean')
+    vim.b[buf].skg_search_snapshot_was_dirty = false
+    search.display_search_enrichment(sexpr.read(
+      '((terms "clean") (content "* enriched") (warnings ()))'))
+    assert.is_false(vim.bo[buf].modified)
+    assert.are.equal('* enriched\n', vim.b[buf].skg_clean_baseline)
   end)
 
   it('search_make_link finish inserts a link at the recorded spot',

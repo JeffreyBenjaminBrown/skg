@@ -9,6 +9,7 @@ pub mod herald_rules;
 pub mod rebuild_ephemeral_data_stores;
 pub mod rerender_all_views;
 pub mod save_buffer;
+pub(crate) mod save_dependencies;
 pub mod text_release;
 pub mod single_root_view;
 pub mod source_sets;

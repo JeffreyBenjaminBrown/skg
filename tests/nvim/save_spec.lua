@@ -132,7 +132,7 @@ describe('skg.save pipeline', function ()
     assert.is_false(vim.bo[buf].modified)
   end)
 
-  it('locks all views, then unlocks non-collateral on save-lock',
+  it('retains broad locks until save-relax-lock narrows them',
      function ()
     local respond_fn = nil
     server = helpers.connect_to_fake_server(function (line, respond)
@@ -155,13 +155,18 @@ describe('skg.save pipeline', function ()
     assert.is_false(vim.bo[saved].modifiable)
     assert.is_false(vim.bo[collateral].modifiable)
     assert.is_false(vim.bo[bystander].modifiable)
-    vim.wait(3000, function ()
-      return vim.bo[bystander].modifiable end, 10)
-    -- save-lock arrived: the bystander is free, the saved view and
-    -- the collateral stay locked until their updates arrive.
-    assert.is_true(vim.bo[bystander].modifiable)
+    vim.wait(3000, function () return respond_fn ~= nil end, 10)
+    vim.wait(50)
+    -- save-lock only acknowledges the broad client lock.  In particular,
+    -- views unknown to the server cannot be released from that message.
+    assert.is_false(vim.bo[bystander].modifiable)
     assert.is_false(vim.bo[saved].modifiable)
     assert.is_false(vim.bo[collateral].modifiable)
+    respond_fn(helpers.framed(
+      '((response-type save-relax-lock)'
+      .. ' (lock-views (uri-collateral)))'))
+    vim.wait(3000, function () return vim.bo[bystander].modifiable end, 10)
+    assert.is_true(vim.bo[bystander].modifiable)
     -- Stream the collateral update, then the terminal result.
     respond_fn(helpers.framed(
       '((response-type collateral-view) (view-uri uri-collateral)'
