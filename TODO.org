@@ -1,27 +1,7 @@
 * REMEMBER
 ** not to dirty the production skg's code.
 ** to set the model
-* ONGOING TODO/one-hop-collateral-neighborhood/
-* TODO change how link heralds look
-** tone down the yellow "a = parent" herald
-same yellow but 1/4 as bright
-** don't show full H or O stats in herald
-Just a * on either side if there is action on that side.
-** simplify link kherald
-<body, children or multiple links in headline> / <total links>
-Make the first the "interesting stat" font,
-currently white on an orange background like for multiple containers.
-(Is that used anywhere else? Should it be?)
-if the first would be zero, omit it and the slash.
-** make the content herald of asubscribee-as-such resemble link heralds
-C<unintegrated>/<all>
-Unintegrated gets the interesting-stat font.
-Unintegrated and slash are omitted if unintegrated = 0.
-** document all these changes wherever heralds are documented for the user
-and review that documentation to make sure it is accurate.
-If it doesn't exist, make it; if it's outside of docs/,
-collect it there.
-** The entire overrides herald should get the interesting font.
+* ONGOING TODO/heralds_sept-2026/heralds_sept-2026/
 * next
 ** for video
 *** AWAITS navigate point through herald (overlay)

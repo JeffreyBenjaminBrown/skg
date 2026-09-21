@@ -1,0 +1,40 @@
+* vision : updates to the herald system
+** tone down the yellow "a = parent" herald
+same yellow but 1/4 as bright
+** simplify link kherald
+<body, children or multiple links in headline> / <total links>
+Make the first the "interesting stat" font,
+currently white on an orange background like for multiple containers.
+(Is that used anywhere else? Should it be?)
+if the first would be zero, omit it and the slash.
+** make the content herald of asubscribee-as-such resemble link heralds
+C<unintegrated content>/<total content>
+Unintegrated gets the interesting-stat font.
+Unintegrated and slash are omitted if unintegrated = 0.
+** The override character 'O' always gets the interesting font
+to mitigate the danger that the user edits one thing
+while thinking they are editing another.
+** add 'skg-toggle-link-target-source-overlays'
+This would insert an overlay suffix indicating the source of each link
+after each link label. It would use the same green look as the sources
+shown for each node. It will be handy if the user follows a link
+and then discovers the thing they landed at is overridden,
+to determine whether they were redirected by an override.
+
+Is that an inelegant solution to the problem of knowing
+whether you followed an override? It wouldn't even be enough information,
+if it were true that override relationships could connect nodes
+in the same source. Can they? Should they be able to?
+(At first blush it seems silly to do that --
+if I have two public notes on love, one of which overrides the other,
+why do I have them both there? By contrast,
+it's clear why I might want my private note on love
+to override my public note on love.)
+** evaluate the experience of the system
+Could the herald system be simpler? More coherent?
+If you were a user, are there stats you would want to see at a glance
+from the heralds that are not present yet?
+** document all changes we introduce wherever heralds are documented for the user
+and review that documentation to make sure it is accurate.
+If it doesn't exist, make it; if it's outside of docs/,
+collect it there.
