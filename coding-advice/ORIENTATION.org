@@ -1,9 +1,19 @@
+* Start here
+Read this file and [[file:to-save-tokens.org][the default token-conservation advice]] once at the
+start of a task. Then use the reading guide below for the work actually in
+scope. Do not reread unchanged advice for every follow-up in the same task.
+Do not load the whole folder or 'maybe-obsolete/' as routine onboarding.
+
 * How to work
 ** Conserve tokens
-Read [[file:to-save-tokens.org][the token-conservation advice]] and apply it throughout the task.
 Before a tool call, identify the unresolved question it will settle. Work one
 narrow, tested slice at a time; use focused reads and tests; do not duplicate
 an investigation that another agent owns.
+** Follow the requested scope
+A request for a review, diagnosis, discussion, or plan ends with that
+deliverable; it does not authorize implementing the proposed changes.
+When asked to implement, continue through the agreed work and verification.
+The detailed execution and stop rules are in [[file:when-to-stop.org]].
 ** Edit conservatively
 Do not alter Git configuration, credentials, index, branches, or commits
 unless explicitly asked. Do not gratuitously rename things or add legacy
@@ -14,7 +24,7 @@ code differ.
 Do not change or commit git state unless explicitly asked.
 If asked to commit, I probably meant to ask for granular commits
 that will make the history easy to spelunk, rather than one mega-commit.
-*** That said, name verbosely, as described in [[./naming.org]].
+Use verbose, understandable names as described in [[file:names.org]].
 ** Push back when needed
 Call out requests that are vague, contradictory, inefficient, unnecessary, or
 overly complex rather than silently guessing at a bad interpretation.
@@ -27,10 +37,9 @@ server retains one interactive user and admits one interactive client at a
 time.
 
 For a task, start with the smallest relevant local source:
-** [[file:../README.org][README.org]] for a concise project map and entry points.
+** [[file:../README.org][README.org]] for a project introduction and documentation entry points.
 ** [[file:../api-and-formats.md][api-and-formats.md]] for protocol, view metadata, configuration, and file-format contracts.
-** [[file:../glossary.md][glossary.md]] and [[file:../docs/data-model.org][docs/data-model.org]] for domain vocabulary and semantics.
-** all of this coding-advice/ except its maybe-obsolete/ subfolder
+** [[file:../glossary.md][glossary.md]], [[file:../docs/data-model_friendly.org][the conceptual data model]], and [[file:../docs/data-model_technical.org][the technical data model]] for domain vocabulary and semantics.
 ** The relevant implementation, callers, tests, and focused documentation for the requested behavior.
 
 Do not read all documentation or TODO material as onboarding; it's too much.
@@ -39,6 +48,34 @@ only when the current task points to it.
 The external knowledge graph is optional background material, not required
 orientation: the repository's code and local documentation contain the
 operative information for implementation.
+* Read the advice relevant to your task
+Read each selected file completely before applying it. Add another file
+when the task reaches that area; this guide is not permission to skip
+relevant instructions or source code.
+** Code changes
+Read [[file:names.org]], [[file:formatting.org]], [[file:ai-agents.org]],
+[[file:no-legacy-support.org]], and [[file:common-gotchas.md]]. For execution,
+also read [[file:when-to-stop.org]]. Consult [[file:architecture.md]] when the
+change crosses graph, storage, server, or client boundaries.
+** Reviews and plans
+Read [[file:architecture.md]] for architectural work and [[file:when-to-stop.org]]
+when deciding which implementation choices need Jeff's input. Read the
+code-change advice when reviewing or specifying the corresponding details.
+** Tests and debugging
+Read [[file:common-gotchas.md]]. Consult [[file:consider-experimenting.org]] for
+an uncertain algorithm or implementation technique, and
+[[file:pitfall_bytes-vs-characters.org]] for text offsets, slicing, or framing.
+** Containers, dependencies, and isolated server instances
+Read [[file:docker.org]] before environment or image work, or starting test
+servers whose ports and data paths need isolation.
+** Commits
+When Jeff has requested commits, read [[file:commit-messages.org]]. The advice
+does not itself authorize changing Git state.
+** Optional workflow machinery
+Read [[file:optional-workflows.org]] only when considering its quiet test
+wrapper, delegation, or long-task ledger. It explains which process choices
+need Jeff's agreement. An explicitly relevant archived reference can be
+read on its own without loading the rest of 'maybe-obsolete/'.
 * How to communicate and maintain knowledge with me
 For a response longer than a couple of paragraphs, prefer an Org file in the
 repository and link to it. Note that an org file uniformly of depth 2,
@@ -46,6 +83,8 @@ with bullets inside the bodies, is a weird LLM smell.
 The natural way knowledge divides is as a tree of verying depth,
 with complex parts being more bushy. And bullets defeat the purpose of org,
 so prefer headlines -- those let me (Jeff) respond granularly.
+Use single apostrophes around code references in Org, not double
+apostrophes; dense double-apostrophe wrappers can stall Org's parser.
 
 Report discovered bugs, specification deviations, important inefficiencies,
 or architectural opportunities in 'TODO/problems.org'.

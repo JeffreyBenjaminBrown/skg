@@ -343,10 +343,10 @@ and then we union V' and V''.
 Stated differently, while extending along one direction,
 we don't double back into the other direction.
 
-In the code then we should call this a "mostly one-hop neighborhood",
+In the code then we should call this an "update-relevant neighborhood",
 and define that in the glossary.
 **** Codex: adopt monotone override reachability, with two boundaries made explicit
-     Agreed on the name 'mostly one-hop neighborhood' and on documenting
+     Agreed on the name 'update-relevant neighborhood' and on documenting
      it in the glossary when implementing. For each graph snapshot and
      seed set S, I read your rule as:
 

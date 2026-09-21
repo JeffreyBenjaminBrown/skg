@@ -3,6 +3,18 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
+* Search enrichment can mark unsaved edits clean (2026-09-20)
+  Code review: search enrichment takes a snapshot of the current editor
+  text, preserves its edits while adding context, and returns that text.
+  Emacs 'skg--replace-search-content' and Neovim
+  'display_search_enrichment' unconditionally clear the modified flag.
+  Edits made between initial search results and the enrichment snapshot
+  can therefore stop counting as unsaved, despite no graph save occurring.
+
+  The proposed dirty-view conflict check must preserve the dirty flag
+  and clean baseline across such enrichment, or it can miss these views.
+  See [[file:one-hop-collateral-neighborhood/2_plan.org][the collateral implementation plan]]. This finding is based on code
+  inspection; the plan calls for regression coverage in both clients.
 * Collateral lock selection can miss nodes introduced into the saved view (2026-09-20)
   Code review: 'uris_of_views_to_lock' uses only the saved view's
   registered pre-save PIDs and sends 'save-lock' before reading incoming

@@ -1,0 +1,477 @@
+#+TITLE: Collateral refresh by update-relevant neighborhood and preservation of unsaved edits
+
+* Purpose and handoff
+  This implementation plan for Sol consolidates the accepted decisions
+  from [[file:1_discussion.org][the discussion]] and the current source. It states the design
+  to implement; the discussion is background, not a list of additional
+  alternatives to resolve. No implementation was performed while writing it.
+
+  Deliver correct collateral selection, refusal of saves that conflict
+  with another dirty view, and a durable way to extract unsaved edits.
+  Include both Emacs and Neovim: both currently implement the save
+  protocol, dirty-buffer warning, locks, and editable search views.
+
+  Use conservative reference matching for dirty-view conflicts, as
+  specified below. Implement one conflict algorithm.
+** Execution conventions
+   Read [[file:../../coding-advice/ORIENTATION.org][ORIENTATION.org]] and follow its applicable instructions.
+   Work in coherent slices, verify each slice,
+   commit incrementally, and preserve unrelated changes
+   Do not add legacy protocol support, a dependency cache, automatic
+   conflict merging, or a general version-validation system.
+
+   Use descriptive names and the project's existing formatting. Suggested
+   names below are implementation guidance, not a requirement to rename
+   existing helpers gratuitously. New Rust module folders use mod.rs.
+
+   Jeff specifically requested early lock narrowing as a separate commit.
+   Keep that change independently reviewable and commit it separately
+   when executing that instruction; do not infer authorization to commit
+   unrelated files or user edits. This planning turn makes no commits.
+   Follow [[file:../../coding-advice/commit-messages.org][the commit-message guidance]] rather than copying test logs into
+   commit messages.
+
+   During execution, apply [[file:../../coding-advice/when-to-stop.org][when-to-stop.org]]: resolve reversible local
+   choices yourself; stop for an unanticipated architectural decision or
+   a goal that appears impossible without an ugly workaround. At such a
+   stop, record the specified four categories in progress.org. This plan
+   does not require a separate chronological ledger,
+   delegation or the optional quiet-test workflow.
+
+* Settled behavior
+** Define an update-relevant neighborhood precisely
+   For seed IDs S and one graph snapshot G:
+
+   #+begin_example
+   M_G(S) = S
+            union immediate neighbors along the four non-override relations
+            union nodes reachable monotonically overriderward from S
+            union nodes reachable monotonically overriddenward from S.
+   #+end_example
+
+   The four ordinary relations are contains, textlinks_to, subscribes,
+   and hides_from_its_subscriptions, each traversed in both directions.
+   The override walks start independently from S. They never reverse
+   direction, and never start from an ordinary neighbor. Do not mix an
+   ordinary hop with an override walk or expand an ordinary neighbor again.
+   Include seeds even when deleted or unresolved. Traverse without source
+   visibility or ownership gating; rendering retains all existing gates.
+
+   Use independent visited sets for the two override directions. Traverse
+   all branches and terminate cycles without a depth cap. Foreign override
+   facts can branch or cycle; user-owned substitution constraints do not
+   justify treating this traversal as a single linked list.
+** Compute affected IDs once per save
+   W means all actual write/delete identities of the prepared save,
+   including delete cleanup, merge participants and preservation nodes,
+   fork clones, source moves, and repaired telescope writes.
+
+   #+begin_example
+   affected IDs = M_before(W) union M_after(W)
+   collateral views = other registered views intersecting affected IDs
+   #+end_example
+
+   Each graph is traversed separately. Unioning edges before traversal
+   could invent a path present in neither snapshot. Match IDs with the
+   snapshot-appropriate primary/extra-ID mapping, retaining raw spellings
+   needed for deleted or unresolved references. The identity details below
+   are necessary; never canonicalize only against the final graph.
+
+   Keep 'ViewState.pids' as actual active view membership. Do not insert
+   neighbors into it. Select content and search views, exclude the saved
+   URI, and deduplicate the selected URIs.
+** Refresh selected views through the existing whole-view completion
+   Reconcile collections and recompute heralds from the final graph.
+   Do not automatically display the selected neighborhood or add a
+   herald-only patch protocol. Newly exposed existing descendants must
+   be completed during the same rerender.
+
+   Preserve fold/focus restoration, write protection, source-set behavior,
+   diff behavior, and both text-release checks. Selecting a view is not
+   authorization to expose protected text.
+** Refuse conflicting saves before mutation
+   Replace the modal warning-and-proceed save policy with a hard refusal
+   identifying the other dirty views. A refused save must not write files,
+   publish a graph, queue an index update, replace views, or mark them clean.
+
+   Check the other dirty views' original ("clean") and current dependencies,
+   not just their last registered active IDs. Missing or unparseable dependency
+   information causes a conservative refusal, with a useful explanation.
+   Baseline IDs removed by local edits still count. Newly inserted nodes,
+   references, merge targets, and override markers must not disappear from
+   consideration simply because the server has not rendered them.
+
+*** Use conservative reference matching
+    Collect all relevant IDs from each dirty view into one set, including
+    bare textlink targets as well as displayed nodes and write targets.
+    Refuse the save when this set intersects the affected IDs. Do not
+    distinguish reference categories to exempt potentially harmless cases.
+
+    This intentionally refuses some independent saves. If A links to X
+    and dirty B also links to X, saving a title edit to A affects a
+    neighborhood containing X and therefore conflicts with B's reference
+    set. Refuse even when B displays only a literal link, not X or its
+    incoming-link herald. The simpler check is preferred to individually
+    classifying dependencies; extracting unsaved changes provides the
+    way forward when it refuses a save.
+** Provide a durable recovery command
+   'skg-show-unsaved-changes' creates and opens a detached recovery
+   document at a user-chosen path, preserving baseline text, current text,
+   context, and a readable diff. Tell the user that it was created and
+   give its actual path. Provide the equivalent Neovim command.
+
+   Do not save graph data, execute requests, close the source buffer, or
+   mark it clean. The user can close archived views, save the remaining
+   view, reopen fresh views, and manually reapply changes. Do not encourage
+   submitting an entire stale archived snapshot as a new save.
+
+* Code map and constraints to retain
+** Server save preparation and publication
+   [[file:../../server/serve/handlers/save_buffer.rs][save_buffer.rs]] owns the request lifecycle, confirmations, mutation
+   gate, preparation inputs, runtime publication, and call to rerender.
+   'update_from_and_rerender_buffer_with_approvals' is the main entry.
+
+   [[file:../../server/save.rs][save.rs]] / 'update_graph_including_nodeMerges_under_mutation_gate'
+   already prepares ordinary and merge graph updates and filesystem
+   updates before applying them. Its 'final_candidate' is the natural
+   pre-write graph for selection and conflict checking.
+
+   [[file:../../server/dbs/in_rust_graph/prepared_update.rs][prepared_update.rs]] contains 'PreparedGraphUpdate', immutable candidate
+   graphs, normalized definitions, and 'affected_ids'. The latter includes
+   touched primary IDs plus old/new extra IDs; it is identity bookkeeping,
+   not the update-relevant neighborhood requested here. 'verify_base'
+   protects applying preparation to the wrong graph snapshot.
+** Graph selection and rendering
+   [[file:../../server/update_buffer.rs][update_buffer.rs]] / 'find_collateral_view_uris' currently selects by
+   DefineNode PIDs alone. 'update_views_after_save' stages view text and
+   checks text release before updating the registry and streaming it.
+   Its current save-relax-lock send occurs after rendering.
+
+   [[file:../../server/types/views_state.rs][views_state.rs]] defines the registry and 'pids_from_viewforest'.
+   [[file:../../server/dbs/in_rust_graph/relation_accessors.rs][relation_accessors.rs]] provides ordinary and override neighbors;
+   [[file:../../server/dbs/in_rust_graph.rs][in_rust_graph.rs]] provides canonical IDs and inverse indexes.
+   Use ungated accessors, not 'resolve_override', for invalidation.
+   [[file:../../server/dbs/in_rust_graph/stats.rs][stats.rs]] / 'link_split' explains why text-only changes can affect
+   a neighbor's herald even when no relationship edge changes.
+** Parsing without interpreting a second save
+   [[file:../../server/from_text/buffer_to_viewnodes/uninterpreted.rs][uninterpreted.rs]] / 'org_to_uninterpreted_viewforest' parses raw Org
+   to a maybe-placed forest and returns errors separately. Dependency
+   collection can use this stage without filling missing IDs or running
+   'buffer_to_validated_saveplan'. Inspect both Result failures and the
+   returned error vector; never silently accept a partially parsed forest.
+
+   [[file:../../server/serve/parse_metadata_sexp.rs][parse_metadata_sexp.rs]], [[file:../../server/types/maybe_placed_viewnode.rs][maybe_placed_viewnode.rs]], and
+   [[file:../../server/types/viewnode.rs][viewnode.rs]] define ID-bearing fields. Reuse the textlink parser in
+   [[file:../../server/types/textlinks.rs][textlinks.rs]]. Do not invent a second regex-based Org parser in
+   each client. New nodes without IDs are valid dependency inputs; malformed
+   metadata is a different case.
+** Clients and tests
+   Emacs: [[file:../../elisp/skg-request-save.el][skg-request-save.el]], [[file:../../elisp/skg-request-save/skg-lock-buffers.el][skg-lock-buffers.el]],
+   [[file:../../elisp/skg-buffer.el][skg-buffer.el]], and [[file:../../elisp/skg-request-text-search.el][skg-request-text-search.el]].
+   Neovim: [[file:../../nvim/lua/skg/save.lua][save.lua]], [[file:../../nvim/lua/skg/lock.lua][lock.lua]],
+   [[file:../../nvim/lua/skg/buffer.lua][buffer.lua]], and [[file:../../nvim/lua/skg/search.lua][search.lua]].
+
+   Reuse collateral-message helpers in [[file:../../tests/collateral_partner_folder.rs][collateral_partner_folder.rs]]
+   and [[file:../../tests/collateral_subscribee_staleness.rs][collateral_subscribee_staleness.rs]]. Existing regressions include
+   [[file:../../tests/collateral_source_move.rs][source moves]], [[file:../../tests/collateral_delete.rs][deletion]], [[file:../../tests/unit/prepared_graph_update.rs][prepared graphs]],
+   and [[file:../../tests/save/extra_id_revocation.rs][two-phase save preflight]]. Search for callers before changing signatures.
+
+* Implementation sequence
+** TODO Implement and test the neighborhood and identity matching
+   Add a focused pure graph helper, with 'update_relevant_neighborhood'
+   in its name. Put traversal beside the existing relation accessors;
+   keep save/view policy outside this helper. Deduplicate seeds/results
+   and walk each override direction once for the entire seed set.
+*** Handle primary, extra, deleted, and unresolved IDs deliberately
+    Derive raw touched identities from both prepared stages and their
+    definitions. For each snapshot, resolve each raw identity to its
+    primary ID where possible, otherwise retain the raw ID. Traverse
+    that snapshot's relationships from those seeds.
+
+    For matching, retain raw touched identities and normalize each
+    candidate view/reference ID against both snapshots. Match if either
+    snapshot's corresponding canonical ID occurs in its affected set,
+    or its raw identity was touched. Do not forget raw outbound references:
+    PID-only outbound accessors drop unresolved targets, which matters
+    for dirty text linking to a currently missing node.
+
+    A merge's old PID may become an extra ID; inspect both prepared stages
+    so neither acquiree nor acquirer disappears from W. Source-only moves
+    must contribute their PID even if a preparation path reports them
+    separately from ordinary definitions. Write identity tests before
+    wiring selection into the handler.
+*** Regression cases
+    Exercise each ordinary relation in both directions; direct seed
+    matching; long override paths in both directions; branching foreign
+    overrides; cycles; no direction reversal; no mixed ordinary/override
+    paths; and no path assembled across old/new snapshots.
+
+    Exercise addition/removal of an edge, creation/deletion of its owner,
+    extra-ID references, merge identity changes, and dangling targets.
+    Include an unrelated view and a two-hop ordinary node that must not
+    be selected merely for being two hops away.
+** TODO Expose a prepared save without changing its transaction semantics
+   Split preparation from application in save.rs. A consuming preparation
+   value should retain the old graph, final candidate, both prepared graph
+   stages, both prepared filesystem stages, final write identities,
+   deleted extra IDs, and pending warnings needed by the existing apply path.
+   Reuse owned prepared values rather than reconstructing definitions later.
+
+   Preserve ordinary-before-merge application, filesystem preflight,
+   base-snapshot verification, warning behavior, and runtime publication.
+   Keep the mutation gate from before preparation reads through application
+   and publication. Selection reads the prepared value while that gate is
+   held. Rerendering remains outside the writer critical section.
+
+   Retain appropriate convenience wrappers for existing callers when they
+   express a useful prepare-and-apply operation; do not add legacy protocol
+   adapters. Preparation itself must not publish, queue Tantivy work, or
+   write authoritative files. Do not weaken existing two-phase tests.
+** TODO Capture clean baselines and preserve dirty state in both clients
+   Add buffer-local baseline text and context. Capture the initial clean
+   view and every successful server replacement after client normalization
+   and transient focus/fold marker cleanup. The baseline should match
+   what the user began editing, not a wire string with temporary markers.
+
+   Include initial content views, empty views, search results, saved-view
+   results, collateral updates, and explicit rerenders. Failed/refused
+   saves and confirmation prompts must not overwrite a baseline or clear
+   dirty state. Preserve exact whitespace and Unicode in recovery snapshots.
+*** Search enrichment currently clears dirty state without saving edits
+    Both clients unconditionally mark enriched search text clean. The
+    server enriches a snapshot of the current buffer, so that text can
+    contain unsaved edits. Fix this as part of trustworthy dirty tracking.
+    Capture whether the snapshot was dirty and restore that status after
+    enrichment; keep its prior clean baseline when it was dirty. Only a
+    clean snapshot may establish a new clean enriched baseline.
+
+    A recovery diff in that case can include enrichment-added presentation
+    as well as user edits. Label this case in the recovery document and
+    preserve the complete snapshots; do not claim it is a semantic patch
+    containing only user intent. Computing a separately enriched clean
+    baseline is unnecessary for the first version.
+
+    Ensure enrichment cannot bypass a save lock or replace checked inputs
+    during an in-flight save. Reuse the stream guards; if needed, defer
+    save while a search snapshot/enrichment exchange is pending and defer
+    starting that exchange during save. Test both orderings and cleanup.
+** TODO Implement detached recovery documents before enabling hard refusal
+   Add 'skg-show-unsaved-changes' and the Neovim counterpart using existing
+   command-registration conventions. No new keybinding is required.
+   Prompt for the document path, write successfully, open it, and report
+   that path. Handle cancellation and write errors without discarding edits.
+
+   Store buffer name, URI, timestamp, available source-set/diff context,
+   baseline text, current text, and a readable text diff. If context or a
+   baseline is unavailable, state that explicitly; do not invent it or
+   use the current text as a fake clean baseline. New empty views have
+   an empty baseline. Older live views can still export their current
+   text, but that is a partial recovery record, not a verified edit diff.
+
+   Keep exact snapshots in a lossless escaped representation so arbitrary
+   Org headings, block delimiters, metadata, tabs, and trailing newlines
+   survive. A readable diff is supplementary. Test decoding against the
+   original text, including text that looks like archive delimiters.
+   Reuse local text-diff facilities; never stage temporary user edits in
+   .skg files or Git merely to obtain a diff.
+
+   The document is ordinary local text with no 'skg-view-uri', live-view
+   hooks, or graph-save binding. It must survive closing the original view.
+   Leave the original dirty flag and undo history alone. Its instructions
+   should explain manual reapplication to freshly opened views and warn
+   against saving the whole archived edited snapshot over newer data.
+** TODO Extend the save payload to include other view states
+   Keep the request-line metadata for the saved URI, point, and existing
+   approvals. Replace the following length-prefixed raw Org payload with
+   one structured S-expression envelope containing the saved Org text
+   and an explicit list of the other client views. For example:
+
+   #+begin_example
+   ((saved-buffer "...Org text...")
+    (other-views
+      (((view-uri "...") (dirty false))
+       ((view-uri "...") (dirty true)
+        (baseline "...last clean text...") (current "...edited text...")))))
+   #+end_example
+
+   Use proper serializers, UTF-8 byte lengths, and a single LP frame.
+   Keep bulk text out of the request line, which the server logs. An
+   explicit empty other-views list is distinct from a missing field.
+   This is a coordinated repository-wide protocol change: update both
+   clients, fixtures, docs, and direct protocol tests. No legacy fallback
+   that silently treats an old request as having no dirty views.
+
+   Capture every other client view, including dirty views not yet
+   registered on the server. Clean entries need only their URI; dirty
+   entries need exact baseline/current strings. When no baseline exists,
+   encode that explicitly and fail the conflict check conservatively.
+   Reject duplicate/self URI entries and malformed field types. The
+   server cannot independently discover an omitted editor buffer; both
+   clients must enumerate their live view buffers reliably.
+
+   Start the stream guard and local locks before taking this snapshot.
+   Preserve the existing temporary marker serialization for the saved
+   buffer without making marker insertions look like user edits. Ensure
+   local serialization/send failures unwind locks and handlers. Every
+   confirmation retry must recapture current other-view state.
+** TODO Collect dirty dependencies and reject conflicts
+   Implement one Rust dependency collector over parsed baseline/current
+   forests, unioning the registered baseline where available. Collect
+   node IDs, ID qualifier values, merge targets, 'overridesHere' originals,
+   unknown/deleted/diff IDs where present, and textlink targets. Include
+   references in new no-ID nodes' text. Union these into one dependency
+   set; all categories participate in the same conservative match.
+
+   Do not require every dirty buffer to be a valid save: missing IDs and
+   pending requests are normal. Do refuse a save if another dirty buffer
+   is too malformed to collect dependencies reliably. Report which buffer
+   needs correction or extraction. Do not interpret or execute its save
+   requests, allocate persistent IDs for it, or mutate its registered view.
+
+   Once the candidate graph and complete W exist, calculate selected
+   collateral URIs and dirty conflicts using the conservative intersection
+   predicate specified above.
+   A dirty registered replacement target always conflicts. An unregistered
+   dirty view can also conflict through its parsed references.
+*** Explain the intentional over-approximation in the implementation
+    At the conflict predicate, include a comment beginning exactly
+    'todo | PITFALL :', using lowercase 'todo' for Jeff's convention that
+    this is not a big deal. Explain that the check is more conservative
+    than necessary but much more convenient than classifying dependencies.
+    Include the shared-link-target example so a future maintainer knows
+    the extra refusal is intentional. For example:
+
+    #+begin_src rust
+    // todo | PITFALL : Matching every reference is more conservative than
+    // necessary, but much more convenient than classifying dependencies.
+    // A save of A and a dirty view of B can conflict merely because both
+    // link to X, even when B does not display X's changing herald.
+    #+end_src
+*** Use the existing terminal error path
+    Return save-result with nil content and actionable errors, as existing
+    failed saves do. Do not return an empty content string: the client
+    could treat that as an instruction to erase the saved buffer.
+    Include conflicting URIs and IDs without fetching hidden titles.
+    Let clients map URIs to local buffer names and mention the recovery
+    command. There is no "save anyway" option for this refusal.
+
+    Preserve one save-lock acknowledgement and exactly one terminal
+    response, response-handler counts, and terminal cleanup. Ordinary
+    fork/hoist confirmations remain pre-write; text-release confirmation
+    retains its existing post-commit semantics. Do not imply that the
+    latter rolls back a committed save.
+*** Remove warnings that contradict the new workflow
+    Remove warning-and-proceed from the save commands. Update/remove the
+    edit-time two-dirty-buffer modal warning too: multiple disjoint dirty
+    views are now supported, and edits should be permitted until an
+    actual save conflict is found. Update both clients and their tests.
+** TODO Wire expanded collateral selection with conservative locks
+   Before expanding selection, change initial save-lock handling to retain
+   all local view locks. Treat it as acknowledgement of the broad lock,
+   not permission to unlock client-only/unregistered views absent from
+   the server's list. Late narrowing can use the computed set.
+
+   Pass the prepared selected URIs into 'update_views_after_save'; do not
+   recompute selection from old DefineNode PIDs after committing. Dirty
+   views that passed the check receive no replacement. Existing successful
+   whole-view completion remains the rendering path.
+
+   At this checkpoint, leaving all locks held until the existing late
+   narrowing/terminal path is safe. Verify correctness before moving the
+   narrowing message earlier.
+** TODO Narrow locks earlier in the separate requested commit
+   Move save-relax-lock to immediately after preparation and a successful
+   conflict check, before applying the prepared save. Keep locked the saved
+   URI, selected collateral URIs, and every dirty view examined, including
+   unregistered ones. Only unrelated clean views become editable early.
+
+   Update comments/docs: the narrowed set is no longer "exact collateral";
+   it also protects dirty conflict-check inputs. A selected clean view can
+   unlock on its replacement; dirty checked views unlock on termination.
+   Do not send a second late message that accidentally releases dirty views.
+
+   Preserve confirmation/error/disconnect cleanup. A malformed lock message
+   must retain locks until terminal cleanup, not use the current fallback
+   that unlocks everything except the saved view. Keep network concerns in
+   the request layer; the prepared-save type must not depend on a stream.
+
+* Verification and completion
+** Prove behavior, not just helper output
+   Use pure graph tests for neighborhood semantics, then save-pipeline
+   tests that inspect the actual collateral stream and resulting heralds.
+   Avoid automatic ancestry in minimal fixtures hiding selection bugs:
+   construct a view containing only the endpoint whose ID must be reached.
+
+   Cover source moves, merge/extra IDs, title-only surprising-link changes,
+   override-chain insertion/removal, visibility restrictions, and newly
+   exposed existing descendants. In override cases assert the displayed
+   substitute as well as the presence of a collateral message.
+** Prove refusal leaves data and editor state untouched
+   Test direct conflicts, old-only/new-only neighbors, removed local IDs,
+   newly pasted existing nodes, new textlinks, merge/override references,
+   malformed dirty metadata, and client-only views. Assert that saving a
+   title edit to A refuses when A and dirty B merely link to the same X,
+   even without an active occurrence of X in B. Also test disjoint dirty
+   views that can save successfully.
+
+   Snapshot authoritative files and the runtime before a rejected save;
+   verify no changes, no index work, no registry replacements, no collateral
+   messages, and preserved client text/dirty flags/baselines. Exercise both
+   ordinary and merge/fork preparation paths. Drain Tantivy before reading
+   its results after successful saves, following common-gotchas.md.
+** Test the lock sequence deterministically
+   Unit tests should deliver each protocol message separately and attempt
+   edits between them; do not depend on a conveniently slow server.
+   Verify all initially locked, unrelated clean views freed on relaxation,
+   dirty inputs retained, targets locked until replacement, and everything
+   released on each terminal path or disconnect. Check pending counts and
+   subsequent saves after failures/confirmations, not just lock removal.
+
+   Add end-to-end coverage to the save-lock-lifecycle integration family
+   for both clients. A race-window test must inspect the intermediate
+   state; the existing "unlocked after save completes" assertion alone
+   cannot establish early narrowing or continuous protection.
+** Test recovery and search dirty-state behavior
+   Verify baseline/current lossless round trips, visible diff, reported
+   destination path, successful reopen after killing the original, no
+   registration as a live view, and no graph/dirty-state mutation. Include
+   invalid Org, no-ID nodes, Unicode, tabs, and missing final newline.
+   Test cancellation, unwritable destinations, and overwrite handling.
+
+   Edit phase-one search results before enrichment; after enrichment they
+   must still be dirty and a conflicting save must refuse. Recovery must
+   preserve the earlier clean baseline and the current edited text. Verify
+   initial clean enrichment still establishes a clean baseline normally.
+** Run focused checks, then the affected suites and full acceptance suite
+   Cargo disables automatic tests: register new integration modules in
+   existing grouped targets rather than adding standalone unregistered
+   test files. Start with the specific tests for the slice. Useful broader
+   commands from the repository root are:
+
+   #+begin_src sh
+   cargo check --all-targets
+   cargo nextest run --test grouped_saves --test grouped_overrides --test grouped_unit
+   bash bash/emacs-tests.sh
+   bash bash/nvim-tests.sh
+   SKG_TEST_CLIENT=emacs bash tests/integration/save_lock_lifecycle/run-test.sh
+   SKG_TEST_CLIENT=nvim bash tests/integration/save_lock_lifecycle/run-test.sh
+   bash bash/all-tests.sh --no-sound
+   #+end_src
+
+   Register new client tests with the existing discovery conventions. Use
+   isolated fixture data and ports from the harness. Never use the user's
+   running server/data. Full-suite output lives under tests/results; the
+   harness replaces that directory, so retain any needed prior evidence
+   before invoking it. Record actual checks/results, not assumed passes.
+** Update durable documentation and close the tracked problems
+   Define "update-relevant neighborhood" in [[file:../../glossary.md][glossary.md]], including its
+   no-mixed-path/no-direction-reversal boundaries. Update [[file:../../api-and-formats.md][api-and-formats.md]]
+   for the payload, conflict behavior, and broad/narrow lock sets. Document
+   recovery commands and manual replay in the client command docs.
+
+   When regressions pass, move the stale collateral-stats, insufficient
+   early-lock, and search-enrichment dirty-state entries from
+   [[file:../problems.org][problems.org]] to [[file:../DONE/problems.org][DONE/problems.org]], following that file's instructions.
+   Finish with a scoped diff review. Report implementation, relevant tests,
+   and remaining limitations; do not claim universal dependency freshness
+   or automatic safe replay of archived snapshots.

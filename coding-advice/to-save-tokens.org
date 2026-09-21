@@ -1,103 +1,41 @@
 #+TITLE: Token economy during repository work
 
-* Apply these practices proportionately
-
-Every task should avoid needless context use through focused reading, bounded
-output, and appropriately scoped verification.  Some techniques below add
-enough process that they should remain optional rather than becoming ceremony
-for small tasks.
-
-Before using those heavier techniques as a package, briefly tell Jeff what you
-propose to use and why it seems worthwhile, and ask whether he wants that
-workflow for the task.  In particular, ask before introducing a progress
-ledger, changing the test cadence, delegating work, or replacing ordinary test
-output with quiet captured logs.  Once Jeff approves a workflow for one task,
-do not interrupt him for approval before every individual command.
-
-Small investigations and ordinary focused tests do not need ceremony.  The
-point is to let Jeff choose whether the extra bookkeeping and reduced live
-output are a good trade for a long-running job.
+* Defaults for every task
+Read narrowly, work one coherent slice at a time, and verify in proportion
+to the change. Before a tool call, identify the unresolved question it will
+settle. Do not reread unchanged material on every follow-up or create
+bookkeeping for its own sake.
 
 Token economy must never mean weaker verification, hidden failures, unread
-code, or silently narrowed scope.  Preserve the full evidence on disk and
-surface anything that affects correctness or requires a decision.
+code, or silently narrowed scope. Preserve evidence needed to assess the
+result and surface anything that affects correctness or requires a decision.
+For documentation-only work, check the relevant content, links, and diff;
+do not run unrelated application tests.
 
-* The quiet test wrapper
+The practices below are the default. The [[file:optional-workflows.org][optional workflow instructions]] cover
+the quiet test wrapper, delegation, and long-task ledger, including when
+agreement is required. Read those only when considering that workflow.
+A concise stop/deviation report required by [[file:when-to-stop.org]] is already
+authorized; it does not introduce an ongoing ledger.
 
-=bash/quiet-test.sh= runs an arbitrary command, captures its complete output,
-and prints only a one-line result on success.  On failure it prints a bounded
-diagnostic and points to the full log.  It does not retry, clean state, widen
-the command, or use =eval=.
+* Work one narrow vertical slice at a time
 
-Basic use:
-
-#+begin_src sh
-bash/quiet-test.sh --label cargo-check -- cargo check --all-targets
-bash/quiet-test.sh --label save-tests -- \
-  cargo nextest run --test grouped_saves
-#+end_src
-
-The =--= is required.  Everything after it is passed as an argument array, so
-quoted arguments remain quoted.  The command runs in the caller's current
-directory, while logs always go beneath:
-
-#+begin_example
-target/test-logs/graph-only/
-#+end_example
-
-That directory name is historical; the wrapper is otherwise general-purpose.
-Each run writes a =.log= containing all stdout/stderr and a sibling =.meta=
-containing:
-
-- command and working directory;
-- start/end time, duration, and exit status;
-- HEAD and a worktree fingerprint;
-- fingerprint scopes; and
-- included and excluded untracked files.
-
-On failure, read the bounded diagnostic first.  Open the full log only as far
-as needed to diagnose the first actionable failure.  Do not blindly rerun a
-failed expensive suite.
-
-** Fingerprint scopes
-
-By default the wrapper fingerprints the repository's broad code, test, client,
-script, documentation, data/config, and packaging surface.  It does not cover
-every repository file; notably, =coding-advice/= and =TODO/= are outside the
-default.  Derived =windows/out/= package copies are deliberately excluded.
-
-For focused work, explicitly name the paths whose changes could affect the
-result:
-
-#+begin_src sh
-bash/quiet-test.sh --label wrapper-self-test \
-  --scope bash --scope tests -- \
-  bash tests/quiet-test-wrapper.sh
-#+end_src
-
-Use =--scope .= only when a whole-worktree fingerprint is genuinely useful.
-It can hash unrelated untracked files, which may be slow or privacy-surprising.
-Never claim that a green result covers a later or differently scoped worktree;
-compare the fingerprint in the =.meta= file.
-
-* Other techniques that saved context
-
-** Work one narrow vertical slice at a time
-
-Choose one behavior, trace its request-to-effect path, implement it, and run
-the smallest meaningful test before opening another substantial front.  Do
+For implementation, choose one behavior, trace its request-to-effect path,
+and implement it. Run the smallest meaningful test before opening another
+substantial front. Do
 not redesign adjacent concerns merely because they share a type or module.
 Record the interface boundary and defer the next concern until the first slice
 is stable.
 
-** Keep raw output out of the conversation
+* Keep raw output out of the conversation
 
-Put complete compiler/test output in an ignored log and report only the
-command, result, duration/counts, first useful failure, and log path.  Set
-bounded output limits on exploratory shell commands.  Do not paste thousands
+Keep ordinary test output unless Jeff has agreed to the optional captured-log
+workflow. When using that workflow, retain complete output in an ignored log
+and report the command, result, duration/counts, first useful failure, and log
+path. Bound exploratory output without hiding failures. Do not paste thousands
 of passing lines into the conversation or a planning document.
 
-** Read from narrow to broad
+* Read from narrow to broad
 
 Start with =rg= to locate definitions and callers, then read the relevant
 ranges and follow the call graph as correctness requires.  Let an exact
@@ -108,31 +46,24 @@ The repository's
 =tools/introspect/call-graph=, =change-forest=, and =code-map= can help when the
 ordinary text search stops being clear.
 
-** Separate investigation from implementation
+* Separate investigation from implementation
 
 Before a difficult change, capture only the unresolved facts, proposed
-invariants, and the test that could disprove the proposal.  Once the interface
-is chosen, stop broadening the investigation and implement that choice.  For
-long work this can be a compact Org note; small work needs no extra artifact.
+invariants, and the test that could disprove the proposal. Within an
+implementation assignment, once the interface is chosen, stop broadening
+the investigation and implement that choice. For long work this can be a
+compact Org note; small work needs no extra artifact.
 
 Do not run overlapping investigations unless their questions are independent
 and their deliverables do not require rereading the same code.
 
-** Delegate only bounded independent work
+* Use a test ladder
 
-When Jeff has chosen a workflow that includes delegation, give each delegate
-an exact file or question boundary.  Ask for concrete entry points, a proposed
-data shape when relevant, and the smallest verification command.  Several
-agents independently loading the same broad architecture costs more context
-than it saves.
-
-** Use a test ladder
-
-After a local edit, run the smallest test that proves it.  At a coherent work
-boundary run the affected group, at a signature/dependency boundary run
-=cargo check --all-targets=, and at the settled endpoint run the complete
-suite.  Reuse green evidence only while its fingerprint and dependency surface
-remain applicable.
+For code changes, start with the smallest test that proves the local edit.
+At a coherent work boundary run the affected group, at a signature/dependency
+boundary run =cargo check --all-targets=, and at the settled endpoint run the complete
+suite. Reuse green evidence only while the relevant code and dependency
+surface remain unchanged; when using fingerprints, check their scope too.
 
 Stop at the first useful failure during development.  Run broad
 =--no-fail-fast= censuses only when learning the complete failure set is the
@@ -142,7 +73,7 @@ infrastructure failure, or unrelated pre-existing issue.  Record that
 classification beside the first failure so subsequent work does not repeat
 the census or mistake fixture maintenance for product work.
 
-** Let compiler diagnostics bound mechanical work
+* Let compiler diagnostics bound mechanical work
 
 For signature changes, compiler error spans can provide a precise caller list.
 Make the smallest mechanical correction, compile again, and finish with =rg=
@@ -150,7 +81,7 @@ for feature-gated, script, protocol, documentation, and dead-code references
 the compiler cannot see.  Compiler-guided editing is not a substitute for
 understanding semantic call sites.
 
-** Use temporary adapters to stage intentional migrations
+* Use temporary adapters to stage intentional migrations
 
 When an intentional representation change would cause unrelated fixture and
 consumer churn, a narrow adapter at the boundary can keep the migration in
@@ -159,7 +90,7 @@ the adapter as soon as its remaining consumers are ready.  This is especially
 useful for snapshot, journal, and wire types; it is not a reason to add
 permanent legacy compatibility.
 
-** Keep edits and review surfaces small
+* Keep edits and review surfaces small
 
 At each checkpoint, inspect the diff for the files in that slice.  Do not mix
 formatting cleanup, unrelated test repair, design notes, and behavioral
@@ -167,25 +98,7 @@ changes in one review surface unless they are necessary to make the behavior
 testable.  Commit only when Jeff has requested it, following the repository's
 commit guidance.
 
-** Maintain a compact resume record for long tasks
-
-For work likely to survive many context compactions, a small dashboard plus a
-chronological progress ledger can record:
-
-- current task and exact next action;
-- HEAD, dirty state, and fingerprint;
-- behavior changed;
-- green tests with durations and log paths;
-- failures and their classification;
-- decisions, assumptions, and remaining risks; and
-- user-owned dirty files that must remain untouched.
-
-Cycle plan headlines through =TODO=, =ONGOING=, and =DONE= as work advances.
-Update the resume pointer before a likely compaction and before stopping.  Keep
-the plan itself focused on intended work and the ledger focused on observed
-evidence; do not turn either into a raw command transcript.
-
-** Separate durable evidence from generated artifacts
+* Separate durable evidence from generated artifacts
 
 Retain useful test logs and metadata under =target/=, but exclude reproducible
 package staging trees and other generated copies from fingerprints.  Remove

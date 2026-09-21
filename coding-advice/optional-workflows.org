@@ -1,0 +1,101 @@
+#+TITLE: Optional workflow machinery
+
+* Choose a workflow proportionate to the task
+Read this file when considering captured test logs, delegation, or a
+long-task ledger. These are optional additions to the default practices in
+[[file:to-save-tokens.org]], not routine onboarding requirements.
+
+Before introducing a progress ledger, changing the test cadence, delegating
+work, or replacing ordinary test output with quiet captured logs, briefly
+tell Jeff what you propose and why, and ask whether he wants that workflow.
+If he has already authorized it for this task, proceed without asking again.
+The scripts and examples here do not themselves authorize those choices.
+
+Small investigations and ordinary focused tests need no ceremony. A concise
+progress.org report at a substantive stop or implementation deviation is
+required by [[file:when-to-stop.org]] and already authorized there; the optional
+ledger below is continuous bookkeeping beyond that report.
+
+* The quiet test wrapper
+
+=bash/quiet-test.sh= runs an arbitrary command, captures its complete output,
+and prints only a one-line result on success.  On failure it prints a bounded
+diagnostic and points to the full log.  It does not retry, clean state, widen
+the command, or use =eval=.
+
+Basic use:
+
+#+begin_src sh
+bash/quiet-test.sh --label cargo-check -- cargo check --all-targets
+bash/quiet-test.sh --label save-tests -- \
+  cargo nextest run --test grouped_saves
+#+end_src
+
+The =--= is required.  Everything after it is passed as an argument array, so
+quoted arguments remain quoted.  The command runs in the caller's current
+directory, while logs always go beneath:
+
+#+begin_example
+target/test-logs/graph-only/
+#+end_example
+
+That directory name is historical; the wrapper is otherwise general-purpose.
+Each run writes a =.log= containing all stdout/stderr and a sibling =.meta=
+containing:
+
+- command and working directory;
+- start/end time, duration, and exit status;
+- HEAD and a worktree fingerprint;
+- fingerprint scopes; and
+- included and excluded untracked files.
+
+On failure, read the bounded diagnostic first.  Open the full log only as far
+as needed to diagnose the first actionable failure.  Do not blindly rerun a
+failed expensive suite.
+
+** Fingerprint scopes
+
+By default the wrapper fingerprints the repository's broad code, test, client,
+script, documentation, data/config, and packaging surface.  It does not cover
+every repository file; notably, =coding-advice/= and =TODO/= are outside the
+default.  Derived =windows/out/= package copies are deliberately excluded.
+
+For focused work, explicitly name the paths whose changes could affect the
+result:
+
+#+begin_src sh
+bash/quiet-test.sh --label wrapper-self-test \
+  --scope bash --scope tests -- \
+  bash tests/quiet-test-wrapper.sh
+#+end_src
+
+Use =--scope .= only when a whole-worktree fingerprint is genuinely useful.
+It can hash unrelated untracked files, which may be slow or privacy-surprising.
+Never claim that a green result covers a later or differently scoped worktree;
+compare the fingerprint in the =.meta= file.
+
+* Delegate only bounded independent work
+
+When Jeff has chosen a workflow that includes delegation, give each delegate
+an exact file or question boundary.  Ask for concrete entry points, a proposed
+data shape when relevant, and the smallest verification command.  Several
+agents independently loading the same broad architecture costs more context
+than it saves.
+
+* Maintain a compact resume record for long tasks
+
+For work likely to survive many context compactions, a small dashboard plus a
+chronological progress ledger can record:
+
+- current task and exact next action;
+- HEAD, dirty state, and fingerprint;
+- behavior changed;
+- green tests with durations and log paths;
+- failures and their classification;
+- decisions, assumptions, and remaining risks; and
+- user-owned dirty files that must remain untouched.
+
+Cycle plan headlines through =TODO=, =ONGOING=, and =DONE= as work advances.
+Update the resume pointer before a likely compaction and before stopping.  Keep
+the plan itself focused on intended work and the ledger focused on observed
+evidence; do not turn either into a raw command transcript.
