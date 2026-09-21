@@ -1,20 +1,38 @@
 * vision : updates to the herald system
-** tone down the yellow "a = parent" herald
+** plans
+*** tone down the yellow "a = parent" herald
 same yellow but 1/4 as bright
-** simplify link kherald
-<body, children or multiple links in headline> / <total links>
-Make the first the "interesting stat" font,
-currently white on an orange background like for multiple containers.
-(Is that used anywhere else? Should it be?)
-if the first would be zero, omit it and the slash.
-** make the content herald of asubscribee-as-such resemble link heralds
+*** simplify the link herald
+Letting
+    I = |sources with body text, content nodes or multiple links|
+    S = |total sources|
+    T = |total targets|
+the link herald should be
+  I/SOT
+if they are all nonzero,
+and SOT if I is zero.
+The other zero cases are obvious.
+
+The presence of T in that herald is alittle embarrasssing,
+because the user can just count the links in the title and body,
+but omitting it would be confusing.
+
+Render the I in the "interesting font", which is currently
+white on an orange background (like for multiple containers).
+
+Is that font used anywhere else? Should it be?
+It should probably be reified, if we haven't already given it a name.
+*** make the content herald of asubscribee-as-such resemble link heralds
+The content side of the contains herald for a subscribee-as-such should read:
+
 C<unintegrated content>/<total content>
-Unintegrated gets the interesting-stat font.
-Unintegrated and slash are omitted if unintegrated = 0.
-** The override character 'O' always gets the interesting font
-to mitigate the danger that the user edits one thing
+
+Unintegrated content gets the interesting-stat font.
+Unintegrated content and slash are both omitted if unintegrated = 0.
+*** The override character 'O' always gets the interesting font.
+This is to mitigate the danger that the user edits one thing
 while thinking they are editing another.
-** add 'skg-toggle-link-target-source-overlays'
+*** add 'skg-toggle-source-overlay-on-links'
 This would insert an overlay suffix indicating the source of each link
 after each link label. It would use the same green look as the sources
 shown for each node. It will be handy if the user follows a link
@@ -30,11 +48,14 @@ if I have two public notes on love, one of which overrides the other,
 why do I have them both there? By contrast,
 it's clear why I might want my private note on love
 to override my public note on love.)
-** evaluate the experience of the system
-Could the herald system be simpler? More coherent?
-If you were a user, are there stats you would want to see at a glance
-from the heralds that are not present yet?
-** document all changes we introduce wherever heralds are documented for the user
+*** document all changes we introduce wherever heralds are documented for the user
 and review that documentation to make sure it is accurate.
 If it doesn't exist, make it; if it's outside of docs/,
 collect it there.
+** request
+*** evaluate this request
+Are there more design or architecture decisions I'll need to make?
+*** evaluate the experience of the system
+Could the herald system be simpler? More coherent?
+If you were a user, are there stats you would want to see at a glance
+from the heralds that are not present yet?
