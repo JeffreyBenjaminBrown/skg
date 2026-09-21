@@ -63,17 +63,8 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
            (other-view-snapshots
             (skg--other-view-save-snapshots save-buffer))
            (wire-content
-            ;; Emacs prints its empty list as the atom `nil', while the Rust
-            ;; protocol requires an explicit list for other-views. Serialize
-            ;; that one empty value as `()'; all bulk strings still go through
-            ;; the Lisp printer's lossless quoting.
-            (concat
-             "((saved-buffer " (prin1-to-string buffer-contents) ") "
-             "(other-views "
-             (if other-view-snapshots
-                 (prin1-to-string other-view-snapshots)
-               "()")
-             "))"))
+            (skg--serialize-save-envelope
+             buffer-contents other-view-snapshots))
            (request-s-exp (concat (prin1-to-string
                                    (skg--save-request-sexp
                                     skg-view-uri
@@ -153,6 +144,22 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
       (process-send-string tcp-proc header)
       (process-send-string tcp-proc wire-content))))
 
+(defun skg--serialize-save-envelope (saved-buffer other-view-snapshots)
+  "Serialize SAVED-BUFFER and OTHER-VIEW-SNAPSHOTS for the Rust server."
+  ;; Emacs prints its empty list as the atom `nil', while the Rust protocol
+  ;; requires an explicit list for other-views.  Serialize that one empty
+  ;; value as `()'.  Ignore user printer limits: truncation would corrupt the
+  ;; protocol rather than merely shorten display output.
+  (let ((print-length nil)
+        (print-level nil))
+    (concat
+     "((saved-buffer " (prin1-to-string saved-buffer) ") "
+     "(other-views "
+     (if other-view-snapshots
+         (prin1-to-string other-view-snapshots)
+       "()")
+     "))")))
+
 (defun skg--snapshot-with-save-markers (focused-had-metadata)
   "Return current text with transient save markers, restoring the buffer.
 FOCUSED-HAD-METADATA records whether marker removal can leave a bare skg
@@ -166,7 +173,12 @@ internal edit; it is restored before any request is sent."
         (progn
           (skg-add-folded-markers)
           (skg-add-focused-marker)
-          (setq snapshot (buffer-string)))
+          ;; Text properties are an Emacs presentation concern.  If retained,
+          ;; `prin1-to-string' emits #("..." ...) syntax, which is not part of
+          ;; the shared S-expression protocol and is parsed as extra fields by
+          ;; the Rust reader.
+          (setq snapshot
+                (buffer-substring-no-properties (point-min) (point-max))))
       (skg-remove-focused-marker)
       (skg-remove-folded-markers)
       (unless focused-had-metadata
@@ -187,7 +199,8 @@ internal edit; it is restored before any request is sent."
                `((view-uri ,skg-view-uri)
                  (dirty true)
                  (baseline ,(if (stringp skg-clean-baseline)
-                                `(present ,skg-clean-baseline)
+                                `(present ,(substring-no-properties
+                                            skg-clean-baseline))
                               'unavailable))
                  (current ,(buffer-substring-no-properties
                             (point-min) (point-max))))

@@ -50,7 +50,12 @@ view-forest edits do not change it.")
 
 (defun skg--capture-clean-baseline ()
   "Record the current normalized view text and available context."
-  (setq skg-clean-baseline (buffer-string))
+  ;; A baseline is protocol/recovery data, not display data.  Interactive
+  ;; fontification can attach face and other text properties to the buffer;
+  ;; retaining them makes `prin1-to-string' emit Emacs's #(...) syntax when
+  ;; this baseline later travels in a save envelope.
+  (setq skg-clean-baseline
+        (buffer-substring-no-properties (point-min) (point-max)))
   (setq skg-clean-baseline-context
         (list :git-diff-mode
               (and (boundp 'skg--git-diff-mode-enabled)
