@@ -1,0 +1,455 @@
+#+title: Herald refinements and link annotations — execution plan
+#+TODO: TODO ONGOING | DONE
+
+* Assignment and authority
+Implement the agreements in [[file:1_discussion.org][the discussion]]. This plan
+consolidates the final decisions; earlier proposals in that conversation
+are superseded where they conflict with this document. In particular,
+links use L, O retains its ordinary/birth styling, and only ancestor a
+gets dimmer.
+
+Read [[file:../../coding-advice/ORIENTATION.org][the orientation]] and its relevant
+code-change, architecture, testing and execution advice before starting.
+Preserve unrelated edits. Commit incrementally however is natural.
+Each commit should refer to the part of the plan it implements.
+Do not change branches or alter
+Git configuration unless Jeff separately asks. This document is a plan;
+writing it has not implemented any of the behavior below.
+
+** Scope and completion
+Deliver the Rust facts and protocol changes, matching relationship
+rendering in Emacs and Neovim, link source annotations, broken-link
+styling, inspectable explanations, tests, and user documentation.
+
+Use matching Neovim commands for the new Emacs actions as the execution
+default, consistent with the project's two-client pattern. Command names
+and unbound versus available key bindings are ordinary implementation
+choices; preserve existing bindings. The required Emacs source toggle is
+'skg-toggle-source-overlay-on-links'.
+
+Keep exact-ID navigation, override eligibility, subscription integration,
+canonical file formats and save meaning intact. The work changes what is
+reported and displayed. It does not retire the herald rule table or
+introduce compatibility paths for retired herald fields.
+
+Finish the agreed implementation and verification without stopping for
+routine choices. If a substantive new issue emerges, append it under the
+final 'pending decisions' headline and follow the repository's stop rules.
+
+* Agreed behavior
+** Counts describe the active graph
+Use distinct resolved node identities, not occurrences of links, extra-ID
+spellings, configured source names, or rendered rows. Apply both endpoint
+home-source visibility and relationship relSource visibility where the
+relationship has that gate. Unknown targets do not count as resolved
+nodes. Follow literal relationships without override substitution when
+computing these statistics.
+
+Herald facts describe the latest server-rendered graph snapshot. Ordinary
+unsaved title/body edits do not silently become committed graph statistics.
+Link annotations, however, should look up the IDs currently in the buffer.
+
+** Link herald: I/SLT
+S counts distinct visible nodes linking to this node. T counts its
+distinct visible resolved targets across title and body. I counts the
+subset of S whose nodes have any of: nonempty body text, at least one
+visible direct content node, or more than one distinct visible resolved
+link target. Count each such source once, even if it meets all criteria.
+Use the existing body normalization invariant; whitespace alone is not
+body text. Repeated links and alternate IDs for one target do not satisfy
+the multiple-target criterion by themselves. Do not retain the old
+title-versus-label surprise predicate or its special self-link exclusion.
+
+I and S are numbers in the explanation, not literal letters to print.
+Use L as the separator between incoming and outgoing facts. T is useful
+even with folded bodies and repeated links; it need not equal the number
+of link labels visible in the buffer.
+
+*** Examples without ancestor flags
+| I | S | T | Rendered text |
+|---+---+---+---------------|
+| 2 | 5 | 3 | 2/5L3         |
+| 0 | 5 | 3 | 5L3           |
+| 2 | 5 | 0 | 2/5L          |
+| 0 | 5 | 0 | 5L            |
+| 0 | 0 | 3 | L3            |
+| 0 | 0 | 0 | no L token    |
+| 5 | 5 | 3 | 5/L3          |
+
+** Subscribee-as-such content herald: CU/D
+For a subscribee B occurring under subscriber A, D is B's visible direct
+content count. U counts those members after subtracting what A visibly
+hides or directly contains. Use the existing integration semantics:
+resolve extra IDs, but do not identify an overrider with the node it
+overrides. Hidden content is already dealt with, so it is excluded from U
+but included in D when visible under B.
+
+This numerator belongs to the occurrence: the same B can have different U
+under different subscribers. It must agree with the membership used to
+populate that occurrence, before display folds and node budgets. Do not
+count folder rows, expanded descendants or override substitutes as new
+content members. Count resolved visible members, not Unknown placeholders.
+
+Keep the incoming contains side unchanged. An entire token can therefore
+be '2C3/8'. Outside the subscribee-as-such role, retain ordinary contains
+rendering.
+
+*** Examples for the outgoing side, without ancestor flags
+| U | D | Rendered content side                         |
+|---+---+-----------------------------------------------|
+| 2 | 8 | C2/8                                          |
+| 0 | 8 | C8                                            |
+| 8 | 8 | C8/                                           |
+| 0 | 0 | no outgoing side; retain C if incoming exists |
+
+** One fraction grammar for L and C
+The numerator is a subset of the denominator. Validate that its count
+does not exceed the total; this is an invariant, not an invitation to
+silently clamp inconsistent facts.
+
+*** Apply omission in a defined order
+When the total is zero, omit that side. When the numerator is zero,
+omit the numerator and slash, and render the total with ordinary ancestor
+compression. Otherwise render numerator, slash, and denominator.
+
+When nonzero numerator equals denominator, omit the denominator entirely,
+but keep the slash. Compare actual counts before suppressing numerals.
+Thus '5/5L' becomes '5/L', 'C5/5' becomes 'C5/', and an interesting sole
+parent source renders 'a/L'. A slash must never stand for 0/0.
+
+*** Ancestors can appear on either side of the slash
+Preserve the existing tracked-ancestor policy and generation meanings,
+including scaffold levels. Add incoming-link ancestor facts; do not
+expand which ancestors are tracked merely for this feature.
+
+Print each ancestor flag once within a fraction: in the numerator if its
+node is in the subset, otherwise after the denominator's numeral. The
+denominator's count still includes the subset. Keep full counts and full
+membership facts on the wire; this partition is a rendering choice.
+
+Suppress a numeral when its members are completely accounted for by the
+ancestor flags, consistently with ordinary relations. For a fraction's
+denominator, account for ancestor members already named in the numerator
+as well as those printed after the slash. Do not count printed characters
+as members: a generation rendered as '{27}' is one flag, and a repeated
+node identity is not several distinct members.
+
+| Facts                                   | Rendered text |
+|-----------------------------------------+---------------|
+| Parent is sole interesting source of 5  | a/5L          |
+| 1 of 5 interesting; parent is another   | 1/5aL         |
+| Parent is sole source and interesting   | a/L           |
+| Parent is sole source and uninteresting | aL            |
+| Sole outgoing target is parent          | La            |
+| 3 outgoing targets, including parent    | L3a           |
+
+If two distinct tracked ancestors a and b are the only inbound sources,
+with only a interesting, 'a/bL' expresses numerator 1 and total 2. This
+follows the no-repeated-flags and fully-explained-count rules together;
+the denominator is not the uninteresting remainder. Explain this example
+in the legend and inspector.
+
+** Styles and overrides
+Give the white-on-orange style a semantic name, such as
+'heralds-interesting-face' and 'SkgHeraldInteresting'. Preserve its current
+'#d2691e' appearance. Route existing orange uses through that semantic
+style, including multiple-container counts, the nonmembership marker ⊥
+and unknown-node messages. Keep red error/edit-request conventions.
+
+*** Interesting numerals, ordinary relation letters
+Use the interesting style for displayed I and U numerals, and for any
+displayed incoming or outgoing override count, including one. Slashes
+and denominators retain the relation's ordinary/birth style. O itself
+retains purple or the black-on-white birth style. Other relations retain
+their established base and birth behavior.
+
+Ancestor letters retain their ancestor style, even when they replace an
+interesting numeral. Do not restore a redundant numeral merely to paint
+something orange. 'Oa' and 'aO' lose no count information by omitting one.
+
+*** Dim only a
+Give a a separate, muted yellow treatment, approximately one quarter the
+current visual prominence, with legible lettering. Keep b and all higher
+ancestor markers at their existing brightness. This requires styling
+individual ancestor flags, not applying one face to the entire string.
+Choose the precise colors by visual checking; no color approval round is
+needed. Support the same distinction in both clients.
+
+*** Pink h means substitution at this occurrence
+Introduce the named 'confusable' style as a pink foreground. Immediately
+after O, insert h exactly when that occurrence has 'overridesHere'. It
+precedes the outgoing count and ancestor flags: for example, '2Oh3'.
+Use the existing marker as the source of truth, never infer substitution
+from override counts or birth status. An override folder/path occurrence
+without 'overridesHere' gets no pink h.
+
+Preserve the marker's original ID and all save validation/round-trip
+semantics. A marked occurrence must still expose its h even if ordinary
+count omission would otherwise leave no O token. Counts-only phantoms do
+not acquire substitution markers.
+
+The eighth ancestor may also be h. Its ancestor style remains yellow;
+the substitution h is pink. Jeff accepted the ambiguity in unstyled text.
+Document and explain the difference rather than changing either notation.
+
+** Link annotations
+*** Source suffix
+'skg-toggle-source-overlay-on-links' toggles display-only suffixes for
+Skg links in titles and bodies in the current buffer. Default the suffix
+off. Implement the corresponding buffer-local Neovim action.
+
+For a visible resolved target, show its home-source abbreviation using
+the existing green source style and source-label formatter. Resolve extra
+IDs first. Annotate the literal target, not its overrider and not the
+relationship's relSource. Keep following a link an exact-ID visit.
+
+Missing, inactive and not-yet-known targets need distinct unavailable
+states. Do not invent a source name for them, or expose inactive node
+titles/home-source labels through this feature. Exact suffix punctuation
+is an ordinary implementation choice; use the existing source vocabulary.
+
+*** Broken links
+Color a Skg link pink and underlined only when the current server graph
+confirms the target is missing after extra-ID resolution. Preserve link
+navigation so attempting it can explain the failure. Apply this in both
+clients even while the source suffix is off.
+
+Inactive targets, pending lookups and transport errors are not evidence
+of a broken link. Do not apply the rule to arbitrary web/file links.
+The shared confusable style supplies pink; link presentation supplies
+underlining, without requiring the herald's h to be underlined.
+
+*** Lifecycle and asynchronous correctness
+Preserve toggle state across buffer rerenders and major-mode setup.
+Refresh annotations after link edits, saved/collateral view replacement,
+successful graph-changing operations, source-set changes and reconnects.
+Refresh even when a changed target has no headline in the annotated view;
+it may appear only as a link. A deleted target must become pink, and a
+newly created target must stop being pink.
+
+Batch and deduplicate target lookups, debounce edits, and reuse results
+within the appropriate graph/source-set lifetime. Never make one network
+request per link, block typing on a lookup, or rescan the whole project
+per edit. Discard replies for obsolete text, changed source sets, dead
+buffers and old connections. Associate replies with the right requests
+when several buffers are active. Clean up only this feature's overlays,
+extmarks, timers and callbacks.
+
+Annotations must not change buffer text, modified state, undo history,
+saved files, clipboard text or navigation offsets. Verify interactions
+with hidden Org link syntax, herald overlays, folds and Unicode labels.
+
+** Inspectable explanations
+Provide a small read-only inspect-herald command in each client. Explain
+the selected/current headline's available herald facts in plain language,
+using actual counts rather than reverse-parsing abbreviated display text.
+Include subset/total meanings, ancestor generations, active-source scope,
+birth meaning, and substitution when present. Make the relevant existing
+relationship navigation discoverable from the explanation.
+
+For a substituted row, identify its original and drawn node and explain:
+edits affect the drawn node; parent membership still refers to the
+original. Use already available/released labels where possible and IDs
+where necessary, without fetching hidden titles or substituting IDs for
+missing titles. Explicitly distinguish pink h from ancestor h.
+
+Give missing/inactive/pending links inspectable status explanations too.
+Use one semantic interpretation for rendering and explanations in each
+client, so an explanation cannot drift from the displayed counts.
+
+* Implementation order and boundaries
+Work in tested vertical slices. The sections below identify relevant
+code, not a requirement to create a new abstraction for each paragraph.
+
+** TODO Add graph facts and the common fraction rendering
+Start with [[file:../../server/dbs/in_rust_graph/stats.rs][graph statistics]],
+[[file:../../server/types/viewnode.rs][view-node types]],
+[[file:../../server/herald_tokens.rs][semantic serialization]], and
+[[file:../../server/update_buffer/viewnodestats.rs][occurrence facts]].
+
+Replace 'link_surprising' and 'link_with_content' with the agreed subset
+count; add the outgoing target count and incoming ancestor membership.
+Share the interesting-source predicate between counting and identifying
+interesting ancestors. Avoid re-parsing the same source once per inbound
+destination; use existing graph indexes and render-scoped reuse where useful.
+
+Extract/reuse the subscribee content membership calculation in
+[[file:../../server/update_buffer/reconcile/content.rs][content reconciliation]]
+to produce the contextual U and its ancestor subset. Reuse its subtraction
+semantics without changing integration or override behavior. Graph-level
+statistics must remain independent of the occurrence's subscriber.
+
+*** Wire representation
+Keep the wire semantic. For L, send incoming total, interesting subset,
+their ancestor membership, and outgoing total/ancestors. For contextual
+C, send outgoing total plus unintegrated count and membership. Represent
+"applicable but zero" distinctly from "not applicable" for contextual
+C; do not make clients infer the role from a zero count.
+
+An appropriate shape is an 'interesting' or 'unintegrated' subform under
+the relevant side, alongside its full total and ancestor facts. Sol may
+choose precise Rust types and keys consistently with the existing schema.
+Do not send precolored text, numerator/denominator omissions, or glyphs
+from Rust. Preserve 'overridesHere' as its existing load-bearing metadata.
+
+Update active-node, counts-only phantom, parser/stripping, and test paths
+together. New display facts must not become save instructions. Search
+for all retired field names and old surprise-format fixtures, including
+collateral-save assertions such as 'tests/save_dirty_conflicts.rs'.
+
+*** Client rendering
+Implement the same fraction rules in
+[[file:../../elisp/heralds-minor-mode.el][Emacs heralds]] and
+[[file:../../nvim/lua/skg/heralds.lua][Neovim heralds]]. Factor repeated side/fraction
+rendering within each client rather than giving L and C divergent rules.
+Keep the stable C L S O H A I P order and unrelated markers intact.
+
+Verify graph changes that affect a linking node's body, visible contents
+or target set refresh its destinations' displayed I values in collateral
+views. A passing direct stats test alone does not establish this behavior.
+
+** TODO Apply semantic styles and the substitution marker
+Implement the interesting/confusable styles and dim-a distinction in both
+clients. Consult [[file:../../server/heralds.rs][the served rule table]] for existing
+orange uses and its 'overridesHere' placeholder. Insert h inside the O
+token through the relationship renderer, not as a separate token at the
+table's later viewStats position.
+
+Keep the rule-table color vocabulary if useful; the semantic face names
+need not force a protocol redesign. Remove obsolete face names/callers
+rather than adding legacy aliases. Update misleading touched comments,
+especially claims that every visual choice lives in Rust or that birth
+is orange. Regenerate the herald-rule fixture only if its contents change.
+
+** TODO Add a batch graph lookup for link annotations
+Use the published runtime graph snapshot to classify each requested ID
+as visible/resolved, inactive, or missing. For visible targets return the
+resolved identity and home-source information needed by the suffix.
+Do not return title/body text just to annotate source or existence.
+
+Add the request/response through
+[[file:../../server/serve/protocol.rs][protocol types]],
+[[file:../../server/serve.rs][dispatch]], and the handler module. Give each batch
+a reliable association with the requesting buffer/generation; exact
+request naming and correlation representation are ordinary choices.
+
+[[file:../../elisp/skg-readable-ids.el][Readable-ID annotations]] and
+[[file:../../nvim/lua/skg/readable_ids.lua][their Neovim counterpart]] provide prior
+art for batches and stale-response handling. Reuse suitable mechanics,
+but do not reuse the Tantivy-backed 'titles by ids' result as authoritative
+existence, or treat an omitted title as a missing node. Its negative-cache
+semantics cannot distinguish all the states required here.
+
+Implement display and lifecycle integration in both clients, including
+initial buffers, save/rerender paths, source-set updates and reconnects.
+Use existing link parsing and request-dispatch conventions. Add the new
+modules to client initialization/reload paths and user command exposure.
+
+** TODO Add explanations and documentation
+Implement the inspector against the semantic facts and substitution
+metadata, then create 'docs/heralds.org' as the user-facing legend. Explain
+all herald families, not only the changed ones: relations, fractions,
+ancestor flags, birth, source/relSource, editability, unknown/inactive
+states, edit requests and Git markers. Include the examples above,
+confusable h, broken links and source-overlay usage.
+
+Collect user-facing explanations from 'api-and-formats.md' into that guide
+and replace duplicated prose with links. Keep the exact updated wire
+contract and new lookup endpoint documented in the API file. Audit
+'docs/COMMANDS.org', 'docs/COMMANDS-nvim.org', 'docs/override.org', and
+other current documentation found by a focused herald search. Link the
+new guide from the project's documentation entry point. Historical TODO
+discussions remain history rather than a second user manual.
+
+*** Close the confirmed problem when its regression test passes
+Move the complete entry 'Link interestingness inspects inactive content
+relationships (2026-09-21)' from [[file:../problems.org][problems.org]] to the top of
+[[file:../DONE/problems.org][DONE/problems.org]], following that file's instructions.
+Record the implemented fix and verifying test. Jeff explicitly requested
+this cleanup. Do not leave a done copy among open problems.
+
+Review the existing API herald documentation-drift entry too. Close it
+only if this audit actually resolves its remaining claims; otherwise
+narrow its description to what remains. Do not accidentally promise
+rule-table retirement, which is outside this plan.
+
+* Verification and acceptance
+** TODO Prove the semantics at their owning boundaries
+Extend [[file:../../tests/herald_tokens.rs][semantic-wire tests]], graph-stat tests,
+source-set tests and subscribee/view tests. Use graph fixtures where
+titles differ from IDs.
+
+*** Counts and contextual membership
+Cover the full zero/equality tables, each interestingness criterion and
+their union, repeated links, primary/extra IDs, self-links, dangling
+targets, inactive endpoints and inactive contains relationships. Include
+the exact reported regression: visible linking source with content only
+through an inactive relationship must not become interesting for that
+reason.
+
+Exercise one subscribee under two subscribers with different U, hiding
+versus directly containing a member, extra-ID integration, distinct
+overriders, missing members, folds/budgets, and relevant source-set changes.
+Keep U <= D. Demonstrate that display expansion does not determine counts.
+
+*** Rendering and style priority
+Extend [[file:../../tests/elisp/test-heralds-minor-mode.el][ERT herald tests]] and
+[[file:../../tests/nvim/heralds_spec.lua][Neovim herald tests]] with matching examples.
+Assert both rendered characters and their per-character styles. Cover
+numerator/denominator ancestor partitioning, all-explained counts,
+generation encodings, ordinary and birth relations, dim a versus bright b,
+O numerals, pink h, and h adjacent to an ancestor letter.
+
+Exercise raw direct visits, ordinary override-folder/path rows and actual
+substitution, including same-source overrides. Assert that the marker is
+present exactly when 'overridesHere' is present and that saving still
+retains the original membership ID. Do not substitute raw roots.
+
+** TODO Prove annotation behavior across a live request cycle
+Test batch status results and extra-ID resolution against the graph,
+including immediately after graph publication without waiting for a
+Tantivy commit. Test simultaneous buffers, out-of-date replies, source-set
+switches, reconnect, closed buffers, unsaved link edits, target creation,
+target deletion and source moves. Toggle suffixes independently of
+broken-link styling and verify state survives rerendering.
+
+Use an isolated integration fixture for the server-to-client path in both
+clients. Existing 'tests/integration/herald-rules' and
+'tests/integration/visit-link' are suitable harness references. Verify
+text remains byte-for-byte unchanged by annotation and save, with Unicode
+labels and folded content included. Visually inspect representative
+heralds in both clients; automated style assertions alone cannot judge
+whether dim a and pink remain legible.
+
+** Test ladder and final checks
+Begin with focused tests, then affected grouped Rust targets and client
+test families. Rust tests are grouped explicitly in Cargo.toml; a file
+such as 'tests/herald_tokens.rs' is not its own Cargo test target.
+
+Useful focused starting commands, from the repository root:
+#+begin_src sh
+bash bash/nextest.sh -E 'test(herald_tokens::)'
+emacs --batch -Q -L elisp -L elisp/skg-sexpr -l tests/elisp/test-heralds-minor-mode.el -f ert-run-tests-batch-and-exit
+bash bash/nvim-tests.sh
+cargo check --all-targets
+#+end_src
+
+Run 'cargo check --all-targets' at the type/protocol boundary, then finish
+with the complete Rust, Emacs, Neovim, doctest and integration suites using
+the repository runners. 'bash/nextest.sh', 'bash/emacs-tests.sh',
+'bash/nvim-tests.sh', 'cargo test --doc', and
+'tests/integration/run-all-tests.sh' cover those families; run integration
+for both 'SKG_TEST_CLIENT=emacs' and 'SKG_TEST_CLIENT=nvim'. Read the Docker
+advice before starting isolated servers and use their test-specific ports
+and data paths. Do not attach tests to Jeff's interactive server.
+
+Stop at a useful failure, classify it and resolve failures caused by this
+work. Report unrelated or infrastructure failures explicitly. Do not
+claim a skipped visual check or unavailable client passed. Once required
+checks pass, do not repeat the entire suite without a new reason.
+
+Inspect the final diff and documentation links. Verify retired surprise
+fields have no operative callers, both clients consume the final wire,
+and the annotations never become persisted edits. Handoff with what
+changed, test evidence and any remaining limitations. No commits unless
+separately requested.
