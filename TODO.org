@@ -1,19 +1,6 @@
 * REMEMBER
 ** not to dirty the production skg's code.
 ** to set the model
-* ought, might
-** set the default Codex model
-■ Failed to save default model: config/batchWrite failed in TUI: config/batchWrite failed: failed to
-persist config.toml: failed to persist config at /home/ubuntu/.codex/config.toml (code -32603)
-** save to disk: how to fork a checkpoint
-Create your “orientation loaded” checkpoint once:
-
-/rename orientation-loaded
-
-Then whenever you want to start a new piece of work from exactly that point, while sitting in that checkpoint thread:
-
-/fork
-/rename whatever-this-task-is
 * ONGOING TODO/one-hop-collateral-neighborhood/
 * TODO change how link heralds look
 ** tone down the yellow "a = parent" herald
@@ -138,6 +125,19 @@ and try toggling that for one of its intermediate children.
 **** bug in export to org-roam
 The 'exporter' node, the one that defines where to write the org file
 derived from its parent, might have multiple parents.
+** infra
+*** set the default Codex model
+■ Failed to save default model: config/batchWrite failed in TUI: config/batchWrite failed: failed to
+persist config.toml: failed to persist config at /home/ubuntu/.codex/config.toml (code -32603)
+*** save to disk: how to fork a checkpoint
+Create your “orientation loaded” checkpoint once:
+
+/rename orientation-loaded
+
+Then whenever you want to start a new piece of work from exactly that point, while sitting in that checkpoint thread:
+
+/fork
+/rename whatever-this-task-is
 ** work through TODO/problems.org
 ** try neovim
 * skg-show-definition
