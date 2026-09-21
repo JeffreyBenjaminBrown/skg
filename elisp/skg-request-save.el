@@ -286,7 +286,12 @@ before the add/remove cycle."
         (unless (and lock-entry (listp (cadr lock-entry)))
           (error "Malformed save-relax-lock payload"))
         (skg--unlock-non-collateral-buffers
-         saved-uri (cadr lock-entry)))
+         saved-uri
+         (mapcar (lambda (uri)
+                   (cond ((stringp uri) uri)
+                         ((symbolp uri) (symbol-name uri))
+                         (t (error "Malformed lock view URI: %S" uri))))
+                 (cadr lock-entry))))
     (error
      ;; Retain every lock: an incomplete or malformed keep-set cannot safely
      ;; identify a buffer whose checked contents are no longer needed.

@@ -53,4 +53,31 @@ describe('skg.recovery', function ()
     vim.api.nvim_buf_delete(source, { force = true })
     assert.is_true(vim.api.nvim_buf_is_valid(archive))
   end)
+
+  it('cancellation, refused overwrite and write error preserve edits',
+     function ()
+    local source = buffer.open_org_buffer_from_text(
+      '* baseline\n', 'skg://recovery-errors', 'error-uri')
+    vim.api.nvim_buf_set_lines(source, 1, 1, false, { 'unsaved' })
+    assert.is_nil(recovery.show_unsaved_changes('', false))
+
+    local existing = vim.fn.tempname() .. '-skg-recovery-test.org'
+    table.insert(paths, existing)
+    vim.fn.writefile({ 'do not replace' }, existing)
+    local original_confirm = vim.fn.confirm
+    vim.fn.confirm = function () return 2 end
+    local overwrite_ok = pcall(
+      recovery.show_unsaved_changes, existing, false)
+    vim.fn.confirm = original_confirm
+    assert.is_false(overwrite_ok)
+    assert.are.same({ 'do not replace' }, vim.fn.readfile(existing))
+
+    local directory = vim.fn.tempname() .. '-skg-recovery-test-dir'
+    vim.fn.mkdir(directory)
+    table.insert(paths, directory)
+    local write_ok = pcall(recovery.show_unsaved_changes, directory, true)
+    assert.is_false(write_ok)
+    assert.is_true(vim.bo[source].modified)
+    assert.are.equal('error-uri', vim.b[source].skg_view_uri)
+  end)
 end)

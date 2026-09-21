@@ -70,4 +70,34 @@
       (when (buffer-live-p archive) (kill-buffer archive))
       (when (file-exists-p path) (delete-file path)))))
 
+(ert-deftest test-skg-recovery-refused-overwrite-and-write-error-preserve-edits ()
+  (let ((existing (make-temp-file "skg-recovery-existing-"))
+        (directory (make-temp-file "skg-recovery-directory-" t))
+        (source (generate-new-buffer "*skg recovery errors*")))
+    (unwind-protect
+        (with-current-buffer source
+          (insert "* baseline\n")
+          (skg-content-view-mode)
+          (setq skg-view-uri "error-uri")
+          (set-buffer-modified-p nil)
+          (skg--capture-clean-baseline)
+          (goto-char (point-max))
+          (insert "unsaved")
+          (with-temp-file existing (insert "do not replace"))
+          (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest _) nil)))
+            (should-error (skg-show-unsaved-changes existing)
+                          :type 'user-error))
+          (should (equal "do not replace"
+                         (with-temp-buffer
+                           (insert-file-contents existing)
+                           (buffer-string))))
+          (should-error (skg-show-unsaved-changes directory t) :type 'error)
+          (should (buffer-modified-p))
+          (should (equal "error-uri" skg-view-uri)))
+      (when (buffer-live-p source)
+        (with-current-buffer source (set-buffer-modified-p nil))
+        (kill-buffer source))
+      (when (file-exists-p existing) (delete-file existing))
+      (when (file-directory-p directory) (delete-directory directory)))))
+
 (provide 'test-skg-recovery)

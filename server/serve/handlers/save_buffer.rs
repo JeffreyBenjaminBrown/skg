@@ -87,9 +87,9 @@ pub struct ClientViewSnapshot {
   pub current  : Option<String>,
 }
 
-struct SaveRequestEnvelope {
-  saved_buffer : String,
-  other_views  : Vec<ClientViewSnapshot>,
+pub struct SaveRequestEnvelope {
+  pub saved_buffer : String,
+  pub other_views  : Vec<ClientViewSnapshot>,
 }
 
 #[derive(Clone)]
@@ -262,7 +262,7 @@ pub fn handle_save_buffer_request (
         & tag_sexp_response (
           TcpToClient::SaveResult, &response_sexp )); }} }
 
-fn parse_save_request_envelope (
+pub fn parse_save_request_envelope (
   content   : &str,
   saved_uri : Option<&ViewUri>,
 ) -> Result<SaveRequestEnvelope, Box<dyn Error>> {

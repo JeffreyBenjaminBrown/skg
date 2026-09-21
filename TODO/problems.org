@@ -3,31 +3,6 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
-* Search enrichment can mark unsaved edits clean (2026-09-20)
-  Code review: search enrichment takes a snapshot of the current editor
-  text, preserves its edits while adding context, and returns that text.
-  Emacs 'skg--replace-search-content' and Neovim
-  'display_search_enrichment' unconditionally clear the modified flag.
-  Edits made between initial search results and the enrichment snapshot
-  can therefore stop counting as unsaved, despite no graph save occurring.
-
-  The proposed dirty-view conflict check must preserve the dirty flag
-  and clean baseline across such enrichment, or it can miss these views.
-  See [[file:one-hop-collateral-neighborhood/2_plan.org][the collateral implementation plan]]. This finding is based on code
-  inspection; the plan calls for regression coverage in both clients.
-* Collateral lock selection can miss nodes introduced into the saved view (2026-09-20)
-  Code review: 'uris_of_views_to_lock' uses only the saved view's
-  registered pre-save PIDs and sends 'save-lock' before reading incoming
-  text. A save that newly includes and changes an existing node can
-  therefore select a collateral view that the early message unlocked.
-  'save-relax-lock' only unlocks, and the collateral handler replaces the
-  buffer. Edits made during that unlocked interval can be overwritten;
-  the pre-request dirty-buffer warning cannot cover such later edits.
-
-  Broadening collateral selection to one-hop neighbors also requires
-  broadening this lock coverage. See the locking discussion in
-  [[file:one-hop-collateral-neighborhood/discussion.org::*Codex review: decisions about neighborhood semantics, refreshes, and edit safety][the one-hop review]]. This finding is based on the request/handler
-  code, not a reproduced interactive race.
 * Dead-link warnings miss targets deleted by the same save (2026-09-13)
   =dead_link_warnings= regards every ID present in the pre-save graph as
   live. Therefore, when one buffer both saves a text link and deletes that
@@ -405,15 +380,6 @@
 * Problems found while taking over the local-view-update dialog (2026-06-02)
   Found while answering the open questions in
   TODO/local-view-update/problems.org. Each is cross-referenced there.
-** Collateral graphStats can go stale when only a node's relationships change
-   server/update_buffer.rs / find_collateral_view_uris.
-   Collateral views are selected by the PIDs in the SavePlan's DefineNodes.
-   If saving buffer X changes A.contains to include B (only A is saved),
-   then a different view rooted at B is not rerendered, even though B's
-   container count (graphStats.containRels) changed. B's herald is stale
-   until B's view is next rerendered. Pre-existing and arguably acceptable;
-   fixing it would require selecting collateral by the neighbors of changed
-   nodes, not just the changed nodes.
 ** (not a bug, but a simplification) Lock over-approximates the rerender set
    server/serve/handlers/save_buffer.rs, elisp/skg-request-save.el.
    The early lock message ('uris_of_views_to_lock') locks every open view

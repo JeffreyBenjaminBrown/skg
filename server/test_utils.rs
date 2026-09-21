@@ -9,7 +9,11 @@ use crate::dbs::tantivy::search::{SearchOptions, search_index};
 use crate::types::env::SkgEnv;
 use crate::from_text::buffer_to_viewnodes::uninterpreted::{headline_to_triple, HeadlineInfo};
 use crate::serve::ViewsState;
-use crate::serve::handlers::save_buffer::{SaveResponse, update_from_and_rerender_buffer};
+use crate::serve::handlers::save_buffer::{
+  ClientViewSnapshot, SaveResponse,
+  update_from_and_rerender_buffer,
+  update_from_and_rerender_buffer_with_approvals,
+};
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
 use crate::types::views_state::ViewUri;
 use crate::types::misc::{MSV, SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName, rel_partners_at_relSource, rel_partners_at_relSource_msv, RelPartner};
@@ -404,6 +408,27 @@ pub async fn update_from_and_rerender_buffer_test (
     stream, org_buffer_text, config, tantivy_index, graph,
     diff_mode_enabled, viewuri_from_request_result, views_state,
     /* fork_approved = */ true ) . await }
+
+/// Drive the full prepared-save conflict path with explicit client snapshots.
+pub async fn update_from_and_rerender_buffer_with_snapshots_test (
+  stream                      : &mut std::net::TcpStream,
+  org_buffer_text             : &str,
+  config                      : &SkgConfig,
+  tantivy_index               : &TantivyIndex,
+  graph                       : &InRustGraphHandle,
+  diff_mode_enabled           : bool,
+  viewuri_from_request_result : &Result<ViewUri, String>,
+  views_state                 : &mut ViewsState,
+  other_views                 : &[ClientViewSnapshot],
+) -> Result<SaveResponse, Box<dyn Error>> {
+  let mut env : SkgEnv =
+    skg_env_from_parts (config, tantivy_index, graph);
+  update_from_and_rerender_buffer_with_approvals (
+    stream, org_buffer_text, &mut env, diff_mode_enabled,
+    viewuri_from_request_result, views_state, None,
+    true, &HashMap::new (), &std::collections::HashSet::new (),
+    &std::collections::HashSet::new (), other_views ) . await
+}
 
 /// As 'update_from_and_rerender_buffer_test', but lets the test choose
 /// whether forks are approved -- pass false to exercise the

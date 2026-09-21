@@ -84,6 +84,17 @@ end
 function M.request_text_search (search_terms, regex, body, operators,
                                 overPrivateText_choice)
   lock.begin_stream('search enrichment')
+  local ok, err = pcall(
+    M.send_text_search_request, search_terms, regex, body, operators,
+    overPrivateText_choice)
+  if not ok then
+    M.cancel_locally_failed_search()
+    error(err) end
+end
+
+---Register handlers and send one guarded text-search request.
+function M.send_text_search_request (search_terms, regex, body, operators,
+                                     overPrivateText_choice)
   local request_form = {
     sexpr.pair(sexpr.symbol('request'), 'text search'),
     sexpr.pair(sexpr.symbol('terms'), search_terms),
@@ -133,6 +144,20 @@ function M.request_text_search (search_terms, regex, body, operators,
     end, false)
   state.lp_reset()
   client.send_string(request)
+end
+
+function M.cancel_locally_failed_search ()
+  for _, response_type in ipairs(
+      { 'search-results', 'search-enrichment' }) do
+    if state.response_handler_map[response_type] then
+      state.lp_pending_count = math.max(0, state.lp_pending_count - 1) end
+  end
+  for _, response_type in ipairs({
+      'search-results', 'search-enrichment', 'request-snapshot',
+      'overPrivateText-telescope-confirmation' }) do
+    state.response_handler_map[response_type] = nil
+  end
+  lock.end_stream()
 end
 
 ---Display the immediate results: a search view buffer registered

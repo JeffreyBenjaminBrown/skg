@@ -36,7 +36,7 @@
           (skg--lock-all-skg-buffers)
           (skg--save-relax-lock-handler
            "uri-saved"
-           "((response-type save-relax-lock) (lock-views (\"uri-dirty\")))")
+           "((response-type save-relax-lock) (lock-views (uri-dirty)))")
           (should (buffer-local-value 'skg--save-lock-overlay saved))
           (should (buffer-local-value 'skg--save-lock-overlay dirty))
           (should-not (buffer-local-value 'skg--save-lock-overlay clean)))

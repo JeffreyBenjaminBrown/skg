@@ -70,6 +70,16 @@ headline documenting `skg-search-interactive'."
   "Request a text search from the Rust server.
 REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
   (skg--begin-stream "search enrichment")
+  (condition-case err
+      (skg--send-text-search-request
+       search-terms regex body operators overPrivateText-choice)
+    (error
+     (skg--cancel-locally-failed-search)
+     (signal (car err) (cdr err)))))
+
+(defun skg--send-text-search-request (search-terms regex body operators
+                                                   overPrivateText-choice)
+  "Register handlers and send one guarded text-search request."
   (let* ((tcp-proc (skg-tcp-connect-to-rust))
          (clean-terms (if (stringp search-terms)
                           (substring-no-properties search-terms)
@@ -137,6 +147,18 @@ REGEX, BODY, OPERATORS are booleans; sent as \"true\"/\"false\"."
      nil)
     (skg-lp-reset)
     (process-send-string tcp-proc request-s-exp)))
+
+(defun skg--cancel-locally-failed-search ()
+  "Unwind search handlers and stream state after a local send failure."
+  (dolist (response-type '(search-results search-enrichment))
+    (when (assoc response-type skg-response-handler-map)
+      (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count)))))
+  (dolist (response-type
+           '(search-results search-enrichment request-snapshot
+             overPrivateText-telescope-confirmation))
+    (setq skg-response-handler-map
+          (assoc-delete-all response-type skg-response-handler-map)))
+  (skg--end-stream))
 
 (defvar skg--search-buffer-setup-hook nil
   "Hook run inside a freshly populated search buffer.

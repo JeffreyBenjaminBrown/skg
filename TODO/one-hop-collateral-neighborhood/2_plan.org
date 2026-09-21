@@ -177,7 +177,7 @@
    and [[file:../../tests/save/extra_id_revocation.rs][two-phase save preflight]]. Search for callers before changing signatures.
 
 * Implementation sequence
-** TODO Implement and test the neighborhood and identity matching
+** DONE Implement and test the neighborhood and identity matching
    Add a focused pure graph helper, with 'update_relevant_neighborhood'
    in its name. Put traversal beside the existing relation accessors;
    keep save/view policy outside this helper. Deduplicate seeds/results
@@ -210,7 +210,7 @@
     extra-ID references, merge identity changes, and dangling targets.
     Include an unrelated view and a two-hop ordinary node that must not
     be selected merely for being two hops away.
-** TODO Expose a prepared save without changing its transaction semantics
+** DONE Expose a prepared save without changing its transaction semantics
    Split preparation from application in save.rs. A consuming preparation
    value should retain the old graph, final candidate, both prepared graph
    stages, both prepared filesystem stages, final write identities,
@@ -227,7 +227,7 @@
    express a useful prepare-and-apply operation; do not add legacy protocol
    adapters. Preparation itself must not publish, queue Tantivy work, or
    write authoritative files. Do not weaken existing two-phase tests.
-** TODO Capture clean baselines and preserve dirty state in both clients
+** DONE Capture clean baselines and preserve dirty state in both clients
    Add buffer-local baseline text and context. Capture the initial clean
    view and every successful server replacement after client normalization
    and transient focus/fold marker cleanup. The baseline should match
@@ -255,7 +255,7 @@
     during an in-flight save. Reuse the stream guards; if needed, defer
     save while a search snapshot/enrichment exchange is pending and defer
     starting that exchange during save. Test both orderings and cleanup.
-** TODO Implement detached recovery documents before enabling hard refusal
+** DONE Implement detached recovery documents before enabling hard refusal
    Add 'skg-show-unsaved-changes' and the Neovim counterpart using existing
    command-registration conventions. No new keybinding is required.
    Prompt for the document path, write successfully, open it, and report
@@ -280,7 +280,7 @@
    Leave the original dirty flag and undo history alone. Its instructions
    should explain manual reapplication to freshly opened views and warn
    against saving the whole archived edited snapshot over newer data.
-** TODO Extend the save payload to include other view states
+** DONE Extend the save payload to include other view states
    Keep the request-line metadata for the saved URI, point, and existing
    approvals. Replace the following length-prefixed raw Org payload with
    one structured S-expression envelope containing the saved Org text
@@ -314,7 +314,7 @@
    buffer without making marker insertions look like user edits. Ensure
    local serialization/send failures unwind locks and handlers. Every
    confirmation retry must recapture current other-view state.
-** TODO Collect dirty dependencies and reject conflicts
+** DONE Collect dirty dependencies and reject conflicts
    Implement one Rust dependency collector over parsed baseline/current
    forests, unioning the registered baseline where available. Collect
    node IDs, ID qualifier values, merge targets, 'overridesHere' originals,
@@ -365,7 +365,7 @@
     edit-time two-dirty-buffer modal warning too: multiple disjoint dirty
     views are now supported, and edits should be permitted until an
     actual save conflict is found. Update both clients and their tests.
-** TODO Wire expanded collateral selection with conservative locks
+** DONE Wire expanded collateral selection with conservative locks
    Before expanding selection, change initial save-lock handling to retain
    all local view locks. Treat it as acknowledgement of the broad lock,
    not permission to unlock client-only/unregistered views absent from
@@ -379,7 +379,7 @@
    At this checkpoint, leaving all locks held until the existing late
    narrowing/terminal path is safe. Verify correctness before moving the
    narrowing message earlier.
-** TODO Narrow locks earlier in the separate requested commit
+** DONE Narrow locks earlier in the separate requested commit
    Move save-relax-lock to immediately after preparation and a successful
    conflict check, before applying the prepared save. Keep locked the saved
    URI, selected collateral URIs, and every dirty view examined, including

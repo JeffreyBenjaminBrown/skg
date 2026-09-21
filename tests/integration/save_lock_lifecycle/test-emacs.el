@@ -10,10 +10,8 @@
 ;;;             pid set contains a; saving a re-renders it).
 ;;;   *solo* -- truly NON-COLLATERAL to saving a (its pid set is {solo}).
 ;;;
-;;; NOTE: this asserts the post-settle end state (every view unlocked, and the
-;;; non-collateral one genuinely editable). It deliberately does NOT assert the
-;;; mid-stream timing -- "saved buffer stays locked UNTIL save-result" (§20.2b) --
-;;; which is not observable deterministically from a batch Emacs test.
+;;; Response-handler advice observes both intermediate protocol boundaries
+;;; synchronously, before the next framed message can be dispatched.
 ;;;
 ;;; File system operations (backup/cleanup) are handled by run-test.sh.
 
@@ -22,6 +20,39 @@
 
 (defvar integration-test-phase "starting")
 (defvar integration-test-completed nil)
+(defvar integration-test-saw-broad-lock nil)
+(defvar integration-test-saw-relaxed-lock nil)
+
+(defun integration-test-observe-broad-lock (original payload)
+  "Assert that broad acknowledgement has not unlocked any local view."
+  (funcall original payload)
+  (dolist (name '("*a*" "*b*" "*solo*"))
+    (unless (buffer-local-value 'skg--save-lock-overlay (get-buffer name))
+      (message "✗ FAIL: %s unlocked at broad save-lock" name)
+      (kill-emacs 1)))
+  (setq integration-test-saw-broad-lock t)
+  (message "✓ broad save-lock retained every local view"))
+
+(defun integration-test-observe-relaxed-lock (original saved-uri payload)
+  "Assert the narrowed intermediate lock set before collateral streaming."
+  (funcall original saved-uri payload)
+  (unless (and (buffer-local-value 'skg--save-lock-overlay
+                                    (get-buffer "*a*"))
+               (buffer-local-value 'skg--save-lock-overlay
+                                    (get-buffer "*b*"))
+               (not (buffer-local-value 'skg--save-lock-overlay
+                                         (get-buffer "*solo*"))))
+    (message "✗ FAIL: unexpected lock set after save-relax-lock: a=%S b=%S solo=%S payload=%s"
+             (not (null (buffer-local-value 'skg--save-lock-overlay
+                                             (get-buffer "*a*"))))
+             (not (null (buffer-local-value 'skg--save-lock-overlay
+                                             (get-buffer "*b*"))))
+             (not (null (buffer-local-value 'skg--save-lock-overlay
+                                             (get-buffer "*solo*"))))
+             payload)
+    (kill-emacs 1))
+  (setq integration-test-saw-relaxed-lock t)
+  (message "✓ save-relax-lock freed only the unrelated clean view"))
 
 (defun phase-1-open-three-views ()
   "Open views *a*, *b*, and *solo*."
@@ -39,6 +70,10 @@
   "Edit a's title in *a* and save it."
   (message "=== PHASE 2: Edit a's title and save *a* ===")
   (setq integration-test-phase "phase-2-edit-and-save-a")
+  (advice-add 'skg--broad-save-lock-handler :around
+              #'integration-test-observe-broad-lock)
+  (advice-add 'skg--save-relax-lock-handler :around
+              #'integration-test-observe-relaxed-lock)
   (with-current-buffer "*a*"
     (goto-char (point-min))
     (end-of-line)            ;; end of the root line (a's title)
@@ -58,6 +93,10 @@ truly-non-collateral view *solo* is genuinely editable."
   (when skg--stream-in-progress
     (message "✗ FAIL [§20.2a]: skg--stream-in-progress still set after save: %S"
              skg--stream-in-progress)
+    (kill-emacs 1))
+  (unless (and integration-test-saw-broad-lock
+               integration-test-saw-relaxed-lock)
+    (message "✗ FAIL: both intermediate lock messages were not observed")
     (kill-emacs 1))
 
   (dolist (spec '(("*solo*" . "non-collateral")

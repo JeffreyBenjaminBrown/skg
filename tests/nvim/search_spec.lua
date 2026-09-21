@@ -9,9 +9,13 @@ local helpers = dofile(
   debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
 
 local buffer = require('skg.buffer')
+local client = require('skg.client')
+local lock = require('skg.lock')
+local save = require('skg.save')
 local search = require('skg.search')
 local search_make_link = require('skg.search_make_link')
 local sexpr = require('skg.sexpr.parse')
+local state = require('skg.state')
 
 describe('skg.search', function ()
   local server
@@ -51,6 +55,35 @@ describe('skg.search', function ()
     vim.wait(2000, function () return seen ~= nil end, 10)
     assert.is_truthy(seen:find(
       '(overPrivateText-telescopes . "exclude")', 1, true))
+  end)
+
+  it('a pending search blocks save before save locks are taken', function ()
+    server = helpers.connect_to_fake_server(function () end)
+    search.request_text_search('still enriching', false, false, false)
+    local buf = buffer.open_org_buffer_from_text(
+      '* (skg (node (id a))) a', 'skg://a', 'uri-a')
+    local ok, err = pcall(save.request_save_buffer)
+    assert.is_false(ok)
+    assert.is_truthy(tostring(err):find(
+      'search enrichment already in progress', 1, true))
+    assert.is_true(vim.bo[buf].modifiable)
+  end)
+
+  it('local send failure unwinds search handlers and stream state', function ()
+    local original_send = client.send_string
+    client.send_string = function () error('synthetic send failure') end
+    local ok, err = pcall(
+      search.request_text_search, 'fails locally', false, false, false)
+    client.send_string = original_send
+    assert.is_false(ok)
+    assert.is_truthy(tostring(err):find('synthetic send failure', 1, true))
+    assert.is_nil(lock.stream_in_progress)
+    assert.are.equal(0, state.lp_pending_count)
+    for _, response_type in ipairs({
+        'search-results', 'search-enrichment', 'request-snapshot',
+        'overPrivateText-telescope-confirmation' }) do
+      assert.is_nil(state.response_handler_map[response_type])
+    end
   end)
 
   it('opens results, snapshots on request, and applies enrichment',
