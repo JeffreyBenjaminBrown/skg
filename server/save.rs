@@ -189,7 +189,7 @@ pub async fn update_graph_including_nodeMerges (
 /// mutation gate.  The TCP save handler takes the gate before parsing so its
 /// disk-derived SavePlan cannot become stale before this function publishes.
 pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
-  mut save_instructions  : Vec<DefineNode>,
+  save_instructions  : Vec<DefineNode>,
   nodeMerge_instructions : &[NodeMerge],
   source_moves       : &[SourceMove],
   config             : SkgConfig,
@@ -197,21 +197,97 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
   graph              : &InRustGraphHandle,
   hoist_approved_pids : &HashSet<ID>,
 ) -> Result<HashMap<ID, HashSet<ID>>, Box<dyn Error>> {
+  let prepared : PreparedSave = prepare_save_under_mutation_gate (
+    save_instructions, nodeMerge_instructions, source_moves, &config,
+    graph, hoist_approved_pids) ?;
+  prepared . apply (config, tantivy_index, graph)
+}
+
+pub(crate) struct PreparedSave {
+  graph_before_save             : Arc<InRustGraph>,
+  final_candidate               : Arc<InRustGraph>,
+  prepared_save                 : Option<PreparedGraphUpdate>,
+  prepared_nodeMerge            : Option<PreparedGraphUpdate>,
+  prepared_save_filesystem      : Option<PreparedFilesystemUpdate>,
+  prepared_nodeMerge_filesystem : Option<PreparedFilesystemUpdate>,
+  final_write_identities        : HashSet<ID>,
+  deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
+  telescope_warnings            : Vec<(ID, TelescopeViolation)>,
+}
+
+impl PreparedSave {
+  pub(crate) fn graph_before_save (
+    &self,
+  ) -> &Arc<InRustGraph> {
+    &self . graph_before_save
+  }
+
+  pub(crate) fn final_candidate (
+    &self,
+  ) -> &Arc<InRustGraph> {
+    &self . final_candidate
+  }
+
+  pub(crate) fn final_write_identities (
+    &self,
+  ) -> &HashSet<ID> {
+    &self . final_write_identities
+  }
+
+  pub(crate) fn apply (
+    self,
+    config        : SkgConfig,
+    tantivy_index : &mut TantivyIndex,
+    graph         : &InRustGraphHandle,
+  ) -> Result<HashMap<ID, HashSet<ID>>, Box<dyn Error>> {
+    if let Some ((prepared, prepared_filesystem)) =
+      self . prepared_save . zip (self . prepared_save_filesystem)
+    {
+      let save_replacement : Option<TantivyIndex> =
+        { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+            "apply_ordinary_defineNodes" ). entered();
+          apply_defineNodes (
+            prepared, prepared_filesystem, config . clone (),
+            tantivy_index, graph ) } ?;
+      if let Some (new_index) = save_replacement {
+        *tantivy_index = new_index; }}
+    let nodeMerge_replacement : Option<TantivyIndex> =
+      { let _span : tracing::span::EnteredSpan = tracing::info_span!(
+          "apply_nodeMerge_defineNodes" ). entered();
+        crate::nodeMerge::apply_prepared_nodeMerges (
+          self . prepared_nodeMerge . zip (
+            self . prepared_nodeMerge_filesystem),
+          config, tantivy_index, graph ) } ?;
+    if let Some (new_index) = nodeMerge_replacement {
+      *tantivy_index = new_index; }
+    emit_telescope_warnings (&self . telescope_warnings);
+    Ok (self . deleted_by_this_save_extra_ids)
+  }
+}
+
+pub(crate) fn prepare_save_under_mutation_gate (
+  mut save_instructions  : Vec<DefineNode>,
+  nodeMerge_instructions : &[NodeMerge],
+  source_moves       : &[SourceMove],
+  config             : &SkgConfig,
+  graph              : &InRustGraphHandle,
+  hoist_approved_pids : &HashSet<ID>,
+) -> Result<PreparedSave, Box<dyn Error>> {
   let graph_before_save : Arc<InRustGraph> = graph . load_full ();
   apply_delete_propagation_cleanup (
-    &mut save_instructions, &graph_before_save, &config );
+    &mut save_instructions, &graph_before_save, config );
   let all_filesystem_outputs : Vec<DefineNode> =
     save_instructions . iter () . cloned ()
     . chain ( nodeMerge_instructions . iter ()
              . flat_map ( |node_merge| node_merge . to_vec () ) )
     . collect ();
   crate::nodeMerge::error_unless_nodeMerge_hoist_is_approved (
-    nodeMerge_instructions, &config, hoist_approved_pids ) ?;
+    nodeMerge_instructions, config, hoist_approved_pids ) ?;
 
   let prepared_save : Option<PreparedGraphUpdate> =
     if save_instructions . is_empty () { None }
     else { Some (prepare_graph_update (
-      &config, graph_before_save . clone (), save_instructions)
+      config, graph_before_save . clone (), save_instructions)
       . map_err (graph_preparation_save_error) ?) };
   let graph_after_save : Arc<InRustGraph> = prepared_save . as_ref ()
     . map ( |prepared| prepared . candidate () . clone () )
@@ -223,24 +299,24 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
   let prepared_nodeMerge : Option<PreparedGraphUpdate> =
     if nodeMerge_definitions . is_empty () { None }
     else { Some (prepare_graph_update (
-      &config, graph_after_save, nodeMerge_definitions)
+      config, graph_after_save, nodeMerge_definitions)
       . map_err (graph_preparation_save_error) ?) };
   // Prepare and retain both filesystem phases before either is consumed.
   // This is the save-level all-or-nothing preflight for fallible ownership,
   // shape, path, and serialization work.
   let prepared_save_filesystem : Option<PreparedFilesystemUpdate> =
     prepared_save . as_ref () . map (|prepared| prepare_fs_update (
-      prepared . definitions (), source_moves, &config, hoist_approved_pids))
+      prepared . definitions (), source_moves, config, hoist_approved_pids))
     . transpose () ?;
   let prepared_nodeMerge_filesystem : Option<PreparedFilesystemUpdate> =
     prepared_nodeMerge . as_ref () . map (|prepared| prepare_fs_update (
-      prepared . definitions (), &[], &config, hoist_approved_pids))
+      prepared . definitions (), &[], config, hoist_approved_pids))
     . transpose () ?;
-  let final_candidate : &InRustGraph = prepared_nodeMerge . as_ref ()
-    .map (|prepared| prepared . candidate () . as_ref ())
+  let final_candidate : Arc<InRustGraph> = prepared_nodeMerge . as_ref ()
+    .map (|prepared| prepared . candidate () . clone ())
     .or_else (|| prepared_save . as_ref ()
-      .map (|prepared| prepared . candidate () . as_ref ()))
-    .unwrap_or (&graph_before_save);
+      .map (|prepared| prepared . candidate () . clone ()))
+    .unwrap_or_else (|| graph_before_save . clone ());
   let saved_pids_for_telescope : HashSet<ID> = prepared_save . iter ()
     .chain (prepared_nodeMerge . iter ())
     .flat_map (|prepared| prepared . saved_pids () . iter () . cloned ())
@@ -251,7 +327,7 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
     .collect ();
   let telescope_warnings : Vec<(ID, TelescopeViolation)> =
     affected_telescope_warnings (
-      &config, &graph_before_save, final_candidate,
+      config, &graph_before_save, &final_candidate,
       &saved_pids_for_telescope, &affected_ids_for_telescope);
   let deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>> =
     all_filesystem_outputs . iter ()
@@ -261,27 +337,39 @@ pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
                        node . extra_ids . iter () . cloned () . collect ())),
       _ => None })
     . collect ();
-  if let Some ((prepared, prepared_filesystem)) =
-    prepared_save . zip (prepared_save_filesystem)
-  {
-    let save_replacement : Option<TantivyIndex> =
-      { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-          "apply_ordinary_defineNodes" ). entered();
-        apply_defineNodes (
-          prepared, prepared_filesystem, config . clone (),
-          tantivy_index, graph ) } ?;
-    if let Some (new_index) = save_replacement {
-      *tantivy_index = new_index; }}
-  let nodeMerge_replacement : Option<TantivyIndex> =
-    { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "apply_nodeMerge_defineNodes" ). entered();
-      crate::nodeMerge::apply_prepared_nodeMerges (
-        prepared_nodeMerge . zip (prepared_nodeMerge_filesystem), config,
-        tantivy_index, graph ) } ?;
-  if let Some (new_index) = nodeMerge_replacement {
-    *tantivy_index = new_index; }
-  emit_telescope_warnings (&telescope_warnings);
-  Ok (deleted_by_this_save_extra_ids) }
+  let final_write_identities : HashSet<ID> = all_filesystem_outputs . iter ()
+    .chain (prepared_save . iter ()
+      .flat_map (|prepared| prepared . definitions () . iter ()))
+    .chain (prepared_nodeMerge . iter ()
+      .flat_map (|prepared| prepared . definitions () . iter ()))
+    .flat_map (identities_in_definition)
+    .chain (source_moves . iter () . map (|source_move|
+      source_move . pid . clone ()))
+    .chain (affected_ids_for_telescope)
+    .collect ();
+  Ok (PreparedSave {
+    graph_before_save,
+    final_candidate,
+    prepared_save,
+    prepared_nodeMerge,
+    prepared_save_filesystem,
+    prepared_nodeMerge_filesystem,
+    final_write_identities,
+    deleted_by_this_save_extra_ids,
+    telescope_warnings,
+  })
+}
+
+fn identities_in_definition (
+  definition : &DefineNode,
+) -> Vec<ID> {
+  match definition {
+    DefineNode::Save (SaveNode (node)) =>
+      std::iter::once (node . pid . clone ())
+        .chain (node . extra_ids . iter () . cloned ())
+        .collect (),
+    DefineNode::Delete (delete) => vec![delete . id . clone ()], }
+}
 
 pub(crate) fn emit_telescope_warnings (
   warnings : &[(ID, TelescopeViolation)],
