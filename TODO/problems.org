@@ -3,6 +3,23 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
+* Link interestingness inspects inactive content relationships (2026-09-21)
+  'link_split' in 'server/dbs/in_rust_graph/stats.rs' filters inbound
+  linking nodes by active home source, then tests their raw 'contains'
+  list with '! src . contains . is_empty ()'. Unlike the ordinary
+  contains count, this does not gate the relationship's relSource or
+  the contained node's home source.
+
+  Consequently, a visible linking node whose only content relationship
+  is inactive still increments 'link_with_content' and bypasses the
+  surprising-label classification. An inactive relationship can change
+  the visible link herald. This is established by code inspection, not
+  a new runtime test.
+
+  When replacing the link split with the proposed interesting-source
+  count, use visible content membership consistently with the ordinary
+  relationship statistics. See
+  [[file:heralds_sept-2026/1_discussion.org::*Codex's response — 2026-09-21][the herald discussion]].
 * Dead-link warnings miss targets deleted by the same save (2026-09-13)
   =dead_link_warnings= regards every ID present in the pre-save graph as
   live. Therefore, when one buffer both saves a text link and deletes that

@@ -79,10 +79,10 @@ read on its own without loading the rest of 'maybe-obsolete/'.
 * How to communicate and maintain knowledge with me
 For a response longer than a couple of paragraphs, prefer an Org file in the
 repository and link to it. Note that an org file uniformly of depth 2,
-with bullets inside the bodies, is a weird LLM smell.
-The natural way knowledge divides is as a tree of verying depth,
-with complex parts being more bushy. And bullets defeat the purpose of org,
-so prefer headlines -- those let me (Jeff) respond granularly.
+with bullets inside the bodies, is an unnatural LLM pattern.
+Knowledge usually divides as an irregular tree of verying depth,
+complex parts being bushier. And bullets defeat the purpose of org,
+so prefer headlines -- those let me respond granularly.
 Use single apostrophes around code references in Org, not double
 apostrophes; dense double-apostrophe wrappers can stall Org's parser.
 

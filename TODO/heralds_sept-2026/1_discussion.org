@@ -1,0 +1,508 @@
+* vision : updates to the herald system
+** plans
+*** tone down the yellow "a = parent" herald
+same yellow but 1/4 as bright
+*** simplify the link herald
+Letting
+    I = |sources with body text, content nodes or multiple links|
+    S = |total sources|
+    T = |total targets|
+the link herald should be
+  I/SOT
+if they are all nonzero,
+and SOT if I is zero.
+The other zero cases are obvious.
+
+The presence of T in that herald is alittle embarrasssing,
+because the user can just count the links in the title and body,
+but omitting it would be confusing.
+
+Render the I in the "interesting font", which is currently
+white on an orange background (like for multiple containers).
+
+Is that font used anywhere else? Should it be?
+It should probably be reified, if we haven't already given it a name.
+*** make the content herald of asubscribee-as-such resemble link heralds
+The content side of the contains herald for a subscribee-as-such should read:
+
+C<unintegrated content>/<total content>
+
+Unintegrated content gets the interesting-stat font.
+Unintegrated content and slash are both omitted if unintegrated = 0.
+*** The override character 'O' always gets the interesting font.
+This is to mitigate the danger that the user edits one thing
+while thinking they are editing another.
+*** add 'skg-toggle-source-overlay-on-links'
+This would insert an overlay suffix indicating the source of each link
+after each link label. It would use the same green look as the sources
+shown for each node. It will be handy if the user follows a link
+and then discovers the thing they landed at is overridden,
+to determine whether they were redirected by an override.
+
+Is that an inelegant solution to the problem of knowing
+whether you followed an override? It wouldn't even be enough information,
+if it were true that override relationships could connect nodes
+in the same source. Can they? Should they be able to?
+(At first blush it seems silly to do that --
+if I have two public notes on love, one of which overrides the other,
+why do I have them both there? By contrast,
+it's clear why I might want my private note on love
+to override my public note on love.)
+*** document all changes we introduce wherever heralds are documented for the user
+and review that documentation to make sure it is accurate.
+If it doesn't exist, make it; if it's outside of docs/,
+collect it there.
+** request
+*** evaluate this request
+Are there more design or architecture decisions I'll need to make?
+*** evaluate the experience of the system
+Could the herald system be simpler? More coherent?
+If you were a user, are there stats you would want to see at a glance
+from the heralds that are not present yet?
+
+* Codex's response — 2026-09-21
+The proposed ratios would make the heralds easier to read. I especially
+like giving the numerator a consistent meaning: something within the
+total that deserves attention. There are a few semantic choices to settle,
+though, and the motivation for the link-source overlay rests on behavior
+that the current code no longer has.
+
+** Following a link currently visits the exact node
+'skg-goto' sends the selected ID to the single-root-view handler, which
+opens that node itself. Override substitution can occur in the content
+drawn beneath it. Finding an O herald at your destination therefore does
+not mean that following the link redirected you.
+
+This is explicit in [[file:../../elisp/skg-id-search.el::(defun skg-goto][skg-goto]],
+[[file:../../server/serve/handlers/single_root_view.rs][the request handler]], and
+[[file:../../docs/override.org::*Direct visits are exact][the override guide]].
+
+*** Same-source overrides are allowed, and I would keep them
+The [[file:../../server/dbs/in_rust_graph/override_invariants.rs][override invariants]]
+limit owned overriders per target and prohibit owned cycles; they do not
+require different endpoint sources. The
+[[file:../../server/dbs/in_rust_graph/override_resolution.rs][resolver]] checks ownership
+and visibility, without requiring a source change.
+
+A useful example is a revised public note superseding an older public
+note whose ID and text remain valuable for old references. Another is a
+private override relationship between two public notes: relationship
+source and node source are independent. Sources organize ownership and
+visibility; they need not define which notes can supersede one another.
+
+*** The overlay is useful as provenance, independently of overrides
+I would define its suffix as the home source of the link's literal target,
+using the same abbreviation and green styling as node sources. Here
+"source" means a configured source, not an inbound linking node.
+
+Make it a buffer-local toggle covering links in titles and bodies. Its
+annotations should be display-only, survive view refresh while enabled,
+and update after link edits and source-set changes. Unknown or inactive
+targets need an explicit unavailable state; a failed lookup must not look
+like a known source. Resolve extra IDs to their node before looking up
+the source. Batch lookups against the graph rather than issue one request
+per link or depend on the asynchronously updated search index.
+
+I would implement this if you want provenance at a glance. I would defer
+it if its only purpose is to detect link-following redirection.
+
+**** Jeff to ponder : The missing override cue belongs on substituted occurrences
+The useful distinction is "this node has override relationships" versus
+"this occurrence replaces another node here". The server already records
+the latter as 'overridesHere', but the rule table consumes that field
+without drawing a separate marker. Instead, the view-stat pass adds
+overrides to the birth relations.
+
+That is not an unambiguous substitution cue: an override-folder member
+also has an override birth relation. Making every O orange further reduces
+the distinction. I recommend a small explicit replacement marker beside O
+only when 'overridesHere' is present, with an inspectable explanation
+identifying the original and the drawn node. The marker's exact glyph is
+a design choice; the distinction itself matters more than the glyph.
+
+***** Codex: the concrete example is below
+I explain this under your question "What is 'actual substitution at this
+occurrence'?" below. Your revised O styling preserves the existing birth
+cue, but that cue has several meanings; an explicit substitution marker
+remains a separate choice. I would keep this question open for that reason.
+
+***** Jeff: lets mark overridesHere with a pink h right after the O.
+Let's name the pink font (I've described it elsewhere)
+the 'confusable' font.
+It's not meant to be interpreted as an ancestor;
+that would get an 'interesting' font instead.
+
+****** Codex: agreed; this settles the substitution marker
+Show the pink h immediately after O exactly when this occurrence carries
+'overridesHere'. It precedes any outbound count or ancestor letters:
+for example, '2Oh3'. O keeps its ordinary/birth style, displayed counts
+keep the interesting style, and h uses the named confusable style. An
+override relationship by itself does not earn h. This supplies the
+specific substitution cue I was asking for.
+
+One correction: ancestor letters have the yellow ancestor style, with
+only a dimmed under our agreement. They do not have the orange interesting
+style. The eighth ancestor is itself h, so pink h and yellow h can have
+the same character and position in otherwise different heralds. Your
+choice distinguishes those by color; plain unstyled 'Oh' is ambiguous.
+I would keep your chosen marker and document that limitation, with the
+inspect-herald explanation explicitly identifying substitution versus
+ancestry. No need to change the ancestor styling to accommodate it.
+
+Use 'confusable' for the shared pink foreground on this marker and broken
+links. Underlining belongs to the link presentation, so sharing the pink
+style need not underline the herald's h.
+
+** Link counts: use I/SLT, with L as the relation letter
+I assume the O in 'I/SOT' is a slip. O already means overrides, while L
+means text links. Reusing O here would make the system harder to read.
+In '2/5L3', two of five inbound linking nodes are interesting, and this
+node links to three targets. I, S and T are variables in the explanation,
+not literal letters in the display.
+
+*** Spell out the zero cases and retain ancestor information
+I recommend these forms:
+
+| I | S | T | Display |
+|---+---+---+---------|
+| 2 | 5 | 3 | 2/5L3   |
+| 0 | 5 | 3 | 5L3     |
+| 2 | 5 | 0 | 2/5L    |
+| 0 | 5 | 0 | 5L      |
+| 0 | 0 | 3 | L3      |
+| 0 | 0 | 0 | omitted |
+
+'I > S' is invalid, and 'I > 0' requires 'S > 0'. Highlight only the
+interesting numeral, not its slash or denominator.
+
+Keep the existing outbound ancestor letters: 'L3a' means three targets,
+one of which is the visible parent. I would retain the total even in
+'L1a', so the new link statistic stays explicit. That is a small exception
+to the ordinary relation rule that suppresses a count fully explained by
+ancestor letters; it should be deliberate and documented.
+
+**** agreed everywhere except the exception
+I might at some point decide that the rule
+'suppress if there's only 1 and it's explained by the ancestor character'
+should be dropped entirely, but we shouldn't skip it for one special case.
+
+I missed an edge case: An ancestor character could be on either side
+of the slash. But I think the logic for how to handle those cases is clear.
+Note that one reasonable outcome is 'a/5L'.
+
+***** Codex: agreed on uniform suppression; ancestor placement needs one rule
+Yes; withdraw my 'L1a' exception. Apply the ordinary omission rule to
+links too. One precision: the current renderer suppresses a count when
+the ancestor letters account for all members, including several members,
+not just a singleton. I take your instruction to mean preserve that rule.
+
+For fractions, the numerator is a subset of the denominator, so an
+interesting ancestor belongs to both. To get your 'a/5L' without repeating
+a, I suggest printing each ancestor letter only once: in the numerator
+if interesting, otherwise in the denominator. The denominator's number
+still counts all sources, including those named in the numerator.
+
+| Situation                                  | Display |
+|--------------------------------------------+---------|
+| Parent is the sole interesting source of 5 | a/5L    |
+| 1 of 5 is interesting; parent is another   | 1/5aL   |
+| Parent is the sole source, and interesting | a/L     |
+| Parent is the sole source, uninteresting   | aL      |
+
+The last two also apply your denominator-omission rule below. Ancestor
+letters keep their ancestor styling, including dim a. If a replaces the
+whole interesting count, there is no orange numeral left; the slash still
+identifies the interesting subset. That is a real consequence of combining
+the omission and color rules, rather than an implementation accident.
+
+This needs new inbound link-ancestor facts: the current server explicitly
+drops them. It is a sensible extension, but not just rearranging existing
+display characters. Apply the same letter-placement rule to C fractions.
+
+**** if numerator=denominator, omit denominator
+"a/1L" wastes a precious chracter (I really want short heralds).
+Instead we'll write "a/L".
+
+This should apply to both heralds (L and C) that use the fraction notation.
+
+***** Codex: yes, with the slash retained and zero handled first
+Agreed. '5/5L' becomes '5/L', 'C5/5' becomes 'C5/', and your 'a/1L'
+becomes 'a/L'. The slash means "all are in the interesting/unintegrated
+subset" when its denominator is absent. Without it, '5L' would instead
+mean five sources and no interesting ones under our zero-numerator rule.
+
+Compare the underlying counts before any ancestor-based omission. For
+zero numerator, omit numerator and slash first; when both counts are zero,
+omit that side entirely. Otherwise equality would create a meaningless
+bare slash for 0/0. The cost of this compression is one extra reading
+rule, but it remains unambiguous and serves your preference for brevity.
+
+*** Define the counted objects before implementing the statistic
+S should count distinct inbound nodes, not link occurrences or configured
+sources. T should count distinct target nodes, resolving extra IDs and
+respecting the active source set. Multiple links to one target then
+contribute one to T. Count the literal graph relationships, without
+following override chains.
+
+For "multiple links" in the interesting-source predicate, I recommend
+multiple distinct targets as well. Repeating a link to the same note
+would not alone make an otherwise empty source interesting. If you mean
+multiple textual occurrences instead, that is a meaningful alternative
+to decide explicitly. In either case, count each interesting source only
+once when it satisfies more than one condition.
+
+T is useful even when links can be counted by hand: bodies can be folded,
+links can repeat, and some targets can be outside the active source set.
+With these semantics it is not necessarily the number of visible link
+labels. Unresolved targets need a separate policy; I would exclude them
+from the resolved-node total and expose their failure separately.
+
+**** The new I cannot be obtained by adding the old subcounts
+[[file:../../server/dbs/in_rust_graph/stats.rs::fn link_split][link_split]] currently
+counts sources with content separately from bodyless, contentless sources
+whose link labels differ from their titles. Body text and multiple targets
+are not the requested union of those old categories. The interesting
+predicate must change in the server, and outbound link counts must be
+added to the semantic payload: it currently sends only outbound ancestor
+flags for links.
+
+The predicate should inspect content visible in the active source set.
+The current content test uses the raw 'contains' list, which can let an
+inactive relationship influence the statistic. I recorded that concrete
+issue in [[file:../problems.org::*Link interestingness inspects inactive content relationships (2026-09-21)][problems.org]].
+
+** Subscribee content: the numerator belongs to the occurrence
+For a subscribee B under subscriber A, I recommend defining the numerator
+as B's visible direct content minus what A visibly hides or directly
+contains. This follows the existing
+[[file:../../server/update_buffer/reconcile/content.rs::fn content_goal_list][content-goal calculation]].
+Hidden content is already dealt with and should not count as unintegrated.
+The denominator is all B's visible direct content, including that hidden
+or integrated subset. Thus 'C2/8' becomes 'C8' when the remaining two are
+dealt with.
+
+*** Keep this contextual count out of graph-wide node statistics
+The same B can have different unintegrated counts under two subscribers.
+Compute the numerator from the same membership rules used to populate
+that occurrence, resolving extra IDs and applying relationship and node
+visibility consistently. Do not count rendered child rows: folds, display
+budgets, folders and placeholders can make those differ from membership.
+
+Keep the inbound contains side intact: a full token might be '2C3/8'.
+If total content is zero, omit the outbound side; retain C if the inbound
+side still has something to say. Outside the subscribee-as-such context,
+retain the ordinary content count.
+
+**** One semantic edge deserves an explicit decision
+The existing subtraction compares node identities after extra-ID
+resolution. It does not equate a node with its overrider. I would preserve
+that definition here. Treating "I contain an override of this child" as
+integration would change subscription behavior, not just its herald.
+
+** Give the colors semantic names and a clear priority
+*** The interesting style already exists under a color name
+It is 'heralds-orange-face' in Emacs and 'SkgHeraldOrange' in Neovim,
+currently white on '#d2691e'. Besides multiple containers, it styles the
+'affectsParent=false' marker ⊥ and the unknown-node message through the
+[[file:../../server/heralds.rs][rule table]].
+
+I would give the shared role a name such as 'heralds-interesting-face',
+with a corresponding Neovim group. "Interesting" accommodates both
+useful connections and situations requiring care. Its existing uses fit
+that meaning; the two new numerators and O fit too. Keep red for errors
+and explicit edit requests, so ordinary interesting statistics do not
+compete with those messages.
+
+*** O needs an explicit exception to birth styling
+The current birth style is black on white, not orange. For the proposal,
+the O character should always use the interesting style, even when
+overrides explains why the row was drawn. Ancestor letters retain their
+ancestor style; the other characters retain the ordinary or birth style.
+Document that priority, and preserve the separate substitution cue above.
+
+**** ooh good catch
+Let's ditch the interesting coloring for the O itself;
+it can follow the old rules.
+Let's continue to use the interesting font for the counts on potentially
+either side of it. This way we sacrifice nothing.
+
+***** Codex: this preserves birth styling, with two qualifications
+Yes: O keeps its existing purple or black-on-white birth style, while
+any displayed override counts on either side use the interesting style.
+This supersedes the original instruction to make O itself interesting.
+
+"Continue" is slightly misleading: the current renderer only gives the
+multiple-container count that treatment; override counts currently use
+their relation's ordinary/birth style. This would add interesting styling
+to override counts, including a displayed count of one.
+
+"We sacrifice nothing" is true of retaining the O birth cue, but not of
+guaranteeing orange wherever overrides occur. In 'Oa' or 'aO', count
+suppression leaves no numeral to color. I would preserve that compactness
+and ancestor styling as you requested. Also, the birth cue still does not
+uniquely mean "substituted here"; see the example below.
+
+****** what information do we lose
+by not having a numeral to color?
+
+******* Codex: none of the relationship or count information
+None. In 'Oa', a identifies the parent as the sole outbound override
+target; in 'aO', it identifies the parent as the sole inbound overrider.
+The omitted one is recoverable from the ancestor notation. O still names
+the relationship, and its ordinary/birth styling retains that distinction.
+
+What disappears is only the extra orange attention cue. Since orange on
+an override count would be determined by the already visible O, it adds
+emphasis, not an independent fact. My earlier qualification made that
+sound like a loss of information; it is not. There is no reason to restore
+a redundant numeral just to have something orange to display.
+
+The separate information gap was whether this occurrence actually stands
+in for another node. Your pink h now addresses that explicitly, even when
+there is no count numeral. With that addition, the issue is settled.
+
+*** Dim ancestor markers together
+The yellow face is shared by a, b, c and further ancestor markers. I
+recommend dimming the whole family, rather than making a uniquely dim a.
+"One quarter as bright" could mean RGB intensity, luminance or perceived
+prominence; those do not yield the same color. I would treat the request
+as a visual target and choose a muted yellow with legible lettering.
+Simply quartering RGB channels while retaining black text needs visual
+checking, especially in a terminal.
+
+**** agreed, except just for 'a'
+'a' pops up everywhere, and we don't want it to cry wolf.
+Higher ancestors are rare and deserve the extra attention.
+
+** A coherent system needs a readable explanation more than more counts
+The common shape "incoming / relation / outgoing" is worth preserving.
+The new subset/total convention fits it well. Keep the relation order
+stable and make color supplementary: the letters and positions should
+still communicate the relationship when colors are hard to distinguish.
+
+As a user, my first extra cue would be actual substitution at this
+occurrence. My next would be an unresolved-link indication, because it
+tells me where navigation needs repair. I would not add more always-on
+counts until those needs and the proposed numerators are covered.
+
+An inspect-herald command would help more than another abbreviation:
+for '2/5L3', explain "5 nodes link here; 2 have body text, content, or
+multiple targets; this node links to 3 nodes", then offer the relevant
+relationship view. This can also explain a/b ancestry, the active-source
+scope, and the original node behind a substitution.
+
+*** What is 'actual substitution at this occurrence'?
+
+**** Codex: the parent names N, but this row shows R
+Suppose a container P contains a public note N, and your note R overrides
+N. When viewing P, Skg can draw R in the position occupied by P's stored
+reference to N. That particular row is a substituted occurrence: its
+title/body and node edits concern R, while its membership in P still
+represents N. Saving it does not silently change P's reference to R.
+
+Visiting R directly shows the same note R, with the same override
+relationship, but no substitution occurred at that root. Visiting N
+directly shows N. Thus "R overrides N" is a graph fact; "this R row is
+standing in for N" is a fact about a particular position in a view.
+
+The latter is what 'overridesHere' records. Currently it makes O a birth
+relation, but O is also a birth relation when R appears in an override
+folder or path. The old O style therefore says "overrides explains why
+this row appears", which is broader than "this row replaced another".
+
+I recommend a distinct marker only on substituted rows, with an
+explanation such as "Showing R in place of N; edits affect R; the
+container still refers to N." If preserving the existing birth cue is
+enough for you, we can omit that extra marker, but those two designs
+provide different amounts of information.
+
+*** good idea about broken links!
+Rather than blue unterlined, pink underlined.
+(Pink is like red but not so dangerous.)
+
+**** Codex: put the indication on the link itself, with a precise failure meaning
+Agreed: pink and underlined on a broken Skg link is more directly useful
+than adding a broken-link count to the herald. Keep the link followable
+so attempting it can explain the failure.
+
+Use pink when the server confirms that the ID has no node, after resolving
+extra IDs. A target outside the active source set still exists; a pending
+lookup or disconnected server has not established that anything is broken.
+Those cases must not receive the same verdict. This applies to Skg node
+links, not arbitrary web or file links.
+
+The broken-link check and source overlay can share a batched lookup, but
+broken-link styling should work even when the source suffix is off. Its
+results need refreshing after saves, especially deletions; use the
+published graph, not the potentially lagging search index. "Pink is less
+dangerous" is a useful visual intention, not a universal property of the
+color, so an inspectable "missing target" explanation should accompany it.
+
+** Architecture and documentation
+Relationship facts are assembled in
+[[file:../../server/herald_tokens.rs][server/herald_tokens.rs]]; their presentation
+is implemented in both [[file:../../elisp/heralds-minor-mode.el][Emacs]] and
+[[file:../../nvim/lua/skg/heralds.lua][Neovim]]. The rule table still handles other
+metadata. Preserve that division: new graph and occurrence facts belong
+in Rust, and notation and styles belong in the clients. There is no need
+to redesign the whole herald mechanism for this work.
+
+I recommend matching relationship presentation in both clients. The
+specifically named overlay command is an Emacs feature; whether to add
+its Neovim counterpart at the same time is a scope choice.
+
+*** Put the user legend in docs/heralds.org
+Include the relation grammar, zero cases, highlighted subsets, ancestor
+letters, birth styling, substitution, source and relationship-source
+markers, editability, unknown/inactive states and Git markers. Give short
+examples and explain how to inspect the represented relationships.
+
+Move user-facing herald explanations from 'api-and-formats.md' into that
+guide and leave links there; retain the wire contract in the API document.
+Link both command guides and the override guide to the legend. During
+implementation, audit their examples against the renderers: the API
+currently describes orange birth tokens, blue relationship tokens
+generally, and a red Oh substitution marker, which do not match the code.
+There is already a documentation-drift entry in 'TODO/problems.org'.
+
+*** Choices I would want your answer on before implementation
+The substantive choices are whether
+**** the source overlay is still useful given exact visits
+Yes. Different purpose (esp. "is this one of mine?") but still useful.
+**** whether "multiple links" means distinct targets or occurrences
+Distinct targets like you suggested. (That is what you suggested, right?)
+
+***** Codex: yes, distinct target nodes
+Yes. Several occurrences, or a primary ID and an extra ID for the same
+target, count as one target. That settles the "multiple links" predicate.
+
+**** whether integration should retain its current identity-based meaning
+Yes. (That was also your rec, right?)
+
+***** Codex: yes, preserve the existing identity-based rule
+Yes. Resolve extra IDs to the same node, but do not treat a distinct
+overrider as that node for integration. The herald should describe the
+existing subscription behavior.
+
+**** how to distinguish actual substitution after every O receives the interesting style.
+I answered, right? With a cake-ist solution.
+
+***** Codex: you settled O styling; the substitution distinction remains
+You did answer the styling conflict: keep O's old style and highlight
+its displayed counts. That preserves both kinds of styling where there
+are numerals. It does not distinguish an override-folder occurrence from
+a substituted occurrence, because both already receive the birth style.
+The concrete example above explains the remaining choice; it is narrower
+than the original color question.
+*** more
+The L spelling, precise color, semantic face names, batching, and refresh
+mechanics are ordinary implementation choices once those meanings are
+settled. Verification should cover the zero-case table, repeated and
+extra-ID links, source visibility, one subscribee under two subscribers,
+same-source substitution, and character-level style priority in both
+clients. This response is an evaluation; no herald behavior has been changed.
+
+** cleanup problems.org
+Doing the above will solve one of the issues there, titled
+  Link interestingness inspects inactive content relationships (2026-09-21)
+so bury that wherever it is that done problems go.
