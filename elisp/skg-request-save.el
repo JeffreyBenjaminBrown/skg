@@ -63,9 +63,17 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
            (other-view-snapshots
             (skg--other-view-save-snapshots save-buffer))
            (wire-content
-            (prin1-to-string
-             `((saved-buffer ,buffer-contents)
-               (other-views ,other-view-snapshots))))
+            ;; Emacs prints its empty list as the atom `nil', while the Rust
+            ;; protocol requires an explicit list for other-views. Serialize
+            ;; that one empty value as `()'; all bulk strings still go through
+            ;; the Lisp printer's lossless quoting.
+            (concat
+             "((saved-buffer " (prin1-to-string buffer-contents) ") "
+             "(other-views "
+             (if other-view-snapshots
+                 (prin1-to-string other-view-snapshots)
+               "()")
+             "))"))
            (request-s-exp (concat (prin1-to-string
                                    (skg--save-request-sexp
                                     skg-view-uri

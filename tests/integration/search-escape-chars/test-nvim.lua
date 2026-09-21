@@ -17,6 +17,8 @@ local function test_one_escape_query (query, expected_id)
   local search_buf = T.wait_for_buffer(buffer.search_buffer_name(query))
   T.check(search_buf ~= nil,
     string.format('search buffer created for query %q', query))
+  T.check(T.wait_for_response(),
+          string.format('search enrichment settled for query %q', query))
   local content = T.buffer_text(search_buf)
   local needle = string.format('(id %s)', expected_id)
   if content:find(needle, 1, true) then
