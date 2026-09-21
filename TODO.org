@@ -15,28 +15,28 @@ Then whenever you want to start a new piece of work from exactly that point, whi
 /fork
 /rename whatever-this-task-is
 * ONGOING TODO/one-hop-collateral-neighborhood/
-* next
-** for video
-*** change how link heralds look
-**** tone down the yellow "a = parent" herald
+* TODO change how link heralds look
+** tone down the yellow "a = parent" herald
 same yellow but 1/4 as bright
-**** don't show full H or O stats in herald
+** don't show full H or O stats in herald
 Just a * on either side if there is action on that side.
-**** simplify link kherald
+** simplify link kherald
 <body, children or multiple links in headline> / <total links>
 Make the first the "interesting stat" font,
 currently white on an orange background like for multiple containers.
 (Is that used anywhere else? Should it be?)
 if the first would be zero, omit it and the slash.
-**** make the content herald of asubscribee-as-such resemble link heralds
+** make the content herald of asubscribee-as-such resemble link heralds
 C<unintegrated>/<all>
 Unintegrated gets the interesting-stat font.
 Unintegrated and slash are omitted if unintegrated = 0.
-**** document all these changes wherever heralds are documented for the user
+** document all these changes wherever heralds are documented for the user
 and review that documentation to make sure it is accurate.
 If it doesn't exist, make it; if it's outside of docs/,
 collect it there.
-**** The entire overrides herald should get the interesting font.
+** The entire overrides herald should get the interesting font.
+* next
+** for video
 *** AWAITS navigate point through herald (overlay)
 walk point through the herald string normally
 treat it as one character
@@ -47,9 +47,16 @@ A config option, for recording videos.
 Could put a second minibuffer line,
 that reads if anything (key sequence -> command),
 leaving a trail for five seconds or until interrupted.
+** docs
+*** test skg-to-org
+**** what happens to multi-contained 'export me' markers?
+**** Should I adjust my link vs. content style?
+**** Granular links work? Even with weird headline anchors?
+e.g. weird b/c it has a link
+*** ingest into skg
 ** bugs
 *** TODO bugs in make-link / make-content
-**** TODO bug: making a link into content gives an unavailable view error
+**** bug: making a link into content gives an unavailable view error
 ***** what I did
 ****** Searched 'sharing'. Visited the top result.
 ****** Saw a link to 'understanding & sharing' in its content.
@@ -59,7 +66,7 @@ leaving a trail for five seconds or until interrupted.
   * errors
   ** Collateral view search:sharing: No such file or directory (os error 2)
 ****** But save seemed to work.
-**** TODO BUG :: make-content cleanup -> collateral view not found
+**** BUG :: make-content cleanup -> collateral view not found
 ***** the bug
 Change a link relationship into an ordinary content relationship. This orphans the linking node. Visit the linking node. If it is an island (ignoring its out-link), delete it. The save works, but a (warning?) buffer complains that some collateral buffer does not exist.
 ***** a test case
