@@ -22,7 +22,7 @@ use crate::serve::handlers::text_release::{
   TextReleaseDecision, challenge_response, decide,
 };
 use crate::serve::protocol::TcpToClient;
-use crate::serve::util::{ format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
+use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
 use crate::source_sets::{ActiveSourceSet, apply_source_set_to_viewforest};
 use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids_with_source_set;
 use crate::to_org::util::DefinitiveMap;
@@ -228,7 +228,7 @@ pub fn update_views_after_save (
     { Ok (rendered) => collateral_views . push (rendered),
       Err (e) => context . errors . push (e), }}
   // Everything textual is now staged in memory. Decide before changing the
-  // open-view registry, narrowing locks, or streaming the first view.
+  // open-view registry or streaming the first view.
   let mut release_candidates : Vec<ID> =
     active_ids_in_viewforest (&saved_view_mut);
   for collateral in &collateral_views {
@@ -256,25 +256,6 @@ pub fn update_views_after_save (
   if let Ok (uri) = viewuri_from_request_result {
     views_state . open_views . update_view (
       &context . graph_snap, uri, saved_view_mut);
-    // TODO/DONE/local-view-update/plan_v2.org §8.1 step 3: relax the early (broad) lock to the EXACT collateral
-    // set now that the SavePlan is known. Emacs keeps saved + these locked and
-    // unlocks everything else it locked early, so the user can edit truly-
-    // unaffected buffers during the rest of the pipeline. Symmetric with the
-    // save-lock message; sent before the collateral-view stream.
-    send_response_with_length_prefix (
-      stream,
-      & tag_sexp_response (
-        TcpToClient::SaveRelaxLock,
-        & format_lock_views_sexp ( &collateral_uris )));
-    if collateral_uris . is_empty () {
-      tracing::debug!("update_views_after_save: no collateral views");
-    } else {
-      tracing::info!(
-        "update_views_after_save: {} collateral view(s): {:?}",
-        collateral_uris . len (),
-        collateral_uris . iter ()
-          . map ( |u| u . repr_in_client () )
-          . collect::<Vec<_>> ()); }
     for rendered in collateral_views {
       views_state . open_views . update_view (
         &context . graph_snap,

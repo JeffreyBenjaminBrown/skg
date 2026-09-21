@@ -13,6 +13,7 @@ local folds = require('skg.folds')
 local lock = require('skg.lock')
 local metadata = require('skg.metadata')
 local save = require('skg.save')
+local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
 local function open_view (text, name, uri)
@@ -184,6 +185,53 @@ describe('skg.save pipeline', function ()
     vim.wait(3000, function ()
       return lock.stream_in_progress == nil end, 10)
     assert.is_true(vim.bo[saved].modifiable)
+  end)
+
+  it('keeps dirty conflict-check inputs locked through relaxation',
+     function ()
+    local respond_fn = nil
+    server = helpers.connect_to_fake_server(function (line, respond)
+      if line:find('save buffer', 1, true) then
+        respond_fn = respond
+        respond(helpers.framed(
+          '((response-type save-lock) (lock-views ()))'))
+      end
+    end)
+    local saved = open_view('* (skg (node (id a))) a',
+                            'skg://a', 'uri-saved')
+    local dirty = open_view('* (skg (node (id b))) b\nlocal edit',
+                            'skg://b', 'uri-dirty')
+    vim.bo[dirty].modified = true
+    local clean = open_view('* (skg (node (id c))) c',
+                            'skg://c', 'uri-clean')
+    vim.api.nvim_set_current_buf(saved)
+    save.request_save_buffer()
+    vim.wait(3000, function () return respond_fn ~= nil end, 10)
+    respond_fn(helpers.framed(
+      '((response-type save-relax-lock) (lock-views (uri-dirty)))'))
+    vim.wait(3000, function () return vim.bo[clean].modifiable end, 10)
+    assert.is_false(vim.bo[saved].modifiable)
+    assert.is_false(vim.bo[dirty].modifiable)
+    assert.is_true(vim.bo[clean].modifiable)
+    respond_fn(helpers.framed(
+      '((response-type save-result)'
+      .. ' (content "* (skg (node (id a))) a")'
+      .. ' (errors ()) (warnings ()))'))
+    vim.wait(3000, function ()
+      return lock.stream_in_progress == nil end, 10)
+    assert.is_true(vim.bo[dirty].modifiable)
+  end)
+
+  it('retains every lock after a malformed relaxation', function ()
+    local saved = open_view('* (skg (node (id a))) a',
+                            'skg://a', 'uri-saved')
+    local other = open_view('* (skg (node (id b))) b',
+                            'skg://b', 'uri-other')
+    lock.lock_all_skg_buffers()
+    save.save_relax_lock_handler(
+      'uri-saved', sexpr.read('((lock-views not-a-list))'))
+    assert.is_false(vim.bo[saved].modifiable)
+    assert.is_false(vim.bo[other].modifiable)
   end)
 
   it('shows the warning channel on save-result', function ()

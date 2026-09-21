@@ -84,9 +84,9 @@ buffer and offers `skg-approve-fork' (re-save with FORK-APPROVED) /
        (lambda (_tcp-proc payload)
          (skg--broad-save-lock-handler payload))
        t)
-      ;; save-relax-lock: same shape/handling as save-lock, but with the
-      ;; EXACT collateral view set (post-SavePlan), so buffers locked early that
-      ;; aren't actually collateral get unlocked. The saved buffer stays
+      ;; save-relax-lock carries the post-preparation keep-set: collateral
+      ;; targets plus dirty conflict-check inputs. Buffers locked early that
+      ;; are absent can unlock. The saved buffer stays
       ;; locked (skg--unlock-non-collateral-buffers keeps saved-uri) until
       ;; save-result. Registered NON-one-shot (like collateral-view) so it does
       ;; NOT add to skg-lp--pending-count: an *invalid* save errors before the

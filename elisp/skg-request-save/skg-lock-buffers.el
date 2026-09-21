@@ -69,8 +69,9 @@ the TCP sentinel, and the busy-initializing handler.")
             (skg--unlock-after-save)) )) )) )
 
 (defun skg--unlock-non-collateral-buffers (saved-uri collateral-uris)
-  "Unlock skg buffers that are NOT SAVED-URI and NOT in COLLATERAL-URIS.
-The keep-locked set is the collateral views plus the saved view itself."
+  "Unlock buffers outside SAVED-URI and the server's narrowed keep-set.
+COLLATERAL-URIS is historical naming: it can also contain dirty views whose
+snapshots were inputs to the conflict check."
   (skg--unlock-buffers-not-in-uri-list (cons saved-uri collateral-uris)))
 
 (defun skg--begin-stream (label)

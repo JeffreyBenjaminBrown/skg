@@ -92,8 +92,8 @@ function M.send_save_buffer (save_buf, saved_uri, fork_approved, fork_sources,
     function (_payload_text, response)
       M.broad_save_lock_handler(response)
     end, true)
-  -- save-relax-lock: same handling, but with the EXACT collateral set
-  -- (post-SavePlan). Registered NON-one-shot so it does not add to
+  -- save-relax-lock carries collateral targets plus every dirty input checked
+  -- during preparation. Registered NON-one-shot so it does not add to
   -- the pending count: an invalid save errors before the server
   -- reaches the point that emits it, and a one-shot count would leak.
   -- save-result removes it.
@@ -282,6 +282,8 @@ function M.broad_save_lock_handler (response)
   local ok, err = pcall(function ()
     local lock_views = payload.field(response, 'lock-views')
     if lock_views == nil then error('missing lock-views') end
+    if not sexpr.is_list(lock_views) then
+      error('lock-views is not a list') end
     payload.string_list(lock_views)
   end)
   if not ok then
@@ -298,6 +300,8 @@ function M.save_relax_lock_handler (saved_uri, response)
   local ok, err = pcall(function ()
     local lock_views = payload.field(response, 'lock-views')
     if lock_views == nil then error('missing lock-views') end
+    if not sexpr.is_list(lock_views) then
+      error('lock-views is not a list') end
     lock.unlock_non_collateral_buffers(
       saved_uri, payload.string_list(lock_views))
   end)

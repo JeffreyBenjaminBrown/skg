@@ -742,6 +742,29 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       prepared_save . graph_before_save (),
       prepared_save . final_candidate ()))
     .unwrap_or_default ();
+  let mut narrowed_lock_uris : Vec<ViewUri> = collateral_uris . clone ();
+  narrowed_lock_uris . extend (
+    other_views . iter () . filter (|view| view . dirty)
+      . map (|view| view . uri . clone ()));
+  narrowed_lock_uris . sort_by_key (ViewUri::repr_in_client);
+  narrowed_lock_uris . dedup ();
+  // The client keeps the saved URI implicitly. Every dirty view stays locked
+  // because its exact snapshot was an input to the conflict decision, even
+  // when that view is client-only and not a collateral target.
+  send_response_with_length_prefix (
+    stream,
+    & tag_sexp_response (
+      TcpToClient::SaveRelaxLock,
+      & format_lock_views_sexp (&narrowed_lock_uris) ));
+  if collateral_uris . is_empty () {
+    tracing::debug!("save preparation selected no collateral views");
+  } else {
+    tracing::info!(
+      "save preparation selected {} collateral view(s): {:?}",
+      collateral_uris . len (),
+      collateral_uris . iter ()
+        . map (ViewUri::repr_in_client)
+        . collect::<Vec<_>> ()); }
   let deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>> =
   { // Apply the already-checked preparation. Context origin types are
     // computed from the post-save graph in the ordinary apply path.
