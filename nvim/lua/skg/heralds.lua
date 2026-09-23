@@ -47,7 +47,7 @@ local color_to_highlight_group = {
   GREEN = 'SkgHeraldGreen',
   BLUE = 'SkgHeraldBlue',
   YELLOW = 'SkgHeraldYellow',
-  ORANGE = 'SkgHeraldOrange' }
+  ORANGE = 'SkgHeraldInteresting' }
 
 function M.define_highlight_groups ()
   vim.api.nvim_set_hl(0, 'SkgHeraldRed',
@@ -58,8 +58,12 @@ function M.define_highlight_groups ()
     { fg = 'white', bg = 'blue', default = true })
   vim.api.nvim_set_hl(0, 'SkgHeraldYellow',
     { fg = 'black', bg = 'yellow', default = true })
-  vim.api.nvim_set_hl(0, 'SkgHeraldOrange',
+  vim.api.nvim_set_hl(0, 'SkgHeraldInteresting',
     { fg = 'white', bg = '#d2691e', default = true })
+  vim.api.nvim_set_hl(0, 'SkgHeraldDimAncestor',
+    { fg = 'white', bg = '#5e5e20', default = true })
+  vim.api.nvim_set_hl(0, 'SkgHeraldConfusable',
+    { fg = '#ff69b4', default = true })
   vim.api.nvim_set_hl(0, 'SkgHeraldPurple',
     { fg = 'white', bg = '#8b00ff', default = true })
   vim.api.nvim_set_hl(0, 'SkgHeraldCyan',
@@ -204,7 +208,7 @@ end
 
 -- ── relationship heralds: render the server's SEMANTIC facts ─────────
 -- ALL presentation lives here (letters, colors, order, count-omission,
--- the a(b,c) link form); the server sends only facts. See
+-- link and subscribee fractions); the server sends only facts. See
 -- TODO/heralds-semantic-wire.org. Mirrors the elisp renderer
 -- (heralds--render-rel-facts et al.) exactly.
 
@@ -250,37 +254,66 @@ local function ancestors_of (side)
 end
 
 ---GENS as sorted distinct letters: 1->a, 2->b, ...
-local function gen_letters (gens)
+local function distinct_gens (gens)
   local seen, sorted = {}, {}
   for _, g in ipairs(gens) do
     if not seen[g] then seen[g] = true; table.insert(sorted, g) end
   end
   table.sort(sorted)
+  return sorted
+end
+
+local function ancestor_chunks (gens)
   local out = {}
-  for _, g in ipairs(sorted) do
-    if type(g) == 'number' and g >= 1 and g <= 26 then
-      table.insert(out, string.char(96 + g))
-    else
-      table.insert(out, '{' .. tostring(g) .. '}') end
+  for _, g in ipairs(distinct_gens(gens)) do
+    local letter = (type(g) == 'number' and g >= 1 and g <= 26)
+      and string.char(96 + g) or '{' .. tostring(g) .. '}'
+    table.insert(out, { letter, g == 1 and 'SkgHeraldDimAncestor'
+                                  or 'SkgHeraldYellow' })
   end
-  return table.concat(out)
+  return out
 end
 
 ---Chunks for one side: the count then ancestor letters. Omits the count
 ---when it equals the number of ancestors (>=1). MULTI (contains inbound)
 ---makes a count > 1 orange; ancestor letters are yellow.
 local function side_chunks (count, gens, base_hl, multi)
-  local letters = gen_letters(gens)
-  local n = #letters
+  gens = distinct_gens(gens)
+  local n = #gens
   local chunks = {}
   if count > 0 or n > 0 then
     if not (n > 0 and count == n) then
-      local hl = (multi and count > 1) and 'SkgHeraldOrange' or base_hl
+      local hl = (multi and count > 1) and 'SkgHeraldInteresting' or base_hl
       table.insert(chunks, { tostring(count), hl })
     end
-    if n > 0 then
-      table.insert(chunks, { letters, 'SkgHeraldYellow' })
-    end
+    for _, c in ipairs(ancestor_chunks(gens)) do table.insert(chunks, c) end
+  end
+  return chunks
+end
+
+local function fraction_chunks (total, total_gens, numerator,
+                                numerator_gens, base_hl)
+  assert(numerator <= total, 'herald subset exceeds total')
+  if total == 0 then return {} end
+  if numerator == 0 then
+    return side_chunks(total, total_gens, base_hl, false) end
+  total_gens = distinct_gens(total_gens)
+  numerator_gens = distinct_gens(numerator_gens)
+  local numerator_set = {}
+  for _, g in ipairs(numerator_gens) do numerator_set[g] = true end
+  local chunks = {}
+  if numerator ~= #numerator_gens then
+    table.insert(chunks, { tostring(numerator), 'SkgHeraldInteresting' }) end
+  for _, c in ipairs(ancestor_chunks(numerator_gens)) do
+    table.insert(chunks, c) end
+  table.insert(chunks, { '/', base_hl })
+  if numerator ~= total then
+    if total ~= #total_gens then
+      table.insert(chunks, { tostring(total), base_hl }) end
+    for _, g in ipairs(total_gens) do
+      if not numerator_set[g] then
+        for _, c in ipairs(ancestor_chunks({g})) do
+          table.insert(chunks, c) end end end
   end
   return chunks
 end
@@ -291,48 +324,47 @@ local function rel_side (form, side)
   return { count = first_number(s) or 0, gens = ancestors_of(s) }
 end
 
-local function ordinary_rel_chunks (rel, form, base_hl)
+local function ordinary_rel_chunks (rel, form, base_hl, overrides_here)
   local inn = rel_side(form, 'in')
   local out = rel_side(form, 'out')
+  local number_hl = rel == 'overrides' and 'SkgHeraldInteresting'
+                                       or base_hl
   local in_c = side_chunks(inn and inn.count or 0, inn and inn.gens or {},
-                           base_hl, rel == 'contains')
-  local out_c = side_chunks(out and out.count or 0, out and out.gens or {},
-                            base_hl, false)
-  if #in_c == 0 and #out_c == 0 then return nil end
+                           number_hl, rel == 'contains')
+  local unintegrated = rel == 'contains' and assq(assq(form, 'out'),
+                                                 'unintegrated') or nil
+  local out_c
+  if unintegrated then
+    out_c = fraction_chunks(out and out.count or 0, out and out.gens or {},
+      first_number(unintegrated) or 0, ancestors_of(unintegrated), number_hl)
+  else
+    out_c = side_chunks(out and out.count or 0, out and out.gens or {},
+                        number_hl, false) end
+  if #in_c == 0 and #out_c == 0
+     and not (rel == 'overrides' and overrides_here) then return nil end
   local chunks = {}
   for _, c in ipairs(in_c) do table.insert(chunks, c) end
   table.insert(chunks, { rel_letter(rel), base_hl })
+  if rel == 'overrides' and overrides_here then
+    table.insert(chunks, { 'ĥ', 'SkgHeraldConfusable' }) end
   for _, c in ipairs(out_c) do table.insert(chunks, c) end
   return chunks
 end
 
 local function link_rel_chunks (form, base_hl)
-  local inn = assq(form, 'in')
-  local out = assq(form, 'out')
-  local in_chunk
-  if inn then
-    local total = first_number(inn) or 0
-    local surp = assq(inn, 'surprising')
-    local wc = assq(inn, 'withContent')
-    local b = surp and first_number(surp) or nil
-    local c = wc and first_number(wc) or nil
-    local inner
-    if b == nil and c == nil then inner = ''
-    elseif c == nil then inner = '(' .. b .. ')'
-    elseif b == nil then inner = '(,' .. c .. ')'
-    else inner = '(' .. b .. ',' .. c .. ')' end
-    in_chunk = { tostring(total) .. inner, base_hl }
-  end
-  local out_chunk
-  if out then
-    local gens = ancestors_of(out)
-    if #gens > 0 then out_chunk = { gen_letters(gens), 'SkgHeraldYellow' } end
-  end
-  if not in_chunk and not out_chunk then return nil end
+  local inn = rel_side(form, 'in')
+  local out = rel_side(form, 'out')
+  local interesting = assq(assq(form, 'in'), 'interesting')
+  local in_c = fraction_chunks(inn and inn.count or 0,
+    inn and inn.gens or {}, interesting and first_number(interesting) or 0,
+    interesting and ancestors_of(interesting) or {}, base_hl)
+  local out_c = side_chunks(out and out.count or 0,
+    out and out.gens or {}, base_hl, false)
+  if #in_c == 0 and #out_c == 0 then return nil end
   local chunks = {}
-  if in_chunk then table.insert(chunks, in_chunk) end
+  for _, c in ipairs(in_c) do table.insert(chunks, c) end
   table.insert(chunks, { 'L', base_hl })
-  if out_chunk then table.insert(chunks, out_chunk) end
+  for _, c in ipairs(out_c) do table.insert(chunks, c) end
   return chunks
 end
 
@@ -347,6 +379,9 @@ function M.render_rel_facts (sexp)
   local rels = M.find_rels(sexp)
   if not rels then return nil end
   local birth = {}
+  local node = assq(sexp, 'node')
+  local view_stats = assq(node, 'viewStats')
+  local overrides_here = assq(view_stats, 'overridesHere') ~= nil
   local birth_form = assq(rels, 'birth')
   if birth_form then
     for i = 2, #birth_form do
@@ -361,11 +396,11 @@ function M.render_rel_facts (sexp)
   end
   for _, rel in ipairs(REL_ORDER) do
     local form = assq(rels, rel)
-    if form then
+    if form or (rel == 'overrides' and overrides_here) then
       local base = birth[rel] and 'SkgHeraldBirth' or rel_base_hl(rel)
       add_token((rel == 'textlinksTo')
         and link_rel_chunks(form, base)
-        or ordinary_rel_chunks(rel, form, base))
+        or ordinary_rel_chunks(rel, form, base, overrides_here))
     end
   end
   local aliases = assq(rels, 'aliases')

@@ -1,0 +1,7 @@
+tantivy_folder = "/tmp/placeholder"
+port = 1730
+beep_when_server_becomes_available = false
+
+[[sources]]
+name = "main"
+path = "."

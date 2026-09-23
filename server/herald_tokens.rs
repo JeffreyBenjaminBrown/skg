@@ -13,8 +13,9 @@
 //!     (subscribes  (in ...) (out ...))
 //!     (overrides   (in ...) (out ...))
 //!     (hides       (in ...) (out ...))
-//!     (textlinksTo (in  COUNT (surprising B) (withContent C)) ; no ancestors in
-//!                  (out (ancestors GEN...)))                   ; no count out
+//!     (textlinksTo (in COUNT (ancestors GEN...)
+//!                      (interesting COUNT (ancestors GEN...)))
+//!                  (out COUNT (ancestors GEN...)))
 //!     (aliases  K)
 //!     (extraIds K)
 //!     (properties K)
@@ -29,11 +30,12 @@ use crate::types::viewnode::RelationCounts;
 /// Per-relation, per-side ancestor-flag generation distances (1 = the
 /// visible parent, 2 = grandparent, ...). Transient: computed in the
 /// viewnodestats pass and consumed immediately when emitting the
-/// relationship heralds. The inbound L side is absent on purpose -- a
-/// link's inbound side never carries ancestor flags.
+/// relationship heralds.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct AncestorFlags {
   pub contains_in    : Vec<usize>, pub contains_out    : Vec<usize>,
+  pub contents_unintegrated_out : Vec<usize>,
+  pub links_in       : Vec<usize>, pub links_interesting_in : Vec<usize>,
   pub links_out      : Vec<usize>,
   pub hides_in       : Vec<usize>, pub hides_out       : Vec<usize>,
   pub subscribes_in  : Vec<usize>, pub subscribes_out  : Vec<usize>,
@@ -43,7 +45,7 @@ pub struct AncestorFlags {
 impl AncestorFlags {
   /// Record a flag at generation 'generation' for relation 'rel' on the
   /// given side (inbound = "ancestor R's the node", outbound = "the node
-  /// R's the ancestor"). The inbound L side is dropped (never lettered).
+  /// R's the ancestor").
   pub fn record (
     &mut self,
     rel        : NodeRelation,
@@ -53,7 +55,7 @@ impl AncestorFlags {
     let slot : Option<&mut Vec<usize>> = match (rel, inbound) {
       (NodeRelation::Contains,                  true ) => Some (&mut self . contains_in),
       (NodeRelation::Contains,                  false) => Some (&mut self . contains_out),
-      (NodeRelation::TextlinksTo,               true ) => None, // no inbound L flags
+      (NodeRelation::TextlinksTo,               true ) => Some (&mut self . links_in),
       (NodeRelation::TextlinksTo,               false) => Some (&mut self . links_out),
       (NodeRelation::HidesFromItsSubscriptions, true ) => Some (&mut self . hides_in),
       (NodeRelation::HidesFromItsSubscriptions, false) => Some (&mut self . hides_out),
@@ -119,23 +121,53 @@ fn relation_sexp (
   if let Some (s) = out { inner . push (s); }
   Some ( format! ("({} {})", key, inner . join (" ")) ) }
 
-/// The textlinks_to relation. Its inbound side is the surprising-links
-/// split `(in TOTAL (surprising B) (withContent C))` with no ancestors;
-/// its outbound side is only the linkSource-birth case
-/// `(out (ancestors ...))` with no count.
-fn links_sexp (
-  total        : usize,
-  surprising   : usize,
-  with_content : usize,
-  out_flags    : &[usize],
+fn contains_sexp (
+  counts       : &RelationCounts,
+  flags        : &AncestorFlags,
+  unintegrated : Option<usize>,
 ) -> Option<String> {
-  let inb : Option<String> = if total == 0 { None } else {
+  let inb : Option<String> = side_sexp (
+    "in", counts . containers, &flags . contains_in);
+  let out : Option<String> = if let Some (numerator) = unintegrated {
+    assert! (numerator <= counts . contents);
+    let mut facts : Vec<String> = vec![counts . contents . to_string ()];
+    if let Some (a) = ancestors_sexp (&flags . contains_out) {
+      facts . push (a); }
+    let mut subset : Vec<String> = vec![numerator . to_string ()];
+    if let Some (a) = ancestors_sexp (&flags . contents_unintegrated_out) {
+      subset . push (a); }
+    facts . push (format! ("(unintegrated {})", subset . join (" ")));
+    Some (format! ("(out {})", facts . join (" ")))
+  } else {
+    side_sexp ("out", counts . contents, &flags . contains_out) };
+  if inb . is_none () && out . is_none () { return None; }
+  let mut sides : Vec<String> = Vec::new ();
+  if let Some (s) = inb { sides . push (s); }
+  if let Some (s) = out { sides . push (s); }
+  Some (format! ("(contains {})", sides . join (" "))) }
+
+/// The textlinks_to relation reports the interesting inbound subset and
+/// distinct resolved outbound targets. All counts are complete facts.
+fn links_sexp (
+  total             : usize,
+  interesting       : usize,
+  in_flags          : &[usize],
+  interesting_flags : &[usize],
+  targets           : usize,
+  out_flags         : &[usize],
+) -> Option<String> {
+  assert! (interesting <= total);
+  let inb : Option<String> = if total == 0 && in_flags . is_empty () {
+    None
+  } else {
     let mut parts : Vec<String> = vec! [ total . to_string () ];
-    if surprising   > 0 { parts . push ( format! ("(surprising {})", surprising) ); }
-    if with_content > 0 { parts . push ( format! ("(withContent {})", with_content) ); }
+    if let Some (a) = ancestors_sexp (in_flags) { parts . push (a); }
+    let mut subset : Vec<String> = vec! [interesting . to_string ()];
+    if let Some (a) = ancestors_sexp (interesting_flags) {
+      subset . push (a); }
+    parts . push (format! ("(interesting {})", subset . join (" ")));
     Some ( format! ("(in {})", parts . join (" ")) ) };
-  let out : Option<String> = ancestors_sexp (out_flags)
-    . map ( |a| format! ("(out {})", a) );
+  let out : Option<String> = side_sexp ("out", targets, out_flags);
   if inb . is_none () && out . is_none () { return None; }
   let mut inner : Vec<String> = Vec::new ();
   if let Some (s) = inb { inner . push (s); }
@@ -154,14 +186,15 @@ pub fn relationship_heralds_sexp (
   properties : usize,
   flags     : &AncestorFlags,
   birth     : &[NodeRelation],
+  unintegrated : Option<usize>,
 ) -> Option<String> {
   let mut parts : Vec<String> = Vec::new ();
-  if let Some (s) = relation_sexp (
-    "contains", counts . containers, &flags . contains_in,
-    counts . contents, &flags . contains_out) { parts . push (s); }
+  if let Some (s) = contains_sexp (
+    counts, flags, unintegrated) { parts . push (s); }
   if let Some (s) = links_sexp (
-    counts . link_total, counts . link_surprising,
-    counts . link_with_content, &flags . links_out) { parts . push (s); }
+    counts . link_total, counts . link_interesting,
+    &flags . links_in, &flags . links_interesting_in,
+    counts . link_targets, &flags . links_out) { parts . push (s); }
   if let Some (s) = relation_sexp (
     "subscribes", counts . subscribers, &flags . subscribes_in,
     counts . subscribees, &flags . subscribes_out) { parts . push (s); }

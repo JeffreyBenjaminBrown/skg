@@ -16,7 +16,7 @@ fn emit (
   f     : &AncestorFlags,
   birth : &[NodeRelation],
 ) -> Option<String> {
-  relationship_heralds_sexp (c, al, ex, 0, f, birth) }
+  relationship_heralds_sexp (c, al, ex, 0, f, birth, None) }
 
 #[test]
 fn contains_birth () {
@@ -61,6 +61,23 @@ fn subscribee_as_such () {
 }
 
 #[test]
+fn contextual_content_distinguishes_applicable_zero_from_absent () {
+  let c = RelationCounts { containers : 2, contents : 8, .. counts () };
+  let mut f = AncestorFlags::default ();
+  f . record (NodeRelation::Contains, false, 2);
+  f . contents_unintegrated_out . push (2);
+  let normal = emit (&c, 0, 0, &f, &[]) . unwrap ();
+  assert_eq! (normal, "(rels (contains (in 2) (out 8 (ancestors 2))))");
+  let contextual = relationship_heralds_sexp (
+    &c, 0, 0, 0, &f, &[], Some (2)) . unwrap ();
+  assert_eq! (contextual,
+    "(rels (contains (in 2) (out 8 (ancestors 2) (unintegrated 2 (ancestors 2)))))");
+  let zero = relationship_heralds_sexp (
+    &c, 0, 0, 0, &AncestorFlags::default (), &[], Some (0)) . unwrap ();
+  assert_eq! (zero, "(rels (contains (in 2) (out 8 (unintegrated 0))))");
+}
+
+#[test]
 fn overrider_as_such_out_side () {
   // Ob: it overrides its grandparent (out, gen 2), born of overrides.
   let c = RelationCounts { overrides_out : 1, .. counts () };
@@ -88,31 +105,45 @@ fn filter_folder_two_births_in_fixed_order () {
 }
 
 #[test]
-fn surprising_links_collapse () {
-  let mk = | total, b, c | {
+fn link_counts_and_interesting_subset () {
+  let mk = | total, interesting, targets | {
     let cc = RelationCounts {
-      link_total : total, link_surprising : b, link_with_content : c,
+      link_total : total, link_interesting : interesting,
+      link_targets : targets,
       .. counts () };
     emit (&cc, 0, 0, &AncestorFlags::default (), &[]) };
-  assert_eq! ( mk (3, 1, 1) . as_deref (),
-    Some ("(rels (textlinksTo (in 3 (surprising 1) (withContent 1))))") );
+  assert_eq! ( mk (3, 1, 2) . as_deref (),
+    Some ("(rels (textlinksTo (in 3 (interesting 1)) (out 2)))") );
   assert_eq! ( mk (3, 0, 0) . as_deref (),
-    Some ("(rels (textlinksTo (in 3)))") );
-  assert_eq! ( mk (2, 1, 0) . as_deref (),
-    Some ("(rels (textlinksTo (in 2 (surprising 1))))") );
-  assert_eq! ( mk (2, 0, 1) . as_deref (),
-    Some ("(rels (textlinksTo (in 2 (withContent 1))))") );
+    Some ("(rels (textlinksTo (in 3 (interesting 0))))") );
+  assert_eq! ( mk (0, 0, 2) . as_deref (),
+    Some ("(rels (textlinksTo (out 2)))") );
   assert_eq! ( mk (0, 0, 0), None );
 }
 
 #[test]
 fn linksource_birth_out_only () {
   // La: it links to its parent (out, gen 1), born of textlinks.
+  let c = RelationCounts { link_targets : 1, .. counts () };
   let mut f = AncestorFlags::default ();
   f . record (NodeRelation::TextlinksTo, false, 1);
   assert_eq! (
-    emit (&counts (), 0, 0, &f, &[NodeRelation::TextlinksTo]) . as_deref (),
-    Some ("(rels (textlinksTo (out (ancestors 1))) (birth textlinksTo))") );
+    emit (&c, 0, 0, &f, &[NodeRelation::TextlinksTo]) . as_deref (),
+    Some ("(rels (textlinksTo (out 1 (ancestors 1))) (birth textlinksTo))") );
+}
+
+#[test]
+fn link_ancestor_membership_includes_interesting_subset () {
+  let c = RelationCounts {
+    link_total : 2, link_interesting : 1, link_targets : 3,
+    .. counts () };
+  let mut f = AncestorFlags::default ();
+  f . record (NodeRelation::TextlinksTo, true, 1);
+  f . links_interesting_in . push (1);
+  f . record (NodeRelation::TextlinksTo, false, 2);
+  assert_eq! (
+    emit (&c, 0, 0, &f, &[]) . as_deref (),
+    Some ("(rels (textlinksTo (in 2 (ancestors 1) (interesting 1 (ancestors 1))) (out 3 (ancestors 2))))") );
 }
 
 #[test]
@@ -128,7 +159,7 @@ fn aliases_and_extra_ids () {
 fn true_properties_are_counted_and_zero_is_omitted () {
   assert_eq! (
     relationship_heralds_sexp (
-      &counts (), 0, 0, 2, &AncestorFlags::default (), &[])
+      &counts (), 0, 0, 2, &AncestorFlags::default (), &[], None)
       . as_deref (),
     Some ("(rels (properties 2))") );
   assert_eq! (emit (&counts (), 0, 0, &AncestorFlags::default (), &[]),

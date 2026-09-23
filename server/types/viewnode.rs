@@ -313,7 +313,7 @@ pub struct ContainerwardPathStats {
 }
 
 /// Directional member counts for the five graph relations, plus the
-/// "surprising links" split, feeding the uniform-herald token grammar
+/// interesting inbound links and distinct outbound targets, feeding the uniform-herald token grammar
 /// (server/herald_tokens.rs). All are graph-level (position-independent)
 /// counts of a node's members on each side of each relation.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -326,13 +326,9 @@ pub struct RelationCounts {
   pub subscribees   : usize, // S outbound: its subscribees
   pub overriders    : usize, // O inbound: nodes that override it
   pub overrides_out : usize, // O outbound: nodes it overrides
-  /// L inbound, the =a(b,c)= split: a = total inbound link sources;
-  /// b = of those, bodyless+contentless sources whose normalized title
-  /// differs from the link label ("surprising"); c = of those, sources
-  /// with their own content.
-  pub link_total        : usize,
-  pub link_surprising   : usize,
-  pub link_with_content : usize,
+  pub link_total       : usize, // L inbound: distinct visible sources
+  pub link_interesting : usize, // inbound sources with body, content, or multiple targets
+  pub link_targets     : usize, // L outbound: distinct visible resolved targets
 }
 
 /// Graph-level statistics about a node.

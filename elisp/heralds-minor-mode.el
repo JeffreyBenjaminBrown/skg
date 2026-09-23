@@ -121,7 +121,7 @@ tokens and per-segment-colored INTERC tokens."
     ((eq color-keyword 'GREEN)  'heralds-green-face)
     ((eq color-keyword 'BLUE)   'heralds-blue-face)
     ((eq color-keyword 'YELLOW) 'heralds-yellow-face)
-    ((eq color-keyword 'ORANGE) 'heralds-orange-face)
+    ((eq color-keyword 'ORANGE) 'heralds-interesting-face)
     (t nil)))
 
 (defun heralds--ensure-rules ()
@@ -303,7 +303,7 @@ na anyway) any stray sentinel token is dropped."
 
 ;; ── relationship heralds: render the server's SEMANTIC facts ─────────
 ;; ALL presentation lives here (letters, colors, order, count-omission,
-;; the a(b,c) link form); the server sends only facts. See
+;; link and subscribee fractions); the server sends only facts. See
 ;; TODO/heralds-semantic-wire.org. The nvim client mirrors this exactly
 ;; (nvim/lua/skg/heralds.lua).
 
@@ -321,13 +321,20 @@ C/L blue, S/O/H purple."
   (pcase rel ((or 'contains 'textlinksTo) 'heralds-blue-face)
              (_ 'heralds-purple-face)))
 
-(defun heralds--gen-letters (gens)
-  "GENS (generation integers) as sorted distinct letters: 1->a, 2->b, ..."
-  (mapconcat (lambda (g) (if (and (integerp g) (>= g 1) (<= g 26))
-                             (char-to-string (+ ?a (1- g)))
-                           (format "{%s}" g)))
-             (sort (delete-dups (copy-sequence gens)) #'<)
-             ""))
+(defun heralds--gen-list (gens)
+  "Return sorted distinct generation integers from GENS."
+  (sort (delete-dups (copy-sequence gens)) #'<))
+
+(defun heralds--ancestor-text (gens)
+  "Render GENS with the muted face for a and the ordinary face otherwise."
+  (mapconcat
+   (lambda (g)
+     (propertize (if (and (>= g 1) (<= g 26))
+                     (char-to-string (+ ?a (1- g)))
+                   (format "{%s}" g))
+                 'face (if (= g 1) 'heralds-dim-ancestor-face
+                         'heralds-yellow-face)))
+   (heralds--gen-list gens) ""))
 
 (defun heralds--rel-side (form side)
   "FORM is a relation form like (contains (in 2 (ancestors 1)) (out 1));
@@ -342,53 +349,85 @@ return (COUNT . GENS) for SIDE (`in' or `out'), or nil if na."
 when it equals the number of ancestors (>=1). BASE-FACE colors the
 count, unless MULTI (the contains inbound side) and count > 1, which is
 orange. Ancestor letters are always yellow."
-  (let* ((letters (heralds--gen-letters (or gens '())))
-         (n (length letters))
+  (let* ((gens (heralds--gen-list (or gens '())))
+         (n (length gens))
          (out ""))
     (when (or (> count 0) (> n 0))
       (unless (and (> n 0) (= count n))
         (setq out (propertize (number-to-string count) 'face
                               (if (and multi (> count 1))
-                                  'heralds-orange-face base-face))))
+                                  'heralds-interesting-face base-face))))
       (when (> n 0)
-        (setq out (concat out (propertize letters 'face 'heralds-yellow-face)))))
+        (setq out (concat out (heralds--ancestor-text gens)))))
     out))
 
-(defun heralds--ordinary-rel-token (rel form base-face)
+(defun heralds--fraction-side-string
+    (total total-gens numerator numerator-gens base-face)
+  "Render a subset fraction with complete ancestor membership facts."
+  (unless (<= numerator total)
+    (error "Herald subset %s exceeds total %s" numerator total))
+  (let* ((total-gens (heralds--gen-list (or total-gens '())))
+         (numerator-gens (heralds--gen-list (or numerator-gens '())))
+         (remaining-gens (cl-set-difference total-gens numerator-gens))
+         (numerator-text
+          (concat (if (= numerator (length numerator-gens)) ""
+                    (propertize (number-to-string numerator)
+                                'face 'heralds-interesting-face))
+                  (heralds--ancestor-text numerator-gens)))
+         (denominator-text
+          (if (= numerator total) ""
+            (concat (if (= total (length total-gens)) ""
+                      (propertize (number-to-string total) 'face base-face))
+                    (heralds--ancestor-text remaining-gens)))))
+    (cond ((= total 0) "")
+          ((= numerator 0)
+           (heralds--rel-side-string total total-gens base-face nil))
+          (t (concat numerator-text (propertize "/" 'face base-face)
+                     denominator-text)))))
+
+(defun heralds--ordinary-rel-token (rel form base-face overrides-here)
   "Render an ordinary (non-link) relation token, or nil if empty."
   (let* ((in  (heralds--rel-side form 'in))
          (out (heralds--rel-side form 'out))
+         (number-face (if (eq rel 'overrides)
+                          'heralds-interesting-face base-face))
          (in-s  (heralds--rel-side-string
-                 (if in (car in) 0) (and in (cdr in)) base-face
+                 (if in (car in) 0) (and in (cdr in)) number-face
                  (eq rel 'contains)))
-         (out-s (heralds--rel-side-string
-                 (if out (car out) 0) (and out (cdr out)) base-face nil)))
-    (unless (and (string-empty-p in-s) (string-empty-p out-s))
+         (unintegrated (and (eq rel 'contains)
+                            (assq 'unintegrated
+                                  (cdr (assq 'out (cdr form))))))
+         (out-s (if unintegrated
+                    (heralds--fraction-side-string
+                     (if out (car out) 0) (and out (cdr out))
+                     (or (cl-find-if #'integerp (cdr unintegrated)) 0)
+                     (cdr (assq 'ancestors (cdr unintegrated)))
+                     number-face)
+                  (heralds--rel-side-string
+                   (if out (car out) 0) (and out (cdr out))
+                   number-face nil))))
+    (unless (and (string-empty-p in-s) (string-empty-p out-s)
+                 (not (and (eq rel 'overrides) overrides-here)))
       (concat in-s (propertize (heralds--rel-letter rel) 'face base-face)
+              (if (and (eq rel 'overrides) overrides-here)
+                  (propertize "ĥ" 'face 'heralds-confusable-face) "")
               out-s))))
 
 (defun heralds--link-rel-token (form base-face)
-  "Render the textlinksTo token: the a(b,c) inbound digit form and an
-outbound ancestor-letters-only side. FORM = (textlinksTo (in TOTAL
-(surprising B) (withContent C)) (out (ancestors ...)))."
-  (let* ((in  (assq 'in  (cdr form)))
-         (out (assq 'out (cdr form)))
-         (in-s (when in
-                 (let* ((total (or (cl-find-if #'integerp (cdr in)) 0))
-                        (b (cadr (assq 'surprising  (cdr in))))
-                        (c (cadr (assq 'withContent (cdr in))))
-                        (inner (cond ((and (null b) (null c)) "")
-                                     ((null c) (format "(%d)" b))
-                                     ((null b) (format "(,%d)" c))
-                                     (t (format "(%d,%d)" b c)))))
-                   (propertize (format "%d%s" total inner) 'face base-face))))
-         (out-s (when out
-                  (let ((gens (cdr (assq 'ancestors (cdr out)))))
-                    (when gens
-                      (propertize (heralds--gen-letters gens)
-                                  'face 'heralds-yellow-face))))))
-    (unless (and (null in-s) (null out-s))
-      (concat (or in-s "") (propertize "L" 'face base-face) (or out-s "")))))
+  "Render inbound interesting sources and outbound resolved targets."
+  (let* ((in (heralds--rel-side form 'in))
+         (out (heralds--rel-side form 'out))
+         (interesting-form (assq 'interesting (cdr (assq 'in (cdr form)))))
+         (interesting (or (and interesting-form
+                               (cl-find-if #'integerp (cdr interesting-form))) 0))
+         (in-s (heralds--fraction-side-string
+                (if in (car in) 0) (and in (cdr in))
+                interesting (cdr (assq 'ancestors (cdr interesting-form)))
+                base-face))
+         (out-s (heralds--rel-side-string
+                 (if out (car out) 0) (and out (cdr out)) base-face nil)))
+    (unless (and (string-empty-p in-s) (string-empty-p out-s))
+      (concat in-s (propertize "L" 'face base-face) out-s))))
 
 (defun heralds--render-rel-facts (sexp)
   "Render the semantic `(rels ...)' payload in SEXP to one propertized
@@ -399,15 +438,20 @@ A/I/P cyan. Tokens are ordered C L S O H A I P and space-separated."
   (let ((rels (heralds--find-rels sexp)))
     (when rels
       (let ((birth (cdr (assq 'birth (cdr rels))))
+            (overrides-here
+             (assq 'overridesHere
+                   (cdr (assq 'viewStats
+                              (cdr (assq 'node (cdr sexp)))))))
             (tokens '()))
         (dolist (rel heralds--rel-order)
           (let ((form (assq rel (cdr rels))))
-            (when form
+            (when (or form (and (eq rel 'overrides) overrides-here))
               (let* ((base (if (memq rel birth) 'heralds-birth-face
                              (heralds--rel-base-face rel)))
                      (tok (if (eq rel 'textlinksTo)
                               (heralds--link-rel-token form base)
-                            (heralds--ordinary-rel-token rel form base))))
+                            (heralds--ordinary-rel-token
+                             rel form base overrides-here))))
                 (when tok (push tok tokens))))))
         (let ((a (cadr (assq 'aliases (cdr rels)))))
           (when a (push (propertize (format "A%d" a) 'face 'heralds-cyan-face)
@@ -456,11 +500,17 @@ orange birth herald the server assembles (an (skg (node ... (birthHerald
 relationship-herald spans -- the letters that mark a tracked ancestor as
 a member on that side.")
 
-(defface heralds-orange-face
+(defface heralds-interesting-face
   '((t :foreground "white" :background "#d2691e"))
-  "White-on-orange: the multi-contained containers count (the number
-before C), the affectsParent-false marker (⊥), and the \"unknown
-node\" message.")
+  "White-on-orange for interesting counts and existing orange markers.")
+
+(defface heralds-dim-ancestor-face
+  '((t :foreground "white" :background "#5e5e20"))
+  "Muted ancestor a; higher generations retain the bright yellow face.")
+
+(defface heralds-confusable-face
+  '((t :foreground "#ff69b4"))
+  "Pink marker for an override substitution or a confirmed broken link.")
 
 (defface heralds-purple-face
   '((t :foreground "white" :background "#8b00ff"))

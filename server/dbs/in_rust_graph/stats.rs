@@ -1,7 +1,6 @@
 /// PURPOSE: Fetch all graph-node statistics for a set of PIDs from the
 /// in-Rust graph: directional member counts for the five relations, the
-/// alias / extra-id / true-property counts, and the "surprising links"
-/// =a(b,c)= split.
+/// alias / extra-id / true-property counts, and the interesting-link subset.
 /// These feed the uniform-herald token grammar (server/herald_tokens.rs).
 ///
 /// PITFALL: Assumes input IDs are primary IDs, not extra IDs. Always
@@ -9,7 +8,7 @@
 /// tree).
 ///
 /// Statistics are computed directly from the explicit graph snapshot. The
-/// directional counts and on-demand surprising-links parse are graph-native
+/// directional counts and link facts are graph-native
 /// operations used by the uniform-herald grammar.
 
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -17,8 +16,6 @@ use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::source_sets::ActiveSourceSet;
 use crate::types::misc::ID;
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::textlinks::{replace_each_link_with_its_label,
-                              textlinks_from_text};
 use crate::types::viewnode::{GraphNodeStats, RelationCounts};
 
 use std::collections::{HashMap, HashSet};
@@ -105,6 +102,7 @@ fn fetch_all_graphnodestats_in_rust (
   active  : Option<&ActiveSourceSet>,
 ) -> AllGraphNodeStats {
   let mut counts : HashMap<ID, RelationCounts> = HashMap::new ();
+  let mut link_source_facts : HashMap<ID, (HashSet<ID>, bool)> = HashMap::new ();
   let mut container_to_contents
     : HashMap<ID, HashSet<ID>> = HashMap::new ();
   let mut content_to_containers
@@ -115,13 +113,13 @@ fn fetch_all_graphnodestats_in_rust (
       graph . inbound_pids_for_relation_gated (pid, relation, active)
       . iter ()
       . filter ( |p| pid_source_is_active (graph, active, p) )
-      . count () };
+      . collect::<HashSet<_>> () . len () };
     // Outbound counts: gated partners, further source-filtered.
     let outbound_count = | relation : NodeRelation | -> usize {
       graph . outbound_pids_for_relation_gated (pid, relation, active)
       . iter ()
       . filter ( |p| pid_source_is_active (graph, active, p) )
-      . count () };
+      . collect::<HashSet<_>> () . len () };
     let containers : usize = inbound_count (NodeRelation::Contains);
     let contents : usize = outbound_count (NodeRelation::Contains);
     let hiders : usize =
@@ -133,12 +131,28 @@ fn fetch_all_graphnodestats_in_rust (
     let overriders : usize = inbound_count (NodeRelation::OverridesViewOf);
     let overrides_out : usize =
       outbound_count (NodeRelation::OverridesViewOf);
-    let (link_total, link_surprising, link_with_content) : (usize, usize, usize) =
-      link_split (graph, active, pid);
+    let link_sources : HashSet<ID> =
+      graph . inbound_pids_for_relation_gated (
+        pid, NodeRelation::TextlinksTo, active )
+      . into_iter ()
+      . filter (|source| pid_source_is_active (graph, active, source))
+      . collect ();
+    let link_total : usize = link_sources . len ();
+    let link_interesting : usize = link_sources . iter ()
+      . filter (|source| {
+        let facts : &(HashSet<ID>, bool) =
+          link_source_facts . entry ((*source) . clone ())
+          . or_insert_with (|| link_facts_for_source (graph, active, source));
+        facts . 1 })
+      . count ();
+    let link_targets : usize =
+      link_source_facts . entry (pid . clone ())
+      . or_insert_with (|| link_facts_for_source (graph, active, pid))
+      . 0 . len ();
     counts . insert ( pid . clone (), RelationCounts {
       containers, contents, hiders, hides,
       subscribers, subscribees, overriders, overrides_out,
-      link_total, link_surprising, link_with_content } );
+      link_total, link_interesting, link_targets } );
     // container_to_contents[pid] = (pid's gated contents) ∩ pid_set.
     { let intersected : HashSet<ID> =
         graph . outbound_pids_for_relation_gated (
@@ -167,60 +181,38 @@ fn fetch_all_graphnodestats_in_rust (
     content_to_containers,
   } }
 
-/// The inbound textlink split =a(b,c)= for one node (option A: re-parse
-/// each source's title+body on demand). a = total active inbound link
-/// sources; c = of those, sources with their own content; b = of those,
-/// sources that differ from this node, are bodyless AND contentless, and
-/// EVERY label they use to link here is "surprising" -- the source's
-/// normalized title is something other than the (normalized) link label.
-fn link_split (
+/// Distinct visible resolved link targets and the source's interestingness.
+/// The graph already parsed title and body into textlinks_to.
+fn link_facts_for_source (
   graph  : &InRustGraph,
   active : Option<&ActiveSourceSet>,
   pid    : &ID,
-) -> (usize, usize, usize) {
-  let sources : Vec<ID> = match graph . textlinks_in . get (pid) {
-    Some (s) => s . iter ()
-      . filter ( |src| pid_source_is_active (graph, active, src) )
-      . cloned () . collect (),
-    None => return (0, 0, 0), };
-  let mut total       : usize = 0;
-  let mut surprising  : usize = 0;
-  let mut with_content : usize = 0;
-  for src_pid in &sources {
-    total += 1;
-    let src = match graph . nodes . get (src_pid) {
-      Some (n) => n, None => continue, };
-    if ! src . contains . is_empty () {
-      with_content += 1;
-      continue; } // c-bucket: sources with content are never "surprising"
-    // Contentless. Surprising iff it differs from this node, is
-    // bodyless, and every label it uses to link here differs from its
-    // normalized title.
-    let differs   : bool = src_pid != pid;
-    let bodyless  : bool = src . body . is_none ();
-    if differs && bodyless {
-      let src_text : String = format! (
-        "{} {}", src . title, src . body . as_deref () . unwrap_or ("") );
-      let labels_here : Vec<String> =
-        textlinks_from_text (& src_text) . into_iter ()
-        . filter ( |tl| graph . pid_of (& tl . id) . as_ref () == Some (pid) )
-        . map ( |tl| tl . label )
-        . collect ();
-      let norm_title : String = normalize_for_compare (& src . title);
-      let all_surprising : bool =
-        ! labels_here . is_empty ()
-        && labels_here . iter () . all (
-          |l| normalize_for_compare (l) != norm_title );
-      if all_surprising { surprising += 1; } } }
-  (total, surprising, with_content) }
+) -> (HashSet<ID>, bool) {
+  if ! pid_source_is_active (graph, active, pid) {
+    return (HashSet::new (), false); }
+  let Some (node) = graph . nodes . get (pid) else {
+    return (HashSet::new (), false); };
+  let targets : HashSet<ID> =
+    graph . outbound_pids_for_relation_gated (
+      pid, NodeRelation::TextlinksTo, active )
+    . into_iter ()
+    . filter (|target| pid_source_is_active (graph, active, target))
+    . collect ();
+  let has_body : bool = node . body . as_ref ()
+    . is_some_and (|body| ! body . trim () . is_empty ());
+  let has_content : bool = graph . outbound_pids_for_relation_gated (
+      pid, NodeRelation::Contains, active )
+    . iter ()
+    . any (|member| pid_source_is_active (graph, active, member));
+  let interesting : bool = has_body || has_content || targets . len () > 1;
+  (targets, interesting) }
 
-/// Normalize text for the surprising-links title/label comparison:
-/// replace each link with its label, then trim and lowercase (matching
-/// the existing Tantivy/search practice).
-fn normalize_for_compare (
-  text : &str,
-) -> String {
-  replace_each_link_with_its_label (text) . trim () . to_lowercase () }
+pub(crate) fn link_source_is_interesting (
+  graph  : &InRustGraph,
+  active : Option<&ActiveSourceSet>,
+  pid    : &ID,
+) -> bool {
+  link_facts_for_source (graph, active, pid) . 1 }
 
 fn pid_source_is_active (
   graph  : &InRustGraph,
@@ -239,6 +231,78 @@ fn pid_source_is_active (
 mod tests {
   use super::*;
   use crate::types::nodes::complete::{FileProperty, empty_node_complete};
+  use crate::types::misc::{RelPartner, SourceName};
+  use crate::dbs::filesystem::not_nodes::load_config;
+  use crate::source_sets::SourceSetName;
+
+  fn node (
+    id    : &str,
+    title : &str,
+    body  : Option<&str>,
+  ) -> NodeComplete {
+    NodeComplete {
+      pid : ID::from (id),
+      title : title . to_string (),
+      body : body . map (str::to_string),
+      .. empty_node_complete () } }
+
+  #[test]
+  fn links_count_distinct_resolved_identities_and_interesting_sources () {
+    let mut target : NodeComplete = node ("target", "A different title", None);
+    target . extra_ids = vec![ ID::from ("old-target") ];
+    let mut with_content : NodeComplete =
+      node ("with-content", "[[id:target][x]]", None);
+    with_content . contains = vec![ RelPartner::at_relSource (
+      SourceName::from ("main"), ID::from ("target")) ];
+    let nodes : Vec<NodeComplete> = vec![
+      target,
+      node ("other", "Another distinct target", None),
+      node ("repeated", "[[id:target][x]] [[id:old-target][y]]", None),
+      node ("with-body", "[[id:target][x]]", Some ("body text")),
+      with_content,
+      node ("two-targets", "[[id:target][x]] [[id:other][y]]", None),
+      node ("with-self-link", "[[id:target][x]] [[id:with-self-link][self]]", None),
+      node ("with-dangling", "[[id:target][x]] [[id:missing][z]]", None) ];
+    let graph : InRustGraph = InRustGraph::from_nodecompletes (&nodes);
+    let pids : Vec<ID> = nodes . iter () . map (|n| n . pid . clone ()) . collect ();
+    let stats : AllGraphNodeStats = fetch_all_graphnodestats (
+      &graph, &pids) . unwrap ();
+    let target_counts : &RelationCounts = stats . counts . get (&ID::from ("target")) . unwrap ();
+    assert_eq! (target_counts . link_total, 6);
+    assert_eq! (target_counts . link_interesting, 4);
+    assert_eq! (stats . counts [&ID::from ("repeated")] . link_targets, 1);
+    assert_eq! (stats . counts [&ID::from ("two-targets")] . link_targets, 2);
+    assert_eq! (stats . counts [&ID::from ("with-self-link")] . link_targets, 2);
+    assert_eq! (stats . counts [&ID::from ("with-dangling")] . link_targets, 1);
+  }
+
+  #[test]
+  fn inactive_content_and_targets_do_not_make_a_link_source_interesting () {
+    let config = load_config (
+      "tests/source_sets/fixtures/skgconfig.toml") . unwrap ();
+    let active : ActiveSourceSet = ActiveSourceSet::named (
+      &config, SourceSetName::from ("public")) . unwrap ();
+    let mut source : NodeComplete = node (
+      "source", "[[id:dest][d]] [[id:private-target][p]]", None);
+    source . source = SourceName::from ("public");
+    source . contains = vec![RelPartner::at_relSource (
+      SourceName::from ("private"), ID::from ("visible-child"))];
+    let mut dest : NodeComplete = node ("dest", "destination", None);
+    dest . source = SourceName::from ("public");
+    let mut child : NodeComplete = node ("visible-child", "child", None);
+    child . source = SourceName::from ("public");
+    let mut private_target : NodeComplete = node (
+      "private-target", "private target", None);
+    private_target . source = SourceName::from ("private");
+    let graph : InRustGraph = InRustGraph::from_nodecompletes (
+      &[source, dest, child, private_target]);
+    let stats : AllGraphNodeStats = fetch_all_graphnodestats_with_source_set (
+      &graph, &[ID::from ("source"), ID::from ("dest")],
+      Some (&active)) . unwrap ();
+    assert_eq! (stats . counts [&ID::from ("dest")] . link_total, 1);
+    assert_eq! (stats . counts [&ID::from ("dest")] . link_interesting, 0);
+    assert_eq! (stats . counts [&ID::from ("source")] . link_targets, 1);
+  }
 
   #[test]
   fn property_count_is_the_number_of_distinct_true_properties () {

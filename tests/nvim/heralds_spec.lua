@@ -34,11 +34,37 @@ end
 describe('skg.heralds', function ()
   before_each(install_fixture_rules)
 
+  it('renders subset fractions and distinguishes ĥ from ancestor h', function ()
+    for _, case in ipairs({
+      { '(textlinksTo (in 5 (interesting 2)) (out 3))', '2/5L3' },
+      { '(textlinksTo (in 5 (interesting 0)) (out 3))', '5L3' },
+      { '(textlinksTo (in 5 (interesting 2)))', '2/5L' },
+      { '(textlinksTo (out 3))', 'L3' },
+      { '(textlinksTo (in 5 (interesting 5)))', '5/L' },
+      { '(textlinksTo (in 1 (ancestors 1)'
+        .. ' (interesting 1 (ancestors 1))))', 'a/L' },
+      { '(textlinksTo (in 2 (ancestors 1 2)'
+        .. ' (interesting 1 (ancestors 1))))', 'a/bL' },
+      { '(contains (in 2) (out 8 (unintegrated 2)))', '2C2/8' },
+      { '(contains (out 8 (unintegrated 0)))', 'C8' },
+      { '(contains (out 8 (unintegrated 8)))', 'C8/' },
+    }) do
+      assert.are.equal(case[2], herald_text(
+        '(skg (node (id x) (rels ' .. case[1] .. ')))'))
+    end
+    local chunks = heralds.chunks_from_metadata(
+      '(skg (node (id x) (rels (overrides (out 1 (ancestors 8))))'
+      .. ' (viewStats (overridesHere y))))')
+    assert.are.equal('Oĥh', heralds.chunks_text(chunks))
+    assert.are.equal('SkgHeraldConfusable', chunks[2][2])
+    assert.are.equal('SkgHeraldYellow', chunks[3][2])
+  end)
+
   it('toggling adds and removes extmarks', function ()
     local buf = scratch_buffer_with({
       'Test line with (skg (node (id 123) (rels (contains (out 2)))'
       .. ' (viewStats cycle))) herald',
-      'Another line (skg (node (id 456) (rels (textlinksTo (in 3 (surprising 3))))'
+      'Another line (skg (node (id 456) (rels (textlinksTo (in 3 (interesting 3))))'
       .. ' (editRequest delete))) more text',
       'Plain line without heralds' })
     assert.is_true(heralds.enable(buf))
@@ -80,8 +106,8 @@ describe('skg.heralds', function ()
     assert.is_truthy(text:find('⟳', 1, true))
     assert.is_truthy(text:find('delete', 1, true))
     -- per-span highlight groups on the 2aC token
-    assert.are.equal('SkgHeraldOrange', hl_of['2'])
-    assert.are.equal('SkgHeraldYellow', hl_of['a'])
+    assert.are.equal('SkgHeraldInteresting', hl_of['2'])
+    assert.are.equal('SkgHeraldDimAncestor', hl_of['a'])
     assert.are.equal('SkgHeraldBirth', hl_of['C'])
     heralds.disable(buf)
     assert.are.equal(0, #herald_extmarks(buf))

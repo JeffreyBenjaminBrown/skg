@@ -494,10 +494,6 @@ fn content_goal_list (
     // (its contains holds the pre-merge acquiree alias, while the
     // subscribee's contains holds the acquirer's primary) would not
     // cancel, and would double-show as unintegrated subscribed content.
-    let resolve_pids = | ids : Vec<ID> | -> Vec<ID> {
-      ids . into_iter ()
-        . map ( |id| graph_snap . pid_of (&id) . unwrap_or (id) )
-        . collect () };
     // relSource gating (render-and-gating, 5_plan.org): a member
     // the grandparent-subscriber HIDES or CONTAINS only in a source
     // outside the active set must not subtract the subscribee's
@@ -510,23 +506,38 @@ fn content_goal_list (
       None      => true,
       Some (a)  => a . is_all () || a . contains_source (source) };
     let worktree_hidden : Vec<ID> =
-      resolve_pids (
         grandparent_nodecomplete . hides_from_its_subscriptions
         . or_default () . iter ()
         . filter ( |m| source_active (& m . relSource) )
         . map ( |m| m . member . clone () )
-        . collect () );
+        . collect ();
     let subscriber_contains : Vec<ID> =
-      resolve_pids (
         grandparent_nodecomplete . contains . iter ()
         . filter ( |m| source_active (& m . relSource) )
         . map ( |m| m . member . clone () )
-        . collect () );
-    Ok ( setlike_vector_subtraction (
-           setlike_vector_subtraction (
-             content_ids . to_vec(), &worktree_hidden ),
-           &subscriber_contains ) )
+        . collect ();
+    Ok ( unintegrated_content_ids (
+      graph_snap, content_ids, &worktree_hidden, &subscriber_contains ) )
   } }
+
+/// The membership subtraction shared by subscribee reconciliation and
+/// occurrence-level herald facts. Inputs preserve raw IDs; extra IDs are
+/// resolved before comparing membership, without replacing overridden nodes.
+pub fn unintegrated_content_ids (
+  graph               : &InRustGraph,
+  content_ids         : &[ID],
+  subscriber_hidden   : &[ID],
+  subscriber_contains : &[ID],
+) -> Vec<ID> {
+  let resolve_pids = |ids : &[ID]| -> Vec<ID> {
+    ids . iter ()
+      . map (|id| graph . pid_of (id) . unwrap_or_else (|| id . clone ()))
+      . collect () };
+  let contents : Vec<ID> = resolve_pids (content_ids);
+  let hidden : Vec<ID> = resolve_pids (subscriber_hidden);
+  let contained : Vec<ID> = resolve_pids (subscriber_contains);
+  setlike_vector_subtraction (
+    setlike_vector_subtraction (contents, &hidden), &contained) }
 
 /// Reconcile the node's non-parentIgnored ActiveNode children
 /// against the goal list (content IDs, possibly interleaved with

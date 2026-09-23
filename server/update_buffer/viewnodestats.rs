@@ -1,4 +1,5 @@
 use crate::dbs::in_rust_graph::InRustGraph;
+use crate::dbs::in_rust_graph::stats::link_source_is_interesting;
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole };
 use crate::herald_tokens::{AncestorFlags, relationship_heralds_sexp};
@@ -7,6 +8,7 @@ use crate::types::misc::{ID, SkgConfig, SourceName};
 use crate::types::viewnode::{
   Birth, GraphNodeStats, AffectsParent, PartnerFolder, ViewNode, ViewNodeKind, Vognode };
 use crate::update_buffer::ancestry::required_ancestor;
+use crate::update_buffer::reconcile::content::unintegrated_content_ids;
 use ego_tree::{Tree, NodeId};
 use std::collections::{HashMap, HashSet};
 
@@ -123,18 +125,46 @@ fn set_herald_strings_in_viewnode (
   let parent_kind : ParentKind = parent_kind_of (tree, treeid);
   // Gather tracked ancestors (pid, generation), then flag relations.
   let mut flags : AncestorFlags = AncestorFlags::default ();
-  for (anc_pid, generation) in
-    tracked_ancestors (tree, &parent_kind) {
+  let ancestors : Vec<(ID, usize)> = tracked_ancestors (tree, &parent_kind);
+  for (anc_pid, generation) in &ancestors {
     flag_ancestor_relations (
       &mut flags, graph, active,
       container_to_contents, content_to_containers,
-      node_pid, &anc_pid, generation ); }
+      node_pid, anc_pid, *generation ); }
+  let unintegrated : Option<usize> =
+    if affectsParent == AffectsParent::True
+      && matches! (parent_kind, ParentKind::Folder (PartnerFolder::Subscribee, _)) {
+      graph . and_then (|g| {
+        let subscriber_pid : &ID = &ancestors . iter ()
+          . find (|(_, generation)| *generation == 2) ? . 0;
+        let visible = |id : &ID| -> bool {
+          match active {
+            None => true,
+            Some (a) if a . is_all () => true,
+            Some (a) => g . nodes . get (id)
+              .is_some_and (|n| a . contains_source (&n . source)), }};
+        let contents : Vec<ID> = g . outbound_pids_for_relation_gated (
+          node_pid, NodeRelation::Contains, active )
+          . into_iter () . filter (|id| visible (id)) . collect ();
+        let hidden : Vec<ID> = g . outbound_pids_for_relation_gated (
+          subscriber_pid, NodeRelation::HidesFromItsSubscriptions, active );
+        let contained : Vec<ID> = g . outbound_pids_for_relation_gated (
+          subscriber_pid, NodeRelation::Contains, active );
+        let members : HashSet<ID> = unintegrated_content_ids (
+          g, &contents, &hidden, &contained )
+          . into_iter () . collect ();
+        for (id, generation) in &ancestors {
+          if members . contains (id)
+            && flags . contains_out . contains (generation) {
+            flags . contents_unintegrated_out . push (*generation); } }
+        Some (members . len ()) })
+    } else { None };
   let birth_rels : Vec<NodeRelation> =
     birth_relations (&parent_kind, affectsParent, birth, &flags,
                      overridesHere);
   let rel_heralds : Option<String> = relationship_heralds_sexp (
     &counts, gstats . aliases, gstats . extra_ids, gstats . properties,
-    &flags, &birth_rels );
+    &flags, &birth_rels, unintegrated );
   if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . rel_heralds = rel_heralds; } }
@@ -226,7 +256,10 @@ fn flag_ancestor_relations (
     if graph . relation_membership_is_visible (
       node_pid, anc_pid,
       RelationRole::new (rel, BinaryRolePosition::First), active ) {
-      flags . record (rel, true, generation); }
+      flags . record (rel, true, generation);
+      if rel == NodeRelation::TextlinksTo
+        && link_source_is_interesting (graph, active, anc_pid) {
+        flags . links_interesting_in . push (generation); } }
     // outbound: node R's ancestor (ancestor plays the second role).
     if graph . relation_membership_is_visible (
       node_pid, anc_pid,

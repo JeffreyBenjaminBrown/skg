@@ -62,7 +62,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
       let (a_view, _, _) = single_root_view (
         config, Some (tantivy), &ID::from ("A"), false) ?;
       let edited_a : String = a_view . replace (
-        "A links to [[id:X][X]]", "[[id:X][X]]");
+        "A links to [[id:X][X]]", "[[id:X][X]] [[id:A][A]]");
       let (b_view, _, _) = single_root_view (
         config, Some (tantivy), &ID::from ("B"), false) ?;
       let dirty_b : String = format! ("{}\nlocal edit", b_view);
@@ -126,13 +126,13 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
         . expect ("X must receive a collateral view update");
       let collateral_text = extract_string_field_from_sexp (
         collateral, "content") . unwrap ();
-      assert! (collateral_text . contains ("(surprising 1)"),
-               "X's surprising-link herald must reflect A's new title: {}",
+      assert! (collateral_text . contains ("(interesting 1)"),
+               "X's interesting-link herald must reflect A's new target: {}",
                collateral_text);
       assert_eq! (
         nodecomplete_from_graph (&graph . load_full (), &ID::from ("A"))
           . unwrap () . title,
-        "[[id:X][X]]");
+        "[[id:X][X]] [[id:A][A]]");
       Ok (( ))
     }))
 }

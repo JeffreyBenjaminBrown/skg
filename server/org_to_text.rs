@@ -516,7 +516,7 @@ fn phantom_rels_atom (
   gs . rels . as_ref () . and_then ( |counts|
     relationship_heralds_sexp (
       counts, gs . aliases, gs . extra_ids, gs . properties,
-      &AncestorFlags::default (), &[] ) ) }
+      &AncestorFlags::default (), &[], None ) ) }
 
 fn org_bullet ( level: usize ) -> String {
   "*" . repeat ( level . max (1)) }

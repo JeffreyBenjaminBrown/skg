@@ -296,8 +296,8 @@ pub fn herald_rule_table () -> HeraldRule {
         rule ("rels", vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
         crule (Blue, "viewStats", vec! [
           leaf (Blue, "cycle", "⟳"),
-          // overridesHere is displayed as the orange O birth herald
-          // (frontloaded in viewnodestats.rs), not here. The atom's
+          // overridesHere is displayed as pink ĥ inside the O token
+          // by the client relationship renderer. The atom's
           // ID payload is load-bearing save metadata, never displayed.
           vac ("overridesHere"),
           // relSource is a display fact, not a save request.  It

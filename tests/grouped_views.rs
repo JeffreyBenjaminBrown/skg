@@ -16,3 +16,6 @@ mod initial_view_bfs;
 
 #[path = "subscribee_folder_empty_persists.rs"]
 mod subscribee_folder_empty_persists;
+
+#[path = "subscribee_heralds.rs"]
+mod subscribee_heralds;

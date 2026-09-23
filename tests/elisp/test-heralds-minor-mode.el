@@ -5,12 +5,36 @@
 (require 'skg-request-herald-rules) ;; self-heal: skg-herald-rules-ensure
 (skg-test-install-herald-rules)
 
+(ert-deftest test-herald-fractions-and-substitution-styles ()
+  "L and C use the same subset grammar; ĥ is distinct from ancestor h."
+  (dolist (case '(("(textlinksTo (in 5 (interesting 2)) (out 3))" . "2/5L3")
+                  ("(textlinksTo (in 5 (interesting 0)) (out 3))" . "5L3")
+                  ("(textlinksTo (in 5 (interesting 2)))" . "2/5L")
+                  ("(textlinksTo (out 3))" . "L3")
+                  ("(textlinksTo (in 5 (interesting 5)))" . "5/L")
+                  ("(textlinksTo (in 1 (ancestors 1) (interesting 1 (ancestors 1))))" . "a/L")
+                  ("(textlinksTo (in 2 (ancestors 1 2) (interesting 1 (ancestors 1))))" . "a/bL")
+                  ("(contains (in 2) (out 8 (unintegrated 2)))" . "2C2/8")
+                  ("(contains (out 8 (unintegrated 0)))" . "C8")
+                  ("(contains (out 8 (unintegrated 8)))" . "C8/")))
+    (let ((display (heralds-from-metadata
+                    (format "(skg (node (id x) (rels %s)))" (car case)))))
+      (should (equal (substring-no-properties display) (cdr case)))))
+  (let* ((display (heralds-from-metadata
+                   "(skg (node (id x) (rels (overrides (out 1 (ancestors 8)))) (viewStats (overridesHere y))))"))
+         (plain (substring-no-properties display)))
+    (should (equal plain "Oĥh"))
+    (should (eq (get-text-property 1 'face display)
+                'heralds-confusable-face))
+    (should (eq (get-text-property 2 'face display)
+                'heralds-yellow-face))))
+
 (ert-deftest test-heralds-minor-mode-toggle ()
   "Test that heralds-minor-mode properly adds and removes overlays."
   (with-temp-buffer
     (progn ;; Insert test text with herald markers
       (insert "Test line with (skg (node (id 123) (rels (contains (out 2))) (viewStats cycle))) herald\n")
-      (insert "Another line (skg (node (id 456) (rels (textlinksTo (in 3 (surprising 3)))) (editRequest delete))) more text\n")
+      (insert "Another line (skg (node (id 456) (rels (textlinksTo (in 3 (interesting 3)))) (editRequest delete))) more text\n")
       (insert "Plain line without heralds\n"))
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
@@ -66,9 +90,9 @@ the C token 2aC: the multi-contains \"2\" (orange), the ancestor \"a\"
           ;; per-span faces on the 2aC relationship token
           (let ( ( i ( string-match "2aC" display-text )) )
             ( should ( eq ( get-text-property i 'face display-text )
-                          'heralds-orange-face )) ;; the "2"
+                          'heralds-interesting-face )) ;; the "2"
             ( should ( eq ( get-text-property (+ i 1) 'face display-text )
-                          'heralds-yellow-face )) ;; the "a"
+                          'heralds-dim-ancestor-face )) ;; the "a"
             ( should ( eq ( get-text-property (+ i 2) 'face display-text )
                           'heralds-birth-face )) )))) ;; the "C"
     (progn ;; what happens upon disabling it
