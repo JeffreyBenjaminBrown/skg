@@ -60,6 +60,7 @@ think it worked, and lose them.
 intending to replace it, but can't replace it.
 There are likely other viewnode kinds for which this happens.
 ** behavior changes
+*** TODO/help.org
 *** text search across containment paths
 *** making a link into content
 **** should rewrite edges, including text links, that pointed to the node with the link

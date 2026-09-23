@@ -109,7 +109,7 @@ describe('skg.heralds', function ()
     assert.are.equal('SkgHeraldCyan', chunks[1][2])
   end)
 
-  it('displays friendly colon-free property-row heralds', function ()
+  it('displays friendly colon-free property-viewnode heralds', function ()
     for _, case in ipairs({
       { property = 'hadId',
         expected = '☮ had ID before org-roam import' },

@@ -180,7 +180,7 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///     appear here.
 ///
 ///   * deletedScaffold vs deleted -- two shapes come in from the
-///     server depending on whether the deletion is on a scaffold row
+///     server depending on whether the deletion is on a scaffold viewnode
 ///     (like a deleted aliasFolder) or on a file-level node. Each gets
 ///     its own matcher; both render as "DELETED ...".
 ///
@@ -458,7 +458,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     // change rather than echoing two context-free arguments.
     "delete", "merge", "property", "true", "false",
   ];
-  // Property-row heralds match every public wire name.  Keeping this derived
+  // Property-viewnode heralds match every public wire name.  Keeping this derived
   // from the registry makes adding a property a conformance-checked change.
   atoms . extend (FileProperty::ALL . map (FileProperty::wire_name));
   atoms . extend ( graphstats_atoms () );

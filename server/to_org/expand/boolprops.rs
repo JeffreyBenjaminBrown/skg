@@ -78,7 +78,7 @@ mod tests {
   }
 
   #[test]
-  fn builder_emits_true_rows_in_registry_order_and_keeps_empty_folder () {
+  fn builder_emits_true_viewnodes_in_registry_order_and_keeps_empty_folder () {
     let source = SourceName::from ("main");
     let rich = NodeComplete {
       pid: ID::from ("rich"), title: "Rich" . to_string (),
@@ -96,13 +96,13 @@ mod tests {
     build_and_integrate_boolprops (&mut tree, root, &graph, &config ())
       . unwrap ();
     let folder = tree . get (root) . unwrap () . children () . next () . unwrap ();
-    let rows : Vec<(FileProperty, String)> = folder . children ()
+    let viewnodes : Vec<(FileProperty, String)> = folder . children ()
       . map (|child| match &child . value () . kind {
         ViewNodeKind::Qual (Qual::BoolProp { property, title, .. }) =>
           (*property, title . clone ()),
-        other => panic! ("unexpected row: {:?}", other), })
+        other => panic! ("unexpected viewnode: {:?}", other), })
       . collect ();
-    assert_eq! (rows, vec![
+    assert_eq! (viewnodes, vec![
       (FileProperty::Had_ID_Before_Import, String::new ()),
       (FileProperty::NoSearchMatching, String::new ())]);
 

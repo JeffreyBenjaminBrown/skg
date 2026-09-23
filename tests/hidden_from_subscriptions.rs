@@ -1159,7 +1159,7 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
     assert! (
       rerendered . lines () . any ( |line|
         line . contains ("(id H)")),
-      "Expected original hidden-outside row H to remain:\n{}",
+      "Expected original hidden-outside viewnode H to remain:\n{}",
       rerendered );
     assert! (
       ! rerendered . lines () . any ( |line|

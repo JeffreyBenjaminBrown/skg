@@ -1,0 +1,438 @@
+#+title: Interactive help
+#+TODO: TODO ONGOING | DONE
+
+* Scope and dependencies
+The herald help specification below builds on the semantic facts,
+rendering and link annotations defined in
+[[file:heralds_sept-2026/2_plan.org][the herald plan]]. That plan owns the static
+'docs/heralds.org' legend and the herald/link behavior; this document owns
+the interactive help buffers, their documentation links and their tests.
+The herald work can be completed independently of this help feature.
+
+Use the final implemented facts and legend when implementing help. The
+case descriptions below specify explanations of those facts, not a second
+definition of the herald protocol. Per-command help and explanations of
+relationships between two viewnodes remain separate TODOs at the end.
+
+* Inspectable explanations
+Implement 'skg-describe-heralds' in Emacs and ':SkgDescribeHeralds' in
+Neovim. Open a read-only Org help buffer for the current occurrence,
+organized as a short linked introduction followed by one section per
+displayed herald. This is a deterministic explanation of available facts,
+not generated prose from a language model or a new graph exploration API.
+
+** Invocation and buffer behavior
+From a headline or its body, inspect that owning headline. If point is on
+a Skg link, include its annotation/status explanation after the headline's
+heralds. Work with herald display enabled or disabled. A scaffold or
+phantom gets an explanation of its own metadata, not a guessed explanation
+of the nearest real node. If there is no Skg headline, say so without
+selecting an unrelated nearby ID.
+
+Use a help-specific Org mode/keymap, not a writable Skg content-view mode.
+RET follows documentation or return links, TAB folds sections, q closes
+the help, and g rebuilds it from the originating occurrence. Opening,
+refreshing or closing help must not save, change the graph, change the
+origin's modified state, or add requests to its metadata.
+
+The header identifies the origin buffer, the headline's available title,
+and that this is an explanation of the currently rendered metadata. Give
+a link back to that exact occurrence, not just a visit to its node ID:
+two occurrences of one node may have different meanings. Use a tracked
+position and verify it still identifies the captured occurrence before
+returning or refreshing. If the origin was removed or replaced, retain
+the explanation as a snapshot and ask the user to invoke help again from
+the desired viewnode. Do not silently retarget a different occurrence.
+
+Show the active source-set name when available. If the origin has unsaved
+edits, say that graph counts describe the last server render and any
+displayed edit requests are still requests. Do not save to make the help
+appear more current. No refresh loop or persistent help history is needed.
+
+** Layout: general reading aids, then this occurrence
+Start with links explaining the colors, incoming/outgoing notation,
+fractions and ancestor letters. Then show the actual herald string with
+the same styles as the origin and explain its tokens in display order.
+Each token section has its literal text, a link defining its concept,
+the specific counts/context, and a short "See more" instruction with the
+applicable command and its documentation link. Use proper singular/plural
+wording and omit irrelevant instructions and zero-valued sides.
+
+For example, the following is a layout sketch; bracketed links represent
+real documentation links or the return link in the implemented buffer:
+
+  #+begin_example
+  * Heralds for "Planning notes"
+  From [[this occurrence]] in *skg: Planning notes*; source set: public.
+  What [[the colors]] mean; how to read [[directions]], [[fractions]],
+  and [[ancestor letters]].
+
+  ** 2aC3 — contains
+  C represents the [[contains relationship]].
+  2 nodes contain this node; one is its parent in this view (a).
+  This node contains 3 nodes.
+  The orange 2 draws attention to multiple containers.
+  See more: return to this occurrence and use C-c p C
+  (skg-show-paths-through-containers; [[command documentation]]).
+  That command requests ancestry and saves the originating view buffer.
+  To inspect its contents, unfold this occurrence or visit the node itself.
+
+  ** 1/4L2 — text links
+  4 nodes link here; 1 has body text, visible content, or multiple targets.
+  This node links to 2 distinct visible targets.
+  The orange 1 is the interesting subset, not an additional source.
+  See more: C-c p L for paths through sources; C-c p l for targets
+  ([[link-source command]], [[link-target command]]; both auto-save).
+  #+end_example
+
+Do not invent why a particular source qualifies from an aggregate count:
+the example says it meets at least one criterion, not which one. The
+existing source path shows sources generally, not a promised filtered
+list of only interesting sources.
+
+** Documentation links and command instructions are different things
+Documentation links open the relevant local document at a stable named
+section. They never execute the command being described. For this feature,
+"See more" means a return link plus instructions and a command-doc link;
+do not add buttons that issue view requests from the help buffer.
+
+Folder and path commands currently auto-save the originating buffer.
+Say so next to those instructions: they can save the user's other edits
+as well. This follows [[file:../elisp/skg-request-views.el][the actual commands]],
+and avoids presenting them as passive inspection. Opening help itself
+must not call any of them. Do not offer delete, merge, staging, source
+changes or definitive-view requests as executable help actions.
+
+Obtain displayed bindings from the origin's active keymap when possible;
+always include the command name, and fall back to M-x or the Neovim Ex
+name if unbound. The keys below are the current Emacs defaults verified
+in [[file:../elisp/skg-keymaps-and-aliases.el][the keymap]]. Neovim uses the matching
+entries in [[file:../nvim/lua/skg/keymaps.lua][its command table]], for example
+':SkgShowPathsThroughContainers'. Show the user's current client, not an
+Emacs-only instruction in Neovim help.
+
+** Relationship cases and where to see more
+Use the node actually shown as the subject of the counts. Treat incoming
+and outgoing sides independently, even when both occur in one token.
+
+*** Incoming C
+**** Specific explanation
+N nodes contain this node; name the multi-container case when N > 1.
+**** See more in the originating view
+'skg-show-paths-through-containers', C-c p C.
+
+*** Ordinary outgoing C
+**** Specific explanation
+This node directly contains N visible nodes.
+**** See more in the originating view
+Unfold its content; 'skg-goto', C-c g RET, on the headline's own ID for
+an exact-root view.
+
+*** Subscribee outgoing C fraction
+**** Specific explanation
+Of D contents of this subscribee, U are not yet hidden or directly
+contained by this subscriber.
+**** See more in the originating view
+Unfold this subscribee occurrence for the remainder; inspect the
+subscriber's content and hide/subscription folders for handled items.
+
+*** Incoming L fraction
+**** Specific explanation
+S distinct visible nodes link here; I meet the stated interestingness
+predicate.
+**** See more in the originating view
+'skg-show-paths-through-link-sources', C-c p L.
+
+*** Outgoing L
+**** Specific explanation
+This node links to T distinct visible target nodes.
+**** See more in the originating view
+Its title/body links; 'skg-show-paths-through-link-dests', C-c p l.
+
+*** Incoming S
+**** Specific explanation
+N nodes subscribe to this node.
+**** See more in the originating view
+'skg-show-paths-through-subscribers', C-c p S.
+
+*** Outgoing S
+**** Specific explanation
+This node subscribes to N nodes.
+**** See more in the originating view
+'skg-show-paths-through-subscribees', C-c p s.
+
+*** Incoming O
+**** Specific explanation
+N nodes override this node.
+**** See more in the originating view
+'skg-show-paths-through-overriders', C-c p O.
+
+*** Outgoing O
+**** Specific explanation
+This node overrides N nodes.
+**** See more in the originating view
+'skg-show-paths-through-overridden', C-c p o.
+
+*** Incoming H
+**** Specific explanation
+N nodes hide this node from their subscriptions.
+**** See more in the originating view
+'skg-show-paths-through-hiders', C-c p H.
+
+*** Outgoing H
+**** Specific explanation
+This node hides N nodes from its subscriptions.
+**** See more in the originating view
+'skg-show-paths-through-hidden', C-c p h.
+
+*** Folder alternatives and subscriber context
+For S, O and H, also name the corresponding two-direction folder command
+when the user wants immediate members: 'skg-show-folderOf-subscribes'
+(C-c l s), 'skg-show-folderOf-overrides' (C-c l o), and
+'skg-show-folderOf-hides' (C-c l h). Describe paths as ancestry traversals
+that stop at a branch, cycle or root, rather than promising a complete
+transitive listing. All these folder/path commands auto-save.
+
+For U/D, identify the subscriber by its available title/occurrence, not
+just "the parent": its subscribeeFolder is between it and the subscribee.
+Commands for the subscriber must be described as running at that
+subscriber's viewnode. Do not tell the user that the subscribee's own H counts
+describe what its subscriber hides. Visiting B directly loses this
+subscriber-specific context, so it is not the way to inspect U.
+
+*** Decorations within those relationship tokens
+Expand a suppressed count from the numeric facts. For each ancestor flag,
+explain its generation and direction and, if available in the origin,
+identify the corresponding ancestor. Offer 'skg-view-org-ancestry'
+(C-c v o) for the current Org ancestry; distinguish it from the graph's
+containerward paths. A folder level contributes to generation distance.
+
+Explain which ancestors belong to the subset versus the total and why
+a numeral or equal denominator is absent. In 'a/bL', for example, the
+total is two, not one; in 'a/L' all one source is interesting. Preserve
+the underlying full counts in the explanation.
+
+Explain birth coloring as "this relationship explains why this occurrence
+was drawn here". If several birth relations are present, name them all.
+Ordinary coloring does not imply the relationship is unimportant.
+
+Pink ĥ specifically says this occurrence shows R in place of N, edits
+affect R, and the parent's membership still refers to N. Identify both
+nodes using already available labels and explicitly labeled IDs where
+necessary; do not use an ID as a fabricated title or fetch hidden text.
+Suggest an exact visit to the original ID and the override folders/paths
+for more detail. Yellow ancestor h means generation eight instead.
+
+** Other heralds and special viewnodes
+These cases belong in the same help buffer when present. Explanation
+coverage must follow the complete operative rule table, not only C/L/O.
+
+*** Ak
+**** Explain
+k aliases, excluding the title
+**** More detail
+Alias folder: 'skg-show-folderOf-aliases', C-c l a; auto-saves
+
+*** Ik
+**** Explain
+k extra IDs, excluding the primary ID; these resolve to the same node
+**** More detail
+Existing IDs folder if present; otherwise inspect the node's .skg
+'extra_ids' through its file/Git view
+
+*** Pk
+**** Explain
+k true file properties, not k editable settings
+**** More detail
+Properties folder: 'skg-show-folderOf-properties', C-c l p; auto-saves
+
+*** ⌂ source
+**** Explain
+This viewnode is at a source boundary; name the displayed home source
+**** More detail
+Link to source/ownership documentation and 'skg-limit-source-set', C-c
+v l; changing the source set changes visibility, not ownership
+
+*** ~source
+**** Explain
+This occurrence's relationship has a deliberately raised relSource,
+distinct from node home
+**** More detail
+Link to relSource/telescope documentation and 'skg-view-metadata', C-c
+v m; describe 'skg-set-relSource' only as an editing command
+
+*** ⊥
+**** Explain
+This occurrence does not express membership in its view parent
+**** More detail
+Membership documentation; view metadata; do not call it graph-wide
+orphanhood
+
+*** ☮ on a node
+**** Explain
+This occurrence is write-protected; it does not by itself mean the
+node is foreign
+**** More detail
+Editability documentation and view metadata
+
+*** ☮ on a folder/property viewnode
+**** Explain
+This projection cannot be edited here
+**** More detail
+The appropriate folder/property documentation; do not suggest making a
+scaffold definitive
+
+*** B beside ☮
+**** Explain
+The node has a body omitted at this protected occurrence
+**** More detail
+Visit its node for a content view; distinguish this from a merely
+folded body
+
+*** ⟳
+**** Explain
+This occurrence repeats an ancestor's node identity
+**** More detail
+Current Org ancestry, C-c v o; explain the stopped expansion without
+declaring a graph error
+
+*** Unknown-node message
+**** Explain
+The referenced node is absent, not merely outside the active source
+set
+**** More detail
+Missing-target documentation and the visible reference ID; no normal
+traversal promises
+
+*** Inactive-node message
+**** Explain
+The node is unavailable in the active source set
+**** More detail
+Source-set documentation/selection; do not reveal a concealed
+identity, title or source
+
+*** DELETED node/scaffold
+**** Explain
+This is a retained deleted placeholder, not a pending delete request
+**** More detail
+Deletion/phantom documentation and relevant Git view when available
+
+*** diff:not-in-git
+**** Explain
+Diff information is unavailable because the source is not in a Git
+repository
+**** More detail
+Git/diff documentation; do not call the file merely untracked
+
+*** Extra-ID inspection
+
+There is currently no public 'show IDs folder' command in the view-request
+command table. Do not invent a binding for Ik, or claim that the metadata
+buffer contains the actual extra-ID list when it contains only its count.
+Document the file fallback: in Emacs, 'skg-goto-in-magit' (C-c g m) locates
+the node's file, which can then be visited. Use the corresponding Neovim
+Git/file route. No new ID-list endpoint is required for this inspector.
+
+*** Folder and qualifier labels
+Explain aliases, IDs and individual alias/ID viewnodes as such. For each
+subscription/override/hide folder, state which direction it lists and
+which node owns that list. The special hidden-in-subscribee and
+hidden-outside-subscribee folders need their actual subscriber/subscribee
+context, not a generic H explanation. Link to the matching folder section.
+
+For property viewnodes, explain 'hadId' and 'wasOverloaded' as read-only import
+provenance, and 'noSearchMatching' as exclusion from direct search matches,
+not an access restriction. Show only facts actually present. P2 alone
+does not tell the inspector which two properties are true.
+
+*** Pending requests and Git changes
+Explain 'delete', 'merge:...', 'request:~...', search-matching requests,
+and 'req:folder/path/properties/definitive' as pending metadata requests,
+not completed changes. Include their displayed parameters. Link to the
+relevant command documentation and metadata view; opening help must not
+fulfill, cancel or validate them by saving.
+
+For staged/unstaged markers, decode every component: staged compares HEAD
+with index; unstaged compares index with worktree. X/-X means added/removed
+file existence; M/-M means added/removed membership at this occurrence,
+including non-content folder membership. Neither is just "text changed".
+Explain textChanged viewnodes separately, with the indicated stage(s). Offer
+the node's Git view, the parent's Git view for applicable membership
+changes, and 'skg-diff-report' (C-c t r) for a broader semantic report;
+note that the report requires saved Skg view buffers. No staging actions.
+
+** Link status section and empty/error cases
+When invoked on a Skg link, add its current target status and source
+suffix meaning after the herald sections. Distinguish visible, missing,
+inactive and pending/failed lookup. Pink means confirmed missing; green
+source describes the literal target's home, not an overrider's home.
+Link to documentation for annotations and the source toggle. Read the
+annotation data already available; do not block opening help on a lookup.
+
+For a valid viewnode with no heralds, show the introduction and "No heralds are
+displayed for this occurrence", not a page of zero counts. If metadata
+is malformed or a new field is unsupported, report that specific limit
+and provide a metadata/documentation route; do not interpret missing facts
+as zero or silently omit an unrecognized displayed marker.
+
+** Stable documentation destinations
+Reuse the 'docs/heralds.org' legend supplied by the herald plan. Add stable
+CUSTOM_ID values where missing to its relevant sections
+for colors, directions, fractions, ancestors, birth, contains, textlinks,
+subscribes, overrides, hides, substitution, aliases, extra-ids, properties,
+sources, relsource, membership, editability, hidden-body, cycles,
+placeholders, requests, git-diffs, folders and link-annotations. Prefix
+their IDs consistently, for example 'herald-colors' and 'herald-contains'.
+The relationship sections may link onward to fuller data-model material.
+
+Resolve links from the installed project's documentation root, not the
+data directory or the user's current directory. In the implementation,
+these must be real local links to real sections, including command-guide
+destinations. Provide labels like "the colors" and "contains relationship",
+not raw filenames/anchors. If documentation is unavailable, give a clear
+message and retain the inline explanation. Do not open an unrelated file.
+
+** Implementation boundary
+Interpret the full metadata and local occurrence context into a small
+description of the displayed tokens: semantic kind, counts/subsets,
+ancestor flags, style roles, documentation destination and relevant
+command references. Share that interpretation with rendering where
+practical within each client. Do not parse compressed strings back into
+facts or use the save-oriented metadata stripper that discards heralds.
+
+Use client-side templates for the prose and a finite mapping for docs and
+commands. This needs no server-generated help prose, new persistent store,
+or generic command-execution framework. Check coverage against
+[[file:../server/heralds.rs][the rule table]] and the relationship renderers.
+
+** TODO Verify the help buffer as a user-facing feature
+Use table-driven examples covering every relationship direction and
+every other marker family listed under 'Inspectable explanations'. Assert
+specific count explanations, relevant command references, style meanings
+and documentation destinations; avoid pinning every word of prose.
+
+Include a multi-contained node with the C-c p C/container-path instruction,
+L fractions with ancestor and equal-denominator omissions, U/D under two
+different subscribers, and actual substitution versus an ordinary O birth
+viewnode. Cover property/ID count-only metadata without inventing member lists,
+folder/qualifier viewnodes, write protection with hidden body, each Git axis,
+pending requests, unknown/inactive/deleted viewnodes, no heralds and malformed
+metadata. Verify the substitution-ĥ/ancestor-h distinction in explanations
+too, describing the circumflex as well as the colors.
+
+Open from both headline and body, with heralds on/off, and on a link.
+Assert that opening help and following every documentation link issue no
+save or view request. Test user-rebound and unbound commands, both client
+names, folding/quit/refresh, return to the exact occurrence, duplicate
+occurrences of one node, origin deletion/replacement and unsaved edits.
+Assert origin text, metadata, modified state and undo history are unchanged.
+
+Resolve every generated documentation target and CUSTOM_ID against the
+actual docs, including command links, from a non-repository working
+directory. Test a missing-docs installation for a useful message. Include
+one real buffer-to-help-to-documentation-to-origin walkthrough in each
+client; a collection of prose unit tests alone does not establish usable
+navigation.
+
+* TODO per-command help
+* TODO explain relationship between two viewnodes

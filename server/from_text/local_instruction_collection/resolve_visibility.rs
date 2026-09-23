@@ -98,8 +98,8 @@ pub fn resolve_visibility (
   Ok ((lowered, post_commit_notice_candidates)) }
 
 /// Applies the submitted visible-outside subset after all ordinary hide
-/// inference.  Only the old *visible outside* rows are replaceable: inactive
-/// relationship members and rows classified inside a subscribee remain owned
+/// inference.  Only the old *visible outside* viewnodes are replaceable: inactive
+/// relationship members and viewnodes classified inside a subscribee remain owned
 /// by the graph and survive an edit of this derived filter.
 fn apply_hiddenoutside_edits (
   lowered : &mut LoweredIntents,

@@ -120,8 +120,8 @@ the C token 2aC: the multi-contains \"2\" (orange), the ancestor \"a\"
     (should (eq (get-text-property 0 'face result)
                 'heralds-cyan-face))))
 
-(ert-deftest test-heralds-property-rows-are-friendly-and-colon-free ()
-  "Property-row heralds carry the whole titleless row label."
+(ert-deftest test-heralds-property-viewnodes-are-friendly-and-colon-free ()
+  "Property-viewnode heralds carry the whole titleless viewnode label."
   (dolist (case '((hadId "☮ had ID before org-roam import")
                   (wasOverloaded "☮ was overloaded during org-roam import")
                   (noSearchMatching "☮ no search matching")))

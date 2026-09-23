@@ -79,7 +79,7 @@ fn unchanged_contained_diff_lines_align_with_changed_lines () {
   assert! (
     rendered . contains (
       "\n**** contained diff\n  k..Keep\n -g..Gone\n +n..New\n" ),
-    "contained diff rows should align: {}",
+    "contained diff viewnodes should align: {}",
       rendered );
 }
 

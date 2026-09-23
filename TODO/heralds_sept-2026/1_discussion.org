@@ -285,7 +285,7 @@ dealt with.
 The same B can have different unintegrated counts under two subscribers.
 Compute the numerator from the same membership rules used to populate
 that occurrence, resolving extra IDs and applying relationship and node
-visibility consistently. Do not count rendered child rows: folds, display
+visibility consistently. Do not count rendered child viewnodes: folds, display
 budgets, folders and placeholders can make those differ from membership.
 
 Keep the inbound contains side intact: a full token might be '2C3/8'.
@@ -316,7 +316,7 @@ compete with those messages.
 *** O needs an explicit exception to birth styling
 The current birth style is black on white, not orange. For the proposal,
 the O character should always use the interesting style, even when
-overrides explains why the row was drawn. Ancestor letters retain their
+overrides explains why the viewnode was drawn. Ancestor letters retain their
 ancestor style; the other characters retain the ordinary or birth style.
 Document that priority, and preserve the separate substitution cue above.
 
@@ -393,24 +393,24 @@ scope, and the original node behind a substitution.
 
 *** What is 'actual substitution at this occurrence'?
 
-**** Codex: the parent names N, but this row shows R
+**** Codex: the parent names N, but this viewnode shows R
 Suppose a container P contains a public note N, and your note R overrides
 N. When viewing P, Skg can draw R in the position occupied by P's stored
-reference to N. That particular row is a substituted occurrence: its
+reference to N. That particular viewnode is a substituted occurrence: its
 title/body and node edits concern R, while its membership in P still
 represents N. Saving it does not silently change P's reference to R.
 
 Visiting R directly shows the same note R, with the same override
 relationship, but no substitution occurred at that root. Visiting N
-directly shows N. Thus "R overrides N" is a graph fact; "this R row is
+directly shows N. Thus "R overrides N" is a graph fact; "this R viewnode is
 standing in for N" is a fact about a particular position in a view.
 
 The latter is what 'overridesHere' records. Currently it makes O a birth
 relation, but O is also a birth relation when R appears in an override
 folder or path. The old O style therefore says "overrides explains why
-this row appears", which is broader than "this row replaced another".
+this viewnode appears", which is broader than "this viewnode replaced another".
 
-I recommend a distinct marker only on substituted rows, with an
+I recommend a distinct marker only on substituted viewnodes, with an
 explanation such as "Showing R in place of N; edits affect R; the
 container still refers to N." If preserving the existing birth cue is
 enough for you, we can omit that extra marker, but those two designs

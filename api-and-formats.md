@@ -692,8 +692,8 @@ node's heralds.
   `PARTNER_ROLE_VOCAB`. Emitted by the `C-c p` commands.
 - `definitiveView` — make a write-protected, childless node editable.
 - `properties` — add one read-only `propertiesFolder`, retained even when empty.
-  Its true-only rows use `(property hadId)`, `(property wasOverloaded)`, and
-  `(property noSearchMatching)` metadata in that order. Rows have no Org title;
+  Its true-only viewnodes use `(property hadId)`, `(property wasOverloaded)`, and
+  `(property noSearchMatching)` metadata in that order. Viewnodes have no Org title;
   their friendly visible label comes from the herald. Deleting the entire
   folder dismisses this optional projection and has no persistence meaning;
   edits within a retained folder are rejected rather than silently ignored.

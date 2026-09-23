@@ -174,7 +174,7 @@ fn write_protected_changes (
 struct BoolPropsFolderSurface {
   title          : String,
   body           : Option<String>,
-  rows           : Vec<(FileProperty, String, Option<String>)>,
+  viewnodes      : Vec<(FileProperty, String, Option<String>)>,
   other_children : Vec<String>,
 }
 
@@ -206,17 +206,17 @@ fn collect_boolprops_surfaces (
         let ViewNodeKind::QualFolder (QualFolder::BoolProps {
           title, body }) = &child . value () . kind
         else { return None; };
-        let mut rows : Vec<(FileProperty, String, Option<String>)> = Vec::new ();
+        let mut viewnodes : Vec<(FileProperty, String, Option<String>)> = Vec::new ();
         let mut other_children : Vec<String> = Vec::new ();
         for leaf in child . children () {
           match &leaf . value () . kind {
             ViewNodeKind::Qual (Qual::BoolProp {
               property, title, body }) =>
-              rows . push ((*property, title . clone (), body . clone ())),
+              viewnodes . push ((*property, title . clone (), body . clone ())),
             other => other_children . push (format! ("{:?}", other)), } }
         Some (BoolPropsFolderSurface {
           title : title . clone (), body : body . clone (),
-          rows, other_children }) })
+          viewnodes, other_children }) })
       . collect ();
     result . push (LocatedBoolPropsSurface {
       owner_id    : owner . id . clone (),
@@ -278,7 +278,7 @@ pub fn boolprops_surface_errors_against_graph (
     if surface . folders . is_empty () { continue; }
     let Some (node) = nodecomplete_from_graph (graph, &surface . owner_id)
     else { continue; };
-    let expected_rows : Vec<(FileProperty, String, Option<String>)> =
+    let expected_viewnodes : Vec<(FileProperty, String, Option<String>)> =
       FileProperty::ALL
       . into_iter ()
       . filter (|property| file_property_is_true (&node . misc, *property))
@@ -287,7 +287,7 @@ pub fn boolprops_surface_errors_against_graph (
     let expected = vec![BoolPropsFolderSurface {
       title    : String::new (),
       body     : None,
-      rows     : expected_rows,
+      viewnodes : expected_viewnodes,
       other_children : Vec::new (), }];
     if surface . folders != expected {
       errors . push (BufferValidationError::BoolPropsSurfaceEdited {
@@ -322,9 +322,9 @@ fn boolprops_surface_changes (
       changes . push ("changed non-property children in propertiesFolder"
                       . to_string ()); }
     for property in FileProperty::ALL {
-      let old = old_folder . rows . iter ()
+      let old = old_folder . viewnodes . iter ()
         . position (|(p, _, _)| *p == property);
-      let new = new_folder . rows . iter ()
+      let new = new_folder . viewnodes . iter ()
         . position (|(p, _, _)| *p == property);
       match (old, new) {
         (Some (_), None) => changes . push (format! (
@@ -333,27 +333,27 @@ fn boolprops_surface_changes (
           "added {}", property . wire_name ())),
         (Some (old_pos), Some (new_pos)) => {
           if old_pos != new_pos { changes . push (format! (
-            "moved {} from row {} to row {}", property . wire_name (),
+            "moved {} from position {} to position {} in propertiesFolder", property . wire_name (),
             old_pos + 1, new_pos + 1)); }
-          let old_title = &old_folder . rows [old_pos] . 1;
-          let new_title = &new_folder . rows [new_pos] . 1;
+          let old_title = &old_folder . viewnodes [old_pos] . 1;
+          let new_title = &new_folder . viewnodes [new_pos] . 1;
           if old_title != new_title { changes . push (format! (
             "changed {} headline from {:?} to {:?}",
             property . wire_name (), old_title, new_title)); } },
         (None, None) => (), } }
-    for (property, _, old_body) in &old_folder . rows {
-      if let Some ((_, _, new_body)) = new_folder . rows . iter ()
+    for (property, _, old_body) in &old_folder . viewnodes {
+      if let Some ((_, _, new_body)) = new_folder . viewnodes . iter ()
         . find (|(candidate, _, _)| candidate == property)
       { describe_body_change (
           &mut changes, property . wire_name (), old_body, new_body); } }
     for (index, ((old_property, _, _), (new_property, _, _))) in
-      old_folder . rows . iter () . zip (&new_folder . rows) . enumerate ()
+      old_folder . viewnodes . iter () . zip (&new_folder . viewnodes) . enumerate ()
     { if old_property != new_property { changes . push (format! (
-        "changed property metadata in row {} from {} to {}", index + 1,
+        "changed property metadata in viewnode {} from {} to {}", index + 1,
         old_property . wire_name (), new_property . wire_name ())); } }
   }
   if changes . is_empty () {
-    changes . push ("changed properties rows" . to_string ()); }
+    changes . push ("changed properties viewnodes" . to_string ()); }
   changes
 }
 

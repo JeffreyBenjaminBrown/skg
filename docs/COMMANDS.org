@@ -345,11 +345,11 @@ even when empty) and the subscriberFolder (the nodes that subscribe to
 this one -- read-only, ☮).
 *** C-c l p : skg-show-folderOf-properties
 Shows the read-only =propertiesFolder=. It lists only true node-file
-properties as titleless rows whose heralds carry their labels, in canonical
+properties as titleless viewnodes whose heralds carry their labels, in canonical
 order, and remains visible when none are true.
 =Had ID before org-roam import= and =Was overloaded during org-roam import=
 are provenance; =No search matching= is the user setting. Edit none of these
-generated rows directly. Delete the whole folder branch to dismiss this
+generated viewnodes directly. Delete the whole folder branch to dismiss this
 optional view; doing so does not change any property.
 ** C-c p : show a path (the backpath through one relation role)
 Like the folders, each inserts a request that, on save, grafts the

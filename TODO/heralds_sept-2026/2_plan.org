@@ -19,7 +19,7 @@ writing it has not implemented any of the behavior below.
 ** Scope and completion
 Deliver the Rust facts and protocol changes, matching relationship
 rendering in Emacs and Neovim, link source annotations, broken-link
-styling, inspectable explanations, tests, and user documentation.
+styling, tests, and user documentation.
 
 Use matching Neovim commands for the new Emacs actions as the execution
 default, consistent with the project's two-client pattern. Command names
@@ -39,7 +39,7 @@ final 'pending decisions' headline and follow the repository's stop rules.
 * Agreed behavior
 ** Counts describe the active graph
 Use distinct resolved node identities, not occurrences of links, extra-ID
-spellings, configured source names, or rendered rows. Apply both endpoint
+spellings, configured source names, or rendered viewnodes. Apply both endpoint
 home-source visibility and relationship relSource visibility where the
 relationship has that gate. Unknown targets do not count as resolved
 nodes. Follow literal relationships without override substitution when
@@ -50,6 +50,7 @@ unsaved title/body edits do not silently become committed graph statistics.
 Link annotations, however, should look up the IDs currently in the buffer.
 
 ** Link herald: I/SLT
+I, S and T are integers; L is a character literal.
 S counts distinct visible nodes linking to this node. T counts its
 distinct visible resolved targets across title and body. I counts the
 subset of S whose nodes have any of: nonempty body text, at least one
@@ -60,8 +61,7 @@ body text. Repeated links and alternate IDs for one target do not satisfy
 the multiple-target criterion by themselves. Do not retain the old
 title-versus-label surprise predicate or its special self-link exclusion.
 
-I and S are numbers in the explanation, not literal letters to print.
-Use L as the separator between incoming and outgoing facts. T is useful
+L is the separator between incoming and outgoing facts. T is useful
 even with folded bodies and repeated links; it need not equal the number
 of link labels visible in the buffer.
 
@@ -76,7 +76,9 @@ of link labels visible in the buffer.
 | 0 | 0 | 0 | no L token    |
 | 5 | 5 | 3 | 5/L3          |
 
-** Subscribee-as-such content herald: CU/D
+** Subscribee-as-such content herald: "...CU/D"
+The ellipsis on the other side of the literal C is already implemented.
+
 For a subscribee B occurring under subscriber A, D is B's visible direct
 content count. U counts those members after subtracting what A visibly
 hides or directly contains. Use the existing integration semantics:
@@ -87,7 +89,7 @@ but included in D when visible under B.
 This numerator belongs to the occurrence: the same B can have different U
 under different subscribers. It must agree with the membership used to
 populate that occurrence, before display folds and node budgets. Do not
-count folder rows, expanded descendants or override substitutes as new
+count folder viewnodes, expanded descendants or override substitutes as new
 content members. Count resolved visible members, not Unknown placeholders.
 
 Keep the incoming contains side unchanged. An entire token can therefore
@@ -147,7 +149,7 @@ If two distinct tracked ancestors a and b are the only inbound sources,
 with only a interesting, 'a/bL' expresses numerator 1 and total 2. This
 follows the no-repeated-flags and fully-explained-count rules together;
 the denominator is not the uninteresting remainder. Explain this example
-in the legend and inspector.
+in the legend.
 
 ** Styles and overrides
 Give the white-on-orange style a semantic name, such as
@@ -175,22 +177,23 @@ individual ancestor flags, not applying one face to the entire string.
 Choose the precise colors by visual checking; no color approval round is
 needed. Support the same distinction in both clients.
 
-*** Pink h means substitution at this occurrence
+*** Pink ĥ means substitution at this occurrence
 Introduce the named 'confusable' style as a pink foreground. Immediately
-after O, insert h exactly when that occurrence has 'overridesHere'. It
-precedes the outgoing count and ancestor flags: for example, '2Oh3'.
+after O, insert ĥ (U+0125, Latin small letter h with circumflex) exactly
+when that occurrence has 'overridesHere'. It precedes the outgoing count
+and ancestor flags: for example, '2Oĥ3'. Use the precomposed character.
 Use the existing marker as the source of truth, never infer substitution
 from override counts or birth status. An override folder/path occurrence
-without 'overridesHere' gets no pink h.
+without 'overridesHere' gets no pink ĥ.
 
 Preserve the marker's original ID and all save validation/round-trip
-semantics. A marked occurrence must still expose its h even if ordinary
+semantics. A marked occurrence must still expose its ĥ even if ordinary
 count omission would otherwise leave no O token. Counts-only phantoms do
 not acquire substitution markers.
 
-The eighth ancestor may also be h. Its ancestor style remains yellow;
-the substitution h is pink. Jeff accepted the ambiguity in unstyled text.
-Document and explain the difference rather than changing either notation.
+The eighth ancestor remains plain h in the yellow ancestor style.
+The substitution marker is ĥ in pink: its circumflex distinguishes it
+from ancestor h even without color. Document both the shape and color.
 
 ** Link annotations
 *** Source suffix
@@ -217,7 +220,7 @@ clients even while the source suffix is off.
 Inactive targets, pending lookups and transport errors are not evidence
 of a broken link. Do not apply the rule to arbitrary web/file links.
 The shared confusable style supplies pink; link presentation supplies
-underlining, without requiring the herald's h to be underlined.
+underlining, without requiring the herald's ĥ to be underlined.
 
 *** Lifecycle and asynchronous correctness
 Preserve toggle state across buffer rerenders and major-mode setup.
@@ -238,24 +241,6 @@ extmarks, timers and callbacks.
 Annotations must not change buffer text, modified state, undo history,
 saved files, clipboard text or navigation offsets. Verify interactions
 with hidden Org link syntax, herald overlays, folds and Unicode labels.
-
-** Inspectable explanations
-Provide a small read-only inspect-herald command in each client. Explain
-the selected/current headline's available herald facts in plain language,
-using actual counts rather than reverse-parsing abbreviated display text.
-Include subset/total meanings, ancestor generations, active-source scope,
-birth meaning, and substitution when present. Make the relevant existing
-relationship navigation discoverable from the explanation.
-
-For a substituted row, identify its original and drawn node and explain:
-edits affect the drawn node; parent membership still refers to the
-original. Use already available/released labels where possible and IDs
-where necessary, without fetching hidden titles or substituting IDs for
-missing titles. Explicitly distinguish pink h from ancestor h.
-
-Give missing/inactive/pending links inspectable status explanations too.
-Use one semantic interpretation for rendering and explanations in each
-client, so an explanation cannot drift from the displayed counts.
 
 * Implementation order and boundaries
 Work in tested vertical slices. The sections below identify relevant
@@ -311,7 +296,7 @@ views. A passing direct stats test alone does not establish this behavior.
 ** TODO Apply semantic styles and the substitution marker
 Implement the interesting/confusable styles and dim-a distinction in both
 clients. Consult [[file:../../server/heralds.rs][the served rule table]] for existing
-orange uses and its 'overridesHere' placeholder. Insert h inside the O
+orange uses and its 'overridesHere' placeholder. Insert ĥ inside the O
 token through the relationship renderer, not as a separate token at the
 table's later viewStats position.
 
@@ -345,13 +330,12 @@ initial buffers, save/rerender paths, source-set updates and reconnects.
 Use existing link parsing and request-dispatch conventions. Add the new
 modules to client initialization/reload paths and user command exposure.
 
-** TODO Add explanations and documentation
-Implement the inspector against the semantic facts and substitution
-metadata, then create 'docs/heralds.org' as the user-facing legend. Explain
+** TODO Document heralds and link annotations
+Create 'docs/heralds.org' as the user-facing legend. Explain
 all herald families, not only the changed ones: relations, fractions,
 ancestor flags, birth, source/relSource, editability, unknown/inactive
 states, edit requests and Git markers. Include the examples above,
-confusable h, broken links and source-overlay usage.
+confusable ĥ, broken links and source-overlay usage.
 
 Collect user-facing explanations from 'api-and-formats.md' into that guide
 and replace duplicated prose with links. Keep the exact updated wire
@@ -398,9 +382,11 @@ Extend [[file:../../tests/elisp/test-heralds-minor-mode.el][ERT herald tests]] a
 Assert both rendered characters and their per-character styles. Cover
 numerator/denominator ancestor partitioning, all-explained counts,
 generation encodings, ordinary and birth relations, dim a versus bright b,
-O numerals, pink h, and h adjacent to an ancestor letter.
+O numerals, pink ĥ, and ĥ adjacent to an ancestor letter. Assert that
+substitution ĥ and ancestor h remain distinct in unstyled text; include
+'Oĥh' to exercise their adjacency and Unicode character/byte offsets.
 
-Exercise raw direct visits, ordinary override-folder/path rows and actual
+Exercise raw direct visits, ordinary override-folder/path viewnodes and actual
 substitution, including same-source overrides. Assert that the marker is
 present exactly when 'overridesHere' is present and that saving still
 retains the original membership ID. Do not substitute raw roots.

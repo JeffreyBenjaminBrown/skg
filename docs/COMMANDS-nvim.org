@@ -345,9 +345,9 @@ The subscribeeFolder (the nodes this node subscribes to -- WRITABLE, shown
 even when empty) and the subscriberFolder (the nodes that subscribe to
 this one -- read-only, ☮).
 *** <localleader>cp : :SkgShowFolderOfProperties
-Shows the read-only, true-only properties folder as titleless rows whose
+Shows the read-only, true-only properties folder as titleless viewnodes whose
 heralds carry their labels, in canonical order.
-The empty folder is retained. Import provenance rows have no setter; use the
+The empty folder is retained. Import provenance viewnodes have no setter; use the
 search-matching command below for =No search matching=. Delete the whole
 folder branch to dismiss this optional view without changing any property.
 ** <localleader>p : show a path (the backpath through one relation role)
