@@ -246,7 +246,7 @@ with hidden Org link syntax, herald overlays, folds and Unicode labels.
 Work in tested vertical slices. The sections below identify relevant
 code, not a requirement to create a new abstraction for each paragraph.
 
-** TODO Add graph facts and the common fraction rendering
+** DONE Add graph facts and the common fraction rendering
 Start with [[file:../../server/dbs/in_rust_graph/stats.rs][graph statistics]],
 [[file:../../server/types/viewnode.rs][view-node types]],
 [[file:../../server/herald_tokens.rs][semantic serialization]], and
@@ -293,7 +293,7 @@ Verify graph changes that affect a linking node's body, visible contents
 or target set refresh its destinations' displayed I values in collateral
 views. A passing direct stats test alone does not establish this behavior.
 
-** TODO Apply semantic styles and the substitution marker
+** DONE Apply semantic styles and the substitution marker
 Implement the interesting/confusable styles and dim-a distinction in both
 clients. Consult [[file:../../server/heralds.rs][the served rule table]] for existing
 orange uses and its 'overridesHere' placeholder. Insert ĥ inside the O
@@ -306,7 +306,7 @@ rather than adding legacy aliases. Update misleading touched comments,
 especially claims that every visual choice lives in Rust or that birth
 is orange. Regenerate the herald-rule fixture only if its contents change.
 
-** TODO Add a batch graph lookup for link annotations
+** DONE Add a batch graph lookup for link annotations
 Use the published runtime graph snapshot to classify each requested ID
 as visible/resolved, inactive, or missing. For visible targets return the
 resolved identity and home-source information needed by the suffix.
@@ -330,7 +330,7 @@ initial buffers, save/rerender paths, source-set updates and reconnects.
 Use existing link parsing and request-dispatch conventions. Add the new
 modules to client initialization/reload paths and user command exposure.
 
-** TODO Document heralds and link annotations
+** DONE Document heralds and link annotations
 Create 'docs/heralds.org' as the user-facing legend. Explain
 all herald families, not only the changed ones: relations, fractions,
 ancestor flags, birth, source/relSource, editability, unknown/inactive
@@ -358,7 +358,7 @@ narrow its description to what remains. Do not accidentally promise
 rule-table retirement, which is outside this plan.
 
 * Verification and acceptance
-** TODO Prove the semantics at their owning boundaries
+** DONE Prove the semantics at their owning boundaries
 Extend [[file:../../tests/herald_tokens.rs][semantic-wire tests]], graph-stat tests,
 source-set tests and subscribee/view tests. Use graph fixtures where
 titles differ from IDs.
@@ -391,7 +391,7 @@ substitution, including same-source overrides. Assert that the marker is
 present exactly when 'overridesHere' is present and that saving still
 retains the original membership ID. Do not substitute raw roots.
 
-** TODO Prove annotation behavior across a live request cycle
+** ONGOING Prove annotation behavior across a live request cycle
 Test batch status results and extra-ID resolution against the graph,
 including immediately after graph publication without waiting for a
 Tantivy commit. Test simultaneous buffers, out-of-date replies, source-set
@@ -406,6 +406,11 @@ text remains byte-for-byte unchanged by annotation and save, with Unicode
 labels and folded content included. Visually inspect representative
 heralds in both clients; automated style assertions alone cannot judge
 whether dim a and pink remain legible.
+
+The automated live cycles, style assertions, and a light/dark color
+preview are complete. Direct visual inspection of actual Emacs and
+Neovim windows remains open: this headless workspace has no GUI or
+terminal image renderer. Do not infer that check from the preview.
 
 ** Test ladder and final checks
 Begin with focused tests, then affected grouped Rust targets and client
