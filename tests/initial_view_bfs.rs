@@ -222,8 +222,8 @@ async fn test_budget_content_beats_subscribers (
 
       let expected = indoc! {"* (skg (node (id r) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2))))) r
                               ** (skg subscribeeFolder)
-                              *** (skg (node (id s1) (source main) writeProtected (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)))) s1
-                              *** (skg (node (id s2) (source main) writeProtected (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)))) s2
+                              *** (skg (node (id s1) (source main) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) s1
+                              *** (skg (node (id s2) (source main) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) s2
                               ** (skg (node (id c1) (source main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) c1
                               *** (skg (node (id c2) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) c2
                               "};

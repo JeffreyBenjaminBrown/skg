@@ -191,15 +191,15 @@ async fn test_multi_root_view_with_shared_nodes (
         "* (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 2)) (hides (out 2))))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
-         ** (skg (node (id 2) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1)) (subscribes (out 2)) (extraIds 1) (birth contains)))) title 2
-         ** (skg (node (id 5) (source main) (rels (textlinksTo (in 1)) (subscribes (in 2)) (overrides (out 2)) (hides (in 1 (ancestors 1))) (extraIds 1) (birth overrides)) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
+         ** (skg (node (id 2) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1 (interesting 1))) (subscribes (out 2)) (extraIds 1) (birth contains)))) title 2
+         ** (skg (node (id 5) (source main) (rels (textlinksTo (in 1 (interesting 1)) (out 3)) (subscribes (in 2)) (overrides (out 2)) (hides (in 1 (ancestors 1))) (extraIds 1) (birth overrides)) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
-         * (skg (node (id 2) (source main) (affectsParent na) (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2)) (extraIds 1)))) title 2
+         * (skg (node (id 2) (source main) (affectsParent na) (rels (contains (in 1)) (textlinksTo (in 1 (interesting 1))) (subscribes (out 2)) (extraIds 1)))) title 2
          this one string could span pages
          ** (skg (node (id 1) (source main) (affectsParent false) writeProtected hiddenBody (rels (contains (out 2 (ancestors 1))) (hides (out 2)) (birth contains)))) title 1
          ** (skg subscribeeFolder)
-         *** (skg (node (id 4) (source main) writeProtected hiddenBody (rels (subscribes (in 2 (ancestors 2))) (overrides (in 1)) (hides (in 1)) (extraIds 1) (birth subscribes)))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) writeProtected hiddenBody (rels (textlinksTo (in 1) (out (ancestors 2))) (subscribes (in 2 (ancestors 2))) (overrides (out 2)) (hides (in 1)) (extraIds 1) (birth subscribes)))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) writeProtected hiddenBody (rels (contains (out 0 (unintegrated 0))) (subscribes (in 2 (ancestors 2))) (overrides (in 1)) (hides (in 1)) (extraIds 1) (birth subscribes)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) writeProtected hiddenBody (rels (contains (out 0 (unintegrated 0))) (textlinksTo (in 1 (interesting 1)) (out 3 (ancestors 2))) (subscribes (in 2 (ancestors 2))) (overrides (out 2)) (hides (in 1)) (extraIds 1) (birth subscribes)))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_metadata_eq!(result, expected,
                  "Multi root view should detect cross-tree duplicates");
@@ -237,15 +237,15 @@ async fn test_multi_root_view_with_node_limit (
         "* (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 2)) (hides (out 2))))) title 1
          This one string could span pages,
          and it can include newlines, no problem.
-         ** (skg (node (id 2) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1)) (subscribes (out 2)) (extraIds 1) (birth contains)))) title 2
-         ** (skg (node (id 5) (source main) (rels (textlinksTo (in 1)) (subscribes (in 2)) (overrides (out 2)) (hides (in 1 (ancestors 1))) (extraIds 1) (birth overrides)) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
+         ** (skg (node (id 2) (source main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1 (interesting 1))) (subscribes (out 2)) (extraIds 1) (birth contains)))) title 2
+         ** (skg (node (id 5) (source main) (rels (textlinksTo (in 1 (interesting 1)) (out 3)) (subscribes (in 2)) (overrides (out 2)) (hides (in 1 (ancestors 1))) (extraIds 1) (birth overrides)) (viewStats (overridesHere 3)))) this title includes a [[id:22][textlink to another file]]
          this body includes more textlinks:  [[id:33][to the third]] and [[id:55][even to itself]]
-         * (skg (node (id 2) (source main) (affectsParent na) (rels (contains (in 1)) (textlinksTo (in 1)) (subscribes (out 2)) (extraIds 1)))) title 2
+         * (skg (node (id 2) (source main) (affectsParent na) (rels (contains (in 1)) (textlinksTo (in 1 (interesting 1))) (subscribes (out 2)) (extraIds 1)))) title 2
          this one string could span pages
          ** (skg (node (id 1) (source main) (affectsParent false) writeProtected hiddenBody (rels (contains (out 2 (ancestors 1))) (hides (out 2)) (birth contains)))) title 1
          ** (skg subscribeeFolder)
-         *** (skg (node (id 4) (source main) writeProtected hiddenBody (rels (subscribes (in 2 (ancestors 2))) (overrides (in 1)) (hides (in 1)) (extraIds 1) (birth subscribes)))) This is a [[id:shgulasdghu][test]] of a second kind.
-         *** (skg (node (id 5) (source main) writeProtected hiddenBody (rels (textlinksTo (in 1) (out (ancestors 2))) (subscribes (in 2 (ancestors 2))) (overrides (out 2)) (hides (in 1)) (extraIds 1) (birth subscribes)))) this title includes a [[id:22][textlink to another file]]
+         *** (skg (node (id 4) (source main) writeProtected hiddenBody (rels (contains (out 0 (unintegrated 0))) (subscribes (in 2 (ancestors 2))) (overrides (in 1)) (hides (in 1)) (extraIds 1) (birth subscribes)))) This is a [[id:shgulasdghu][test]] of a second kind.
+         *** (skg (node (id 5) (source main) writeProtected hiddenBody (rels (contains (out 0 (unintegrated 0))) (textlinksTo (in 1 (interesting 1)) (out 3 (ancestors 2))) (subscribes (in 2 (ancestors 2))) (overrides (out 2)) (hides (in 1)) (extraIds 1) (birth subscribes)))) this title includes a [[id:22][textlink to another file]]
          "};
       assert_metadata_eq!(result, expected,
                  "Multi root view limit=3 truncates by the §5.5 budget");

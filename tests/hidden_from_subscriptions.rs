@@ -785,8 +785,8 @@ async fn test_subscribee_and_filter_folders (
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 3))))) R
        ** (skg subscribeeFolder)
-       *** (skg (node (id E1) (source main) writeProtected (rels (contains (out 2)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
-       *** (skg (node (id E2) (source main) writeProtected (rels (contains (out 2)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
+       *** (skg (node (id E1) (source main) writeProtected (rels (contains (out 2 (unintegrated 1))) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
+       *** (skg (node (id E2) (source main) writeProtected (rels (contains (out 2 (unintegrated 1))) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeFolder)
        **** (skg folded (node (id hidden-for-no-reason) (source main) writeProtected (rels (hides (in 1 (ancestors 3))) (birth hides)))) hidden-for-no-reason
        ** (skg (node (id R1) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) R1
@@ -817,11 +817,11 @@ async fn test_subscribee_and_filter_folders (
     let expected_expanded = indoc! {
       "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 3))))) R
        ** (skg subscribeeFolder)
-       *** (skg (node (id E1) (source main) (rels (contains (out 2)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
+       *** (skg (node (id E1) (source main) (rels (contains (out 2 (unintegrated 1))) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded (node (id hidden-in-E1) (source main) writeProtected (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4))) (birth contains hides)))) hidden-in-E1
        **** (skg (node (id E11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) E11
-       *** (skg (node (id E2) (source main) (rels (contains (out 2)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
+       *** (skg (node (id E2) (source main) (rels (contains (out 2 (unintegrated 1))) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded (node (id hidden-in-E2) (source main) writeProtected (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4))) (birth contains hides)))) hidden-in-E2
        **** (skg (node (id E21) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) E21
@@ -858,7 +858,7 @@ async fn test_hidden_within_but_none_without (
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 1)) (hides (out 1))))) R
        ** (skg subscribeeFolder)
-       *** (skg (node (id E1) (source main) writeProtected (rels (contains (out 3)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
+       *** (skg (node (id E1) (source main) writeProtected (rels (contains (out 3 (unintegrated 2))) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
        ** (skg (node (id R1) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) R1
        "};
     assert_metadata_eq!(initial_view, expected_initial,
@@ -889,7 +889,7 @@ async fn test_hidden_within_but_none_without (
     let expected_expanded = indoc! {
       "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 1)) (hides (out 1))))) R
        ** (skg subscribeeFolder)
-       *** (skg (node (id E1) (source main) (rels (contains (out 3)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
+       *** (skg (node (id E1) (source main) (rels (contains (out 3 (unintegrated 2))) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded (node (id H) (source main) writeProtected (rels (contains (in 1 (ancestors 2))) (hides (in 1 (ancestors 4))) (birth contains hides)))) H
        **** (skg (node (id E11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) E11
@@ -1086,8 +1086,8 @@ async fn test_hidden_without_but_none_within (
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
        ** (skg subscribeeFolder)
-       *** (skg (node (id E1) (source main) writeProtected (rels (contains (out 2)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
-       *** (skg (node (id E2) (source main) writeProtected (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
+       *** (skg (node (id E1) (source main) writeProtected (rels (contains (out 2 (unintegrated 2))) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
+       *** (skg (node (id E2) (source main) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeFolder)
        **** (skg folded (node (id H) (source main) writeProtected (rels (hides (in 1 (ancestors 3))) (birth hides)))) H
        ** (skg (node (id R1) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) R1
@@ -1116,11 +1116,11 @@ async fn test_hidden_without_but_none_within (
     let expected_expanded = indoc! {
       "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
        ** (skg subscribeeFolder)
-       *** (skg (node (id E1) (source main) (rels (contains (out 2)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
+       *** (skg (node (id E1) (source main) (rels (contains (out 2 (unintegrated 2))) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
        **** (skg (node (id E11) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) E11
        **** (skg (node (id E12) (source main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) E12
        ***** (skg (node (id E121) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) E121
-       *** (skg (node (id E2) (source main) (rels (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
+       *** (skg (node (id E2) (source main) (rels (contains (out 0 (unintegrated 0))) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
        *** (skg hiddenOutsideOfSubscribeeFolder)
        **** (skg folded (node (id H) (source main) writeProtected (rels (hides (in 1 (ancestors 3))) (birth hides)))) H
        ** (skg (node (id R1) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) R1
@@ -1225,8 +1225,8 @@ async fn test_overlapping_hidden_within (
     let expected_initial = indoc! {
       "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
        ** (skg subscribeeFolder)
-       *** (skg (node (id E1) (source main) writeProtected (rels (contains (out 1)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
-       *** (skg (node (id E2) (source main) writeProtected (rels (contains (out 1)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
+       *** (skg (node (id E1) (source main) writeProtected (rels (contains (out 1 (unintegrated 0))) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
+       *** (skg (node (id E2) (source main) writeProtected (rels (contains (out 1 (unintegrated 0))) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
        ** (skg (node (id R1) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) R1
        "};
     assert_metadata_eq!(initial_view, expected_initial,
@@ -1253,10 +1253,10 @@ async fn test_overlapping_hidden_within (
     let expected_expanded = indoc! {
       "* (skg (node (id R) (source main) (affectsParent na) (rels (contains (out 1)) (subscribes (out 2)) (hides (out 1))))) R
        ** (skg subscribeeFolder)
-       *** (skg (node (id E1) (source main) (rels (contains (out 1)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
+       *** (skg (node (id E1) (source main) (rels (contains (out 1 (unintegrated 0))) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-1
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded (node (id H) (source main) writeProtected (rels (contains (in 2 (ancestors 2))) (hides (in 1 (ancestors 4))) (birth contains hides)))) H
-       *** (skg (node (id E2) (source main) (rels (contains (out 1)) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
+       *** (skg (node (id E2) (source main) (rels (contains (out 1 (unintegrated 0))) (subscribes (in 1 (ancestors 2))) (birth subscribes)))) subscribee-2
        **** (skg hiddenInSubscribeeFolder)
        ***** (skg folded (node (id H) (source main) writeProtected (rels (contains (in 2 (ancestors 2))) (hides (in 1 (ancestors 4))) (birth contains hides)))) H
        ** (skg (node (id R1) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) R1

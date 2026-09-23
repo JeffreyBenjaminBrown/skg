@@ -440,7 +440,7 @@ async fn path_request_scenarios (
     // origin), no outbound. (Replaces the gone "(birth backpath
     // linkDest)" marker.)
     fails . want_contains (
-      s, &resp . saved_view, "(textlinksTo (in 1))" ); }
+      s, &resp . saved_view, "(textlinksTo (in 1 (ancestors 1) (interesting 0)))" ); }
   { // Self-referential fixture: a node that links to ITSELF. A
     // non-container path role is cycle-guarded and needs NO view-root
     // special-case (unlike containerward) -- the build must not panic,
