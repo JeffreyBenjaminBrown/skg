@@ -508,7 +508,7 @@ a member on that side.")
   "Muted ancestor a; higher generations retain the bright yellow face.")
 
 (defface heralds-confusable-face
-  '((t :foreground "#ff69b4"))
+  '((t :foreground "#c84286"))
   "Pink marker for an override substitution or a confirmed broken link.")
 
 (defface heralds-purple-face

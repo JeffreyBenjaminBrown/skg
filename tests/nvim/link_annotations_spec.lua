@@ -41,6 +41,12 @@ describe('skg.link_annotations', function ()
             :sub(mark[3] + 1, mark[4].end_col)) end
     end
     assert.are.equal(1, broken)
+    local confusable = vim.api.nvim_get_hl(0,
+      { name = 'SkgHeraldConfusable', link = false })
+    local broken_link = vim.api.nvim_get_hl(0,
+      { name = 'SkgBrokenLink', link = false })
+    assert.are.equal(confusable.fg, broken_link.fg)
+    assert.is_true(broken_link.underline)
     assert.are.equal(0, #suffixes(buf))
     annotations.toggle_source_overlay(buf)
     assert.same({ ' [⌂:pub]', ' [⌂:missing]', ' [⌂:inactive]' },

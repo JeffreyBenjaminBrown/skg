@@ -8,7 +8,7 @@
 
 (defconst skg-link-annotations--regexp
   "\\[\\[id:\\([^]\n]+\\)\\]\\[\\([^]\n]*\\)\\]\\]"
-  "The literal Skg link syntax used by the server graph parser.")
+  "Capture a literal Skg link's target ID and label in a view buffer.")
 
 (defvar skg-link-annotations--cache (make-hash-table :test 'equal)
   "Status by literal ID for the current graph and source-set lifetime.")

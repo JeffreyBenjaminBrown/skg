@@ -1,9 +1,9 @@
 -- PURPOSE: Display skg metadata as a short list of "herald" markers.
 -- Each org headline the server sends starts with '(skg ...)' metadata.
 -- This module lenses that tree via skg.sexpr.lens, producing colored
--- tokens that summarize view and code information. Every piece of
--- display logic lives in the rule table, which LIVES IN RUST
--- (server/heralds.rs) and is fetched/cached by skg.herald_rules.
+-- tokens that summarize view and code information. The served rule
+-- table (server/heralds.rs) places non-relationship tokens. This client
+-- renders semantic relationship facts and their per-character styles.
 -- The Lua port of elisp/heralds-minor-mode.el.
 --
 -- DISPLAY MECHANISM. Where Emacs used an overlay with a 'display'
@@ -30,13 +30,14 @@ local sexpr = require('skg.sexpr.parse')
 local M = {}
 
 M.namespace = vim.api.nvim_create_namespace('skg-heralds')
+M.confusable_fg = '#c84286'
 
 -- The placeholder token the server's `rels` rule emits
 -- (RELS_SPANS_SENTINEL in server/heralds.rs). The relationship heralds
 -- are per-CHARACTER styled spans -- more than the rule table's
 -- atom-level coloring can express -- so the rule only POSITIONS them by
 -- emitting this sentinel, which `chunks_from_metadata' replaces with the
--- spans it renders from the `(rels (COLOR "text") ...)' payload. The
+-- spans it renders from semantic `(rels ...)' facts. The
 -- analog of `heralds--rels-sentinel' in elisp.
 M.RELS_SENTINEL = '__RELS_SPANS__'
 
@@ -63,7 +64,7 @@ function M.define_highlight_groups ()
   vim.api.nvim_set_hl(0, 'SkgHeraldDimAncestor',
     { fg = 'white', bg = '#5e5e20', default = true })
   vim.api.nvim_set_hl(0, 'SkgHeraldConfusable',
-    { fg = '#ff69b4', default = true })
+    { fg = M.confusable_fg, default = true })
   vim.api.nvim_set_hl(0, 'SkgHeraldPurple',
     { fg = 'white', bg = '#8b00ff', default = true })
   vim.api.nvim_set_hl(0, 'SkgHeraldCyan',

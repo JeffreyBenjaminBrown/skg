@@ -1,6 +1,7 @@
 -- Display-only source suffixes and confirmed broken-link styling in views.
 
 local client = require('skg.client')
+local heralds = require('skg.heralds')
 local payload = require('skg.payload')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
@@ -14,7 +15,7 @@ M.epoch = 0
 M.next_request = 0
 
 vim.api.nvim_set_hl(0, 'SkgBrokenLink',
-  { fg = '#ff69b4', underline = true, default = true })
+  { fg = heralds.confusable_fg, underline = true, default = true })
 
 local function valid (buf)
   return vim.api.nvim_buf_is_valid(buf)
