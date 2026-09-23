@@ -437,5 +437,5 @@ checks pass, do not repeat the entire suite without a new reason.
 Inspect the final diff and documentation links. Verify retired surprise
 fields have no operative callers, both clients consume the final wire,
 and the annotations never become persisted edits. Handoff with what
-changed, test evidence and any remaining limitations. No commits unless
-separately requested.
+changed, test evidence and any remaining limitations. Commit incrementally,
+with each commit referring to the part of this plan that it implements.
