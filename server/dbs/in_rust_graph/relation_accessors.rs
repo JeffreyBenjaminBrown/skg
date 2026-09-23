@@ -164,8 +164,8 @@ impl RelationRole {
       . find ( |(name, _, _)| *name == s )
       . map ( |(_, role, _)| *role ) }
 
-  /// The birth/path glyph for this partner role (orange when emitted
-  /// as a birth). Panics for a role absent from PARTNER_ROLE_VOCAB.
+  /// The path glyph for this partner role. Birth styling is applied
+  /// by the clients. Panics for a role absent from PARTNER_ROLE_VOCAB.
   pub fn glyph (
     self,
   ) -> &'static str {

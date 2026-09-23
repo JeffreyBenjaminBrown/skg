@@ -267,14 +267,30 @@ So far there are these endpoints:
     in the grammar `elisp/skg-sexpr/skg-lens.el` interprets. Inside it,
     strings are always double-quoted and match atoms are bare symbols;
     the distinction is load-bearing for the lens engine.
-  - The table is defined in `server/heralds.rs`, the single home of the
-    herald vocabulary and its presentation (labels, colors, order). Emacs
-    fetches it once per connection (at `skg-client-init`), caches it for
-    the session, and re-fetches on reconnect. If the fetch fails, heralds
-    are disabled for the session; there is no client-side fallback table.
+  - The table in `server/heralds.rs` supplies non-relationship labels,
+    colors and placement. Both clients render the semantic `(rels ...)`
+    facts themselves, including fractions and per-character styles.
+    Emacs fetches the table at connection setup and re-fetches on reconnect.
+    If the fetch fails, its herald display disables after bounded retries;
+    there is no client-side fallback table. The user-facing legend is
+    [docs/heralds.org](docs/heralds.org).
   - A Rust unit test (`herald_rules_cover_the_emittable_vocabulary`)
     pins the table to the metadata vocabulary the server can emit, in
     both directions. It pins atom coverage only, not presentation.
+
+## Link statuses
+  - Request: `((request . "link statuses") (request-id . "TOKEN") (ids "ID" ...))`.
+    A client batches and deduplicates literal link target IDs in a view.
+  - Response: LP `((response-type link-statuses) (request-id "TOKEN")
+    (results (("ID" resolved "PID" "SOURCE-LABEL")
+              ("ID" inactive) ("ID" missing) ...)))`.
+    Results follow the requested IDs. `PID` is the resolved primary ID,
+    including resolution from an extra ID. `SOURCE-LABEL` is the visible
+    target's home-source herald label, not the link's relSource. Inactive
+    and missing rows return neither title nor source. The lookup reads the
+    published in-Rust graph snapshot and active source-set, independently
+    of Tantivy title-index commits. `request-id` associates asynchronous
+    responses with their requesting buffer and generation.
 
 ## Diff analysis
   - Request: `((request . "diff analysis") (include-staged . "BOOL") (include-unstaged . "BOOL"))`
@@ -658,10 +674,9 @@ the view regenerates it.
   `hider`, `hidden`, `subscriber`, `subscribee`). ROLENAME is one of the
   nine in `PARTNER_ROLE_VOCAB`
   (`server/dbs/in_rust_graph/relation_accessors.rs`). The graft's herald
-  is not a fixed glyph: it is the ancestor-lettered relationship token
-  the uniform-herald grammar assembles for that role (see "Stats
-  metadata" — e.g. an `overrider` graft reads `Oa`, an `overridden`
-  graft `aO`).
+  is not a fixed glyph: the clients render its semantic relation and
+  ancestor facts (see "Stats metadata" — e.g. an `overrider` graft reads
+  `Oa`, an `overridden` graft `aO`).
 
 ## View requests: (viewRequests ...)
 
@@ -704,43 +719,42 @@ node's heralds.
 
 ## Stats metadata: graphStats and viewStats
 
-Generated display facts decorate a `(node ...)` (never save intent;
-the client renders them as heralds via the rule table in
-`server/heralds.rs`; see "Herald rules"). Graph-wide counts and
-view-position relationship facts are emitted in one semantic `(rels ...)`
-form. It contains per-relation `in`/`out` facts and, when nonzero,
-`(aliases K)`, `(extraIds K)`, and `(properties K)`. `(birth RELNAME...)`
-records the relation(s) that explain why the node was drawn here.
+Generated display facts decorate a `(node ...)` and are never save intent.
+`server/herald_tokens.rs` assembles graph counts and occurrence facts into
+one semantic `(rels ...)` form. Clients render it; the wire contains no
+assembled glyphs, omitted numerals or colors. For example:
 
-The form is assembled in `server/herald_tokens.rs` from
-`GraphNodeStats` and `ViewNodeStats` (`server/types/viewnode.rs`).
-Clients render the relationship facts as blue tokens, the birth relation
-token in orange hugging the ☮, and the action counts as cyan `Ak`, `Ik`, and
-`Pk`. Thus `P3` means that the node has three true file properties; `P0` is
-omitted.
-Each graph relation contributes at most one token of the shape
-`[inNum][inLetters] X [outNum][outLetters]`:
+```text
+(rels
+  (contains (in 2 (ancestors 1))
+            (out 8 (ancestors 2) (unintegrated 3 (ancestors 2))))
+  (textlinksTo (in 5 (ancestors 1 2)
+                   (interesting 2 (ancestors 1)))
+               (out 3 (ancestors 2)))
+  (overrides (out 1 (ancestors 1)))
+  (aliases 2) (extraIds 1) (properties 3)
+  (birth overrides))
+```
 
-- `X` is the relation letter: `C` contains, `L` textlinks_to,
-  `H` hides_from_its_subscriptions, `S` subscribes,
-  `O` overrides_view_of.
-- the numbers are member counts on each side: the INBOUND (left) side
-  counts nodes on the far end that point at this node (its containers,
-  its overriders, ...); the OUTBOUND (right) side counts those this
-  node points to (its contents, the nodes it overrides, ...).
-- a lowercase letter flags a tracked ANCESTOR that is a member on that
-  side: `a` = visible org-parent, `b` = grandparent, ... (counting all
-  viewnodes, folder scaffolds included). So an ordinary content child
-  reads `aC` ("my parent contains me"); a containerward-ancestry graft
-  reads `...Ca` ("I contain my parent", e.g. `1C8a`); a node its parent
-  overrides reads `aO`, one that overrides its parent `Oa`. When a
-  side's count equals its number of ancestor letters, the count is
-  omitted (a lone parent-override is `Oa`, not `1Oa`).
-- the `L` token is special: its inbound side is the "surprising links"
-  digit form `a(b,c)` and never carries ancestor letters; its outbound
-  side is omitted except for the linkSource-birth graft (`La`).
+Each relation side is `(in COUNT (ancestors GEN...))` or
+`(out COUNT (ancestors GEN...))`. Empty sides are generally omitted;
+`COUNT` is the complete distinct visible node count even when ancestor
+flags let the client omit its numeral. Generation 1 is the visible parent,
+2 the grandparent, counting scaffold levels. Relation keys are `contains`,
+`textlinksTo`, `subscribes`, `overrides`, and `hides`. The `textlinksTo`
+incoming side adds `(interesting COUNT (ancestors GEN...))` for the subset
+whose source has a nonempty body, visible direct content, or more than one
+distinct visible resolved target. Its outgoing side counts distinct visible
+resolved targets. An applicable subscribee-as-such `contains` outgoing side
+adds `(unintegrated COUNT (ancestors GEN...))`, including when both counts
+are zero; absence of that subform means the role does not apply. The
+numerator counts members not already directly contained or hidden by that
+occurrence's subscriber. Subset counts cannot exceed their side's total.
+`(birth RELNAME...)` identifies the relation(s) behind this occurrence.
+Nonzero `(aliases K)`, `(extraIds K)` and `(properties K)` are action counts.
+See [docs/heralds.org](docs/heralds.org) for the rendered notation and styles.
 
-This replaces the retired per-atom scheme. There is no longer a
+There is no longer a
 `(graphStats ...)` sexp on an active node: its counts fold into the
 form above (`overriding`/`subscribing`/`hiding` become the `O`/`S`/
 `H` tokens; `aliasing`/`extraIDs`/true properties become the
@@ -786,6 +800,8 @@ under different parents):
   the request; a failed save leaves it in the buffer. Herald view presents the
   request as one red semantic state: `request:no search matching` for `true`,
   or `request:search matching` for `false`.
+- `(overridesHere N)` — pink `ĥ` immediately after the `O` token; the load-bearing
+  substitution marker, documented in the next subsection.
 
 ## Node file properties
 
@@ -797,8 +813,6 @@ lookup but marks every title/alias document with indexed, stored
 therefore blocks direct title, alias, body, regexp, operator, and
 field-qualified matches, but is not an access-control boundary and does not
 remove graph context.
-- `(overridesHere N)` — herald red "Oh"; the load-bearing
-  substitution marker, documented in the next subsection.
 
 ## Override substitution and the overridesHere marker
 
@@ -831,7 +845,7 @@ a node whose only overrider is invisible under the active source-set is
 "overridden but drawn raw" too, so its children draw raw as well.
 
 A substituted viewnode carries the keyed viewStats form
-`(overridesHere N)` -- herald red "Oh" -- naming the original it
+`(overridesHere N)` -- pink `ĥ` immediately after `O` -- naming the original it
 stands for. The marker is LOAD-BEARING at save: wherever it
 appears, extraction collects N rather than the carrying node's own
 ID, so a container's contains list round-trips to the original

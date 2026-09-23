@@ -1,6 +1,6 @@
-/// PURPOSE: The herald rule table -- the single source of truth for
-/// how the Emacs client displays '(skg ...)' metadata as short
-/// colored "herald" tokens.
+/// PURPOSE: The herald rule table for non-relationship '(skg ...)'
+/// metadata. Emacs and Neovim render semantic relationship facts and
+/// their per-character styles themselves.
 ///
 /// The DATA lives here; the code that USES the data (the lens
 /// engine, 'elisp/skg-sexpr/skg-lens.el') lives entirely in Emacs.
@@ -287,9 +287,8 @@ pub fn herald_rule_table () -> HeraldRule {
         // body -- one the rendering hides. ABUT so the B rides the ☮.
         leaf_abut (Green, "hiddenBody", "B"),
         // The relationship heralds are per-CHARACTER styled spans that
-        // the lens cannot color, so the server assembles them
-        // (herald_tokens.rs) as a (rels (COLOR "text") ...) payload and
-        // the CLIENT renders them. This rule only POSITIONS them: the
+        // the lens cannot color, so the server assembles semantic
+        // (rels ...) facts and the CLIENT renders them. This rule only POSITIONS them: the
         // ANY child makes it match the (rels ...) list form and consumes
         // the span sub-forms, and it emits the sentinel token, which the
         // client swaps for the rendered spans.
@@ -469,8 +468,8 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   atoms . extend ( ViewRequest::EMITTABLE_MATCH_ATOMS );
   atoms . into_iter () . collect () }
 
-/// GraphNodeStats emits NO match atoms now: its counts feed the
-/// assembled 'birthHerald'/'rels' strings (value position). The
+/// GraphNodeStats emits no match atoms: its counts feed semantic
+/// '(rels ...)' facts. The
 /// destructuring pattern is the exhaustiveness guard -- a new field
 /// fails to compile here until it is accounted for.
 fn graphstats_atoms () -> Vec<&'static str> {
@@ -486,8 +485,8 @@ fn graphstats_atoms () -> Vec<&'static str> {
   vec! [] }
 
 /// ViewNodeStats match atoms, from activeNode_metadata_to_string's
-/// view_stats (org_to_text.rs). The birth/rels herald strings are
-/// node-level atoms (in the base list above), not viewStats sub-forms.
+/// view_stats (org_to_text.rs). Birth and relationship facts are
+/// node-level '(rels ...)' data, not viewStats sub-forms.
 fn viewstats_atoms () -> Vec<&'static str> {
   use crate::types::viewnode::ViewNodeStats;
   fn guard ( v : ViewNodeStats ) {

@@ -171,7 +171,7 @@ instead, marked as standing in for the original:
 ```
 * mysticism                         (yours)
 ** common objects with mystical associations
-*** eggy mysticism      «Oh» (drawn in place of Egg Man's "mystical")
+*** eggy mysticism      «Oĥ» (drawn in place of Egg Man's "mystical")
 **** Which came first, the chicken or the egg?
 *** subscribeeFolder
 **** mystical           (the subscribee-as-such; empty so far)
@@ -191,7 +191,7 @@ his two new children — which you have not integrated — show up under the
 subscribee-as-such:
 
 ```
-*** eggy mysticism      «Oh»
+*** eggy mysticism      «Oĥ»
 **** Which came first, the chicken or the egg?
 *** subscribeeFolder
 **** mystical

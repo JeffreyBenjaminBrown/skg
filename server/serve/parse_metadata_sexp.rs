@@ -509,11 +509,9 @@ fn parse_node_sexp (
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
             metadata . source = Some ( SourceName::from (value) ); },
-          // The relationship / birth heralds are display-only strings
-          // (assembled in Rust, echoed by the rule table). Emacs strips
-          // them before save; if a stale buffer still carries them, we
-          // accept and discard -- the view regenerates them.
-          "rels" | "birthHerald" => {},
+          // Semantic relationship / birth facts are display-only.
+          // The client strips them before save; the view regenerates them.
+          "rels" => {},
           "viewStats" => {
             parse_viewstats_sexp ( &subitems[1..], &mut metadata . viewStats ) ?; },
           "editRequest" => {
@@ -559,7 +557,7 @@ fn parse_node_sexp (
           "writeProtected" =>
             metadata . writeProtected = true,
           "hiddenBody" =>
-            // Display-only (like rels/birthHerald): the view
+            // Display-only (like rels): the view
             // regenerates it, so accept and discard.
             {},
           "notInGit" =>
@@ -710,9 +708,8 @@ fn parse_deleted_sexp (
 
 /// Parse the (viewStats ...) s-expression contents: the bare-atom
 /// 'cycle' stat and the keyed 'overridesHere' / 'sourceHerald'
-/// sub-forms. (The relationship stats are now display-only herald
-/// strings, parsed -- and discarded -- as the 'rels'/'birthHerald'
-/// atoms instead.)
+/// sub-forms. Relationship stats are semantic display-only '(rels ...)'
+/// facts, parsed and discarded at node level instead.
 fn parse_viewstats_sexp (
   items : &[Sexp],
   stats : &mut ViewNodeStats

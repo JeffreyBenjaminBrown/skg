@@ -1,0 +1,127 @@
+#+title: Reading Skg heralds and link annotations
+
+* What a herald describes
+An Skg headline begins with metadata. In a view, heralds condense that
+metadata into short colored tokens. Toggle the compact display with
+'skg-view-heralds-mode' (=C-c v h=) in Emacs or ':SkgHeraldsToggle'
+(=<localleader>vh=) in Neovim. The expanded metadata is useful when you
+need to inspect the exact facts or requests.
+
+Relationship counts describe the latest rendered graph under the active
+source-set. They count distinct visible nodes, including visible
+relationship edges, and resolve extra IDs. They do not count repeated
+links or unsaved buffer edits as new graph facts. A folded body can still
+contribute links. A view's position can add ancestor flags and a birth
+style, so two occurrences of the same node can have different heralds.
+
+* Relationship tokens
+
+The order is =C L S O H A I P=. =C= means contains, =L= text links to,
+=S= subscribes to, =O= overrides the view of, and =H= hides from its
+subscriptions. A number before the letter counts nodes pointing at this
+node; a number after it counts nodes this node points at. =2C3= thus
+means two containers and three direct contents. =C= and =L= are blue;
+=S=, =O= and =H= are purple. Missing sides and empty relations are
+omitted. =A3= counts aliases, =I2= extra IDs, and =P1= true file
+properties; these action counts are cyan.
+
+An orange numeral inside =C= or =L= has a narrower meaning. In =2/5L3=,
+five visible nodes link here, two are interesting, and this node links
+to three distinct visible targets. A linking source is interesting if
+it has nonempty body text, visible direct content, or links to more
+than one distinct visible target. Whitespace-only bodies, repeated
+links and alternate IDs for the same target do not add to that count.
+The numerator can be zero (=5L3=), equal the total (=5/L3=), or the
+only populated side (=L3=). =5L= has no resolved outgoing target;
+there is no =L= token when both sides are empty. A self-link counts
+when visible.
+
+On a subscribee shown under a subscriber, outgoing =C= has a similar
+fraction. =C2/8= means it has eight visible direct contents, two of
+which the subscriber has neither directly included nor hidden. =C8=
+means none remains unintegrated; =C8/= means all eight do. This count
+belongs to that occurrence: another subscriber can give the same
+subscribee a different numerator. Outside that role, =C= uses ordinary
+counts. The incoming side can combine with it, as in =2C3/8=.
+
+The slash is kept when a nonzero numerator equals its total; its
+denominator is then omitted. The slash never means zero divided by
+zero. Orange also marks displayed =O= counts, even a count of one.
+The =O= letter keeps its usual purple or birth style.
+
+* Ancestors and birth
+
+Lowercase flags name tracked ancestors: =a= is the visible parent,
+=b= the grandparent, and so on, counting folder scaffolds too. After
+=z=, a generation appears as ={27}=, ={28}=, etc. An =a= is muted
+yellow; =b= and higher are brighter yellow. =aC= says the parent
+contains this node; =Ca= says this node contains its parent. =Oa=
+and =aO= distinguish the direction of an override edge.
+
+A flag replaces a numeral when it fully explains a side. With
+fractions, an ancestor appears once: before the slash if it belongs
+to the numerator, otherwise after the denominator's numeral. =a/5L=
+means the parent is the sole interesting source among five; =1/5aL=
+means one other source is interesting and the parent is not. =a/L=
+means the parent is the sole incoming source and is interesting;
+=aL= means the sole parent source is uninteresting. =La= means the
+sole outgoing target is the parent; =L3a= counts three targets,
+including the parent. If distinct ancestors =a= and =b= are the only
+inbound sources, and only =a= is interesting, =a/bL= expresses one
+interesting source out of two. The denominator still includes =a=;
+its numeral is omitted because both ancestors account for the total.
+
+A black-on-white relationship token identifies the relation that put
+this occurrence here. Ordinary =O= facts merely report an edge;
+a birth-styled =O= explains this placement. An occurrence can have
+more than one birth relation. Immediately after =O=, a pink =ĥ=
+(precomposed h with circumflex) means this occurrence substitutes
+for an overridden node. =2Oĥ3= is an example. It comes from the
+load-bearing 'overridesHere' marker; an override folder or path
+occurrence without that marker has no =ĥ=. The eighth ancestor is
+plain yellow =h=, so =Oĥh= shows the two different markers together.
+The marker preserves the original membership ID when a substituted
+view is saved. See [[file:override.org][override behavior]].
+
+* Other heralds
+
+Green =⌂:LABEL= marks a node's home-source boundary. A red =~NAME=
+immediately before it reports a relationship stored at a more private
+relSource than its default. A red =request:~NAME= is an explicit
+pending request to change that relationship source on save. The
+home source belongs to the node; relSource belongs to an edge. Green
+folder and property labels, =ID= and =alias= describe their respective
+view positions. =req:folder:...=, =req:path:...=,
+=req:properties= and =req:definitive= request a view. Red =delete=,
+=merge:...=, and =request:no search matching= or
+=request:search matching= are save requests.
+
+=☮= marks a write-protected position, with =B= attached when its body
+exists but is hidden. Orange =⊥= means a displayed child does not
+affect its parent's membership on save. Blue =⟳= marks a cycle.
+An unknown node is labeled =Reference to unknown node.= in the
+interesting orange style; an inactive source yields an anonymous
+=node from inactive source= marker. Inactive placeholders reveal no
+node title or source. Red =DELETED= marks a deletion in a diff or
+edit, while =diff:not-in-git= marks a node without a Git counterpart.
+=staged:= and =unstaged:= prefixes report Git changes; =X= and =-X=
+mark existence changes, =M= and =-M= membership changes, and
+=text changed= reports text changes. These are view facts unless
+specifically identified above as requests.
+
+* Link annotations
+
+The current buffer can display a suffix after each literal
+='[[id:ID][LABEL]]'= link with the target's home-source abbreviation.
+Use 'skg-toggle-source-overlay-on-links' (=C-c v L=) in Emacs or
+':SkgToggleSourceOverlayOnLinks' (=<localleader>vL=) in Neovim.
+Suffixes start off and the toggle is local to the buffer. A resolved
+target appears in green, for example =[⌂:pub]=. Extra IDs resolve
+to their target's home source. =⌂:missing=, =⌂:inactive=,
+=⌂:…= and =⌂:unavailable= distinguish missing, inactive, pending
+and lookup-error states. The latter states reveal no source name.
+
+Even with suffixes off, the label of a link confirmed missing in the
+current graph is pink and underlined. Inactive or still unknown
+targets are not marked broken. These display-only annotations do not
+change link text, save contents, or exact-ID navigation.

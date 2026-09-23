@@ -30,7 +30,7 @@ local function search_root_line (buf)
 end
 
 ---Assert BUF's leaf-b search-root line exists and carries none of the
----special-origin birthHeralds (false / content / linksToParent):
+---special-origin birth facts (false / content / linksToParent):
 ---a plain search result should just be a content-type root.
 ---@param buf integer
 ---@param phase string for failure messages

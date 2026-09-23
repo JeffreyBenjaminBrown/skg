@@ -140,7 +140,7 @@ impl NodeComplete {
 /// Normalize a node body: drop leading and trailing whitespace-only
 /// lines (a line is whitespace-only iff it trims to empty); if nothing
 /// remains, the body becomes 'None'. After this, "bodyless" is exactly
-/// 'body == None' -- the invariant the surprising-links =bodyless= test
+/// 'body == None' -- the invariant the link-interestingness predicate
 /// relies on. Idempotent; enforced at every disk write ('NodeFS::from')
 /// and on the in-memory save NodeComplete ('into_nodecomplete'), with a
 /// one-time migration ('data/bash/trim-node-bodies.org') for old data.

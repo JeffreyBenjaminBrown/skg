@@ -359,7 +359,7 @@ pub struct ViewNodeStats {
   /// order). See TODO/heralds-semantic-wire.org.
   pub rel_heralds           : Option<String>,
   /// Some(N) means this viewnode was drawn here in place of N,
-  /// which it (transitively) overrides. Herald red "Oh".
+  /// which it (transitively) overrides. Herald pink "ĥ" after "O".
   /// LOAD-BEARING, unlike the other view stats: save extraction
   /// collects N (not this node's own ID) into the parent's lists
   /// wherever this marker appears, so a substituted child

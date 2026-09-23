@@ -66,9 +66,8 @@ fn add_definitive_view_request_to_subscribees (
     . map(|line| {
       if line . contains ("subscribee-") && line . contains ("writeProtected") {
         // Insert viewRequests right after the `write-protected' marker. In the
-        // uniform-herald format `write-protected' may be followed by `)' (no more
-        // atoms) or by another atom group such as `(birthHerald ...)',
-        // `(rels ...)', or `(viewStats ...)'.
+        // semantic-herald format `writeProtected' may be followed by `)'
+        // (no more atoms) or by `(rels ...)' or `(viewStats ...)'.
         if line . contains ("writeProtected)") {
           line . replace (
             "writeProtected)", "writeProtected (viewRequests definitiveView))")

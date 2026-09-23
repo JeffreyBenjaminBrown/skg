@@ -35,6 +35,7 @@ are in (my public knowledge) .skg graph,
 * [[./docs/setup.org][How to set up Skg]]
   This includes how to import data from org-roam.
 * [[./docs/COMMANDS.org][Commands available in Skg]]
+* [[./docs/heralds.org][How to read heralds and link annotations]]
 * [[./docs/data-model_friendly.org][The Skg data model]]
   A conceptual introduction; see also the [[./docs/data-model_technical.org][technical reference]].
 * to understand the code

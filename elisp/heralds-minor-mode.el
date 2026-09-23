@@ -25,9 +25,9 @@
 (defvar heralds--transform-rules nil
   "Rules for lensing `(skg ...)` metadata into a line of herald tokens.
 
-The table itself LIVES IN RUST (`server/heralds.rs`), the single
-source of truth for every visual decision in the herald display:
-match atoms, labels, colors, presentation order. Emacs fetches it
+The table itself LIVES IN RUST (`server/heralds.rs`) and supplies
+non-relationship match atoms, labels, colors, and placement. This
+client renders semantic relationship facts and their styles. Emacs fetches it
 over the \"herald rules\" endpoint at connect time
 (`skg-request-herald-rules', called by `skg-client-init') and caches
 it here; re-running `skg-client-init' re-fetches it. (A lazy
@@ -50,10 +50,9 @@ directives, ANY/IT, ABUT, and INTERC are documented there. The rule
 patterns the table uses are documented on `herald_rule_table` in
 server/heralds.rs.
 
-No client-side normalisation is needed: the ordinary-content herald is
-the orange birth herald the server assembles, `(node ... (birthHerald
-\"aC\") ..)', so omitted affectsParent=true content carries no affectsParent
-herald of its own.")
+No client-side normalisation is needed: omitted affectsParent=true
+content carries no affectsParent herald of its own. Its relationship
+and birth facts arrive in `(rels ...)'.")
 
 (defun heralds-install-rules (rules)
   "Install RULES (a list whose car is `skg') as the herald rule table.
@@ -159,8 +158,8 @@ rule table after repeated attempts.")
   "Display skg metadata as a short list of \"herald\" markers.
 Each org headline the server sends starts with `(skg ...)` metadata.
 This mode lenses that tree via `skg-transform-sexp-flat`, producing
-coloured tokens that summarise view and code information. Every
-piece of display logic lives in `heralds--transform-rules'."
+coloured tokens that summarise view and code information. The served
+rules place non-relationship tokens; this client renders `(rels ...)'."
   :lighter " ⟪Y⟫"
   (if heralds-minor-mode
       (if (not (heralds--ensure-rules))
@@ -467,10 +466,9 @@ A/I/P cyan. Tokens are ordered C L S O H A I P and space-separated."
 
 (defun heralds--read-metadata (metadata-sexp)
   "Read METADATA-SEXP string into a Lisp object.
-Returns nil if parsing fails. The ordinary-content herald is now the
-orange birth herald the server assembles (an (skg (node ... (birthHerald
-\"aC\") ..)) form), so no client-side normalisation is needed: omitted
-'true' membership simply has no affectsParent herald of its own."
+Returns nil if parsing fails. Omitted affectsParent=true membership
+has no affectsParent herald of its own; relationship and birth facts
+are rendered from `(rels ...)'."
   (condition-case nil
       (car (read-from-string metadata-sexp))
     (error nil)))

@@ -535,6 +535,11 @@ This toggles whether, at the start of every node,
 metadata is shown in its full plain-text glory,
 or is instead summarized via brief 'heralds'.
 It is turned on at every view by default.
+See [[file:heralds.org][the herald legend]] for the tokens and colors.
+*** <localleader>vL : :SkgToggleSourceOverlayOnLinks
+Toggle display-only home-source suffixes on Skg links in this buffer.
+The suffixes start off. Links confirmed missing are pink and underlined
+even with suffixes off. See [[file:heralds.org::*Link annotations][link annotations]].
 *** <localleader>vl : :SkgLimitSourceSet
 Limits display and search to one configured source-set for this
 Neovim connection.

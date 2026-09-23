@@ -36,7 +36,7 @@ When you clone a foreign node, the clone `overrides_view_of` the original. The c
 
 Substitution is careful in four ways:
 
-- **It round-trips to the original on save.** The drawn overrider carries a hidden marker (`overridesHere`, herald "Oh") naming the node it stands for. When you save the container, Skg records the *original*'s ID in the container's content list, not the overrider's, so drawing your version never silently rewrites someone's contains list.
+- **It round-trips to the original on save.** The drawn overrider carries an `overridesHere` marker (shown as pink `ĥ` after `O`; see [the herald legend](heralds.org)) naming the node it stands for. When you save the container, Skg records the *original*'s ID in the container's content list, not the overrider's, so drawing your version never silently rewrites someone's contains list.
 - **It is one level deep.** A node that is itself drawn raw — a member of a folder, a view root, or an *overridden-as-such* (an overridden node shown deliberately, e.g. under an `overriddenFolder`) — shows its own children raw. You are looking at the original there, so its children are the original's. Substitution resumes one level further down.
 - **Foreign override edges never substitute.** If someone else's node overrides one of yours, that is a display-only fact (it can earn an herald), but it does not change what you see. Only your own overrides substitute (those from sources under your `owned` folder; see `docs/telescopes.md`, "Ownership and folders").
 - **Visibility gates substitution.** An overrider whose source is inactive under the current source-set cannot be drawn, so it does not substitute; the original is drawn instead. Switching source-sets can therefore change which node a view draws.

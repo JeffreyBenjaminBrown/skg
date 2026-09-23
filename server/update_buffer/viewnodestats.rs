@@ -101,7 +101,7 @@ enum ParentKind {
   Other,
 }
 
-/// Compute and store the orange birth herald and blue rels herald for
+/// Compute and store semantic relationship and birth facts for
 /// the active vognode at treeid.
 fn set_herald_strings_in_viewnode (
   tree                  : &mut Tree<ViewNode>,
@@ -266,8 +266,8 @@ fn flag_ancestor_relations (
       RelationRole::new (rel, BinaryRolePosition::Second), active ) {
       flags . record (rel, false, generation); } } }
 
-/// The birth relation(s) -- which relation token(s) lead in orange,
-/// and in what order. Usually a singleton; a HiddenInSubscribee member
+/// The birth relation(s) -- which relation token(s) explain this
+/// occurrence. Usually a singleton; a HiddenInSubscribee member
 /// is [Hides, Contains].
 fn birth_relations (
   parent_kind : &ParentKind,
