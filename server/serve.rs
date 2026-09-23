@@ -35,6 +35,7 @@ use crate::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_
 use crate::serve::handlers::text_search::render_enriched_search_buffer::{insert_containerward_ancestries_into_search_view, insert_overrideward_view_subtrees};
 use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
 use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request_with_source_set;
+use crate::serve::handlers::link_statuses::handle_link_statuses_request;
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
 use crate::to_org::util::mark_view_roots_parent_na;
@@ -202,6 +203,10 @@ fn handle_emacs (
               views_state . diff_mode_enabled,
               &active_source_set,
               &runtime . graph ),
+          Ok (RequestType::LinkStatuses) =>
+            handle_link_statuses_request (
+              &mut stream, &request_header, &runtime . graph,
+              &runtime . config, &active_source_set ),
           Ok (RequestType::DiffAnalysis) =>
             handle_diff_analysis_request_with_source_set (
               &mut stream, &request_header, &runtime . config,

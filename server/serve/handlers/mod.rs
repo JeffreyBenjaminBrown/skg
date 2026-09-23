@@ -18,3 +18,4 @@ pub mod strip_body_whitespace;
 pub mod telescope_hoist;
 pub mod text_search;
 pub mod titles_by_ids;
+pub mod link_statuses;
