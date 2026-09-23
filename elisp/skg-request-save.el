@@ -894,7 +894,9 @@ moves point to focused headline, and removes focus marker."
       (skg-remove-folded-markers))
     (skg--restore-save-point-position save-point-position)
     (set-buffer-modified-p nil)
-    (skg--capture-clean-baseline))
+    (skg--capture-clean-baseline)
+    (when (fboundp 'skg-link-annotations-refresh)
+      (skg-link-annotations-refresh)))
   (message "Buffer updated with processed content from Rust"))
 
 (defun skg--restore-save-point-position (save-point-position)

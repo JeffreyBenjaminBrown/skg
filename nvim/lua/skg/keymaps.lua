@@ -112,6 +112,9 @@ M.commands = {
                    desc = 'Open a fresh root node in a chosen source' },
   HeraldsToggle = { module = 'skg.heralds', fn = 'toggle',
                     desc = 'Toggle herald display of metadata', pass_buf = true },
+  ToggleSourceOverlayOnLinks = {
+    module = 'skg.link_annotations', fn = 'toggle_source_overlay',
+    desc = 'Toggle source suffixes on Skg links', pass_buf = true },
   LimitSourceSet = { module = 'skg.source_sets', fn = 'set_active_source_set',
                      desc = 'Limit display and search to one source-set' },
   ViewMetadata = { module = 'skg.metadata_edit', fn = 'edit_metadata',
@@ -247,6 +250,7 @@ M.content_view_bindings = {
   { 've', 'ViewNewEmpty' },              -- C-c v e
   { 'vh', 'HeraldsToggle' },             -- C-c v h
   { 'vl', 'LimitSourceSet' },            -- C-c v l
+  { 'vL', 'ToggleSourceOverlayOnLinks' }, -- C-c v L
   { 'vm', 'ViewMetadata' },              -- C-c v m
   { 'vo', 'ViewOrgAncestry' },           -- C-c v o
   { 'vr', 'ReadableIdsToggle' },         -- C-c v r

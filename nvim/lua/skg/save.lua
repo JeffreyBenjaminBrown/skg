@@ -434,6 +434,7 @@ function M.replace_buffer_with_new_content (buf, new_content,
   end
   vim.bo[buf].modified = false
   buffer.capture_clean_baseline(buf)
+  require('skg.link_annotations').refresh(buf)
   vim.notify('Buffer updated with processed content from Rust')
 end
 

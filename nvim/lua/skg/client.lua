@@ -60,6 +60,8 @@ function M.connect ()
     else
       vim.schedule(function () M.handle_rust_response(chunk) end) end
   end)
+  local annotations = package.loaded['skg.link_annotations']
+  if annotations then annotations.connection_changed() end
   return state.tcp
 end
 

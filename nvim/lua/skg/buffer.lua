@@ -181,6 +181,7 @@ function M.configure_view_buffer (buf, uri)
   vim.bo[buf].indentexpr = ''
   vim.bo[buf].autoindent = false
   heralds.enable(buf)
+  require('skg.link_annotations').enable(buf)
   require('skg.keymaps').attach_content_view(buf)
   do -- The skg fold model, on every window that shows this buffer.
     local folds = require('skg.folds')

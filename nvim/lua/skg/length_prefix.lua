@@ -63,6 +63,14 @@ function M.dispatch_by_type (payload)
               response_type)
       return end
     entry.handler(payload, response)
+    if response_type == 'save-result'
+       or response_type == 'rerender-done'
+       or response_type == 'active-source-set'
+       or response_type == 'delete-references-result'
+       or response_type == 'rebuild-ephemeral-data-stores' then
+      local annotations = package.loaded['skg.link_annotations']
+      if annotations then annotations.invalidate_all() end
+    end
     if entry.one_shot then
       state.response_handler_map[response_type] = nil
       state.lp_pending_count =

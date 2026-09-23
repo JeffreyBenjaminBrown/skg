@@ -50,6 +50,12 @@ function M.reload ()
       pcall(herald_rules.install_rules, captured_herald_rules) end
   end
   if not reload_succeeded then error(reload_error) end
+  local annotations = require('skg.link_annotations')
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_valid(buf)
+       and vim.b[buf].skg_link_annotations_enabled == true then
+      annotations.enable(buf) end
+  end
   vim.notify('skg: all modules reloaded')
 end
 

@@ -108,6 +108,7 @@ rather than via `unload-feature'."
             skg-state
             skg-test-utils
             skg-readable-ids
+            skg-link-annotations
             skg-file-minor-mode
             skg-git-add
             skg-view-org-ancestry

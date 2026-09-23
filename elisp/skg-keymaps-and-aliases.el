@@ -156,6 +156,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c v e") #'skg-view-new-empty)
     (define-key map (kbd "C-c v h") #'skg-view-heralds-mode)
     (define-key map (kbd "C-c v l") #'skg-limit-source-set)
+    (define-key map (kbd "C-c v L") #'skg-toggle-source-overlay-on-links)
     (define-key map (kbd "C-c v m") #'skg-view-metadata)
     (define-key map (kbd "C-c v o") #'skg-view-org-ancestry)
     (define-key map (kbd "C-c v r") #'skg-readable-ids-mode)

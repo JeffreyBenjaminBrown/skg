@@ -5,6 +5,7 @@
 (require 'cl-lib)
 
 (require 'heralds-minor-mode)
+(require 'skg-link-annotations)
 (require 'skg-config)
 (require 'skg-length-prefix)
 (require 'skg-lock-buffers)
@@ -97,7 +98,8 @@
      ;; What sentinels do: When Emacs detects that a process changes state — it exits, is killed, the TCP connection closes (maybe abnormally), etc. — Emacs calls that process's sentinel function with the process and a string describing the event (e.g. "deleted\n", "connection broken by remote peer\n").
      ;; What this sentinel does: If the server crashes or the connection drops mid-save, skg--tcp-sentinel fires and unlocks all save-locked buffers. Without it, a server crash would leave buffers permanently locked.
      skg-rust-tcp-proc
-     #'skg--tcp-sentinel) )
+     #'skg--tcp-sentinel)
+    (skg-link-annotations-invalidate-all) )
   skg-rust-tcp-proc)
 
 (defun skg--server-unavailable-message (err)
@@ -144,6 +146,7 @@ or rerender-view) from lingering after a server crash."
   (when (not (string-prefix-p "open" event))
     (skg--end-stream)
     (skg--unlock-all-save-locked)
+    (skg-link-annotations-connection-reset)
     (setq skg-response-handler-map nil
           skg-lp--pending-count     0)) )
 

@@ -4,6 +4,7 @@
 (require 'cl-lib)
 (require 'subr-x)
 (require 'heralds-minor-mode)
+(require 'skg-link-annotations)
 (require 'skg-sexpr-search)
 (require 'skg-keymaps-and-aliases)
 
@@ -179,7 +180,8 @@ otherwise generate a new UUID."
         (erase-buffer)
         (insert org-text)
         (skg-content-view-mode)
-        (heralds-minor-mode))
+        (heralds-minor-mode)
+        (skg-link-annotations-mode 1))
       (setq skg-view-uri uri)
       (setq skg-contentView-initialRoot-source source)
       (add-hook 'kill-buffer-hook #'skg-send-close-view nil t)
