@@ -71,16 +71,16 @@ LINE-NUMBER is zero-based."
 
   (let ((expected-line0
          (concat "* (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 2))))) 1\n"
-                 "** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1)) (birth contains)))) 11\n"
+                 "** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1 (interesting 0))) (birth contains)))) 11\n"
                  "** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 12\n"))
         (expected-line2
          (concat "* (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 2))))) 1\n"
-                 "** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1)) (birth contains)))) 11\n"
+                 "** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1 (interesting 0))) (birth contains)))) 11\n"
                  "** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 12\n"))
         (expected-changed
          (concat "* (skg (node (id 1) (source main) (affectsParent na) (rels (contains (out 2))))) 1\n"
-                 "** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1)) (birth contains)))) 11\n"
-                 "*** (skg (node (id l-11) (source main) (affectsParent false) writeProtected (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo)))) [[id:11][a link to 11]]\n"
+                 "** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1 (interesting 0))) (birth contains)))) 11\n"
+                 "*** (skg (node (id l-11) (source main) (affectsParent false) writeProtected (rels (textlinksTo (out 1 (ancestors 1))) (birth textlinksTo)))) [[id:11][a link to 11]]\n"
                  "** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 12\n"))
         (expected-no-link (concat "* 1\n** 11\n** 12\n"))
         (expected-with-link (concat "* 1\n** 11\n*** [[id:11][a link to 11]]\n** 12\n")))
