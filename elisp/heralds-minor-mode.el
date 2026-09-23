@@ -347,7 +347,7 @@ return (COUNT . GENS) for SIDE (`in' or `out'), or nil if na."
   "COUNT then ancestor letters, as a propertized string. Omit the count
 when it equals the number of ancestors (>=1). BASE-FACE colors the
 count, unless MULTI (the contains inbound side) and count > 1, which is
-orange. Ancestor letters are always yellow."
+orange. The parent flag is muted; higher ancestors are bright yellow."
   (let* ((gens (heralds--gen-list (or gens '())))
          (n (length gens))
          (out ""))
@@ -432,7 +432,8 @@ orange. Ancestor letters are always yellow."
   "Render the semantic `(rels ...)' payload in SEXP to one propertized
 string, or nil if there is none / it produces nothing. Coloring: group
 base (C/L blue, S/O/H purple), the reason-for-being token black-on-white,
-ancestor letters black-on-yellow, the contains inbound count>1 orange,
+ancestor a muted and higher ancestors black-on-yellow, the contains
+inbound count>1 orange,
 A/I/P cyan. Tokens are ordered C L S O H A I P and space-separated."
   (let ((rels (heralds--find-rels sexp)))
     (when rels
@@ -494,7 +495,7 @@ are rendered from `(rels ...)'."
 
 (defface heralds-yellow-face
   '((t :foreground "black" :background "yellow"))
-  "Black-on-yellow for the ancestor-flag letters (a/b/c...) inside the
+  "Black-on-yellow for ancestor flags b and higher inside the
 relationship-herald spans -- the letters that mark a tracked ancestor as
 a member on that side.")
 

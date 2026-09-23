@@ -96,6 +96,9 @@ mod tests {
   use crate::source_sets::SourceSetName;
   use crate::types::misc::SourceName;
   use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
+  use crate::dbs::in_rust_graph::InRustGraphHandle;
+  use arc_swap::ArcSwap;
+  use std::sync::Arc;
 
   #[test]
   fn statuses_use_the_published_graph_and_hide_inactive_sources () {
@@ -133,5 +136,35 @@ mod tests {
     assert! (response . contains ("(\"private\" inactive)"));
     assert! (response . contains ("(\"unknown\" missing)"));
     assert! (! response . contains ("Private title"));
+  }
+
+  #[test]
+  fn a_newly_published_graph_answers_before_any_title_index_update () {
+    let config : SkgConfig = load_config (
+      "tests/source_sets/fixtures/skgconfig.toml") . unwrap ();
+    let active : ActiveSourceSet = ActiveSourceSet::named (
+      &config, SourceSetName::from ("public")) . unwrap ();
+    let handle : InRustGraphHandle = Arc::new (ArcSwap::from_pointee (
+      InRustGraph::new ()));
+    let requested : Vec<ID> = vec![ID::from ("old-new")];
+    assert_eq! (classify_link_ids (
+      &handle . load_full (), &config, &active, &requested),
+      vec![(ID::from ("old-new"), LinkStatus::Missing)]);
+
+    let published : InRustGraph = InRustGraph::from_nodecompletes (&[
+      NodeComplete {
+        pid : ID::from ("new"),
+        extra_ids : requested . clone (),
+        source : SourceName::from ("public"),
+        .. empty_node_complete () } ]);
+    handle . store (Arc::new (published));
+    let result = classify_link_ids (
+      &handle . load_full (), &config, &active, &requested);
+    assert_eq! (result, vec![(ID::from ("old-new"),
+      LinkStatus::Resolved {
+        pid : ID::from ("new"),
+        source_label : config . sources
+          [&SourceName::from ("public")] . herald_label () . to_string (),
+      })]);
   }
 }

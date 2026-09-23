@@ -87,9 +87,29 @@ describe('skg.link_annotations', function ()
     assert.same({ 'resolved', 'node', 'main' }, annotations.cache.node)
     assert.is_nil(annotations.requests.old)
     assert.is_nil(annotations.requests.right)
+    annotations.requests.old_source_set = {
+      buf = second,
+      generation = vim.b[second].skg_link_annotations_generation,
+      tick = vim.api.nvim_buf_get_changedtick(second),
+      epoch = 20, ids = { 'node' } }
+    annotations.epoch = 21
+    annotations.handle_response(sexpr.read(
+      '((request-id "old_source_set") (results (("node" missing))))'))
+    assert.same({ 'resolved', 'node', 'main' }, annotations.cache.node)
+    annotations.requests.dead_buffer = {
+      buf = first, generation = 1, tick = 1, epoch = 21,
+      ids = { 'node' } }
+    vim.api.nvim_buf_delete(first, { force = true })
+    annotations.handle_response(sexpr.read(
+      '((request-id "dead_buffer") (results (("node" missing))))'))
+    assert.same({ 'resolved', 'node', 'main' }, annotations.cache.node)
+    annotations.requests.old_connection = {
+      buf = second, generation = 1, tick = 1, epoch = 21,
+      ids = { 'node' } }
+    annotations.connection_reset()
+    assert.is_nil(annotations.requests.old_connection)
     annotations.disable(first)
     annotations.disable(second)
-    vim.api.nvim_buf_delete(first, { force = true })
     vim.api.nvim_buf_delete(second, { force = true })
   end)
 end)

@@ -90,8 +90,10 @@ immediately before it reports a relationship stored at a more private
 relSource than its default. A red =request:~NAME= is an explicit
 pending request to change that relationship source on save. The
 home source belongs to the node; relSource belongs to an edge. Green
-folder and property labels, =ID= and =alias= describe their respective
-view positions. =req:folder:...=, =req:path:...=,
+folder labels, =ID= and =alias= describe their respective view
+positions. The properties view spells out =☮ had ID before org-roam
+import=, =☮ was overloaded during org-roam import=, and
+=☮ no search matching= when true. =req:folder:...=, =req:path:...=,
 =req:properties= and =req:definitive= request a view. Red =delete=,
 =merge:...=, and =request:no search matching= or
 =request:search matching= are save requests.

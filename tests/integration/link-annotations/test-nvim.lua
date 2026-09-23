@@ -40,6 +40,18 @@ T.check(buffer.text(buf) == view_text and not vim.bo[buf].modified,
         'initial annotations leave buffer text and modified state alone')
 T.check(vim.b[buf].skg_link_source_suffix ~= true,
         'source suffix starts off')
+local source_sets = require('skg.source_sets')
+local state = require('skg.state')
+source_sets.set_active_source_set('all')
+T.check(T.wait_for(function ()
+  return status('private-node', 'resolved')
+         and state.lp_pending_count == 0 end, 10),
+  'widening the source-set refreshes a link target without a headline')
+source_sets.set_active_source_set('public')
+T.check(T.wait_for(function ()
+  return status('private-node', 'inactive')
+         and state.lp_pending_count == 0 end, 10),
+  'narrowing the source-set hides its source again')
 annotations.toggle_source_overlay(buf)
 T.check(suffix('⌂:PUB') and suffix('⌂:missing')
         and suffix('⌂:inactive') and not suffix('PRIV'),

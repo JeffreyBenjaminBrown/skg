@@ -86,6 +86,28 @@
                          (equal (substring-no-properties
                                  (or (overlay-get overlay 'after-string) ""))
                                 " [⌂:main]"))
-                       (overlays-in (point-min) (point-max)))))))
+                       (overlays-in (point-min) (point-max))))))
+          (with-current-buffer second
+            (puthash "old-source-set"
+                     (list second skg-link-annotations--generation
+                           (buffer-chars-modified-tick) 20 '("node"))
+                     skg-link-annotations--requests))
+          (setq skg-link-annotations--epoch 21)
+          (skg-link-annotations--handle-response
+           nil "((request-id \"old-source-set\") (results ((\"node\" missing))))")
+          (should (equal (gethash "node" skg-link-annotations--cache)
+                         '(resolved "node" "main")))
+          (puthash "dead-buffer" (list first 1 1 21 '("node"))
+                   skg-link-annotations--requests)
+          (kill-buffer first)
+          (skg-link-annotations--handle-response
+           nil "((request-id \"dead-buffer\") (results ((\"node\" missing))))")
+          (should (equal (gethash "node" skg-link-annotations--cache)
+                         '(resolved "node" "main")))
+          (puthash "old-connection" (list second 1 1 21 '("node"))
+                   skg-link-annotations--requests)
+          (skg-link-annotations-connection-reset)
+          (should-not (gethash "old-connection"
+                               skg-link-annotations--requests)))
       (kill-buffer first)
       (kill-buffer second))))

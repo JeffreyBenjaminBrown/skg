@@ -276,7 +276,7 @@ end
 
 ---Chunks for one side: the count then ancestor letters. Omits the count
 ---when it equals the number of ancestors (>=1). MULTI (contains inbound)
----makes a count > 1 orange; ancestor letters are yellow.
+---makes a count > 1 orange; parent a is muted, higher ancestors yellow.
 local function side_chunks (count, gens, base_hl, multi)
   gens = distinct_gens(gens)
   local n = #gens
@@ -371,7 +371,8 @@ end
 ---Render the semantic (rels ...) payload in SEXP to virtual-text chunks,
 ---or nil if there is none / it produces nothing. Coloring: group base
 ---(C/L blue, S/O/H purple), the reason-for-being token black-on-white,
----ancestor letters black-on-yellow, the contains inbound count>1 orange,
+---ancestor a muted and higher ancestors black-on-yellow, contains
+---inbound count>1 orange,
 ---A/I/P cyan. Tokens ordered C L S O H A I P, space-separated.
 ---@param sexp any
 ---@return table[]|nil

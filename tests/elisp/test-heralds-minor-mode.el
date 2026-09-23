@@ -14,9 +14,16 @@
                   ("(textlinksTo (in 5 (interesting 5)))" . "5/L")
                   ("(textlinksTo (in 1 (ancestors 1) (interesting 1 (ancestors 1))))" . "a/L")
                   ("(textlinksTo (in 2 (ancestors 1 2) (interesting 1 (ancestors 1))))" . "a/bL")
+                  ("(textlinksTo (in 5 (ancestors 1) (interesting 1 (ancestors 1))))" . "a/5L")
+                  ("(textlinksTo (in 5 (ancestors 1) (interesting 1)))" . "1/5aL")
+                  ("(textlinksTo (in 1 (ancestors 1) (interesting 0)))" . "aL")
+                  ("(textlinksTo (out 1 (ancestors 1)))" . "La")
+                  ("(textlinksTo (out 3 (ancestors 1)))" . "L3a")
+                  ("(textlinksTo (in 1 (ancestors 27) (interesting 1 (ancestors 27))))" . "{27}/L")
                   ("(contains (in 2) (out 8 (unintegrated 2)))" . "2C2/8")
                   ("(contains (out 8 (unintegrated 0)))" . "C8")
-                  ("(contains (out 8 (unintegrated 8)))" . "C8/")))
+                  ("(contains (out 8 (unintegrated 8)))" . "C8/")
+                  ("(contains (in 2) (out 0 (unintegrated 0)))" . "2C")))
     (let ((display (heralds-from-metadata
                     (format "(skg (node (id x) (rels %s)))" (car case)))))
       (should (equal (substring-no-properties display) (cdr case)))))
@@ -27,7 +34,20 @@
     (should (eq (get-text-property 1 'face display)
                 'heralds-confusable-face))
     (should (eq (get-text-property 2 'face display)
-                'heralds-yellow-face))))
+                'heralds-yellow-face)))
+  (let ((display (heralds-from-metadata
+                  "(skg (node (id x) (rels (textlinksTo (in 5 (interesting 2)) (out 3)) (overrides (out 1)) (birth overrides))))")))
+    (should (equal (substring-no-properties display) "2/5L3 O1"))
+    (should (eq (get-text-property 0 'face display) 'heralds-interesting-face))
+    (dolist (i '(1 2 3 4))
+      (should (eq (get-text-property i 'face display) 'heralds-blue-face)))
+    (should (eq (get-text-property 6 'face display) 'heralds-birth-face))
+    (should (eq (get-text-property 7 'face display) 'heralds-interesting-face)))
+  (let ((display (heralds-from-metadata
+                  "(skg (node (id x) (rels (textlinksTo (in 2 (ancestors 1 2) (interesting 1 (ancestors 1)))))))")))
+    (should (equal (substring-no-properties display) "a/bL"))
+    (should (eq (get-text-property 0 'face display) 'heralds-dim-ancestor-face))
+    (should (eq (get-text-property 2 'face display) 'heralds-yellow-face))))
 
 (ert-deftest test-heralds-minor-mode-toggle ()
   "Test that heralds-minor-mode properly adds and removes overlays."
@@ -65,7 +85,7 @@ faces, the ⊥/⟳/delete heralds appear, the sentinel placeholder never
 leaks, and the overlay clears on disable. The injected node's rels
 payload -- (contains (in 2 (ancestors 1))), birth contains -- renders as
 the C token 2aC: the multi-contains \"2\" (orange), the ancestor \"a\"
-(yellow), and the birth \"C\" (black-on-white)."
+(muted yellow), and the birth \"C\" (black-on-white)."
   (with-temp-buffer
     (insert "Line with (skg (node (id 123) (affectsParent false) (rels (contains (in 2 (ancestors 1))) (birth contains)) (viewStats cycle) (editRequest delete))) text")
     (progn ;; what happens upon enabling heralds-minor-mode

@@ -43,6 +43,16 @@
     (unless (and (not (buffer-modified-p))
                  (not skg-link-annotations--source-suffix-enabled))
       (error "Initial annotations changed state"))
+    (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest _) t)))
+      (skg-set-active-source-set "all"))
+    (link-test-wait
+     (lambda () (and (link-test-status "private-node" 'resolved)
+                     (= skg-lp--pending-count 0))))
+    (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest _) t)))
+      (skg-set-active-source-set "public"))
+    (link-test-wait
+     (lambda () (and (link-test-status "private-node" 'inactive)
+                     (= skg-lp--pending-count 0))))
     (skg-toggle-source-overlay-on-links)
     (unless (and (link-test-suffix "⌂:PUB")
                  (link-test-suffix "⌂:missing")
