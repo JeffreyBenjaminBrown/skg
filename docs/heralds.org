@@ -71,8 +71,9 @@ inbound sources, and only =a= is interesting, =a/bL= expresses one
 interesting source out of two. The denominator still includes =a=;
 its numeral is omitted because both ancestors account for the total.
 
-A black-on-white relationship token identifies the relation that put
-this occurrence here. Ordinary =O= facts merely report an edge;
+A black-on-white relationship letter identifies the relation that put
+this occurrence here; its adjacent counts and slash keep their usual
+styles. Ordinary =O= facts merely report an edge;
 a birth-styled =O= explains this placement. An occurrence can have
 more than one birth relation. Immediately after =O=, a pink =ĥ=
 (precomposed h with circumflex) means this occurrence substitutes
@@ -98,7 +99,7 @@ The herald faces in Emacs and their Neovim highlight groups are:
 | Source and folder markers | 'heralds-green-face' | 'SkgHeraldGreen' | white on dark green |
 | Requests and deletions | 'heralds-red-face' | 'SkgHeraldRed' | white on red |
 | =A=, =I= and =P= counts | 'heralds-cyan-face' | 'SkgHeraldCyan' | black on cyan |
-| Birth relation | 'heralds-birth-face' | 'SkgHeraldBirth' | black on white |
+| Birth relation letter only | 'heralds-birth-face' | 'SkgHeraldBirth' | black on white |
 
 Customize an Emacs face with 'customize-face'. In Neovim, override a
 highlight group with ':highlight' or 'vim.api.nvim_set_hl' after Skg loads.

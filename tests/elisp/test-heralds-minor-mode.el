@@ -49,6 +49,33 @@
     (should (eq (get-text-property 0 'face display) 'heralds-slightly-interesting-face))
     (should (eq (get-text-property 2 'face display) 'heralds-moderately-interesting-face))))
 
+(ert-deftest test-herald-birth-face-covers-only-relation-letter ()
+  "Counts and fraction slashes beside a birth letter keep their own faces."
+  (dolist (case '(((contains (in 1) (out 2)) (birth contains)
+                  "1C2" (heralds-blue-face heralds-birth-face heralds-blue-face))
+                 ((textlinksTo (in 5 (interesting 2)) (out 3))
+                  (birth textlinksTo) "2/5L3"
+                  (heralds-highly-interesting-face heralds-blue-face
+                   heralds-blue-face heralds-birth-face heralds-blue-face))
+                 ((contains (out 8 (unintegrated 2))) (birth contains)
+                  "C2/8" (heralds-birth-face heralds-highly-interesting-face
+                   heralds-blue-face heralds-blue-face))
+                 ((subscribes (in 1) (out 2)) (birth subscribes)
+                  "1S2" (heralds-purple-face heralds-birth-face heralds-purple-face))
+                 ((overrides (in 1) (out 2)) (birth overrides)
+                  "1O2" (heralds-highly-interesting-face heralds-birth-face
+                   heralds-highly-interesting-face))
+                 ((hides (in 1) (out 2)) (birth hides)
+                  "1H2" (heralds-purple-face heralds-birth-face heralds-purple-face))))
+    (let ((display (heralds-from-metadata
+                    (format "(skg (node (id x) (rels %s %s)))"
+                            (prin1-to-string (car case))
+                            (prin1-to-string (cadr case))))))
+      (should (equal (substring-no-properties display) (nth 2 case)))
+      (cl-loop for face in (nth 3 case) for index from 0
+               do (should (eq (get-text-property index 'face display)
+                              face))))))
+
 (ert-deftest test-heralds-minor-mode-toggle ()
   "Test that heralds-minor-mode properly adds and removes overlays."
   (with-temp-buffer

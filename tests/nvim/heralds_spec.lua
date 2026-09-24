@@ -83,6 +83,33 @@ describe('skg.heralds', function ()
     assert.are.equal('SkgHeraldModeratelyInteresting', chunks[3][2])
   end)
 
+  it('styles only the birth relation letter with the birth highlight', function ()
+    for _, case in ipairs({
+      { '(contains (in 1) (out 2)) (birth contains)', '1C2',
+        { 'SkgHeraldBlue', 'SkgHeraldBirth', 'SkgHeraldBlue' } },
+      { '(textlinksTo (in 5 (interesting 2)) (out 3)) (birth textlinksTo)',
+        '2/5L3', { 'SkgHeraldHighlyInteresting', 'SkgHeraldBlue',
+                  'SkgHeraldBlue', 'SkgHeraldBirth', 'SkgHeraldBlue' } },
+      { '(contains (out 8 (unintegrated 2))) (birth contains)', 'C2/8',
+        { 'SkgHeraldBirth', 'SkgHeraldHighlyInteresting',
+          'SkgHeraldBlue', 'SkgHeraldBlue' } },
+      { '(subscribes (in 1) (out 2)) (birth subscribes)', '1S2',
+        { 'SkgHeraldPurple', 'SkgHeraldBirth', 'SkgHeraldPurple' } },
+      { '(overrides (in 1) (out 2)) (birth overrides)', '1O2',
+        { 'SkgHeraldHighlyInteresting', 'SkgHeraldBirth',
+          'SkgHeraldHighlyInteresting' } },
+      { '(hides (in 1) (out 2)) (birth hides)', '1H2',
+        { 'SkgHeraldPurple', 'SkgHeraldBirth', 'SkgHeraldPurple' } },
+    }) do
+      local chunks = heralds.chunks_from_metadata(
+        '(skg (node (id x) (rels ' .. case[1] .. ')))')
+      assert.are.equal(case[2], heralds.chunks_text(chunks))
+      assert.are.equal(#case[3], #chunks)
+      for i, hl in ipairs(case[3]) do
+        assert.are.equal(hl, chunks[i][2]) end
+    end
+  end)
+
   it('toggling adds and removes extmarks', function ()
     local buf = scratch_buffer_with({
       'Test line with (skg (node (id 123) (rels (contains (out 2)))'

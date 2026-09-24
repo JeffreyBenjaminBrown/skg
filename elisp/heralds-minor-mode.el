@@ -315,8 +315,7 @@ na anyway) any stray sentinel token is dropped."
              ('overrides "O") ('hides "H") (_ "?")))
 
 (defun heralds--rel-base-face (rel)
-  "Group base face for REL when it is not the reason-for-being:
-C/L blue, S/O/H purple."
+  "Group base face for REL's counts and slash: C/L blue, S/O/H purple."
   (pcase rel ((or 'contains 'textlinksTo) 'heralds-blue-face)
              (_ 'heralds-purple-face)))
 
@@ -384,8 +383,9 @@ yellow. The parent flag is muted; higher ancestors are orange."
           (t (concat numerator-text (propertize "/" 'face base-face)
                      denominator-text)))))
 
-(defun heralds--ordinary-rel-token (rel form base-face overrides-here)
-  "Render an ordinary (non-link) relation token, or nil if empty."
+(defun heralds--ordinary-rel-token (rel form base-face letter-face overrides-here)
+  "Render a non-link relation token, or nil if empty.
+BASE-FACE styles ordinary counts; LETTER-FACE styles only the relation letter."
   (let* ((in  (heralds--rel-side form 'in))
          (out (heralds--rel-side form 'out))
          (number-face (if (eq rel 'overrides)
@@ -407,13 +407,14 @@ yellow. The parent flag is muted; higher ancestors are orange."
                    number-face nil))))
     (unless (and (string-empty-p in-s) (string-empty-p out-s)
                  (not (and (eq rel 'overrides) overrides-here)))
-      (concat in-s (propertize (heralds--rel-letter rel) 'face base-face)
+      (concat in-s (propertize (heralds--rel-letter rel) 'face letter-face)
               (if (and (eq rel 'overrides) overrides-here)
                   (propertize "ĥ" 'face 'heralds-confusable-face) "")
               out-s))))
 
-(defun heralds--link-rel-token (form base-face)
-  "Render inbound interesting sources and outbound resolved targets."
+(defun heralds--link-rel-token (form base-face letter-face)
+  "Render inbound interesting sources and outbound resolved targets.
+BASE-FACE styles ordinary counts and slash; LETTER-FACE styles only L."
   (let* ((in (heralds--rel-side form 'in))
          (out (heralds--rel-side form 'out))
          (interesting-form (assq 'interesting (cdr (assq 'in (cdr form)))))
@@ -426,12 +427,12 @@ yellow. The parent flag is muted; higher ancestors are orange."
          (out-s (heralds--rel-side-string
                  (if out (car out) 0) (and out (cdr out)) base-face nil)))
     (unless (and (string-empty-p in-s) (string-empty-p out-s))
-      (concat in-s (propertize "L" 'face base-face) out-s))))
+      (concat in-s (propertize "L" 'face letter-face) out-s))))
 
 (defun heralds--render-rel-facts (sexp)
   "Render the semantic `(rels ...)' payload in SEXP to one propertized
 string, or nil if there is none / it produces nothing. Coloring: group
-base (C/L blue, S/O/H purple), the reason-for-being token black-on-white,
+base (C/L blue, S/O/H purple), the reason-for-being letter black-on-white,
 ancestor a muted and higher ancestors white-on-orange, the contains
 inbound count>1 yellow,
 A/I/P cyan. Tokens are ordered C L S O H A I P and space-separated."
@@ -446,12 +447,13 @@ A/I/P cyan. Tokens are ordered C L S O H A I P and space-separated."
         (dolist (rel heralds--rel-order)
           (let ((form (assq rel (cdr rels))))
             (when (or form (and (eq rel 'overrides) overrides-here))
-              (let* ((base (if (memq rel birth) 'heralds-birth-face
-                             (heralds--rel-base-face rel)))
+              (let* ((base (heralds--rel-base-face rel))
+                     (letter-face (if (memq rel birth) 'heralds-birth-face
+                                    base))
                      (tok (if (eq rel 'textlinksTo)
-                              (heralds--link-rel-token form base)
+                              (heralds--link-rel-token form base letter-face)
                             (heralds--ordinary-rel-token
-                             rel form base overrides-here))))
+                             rel form base letter-face overrides-here))))
                 (when tok (push tok tokens))))))
         (let ((a (cadr (assq 'aliases (cdr rels)))))
           (when a (push (propertize (format "A%d" a) 'face 'heralds-cyan-face)
@@ -521,7 +523,7 @@ white text).")
 
 (defface heralds-birth-face
   '((t :foreground "black" :background "white"))
-  "Black-on-white for the reason-for-being (birth) relationship token
--- the token that explains why the node was drawn.")
+  "Black-on-white for the birth relationship letter that explains why
+the node was drawn.")
 
 (provide 'heralds-minor-mode)

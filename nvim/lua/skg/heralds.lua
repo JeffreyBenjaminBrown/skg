@@ -325,7 +325,8 @@ local function rel_side (form, side)
   return { count = first_number(s) or 0, gens = ancestors_of(s) }
 end
 
-local function ordinary_rel_chunks (rel, form, base_hl, overrides_here)
+local function ordinary_rel_chunks (rel, form, base_hl, letter_hl,
+                                    overrides_here)
   local inn = rel_side(form, 'in')
   local out = rel_side(form, 'out')
   local number_hl = rel == 'overrides' and 'SkgHeraldHighlyInteresting'
@@ -345,14 +346,14 @@ local function ordinary_rel_chunks (rel, form, base_hl, overrides_here)
      and not (rel == 'overrides' and overrides_here) then return nil end
   local chunks = {}
   for _, c in ipairs(in_c) do table.insert(chunks, c) end
-  table.insert(chunks, { rel_letter(rel), base_hl })
+  table.insert(chunks, { rel_letter(rel), letter_hl })
   if rel == 'overrides' and overrides_here then
     table.insert(chunks, { 'ĥ', 'SkgHeraldConfusable' }) end
   for _, c in ipairs(out_c) do table.insert(chunks, c) end
   return chunks
 end
 
-local function link_rel_chunks (form, base_hl)
+local function link_rel_chunks (form, base_hl, letter_hl)
   local inn = rel_side(form, 'in')
   local out = rel_side(form, 'out')
   local interesting = assq(assq(form, 'in'), 'interesting')
@@ -364,14 +365,14 @@ local function link_rel_chunks (form, base_hl)
   if #in_c == 0 and #out_c == 0 then return nil end
   local chunks = {}
   for _, c in ipairs(in_c) do table.insert(chunks, c) end
-  table.insert(chunks, { 'L', base_hl })
+  table.insert(chunks, { 'L', letter_hl })
   for _, c in ipairs(out_c) do table.insert(chunks, c) end
   return chunks
 end
 
 ---Render the semantic (rels ...) payload in SEXP to virtual-text chunks,
 ---or nil if there is none / it produces nothing. Coloring: group base
----(C/L blue, S/O/H purple), the reason-for-being token black-on-white,
+---(C/L blue, S/O/H purple), the reason-for-being letter black-on-white,
 ---ancestor a muted and higher ancestors white-on-orange, contains
 ---inbound count>1 yellow,
 ---A/I/P cyan. Tokens ordered C L S O H A I P, space-separated.
@@ -399,10 +400,11 @@ function M.render_rel_facts (sexp)
   for _, rel in ipairs(REL_ORDER) do
     local form = assq(rels, rel)
     if form or (rel == 'overrides' and overrides_here) then
-      local base = birth[rel] and 'SkgHeraldBirth' or rel_base_hl(rel)
+      local base = rel_base_hl(rel)
+      local letter_hl = birth[rel] and 'SkgHeraldBirth' or base
       add_token((rel == 'textlinksTo')
-        and link_rel_chunks(form, base)
-        or ordinary_rel_chunks(rel, form, base, overrides_here))
+        and link_rel_chunks(form, base, letter_hl)
+        or ordinary_rel_chunks(rel, form, base, letter_hl, overrides_here))
     end
   end
   local aliases = assq(rels, 'aliases')
