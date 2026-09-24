@@ -25,7 +25,7 @@ means two containers and three direct contents. =C= and =L= are blue;
 omitted. =A3= counts aliases, =I2= extra IDs, and =P1= true file
 properties; these action counts are cyan.
 
-An orange numeral inside =C= or =L= has a narrower meaning. In =2/5L3=,
+A yellow numeral inside =C= or =L= has a narrower meaning. In =2/5L3=,
 five visible nodes link here, two are interesting, and this node links
 to three distinct visible targets. A linking source is interesting if
 it has nonempty body text, visible direct content, or links to more
@@ -46,7 +46,7 @@ counts. The incoming side can combine with it, as in =2C3/8=.
 
 The slash is kept when a nonzero numerator equals its total; its
 denominator is then omitted. The slash never means zero divided by
-zero. Orange also marks displayed =O= counts, even a count of one.
+zero. Yellow also marks displayed =O= counts, even a count of one.
 The =O= letter keeps its usual purple or birth style.
 
 * Ancestors and birth
@@ -54,7 +54,7 @@ The =O= letter keeps its usual purple or birth style.
 Lowercase flags name tracked ancestors: =a= is the visible parent,
 =b= the grandparent, and so on, counting folder scaffolds too. After
 =z=, a generation appears as ={27}=, ={28}=, etc. An =a= is muted
-yellow; =b= and higher are brighter yellow. =aC= says the parent
+yellow; =b= and higher are orange. =aC= says the parent
 contains this node; =Ca= says this node contains its parent. =Oa=
 and =aO= distinguish the direction of an override edge.
 
@@ -79,9 +79,32 @@ more than one birth relation. Immediately after =O=, a pink =ĥ=
 for an overridden node. =2Oĥ3= is an example. It comes from the
 load-bearing 'overridesHere' marker; an override folder or path
 occurrence without that marker has no =ĥ=. The eighth ancestor is
-plain yellow =h=, so =Oĥh= shows the two different markers together.
+plain orange =h=, so =Oĥh= shows the two different markers together.
 The marker preserves the original membership ID when a substituted
 view is saved. See [[file:override.org][override behavior]].
+
+* Colors and customization
+
+The herald faces in Emacs and their Neovim highlight groups are:
+
+| Meaning | Emacs face | Neovim highlight group | Default style |
+|---------+------------+------------------------+---------------|
+| Highly interesting counts and markers | 'heralds-highly-interesting-face' | 'SkgHeraldHighlyInteresting' | black on yellow |
+| Moderately interesting ancestors =b= and higher | 'heralds-moderately-interesting-face' | 'SkgHeraldModeratelyInteresting' | white on orange |
+| Slightly interesting parent =a= | 'heralds-slightly-interesting-face' | 'SkgHeraldSlightlyInteresting' | white on muted olive |
+| Confusable =ĥ= | 'heralds-confusable-face' | 'SkgHeraldConfusable' | pink foreground |
+| =C= and =L= | 'heralds-blue-face' | 'SkgHeraldBlue' | white on blue |
+| =S=, =O= and =H= | 'heralds-purple-face' | 'SkgHeraldPurple' | white on purple |
+| Source and folder markers | 'heralds-green-face' | 'SkgHeraldGreen' | white on dark green |
+| Requests and deletions | 'heralds-red-face' | 'SkgHeraldRed' | white on red |
+| =A=, =I= and =P= counts | 'heralds-cyan-face' | 'SkgHeraldCyan' | black on cyan |
+| Birth relation | 'heralds-birth-face' | 'SkgHeraldBirth' | black on white |
+
+Customize an Emacs face with 'customize-face'. In Neovim, override a
+highlight group with ':highlight' or 'vim.api.nvim_set_hl' after Skg loads.
+Confirmed broken link labels inherit 'heralds-confusable-face' and add
+an underline in Emacs; Neovim uses 'SkgBrokenLink' with the same pink
+foreground and an underline.
 
 * Other heralds
 
@@ -99,10 +122,10 @@ import=, =☮ was overloaded during org-roam import=, and
 =request:search matching= are save requests.
 
 =☮= marks a write-protected position, with =B= attached when its body
-exists but is hidden. Orange =⊥= means a displayed child does not
+exists but is hidden. Yellow =⊥= means a displayed child does not
 affect its parent's membership on save. Blue =⟳= marks a cycle.
 An unknown node is labeled =Reference to unknown node.= in the
-interesting orange style; an inactive source yields an anonymous
+interesting yellow style; an inactive source yields an anonymous
 =node from inactive source= marker. Inactive placeholders reveal no
 node title or source. Red =DELETED= marks a deletion in a diff or
 edit, while =diff:not-in-git= marks a node without a Git counterpart.

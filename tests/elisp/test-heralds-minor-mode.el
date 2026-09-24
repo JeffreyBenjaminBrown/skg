@@ -34,20 +34,20 @@
     (should (eq (get-text-property 1 'face display)
                 'heralds-confusable-face))
     (should (eq (get-text-property 2 'face display)
-                'heralds-yellow-face)))
+                'heralds-moderately-interesting-face)))
   (let ((display (heralds-from-metadata
                   "(skg (node (id x) (rels (textlinksTo (in 5 (interesting 2)) (out 3)) (overrides (out 1)) (birth overrides))))")))
     (should (equal (substring-no-properties display) "2/5L3 O1"))
-    (should (eq (get-text-property 0 'face display) 'heralds-interesting-face))
+    (should (eq (get-text-property 0 'face display) 'heralds-highly-interesting-face))
     (dolist (i '(1 2 3 4))
       (should (eq (get-text-property i 'face display) 'heralds-blue-face)))
     (should (eq (get-text-property 6 'face display) 'heralds-birth-face))
-    (should (eq (get-text-property 7 'face display) 'heralds-interesting-face)))
+    (should (eq (get-text-property 7 'face display) 'heralds-highly-interesting-face)))
   (let ((display (heralds-from-metadata
                   "(skg (node (id x) (rels (textlinksTo (in 2 (ancestors 1 2) (interesting 1 (ancestors 1)))))))")))
     (should (equal (substring-no-properties display) "a/bL"))
-    (should (eq (get-text-property 0 'face display) 'heralds-dim-ancestor-face))
-    (should (eq (get-text-property 2 'face display) 'heralds-yellow-face))))
+    (should (eq (get-text-property 0 'face display) 'heralds-slightly-interesting-face))
+    (should (eq (get-text-property 2 'face display) 'heralds-moderately-interesting-face))))
 
 (ert-deftest test-heralds-minor-mode-toggle ()
   "Test that heralds-minor-mode properly adds and removes overlays."
@@ -84,7 +84,7 @@
 faces, the ⊥/⟳/delete heralds appear, the sentinel placeholder never
 leaks, and the overlay clears on disable. The injected node's rels
 payload -- (contains (in 2 (ancestors 1))), birth contains -- renders as
-the C token 2aC: the multi-contains \"2\" (orange), the ancestor \"a\"
+the C token 2aC: the multi-contains \"2\" (yellow), the ancestor \"a\"
 (muted yellow), and the birth \"C\" (black-on-white)."
   (with-temp-buffer
     (insert "Line with (skg (node (id 123) (affectsParent false) (rels (contains (in 2 (ancestors 1))) (birth contains)) (viewStats cycle) (editRequest delete))) text")
@@ -110,9 +110,9 @@ the C token 2aC: the multi-contains \"2\" (orange), the ancestor \"a\"
           ;; per-span faces on the 2aC relationship token
           (let ( ( i ( string-match "2aC" display-text )) )
             ( should ( eq ( get-text-property i 'face display-text )
-                          'heralds-interesting-face )) ;; the "2"
+                          'heralds-highly-interesting-face )) ;; the "2"
             ( should ( eq ( get-text-property (+ i 1) 'face display-text )
-                          'heralds-dim-ancestor-face )) ;; the "a"
+                          'heralds-slightly-interesting-face )) ;; the "a"
             ( should ( eq ( get-text-property (+ i 2) 'face display-text )
                           'heralds-birth-face )) )))) ;; the "C"
     (progn ;; what happens upon disabling it

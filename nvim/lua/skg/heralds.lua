@@ -47,8 +47,8 @@ local color_to_highlight_group = {
   RED = 'SkgHeraldRed',
   GREEN = 'SkgHeraldGreen',
   BLUE = 'SkgHeraldBlue',
-  YELLOW = 'SkgHeraldYellow',
-  ORANGE = 'SkgHeraldInteresting' }
+  YELLOW = 'SkgHeraldModeratelyInteresting',
+  ORANGE = 'SkgHeraldHighlyInteresting' }
 
 function M.define_highlight_groups ()
   vim.api.nvim_set_hl(0, 'SkgHeraldRed',
@@ -57,11 +57,11 @@ function M.define_highlight_groups ()
     { fg = 'white', bg = '#006400', default = true })
   vim.api.nvim_set_hl(0, 'SkgHeraldBlue',
     { fg = 'white', bg = 'blue', default = true })
-  vim.api.nvim_set_hl(0, 'SkgHeraldYellow',
-    { fg = 'black', bg = 'yellow', default = true })
-  vim.api.nvim_set_hl(0, 'SkgHeraldInteresting',
+  vim.api.nvim_set_hl(0, 'SkgHeraldModeratelyInteresting',
     { fg = 'white', bg = '#d2691e', default = true })
-  vim.api.nvim_set_hl(0, 'SkgHeraldDimAncestor',
+  vim.api.nvim_set_hl(0, 'SkgHeraldHighlyInteresting',
+    { fg = 'black', bg = 'yellow', default = true })
+  vim.api.nvim_set_hl(0, 'SkgHeraldSlightlyInteresting',
     { fg = 'white', bg = '#5e5e20', default = true })
   vim.api.nvim_set_hl(0, 'SkgHeraldConfusable',
     { fg = M.confusable_fg, default = true })
@@ -269,22 +269,22 @@ local function ancestor_chunks (gens)
   for _, g in ipairs(distinct_gens(gens)) do
     local letter = (type(g) == 'number' and g >= 1 and g <= 26)
       and string.char(96 + g) or '{' .. tostring(g) .. '}'
-    table.insert(out, { letter, g == 1 and 'SkgHeraldDimAncestor'
-                                  or 'SkgHeraldYellow' })
+    table.insert(out, { letter, g == 1 and 'SkgHeraldSlightlyInteresting'
+                                  or 'SkgHeraldModeratelyInteresting' })
   end
   return out
 end
 
 ---Chunks for one side: the count then ancestor letters. Omits the count
 ---when it equals the number of ancestors (>=1). MULTI (contains inbound)
----makes a count > 1 orange; parent a is muted, higher ancestors yellow.
+---makes a count > 1 yellow; parent a is muted, higher ancestors orange.
 local function side_chunks (count, gens, base_hl, multi)
   gens = distinct_gens(gens)
   local n = #gens
   local chunks = {}
   if count > 0 or n > 0 then
     if not (n > 0 and count == n) then
-      local hl = (multi and count > 1) and 'SkgHeraldInteresting' or base_hl
+      local hl = (multi and count > 1) and 'SkgHeraldHighlyInteresting' or base_hl
       table.insert(chunks, { tostring(count), hl })
     end
     for _, c in ipairs(ancestor_chunks(gens)) do table.insert(chunks, c) end
@@ -304,7 +304,7 @@ local function fraction_chunks (total, total_gens, numerator,
   for _, g in ipairs(numerator_gens) do numerator_set[g] = true end
   local chunks = {}
   if numerator ~= #numerator_gens then
-    table.insert(chunks, { tostring(numerator), 'SkgHeraldInteresting' }) end
+    table.insert(chunks, { tostring(numerator), 'SkgHeraldHighlyInteresting' }) end
   for _, c in ipairs(ancestor_chunks(numerator_gens)) do
     table.insert(chunks, c) end
   table.insert(chunks, { '/', base_hl })
@@ -328,7 +328,7 @@ end
 local function ordinary_rel_chunks (rel, form, base_hl, overrides_here)
   local inn = rel_side(form, 'in')
   local out = rel_side(form, 'out')
-  local number_hl = rel == 'overrides' and 'SkgHeraldInteresting'
+  local number_hl = rel == 'overrides' and 'SkgHeraldHighlyInteresting'
                                        or base_hl
   local in_c = side_chunks(inn and inn.count or 0, inn and inn.gens or {},
                            number_hl, rel == 'contains')
@@ -372,8 +372,8 @@ end
 ---Render the semantic (rels ...) payload in SEXP to virtual-text chunks,
 ---or nil if there is none / it produces nothing. Coloring: group base
 ---(C/L blue, S/O/H purple), the reason-for-being token black-on-white,
----ancestor a muted and higher ancestors black-on-yellow, contains
----inbound count>1 orange,
+---ancestor a muted and higher ancestors white-on-orange, contains
+---inbound count>1 yellow,
 ---A/I/P cyan. Tokens ordered C L S O H A I P, space-separated.
 ---@param sexp any
 ---@return table[]|nil

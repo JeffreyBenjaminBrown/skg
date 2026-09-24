@@ -66,21 +66,21 @@ describe('skg.heralds', function ()
       .. ' (viewStats (overridesHere y))))')
     assert.are.equal('Oĥh', heralds.chunks_text(chunks))
     assert.are.equal('SkgHeraldConfusable', chunks[2][2])
-    assert.are.equal('SkgHeraldYellow', chunks[3][2])
+    assert.are.equal('SkgHeraldModeratelyInteresting', chunks[3][2])
     chunks = heralds.chunks_from_metadata(
       '(skg (node (id x) (rels (textlinksTo (in 5 (interesting 2))'
       .. ' (out 3)) (overrides (out 1)) (birth overrides))))')
     assert.are.equal('2/5L3 O1', heralds.chunks_text(chunks))
-    assert.are.equal('SkgHeraldInteresting', chunks[1][2])
+    assert.are.equal('SkgHeraldHighlyInteresting', chunks[1][2])
     for i = 2, 5 do assert.are.equal('SkgHeraldBlue', chunks[i][2]) end
     assert.are.equal('SkgHeraldBirth', chunks[7][2])
-    assert.are.equal('SkgHeraldInteresting', chunks[8][2])
+    assert.are.equal('SkgHeraldHighlyInteresting', chunks[8][2])
     chunks = heralds.chunks_from_metadata(
       '(skg (node (id x) (rels (textlinksTo (in 2 (ancestors 1 2)'
       .. ' (interesting 1 (ancestors 1)))))))')
     assert.are.equal('a/bL', heralds.chunks_text(chunks))
-    assert.are.equal('SkgHeraldDimAncestor', chunks[1][2])
-    assert.are.equal('SkgHeraldYellow', chunks[3][2])
+    assert.are.equal('SkgHeraldSlightlyInteresting', chunks[1][2])
+    assert.are.equal('SkgHeraldModeratelyInteresting', chunks[3][2])
   end)
 
   it('toggling adds and removes extmarks', function ()
@@ -105,7 +105,7 @@ describe('skg.heralds', function ()
   it('conceals the metadata extent and renders semantic rel facts',
      function ()
     -- rels payload (contains (in 2 (ancestors 1))), birth contains
-    -- renders as the C token 2aC: the multi-contains "2" (orange), the
+    -- renders as the C token 2aC: the multi-contains "2" (yellow), the
     -- ancestor "a" (muted yellow), and the birth "C" (black-on-white).
     local buf = scratch_buffer_with({
       'Line with (skg (node (id 123) (affectsParent false)'
@@ -129,8 +129,8 @@ describe('skg.heralds', function ()
     assert.is_truthy(text:find('⟳', 1, true))
     assert.is_truthy(text:find('delete', 1, true))
     -- per-span highlight groups on the 2aC token
-    assert.are.equal('SkgHeraldInteresting', hl_of['2'])
-    assert.are.equal('SkgHeraldDimAncestor', hl_of['a'])
+    assert.are.equal('SkgHeraldHighlyInteresting', hl_of['2'])
+    assert.are.equal('SkgHeraldSlightlyInteresting', hl_of['a'])
     assert.are.equal('SkgHeraldBirth', hl_of['C'])
     heralds.disable(buf)
     assert.are.equal(0, #herald_extmarks(buf))

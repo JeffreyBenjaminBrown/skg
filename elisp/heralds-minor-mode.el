@@ -119,8 +119,8 @@ tokens and per-segment-colored INTERC tokens."
     ((eq color-keyword 'RED)    'heralds-red-face)
     ((eq color-keyword 'GREEN)  'heralds-green-face)
     ((eq color-keyword 'BLUE)   'heralds-blue-face)
-    ((eq color-keyword 'YELLOW) 'heralds-yellow-face)
-    ((eq color-keyword 'ORANGE) 'heralds-interesting-face)
+    ((eq color-keyword 'YELLOW) 'heralds-moderately-interesting-face)
+    ((eq color-keyword 'ORANGE) 'heralds-highly-interesting-face)
     (t nil)))
 
 (defun heralds--ensure-rules ()
@@ -331,8 +331,8 @@ C/L blue, S/O/H purple."
      (propertize (if (and (>= g 1) (<= g 26))
                      (char-to-string (+ ?a (1- g)))
                    (format "{%s}" g))
-                 'face (if (= g 1) 'heralds-dim-ancestor-face
-                         'heralds-yellow-face)))
+                 'face (if (= g 1) 'heralds-slightly-interesting-face
+                         'heralds-moderately-interesting-face)))
    (heralds--gen-list gens) ""))
 
 (defun heralds--rel-side (form side)
@@ -347,7 +347,7 @@ return (COUNT . GENS) for SIDE (`in' or `out'), or nil if na."
   "COUNT then ancestor letters, as a propertized string. Omit the count
 when it equals the number of ancestors (>=1). BASE-FACE colors the
 count, unless MULTI (the contains inbound side) and count > 1, which is
-orange. The parent flag is muted; higher ancestors are bright yellow."
+yellow. The parent flag is muted; higher ancestors are orange."
   (let* ((gens (heralds--gen-list (or gens '())))
          (n (length gens))
          (out ""))
@@ -355,7 +355,7 @@ orange. The parent flag is muted; higher ancestors are bright yellow."
       (unless (and (> n 0) (= count n))
         (setq out (propertize (number-to-string count) 'face
                               (if (and multi (> count 1))
-                                  'heralds-interesting-face base-face))))
+                                  'heralds-highly-interesting-face base-face))))
       (when (> n 0)
         (setq out (concat out (heralds--ancestor-text gens)))))
     out))
@@ -371,7 +371,7 @@ orange. The parent flag is muted; higher ancestors are bright yellow."
          (numerator-text
           (concat (if (= numerator (length numerator-gens)) ""
                     (propertize (number-to-string numerator)
-                                'face 'heralds-interesting-face))
+                                'face 'heralds-highly-interesting-face))
                   (heralds--ancestor-text numerator-gens)))
          (denominator-text
           (if (= numerator total) ""
@@ -389,7 +389,7 @@ orange. The parent flag is muted; higher ancestors are bright yellow."
   (let* ((in  (heralds--rel-side form 'in))
          (out (heralds--rel-side form 'out))
          (number-face (if (eq rel 'overrides)
-                          'heralds-interesting-face base-face))
+                          'heralds-highly-interesting-face base-face))
          (in-s  (heralds--rel-side-string
                  (if in (car in) 0) (and in (cdr in)) number-face
                  (eq rel 'contains)))
@@ -432,8 +432,8 @@ orange. The parent flag is muted; higher ancestors are bright yellow."
   "Render the semantic `(rels ...)' payload in SEXP to one propertized
 string, or nil if there is none / it produces nothing. Coloring: group
 base (C/L blue, S/O/H purple), the reason-for-being token black-on-white,
-ancestor a muted and higher ancestors black-on-yellow, the contains
-inbound count>1 orange,
+ancestor a muted and higher ancestors white-on-orange, the contains
+inbound count>1 yellow,
 A/I/P cyan. Tokens are ordered C L S O H A I P and space-separated."
   (let ((rels (heralds--find-rels sexp)))
     (when rels
@@ -493,19 +493,18 @@ are rendered from `(rels ...)'."
   '((t :foreground "white" :background "red"))
   "White-on-red for problem markers like delete.")
 
-(defface heralds-yellow-face
+(defface heralds-highly-interesting-face
   '((t :foreground "black" :background "yellow"))
-  "Black-on-yellow for ancestor flags b and higher inside the
-relationship-herald spans -- the letters that mark a tracked ancestor as
-a member on that side.")
+  "Highly interesting: black-on-yellow for interesting counts and markers.")
 
-(defface heralds-interesting-face
+(defface heralds-moderately-interesting-face
   '((t :foreground "white" :background "#d2691e"))
-  "White-on-orange for interesting counts and existing orange markers.")
+  "Moderately interesting: white-on-orange for ancestor flags b and higher
+inside relationship-herald spans.")
 
-(defface heralds-dim-ancestor-face
+(defface heralds-slightly-interesting-face
   '((t :foreground "white" :background "#5e5e20"))
-  "Muted ancestor a; higher generations retain the bright yellow face.")
+  "Slightly interesting: muted yellow for the parent flag a.")
 
 (defface heralds-confusable-face
   '((t :foreground "#c84286"))
