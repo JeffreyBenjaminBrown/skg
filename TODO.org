@@ -1,7 +1,7 @@
 * REMEMBER
 ** not to dirty the production skg's code.
 ** to set the model
-* ONGOING TODO/heralds_sept-2026/heralds_sept-2026/
+* ONGOING TODO/import-md-and-org/
 * next
 ** for video
 *** AWAITS navigate point through herald (overlay)
@@ -21,6 +21,8 @@ leaving a trail for five seconds or until interrupted.
 **** Granular links work? Even with weird headline anchors?
 e.g. weird b/c it has a link
 *** ingest into skg
+** embarrasssments
+*** the org-export and docs nodes should be in another repo
 ** bugs
 *** TODO bugs in make-link / make-content
 **** bug: making a link into content gives an unavailable view error

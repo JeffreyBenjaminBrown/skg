@@ -780,10 +780,9 @@ Exports Skg data to plain =.org= files, so the data can be read
 (and navigated on GitHub) without running Skg. No keybinding.
 
 It asks two things:
-- which source-set to export (tab completion and shift-left /
-  shift-right cycling); only nodes from that set are included.
-  Choose a public-facing source-set so private notes are not
-  exported; exporting =all= warns you about this.
+- the most private source to include. The export includes
+  that source and every source more public than it.
+  Choose all to include every source.
 - which directory to write to (default =org-exports=). This path
   is interpreted *by the server*, relative to the project root the
   server runs from. Because the server may run inside a Docker
@@ -791,29 +790,38 @@ It asks two things:
   this prompt has no tab completion. An absolute path is used
   as-is.
 
-If a restricted export would include overPrivateText telescope text, Skg asks for
-request-scoped approval before writing any file. Source-set =all= exports
-it with a warning. The noninteractive form fails closed unless passed
-=--include-overPrivateText-telescopes=:
-
-: cargo run --bin skg -- export-org [config-path] [source-set] [output-dir] [--include-overPrivateText-telescopes]
-
-A node is exported when one of its children's title links to the
-export-instruction node and that child's body gives a
-=target_filepath= (TOML-ish: =target_filepath = docs/setup=,
-quoted if it contains whitespace). That parent is written to
+A node N is exported when the title of a node C it contains
+links to the export-instruction node and C's body defines a
+=target_filepath=
+(using TOML-ish syntax, e.g. =target_filepath = docs/setup=,
+with the path quoted if it contains whitespace).
+That parent is written to
 =<output-dir>/<target_filepath>.org= as a recursive content view,
 stripped of skg metadata. The marker child is omitted.
 
-Links are rewritten to relative org links. A link to another
-exported file's root points at that file; a link to a non-root
-node points deep, via =[[./file.org::*Heading][label]]=. A nested
-export root is shown as a link, not inlined. A link whose dest
-is not exported under the chosen set points to a "some links
-might be broken" note.
-
 Existing files in the output dir are overwritten in place; other
 files there are left untouched.
+**** links and overlap
+Links are rewritten to relative org links. A link to another
+exported file's root points at that file; a link to a non-root
+node points deep, to the relevant headline of the document,
+via =[[./file.org::*Heading][label]]=.
+
+if an exported node contains another export root,
+the second root’s contents go in its own file,
+and are not duplicated into the first.
+The first instead gets a heading linking to the second file.
+
+A link whose dest
+is not exported under the chosen set points to a "some links
+might be broken" note.
+**** privacy
+If a restricted export would include overPrivateText telescope text, Skg asks for
+approval for each such ID before writing any file. Source-set =all= exports
+it with a warning. The noninteractive form "fails closed" (fails before writing any files) unless passed
+=--include-overPrivateText-telescopes=:
+
+: cargo run --bin skg -- export-org [config-path] [source-set] [output-dir] [--include-overPrivateText-telescopes]
 ** connection, reload, rebuild ephemeral data stores
 Unless you're coding or troubleshooting,
 you probably won't need these.

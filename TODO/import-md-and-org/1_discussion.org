@@ -1,0 +1,25 @@
+* vision
+I'd like to give Skg the ability to import from org (not org-roam).
+It would ask the user for the root folder (in Docker) to import,
+and the same folder's name on the host system.
+It would use that second piece of information to interpret links,
+which are written relative to the user's host system.
+
+It would also ask for the data source to import into.
+
+This would be a single command, which imports markdown *and* org.
+They can even, probably, link to each other.
+
+Both would be easy to do with text substitution in skg,
+if it weren't for the links.
+
+The hide, override and subscription relationships will always be empty;
+they aren't represented outside of skg.
+There might be other kinds of data to take along, though; let me know.
+
+Please respond to this vision in a new headline,
+in which you describe all the remaining decisions
+(design and architectural) that I'll need to decide.
+Also push back on anything that deserves it.
+It's probably worth thinking through whether complications will arise
+when a user uses this in conjunction with org-roam import and org export.
