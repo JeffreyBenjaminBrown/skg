@@ -317,6 +317,7 @@ mod tests {
   use crate::dbs::init::empty_in_ram_tantivy_index;
   use crate::dbs::in_rust_graph::InRustGraph;
   use crate::dbs::tantivy::background_writer::wait_for_tantivy_writes_idle;
+  use crate::dbs::tantivy::search::{SearchOptions, search_index};
   use crate::export_org::export_to_org;
   use crate::source_sets::{ActiveSourceSet, SourceSetName};
   use crate::types::misc::SkgfileSource;
@@ -373,6 +374,10 @@ mod tests {
       existing_authoritative_nodes (&runtime . config) . unwrap ();
     ensure_runtime_matches_disk (&disk, &runtime . graph) . unwrap ();
     wait_for_tantivy_writes_idle ();
+    let (hits, _) = search_index (
+      &env . runtime_snapshot () . tantivy_index,
+      "Notes", &SearchOptions::default ()) . unwrap ();
+    assert! (! hits . is_empty (), "imported title is searchable after index drain");
   }
 
   #[test]
