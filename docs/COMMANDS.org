@@ -774,8 +774,116 @@ Like skg-paste-node,
 but also removes the node from the stack.
 **** C-c v s : skg-view-id-stack
 repeated here; described earlier in this doc
-** exporting to org
-*** skg-export-some-to-org
+** import and export
+*** importing from org-roam
+:PROPERTIES:
+:CUSTOM_ID: import-org-roam
+:END:
+**** import-org-roam : terminal command
+This imports Org-roam '.org' files into Skg. It is a Cargo subcommand,
+not an Emacs 'M-x skg-import' command, and needs no running server.
+General Org and Markdown import are not implemented.
+
+Run from the repository root, where Cargo and the input files are available:
+
+#+begin_src sh
+cargo run --bin skg -- import-org-roam ORG_DIR OUTPUT_DIR SOURCE_NAME
+#+end_src
+
+All three arguments are required. 'ORG_DIR' contains your Org-roam notes;
+'OUTPUT_DIR' receives the '.skg' files; 'SOURCE_NAME' names the destination
+Skg source. For example, using a fresh staging directory:
+
+#+begin_src sh
+cargo run --bin skg -- import-org-roam /imports/org-roam /tmp/skg-import-review imported-notes
+#+end_src
+
+Paths are relative to the process's working directory unless absolute.
+Inside Docker, supply container-visible paths. There is no host-path
+mapping argument or interactive prompt.
+**** Before running: the destination is replaced
+The importer creates 'OUTPUT_DIR' if necessary, then deletes every immediate
+'.skg' file already in it, before reading the input. There is no confirmation,
+dry run, merge-with-destination mode, or automatic backup. Other files and
+nested directories are left alone. Use a fresh staging directory and inspect
+the result before replacing existing data.
+
+An incorrect or unreadable input can leave the destination empty. Traversal
+errors are skipped; unreadable files and files without the required file-level
+ID silently produce no nodes. The report counts files read, nodes written,
+and write errors, but a successful exit does not establish that every input
+was imported. Check the output against your originals.
+**** What is imported
+The scan recurses for the exact extension '.org', skipping '.git' directories.
+Each file must begin with a ':PROPERTIES:' drawer containing ':ID:'.
+Indentation on that first drawer line is accepted; blank lines before it
+are not. Files without this file-level ID are skipped even if headings have IDs.
+
+Each accepted file becomes a node, titled from '#+title:' or, if absent,
+the filename without its extension. Each heading becomes a node, with
+ordered 'contains' relationships representing the outline. Existing IDs are
+retained; headings without IDs get fresh UUIDs on every run. Some skipped
+heading levels introduce grouping nodes titled 'These are special!' and
+'These are normal.' rather than reproducing the outline literally.
+
+'ROAM_ALIASES' becomes Skg aliases. Nodes with an original ID receive the
+'Had ID before org-roam import' property. Duplicate IDs within the input
+are merged: children and aliases are combined, and additional titles and
+bodies are appended with a separator. Such nodes receive 'Was overloaded
+during org-roam import'. This does not compare or merge with existing
+nodes in your configured Skg sources.
+***** Text and links
+Bodies are copied with whitespace normalization. Parsed property drawers
+are consumed; properties other than 'ID' and 'ROAM_ALIASES' are not retained
+from those drawers. The parser uses line-based heading detection, so this
+is not a lossless general-purpose Org conversion.
+
+Existing '[[id:ID][label]]' links retain their targets. File links and heading
+search links are not converted to Skg ID links, and attachments are not copied.
+Relative file links may no longer resolve after import. The importer does not
+validate that linked IDs exist. It creates no subscriptions, hides, or overrides.
+**** Making the imported data available in Skg
+The command writes one 'ID.skg' file per resulting node. It does not edit
+configuration, start the server, or refresh a running server's graph and
+search index. 'SOURCE_NAME' labels the source during conversion; the permanent
+source association comes from the configured directory, not a source field
+inside each file.
+
+After reviewing the output, place it in the intended owned source directory
+and configure that source with the intended name and privacy order. See
+[[file:../api-and-formats.md][the configuration reference]]. Check for ID collisions with existing sources
+before loading: the importer itself does not check them.
+
+For a first setup, configure the source before starting Skg. When replacing
+existing data, save and close affected views and stop the server before
+changing its source files, then restart it. If files in an already configured
+source changed while the server remained running,
+'M-x skg-rebuild-ephemeral-data-stores' reloads them; close stale views and
+open fresh ones before editing. Configuration changes require a restart.
+
+The Cargo command prints a reminder to commit the imported files so Git
+diff views have a baseline; it does not run Git. Reimporting replaces the
+destination and gives ID-less headings new IDs, so it is not an incremental
+update workflow. Keep your originals and a backup of Skg edits you want to
+retain. [[file:undoing-import.org][Exporting back to Org]] does not restore the original files or all graph
+semantics.
+**** bash/import-org-roam.sh : host-side Docker and Git wrapper
+[[file:../bash/import-org-roam.sh][This script]] accepts 'SOURCE DEST NICKNAME' and prompts for a Docker
+container. Unlike the Cargo command, it offers to remove the destination's
+'.git' directory as well as its '.skg' files, then runs the importer,
+initializes Git, stages the destination, and opens an editor for a commit.
+Declining its cleanup prompt does not prevent the underlying importer from
+deleting existing '.skg' files.
+
+It also offers to request a server rebuild, reading the port from 'SKG_CONFIG'
+(default 'data/skgconfig.toml'). Its Docker working directory is hard-coded
+to '/home/ubuntu', while host-side paths use the shell's working directory.
+Check that the mounts and paths identify the intended directories on both
+sides. Use the Cargo command directly when you do not want Git operations.
+*** skg-export-some-to-org : exporting to org
+:PROPERTIES:
+:CUSTOM_ID: export-org
+:END:
 Exports Skg data to plain =.org= files, so the data can be read
 (and navigated on GitHub) without running Skg. No keybinding.
 
@@ -801,7 +909,7 @@ stripped of skg metadata. The marker child is omitted.
 
 Existing files in the output dir are overwritten in place; other
 files there are left untouched.
-**** links and overlap
+***** links and overlap
 Links are rewritten to relative org links. A link to another
 exported file's root points at that file; a link to a non-root
 node points deep, to the relevant headline of the document,
@@ -815,7 +923,7 @@ The first instead gets a heading linking to the second file.
 A link whose dest
 is not exported under the chosen set points to a "some links
 might be broken" note.
-**** privacy
+***** privacy
 If a restricted export would include overPrivateText telescope text, Skg asks for
 approval for each such ID before writing any file. Source-set =all= exports
 it with a warning. The noninteractive form "fails closed" (fails before writing any files) unless passed

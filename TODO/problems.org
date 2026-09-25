@@ -3,6 +3,24 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
+* Some docs links retain paths relative to the repository root (2026-09-25)
+  [[file:../docs/README-old.org][docs/README-old.org]] links to 'docs/FAQ.md', which resolves from its
+  current directory to the absent 'docs/docs/FAQ.md'. Likewise,
+  [[file:../docs/some-underlying-beliefs.org][docs/some-underlying-beliefs.org]] links to
+  './docs/wise-people-say-write.md' instead of './wise-people-say-write.md'.
+  These are stale input links, not missing importer syntax. A future importer
+  should report them without guessing a different base directory. The docs
+  links themselves have not been repaired in this discussion-only task.
+* Org-roam import clears its destination before validating input (2026-09-24)
+  'import_org_roam_directory' in [[file:../server/import_org_roam.rs][server/import_org_roam.rs]] removes
+  existing immediate '.skg' files before scanning the input. Traversal errors
+  are filtered out, and 'parse_org_file' returns no nodes for unreadable
+  files or files without a file-level ID. An unusable input can therefore
+  erase an earlier import without a corresponding parse error in the report.
+  This is also a barrier to reusing the entry point for import into a
+  populated configured source. Preflight input and stage replacement before
+  modifying existing files; make replacement an explicit operation.
+  See [[file:import-md-and-org/1_discussion.org][the mixed-format import discussion]]. No implementation changed here.
 * Dead-link warnings miss targets deleted by the same save (2026-09-13)
   =dead_link_warnings= regards every ID present in the pre-save graph as
   live. Therefore, when one buffer both saves a text link and deletes that

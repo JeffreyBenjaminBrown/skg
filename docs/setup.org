@@ -10,13 +10,11 @@ Please ask an AI for help setting it up.
    See ../bash/docker.sh
 ** within the Docker container
 *** start the Skg server
-    See ../bash/start-servers.sh
+See ../bash/start-servers.sh
 *** optional : import data from org-roam
-    cargo run --bin skg -- import-org-roam [source] [target] [nickname]
-    (Eventually importing will support more formats.)
-
-    After importing it into and manipulating it in Skg,
-    extracting your data [[../docs/undoing-import.org][might be annoying.]]
+See [[file:COMMANDS.org::#import-org-roam][importing from Org-roam]] for arguments,
+supported input, and setup steps. Use a fresh staging directory:
+the command deletes existing '.skg' files in its destination.
 ** set up your data folder
    You can make your thoughts entirely private, entirely public,
    or a mix, and you can share with anyone.
