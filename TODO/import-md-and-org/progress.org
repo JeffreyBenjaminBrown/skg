@@ -1,0 +1,21 @@
+#+title: Import Markdown and Org: implementation deviation
+
+* Markdown hard breaks become Org hard breaks
+The plan called for preserving original Markdown body text except for link
+rewrites, relocated footnote definitions, and Skg body normalization. Jeff
+approved one additional conversion: every parsed CommonMark hard break in a
+'.md' document becomes two trailing backslashes, Org's hard-break syntax.
+This applies to the two-trailing-space and one-backslash Markdown forms.
+The source text and byte ranges remain available for address resolution and
+input revalidation; the converted body is stored in Skg. Literal code spans
+and blocks are not hard-break events and remain outside this conversion.
+
+This keeps the ordinary Skg save parser's trailing-whitespace cleanup.
+It also makes subsequent Org export render those line breaks in Emacs Org
+export and GitHub's Org renderer. The imported body no longer preserves the
+original spelling of a Markdown hard break; that is the approved exception.
+
+* Incremental commits
+Jeff later requested incremental commits, superseding the plan's instruction
+not to create commits. The implementation is committed in coherent stages,
+with commit messages pointing back to sections of =2_plan.org=.

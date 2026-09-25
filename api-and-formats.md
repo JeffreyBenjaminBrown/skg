@@ -444,6 +444,50 @@ So far there are these endpoints:
     reviewing the result with `git diff --ignore-all-space`, which
     should show nothing.
 
+## Import Markdown and Org
+
+The Emacs `skg-import-md-and-org` and Neovim `:SkgImportMdAndOrg`
+commands use the same length-prefixed S-expression exchange on one persistent
+TCP connection:
+
+- Initial preview request: `((request . "import md and org")
+  (action . "preview") (input-directory . "/absolute/server/path")
+  (destination-source . "OWNED-SOURCE"))`.
+- If absolute filesystem links are found, the server responds with
+  `response-type` `import-md-and-org-host-mapping-needed` and a `content`
+  explanation. The client asks for the absolute host path corresponding to
+  the input directory, then retries the same preview with
+  `(host-root . "/absolute/host/path")`. An empty string explicitly declines
+  mapping. Web URLs and literal code examples do not trigger this prompt.
+- A successful or invalid preflight responds with `response-type`
+  `import-md-and-org-preview`, `content` containing the resolved arguments,
+  counts, export paths, and diagnostics, plus `(errors (...))` and
+  `(warnings (...))`. A valid nonempty preview also carries
+  `(approval-token "OPAQUE")`. No token means that nothing may be applied
+  (including an empty input set).
+- Explicit confirmation sends `((request . "import md and org")
+  (action . "apply") (approval-token . "OPAQUE"))`. The one-use token refers
+  to server-retained preparation, not to client-supplied nodes. The server
+  consumes it and revalidates inputs, configuration, identities, export
+  claims, and file absence under the mutation gate before writing. A new
+  preview replaces the previous approval; closing the connection discards it.
+  Stale, unknown, reused, and cross-session tokens cannot apply a batch.
+- Declining sends `((request . "import md and org") (action . "cancel"))`,
+  clearing retained preparation without writing. Apply/cancel responses have
+  `response-type` `import-md-and-org-result` and `content`, `errors`, and
+  `warnings` fields. A successful apply additionally has
+  `(record-id "ID")`; clients then use the normal rerender protocol with an
+  optional `(exclude-view-uris "URI" ...)` list naming dirty editor views.
+  Those views are not replaced or updated in the server's open-view state;
+  clean views refresh normally. An absent list means rerender all views.
+
+The importer only creates new authoritative `.skg` files and then publishes
+the graph and search delta. An ordinary write failure removes files created
+by that attempt where possible and reports residual paths; a process crash
+is not guaranteed atomic. Source files are never changed. An export marker
+under each imported file root prepares a later Org export, but does not run
+one automatically.
+
 ## Export to org
   - Request: `((request . "export to org") (source-set . "NAME")
     (output-dir . "PATH") (allow-overPrivateText-telescopes "PID" ...))`.

@@ -15,6 +15,10 @@ See ../bash/start-servers.sh
 See [[file:COMMANDS.org::#import-org-roam][importing from Org-roam]] for arguments,
 supported input, and setup steps. Use a fresh staging directory:
 the command deletes existing '.skg' files in its destination.
+For an additive, previewed import of mixed Markdown and ordinary Org files
+into an existing owned source, use [[file:COMMANDS.org::#import-md-and-org][=M-x skg-import-md-and-org=]]
+after starting the server and client instead. Keep the source documents as
+a backup; Org export is readable but not a round trip.
 ** set up your data folder
    You can make your thoughts entirely private, entirely public,
    or a mix, and you can share with anyone.

@@ -347,7 +347,7 @@ this one -- read-only, ☮).
 Shows the read-only =propertiesFolder=. It lists only true node-file
 properties as titleless viewnodes whose heralds carry their labels, in canonical
 order, and remains visible when none are true.
-=Had ID before org-roam import= and =Was overloaded during org-roam import=
+=Had ID before import= and =Was overloaded during org-roam import=
 are provenance; =No search matching= is the user setting. Edit none of these
 generated viewnodes directly. Delete the whole folder branch to dismiss this
 optional view; doing so does not change any property.
@@ -775,14 +775,45 @@ but also removes the node from the stack.
 **** C-c v s : skg-view-id-stack
 repeated here; described earlier in this doc
 ** import and export
+*** skg-import-md-and-org : additive mixed-document import
+:PROPERTIES:
+:CUSTOM_ID: import-md-and-org
+:END:
+Run =M-x skg-import-md-and-org= with the server running. Choose an absolute
+directory in the server/container filesystem and an existing owned source.
+That source determines the privacy of every new node. The importer scans
+exact =.md= and =.org= files recursively, skips symlinks and =.git=, and
+leaves the originals untouched. It asks for a host-root mapping only if it
+finds absolute filesystem links. A blank mapping preserves unresolved links
+with warnings.
+
+Review the preview of files, generated =.org= export paths, and warnings,
+then explicitly approve or decline. Approval applies only to that preview;
+changed input or destination state requires a new one. The operation creates
+file-root and heading nodes, an import-record node linked to all file roots,
+and an export marker under each root. It does not merge with existing nodes,
+copy attachments, synchronize later edits, or automatically export. IDs and
+the chosen source are checked before creation; existing =.skg= files are not
+replaced. Save-time trailing-whitespace cleanup remains in effect: imported
+Markdown hard breaks become Org's two-backslash hard breaks.
+
+Only document structure, selected metadata, links, and named Markdown
+footnotes are interpreted. Other Markdown/Org markup remains readable text,
+not a full format conversion. Unresolved links and unsupported constructs
+are left in place with warnings. Subsequent Org export is for reading, not
+a round-trip backup: it does not preserve Markdown syntax or all Skg graph
+semantics. Exporting to the original input directory would overwrite matching
+=.org= files, while leaving =.md= files alone. There is no dedicated undo or
+crash-recovery transaction; keep the originals and back up the owned source.
+
 *** importing from org-roam
 :PROPERTIES:
 :CUSTOM_ID: import-org-roam
 :END:
 **** import-org-roam : terminal command
 This imports Org-roam '.org' files into Skg. It is a Cargo subcommand,
-not an Emacs 'M-x skg-import' command, and needs no running server.
-General Org and Markdown import are not implemented.
+not an Emacs command, and needs no running server. Unlike the additive
+interactive importer above, this legacy command replaces its destination.
 
 Run from the repository root, where Cargo and the input files are available:
 
@@ -827,7 +858,7 @@ heading levels introduce grouping nodes titled 'These are special!' and
 'These are normal.' rather than reproducing the outline literally.
 
 'ROAM_ALIASES' becomes Skg aliases. Nodes with an original ID receive the
-'Had ID before org-roam import' property. Duplicate IDs within the input
+'Had ID before import' property. Duplicate IDs within the input
 are merged: children and aliases are combined, and additional titles and
 bodies are appended with a separator. Such nodes receive 'Was overloaded
 during org-roam import'. This does not compare or merge with existing

@@ -679,6 +679,26 @@ Cycles the headline's TODO keyword forward (=cit=) or backward
 (=ciT=) without corrupting its metadata: the =(skg ...)= sexp is
 stripped before org's own TODO-cycling runs, then re-inserted
 after the stars and before the (possibly new) keyword.
+** importing Markdown and Org
+*** :SkgImportMdAndOrg
+With the server running, choose an absolute input directory in the
+server/container filesystem and an existing owned destination source. The
+source determines the privacy of all new nodes. Skg scans exact =.md= and
+=.org= files recursively, leaves the originals untouched, and asks for a
+host-root mapping only when absolute filesystem links occur. Blank mapping
+leaves unresolved links with warnings. Review the file/node counts, generated
+export paths, and diagnostics; then explicitly confirm or decline. A changed
+input or destination requires a fresh preview.
+
+The import is additive: it creates file-root and heading nodes, an import
+record, and an Org export marker under each file root. It does not replace
+existing =.skg= files, copy attachments, synchronize later changes, or export
+automatically. Most original markup remains text; Markdown hard breaks become
+Org's two-backslash form so save-time trailing-whitespace cleanup remains.
+Later export is a readable rendition, not a round-trip backup. Exporting to
+the original directory overwrites matching =.org= files but not =.md= files.
+There is no dedicated undo or crash-recovery transaction.
+
 ** exporting to org
 *** :SkgExportToOrg
 Exports Skg data to plain =.org= files, so the data can be read
