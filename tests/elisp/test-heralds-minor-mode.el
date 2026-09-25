@@ -193,7 +193,7 @@ the C token 2aC: the multi-contains \"2\" (yellow), the ancestor \"a\"
 
 (ert-deftest test-heralds-property-viewnodes-are-friendly-and-colon-free ()
   "Property-viewnode heralds carry the whole titleless viewnode label."
-  (dolist (case '((hadId "☮ had ID before org-roam import")
+  (dolist (case '((hadId "☮ had ID before import")
                   (wasOverloaded "☮ was overloaded during org-roam import")
                   (noSearchMatching "☮ no search matching")))
     (let ((result (heralds-from-metadata

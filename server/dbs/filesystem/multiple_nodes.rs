@@ -35,6 +35,19 @@ pub fn read_all_skg_files_from_sources (
                      "telescope violation found at load" ); }
   Ok (nodes) }
 
+/// Import preflight must inspect authoritative export claims without
+/// creating or removing the loader's diagnostic reports.
+pub(crate) fn read_all_skg_files_from_sources_read_only (
+  config : &SkgConfig,
+) -> io::Result<Vec<NodeComplete>> {
+  let (nodes, violations) =
+    read_all_skg_files_from_sources_impl (config, false)?;
+  if ! violations . is_empty () {
+    return Err (io::Error::new (io::ErrorKind::InvalidData,
+      "Configured sources have telescope violations; resolve them before import")); }
+  Ok (nodes)
+}
+
 /// As 'read_all_skg_files_from_sources', but hands back the
 /// load-time telescope violations rather than logging them, so
 /// init and rebuild can report them alongside the graph-level ones
@@ -47,6 +60,13 @@ pub fn read_all_skg_files_from_sources (
 ///   use the same pid. The owned telescope wins before folding.
 pub fn read_all_skg_files_from_sources_collecting_violations (
   config: &SkgConfig
+) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
+  read_all_skg_files_from_sources_impl (config, true)
+}
+
+fn read_all_skg_files_from_sources_impl (
+  config : &SkgConfig,
+  report_errors : bool,
 ) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
   let mut sections_by_pid
     : HashMap<ID, Vec<(SourceName, NodeFS)>> = HashMap::new();
@@ -73,7 +93,8 @@ pub fn read_all_skg_files_from_sources_collecting_violations (
           source . path . display() . to_string(),
           e . to_string()
         )); }} }
-  report_load_errors (&load_errors, &config . data_root) ?;
+  if report_errors {
+    report_load_errors (&load_errors, &config . data_root) ?; }
   if ! load_errors . is_empty() {
     return Err (io::Error::new (
       io::ErrorKind::InvalidData,

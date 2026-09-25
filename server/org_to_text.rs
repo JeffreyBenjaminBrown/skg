@@ -137,7 +137,7 @@ pub fn viewnode_to_text (
   result . push ('\n');
   if let Some (body_text) = body {
     if ! body_text . is_empty () {
-      result . push_str (body_text);
+      result . push_str (&crate::body_view_escape::encode_body_for_view (body_text));
       if ! body_text . ends_with ('\n') {
         result . push ('\n'); }} }
   Ok (result) }

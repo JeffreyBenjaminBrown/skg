@@ -187,7 +187,7 @@ pub fn validate_complete_graph_candidate (
   validate_complete_graph (config, &nodes)
 }
 
-fn complete_from_rust (node : &NodeRust) -> NodeComplete {
+pub(crate) fn complete_from_rust (node : &NodeRust) -> NodeComplete {
   NodeComplete {
     title : node . title . clone (),
     overPrivateText_telescope : node . overPrivateText_telescope,

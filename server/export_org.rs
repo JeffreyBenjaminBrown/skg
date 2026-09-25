@@ -13,7 +13,8 @@
 //! unit-testable. The server handler and the `export-org`
 //! subcommand both call it.
 
-use crate::source_sets::ActiveSourceSet;
+use crate::source_sets::{ActiveSourceSet, SourceSetName};
+use crate::types::misc::SkgConfig;
 use crate::types::misc::{ID, RelPartner};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::textlinks::replace_each_link_with_its_label;
@@ -217,6 +218,26 @@ pub fn export_candidate_pids (
   let mut candidates : Vec<ID> = candidates . into_iter () . collect ();
   candidates . sort ();
   candidates
+}
+
+/// All currently valid export-root claims across configured sources. Import
+/// uses this read-only view to reject a new automatic target that would
+/// compete with an existing export root.
+pub(crate) fn claimed_export_targets (
+  nodes : &[NodeComplete],
+  config : &SkgConfig,
+) -> Result<Vec<(ID, String)>, String> {
+  let active : ActiveSourceSet = ActiveSourceSet::named (
+    config, SourceSetName::from ("all"))
+    .map_err (|error| error . to_string ())?;
+  let aliases : HashMap<ID, ID> = nodes . iter ()
+    .flat_map (|node| node . extra_ids . iter ()
+      .map (|extra| (extra . clone (), node . pid . clone ())))
+    .collect ();
+  let mut warnings : Vec<String> = Vec::new ();
+  let (roots, _) = discover_roots (nodes, &aliases, &active, &mut warnings);
+  Ok (roots . into_values ()
+    .map (|root| (root . root_pid, root . target)) . collect ())
 }
 
 fn write_export_file (

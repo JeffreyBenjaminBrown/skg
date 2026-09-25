@@ -21,7 +21,7 @@ use std::collections::HashSet;
 /// A .skg file can have any number of associated FileProperties.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FileProperty {
-  Had_ID_Before_Import, // Node had an :ID: property before org-roam import.
+  Had_ID_Before_Import, // Node had an :ID: property before import.
   Was_Overloaded, // Multiple org-roam nodes used the same ID (as an ID, not in a link). This guards against a bug in my org-roam data (I can't say it's a bug in org-roam; I don't know.) The importer merges their content into a single node with the ID that was overloaded in org-roam.
   NoSearchMatching, // Title, aliases and body cannot produce a direct text-search match. This is search decluttering, not access control.
 }
@@ -49,7 +49,7 @@ impl FileProperty {
   pub fn herald_text (self) -> &'static str {
     match self {
       FileProperty::Had_ID_Before_Import =>
-        "☮ had ID before org-roam import",
+        "☮ had ID before import",
       FileProperty::Was_Overloaded =>
         "☮ was overloaded during org-roam import",
       FileProperty::NoSearchMatching =>

@@ -188,7 +188,7 @@ describe('skg.heralds', function ()
   it('displays friendly colon-free property-viewnode heralds', function ()
     for _, case in ipairs({
       { property = 'hadId',
-        expected = '☮ had ID before org-roam import' },
+        expected = '☮ had ID before import' },
       { property = 'wasOverloaded',
         expected = '☮ was overloaded during org-roam import' },
       { property = 'noSearchMatching',
