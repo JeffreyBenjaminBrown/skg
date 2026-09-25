@@ -19,6 +19,7 @@
 (require 'skg-request-relSource-info)
 (require 'skg-request-boolprop-state)
 (require 'skg-request-export-org)
+(require 'skg-request-import-md-and-org)
 (require 'skg-request-git-diff-mode)
 (require 'skg-request-rebuild-ephemeral-data-stores)
 (require 'skg-request-rerender-all-views)

@@ -21,26 +21,58 @@ M.after_empty_stream = nil
 ---Ask the server to re-render every open view: lock everything, then
 ---drive the streaming protocol.
 function M.request_rerender_all_views ()
-  return M.request_rerender_all_views_with_approval(nil)
+  return M.request_rerender_all_views_with_approval(nil, nil)
 end
 
-function M.request_rerender_all_views_with_approval (approved_pids)
+function M.request_rerender_clean_views_after_import ()
+  local dirty_uris = {}
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].modified then
+      local uri = vim.b[buf].skg_view_uri
+      if uri then table.insert(dirty_uris, uri) end
+    end
+  end
+  return M.request_rerender_all_views_with_approval(nil, dirty_uris)
+end
+
+function M.request_rerender_all_views_with_approval (approved_pids,
+                                                     excluded_view_uris)
   lock.begin_stream('rerender')
   lock.lock_all_skg_buffers()
   M.register_rerender_stream_handlers()
   M.register_overPrivateText_confirmation(function (pids)
-    M.request_rerender_all_views_with_approval(pids)
+    M.request_rerender_all_views_with_approval(pids, excluded_view_uris)
   end)
   state.lp_reset()
   local request = {
     sexpr.pair(
       sexpr.symbol('request'),
       'rerender all views') }
+  if excluded_view_uris then
+    local excluded = { sexpr.symbol('exclude-view-uris') }
+    for _, uri in ipairs(excluded_view_uris) do
+      table.insert(excluded, uri) end
+    table.insert(request, excluded)
+  end
   if approved_pids and #approved_pids > 0 then
     local approval = { sexpr.symbol('allow-overPrivateText-telescopes') }
     for _, pid in ipairs(approved_pids) do table.insert(approval, pid) end
     table.insert(request, approval) end
-  client.send_string(sexpr.to_string(request) .. '\n')
+  local ok, err = pcall(client.send_string, sexpr.to_string(request) .. '\n')
+  if not ok then
+    for _, kind in ipairs({ 'rerender-lock', 'rerender-view',
+                            'rerender-done',
+                            'overPrivateText-telescope-confirmation' }) do
+      local entry = state.response_handler_map[kind]
+      if entry and entry.one_shot then
+        state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
+      end
+      state.response_handler_map[kind] = nil
+    end
+    lock.end_stream()
+    lock.unlock_all_save_locked()
+    error(err)
+  end
 end
 
 ---Register the alternative privacy challenge for a rerendering request.

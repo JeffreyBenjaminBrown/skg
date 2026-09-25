@@ -28,6 +28,7 @@ pub enum RequestType {
   ActiveSourceSet,
   SetActiveSourceSet,
   ExportToOrg,
+  ImportMdAndOrg,
   DeleteReferencesToAbsentNode,
 }
 
@@ -59,6 +60,7 @@ impl RequestType {
       "active source set"        => Ok (RequestType::ActiveSourceSet),
       "set active source set"    => Ok (RequestType::SetActiveSourceSet),
       "export to org"            => Ok (RequestType::ExportToOrg),
+      "import md and org"         => Ok (RequestType::ImportMdAndOrg),
       "delete references to absent node" => Ok (RequestType::DeleteReferencesToAbsentNode),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
@@ -101,6 +103,9 @@ pub enum TcpToClient {
   SourceSets,
   ActiveSourceSet,
   ExportToOrg,
+  ImportMdAndOrgHostMappingNeeded,
+  ImportMdAndOrgPreview,
+  ImportMdAndOrgResult,
   DeleteReferencesConfirmation,
   DeleteReferencesResult,
   Error,
@@ -144,6 +149,9 @@ impl TcpToClient {
       TcpToClient::SourceSets       => "source-sets",
       TcpToClient::ActiveSourceSet  => "active-source-set",
       TcpToClient::ExportToOrg      => "export-to-org",
+      TcpToClient::ImportMdAndOrgHostMappingNeeded => "import-md-and-org-host-mapping-needed",
+      TcpToClient::ImportMdAndOrgPreview => "import-md-and-org-preview",
+      TcpToClient::ImportMdAndOrgResult => "import-md-and-org-result",
       TcpToClient::DeleteReferencesConfirmation => "delete-references-confirmation",
       TcpToClient::DeleteReferencesResult => "delete-references-result",
       TcpToClient::Error            => "error", }} }

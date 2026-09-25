@@ -4,6 +4,7 @@ pub mod diff_analysis;
 pub mod relSource_info;
 pub mod boolprop_state;
 pub mod export_to_org;
+pub mod import_md_and_org;
 pub mod get_file_path;
 pub mod herald_rules;
 pub mod rebuild_ephemeral_data_stores;

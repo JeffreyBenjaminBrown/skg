@@ -40,11 +40,74 @@ pub fn handle_rerender_all_views_request (
   views_state : &mut ViewsState,
   active_source_set : &ActiveSourceSet,
 ) {
-  stream_rerender_views (
-    stream, env, views_state, Some (active_source_set),
-    None, false,
-    "rerender-all-views",
-    &approved_pids_from_request (request)); }
+  let excluded : HashSet<ViewUri> =
+    match excluded_view_uris_from_request (request) {
+      Ok (excluded) => excluded,
+      Err (error) => {
+        send_response_with_length_prefix (
+          stream, &tag_sexp_response (TcpToClient::RerenderLock,
+            &format_lock_views_sexp (&[])));
+        send_response_with_length_prefix (
+          stream, &tag_sexp_response (TcpToClient::RerenderDone,
+            &format_errors_warnings_sexp (&[error], &[])));
+        return; } };
+  stream_rerender_views_excluding (
+    stream, env, views_state, active_source_set,
+    &approved_pids_from_request (request), &excluded); }
+
+fn excluded_view_uris_from_request (
+  request : &str,
+) -> Result<HashSet<ViewUri>, String> {
+  let parsed = sexp::parse (request) . map_err (|error| error . to_string ())?;
+  let present : bool = match &parsed {
+    sexp::Sexp::List (items) => items . iter () . any (|item|
+      matches! (item, sexp::Sexp::List (fields)
+        if matches! (fields . first (), Some (sexp::Sexp::Atom (
+          sexp::Atom::S (name))) if name == "exclude-view-uris"))),
+    _ => false, };
+  if ! present { return Ok (HashSet::new ()); }
+  crate::types::sexp::extract_string_list_from_sexp (
+    &parsed, "exclude-view-uris")
+    .map (|uris| uris . into_iter ()
+      .map (ViewUri::from_client_string) . collect ())
+}
+
+#[cfg(test)]
+mod import_exclusion_tests {
+  use super::*;
+
+  #[test]
+  fn dirty_view_exclusions_are_parsed_and_malformed_lists_fail_closed () {
+    let request : &str = "((request . \"rerender all views\") (exclude-view-uris \"dirty-uri\"))";
+    let excluded : HashSet<ViewUri> =
+      excluded_view_uris_from_request (request) . unwrap ();
+    assert! (excluded . contains (&ViewUri::from_client_string (
+      "dirty-uri" . to_string ())));
+    assert! (excluded_view_uris_from_request (
+      "((request . \"rerender all views\") (exclude-view-uris (bad)))")
+      . is_err ());
+  }
+}
+
+fn stream_rerender_views_excluding (
+  stream : &mut TcpStream,
+  env : &SkgEnv,
+  views_state : &mut ViewsState,
+  active_source_set : &ActiveSourceSet,
+  approved_pids : &HashSet<crate::types::misc::ID>,
+  excluded : &HashSet<ViewUri>,
+) {
+  let mut prepared : PreparedRerenders = prepare_rerender_views (
+    env, views_state, views_state . diff_mode_enabled,
+    Some (active_source_set), None, false);
+  prepared . uris . retain (|uri| ! excluded . contains (uri));
+  prepared . views . retain (|view| ! excluded . contains (&view . uri));
+  if ! authorize_prepared_rerenders (
+    stream, &mut prepared, Some (active_source_set),
+    "rerender-all-views", approved_pids) {
+    return; }
+  stream_prepared_rerenders (stream, views_state, prepared);
+}
 
 /// Stream re-rendered views to Emacs.
 /// Sends: rerender-lock → rerender-view* → rerender-done.
