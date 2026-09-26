@@ -40,6 +40,20 @@ section exists for a PID, the entire owned telescope is retained and all
 same-PID foreign sections are ignored (with a deterministic warning and no
 filesystem edit). A telescope with no owned section remains wholly foreign.
 
+## overPrivateText
+
+A privacy telescope is **overPrivateText** when its folded title or body is
+selected from a section more private than its home (most public retained)
+section. The flag applies to the whole telescope, even if only one text
+field is below home. This violates the rule that the node's text lives at
+home; see [privacy telescopes](docs/telescopes.md).
+
+Source-set `all` can show that text with a warning. A restricted request
+asks for approval scoped to the affected node IDs and that request before
+releasing it; search asks whether to include or exclude such telescopes.
+Approval to display the text does not authorize **Hoist**, the separate
+repair that moves the selected title and body to home.
+
 ## privacy order and relSource
 
 The position of a source in the config's privacy order (most public

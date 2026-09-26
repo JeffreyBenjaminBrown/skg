@@ -779,32 +779,55 @@ repeated here; described earlier in this doc
 :PROPERTIES:
 :CUSTOM_ID: import-md-and-org
 :END:
+**** ordinary usage
 Run =M-x skg-import-md-and-org= with the server running. Choose an absolute
 directory in the server/container filesystem and an existing owned source.
-That source determines the privacy of every new node. The importer scans
+That source determines where every new node will be written. The importer scans
 exact =.md= and =.org= files recursively, skips symlinks and =.git=, and
-leaves the originals untouched. It asks for a host-root mapping only if it
-finds absolute filesystem links. A blank mapping preserves unresolved links
-with warnings.
+leaves the originals untouched.
 
 Review the preview of files, generated =.org= export paths, and warnings,
 then explicitly approve or decline. Approval applies only to that preview;
-changed input or destination state requires a new one. The operation creates
-file-root and heading nodes, an import-record node linked to all file roots,
-and an export marker under each root. It does not merge with existing nodes,
-copy attachments, synchronize later edits, or automatically export. IDs and
-the chosen source are checked before creation; existing =.skg= files are not
-replaced. Save-time trailing-whitespace cleanup remains in effect: imported
-Markdown hard breaks become Org's two-backslash hard breaks.
+another run requires a new one.
+
+The operation creates file-root and heading nodes,
+which correspond 1-to-1 to sections of the imported data.
+It also creates two kinds of nodes that do not so correspond:
+- a single import-record node with textlinks to all file roots,
+  so you can see everything you just imported in one place.
+- an export marker under each root,
+  so you can export back to the same path if you want.
+  But this is dangerous -- see "Re-export is dangerous" below.
+
+The importer does not merge into existing nodes,
+copy attachments, synchronize later edits, or automatically export.
 
 Only document structure, selected metadata, links, and named Markdown
 footnotes are interpreted. Other Markdown/Org markup remains readable text,
 not a full format conversion. Unresolved links and unsupported constructs
-are left in place with warnings. Subsequent Org export is for reading, not
+are left in place with warnings.
+
+**** Re-export is dangerous.
+Subsequent Org export is for reading, not
 a round-trip backup: it does not preserve Markdown syntax or all Skg graph
 semantics. Exporting to the original input directory would overwrite matching
 =.org= files, while leaving =.md= files alone. There is no dedicated undo or
 crash-recovery transaction; keep the originals and back up the owned source.
+
+**** Skg asks for a host-root mapping if it finds absolute filesystem links.
+Skg runs in a Docker container.
+The folder /home/ubuntu/host in that container
+corresponds to some folder on the host system.
+If the files to be imported contain absolute links,
+skg needs to know how those host-system paths
+correspond to paths in the docker container.
+
+**** Imported Markdown hard breaks become Org's two-backslash hard breaks.
+In Markdown you can put a slash or two spaces after a line
+to ensure that the next line is shown on a separate line,
+rather than smooshed into a single flowing paragraph.
+In Org, such a "hard break" is represented by two slashes,
+so the importer makes that conversion.
 
 *** importing from org-roam
 :PROPERTIES:

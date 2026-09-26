@@ -14,6 +14,20 @@ A config option, for recording videos.
 Could put a second minibuffer line,
 that reads if anything (key sequence -> command),
 leaving a trail for five seconds or until interrupted.
+** TODO CRITICAL : git commit workflow
+Solving this puzzle will save me a lot of time.
+
+I want to see, for each content that was removed from any container,
+where (plural) it was removed from and where (plural) it resides,
+as containerward trees.
+I will use that information to verify it is well-placed.
+I want not to duplicate that effort -- that is, if it was removed from multiple places,
+and I verify that it is well-placed while processing one of those places,
+I don't want to re-verify when processing another place.
+I therefore want a set of nodes marked 'well-placed',
+and a herald marking any RemovedHere node as such.
+
+That should be visible both in skg and magit.
 ** docs
 *** test skg-to-org
 **** what happens to multi-contained 'export me' markers?
@@ -63,6 +77,8 @@ intending to replace it, but can't replace it.
 There are likely other viewnode kinds for which this happens.
 ** behavior changes
 *** TODO/help.org
+*** Telescope sections are confusing from magit.
+Would like to be able to see them all at a glance for a given ID.
 *** text search across containment paths
 *** making a link into content
 **** should rewrite edges, including text links, that pointed to the node with the link
@@ -777,9 +793,6 @@ Compare the state of both sources.
 ** If I need to graft a forest's trees onto a false root,
    rctree can
    egotree can't
-* dubious
-** fold body into false headline
-   there in Emacs but (at worst ignored) when Rust rebuilds
 * if anyone else is reading this
 ** Most plans are not here but online.
    e.g. here:
