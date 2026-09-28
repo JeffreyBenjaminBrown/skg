@@ -582,8 +582,8 @@
    Documentation changes that are load-bearing for an earlier commit
    should land with that commit. At the end, make one consistency pass:
 
-   - [[../../docs/telescopes.md]], [[../../glossary.md]],
-     [[../../api-and-formats.md]], [[../../docs/COMMANDS.org]], and comments
+   - [[../../docs/telescopes.md]], [[../../docs/glossary.md]],
+     [[../../docs/api-and-formats.md]], [[../../docs/COMMANDS.org]], and comments
      in [[../../schema.tql]] must agree that home is the most-public retained
      section and title/body at home is an invariant.
    - Document the owned-pid collision rule, overPrivateText-data warning/confirmation,

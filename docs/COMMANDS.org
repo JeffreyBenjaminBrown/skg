@@ -905,7 +905,7 @@ inside each file.
 
 After reviewing the output, place it in the intended owned source directory
 and configure that source with the intended name and privacy order. See
-[[file:../api-and-formats.md][the configuration reference]]. Check for ID collisions with existing sources
+[[file:api-and-formats.md][the configuration reference]]. Check for ID collisions with existing sources
 before loading: the importer itself does not check them.
 
 For a first setup, configure the source before starting Skg. When replacing

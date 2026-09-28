@@ -117,25 +117,16 @@ permissions. They are ignored by =.dockerignore=.
 - =install.ps1=
 - =run.ps1=
 - =WINDOWS.org=
-- project =README.org= at the package root
-- root =glossary.md=
-- selected project docs under =docs/=
+- project =docs/README.org= and =docs/glossary.md=
+- all project docs under =docs/=
+- root =LICENSE.md=
 - =elisp/=
 - =starter-data/=
 
-The root =README.org= is intentionally one directory above =docs/= so
-relative links like =[[./docs/setup.org]]= keep working.
+The project README lives in =docs/=, so its relative links such as
+=[[./setup.org]]= work in both the repository and the package.
 
-Selected docs currently include:
-- =docs/setup.org=
-- =docs/COMMANDS.org=
-- =docs/merging.org=
-- =docs/moving-nodes-across-repos.org=
-- =docs/hyperlinks.md=
-- =docs/forks.md=
-- =docs/data-model_friendly.org=
-- =docs/data-model_technical.org=
-- =glossary.md= at package root
+The package copies the complete =docs/= directory.
 
 ** Windows-side intended flow
 On the Windows machine:

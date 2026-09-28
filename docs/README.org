@@ -31,13 +31,13 @@ Much of it, including the bulk of the really conceptual parts,
 are in (my public knowledge) .skg graph,
   https://github.com/JeffreyBenjaminBrown/public-notes-in-skg-format
 * Skg is software for manipulating and sharing knowledge.
-  [[./docs/this-is-awesome.org][Here's one pitch for it.]]
-* [[./docs/setup.org][How to set up Skg]]
+  [[./this-is-awesome.org][Here's one pitch for it.]]
+* [[./setup.org][How to set up Skg]]
   This includes how to import data from org-roam.
-* [[./docs/COMMANDS.org][Commands available in Skg]]
-* [[./docs/heralds.org][How to read heralds and link annotations]]
-* [[./docs/data-model_friendly.org][The Skg data model]]
-  A conceptual introduction; see also the [[./docs/data-model_technical.org][technical reference]].
+* [[./COMMANDS.org][Commands available in Skg]]
+* [[./heralds.org][How to read heralds and link annotations]]
+* [[./data-model_friendly.org][The Skg data model]]
+  A conceptual introduction; see also the [[./data-model_technical.org][technical reference]].
 * to understand the code
 The server and its graph are written in Rust. The =.skg= files are
 authoritative; the server builds an immutable in-memory graph and a derived
@@ -47,11 +47,11 @@ TCP protocol is editor-independent.
 The API, the view metadata format, and the .skg file format are described in [[./api-and-formats.md][api-and-formats.md]].
 
 Some other reasonable jumping-off points include:
-- [[./server/types/][the types]] (in the server), especially
-  - [[./server/types/nodes/complete.rs][nodes/complete.rs]] -- what nodes in the graph are
-  - [[./server/types/viewnode.rs][viewnode.rs]] -- how nodes in the graph are represented on-screen
-- [[./server/main.rs][main]]
+- [[../server/types/][the types]] (in the server), especially
+  - [[../server/types/nodes/complete.rs][nodes/complete.rs]] -- what nodes in the graph are
+  - [[../server/types/viewnode.rs][viewnode.rs]] -- how nodes in the graph are represented on-screen
+- [[../server/main.rs][main]]
 - [[https://github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org][my org-roam notes about Skg online]]
-- [[./TODO/feasible-now-probably.org][how I implemented some recent features using Claude]]
+- [[../TODO/feasible-now-probably.org][how I implemented some recent features using Claude]]
 * to help
   Tell me you want to! I would work hard to bring you onboard.

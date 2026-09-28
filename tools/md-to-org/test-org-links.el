@@ -1,7 +1,7 @@
 ;;; test-org-links.el --- Test that all org links resolve correctly -*- lexical-binding: t; -*-
 
 ;;; Commentary:
-;; This script tests all org links in the docs/ and README.org files.
+;; This script tests all org links in docs/.
 ;; For links with GitHub-style anchors, it verifies the heading exists.
 ;; For links without anchors, it verifies the file exists.
 ;; Broken links are reported with their source location.
@@ -9,8 +9,10 @@
 ;;; Code:
 
 (require 'org)
+(require 'org-element)
 
-(defvar test-org-links-base-dir "/home/ubuntu/"
+(defvar test-org-links-base-dir
+  (expand-file-name "../.." (file-name-directory (or load-file-name buffer-file-name)))
   "Base directory for the org files.")
 
 (defun test-org-links--heading-to-anchor (heading)
@@ -54,18 +56,19 @@ Returns (heading-text . line-number) if found, nil otherwise."
         (nreverse headings)))))
 
 (defun test-org-links--extract-links (file)
-  "Extract all org links from FILE.
+  "Extract actual local file links from FILE.
 Returns a list of (link-path . link-text) pairs."
   (with-temp-buffer
     (insert-file-contents file)
     (org-mode)
-    (goto-char (point-min))
-    (let ((links nil))
-      (while (re-search-forward org-link-bracket-re nil t)
-        (let ((link (match-string 1))
-              (text (or (match-string 2) "")))
-          (push (cons link text) links)))
-      (nreverse links))))
+    (org-element-map (org-element-parse-buffer) 'link
+      (lambda (link)
+        (when (equal (org-element-property :type link) "file")
+          (cons (concat (org-element-property :path link)
+                        (when-let* ((search (org-element-property
+                                             :search-option link)))
+                          (concat "::" search)))
+                (or (org-element-property :raw-link link) "")))))))
 
 (defun test-org-links--resolve-path (link source-file)
   "Resolve LINK path relative to SOURCE-FILE."
@@ -84,35 +87,38 @@ Returns a list of (link-path . link-text) pairs."
 (defun test-org-links--test-single-link (link text source-file)
   "Test a single LINK with TEXT from SOURCE-FILE.
 Returns nil if OK, or an error description string."
-  ;; Skip external links
-  (when (not (string-match "^https?://" link))
-    (let* ((has-anchor (string-match "\\(.+\\)#\\(.+\\)$" link))
-           (file-part (if has-anchor (match-string 1 link) link))
-           (anchor (when has-anchor (match-string 2 link)))
-           (resolved-path (test-org-links--resolve-path file-part source-file))
-           (heading-result (when (and anchor (file-exists-p resolved-path))
-                             (test-org-links--find-heading-by-anchor resolved-path anchor))))
+  (let* ((parts (split-string link "::"))
+         (file-part (car parts))
+         (search (cadr parts))
+         (resolved-path (test-org-links--resolve-path file-part source-file)))
       (cond
        ;; File doesn't exist
        ((not (file-exists-p resolved-path))
         (format "File not found: %s" resolved-path))
-       ;; Has anchor but heading not found
-       ((and anchor (not heading-result))
-        (format "Anchor '#%s' not found in %s\n  Available headings:\n%s"
-                anchor
-                (file-name-nondirectory resolved-path)
-                (mapconcat
-                 (lambda (h) (format "    #%s -> \"%s\"" (car h) (cdr h)))
-                 (test-org-links--list-headings resolved-path)
-                 "\n")))
-       ;; Has anchor but heading is on line 1 (would look like going to top of file)
-       ((and anchor heading-result (= (cdr heading-result) 1))
-        (format "Anchor '#%s' resolves to line 1 in %s (heading: \"%s\")\n  This is indistinguishable from landing at top of file"
-                anchor
-                (file-name-nondirectory resolved-path)
-                (car heading-result)))
+       ((and search (string-prefix-p "#" search)
+             (not (with-temp-buffer
+                    (insert-file-contents resolved-path)
+                    (goto-char (point-min))
+                    (re-search-forward
+                     (concat "^[ \t]*:CUSTOM_ID:[ \t]*"
+                             (regexp-quote (substring search 1))
+                             "[ \t]*$") nil t))))
+        (format "Custom ID %s not found in %s" search resolved-path))
+       ((and search (string-prefix-p "*" search)
+             (not (with-temp-buffer
+                    (insert-file-contents resolved-path)
+                    (org-mode)
+                    (goto-char (point-min))
+                    (let ((found nil))
+                      (while (and (not found)
+                                  (re-search-forward org-heading-regexp nil t))
+                        (setq found
+                              (string= (org-get-heading t t t t)
+                                       (substring search 1))))
+                      found))))
+        (format "Heading %s not found in %s" search resolved-path))
        ;; OK
-       (t nil)))))
+       (t nil))))
 
 (defun test-org-links--test-file (file)
   "Test all links in FILE. Returns list of error messages."
@@ -130,13 +136,11 @@ Returns nil if OK, or an error description string."
     (nreverse errors)))
 
 (defun test-org-links-run ()
-  "Run link tests on all org files in docs/ and README.org."
+  "Run link tests on all org files in docs/."
   (interactive)
-  (let ((files (append
-                (list (expand-file-name "README.org" test-org-links-base-dir))
-                (directory-files-recursively
-                 (expand-file-name "docs" test-org-links-base-dir)
-                 "\\.org$")))
+  (let ((files (directory-files-recursively
+                (expand-file-name "docs" test-org-links-base-dir)
+                "\\.org$"))
         (all-errors nil)
         (total-links 0)
         (broken-links 0))

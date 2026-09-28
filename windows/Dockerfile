@@ -15,16 +15,8 @@ FROM jeffreybbrown/hode:latest
 WORKDIR /opt/skg
 COPY --from=builder /opt/skg/target/release/skg /usr/local/bin/skg
 COPY windows/container/start-servers.sh /opt/skg/windows/container/start-servers.sh
-COPY README.org /opt/skg/README.org
-COPY glossary.md /opt/skg/glossary.md
-COPY docs/setup.org /opt/skg/docs/setup.org
-COPY docs/COMMANDS.org /opt/skg/docs/COMMANDS.org
-COPY docs/merging.org /opt/skg/docs/merging.org
-COPY docs/moving-nodes-across-repos.org /opt/skg/docs/moving-nodes-across-repos.org
-COPY docs/hyperlinks.md /opt/skg/docs/hyperlinks.md
-COPY docs/forks.md /opt/skg/docs/forks.md
-COPY docs/data-model_friendly.org /opt/skg/docs/data-model_friendly.org
-COPY docs/data-model_technical.org /opt/skg/docs/data-model_technical.org
+COPY docs /opt/skg/docs
+COPY LICENSE.md /opt/skg/LICENSE.md
 RUN chmod +x /usr/local/bin/skg /opt/skg/windows/container/start-servers.sh
 
 ENV SKG_PROJECT_ROOT=/opt/skg

@@ -2,40 +2,39 @@
 ** Purpose
 Skg is for thinking, individually and collectively. It is a simple, novel way to write, collect (from other writers), organize and share information. (Any of which can be ignored -- you don't have to share, for instance, to use the app productively.) In a world of abundant information, I hope Skg will let users direct their attention, process information and collaborate more effectively.
 
-Skg begins from a [simple web-of-thought data model](docs/data-model-trees-with-links.md) that [many people already love](docs/who-maps-knowledge.md). Its novelty is to extend that model [to integrate the thoughts of different users](docs/skg-enables-deep-sharing.md).
+Skg begins from a [[file:data-model-trees-with-links.md][simple web-of-thought data model]] that [[file:who-maps-knowledge.md][many people already love]]. Its novelty is to extend that model [[file:skg-enables-deep-sharing.md][to integrate the thoughts of different users]].
 
-Technical doubts? See the small [FAQ](docs/FAQ.md).
+Technical doubts? See the small [[file:FAQ.md][FAQ]].
 
 ** If you need more motivation
 to get excited about this idea:
 
-- [Preempting some common concerns](docs/preempt.md) about ownership and privacy.
+- [[file:preempt.md][Preempting some common concerns]] about ownership and privacy.
 - Some less obvious motivations
-  - [Writing is like thinking with power tools.](docs/wise-people-say-write.md)
-  - [Traditional data ownership is awkward.](docs/ownership-has-been-awkward.md)
+  - [[file:wise-people-say-write.md][Writing is like thinking with power tools.]]
+  - [[file:ownership-has-been-awkward.md][Traditional data ownership is awkward.]]
   - The web of thought experience feels good.
-    - [It is liberating, fun, peaceful, and psychically integrating.](docs/it-will-be-fun.md)
-    - [It is Zen.](docs/knowledge-gardening-is-zen.md)
-  - [Private writing is powerful.](docs/private-writing.md)
-  - [Integrating your public and private writing only recently became possible](docs/integrate-public-and-private.md)
-    - which is important, because [writing is like thinking with power tools](docs/wise-people-say-write.md).
-- And of course, [sharing information is powerful.](docs/sharing-is-powerful.md)
+    - [[file:it-will-be-fun.md][It is liberating, fun, peaceful, and psychically integrating.]]
+    - [[file:knowledge-gardening-is-zen.md][It is Zen.]]
+  - [[file:private-writing.md][Private writing is powerful.]]
+  - [[file:integrate-public-and-private.md][Integrating your public and private writing only recently became possible]]
+    - which is important, because [[file:wise-people-say-write.md][writing is like thinking with power tools]].
+- And of course, [[file:sharing-is-powerful.md][sharing information is powerful.]]
 
 ** If you're a programmer, please help!
-[Skg uses cool technologies!](docs/cool-tech-in-skg.md), including Rust, TypeDB and Emacs. (That said, I'm flexible -- if you want to write a non-Emacs client, or rewrite the server in Haskell, let's go!)
+[[file:cool-tech-in-skg.md][Skg uses cool technologies!]], including Rust and Emacs. (That said, I'm flexible -- if you want to write another client, or rewrite the server in Haskell, let's go!)
 
-- [Usage: How to run Skg](docs/usage.md)
+- [[file:usage.md][Usage: How to run Skg]]
 - Skg's data model and user experience
-  - Trees and textlinks: [Some simple but important definitions](docs/vocabulary.md)
-  - [TextLinks can point to any part of a document.](docs/hyperlinks.md)
-  - ["Forks": Subscription and overriding in detail](docs/forks.md)
-  - [The data model](docs/data-model-skg-extensions.md).
-  - [The sharing model](docs/sharing-model.md).
-- [What's done, and what's left to do](docs/progress.md)
+  - Trees and textlinks: [[file:vocabulary.md][Some simple but important definitions]]
+  - [[file:hyperlinks.md][TextLinks can point to any part of a document.]]
+  - [[file:forks.md]["Forks": Subscription and overriding in detail]]
+  - [[file:data-model-skg-extensions.md][The data model]].
+  - [[file:sharing-model.md][The sharing model]].
+- [[file:COMMANDS.org][What's available in Skg]]
 - Some reasonable jumping-off points for understanding the code
-  - [The TypeDB schema](schema.tql)
-  - [The Rust types](server/types.rs)
-  - [The Rust server](server/serve.rs). (The `main` module is just a wrapper for this module.)
-  - [The Emacs client](elisp/skg-client.el)
+  - [[file:../server/types/nodes/complete.rs][The Rust node types]]
+  - [[file:../server/serve.rs][The Rust server]]. (The =main= module is just a wrapper for this module.)
+  - [[file:../elisp/skg-client.el][The Emacs client]]
 ** meh
   The view above only has one root, but views in Skg can have multiple roots.

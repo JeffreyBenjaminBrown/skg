@@ -290,7 +290,7 @@ Auto-defined levels replace manual =[[source_sets]]= config
 [[../../coding-advice/for-ai.md][for-ai.md]]). Loose ends: the reserved set =all= and the features
 that require it (git diff mode, diff analysis) map naturally to
 "maximum level plus every foreign source", but
-[[../../api-and-formats.md][api-and-formats.md]] should say so; =default_source_set= becomes a
+[[../../../docs/api-and-formats.md][api-and-formats.md]] should say so; =default_source_set= becomes a
 default *level*; and the per-connection reset-on-reconnect behavior
 carries over unchanged.
 
@@ -475,5 +475,5 @@ diff-mode's rendering of carrier files.
 
 The two documentation problems reported in [[../problems.org][TODO/problems.org]]
 during the first draft (the mislabeled subscriberCol passage in
-[[../../glossary.md][glossary.md]]; the overstated =subscribes= comment in
+[[../../../docs/glossary.md][glossary.md]]; the overstated =subscribes= comment in
 [[../../schema.tql][schema.tql]]) are unaffected by the vision update and stand.

@@ -244,7 +244,7 @@ where Relevant : Fn (&ViewNode) -> bool,
 ///   child a user parks inside a folder is "irrelevant" here, so it is moved
 ///   ABOVE the generated members on save. This is deliberate -- the
 ///   membership is generated and ordered, so a parked note stays but is
-///   visibly separated from the live membership. Documented in glossary.md
+///   visibly separated from the live membership. Documented in docs/glossary.md
 ///   ("PartnerFolder") and docs/sharing-model.md.
 /// - Returns a RepairSummary of what it created, demoted and detached.
 pub fn complete_relevant_children

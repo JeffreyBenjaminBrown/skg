@@ -46,7 +46,7 @@ A privacy telescope is **overPrivateText** when its folded title or body is
 selected from a section more private than its home (most public retained)
 section. The flag applies to the whole telescope, even if only one text
 field is below home. This violates the rule that the node's text lives at
-home; see [privacy telescopes](docs/telescopes.md).
+home; see [privacy telescopes](telescopes.md).
 
 Source-set `all` can show that text with a warning. A restricted request
 asks for approval scoped to the affected node IDs and that request before
@@ -125,7 +125,7 @@ Where the code says "child" or "parent", it means the relationship between viewn
 -- and might or might not correspond to a graph relation.
 
 For one example, see the discussion of alias nodes in
-[the architecture documentation](coding-advice/architecture.md).
+[the architecture documentation](../coding-advice/architecture.md).
 
 ## col
 
@@ -266,7 +266,7 @@ See `docs/forks.md` and `docs/sharing-model.md`.
 
 ## hiderel = "hides" relationship
 
-See [the technical data model](docs/data-model_technical.org) for the hiding
+See [the technical data model](data-model_technical.org) for the hiding
 relationship.
 
 ## interp = interpretation
@@ -361,7 +361,7 @@ folders and paths.
 ## "subscribee as such"
 
 In Skg some nodes are "subscribers", which "subscribe" to "subscribees".
-(See [the technical data model](docs/data-model_technical.org).)
+(See [the technical data model](data-model_technical.org).)
 A node that plays the 'subscribee' role can be viewed as an ordinary node,
 or *as* a subscribee. In the latter case it appears
 underneath the relevant subscriber, in a 'subscribeeFolder':

@@ -273,7 +273,7 @@ So far there are these endpoints:
     Emacs fetches the table at connection setup and re-fetches on reconnect.
     If the fetch fails, its herald display disables after bounded retries;
     there is no client-side fallback table. The user-facing legend is
-    [docs/heralds.org](docs/heralds.org).
+    [heralds.org](heralds.org).
   - A Rust unit test (`herald_rules_cover_the_emittable_vocabulary`)
     pins the table to the metadata vocabulary the server can emit, in
     both directions. It pins atom coverage only, not presentation.
@@ -796,7 +796,7 @@ numerator counts members not already directly contained or hidden by that
 occurrence's subscriber. Subset counts cannot exceed their side's total.
 `(birth RELNAME...)` identifies the relation(s) behind this occurrence.
 Nonzero `(aliases K)`, `(extraIds K)` and `(properties K)` are action counts.
-See [docs/heralds.org](docs/heralds.org) for the rendered notation and styles.
+See [heralds.org](heralds.org) for the rendered notation and styles.
 
 There is no longer a
 `(graphStats ...)` sexp on an active node: its counts fold into the

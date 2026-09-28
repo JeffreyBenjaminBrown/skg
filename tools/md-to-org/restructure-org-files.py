@@ -57,9 +57,9 @@ def restructure_file(filepath):
     return True
 
 def main():
-    base_dir = '/home/ubuntu'
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 
-    files = [os.path.join(base_dir, 'README.org')]
+    files = []
 
     # Add docs/*.org
     docs_dir = os.path.join(base_dir, 'docs')

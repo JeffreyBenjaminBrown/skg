@@ -1,7 +1,7 @@
 -- Tests for nvim/lua/skg/sexpr/parse.lua. Partially mirrors
 -- tests/elisp/test-skg-sexpr-search.el (the find-sexp-end cases); the
 -- reader/printer tests are new, since Emacs got those for free from
--- 'read'/'prin1'. Wire shapes come from api-and-formats.md and the
+-- 'read'/'prin1'. Wire shapes come from docs/api-and-formats.md and the
 -- pinned herald-rules fixture.
 
 local sexpr = require('skg.sexpr.parse')
@@ -114,7 +114,7 @@ describe('skg.sexpr.parse reading lists and pairs', function ()
 end)
 
 describe('skg.sexpr.parse printing', function ()
-  it('round-trips the wire shapes of api-and-formats.md', function ()
+  it('round-trips the wire shapes of docs/api-and-formats.md', function ()
     round_trips('((request . "text search") (terms . "dog cat") '
                 .. '(regex . "false"))')
     round_trips('((response-type save-result) (content "* (skg (node '

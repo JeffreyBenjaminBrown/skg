@@ -1,6 +1,6 @@
-See also the [API](../api-and-formats.md), the
+See also the [API](../docs/api-and-formats.md), the
 [technical data model](../docs/data-model_technical.org), and the
-[glossary](../glossary.md).
+[glossary](../docs/glossary.md).
 
 Note that the above documents, this document, and any other documentation might be obsolete. The definitive source of truth is the code, not the docs.
 

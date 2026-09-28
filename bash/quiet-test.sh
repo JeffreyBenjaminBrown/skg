@@ -86,7 +86,6 @@ if [ "${#scopes[@]}" -eq 0 ]; then
   scopes=(
     Cargo.toml Cargo.lock
     server tests tools bash elisp nvim docs data windows example-data
-    README.org api-and-formats.md glossary.md
   )
 fi
 

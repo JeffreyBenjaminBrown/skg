@@ -37,9 +37,9 @@ server retains one interactive user and admits one interactive client at a
 time.
 
 For a task, start with the smallest relevant local source:
-** [[file:../README.org][README.org]] for a project introduction and documentation entry points.
-** [[file:../api-and-formats.md][api-and-formats.md]] for protocol, view metadata, configuration, and file-format contracts.
-** [[file:../glossary.md][glossary.md]], [[file:../docs/data-model_friendly.org][the conceptual data model]], and [[file:../docs/data-model_technical.org][the technical data model]] for domain vocabulary and semantics.
+** [[file:../docs/README.org][README.org]] for a project introduction and documentation entry points.
+** [[file:../docs/api-and-formats.md][api-and-formats.md]] for protocol, view metadata, configuration, and file-format contracts.
+** [[file:../docs/glossary.md][glossary.md]], [[file:../docs/data-model_friendly.org][the conceptual data model]], and [[file:../docs/data-model_technical.org][the technical data model]] for domain vocabulary and semantics.
 ** The relevant implementation, callers, tests, and focused documentation for the requested behavior.
 
 Do not read all documentation or TODO material as onboarding; it's too much.

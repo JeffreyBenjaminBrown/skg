@@ -6,9 +6,9 @@ Yes and yes.
 
 I hope to create an isomorphism from Skg into [Dragon](https://github.com/CategoricalData/hydra/tree/main), whereupon it can easily be converted back and forth into anything else for which such an isomorphism has been written. Anything expressible in Skg and not the other system, or vice-versa, can (but needn't be) preserved as comments -- that is part of Hydra's magic.
 
-Skg uses Org text to manipulate data, but stores it as YAML in `.skg` files. Skg files are valid YAML, but most YAML is not valid Skg. See the [file-format reference](../api-and-formats.md) and [on-disk node types](../server/types/nodes/fs.rs).
+Skg uses Org text to manipulate data, but stores it as YAML in `.skg` files. Skg files are valid YAML, but most YAML is not valid Skg. See the [file-format reference](api-and-formats.md) and [on-disk node types](../server/types/nodes/fs.rs).
 
-Skg already imports Org-roam files and exports selected content to plain Org; see the [command reference](COMMANDS.org). General Org and Markdown import are not implemented. Import creates a node for each file and heading, retaining existing IDs and assigning IDs where needed. The importer replaces existing `.skg` files in its destination, so use a fresh staging directory first.
+Skg can import ordinary Org and Markdown into an existing owned source after a preview and explicit approval; see the [command reference](COMMANDS.org). It also has a separate Org-roam importer, which replaces existing `.skg` files in its destination; use a fresh staging directory for that older command. Skg exports selected content to plain Org.
 
 Export is for readable documents, not lossless backup or synchronization with Org-roam. It omits identities and relationships needed to reconstruct the graph. See [returning imported data to Org](undoing-import.org) for the limitations.
 
