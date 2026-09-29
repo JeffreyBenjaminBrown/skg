@@ -133,7 +133,30 @@ pub fn parse_document (
   }
   if format == DocumentFormat::Org { parse_org_links (&mut document); }
   set_body_ranges (&mut document);
+  promote_sole_top_heading_to_root (&mut document);
   document
+}
+
+/// A document with nothing before its only top-level heading is that
+/// heading, so the heading becomes the file root rather than the sole
+/// child of a root titled after the file. This also makes an exported
+/// document, which has one top-level heading, import back to the same
+/// shape.
+fn promote_sole_top_heading_to_root (
+  document : &mut ParsedDocument,
+) {
+  let Some (top_level) : Option<usize> = document . sections [1..] . iter ()
+    . map (|section| section . level) . min () else { return; };
+  let sole_top_heading : bool =
+    document . sections [1] . level == top_level
+    && document . sections [2..] . iter ()
+       . all (|section| section . level > top_level);
+  let preamble_is_blank : bool =
+    document . text [document . sections [0] . body . clone ()]
+    . trim () . is_empty ();
+  if ! ( sole_top_heading && preamble_is_blank ) { return; }
+  let heading : ParsedSection = document . sections . remove (1);
+  document . sections [0] = ParsedSection { level : 0, ..heading };
 }
 
 fn parse_markdown_footnotes (
@@ -618,6 +641,21 @@ mod tests {
       . contains ("# fake"));
     assert! (text [document . sections [0] . body . clone ()]
       . contains ("Preface"));
+  }
+
+  #[test]
+  fn sole_top_level_heading_becomes_the_root_only_without_a_preamble () {
+    let titles = |text : &str| -> Vec<String> {
+      parse_document (Path::new ("doc.org"), text . to_string ())
+        . sections . into_iter () . map (|section| section . title) . collect () };
+    assert_eq! (titles ("\n* Only\nbody\n** Child\n"), vec! ["Only", "Child"]);
+    assert_eq! (titles ("Preamble\n* Only\n"), vec! ["doc", "Only"]);
+    assert_eq! (titles ("* One\n* Two\n"), vec! ["doc", "One", "Two"]);
+    let markdown : ParsedDocument = parse_document (
+      Path::new ("doc.md"), "# Only\nbody\n" . to_string ());
+    assert_eq! (markdown . sections . len (), 1);
+    assert_eq! (rendered_range (&markdown, markdown . sections [0] . body . clone ()),
+                "body\n");
   }
 
   #[test]

@@ -191,7 +191,7 @@ fn build_address_index (
       if let Some (custom) = &section . custom_id {
         index . custom_ids . entry ((document_index, custom . clone ()))
           . or_default () . push (id . clone ()); }
-      if section_index == 0 { continue; }
+      if section . heading . is_empty () { continue; } // a root without one
       index . org_headings . entry ((document_index, section . title . clone ()))
         . or_default () . push (id . clone ());
       let base : String = github_slug (&section . title);
@@ -474,12 +474,13 @@ mod tests {
     resolve_document_links (&mut documents, &mut built,
       Path::new ("/container/import"), None, &HashMap::new ());
     let a_second_body : &str = built [0] . nodes [2] . body . as_deref () . unwrap ();
+    // b.org's sole top-level heading is its root.
     assert! (a_second_body . contains (&format! (
-      "[[id:{}][org]]", built [1] . nodes [1] . pid)));
+      "[[id:{}][org]]", built [1] . root_id)));
     assert! (a_second_body . contains (&format! (
       "[[id:{}][later]]", built [1] . root_id)));
     assert! (a_second_body . contains ("[site][web]"));
-    let b_body : &str = built [1] . nodes [1] . body . as_deref () . unwrap ();
+    let b_body : &str = built [1] . nodes [0] . body . as_deref () . unwrap ();
     assert! (b_body . contains (&format! (
       "[[id:{}][root]]", built [0] . root_id)));
     assert! (b_body . contains ("[[file:notes/a.md::*Same][ambiguous]]"));
@@ -534,7 +535,8 @@ mod tests {
     let footnote_id : ID = built [0] . nodes [footnote_index] . pid . clone ();
     resolve_document_links (&mut documents, &mut built,
       Path::new ("/container/import"), None, &HashMap::new ());
-    let body : &str = built [0] . nodes [1] . body . as_deref () . unwrap ();
+    let body : &str = // the sole heading, Topic, is the root
+      built [0] . nodes [0] . body . as_deref () . unwrap ();
     assert_eq! (body . matches (&format! ("[[id:{}][Footnote a]]", footnote_id))
       .count (), 2);
     assert! (! body . contains ("[^a]:"));

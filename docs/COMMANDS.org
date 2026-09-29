@@ -792,6 +792,9 @@ another run requires a new one.
 
 The operation creates file-root and heading nodes,
 which correspond 1-to-1 to sections of the imported data.
+A document whose only top-level heading has nothing before it
+is that heading, so the heading is its file root;
+otherwise the file root is titled after the document.
 It also creates two kinds of nodes that do not so correspond:
 - a single import-record node with textlinks to all file roots,
   so you can see everything you just imported in one place.

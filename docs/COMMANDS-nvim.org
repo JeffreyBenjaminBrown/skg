@@ -691,7 +691,9 @@ export paths, and diagnostics; then explicitly confirm or decline. A changed
 input or destination requires a fresh preview.
 
 The import is additive: it creates file-root and heading nodes, an import
-record, and an Org export marker under each file root. It does not replace
+record, and an Org export marker under each file root. A document whose
+only top-level heading has nothing before it uses that heading as its
+file root. It does not replace
 existing =.skg= files, copy attachments, synchronize later changes, or export
 automatically. Most original markup remains text; Markdown hard breaks become
 Org's two-backslash form so save-time trailing-whitespace cleanup remains.
