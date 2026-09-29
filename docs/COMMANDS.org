@@ -951,18 +951,47 @@ It asks two things:
   container whose filesystem differs from the host Emacs runs on,
   this prompt has no tab completion. An absolute path is used
   as-is.
+  Existing files in the output dir are overwritten in place; other
+  files there are left untouched.
 
-A node N is exported when the title of a node C it contains
-links to the export-instruction node and C's body defines a
-=target_filepath=
-(using TOML-ish syntax, e.g. =target_filepath = docs/setup=,
-with the path quoted if it contains whitespace).
-That parent is written to
-=<output-dir>/<target_filepath>.org= as a recursive content view,
-stripped of skg metadata. The marker child is omitted.
+***** choosing what to export: export markers
+Nothing is exported unless you mark
+it. To make node N into an exported file,
+make N contain a child node, called an /export marker/, such that:
+- The marker's title contains a link to the ID
+  =3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f=.
+  That ID is a fixed constant that the exporter looks for.
+  The node it names only documents this feature.
+  The link works even if your sources do not contain that node.
+  The link's label is up to you, for example:
+  : [[id:3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f][Export to Org]]
+- The marker's body contains a line saying where to write the file,
+  relative to the output directory and without the =.org= extension:
+  : target_filepath = docs/setup
+  Quote the path if it contains whitespace
+  (=target_filepath = "my notes/setup"=).
+  The path cannot be absolute or contain =.= or =..= components.
 
-Existing files in the output dir are overwritten in place; other
-files there are left untouched.
+N is then written to =<output-dir>/<target_filepath>.org= as a
+recursive content view: N's title and body,
+each of its content nodes' titles and bodies,
+each of *their* content nodes' titles and bodies, etc.,
+stripped of Skg metadata. The export marker itself is left out of the file.
+N's position does not matter; it can be anywhere in the graph.
+But N must belong to a source included in the export;
+otherwise it is skipped, with a warning.
+If N has several markers, the first one is used, with a warning.
+If two nodes claim the same path, only one of them is exported, with a warning.
+
+A node whose title links to that ID but whose body has no =target_filepath=
+line is not a marker. It is exported as ordinary content, so you can
+mention the feature in your notes without triggering it.
+If the =target_filepath= is malformed, the node is dropped from the
+export, N is not exported, and you get a warning.
+
+[[#import-md-and-org][skg-import-md-and-org]] adds a marker to each
+imported document automatically.
+
 ***** links and overlap
 Links are rewritten to relative org links. A link to another
 exported file's root points at that file; a link to a non-root
