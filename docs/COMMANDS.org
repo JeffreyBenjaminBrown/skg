@@ -997,6 +997,10 @@ Links are rewritten to relative org links. A link to another
 exported file's root points at that file; a link to a non-root
 node points deep, to the relevant headline of the document,
 via =[[./file.org::*Heading][label]]=.
+Links in headlines are kept. Org cannot find a headline containing
+a link by its text, so a link to such a headline uses its node's ID
+instead, =[[./file.org::#ID][label]]=, and that headline gets a
+=:CUSTOM_ID: ID= property. Only headlines something links to get one.
 
 if an exported node contains another export root,
 the second root’s contents go in its own file,

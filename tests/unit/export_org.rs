@@ -152,43 +152,62 @@ fn export_writes_expected_files_and_links () {
 }
 
 #[test]
-fn heading_text_matches_deep_link_anchor () {
-  // A node whose title contains a link: the rendered heading must
-  // be the plain-label form, equal to the anchor used to link to it,
-  // so org's `::*` / `*` heading search resolves.
+fn headline_links_survive_and_linked_ones_get_custom_ids () {
+  // A title containing a link keeps it (rewritten like a body link).
+  // Org's '*Heading' search cannot match such a headline, so links to
+  // it use '#PID', and its headline gets a CUSTOM_ID drawer -- but
+  // only if some link actually addresses it.
   let nodes : Vec<NodeComplete> = vec! [
     node ("a","Root A", Some ("ref [[id:hl][to headline]]"),
-          &["ma","hl","other"]),
+          &["ma","hl","quiet","other"]),
     node ("ma", &format! ("[[id:{}][how]]", MAGIC),
           Some ("target_filepath = a"), &[]),
     node ("hl", "Pre [[id:other][mid]] Post", Some ("hl body"), &[]),
+    node ("quiet", "Unlinked [[id:other][also]]", None, &[]),
     node ("other","Other", None, &[]),
+    node ("z","Zed", Some ("far [[id:hl][cross-file]]"), &["mz"]),
+    node ("mz", &format! ("[[id:{}][how]]", MAGIC),
+          Some ("target_filepath = z"), &[]),
   ];
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
   export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
   let a : String =
     fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
-  // heading is plain text (no link markup), and the body link to it
-  // uses exactly that text.
-  assert! (a . contains ("** Pre mid Post"), "a.org:\n{}", a);
-  assert! (a . contains ("[[*Pre mid Post][to headline]]"), "a.org:\n{}", a);
-  assert! (! a . contains ("** Pre [[*Other"), "heading kept link markup:\n{}", a);
+  assert! (a . contains (
+    "** Pre [[*Other][mid]] Post\n:PROPERTIES:\n:CUSTOM_ID: hl\n:END:\nhl body"),
+    "a.org:\n{}", a);
+  assert! (a . contains ("[[#hl][to headline]]"), "a.org:\n{}", a);
+  assert! (a . contains ("** Unlinked [[*Other][also]]\n** Other"),
+    "an unlinked headline gets no drawer:\n{}", a);
+  assert_eq! (a . matches (":CUSTOM_ID:") . count (), 1, "a.org:\n{}", a);
+  let z : String =
+    fs::read_to_string (dir . path () . join ("z.org")) . unwrap ();
+  assert! (z . contains ("[[./a.org::#hl][cross-file]]"), "z.org:\n{}", z);
 
-  // A root whose title contains a link: heading is the label form,
-  // and a same-file self-link uses that same text.
+  // A root whose title contains a link: a same-file self-link uses
+  // its CUSTOM_ID; a link from another file needs none (it targets
+  // the file), so without the self-link there is no drawer.
   let nodes2 : Vec<NodeComplete> = vec! [
     node ("r","Root [[id:x][X]] tail",
           Some ("self [[id:r][back to root]]"), &["mr","x"]),
     node ("mr", &format! ("[[id:{}][how]]", MAGIC),
           Some ("target_filepath = r"), &[]),
-    node ("x","Ex", Some ("up [[id:r][to root]]"), &[]),
+    node ("x","Ex", None, &[]),
+    node ("s","Ess", Some ("to [[id:r][that root]]"), &["ms"]),
+    node ("ms", &format! ("[[id:{}][how]]", MAGIC),
+          Some ("target_filepath = s"), &[]),
   ];
   let dir2 : tempfile::TempDir = tempfile::tempdir () . unwrap ();
   export_to_org (&active_all (), &nodes2, dir2 . path ()) . unwrap ();
   let r : String =
     fs::read_to_string (dir2 . path () . join ("r.org")) . unwrap ();
-  assert! (r . contains ("* Root X tail"), "r.org:\n{}", r);
-  assert! (r . contains ("[[*Root X tail][back to root]]"), "r.org:\n{}", r);
+  assert! (r . starts_with (
+    "* Root [[*Ex][X]] tail\n:PROPERTIES:\n:CUSTOM_ID: r\n:END:\n"),
+    "r.org:\n{}", r);
+  assert! (r . contains ("[[#r][back to root]]"), "r.org:\n{}", r);
+  let s : String =
+    fs::read_to_string (dir2 . path () . join ("s.org")) . unwrap ();
+  assert! (s . contains ("[[./r.org][that root]]"), "s.org:\n{}", s);
 }
 
 #[test]

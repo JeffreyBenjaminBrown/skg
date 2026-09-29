@@ -529,7 +529,9 @@ one automatically.
     dest is not exported under =NAME= point to the export of
     =9ff04e25-01e8-4634-8aa5-f5849bc1eb81= ("Some links might be
     broken."); if that note is itself not exported, the link degrades
-    to plain label text.
+    to plain label text. A deep link targets =*Heading=, or =#PID=
+    when that headline contains a link; only headlines targeted by
+    =#PID= get a =:CUSTOM_ID: PID= drawer.
   - The same export is available as a CLI subcommand (no running server):
     =cargo run --bin skg -- export-org [config-path] [source-set]
     [output-dir] [--include-overPrivateText-telescopes]=. Under a restricted set it
