@@ -224,8 +224,7 @@ fn diamond_node_rendered_once_then_linked () {
     node ("leaf","Leaf", None, &[]),
   ];
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
-  let report : ExportReport =
-    export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
+  export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
   let a : String =
     fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
   assert_eq! (a . matches ("Shared\nshared body") . count (), 1,
@@ -235,10 +234,38 @@ fn diamond_node_rendered_once_then_linked () {
   // the second occurrence is a link to the first.
   assert! (a . contains ("[[*Shared][Shared]]"),
            "second container should link to shared:\n{}", a);
-  // no false ambiguous-heading warning (it is the SAME node, once).
-  assert! (! report . warnings . iter ()
-           . any ( |w| w . contains ("ambiguous heading")),
-           "unexpected ambiguity warning: {:?}", report . warnings);
+  // Not a repeated title (it is the SAME node, once), so no CUSTOM_ID.
+  assert! (! a . contains (":CUSTOM_ID:"), "a.org:\n{}", a);
+}
+
+#[test]
+fn links_to_a_repeated_title_use_custom_id () {
+  // Org's '*language' finds the first such headline, so only links to
+  // a later one need its CUSTOM_ID, and only it gets the drawer.
+  let nodes : Vec<NodeComplete> = vec! [
+    node ("a","Root A",
+          Some ("[[id:l1][first]] [[id:l2][second]]"),
+          &["ma","p","q"]),
+    node ("ma", &format! ("[[id:{}][how]]", MAGIC),
+          Some ("target_filepath = a"), &[]),
+    node ("p","Pee", None, &["l1"]),
+    node ("q","Queue", None, &["l2","l3"]),
+    node ("l1","language", None, &[]),
+    node ("l2","language", None, &[]),
+    node ("l3","language", None, &[]), // repeated, but nothing links to it
+  ];
+  let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+  let report : ExportReport =
+    export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
+  let a : String =
+    fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
+  assert! (a . contains ("[[*language][first]]"), "a.org:\n{}", a);
+  assert! (a . contains ("[[#l2][second]]"), "a.org:\n{}", a);
+  assert! (a . contains (
+    "*** language\n:PROPERTIES:\n:CUSTOM_ID: l2\n:END:\n*** language\n"),
+    "a.org:\n{}", a);
+  assert_eq! (a . matches (":CUSTOM_ID:") . count (), 1, "a.org:\n{}", a);
+  assert! (report . warnings . is_empty (), "{:?}", report . warnings);
 }
 
 #[test]

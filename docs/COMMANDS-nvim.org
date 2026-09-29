@@ -734,6 +734,7 @@ Links are rewritten to relative org links. A link to another
 exported file's root points at that file; a link to a non-root
 node points deep, via =[[./file.org::*Heading][label]]=, or via
 =[[./file.org::#ID][label]]= when that headline contains a link
+or repeats an earlier headline's text in its file
 (the headline then gets a =:CUSTOM_ID: ID= property). A nested
 export root is shown as a link, not inlined. A link whose dest
 is not exported under the chosen set points to a "some links

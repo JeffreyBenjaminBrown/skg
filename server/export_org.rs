@@ -91,8 +91,9 @@ struct ExportRoot {
 
 /// A 'search' is the org search option addressing a heading within
 /// its file: '*Heading' for a plain title, or '#PID' (the node's
-/// CUSTOM_ID) for a title containing a link, since org's '*' search
-/// cannot match a headline whose text includes link markup.
+/// CUSTOM_ID) where '*Heading' would miss: for a title containing a
+/// link (org's '*' search cannot match a headline whose text includes
+/// link markup), or for a title repeating an earlier headline's.
 enum HomeKind {
   Root    { search : String }, // links to the file (top), or to search same-file
   Content { search : String }, // links to search (deep)
@@ -164,7 +165,7 @@ pub fn export_to_org (
     . collect ();
 
   let homes : HashMap<ID, Home> =
-    build_homes (&roots, &root_events, &by_pid, &mut warnings);
+    build_homes (&roots, &root_events, &by_pid);
   let custom_id_targets : HashSet<ID> =
     custom_id_link_targets (&root_events, &homes, &by_pid, &alias_to_pid);
 
@@ -459,7 +460,6 @@ fn build_homes (
   roots       : &[&ExportRoot],
   root_events : &[(&ExportRoot, Vec<Ev>)],
   by_pid      : &HashMap<ID, &NodeComplete>,
-  warnings    : &mut Vec<String>,
 ) -> HashMap<ID, Home> {
   let mut homes : HashMap<ID, Home> = HashMap::new ();
   // A node that is itself a root always homes to its own file.
@@ -472,36 +472,27 @@ fn build_homes (
       Home { target : r . target . clone (),
              kind   : HomeKind::Root { search } } ); }
   // Then non-root content nodes; first appearance (in target order)
-  // wins. Pre-seed each file's anchor set with its root heading.
-  let mut anchors_per_file : HashMap<String, HashSet<String>> =
-    HashMap::new ();
-  for r in roots {
-    if let Some (n) = by_pid . get (&r . root_pid) {
-      if ! title_has_link (n) {
-        anchors_per_file . entry (r . target . clone ())
-          . or_default () . insert ( anchor_text (n) ); }}}
+  // wins. Org's '*Heading' search finds the first headline in the
+  // file with that text, so a node whose plain title repeats an
+  // earlier headline in its home file is addressed by CUSTOM_ID.
   for (root, events) in root_events {
+    let mut earlier_anchors : HashSet<String> = HashSet::new ();
     for ev in events {
       if ! matches! (ev . kind, EvKind::Normal) { continue; }
-      if homes . contains_key (&ev . pid) { continue; }
       let node : &NodeComplete = match by_pid . get (&ev . pid) {
         Some (n) => n,
         None     => continue, };
-      if ! title_has_link (node) { // a CUSTOM_ID is never ambiguous
-        let anchor : String = anchor_text (node);
-        let file_anchors : &mut HashSet<String> =
-          anchors_per_file . entry (root . target . clone ())
-          . or_default ();
-        if ! file_anchors . insert (anchor . clone ()) {
-          warnings . push ( format! (
-            "ambiguous heading {:?} in {}.org: deep links to it \
-             resolve to the first occurrence",
-            anchor, root . target ) ); }}
+      let anchor_is_repeat : bool =
+        ! title_has_link (node) // such a headline never matches a '*' search
+        && ! earlier_anchors . insert ( anchor_text (node) );
+      if homes . contains_key (&ev . pid) { continue; }
+      let search : String =
+        if anchor_is_repeat { format! ("#{}", node . pid) }
+        else { org_search_for_heading (node) };
       homes . insert (
         ev . pid . clone (),
         Home { target : root . target . clone (),
-               kind   : HomeKind::Content {
-                 search : org_search_for_heading (node) } } ); }}
+               kind   : HomeKind::Content { search } } ); }}
   homes }
 
 //

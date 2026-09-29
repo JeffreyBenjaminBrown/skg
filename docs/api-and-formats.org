@@ -504,8 +504,8 @@ one automatically.
     =content= is a human-readable report (files written, broken-link
     count, warning count). =errors= is non-empty only on failure
     (bad/unknown source-set name, unreadable =.skg= files, filesystem
-    error). =warnings= are non-fatal (skipped roots, ambiguous
-    headings, broken links, body lines that look like org structure).
+    error). =warnings= are non-fatal (skipped roots,
+    broken links, body lines that look like org structure).
   - Behavior: Reads all =.skg= files fresh from disk, finds every
     export root, and writes each to
     =<output-dir>/<target_filepath>.org= as a recursive content view
@@ -530,7 +530,8 @@ one automatically.
     =9ff04e25-01e8-4634-8aa5-f5849bc1eb81= ("Some links might be
     broken."); if that note is itself not exported, the link degrades
     to plain label text. A deep link targets =*Heading=, or =#PID=
-    when that headline contains a link; only headlines targeted by
+    when that headline contains a link or repeats an earlier
+    headline's text in its file; only headlines targeted by
     =#PID= get a =:CUSTOM_ID: PID= drawer.
   - The same export is available as a CLI subcommand (no running server):
     =cargo run --bin skg -- export-org [config-path] [source-set]
