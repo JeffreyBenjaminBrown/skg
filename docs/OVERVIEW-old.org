@@ -65,14 +65,14 @@ and some relationships to other nodes.
     used to encode other kinds of data.
     For instances, when a SkgNode N has aliases,
     they are represented as N's descendents in the org view:
-```
+#+begin_example
   * N                                   # true node
   ** its aliases                        # 'scaffold' node
   *** alias 1                           # 'scaffold' node
   *** alias 2                           # 'scaffold' node
   ** the first SkgNode that N contains  # true node
   ** the second SkgNode that N contains # true node
-```
+#+end_example
 As the comments indicate, some of those org nodes
 correspond to true skg nodes, while others ('scaffold' nodes)
 describe an ancestor -- in this case, the SkgNode N.

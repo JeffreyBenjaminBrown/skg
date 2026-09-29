@@ -1,6 +1,6 @@
-#+title: Reading Skg heralds and link annotations
+* Reading Skg heralds and link annotations
 
-* What a herald describes
+** What a herald describes
 An Skg headline begins with metadata. In a view, heralds condense that
 metadata into short colored tokens. Toggle the compact display with
 'skg-view-heralds-mode' (=C-c v h=) in Emacs or ':SkgHeraldsToggle'
@@ -14,7 +14,7 @@ links or unsaved buffer edits as new graph facts. A folded body can still
 contribute links. A view's position can add ancestor flags and a birth
 style, so two occurrences of the same node can have different heralds.
 
-* Relationship tokens
+** Relationship tokens
 
 The order is =C L S O H A I P=. =C= means contains, =L= text links to,
 =S= subscribes to, =O= overrides the view of, and =H= hides from its
@@ -49,7 +49,7 @@ denominator is then omitted. The slash never means zero divided by
 zero. Yellow also marks displayed =O= counts, even a count of one.
 The =O= letter keeps its usual purple or birth style.
 
-* Ancestors and birth
+** Ancestors and birth
 
 Lowercase flags name tracked ancestors: =a= is the visible parent,
 =b= the grandparent, and so on, counting folder scaffolds too. After
@@ -84,7 +84,7 @@ plain orange =h=, so =Oĥh= shows the two different markers together.
 The marker preserves the original membership ID when a substituted
 view is saved. See [[file:override.org][override behavior]].
 
-* Colors and customization
+** Colors and customization
 
 The herald faces in Emacs and their Neovim highlight groups are:
 
@@ -107,7 +107,7 @@ Confirmed broken link labels inherit 'heralds-confusable-face' and add
 an underline in Emacs; Neovim uses 'SkgBrokenLink' with the same pink
 foreground and an underline.
 
-* Other heralds
+** Other heralds
 
 Green =⌂:LABEL= marks a node's home-source boundary. A red =~NAME=
 immediately before it reports a relationship stored at a more private
@@ -135,7 +135,7 @@ mark existence changes, =M= and =-M= membership changes, and
 =text changed= reports text changes. These are view facts unless
 specifically identified above as requests.
 
-* Link annotations
+** Link annotations
 
 The current buffer can display a suffix after each literal
 ='[[id:ID][LABEL]]'= link with the target's home-source abbreviation.
