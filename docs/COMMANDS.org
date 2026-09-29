@@ -892,7 +892,7 @@ are consumed; properties other than 'ID' and 'ROAM_ALIASES' are not retained
 from those drawers. The parser uses line-based heading detection, so this
 is not a lossless general-purpose Org conversion.
 
-Existing '[[id:ID][label]]' links retain their targets. File links and heading
+Existing =[[id:ID][label]]= links retain their targets. File links and heading
 search links are not converted to Skg ID links, and attachments are not copied.
 Relative file links may no longer resolve after import. The importer does not
 validate that linked IDs exist. It creates no subscriptions, hides, or overrides.

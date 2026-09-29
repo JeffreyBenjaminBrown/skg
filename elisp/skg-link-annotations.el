@@ -40,15 +40,108 @@
       (delete-overlay overlay))))
 
 (defun skg-link-annotations--scan ()
-  "Return (label-start label-end link-end literal-ID) for this buffer."
-  (let ((positions nil))
+  "Return (label-start label-end link-end literal-ID) for this buffer.
+Link syntax in text Org shows literally is an example, not a link."
+  (let ((positions nil)
+        (literal (skg-link-annotations--literal-ranges)))
     (save-excursion
       (goto-char (point-min))
       (while (re-search-forward skg-link-annotations--regexp nil t)
-        (push (list (match-beginning 2) (match-end 2)
-                    (match-end 0) (match-string-no-properties 1))
-              positions)))
+        (let ((start (match-beginning 0))
+              (end (match-end 0)))
+          (unless (cl-some (lambda (range)
+                             (and (< (car range) end) (< start (cdr range))))
+                           literal)
+            (push (list (match-beginning 2) (match-end 2)
+                        end (match-string-no-properties 1))
+                  positions)))))
     (nreverse positions)))
+
+(defconst skg-link-annotations--verbatim-pre "-('\"{"
+  "Characters Org accepts just before an opening = or ~.")
+(defconst skg-link-annotations--verbatim-post "-.,:!?;'\")}\\["
+  "Characters Org accepts just after a closing = or ~.")
+
+(defun skg-link-annotations--literal-ranges ()
+  "Return (BEG . END) ranges of this buffer that Org shows literally.
+Mirrors the server's 'org_literal_ranges' in
+server/types/textlinks/org_literal_ranges.rs: #+begin_X ... #+end_X
+blocks, ``` fences, fixed-width lines, and inline =verbatim= and
+~code~. A headline ends any open block, as the end of a node's body
+does on the server."
+  (let ((ranges nil)
+        (open-start nil)
+        (closing nil))
+    (save-excursion
+      (goto-char (point-min))
+      (while (not (eobp))
+        (let* ((bol (line-beginning-position))
+               (eol (line-end-position))
+               (line (buffer-substring-no-properties bol eol))
+               (trimmed (downcase (string-trim-left line))))
+          (when (and open-start (string-match-p "\\`\\*+ " line))
+            (push (cons open-start bol) ranges)
+            (setq open-start nil))
+          (cond
+           (open-start
+            (when (string-prefix-p closing trimmed)
+              (push (cons open-start eol) ranges)
+              (setq open-start nil)))
+           ((string-prefix-p "#+begin_" trimmed)
+            (setq open-start bol
+                  closing (concat "#+end_"
+                                  (car (split-string
+                                        (substring trimmed 8))))))
+           ((string-prefix-p "```" trimmed)
+            (setq open-start bol
+                  closing "```"))
+           ((or (string= trimmed ":") (string-prefix-p ": " trimmed))
+            (push (cons bol eol) ranges))
+           (t
+            (dolist (span (skg-link-annotations--inline-verbatim-spans line))
+              (push (cons (+ bol (car span)) (+ bol (cdr span)))
+                    ranges)))))
+        (forward-line 1))
+      (when open-start
+        (push (cons open-start (point-max)) ranges)))
+    ranges))
+
+(defun skg-link-annotations--inline-verbatim-spans (line)
+  "Return (START . END) offsets of =verbatim= and ~code~ spans in LINE.
+The opening marker follows the line start, whitespace or a
+`skg-link-annotations--verbatim-pre' character, and precedes a
+non-space; the closing marker follows a non-space and precedes the
+line end, whitespace or a `skg-link-annotations--verbatim-post'
+character."
+  (let ((spans nil)
+        (index 0)
+        (length (length line)))
+    (cl-flet ((space-p (char) (memq char '(?\s ?\t ?\r ?\f))))
+      (while (< index length)
+        (let* ((marker (aref line index))
+               (opens
+                (and (memq marker '(?= ?~))
+                     (or (= index 0)
+                         (let ((before (aref line (1- index))))
+                           (or (space-p before)
+                               (cl-find before skg-link-annotations--verbatim-pre))))
+                     (< (1+ index) length)
+                     (not (space-p (aref line (1+ index))))))
+               (closing
+                (and opens
+                     (cl-loop for candidate from (+ index 2) below length
+                              when (and (eq (aref line candidate) marker)
+                                        (not (space-p (aref line (1- candidate))))
+                                        (or (= (1+ candidate) length)
+                                            (let ((after (aref line (1+ candidate))))
+                                              (or (space-p after)
+                                                  (cl-find after skg-link-annotations--verbatim-post)))))
+                              return candidate))))
+          (if closing
+              (progn (push (cons index (1+ closing)) spans)
+                     (setq index (1+ closing)))
+            (setq index (1+ index))))))
+    (nreverse spans)))
 
 (defun skg-link-annotations--paint (positions)
   "Paint POSITIONS using the current status cache and suffix setting."

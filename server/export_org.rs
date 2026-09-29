@@ -17,13 +17,13 @@ use crate::source_sets::{ActiveSourceSet, SourceSetName};
 use crate::types::misc::SkgConfig;
 use crate::types::misc::{ID, RelPartner};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::textlinks::org_literal_ranges::org_literal_ranges;
-use crate::types::textlinks::replace_each_link_with_its_label;
+use crate::types::textlinks::{
+  replace_each_link_with_its_label, textlinks_from_text,
+  textlinks_with_ranges_from_text};
 
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::ops::Range;
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
@@ -523,8 +523,8 @@ fn custom_id_link_targets (
           let texts : [&str; 2] =
             [ &node . title, node . body . as_deref () . unwrap_or ("") ];
           for text in texts {
-            for caps in live_textlinks (text) {
-              let pid : ID = resolve_pid (&ID::from (&caps[1]), alias_to_pid);
+            for textlink in textlinks_from_text (text) {
+              let pid : ID = resolve_pid (&textlink . id, alias_to_pid);
               linked . push (
                 if homes . contains_key (&pid) { pid }
                 else { sink_pid . clone () } ); }} }, }}
@@ -589,12 +589,11 @@ fn rewrite_links (
   let sink_pid : ID = ID::from (BROKEN_LINK_SINK_ID);
   let mut out : String = String::new ();
   let mut copied_up_to : usize = 0;
-  for caps in live_textlinks (text) {
-    let whole : regex::Match = caps . get (0) . unwrap ();
-    out . push_str (&text [copied_up_to .. whole . start ()]);
-    copied_up_to = whole . end ();
-    let uid : ID = ID::from (&caps[1]);
-    let label : &str = &caps[2];
+  for (range, textlink) in textlinks_with_ranges_from_text (text) {
+    out . push_str (&text [copied_up_to .. range . start]);
+    copied_up_to = range . end;
+    let uid : ID = textlink . id;
+    let label : &str = &textlink . label;
     let pid : ID =
       alias_to_pid . get (&uid) . cloned () . unwrap_or (uid);
     out . push_str (& match homes . get (&pid) {
@@ -614,18 +613,6 @@ fn rewrite_links (
   out . push_str (&text [copied_up_to ..]);
   out }
 
-/// The textlinks in 'text' that Org treats as links: those outside
-/// the ranges Org shows literally, where a link is only an example.
-fn live_textlinks <'t> (
-  text : &'t str,
-) -> Vec<regex::Captures<'t>> {
-  let literal : Vec<Range<usize>> = org_literal_ranges (text);
-  TEXTLINK_PATTERN . captures_iter (text)
-    . filter ( |caps| {
-      let whole : regex::Match = caps . get (0) . unwrap ();
-      ! literal . iter () . any ( |range|
-        range . start < whole . end () && whole . start () < range . end ) } )
-    . collect () }
 
 fn org_link_for_home (
   home           : &Home,

@@ -1,13 +1,15 @@
 pub mod org_literal_ranges;
 
-use regex::{Regex, Match};
+use regex::{Captures, Regex, Match};
 use std::fmt;
+use std::ops::Range;
 use std::str::FromStr;
 use std::sync::LazyLock;
 
 use crate::types::misc::ID;
 use crate::types::errors::TextLinkParseError;
 use crate::types::nodes::complete::NodeComplete;
+use org_literal_ranges::org_literal_ranges;
 
 // LazyLock<Regex> ensures each regex is compiled exactly once, on first use, rather than per call.
 static TEXTLINK_PATTERN : LazyLock<Regex> =
@@ -79,34 +81,53 @@ pub fn textlinks_from_node (
   -> Vec<TextLink> {
   // All textlinks in its title
   // and (if present) its body.
-
-  let combined_text : String =
-    format!(
-      "{} {}",
-      node . title,
-      node . body . as_deref () . unwrap_or ("") );
-  textlinks_from_text (&combined_text) }
+  // Scanned separately, so the body's first line is still a line start.
+  let mut textlinks : Vec<TextLink> = textlinks_from_text (&node . title);
+  textlinks . extend (
+    textlinks_from_text ( node . body . as_deref () . unwrap_or ("") ));
+  textlinks }
 
 pub fn textlinks_from_text (
   text: &str )
   -> Vec <TextLink> {
-  let mut textlinks : Vec<TextLink> = Vec::new ();
-  for capture in TEXTLINK_PATTERN . captures_iter (text) {
-    if capture . len () >= 3 { // capture group 0 is the entire match
-      let skgid : String = capture [1] . to_string ();
-      let label  : String = capture [2] . to_string ();
-      textlinks . push (
-        TextLink::new ( skgid, label )); }}
-  textlinks }
+  textlinks_with_ranges_from_text (text) . into_iter ()
+    . map ( |(_, textlink)| textlink )
+    . collect () }
+
+/// Each textlink in 'text' that Org treats as a link, with its byte
+/// range. Link syntax in text Org shows literally (see
+/// 'org_literal_ranges') is an example, not a link.
+pub fn textlinks_with_ranges_from_text (
+  text: &str )
+  -> Vec <(Range<usize>, TextLink)> {
+  captures_outside_literals (&TEXTLINK_PATTERN, text) . into_iter ()
+    . map ( |capture| (
+      capture . get (0) . unwrap () . range (),
+      TextLink::new ( capture [1] . to_string (),
+                      capture [2] . to_string () )) )
+    . collect () }
+
+fn captures_outside_literals <'t> (
+  pattern : &Regex,
+  text    : &'t str )
+  -> Vec <Captures<'t>> {
+  let literal : Vec<Range<usize>> = org_literal_ranges (text);
+  pattern . captures_iter (text)
+    . filter ( |capture| {
+      let whole : Match = capture . get (0) . unwrap ();
+      ! literal . iter () . any ( |range|
+        range . start < whole . end () && whole . start () < range . end ) } )
+    . collect () }
 
 pub fn replace_each_link_with_its_label (
   text : &str )
   -> String {
-  // Replaces each textlink with that textlink's label.
+  // Replaces each textlink with that textlink's label,
+  // except examples in text Org shows literally.
   // Strips some text from each textlink while adding nothing.
   let mut result : String = String::from (text);
   let mut input_offset : usize = 0; // offset in the input string
-  for cap in LINK_LABEL_PATTERN . captures_iter (text) {
+  for cap in captures_outside_literals (&LINK_LABEL_PATTERN, text) {
     let whole_match : Match =
       cap . get (0) . unwrap ();
     let textlink_label : Match =
