@@ -44,7 +44,7 @@ authoritative; the server builds an immutable in-memory graph and a derived
 Tantivy search index from them. Clients exist for Emacs and Neovim, and the
 TCP protocol is editor-independent.
 
-The API, the view metadata format, and the .skg file format are described in [[./api-and-formats.md][api-and-formats.md]].
+The API, the view metadata format, and the .skg file format are described in [[./api-and-formats.org][api-and-formats.org]].
 
 Some other reasonable jumping-off points include:
 - [[../server/types/][the types]] (in the server), especially

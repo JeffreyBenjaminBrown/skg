@@ -4,7 +4,7 @@
 // (TODO/full-schema/13_test-rel-matrix.org): substitution does not
 // apply to the immediate children of an overridden node drawn RAW.
 //
-// Fixture (the docs/forks.md shape): clone R overrides original X, and
+// Fixture (the docs/forks.org shape): clone R overrides original X, and
 // R's child R1 overrides X's child X1. Opening X as a view root draws
 // X raw (roots draw raw); its immediate child X1 must therefore draw
 // RAW too -- NOT substituted by R1 -- because the user is looking at

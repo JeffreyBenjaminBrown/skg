@@ -7,7 +7,7 @@ set, builds an immutable =InRustGraph= snapshot, and builds Tantivy from the
 same values.  Tantivy is a derived text index; it is not graph authority.
 
 For a gentler introduction, see [[./data-model_friendly.org][the friendly data-model guide]].  For
-privacy-section folding and unfolding, see [[./telescopes.md][telescopes]].
+privacy-section folding and unfolding, see [[./telescopes.org][telescopes]].
 
 * Node fields
 

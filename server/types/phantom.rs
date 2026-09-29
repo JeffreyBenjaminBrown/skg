@@ -113,7 +113,7 @@ pub fn phantom_axes (
 /// order Rust randomizes per process, so returning its first hit
 /// answered arbitrarily for any node with more than one section.
 /// Since the home is DEFINITIONALLY the most public section
-/// (docs/telescopes.md), the first hit in privacy order is the
+/// (docs/telescopes.org), the first hit in privacy order is the
 /// answer; a home whose section carries no title is a violation the
 /// fold reports, not a reason to keep looking.
 pub fn home_from_disk (

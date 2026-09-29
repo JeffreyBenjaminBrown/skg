@@ -2,35 +2,35 @@
 ** Purpose
 Skg is for thinking, individually and collectively. It is a simple, novel way to write, collect (from other writers), organize and share information. (Any of which can be ignored -- you don't have to share, for instance, to use the app productively.) In a world of abundant information, I hope Skg will let users direct their attention, process information and collaborate more effectively.
 
-Skg begins from a [[file:data-model-trees-with-links.md][simple web-of-thought data model]] that [[file:who-maps-knowledge.md][many people already love]]. Its novelty is to extend that model [[file:skg-enables-deep-sharing.md][to integrate the thoughts of different users]].
+Skg begins from a [[file:data-model-trees-with-links.org][simple web-of-thought data model]] that [[file:who-maps-knowledge.org][many people already love]]. Its novelty is to extend that model [[file:skg-enables-deep-sharing.org][to integrate the thoughts of different users]].
 
-Technical doubts? See the small [[file:FAQ.md][FAQ]].
+Technical doubts? See the small [[file:FAQ.org][FAQ]].
 
 ** If you need more motivation
 to get excited about this idea:
 
-- [[file:preempt.md][Preempting some common concerns]] about ownership and privacy.
+- [[file:preempt.org][Preempting some common concerns]] about ownership and privacy.
 - Some less obvious motivations
-  - [[file:wise-people-say-write.md][Writing is like thinking with power tools.]]
-  - [[file:ownership-has-been-awkward.md][Traditional data ownership is awkward.]]
+  - [[file:wise-people-say-write.org][Writing is like thinking with power tools.]]
+  - [[file:ownership-has-been-awkward.org][Traditional data ownership is awkward.]]
   - The web of thought experience feels good.
-    - [[file:it-will-be-fun.md][It is liberating, fun, peaceful, and psychically integrating.]]
-    - [[file:knowledge-gardening-is-zen.md][It is Zen.]]
-  - [[file:private-writing.md][Private writing is powerful.]]
-  - [[file:integrate-public-and-private.md][Integrating your public and private writing only recently became possible]]
-    - which is important, because [[file:wise-people-say-write.md][writing is like thinking with power tools]].
-- And of course, [[file:sharing-is-powerful.md][sharing information is powerful.]]
+    - [[file:it-will-be-fun.org][It is liberating, fun, peaceful, and psychically integrating.]]
+    - [[file:knowledge-gardening-is-zen.org][It is Zen.]]
+  - [[file:private-writing.org][Private writing is powerful.]]
+  - [[file:integrate-public-and-private.org][Integrating your public and private writing only recently became possible]]
+    - which is important, because [[file:wise-people-say-write.org][writing is like thinking with power tools]].
+- And of course, [[file:sharing-is-powerful.org][sharing information is powerful.]]
 
 ** If you're a programmer, please help!
-[[file:cool-tech-in-skg.md][Skg uses cool technologies!]], including Rust and Emacs. (That said, I'm flexible -- if you want to write another client, or rewrite the server in Haskell, let's go!)
+[[file:cool-tech-in-skg.org][Skg uses cool technologies!]], including Rust and Emacs. (That said, I'm flexible -- if you want to write another client, or rewrite the server in Haskell, let's go!)
 
-- [[file:usage.md][Usage: How to run Skg]]
+- [[file:usage.org][Usage: How to run Skg]]
 - Skg's data model and user experience
-  - Trees and textlinks: [[file:vocabulary.md][Some simple but important definitions]]
-  - [[file:hyperlinks.md][TextLinks can point to any part of a document.]]
-  - [[file:forks.md]["Forks": Subscription and overriding in detail]]
-  - [[file:data-model-skg-extensions.md][The data model]].
-  - [[file:sharing-model.md][The sharing model]].
+  - Trees and textlinks: [[file:vocabulary.org][Some simple but important definitions]]
+  - [[file:hyperlinks.org][TextLinks can point to any part of a document.]]
+  - [[file:forks.org]["Forks": Subscription and overriding in detail]]
+  - [[file:data-model-skg-extensions.org][The data model]].
+  - [[file:sharing-model.org][The sharing model]].
 - [[file:COMMANDS.org][What's available in Skg]]
 - Some reasonable jumping-off points for understanding the code
   - [[file:../server/types/nodes/complete.rs][The Rust node types]]

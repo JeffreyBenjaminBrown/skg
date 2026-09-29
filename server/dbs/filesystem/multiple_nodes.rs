@@ -188,7 +188,7 @@ fn fold_grouped_sections (
 
 /// NOT AN ERROR: same-id files across sources. Those are the
 /// SECTIONS of one privacy telescope, grouped and folded at load,
-/// and they are the feature -- see docs/telescopes.md. Sections of
+/// and they are the feature -- see docs/telescopes.org. Sections of
 /// one telescope share a pid, so they can never trip this check.
 ///
 /// THE ERROR: one id claimed by two DIFFERENT nodes -- an id
@@ -329,7 +329,7 @@ fn report_ids_claimed_by_two_nodes(
     content . push_str ("#+title: IDs claimed by more than one node\n");
     content . push_str ("#+date: <generated at initialization>\n\n");
     content . push_str( &format!(
-      "{} id(s) claimed by more than one node. Same-id files ACROSS SOURCES are not this: those are the sections of one privacy telescope (docs/telescopes.md). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n",
+      "{} id(s) claimed by more than one node. Same-id files ACROSS SOURCES are not this: those are the sections of one privacy telescope (docs/telescopes.org). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n",
       count));
     let mut sorted_ids: Vec<(&ID, &Vec<(ID, SourceName)>)> =
       // for deterministic output

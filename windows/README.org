@@ -117,7 +117,7 @@ permissions. They are ignored by =.dockerignore=.
 - =install.ps1=
 - =run.ps1=
 - =WINDOWS.org=
-- project =docs/README.org= and =docs/glossary.md=
+- project =docs/README.org= and =docs/glossary.org=
 - all project docs under =docs/=
 - root =LICENSE.md=
 - =elisp/=

@@ -72,7 +72,8 @@ mod tests {
 
   #[test]
   fn repository_document_samples_keep_mixed_syntax_and_warn_on_stale_paths () {
-    let root : &Path = Path::new (env! ("CARGO_MANIFEST_DIR"));
+    let root : &Path = &Path::new (env! ("CARGO_MANIFEST_DIR"))
+      . join ("tests/import_md_and_org_samples"); // snapshots of docs/
     let names : [&str; 4] = [
       "docs/setup.org", "docs/README-old.org",
       "docs/data-model_friendly.org",

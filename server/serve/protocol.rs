@@ -64,7 +64,7 @@ impl RequestType {
       "delete references to absent node" => Ok (RequestType::DeleteReferencesToAbsentNode),
       other => Err (format! ("Unsupported request type: {}", other)), }} }
 
-/// IN DETAIL: See docs/api-and-formats.md
+/// IN DETAIL: See docs/api-and-formats.org
 ///
 /// IN BRIEF: Enum of all message types the server sends to the client.
 /// The client format is a string in the s-exp

@@ -64,7 +64,7 @@ the clone landed in the rotated source."
     (with-current-buffer confirm-buf
       ;; The server pre-fills the PICK-A-SOURCE placeholder and only
       ;; SUGGESTS the inferred source in a comment line (fork.rs;
-      ;; documented in docs/COMMANDS.org and glossary.md). An earlier
+      ;; documented in docs/COMMANDS.org and glossary.org). An earlier
       ;; version of this test asserted "(source owned)" directly,
       ;; which predates the placeholder mechanism -- see the 2026-07-02
       ;; entry in TODO/problems.org.

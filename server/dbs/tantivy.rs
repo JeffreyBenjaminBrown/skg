@@ -8,7 +8,7 @@
 //                     delete-and-readd.
 
 // GLOSSARY:
-// See the Tantivy section in docs/glossary.md.
+// See the Tantivy section in docs/glossary.org.
 
 pub mod background_writer;
 pub mod context_update;

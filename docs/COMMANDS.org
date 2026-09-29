@@ -603,7 +603,7 @@ strips the fork request so the next save does not re-fork).
 The clone subscribes to and overrides the node, and the original
 keeps its own (owned) content. A node may have at most one clone
 you own; forking an already-forked node is rejected, naming the
-existing clone. See =docs/forks.md=.
+existing clone. See =docs/forks.org=.
 *** C-c m l : skg-replace-content-with-link
 Replace the branch at point with a link to the node that used to
 be there, then save the buffer.
@@ -905,7 +905,7 @@ inside each file.
 
 After reviewing the output, place it in the intended owned source directory
 and configure that source with the intended name and privacy order. See
-[[file:api-and-formats.md][the configuration reference]]. Check for ID collisions with existing sources
+[[file:api-and-formats.org][the configuration reference]]. Check for ID collisions with existing sources
 before loading: the importer itself does not check them.
 
 For a first setup, configure the source before starting Skg. When replacing

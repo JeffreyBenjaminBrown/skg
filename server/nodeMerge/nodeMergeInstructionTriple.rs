@@ -225,7 +225,7 @@ fn three_nodeMerged_nodecompletes(
 /// The ids 'node' shows as unintegrated subscribed content: contained
 /// by some node it subscribes to, and neither hidden by it nor among
 /// its own contents (the subscribee-as-such display rule,
-/// docs/sharing-model.md). A subscribee with no disk entry
+/// docs/sharing-model.org). A subscribee with no disk entry
 /// contributes nothing.
 fn ids_shown_through_subscriptions (
   node   : &NodeComplete,

@@ -1,0 +1,19 @@
+* FAQ
+
+** How it works
+
+- [[file:./plaintext-and-interoperability.org][Does it use plaintext? Is it interoperable with Emacs org-mode?]]
+  Yes and yes.
+
+** How to do things
+There are keyboard shortcuts for all commands mentioned here;
+see [[file:./COMMANDS.org][COMMANDS]].
+
+*** How to [[file:./merging.org][merge two nodes]]
+
+*** How to [[file:./moving-nodes-across-repos.org][move a node]] to a different source repository
+
+** Context
+
+*** [[file:./networking-and-scale.org][How will it network and scale?]]
+  Even with no internet you could collaborate with ten thousand people. With internet, no limit.

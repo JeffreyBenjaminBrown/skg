@@ -491,7 +491,7 @@ you back at these two keys.
 The clone subscribes to and overrides the node, and the original
 keeps its own (owned) content. A node may have at most one clone
 you own; forking an already-forked node is rejected, naming the
-existing clone. See =docs/forks.md=.
+existing clone. See =docs/forks.org=.
 *** <localleader>ml : :SkgReplaceContentWithLink
 Replace the branch at point with a link to the node that used to
 be there, then save the buffer.
