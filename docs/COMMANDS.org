@@ -993,7 +993,9 @@ export, N is not exported, and you get a warning.
 imported document automatically.
 
 ***** links and overlap
-Links are rewritten to relative org links. A link to another
+Links are rewritten to relative org links. Link syntax that Org shows
+literally (in =verbatim= or ~code~, a fixed-width =:= line, or a
+=#+begin_...= block or code fence) is an example, and is left alone. A link to another
 exported file's root points at that file; a link to a non-root
 node points deep, to the relevant headline of the document,
 via =[[./file.org::*Heading][label]]=.

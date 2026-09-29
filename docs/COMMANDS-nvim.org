@@ -730,7 +730,9 @@ quoted if it contains whitespace). That parent is written to
 =<output-dir>/<target_filepath>.org= as a recursive content view,
 stripped of skg metadata. The marker child is omitted.
 
-Links are rewritten to relative org links. A link to another
+Links are rewritten to relative org links, except examples in text
+Org shows literally (verbatim, code, fixed-width lines, blocks and
+fences). A link to another
 exported file's root points at that file; a link to a non-root
 node points deep, via =[[./file.org::*Heading][label]]=, or via
 =[[./file.org::#ID][label]]= when that headline contains a link

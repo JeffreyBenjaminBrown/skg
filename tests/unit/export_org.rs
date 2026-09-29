@@ -341,3 +341,28 @@ fn private_source_edge_is_omitted_from_restricted_export () {
     let content : String =
       fs::read_to_string ( dir . path () . join ("r.org") ) . unwrap ();
     assert! ( content . contains ("Private child"), "{}", content ); }}
+
+#[test]
+fn example_links_in_literal_text_are_not_rewritten () {
+  let body : &str = "\
+a =[[id:gone][LABEL]]= link is inserted
+: [[id:gone][fixed width]]
+#+begin_example
+[[id:gone][in a block]]
+#+end_example
+real [[id:gone][broken]]";
+  let nodes : Vec<NodeComplete> = vec! [
+    node ("a","Root A", Some (body), &["ma"]),
+    node ("ma", &format! ("[[id:{}][how]]", MAGIC),
+          Some ("target_filepath = a"), &[]),
+  ];
+  let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+  let report : ExportReport =
+    export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
+  let a : String =
+    fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
+  assert! (a . contains (&body [.. body . len () - "real [[id:gone][broken]]" . len ()]),
+           "literal text changed:\n{}", a);
+  assert! (a . ends_with ("real broken\n"), "a.org:\n{}", a);
+  assert_eq! (report . broken_links, 1);
+}
