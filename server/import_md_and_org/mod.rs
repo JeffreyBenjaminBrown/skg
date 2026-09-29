@@ -93,7 +93,7 @@ mod tests {
     assert! (built [0] . nodes . iter () . any (|node|
       node . body . as_deref () . unwrap_or ("") . contains ("```elisp")));
     assert! (documents [1] . diagnostics . iter () . any (|diagnostic|
-      diagnostic . message . contains ("docs/data-model-trees-with-links.md")));
+      diagnostic . message . contains ("data-model-trees-with-links.md")));
     assert! (built [3] . nodes . iter () . any (|node|
       node . body . as_deref () . unwrap_or ("") . contains (
         "[Semantic Synchrony](https://github.com/synchrony/smsn)")));
