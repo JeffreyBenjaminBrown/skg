@@ -278,6 +278,9 @@ fn resolve_link (
         . map (|(path, fragment)| (path, Some (fragment)))
         . unwrap_or ((target, None));
       (path, fragment) }
+    LinkSyntax::Org if destination == target &&
+      (target . starts_with ('#') || target . starts_with ('*')) =>
+      ("", Some (target)), // Org's search within this document
     LinkSyntax::Org => {
       let (path, search) = target . split_once ("::")
         . map (|(path, search)| (path, Some (search)))
@@ -486,6 +489,26 @@ mod tests {
     assert! (b_body . contains ("[[file:notes/a.md::*Same][ambiguous]]"));
     assert! (documents [1] . diagnostics . iter () . any (|warning|
       warning . message . contains ("ambiguous")));
+  }
+
+  #[test]
+  fn org_searches_without_a_file_address_this_document () {
+    let mut documents : Vec<ParsedDocument> = vec! [parse_document (
+      Path::new ("doc.org"),
+      "* Top\n** Section\n:PROPERTIES:\n:CUSTOM_ID: sec\n:END:\n** Other\n[[#sec][by id]] [[*Section][by heading]]\n"
+        . to_string ())];
+    let source : SourceName = SourceName::from ("owned");
+    let mut next = || ID::new (&uuid::Uuid::new_v4 () . to_string ());
+    let mut built : Vec<BuiltDocument> = documents . iter ()
+      . map (|doc| build_document (doc, &source, &mut next) . unwrap ())
+      . collect ();
+    resolve_document_links (&mut documents, &mut built,
+      Path::new ("/input"), None, &HashMap::new ());
+    let titled = |title : &str| built [0] . nodes . iter ()
+      . find (|node| node . title == title) . unwrap ();
+    let section : &ID = &titled ("Section") . pid;
+    assert_eq! (titled ("Other") . body . as_deref (), Some (&*format! (
+      "[[id:{}][by id]] [[id:{}][by heading]]", section, section)));
   }
 
   #[test]
