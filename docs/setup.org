@@ -29,7 +29,7 @@ a backup; Org export is readable but not a round trip.
          (skg-reload)
          (skg-client-init "../data/skgconfig.toml"))
 ```
-** Now you can use it. See [[../docs/COMMANDS.org][commands]].
+** Now you can use it. See [[./COMMANDS.org][commands]].
 ** stop the server later if you want
    ```
    ../bash/stop-servers.sh

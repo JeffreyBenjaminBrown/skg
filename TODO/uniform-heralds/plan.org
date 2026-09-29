@@ -207,7 +207,7 @@ In [[../../server/dbs/typedb/search/all_graphnodestats.rs][all_graphnodestats.rs
 - carry the alias count and extra-id count (for =Ak= / =Ik=).
 
 Keep the in-Rust path and the (test-only) TypeDB fallback in lockstep,
-or retire the fallback (see the out-of-scope note in [[../../TODO/problems.org][TODO/problems.org]]).
+or retire the fallback (see the out-of-scope note in [[../problems.org][TODO/problems.org]]).
 
 ** Step 3 — compute position stats + birth (ViewNodeStats)
 
@@ -275,7 +275,7 @@ join already exist. Required edits:
   'containsHerald' / 'linksHerald' / 'sourceHerald' / viewStats);
 - update the elisp display tests ([[../../tests/elisp/test-heralds-minor-mode.el][test-heralds-minor-mode.el]] etc.) to the
   new tokens. (These also still reference dead 'containsHerald' /
-  'linksHerald' inputs — see [[../../TODO/problems.org][TODO/problems.org]].)
+  'linksHerald' inputs — see [[../problems.org][TODO/problems.org]].)
 
 ** Step 7 — update golden tests, in layers
 
@@ -333,7 +333,7 @@ made the reasonable call and flag it so it can be cheaply overridden.
 - *Density.* The compact grammar is precise but dense (=3aC4a=); this
   is a deliberate "fewer tokens, more to learn per token" trade.
 - *Out-of-scope code problems* found during research are logged in
-  [[../../TODO/problems.org][TODO/problems.org]] under "Problems found while planning uniform
+  [[../problems.org][TODO/problems.org]] under "Problems found while planning uniform
   heralds (2026-06-21)": stale elisp test inputs, the non-source-set-
   aware TypeDB fallback, the incomplete owner-relative stats today, and
   the from-leaves-by-subtraction quirk.
