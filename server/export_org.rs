@@ -17,6 +17,7 @@ use crate::source_sets::{ActiveSourceSet, SourceSetName};
 use crate::types::misc::SkgConfig;
 use crate::types::misc::{ID, RelPartner};
 use crate::types::nodes::complete::NodeComplete;
+use crate::types::textlinks::org_literal_ranges::org_literal_ranges;
 use crate::types::textlinks::{
   replace_each_link_with_its_label, textlinks_from_text,
   textlinks_with_ranges_from_text};
@@ -24,6 +25,7 @@ use crate::types::textlinks::{
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
+use std::ops::Range;
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
@@ -568,10 +570,9 @@ fn render_root (
             ":PROPERTIES:\n:CUSTOM_ID: {}\n:END:\n", node . pid ) ); }
         if let Some (body) = node . body . as_deref () {
           if ! body . trim () . is_empty () {
-            let body : String =
-              rewrite_links ( body, target, homes,
-                              alias_to_pid, broken, warnings );
-            warn_body_structure (&node . pid, &body, warnings);
+            let body : String = defuse_headline_lines (
+              & rewrite_links ( body, target, homes,
+                                alias_to_pid, broken, warnings ));
             out . push_str ( body . trim_end_matches ('\n') );
             out . push ('\n'); }} }, }}
   out }
@@ -670,21 +671,31 @@ fn relpath (
   let joined : String = parts . join ("/");
   if ups == 0 { format! ("./{}", joined) } else { joined } }
 
-fn warn_body_structure (
-  pid      : &ID,
-  body     : &str,
-  warnings : &mut Vec<String>,
-) {
-  for line in body . lines () {
-    let is_headline : bool =
-      line . starts_with ('*')
-      && line . trim_start_matches ('*') . starts_with (' ');
-    if is_headline || line . starts_with ("#+") {
-      warnings . push ( format! (
-        "node {}: body line {:?} begins like org structure and may \
-         render as a spurious headline/keyword",
-        pid, line ) );
-      return; }}} // one warning per node is enough
+/// A body line that Org would read as a headline ('*'s then a space)
+/// would split the exported document. Inside a '#+begin_' block, Org's
+/// own comma escape hides it; elsewhere, two leading spaces make it a
+/// list item (for '* ') or plain text.
+fn defuse_headline_lines (
+  body : &str,
+) -> String {
+  let org_blocks : Vec<Range<usize>> = org_literal_ranges (body)
+    . into_iter ()
+    . filter ( |range| body [range . clone ()] . trim_start ()
+                       . to_ascii_lowercase () . starts_with ("#+begin_") )
+    . collect ();
+  let mut out : String = String::new ();
+  let mut line_start : usize = 0;
+  for line in body . split_inclusive ('\n') {
+    let looks_like_headline : bool = {
+      let stars : usize = line . bytes () . take_while (|b| *b == b'*') . count ();
+      stars > 0 && line [stars ..] . starts_with (' ') };
+    if looks_like_headline {
+      let in_org_block : bool = org_blocks . iter ()
+        . any ( |range| range . start < line_start && line_start < range . end );
+      out . push_str (if in_org_block { "," } else { "  " }); }
+    out . push_str (line);
+    line_start += line . len (); }
+  out }
 
 //
 // Small shared helpers

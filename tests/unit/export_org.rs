@@ -366,3 +366,38 @@ real [[id:gone][broken]]";
   assert! (a . ends_with ("real broken\n"), "a.org:\n{}", a);
   assert_eq! (report . broken_links, 1);
 }
+
+#[test]
+fn headline_like_body_lines_are_defused () {
+  let body : &str = "\
+* bullet
+#+begin_src org
+* inside a block
+#+end_src
+```
+* inside a fence
+```
+#+title: kept";
+  let nodes : Vec<NodeComplete> = vec! [
+    node ("a","Root A", Some (body), &["ma"]),
+    node ("ma", &format! ("[[id:{}][how]]", MAGIC),
+          Some ("target_filepath = a"), &[]),
+  ];
+  let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+  let report : ExportReport =
+    export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
+  let a : String =
+    fs::read_to_string (dir . path () . join ("a.org")) . unwrap ();
+  assert_eq! (a, "\
+* Root A
+  * bullet
+#+begin_src org
+,* inside a block
+#+end_src
+```
+  * inside a fence
+```
+#+title: kept
+");
+  assert! (report . warnings . is_empty (), "{:?}", report . warnings);
+}

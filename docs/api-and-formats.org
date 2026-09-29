@@ -505,7 +505,7 @@ one automatically.
     count, warning count). =errors= is non-empty only on failure
     (bad/unknown source-set name, unreadable =.skg= files, filesystem
     error). =warnings= are non-fatal (skipped roots,
-    broken links, body lines that look like org structure).
+    broken links).
   - Behavior: Reads all =.skg= files fresh from disk, finds every
     export root, and writes each to
     =<output-dir>/<target_filepath>.org= as a recursive content view

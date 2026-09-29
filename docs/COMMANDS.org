@@ -956,6 +956,9 @@ It asks two things:
   as-is.
   Existing files in the output dir are overwritten in place; other
   files there are left untouched.
+  A body line Org would read as a headline (such as a Markdown
+  =* item=) is indented two spaces, making it a list item, or inside a
+  =#+begin_= block is escaped with a comma, as Org itself does.
 
 ***** choosing what to export: export markers
 Nothing is exported unless you mark
