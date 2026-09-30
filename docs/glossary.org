@@ -126,7 +126,7 @@ Where the code says "child" or "parent", it means the relationship between viewn
 -- and might or might not correspond to a graph relation.
 
 For one example, see the discussion of alias nodes in
-[[file:../coding-advice/architecture.org][the architecture documentation]].
+[[file:../coding-advice/architecture.md][the architecture documentation]].
 
 *** col
 

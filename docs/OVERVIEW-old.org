@@ -114,7 +114,7 @@ Except for the whitespace around the brackets and colon
   [ [ id : long-number ] [ any-title-however-misleading ] ]
 ***** link appearance
 A title or (as in this case) body
-can have [[_][any]] number of [[_][links]] with [[../org_export_is_partial.org][any title, however misleading]].
+can have [[*link representation][any]] number of [[*why use links][links]] with [[./hyperlinks.org][any title, however misleading]].
 ***** why use links
 ****** They let 'documents' stay reasonably-sized.
 where 'document' = recursive containtment view

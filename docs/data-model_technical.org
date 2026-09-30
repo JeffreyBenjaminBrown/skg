@@ -1,4 +1,4 @@
-#+TITLE: Skg data model: technical reference
+* Skg data model: technical reference
 
 This document describes the complete runtime graph model.  The =.skg= files
 and =skgconfig.toml= are authoritative.  At startup and explicit rebuild, the
@@ -9,7 +9,7 @@ same values.  Tantivy is a derived text index; it is not graph authority.
 For a gentler introduction, see [[./data-model_friendly.org][the friendly data-model guide]].  For
 privacy-section folding and unfolding, see [[./telescopes.org][telescopes]].
 
-* Node fields
+** Node fields
 
 The full folded representation is =NodeComplete= in
 =server/types/nodes/complete.rs=.  =NodeRust= is its graph projection and adds
@@ -38,7 +38,7 @@ save instructions are reconciled.  =RelPartner<T>= attaches the privacy
 source where an alias or edge is recorded.  The order of list-valued fields is
 preserved.
 
-* Relationships
+** Relationships
 
 All stored relationships are directed from the owning node to a member ID.
 Member IDs may be primary IDs or extra IDs; graph indexes canonicalize known
@@ -57,7 +57,7 @@ Home source and extra-ID ownership are node properties, not separate runtime
 relationship entities.  Edge relSource remains part of every stored
 =RelPartner= and participates in source-set/privacy gating.
 
-* Hard validation constraints
+** Hard validation constraints
 
 =validate_complete_graph= runs before startup/rebuild publication.  Saves
 preserve the same constraints incrementally: while holding the mutation gate,
@@ -97,7 +97,7 @@ against the same stale snapshot.  Filesystem preflight and graph validation
 produce tokens tied to that exact snapshot; commit consumes those prepared
 values rather than recomputing them after writes begin.
 
-* Graph indexes
+** Graph indexes
 
 =InRustGraph= stores =NodeRust= values in a persistent =im::HashMap=.  Its
 derived indexes are:
@@ -135,7 +135,7 @@ extant owner's home is the conservative ceiling.  Saves recompute warnings for
 saved owners plus untouched inbound owners affected by identity, existence, or
 home changes; startup and rebuild still audit every owner.
 
-* Runtime generations and rebuilding
+** Runtime generations and rebuilding
 
 An =SkgEnv= family shares one atomic =RuntimeGeneration= publication point and
 one mutation gate.  A generation contains an =Arc<SkgConfig>=, an
