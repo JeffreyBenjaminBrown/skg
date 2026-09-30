@@ -27,30 +27,30 @@ and H is its 'child'.
 ***** Some org nodes are not contained.
 These are 'roots' or 'top-level org nodes'.
 **** Folding (hiding contents) makes complex trees readable, navigable.
-** terms from org-mode that I use
-*** fold
+** some important terms
+*** from org-mode
+**** fold
 = hide an org node's children (and body), showing only the title
-*** parent and child
+**** parent and child
 In the display, the parent-child relationship
   can be used to display multiple kinds of relationship.
 In the Skg graph there are no parents or children --
   there are instead explicit named relationships.
-*** OrgNode
-** client, server and graph
-*** the graph
-is the user's collection of knowledge.
+**** OrgNode
+*** more
+**** The 'graph' is the user's collection of knowledge.
 The user need not be the sole author --
 Skg lets you integrate other authors' notes into your own,
 and manipulate them as if you did own them.
 More on the graph [[*the graph][below]].
-*** the 'client'
-is an app that permits a user to view and manipulate the graph.
-So far the only client is written for Emacs,
-but there could be others.
-*** The 'server'
-is an app that the user only controls through the client.
+**** The 'server' does the heavy lifting.
+It is an app that the user only controls through the client.
 The server manipulates the graph,
 and creates views of it (as plain text) for the client.
+**** The 'client' is what the user uses to see and change the graph.
+Skg has an Emacs client and a Neovim client.
+I hope to make a web client soon.
+You only need to use one of them at a time.
 ** the graph
 *** consists of 'SkgNode's
 **** what that means

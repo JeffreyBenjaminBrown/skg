@@ -960,7 +960,7 @@ It asks two things:
   =* item=) is indented two spaces, making it a list item, or inside a
   =#+begin_= block is escaped with a comma, as Org itself does.
 
-***** choosing what to export: export markers
+**** choosing what to export: export markers
 Nothing is exported unless you mark
 it. To make node N into an exported file,
 make N contain a child node, called an /export marker/, such that:
@@ -998,7 +998,7 @@ export, N is not exported, and you get a warning.
 [[#import-md-and-org][skg-import-md-and-org]] adds a marker to each
 imported document automatically.
 
-***** links and overlap
+**** links and overlap
 Links are rewritten to relative org links. Link syntax that Org shows
 literally (in =verbatim= or ~code~, a fixed-width =:= line, or a
 =#+begin_...= block or code fence) is an example, and is left alone. A link to another
@@ -1020,7 +1020,7 @@ The first instead gets a heading linking to the second file.
 A link whose dest
 is not exported under the chosen set points to a "some links
 might be broken" note.
-***** privacy
+**** privacy
 If a restricted export would include overPrivateText telescope text, Skg asks for
 approval for each such ID before writing any file. Source-set =all= exports
 it with a warning. The noninteractive form "fails closed" (fails before writing any files) unless passed
