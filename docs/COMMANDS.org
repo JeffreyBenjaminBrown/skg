@@ -825,6 +825,32 @@ If the files to be imported contain absolute links,
 skg needs to know how those host-system paths
 correspond to paths in the docker container.
 
+**** Link syntax in literal text is an example, not a link.
+In an Org file, the importer leaves alone any link written inside text
+that Org shows literally:
+- inline =verbatim= or ~code~, like =[[id:ID][label]]=,
+- a fixed-width line, which begins with a colon and a space
+  (=: [[id:ID][label]]=), or is a lone colon,
+- a =#+begin_...= / =#+end_...= block of any kind, and
+- a =```= fence (Markdown syntax, but common in Org files too).
+Such links are not resolved or rewritten, and do not produce warnings.
+Backticks (=`code`=) are not literal in Org, so a link inside them is a link.
+Use =verbatim= or ~code~ instead.
+(To insert a block in Emacs, use =C-c C-,=, which is =org-insert-structure-template=.)
+The rest of Skg (saving, link statistics, link annotations, export)
+treats links in literal text the same way.
+
+**** An Org heading inside a block or fence stops the import.
+If a line of an Org file looks like a heading (asterisks at the start of
+the line, then a space) but is inside a =#+begin_...= block or a =```= fence,
+nothing is imported, and the preview explains which lines are the problem.
+Org would read the line as a heading and end the block there,
+so Skg cannot tell what was meant.
+Often the block was never closed.
+If the line belongs inside the block, escape it with a leading comma
+(=,* ...=), as Org does. This check applies only to Org files;
+in a Markdown file, a =#= line in a code block is ordinary code.
+
 **** Imported Markdown hard breaks become Org's two-backslash hard breaks.
 In Markdown you can put a slash or two spaces after a line
 to ensure that the next line is shown on a separate line,

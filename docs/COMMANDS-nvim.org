@@ -701,6 +701,14 @@ Later export is a readable rendition, not a round-trip backup. Exporting to
 the original directory overwrites matching =.org= files but not =.md= files.
 There is no dedicated undo or crash-recovery transaction.
 
+In Org files, link syntax inside text Org shows literally (=verbatim=,
+~code~, a fixed-width line beginning with =: =, a =#+begin_...= block, or a
+=```= fence) is an example, and is left alone; backticks are not literal in
+Org. A line that looks like an Org heading inside a block or fence stops the
+import, with nothing written; close the block, or escape the line with a
+leading comma (=,* ...=). The Emacs command reference explains both in more
+detail.
+
 ** exporting to org
 *** :SkgExportToOrg
 Exports Skg data to plain =.org= files, so the data can be read

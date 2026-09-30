@@ -1,7 +1,7 @@
 //! Read-only preparation and under-gate revalidation of one import.
 
 use super::{discover_documents, build::{BuiltDocument, build_document},
-  parse::ParsedDocument, publish::prepare_import_publication,
+  parse::{ParsedDocument, line_at}, publish::prepare_import_publication,
   resolve::{contains_absolute_file_link, resolve_document_links}};
 use crate::dbs::filesystem::multiple_nodes::{
   read_all_skg_files_from_sources_read_only, read_skg_sections_from_folder};
@@ -67,6 +67,7 @@ pub fn prepare_import_batch_with (
     return Err (format! ("Destination source {} is absent or not owned",
       destination_source)); }
   let mut documents : Vec<ParsedDocument> = discover_documents (input_directory)?;
+  refuse_documents_with_errors (&documents)?;
   if ! host_mapping_answered && contains_absolute_file_link (&documents) {
     return Ok (ImportPreparation::HostMappingNeeded); }
   let existing_ids : HashMap<String, ID> =
@@ -174,6 +175,26 @@ impl PreparedImportBatch {
     let created : usize = prepared . apply_under_mutation_gate (env)?;
     Ok ((created, record_id))
   }
+}
+
+/// Some input is ambiguous enough that no import should proceed.
+fn refuse_documents_with_errors (
+  documents : &[ParsedDocument],
+) -> Result<(), String> {
+  let errors : Vec<String> = documents . iter ()
+    . flat_map (|document| document . errors . iter () . map (|error|
+      format! ("  {}:{}: {}", document . path . display (),
+               line_at (&document . text, error . range . start),
+               error . message)))
+    . collect ();
+  if errors . is_empty () { return Ok (()); }
+  Err (format! (
+    "Nothing was imported. In these Org files, a line that looks like a heading \
+is inside a #+begin_... block or a ``` fence. Org would read it as a heading \
+and end the block there, so Skg cannot tell which was meant. Either close the \
+block before the heading, or, if the line belongs inside the block, escape it \
+with a leading comma (',* ...'), as Org does.\n{}",
+    errors . join ("\n")))
 }
 
 fn configured_identity_map (
@@ -303,14 +324,6 @@ fn import_record_body (
     source, time)
 }
 
-fn line_at (
-  text : &str,
-  offset : usize,
-) -> usize {
-  1 + text [..offset . min (text . len ())] . bytes ()
-    .filter (|byte| *byte == b'\n') . count ()
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -378,6 +391,23 @@ mod tests {
       &env . runtime_snapshot () . tantivy_index,
       "Notes", &SearchOptions::default ()) . unwrap ();
     assert! (! hits . is_empty (), "imported title is searchable after index drain");
+  }
+
+  #[test]
+  fn heading_inside_a_block_refuses_the_preview () {
+    let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
+    let input : PathBuf = temp . path () . join ("input");
+    let source : PathBuf = temp . path () . join ("source");
+    fs::create_dir (&input) . unwrap ();
+    fs::create_dir (&source) . unwrap ();
+    fs::write (input . join ("bad.org"),
+      "* Top\n#+begin_src\n* inside\n#+end_src\n") . unwrap ();
+    let env : SkgEnv = environment (&source, true);
+    let error : String = prepare_import_batch (
+      &input, &SourceName::from ("notes"), None, false, &env)
+      . err () . unwrap ();
+    assert! (error . starts_with ("Nothing was imported."), "{}", error);
+    assert! (error . contains ("bad.org:3: \"* inside\""), "{}", error);
   }
 
   #[test]

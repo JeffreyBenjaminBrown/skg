@@ -17,6 +17,13 @@ const VERBATIM_POST : &str = "-.,:!?;'\")}\\[";
 pub fn org_literal_ranges (
   text : &str,
 ) -> Vec<Range<usize>> {
+  org_literal_ranges_and_unclosed_block (text) . 0 }
+
+/// As 'org_literal_ranges', plus where an unclosed block or fence
+/// starts, if there is one.
+pub fn org_literal_ranges_and_unclosed_block (
+  text : &str,
+) -> (Vec<Range<usize>>, Option<usize>) {
   let mut ranges : Vec<Range<usize>> = Vec::new ();
   let mut open_block : Option<(usize, String)> = None; // (start, closing line)
   let mut offset : usize = 0;
@@ -44,9 +51,11 @@ pub fn org_literal_ranges (
     ranges . extend (
       inline_verbatim_ranges (line) . into_iter ()
       . map (|range| start + range . start .. start + range . end)); }
-  if let Some ((block_start, _)) = open_block {
+  let unclosed_block_start : Option<usize> =
+    open_block . map ( |(block_start, _)| block_start );
+  if let Some (block_start) = unclosed_block_start {
     ranges . push (block_start .. text . len ()); }
-  ranges }
+  (ranges, unclosed_block_start) }
 
 /// '=verbatim=' and '~code~' spans in one line, following Org's
 /// border rules: the opening marker follows the line start, whitespace
