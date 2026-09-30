@@ -115,8 +115,10 @@ fn captures_outside_literals <'t> (
   pattern . captures_iter (text)
     . filter ( |capture| {
       let whole : Match = capture . get (0) . unwrap ();
+      // Only a literal region containing the whole link makes it an
+      // example; =verbatim= in a link's label is just its formatting.
       ! literal . iter () . any ( |range|
-        range . start < whole . end () && whole . start () < range . end ) } )
+        range . start <= whole . start () && whole . end () <= range . end ) } )
     . collect () }
 
 pub fn replace_each_link_with_its_label (

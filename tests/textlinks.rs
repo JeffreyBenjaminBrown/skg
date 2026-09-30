@@ -180,3 +180,9 @@ fn node_body_first_line_is_a_line_start () {
   assert_eq! ( textlinks_from_node (&node),
                vec! [ TextLink::new ("t", "T") ] );
 }
+
+#[test]
+fn verbatim_in_a_link_label_does_not_make_it_an_example () {
+  assert_eq! ( textlinks_from_text ("see [[id:a][=code= label]] and =x="),
+               vec! [ TextLink::new ("a", "=code= label") ] );
+}

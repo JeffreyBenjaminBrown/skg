@@ -49,8 +49,10 @@ Link syntax in text Org shows literally is an example, not a link."
       (while (re-search-forward skg-link-annotations--regexp nil t)
         (let ((start (match-beginning 0))
               (end (match-end 0)))
+          ;; Only a literal region containing the whole link makes it an
+          ;; example; =verbatim= in a link's label is just its formatting.
           (unless (cl-some (lambda (range)
-                             (and (< (car range) end) (< start (cdr range))))
+                             (and (<= (car range) start) (<= end (cdr range))))
                            literal)
             (push (list (match-beginning 2) (match-end 2)
                         end (match-string-no-properties 1))

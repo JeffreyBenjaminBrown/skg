@@ -100,12 +100,14 @@ function M.literal_lines (lines)
   return result
 end
 
----Whether bytes START..FINISH of a line overlap its LITERAL_ROW
----(an entry of 'M.literal_lines').
+---Whether bytes START..FINISH of a line lie within its LITERAL_ROW
+---(an entry of 'M.literal_lines'). Only a literal span containing the
+---whole link makes it an example; =verbatim= in a link's label is just
+---its formatting.
 local function within_literal (literal_row, start, finish)
   if literal_row == true then return true end
   for _, span in ipairs(literal_row) do
-    if span[1] <= finish and start <= span[2] then return true end
+    if span[1] <= start and finish <= span[2] then return true end
   end
   return false
 end

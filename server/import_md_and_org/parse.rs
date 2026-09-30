@@ -284,8 +284,8 @@ fn parse_org_links (
     let Some (relative_end) = text [start + 2..] . find ("]]" ) else { break; };
     let end : usize = start + 2 + relative_end + 2;
     cursor = end;
-    if document . literal_ranges . iter () . any (|literal|
-      ranges_overlap (&(start..end), literal)) { continue; }
+    if document . literal_ranges . iter () . any (|literal| // =x= in a label is formatting
+      literal . start <= start && end <= literal . end) { continue; }
     let inner : &str = &text [start + 2..end - 2];
     let (destination, label) : (&str, &str) =
       inner . split_once ("][") . unwrap_or ((inner, inner));
@@ -672,11 +672,14 @@ mod tests {
 
   #[test]
   fn org_metadata_and_links_inside_literal_content_are_not_interpreted () {
-    let text : String = "#+begin_src org\n#+title: False\n:PROPERTIES:\n:ID: false\n:END:\n#+end_src\n#+title: True\n* Actual\n~[[file:other.org]]~ =[[id:absent]]= `[[file:no.md]]`\n" . to_string ();
+    let text : String = "#+begin_src org\n#+title: False\n:PROPERTIES:\n:ID: false\n:END:\n#+end_src\n#+title: True\n* Actual\n~[[file:other.org]]~ =[[id:absent]]= `[[file:no.md]]`\n[[file:real.org][=verbatim= label]]\n" . to_string ();
     let document : ParsedDocument = parse_document (Path::new ("note.org"), text);
     assert_eq! (document . sections [0] . title, "True");
     assert_eq! (document . sections [0] . explicit_id, None);
-    assert_eq! (document . links . len (), 0);
+    assert_eq! ( // verbatim within a label does not make the link literal
+      document . links . iter () . map (|link| link . destination . as_str ())
+        . collect::<Vec<&str>> (),
+      vec! ["file:real.org"] );
   }
 
   #[test]

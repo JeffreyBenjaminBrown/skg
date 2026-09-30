@@ -128,11 +128,12 @@ describe('skg.link_annotations', function ()
       '#+begin_example', '[[id:f][F]]',
       '* next [[id:g][G]]',
       '```', '[[id:h][H]]', '```',
-      'x=[[id:i][I]]=y' })
+      'x=[[id:i][I]]=y',
+      '[[id:j][=verbatim= label]]' })
     local ids = {}
     for _, position in ipairs(annotations.collect(buf)) do
       table.insert(ids, position.id) end
-    assert.are.same({ 'a', 'g', 'i' }, ids)
+    assert.are.same({ 'a', 'g', 'i', 'j' }, ids)
     vim.api.nvim_buf_delete(buf, { force = true })
   end)
 end)

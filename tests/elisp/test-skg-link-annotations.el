@@ -119,7 +119,8 @@ A headline ends an unclosed block, as a node body's end does."
     (insert "* h\nreal [[id:a][A]] =[[id:b][B]]= (~[[id:c][C]]~)\n"
             ": [[id:d][D]]\n#+BEGIN_SRC org\n[[id:e][E]]\n#+end_src\n"
             "#+begin_example\n[[id:f][F]]\n* next [[id:g][G]]\n"
-            "```\n[[id:h][H]]\n```\nx=[[id:i][I]]=y\n")
+            "```\n[[id:h][H]]\n```\nx=[[id:i][I]]=y\n"
+            "[[id:j][=verbatim= label]]\n")
     (should (equal (mapcar (lambda (position) (nth 3 position))
                            (skg-link-annotations--scan))
-                   '("a" "g" "i")))))
+                   '("a" "g" "i" "j")))))
