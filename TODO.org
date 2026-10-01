@@ -2,7 +2,23 @@
 ** not to dirty the production skg's code.
 ** to set the model
 * ONGOING TODO/import-md-and-org/
+** data/skg-system/ should not need mention in the config
 * next
+** for docs : the org exporter
+*** ONGOING bug : flattening example links
+  - Example links inside verbatim text got flattened. The exporter treats a link
+    written as a literal example, like =[[id:X][LABEL]]= in COMMANDS.org, as a
+    real link to a node that wasn't exported, and replaces it with its label. So
+    "=[[id:X][LABEL]]= link is inserted at point" became "=LABEL= link is
+    inserted at point". The same happened to the example link in the
+    export-marker section I just wrote. That one points at the documentation
+    node in public, which wasn't exported, so it came out as : Export to Org.
+*** ONGOING List items that look like headings are lost.
+A Markdown list item at column 0 (* [Does it use plaintext?…] in FAQ.md)
+is now a line starting with * , which Org reads as a top-level heading.
+This breaks FAQ.org's outline.
+The exporter warned about this and similar lines (#+begin_src, #+title)
+but wrote them anyway.
 ** for video
 *** AWAITS navigate point through herald (overlay)
 walk point through the herald string normally
@@ -15,19 +31,31 @@ Could put a second minibuffer line,
 that reads if anything (key sequence -> command),
 leaving a trail for five seconds or until interrupted.
 ** TODO CRITICAL : git commit workflow
-Solving this puzzle will save me a lot of time.
-
-I want to see, for each content that was removed from any container,
-where (plural) it was removed from and where (plural) it resides,
-as containerward trees.
-I will use that information to verify it is well-placed.
-I want not to duplicate that effort -- that is, if it was removed from multiple places,
-and I verify that it is well-placed while processing one of those places,
-I don't want to re-verify when processing another place.
-I therefore want a set of nodes marked 'well-placed',
-and a herald marking any RemovedHere node as such.
-
-That should be visible both in skg and magit.
+**** ? worry about telescopes
+**** Render the git diff report v2 like a content view, in Skg.
+**** Include all sources.
+Refuse the view if that conflicts with the source set
+(the current maximum privacy level shown --
+what's the term used in the code for that?)
+**** make TextChanged more informative
+Now TextChanged shows a synthetic OldText child,
+with no content but the old title and the old body,
+and also a BodyDiff node with a diff of the two bodies.
+**** show current positions under each RemovedHere node
+That is, if content E was removed from container A,
+then the RemovedHere image of E under A
+should include as children all the current containers of E.
+**** show old containers under each Removed node
+**** update heralds to include "commit-readiness annotations"
+***** user can mark nodes well-placed
+This prevents redundant work.
+It affects the NewHere and RemovedHere images of the node.
+It doesn't describe edits to the node itself,
+but rather to its containers.
+***** user can mark nodes well-edited
+Indicates that all changes to that node can be committed.
+**** decide what are roots of the view
+minimizing redundancy, maximizing informativity
 ** docs
 *** test skg-to-org
 **** what happens to multi-contained 'export me' markers?
@@ -38,6 +66,9 @@ e.g. weird b/c it has a link
 ** embarrasssments
 *** the org-export and docs nodes should be in another repo
 ** bugs
+*** heralds temporarily lose the overlay
+If I save a big buffer, and then quickly move a node
+while the buffer is still saving.
 *** TODO bugs in make-link / make-content
 **** bug: making a link into content gives an unavailable view error
 ***** what I did
