@@ -730,7 +730,7 @@ In [[../../server/dbs/typedb/][server/dbs/typedb/]] many functions that issue on
 
 ** Doc drift on 'initial_node_limit' default
 
-[[../../api-and-formats.md][api-and-formats.md]] says 'initial_node_limit' defaults to 100. [[../../server/consts.rs][server/consts.rs]] defines 'DEFAULT_INITIAL_NODE_LIMIT = 1000'. The hardcoded test default in [[../../server/types/misc.rs][server/types/misc.rs]] is 100. Pick one and update the other.
+[[../../../../docs/api-and-formats.md][api-and-formats.md]] says 'initial_node_limit' defaults to 100. [[../../server/consts.rs][server/consts.rs]] defines 'DEFAULT_INITIAL_NODE_LIMIT = 1000'. The hardcoded test default in [[../../server/types/misc.rs][server/types/misc.rs]] is 100. Pick one and update the other.
 
 ** Per-connection pool is populated as a reactive side-effect
 

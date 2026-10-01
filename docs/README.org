@@ -1,0 +1,57 @@
+* if you are exceedingly clever
+An algebra for graph operations would be beautiful,
+and might make skg safer.
+I beg you, whoever can.
+* technology of Inner peace
+It is important to know this unity before you die.
+Meditate here. Build the rollercoaster, name and collect connections across ideas.
+Make whatever of it private you like. Use whateer of others' in yours.
+Sometimes don't read it. Let an idea come to you. Do not force it, do not photograph early.
+The knowledge is one. It has assimilated what it will keep of you, and you can kind of see your shadow in it. You can put more of yourself there. Maybe you shouldn't. We are butterflies, crickets at fixed points on a graph, broadcasting to each other. Nobody has forever tagged perfection, because we are each others' karma.
+
+That this is technological, that it is not instinctive to all, seems suboptimal.
+* more things this code needs
+* Skg is only currently useable with the help of AI.
+** Just ask for this.
+*** How do I make a node?
+its title, its optional big block of text
+*** Save?
+*** Merge two nodes? Why would I do that?
+*** Search?
+how aliases work
+search ranking should be more flexible
+*** Fork?
+*** Share my public notes? Find others' public notes?
+Up to you, but a git history is recommended.
+*** Navigate?
+Contains is how you write a tree from a root context.
+Link targets lists things that link to the root.
+** documentation is fragmented
+Much of it, including the bulk of the really conceptual parts,
+are in (my public knowledge) .skg graph,
+  https://github.com/JeffreyBenjaminBrown/public-notes-in-skg-format
+* Skg is software for manipulating and sharing knowledge.
+  [[./this-is-awesome.org][Here's one pitch for it.]]
+* [[./setup.org][How to set up Skg]]
+  This includes how to import data from org-roam.
+* [[./COMMANDS.org][Commands available in Skg]]
+* [[./heralds.org][How to read heralds and link annotations]]
+* [[./data-model_friendly.org][The Skg data model]]
+  A conceptual introduction; see also the [[./data-model_technical.org][technical reference]].
+* to understand the code
+The server and its graph are written in Rust. The =.skg= files are
+authoritative; the server builds an immutable in-memory graph and a derived
+Tantivy search index from them. Clients exist for Emacs and Neovim, and the
+TCP protocol is editor-independent.
+
+The API, the view metadata format, and the .skg file format are described in [[./api-and-formats.org][api-and-formats.org]].
+
+Some other reasonable jumping-off points include:
+- [[../server/types/][the types]] (in the server), especially
+  - [[../server/types/nodes/complete.rs][nodes/complete.rs]] -- what nodes in the graph are
+  - [[../server/types/viewnode.rs][viewnode.rs]] -- how nodes in the graph are represented on-screen
+- [[../server/main.rs][main]]
+- [[https://github.com/JeffreyBenjaminBrown/public_notes_with_github-navigable_links/blob/main/shareable_knowledge_gardens.org][my org-roam notes about Skg online]]
+- [[../TODO/feasible-now-probably.org][how I implemented some recent features using Claude]]
+* to help
+  Tell me you want to! I would work hard to bring you onboard.

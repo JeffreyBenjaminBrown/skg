@@ -1,7 +1,7 @@
 * The skg Neovim client
 This directory is a standard Neovim plugin implementing a full skg
 client -- the Neovim counterpart of ../elisp/. It speaks the same TCP
-protocol to the same Rust server (see ../api-and-formats.md); the two
+protocol to the same Rust server (see ../docs/api-and-formats.org); the two
 clients are interchangeable.
 
 Requires Neovim 0.11+ (developed against 0.12). The docker image

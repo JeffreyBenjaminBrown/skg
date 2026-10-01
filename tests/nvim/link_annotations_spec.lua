@@ -118,4 +118,22 @@ describe('skg.link_annotations', function ()
     annotations.disable(second)
     vim.api.nvim_buf_delete(second, { force = true })
   end)
+  it('skips example links in text Org shows literally', function ()
+    local buf = vim.api.nvim_create_buf(true, false)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+      '* h',
+      'real [[id:a][A]] =[[id:b][B]]= (~[[id:c][C]]~)',
+      ': [[id:d][D]]',
+      '#+BEGIN_SRC org', '[[id:e][E]]', '#+end_src',
+      '#+begin_example', '[[id:f][F]]',
+      '* next [[id:g][G]]',
+      '```', '[[id:h][H]]', '```',
+      'x=[[id:i][I]]=y',
+      '[[id:j][=verbatim= label]]' })
+    local ids = {}
+    for _, position in ipairs(annotations.collect(buf)) do
+      table.insert(ids, position.id) end
+    assert.are.same({ 'a', 'g', 'i', 'j' }, ids)
+    vim.api.nvim_buf_delete(buf, { force = true })
+  end)
 end)

@@ -191,7 +191,7 @@ fn build_address_index (
       if let Some (custom) = &section . custom_id {
         index . custom_ids . entry ((document_index, custom . clone ()))
           . or_default () . push (id . clone ()); }
-      if section_index == 0 { continue; }
+      if section . heading . is_empty () { continue; } // a root without one
       index . org_headings . entry ((document_index, section . title . clone ()))
         . or_default () . push (id . clone ());
       let base : String = github_slug (&section . title);
@@ -278,6 +278,9 @@ fn resolve_link (
         . map (|(path, fragment)| (path, Some (fragment)))
         . unwrap_or ((target, None));
       (path, fragment) }
+    LinkSyntax::Org if destination == target &&
+      (target . starts_with ('#') || target . starts_with ('*')) =>
+      ("", Some (target)), // Org's search within this document
     LinkSyntax::Org => {
       let (path, search) = target . split_once ("::")
         . map (|(path, search)| (path, Some (search)))
@@ -474,17 +477,38 @@ mod tests {
     resolve_document_links (&mut documents, &mut built,
       Path::new ("/container/import"), None, &HashMap::new ());
     let a_second_body : &str = built [0] . nodes [2] . body . as_deref () . unwrap ();
+    // b.org's sole top-level heading is its root.
     assert! (a_second_body . contains (&format! (
-      "[[id:{}][org]]", built [1] . nodes [1] . pid)));
+      "[[id:{}][org]]", built [1] . root_id)));
     assert! (a_second_body . contains (&format! (
       "[[id:{}][later]]", built [1] . root_id)));
     assert! (a_second_body . contains ("[site][web]"));
-    let b_body : &str = built [1] . nodes [1] . body . as_deref () . unwrap ();
+    let b_body : &str = built [1] . nodes [0] . body . as_deref () . unwrap ();
     assert! (b_body . contains (&format! (
       "[[id:{}][root]]", built [0] . root_id)));
     assert! (b_body . contains ("[[file:notes/a.md::*Same][ambiguous]]"));
     assert! (documents [1] . diagnostics . iter () . any (|warning|
       warning . message . contains ("ambiguous")));
+  }
+
+  #[test]
+  fn org_searches_without_a_file_address_this_document () {
+    let mut documents : Vec<ParsedDocument> = vec! [parse_document (
+      Path::new ("doc.org"),
+      "* Top\n** Section\n:PROPERTIES:\n:CUSTOM_ID: sec\n:END:\n** Other\n[[#sec][by id]] [[*Section][by heading]]\n"
+        . to_string ())];
+    let source : SourceName = SourceName::from ("owned");
+    let mut next = || ID::new (&uuid::Uuid::new_v4 () . to_string ());
+    let mut built : Vec<BuiltDocument> = documents . iter ()
+      . map (|doc| build_document (doc, &source, &mut next) . unwrap ())
+      . collect ();
+    resolve_document_links (&mut documents, &mut built,
+      Path::new ("/input"), None, &HashMap::new ());
+    let titled = |title : &str| built [0] . nodes . iter ()
+      . find (|node| node . title == title) . unwrap ();
+    let section : &ID = &titled ("Section") . pid;
+    assert_eq! (titled ("Other") . body . as_deref (), Some (&*format! (
+      "[[id:{}][by id]] [[id:{}][by heading]]", section, section)));
   }
 
   #[test]
@@ -534,7 +558,8 @@ mod tests {
     let footnote_id : ID = built [0] . nodes [footnote_index] . pid . clone ();
     resolve_document_links (&mut documents, &mut built,
       Path::new ("/container/import"), None, &HashMap::new ());
-    let body : &str = built [0] . nodes [1] . body . as_deref () . unwrap ();
+    let body : &str = // the sole heading, Topic, is the root
+      built [0] . nodes [0] . body . as_deref () . unwrap ();
     assert_eq! (body . matches (&format! ("[[id:{}][Footnote a]]", footnote_id))
       .count (), 2);
     assert! (! body . contains ("[^a]:"));

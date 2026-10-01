@@ -24,15 +24,15 @@ a backup; Org export is readable but not a round trip.
    or a mix, and you can share with anyone.
    See example-data/ for how.
 ** start the client
-```elisp
+#+begin_src elisp
   (progn (load-file "../elisp/skg-reload.el")
          (skg-reload)
          (skg-client-init "../data/skgconfig.toml"))
-```
-** Now you can use it. See [[../docs/COMMANDS.org][commands]].
+#+end_src
+** Now you can use it. See [[./COMMANDS.org][commands]].
 ** stop the server later if you want
-   ```
+   #+begin_example
    ../bash/stop-servers.sh
-   ```
+   #+end_example
 
    You can't use the client (much) when the server isn't running.

@@ -48,6 +48,6 @@ From the repository root on Linux:
 That writes =windows/out/skg-windows-package/= with the two PowerShell
 scripts, docs, starter data scripts, and the Emacs Lisp client files.
 
-The package root contains the project =README.org=, so links like
-=[[./docs/setup.org]]= keep working. Windows-specific instructions are in
-=WINDOWS.org=.
+The project README is =docs/README.org=, where links like
+=[[./setup.org]]= keep working. Windows-specific instructions are in
+=WINDOWS.org= at the package root.

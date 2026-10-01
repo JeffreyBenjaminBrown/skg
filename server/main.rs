@@ -1,6 +1,6 @@
 /// USAGE:
 /// There is an optional command-line argument: the config file path.
-/// See api-and-formats.md § skgconfig.toml,
+/// See docs/api-and-formats.org § skgconfig.toml,
 /// or the example at data/skgconfig.toml.
 ///
 /// Subcommand: import-org-roam <org-dir> <skg-output-dir> <source-name>

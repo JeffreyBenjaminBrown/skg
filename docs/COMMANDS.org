@@ -603,7 +603,7 @@ strips the fork request so the next save does not re-fork).
 The clone subscribes to and overrides the node, and the original
 keeps its own (owned) content. A node may have at most one clone
 you own; forking an already-forked node is rejected, naming the
-existing clone. See =docs/forks.md=.
+existing clone. See =docs/forks.org=.
 *** C-c m l : skg-replace-content-with-link
 Replace the branch at point with a link to the node that used to
 be there, then save the buffer.
@@ -792,6 +792,9 @@ another run requires a new one.
 
 The operation creates file-root and heading nodes,
 which correspond 1-to-1 to sections of the imported data.
+A document whose only top-level heading has nothing before it
+is that heading, so the heading is its file root;
+otherwise the file root is titled after the document.
 It also creates two kinds of nodes that do not so correspond:
 - a single import-record node with textlinks to all file roots,
   so you can see everything you just imported in one place.
@@ -821,6 +824,32 @@ corresponds to some folder on the host system.
 If the files to be imported contain absolute links,
 skg needs to know how those host-system paths
 correspond to paths in the docker container.
+
+**** Link syntax in literal text is an example, not a link.
+In an Org file, the importer leaves alone any link written inside text
+that Org shows literally:
+- inline =verbatim= or ~code~, like =[[id:ID][label]]=,
+- a fixed-width line, which begins with a colon and a space
+  (=: [[id:ID][label]]=), or is a lone colon,
+- a =#+begin_...= / =#+end_...= block of any kind, and
+- a =```= fence (Markdown syntax, but common in Org files too).
+Such links are not resolved or rewritten, and do not produce warnings.
+Backticks (=`code`=) are not literal in Org, so a link inside them is a link.
+Use =verbatim= or ~code~ instead.
+(To insert a block in Emacs, use =C-c C-,=, which is =org-insert-structure-template=.)
+The rest of Skg (saving, link statistics, link annotations, export)
+treats links in literal text the same way.
+
+**** An Org heading inside a block or fence stops the import.
+If a line of an Org file looks like a heading (asterisks at the start of
+the line, then a space) but is inside a =#+begin_...= block or a =```= fence,
+nothing is imported, and the preview explains which lines are the problem.
+Org would read the line as a heading and end the block there,
+so Skg cannot tell what was meant.
+Often the block was never closed.
+If the line belongs inside the block, escape it with a leading comma
+(=,* ...=), as Org does. This check applies only to Org files;
+in a Markdown file, a =#= line in a code block is ordinary code.
 
 **** Imported Markdown hard breaks become Org's two-backslash hard breaks.
 In Markdown you can put a slash or two spaces after a line
@@ -892,7 +921,7 @@ are consumed; properties other than 'ID' and 'ROAM_ALIASES' are not retained
 from those drawers. The parser uses line-based heading detection, so this
 is not a lossless general-purpose Org conversion.
 
-Existing '[[id:ID][label]]' links retain their targets. File links and heading
+Existing =[[id:ID][label]]= links retain their targets. File links and heading
 search links are not converted to Skg ID links, and attachments are not copied.
 Relative file links may no longer resolve after import. The importer does not
 validate that linked IDs exist. It creates no subscriptions, hides, or overrides.
@@ -905,7 +934,7 @@ inside each file.
 
 After reviewing the output, place it in the intended owned source directory
 and configure that source with the intended name and privacy order. See
-[[file:../api-and-formats.md][the configuration reference]]. Check for ID collisions with existing sources
+[[file:api-and-formats.org][the configuration reference]]. Check for ID collisions with existing sources
 before loading: the importer itself does not check them.
 
 For a first setup, configure the source before starting Skg. When replacing
@@ -951,23 +980,63 @@ It asks two things:
   container whose filesystem differs from the host Emacs runs on,
   this prompt has no tab completion. An absolute path is used
   as-is.
+  Existing files in the output dir are overwritten in place; other
+  files there are left untouched.
+  A body line Org would read as a headline (such as a Markdown
+  =* item=) is indented two spaces, making it a list item, or inside a
+  =#+begin_= block is escaped with a comma, as Org itself does.
 
-A node N is exported when the title of a node C it contains
-links to the export-instruction node and C's body defines a
-=target_filepath=
-(using TOML-ish syntax, e.g. =target_filepath = docs/setup=,
-with the path quoted if it contains whitespace).
-That parent is written to
-=<output-dir>/<target_filepath>.org= as a recursive content view,
-stripped of skg metadata. The marker child is omitted.
+**** choosing what to export: export markers
+Nothing is exported unless you mark
+it. To make node N into an exported file,
+make N contain a child node, called an /export marker/, such that:
+- The marker's title contains a link to the ID
+  =3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f=.
+  That ID is a fixed constant that the exporter looks for.
+  The node it names only documents this feature.
+  The link works even if your sources do not contain that node.
+  The link's label is up to you, for example:
+  : [[id:3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f][Export to Org]]
+- The marker's body contains a line saying where to write the file,
+  relative to the output directory and without the =.org= extension:
+  : target_filepath = docs/setup
+  Quote the path if it contains whitespace
+  (=target_filepath = "my notes/setup"=).
+  The path cannot be absolute or contain =.= or =..= components.
 
-Existing files in the output dir are overwritten in place; other
-files there are left untouched.
-***** links and overlap
-Links are rewritten to relative org links. A link to another
+N is then written to =<output-dir>/<target_filepath>.org= as a
+recursive content view: N's title and body,
+each of its content nodes' titles and bodies,
+each of *their* content nodes' titles and bodies, etc.,
+stripped of Skg metadata. The export marker itself is left out of the file.
+N's position does not matter; it can be anywhere in the graph.
+But N must belong to a source included in the export;
+otherwise it is skipped, with a warning.
+If N has several markers, the first one is used, with a warning.
+If two nodes claim the same path, only one of them is exported, with a warning.
+
+A node whose title links to that ID but whose body has no =target_filepath=
+line is not a marker. It is exported as ordinary content, so you can
+mention the feature in your notes without triggering it.
+If the =target_filepath= is malformed, the node is dropped from the
+export, N is not exported, and you get a warning.
+
+[[#import-md-and-org][skg-import-md-and-org]] adds a marker to each
+imported document automatically.
+
+**** links and overlap
+Links are rewritten to relative org links. Link syntax that Org shows
+literally (in =verbatim= or ~code~, a fixed-width =:= line, or a
+=#+begin_...= block or code fence) is an example, and is left alone. A link to another
 exported file's root points at that file; a link to a non-root
 node points deep, to the relevant headline of the document,
 via =[[./file.org::*Heading][label]]=.
+Links in headlines are kept. Org cannot find a headline containing
+a link by its text, and finds only the first of several headlines
+with the same text. So a link to either kind of headline uses its
+node's ID instead, =[[./file.org::#ID][label]]=, and that headline
+gets a =:CUSTOM_ID: ID= property. Only headlines something links to
+get one.
 
 if an exported node contains another export root,
 the second root’s contents go in its own file,
@@ -977,7 +1046,7 @@ The first instead gets a heading linking to the second file.
 A link whose dest
 is not exported under the chosen set points to a "some links
 might be broken" note.
-***** privacy
+**** privacy
 If a restricted export would include overPrivateText telescope text, Skg asks for
 approval for each such ID before writing any file. Source-set =all= exports
 it with a warning. The noninteractive form "fails closed" (fails before writing any files) unless passed

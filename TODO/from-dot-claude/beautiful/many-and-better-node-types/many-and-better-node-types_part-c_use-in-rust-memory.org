@@ -154,7 +154,7 @@ The type name 'Graph' in [[../../server/dbs/memory.rs][server/dbs/memory.rs]] is
 
 *** Doc drift on 'initial_node_limit'
 
-[[../../api-and-formats.md][api-and-formats.md]] says 100; [[../../server/consts.rs][consts.rs]] says 1000; test default in [[../../server/types/misc.rs][types/misc.rs]] is 100. Pick one and fix the others.
+[[../../../../docs/api-and-formats.md][api-and-formats.md]] says 100; [[../../server/consts.rs][consts.rs]] says 1000; test default in [[../../server/types/misc.rs][types/misc.rs]] is 100. Pick one and fix the others.
 
 *** Merge-compute reads could come from memory
 

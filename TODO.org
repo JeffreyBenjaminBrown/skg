@@ -140,7 +140,7 @@ Yes—these rules are user-facing documented in docs/COMMANDS.org:51.
   - Ranking formula and graph-role multipliers (docs/COMMANDS.org:183): BM25 × text-term coverage × context-origin multiplier.
   - The graph roles are explicitly listed: Root 100×, CycleMember ~32×, Dest 10×, HadID 10×, MultiContained ~3.2×; everything else 1×. It also says these only rerank—every match is returned.
 
-  The Neovim-facing equivalent is docs/COMMANDS-nvim.org:63. The API-level synopsis is api-and-formats.md:26.
+  The Neovim-facing equivalent is docs/COMMANDS-nvim.org:63. The API-level synopsis is docs/api-and-formats.md:26.
 
   For implementation authority, see server/context.rs:1 (how graph-origin types are assigned) and server/serve/handlers/text_search.rs:448 (the combined ranking calculation).
 *** matching all words should be much more highly valued

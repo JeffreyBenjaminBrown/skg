@@ -2,6 +2,7 @@
 
 use pulldown_cmark::{Event, LinkType, Options, Parser, Tag, TagEnd};
 use serde_yaml::Value;
+use crate::types::textlinks::org_literal_ranges::org_literal_ranges_and_unclosed_block;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 
@@ -32,6 +33,8 @@ pub struct ParsedDocument {
   pub text : String,
   pub sections : Vec<ParsedSection>,
   pub diagnostics : Vec<Diagnostic>,
+  /// Problems that make the document unimportable.
+  pub errors : Vec<Diagnostic>,
   /// Replacements are located in the original text, before sections split it.
   pub source_edits : Vec<SourceEdit>,
   pub links : Vec<ParsedLink>,
@@ -85,6 +88,7 @@ pub fn parse_document (
     text,
     sections : Vec::new (),
     diagnostics : Vec::new (),
+    errors : Vec::new (),
     source_edits : Vec::new (),
     links : Vec::new (),
     literal_ranges : Vec::new (),
@@ -117,7 +121,6 @@ pub fn parse_document (
     DocumentFormat::Markdown => parse_markdown_headings (&mut document),
     DocumentFormat::Org => {
       parse_org_headings (&mut document);
-      parse_org_inline_literals (&mut document);
       let (title, aliases, id, custom_id) =
         parse_org_file_metadata (&document);
       let root : &mut ParsedSection = &mut document . sections [0];
@@ -133,7 +136,30 @@ pub fn parse_document (
   }
   if format == DocumentFormat::Org { parse_org_links (&mut document); }
   set_body_ranges (&mut document);
+  promote_sole_top_heading_to_root (&mut document);
   document
+}
+
+/// A document with nothing before its only top-level heading is that
+/// heading, so the heading becomes the file root rather than the sole
+/// child of a root titled after the file. This also makes an exported
+/// document, which has one top-level heading, import back to the same
+/// shape.
+fn promote_sole_top_heading_to_root (
+  document : &mut ParsedDocument,
+) {
+  let Some (top_level) : Option<usize> = document . sections [1..] . iter ()
+    . map (|section| section . level) . min () else { return; };
+  let sole_top_heading : bool =
+    document . sections [1] . level == top_level
+    && document . sections [2..] . iter ()
+       . all (|section| section . level > top_level);
+  let preamble_is_blank : bool =
+    document . text [document . sections [0] . body . clone ()]
+    . trim () . is_empty ();
+  if ! ( sole_top_heading && preamble_is_blank ) { return; }
+  let heading : ParsedSection = document . sections . remove (1);
+  document . sections [0] = ParsedSection { level : 0, ..heading };
 }
 
 fn parse_markdown_footnotes (
@@ -261,8 +287,8 @@ fn parse_org_links (
     let Some (relative_end) = text [start + 2..] . find ("]]" ) else { break; };
     let end : usize = start + 2 + relative_end + 2;
     cursor = end;
-    if document . literal_ranges . iter () . any (|literal|
-      ranges_overlap (&(start..end), literal)) { continue; }
+    if document . literal_ranges . iter () . any (|literal| // =x= in a label is formatting
+      literal . start <= start && end <= literal . end) { continue; }
     let inner : &str = &text [start + 2..end - 2];
     let (destination, label) : (&str, &str) =
       inner . split_once ("][") . unwrap_or ((inner, inner));
@@ -276,34 +302,6 @@ fn parse_org_links (
       reference_id : None,
     }); }
   document . links . sort_by_key (|link| link . range . start);
-}
-
-fn parse_org_inline_literals (
-  document : &mut ParsedDocument,
-) {
-  let text : &str = &document . text;
-  let mut spans : Vec<Range<usize>> = Vec::new ();
-  for (offset, line) in lines_with_offsets (text) {
-    if document . literal_ranges . iter () . any (|range|
-      range . start <= offset && offset < range . end) { continue; }
-    let mut cursor : usize = 0;
-    while cursor < line . len () {
-      let Some (ch) = line [cursor..] . chars () . next () else { break; };
-      if ch != '~' && ch != '=' && ch != '`' {
-        cursor += ch . len_utf8 ();
-        continue; }
-      let delimiter : usize = ch . len_utf8 ();
-      let after : usize = cursor + delimiter;
-      if line [after..] . starts_with (char::is_whitespace) {
-        cursor = after; continue; }
-      let Some (closing) = line [after..] . find (ch) else {
-        cursor = after; continue; };
-      let end : usize = after + closing + delimiter;
-      if closing > 0 {
-        spans . push (offset + cursor..offset + end);
-        cursor = end;
-      } else { cursor = after; } } }
-  document . literal_ranges . extend (spans);
 }
 
 fn warn_markdown_wiki_links (
@@ -478,34 +476,24 @@ fn parse_org_file_metadata (
 fn parse_org_headings (
   document : &mut ParsedDocument,
 ) {
+  let (literal, unclosed_block_start) : (Vec<Range<usize>>, Option<usize>) =
+    org_literal_ranges_and_unclosed_block (&document . text);
   let lines : Vec<(usize, &str)> = lines_with_offsets (&document . text);
-  let mut literal_end : Option<&str> = None;
-  let mut literal_start : Option<usize> = None;
-  let mut fence : Option<(char, usize)> = None;
   for (index, (start, line)) in lines . iter () . enumerate () {
-    let trimmed : &str = line . trim_start ();
-    if let Some (end_directive) = literal_end {
-      if trimmed . to_ascii_lowercase () . starts_with (end_directive) {
-        document . literal_ranges . push (
-          literal_start . take () . unwrap ()..*start + line . len ());
-        literal_end = None; }
-      continue; }
-    if let Some ((delimiter, minimum)) = fence {
-      if markdown_fence (trimmed) . is_some_and (|(found, width)|
-        found == delimiter && width >= minimum) {
-        document . literal_ranges . push (
-          literal_start . take () . unwrap ()..*start + line . len ());
-        fence = None; }
-      continue; }
-    if trimmed . to_ascii_lowercase () . starts_with ("#+begin_src") {
-      literal_end = Some ("#+end_src"); literal_start = Some (*start); continue; }
-    if trimmed . to_ascii_lowercase () . starts_with ("#+begin_example") {
-      literal_end = Some ("#+end_example"); literal_start = Some (*start); continue; }
-    if let Some (marker) = markdown_fence (trimmed) {
-      fence = Some (marker); literal_start = Some (*start); continue; }
     let Some ((level, title)) : Option<(usize, String)> =
       org_heading (line) else { continue; };
     let line_end : usize = *start + line . len ();
+    if let Some (block) = literal . iter ()
+      . find (|range| range . start < *start && *start < range . end) {
+      // Org would read this line as a heading, ending the block early.
+      document . errors . push (Diagnostic {
+        range : *start..line_end,
+        message : format! (
+          "{:?} looks like a heading but is inside the block or fence that begins on line {}{}",
+          line, line_at (&document . text, block . start),
+          if unclosed_block_start == Some (block . start) {
+            ", which is never closed" } else { "" }), });
+      continue; }
     let (id, custom_id, aliases) :
       (Option<String>, Option<String>, Vec<String>) =
       if lines . get (index + 1) . is_some_and (|(_, next)|
@@ -521,12 +509,11 @@ fn parse_org_headings (
       custom_id,
       aliases,
     }); }
-  if literal_end . is_some () || fence . is_some () {
-    document . literal_ranges . push (
-      literal_start . unwrap_or (document . text . len ())..document . text . len ());
+  if let Some (block_start) = unclosed_block_start {
     document . diagnostics . push (Diagnostic {
-      range : document . text . len ()..document . text . len (),
+      range : block_start..block_start,
       message : "Unclosed literal block or Markdown fence" . to_string (), }); }
+  document . literal_ranges . extend (literal);
 }
 
 fn org_heading (
@@ -535,18 +522,6 @@ fn org_heading (
   let level : usize = line . bytes () . take_while (|byte| *byte == b'*') . count ();
   if level == 0 || ! line [level..] . starts_with (' ') { return None; }
   Some ((level, line [level + 1..] . trim_end () . to_string ()))
-}
-
-fn markdown_fence (
-  line : &str,
-) -> Option<(char, usize)> {
-  let indent : usize = line . len () - line . trim_start_matches (' ') . len ();
-  if indent > 3 { return None; }
-  let line : &str = &line [indent..];
-  let delimiter : char = line . chars () . next ()?;
-  if delimiter != '`' && delimiter != '~' { return None; }
-  let width : usize = line . chars () . take_while (|ch| *ch == delimiter) . count ();
-  if width < 3 { None } else { Some ((delimiter, width)) }
 }
 
 fn org_drawer_metadata (
@@ -575,6 +550,15 @@ fn org_property <'a> (
   line . get (..name . len ())
     . filter (|prefix| prefix . eq_ignore_ascii_case (name))
     . map (|_| &line [name . len ()..])
+}
+
+/// The 1-based line number of byte 'offset' in 'text'.
+pub(crate) fn line_at (
+  text : &str,
+  offset : usize,
+) -> usize {
+  1 + text [..offset . min (text . len ())] . bytes ()
+    .filter (|byte| *byte == b'\n') . count ()
 }
 
 fn lines_with_offsets (
@@ -621,6 +605,21 @@ mod tests {
   }
 
   #[test]
+  fn sole_top_level_heading_becomes_the_root_only_without_a_preamble () {
+    let titles = |text : &str| -> Vec<String> {
+      parse_document (Path::new ("doc.org"), text . to_string ())
+        . sections . into_iter () . map (|section| section . title) . collect () };
+    assert_eq! (titles ("\n* Only\nbody\n** Child\n"), vec! ["Only", "Child"]);
+    assert_eq! (titles ("Preamble\n* Only\n"), vec! ["doc", "Only"]);
+    assert_eq! (titles ("* One\n* Two\n"), vec! ["doc", "One", "Two"]);
+    let markdown : ParsedDocument = parse_document (
+      Path::new ("doc.md"), "# Only\nbody\n" . to_string ());
+    assert_eq! (markdown . sections . len (), 1);
+    assert_eq! (rendered_range (&markdown, markdown . sections [0] . body . clone ()),
+                "body\n");
+  }
+
+  #[test]
   fn org_structure_ignores_literal_headings_and_reads_real_drawers () {
     let text : String = "#+title: Space\n:PROPERTIES:\n:ID: root\n:END:\nBefore\n* One\n:PROPERTIES:\n:ID: one\n:ROAM_ALIASES: \"first one\" first\n:END:\n#+begin_src org\n* fake\n#+end_src\n```org\n* also fake\n```\n** Two\n" . to_string ();
     let document : ParsedDocument = parse_document (Path::new ("notes.org"), text);
@@ -633,12 +632,31 @@ mod tests {
   }
 
   #[test]
+  fn org_headings_inside_blocks_are_errors_and_fixed_width_links_are_literal () {
+    let document : ParsedDocument = parse_document (Path::new ("note.org"),
+      "* Top\n: [[id:example][label]]\n#+begin_example\n* inside\n#+end_example\n,* escaped\n```\n** fenced\n```\n#+begin_src\n* after unclosed\n" . to_string ());
+    assert_eq! (document . links . len (), 0);
+    let messages : Vec<&str> = document . errors . iter ()
+      . map (|error| error . message . as_str ()) . collect ();
+    assert_eq! (messages, vec! [
+      "\"* inside\" looks like a heading but is inside the block or fence that begins on line 3",
+      "\"** fenced\" looks like a heading but is inside the block or fence that begins on line 7",
+      "\"* after unclosed\" looks like a heading but is inside the block or fence that begins on line 10, which is never closed",
+    ]);
+    assert_eq! (document . sections . len (), 1);
+  }
+
+  #[test]
   fn org_metadata_and_links_inside_literal_content_are_not_interpreted () {
-    let text : String = "#+begin_src org\n#+title: False\n:PROPERTIES:\n:ID: false\n:END:\n#+end_src\n#+title: True\n* Actual\n~[[file:other.org]]~ =[[id:absent]]= `[[file:no.md]]`\n" . to_string ();
+    let text : String = "#+begin_src org\n#+title: False\n:PROPERTIES:\n:ID: false\n:END:\n#+end_src\n#+title: True\n* Actual\n~[[file:other.org]]~ =[[id:absent]]= `[[file:no.md]]`\n[[file:real.org][=verbatim= label]]\n" . to_string ();
     let document : ParsedDocument = parse_document (Path::new ("note.org"), text);
     assert_eq! (document . sections [0] . title, "True");
     assert_eq! (document . sections [0] . explicit_id, None);
-    assert_eq! (document . links . len (), 0);
+    assert_eq! ( // Org does not treat backticks as literal; verbatim
+                 // within a label does not make the link literal
+      document . links . iter () . map (|link| link . destination . as_str ())
+        . collect::<Vec<&str>> (),
+      vec! ["file:no.md", "file:real.org"] );
   }
 
   #[test]

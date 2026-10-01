@@ -143,7 +143,7 @@ must do:
   relation member removed, a hidden node un-hidden -- each needs a phantom,
   and deciding "removed" requires the col's own HEAD-vs-worktree goal-list
   diff (the =goal_list_for_*= functions already return a =removed_ids= set).
-- *scaffold membership axes*: [[../../api-and-formats.md][api-and-formats.md]] says even Alias/ID scaffold
+- *scaffold membership axes*: [[../../../docs/api-and-formats.md][api-and-formats.md]] says even Alias/ID scaffold
   children carry =(staged/unstaged newM/removedM)=.
 
 Your original framing was right and mine flattened it: the overlay is *rooted

@@ -57,7 +57,7 @@ use std::path::Path;
 /// The ordinary terminal message in the save protocol. Hoist, fork, and
 /// text-release confirmations are alternative terminal messages.
 /// Contains the re-rendered saved buffer and any warnings/errors when sent.
-/// See <api-and-formats.md § Save buffer> for the full sequence:
+/// See <docs/api-and-formats.org § Save buffer> for the full sequence:
 ///   save-lock → save-relax-lock → collateral-view* → save-result.
 pub struct SaveResponse {
   pub saved_view          : String,

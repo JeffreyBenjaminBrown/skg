@@ -464,8 +464,8 @@
    harness replaces that directory, so retain any needed prior evidence
    before invoking it. Record actual checks/results, not assumed passes.
 ** Update durable documentation and close the tracked problems
-   Define "update-relevant neighborhood" in [[file:../../glossary.md][glossary.md]], including its
-   no-mixed-path/no-direction-reversal boundaries. Update [[file:../../api-and-formats.md][api-and-formats.md]]
+   Define "update-relevant neighborhood" in [[file:../../../docs/glossary.md][glossary.md]], including its
+   no-mixed-path/no-direction-reversal boundaries. Update [[file:../../../docs/api-and-formats.md][api-and-formats.md]]
    for the payload, conflict behavior, and broad/narrow lock sets. Document
    recovery commands and manual replay in the client command docs.
 

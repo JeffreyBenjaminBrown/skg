@@ -72,7 +72,8 @@ mod tests {
 
   #[test]
   fn repository_document_samples_keep_mixed_syntax_and_warn_on_stale_paths () {
-    let root : &Path = Path::new (env! ("CARGO_MANIFEST_DIR"));
+    let root : &Path = &Path::new (env! ("CARGO_MANIFEST_DIR"))
+      . join ("tests/import_md_and_org_samples"); // snapshots of docs/
     let names : [&str; 4] = [
       "docs/setup.org", "docs/README-old.org",
       "docs/data-model_friendly.org",
@@ -93,7 +94,7 @@ mod tests {
     assert! (built [0] . nodes . iter () . any (|node|
       node . body . as_deref () . unwrap_or ("") . contains ("```elisp")));
     assert! (documents [1] . diagnostics . iter () . any (|diagnostic|
-      diagnostic . message . contains ("docs/data-model-trees-with-links.md")));
+      diagnostic . message . contains ("data-model-trees-with-links.md")));
     assert! (built [3] . nodes . iter () . any (|node|
       node . body . as_deref () . unwrap_or ("") . contains (
         "[Semantic Synchrony](https://github.com/synchrony/smsn)")));

@@ -17,16 +17,8 @@ mkdir -p "$OUT/elisp"
   find . -type f ! -name '*~' -exec cp "{}" "../$OUT/elisp/{}" \;
 )
 mkdir -p "$OUT/docs"
-cp README.org "$OUT/README.org"
-cp glossary.md "$OUT/glossary.md"
-cp docs/setup.org "$OUT/docs/"
-cp docs/COMMANDS.org "$OUT/docs/"
-cp docs/merging.org "$OUT/docs/"
-cp docs/moving-nodes-across-repos.org "$OUT/docs/"
-cp docs/hyperlinks.md "$OUT/docs/"
-cp docs/forks.md "$OUT/docs/"
-cp docs/data-model_friendly.org "$OUT/docs/"
-cp docs/data-model_technical.org "$OUT/docs/"
+cp -R docs/. "$OUT/docs/"
+cp LICENSE.md "$OUT/LICENSE.md"
 cp -R windows/docs/. "$OUT/docs/"
 
 cat > "$OUT/WINDOWS.org" <<'EOF'
