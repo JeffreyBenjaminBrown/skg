@@ -18,7 +18,35 @@
   "Major mode for skg content view buffers, derived from org-mode.
 Rebinds C-x C-s to save via the skg server,
 and provides C-c prefix keybindings for skg commands."
-  (setq-local org-adapt-indentation nil))
+  (setq-local org-adapt-indentation nil)
+  (add-hook 'first-change-hook
+            #'skg--confirm-before-dirtying-another-view nil t))
+
+(defvar skg--inhibit-dirty-view-confirmation nil
+  "Non-nil while skg itself edits view text (re-rendering, save
+snapshots), so `skg--confirm-before-dirtying-another-view' stays quiet.")
+
+(defun skg--unsaved-view-buffers (&optional except)
+  "Return every live view with unsaved edits, other than EXCEPT.
+A view is a buffer with a non-nil `skg-view-uri': a content view or
+search results, but not the fork-confirmation buffer."
+  (cl-remove-if-not
+   (lambda (buf)
+     (and (not (eq buf except))
+          (buffer-local-value 'skg-view-uri buf)
+          (buffer-modified-p buf)))
+   (buffer-list)))
+
+(defun skg--confirm-before-dirtying-another-view ()
+  "On `first-change-hook': if another view already has unsaved edits,
+ask before letting this view's first edit happen.  Declining signals
+`user-error', which cancels the edit."
+  (when (and skg-view-uri
+             (not skg--inhibit-dirty-view-confirmation)
+             (skg--unsaved-view-buffers (current-buffer))
+             (not (yes-or-no-p
+                   "WARNING: Another buffer has unsaved edits. If you edit this one as well, your edits could clobber each other. Edit anyway? ")))
+    (user-error "Edit cancelled")))
 
 (defvar-local skg-view-uri nil
   "Unique view URI for this skg buffer.")
@@ -176,7 +204,8 @@ otherwise generate a new UUID."
          (buffer (skg--generate-contentView-buffer buffer-name source))
         (uri (or view-uri (org-id-uuid))))
     (with-current-buffer buffer
-      (let ((inhibit-read-only t))
+      (let ((inhibit-read-only t)
+            (skg--inhibit-dirty-view-confirmation t))
         (erase-buffer)
         (insert org-text)
         (skg-content-view-mode)

@@ -5,7 +5,9 @@ This is because you can put 'requests' into your view,
 in which you request more data,
 such as a node's ancestors, or the nodes that link to it.
 Since views can overlap, saving one open view can change another.
-You may edit several views at once. On save, Skg checks the other dirty
+You may edit several views at once, but Emacs asks before letting
+your first edit dirty a view while another view already has unsaved
+edits; answering no cancels that edit. On save, Skg checks the other dirty
 views' last clean text and current text against every graph identity the
 prepared save can affect. A conflict is a hard refusal before any write;
 the error names the views and IDs. Missing or malformed baseline data is

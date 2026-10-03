@@ -166,6 +166,7 @@ FOCUSED-HAD-METADATA records whether marker removal can leave a bare skg
 form.  The saved buffer's lock is suspended only during this synchronous
 internal edit; it is restored before any request is sent."
   (let ((was-save-locked skg--save-lock-overlay)
+        (skg--inhibit-dirty-view-confirmation t)
         snapshot)
     (when was-save-locked
       (skg--unlock-after-save))
@@ -868,7 +869,8 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
   "Replace the current buffer contents with NEW-CONTENT from Rust.
 After inserting content, folds marked headlines, removes fold markers,
 moves point to focused headline, and removes focus marker."
-  (let ((inhibit-read-only t))
+  (let ((inhibit-read-only t)
+        (skg--inhibit-dirty-view-confirmation t))
     (erase-buffer)
     (insert new-content)
     (;; PITFALL: `erase-buffer' does NOT remove overlays — they collapse

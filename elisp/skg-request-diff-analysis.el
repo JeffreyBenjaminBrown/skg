@@ -1,8 +1,8 @@
 ;;; -*- lexical-binding: t; -*-
 
-(require 'cl-lib)
 (require 'skg-keymaps-and-aliases)
 (require 'skg-length-prefix)
+(require 'skg-buffer) ; for skg--unsaved-view-buffers
 (require 'skg-request-save) ; for skg-big-nonfatal-message
 
 (define-minor-mode skg-diff-analysis-mode
@@ -13,12 +13,7 @@
 (defun skg-diff-report ()
   "Request an org report of semantic graph changes."
   (interactive)
-  (let ((unsaved-buffers
-         (cl-remove-if-not
-          (lambda (buf)
-            (and (buffer-local-value 'skg-view-uri buf)
-                 (buffer-modified-p buf)))
-          (buffer-list))))
+  (let ((unsaved-buffers (skg--unsaved-view-buffers)))
     (when unsaved-buffers
       (error "Cannot analyze diff: unsaved skg buffer(s): %s"
              (mapconcat #'buffer-name unsaved-buffers ", "))))
