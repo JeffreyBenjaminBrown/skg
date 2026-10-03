@@ -26,18 +26,6 @@ local M = {}
 ---FORK_SOURCE_PLACEHOLDER in server/from_text/fork.rs.
 M.fork_source_placeholder = 'PICK-A-SOURCE'
 
----@return integer[] skg view buffers other than BUF with unsaved edits
-function M.other_unsaved_skg_buffers (buf)
-  local result = {}
-  for _, other in ipairs(vim.api.nvim_list_bufs()) do
-    if other ~= buf and vim.api.nvim_buf_is_valid(other)
-       and vim.b[other].skg_view_uri ~= nil
-       and vim.bo[other].modified then
-      table.insert(result, other) end
-  end
-  return result
-end
-
 ---Send the current buffer to the server. Before sending, 'folded'
 ---and 'focused' markers are added (for the wire) and then removed
 ---from what the user sees. If the save edited any FOREIGN node the
@@ -139,12 +127,14 @@ end
 
 ---Return the current text with transient save markers, restoring the buffer.
 ---The save lock is synchronously suspended only for the client's internal
----marker edits and restored before any request is sent.
+---marker edits and restored before any request is sent. A clean buffer
+---stays clean, so the marker edits never look like a user's first edit.
 ---@param save_buf integer
 ---@param focused_had_metadata boolean
 ---@return string
 function M.snapshot_with_save_markers (save_buf, focused_had_metadata)
   local was_save_locked = vim.b[save_buf].skg_save_locked == true
+  local was_modified = vim.bo[save_buf].modified
   if was_save_locked then vim.bo[save_buf].modifiable = true end
   local ok, result = pcall(function ()
     folds.add_folded_markers()
@@ -157,6 +147,7 @@ function M.snapshot_with_save_markers (save_buf, focused_had_metadata)
   if not focused_had_metadata then
     pcall(M.strip_bare_skg_at_headline, focus.owning_headline_line()) end
   if was_save_locked then vim.bo[save_buf].modifiable = false end
+  if not was_modified then vim.bo[save_buf].modified = false end
   if not ok then error(result) end
   return result
 end
@@ -398,8 +389,7 @@ end
 ---Replace BUF's contents with NEW_CONTENT from the server, then act
 ---on the markers it carries: move to the focused headline and drop
 ---its marker, restore folds and drop their markers, restore
----point/scroll, clear the modified flag, and re-arm the first-change
----warning. Fold restoration is per-window (vim folds live on
+---point/scroll, and clear the modified flag. Fold restoration is per-window (vim folds live on
 ---windows): it runs in the first window showing BUF; an undisplayed
 ---buffer still gets its markers stripped, it just has no fold state
 ---to restore into.

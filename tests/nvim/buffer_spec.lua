@@ -120,15 +120,107 @@ describe('skg.buffer lifecycle and registry', function ()
   end)
 
   it('captures clean baselines and allows multiple dirty views', function ()
+    local asked = 0
+    local real_confirm = vim.fn.confirm
+    vim.fn.confirm = function () asked = asked + 1 return 1 end
     local first = buffer.open_org_buffer_from_text(
       '* one', 'skg://one', 'uri-one')
     assert.are.equal('* one', vim.b[first].skg_clean_baseline)
     vim.api.nvim_buf_set_lines(first, 1, 1, false, { 'edited' })
+    vim.wait(100, function () return false end) -- let its check run alone
     assert.is_true(vim.bo[first].modified)
     local second = buffer.open_org_buffer_from_text(
       '* two', 'skg://two', 'uri-two')
     vim.api.nvim_buf_set_lines(second, 1, 1, false, { 'edit two' })
+    vim.wait(200, function () return asked > 0 end)
+    vim.fn.confirm = real_confirm
+    assert.are.equal(1, asked) -- the second dirty view asked, and was kept
     assert.is_true(vim.bo[second].modified)
     assert.is_true(vim.bo[first].modified)
+  end)
+end)
+
+describe('skg.buffer confirmation before dirtying another view', function ()
+  local real_confirm
+  local asked
+  before_each(function ()
+    for _, buf in ipairs(buffer.all_skg_buffers()) do
+      vim.bo[buf].modified = false
+      vim.api.nvim_buf_delete(buf, { force = true })
+    end
+    real_confirm = vim.fn.confirm
+    asked = 0
+  end)
+  after_each(function () vim.fn.confirm = real_confirm end)
+
+  ---Make confirm answer CHOICE (1 keeps the edit, 2 cancels it).
+  local function answer (choice)
+    vim.fn.confirm = function () asked = asked + 1 return choice end
+  end
+  local function open (name)
+    return buffer.open_org_buffer_from_text(
+      '* (skg (node (id x))) ' .. name, 'skg://' .. name, 'uri-' .. name)
+  end
+  local function edit (buf)
+    vim.api.nvim_buf_set_lines(buf, 1, 1, false, { 'edit' })
+  end
+  ---Let deferred autocmds and scheduled callbacks run.
+  local function settle () vim.wait(100, function () return false end) end
+
+  it('does not ask when no other view is dirty', function ()
+    answer(2)
+    local a = open('a')
+    open('b')
+    edit(a) settle()
+    assert.are.equal(0, asked)
+    assert.is_true(vim.bo[a].modified)
+  end)
+
+  it('restores the clean baseline when declined', function ()
+    answer(2)
+    local a = open('a')
+    local b = open('b')
+    edit(a) settle()
+    edit(b) settle()
+    assert.are.equal(1, asked)
+    assert.is_false(vim.bo[b].modified)
+    assert.are.equal('* (skg (node (id x))) b', buffer.text(b))
+    assert.is_true(vim.bo[a].modified)
+  end)
+
+  it('asks again for each newly dirtied view', function ()
+    answer(1)
+    local a = open('a')
+    local b = open('b')
+    local c = open('c')
+    edit(a) settle()
+    edit(b) settle()
+    edit(b) settle() -- already dirty: no new question
+    edit(c) settle()
+    assert.are.equal(2, asked)
+    assert.is_true(vim.bo[c].modified)
+  end)
+
+  it('ignores buffers without a view uri', function ()
+    answer(2)
+    local a = open('a')
+    local b = open('b')
+    vim.b[b].skg_view_uri = nil
+    edit(a) settle()
+    edit(b) settle()
+    assert.are.equal(0, asked)
+    assert.is_true(vim.bo[b].modified)
+  end)
+
+  it('does not ask when skg rerenders a view', function ()
+    answer(2)
+    local a = open('a')
+    local b = open('b')
+    edit(a) settle()
+    require('skg.save').replace_buffer_with_new_content(
+      b, '* (skg (node (id y))) y')
+    settle()
+    assert.are.equal(0, asked)
+    assert.is_false(vim.bo[b].modified)
   end)
 end)

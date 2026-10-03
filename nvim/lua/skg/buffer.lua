@@ -117,6 +117,20 @@ function M.all_skg_buffers ()
   return result
 end
 
+---A view is a buffer with a view uri: a content view or search
+---results, but not the fork-confirmation buffer.
+---@return integer[] views other than BUF with unsaved edits
+function M.other_unsaved_skg_buffers (buf)
+  local result = {}
+  for _, other in ipairs(vim.api.nvim_list_bufs()) do
+    if other ~= buf and vim.api.nvim_buf_is_valid(other)
+       and vim.b[other].skg_view_uri ~= nil
+       and vim.bo[other].modified then
+      table.insert(result, other) end
+  end
+  return result
+end
+
 ---@param buf integer
 ---@return string exact logical buffer text, including a represented final newline
 function M.text (buf)
@@ -201,6 +215,18 @@ function M.configure_view_buffer (buf, uri)
     vim.api.nvim_create_autocmd({ 'BufDelete', 'BufWipeout' }, {
       buffer = buf,
       callback = function () M.send_close_view(buf) end })
+    -- on_lines, unlike the BufModifiedSet autocmd, fires for every
+    -- edit to every buffer, not only the current one.
+    vim.api.nvim_buf_attach(buf, false, {
+      on_lines = function ()
+        if not vim.b[buf].skg_dirtiness_check_scheduled then
+          vim.b[buf].skg_dirtiness_check_scheduled = true
+          vim.schedule(function ()
+            if vim.api.nvim_buf_is_valid(buf) then
+              vim.b[buf].skg_dirtiness_check_scheduled = false
+              M.confirm_before_dirtying_another_view(buf) end
+          end) end
+      end })
     vim.api.nvim_create_autocmd('BufWriteCmd', {
       buffer = buf,
       callback = function ()
@@ -210,6 +236,57 @@ function M.configure_view_buffer (buf, uri)
                         .. tostring(save)) end
       end })
   end
+end
+
+---Run soon after any edit to BUF. If BUF has become dirty since it
+---was last clean, and another view already has unsaved edits, ask
+---whether to keep the edit; declining restores BUF's clean baseline.
+---The analog of Emacs's first-change-hook confirmation, except that
+---nvim has no hook that can refuse an edit before it happens, so this
+---undoes it after. Skg's own rewrites of view text end clean, so they
+---never ask.
+---@param buf integer
+function M.confirm_before_dirtying_another_view (buf)
+  if not vim.bo[buf].modified then
+    vim.b[buf].skg_dirtiness_vetted = false
+    return end
+  if vim.b[buf].skg_dirtiness_vetted
+     or vim.b[buf].skg_view_uri == nil then
+    return end
+  vim.b[buf].skg_dirtiness_vetted = true -- ask at most once per dirty spell
+  if #M.other_unsaved_skg_buffers(buf) == 0 then return end
+  local keep = vim.fn.confirm(
+    'WARNING: Another buffer has unsaved edits. If you edit this one'
+    .. ' as well, your edits could clobber each other.',
+    '&Edit anyway\n&Cancel edit', 2) == 1
+  if not keep then M.revert_to_clean_baseline(buf) end
+end
+
+---Replace BUF's text with its clean baseline and mark it unmodified,
+---keeping the cursor as near as possible to where it was.
+---@param buf integer
+function M.revert_to_clean_baseline (buf)
+  local baseline = vim.b[buf].skg_clean_baseline
+  if baseline == nil then
+    vim.notify('skg: cannot cancel the edit: this view has no clean'
+               .. ' baseline. Undo it by hand.', vim.log.levels.ERROR)
+    return end
+  if vim.api.nvim_get_current_buf() == buf then vim.cmd('stopinsert') end
+  local cursors = {}
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_get_buf(win) == buf then
+      cursors[win] = vim.api.nvim_win_get_cursor(win) end
+  end
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false,
+                             vim.split(baseline, '\n'))
+  vim.bo[buf].modified = false
+  vim.b[buf].skg_dirtiness_vetted = false
+  local line_count = vim.api.nvim_buf_line_count(buf)
+  for win, cursor in pairs(cursors) do
+    pcall(vim.api.nvim_win_set_cursor, win,
+          { math.min(cursor[1], line_count), cursor[2] })
+  end
+  vim.notify('Edit cancelled')
 end
 
 ---Tell the server to drop BUF's view. Fire-and-forget; a dead

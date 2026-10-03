@@ -3,10 +3,10 @@
 -- navigation keymap subset. The Lua port of
 -- elisp/skg-request-diff-analysis.el.
 
+local buffer = require('skg.buffer')
 local client = require('skg.client')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
-local save = require('skg.save')
 local sexpr = require('skg.sexpr.parse')
 local state = require('skg.state')
 
@@ -19,7 +19,7 @@ local M = {}
 ---@param include_staged boolean|nil for tests; prompted when nil
 ---@param include_unstaged boolean|nil
 function M.diff_report (include_staged, include_unstaged)
-  local unsaved = save.other_unsaved_skg_buffers(-1)
+  local unsaved = buffer.other_unsaved_skg_buffers(-1)
   if #unsaved > 0 then
     local names = {}
     for _, buf in ipairs(unsaved) do

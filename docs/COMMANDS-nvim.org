@@ -14,7 +14,9 @@ in which you request more data,
 such as a node's ancestors, or the nodes that link to it.
 Since views can overlap,
 saving one open view can change another.
-You may edit several views at once. On save, Skg checks the other dirty
+You may edit several views at once, but Neovim asks when an edit
+first dirties a view while another view already has unsaved edits;
+choosing Cancel restores the view's last clean text. On save, Skg checks the other dirty
 views' last clean text and current text against every graph identity the
 prepared save can affect. A conflict is a hard refusal before any write;
 the error names the views and IDs. Missing or malformed baseline data is

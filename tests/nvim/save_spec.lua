@@ -134,6 +134,24 @@ describe('skg.save pipeline', function ()
     assert.is_false(vim.bo[buf].modified)
   end)
 
+  it('save markers leave a clean buffer clean, so nothing asks to confirm',
+     function ()
+    local asked = 0
+    local real_confirm = vim.fn.confirm
+    vim.fn.confirm = function () asked = asked + 1 return 2 end
+    local dirty = open_view('* (skg (node (id a))) a', 'skg://a', 'uri-a')
+    vim.api.nvim_buf_set_lines(dirty, 1, 1, false, { 'edit' })
+    local clean = open_view(
+      '* (skg (node (id b))) b\n** (skg (node (id c))) c',
+      'skg://b', 'uri-b')
+    vim.api.nvim_win_set_cursor(0, { 2, 0 })
+    save.snapshot_with_save_markers(clean, true)
+    vim.wait(100, function () return false end)
+    vim.fn.confirm = real_confirm
+    assert.are.equal(0, asked)
+    assert.is_false(vim.bo[clean].modified)
+  end)
+
   it('retains broad locks until save-relax-lock narrows them',
      function ()
     local respond_fn = nil
