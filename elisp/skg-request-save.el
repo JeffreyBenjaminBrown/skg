@@ -681,6 +681,8 @@ its id-less clone-to-be parents would create bare nodes. Only C-c C-c
         (erase-buffer)
         (insert (or content ""))
         (skg-content-view-mode)
+        (setq mode-name ;; not "SKG": this is not a savable view
+              "skg-fork-ask")
         (when (fboundp 'heralds-minor-mode) (heralds-minor-mode))
         (goto-char (point-min)))
       ;; nil view-uri: not a registered view, and the ordinary-save guard

@@ -16,7 +16,7 @@
   "Minor mode for buffers visiting .skg files.
 Enables skg navigation keys like \\[skg-goto] on UUIDs
 and .skg filenames."
-  :lighter " skg"
+  :lighter " skg-file"
   :keymap skg-file-minor-mode-map)
 
 (defun skg-file-minor-mode--maybe-enable ()
