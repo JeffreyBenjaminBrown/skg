@@ -38,7 +38,7 @@ newer graph. If dirty search results were enriched, the archive labels that
 the diff also includes enrichment presentation and is not a semantic patch
 of user intent alone.
 ** C-c <backspace> : deletion
-***     C-c <backspace> : skg-delete
+*** C-c <backspace> : skg-delete
 Marks the node at point for deletion from the graph.
 Upon saving the view, it will vanish not just from this view,
 but from the graph itself.
