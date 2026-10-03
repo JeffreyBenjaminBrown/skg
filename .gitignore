@@ -5,7 +5,12 @@
 /.bashrc
 /.cache
 /.cargo
-/.claude*
+# Of .claude/, only project skills (and a few files committed earlier)
+# are tracked: the rest is Claude state, including credentials, from
+# before CLAUDE_CONFIG_DIR moved to my-dot-claude.
+/.claude/*
+!/.claude/skills/
+/.claude?*
 /.claude/settings.json
 /my-dot-claude/
 /.codex
