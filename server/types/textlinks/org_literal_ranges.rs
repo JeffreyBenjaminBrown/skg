@@ -1,5 +1,7 @@
 //! Byte ranges of Org text that Org shows literally, so that
 //! link-like text inside them is an example, not a link.
+//! Both clients reimplement this; tests/shared/literal-link-cases.txt
+//! holds the cases all three must agree on.
 
 use std::ops::Range;
 

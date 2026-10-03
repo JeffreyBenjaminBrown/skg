@@ -14,6 +14,27 @@ local function suffixes (buf)
   return result
 end
 
+---{name, lines, live} for each case in the file, which the Rust and
+---Emacs tests read too.
+local function shared_cases ()
+  local path = debug.getinfo(1, 'S').source:sub(2):match('^(.*)/')
+    .. '/../shared/literal-link-cases.txt'
+  local cases, current = {}, nil
+  for line in io.lines(path) do
+    if line:sub(1, 5) == '==== ' then
+      current = { name = line:sub(6), lines = {} }
+    elseif line:sub(1, 10) == '---- live:' then
+      current.live = vim.split(vim.trim(line:sub(11)), '%s+',
+                               { trimempty = true })
+      table.insert(cases, current)
+      current = nil
+    elseif current then
+      table.insert(current.lines, line)
+    end
+  end
+  return cases
+end
+
 describe('skg.link_annotations', function ()
   before_each(function ()
     annotations.cache = {}
@@ -118,22 +139,29 @@ describe('skg.link_annotations', function ()
     annotations.disable(second)
     vim.api.nvim_buf_delete(second, { force = true })
   end)
-  it('skips example links in text Org shows literally', function ()
+  it('annotates only real links, per the cases shared with Rust and Emacs',
+     function ()
+    local cases = shared_cases()
+    assert.is_true(#cases > 5)
+    for _, case in ipairs(cases) do
+      local buf = vim.api.nvim_create_buf(true, false)
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, case.lines)
+      local ids = {}
+      for _, position in ipairs(annotations.collect(buf)) do
+        table.insert(ids, position.id) end
+      assert.are.same({ case.name, case.live }, { case.name, ids })
+      vim.api.nvim_buf_delete(buf, { force = true })
+    end
+  end)
+
+  it('ends a block at a headline, as a body ends on the server', function ()
     local buf = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
-      '* h',
-      'real [[id:a][A]] =[[id:b][B]]= (~[[id:c][C]]~)',
-      ': [[id:d][D]]',
-      '#+BEGIN_SRC org', '[[id:e][E]]', '#+end_src',
-      '#+begin_example', '[[id:f][F]]',
-      '* next [[id:g][G]]',
-      '```', '[[id:h][H]]', '```',
-      'x=[[id:i][I]]=y',
-      '[[id:j][=verbatim= label]]' })
+      '* h', '#+begin_example', '[[id:a][A]]', '* next [[id:b][B]]' })
     local ids = {}
     for _, position in ipairs(annotations.collect(buf)) do
       table.insert(ids, position.id) end
-    assert.are.same({ 'a', 'g', 'i', 'j' }, ids)
+    assert.are.same({ 'b' }, ids)
     vim.api.nvim_buf_delete(buf, { force = true })
   end)
 end)

@@ -75,7 +75,8 @@ end
 ---'org_literal_ranges' (server/types/textlinks/org_literal_ranges.rs):
 ---#+begin_X ... #+end_X blocks, ``` fences, fixed-width lines, and
 ---inline =verbatim= and ~code~. A headline ends any open block, as the
----end of a node's body does on the server.
+---end of a node's body does on the server. tests/shared/literal-link-cases.txt
+---holds the cases this, the server and the Emacs client must agree on.
 function M.literal_lines (lines)
   local result = {}
   local closing = nil
