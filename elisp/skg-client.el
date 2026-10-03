@@ -14,7 +14,7 @@
 (require 'skg-view-new-empty)
 (require 'skg-request-file-path)
 (require 'skg-request-herald-rules)
-(require 'skg-request-diff-analysis)
+(require 'skg-request-diff-report)
 (require 'skg-request-delete-references-to-absent-node)
 (require 'skg-request-relSource-info)
 (require 'skg-request-boolprop-state)

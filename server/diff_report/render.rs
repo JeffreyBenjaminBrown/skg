@@ -1,4 +1,4 @@
-use crate::diff_analysis::types::{
+use crate::diff_report::types::{
   CommitStamp, DiffReport, DuplicateIDReport, ListDiffItem,
   NodeDiffReport, RelationshipDiff, SourceForReport, TextDiffLine,
   ValueSetDiff, VanishedNodeReport};

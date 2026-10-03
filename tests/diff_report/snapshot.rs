@@ -1,5 +1,5 @@
-use skg::diff_analysis::snapshot::read_snapshot_pair;
-use skg::diff_analysis::types::{DiffSelection, SnapshotPair};
+use skg::diff_report::snapshot::read_snapshot_pair;
+use skg::diff_report::types::{DiffSelection, SnapshotPair};
 use skg::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
 
 use git2::Repository;

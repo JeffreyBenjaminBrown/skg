@@ -8,9 +8,9 @@
 //! which it vanished and what it was connected to (in every possible
 //! way, textlinks included) when last present.
 
-use crate::diff_analysis::snapshot::{
+use crate::diff_report::snapshot::{
   parse_blob_node, path_is_source_skg, source_prefix_in_repo};
-use crate::diff_analysis::types::{
+use crate::diff_report::types::{
   CommitStamp, GraphSnapshot, VanishedNodeReport, VanishedNodeSighting};
 use crate::git_ops::read_repo::open_repo;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName, members_msv, members_of};
@@ -55,7 +55,7 @@ pub fn dangling_ids_in_snapshot (
 /// Investigate each id of 'ids' in the git history of every source:
 /// walk each repo's FIRST-PARENT chain from HEAD looking for the most
 /// recent commit whose tree holds '<id>.skg'. A source that cannot be
-/// opened or walked contributes nothing (the ordinary diff-analysis
+/// opened or walked contributes nothing (the ordinary diff-report
 /// refusals have already vetted the sources the selection needs).
 /// One walk per source covers all ids.
 pub fn investigate_vanished_ids (

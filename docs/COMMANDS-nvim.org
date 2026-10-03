@@ -298,7 +298,7 @@ These four commands are described elsewhere in this document.
 *** <localleader>tr         : :SkgDiffReport
 Asks whether to include staged changes and, if so,
 whether to include unstaged changes.
-Then opens an org report (=skg://diff-analysis=) summarizing
+Then opens an org report (=skg://diff-report=) summarizing
 semantic graph changes across all configured sources.
 
 The report is based on git/index/worktree state,

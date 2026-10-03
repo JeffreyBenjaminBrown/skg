@@ -152,7 +152,7 @@ M.commands = {
                                   desc = 'Preview the git add script for this subtree' },
   StageMoves = { module = 'skg.stage_moves', fn = 'stage_moves',
                  desc = 'Script staging cross-source node moves' },
-  DiffReport = { module = 'skg.diff_analysis', fn = 'diff_report',
+  DiffReport = { module = 'skg.diff_report', fn = 'diff_report',
                  desc = 'Semantic report of git-visible graph changes' },
   ExportToOrg = { module = 'skg.export', fn = 'export_some_to_org',
                   desc = 'Export a source-set to plain .org files' },
@@ -281,8 +281,8 @@ M.file_bindings = {
   { 'Oi', 'PopId' }, { 'Ol', 'PopLink' }, { 'On', 'PopNode' },
 }
 
----The subset used by diff-analysis report buffers.
-M.diff_analysis_bindings = {
+---The subset used by diff-report report buffers.
+M.diff_report_bindings = {
   { 'ff', 'Search' }, { 'fi', 'SearchInteractive' },
   { 'gg', 'Goto' }, { 'GG', 'GotoAndCloseThis' },
   { 'gi', 'GotoById' }, { 'Gi', 'GotoByIdAndCloseThis' },
@@ -349,10 +349,10 @@ function M.attach_file_buffer (buf)
                  { buffer = buf, desc = M.commands.IdPrev.desc })
 end
 
----Attach the diff-analysis subset to BUF.
+---Attach the diff-report subset to BUF.
 ---@param buf integer
-function M.attach_diff_analysis (buf)
-  M.apply_bindings(buf, M.diff_analysis_bindings)
+function M.attach_diff_report (buf)
+  M.apply_bindings(buf, M.diff_report_bindings)
 end
 
 return M

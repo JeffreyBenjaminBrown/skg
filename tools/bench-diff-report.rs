@@ -1,9 +1,9 @@
 use skg::dbs::filesystem::not_nodes::load_config;
-use skg::diff_analysis::diff_analysis_report;
-use skg::diff_analysis::diff::diff_snapshots;
-use skg::diff_analysis::render::render_report;
-use skg::diff_analysis::snapshot::read_snapshot_pair;
-use skg::diff_analysis::types::{DiffReport, DiffSelection, SnapshotPair};
+use skg::diff_report::diff_report_as_org;
+use skg::diff_report::diff::diff_snapshots;
+use skg::diff_report::render::render_report;
+use skg::diff_report::snapshot::read_snapshot_pair;
+use skg::diff_report::types::{DiffReport, DiffSelection, SnapshotPair};
 use skg::types::misc::SkgConfig;
 
 use std::env;
@@ -30,8 +30,8 @@ fn main (
     for repeat in 0..repeats {
       let rendered : String =
         timed (
-          &format! ("diff_analysis_report {}", repeat + 1),
-          || diff_analysis_report (&config, selection)) ?;
+          &format! ("diff_report_as_org {}", repeat + 1),
+          || diff_report_as_org (&config, selection)) ?;
       println! ("rendered bytes: {}", rendered . len ()); }
     return Ok (( )); }
   let total_start : Instant =
@@ -78,7 +78,7 @@ fn selection_from_args (
     "unstaged" => Ok ( DiffSelection {
       include_staged: false, include_unstaged: true }),
     _          => Err ( format! (
-      "Usage: bench-diff-analysis [CONFIG] [all|staged|unstaged], got {:?}",
+      "Usage: bench-diff-report [CONFIG] [all|staged|unstaged], got {:?}",
       mode )), } }
 
 fn timed<T, E, F> (
