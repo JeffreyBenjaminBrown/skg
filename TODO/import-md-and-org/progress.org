@@ -19,3 +19,45 @@ original spelling of a Markdown hard break; that is the approved exception.
 Jeff later requested incremental commits, superseding the plan's instruction
 not to create commits. The implementation is committed in coherent stages,
 with commit messages pointing back to sections of =2_plan.org=.
+
+* Deviations made while trialing an import of docs/
+Trial round trips (import docs/, export, re-import, export again) drove
+these. The second round trip now reproduces the first byte for byte.
+** Explicit-ID collisions are still refused
+An explicit ID already claimed by a configured source still blocks the
+preview, as the plan says. A fallback to fresh IDs was tried and dropped:
+the refusal exposed stale IDs in the data, which Jeff fixed there.
+** A sole top-level heading becomes the file root
+The plan retained a first heading even when it duplicated the file-root
+title. Instead, when nothing precedes a document's only top-level heading,
+that heading is the file root. Without this, every export/import cycle
+nested the document one level deeper under a filename-titled root.
+** Org same-document searches resolve
+=[[#custom-id]]= and =[[*Heading]]= with no file part search the containing
+document, as in Org. The plan named only the =::= forms.
+** Literal Org text uses the shared rules
+The importer's own Org literal detection was replaced by
+'server/types/textlinks/org_literal_ranges.rs', which the rest of Skg uses.
+*** What counts as literal
+Blocks of any kind, =```= fences, fixed-width =: = lines, and inline
+=verbatim= and ~code~. A link counts as an example only if a literal region
+contains all of it, so =verbatim= in a link's label is just formatting.
+*** Backticks are not literal in Org files
+The plan protected Markdown inline code in Org files. Org does not, and Jeff
+chose to keep backticks out of his Org data instead.
+*** A heading inside a block or fence stops the import
+In an Org file, a line that looks like a heading inside a block or fence
+refuses the whole preview, listing each such line. Org would end the block
+there, so the intent is ambiguous; often the block is unclosed. Markdown
+files are exempt, since =#= lines in code blocks are ordinary code.
+** The exporter changed too
+Not part of this plan, but needed for clean round trips.
+*** Headline links are kept
+A link to a headline that contains a link, or that repeats an earlier
+headline's text in its file, uses =#PID= and gives that headline a
+=CUSTOM_ID= drawer, only when something links to it.
+*** Example links are left alone
+Link syntax in literal text is neither rewritten nor counted as broken.
+*** Headline-like body lines are defused
+Indented two spaces, or comma-escaped inside a =#+begin_= block, instead of
+being warned about.
