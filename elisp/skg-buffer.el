@@ -37,16 +37,44 @@ search results, but not the fork-confirmation buffer."
           (buffer-modified-p buf)))
    (buffer-list)))
 
+(defvar-local skg--dirtying-view-approved nil
+  "Non-nil when the user has approved the next first edit of this view
+despite another view's unsaved edits.  The next first change consumes it.")
+
 (defun skg--confirm-before-dirtying-another-view ()
   "On `first-change-hook': if another view already has unsaved edits,
-ask before letting this view's first edit happen.  Declining signals
-`user-error', which cancels the edit."
-  (when (and skg-view-uri
-             (not skg--inhibit-dirty-view-confirmation)
-             (skg--unsaved-view-buffers (current-buffer))
-             (not (yes-or-no-p
-                   "WARNING: Another buffer has unsaved edits. If you edit this one as well, your edits could clobber each other. Edit anyway? ")))
-    (user-error "Edit cancelled")))
+cancel this view's first edit, then ask whether to make it anyway.
+The question waits until the editing command has finished, because a
+prompt opened mid-edit inherits that command's temporary state.  (E.g.
+`newline' adds a function to `post-self-insert-hook' that returns point
+to the start of the line, so an answer typed there came out reversed.)"
+  (cond
+   (skg--dirtying-view-approved
+    (setq skg--dirtying-view-approved nil))
+   ((and skg-view-uri
+         (not skg--inhibit-dirty-view-confirmation)
+         (skg--unsaved-view-buffers (current-buffer)))
+    (run-at-time 0 nil #'skg--ask-to-dirty-another-view
+                 (current-buffer)
+                 (and this-command ;; nil when no command made the edit
+                      (this-command-keys-vector)))
+    (user-error "Edit paused: another skg buffer has unsaved edits"))))
+
+(defun skg--ask-to-dirty-another-view (buffer keys)
+  "Ask whether to edit BUFFER despite another view's unsaved edits.
+On yes, approve BUFFER's next first edit, and replay KEYS (the keys of
+the cancelled command) if they would reach BUFFER."
+  (when (and (buffer-live-p buffer)
+             (not (buffer-modified-p buffer)))
+    (if (not (yes-or-no-p "WARNING: Another buffer has unsaved edits. If you edit this one as well, your edits could clobber each other. Edit anyway? "))
+        (message "Edit cancelled")
+      (with-current-buffer buffer
+        (setq skg--dirtying-view-approved t))
+      (if (and (> (length keys) 0)
+               (eq buffer (window-buffer (selected-window))))
+          (setq unread-command-events
+                (append (listify-key-sequence keys) unread-command-events))
+        (message "Approved: repeat your edit.")))))
 
 (defvar-local skg-view-uri nil
   "Unique view URI for this skg buffer.")
