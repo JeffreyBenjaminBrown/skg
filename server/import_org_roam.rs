@@ -8,6 +8,8 @@ use crate::telescope::unfold::{
 };
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
+use crate::types::textlinks::org_literal_ranges::{
+  HEADLINES_INSIDE_BLOCKS_EXPLANATION, headlines_inside_blocks};
 
 use std::collections::HashMap;
 use std::error::Error;
@@ -45,6 +47,8 @@ pub fn import_org_roam_directory (
   output_dir : &Path,
   source     : &SourceName,
 ) -> Result<ImportStats, Box<dyn Error>> {
+  let org_files : Vec<PathBuf> = org_files_in (org_dir);
+  refuse_headlines_inside_blocks (&org_files)?; // before wiping anything
   fs::create_dir_all (output_dir)?;
   for entry in fs::read_dir (output_dir)? { // Wipe existing .skg files to avoid orphans from previous runs.
     let entry : fs::DirEntry = entry?;
@@ -59,15 +63,7 @@ pub fn import_org_roam_directory (
   // When multiple org files define the same ID,
   // merge their children rather than clobbering.
   let mut node_map : HashMap<ID, NodeComplete> = HashMap::new();
-  for entry in WalkDir::new (org_dir)
-    . into_iter()
-    . filter_entry (|e| // Never descend into a repo's .git folder.
-      e . file_name() != ".git" )
-    . filter_map (|e| e . ok() )
-    . filter (|e| {
-      e . path() . extension()
-        . map_or (false, |ext| ext == "org") }) {
-    let path : &Path = entry . path();
+  for path in &org_files {
     stats . files_read += 1;
     let nodes : Vec<NodeComplete> =
       parse::parse_org_file (path);
@@ -98,6 +94,39 @@ pub fn import_org_roam_directory (
           node . title, e);
         stats . errors . push (msg); }} }
   Ok (stats) }
+
+fn org_files_in (
+  org_dir : &Path,
+) -> Vec<PathBuf> {
+  WalkDir::new (org_dir)
+    . into_iter()
+    . filter_entry (|e| // Never descend into a repo's .git folder.
+      e . file_name() != ".git" )
+    . filter_map (|e| e . ok() )
+    . filter (|e| {
+      e . path() . extension()
+        . map_or (false, |ext| ext == "org") })
+    . map (|e| e . path() . to_path_buf() )
+    . collect() }
+
+/// A headline-like line inside a block is ambiguous (Org would end the
+/// block there), so no file is imported, and nothing is wiped.
+fn refuse_headlines_inside_blocks (
+  org_files : &[PathBuf],
+) -> Result<(), Box<dyn Error>> {
+  let mut problems : Vec<String> = Vec::new();
+  for path in org_files {
+    let Ok (text) : Result<String, std::io::Error> =
+      fs::read_to_string (path) else { continue; }; // parse skips it too
+    for inside in headlines_inside_blocks (&text) {
+      problems . push ( format! (
+        "  {}:{}: {}", path . display(),
+        1 + text [.. inside . headline . start] . matches ('\n') . count(),
+        inside )); }}
+  if problems . is_empty() { return Ok (( )); }
+  Err ( format! ("{}\n{}",
+                 HEADLINES_INSIDE_BLOCKS_EXPLANATION,
+                 problems . join ("\n")) . into() ) }
 
 //
 // File writing

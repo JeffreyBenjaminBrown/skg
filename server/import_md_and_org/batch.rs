@@ -9,6 +9,7 @@ use crate::dbs::in_rust_graph::{InRustGraph,
   complete_validation::complete_from_rust};
 use crate::export_org::claimed_export_targets;
 use crate::types::env::SkgEnv;
+use crate::types::textlinks::org_literal_ranges::HEADLINES_INSIDE_BLOCKS_EXPLANATION;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName, rel_partners_at_relSource};
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 use std::collections::HashMap;
@@ -188,13 +189,8 @@ fn refuse_documents_with_errors (
                error . message)))
     . collect ();
   if errors . is_empty () { return Ok (()); }
-  Err (format! (
-    "Nothing was imported. In these Org files, a line that looks like a heading \
-is inside a #+begin_... block or a ``` fence. Org would read it as a heading \
-and end the block there, so Skg cannot tell which was meant. Either close the \
-block before the heading, or, if the line belongs inside the block, escape it \
-with a leading comma (',* ...'), as Org does.\n{}",
-    errors . join ("\n")))
+  Err (format! ("{}\n{}",
+    HEADLINES_INSIDE_BLOCKS_EXPLANATION, errors . join ("\n")))
 }
 
 fn configured_identity_map (

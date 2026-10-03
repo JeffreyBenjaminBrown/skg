@@ -3,6 +3,7 @@
 //! Both clients reimplement this; tests/shared/literal-link-cases.txt
 //! holds the cases all three must agree on.
 
+use std::fmt;
 use std::ops::Range;
 
 /// Characters Org accepts just before an opening '=' or '~'.
@@ -58,6 +59,56 @@ pub fn org_literal_ranges_and_unclosed_block (
   if let Some (block_start) = unclosed_block_start {
     ranges . push (block_start .. text . len ()); }
   (ranges, unclosed_block_start) }
+
+/// Why both importers refuse a file with a 'HeadlineInsideBlock'.
+pub const HEADLINES_INSIDE_BLOCKS_EXPLANATION : &str =
+  "Nothing was imported. In these Org files, a line that looks like a heading \
+is inside a #+begin_... block or a ``` fence. Org would read it as a heading \
+and end the block there, so Skg cannot tell which was meant. Either close the \
+block before the heading, or, if the line belongs inside the block, escape it \
+with a leading comma (',* ...'), as Org does.";
+
+/// A line Org would read as a headline (asterisks, then a space), lying
+/// inside a block or fence of a whole Org file.
+pub struct HeadlineInsideBlock {
+  pub headline          : Range<usize>, // the line, without its newline
+  pub headline_text     : String,
+  pub block_line        : usize, // 1-based
+  pub block_is_unclosed : bool,
+}
+
+impl fmt::Display for HeadlineInsideBlock {
+  fn fmt (
+    &self,
+    f : &mut fmt::Formatter<'_>,
+  ) -> fmt::Result {
+    write! (f,
+      "{:?} looks like a heading but is inside the block or fence that begins on line {}{}",
+      self . headline_text, self . block_line,
+      if self . block_is_unclosed { ", which is never closed" } else { "" } ) }}
+
+/// Headline-like lines of 'text' inside its blocks and fences.
+pub fn headlines_inside_blocks (
+  text : &str,
+) -> Vec<HeadlineInsideBlock> {
+  let (literal, unclosed_block_start) : (Vec<Range<usize>>, Option<usize>) =
+    org_literal_ranges_and_unclosed_block (text);
+  let mut found : Vec<HeadlineInsideBlock> = Vec::new ();
+  let mut offset : usize = 0;
+  for raw_line in text . split_inclusive ('\n') {
+    let start : usize = offset;
+    offset += raw_line . len ();
+    let line : &str = raw_line . trim_end_matches ('\n') . trim_end_matches ('\r');
+    let stars : usize = line . bytes () . take_while (|b| *b == b'*') . count ();
+    if stars == 0 || ! line [stars ..] . starts_with (' ') { continue; }
+    if let Some (block) = literal . iter ()
+      . find (|range| range . start < start && start < range . end) {
+      found . push (HeadlineInsideBlock {
+        headline          : start .. start + line . len (),
+        headline_text     : line . to_string (),
+        block_line        : 1 + text [.. block . start] . matches ('\n') . count (),
+        block_is_unclosed : unclosed_block_start == Some (block . start), }); }}
+  found }
 
 /// '=verbatim=' and '~code~' spans in one line, following Org's
 /// border rules: the opening marker follows the line start, whitespace

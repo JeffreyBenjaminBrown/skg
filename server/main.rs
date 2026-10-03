@@ -295,7 +295,11 @@ fn run_import (
   let output_dir : &Path       = Path::new (&args[3]);
   let source     : SourceName  = SourceName::from (&args[4]);
   let stats : ImportStats =
-    import_org_roam_directory (org_dir, output_dir, &source)?;
+    match import_org_roam_directory (org_dir, output_dir, &source) {
+      Ok (stats) => stats,
+      Err (e) => { // printed plainly; a returned error's newlines would be escaped
+        eprintln! ("{}", e);
+        std::process::exit (1); }};
   tracing::info! ("{}", stats);
   for err in &stats . errors {
     tracing::warn! ("  {}", err); }

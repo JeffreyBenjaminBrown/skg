@@ -885,8 +885,12 @@ Paths are relative to the process's working directory unless absolute.
 Inside Docker, supply container-visible paths. There is no host-path
 mapping argument or interactive prompt.
 **** Before running: the destination is replaced
-The importer creates 'OUTPUT_DIR' if necessary, then deletes every immediate
-'.skg' file already in it, before reading the input. There is no confirmation,
+First, if any input file has a line that looks like a heading inside a
+'#+begin_' block or a fence, the command stops, naming those lines, and
+nothing is deleted or written; see
+[[*An Org heading inside a block or fence stops the import.][the same check in the interactive importer]].
+Otherwise the importer creates 'OUTPUT_DIR' if necessary, then deletes every
+immediate '.skg' file already in it, before importing the input. There is no confirmation,
 dry run, merge-with-destination mode, or automatic backup. Other files and
 nested directories are left alone. Use a fresh staging directory and inspect
 the result before replacing existing data.
