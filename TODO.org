@@ -30,31 +30,246 @@ A config option, for recording videos.
 Could put a second minibuffer line,
 that reads if anything (key sequence -> command),
 leaving a trail for five seconds or until interrupted.
-** TODO CRITICAL : git commit workflow
-**** ? worry about telescopes
-**** Render the git diff report v2 like a content view, in Skg.
-**** Include all sources.
+** TODO CRITICAL : representation change for safety
+*** subscribee-as-such must be a metadata property.
+The metadata should in effect say
+"this is node <ID> as presented by subscriber <ID>".
+
+Otherwise the user could copy the subscribee
+to somewhere outside of the collection of subscribees.
+If it is owned, that could destroy a lot of its content relationships,
+because they were being hidden from the subscribee-as-such view.
+
+This requires no additional signaling to the user --
+a subscribee-as-such is already visually obvious to the user.
+** TODO CRITICAL : language changes
+*** "mentioner mentions mentioned"
+*** hides-from-subscriptions -> hides
+Should apply not just to subscribee content,
+but also to mentioners.
+*** "follower subscribes-to followed"
+*** source -> repository
+SkgRepo (Rust), skg-repo (Emacs), "Skg repository" (English).
+Specify skg to avoid confusion with a git repo.
+Mention at each definition that a skg repo can be a git repo,
+and indeed skg is written to make that convenient.
+*** dubious
+**** ? graphnode -> atom
+Still specify 'viewnode' rather than saying 'node' to mean a node in a view.
+But only the graph has atoms.
+**** "container presents contained"
+Better to just explain to the user that 'contains' means 'presents'.
+** TODO CRITICAL : workflow for committing changes to repositories
+*** A relationship's commit status should be cycleable from either member.
+*** 'readonly leaf'
+This is a readonly viewnode
+  without its body or content
+  but with a containerward viewtree.
+A readonly leaf can be decorated with view-descendents,
+  e.g. (as is common) a containerward tree.
+  Now it is not a leaf.
+It can also be made writeable,
+  which causes its content to be among its view-children
+  if they are not already.
+*** 'deleted atom'
+**** what it is
+If an atom from a repo
+has been deleted since that repo's latest commit,
+a 'resurrected deletion' can still show
+its title, body and content.
+Those data could be part of the ephemeral data store,
+or they could be deduced from the git history.
+**** It can still show data!
+This differs from the current skg implemntation of a "deleted node" viewnode,
+which makes nothing available but the ID.
+It seems better to never show a deletion that way --
+instead, show it with its title,
+and if the user asks for them, even its content.
+(Deleted content would show as further 'deleted atom' viewnodes.)
+**** if it was acquired, it should show tha
+If the deleted graphnode was the acquiree in a merger,
+the viewnode representing its deletion
+should mention the acquirer.
+This seems most easily shown via an intermediary folder:
+#+begin_example
+  * <deleted node>
+  ** "it was acquired by"
+  *** <acquirer>
+#+end_example
+*** the kind of edits there are
+**** changed an atom's text
+**** changed an atom's set of aliases
+**** deleted an atom
+**** added IDs to an atom
+**** changed an atom's source
+**** changed a relationship's source
+**** deleted a relationship
+**** created a relationship
+*** how to collect all edits in one buffer
+List the edited nodes.
+Compute a 'truncated spanning presentation forest' for the edited nodes.
+*** where to show/edit the commit-status of each kind of edit
+**** alias changes
+New and deleted aliases have a commit status.
+Their commit status propagates up to the aliases folder they belong to.
+
+Alias changes to graphnode X are shown under an "its aliases" viewchild of X.
+A deleted alias is just an alias node marked Removed.
+A new alias is just an alias marked New.
+All other aliases are also shown, but without a Removed or New.
+
+Each deleted and each added alias is separately commit-cycled.
+Each edit begins in the TODO state.
+If any of them are TODO, the whole aliases collection is also TODO.
+If not, but any of them is ONGOING, the whole aliases collection is ONGOING.
+If they are all DONE, the whole is also DONE.
+The user does not control the whole collection's commit status,
+just the individual aliases.
+**** new IDs
+New IDs are shown under an "its IDs" viewchild of X,
+alongside the other IDs. The PID is first. The new ones are heralded "new".
+
+If the user is not okay with an extra ID, they ran a merger they regret.
+An automatic way to unwind the merger would be nice but seems not critical.
+
+New IDs have a commit status.
+**** changes to a graphnode's text
+The graphnode might be represented by a readonly leaf,
+in which case its body is not shown.
+Therefore an "its text was changed" viewchild
+should contain two children "old" and "new":
+#+begin_example
+  * <a graphnode>
+  ** "its text changed"
+  *** "old" <old title>
+  <old body>
+  *** "new" <new title>
+  <new body>
+#+end_example
+The text in quotations shows in a system font.
+**** show changes to the content list
+The commit status of each member content here is cycleable.
+**** show changes to the container set
+The commit status of each member content here is cycleable.
+**** show a readonly collection of changes to the link sources set
+**** Show changes to the subscribee list.
+Under a subscriber in the edit commit view,
+the commit status of each member content here is cycleable.
+**** Don't show changes to a subscriber list.
+**** changes to a list of subscriptions
+**** changes to a list of links : don't
+*** "commitment status"
+Some things in the edit report need a "commitment status"
+that the user can cycle between TODO, DOING, and DONE.
+**** elaboration | motivation
+TODO and ONGOING are both just prompts for the user.
+Indeed maybe the user should be able to define other labels.
+
+But DONE is a special label,
+because (although the meaning of DONE is up to the user)
+the user aims to mark all edits DONE,
+knowing that once all are so marked
+they can feel safe committing all changes to all repositories.
+**** Changes to atoms and changes to relationships require separate commitment statuses.
+Suppose A and B both contain C, and C is deleted.
+The user wants to separately OK each of
+- the deletion of C
+- the deletion of (A contains C)
+- the deletion of (B contains C)
+**** yeah
+***** The commitment status on an atom facilitates avoiding duplicate work.
+For instance, two containers may have both lost a contains relationship
+to the same node, because it was deleted.
+That node will be represented by a 'resurrected deletion'
+under both containers.
+Once the user has determined that they are OK that it was deleted,
+they can mark either deletion DONE,
+and the other will show as DONE, too.
+This way they don't have to redetermine,
+when they come to the second container,
+whether it is okay that that thing was deleted.
+***** Commitment status propgagates across representations of the same object.
+To cycle the diff work status of any graphnode,
+deleted or present,
+causes every representation of that graphnode
+to show the same diff work status.
+**** what is diff-work-cycleable
+***** A resurrected deletion.
+***** An ordinary node.
+***** ? maybe a merge
+*** the diff report includes
+**** a 'minimal spanning presentation forest' branch.
+to span all edits (staged and unstaged).
+***** how to define the nodes in this branch
+For any node E that was edited, show contentward views
+(that is, a view in which parents contain children)
+from every rootish node R
+(either uncontained or contained by a contains-cyclic root)
+for which E is in R's recursive content.
+Every atom in the spanning forest that is unedited
+*and* whose recursive content is unedited
+is rendered as a readonly leaf.
+***** edited nodes are work-cycleable
+**** a 'merges' branch
+Each merge has the following descendents.
+Quotation marks indicate verbatim text;
+angle brackets indicate substitution of graph data.
+***** work-cycleable : "the acquirer, which persists"
+****** <the acquirer, initially readonly and without its content>
+Since the git report v2  is an ordinary view,
+the user can summon its content and make it writeable.
+***** "this aquiree was deleted"
+****** "the ids it had"
+******* <an id>
+******* <maybe another id, probably not>
+******* ...
+****** "the text it had" : <its title>
+<its body>
+******* "YOU MUST verify for yourself that the acquirer has not lost this text."
+****** "content it presented that was been deleted"
+Each child of this is a resurrected deletion
+that used to be presented as content of the acquiree.
+****** "content it presented that the acquirer now presents"
+Each child of this is born as a readonly leaf
+representing something the acquiree used to present
+that the acquirer now presents.
+****** "content it presented that nothing now presents"
+Each child of folder is a readonly viewnode
+without its body or content
+but with a containerward viewtree.
+**** a 'source changes of atoms'
+Show an atom's source changed with an
+AtomSourceChanged child, which reads 'its source changed from <source> to <source>', where the sources and 'its source changed' are all in a system font but the 'from' and 'to' are ordinary white text. It has no title, it is not a graphnode, just a viewnode.
+*** Include all sources (skg repositories).
 Refuse the view if that conflicts with the source set
 (the current maximum privacy level shown --
 what's the term used in the code for that?)
-**** make TextChanged more informative
+*** Show source changes for relationships.
+Show that an atom's rel to its parent changed source
+with a RelSourceChanged child,
+which reads 'its (a's) rel to its parent (b) changed from <source> to <source>',
+again with all text except the 'from' and the 'to'
+in a system font, and those two sybmols looking ordinary.
+*** Show deletions.
+Each shows as a resurrected deletion.
+*** Make TextChanged more informative.
 Now TextChanged shows a synthetic OldText child,
 with no content but the old title and the old body,
 and also a BodyDiff node with a diff of the two bodies.
-**** show current positions under each RemovedHere node
+*** show current positions under each RemovedHere node
 That is, if content E was removed from container A,
 then the RemovedHere image of E under A
 should include as children all the current containers of E.
-**** show old containers under each Removed node
-**** update heralds to include "commit-readiness annotations"
-***** user can mark nodes well-placed
+*** show old containers under each Removed node
+*** update heralds to include "commit-readiness annotations"
+**** user can mark nodes well-placed
 This prevents redundant work.
 It affects the NewHere and RemovedHere images of the node.
 It doesn't describe edits to the node itself,
 but rather to its containers.
-***** user can mark nodes well-edited
+**** user can mark nodes well-edited
 Indicates that all changes to that node can be committed.
-**** decide what are roots of the view
+*** decide what are roots of the view
 minimizing redundancy, maximizing informativity
 ** docs
 *** test skg-to-org
