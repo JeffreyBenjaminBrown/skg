@@ -98,8 +98,8 @@ org-parent), relation = the folder's relation."
                     '(:owner "anchor" :member "seen"
                       :relation "subscribes_to"))))))
 
-(ert-deftest test-rel-refuses-on-readonly-folder-member ()
-  "Refuses (user-error) on a member of a read-only folder."
+(ert-deftest test-rel-refuses-on-write-protected-folder-member ()
+  "Refuses (user-error) on a member of a write-protected folder."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (repo public))) owner\n"
@@ -112,7 +112,7 @@ org-parent), relation = the folder's relation."
      (beginning-of-line)
      (let ((err (should-error (skg--rel-at-point)
                               :type 'user-error)))
-       (should (string-match-p "read-only" (cadr err)))
+       (should (string-match-p "write-protected" (cadr err)))
        (should (string-match-p "subscriberFolder" (cadr err)))))))
 
 (ert-deftest test-rel-refuses-on-root ()
@@ -505,8 +505,8 @@ own content children (the member being definitive) match kind
        (should-not (string-match-p "relRepo"
                                    (test--line-of-id "o")))))))
 
-(ert-deftest test-recursive-walk-prunes-readonly-folder ()
-  "A read-only folder's whole branch is pruned: even a definitive
+(ert-deftest test-recursive-walk-prunes-write-protected-folder ()
+  "A write-protected folder's whole branch is pruned: even a definitive
 member's content children are not reached."
   (test--with-skg-content-view
    (concat
@@ -593,7 +593,7 @@ writable position, and covers all five schema relations."
 
 (ert-deftest test-relationship-kind-menu-choose ()
   "RET on a settable role calls the continuation with its kind; RET
-on a read-only role refuses; RET on a relation (level-1) headline
+on a write-protected role refuses; RET on a relation (level-1) headline
 does neither."
   (unwind-protect
       (progn

@@ -187,7 +187,7 @@ repo field defaults. Returns a flat list of headlines."
                                 (cons (1+ child-level)
                                       (concat default-repo
                                               " (default)"))))))))))
-    ;; Add remaining fields not in canonical order (readonly stats etc.)
+    ;; Add remaining fields not in canonical order (write-protected stats etc.)
     (dolist (entry field-map)
       (unless (member (car entry) seen)
         (setq ordered (append ordered (cdr entry)))))

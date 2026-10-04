@@ -86,9 +86,9 @@ fn all_tests
                              SUBSCRIBEE_EDIT_CONFIG) ?;
       pipeline_subscribee_hiderels (
         &s . config ) . await ?;
-      s . reset ("pipeline_readonly_folder_member_edits",
+      s . reset ("pipeline_write_protected_folder_member_edits",
                  "tests/merge/merge_nodes/fixtures") ?;
-      pipeline_readonly_folder_member_edits (
+      pipeline_write_protected_folder_member_edits (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("pipeline_inactive_subtree",
                  "tests/merge/merge_nodes/fixtures") ?;
@@ -197,12 +197,12 @@ async fn pipeline_subscribee_hiderels (
         "subscribee-as-such should not produce a SaveNode" );
       Ok (( )) }
 
-async fn pipeline_readonly_folder_member_edits (
+async fn pipeline_write_protected_folder_member_edits (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // This tests the new recursion surface: definitive members of
-  // read-only folders (and their subtrees) save their own edits.
+  // write-protected folders (and their subtrees) save their own edits.
       let input : &str =
         indoc! {"
             * (skg (node (id owner) (repo main))) owner

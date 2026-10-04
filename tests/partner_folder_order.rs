@@ -1,6 +1,6 @@
 // cargo nextest run --test grouped_overrides -E 'test(partner_folder_order::)'
 //
-// A FolderPolicy::ReadOnlySet folder (here a SubscriberFolder) respects the
+// A FolderPolicy::WriteProtectedSet folder (here a SubscriberFolder) respects the
 // user's view-local member order across save and rerender
 // (TODO/full-schema/8_readonly-set-ergonomics.org): present members
 // keep their buffer order, and the order survives a further
@@ -23,14 +23,14 @@ use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 
 #[test]
-fn readonly_folder_order_is_preserved
+fn write_protected_folder_order_is_preserved
   () -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
     "skg-test-partner-folder-order",
     "tests/partner_folder_order/fixtures",
     "/tmp/tantivy-test-partner-folder-order",
     |config, tantivy| Box::pin ( async move {
-      readonly_folder_order_is_preserved_impl (
+      write_protected_folder_order_is_preserved_impl (
         config, tantivy ) . await
     } )) }
 
@@ -80,7 +80,7 @@ fn assert_member_order (
   assert! ( i < j,
     "{}: expected {:?} before {:?} in:\n{}", label, first, second, buf ); }
 
-async fn readonly_folder_order_is_preserved_impl (
+async fn write_protected_folder_order_is_preserved_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {

@@ -1,7 +1,7 @@
 //! The relationship-herald SEMANTIC FACTS, emitted for the client to
 //! render however it likes. The server sends WHAT relates to what (per
 //! relation, per side: a member count and which tracked ancestors are
-//! members), plus the reason-for-being; the CLIENT decides letters,
+//! members), plus the birth; the CLIENT decides letters,
 //! colors, order, and layout (see elisp/heralds-minor-mode.el and
 //! nvim/lua/skg/heralds.lua). No presentation lives here anymore.
 //!

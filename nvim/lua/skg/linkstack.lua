@@ -119,7 +119,7 @@ function M.insert_node_from_entry (entry)
   local request_definitive_view = false
   if vim.b.skg_view_uri ~= nil then
     if M.buffer_has_writeable_instance_p(entry[1]) then
-      vim.notify('NOTE: Pasting node readonly because a writeable'
+      vim.notify('NOTE: Pasting node write-protected because a writeable'
                  .. ' instance is already present in this same buffer.')
     else
       request_definitive_view = true end

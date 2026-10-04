@@ -19,7 +19,7 @@
 /// - folder shapes are valid: each folder holds only the child kinds it
 ///   permits, each folder is unique among its siblings, content members
 ///   have distinct IDs per
-///   'nonignored_children_have_distinct_ids', and read-only-folder
+///   'nonignored_children_have_distinct_ids', and write-protected-folder
 ///   members have distinct IDs per
 ///   'partnerFolder_children_have_distinct_ids'. The defining folders
 ///   (AliasFolder, SubscribeeFolder, OverriddenFolder) may contain
@@ -31,7 +31,7 @@
 /// DEFINITION: a vognode is *save-eligible* iff it is Active,
 /// definitive, lacks a Delete edit request, and is not in
 /// subscribee-as-such position. (Its position may be anywhere else --
-/// including as a member of a read-only folder, where it is
+/// including as a member of a write-protected folder, where it is
 /// save-eligible for itself but invisible to the folder's owner.)
 /// .
 /// DEFINITION: a vognode is *in subscribee-as-such position* iff it
@@ -103,7 +103,7 @@ fn visit (
       visit_aliasFolder (node_ref, context, collected),
     // The two arms below are exactly the FolderPolicy::WritableSet
     // PartnerFolders; the catch-all PartnerFolder arm after them covers the
-    // ReadOnlySet and ReadOnlyFilter policies. If a new PartnerFolder is
+    // WriteProtectedSet and WriteProtectedFilter policies. If a new PartnerFolder is
     // added, 'PartnerFolder::policy' says which group it joins.
     ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee) =>
       visit_subscribee_folder (node_ref, context, collected),
@@ -115,11 +115,11 @@ fn visit (
       | ViewNodeKind::QualFolder (QualFolder::Flags { .. })
       | ViewNodeKind::Qual (_)
       | ViewNodeKind::PartnerFolder (_) =>
-      // These are the read-only folders and the Qual leaves. Vognodes
+      // These are the write-protected folders and the Qual leaves. Vognodes
       // found inside them are self-writers; their membership in the
       // folder is never read.
       recurse_with_uniform_context (
-        node_ref, &LocalContext::UnderReadOnlyFolder, collected), }}
+        node_ref, &LocalContext::UnderWriteProtectedFolder, collected), }}
 
 fn visit_active_vognode (
   node_ref  : NodeRef<ViewNode>,
@@ -214,7 +214,7 @@ fn visit_active_vognode (
 /// This recurses into a gnode-ish node's children. Vognode-ish
 /// children get 'UnderVognode'; defining-folder children get
 /// 'UnderDefiningFolder', carrying the owner's identity (when it has
-/// one); and read-only folders and Quals get 'UnderReadOnlyFolder'.
+/// one); and write-protected folders and Quals get 'UnderWriteProtectedFolder'.
 fn recurse_under_gnode (
   node_ref            : NodeRef<ViewNode>,
   owner               : Option<DefiningFolderOwner>,
@@ -226,8 +226,8 @@ fn recurse_under_gnode (
       match &child . value() . kind {
         ViewNodeKind::QualFolder (QualFolder::Alias)
           // The two PartnerFolders here are exactly the
-          // FolderPolicy::WritableSet ones; the read-only policies fall
-          // to the UnderReadOnlyFolder arm below.
+          // FolderPolicy::WritableSet ones; the write-protected policies fall
+          // to the UnderWriteProtectedFolder arm below.
           | ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee)
           | ViewNodeKind::PartnerFolder (PartnerFolder::Overridden) =>
           match &owner {
@@ -242,7 +242,7 @@ fn recurse_under_gnode (
           QualFolder::ID | QualFolder::Flags { .. })
           | ViewNodeKind::Qual (_)
           | ViewNodeKind::PartnerFolder (_) =>
-          LocalContext::UnderReadOnlyFolder,
+          LocalContext::UnderWriteProtectedFolder,
         _ =>
           LocalContext::UnderVognode {
             parent_if_writeable : parent_if_writeable . clone() } };
@@ -283,7 +283,7 @@ fn visit_aliasFolder (
         owner . id . clone(),
         NodeIntent_Local::SetAliases (aliases) ) ?; }}
   recurse_with_uniform_context (
-    node_ref, &LocalContext::UnderReadOnlyFolder, collected) }
+    node_ref, &LocalContext::UnderWriteProtectedFolder, collected) }
 
 fn visit_subscribee_folder (
   node_ref  : NodeRef<ViewNode>,
@@ -350,7 +350,7 @@ fn visit_hiddenOutside_folder (
         subscriber . clone(),
         NodeIntent_Local::HiddenOutsideEdit (HiddenOutsideEdit { members }) ) ?; }}
   recurse_with_uniform_context (
-    node_ref, &LocalContext::UnderReadOnlyFolder, collected)
+    node_ref, &LocalContext::UnderWriteProtectedFolder, collected)
 }
 
 fn visit_overridden_folder (
@@ -452,7 +452,7 @@ fn subscribeeFolder_members (
 /// Including a buffer-present inactive child would let a stale or
 /// concurrently-edited buffer resurrect a member that was
 /// authoritatively removed, and would persist reorderings of a
-/// read-only placeholder. (See TODO/problems.org, "Retained inactive
+/// write-protected placeholder. (See TODO/problems.org, "Retained inactive
 /// nodes emit positional save intentions for their container".)
 fn content_members (
   node_ref : NodeRef<ViewNode>,

@@ -26,7 +26,7 @@ pub fn build_and_integrate_flags_then_drop_request (
     "Failed to integrate flags view", errors, result )
 }
 
-/// Add the read-only folder of true flags.  The folder itself is
+/// Add the write-protected folder of true flags.  The folder itself is
 /// useful even when empty, so it is always created and preserved.
 pub fn build_and_integrate_flags (
   tree     : &mut Tree<ViewNode>,

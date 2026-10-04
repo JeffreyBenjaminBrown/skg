@@ -74,7 +74,7 @@ pub(super) struct CompletionContext<'a> {
   /// ordinary collateral rerenders retain their existing raw positions.
   pub(super) substitute_existing_content_overrides : bool,
   /// Some only when this completion serves the view the user just
-  /// saved: read-only PartnerFolder reconcilers report their repairs
+  /// saved: write-protected PartnerFolder reconcilers report their repairs
   /// here, and the save response surfaces them as warnings. None for
   /// de-novo renders, collateral rerenders and rerender-all, whose
   /// repairs do not correspond to edits the user just made.
@@ -177,7 +177,7 @@ fn dispatch_node_update (
     ViewNodeKind::PartnerFolder (role)
       // This arm serves one FolderPolicy::WritableSet folder (Overridden;
       // Subscribee has its own completer above) and every
-      // FolderPolicy::ReadOnlySet folder. The reconciler branches on
+      // FolderPolicy::WriteProtectedSet folder. The reconciler branches on
       // 'PartnerFolder::policy' where their treatment differs.
       if role . relation_member_role () . is_some () =>
       reconcile_partnerFolder_children (
@@ -228,7 +228,7 @@ fn visit_normal_node (
   // reconciliation. Do it before definitive arbitration, budget handling, or
   // write-protected refresh: all of those paths may consult the post-save
   // graph, where the node is necessarily absent. This also ensures every
-  // indefinitive/read-only image becomes Deleted rather than Unknown.
+  // indefinitive/write-protected image becomes Deleted rather than Unknown.
   let (pid, repo) : (ID, RepoName) =
     pid_and_repo_from_treenode (
       tree, treeid, "visit_normal_node deletion preflight" ) ?;
@@ -339,7 +339,7 @@ fn visit_normal_node (
 /// one place self-deletion lives -- per-kind reconcilers no longer detach
 /// themselves when empty.
 /// - DeadScaffold and a childless Vognode::Deleted (TODO/DONE/local-view-update/plan_v2.org §6.6).
-/// - the read-only PartnerFolders Subscriber/Overrider/Hider/Hidden (a graph
+/// - the write-protected PartnerFolders Subscriber/Overrider/Hider/Hidden (a graph
 ///   relationship the user cannot edit from this side, so an emptied one is
 ///   just noise) -- but NOT Overridden (the editable interface for adding
 ///   overrides, preserved when empty like AliasFolder).
@@ -365,7 +365,7 @@ fn is_self_deletable_when_empty (
 /// The TODO/DONE/local-view-update/plan_v2.org §3.4 postorder prune sweep -- the *one* place self-deletion happens.
 /// Removes, bottom-up, every childless `is_self_deletable_when_empty` node:
 /// deadened folders whose members all died, a TODO/DONE/local-view-update/plan_v2.org §6.6 childless Deleted, and empty
-/// read-only relation / Hidden* / ID folders. Postorder so a chain (e.g.
+/// write-protected relation / Hidden* / ID folders. Postorder so a chain (e.g.
 /// Dead -> Deleted, or a folder emptied by the removal of its last member)
 /// collapses completely in one pass. Focus is transferred to the surviving
 /// parent if the removed node held it. Never prunes a *view root* (child of the

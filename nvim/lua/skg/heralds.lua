@@ -372,7 +372,7 @@ end
 
 ---Render the semantic (rels ...) payload in SEXP to virtual-text chunks,
 ---or nil if there is none / it produces nothing. Coloring: group base
----(C/L blue, S/O/H purple), the reason-for-being letter black-on-white,
+---(C/L blue, S/O/H purple), the birth letter black-on-white,
 ---ancestor a muted and higher ancestors white-on-orange, contains
 ---inbound count>1 yellow,
 ---A/I/P cyan. Tokens ordered C L S O H A I P, space-separated.

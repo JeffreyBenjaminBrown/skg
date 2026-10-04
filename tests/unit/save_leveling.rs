@@ -743,7 +743,7 @@ fn relrepo_requests_are_contextual_and_singular (
 }
 
 #[test]
-fn flag_requests_parse_round_trip_and_reject_read_only_flags (
+fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
 ) {
   use crate::org_to_text::viewnode_to_string;
   use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
@@ -787,7 +787,7 @@ fn flag_requests_parse_round_trip_and_reject_read_only_flags (
     "(skg (node (id n) (editRequest (flag wasOverloaded false))))",
   ] {
     assert! ( parse_metadata_to_viewnodemd (malformed) . is_err (),
-              "malformed/read-only flag request was accepted: {}",
+              "malformed/write-protected flag request was accepted: {}",
               malformed ); }
 }
 

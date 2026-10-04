@@ -85,7 +85,7 @@ async fn empty_subscribee_folder_persists_impl (
     response . errors );
   Ok (( )) }
 
-// Contrast (plan_v2 §3.4/§6.8): an empty *read-only* PartnerFolder -- here a
+// Contrast (plan_v2 §3.4/§6.8): an empty *write-protected* PartnerFolder -- here a
 // subscriberFolder -- IS removed by the postorder prune sweep, because (unlike the
 // SubscribeeFolder) it is not an editable interface; an emptied one is just noise.
 async fn test_empty_subscriber_folder_is_removed (
@@ -122,7 +122,7 @@ async fn empty_subscriber_folder_removed_impl (
 
   println!("Rendered buffer:\n{}", response . saved_view);
   assert! ( ! response . saved_view . contains ("subscriberFolder"),
-    "an empty read-only subscriberFolder must be REMOVED by the §3.4 prune sweep; \
+    "an empty write-protected subscriberFolder must be REMOVED by the §3.4 prune sweep; \
      got:\n{}", response . saved_view );
   assert! ( response . errors . is_empty (),
     "rerender must not error; got: {:?}", response . errors );

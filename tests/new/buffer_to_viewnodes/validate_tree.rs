@@ -778,7 +778,7 @@ fn duplicate_members_of_defining_folders_pass_validation () {
       . expect ("duplicate members of a defining folder should pass validation"); }}
 
 #[test]
-fn duplicate_members_of_readonly_folders_are_still_rejected () {
+fn duplicate_members_of_write_protected_folders_are_still_rejected () {
   let input : &str =
     indoc! {"
       * (skg (node (id owner) (repo main))) owner
@@ -798,10 +798,10 @@ fn duplicate_members_of_readonly_folders_are_still_rejected () {
     let error = validate_local_structure (
         &viewforest, folder_id, &config)
       . expect_err (
-        "duplicate members of a read-only folder should fail validation");
+        "duplicate members of a write-protected folder should fail validation");
     assert!(
       error . message . contains ("must not have duplicate ActiveNode children"),
-      "Unexpected read-only-folder validation error: {:?}",
+      "Unexpected write-protected-folder validation error: {:?}",
       error ); }}
 
 fn partner_folder_treeids (

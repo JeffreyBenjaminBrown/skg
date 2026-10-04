@@ -7,7 +7,7 @@
 # container draws the chain end D, marked (overridesHere N), and the save
 # accepts the chain-end carrier.
 #
-# Repos: public + private (owned) and foreign (read-only).
+# Repos: public + private (owned) and foreign (write-protected).
 
 set -e
 

@@ -163,7 +163,7 @@ character."
                         ('resolved (format "⌂:%s" (nth 2 status)))
                         ('missing "⌂:missing")
                         ('inactive "⌂:inactive")
-                        ('error "⌂:unavailable")
+                        ('lookup-failed "⌂:lookup failed")
                         (_ "⌂:…")))
                (face (if (eq kind 'resolved)
                          'heralds-green-face 'shadow))
@@ -197,7 +197,7 @@ character."
     (if (not (and process (process-live-p process)))
         (progn
           (dolist (id ids)
-            (puthash id '(error) skg-link-annotations--cache))
+            (puthash id '(lookup-failed) skg-link-annotations--cache))
           (skg-link-annotations--paint (skg-link-annotations--scan)))
       (let* ((request-id (format "links-%s" (cl-incf skg-link-annotations--next-request)))
              (entry (list (current-buffer) generation tick
@@ -216,7 +216,7 @@ character."
            (remhash request-id skg-link-annotations--requests)
            (setq skg-lp--pending-count (max 0 (1- skg-lp--pending-count)))
            (dolist (id ids)
-             (puthash id '(error) skg-link-annotations--cache))
+             (puthash id '(lookup-failed) skg-link-annotations--cache))
            (skg-link-annotations--paint (skg-link-annotations--scan))))))))
 
 (defun skg-link-annotations--handle-response (_process payload)
@@ -243,7 +243,7 @@ character."
                                                 (nth 3 row)))
                                ('inactive '(inactive))
                                ('missing '(missing))
-                               (_ '(error)))
+                               (_ '(lookup-failed)))
                              skg-link-annotations--cache))))
               (skg-link-annotations--paint
                (skg-link-annotations--scan)))))))))

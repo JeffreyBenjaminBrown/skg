@@ -197,7 +197,7 @@
     (should (equal result sexp))))
 
 ;;
-;; Canonical ordering: id and repo first, editable fields, readonly stats last
+;; Canonical ordering: id and repo first, editable fields, write-protected stats last
 ;;
 
 (ert-deftest test-canonical-ordering ()

@@ -99,7 +99,7 @@ There are three ways to test the code:
   - NOT serialized in .skg files — inferred from file location at load time
   - Stored in the complete in-Rust node and in Tantivy as a search field
   - Used by 'path_from_pid_and_repo' to compute file paths: repo.path / pid.skg
-  - Governed by user_owns_it flag: foreign Skg repos are read-only
+  - Governed by user_owns_it flag: foreign Skg repos are write-protected
 
   All graph relationships (contains, subscribes_to, etc.) reference nodes by ID, not by Skg repo. Skg repo is purely about where the .skg file lives on disk.
 
@@ -115,7 +115,7 @@ There are three ways to test the code:
   - links_to: org-roam style [[id:...]] hyperlinks
 
   The view system is ephemeral scaffolding rebuilt every save:
-  - ActiveNode: corresponds to an NodeComplete, can be Definitive (editable) or Write-protected (read-only)
+  - ActiveNode: corresponds to an NodeComplete, can be Definitive (editable) or Write-protected
   - Scaffold: display-only nodes; the relation folders are
     PartnerFolders (subscribeeFolder, subscriberFolder, overriddenFolder, ...),
     plus AliasFolder, IDFolder, etc. (see docs/glossary.org, "PartnerFolder")

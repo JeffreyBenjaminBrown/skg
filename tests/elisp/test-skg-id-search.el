@@ -297,7 +297,7 @@ Return (BUFFER-TEXT . LAST-MESSAGE)."
                    (concat "* (skg (node (id id-1) (repo main))) Writeable\n"
                            "* (skg (node (id id-1) writeProtected)) Title from stack\n")))
     (should (equal (cdr result)
-                   "NOTE: Pasting node readonly because a writeable instance is already present in this same buffer.")) ))
+                   "NOTE: Pasting node write-protected because a writeable instance is already present in this same buffer.")) ))
 
 (ert-deftest test-skg-paste-node-in-view-twice ()
   "A pending definitive view request counts as a writeable instance."

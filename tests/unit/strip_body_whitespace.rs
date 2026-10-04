@@ -46,7 +46,7 @@ fn strips_on_disk_only_where_needed () {
               "title: bodyless\npid: bodyless\n"
             ) . unwrap ();
   fs::write ( foreign_dir . join ("theirs.skg"),
-              // A foreign repo is read-only: its trailing
+              // A foreign repo is write-protected: its trailing
               // whitespace survives the strip.
               "title: theirs\npid: theirs\nbody: \"alpha \\nbeta\"\n"
             ) . unwrap ();

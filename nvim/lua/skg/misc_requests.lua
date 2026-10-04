@@ -43,7 +43,7 @@ function M.rebuild_ephemeral_data_stores ()
 end
 
 ---Strip trailing whitespace from every line of every body, in every
----repo the user owns (foreign repos are read-only and left
+---repo the user owns (foreign repos are write-protected and left
 ---untouched). Rewrites exactly the .skg files whose bodies change;
 ---derived caches are refreshed.
 function M.strip_body_whitespace ()

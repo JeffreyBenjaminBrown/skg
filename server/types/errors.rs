@@ -31,8 +31,8 @@ pub enum BufferValidationError {
   AmbiguousDeletion              (ID),
   DuplicatedContent              (ID), // A node has multiple Content children with the same ID
   InconsistentRepos            (ID, HashSet<RepoName>), // Multiple viewnodes with same ID have different repos
-  ModifiedForeignNode            (ID, RepoName), // Attempted to modify a node from a foreign (read-only) repo - (node_id, repo_name)
-  CreatedForeignNode             (ID, RepoName), // Attempted to create a node in a foreign (read-only) repo - (node_id, repo_name)
+  ModifiedForeignNode            (ID, RepoName), // Attempted to modify a node from a foreign (write-protected) repo - (node_id, repo_name)
+  CreatedForeignNode             (ID, RepoName), // Attempted to create a node in a foreign (write-protected) repo - (node_id, repo_name)
   CannotMoveToOrFromForeignRepo (ID,
                                    RepoName, // disk repo
                                    RepoName), // buffer repo
@@ -56,7 +56,7 @@ pub enum BufferValidationError {
   MultipleDefinitiveRequestsForSameId    (ID), // Multiple definitive view requests for the same ID
   EmptyTitle                             (ID),
   LocalStructureViolation        (String, ID), // (error message, nearest ancestor ID)
-  EditRequestOnWriteProtectedOccurrence      (ID), // Write-protected (read-only) nodes -- phantoms in particular -- cannot carry write instructions like (editRequest delete) or (editRequest (merge X)). The user must visit a definitive view of the node first.
+  EditRequestOnWriteProtectedOccurrence      (ID), // Write-protected nodes -- phantoms in particular -- cannot carry write instructions like (editRequest delete) or (editRequest (merge X)). The user must visit a definitive view of the node first.
   EditedWriteProtectedOccurrence {
     id      : ID,
     title   : String,
@@ -118,11 +118,11 @@ impl std::fmt::Display for BufferValidationError {
         let repo_list: Vec<&RepoName> = repos . iter() . collect();
         write!(f, "Multiple viewnodes with ID {:?} have inconsistent repos: {:?}", id, repo_list) },
       BufferValidationError::ModifiedForeignNode(id, repo) =>
-        write!(f, "Cannot modify node {:?} from foreign (read-only) repo '{}'", id, repo),
+        write!(f, "Cannot modify node {:?} from foreign (write-protected) repo '{}'", id, repo),
       BufferValidationError::CreatedForeignNode(id, repo) =>
-        write!(f, "Cannot create node {:?} in foreign (read-only) repo '{}'", id, repo),
+        write!(f, "Cannot create node {:?} in foreign (write-protected) repo '{}'", id, repo),
       BufferValidationError::CannotMoveToOrFromForeignRepo(id, disk_repo, buffer_repo) =>
-        write!(f, "Cannot move node {:?} between repos '{}' and '{}': one or both are foreign (read-only)", id, disk_repo, buffer_repo),
+        write!(f, "Cannot move node {:?} between repos '{}' and '{}': one or both are foreign (write-protected)", id, disk_repo, buffer_repo),
       BufferValidationError::CannotMoveAndMergeSimultaneously(id) =>
         write!(f, "Cannot move and merge node {:?} in the same save", id),
       BufferValidationError::RepoNotInConfig(id, repo) =>
@@ -157,7 +157,7 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Edit request on write-protected (phantom) node {:?}. Phantoms are write-protected; write-protected nodes cannot carry write instructions. Visit a definitive view of the node first (C-c g RET).", id),
       BufferValidationError::EditedWriteProtectedOccurrence {
         id, title, changes } =>
-        write!(f, "The write-protected occurrence of node {:?} ({:?}) was edited ({}) but is read-only. Re-render, then edit a definitive occurrence instead.",
+        write!(f, "The write-protected occurrence of node {:?} ({:?}) was edited ({}) but is write-protected. Re-render, then edit a definitive occurrence instead.",
                id, title, changes . join ("; ")),
       BufferValidationError::FlagsSurfaceEdited {
         owner_id, owner_title, changes } =>

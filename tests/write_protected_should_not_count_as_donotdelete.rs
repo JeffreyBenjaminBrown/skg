@@ -3,7 +3,7 @@
 // Reproduces the bug Jeff hit: a buffer that has the same node
 // shown definitive-with-editRequest-delete in one place AND
 // write-protected elsewhere triggers AmbiguousDeletion validation,
-// even though the write-protected view is read-only and shouldn't count as
+// even though a write-protected view cannot be edited and shouldn't count as
 // a "do not delete" stance.
 //
 // Fixture:

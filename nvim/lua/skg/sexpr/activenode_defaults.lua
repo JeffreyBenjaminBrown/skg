@@ -188,7 +188,7 @@ function M.expand_and_reorder (children, child_level, default_repo)
     end
   end
   for _, entry in ipairs(field_map) do
-    -- Remaining fields not in canonical order (readonly stats etc.)
+    -- Remaining fields not in canonical order (write-protected stats etc.)
     if not seen[entry.name] then
       for _, headline in ipairs(entry.group) do
         table.insert(ordered, headline) end

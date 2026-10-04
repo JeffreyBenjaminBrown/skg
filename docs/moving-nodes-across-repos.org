@@ -30,7 +30,7 @@ and the Skg repo change will now be visible.
 
 *** Foreign Skg repos are rejected on either end
 Foreign Skg repos (repos outside your =owned/= folder, forked in via
-subscriptions) are read-only. Trying to move a node *into* or *out
+subscriptions) are write-protected. Trying to move a node *into* or *out
 of* a foreign Skg repo produces
 =BufferValidationError::CannotMoveToOrFromForeignRepo=
 (=server/from_text/supplement_from_disk.rs:56=). The buffer save

@@ -258,7 +258,7 @@ fn reconcile_content_children (
   let substitution_for_children : bool =
     // The raw-drawn-override rule (generalized 2026-06-12 from the
     // plan-11 overridden-as-such case): when this node is itself
-    // overridden but drawn RAW by its position -- a read-only folder
+    // overridden but drawn RAW by its position -- a write-protected folder
     // member, an overriddenFolder member, or a view root -- the user is
     // looking at the ORIGINAL, so its immediate children draw raw too.
     // Depth one level: a content child is not a raw position, so

@@ -435,7 +435,7 @@ So far there are these endpoints:
     a per-repo breakdown, or "Body whitespace strip failed: ...".
   - Behavior: Strips trailing whitespace from every line of every
     body, and trailing blank lines from each body's tail, in every
-    OWNED Skg repo in the config. Foreign Skg repos are read-only and
+    OWNED Skg repo in the config. Foreign Skg repos are write-protected and
     left untouched (stripping them would make them diverge from
     their upstreams). Rewrites exactly the .skg files whose bodies
     changed (a clean file stays byte-identical); a body that strips
@@ -605,7 +605,7 @@ one automatically.
        rerender-lock → rerender-view* → rerender-done. Each open view
        is re-rendered in place under the new set: nodes whose Skg repo
        became inactive are converted and pruned (an inactive node
-       with active view-children is retained, read-only), and
+       with active view-children is retained, write-protected), and
        PartnerFolders regenerate per the new set, so widening the set
        reveals members and folders.
   - Behavior: The active repo-set is per Emacs TCP connection. It
@@ -746,15 +746,15 @@ node's heralds.
   graph. RELNAME is =aliases=, =overrides=, =hides=, or =subscribes=.
   The writable folder (=overriddenFolder= / =subscribeeFolder= / =aliasFolder=)
   appears even when empty (its editable "add here" surface); an empty
-  read-only folder is pruned. In diff mode, removed members count as content,
+  write-protected folder is pruned. In diff mode, removed members count as content,
   so a requested folder containing only removed-member phantoms still appears.
   Emitted by the =C-c l= commands.
 - =(path ROLENAME)= — build the backpath for one partner role, grafting
-  the partners as inverted read-only children (each marked =(birth
+  the partners as inverted write-protected children (each marked =(birth
   backpath ROLENAME)=). ROLENAME is one of the nine in
   =PARTNER_ROLE_VOCAB=. Emitted by the =C-c p= commands.
 - =definitiveView= — make a write-protected, childless node editable.
-- =flags= — add one read-only =flagsFolder=, retained even when empty.
+- =flags= — add one write-protected =flagsFolder=, retained even when empty.
   Its true-only viewnodes use =(flag hadId)=, =(flag wasOverloaded)=, and
   =(flag noSearchMatching)= metadata in that order. Viewnodes have no Org title;
   their friendly visible label comes from the herald. Deleting the entire
@@ -799,14 +799,14 @@ are zero; absence of that subform means the role does not apply. The
 numerator counts members not already directly contained or hidden by that
 occurrence's subscriber. Subset counts cannot exceed their side's total.
 =(birth RELNAME...)= identifies the relation(s) behind this occurrence.
-Nonzero =(aliases K)=, =(extraIds K)= and =(flags K)= are action counts.
+Nonzero =(aliases K)=, =(extraIds K)= and =(flags K)= are property counts.
 See [[file:./heralds.org][heralds.org]] for the rendered notation and styles.
 
 There is no longer a
 =(graphStats ...)= sexp on an active node: its counts fold into the
 form above (=overriding= / =subscribing= / =hiding= become the =O= / =S= /
 =H= tokens; =aliasing= / =extraIDs=/true flags become the
-=Ak= / =Ik= / =Fk= action tokens),
+=Ak= / =Ik= / =Fk= property tokens),
 and the per-relation view-position flags (=containsParent=,
 =overridesParent= / =parentOverrides=, =subscribesParent= /
 =parentSubscribes=, =hidesParent= / =parentHides=, =grandparentOverrides= /
@@ -844,7 +844,7 @@ under different parents):
   deliberately requests it at the destination.
 - =(editRequest (flag noSearchMatching true|false))= — an idempotent
   save-only desired-state request. The provenance flags =hadId= and
-  =wasOverloaded= are read-only and rejected here. A successful save consumes
+  =wasOverloaded= are write-protected and rejected here. A successful save consumes
   the request; a failed save leaves it in the buffer. Herald view presents the
   request as one red semantic state: =request:no search matching= for =true=,
   or =request:search matching= for =false=.
@@ -950,7 +950,7 @@ The Skg repo name =all= is reserved and rejected.
 *Ownership is by location, not declaration*: a Skg repo is owned
 (writable) iff its path lies under =<data_root>/<owned_folder>=,
 where =owned_folder= is a top-level config field defaulting to
-="owned"=. Everything else is foreign (read-only). The old
+="owned"=. Everything else is foreign (write-protected). The old
 =user_owns_it= field is retired and rejected with an error naming
 the migration script (=bash/migrate-to-author-folders.sh=).
 
@@ -980,7 +980,7 @@ path = "owned/private"
 
 [[repos]]
 name = "Fred"
-path = "Fred"           # foreign => read-only
+path = "Fred"           # foreign => write-protected
 #+end_src
 
 Here the available repo-sets are =public= = {public},

@@ -152,7 +152,7 @@ describe('skg.linkstack paste and pop', function ()
       '* (skg (node (id id-1) (repo main))) Writeable\n'
       .. '* (skg (node (id id-1) writeProtected)) Title from stack\n',
       text)
-    assert.are.equal('NOTE: Pasting node readonly because a writeable'
+    assert.are.equal('NOTE: Pasting node write-protected because a writeable'
                      .. ' instance is already present in this same buffer.',
                      notified)
   end)

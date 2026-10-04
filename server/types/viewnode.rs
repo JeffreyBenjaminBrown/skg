@@ -229,7 +229,7 @@ pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
 /// still in the worktree, so the graph can still answer about it) is told apart by
 /// `is_removedhere_diffPhantom`.
 ///
-/// USED: as a read-only diff annotation. It depicts a removed member at its
+/// USED: as a write-protected diff annotation. It depicts a removed member at its
 /// correct HEAD position among surviving siblings, decorated with per-stage diff
 /// atoms. Always write-protected and bodyless (enforced by `normal_to_phantom` /
 /// `mk_phantom_viewnode`); its affectsParent is never read or rendered (implicit
@@ -293,7 +293,7 @@ impl < Id, Src > PhantomDiff_Generic < Id, Src > {
 /// - A Definitive represents an editable view.
 ///   The user's changes to title, body and children
 ///   will be written to disk and the dbs when they save.
-/// - `WriteProtected` represents a read-only view,
+/// - `WriteProtected` represents a write-protected view,
 ///   in which case the body is not presented.
 ///   (TODO ? Maybe it should be.)
 #[derive( Debug, Clone, PartialEq )]
@@ -354,7 +354,7 @@ pub struct ViewNodeStats {
   /// The relationship heralds as the SEMANTIC `(rels ...)` sexp string
   /// (server/herald_tokens.rs `relationship_heralds_sexp`): per-relation
   /// member counts and which tracked ancestors are members on each side,
-  /// plus the reason-for-being. None when there is nothing to say. The
+  /// plus the birth. None when there is nothing to say. The
   /// client parses this and decides all presentation (letters, colors,
   /// order). See TODO/heralds-semantic-wire.org.
   pub rel_heralds           : Option<String>,
@@ -424,15 +424,15 @@ pub enum Qual {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PartnerFolder {
   Subscribee, // Collects subscribees its parent subscribes to. Writeable.
-  Subscriber, // Collects nodes that subscribe to its parent. Read-only (editable from the other side of the relationship).
+  Subscriber, // Collects nodes that subscribe to its parent. Write-protected (editable from the other side of the relationship).
   Overridden, // Collects nodes whose view its parent overrides. Writeable.
-  Overrider, // Collects nodes that override its parent's view. Read-only (editable from the other side of the relationship).
-  Hider, // Collects nodes that hide its parent. Read-only (editable from the other side of the relationship).
+  Overrider, // Collects nodes that override its parent's view. Write-protected (editable from the other side of the relationship).
+  Hider, // Collects nodes that hide its parent. Write-protected (editable from the other side of the relationship).
   // This folder is not itself hidden. Its children represent the nodes hidden
-  // by the node represented by its parent. The relationships are read-only
+  // by the node represented by its parent. The relationships are write-protected
   // here, but editable within the parent's SubscribeeFolder.
   Hidden,
-  HiddenInSubscribee, // Child of a subscribee-as-such. Collects children of the subscribee that the subscriber hides. Read-only (but these relationships are editable by modifying the listed contents of the subscribee-as-such).
+  HiddenInSubscribee, // Child of a subscribee-as-such. Collects children of the subscribee that the subscriber hides. Write-protected (but these relationships are editable by modifying the listed contents of the subscribee-as-such).
   HiddenOutsideOfSubscribee, // Child of a SubscribeeFolder. Collects things hidden by the SubscribeeFolder's parent but absent from every subscribee's content. This derived filter is editable as an exclusive visible-outside subset; its hide repos remain derived. Shown after all Subscribees, under the same SubscribeeFolder.
 }
 
@@ -450,19 +450,19 @@ pub enum PartnerFolder {
 /// policy. The policies differ in:
 /// - whether buffer membership is read at save extraction
 ///   ('WritableSet' and 'EditableFilter'),
-/// - where the goal list comes from ('WritableSet' and 'ReadOnlySet'
+/// - where the goal list comes from ('WritableSet' and 'WriteProtectedSet'
 ///   from 'relation_member_role'; both filter policies from hide state),
 /// - goal-list order ('WritableSet': graph/disk order, which the
-///   user's own save defines; 'ReadOnlySet': the view's current
+///   user's own save defines; 'WriteProtectedSet': the view's current
 ///   member order, then missing members appended; filter folders are
 ///   derived),
-/// - whether repairs warn (the read-only policies, in the saved view).
+/// - whether repairs warn (the write-protected policies, in the saved view).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FolderPolicy {
   WritableSet,    // Membership edits are graph edits. An absent folder means no opinion; a present-but-empty folder means an explicit empty set (see 'MSV').
   EditableFilter, // A visible derived subset is an explicit edit of that subset; repo requests remain unsupported.
-  ReadOnlySet,    // Membership is generated from the graph. User order is respected view-locally; membership edits are repaired, with a warning.
-  ReadOnlyFilter, // Membership is derived from hide state rather than from a relation role. Repaired, with a warning.
+  WriteProtectedSet,    // Membership is generated from the graph. User order is respected view-locally; membership edits are repaired, with a warning.
+  WriteProtectedFilter, // Membership is derived from hide state rather than from a relation role. Repaired, with a warning.
 }
 
 /// Requests for editing operations on a node.
@@ -609,9 +609,9 @@ impl PartnerFolder {
         | PartnerFolder::Overrider
         | PartnerFolder::Hider
         | PartnerFolder::Hidden
-        => FolderPolicy::ReadOnlySet,
+        => FolderPolicy::WriteProtectedSet,
       PartnerFolder::HiddenInSubscribee
-        => FolderPolicy::ReadOnlyFilter,
+        => FolderPolicy::WriteProtectedFilter,
       PartnerFolder::HiddenOutsideOfSubscribee
         => FolderPolicy::EditableFilter,
     } }

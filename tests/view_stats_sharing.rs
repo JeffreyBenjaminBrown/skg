@@ -76,7 +76,7 @@ fn assert_sharing_stats_in_view_of_R (
      overriddenFolder:\n{}", label, buf );
   // In the SEMANTIC wire the parent-relative stats are relationships to
   // E's grandparent R (generation 2): R both subscribes to and overrides
-  // E. Under a folder, the FOLDER relation is E's reason-for-being (birth); the
+  // E. Under a folder, the FOLDER relation is E's birth; the
   // OTHER (the old gO/gS sharing stat) shows as an ordinary relation.
   // Both carry (ancestors 2). The folders differ by which relation is birth.
   for (folder, line) in &e_lines {
@@ -100,7 +100,7 @@ fn assert_sharing_stats_in_view_of_R (
     }}
   for f_line in lines_containing (buf, "(id F)") {
     // F is a subscribee R does NOT override, so it has no overrides
-    // relation at all -- only its folder subscribe (its reason-for-being).
+    // relation at all -- only its folder subscribe (its birth).
     assert! ( ! f_line . contains ("(overrides_view_of"),
       "{}: F, a subscribee R does not override, shows no override \
        relation:\n{}", label, buf ); }

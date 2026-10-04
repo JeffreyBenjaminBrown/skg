@@ -65,7 +65,7 @@ pub fn reconcile_partnerFolder_children (
     owner_role . is_first_role ();
   let raw_outbound_members : Vec<RelPartner<ID>> = if outbound {
     // Preserve an unresolved ID through this outbound surface.  The old
-    // canonical-PID accessor is still right for inverse/read-only folders, but
+    // canonical-PID accessor is still right for inverse/write-protected folders, but
     // would erase an Unknown from the writable OverriddenFolder.
     graph_snap . outbound_rel_partners_for_relation_gated (
       &owner_pid, member_role . relation, active_repo_set )
@@ -99,7 +99,7 @@ pub fn reconcile_partnerFolder_children (
       // Diff mode, outbound folder: the owner's per-stage relation diff
       // interleaves members removed since HEAD (phantom positions)
       // into the worktree list. This diff-derived order supersedes
-      // the ReadOnlySet view-local order (the hiddenFolder) while diff
+      // the WriteProtectedSet view-local order (the hiddenFolder) while diff
       // mode is on: a phantom belongs at its HEAD position, which a
       // view-local reordering cannot express.
       let (goal, removed) : (Vec<ID>, HashSet<ID>) =
@@ -116,12 +116,12 @@ pub fn reconcile_partnerFolder_children (
           // Graph (disk) order is meaningful here: the user's own
           // save defines it.
           graph_members,
-        FolderPolicy::ReadOnlySet =>
+        FolderPolicy::WriteProtectedSet =>
           // The user may have reordered this generated folder; the
           // order is view-local and respected (metaplan_2.org,
-          // "preserve user-visible order in read-only sets").
+          // "preserve user-visible order in write-protected sets").
           view_order_preserving_goal_list (tree, node, &graph_members) ?,
-        FolderPolicy::ReadOnlyFilter =>
+        FolderPolicy::WriteProtectedFilter =>
           // Unreachable: the let-else above already returned,
           // because the filter folders have no relation member role.
           graph_members,
@@ -192,7 +192,7 @@ pub fn reconcile_partnerFolder_children (
       repo_diffs, deleted_since_head_pid_src_map,
       &relRepos, runtime ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §6.0/§16: the reconciler deletes a stale member that is a view-leaf and
-  // demotes one that is a branch, so a read-only PartnerFolder
+  // demotes one that is a branch, so a write-protected PartnerFolder
   // drops a stale leaf member instead of preserving it.
   let summary : RepairSummary<ID> =
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
@@ -211,7 +211,7 @@ pub fn reconcile_partnerFolder_children (
       tree, node, &axes_by_id ) ?; }
   if kind . policy () != FolderPolicy::WritableSet {
     // Repairs to a writable folder are not repairs: its membership IS
-    // whatever the user saved. Read-only folders warn (when there is a
+    // whatever the user saved. Write-protected folders warn (when there is a
     // sink, i.e. when this completion serves the just-saved view).
     if let Some (sink) = warning_sink {
       push_repair_warnings (sink, kind, &owner_pid, summary); }}
@@ -238,7 +238,7 @@ pub fn push_repair_warnings (
         repair,
         children } ); }}}
 
-/// The effective goal list for a FolderPolicy::ReadOnlySet folder:
+/// The effective goal list for a FolderPolicy::WriteProtectedSet folder:
 /// the folder's existing Active affectsParent=Affected children, in their
 /// current view order, filtered to graph-real members (first
 /// occurrence of a duplicate wins; the reconciler detaches the

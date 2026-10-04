@@ -23,7 +23,7 @@ node; a number after it counts nodes this node points at. =2C3= thus
 means two containers and three direct contents. =C= and =L= are blue;
 =S=, =O= and =H= are purple. Missing sides and empty relations are
 omitted. =A3= counts aliases, =I2= extra IDs, and =F1= true
-flags; these action counts are cyan.
+flags; these property counts are cyan.
 
 A yellow numeral inside =C= or =L= has a narrower meaning. In =2/5L3=,
 five visible nodes link here, two are substantive, and this node links
@@ -144,8 +144,8 @@ Use 'skg-toggle-repo-overlay-on-links' (=C-c v L=) in Emacs or
 Suffixes start off and the toggle is local to the buffer. A resolved
 target appears in green, for example =[⌂:pub]=. Extra IDs resolve
 to their target's home repo. =⌂:missing=, =⌂:inactive=,
-=⌂:…= and =⌂:unavailable= distinguish missing, inactive, pending
-and lookup-error states. The latter states reveal no Skg repo name.
+=⌂:…= and =⌂:lookup failed= distinguish missing, inactive, pending
+and lookup-failed states. The latter states reveal no Skg repo name.
 
 Even with suffixes off, the label of a link confirmed missing in the
 current graph is pink and underlined. Inactive or still unknown

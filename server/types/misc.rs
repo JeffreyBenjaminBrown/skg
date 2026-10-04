@@ -210,7 +210,7 @@ pub struct SkgConfig {
 
   // The directory (as a first path component under the data root)
   // whose repos the user OWNS; every other repo is foreign
-  // (read-only). Replaces the retired per-repo 'user_owns_it'
+  // (write-protected). Replaces the retired per-repo 'user_owns_it'
   // TOML key. The intended layout is data/AUTHOR/REPO, with this
   // field naming the user's own author folder.
   #[serde(default = "default_owned_folder")]

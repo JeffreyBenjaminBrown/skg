@@ -492,7 +492,7 @@ async fn inactive_placeholder_in_buffer_does_not_drive_contains (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // An inactive placeholder is read-only: it emits no save intention
+  // An inactive placeholder is write-protected: it emits no save intention
   // for its container. Its presence and position in the container's
   // contains are owned by the disk merge (weave), not the buffer. So
   // reordering the placeholder cannot move its disk member, and a
@@ -521,7 +521,7 @@ async fn inactive_placeholder_in_buffer_does_not_drive_contains (
             &instructions, "root", &graph) . contains),
           vec![ ID::from ("active-a"), ID::from ("private-a"),
                 ID::from ("active-b") ],
-          "reordering a read-only placeholder must not move its disk \
+          "reordering a write-protected placeholder must not move its disk \
            member" );
         assert! (
           ! save_ids (&instructions) . contains (&ID::from ("private-a")),

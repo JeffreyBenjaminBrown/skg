@@ -9,15 +9,15 @@ fn partnerFolder_policy_mapping () {
   assert_eq! ( PartnerFolder::Overridden . policy (),
                FolderPolicy::WritableSet );
   assert_eq! ( PartnerFolder::Subscriber . policy (),
-               FolderPolicy::ReadOnlySet );
+               FolderPolicy::WriteProtectedSet );
   assert_eq! ( PartnerFolder::Overrider . policy (),
-               FolderPolicy::ReadOnlySet );
+               FolderPolicy::WriteProtectedSet );
   assert_eq! ( PartnerFolder::Hider . policy (),
-               FolderPolicy::ReadOnlySet );
+               FolderPolicy::WriteProtectedSet );
   assert_eq! ( PartnerFolder::Hidden . policy (),
-               FolderPolicy::ReadOnlySet );
+               FolderPolicy::WriteProtectedSet );
   assert_eq! ( PartnerFolder::HiddenInSubscribee . policy (),
-               FolderPolicy::ReadOnlyFilter );
+               FolderPolicy::WriteProtectedFilter );
   assert_eq! ( PartnerFolder::HiddenOutsideOfSubscribee . policy (),
                FolderPolicy::EditableFilter ); }
 

@@ -783,7 +783,7 @@ fn parse_editrequest_sexp (
             "Unknown flag: {}", flag_name )) ?;
         if ! flag . is_mutable () {
           return Err ( format! (
-            "Flag {} is read-only provenance and cannot be changed",
+            "Flag {} is write-protected provenance and cannot be changed",
             flag_name )); }
         let value_name : String = atom_to_string (&subitems [2]) ?;
         let value : bool = match value_name . as_str () {

@@ -325,7 +325,7 @@ it reports moves across all Skg repos.
 These commands don't edit the graph. Each inserts a request into the
 metadata of the node at point that, on save, causes the server to
 render the relation's folder viewnodes into the view, POPULATED from
-the graph. Each builds BOTH folders of its relation. The read-only folder ☮
+the graph. Each builds BOTH folders of its relation. The write-protected folder ☮
 marks a folder you cannot change from here. Every command auto-saves.
 Without such a request, a definitive node shows only its nonempty
 subscribeeFolder (plus the nonempty hiddenInSubscribeeFolder on a definitive
@@ -337,24 +337,24 @@ type an alias in and save.
 *** <localleader>co : :SkgShowFolderOfOverridesViewOf
 The overriddenFolder (the nodes this node overrides -- WRITABLE, shown
 even when empty as an "add an override here" surface) and the
-overriderFolder (the nodes that override this one -- read-only, ☮).
+overriderFolder (the nodes that override this one -- write-protected, ☮).
 *** <localleader>ch : :SkgShowFolderOfHidesFromItsSubscriptions
-The hiderFolder and hiddenFolder -- BOTH read-only (☮). Hiding is edited from
+The hiderFolder and hiddenFolder -- BOTH write-protected (☮). Hiding is edited from
 a subscribee-as-such, never from these folders. On a node that neither
 hides nor is hidden, nothing appears.
 *** <localleader>cs : :SkgShowFolderOfSubscribesTo
 The subscribeeFolder (the nodes this node subscribes to -- WRITABLE, shown
 even when empty) and the subscriberFolder (the nodes that subscribe to
-this one -- read-only, ☮).
+this one -- write-protected, ☮).
 *** <localleader>cp : :SkgShowFolderOfFlags
-Shows the read-only, true-only flags folder as titleless viewnodes whose
+Shows the write-protected, true-only flags folder as titleless viewnodes whose
 heralds carry their labels, in canonical order.
 The empty folder is retained. Import provenance viewnodes have no setter; use the
 search-matching command below for =No search matching=. Delete the whole
 folder branch to dismiss this optional view without changing any flag.
 ** <localleader>p : show a path (the backpath through one relation role)
 Like the folders, each inserts a request that, on save, grafts the
-partners reached through one relation role as inverted, read-only
+partners reached through one relation role as inverted, write-protected
 children, climbing transitively until a fork, cycle, or root. UPPER =
 the partner's active (first) role; lower = its passive (second) role.
 Every command auto-saves.

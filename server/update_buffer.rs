@@ -218,7 +218,7 @@ pub fn update_views_after_save (
         false,
         true ) } ?;
   context . warnings . extend (
-    // Repairs the completion pass made to read-only PartnerFolders in
+    // Repairs the completion pass made to write-protected PartnerFolders in
     // the saved view, batched per (folder, owner).
     render_completion_warnings (&repair_warnings) );
   let mut collateral_views : Vec<RenderedCollateralView> = Vec::new ();

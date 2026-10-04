@@ -96,7 +96,7 @@ enum OverrideDir {
 }
 
 /// Graft each result's override relatives -- BOTH directions -- as
-/// inverted read-only write-protected org-descendants, so an overridden
+/// inverted write-protected org-descendants, so an overridden
 /// node and the node(s) overriding it are navigable straight from the
 /// search results
 /// (TODO/override-ancestry-in-search-results.org). Each direction is

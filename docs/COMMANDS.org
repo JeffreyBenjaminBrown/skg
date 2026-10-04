@@ -324,7 +324,7 @@ on the node at point; it reports moves across all Skg repos.
 These commands don't edit the graph. Each inserts a request into the
 metadata of the node at point that, on save, causes the server to
 render the relation's folder viewnodes into the view, POPULATED from
-the graph. Each builds BOTH folders of its relation. The read-only folder ☮
+the graph. Each builds BOTH folders of its relation. The write-protected folder ☮
 marks a folder you cannot change from here. Every command auto-saves.
 Without such a request, a definitive node shows only its nonempty
 subscribeeFolder (plus the nonempty hiddenInSubscribeeFolder on a definitive
@@ -336,17 +336,17 @@ type an alias in and save.
 *** C-c l o : skg-show-folderOf-overrides_view_of
 The overriddenFolder (the nodes this node overrides -- WRITABLE, shown
 even when empty as an "add an override here" surface) and the
-overriderFolder (the nodes that override this one -- read-only, ☮).
+overriderFolder (the nodes that override this one -- write-protected, ☮).
 *** C-c l h : skg-show-folderOf-hides_from_its_subscriptions
-The hiderFolder and hiddenFolder -- BOTH read-only (☮). Hiding is edited from
+The hiderFolder and hiddenFolder -- BOTH write-protected (☮). Hiding is edited from
 a subscribee-as-such, never from these folders. On a node that neither
 hides nor is hidden, nothing appears.
 *** C-c l s : skg-show-folderOf-subscribes_to
 The subscribeeFolder (the nodes this node subscribes to -- WRITABLE, shown
 even when empty) and the subscriberFolder (the nodes that subscribe to
-this one -- read-only, ☮).
+this one -- write-protected, ☮).
 *** C-c l p : skg-show-folderOf-flags
-Shows the read-only =flagsFolder=. It lists only true node-file
+Shows the write-protected =flagsFolder=. It lists only true node-file
 flags as titleless viewnodes whose heralds carry their labels, in canonical
 order, and remains visible when none are true.
 =Had ID before import= and =Was overloaded during org-roam import=
@@ -355,7 +355,7 @@ generated viewnodes directly. Delete the whole folder branch to dismiss this
 optional view; doing so does not change any flag.
 ** C-c p : show a path (the backpath through one relation role)
 Like the folders, each inserts a request that, on save, grafts the
-partners reached through one relation role as inverted, read-only
+partners reached through one relation role as inverted, write-protected
 children, climbing transitively until a fork, cycle, or root. UPPER =
 the partner's active (first) role; lower = its passive (second) role.
 Every command auto-saves.
@@ -507,7 +507,7 @@ The no-override choice removes the request, which means "no opinion":
 a saved edge keeps its saved Skg repo (sticky). It does NOT reset the
 edge to its default -- to reach the default, choose it.
 
-Refuses with an error when point is on a member of a read-only folder
+Refuses with an error when point is on a member of a write-protected folder
 (subscriberFolder, overriderFolder, hiderFolder, hiddenFolder,
 hiddenInSubscribeeFolder, hiddenOutsideOfSubscribeeFolder): the
 relationship belongs to the other end there, so setting its Skg repo
@@ -539,7 +539,7 @@ view-parent. Only three roles are settable from the child's
 position -- =contained= (ordinary content), =subscribee= (a
 subscribeeFolder member) and =overridden= (an overriddenFolder member);
 RET on any other role explains why its edge cannot be set from
-there (read-only folders belong to the other end; links carry no
+there (write-protected folders belong to the other end; links carry no
 independent Skg repo; hide Skg repos are derived at save). RET picks a
 role; q aborts.
 
@@ -555,7 +555,7 @@ The walk applies to, and recurses on, only viewchildren that affect
 their viewparents: affectsParent=true activeNodes, through the two
 writable folders. It prunes below write-protected nodes and
 subscribee-as-such members (their org-children's edges are not
-collected at save), and prunes read-only folders and other scaffolds
+collected at save), and prunes write-protected folders and other scaffolds
 entirely.
 
 This is the gesture for republicizing a subtree's relationship
@@ -1091,7 +1091,7 @@ they belong to the previous runtime generation.
 Strips trailing whitespace from every line of every body,
 and trailing blank lines from each body's tail,
 in every Skg repo you own.
-Foreign Skg repos are read-only and left untouched.
+Foreign Skg repos are write-protected and left untouched.
 Rewrites exactly the .skg files whose bodies change;
 the derived caches are refreshed to match.
 Review the result with 'git diff --ignore-all-space',

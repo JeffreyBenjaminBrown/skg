@@ -95,7 +95,7 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
       &context . relRepos, runtime ) ?;
   let summary =
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
-      // TODO/DONE/local-view-update/plan_v2.org §6.0: a stale member of this read-only folder is removed when a view-leaf
+      // TODO/DONE/local-view-update/plan_v2.org §6.0: a stale member of this write-protected folder is removed when a view-leaf
       // (the common case) and demoted to Independent only if it has a user
       // subtree. Handled uniformly by the reconciler.
       tree, node, kind,

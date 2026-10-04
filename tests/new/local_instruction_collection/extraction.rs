@@ -479,7 +479,7 @@ fn extraction_collects_subscribees_without_hidden_branches (
   assert_eq!(
     save_ids (&instructions),
     // hidden-in and hidden-outside are definitive members of
-    // read-only folders, so they are self-writers on the new recursion
+    // write-protected folders, so they are self-writers on the new recursion
     // surface.
     vec![
       ID::from ("subscriber"),
@@ -548,7 +548,7 @@ fn empty_overridden_folder_means_empty_override_set (
     MSV::Specified (vec![])); }
 
 #[test]
-fn read_only_folder_members_save_themselves_but_not_their_owner (
+fn write_protected_folder_members_save_themselves_but_not_their_owner (
 ) {
   let input: &str =
     indoc! {"
@@ -573,7 +573,7 @@ fn read_only_folder_members_save_themselves_but_not_their_owner (
   assert_eq!(
     save_ids (&instructions),
     // The members are self-writers, on the new recursion surface;
-    // the owner is unaffected by any of these read-only folders.
+    // the owner is unaffected by any of these write-protected folders.
     vec![ID::from ("owner"),
          ID::from ("subscriber"),
          ID::from ("overrider"),
@@ -1581,7 +1581,7 @@ fn duplicate_members_of_defining_folders_are_silently_deduplicated (
 // the relationship matrix (stage 13) asks for at the cheapest seam:
 // subscribeeFolder order and one-member removal persist to
 // subscribes_to; overriddenFolder order does not matter (the
-// set-difference merge depends on this); and the read-only hiddenFolder
+// set-difference merge depends on this); and the write-protected hiddenFolder
 // never writes the owner's hides.
 
 #[test]
@@ -1660,7 +1660,7 @@ fn reordering_overridden_folder_is_harmless (
 #[test]
 fn deleting_from_hiddenFolder_emits_no_hide_change (
 ) {
-  // hiddenFolder is read-only: its membership is never collected into
+  // hiddenFolder is write-protected: its membership is never collected into
   // the owner's hides_from_its_subscriptions. A member shown there
   // (and, equally, a member deleted from there) emits no hide intent;
   // the owner's hides stay Unspecified (no opinion), preserving

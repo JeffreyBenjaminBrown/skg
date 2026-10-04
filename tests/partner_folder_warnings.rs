@@ -1,6 +1,6 @@
 // cargo nextest run --test grouped_overrides -E 'test(partner_folder_warnings::)'
 //
-// When the completion pass repairs a read-only PartnerFolder in the
+// When the completion pass repairs a write-protected PartnerFolder in the
 // view the user just saved, the save succeeds and
 // SaveResponse.warnings says what was repaired
 // (TODO/full-schema/8_readonly-set-ergonomics.org):
@@ -34,8 +34,8 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-partner-folder-warnings",
     |s| Box::pin ( async move {
-      s . reset ("readonly_folder_repairs_warn", fixtures) ?;
-      readonly_folder_repairs_warn_impl (
+      s . reset ("write_protected_folder_repairs_warn", fixtures) ?;
+      write_protected_folder_repairs_warn_impl (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("failed_save_carries_warnings_with_errors", fixtures) ?;
       failed_save_carries_warnings_with_errors (
@@ -70,7 +70,7 @@ fn line_containing<'a> (
     . unwrap_or_else (
       || panic! ( "no line contains {:?} in:\n{}", fragment, buf )) }
 
-async fn readonly_folder_repairs_warn_impl (
+async fn write_protected_folder_repairs_warn_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {

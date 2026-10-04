@@ -1,7 +1,7 @@
 //! The "strip body whitespace" request (TODO/fork-fixes.org): strips
 //! trailing whitespace from every line of every body (and trailing
 //! blank lines from the body's tail), in every OWNED repo in the
-//! config -- foreign repos are read-only, and stripping them would
+//! config -- foreign repos are write-protected, and stripping them would
 //! make them diverge from their upstreams (Jeff settled on owned
 //! only) -- rewriting only the .skg files whose bodies changed. Bodies also live in two derived stores, the in-Rust graph
 //! and the Tantivy index; both are refreshed here. The graph is
@@ -85,7 +85,7 @@ fn strip_body_whitespace_and_refresh_caches (
 /// rewriting exactly the files whose bodies changed (a file with a
 /// clean body is left byte-identical). Foreign repos are read (the
 /// caller rebuilds whole-graph caches from the returned nodes) but
-/// never written: they are read-only, and local edits would make
+/// never written: they are write-protected, and local edits would make
 /// them diverge from their upstreams. A body that strips to the
 /// empty string is dropped entirely, so the written file omits the
 /// field rather than carrying 'body: ""'. Returns every node read

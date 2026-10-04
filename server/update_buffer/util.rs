@@ -131,7 +131,7 @@ pub fn move_child_to_end<Node> (
 /// What 'complete_relevant_children' changed while reconciling: the
 /// orderkeys it created, demoted to Independent (stale branches),
 /// detached as stale leaves, and detached as duplicates. Callers
-/// that warn about repairs to read-only folders consume this
+/// that warn about repairs to write-protected folders consume this
 /// ('CompletionWarning'); other callers ignore it.
 #[derive(Debug)]
 pub struct RepairSummary<Orderkey> {

@@ -4,7 +4,7 @@
 // (TODO/full-schema/13_test-rel-matrix.org). ONE test function builds
 // ONE database of mutually independent subgraphs (IDs prefixed by
 // scenario), then runs the matrix scenarios serially against it: de
-// novo omission of unrequested read-only folders, and -- after explicit
+// novo omission of unrequested write-protected folders, and -- after explicit
 // folder requests, per folder -- save after
 // reorder, insertion of a non-member, deletion of a member, plus the
 // writable folders' membership edits and the restricted-set omission.
@@ -173,7 +173,7 @@ fn intruder_with_child (
   ( line, child ) }
 
 //////////////////////////////////////////////////////////////
-// Read-only folder spec and per-behavior scenario helpers
+// Write-protected folder spec and per-behavior scenario helpers
 //////////////////////////////////////////////////////////////
 
 struct FolderSpec {
@@ -185,7 +185,7 @@ struct FolderSpec {
   intruder : &'static str, // a public non-member to park in the folder
 }
 
-const READONLY_FOLDERS : [FolderSpec; 4] = [
+const WRITE_PROTECTED_FOLDERS : [FolderSpec; 4] = [
   FolderSpec { atom : "subscriberFolder", owner : "roSub-owner",
             relation : "subscribes_to",
             member_a : "roSub-a", member_b : "roSub-b",
@@ -204,7 +204,7 @@ const READONLY_FOLDERS : [FolderSpec; 4] = [
             intruder : "roHidden-x" },
 ];
 
-async fn readonly_reorder (
+async fn write_protected_reorder (
   fails : &mut Fails, spec : &FolderSpec,
   config : &SkgConfig,
   tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
@@ -236,7 +236,7 @@ async fn readonly_reorder (
       "reorder should not warn of a repair: {:?}", resp . warnings)); }
   Ok (( )) }
 
-async fn readonly_insert (
+async fn write_protected_insert (
   fails : &mut Fails, spec : &FolderSpec,
   config : &SkgConfig,
   tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
@@ -277,7 +277,7 @@ async fn readonly_insert (
       spec . intruder, resp . warnings )); }
   Ok (( )) }
 
-async fn readonly_delete (
+async fn write_protected_delete (
   fails : &mut Fails, spec : &FolderSpec,
   config : &SkgConfig,
   tantivy : &mut TantivyIndex, graph : &InRustGraphHandle,
@@ -298,7 +298,7 @@ async fn readonly_delete (
   if ! resp . errors . is_empty () {
     fails . record (&scenario, format! (
       "save reported errors: {:?}", resp . errors)); return Ok (( )); }
-  // The deleted member respawns (read-only set).
+  // The deleted member respawns (write-protected set).
   fails . want_contains (
     &scenario, &resp . saved_view,
     &format! ("(id {})", spec . member_a) );
@@ -313,14 +313,14 @@ async fn readonly_delete (
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
-// De-novo omission of the four unrequested read-only folders
+// De-novo omission of the four unrequested write-protected folders
 //////////////////////////////////////////////////////////////
 
-async fn denovo_omits_unrequested_readonly_folders (
+async fn denovo_omits_unrequested_write_protected_folders (
   fails : &mut Fails,
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  let s : &str = "denovo/read-only-folders";
+  let s : &str = "denovo/write-protected-folders";
   let buf : String = render ("dn-owner", config) . await ?;
   for atom in ["subscriberFolder", "overriderFolder",
                "hiderFolder", "hiddenFolder"] {
@@ -343,14 +343,14 @@ fn relationship_matrix
         graph_handle_from_config (config) ?;
       let mut fails : Fails = Fails::new ();
 
-      denovo_omits_unrequested_readonly_folders (
+      denovo_omits_unrequested_write_protected_folders (
         &mut fails, config ) . await ?;
-      for spec in &READONLY_FOLDERS {
-        readonly_reorder (
+      for spec in &WRITE_PROTECTED_FOLDERS {
+        write_protected_reorder (
           &mut fails, spec, config, tantivy, &graph) . await ?;
-        readonly_insert (
+        write_protected_insert (
           &mut fails, spec, config, tantivy, &graph) . await ?;
-        readonly_delete (
+        write_protected_delete (
           &mut fails, spec, config, tantivy, &graph) . await ?;
       }
       writable_subscribeeFolder (&mut fails, config) . await ?;
@@ -389,7 +389,7 @@ async fn path_request_scenarios (
   // Since uniform-heralds, the grafted partner no longer carries the
   // old (birth backpath ROLE) marker nor a parent-relative viewStat;
   // instead its relationship TO its org-parent (the origin) shows as the
-  // reason-for-being (black-on-white) token inside its (rels ...) spans.
+  // birth (black-on-white) token inside its (rels ...) spans.
   // E.g. the 'overridden' partner is overridden BY the origin -> its
   // parent (a) overrides it -> token "aO", rendered as the ancestor
   // letter 'a' (yellow) then the birth 'O' (white). The 'overrider'
@@ -397,7 +397,7 @@ async fn path_request_scenarios (
   // spans appear consecutively inside (rels ...) on the partner's line.
   // Each row's 5th field is the SEMANTIC relationship the grafted
   // partner has to the origin (its org-parent, generation 1), which is
-  // its reason-for-being. The direction (in vs out) distinguishes e.g.
+  // its birth. The direction (in vs out) distinguishes e.g.
   // overridden (the origin overrides it) from overrider (it overrides
   // the origin, among others).
   let sharing : [(&str, &str, &str, &str, &str); 6] = [
@@ -474,8 +474,8 @@ async fn folder_request_scenarios (
       owner, rel, owner ) };
   { // (folder overrides_view_of) on wSub-owner, which overrides nothing and is
     // overridden by nothing: the WRITABLE overriddenFolder appears EMPTY
-    // (the "add an override here" surface); the read-only overriderFolder
-    // does not appear (empty read-only folders are pruned).
+    // (the "add an override here" surface); the write-protected overriderFolder
+    // does not appear (empty write-protected folders are pruned).
     let s : &str = "folder-request/overrides-empty";
     let resp : SaveResponse = save (
       &request_buf ("wSub-owner", "overrides_view_of"),
@@ -505,7 +505,7 @@ async fn folder_request_scenarios (
     fails . want_contains (s, &resp . saved_view, "(skg subscribeeFolder)");
     fails . want_contains (s, &resp . saved_view, "(id wSub-a)"); }
   { // (folder hides_from_its_subscriptions) on wSub-owner, which neither hides nor is hidden:
-    // both sides read-only and empty, so NOTHING appears.
+    // both sides write-protected and empty, so NOTHING appears.
     let s : &str = "folder-request/hides-empty";
     let resp : SaveResponse = save (
       &request_buf ("wSub-owner", "hides_from_its_subscriptions"),
@@ -643,11 +643,11 @@ async fn writable_overriddenFolder (
       None => fails . record (s, "no SaveNode for wOvr-owner" . into ()), } }
   Ok (( )) }
 
-/// Deleting a member from the read-only hiddenFolder must not unhide it
+/// Deleting a member from the write-protected hiddenFolder must not unhide it
 /// on disk: the owner's hides_from_its_subscriptions is never read
 /// from the folder, so the deleted member stays hidden. (The view-level
 /// twin -- respawn in the saved view -- is the hiddenFolder case of
-/// readonly_delete; the extraction-seam twin is in commit 1.)
+/// write_protected_delete; the extraction-seam twin is in commit 1.)
 async fn hiddenFolder_delete_does_not_unhide (
   fails : &mut Fails,
   config : &SkgConfig,
@@ -685,7 +685,7 @@ async fn omission_scenarios (
 ) -> Result<(), Box<dyn Error>> {
   let active : ActiveRepoSet =
     ActiveRepoSet::named (config, RepoSetName::from ("public")) ?;
-  { // read-only subscriberFolder: inactive omitted, active shown
+  { // write-protected subscriberFolder: inactive omitted, active shown
     let s : &str = "subscriberFolder/omission";
     let (buf, _p, _t) : (String, Vec<ID>, Tree<ViewNode>) =
       multi_root_view_with_repo_set (

@@ -152,7 +152,7 @@ function M.paint (buf, positions)
     end
     if suffix_enabled then
       local label = ({ missing = '⌂:missing', inactive = '⌂:inactive',
-                       error = '⌂:unavailable', pending = '⌂:…' })[kind]
+                       lookup_failed = '⌂:lookup failed', pending = '⌂:…' })[kind]
                     or ('⌂:' .. status[3])
       local group = kind == 'resolved' and 'SkgHeraldGreen' or 'Comment'
       vim.api.nvim_buf_set_extmark(buf, M.namespace,
@@ -182,7 +182,7 @@ end
 
 function M.request (buf, generation, tick, ids)
   if not state.tcp or state.tcp:is_closing() then
-    for _, id in ipairs(ids) do M.cache[id] = { 'error' } end
+    for _, id in ipairs(ids) do M.cache[id] = { 'lookup_failed' } end
     M.paint(buf, M.collect(buf))
     return end
   M.next_request = M.next_request + 1
@@ -203,7 +203,7 @@ function M.request (buf, generation, tick, ids)
   if not ok then
     M.requests[request_id] = nil
     state.lp_pending_count = math.max(0, state.lp_pending_count - 1)
-    for _, id in ipairs(ids) do M.cache[id] = { 'error' } end
+    for _, id in ipairs(ids) do M.cache[id] = { 'lookup_failed' } end
     if valid(buf) then M.paint(buf, M.collect(buf)) end
   end
 end

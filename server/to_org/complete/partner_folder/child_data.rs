@@ -286,7 +286,7 @@ fn normalize_relationship_backed_partner_unknowns (
 ///   handled by the goal list);
 /// - an Active child whose net result is REMOVED -- reachable only
 ///   when a stale saved buffer still holds, as an Active member, a
-///   read-only-folder member whose edge is gone -- gets the full axes
+///   write-protected-folder member whose edge is gone -- gets the full axes
 ///   and flips to a phantom, so the rendered buffer cannot show a
 ///   removed edge as a live member.
 pub fn apply_relationship_axes_to_folder_members (

@@ -319,7 +319,7 @@ pub fn refuse_delete_with_inactive_sections (
 ///   subscription (see 'hide_repo'): a hide is only as public as
 ///   some subscription that makes it meaningful, else it leaks the
 ///   inference that a private subscription exists. Hides carry no
-///   explicit-repo path: the folder that displays them is read-only
+///   explicit-repo path: the folder that displays them is write-protected
 ///   (the set-relRepo gesture refuses there).
 #[cfg(test)]
 pub(crate) fn apply_sticky_relRepos_in_graph (

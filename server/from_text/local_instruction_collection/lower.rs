@@ -62,7 +62,7 @@ pub struct NodeSaveIntent {
 /// Repos the buffer explicitly requested via '(editRequest
 /// (relRepo NAME))', keyed by member
 /// ID, one map per relation that carries per-member relRepos (hides is
-/// absent: it is inferred, and the folder that shows it is read-only --
+/// absent: it is inferred, and the folder that shows it is write-protected --
 /// the set-relRepo gesture refuses there). Threaded
 /// separately from
 /// NodeComplete because NodeComplete's 'RelPartner::repo' is a

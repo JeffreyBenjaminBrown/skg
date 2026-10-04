@@ -28,7 +28,7 @@ use std::collections::{HashMap, HashSet};
 /// For every FOREIGN vognode in the view, the repo of its nearest
 /// vognode ancestor, recorded IFF that ancestor is an OWNED Active
 /// vognode. A fork's clone C must live in an owned repo; the foreign
-/// node N's own repo is read-only, so C inherits from N's IMMEDIATE
+/// node N's own repo is write-protected, so C inherits from N's IMMEDIATE
 /// container context -- the nearest vognode ancestor reached by skipping
 /// only scaffolds (folders, etc.). The walk STOPS at that nearest vognode
 /// ancestor and never passes it: if the ancestor is foreign (or

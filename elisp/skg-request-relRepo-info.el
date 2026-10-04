@@ -37,7 +37,7 @@ more private endpoint's home more public), choose the default relRepo
 itself; once saved at the default, the display fact and its red ~herald
 stop being rendered.
 
-Refuses on read-only folder members (the edge belongs to the other
+Refuses on write-protected folder members (the edge belongs to the other
 end) and on root headlines (no edge). Like other metadata edits,
 this only modifies the buffer; it does NOT save. Call
 `skg-request-save-buffer' afterward. The server re-validates at

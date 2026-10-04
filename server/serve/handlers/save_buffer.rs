@@ -65,7 +65,7 @@ pub struct SaveResponse {
   pub warnings            : Vec<String>,
   pub save_point_position : Option<SavePointPosition>,
   /// Some when this save found fork candidates and was NOT pre-approved:
-  /// nothing was committed, 'saved_view' instead holds the read-only
+  /// nothing was committed, 'saved_view' instead holds the write-protected
   /// fork-confirmation buffer, and this holds the one-line minibuffer
   /// prompt. The handler then sends a 'fork-confirmation' message rather
   /// than 'save-result'. None for an ordinary save.
@@ -672,7 +672,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       &hoist_candidates, &nonmerge_defineNodes, &runtime . config ) ? );
   if ! fork_specs . is_empty () && ! fork_approved {
     // A save that found forks but was not pre-approved commits NOTHING.
-    // Return a read-only fork-confirmation buffer; the client shows it,
+    // Return a write-protected fork-confirmation buffer; the client shows it,
     // and on approval re-issues the save with (fork-approved . "true").
     // (Monogamy and Skg repo validation already ran in
     // buffer_to_validated_saveplan, so every fork here is admissible.)

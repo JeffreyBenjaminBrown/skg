@@ -129,7 +129,7 @@ async fn run_inbound_save_test (
         &mut stream, INPUT, &config, &tantivy, &graph,
         true, &Err (String::new ()), &mut views_state ) . await ? };
     assert_buffer_contains (&first . saved_view, expected);
-    { // Read-only-folder saves remain unaffected by phantoms: saving
+    { // Write-protected-folder saves remain unaffected by phantoms: saving
       // the rendered result (phantoms included) resurrects no file
       // and re-adds no edge, and the phantoms regenerate.
       let second = {

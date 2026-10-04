@@ -1,6 +1,6 @@
 // cargo nextest run --test grouped_overrides -E 'test(fork::)'
 //
-// The fork/clone feature: editing a foreign node N (read-only, in a
+// The fork/clone feature: editing a foreign node N (write-protected, in a
 // repo the user does not own) is read as a request to clone it. The
 // clone C lives in an owned repo, copies N's edited title/body/
 // contains, subscribes to N and overrides N; N itself is untouched.
@@ -77,7 +77,7 @@ const FORK_WITH_NEW_PARENT_FOR_OLD_CHILD_BUFFER : &str = indoc! {"
   "};
 
 /// Same shape, but the new node EXPLICITLY claims the foreign repo:
-/// a deliberate attempt to create a node in a read-only repo, which
+/// a deliberate attempt to create a node in a write-protected repo, which
 /// must stay rejected.
 const FORK_WITH_EXPLICIT_FOREIGN_NEW_CHILD_BUFFER : &str = indoc! {"
   * (skg (node (id N) (repo foreign))) N-original

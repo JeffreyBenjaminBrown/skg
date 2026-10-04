@@ -185,34 +185,34 @@ col”, and bare “sharing col” are retired names for the general concept.
 There are eight PartnerFolders, named by their external scaffold atom:
 
 - writable: =subscribeeFolder=, =overriddenFolder=;
-- read-only inbound: =subscriberFolder=, =overriderFolder=, =hiderFolder=,
+- write-protected inbound: =subscriberFolder=, =overriderFolder=, =hiderFolder=,
   =hiddenFolder=;
-- read-only filter: =hiddenInSubscribeeFolder=,
+- write-protected filter: =hiddenInSubscribeeFolder=,
   =hiddenOutsideOfSubscribeeFolder=.
 
 Each kind's behavior is decided by one method, =PartnerFolder::policy=
 (=server/types/viewnode.rs=), returning a *FolderPolicy*.  This single
 arbiter is consulted by reconciliation dispatch, save extraction's
-read-only treatment, and herald/warning gating, so a new relation
+write-protected treatment, and herald/warning gating, so a new relation
 cannot acquire inconsistent policies in different layers:
 
 - *WritableSet* (=subscribeeFolder=, =overriddenFolder=): membership edits
   are graph edits.  An absent folder means "no opinion" (its field lowers
   to =MSV::Unspecified=, filled from disk); a present-but-empty folder
   means an explicit empty set (=MSV::Specified(vec![])=).
-- *ReadOnlySet* (=subscriberFolder=, =overriderFolder=, =hiderFolder=,
+- *WriteProtectedSet* (=subscriberFolder=, =overriderFolder=, =hiderFolder=,
   =hiddenFolder=): membership is generated from graph facts; the user's
-  order is respected view-locally; repairs warn.  See [[*read-only set][read-only set]].
-- *ReadOnlyFilter* (=hiddenInSubscribeeFolder=,
+  order is respected view-locally; repairs warn.  See [[*write-protected set][write-protected set]].
+- *WriteProtectedFilter* (=hiddenInSubscribeeFolder=,
   =hiddenOutsideOfSubscribeeFolder=): membership is derived from hide
   state rather than from a single relation role.
 
-The SIX read-only folders (the =ReadOnlySet= four plus the =ReadOnlyFilter=
+The SIX write-protected folders (the =WriteProtectedSet= four plus the =WriteProtectedFilter=
 two) carry the ☮ herald on their folder headline, meaning "this folder
 cannot be changed from here" — the same sense ☮ (=writeProtected=) carries on a
 node.  The two =WritableSet= folders and =aliasFolder= do not.  This is a
 herald-table fact only (=server/heralds.rs=), with no wire atom of its
-own: which folders are read-only is already known from the folder atom.
+own: which folders are write-protected is already known from the folder atom.
 
 The stale-member rule is uniform across all eight kinds (decided
 2026-06-10, demote-not-discard): a stale ~affectsParent=true~ member
@@ -390,9 +390,9 @@ This changes the way edits are interpreted:
 Edits to a "subscribee as such" can only affect
 what the relevant subscriber hides, nothing else.
 
-*** read-only set
+*** write-protected set
 
-A read-only set is a generated folder whose membership follows
+A write-protected set is a generated folder whose membership follows
 from graph facts rather than direct edits to that folder.  A view
 may preserve an order for the set locally, but adding or removing an
 item in the generated folder does not add or remove the underlying
@@ -409,15 +409,15 @@ at a view like the following:
   *** R
   *** T
 #+end_example
-The subscriberFolder ("folder of subscribers") is a read-only set.
+The subscriberFolder ("folder of subscribers") is a write-protected set.
 Thus the user could flip the order of R and T in the subscriberFolder,
 and this change would be respected in the display, but have no effect
 in the graph. The user could insert X under subscriberFolder,
-but because it is a read-only set, X will have its affectsParent field
+but because it is a write-protected set, X will have its affectsParent field
 rewritten to 'Independent', and have no effect on N.
 (If the user wants X to subscribe to N, they must modify X, not N.)
 The user could delete R, but it will respawn as soon as they save,
-because, again, the subscriberFolder is a read-only set.
+because, again, the subscriberFolder is a write-protected set.
 
 *** scaffold
 
@@ -441,7 +441,7 @@ decluttering, not privacy.
 
 *** flags folder and Flag
 
-=flagsFolder= is a generated, read-only scaffold under a graphnode. Its
+=flagsFolder= is a generated, write-protected scaffold under a graphnode. Its
 =(flag FLAG)= leaves list the node's true flags in canonical
 order. Each leaf is titleless because its herald supplies the visible label.
 The folder stays visible when empty. Edits within a retained folder are

@@ -74,7 +74,7 @@ pub enum PostCommitNoticeCandidate {
   HiddenOutsideAdded { subscriber : ID, member : ID },
 }
 
-/// One fork: the user made a foreign node N (read-only, in a repo
+/// One fork: the user made a foreign node N (write-protected, in a repo
 /// they do not own) definitive and edited it; that edit is read as a
 /// request to clone N. 'clone' is the new OWNED node C, built from the
 /// edited buffer node -- a fresh pid, an owned repo, the edited
@@ -197,13 +197,13 @@ fn format_buffer_validation_error (
       format!( "Multiple viewnodes with ID {} have inconsistent repos:\n- Repos: {:?}\n- All instances of the same ID must have the same repo.\n",
               id . 0, repo_list) },
     BufferValidationError::ModifiedForeignNode(id, repo) => {
-      format!("Cannot modify node from foreign (read-only) repo:\n- ID: {}\n- Repo: {}\n- Foreign repos can only be viewed, not modified.\n",
+      format!("Cannot modify node from foreign (write-protected) repo:\n- ID: {}\n- Repo: {}\n- Foreign repos can only be viewed, not modified.\n",
               id . 0, repo) },
     BufferValidationError::CreatedForeignNode(id, repo) => {
-      format!("Cannot create node in foreign (read-only) repo:\n- ID: {}\n- Repo: {}\n- Foreign repos can only be viewed, not modified.\n",
+      format!("Cannot create node in foreign (write-protected) repo:\n- ID: {}\n- Repo: {}\n- Foreign repos can only be viewed, not modified.\n",
               id . 0, repo) },
     BufferValidationError::CannotMoveToOrFromForeignRepo(id, disk_repo, buffer_repo) => {
-      format!("Cannot move node between repos:\n- ID: {}\n- Repo on disk: {}\n- Repo from buffer: {}\n- One or both repos are foreign (read-only).\n",
+      format!("Cannot move node between repos:\n- ID: {}\n- Repo on disk: {}\n- Repo from buffer: {}\n- One or both repos are foreign (write-protected).\n",
               id . 0, disk_repo, buffer_repo) },
     BufferValidationError::CannotMoveAndMergeSimultaneously(id) => {
       format!("Cannot move and merge a node simultaneously:\n- ID: {}\n- Please save the move and merge in separate operations.\n",
@@ -251,7 +251,7 @@ fn format_buffer_validation_error (
               id . 0) },
     BufferValidationError::EditedWriteProtectedOccurrence {
       id, title, changes } => {
-      format!("Edited write-protected occurrence:\n- ID: {}\n- Title: {}\n- Changes: {}\n- This occurrence is read-only; no changes were saved.\n- Re-render, then edit a definitive occurrence instead.\n",
+      format!("Edited write-protected occurrence:\n- ID: {}\n- Title: {}\n- Changes: {}\n- This occurrence is write-protected; no changes were saved.\n- Re-render, then edit a definitive occurrence instead.\n",
               id . 0, title, changes . join ("; ")) },
     BufferValidationError::FlagsSurfaceEdited {
       owner_id, owner_title, changes } => {

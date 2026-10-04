@@ -29,7 +29,7 @@ pub enum LocalContext {
   HiddenOutsidePosition { // The one derived-but-editable filter under a SubscribeeFolder.
     subscriber       : ID,
     is_saveEligible  : bool, },
-  UnderReadOnlyFolder, // The node is inside one of the six read-only RoleFolders, an IDFolder, or a Qual.
+  UnderWriteProtectedFolder, // The node is inside one of the six write-protected RoleFolders, an IDFolder, or a Qual.
 }
 
 /// A DefiningFolderOwner is what a defining folder knows about its owner

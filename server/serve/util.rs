@@ -109,7 +109,7 @@ pub(crate) fn format_buffer_response_sexp (
     format_string_list_sexp ("warnings", warnings) ] )
     . to_string () }
 
-/// Format the fork-confirmation response: a read-only buffer listing
+/// Format the fork-confirmation response: a write-protected buffer listing
 /// the foreign nodes about to be forked, plus the one-line minibuffer
 /// prompt. It has no view-uri: the client adopts the buffer under its
 /// own generated URI because the confirmation is transient, not a

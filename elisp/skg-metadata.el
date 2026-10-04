@@ -367,7 +367,7 @@ a writable-folder member, the folder's anchor (the folder's org-parent) owns
 the folder's relation toward the node at point. Signals `user-error'
 when point represents no writable edge: not on an activeNode or Unknown
 headline, on a root headline (no org-parent, so no edge), on a
-member of a read-only folder, or with an ID missing."
+member of a write-protected folder, or with an ID missing."
   (unless (org-at-heading-p)
     (user-error "Not on a headline"))
   (let ((member-sexp (skg--metadata-sexp-at-point-or-nil)))
@@ -383,15 +383,15 @@ member of a read-only folder, or with an ID missing."
       (unless parent-sexp
         (user-error
          "Root headline: there is no relationship edge here to set"))
-      (let ((readonly-atom
+      (let ((write-protected-atom
              (and (consp parent-sexp)
                   (seq-find (lambda (atom)
                               (memq atom (cdr parent-sexp)))
                             skg--relRepo-unsupported-folder-atoms))))
-        (when readonly-atom
+        (when write-protected-atom
           (user-error
-           "Cannot set the relationship's repo from this read-only %s position"
-           readonly-atom)))
+           "Cannot set the relationship's repo from this write-protected %s position"
+           write-protected-atom)))
       (let ((writable-folder
              (and (consp parent-sexp)
                   (seq-find (lambda (entry)
@@ -532,17 +532,17 @@ next save will do with the edge."
       "Links are inferred from body text; they carry no false relRepo, so there is nothing to set."))
     ("subscribes_to"
      ("subscriber" nil
-      "A subscriberFolder member: the subscribes edge belongs to the member (the subscriber), not to the view-parent. Read-only from here.")
+      "A subscriberFolder member: the subscribes edge belongs to the member (the subscriber), not to the view-parent. Write-protected from here.")
      ("subscribee" subscribee
       "A member of the view-parent's subscribeeFolder. Sets the repo of each anchor-subscribes-to-member edge."))
     ("hides_from_its_subscriptions"
      ("hider" nil
-      "Hide repos are derived at save, floored at the most public explaining subscription; the hiderFolder is read-only.")
+      "Hide repos are derived at save, floored at the most public explaining subscription; the hiderFolder is write-protected.")
      ("hidden" nil
-      "Hide repos are derived at save, floored at the most public explaining subscription; the hiddenFolder is read-only."))
+      "Hide repos are derived at save, floored at the most public explaining subscription; the hiddenFolder is write-protected."))
     ("overrides_view_of"
      ("overrider" nil
-      "An overriderFolder member: the overrides edge belongs to the member (the overrider), not to the view-parent. Read-only from here.")
+      "An overriderFolder member: the overrides edge belongs to the member (the overrider), not to the view-parent. Write-protected from here.")
      ("overridden" overridden
       "A member of the view-parent's overriddenFolder. Sets the repo of each anchor-overrides-view-of-member edge.")))
   "The relationship-kind menu for
@@ -582,7 +582,7 @@ its view-parent counts when it matches) and recurses only on
 viewchildren that affect their viewparents: affectsParent=true
 activeNodes and writable folders. It prunes below write-protected nodes
 and subscribee-as-such members (their org-children's edges are not
-collected at save), and prunes read-only folders and other scaffolds
+collected at save), and prunes write-protected folders and other scaffolds
 entirely.
 
 Like other metadata edits, this only modifies the buffer; it does
@@ -620,7 +620,7 @@ NOT save. Call `skg-request-save-buffer' afterward."
 (defun skg--select-relationship-kind (continuation)
   "Pop up the org-menu over `skg--relationship-kind-menu-tree'.
 RET on a settable role headline buries the menu and calls
-CONTINUATION with the role's kind symbol; RET on a read-only role
+CONTINUATION with the role's kind symbol; RET on a write-protected role
 explains the refusal; q aborts."
   (let ((menu-buffer (get-buffer-create "*skg-relationship-kinds*")))
     (with-current-buffer menu-buffer
@@ -734,7 +734,7 @@ command, but does not edit anything."
               (outline-next-heading))
              ((skg--writable-folder-sexp-p meta)
               (outline-next-heading))
-             (t ;; read-only folders, alias/ID folders, and other phantoms.
+             (t ;; write-protected folders, alias/ID folders, and other phantoms.
               (skg--goto-next-heading-after-subtree))))))
       (nreverse targets))))
 

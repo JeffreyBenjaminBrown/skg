@@ -86,7 +86,7 @@ fn leaf (
 ) -> RuleChild {
   crule ( color, label, vec! [ s (text) ] ) }
 
-/// (COLOR label "☮ text") -- a read-only folder scaffold leaf: the ☮
+/// (COLOR label "☮ text") -- a write-protected folder scaffold leaf: the ☮
 /// marker, a space, then its label text, meaning "this folder
 /// cannot be changed from here" -- the same sense ☮ ('writeProtected') carries
 /// on a node. (A lock 🔒 here is a one-line swap; the conformance test
@@ -94,7 +94,7 @@ fn leaf (
 /// 'concat!' needs 'text' as a literal to fold the ☮ and its trailing
 /// space into one '&'static str' token at compile time -- two separate
 /// children would be joined by the lens engine's ':', not a space.
-macro_rules! leaf_ro {
+macro_rules! leaf_write_protected {
   ( $color:expr, $label:expr, $text:literal ) => {
     crule ( $color, $label, vec! [ s ( concat! ("☮ ", $text) ) ] ) }; }
 
@@ -213,28 +213,28 @@ pub fn herald_rule_table () -> HeraldRule {
       rule ("editRequest", vec! [
         crule (Red, "relRepo", vec! [
           any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]),
-      // The six READ-ONLY folder scaffolds carry ☮ ("cannot be changed
+      // The six WRITE-PROTECTED folder scaffolds carry ☮ ("cannot be changed
       // from here"); the writable folders (subscribeeFolder, overriddenFolder,
       // aliasFolder) do not.
-      leaf_ro! (Green, PartnerFolder::HiddenInSubscribee . repr_in_client (),
+      leaf_write_protected! (Green, PartnerFolder::HiddenInSubscribee . repr_in_client (),
             "It contains these, but the subscribing ancestor hides them."),
       leaf (Green, PartnerFolder::HiddenOutsideOfSubscribee . repr_in_client (),
             "The subscriber ancestor hides these, but subscribes to nothing that contains them."),
       leaf (Green, PartnerFolder::Subscribee . repr_in_client (),
             "It subscribes to these."),
-      leaf_ro! (Green, PartnerFolder::Subscriber . repr_in_client (),
+      leaf_write_protected! (Green, PartnerFolder::Subscriber . repr_in_client (),
             "These subscribe to it."),
-      leaf_ro! (Green, PartnerFolder::Hidden . repr_in_client (),
+      leaf_write_protected! (Green, PartnerFolder::Hidden . repr_in_client (),
             "It hides these from its subscriptions."),
-      leaf_ro! (Green, PartnerFolder::Hider . repr_in_client (),
+      leaf_write_protected! (Green, PartnerFolder::Hider . repr_in_client (),
             "These hide it from their subscriptions."),
       leaf (Green, PartnerFolder::Overridden . repr_in_client (),
             "It overrides the view of these."),
-      leaf_ro! (Green, PartnerFolder::Overrider . repr_in_client (),
+      leaf_write_protected! (Green, PartnerFolder::Overrider . repr_in_client (),
             "These override the view of it."),
       leaf (Green, QualFolder::ID . repr_in_client (), "IDs"),
       leaf (Green, "id", "ID"), // Qual::ID
-      leaf_ro! (Green, QualFolder::flags () . repr_in_client (),
+      leaf_write_protected! (Green, QualFolder::flags () . repr_in_client (),
                 "flags"),
       crule (Green, "flag", Flag::ALL . into_iter ()
         . map (|flag| rule (

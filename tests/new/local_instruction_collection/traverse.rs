@@ -158,7 +158,7 @@ fn folders_under_toDelete_or_writeProtected_owners_emit_nothing () {
            "a write-protected vognode and its folders emit nothing" ); }
 
 #[test]
-fn definitive_member_of_readonly_folder_emits_for_itself_only () {
+fn definitive_member_of_write_protected_folder_emits_for_itself_only () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
       * (skg (node (id owner) (repo main))) owner

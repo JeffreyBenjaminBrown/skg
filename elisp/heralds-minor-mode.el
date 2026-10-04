@@ -432,7 +432,7 @@ BASE-FACE styles ordinary counts and slash; LETTER-FACE styles only L."
 (defun heralds--render-rel-facts (sexp)
   "Render the semantic `(rels ...)' payload in SEXP to one propertized
 string, or nil if there is none / it produces nothing. Coloring: group
-base (C/L blue, S/O/H purple), the reason-for-being letter black-on-white,
+base (C/L blue, S/O/H purple), the birth letter black-on-white,
 ancestor a muted and higher ancestors white-on-orange, the contains
 inbound count>1 yellow,
 A/I/P cyan. Tokens are ordered C L S O H A I P and space-separated."

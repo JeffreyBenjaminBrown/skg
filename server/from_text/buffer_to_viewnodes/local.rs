@@ -350,7 +350,7 @@ fn validate_relation_folder (
   if partnerFolder != PartnerFolder::Overridden
     // OverriddenFolder is a defining folder: duplicate members are silently
     // deduplicated at emission rather than bouncing the save. The
-    // read-only roles keep the check.
+    // write-protected roles keep the check.
     && !partnerFolder_children_have_distinct_ids(tree, node_id) {
     errors . push(format!(
       "{} must not have duplicate ActiveNode children.", label)); }
@@ -418,7 +418,7 @@ fn validate_inactive_node (
   // sit under a folder (a stale buffer from before a repo-set
   // switch) or under another gnode, and it may have children (the
   // retained case: an inactive node kept on screen because of its
-  // active children).  Its own content stays read-only -- the
+  // active children).  Its own content stays write-protected -- the
   // parser rejects title/body text on it -- so the only structural
   // demand left is a parent that can carry it at all.
   let mut errors : Vec<String> = Vec::new();

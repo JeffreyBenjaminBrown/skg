@@ -1,6 +1,6 @@
 /// Typed warnings emitted by view completion into the
 /// 'CompletionContext' warning sink. One kind:
-/// - 'FolderRepair': repairs that completion makes to read-only
+/// - 'FolderRepair': repairs that completion makes to write-protected
 ///   PartnerFolders. Only the SAVED view's completion gets a sink (de
 ///   novo renders, collateral rerenders and rerender-all repair
 ///   silently, because their repairs do not correspond to edits the
@@ -72,7 +72,7 @@ pub fn render_completion_warnings (
         } ); }
       let explainer : &str =
         if any_restored {
-          " (A read-only folder's membership is edited from the other side of the relationship, not by editing the folder.)"
+          " (A write-protected folder's membership is edited from the other side of the relationship, not by editing the folder.)"
         } else { "" };
       rendered . push (
         format! ( "Repaired {} under node {}: {}.{}",

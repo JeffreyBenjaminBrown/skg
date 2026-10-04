@@ -307,7 +307,7 @@ headline."
          ( request-definitive-view
            (and (bound-and-true-p skg-view-uri)
                 (if (skg--buffer-has-writeable-instance-p id)
-                    (progn (message "NOTE: Pasting node readonly because a writeable instance is already present in this same buffer.")
+                    (progn (message "NOTE: Pasting node write-protected because a writeable instance is already present in this same buffer.")
                            nil)
                   t )) )
          ( node-text

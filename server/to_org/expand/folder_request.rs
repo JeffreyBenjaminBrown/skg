@@ -1,9 +1,9 @@
 /// Fulfill a '(viewRequests (folder RELNAME))' request: build BOTH folders of
 /// the relation, each POPULATED from the graph, reusing the de-novo
 /// PartnerFolder generators. The WRITABLE folder of the relation is created
-/// even when empty (its editable "add here" surface); the READ-ONLY
+/// even when empty (its editable "add here" surface); the WRITE-PROTECTED
 /// folders are built only when populated in the worktree or, in diff mode,
-/// on the HEAD side (decision A -- a read-only folder empty on both sides is
+/// on the HEAD side (decision A -- a write-protected folder empty on both sides is
 /// pruned by 'is_self_deletable_when_empty').
 ///
 /// 'aliases' is handled by the AliasFolder builder ('expand/aliases.rs'),
@@ -63,7 +63,7 @@ fn build_and_integrate_folder (
         "build_and_integrate_folder: aliases is built by the AliasFolder \
          builder, not here" . into () ),
     FolderRelation::OverridesViewOf => {
-      // overriddenFolder (writable) -- forced empty; overriderFolder (read-only).
+      // overriddenFolder (writable) -- forced empty; overriderFolder (write-protected).
       maybe_add_one_partnerFolder (
         tree, node_id, PartnerFolder::Overridden, config, graph,
         active_repo_set, repo_diffs, true ) ?;
@@ -71,7 +71,7 @@ fn build_and_integrate_folder (
         tree, node_id, PartnerFolder::Overrider, config, graph,
         active_repo_set, repo_diffs, false ) ?; },
     FolderRelation::HidesFromItsSubscriptions => {
-      // Both sides read-only: hiding is editable only from a
+      // Both sides write-protected: hiding is editable only from a
       // subscribee-as-such, never from a hider/hidden folder.
       maybe_add_one_partnerFolder (
         tree, node_id, PartnerFolder::Hider, config, graph,
@@ -80,7 +80,7 @@ fn build_and_integrate_folder (
         tree, node_id, PartnerFolder::Hidden, config, graph,
         active_repo_set, repo_diffs, false ) ?; },
     FolderRelation::SubscribesTo => {
-      // subscribeeFolder (writable) -- forced empty; subscriberFolder (read-only).
+      // subscribeeFolder (writable) -- forced empty; subscriberFolder (write-protected).
       maybe_add_subscribeeFolder_branch (
         tree, node_id, graph, config,
         active_repo_set, repo_diffs, true ) ?;

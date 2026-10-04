@@ -277,7 +277,7 @@ pub fn maybe_add_default_partnerFolder_branches (
 /// 'force_create_when_empty' overrides the empty-skip: a Folder view-request
 /// uses it to materialize the WRITABLE folder (Overridden) as an empty
 /// "add here" surface even when the relation has no members. (Only ever
-/// passed 'true' for a writable folder; an empty read-only folder would just
+/// passed 'true' for a writable folder; an empty write-protected folder would just
 /// be pruned again.)
 pub fn maybe_add_one_partnerFolder (
   tree    : &mut Tree<ViewNode>,

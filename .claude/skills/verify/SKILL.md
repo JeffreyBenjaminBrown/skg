@@ -32,7 +32,7 @@ on scratch data instead. Instances share nothing but the binary.
    ```
    Paths are relative to the data root, the config file's directory.
    A repo is writable iff its path lies under `owned/` (the
-   `owned_folder` config field); any other path is read-only. The old
+   `owned_folder` config field); any other path is write-protected. The old
    `user_owns_it` and `db_name` keys are rejected, and there is no
    TypeDB anymore.
    `./target/debug/skg check-config <scratch>/skgconfig.toml` validates

@@ -355,8 +355,8 @@ fn activeNode_metadata_to_string (
       AffectsParent::False =>
         parts . push ( "(affectsParent false)" . to_string () ) }
     if activeNode . is_writeProtected () {
-      // `writeProtected` means "write-protected" -- a read-only view of
-      // a node (see Editability in types/viewnode.rs). The metadata
+      // `writeProtected` means "write-protected" -- a view of a node that
+      // cannot be edited (see Editability in types/viewnode.rs). The metadata
       // sexp uses only this short form on both emission and parsing.
       parts . push ( "writeProtected" . to_string () );
       if activeNode . viewStats . hidden_body {

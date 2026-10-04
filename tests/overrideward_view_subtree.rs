@@ -139,7 +139,7 @@ async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
               && line . contains ("(birth overrides_view_of)"),
       "the override graft must render its override birth herald -- its \
        parent overrides it (overrides inbound from the gen-1 ancestor) \
-       and overrides is its reason-for-being -- proving graphStats were \
+       and overrides is its birth -- proving graphStats were \
        fetched for it: {}", line ); }
   Ok (( )) }
 
@@ -171,7 +171,7 @@ fn suppression_anchors_at_user_owned (
      by the foreign B) must survive at top level." );
   Ok (( )) }
 
-/// U's overriddenward chain grafts beneath it as read-only descendants
+/// U's overriddenward chain grafts beneath it as write-protected descendants
 /// marked with the OVERRIDDEN backpath role: U -> F -> G.
 fn override_relatives_graft_as_descendants (
   graph : &InRustGraph,
