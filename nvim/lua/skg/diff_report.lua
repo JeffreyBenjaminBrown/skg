@@ -73,7 +73,7 @@ function M.diff_report_handler (response)
   end
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_get_name(buf) == 'skg://diff-report' then
-      require('skg.keymaps').attach_diff_report(buf)
+      require('skg.keymaps').attach_report(buf)
     end
   end
 end

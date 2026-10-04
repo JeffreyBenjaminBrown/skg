@@ -16,7 +16,9 @@
               ((symbol-function 'process-send-string)
                (lambda (_proc text) (push text requests)))
               ((symbol-function 'skg-big-nonfatal-message)
-               (lambda (&rest args) (push args shown)))
+               (lambda (&rest args)
+                 (push args shown)
+                 (get-buffer-create (car args))))
               ((symbol-function 'read-string)
                (lambda (&rest _) "/host/notes"))
               ((symbol-function 'yes-or-no-p)
@@ -45,6 +47,8 @@
                'fake-proc
                "((content \"Imported\") (record-id \"record\"))")
       (should (equal (car (last (car shown))) "Imported"))
+      (should (buffer-local-value 'skg-report-mode
+                                  (get-buffer "*skg import result*")))
       (should (null skg-response-handler-map))
       (should (= skg-lp--pending-count 0))
       (should (eq (caar scheduled) #'skg--import-rerender-clean-views)))))
@@ -55,7 +59,8 @@
                (lambda () 'fake-proc))
               ((symbol-function 'process-send-string)
                (lambda (_proc text) (push text requests)))
-              ((symbol-function 'skg-big-nonfatal-message) #'ignore)
+              ((symbol-function 'skg-big-nonfatal-message)
+               (lambda (name &rest _) (get-buffer-create name)))
               ((symbol-function 'yes-or-no-p) (lambda (&rest _) nil)))
       (skg-import-md-and-org "/container/notes" "private")
       (funcall (cadr (assoc 'import-md-and-org-preview

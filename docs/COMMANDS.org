@@ -808,6 +808,7 @@ otherwise the file root is titled after the document.
 It also creates two kinds of nodes that do not so correspond:
 - a single import-record node with textlinks to all file roots,
   so you can see everything you just imported in one place.
+  The import result buffer links to it; follow the link with =C-c g RET=.
 - an export marker under each root,
   so you can export back to the same path if you want.
   But this is dangerous -- see "Re-export is dangerous" below.

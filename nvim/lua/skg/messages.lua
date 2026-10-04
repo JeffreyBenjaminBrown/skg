@@ -50,6 +50,7 @@ end
 ---@param buffer_name string
 ---@param message_text string
 ---@param content string
+---@return integer bufnr
 function M.big_nonfatal_message (buffer_name, message_text, content)
   local buf = M.scratch_org_buffer(buffer_name, content)
   local already_visible = false
@@ -64,6 +65,7 @@ function M.big_nonfatal_message (buffer_name, message_text, content)
     vim.api.nvim_set_current_win(current_win)
   end
   vim.notify(message_text)
+  return buf
 end
 
 ---Find-or-create a scratch org buffer named NAME holding CONTENT.

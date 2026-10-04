@@ -84,8 +84,10 @@ privacy for every imported node.  No input file is changed."
        (let* ((response (read payload))
               (content (format "%s" (cadr (assoc 'content response))))
               (record-id (cadr (assoc 'record-id response))))
-         (skg-big-nonfatal-message
-         "*skg import result*" "Import result" content)
+         (with-current-buffer
+             (skg-big-nonfatal-message
+              "*skg import result*" "Import result" content)
+           (skg-report-mode 1)) ; so the record link can be followed
          (when record-id
            (run-at-time 0 nil #'skg--import-rerender-clean-views))))
      nil)

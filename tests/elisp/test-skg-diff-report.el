@@ -66,23 +66,23 @@
                             (errors ())
                             (warnings ()))))
         (with-current-buffer "*skg diff report*"
-          (should skg-diff-report-mode)
-          (should (eq (lookup-key skg-diff-report-mode-map
+          (should skg-report-mode)
+          (should (eq (lookup-key skg-report-mode-map
                                   (kbd "C-c f RET"))
                       #'skg-search))
-          (should (eq (lookup-key skg-diff-report-mode-map
+          (should (eq (lookup-key skg-report-mode-map
                                   (kbd "C-c g m"))
                       #'skg-goto-in-magit))
-          (should (eq (lookup-key skg-diff-report-mode-map
+          (should (eq (lookup-key skg-report-mode-map
                                   (kbd "C-c G M"))
                       #'skg-goto-in-magit-parent-and-close-this))
-          (should (eq (lookup-key skg-diff-report-mode-map
+          (should (eq (lookup-key skg-report-mode-map
                                   (kbd "C-c v e"))
                       #'skg-view-new-empty))
-          (should (eq (lookup-key skg-diff-report-mode-map
+          (should (eq (lookup-key skg-report-mode-map
                                   (kbd "C-c u"))
                       #'skg-id-push))
-          (should (eq (lookup-key skg-diff-report-mode-map
+          (should (eq (lookup-key skg-report-mode-map
                                   (kbd "C-c O l"))
                       #'skg-pop-link))))
     (when (get-buffer "*skg diff report*")
