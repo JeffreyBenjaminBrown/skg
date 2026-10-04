@@ -118,6 +118,55 @@ describe('skg.linkstack paste and pop', function ()
     assert.are.same({ { 'id-1', 'First' } }, state.id_stack)
   end)
 
+  ---Paste id-1 at the end of a view containing EXISTING_LINE.
+  ---@return string buffer text, string|nil last notification
+  local function paste_node_in_view (existing_line)
+    state.id_stack = { { 'id-1', 'Title from stack' } }
+    buffer_with(existing_line .. '\n')
+    vim.b.skg_view_uri = 'test-view'
+    vim.api.nvim_win_set_cursor(0, { 2, 0 })
+    local notified = nil
+    local real_notify = vim.notify
+    vim.notify = function (message) notified = message end
+    linkstack.paste_node()
+    vim.notify = real_notify
+    return buffer_text(), notified
+  end
+
+  it('in a view, paste_node requests a definitive view', function ()
+    local text, notified = paste_node_in_view(
+      '* (skg (node (id id-1) writeProtected)) Elsewhere')
+    assert.are.equal(
+      '* (skg (node (id id-1) writeProtected)) Elsewhere\n'
+      .. '* (skg (node (id id-1) writeProtected'
+      .. ' (viewRequests definitiveView))) Title from stack\n',
+      text)
+    assert.is_nil(notified)
+  end)
+
+  it('beside a writeable instance, paste_node stays write-protected',
+     function ()
+    local text, notified = paste_node_in_view(
+      '* (skg (node (id id-1) (source main))) Writeable')
+    assert.are.equal(
+      '* (skg (node (id id-1) (source main))) Writeable\n'
+      .. '* (skg (node (id id-1) writeProtected)) Title from stack\n',
+      text)
+    assert.are.equal('NOTE: Pasting node readonly because a writeable'
+                     .. ' instance is already present in this same buffer.',
+                     notified)
+  end)
+
+  it('a pending definitive view request counts as writeable', function ()
+    local text, notified = paste_node_in_view(
+      '* (skg (node (id id-1) writeProtected'
+      .. ' (viewRequests definitiveView))) First')
+    assert.is_truthy(text:find(
+      '\n* (skg (node (id id-1) writeProtected)) Title from stack\n',
+      1, true))
+    assert.are.equal('NOTE:', notified:sub(1, 5))
+  end)
+
   it('paste_node after typed stars inserts only metadata and title',
      function ()
     state.id_stack = { { 'id-1', 'Title from stack' } }

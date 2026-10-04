@@ -653,10 +653,18 @@ push it to the stack, then paste it as a node somewhere else.
 
 Inserts, at the cursor, a write-protected view
 of the node whose ID is at the top of the id stack.
-Its metadata includes only the ID and =writeProtected=,
-and its title comes from the stack.
+Its metadata includes only the ID, =writeProtected=,
+and (usually) a definitive view request;
+its title comes from the stack.
 Does not modify the stack or save.
-Saving will provide the rest of its metadata.
+Saving will provide the rest of its metadata,
+and fulfill the definitive view request,
+making the node writeable with its real title, body and content.
+
+The view request is omitted if the buffer already has
+a writeable instance of the node (or one requesting a definitive view),
+because a buffer can hold only one writeable instance of each node.
+Then the pasted node stays write-protected, and Neovim says so.
 **** <localleader>On : :SkgPopNode
 Like PasteNode,
 but also removes the node from the stack.
