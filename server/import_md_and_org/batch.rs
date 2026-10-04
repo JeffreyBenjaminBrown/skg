@@ -114,8 +114,8 @@ pub fn prepare_import_batch_with (
 
 impl PreparedImportBatch {
   /// An Org document: a summary, warnings grouped by file, then the
-  /// imported documents, those whose export marker would write them
-  /// under a different name first.
+  /// imported documents, Markdown ones first, since their exports will
+  /// be named differently.
   pub fn preview_report (
     &self,
   ) -> String {
@@ -139,17 +139,16 @@ impl PreparedImportBatch {
             diagnostic . message)); }}}
     out . push_str (&format! ("* New nodes ({}, from {} documents)\n",
       self . nodes . len (), self . documents . len ()));
-    let (renamed, same) : (Vec<(String, String)>, Vec<(String, String)>) =
-      self . export_targets . iter ()
-      . map (|(source, target)|
-        (source . display () . to_string (), format! ("{}.org", target)))
-      . partition (|(input, output)| input != output);
-    out . push_str ("** whose input and (eventual) output names do *not* match\n");
-    for (input, output) in renamed {
-      out . push_str (&format! ("*** {}\nwill export as {}\n", input, output)); }
-    out . push_str ("** whose input and (eventual) output names match\n");
-    for (input, _) in same {
-      out . push_str (&format! ("*** {}\n", input)); }
+    let (markdown, org) : (Vec<&PathBuf>, Vec<&PathBuf>) =
+      self . documents . iter () . map (|document| &document . path)
+      . partition (|path|
+        path . extension () . is_some_and (|extension| extension == "md"));
+    out . push_str ("** Markdown documents (they will export as .org)\n");
+    for path in markdown {
+      out . push_str (&format! ("*** {}\n", path . display ())); }
+    out . push_str ("** Org documents\n");
+    for path in org {
+      out . push_str (&format! ("*** {}\n", path . display ())); }
     out
   }
 
@@ -387,7 +386,7 @@ mod tests {
     let report : String = prepared . preview_report ();
     assert! (report . starts_with ("* Import preview\n"), "{}", report);
     assert! (report . contains (
-      "* No warnings\n* New nodes (6, from 2 documents)\n** whose input and (eventual) output names do *not* match\n*** empty.md\nwill export as empty.org\n** whose input and (eventual) output names match\n*** notes.org\n"),
+      "* No warnings\n* New nodes (6, from 2 documents)\n** Markdown documents (they will export as .org)\n*** empty.md\n** Org documents\n*** notes.org\n"),
       "{}", report);
     let gate = env . mutation_gate ();
     let _guard = futures::executor::block_on (gate . lock ());
