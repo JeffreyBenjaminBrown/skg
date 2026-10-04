@@ -1,7 +1,7 @@
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::context::context_origin_types_for_saved_from_in_rust_graph;
 use crate::dbs::filesystem::one_node::{
-  PreparedTelescopeWrite, prepare_nodecomplete_telescope,
+  PreparedTelescopeWrite, prepare_graphnode_telescope,
 };
 use crate::telescope::invariants::{
   TelescopeViolation, affected_telescope_warnings,
@@ -18,10 +18,10 @@ use crate::dbs::tantivy::write::{add_documents_to_tantivy_writer, commit_with_st
 use crate::types::env::MutationGate;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, TantivyIndex};
 use crate::types::errors::{BufferValidationError, SaveError};
-use crate::types::nodes::rust::NodeRust;
-use crate::types::nodes::tantivy::NodeTantivy;
+use crate::types::nodes::rust::GraphnodeInRust;
+use crate::types::nodes::tantivy::GraphnodeInTantivy;
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, NodeMerge, RepoMove};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -459,7 +459,7 @@ pub(crate) fn apply_delete_propagation_cleanup (
     for pid in referencer_pids {
       let Some (rust) = graph_snap . get (&pid) else { continue; };
       node_defs . push ( DefineNode::Save ( SaveNode (
-        nodecomplete_from_noderust (rust) ))); }
+        graphnode_from_graphnodeInRust (rust) ))); }
     if cleanup_count > 0 {
       tracing::info!(
         "Adding {} cleanup save(s) to remove references to deleted nodes.",
@@ -479,13 +479,13 @@ pub(crate) fn apply_delete_propagation_cleanup (
         nc . overrides_view_of = remove_from_msv (
           &nc . overrides_view_of, &deleted_id_set ); }} } }
 
-/// Project a NodeRust back into a NodeComplete verbatim. Stripping
+/// Project a GraphnodeInRust back into a Graphnode verbatim. Stripping
 /// of deleted ids happens later, in 'apply_delete_propagation_cleanup'
 /// phase 2, and applies uniformly to all Saves.
-pub(crate) fn nodecomplete_from_noderust (
-  rust : &NodeRust,
-) -> NodeComplete {
-  NodeComplete {
+pub(crate) fn graphnode_from_graphnodeInRust (
+  rust : &GraphnodeInRust,
+) -> Graphnode {
+  Graphnode {
     pid                          : rust . pid . clone (),
     home_repo                       : rust . home_repo . clone (),
     extra_ids                    : rust . extra_ids . clone (),
@@ -579,7 +579,7 @@ pub(crate) fn prepare_fs_update (
   let prepared_writes : Vec<PreparedTelescopeWrite> =
     to_save . iter ()
     . map ( |SaveNode (node)|
-      prepare_nodecomplete_telescope (
+      prepare_graphnode_telescope (
         node,
         config,
         hoist_approved_pids . contains (&node . pid) ) )
@@ -642,12 +642,12 @@ pub(crate) fn update_tantivy_from_saveinstructions (
       &mut writer,
       tantivy_index)? ; }
   // Add documents only for non-deletion instructions.
-  // Convert to NodeTantivy (narrow) at the boundary.
-  let nodes_to_add: Vec<NodeTantivy> =
+  // Convert to GraphnodeInTantivy (narrow) at the boundary.
+  let nodes_to_add: Vec<GraphnodeInTantivy> =
     instructions . iter()
     . filter_map( |instr| match instr {
         DefineNode::Save(SaveNode (node)) =>
-          Some ( NodeTantivy::from (node) ),
+          Some ( GraphnodeInTantivy::from (node) ),
         DefineNode::Delete (_) => None } )
     . collect();
   let processed_count: usize =

@@ -51,7 +51,7 @@ async fn test_delete_removed_node_respawns (
         "gets-removed.skg should stay deleted");
 
       // DISK: 11.skg should still contain moves and not gets-removed
-      let node_11 = read_nodecomplete(gitrepo_path, "11")?;
+      let node_11 = read_graphnode(gitrepo_path, "11")?;
       let contains_11 = members_of (&node_11 . contains);
       assert!(contains_11 . contains(&ID("moves" . to_string())),
         "11.skg should still contain moves");
@@ -88,7 +88,7 @@ async fn test_delete_removed_here_node_respawns (
       ) . await?;
 
       // DISK: 12.skg should still have empty contains
-      let node_12 = read_nodecomplete(gitrepo_path, "12")?;
+      let node_12 = read_graphnode(gitrepo_path, "12")?;
       let contains_12 = members_of (&node_12 . contains);
       assert!(!contains_12 . contains(&ID("moves" . to_string())),
         "12.skg should not contain moves");
@@ -127,7 +127,7 @@ async fn test_delete_new_here_updates_disk (
       ) . await?;
 
       // DISK: 11.skg should no longer contain moves
-      let node_11 = read_nodecomplete(gitrepo_path, "11")?;
+      let node_11 = read_graphnode(gitrepo_path, "11")?;
       let contains_11 = members_of (&node_11 . contains);
       assert!(!contains_11 . contains(&ID("moves" . to_string())),
         "11.skg should no longer contain moves");
@@ -174,14 +174,14 @@ async fn test_add_new_child_creates_on_disk (
       // DISK: newer.skg should be created with correct id and title
       assert!(gitrepo_path . join ("newer.skg") . exists(),
         "newer.skg should be created");
-      let node_newer = read_nodecomplete(gitrepo_path, "newer")?;
+      let node_newer = read_graphnode(gitrepo_path, "newer")?;
       assert_eq!(&node_newer . pid, &ID("newer" . to_string()),
         "newer.skg should have id 'newer'");
       assert_eq!(node_newer . title, "newer",
         "newer.skg should have title 'newer'");
 
       // DISK: 12.skg should contain newer
-      let node_12 = read_nodecomplete(gitrepo_path, "12")?;
+      let node_12 = read_graphnode(gitrepo_path, "12")?;
       let contains_12 = members_of (&node_12 . contains);
       assert!(contains_12 . contains(&ID("newer" . to_string())),
         "12.skg should contain newer");
@@ -381,7 +381,7 @@ async fn test_delete_removed_node_respawns_staged (
         "gets-removed.skg should stay deleted");
 
       // DISK: 11.skg should still contain moves and not gets-removed
-      let node_11 = read_nodecomplete(gitrepo_path, "11")?;
+      let node_11 = read_graphnode(gitrepo_path, "11")?;
       let contains_11 = members_of (&node_11 . contains);
       assert!(contains_11 . contains(&ID("moves" . to_string())),
         "11.skg should still contain moves");

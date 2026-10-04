@@ -14,8 +14,8 @@ use skg::dbs::tantivy::search::{
   SearchOptions, has_overPrivateText_telescope, search_index};
 use skg::dbs::tantivy::write::update_index_with_nodes;
 use skg::types::misc::{ID, MSV, RepoName, TantivyIndex, rel_partners_at_relRepo_msv};
-use skg::types::nodes::tantivy::NodeTantivy;
-use skg::types::nodes::complete::{Flag, NodeComplete, empty_node_complete};
+use skg::types::nodes::tantivy::GraphnodeInTantivy;
+use skg::types::nodes::complete::{Flag, Graphnode, empty_node_complete};
 
 #[test]
 fn test_many_tantivy_things (
@@ -26,7 +26,7 @@ fn test_many_tantivy_things (
     Path::new (index_dir);
 
   let config = load_config ("tests/tantivy/fixtures/skgconfig.toml")?;
-  let nodes: Vec<NodeComplete> =
+  let nodes: Vec<Graphnode> =
     read_all_skg_files_from_repos (&config)?;
 
   let (tantivy_index, indexed_count): (TantivyIndex, usize) =
@@ -89,8 +89,8 @@ fn test_many_tantivy_things (
             initial_top_id);
   println!("✓ Initial search correctly found node 1 as top result");
 
-  // Create a new NodeComplete with ID 6 and title "This is one big tuna."
-  let mut new_node : NodeComplete =
+  // Create a new Graphnode with ID 6 and title "This is one big tuna."
+  let mut new_node : Graphnode =
     empty_node_complete ();
   { new_node . title = "This is one big tuna." . to_string();
     new_node . pid = ID::new ("6"); }
@@ -98,7 +98,7 @@ fn test_many_tantivy_things (
   // Update the index with the new node
   let update_count: usize =
     update_index_with_nodes (
-      &[NodeTantivy::from (&new_node)],
+      &[GraphnodeInTantivy::from (&new_node)],
       &tantivy_index) ?;
   assert_eq!(update_count, 1,
             "Expected to update exactly 1 document, but updated: {}",
@@ -179,7 +179,7 @@ pub fn print_search_results(
 
 #[test]
 fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
-  let empty_node : NodeComplete = empty_node_complete ();
+  let empty_node : Graphnode = empty_node_complete ();
   let mut apple  = empty_node . clone();
   { apple . pid      = ID::new ("apple");
     apple . title    =               "eat apple" . to_string();
@@ -342,17 +342,17 @@ fn test_escape_tantivy_intra_word (
 #[test]
 fn test_search_finds_titles_with_special_chars (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : NodeComplete = empty_node_complete ();
-  let mut c_plus : NodeComplete = empty . clone ();
+  let empty : Graphnode = empty_node_complete ();
+  let mut c_plus : Graphnode = empty . clone ();
   { c_plus . pid   = ID::new ("c_plus");
     c_plus . title = "C++ tips" . to_string (); }
-  let mut brackets : NodeComplete = empty . clone ();
+  let mut brackets : Graphnode = empty . clone ();
   { brackets . pid   = ID::new ("brackets");
     brackets . title = "[draft] plan" . to_string (); }
-  let mut colons : NodeComplete = empty . clone ();
+  let mut colons : Graphnode = empty . clone ();
   { colons . pid   = ID::new ("colons");
     colons . title = "cat:dog" . to_string (); }
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     vec![c_plus, brackets, colons];
   let index_dir : &str =
     "/tmp/tantivy-test-special-chars";
@@ -383,15 +383,15 @@ fn test_search_finds_titles_with_special_chars (
 #[test]
 fn test_search_body_axis (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : NodeComplete = empty_node_complete ();
-  let mut recipe : NodeComplete = empty . clone ();
+  let empty : Graphnode = empty_node_complete ();
+  let mut recipe : Graphnode = empty . clone ();
   { recipe . pid   = ID::new ("recipe");
     recipe . title = "soup recipe" . to_string ();
     recipe . body  = Some ( "add paprika and salt" . to_string () ); }
-  let mut decoy : NodeComplete = empty . clone ();
+  let mut decoy : Graphnode = empty . clone ();
   { decoy . pid   = ID::new ("decoy");
     decoy . title = "shopping list" . to_string (); }
-  let nodes : Vec<NodeComplete> = vec! [recipe, decoy];
+  let nodes : Vec<Graphnode> = vec! [recipe, decoy];
   let (ti, _) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
       &nodes, Path::new ("/tmp/tantivy-test-body-axis") ) ?;
@@ -418,7 +418,7 @@ fn test_search_body_axis (
 #[test]
 fn no_search_matching_excludes_title_alias_and_body_in_every_query_mode (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let mut excluded : NodeComplete = empty_node_complete ();
+  let mut excluded : Graphnode = empty_node_complete ();
   excluded . pid = ID::new ("excluded");
   excluded . title = "shaver titletoken" . to_string ();
   excluded . aliases = rel_partners_at_relRepo_msv (
@@ -427,7 +427,7 @@ fn no_search_matching_excludes_title_alias_and_body_in_every_query_mode (
   excluded . body = Some ("shaver bodytoken" . to_string ());
   excluded . misc = vec![Flag::NoSearchMatching];
 
-  let mut ordinary : NodeComplete = empty_node_complete ();
+  let mut ordinary : Graphnode = empty_node_complete ();
   ordinary . pid = ID::new ("ordinary");
   ordinary . title = "shaver ordinarytoken" . to_string ();
 
@@ -467,13 +467,13 @@ fn no_search_matching_excludes_title_alias_and_body_in_every_query_mode (
     "supporting Tantivy documents remain available to exact-ID lookup");
 
   excluded . misc . clear ();
-  update_index_with_nodes (&[NodeTantivy::from (&excluded)], &index) ?;
+  update_index_with_nodes (&[GraphnodeInTantivy::from (&excluded)], &index) ?;
   let (matches, _) = search_index (
     &index, "titletoken", &SearchOptions::default ()) ?;
   assert_eq! (matches . len (), 1,
     "clearing the flag must become searchable without restart");
   excluded . misc . push (Flag::NoSearchMatching);
-  update_index_with_nodes (&[NodeTantivy::from (&excluded)], &index) ?;
+  update_index_with_nodes (&[GraphnodeInTantivy::from (&excluded)], &index) ?;
   let (matches, _) = search_index (
     &index, "titletoken", &SearchOptions::default ()) ?;
   assert! (matches . is_empty (),
@@ -484,7 +484,7 @@ fn no_search_matching_excludes_title_alias_and_body_in_every_query_mode (
 #[test]
 fn no_search_matching_overPrivateText_does_not_trigger_search_preflight (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let mut node : NodeComplete = empty_node_complete ();
+  let mut node : Graphnode = empty_node_complete ();
   node . pid = ID::new ("excluded-private");
   node . title = "private excluded" . to_string ();
   node . overPrivateText_telescope = true;
@@ -495,7 +495,7 @@ fn no_search_matching_overPrivateText_does_not_trigger_search_preflight (
   assert! (! has_overPrivateText_telescope (&index) ?);
 
   node . misc . clear ();
-  update_index_with_nodes (&[NodeTantivy::from (&node)], &index) ?;
+  update_index_with_nodes (&[GraphnodeInTantivy::from (&node)], &index) ?;
   assert! (has_overPrivateText_telescope (&index) ?);
   Ok (( ))
 }
@@ -503,11 +503,11 @@ fn no_search_matching_overPrivateText_does_not_trigger_search_preflight (
 #[test]
 fn overPrivateText_telescope_filter_runs_inside_the_search_query (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : NodeComplete = empty_node_complete ();
-  let mut clean : NodeComplete = empty . clone ();
+  let empty : Graphnode = empty_node_complete ();
+  let mut clean : Graphnode = empty . clone ();
   clean . pid = ID::new ("clean");
   clean . title = "shared privacy term" . to_string ();
-  let mut overPrivateText : NodeComplete = empty . clone ();
+  let mut overPrivateText : Graphnode = empty . clone ();
   overPrivateText . pid = ID::new ("overPrivateText");
   overPrivateText . title = "shared privacy term" . to_string ();
   overPrivateText . overPrivateText_telescope = true;
@@ -538,17 +538,17 @@ fn overPrivateText_telescope_filter_runs_inside_the_search_query (
 #[test]
 fn test_search_regex_axis (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : NodeComplete = empty_node_complete ();
-  let mut history    : NodeComplete = empty . clone ();
+  let empty : Graphnode = empty_node_complete ();
+  let mut history    : Graphnode = empty . clone ();
   { history    . pid   = ID::new ("history");
     history    . title = "history" . to_string (); }
-  let mut historical : NodeComplete = empty . clone ();
+  let mut historical : Graphnode = empty . clone ();
   { historical . pid   = ID::new ("historical");
     historical . title = "historical" . to_string (); }
-  let mut hello      : NodeComplete = empty . clone ();
+  let mut hello      : Graphnode = empty . clone ();
   { hello      . pid   = ID::new ("hello");
     hello      . title = "hello" . to_string (); }
-  let nodes : Vec<NodeComplete> = vec! [history, historical, hello];
+  let nodes : Vec<Graphnode> = vec! [history, historical, hello];
   let (ti, _) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
       &nodes, Path::new ("/tmp/tantivy-test-regex-axis") ) ?;
@@ -577,13 +577,13 @@ fn test_search_regex_axis (
 #[test]
 fn test_search_regex_multiword (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : NodeComplete = empty_node_complete ();
-  let mk = |pid : &str, title : &str| -> NodeComplete {
-    let mut n : NodeComplete = empty . clone ();
+  let empty : Graphnode = empty_node_complete ();
+  let mk = |pid : &str, title : &str| -> Graphnode {
+    let mut n : Graphnode = empty . clone ();
     n . pid = ID::new (pid);
     n . title = title . to_string ();
     n };
-  let nodes : Vec<NodeComplete> = vec! [
+  let nodes : Vec<Graphnode> = vec! [
     mk ("polsci",   "political science"),
     mk ("polit",    "political"),
     mk ("sci",      "science"),
@@ -630,13 +630,13 @@ fn test_search_regex_multiword (
 #[test]
 fn test_search_regex_with_operators (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : NodeComplete = empty_node_complete ();
-  let mk = |pid : &str, title : &str| -> NodeComplete {
-    let mut n : NodeComplete = empty . clone ();
+  let empty : Graphnode = empty_node_complete ();
+  let mk = |pid : &str, title : &str| -> Graphnode {
+    let mut n : Graphnode = empty . clone ();
     n . pid = ID::new (pid);
     n . title = title . to_string ();
     n };
-  let nodes : Vec<NodeComplete> = vec! [
+  let nodes : Vec<Graphnode> = vec! [
     mk ("polsci",   "political science"),
     mk ("polbio",   "political biology"),
     mk ("scibio",   "science biology"),
@@ -699,13 +699,13 @@ fn test_search_regex_with_operators (
 #[test]
 fn test_search_regex_operator_grouping (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty : NodeComplete = empty_node_complete ();
-  let mk = |pid : &str, title : &str| -> NodeComplete {
-    let mut n : NodeComplete = empty . clone ();
+  let empty : Graphnode = empty_node_complete ();
+  let mk = |pid : &str, title : &str| -> Graphnode {
+    let mut n : Graphnode = empty . clone ();
     n . pid = ID::new (pid);
     n . title = title . to_string ();
     n };
-  let nodes : Vec<NodeComplete> = vec! [
+  let nodes : Vec<Graphnode> = vec! [
     mk ("polsci",  "political science"),
     mk ("polbio",  "political biology"),
     mk ("scibio",  "science biology"),
@@ -781,13 +781,13 @@ fn test_search_regex_operator_grouping (
 #[test]
 fn test_title_by_id_returns_title_not_alias (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let empty_node : NodeComplete = empty_node_complete ();
+  let empty_node : Graphnode = empty_node_complete ();
   let mut node = empty_node . clone ();
   { node . pid     = ID::new ("node-with-aliases");
     node . title   =               "The Real Title" . to_string ();
     node . aliases = rel_partners_at_relRepo_msv ( & node . home_repo, MSV::Specified (vec![   "Alias One" . to_string (),
                                    "Alias Two" . to_string () ])); }
-  let nodes : Vec<NodeComplete> = vec![node];
+  let nodes : Vec<Graphnode> = vec![node];
   let index_dir : &str =
     "/tmp/tantivy-test-title-by-id";
   let (tantivy_index, indexed_count) : (TantivyIndex, usize) =
@@ -815,7 +815,7 @@ fn test_title_by_id_returns_title_not_alias (
 #[test]
 fn overPrivateText_telescope_flag_survives_index_build_and_update (
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let mut node : NodeComplete = empty_node_complete ();
+  let mut node : Graphnode = empty_node_complete ();
   node . pid = ID::new ("overPrivateText-indexed");
   node . title = "uniquely overPrivateText indexed title" . to_string ();
   node . overPrivateText_telescope = true;
@@ -833,6 +833,6 @@ fn overPrivateText_telescope_flag_survives_index_build_and_update (
   assert_eq! (stored_flag (&tantivy_index)?, "true");
   node . overPrivateText_telescope = false;
   update_index_with_nodes (
-    &[NodeTantivy::from (&node)], &tantivy_index )?;
+    &[GraphnodeInTantivy::from (&node)], &tantivy_index )?;
   assert_eq! (stored_flag (&tantivy_index)?, "false");
   Ok (( )) }

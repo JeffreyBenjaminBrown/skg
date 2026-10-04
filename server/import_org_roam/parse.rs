@@ -1,4 +1,4 @@
-/// Parse an org-roam `.org` file into a flat Vec of NodeCompletes.
+/// Parse an org-roam `.org` file into a flat Vec of Graphnodes.
 ///
 /// # Strategy
 ///
@@ -31,13 +31,13 @@
 /// 4. **Assign missing IDs.** Any section (original or synthetic)
 ///    that lacks an `:ID:` gets a fresh UUID.
 ///
-/// 5. **Emit NodeCompletes.** Walk the viewforest depth-first, converting each
-///    `SectionTree` into a flat `NodeComplete` whose `contains` field lists
+/// 5. **Emit Graphnodes.** Walk the viewforest depth-first, converting each
+///    `SectionTree` into a flat `Graphnode` whose `contains` field lists
 ///    its children by ID.
 
 use crate::types::misc::{
   ID, MSV, RelPartner, RepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
-use crate::types::nodes::complete::{Flag, NodeComplete};
+use crate::types::nodes::complete::{Flag, Graphnode};
 
 use std::path::Path;
 use uuid::Uuid;
@@ -69,7 +69,7 @@ struct SectionTree {
 
 pub fn parse_org_file (
   path : &Path,
-) -> Vec<NodeComplete> {
+) -> Vec<Graphnode> {
   let contents : String = match std::fs::read_to_string (path) {
     Ok (s) => s,
     Err (_) => return vec![], };
@@ -86,9 +86,9 @@ pub fn parse_org_file (
   for st in &mut viewforest {
     insert_super_indentation_groups (st);
     assign_missing_ids (st); }
-  let mut nodes : Vec<NodeComplete> = Vec::new();
+  let mut nodes : Vec<Graphnode> = Vec::new();
   for st in &viewforest {
-    collect_nodecompletes (st, &lines, &mut nodes); }
+    collect_graphnodes (st, &lines, &mut nodes); }
   nodes }
 
 //
@@ -256,7 +256,7 @@ fn group_children_by_level (
   vec![ special_node, normal_node ] }
 
 //
-// NodeComplete collection
+// Graphnode collection
 //
 
 fn assign_missing_ids (
@@ -267,20 +267,20 @@ fn assign_missing_ids (
   for child in &mut tree . children {
     assign_missing_ids (child); }}
 
-fn collect_nodecompletes (
+fn collect_graphnodes (
   tree  : &SectionTree,
   lines : &[String],
-  out   : &mut Vec<NodeComplete>,
+  out   : &mut Vec<Graphnode>,
 ) {
-  let node : NodeComplete = nodecomplete_from_section_tree (tree, lines);
+  let node : Graphnode = graphnode_from_section_tree (tree, lines);
   out . push (node);
   for child in &tree . children {
-    collect_nodecompletes (child, lines, out); }}
+    collect_graphnodes (child, lines, out); }}
 
-fn nodecomplete_from_section_tree (
+fn graphnode_from_section_tree (
   tree  : &SectionTree,
   lines : &[String],
-) -> NodeComplete {
+) -> Graphnode {
   // All sections have IDs after assign_missing_ids pre-pass.
   let id_str : &str =
     tree . section . id . as_ref() . unwrap();
@@ -311,7 +311,7 @@ fn nodecomplete_from_section_tree (
     rel_partners_at_relRepo_msv (&repo, aliases_msv);
   let contains : Vec<RelPartner<ID>> =
     rel_partners_at_relRepo (&repo, contained_ids);
-  NodeComplete {
+  Graphnode {
     title    : tree . section . headline . clone(),
     overPrivateText_telescope : false,
     aliases,

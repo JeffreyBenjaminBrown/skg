@@ -44,12 +44,12 @@ async fn test_delete_text_changed_property_respawns (
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: 1.skg should still have the new title
-      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
+      let node_1 = read_graphnode(gitrepo_path, "1")?;
       assert_eq!(node_1 . title, "1 has a new title.",
         "1.skg should still have the new title");
 
       // DISK: 11.skg should still have the new body
-      let node_11 = read_nodecomplete(gitrepo_path, "11")?;
+      let node_11 = read_graphnode(gitrepo_path, "11")?;
       assert_eq!(node_11 . body, Some("11 has a new body." . to_string()),
         "11.skg should still have the new body");
 
@@ -82,7 +82,7 @@ async fn test_edit_text_changed_node_updates_disk (
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: 1.skg should have the newest title
-      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
+      let node_1 = read_graphnode(gitrepo_path, "1")?;
       assert_eq!(node_1 . title, "1 has an even newer title.",
         "1.skg should have the edited title");
 
@@ -122,7 +122,7 @@ async fn test_edit_text_changed_property_respawns (
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: No changes should occur
-      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
+      let node_1 = read_graphnode(gitrepo_path, "1")?;
       assert_eq!(node_1 . title, "1 has a new title.",
         "1.skg should be unchanged");
 
@@ -164,7 +164,7 @@ async fn test_move_text_changed_property_respawns (
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: No changes should occur
-      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
+      let node_1 = read_graphnode(gitrepo_path, "1")?;
       assert_eq!(node_1 . title, "1 has a new title.",
         "1.skg should be unchanged");
 
@@ -201,7 +201,7 @@ async fn test_move_text_changed_to_unedited_node_respawns (
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: No changes should occur
-      let node_12 = read_nodecomplete(gitrepo_path, "12")?;
+      let node_12 = read_graphnode(gitrepo_path, "12")?;
       assert_eq!(node_12 . title, "12",
         "12.skg should be unchanged");
       let contains_12 = node_12 . contains;
@@ -245,12 +245,12 @@ async fn test_delete_text_changed_property_respawns_staged (
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: 1.skg should still have the new title
-      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
+      let node_1 = read_graphnode(gitrepo_path, "1")?;
       assert_eq!(node_1 . title, "1 has a new title.",
         "1.skg should still have the new title");
 
       // DISK: 11.skg should still have the new body
-      let node_11 = read_nodecomplete(gitrepo_path, "11")?;
+      let node_11 = read_graphnode(gitrepo_path, "11")?;
       assert_eq!(node_11 . body, Some("11 has a new body." . to_string()),
         "11.skg should still have the new body");
 

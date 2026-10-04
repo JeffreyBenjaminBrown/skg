@@ -1,4 +1,4 @@
--- PURPOSE: Expand/strip default fields for ActiveNode metadata
+-- PURPOSE: Expand/strip default fields for ActiveVognode metadata
 -- editing. After sexp_to_org, expand inserts missing editable fields
 -- with defaults; before org_to_sexp, strip removes default-valued
 -- fields. The Lua port of elisp/skg-sexpr/skg-activeNode-defaults.el.
@@ -37,7 +37,7 @@ function M.editable_default_for (name)
   return nil
 end
 
----Is SEXP an ActiveNode sexp?
+---Is SEXP an ActiveVognode sexp?
 ---@param sexp any
 ---@return boolean
 function M.activeNode_sexp_p (sexp)
@@ -61,7 +61,7 @@ end
 
 -- ── Expand ─────────────────────────────────────────────────────────
 
----Expand default fields in ORG_TEXT for ActiveNode metadata editing:
+---Expand default fields in ORG_TEXT for ActiveVognode metadata editing:
 ---reorder the '** node' section's fields to canonical order, insert
 ---missing editable fields with defaults, and expand bare boolean
 ---atoms to have a value child. If DEFAULT_REPO is given, insert it

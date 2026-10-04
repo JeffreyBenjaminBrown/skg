@@ -4,7 +4,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::git::NodeChanges;
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, RelPartner, RelationshipMemberKey, RepoName, members_of};
-use crate::types::nodes::rust::NodeRust;
+use crate::types::nodes::rust::GraphnodeInRust;
 
 /// The five stored outbound relationship types and their endpoint roles.
 /// This is domain vocabulary; storage adapters consume it rather than own it.
@@ -333,7 +333,7 @@ impl InRustGraph {
     target   : &ID,
   ) -> Option<RepoName> {
     let target_key : ID = self . pid_of (target) ? ;
-    let node : &NodeRust = self . nodes . get (owner) ? ;
+    let node : &GraphnodeInRust = self . nodes . get (owner) ? ;
     let rel_partners : Vec<RelPartner<ID>> = match relation {
       NodeRelation::Contains =>
         node . contains . clone (),
@@ -486,7 +486,7 @@ impl InRustGraph {
 }
 
 fn outbound_ids_from_node (
-  node     : &NodeRust,
+  node     : &GraphnodeInRust,
   relation : NodeRelation,
 ) -> Vec<ID> {
   match relation {

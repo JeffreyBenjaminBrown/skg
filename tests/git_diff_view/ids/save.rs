@@ -49,7 +49,7 @@ async fn test_delete_id_folder_respawns (
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: 1.skg should still have the worktree ids
-      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
+      let node_1 = read_graphnode(gitrepo_path, "1")?;
       assert!(node_1 . all_ids () . any(|id| id == &ID("1" . to_string())),
         "1.skg should still have id '1'");
       assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
@@ -98,7 +98,7 @@ async fn test_delete_id_properties_aborts (
         "the error should be IDFolder_Edited: {}", err);
 
       // DISK: 1.skg should still have the worktree ids
-      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
+      let node_1 = read_graphnode(gitrepo_path, "1")?;
       assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
       Ok(()) }) }) . await
@@ -137,7 +137,7 @@ async fn test_edit_id_property_aborts (
         "the error should be IDFolder_Edited: {}", err);
 
       // DISK: 1.skg should still have the original worktree ids
-      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
+      let node_1 = read_graphnode(gitrepo_path, "1")?;
       assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
       assert!(!node_1 . all_ids () . any(|id| id == &ID("2-modified" . to_string())),
@@ -216,14 +216,14 @@ async fn test_move_id_properties_to_child_aborts (
         "the error should be IDFolder_Edited: {}", err);
 
       // DISK: child.skg should not have any new ids
-      let node_child = read_nodecomplete(gitrepo_path, "child")?;
+      let node_child = read_graphnode(gitrepo_path, "child")?;
       assert_eq!(1 + node_child . extra_ids . len(), 1,
         "child.skg should still only have its original id");
       assert_eq!(&node_child . pid, &ID("child" . to_string()),
         "child.skg should still have id 'child'");
 
       // DISK: 1.skg should still have its ids
-      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
+      let node_1 = read_graphnode(gitrepo_path, "1")?;
       assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
       Ok(()) }) }) . await

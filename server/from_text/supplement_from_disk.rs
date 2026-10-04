@@ -1,12 +1,12 @@
 /// PURPOSE:
-/// When a NodeComplete is created from user input,
-/// it might not mention every NodeComplete field.
+/// When a Graphnode is created from user input,
+/// it might not mention every Graphnode field.
 /// If it contains Some([]) for that field,
 /// then the user is asking to empty the field.
 /// But if it has None for that field,
 /// then the field should not be changed --
 /// which means it must be read from disk
-/// and inserted into the NodeComplete.
+/// and inserted into the Graphnode.
 
 use crate::from_text::local_instruction_collection::lower::{
   RequestedRelRepos, NodeIntent, NodeSaveIntent };
@@ -14,11 +14,11 @@ use crate::from_text::weave::{relationship_member_is_visible, set_difference_mer
 use crate::repo_sets::ActiveRepoSet;
 use crate::types::errors::BufferValidationError;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::node_lookup::opt_nodecomplete_by_id;
+use crate::dbs::node_lookup::opt_graphnode_by_id;
 use crate::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgConfig, RepoName, members_of, rel_partners_at_relRepo};
 use crate::types::phantom::home_from_disk;
 use crate::types::nodes::complete::{
-  NodeComplete, empty_node_complete, set_flag};
+  Graphnode, empty_node_complete, set_flag};
 use crate::types::save::{DefineNode, SaveNode, RepoMove};
 use std::collections::HashMap;
 use std::error::Error;
@@ -117,8 +117,8 @@ fn supplement_saveintent_from_disk (
 ) -> Result<Definenode_with_Opt_Repomove, Box<dyn Error>> {
   let pid : ID =
     from_buffer . pid . clone();
-  let from_disk : Option<NodeComplete> =
-    opt_nodecomplete_by_id (
+  let from_disk : Option<Graphnode> =
+    opt_graphnode_by_id (
       graph, config, &pid) ?;
   match from_disk {
     None => {
@@ -132,15 +132,15 @@ fn supplement_saveintent_from_disk (
       let requested_relRepos : RequestedRelRepos =
         from_buffer . requested_relRepos ();
       let flag_request = from_buffer . flag_request;
-      let mut supplemented : NodeComplete =
-        from_buffer . into_nodecomplete ();
+      let mut supplemented : Graphnode =
+        from_buffer . into_graphnode ();
       if let Some ((flag, value)) = flag_request {
         set_flag (&mut supplemented . misc, flag, value); }
-      let empty_disk : NodeComplete = NodeComplete {
+      let empty_disk : Graphnode = Graphnode {
         pid    : supplemented . pid    . clone (),
         home_repo : supplemented . home_repo . clone (),
         .. empty_node_complete () };
-      let supplemented : NodeComplete =
+      let supplemented : Graphnode =
         apply_sticky_relRepos_in_graph_with_prospective_homes (
           supplemented, &empty_disk, &requested_relRepos,
           graph, config, prospective_homes )
@@ -149,28 +149,28 @@ fn supplement_saveintent_from_disk (
         instruction : DefineNode::Save (SaveNode (supplemented)),
         repo_move : None, } ) },
     Some (disk_node) => {
-      let disk_node : NodeComplete = disk_node;
+      let disk_node : Graphnode = disk_node;
       let mut from_buffer : NodeSaveIntent = from_buffer;
       from_buffer . fill_unspecified_contains (
         &members_of (&disk_node . contains));
       let requested_relRepos : RequestedRelRepos =
         from_buffer . requested_relRepos ();
       let flag_request = from_buffer . flag_request;
-      let from_buffer : NodeComplete =
-        from_buffer . into_nodecomplete();
-      let canonicalized : NodeComplete =
+      let from_buffer : Graphnode =
+        from_buffer . into_graphnode();
+      let canonicalized : Graphnode =
         canonicalize_ids_from_disk (from_buffer, &disk_node) ?;
       let maybe_move : Option<RepoMove> =
         detect_repo_move ( config,  &pid,
                              &canonicalized . home_repo,
                              &disk_node . home_repo) ?;
-      let supplemented : NodeComplete = {
-        let mut supplemented : NodeComplete =
+      let supplemented : Graphnode = {
+        let mut supplemented : Graphnode =
           supplement_unspecified_fields_from_disk (
             canonicalized, &disk_node);
         if let Some ((flag, value)) = flag_request {
           set_flag (&mut supplemented . misc, flag, value); }
-        let supplemented : NodeComplete =
+        let supplemented : Graphnode =
           match restricted_repo_set {
             None => supplemented,
             Some (active) => preserve_invisible_members (
@@ -194,12 +194,12 @@ fn supplement_saveintent_from_disk (
 /// changed it, so an untouched field keeps its MSV shape (and the
 /// noop filter can still recognize an unchanged node).
 fn preserve_invisible_members (
-  mut supplemented : NodeComplete,
-  disk_node        : &NodeComplete,
+  mut supplemented : Graphnode,
+  disk_node        : &Graphnode,
   graph            : &InRustGraph,
   config           : &SkgConfig,
   active           : &ActiveRepoSet,
-) -> NodeComplete {
+) -> Graphnode {
   let member_key = |id : &ID| -> RelationshipMemberKey {
     graph . relationship_member_key (id) };
   let contains_visible = |id : &ID| -> bool {
@@ -292,7 +292,7 @@ pub fn refuse_delete_with_inactive_sections (
 /// relRepos:
 /// - EXPLICIT: a member named in 'explicit' (the buffer headline's
 ///   '(relRepo NAME)' atom, threaded in as a side-channel because
-///   NodeComplete's 'RelPartner::repo' carries no "was this
+///   Graphnode's 'RelPartner::repo' carries no "was this
 ///   explicit" flag) wins outright, PROVIDED it is at least as
 ///   private as the DEFAULT floor -- normally the more private of
 ///   the two endpoints' homes, NOT the disk relRepo. An explicit atom
@@ -323,23 +323,23 @@ pub fn refuse_delete_with_inactive_sections (
 ///   (the set-relRepo gesture refuses there).
 #[cfg(test)]
 pub(crate) fn apply_sticky_relRepos_in_graph (
-  supplemented : NodeComplete,
-  disk_node    : &NodeComplete,
+  supplemented : Graphnode,
+  disk_node    : &Graphnode,
   explicit     : &RequestedRelRepos,
   graph        : &InRustGraph,
   config       : &SkgConfig,
-) -> Result<NodeComplete, String> {
+) -> Result<Graphnode, String> {
   apply_sticky_relRepos_in_graph_with_prospective_homes (
     supplemented, disk_node, explicit, graph, config, &HashMap::new ()) }
 
 fn apply_sticky_relRepos_in_graph_with_prospective_homes (
-  mut supplemented : NodeComplete,
-  disk_node        : &NodeComplete,
+  mut supplemented : Graphnode,
+  disk_node        : &Graphnode,
   explicit         : &RequestedRelRepos,
   graph            : &InRustGraph,
   config           : &SkgConfig,
   prospective_homes : &HashMap<ID, RepoName>,
-) -> Result<NodeComplete, String> {
+) -> Result<Graphnode, String> {
   let owner_pid  : ID         = supplemented . pid    . clone ();
   let owner_home : RepoName = supplemented . home_repo . clone ();
   let resolve = |id : &ID| -> ID {
@@ -557,9 +557,9 @@ fn hide_repo (
 
 /// Replace buffer's (singleton) ids with disk's (possibly multiple) ids.
 pub fn canonicalize_ids_from_disk (
-  mut from_buffer : NodeComplete,
-  disk_node       : &NodeComplete,
-) -> Result<NodeComplete, Box<dyn Error>> {
+  mut from_buffer : Graphnode,
+  disk_node       : &Graphnode,
+) -> Result<Graphnode, Box<dyn Error>> {
   for buffer_id in from_buffer . all_ids() {
     let buffer_id : &ID = buffer_id;
     if ! disk_node . all_ids() . any ( |id| id == buffer_id ) {
@@ -595,9 +595,9 @@ pub fn detect_repo_move (
 
 /// Fill buffer fields that the buffer left unspecified.
 pub fn supplement_unspecified_fields_from_disk (
-  mut from_buffer : NodeComplete,
-  disk_node       : &NodeComplete,
-) -> NodeComplete {
+  mut from_buffer : Graphnode,
+  disk_node       : &Graphnode,
+) -> Graphnode {
   if from_buffer . aliases . is_unspecified() {
     from_buffer . aliases = disk_node . aliases . clone(); }
   if from_buffer . subscribes_to . is_unspecified() {

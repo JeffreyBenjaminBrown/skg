@@ -5,7 +5,7 @@ use skg::dbs::in_rust_graph::relation_accessors::{
   RelationRole,
 };
 use skg::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, RepoName, rel_partners_at_relRepo};
-use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
+use skg::types::nodes::complete::{Graphnode, empty_node_complete};
 
 fn node (
   pid       : &str,
@@ -13,8 +13,8 @@ fn node (
   subscribes: &[&str],
   hides     : &[&str],
   overrides : &[&str],
-) -> NodeComplete {
-  let mut node : NodeComplete =
+) -> Graphnode {
+  let mut node : Graphnode =
     empty_node_complete ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
@@ -45,8 +45,8 @@ fn node_with_all_relations (
   hides     : &[&str],
   overrides : &[&str],
   links : &[&str],
-) -> NodeComplete {
-  let mut result : NodeComplete =
+) -> Graphnode {
+  let mut result : Graphnode =
     node (pid, &[], subscribes, hides, overrides);
   result . contains = rel_partners_at_relRepo (
     &result . home_repo,
@@ -67,7 +67,7 @@ fn id_set (
 #[test]
 fn relation_accessors_return_both_membership_directions () {
   let graph : InRustGraph =
-    InRustGraph::from_nodecompletes (&[
+    InRustGraph::from_graphnodes (&[
       node ("owner", &[], &["subscribee-alias"], &["hidden"], &["overridden"]),
       node ("subscribee", &["subscribee-alias"], &[], &[], &[]),
       node ("subscriber", &[], &["owner"], &[], &[]),
@@ -112,7 +112,7 @@ fn relation_accessors_return_both_membership_directions () {
 
 #[test]
 fn stored_outbound_accessor_retains_unresolved_raw_members () {
-  let mut owner : NodeComplete = node (
+  let mut owner : Graphnode = node (
     "owner", &[], &[], &[], &[]);
   owner . contains = vec! [
     RelPartner {
@@ -122,7 +122,7 @@ fn stored_outbound_accessor_retains_unresolved_raw_members () {
       member : ID::from ("absent-raw"),
       relRepo : RepoName::from ("main"), },
   ];
-  let graph : InRustGraph = InRustGraph::from_nodecompletes (&[
+  let graph : InRustGraph = InRustGraph::from_graphnodes (&[
     owner,
     node ("known", &["known-extra"], &[], &[], &[]),
   ]);
@@ -148,7 +148,7 @@ fn stored_outbound_accessor_retains_unresolved_raw_members () {
 
 #[test]
 fn relationship_member_key_canonicalizes_only_resolved_ids () {
-  let graph : InRustGraph = InRustGraph::from_nodecompletes (&[
+  let graph : InRustGraph = InRustGraph::from_graphnodes (&[
     node ("known", &["known-extra"], &[], &[], &[]),
   ]);
   assert_eq! (
@@ -160,7 +160,7 @@ fn relationship_member_key_canonicalizes_only_resolved_ids () {
 
 #[test]
 fn update_relevant_neighborhood_includes_each_ordinary_relation_both_ways () {
-  let graph : InRustGraph = InRustGraph::from_nodecompletes (&[
+  let graph : InRustGraph = InRustGraph::from_graphnodes (&[
     node_with_all_relations (
       "seed", &["contained"], &["subscribee"], &["hidden"], &[],
       &["link-dest", "dangling-link"]),
@@ -183,7 +183,7 @@ fn update_relevant_neighborhood_includes_each_ordinary_relation_both_ways () {
 
 #[test]
 fn update_relevant_neighborhood_walks_override_directions_independently () {
-  let graph : InRustGraph = InRustGraph::from_nodecompletes (&[
+  let graph : InRustGraph = InRustGraph::from_graphnodes (&[
     node_with_all_relations ("above-3", &[], &[], &[], &["above-2"], &[]),
     node_with_all_relations ("above-2", &[], &[], &[], &["seed"], &[]),
     node_with_all_relations ("above-branch", &[], &[], &[], &["seed"], &[]),
@@ -200,7 +200,7 @@ fn update_relevant_neighborhood_walks_override_directions_independently () {
 
 #[test]
 fn update_relevant_neighborhood_neither_reverses_nor_mixes_paths () {
-  let graph : InRustGraph = InRustGraph::from_nodecompletes (&[
+  let graph : InRustGraph = InRustGraph::from_graphnodes (&[
     node_with_all_relations ("above", &[], &[], &[], &["seed"], &[]),
     node_with_all_relations ("side-of-above", &["above"], &[], &[], &[], &[]),
     node_with_all_relations ("seed", &["ordinary"], &[], &[], &["below"], &[]),
@@ -217,7 +217,7 @@ fn update_relevant_neighborhood_neither_reverses_nor_mixes_paths () {
 
 #[test]
 fn update_relevant_neighborhood_canonicalizes_aliases_and_retains_unknowns () {
-  let graph : InRustGraph = InRustGraph::from_nodecompletes (&[
+  let graph : InRustGraph = InRustGraph::from_graphnodes (&[
     node ("known", &["alias"], &[], &[], &[]),
     node_with_all_relations (
       "points-at-unknown", &["unknown"], &[], &[], &[], &[]),

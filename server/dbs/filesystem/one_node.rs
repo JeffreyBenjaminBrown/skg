@@ -6,8 +6,8 @@ use crate::telescope::unfold::{
   UnfoldInput, UnfoldedTelescope, unfold_node,
 };
 use crate::types::misc::{ID, SkgConfig, RepoName, members_msv};
-use crate::types::nodes::fs::NodeFS;
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::fs::GraphnodeOnDisk;
+use crate::types::nodes::complete::Graphnode;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use crate::util::path_from_pid_and_repo;
@@ -17,21 +17,21 @@ use std::path::Path;
 use std::fs;
 use serde_yaml;
 
-pub fn nodecomplete_from_id (
+pub fn graphnode_from_id (
   config : &SkgConfig,
   skgid  : &ID
-) -> Result<NodeComplete, Box<dyn Error>> {
+) -> Result<Graphnode, Box<dyn Error>> {
   let nodes = read_all_skg_files_from_repos (config)?;
-  let graph = InRustGraph::from_nodecompletes (&nodes);
+  let graph = InRustGraph::from_graphnodes (&nodes);
   let (pid, repo) : (ID, RepoName) =
     graph . pid_and_repo (skgid)
     . ok_or_else ( || format! (
       "ID '{}' not found in graph", skgid ) ) ?;
-  Ok ( nodecomplete_from_pid_and_repo (
+  Ok ( graphnode_from_pid_and_repo (
     config, pid, &repo )? ) }
 
 
-/// Reads a NodeComplete from disk given its PID: the whole
+/// Reads a Graphnode from disk given its PID: the whole
 /// TELESCOPE -- every same-pid section file across the configured
 /// repos, folded. The 'repo' parameter survives only as the
 /// caller's belief about the home; the fold derives the true home
@@ -39,11 +39,11 @@ pub fn nodecomplete_from_id (
 /// read. Extra-id anchor resolution here is
 /// identity-only (this telescope's own extra_ids are unknown until
 /// read; cross-node merges resolve at the graph layer).
-pub fn nodecomplete_from_pid_and_repo (
+pub fn graphnode_from_pid_and_repo (
   config : &SkgConfig,
   pid    : ID,
   repo : &RepoName,
-) -> io::Result<NodeComplete> {
+) -> io::Result<Graphnode> {
   let Some (telescope) : Option<Telescope> =
     telescope_from_disk (config, &pid) ?
   else {
@@ -61,7 +61,7 @@ pub(crate) fn telescope_from_disk (
   config : &SkgConfig,
   pid    : &ID,
 ) -> io::Result<Option<Telescope>> {
-  let mut sections : Vec<(RepoName, NodeFS)> = Vec::new ();
+  let mut sections : Vec<(RepoName, GraphnodeOnDisk)> = Vec::new ();
   for repo_name in config . ordered_repos () {
     let path : String =
       match path_from_pid_and_repo (
@@ -69,7 +69,7 @@ pub(crate) fn telescope_from_disk (
         Ok (p) => p,
         Err (_) => continue, };
     if ! Path::new (&path) . is_file () { continue; }
-    let node_fs : NodeFS = read_nodecomplete (&path) ?;
+    let node_fs : GraphnodeOnDisk = read_graphnode (&path) ?;
     sections . push (( repo_name, node_fs )); }
   if sections . is_empty () {
     return Ok (None); }
@@ -88,14 +88,14 @@ pub(crate) fn telescope_from_disk (
 /// Reads a node from disk, returning None if not found
 /// (either in DB or on filesystem).
 /// ERRORS are propagated only if they are not of the 'not found' kind.
-pub fn optnodecomplete_from_id (
+pub fn optgraphnode_from_id (
   config : &SkgConfig,
   skgid  : &ID
-) -> Result<Option<NodeComplete>, Box<dyn Error>> {
-  match nodecomplete_from_id(
+) -> Result<Option<Graphnode>, Box<dyn Error>> {
+  match graphnode_from_id(
     config, skgid
   ) {
-    Ok (nodecomplete) => Ok(Some (nodecomplete)),
+    Ok (graphnode) => Ok(Some (graphnode)),
     Err (e)      => {
       let error_msg: String = e . to_string();
       if error_msg . contains ("not found")
@@ -111,11 +111,11 @@ pub fn fetch_aliases_from_file (
   config : &SkgConfig,
   skgid  : ID,
 ) -> Vec<String> {
-  match optnodecomplete_from_id(
+  match optgraphnode_from_id(
     config, &skgid
   ) {
-    Ok ( Some (nodecomplete)) =>
-      members_msv ( & nodecomplete . aliases ) . into_vec(),
+    Ok ( Some (graphnode)) =>
+      members_msv ( & graphnode . aliases ) . into_vec(),
     _ => Vec::new(), }}
 
 /// Write a node as its telescope: unfold into per-repo sections,
@@ -126,18 +126,18 @@ pub fn fetch_aliases_from_file (
 /// skipping, so a foreign home cannot silently lose the title, and
 /// same-pid non-owned files are ignored when an owned telescope
 /// exists, so writes cannot absorb or delete their contents.
-pub fn write_nodecomplete_to_repo (
-  nodecomplete : &NodeComplete,
+pub fn write_graphnode_to_repo (
+  graphnode : &Graphnode,
   config  : &SkgConfig,
 ) -> io::Result<()> {
-  write_nodecomplete_telescope (nodecomplete, config) }
+  write_graphnode_telescope (graphnode, config) }
 
-pub fn write_nodecomplete_telescope (
-  nodecomplete : &NodeComplete,
+pub fn write_graphnode_telescope (
+  graphnode : &Graphnode,
   config       : &SkgConfig,
 ) -> io::Result<()> {
   let prepared : PreparedTelescopeWrite =
-    prepare_nodecomplete_telescope (nodecomplete, config, false) ?;
+    prepare_graphnode_telescope (graphnode, config, false) ?;
   prepared . apply (config) ?;
   prepared . verify_hoist (config)
 }
@@ -197,8 +197,8 @@ impl PreparedTelescopeWrite {
     config : &SkgConfig,
   ) -> io::Result<()> {
     if ! self . verify_as_hoist { return Ok (( )); }
-    let reread : NodeComplete =
-      nodecomplete_from_pid_and_repo (
+    let reread : Graphnode =
+      graphnode_from_pid_and_repo (
         config, self . pid . clone (), &self . home ) ?;
     if reread . overPrivateText_telescope {
       return Err ( io::Error::new (
@@ -214,32 +214,32 @@ impl PreparedTelescopeWrite {
 /// of this crate-private preparation boundary, not of the ordinary public
 /// writer: only the interactive save pipeline may pass true after matching
 /// an exact PID approval.
-pub(crate) fn prepare_nodecomplete_telescope (
-  nodecomplete : &NodeComplete,
+pub(crate) fn prepare_graphnode_telescope (
+  graphnode : &Graphnode,
   config       : &SkgConfig,
   allow_hoist  : bool,
 ) -> io::Result<PreparedTelescopeWrite> {
-  let pid : &ID = &nodecomplete . pid;
+  let pid : &ID = &graphnode . pid;
   let verify_as_hoist : bool =
     error_unless_home_is_writable (
-      nodecomplete, config, allow_hoist ) ?;
+      graphnode, config, allow_hoist ) ?;
   let unfolded : UnfoldedTelescope =
     unfold_node (
       & UnfoldInput {
         pid      : pid,
-        extra_ids : & nodecomplete . extra_ids,
-        misc      : & nodecomplete . misc,
-        title    : Some ( & nodecomplete . title ),
-        body     : nodecomplete . body . as_deref (),
-        home     : & nodecomplete . home_repo,
-        aliases  : nodecomplete . aliases . or_default (),
-        contains : & nodecomplete . contains,
+        extra_ids : & graphnode . extra_ids,
+        misc      : & graphnode . misc,
+        title    : Some ( & graphnode . title ),
+        body     : graphnode . body . as_deref (),
+        home     : & graphnode . home_repo,
+        aliases  : graphnode . aliases . or_default (),
+        contains : & graphnode . contains,
         subscribes_to :
-          nodecomplete . subscribes_to . or_default (),
+          graphnode . subscribes_to . or_default (),
         hides_from_its_subscriptions :
-          nodecomplete . hides_from_its_subscriptions . or_default (),
+          graphnode . hides_from_its_subscriptions . or_default (),
         overrides_view_of :
-          nodecomplete . overrides_view_of . or_default (), },
+          graphnode . overrides_view_of . or_default (), },
       config )
     . map_err ( |e| io::Error::new (
       io::ErrorKind::InvalidData, e ) ) ?;
@@ -289,14 +289,14 @@ pub(crate) fn prepare_nodecomplete_telescope (
 
   Ok ( PreparedTelescopeWrite {
     pid             : pid . clone (),
-    home            : nodecomplete . home_repo . clone (),
+    home            : graphnode . home_repo . clone (),
     writes          : prepared_writes,
     deletions       : prepared_deletions,
     verify_as_hoist,
   } ) }
 
 
-/// The two shapes 'write_nodecomplete_telescope' refuses, because
+/// The two shapes 'write_graphnode_telescope' refuses, because
 /// writing either would publish or destroy the node's text. Both
 /// are unreachable through skg's own saves -- 'apply_sticky_relRepos'
 /// clamps every relRepo to at least the owner's home, so no save
@@ -306,11 +306,11 @@ pub(crate) fn prepare_nodecomplete_telescope (
 /// The nodes this blocks are already broken; the fold reports both
 /// shapes in telescope-warnings.org with their repairs.
 fn error_unless_home_is_writable (
-  nodecomplete : &NodeComplete,
+  graphnode : &Graphnode,
   config       : &SkgConfig,
   allow_hoist  : bool,
 ) -> io::Result<bool> {
-  let home : &RepoName = &nodecomplete . home_repo;
+  let home : &RepoName = &graphnode . home_repo;
   if ! config . user_owns_repo (home) {
     // FOREIGN HOME. Foreign sections are never written. Skipping
     // the home silently would drop the title on the floor, so
@@ -321,12 +321,12 @@ fn error_unless_home_is_writable (
       io::ErrorKind::PermissionDenied,
       format! (
         "Refusing to write '{}': its home is '{}', which you do not own. Foreign sections are never written, so this node cannot be saved from here. See the foreign-overlay entry in telescope-warnings.org.",
-        nodecomplete . pid, home ))); }
+        graphnode . pid, home ))); }
   // TEXT HOIST. Fold the current disk telescope with the same title/body
   // selection used by load. Looking only for a titleless home misses the
   // equally sensitive shape "title at home, body below home".
   let disk_is_overPrivateText : bool =
-    match telescope_from_disk (config, &nodecomplete . pid) ? {
+    match telescope_from_disk (config, &graphnode . pid) ? {
       None => false,
       Some (telescope) => match
         fold_telescope ( telescope, & |id : &ID| id . clone () ) {
@@ -335,20 +335,20 @@ fn error_unless_home_is_writable (
             io::ErrorKind::InvalidData,
             format! (
               "Refusing to write '{}': its current disk telescope cannot select a title ({}), so writing the buffer's text at home '{}' would publish it without a verifiable Hoist candidate. Repair the .skg sections by hand. See telescope-warnings.org.",
-              nodecomplete . pid, error, home ))), }, };
+              graphnode . pid, error, home ))), }, };
   if disk_is_overPrivateText && ! allow_hoist {
       return Err ( io::Error::new (
         io::ErrorKind::InvalidData,
         format! (
           "Refusing to write '{}': its current disk telescope selects title or body below home '{}', so this write would publish it. An interactive save must obtain explicit Hoist approval for this PID; otherwise repair the .skg sections by hand. See telescope-warnings.org.",
-          nodecomplete . pid, home ))); }
+          graphnode . pid, home ))); }
   Ok (disk_is_overPrivateText) }
 
 /// Checks that a node's primary ID matches the filename stem.
 /// This property is assumed by `path_from_pid_and_repo` and
 /// elsewhere but was never validated on read.
 pub(super) fn validate_pid_matches_filename (
-  node : &NodeFS,
+  node : &GraphnodeOnDisk,
   path : &Path,
 ) -> io::Result<()> {
   let pid : &ID = &node . pid;
@@ -368,15 +368,15 @@ pub(super) fn validate_pid_matches_filename (
 
 /// Effectively private.
 ///
-/// Returns a NodeFS (on-disk shape, no repo). Callers attach
-/// repo via 'NodeFS::into_complete' based on file location.
-pub(super) fn read_nodecomplete
+/// Returns a GraphnodeOnDisk (on-disk shape, no repo). Callers attach
+/// repo via 'GraphnodeOnDisk::into_complete' based on file location.
+pub(super) fn read_graphnode
   <P : AsRef <Path>> // any type that can be converted to an &Path
   (file_path : P
-  ) -> io::Result <NodeFS> {
+  ) -> io::Result <GraphnodeOnDisk> {
 
   let file_path : &Path = file_path . as_ref ();
-  let node_fs   : NodeFS = {
+  let node_fs   : GraphnodeOnDisk = {
     let contents : String = fs::read_to_string (file_path)?;
     serde_yaml::from_str (&contents)
     . map_err (

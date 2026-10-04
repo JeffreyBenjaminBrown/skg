@@ -233,7 +233,7 @@ function M.current_headline_metadata_sexp ()
 end
 
 ---@param metadata_sexp any
----@return boolean does METADATA_SEXP describe an ActiveNode?
+---@return boolean does METADATA_SEXP describe an ActiveVognode?
 function M.activeNode_sexp_p (metadata_sexp)
   return metadata_sexp ~= nil
          and compare.subtree_p(metadata_sexp, { SKG, { NODE } })
@@ -423,7 +423,7 @@ function M.strip_metadata_from_org_text (org_text)
   return table.concat(lines, '\n')
 end
 
----Write minimal ActiveNode metadata onto the metadata-less headline
+---Write minimal ActiveVognode metadata onto the metadata-less headline
 ---at point, prompting for an owned repo (no prompt when only one).
 ---@return string|nil the chosen repo
 function M.populate_minimal_node_metadata ()

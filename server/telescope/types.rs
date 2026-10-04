@@ -19,7 +19,7 @@ use serde::{Serialize, Deserialize};
 
 use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::nodes::complete::Flag;
-use crate::types::nodes::fs::NodeFS;
+use crate::types::nodes::fs::GraphnodeOnDisk;
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -30,7 +30,7 @@ use std::fmt;
 /// The point of the type is that "several files, one node" is a
 /// VALUE rather than a condition to be discovered. Before it,
 /// grouping the same-pid files ended in an anonymous
-/// 'Vec<(RepoName, NodeFS)>', and any function tempted to answer a
+/// 'Vec<(RepoName, GraphnodeOnDisk)>', and any function tempted to answer a
 /// one-file question about a many-file node could do so without
 /// anything forcing it to say which section it meant --- which is
 /// how 'repo_from_disk' went on answering the pre-telescope
@@ -45,7 +45,7 @@ use std::fmt;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Telescope {
   pid      : ID,
-  sections : Vec<(RepoName, NodeFS)>,
+  sections : Vec<(RepoName, GraphnodeOnDisk)>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -80,15 +80,15 @@ pub struct IgnoredForeignPidFolderlision {
 /// with no owned section remains an ordinary foreign telescope.
 /// Input order is preserved.
 pub fn retain_owned_sections_when_pid_folderlides (
-  sections : Vec<(RepoName, NodeFS)>,
+  sections : Vec<(RepoName, GraphnodeOnDisk)>,
   config   : &SkgConfig,
-) -> ( Vec<(RepoName, NodeFS)>,
+) -> ( Vec<(RepoName, GraphnodeOnDisk)>,
        Option<IgnoredForeignPidFolderlision> ) {
   let has_owned : bool = sections . iter ()
     . any ( |(repo, _)| config . user_owns_repo (repo) );
   if ! has_owned {
     return (sections, None); }
-  let mut retained : Vec<(RepoName, NodeFS)> = Vec::new ();
+  let mut retained : Vec<(RepoName, GraphnodeOnDisk)> = Vec::new ();
   let mut ignored_repos : Vec<RepoName> = Vec::new ();
   for (repo, node_fs) in sections {
     if config . user_owns_repo (&repo) {
@@ -132,7 +132,7 @@ impl std::error::Error for TelescopeConstructionError {
 impl Telescope {
   pub fn try_new (
     pid      : ID,
-    sections : Vec<(RepoName, NodeFS)>,
+    sections : Vec<(RepoName, GraphnodeOnDisk)>,
     config   : &SkgConfig,
   ) -> Result<Telescope, TelescopeConstructionError> {
     if sections . is_empty () {
@@ -177,7 +177,7 @@ impl Telescope {
 
   pub fn sections (
     &self,
-  ) -> &[(RepoName, NodeFS)] {
+  ) -> &[(RepoName, GraphnodeOnDisk)] {
     &self . sections }
 
   /// Every extra id any section claims, first occurrence first.
@@ -280,7 +280,7 @@ impl<'de> Deserialize<'de> for ListItem {
 
 /// What one section contributes to its node, in section-local form.
 /// This is the PARSED shape of a section file's list fields; the
-/// serde wiring of NodeFS to this shape lands with the rest of the
+/// serde wiring of GraphnodeOnDisk to this shape lands with the rest of the
 /// section format. Ordered relations carry items (anchors legal);
 /// unordered relations and aliases carry plain members.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -381,7 +381,7 @@ mod telescope_construction_tests {
   use super::{Telescope, TelescopeConstructionError};
   use crate::types::misc::{
     ID, SkgConfig, SkgfileRepo, RepoName};
-  use crate::types::nodes::fs::NodeFS;
+  use crate::types::nodes::fs::GraphnodeOnDisk;
 
   use std::collections::HashMap;
   use std::path::PathBuf;
@@ -393,8 +393,8 @@ mod telescope_construction_tests {
 
   fn node_fs (
     pid : &str,
-  ) -> NodeFS {
-    NodeFS {
+  ) -> GraphnodeOnDisk {
+    GraphnodeOnDisk {
       title                        : Some ("title" . to_string ()),
       aliases                      : Vec::new (),
       pid                          : ID::from (pid),

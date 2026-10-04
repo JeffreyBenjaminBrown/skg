@@ -4,13 +4,13 @@
 /// Only needed briefly after parsing a buffer from the client;
 /// after validation, converted to placed types.
 
-pub use super::viewnode::{MpActiveNode, MpPhantomDiff};
+pub use super::viewnode::{MpActiveVognode, MpPhantomDiff};
 use super::viewnode::PhantomDiff;
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
 use super::git::{NodeAxes, RelationshipAxes};
-use super::viewnode::{ Viewnode, ViewnodeKind, ActiveNode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, InactiveNode, PhantomUnknown, GraphNodeStats, ViewnodeStats, Birth, Editability, AffectsParent, };
+use super::viewnode::{ Viewnode, ViewnodeKind, ActiveVognode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, InactiveVognode, PhantomUnknown, GraphnodeStats, ViewnodeStats, Birth, Editability, AffectsParent, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -30,7 +30,7 @@ pub struct MpViewnode {
   pub kind        : MpViewnodeKind,
 }
 
-// MpActiveNode is defined in viewnode.rs.
+// MpActiveVognode is defined in viewnode.rs.
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MpViewnodeKind {
@@ -44,8 +44,8 @@ pub enum MpViewnodeKind {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MpVognode {
-  Active   (MpActiveNode),
-  Inactive (InactiveNode),
+  Active   (MpActiveVognode),
+  Inactive (InactiveVognode),
   Phantom  (MpPhantom),
 }
 
@@ -60,15 +60,15 @@ pub enum MpPhantom {
 // Conversion implementations
 //
 
-impl TryFrom<MpActiveNode> for ActiveNode {
+impl TryFrom<MpActiveVognode> for ActiveVognode {
   type Error = String;
 
-  fn try_from(u: MpActiveNode) -> Result<Self, Self::Error> {
+  fn try_from(u: MpActiveVognode) -> Result<Self, Self::Error> {
     let id = u . id . ok_or_else(
       || format!("Node '{}' has no ID", u . title))?;
     let repo = u . home_repo . ok_or_else(
       || format!("Node '{}' has no repo", u . title))?;
-    Ok(ActiveNode {
+    Ok(ActiveVognode {
       title          : u . title,
       id,
       home_repo: repo,
@@ -127,7 +127,7 @@ impl TryFrom<MpViewnodeKind> for ViewnodeKind {
     match u {
       MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
         Ok (ViewnodeKind::Vognode (
-          Vognode::Active (ActiveNode::try_from (t)?))),
+          Vognode::Active (ActiveVognode::try_from (t)?))),
       MpViewnodeKind::Vognode (MpVognode::Inactive (i)) =>
         Ok (ViewnodeKind::Vognode (Vognode::Inactive (i))),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) =>
@@ -164,9 +164,9 @@ impl TryFrom<MpViewnode> for Viewnode {
 
 // Infallible conversions from placed to maybePlaced types.
 
-impl From<ActiveNode> for MpActiveNode {
-  fn from(t: ActiveNode) -> Self {
-    MpActiveNode {
+impl From<ActiveVognode> for MpActiveVognode {
+  fn from(t: ActiveVognode) -> Self {
+    MpActiveVognode {
       title          : t . title,
       id             : Some(t . id),
       home_repo         : Some(t . home_repo),
@@ -189,7 +189,7 @@ impl From<ViewnodeKind> for MpViewnodeKind {
     match k {
       ViewnodeKind::Vognode (Vognode::Active (t)) =>
         MpViewnodeKind::Vognode (
-          MpVognode::Active (MpActiveNode::from (t))),
+          MpVognode::Active (MpActiveVognode::from (t))),
       ViewnodeKind::Vognode (Vognode::Inactive (i)) =>
         MpViewnodeKind::Vognode (MpVognode::Inactive (i)),
       ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) =>
@@ -279,15 +279,15 @@ pub fn maybePlaced_to_placed_viewforest (
 // Defaults
 //
 
-impl Default for MpActiveNode {
+impl Default for MpActiveVognode {
   fn default() -> Self {
-    MpActiveNode {
+    MpActiveVognode {
       title          : String::new(),
       id             : None,
       home_repo         : None,
       affectsParent       : AffectsParent::True,
       birth          : Birth::Unremarkable,
-      graphStats     : GraphNodeStats::default(),
+      graphStats     : GraphnodeStats::default(),
       viewStats      : ViewnodeStats::default(),
       relRepo_request : None,
       view_requests  : HashSet::new(),
@@ -308,7 +308,7 @@ impl Default for MpViewnode {
       folded      : false,
       body_folded : false,
       kind        : MpViewnodeKind::Vognode (
-        MpVognode::Active (MpActiveNode::default())),
+        MpVognode::Active (MpActiveVognode::default())),
     }
   }
 }
@@ -403,7 +403,7 @@ impl MpViewnode {
         | MpViewnodeKind::DeadViewnode =>
         None, }}
 
-  /// True for the two ActiveNode-ish kinds: an Active vognode or a Diff phantom.
+  /// True for the two ActiveVognode-ish kinds: an Active vognode or a Diff phantom.
   pub fn is_active_or_diff_phantom (&self) -> bool {
     matches! ( &self . kind,
       MpViewnodeKind::Vognode (MpVognode::Active (_))

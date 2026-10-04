@@ -1,5 +1,5 @@
 use crate::types::misc::{ID, RepoName};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -31,7 +31,7 @@ pub struct ChangedSnapshotPair {
 #[derive(Clone, Debug, Default)]
 pub struct GraphSnapshot {
   /// One entry per TELESCOPE (keyed by pid, sections folded).
-  pub nodes     : HashMap<ID, NodeComplete>,
+  pub nodes     : HashMap<ID, Graphnode>,
   /// id -> claiming pid -> repos whose section for that pid
   /// claims the id (as its pid or among its extra_ids). One pid
   /// claiming an id from several repos is the normal telescope

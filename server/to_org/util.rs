@@ -2,14 +2,14 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::repo_sets::ActiveRepoSet;
 use crate::to_org::complete::contents::clobberWriteProtectedViewnode;
 use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_branches;
-use crate::dbs::node_lookup::nodecomplete_graphFirst_by_pid_and_repo;
+use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_repo;
 use crate::types::misc::{ID, SkgConfig, RepoName, members_of};
-use crate::types::nodes::complete::NodeComplete;
-use crate::types::nodes::rust::NodeRust;
+use crate::types::nodes::complete::Graphnode;
+use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
-use crate::types::tree::viewnode_nodecomplete::write_at_activeNode_in_tree;
+use crate::types::tree::viewnode_graphnode::write_at_activeVognode_in_tree;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ Birth, Viewnode, ViewnodeKind, Editability, AffectsParent, ActiveNode, mk_definitive_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ Birth, Viewnode, ViewnodeKind, Editability, AffectsParent, ActiveVognode, mk_definitive_viewnode, mk_unknown_viewnode };
 use crate::types::viewnode::{Vognode, Phantom};
 use crate::types::tree::forest::{ViewForest, tree_forest_root_ids};
 
@@ -55,29 +55,29 @@ pub type DefinitiveMap =
 
 
 // ======================================================
-// Fetching, building and modifying NodeCompletes and Viewnodes
+// Fetching, building and modifying Graphnodes and Viewnodes
 // ======================================================
 
-/// Fetch a NodeComplete from the in-Rust graph or disk. Resolves id→(pid,repo)
+/// Fetch a Graphnode from the in-Rust graph or disk. Resolves id→(pid,repo)
 /// via 'pid_and_repo_from_id', then reads. Makes a Viewnode with
 /// validated title. Returns both.
 /// Returns Ok(None) when SKGID has no record anywhere -- not as a
 /// primary pid or extra_id in the captured graph.
 /// Callers should substitute an PhantomUnknown placeholder. A real
 /// query error still surfaces as Err.
-pub fn nodecomplete_and_viewnode_from_id (
+pub fn graphnode_and_viewnode_from_id (
   graph  : &InRustGraph,
   config : &SkgConfig,
   skgid  : &ID,
-) -> Result < Option<( NodeComplete, Viewnode )>, Box<dyn Error> > {
+) -> Result < Option<( Graphnode, Viewnode )>, Box<dyn Error> > {
   let resolved : Option<(ID, RepoName)> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
-        "nodecomplete_and_viewnode_from_id" ). entered();
+        "graphnode_and_viewnode_from_id" ). entered();
       graph . pid_and_repo (skgid) };
   match resolved {
     None => Ok (None),
     Some ((pid_resolved, repo)) =>
-      match nodecomplete_and_viewnode_from_pid_and_repo (
+      match graphnode_and_viewnode_from_pid_and_repo (
         graph, config, &pid_resolved, &repo ) {
         Ok (node) => Ok ( Some (node) ),
         // A graph member can be dangling when its file is absent. This is not
@@ -87,29 +87,29 @@ pub fn nodecomplete_and_viewnode_from_id (
           => Ok (None),
         Err (e) => Err (e), } } }
 
-/// Fetch a NodeComplete from the in-Rust graph or disk given PID and repo.
+/// Fetch a Graphnode from the in-Rust graph or disk given PID and repo.
 /// Makes an Viewnode with validated title. Returns both.
-pub(super) fn nodecomplete_and_viewnode_from_pid_and_repo (
+pub(super) fn graphnode_and_viewnode_from_pid_and_repo (
   graph  : &InRustGraph,
   config : &SkgConfig,
   pid    : &ID,
   repo : &RepoName,
-) -> Result < ( NodeComplete, Viewnode ), Box<dyn Error> > {
-  let nodecomplete : NodeComplete =
-    nodecomplete_graphFirst_by_pid_and_repo (
+) -> Result < ( Graphnode, Viewnode ), Box<dyn Error> > {
+  let graphnode : Graphnode =
+    graphnode_graphFirst_by_pid_and_repo (
       graph, config, pid, repo )?;
-  let title : String = nodecomplete . title . replace ( '\n', " " );
+  let title : String = graphnode . title . replace ( '\n', " " );
   if title . is_empty () {
     return Err ( Box::new ( io::Error::new (
       io::ErrorKind::InvalidData,
-      format! ( "NodeComplete with ID {} has an empty title",
+      format! ( "Graphnode with ID {} has an empty title",
                  pid ), )) ); }
   let viewnode : Viewnode = mk_definitive_viewnode (
     pid . clone (),
     repo . clone (),
     title,
-    nodecomplete . body . clone () );
-  Ok (( nodecomplete, viewnode )) }
+    graphnode . body . clone () );
+  Ok (( graphnode, viewnode )) }
 
 /// Set node to write-protected,
 /// and reset title and repo.
@@ -119,7 +119,7 @@ pub(super) fn makeWriteProtectedAndClobber (
   graph   : &crate::dbs::in_rust_graph::InRustGraph,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  write_at_activeNode_in_tree (
+  write_at_activeVognode_in_tree (
     tree, node_id,
     |t| { t . editability = Editability::WriteProtected; }
     ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -127,7 +127,7 @@ pub(super) fn makeWriteProtectedAndClobber (
   Ok (( )) }
 
 /// This function's callers add a pristine, out-of-context
-/// (nodecomplete, viewnode) pair to the tree.
+/// (graphnode, viewnode) pair to the tree.
 /// Integrating the pair into the tree requires more work
 /// (and later will require even more, probably),
 /// which this function does:
@@ -144,7 +144,7 @@ pub fn complete_branch_minus_content (
   detect_and_mark_cycle_v1 ( tree, node_id ) ?;
   make_writeProtected_if_repeat_then_extend_defmap (
     tree, node_id, visited ) ?;
-  if activeNode_in_tree_is_writeProtected ( tree, node_id )?
+  if activeVognode_in_tree_is_writeProtected ( tree, node_id )?
   { clobberWriteProtectedViewnode (
       tree, node_id, graph, config ) ?; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -173,7 +173,7 @@ pub fn make_writeProtected_if_repeat_then_extend_defmap (
   let pid : ID = // Will error if node is a Non-vognode.
     get_id_from_treenode ( tree, node_id ) ?;
   let is_writeProtected : bool =
-    write_at_activeNode_in_tree (
+    write_at_activeVognode_in_tree (
       tree, node_id,
       |t| { if defMap . contains_key (&pid)
                { // It's a repeat, so make it write-protected.
@@ -194,7 +194,7 @@ pub fn detect_and_mark_cycle_v1 (
   let is_cycle : bool = {
     let pid : ID = get_id_from_treenode ( tree, node_id ) ?;
     is_ancestor_id ( tree, node_id, &pid ) ? };
-  write_at_activeNode_in_tree
+  write_at_activeVognode_in_tree
     ( tree, node_id,
       |t| { t . viewStats . cycle = is_cycle; } )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -226,7 +226,7 @@ pub fn stub_viewforest_from_root_ids (
     ) ?; }
   Ok (viewforest) }
 
-/// Mark forest-root ActiveNodes as having no parent in the view.
+/// Mark forest-root ActiveVognodes as having no parent in the view.
 pub fn mark_view_roots_parent_na (
   viewforest : &mut Tree<Viewnode>,
 ) {
@@ -240,18 +240,18 @@ pub fn mark_view_roots_parent_na (
       = vn . kind
       { t . affectsParent = AffectsParent::NA; }}}
 
-/// Walk the view and correct any ActiveNode whose metadata claims a
+/// Walk the view and correct any ActiveVognode whose metadata claims a
 /// relationship to its parent that the actual graph doesn't support.
 /// Silently clears stale birth claims or flips stale membership claims
 /// to Independent;
 /// the rendered herald then no longer misleads.
 ///
 /// Three kinds of claim are checked:
-/// - 'Birth::Backpath(role)' on child C with ActiveNode parent P:
+/// - 'Birth::Backpath(role)' on child C with ActiveVognode parent P:
 ///   claim is "C plays 'role' toward P" (e.g. CONTAINER -> C contains
 ///   P; MENTIONER -> C's body/title links to P). Verified against the
 ///   in-Rust graph via 'relation_membership_is_real', keyed by the role.
-/// - 'AffectsParent::True' on child C with WRITE_PROTECTED ActiveNode
+/// - 'AffectsParent::True' on child C with WRITE_PROTECTED ActiveVognode
 ///   parent P: claim is "C is part of P's content". Verified
 ///   against P's 'contains' in the in-Rust graph. Definitive parents are
 ///   skipped because the save just redefined their 'contains' to
@@ -261,7 +261,7 @@ pub fn mark_view_roots_parent_na (
 /// so extra_id aliasing (typically a nodeMerge side-effect) doesn't
 /// produce false mismatches.
 ///
-/// Forest roots have no ActiveNode parent and therefore
+/// Forest roots have no ActiveVognode parent and therefore
 /// do not fall through this check. Also relies on the save pipeline's
 /// invariant that prepared graph publication has updated the in-Rust-graph
 /// graph before the rerender pass runs (see
@@ -280,16 +280,16 @@ pub fn validate_affectsParent_relationships (
     // these will be marked birth = unremarkable
   for edge in viewforest . root () . traverse () {
     if let Edge::Open (child_ref) = edge {
-      let child_tn : &ActiveNode =
+      let child_tn : &ActiveVognode =
         match & child_ref . value () . kind {
           ViewnodeKind::Vognode (Vognode::Active (t)) => t,
           _ => continue };
       let parent_ref : NodeRef<Viewnode> = match child_ref . parent () {
         Some (p) => p, None => continue };
-      let parent_tn : &ActiveNode =
+      let parent_tn : &ActiveVognode =
         match & parent_ref . value () . kind {
           ViewnodeKind::Vognode (Vognode::Active (t)) => t,
-          // A non-ActiveNode parent (BufferRoot, a property or folder, Deleted, DeadViewnode) is not a legitimate subject for any of these relational claims; skip without correcting.
+          // A non-ActiveVognode parent (BufferRoot, a property or folder, Deleted, DeadViewnode) is not a legitimate subject for any of these relational claims; skip without correcting.
           _ => continue };
       if child_tn . affectsParent == AffectsParent::NA {
         // The child was a root, and the user gave it a parent, so let the parent contain it.
@@ -394,7 +394,7 @@ fn child_contained_by_parent (
 ) -> bool {
   let child_pid : ID =
     graph . pid_of (child_id) . unwrap_or_else ( || child_id . clone () );
-  let parent_node : &NodeRust =
+  let parent_node : &GraphnodeInRust =
     match graph . get (parent_id) {
       Some (n) => n,
       None     => return false };
@@ -469,8 +469,8 @@ pub fn build_node_branch_minus_content (
   let result : Result < NodeId, Box<dyn Error> > =
     match tree_and_parent {
       Some ( (tree, parent_treeid) ) => {
-        let lookup : Option<(NodeComplete, Viewnode)> =
-          nodecomplete_and_viewnode_from_id (
+        let lookup : Option<(Graphnode, Viewnode)> =
+          graphnode_and_viewnode_from_id (
             graph, config, skgid ) ?;
         match lookup {
           Some ((_nc, viewnode)) => {
@@ -495,8 +495,8 @@ pub fn build_node_branch_minus_content (
               . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
             Ok (child_treeid) }} },
       None => {
-        let lookup : Option<(NodeComplete, Viewnode)> =
-          nodecomplete_and_viewnode_from_id (
+        let lookup : Option<(Graphnode, Viewnode)> =
+          graphnode_and_viewnode_from_id (
             graph, config, skgid ) ?;
         match lookup {
           Some ((_nc, viewnode)) => {
@@ -518,12 +518,12 @@ pub fn build_node_branch_minus_content (
   result }
 
 // ==============================================
-// Reading from NodeCompletes and Viewnodes, esp. in trees
+// Reading from Graphnodes and Viewnodes, esp. in trees
 // ==============================================
 
-/// Check if an ActiveNode is write-protected.
+/// Check if an ActiveVognode is write-protected.
 /// Errs if given a Non-vognode.
-pub fn activeNode_in_tree_is_writeProtected (
+pub fn activeVognode_in_tree_is_writeProtected (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Result < bool, Box<dyn Error> > {

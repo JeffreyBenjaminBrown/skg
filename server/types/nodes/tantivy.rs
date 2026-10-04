@@ -1,4 +1,4 @@
-//! NodeTantivy: what Tantivy indexes.
+//! GraphnodeInTantivy: what Tantivy indexes.
 //!
 //! Title, aliases, and body for full-text search. No relations.
 //! Includes node flags because 'Had_ID_Before_Import' feeds the
@@ -6,10 +6,10 @@
 //! mandatory direct-match exclusion.
 
 use crate::types::misc::{ID, MSV, RelPartner, RepoName};
-use crate::types::nodes::complete::{Flag, NodeComplete};
+use crate::types::nodes::complete::{Flag, Graphnode};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct NodeTantivy {
+pub struct GraphnodeInTantivy {
   pub pid     : ID,
   pub home_repo  : RepoName, // the home; each alias doc instead
                             // carries ITS OWN level (see 'aliases')
@@ -24,11 +24,11 @@ pub struct NodeTantivy {
   pub misc    : Vec<Flag>,
 }
 
-impl From<&NodeComplete> for NodeTantivy {
+impl From<&Graphnode> for GraphnodeInTantivy {
   /// Keep title, aliases (with relRepos), body, misc (Tantivy indexes
   /// these). Drop relations.
-  fn from (c: &NodeComplete) -> Self {
-    NodeTantivy {
+  fn from (c: &Graphnode) -> Self {
+    GraphnodeInTantivy {
       pid     : c . pid . clone (),
       home_repo  : c . home_repo . clone (),
       title   : c . title . clone (),

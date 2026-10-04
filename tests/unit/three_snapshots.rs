@@ -8,8 +8,8 @@ fn src (s : &str) -> RepoName { RepoName ( s . to_string () ) }
 
 fn modified_hides_entry (
   hides_diff : Vec<Diff_Item<ID>>,
-) -> NodeCompleteDiff {
-  NodeCompleteDiff {
+) -> GraphnodeDiff {
+  GraphnodeDiff {
     status : GitDiffStatus::Modified,
     node_changes : Some ( NodeChanges {
       hides_diff,
@@ -19,8 +19,8 @@ fn modified_hides_entry (
 
 fn diffs_with_one_entry (
   skgrepo   : &RepoName,
-  staged   : Option<(PathBuf, NodeCompleteDiff)>,
-  unstaged : Option<(PathBuf, NodeCompleteDiff)>,
+  staged   : Option<(PathBuf, GraphnodeDiff)>,
+  unstaged : Option<(PathBuf, GraphnodeDiff)>,
 ) -> Option<HashMap<RepoName, RepoDiff>> {
   Some ( HashMap::from ([ ( skgrepo . clone (), RepoDiff {
     is_gitrepo   : true,
@@ -96,7 +96,7 @@ fn hiddenin_signs_come_from_either_input_list_with_exact_stages () {
   let b_file : PathBuf = PathBuf::from ("B.skg");
   let diffs = diffs_with_one_entry (
     &src ("main"),
-    Some (( b_file, NodeCompleteDiff {
+    Some (( b_file, GraphnodeDiff {
       status : GitDiffStatus::Modified,
       node_changes : Some ( NodeChanges {
         contains_diff : vec! [

@@ -10,7 +10,7 @@
 ;;
 
 (ert-deftest test-activeNode-sexp-p-positive ()
-  "Recognizes an ActiveNode sexp."
+  "Recognizes an ActiveVognode sexp."
   (should (skg-activeNode-sexp-p '(skg (node (id abc) (repo jeff))))))
 
 (ert-deftest test-activeNode-sexp-p-negative-not-skg ()
@@ -36,7 +36,7 @@
 ;;
 
 (ert-deftest test-expand-minimal-sexp ()
-  "Expanding a minimal ActiveNode inserts all default fields."
+  "Expanding a minimal ActiveVognode inserts all default fields."
   (let* ((sexp '(skg (node (id abc) (repo jeff))))
          (org-text (sexp-to-org sexp))
          (expanded (skg-activeNode-expand-defaults-in-org org-text))

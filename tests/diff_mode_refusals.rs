@@ -17,7 +17,7 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use skg::dbs::in_rust_graph::stats::AllGraphNodeStats;
+use skg::dbs::in_rust_graph::stats::AllGraphnodeStats;
 use skg::serve::ViewsState;
 use skg::serve::handlers::rerender_all_views::handle_git_diff_toggle_and_rerender;
 use skg::serve::handlers::repo_sets::handle_repo_set_request;
@@ -195,7 +195,7 @@ async fn switch_refusals_take_the_unwinding_shape (
           terms          : "untouched by a refusal" . to_string (),
           search_results : vec![],
           ancestry_by_id : HashMap::new (),
-          graphnodestats : AllGraphNodeStats::empty (),
+          graphnodestats : AllGraphnodeStats::empty (),
           include_overPrivateText_telescopes : true, })));
       let search_cancelled : Arc<AtomicBool> =
         Arc::new (AtomicBool::new (false));

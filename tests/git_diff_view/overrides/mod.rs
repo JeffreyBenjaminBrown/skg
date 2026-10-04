@@ -251,7 +251,7 @@ async fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
           true, &Err (String::new ()), &mut views_state ) . await ? };
       assert_buffer_contains (
         &second . saved_view, EXPECTED_UNSTAGED );
-      let r : NodeComplete = read_nodecomplete (gitrepo_path, "R")?;
+      let r : Graphnode = read_graphnode (gitrepo_path, "R")?;
       assert_eq! (
         members_msv (&r . overrides_view_of) . or_default () . to_vec (),
         vec! [ ID::from ("Z"), ID::from ("O") ],

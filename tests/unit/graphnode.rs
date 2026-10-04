@@ -1,13 +1,13 @@
 use super::{
-  Flag, NodeComplete, empty_node_complete,
+  Flag, Graphnode, empty_node_complete,
   flag_is_true, set_flag};
 use crate::types::misc::ID;
 
 fn node_with_ids (
   pid : &str,
   extra_ids : &[&str],
-) -> NodeComplete {
-  let mut node : NodeComplete = empty_node_complete ();
+) -> Graphnode {
+  let mut node : Graphnode = empty_node_complete ();
   node . pid = ID::from (pid);
   node . extra_ids = extra_ids . iter ()
     . map ( |id| ID::from (*id) )
@@ -17,7 +17,7 @@ fn node_with_ids (
 
 #[test]
 fn normalize_ids_treats_the_pid_as_first_and_keeps_first_extra_order () {
-  let mut node : NodeComplete =
+  let mut node : Graphnode =
     node_with_ids ("P", &["B", "P", "A", "B", "C", "A"]);
   node . normalize_ids ();
   assert_eq! (
@@ -27,7 +27,7 @@ fn normalize_ids_treats_the_pid_as_first_and_keeps_first_extra_order () {
 
 #[test]
 fn normalize_ids_is_idempotent () {
-  let mut node : NodeComplete =
+  let mut node : Graphnode =
     node_with_ids ("P", &["A", "A", "P", "B"]);
   node . normalize_ids ();
   let once : Vec<ID> = node . extra_ids . clone ();
@@ -37,7 +37,7 @@ fn normalize_ids_is_idempotent () {
 
 #[test]
 fn normalize_ids_leaves_an_already_normal_list_alone () {
-  let mut node : NodeComplete =
+  let mut node : Graphnode =
     node_with_ids ("P", &["A", "B", "C"]);
   let before : Vec<ID> = node . extra_ids . clone ();
   node . normalize_ids ();

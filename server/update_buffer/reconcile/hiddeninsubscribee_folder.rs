@@ -4,8 +4,8 @@ use crate::to_org::complete::partner_folder::child_data::{ChildData, apply_relat
 use crate::to_org::complete::partner_folder::goal_list::goal_list_for_hiddenInSubscribee_folder;
 use crate::types::git::{NodeAxes, RelationshipAxes, Sign, RepoDiff, file_node_axes_from_repo_diff};
 use crate::types::misc::{ID, RepoName};
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
-use crate::types::nodes::complete::NodeComplete;
+use crate::dbs::node_lookup::graphnode_rustFirst_by_pid_and_repo;
+use crate::types::nodes::complete::Graphnode;
 use crate::update_buffer::ancestry::pid_and_repo_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::update_buffer::reconcile::partner_folder::push_repair_warnings;
@@ -30,11 +30,11 @@ struct HiddenInContext {
 /// HiddenInSubscribeeFolder completion (called at this folder's own BFS visit).
 ///
 /// Tree structure:
-///   Subscriber (ActiveNode)            <- ancestor 3
+///   Subscriber (ActiveVognode)            <- ancestor 3
 ///     └─ SubscribeeFolder (Non-vognode)    <- ancestor 2
-///          └─ Subscribee (ActiveNode)  <- ancestor 1
+///          └─ Subscribee (ActiveVognode)  <- ancestor 1
 ///               └─ HiddenInSubscribeeFolder (Non-vognode) <- self
-///                    └─ [hidden ActiveNode children]
+///                    └─ [hidden ActiveVognode children]
 ///
 /// The HiddenInSubscribeeFolder collects nodes that the subscriber
 /// hides from its subscriptions AND that are top-level content
@@ -142,20 +142,20 @@ fn read_hiddenin_context (
     None      => true,
     Some (a)  => a . is_all () || a . contains_repo (repo) };
   let subscribee_contains : Vec<ID> = {
-    let subscribee_nodecomplete : NodeComplete =
-      nodecomplete_rustFirst_by_pid_and_repo (
+    let subscribee_graphnode : Graphnode =
+      graphnode_rustFirst_by_pid_and_repo (
         &runtime . graph, &runtime . config,
         &subscribee_pid, &subscribee_repo ) ?;
-    subscribee_nodecomplete . contains . iter ()
+    subscribee_graphnode . contains . iter ()
       . filter ( |m| repo_active (& m . relRepo) )
       . map ( |m| m . member . clone () )
       . collect () };
   let (subscriber_hides, relRepos) : (Vec<ID>, HashMap<ID, RepoName>) = {
-    let subscriber_nodecomplete : NodeComplete =
-      nodecomplete_rustFirst_by_pid_and_repo (
+    let subscriber_graphnode : Graphnode =
+      graphnode_rustFirst_by_pid_and_repo (
         &runtime . graph, &runtime . config,
         &subscriber_pid, &subscriber_repo ) ?;
-    let members = subscriber_nodecomplete . hides_from_its_subscriptions
+    let members = subscriber_graphnode . hides_from_its_subscriptions
       . or_default () . iter ()
       . filter ( |m| repo_active (& m . relRepo) )
       . collect::<Vec<_>> ();

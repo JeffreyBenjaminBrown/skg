@@ -17,7 +17,7 @@ use std::error::Error;
 use std::net::TcpStream;
 use std::path::Path;
 
-use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_repo;
+use skg::dbs::filesystem::one_node::graphnode_from_pid_and_repo;
 use skg::test_utils::{run_with_test_stores, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
@@ -86,19 +86,19 @@ async fn merge_container_into_content_impl (
       "a.skg should be deleted after merge" . to_string() ); }
 
   // aa.skg should exist and have the merged content.
-  let aa_nodecomplete =
-    nodecomplete_from_pid_and_repo (
+  let aa_graphnode =
+    graphnode_from_pid_and_repo (
       config, ID::from ("aa"), &RepoName::from ("main") ) ?;
-  if !aa_nodecomplete . extra_ids . contains (&ID::from ("a")) {
+  if !aa_graphnode . extra_ids . contains (&ID::from ("a")) {
     failures . push (
       "aa should have 'a' as an extra_id" . to_string() ); }
-  if !aa_nodecomplete . contains . iter() . any ( |m| m . member == ID::from ("x") ) {
+  if !aa_graphnode . contains . iter() . any ( |m| m . member == ID::from ("x") ) {
     failures . push (
       "aa should still contain x" . to_string() ); }
-  if !aa_nodecomplete . contains . iter() . any ( |m| m . member == ID::from ("b") ) {
+  if !aa_graphnode . contains . iter() . any ( |m| m . member == ID::from ("b") ) {
     failures . push (
       "aa should now contain b (adopted from a)" . to_string() ); }
-  if !aa_nodecomplete . contains . iter() . any ( |m| m . member == ID::from ("c") ) {
+  if !aa_graphnode . contains . iter() . any ( |m| m . member == ID::from ("c") ) {
     failures . push (
       "aa should now contain c (adopted from a)" . to_string() ); }
 
@@ -107,7 +107,7 @@ async fn merge_container_into_content_impl (
   // but not x, b, c, or aa.
   let known_ids : Vec<&str> = vec!["x", "b", "c", "aa"];
   let preserver_candidates : Vec<&ID> =
-    aa_nodecomplete . contains . iter()
+    aa_graphnode . contains . iter()
     . filter ( |m| !known_ids . contains (& m . member . 0 . as_str()) )
     . map ( |m| & m . member )
     . collect();
@@ -117,29 +117,29 @@ async fn merge_container_into_content_impl (
       preserver_candidates . len(), preserver_candidates ) );
   } else {
     let preserver_pid : &ID = preserver_candidates[0];
-    let preserver_nodecomplete =
-      nodecomplete_from_pid_and_repo (
+    let preserver_graphnode =
+      graphnode_from_pid_and_repo (
         config, preserver_pid . clone(),
         &RepoName::from ("main") ) ?;
-    if preserver_nodecomplete . title != "MERGED: a" {
+    if preserver_graphnode . title != "MERGED: a" {
       failures . push ( format!(
         "Text preserver title should be 'MERGED: a', got '{}'",
-        preserver_nodecomplete . title )); }
-    if preserver_nodecomplete . home_repo != RepoName::from ("main") {
+        preserver_graphnode . title )); }
+    if preserver_graphnode . home_repo != RepoName::from ("main") {
       failures . push ( format!(
         "Text preserver repo should be 'main', got '{:?}'",
-        preserver_nodecomplete . home_repo )); }
-    if !preserver_nodecomplete . contains . is_empty() {
+        preserver_graphnode . home_repo )); }
+    if !preserver_graphnode . contains . is_empty() {
       failures . push ( format!(
         "Text preserver should have no contents, got {:?}",
-        preserver_nodecomplete . contains )); }
-    if !preserver_nodecomplete . extra_ids . is_empty() {
+        preserver_graphnode . contains )); }
+    if !preserver_graphnode . extra_ids . is_empty() {
       failures . push ( format!(
         "Text preserver should have no extra_ids, got {:?}",
-        preserver_nodecomplete . extra_ids )); } }
+        preserver_graphnode . extra_ids )); } }
 
   // aa must not contain itself in the filesystem.
-  if aa_nodecomplete . contains . iter() . any ( |m| m . member == ID::from ("aa") ) {
+  if aa_graphnode . contains . iter() . any ( |m| m . member == ID::from ("aa") ) {
     failures . push (
       "aa contains itself on filesystem (self-containment after merge)"
       . to_string() ); }

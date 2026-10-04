@@ -24,7 +24,7 @@ pub enum RepairKind {
 pub enum CompletionWarning {
   FolderRepair {
     folder      : PartnerFolder,
-    owner    : ID, // the node the folder belongs to (its ActiveNode parent)
+    owner    : ID, // the node the folder belongs to (its ActiveVognode parent)
     repair   : RepairKind,
     children : Vec<ID>,
   },

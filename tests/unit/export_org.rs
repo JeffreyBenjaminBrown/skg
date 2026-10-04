@@ -17,8 +17,8 @@ fn node (
   title    : &str,
   body     : Option<&str>,
   contains : &[&str],
-) -> NodeComplete {
-  let mut n : NodeComplete = empty_node_complete ();
+) -> Graphnode {
+  let mut n : Graphnode = empty_node_complete ();
   n . pid      = ID::from (pid);
   n . title    = title . to_string ();
   n . body     = body . map ( |s| s . to_string () );
@@ -83,7 +83,7 @@ fn parse_target_filepath_cases () {
 // end-to-end export
 //
 
-fn sample_nodes () -> Vec<NodeComplete> {
+fn sample_nodes () -> Vec<Graphnode> {
   vec! [
     node ("a", "Root A",
           Some ("see [[id:b][bee]] and [[id:zzz][gone]]"),
@@ -103,7 +103,7 @@ fn sample_nodes () -> Vec<NodeComplete> {
 
 #[test]
 fn export_preflight_names_rendered_nodes_and_markers_only () {
-  let mut nodes : Vec<NodeComplete> = sample_nodes ();
+  let mut nodes : Vec<Graphnode> = sample_nodes ();
   nodes . push (node ("unrelated", "not exported", None, &[]));
   let candidates : Vec<ID> = export_candidate_pids (&active_all (), &nodes);
   assert! ( candidates . contains (&ID::from ("a")) );
@@ -115,7 +115,7 @@ fn export_preflight_names_rendered_nodes_and_markers_only () {
 
 #[test]
 fn export_writes_expected_files_and_links () {
-  let nodes : Vec<NodeComplete> = sample_nodes ();
+  let nodes : Vec<Graphnode> = sample_nodes ();
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
   let report : ExportReport =
     export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
@@ -157,7 +157,7 @@ fn headline_links_survive_and_linked_ones_get_custom_ids () {
   // Org's '*Heading' search cannot match such a headline, so links to
   // it use '#PID', and its headline gets a CUSTOM_ID drawer -- but
   // only if some link actually addresses it.
-  let nodes : Vec<NodeComplete> = vec! [
+  let nodes : Vec<Graphnode> = vec! [
     node ("a","Root A", Some ("ref [[id:hl][to headline]]"),
           &["ma","hl","quiet","other"]),
     node ("ma", &format! ("[[id:{}][how]]", MAGIC),
@@ -187,7 +187,7 @@ fn headline_links_survive_and_linked_ones_get_custom_ids () {
   // A root whose title contains a link: a same-file self-link uses
   // its CUSTOM_ID; a link from another file needs none (it targets
   // the file), so without the self-link there is no drawer.
-  let nodes2 : Vec<NodeComplete> = vec! [
+  let nodes2 : Vec<Graphnode> = vec! [
     node ("r","Root [[id:x][X]] tail",
           Some ("self [[id:r][back to root]]"), &["mr","x"]),
     node ("mr", &format! ("[[id:{}][how]]", MAGIC),
@@ -214,7 +214,7 @@ fn headline_links_survive_and_linked_ones_get_custom_ids () {
 fn diamond_node_rendered_once_then_linked () {
   // a -> b -> shared -> leaf ; a -> c -> shared. The shared subtree
   // must render exactly once; the second container links to it.
-  let nodes : Vec<NodeComplete> = vec! [
+  let nodes : Vec<Graphnode> = vec! [
     node ("a","Root A", None, &["ma","b","c"]),
     node ("ma", &format! ("[[id:{}][how]]", MAGIC),
           Some ("target_filepath = a"), &[]),
@@ -242,7 +242,7 @@ fn diamond_node_rendered_once_then_linked () {
 fn links_to_a_repeated_title_use_custom_id () {
   // Org's '*language' finds the first such headline, so only links to
   // a later one need its CUSTOM_ID, and only it gets the drawer.
-  let nodes : Vec<NodeComplete> = vec! [
+  let nodes : Vec<Graphnode> = vec! [
     node ("a","Root A",
           Some ("[[id:l1][first]] [[id:l2][second]]"),
           &["ma","p","q"]),
@@ -273,7 +273,7 @@ fn title_link_to_instruction_without_target_is_content () {
   // A node whose title links to the instruction node but has no
   // target_filepath is ordinary content, not a marker: it must NOT
   // be excluded from the export.
-  let nodes : Vec<NodeComplete> = vec! [
+  let nodes : Vec<Graphnode> = vec! [
     node ("a","Root A", None, &["ma","doc"]),
     node ("ma", &format! ("[[id:{}][how]]", MAGIC),
           Some ("target_filepath = a"), &[]),
@@ -291,7 +291,7 @@ fn title_link_to_instruction_without_target_is_content () {
 
 #[test]
 fn marker_child_is_excluded_from_content () {
-  let nodes : Vec<NodeComplete> = sample_nodes ();
+  let nodes : Vec<Graphnode> = sample_nodes ();
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
   export_to_org (&active_all (), &nodes, dir . path ()) . unwrap ();
   let a : String =
@@ -310,13 +310,13 @@ fn private_repo_edge_is_omitted_from_restricted_export () {
   // is RECORDED in repo "private". A main-only export renders the
   // visible fold: "pub" appears, "priv" does not -- even though
   // priv's home is active.
-  let mut root : NodeComplete =
+  let mut root : Graphnode =
     node ("r", "Root", None, &["ma"]);
   root . contains . push ( RelPartner::at_relRepo (
     RepoName::from ("main"), ID::from ("pub") ));
   root . contains . push ( RelPartner::at_relRepo (
     RepoName::from ("private"), ID::from ("priv") ));
-  let nodes : Vec<NodeComplete> = vec! [
+  let nodes : Vec<Graphnode> = vec! [
     root,
     node ("ma", &format! ("[[id:{}][how]]", MAGIC),
           Some ("target_filepath = r"), &[]),
@@ -351,7 +351,7 @@ a =[[id:gone][LABEL]]= link is inserted
 [[id:gone][in a block]]
 #+end_example
 real [[id:gone][broken]]";
-  let nodes : Vec<NodeComplete> = vec! [
+  let nodes : Vec<Graphnode> = vec! [
     node ("a","Root A", Some (body), &["ma"]),
     node ("ma", &format! ("[[id:{}][how]]", MAGIC),
           Some ("target_filepath = a"), &[]),
@@ -378,7 +378,7 @@ fn headline_like_body_lines_are_defused () {
 * inside a fence
 ```
 #+title: kept";
-  let nodes : Vec<NodeComplete> = vec! [
+  let nodes : Vec<Graphnode> = vec! [
     node ("a","Root A", Some (body), &["ma"]),
     node ("ma", &format! ("[[id:{}][how]]", MAGIC),
           Some ("target_filepath = a"), &[]),

@@ -18,7 +18,7 @@ use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
 use crate::types::views_state::ViewUri;
 use crate::types::misc::{MSV, SkgConfig, SkgfileRepo, ID, TantivyIndex, RepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
 use crate::types::save::{DefineNode, SaveNode};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 use crate::types::maybe_placed_viewnode::{ MpViewnode, MpViewnodeKind };
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 
@@ -368,9 +368,9 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), Box<dyn Error>> {
 pub fn graph_handle_from_config (
   config : &SkgConfig,
 ) -> Result<InRustGraphHandle, Box<dyn Error>> {
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     read_all_skg_files_from_repos (config) ?;
-  Ok ( new_handle ( InRustGraph::from_nodecompletes (&nodes) )) }
+  Ok ( new_handle ( InRustGraph::from_graphnodes (&nodes) )) }
 
 /// Bundle a test's existing handles into a 'SkgEnv'.
 pub fn skg_env_from_parts (
@@ -488,7 +488,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_repos_test (
 /// repo-move rule (which member relRepos follow a home move) is owned by
 /// work item save-leveling.
 pub fn set_repo_retagging_relRepos (
-  node  : &mut NodeComplete,
+  node  : &mut Graphnode,
   repo : &RepoName,
 ) {
   node . home_repo = repo . clone ();
@@ -743,10 +743,10 @@ pub fn strip_org_comments(s: &str) -> String {
     . collect::<Vec<String>>()
     . join ("\n") }
 
-/// Example NodeComplete for use in tests.
-pub fn nodecomplete_example () -> NodeComplete {
+/// Example Graphnode for use in tests.
+pub fn graphnode_example () -> Graphnode {
   let repo : RepoName = RepoName::from ("main");
-  NodeComplete {
+  Graphnode {
     title: "This text gets indexed." . to_string(),
     overPrivateText_telescope: false,
     aliases: MSV::Unspecified,
@@ -767,10 +767,10 @@ It better be okay with newlines."# . to_string() ),
     overrides_view_of: MSV::Unspecified,
     misc: Vec::new (), }}
 
-/// Extract NodeComplete from Save variant; panics on Delete.
-pub fn extract_nodecomplete_if_save_else_error(
+/// Extract Graphnode from Save variant; panics on Delete.
+pub fn extract_graphnode_if_save_else_error(
   instr: &DefineNode
-) -> &NodeComplete {
+) -> &Graphnode {
   match instr {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") }}

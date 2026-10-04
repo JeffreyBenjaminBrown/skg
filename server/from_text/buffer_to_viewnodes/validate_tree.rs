@@ -4,7 +4,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::{
   carrier_on_user_owned_chain, resolve_override};
 use crate::dbs::in_rust_graph::override_invariants::existing_user_owned_overrider_of;
-use crate::dbs::node_lookup::opt_nodecomplete_by_id;
+use crate::dbs::node_lookup::opt_graphnode_by_id;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::viewnode::{AffectsParent, Property, PropertyFolder, ViewRequest};
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
@@ -105,14 +105,14 @@ pub fn find_buffer_errors_for_saving (
 ) -> Result<Vec<BufferValidationError>, Box<dyn std::error::Error>> {
   let nodes = crate::dbs::filesystem::multiple_nodes
     ::read_all_skg_files_from_repos (config)?;
-  let graph = InRustGraph::from_nodecompletes (&nodes);
+  let graph = InRustGraph::from_graphnodes (&nodes);
   find_buffer_errors_for_saving_in_graph (
     viewforest, &graph, config ) }
 
 /// Edits to an idFolder's membership abort the save (decision from
 /// vision.org, via metaplan_2.org and
 /// TODO/full-schema/8_readonly-set-ergonomics.org): for each present
-/// idFolder whose parent is an ActiveNode with an ID, the multiset of ID
+/// idFolder whose parent is an ActiveVognode with an ID, the multiset of ID
 /// non-vognodes beneath it must equal the owner's real ID list (pid
 /// plus extra_ids). Reordering passes (the rerender re-sorts
 /// anyway); adding, deleting or text-editing an ID property fails,
@@ -121,7 +121,7 @@ pub fn find_buffer_errors_for_saving (
 /// it net-removed is git history, not a membership claim, and is
 /// excluded before comparing. An absent idFolder means no opinion, as
 /// for other folders. Shapes that other validations reject (an idFolder
-/// without an ActiveNode parent, a parent without an ID) are skipped
+/// without an ActiveVognode parent, a parent without an ID) are skipped
 /// here rather than double-reported.
 #[allow(non_snake_case)]
 fn idFolder_membership_errors (
@@ -154,7 +154,7 @@ fn idFolder_membership_errors (
           _ => None } )
       . collect ();
     let real_ids : Option<Vec<ID>> =
-      opt_nodecomplete_by_id (graph, config, &owner)
+      opt_graphnode_by_id (graph, config, &owner)
  ?
       . map ( |nc| nc . all_ids () . cloned () . collect () );
     match real_ids {
@@ -182,7 +182,7 @@ fn idFolder_membership_errors (
 /// failing after a repo-set switch). With chains the drawn node can
 /// be a MIDDLE link (when a later link's mentioner is hidden), so the
 /// check accepts any honest carrier and rejects only an off-chain
-/// marker. Markers on retained InactiveNodes are checked identically.
+/// marker. Markers on retained InactiveVognodes are checked identically.
 /// The explicit graph is required, so every present marker is checked against
 /// the same snapshot used by the rest of save planning.
 #[allow(non_snake_case)]
@@ -272,13 +272,13 @@ fn validate_view_roots (
         | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))))
     { errors . push (
         BufferValidationError::Other (
-          "View roots must be ActiveNodes, inactive placeholders, deleted nodes or Unknown placeholders."
+          "View roots must be ActiveVognodes, inactive placeholders, deleted nodes or Unknown placeholders."
           . to_string () )); }}}
 
 /// For each node in the viewforest, if it has a definitive view request,
 /// verify that:
 /// - The node is write-protected.
-/// - It has no content children (ActiveNode children with affectsParent ==
+/// - It has no content children (ActiveVognode children with affectsParent ==
 ///   Container). Non-content children — containerward ancestry stubs,
 ///   mentioners, non-vognodes, etc. — don't block expansion:
 ///   they won't be clobbered by it.

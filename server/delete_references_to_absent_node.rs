@@ -5,7 +5,7 @@
 //! that same snapshot rather than from client-supplied text.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::save::nodecomplete_from_noderust;
+use crate::save::graphnode_from_graphnodeInRust;
 use crate::types::misc::{ID, RelPartner, MSV, SkgConfig, RepoName};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::links::links_with_ranges_from_text;
@@ -161,7 +161,7 @@ pub fn preview (
 
 fn record_links (
   occurrences : &mut Vec<LinkOccurrence>,
-  node        : &crate::types::nodes::rust::NodeRust,
+  node        : &crate::types::nodes::rust::GraphnodeInRust,
   raw_id      : &ID,
   field       : TextField,
   text        : &str,
@@ -194,7 +194,7 @@ pub fn rewrite (
   for pid in affected {
     let node = graph . get (&pid)
       .ok_or_else (|| format! ("Cleanup owner disappeared: {}", pid))?;
-    let mut rewritten = nodecomplete_from_noderust (node);
+    let mut rewritten = graphnode_from_graphnodeInRust (node);
     rewritten . contains . retain (|m| m . member != fresh . raw_id);
     rewritten . subscribes_to = remove_exact (
       &rewritten . subscribes_to, &fresh . raw_id);
@@ -221,7 +221,7 @@ fn remove_exact (
 mod tests {
   use super::*;
   use crate::types::misc::{SkgfileRepo};
-  use crate::types::nodes::complete::{empty_node_complete, NodeComplete};
+  use crate::types::nodes::complete::{empty_node_complete, Graphnode};
   use std::collections::HashMap;
   use std::path::PathBuf;
 
@@ -240,8 +240,8 @@ mod tests {
     ]))
   }
 
-  fn node (pid : &str, repo : &str) -> NodeComplete {
-    let mut node : NodeComplete = empty_node_complete ();
+  fn node (pid : &str, repo : &str) -> Graphnode {
+    let mut node : Graphnode = empty_node_complete ();
     node . pid = id (pid);
     node . home_repo = RepoName::from (repo);
     node . title = format! ("{} [[id:gone][title label]]", pid);
@@ -261,7 +261,7 @@ mod tests {
     owned . overrides_view_of = MSV::Specified (vec! [member ("main", "gone")]);
     let mut foreign = node ("foreign", "foreign");
     foreign . contains = vec! [member ("foreign", "gone")];
-    let graph = InRustGraph::from_nodecompletes (&[owned, foreign]);
+    let graph = InRustGraph::from_graphnodes (&[owned, foreign]);
 
     let scanned = preview (&graph, &config (), &id ("gone")) . unwrap ();
     assert_eq! (scanned . structural . len (), 4);
@@ -288,7 +288,7 @@ mod tests {
 
   #[test]
   fn rejects_a_raw_id_that_currently_resolves () {
-    let graph = InRustGraph::from_nodecompletes (&[node ("gone", "main")]);
+    let graph = InRustGraph::from_graphnodes (&[node ("gone", "main")]);
     assert! (preview (&graph, &config (), &id ("gone")) . is_err ());
   }
 
@@ -296,7 +296,7 @@ mod tests {
   fn stale_preview_produces_no_rewrite_instructions () {
     let mut owned = node ("owned", "main");
     owned . contains = vec! [member ("main", "gone")];
-    let graph = InRustGraph::from_nodecompletes (&[owned]);
+    let graph = InRustGraph::from_graphnodes (&[owned]);
     let scanned = preview (&graph, &config (), &id ("gone")) . unwrap ();
     let mut changed = graph . clone ();
     changed . nodes . get_mut (&id ("owned")) . unwrap () . title =

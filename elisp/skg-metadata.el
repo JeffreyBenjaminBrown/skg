@@ -103,7 +103,7 @@ If there is no active region, do nothing."
     (read metadata-str)))
 
 (defun skg--current-node-repo ()
-  "Return the repo string for the ActiveNode headline at point."
+  "Return the repo string for the ActiveVognode headline at point."
   (let* ((sexp (skg--current-headline-metadata-sexp))
          (repo-values (skg-sexp-cdr-at-path sexp '(skg node repo))))
     (unless repo-values
@@ -118,7 +118,7 @@ If there is no active region, do nothing."
         (string-empty-p (cadr split)))))
 
 (defun skg--populate-minimal-node-metadata ()
-  "Write minimal ActiveNode metadata onto the metadata-less headline at point.
+  "Write minimal ActiveVognode metadata onto the metadata-less headline at point.
 Prompts for an owned repo (no prompt when only one repo is owned)
 and inserts (skg (node (repo REPO))).  Returns the chosen repo.
 Reuses `skg-edit-metadata-at-point', which formats and spaces the sexp
@@ -912,7 +912,7 @@ their repo edits take effect even under a write-protected parent."
         (read metadata-str)))))
 
 (defun skg--activeNode-sexp-p (metadata-sexp)
-  "Return non-nil if METADATA-SEXP describes an ActiveNode."
+  "Return non-nil if METADATA-SEXP describes an ActiveVognode."
   (and metadata-sexp
        (skg-sexp-subtree-p metadata-sexp '(skg (node)))))
 
@@ -943,7 +943,7 @@ their repo edits take effect even under a write-protected parent."
        (skg-sexp-subtree-p metadata-sexp '(skg (unknown)))))
 
 (defun skg--relationship-member-id (metadata-sexp)
-  "Return the raw member ID for an ActiveNode or Unknown headline."
+  "Return the raw member ID for an ActiveVognode or Unknown headline."
   (or (skg--node-id metadata-sexp)
       (let ((id-values (skg-sexp-cdr-at-path metadata-sexp
                                               '(skg unknown id))))
@@ -951,7 +951,7 @@ their repo edits take effect even under a write-protected parent."
           (format "%s" (car id-values))))))
 
 (defun skg--node-write-protected-p (metadata-sexp)
-  "Return non-nil if METADATA-SEXP has the bare ActiveNode writeProtected marker."
+  "Return non-nil if METADATA-SEXP has the bare ActiveVognode writeProtected marker."
   (skg-sexp-subtree-p metadata-sexp '(skg (node writeProtected))))
 
 (defun skg--change-repo-at-point (new-repo)

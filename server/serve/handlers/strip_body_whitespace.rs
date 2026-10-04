@@ -9,15 +9,15 @@
 //! from bodies cannot be changed by stripping trailing whitespace.
 
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
-use crate::dbs::filesystem::one_node::write_nodecomplete_to_repo;
+use crate::dbs::filesystem::one_node::write_graphnode_to_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::tantivy::write::update_index_with_nodes;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_text_response};
 use crate::types::env::SkgEnv;
 use crate::types::misc::{SkgConfig, RepoName};
-use crate::types::nodes::complete::NodeComplete;
-use crate::types::nodes::tantivy::NodeTantivy;
+use crate::types::nodes::complete::Graphnode;
+use crate::types::nodes::tantivy::GraphnodeInTantivy;
 
 use std::collections::BTreeMap;
 use std::net::TcpStream;
@@ -49,7 +49,7 @@ fn strip_body_whitespace_and_refresh_caches (
   let mutation_gate = env . mutation_gate ();
   let _mutation_guard = futures::executor::block_on (mutation_gate . lock ());
   let runtime = env . runtime_snapshot ();
-  let (all_nodes, changed) : (Vec<NodeComplete>, Vec<NodeComplete>) =
+  let (all_nodes, changed) : (Vec<Graphnode>, Vec<Graphnode>) =
     strip_body_whitespace_on_disk (&runtime . config) ?;
   let owned_checked : usize =
     all_nodes . iter ()
@@ -59,9 +59,9 @@ fn strip_body_whitespace_and_refresh_caches (
     return Ok ( format! (
       "No body has trailing whitespace ({} files checked, in owned repos).",
       owned_checked )); }
-  let new_graph = Arc::new (InRustGraph::from_nodecompletes (&all_nodes));
-  { let tantivy_nodes : Vec<NodeTantivy> =
-      changed . iter () . map (NodeTantivy::from) . collect ();
+  let new_graph = Arc::new (InRustGraph::from_graphnodes (&all_nodes));
+  { let tantivy_nodes : Vec<GraphnodeInTantivy> =
+      changed . iter () . map (GraphnodeInTantivy::from) . collect ();
     update_index_with_nodes (&tantivy_nodes, &runtime . tantivy_index)
       . map_err ( |e| format! ("Tantivy update failed: {}", e) ) ?; }
   env . runtime . publish (
@@ -93,11 +93,11 @@ fn strip_body_whitespace_and_refresh_caches (
 /// updates and the report).
 pub fn strip_body_whitespace_on_disk (
   config : &SkgConfig,
-) -> Result<(Vec<NodeComplete>, Vec<NodeComplete>), String> {
-  let mut all_nodes : Vec<NodeComplete> =
+) -> Result<(Vec<Graphnode>, Vec<Graphnode>), String> {
+  let mut all_nodes : Vec<Graphnode> =
     read_all_skg_files_from_repos (config)
     . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
-  let mut changed : Vec<NodeComplete> = Vec::new ();
+  let mut changed : Vec<Graphnode> = Vec::new ();
   for node in all_nodes . iter_mut () {
     if ! config . user_owns_repo (& node . home_repo) { continue; }
     let Some (body) = & node . body else { continue; };
@@ -107,7 +107,7 @@ pub fn strip_body_whitespace_on_disk (
     node . body =
       if stripped . is_empty () { None }
       else { Some (stripped) };
-    write_nodecomplete_to_repo (node, config)
+    write_graphnode_to_repo (node, config)
       . map_err ( |e| format! (
         "Writing node {} to repo {}: {}",
         node . pid . as_str (), node . home_repo, e) ) ?;

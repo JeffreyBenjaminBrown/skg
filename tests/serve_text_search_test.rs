@@ -5,7 +5,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::org_to_text::viewforest_to_string;
 use skg::repo_sets::ActiveRepoSet;
 use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, RepoName, RepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
-use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
+use skg::types::nodes::complete::{Graphnode, empty_node_complete};
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::serve::handlers::text_search::{
   group_matches_by_id, build_search_viewforest};
@@ -33,7 +33,7 @@ fn test_text_search_org_format (
     = ( || {
 
       // Create test nodes with overlapping titles/aliases
-      let mut node1 : NodeComplete = // the best match
+      let mut node1 : Graphnode = // the best match
         empty_node_complete ();
       node1 . pid =
         ID::new ("id_1");
@@ -45,21 +45,21 @@ fn test_text_search_org_format (
           "the cheese" . to_string ()
         ] ) );
 
-      let mut node2 : NodeComplete = // matches, but less well
+      let mut node2 : Graphnode = // matches, but less well
         empty_node_complete ();
       node2 . pid =
         ID::new ("id_2");
       node2 . title =
         "cheese makes me happy" . to_string ();
 
-      let mut node3 : NodeComplete = // will not match
+      let mut node3 : Graphnode = // will not match
         empty_node_complete ();
       node3 . pid =
         ID::new ("id_3");
       node3 . title =
         "aliens evade silently" . to_string ();
 
-      let nodes : Vec < NodeComplete > =
+      let nodes : Vec < Graphnode > =
         vec! [ node1, node2, node3 ];
 
       let ( tantivy_index, _ ) : ( TantivyIndex, usize ) =
@@ -88,7 +88,7 @@ fn test_text_search_org_format (
         result . lines () . collect ();
 
       // Parse each line with headline_to_triple.
-      // Collect level-1 ActiveNode headlines and alias groups.
+      // Collect level-1 ActiveVognode headlines and alias groups.
       let mut level1_headlines : Vec < (String, String) > =
         Vec::new ();
       let mut aliases_under_current : Vec < String > =
@@ -185,14 +185,14 @@ fn test_search_results_preserve_links_in_title (
       // Two nodes; both will match a search for "science".
       // node_link's title is a link with label "science"; its
       // raw title carries the link syntax.
-      let mut node_link : NodeComplete = empty_node_complete ();
+      let mut node_link : Graphnode = empty_node_complete ();
       node_link . pid = ID::new ("link_node");
       node_link . title =
         "[[id:other][science]]" . to_string ();
-      let mut node_plain : NodeComplete = empty_node_complete ();
+      let mut node_plain : Graphnode = empty_node_complete ();
       node_plain . pid = ID::new ("plain_node");
       node_plain . title = "science" . to_string ();
-      let nodes : Vec < NodeComplete > =
+      let nodes : Vec < Graphnode > =
         vec! [ node_link, node_plain ];
       let ( tantivy_index, _ ) : ( TantivyIndex, usize ) =
         wipe_then_init_tantivy_db (
@@ -261,18 +261,18 @@ fn test_coverage_multiplier_rewards_matching_more_terms (
     "tests/serve_text_search_test/temp_index_coverage";
   let test_result : Result < (), Box < dyn std::error::Error >>
     = ( || {
-      let mut nodes : Vec<NodeComplete> = Vec::new ();
+      let mut nodes : Vec<Graphnode> = Vec::new ();
       // 30 noise docs to set the IDF baseline for the query terms.
       for i in 0 .. 30 {
-        let mut n : NodeComplete = empty_node_complete ();
+        let mut n : Graphnode = empty_node_complete ();
         n . pid   = ID::new (& format! ("noise_{}", i));
         n . title = "fluorgastric" . to_string ();
         nodes . push (n); }
-      let mut few : NodeComplete = empty_node_complete ();
+      let mut few : Graphnode = empty_node_complete ();
       few . pid   = ID::new ("few");
       few . title = "axiom" . to_string ();
       nodes . push (few);
-      let mut many : NodeComplete = empty_node_complete ();
+      let mut many : Graphnode = empty_node_complete ();
       many . pid   = ID::new ("many");
       many . title = "axiom thesis lemma" . to_string ();
       nodes . push (many);
@@ -360,14 +360,14 @@ fn private_alias_documents_are_filtered_before_grouping (
   let test_result
     : Result < (), Box < dyn std::error::Error >>
     = ( || {
-      let mut node : NodeComplete = empty_node_complete ();
+      let mut node : Graphnode = empty_node_complete ();
       node . pid = ID::new ("id_leveled");
       node . title = "public title" . to_string ();
       node . aliases = MSV::Specified ( vec! [
         RelPartner::at_relRepo (
           RepoName::from ("private"),
           "secret zanzibar" . to_string () ) ] );
-      let nodes : Vec<NodeComplete> = vec! [ node ];
+      let nodes : Vec<Graphnode> = vec! [ node ];
       let ( tantivy_index, _ ) : ( TantivyIndex, usize ) =
         wipe_then_init_tantivy_db (
           &nodes, Path::new (index_dir) ) ?;

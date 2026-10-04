@@ -119,7 +119,7 @@ If the old file is already missing (=ErrorKind::NotFound=), the
 removal is a silent no-op rather than an error.
 
 **** 2. In-memory graph (=apply_definenodes=)
-The new Skg repo is reflected in the in-memory =NodeRust= via the
+The new Skg repo is reflected in the in-memory =GraphnodeInRust= via the
 ordinary =SaveNode=, which carries the new Skg repo field. There is
 no separate move step in memory — the save is sufficient.
 

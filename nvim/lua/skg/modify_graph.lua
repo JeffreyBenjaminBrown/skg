@@ -137,8 +137,8 @@ end
 -- ── replace content with link ──────────────────────────────────────
 
 ---Replace the branch at point with a link to its former root, then
----save. The root must be an existing ActiveNode with an ID; its
----org-parent must be a definitive, owned ActiveNode. Asks before
+---save. The root must be an existing ActiveVognode with an ID; its
+---org-parent must be a definitive, owned ActiveVognode. Asks before
 ---proceeding when the title already contains a link.
 function M.replace_content_with_link ()
   local line = focus.owning_headline_line()
@@ -193,7 +193,7 @@ end
 
 ---Replace the leaf at point with content linked from that leaf, then
 ---save. The leaf must have exactly one org bracket link in its title
----plus body, no org-descendants, and a definitive, owned ActiveNode
+---plus body, no org-descendants, and a definitive, owned ActiveVognode
 ---org-parent; the link must be an id link. Warns when the leaf
 ---already had an ID (the old node may become an orphan).
 function M.replace_link_with_content ()

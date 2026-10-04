@@ -2,11 +2,11 @@
 
 use std::error::Error;
 
-use skg::dbs::filesystem::one_node::optnodecomplete_from_id;
+use skg::dbs::filesystem::one_node::optgraphnode_from_id;
 use skg::from_text::supplement_from_disk::{ canonicalize_ids_from_disk, detect_repo_move, supplement_unspecified_fields_from_disk, };
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::misc::{ID, MSV, SkgConfig, RepoName, TantivyIndex, members_msv, rel_partners_at_relRepo_msv};
-use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
+use skg::types::nodes::complete::{Graphnode, empty_node_complete};
 use skg::types::save::RepoMove;
 
 
@@ -33,16 +33,16 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
-async fn supplement_from_disk_then_extract_nodecomplete (
+async fn supplement_from_disk_then_extract_graphnode (
   config    : &SkgConfig,
 
-  user_node : NodeComplete
-) -> Result<NodeComplete, Box<dyn Error>> {
+  user_node : Graphnode
+) -> Result<Graphnode, Box<dyn Error>> {
   let pid : ID = user_node . pid . clone();
-  let disk_node : NodeComplete =
-    optnodecomplete_from_id (config, &pid) ?
+  let disk_node : Graphnode =
+    optgraphnode_from_id (config, &pid) ?
       . ok_or ("Expected node on disk") ?;
-  let canonicalized : NodeComplete =
+  let canonicalized : Graphnode =
     canonicalize_ids_from_disk (user_node, &disk_node) ?;
   let _repo_move : Option<RepoMove> =
     detect_repo_move (
@@ -66,12 +66,12 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
 
 ) -> Result < (), Box<dyn Error> > {
 
-  { let mut user_node : NodeComplete = empty_node_complete ();
+  { let mut user_node : Graphnode = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . aliases = MSV::Unspecified; }
-    let result : NodeComplete =
-      supplement_from_disk_then_extract_nodecomplete (
+    let result : Graphnode =
+      supplement_from_disk_then_extract_graphnode (
         &config, user_node ) . await ?;
     assert_eq! (
       members_msv (&result . aliases),
@@ -79,26 +79,26 @@ async fn test_none_aliases_get_replaced_with_disk_aliases_logic (
                    "alias 2 on disk" . to_string () ]),
       "Unspecified aliases from client should be replaced aliases from disk." ); }
 
-  { let mut user_node : NodeComplete = empty_node_complete ();
+  { let mut user_node : Graphnode = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . aliases = MSV::Specified ( vec![] ); }
-    let result : NodeComplete =
-      supplement_from_disk_then_extract_nodecomplete (
+    let result : Graphnode =
+      supplement_from_disk_then_extract_graphnode (
         &config, user_node ) . await ?;
     assert_eq! (
       result . aliases,
       MSV::Specified ( vec![] ),
       "Specified ( [] ) aliases from client should be preserved, not replaced by data from disk." ); }
 
-  { let mut user_node : NodeComplete = empty_node_complete ();
+  { let mut user_node : Graphnode = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . aliases = rel_partners_at_relRepo_msv (
         & RepoName::from ("main"),
         MSV::Specified ( vec![ "new alias" . to_string () ] ) ); }
-    let result : NodeComplete =
-      supplement_from_disk_then_extract_nodecomplete (
+    let result : Graphnode =
+      supplement_from_disk_then_extract_graphnode (
         &config, user_node ) . await ?;
     assert_eq! (
       members_msv (&result . aliases),
@@ -120,12 +120,12 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
 
 ) -> Result < (), Box<dyn Error> > {
 
-  { let mut user_node : NodeComplete = empty_node_complete ();
+  { let mut user_node : Graphnode = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . subscribes_to = MSV::Unspecified; }
-    let result : NodeComplete =
-      supplement_from_disk_then_extract_nodecomplete (
+    let result : Graphnode =
+      supplement_from_disk_then_extract_graphnode (
         &config, user_node ) . await ?;
     assert_eq! (
       members_msv (&result . subscribes_to),
@@ -133,26 +133,26 @@ async fn test_none_subscribes_to_get_replaced_with_disk_subscribes_to_logic (
                    ID::new ("sub_2_on_disk") ]),
       "Unspecified subscribes_to from client should be replaced with subscribes_to from disk." ); }
 
-  { let mut user_node : NodeComplete = empty_node_complete ();
+  { let mut user_node : Graphnode = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . subscribes_to = MSV::Specified ( vec![] ); }
-    let result : NodeComplete =
-      supplement_from_disk_then_extract_nodecomplete (
+    let result : Graphnode =
+      supplement_from_disk_then_extract_graphnode (
         &config, user_node ) . await ?;
     assert_eq! (
       result . subscribes_to,
       MSV::Specified ( vec![] ),
       "Specified ( [] ) subscribes_to from client should be preserved, not replaced by data from disk." ); }
 
-  { let mut user_node : NodeComplete = empty_node_complete ();
+  { let mut user_node : Graphnode = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . subscribes_to = rel_partners_at_relRepo_msv (
         & RepoName::from ("main"),
         MSV::Specified ( vec![ ID::new ("new_sub") ] ) ); }
-    let result : NodeComplete =
-      supplement_from_disk_then_extract_nodecomplete (
+    let result : Graphnode =
+      supplement_from_disk_then_extract_graphnode (
         &config, user_node ) . await ?;
     assert_eq! (
       members_msv (&result . subscribes_to),
@@ -174,38 +174,38 @@ async fn test_none_hides_from_its_subscriptions_get_replaced_with_disk_hides_log
 
 ) -> Result < (), Box<dyn Error> > {
 
-  { let mut user_node : NodeComplete = empty_node_complete ();
+  { let mut user_node : Graphnode = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . hides_from_its_subscriptions = MSV::Unspecified; }
-    let result : NodeComplete =
-      supplement_from_disk_then_extract_nodecomplete (
+    let result : Graphnode =
+      supplement_from_disk_then_extract_graphnode (
         &config, user_node ) . await ?;
     assert_eq! (
       members_msv (&result . hides_from_its_subscriptions),
       MSV::Specified ( vec![ ID::new ("hide_1_on_disk") ]),
       "Unspecified hides_from_its_subscriptions from client should be replaced with hides from disk." ); }
 
-  { let mut user_node : NodeComplete = empty_node_complete ();
+  { let mut user_node : Graphnode = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . hides_from_its_subscriptions = MSV::Specified ( vec![] ); }
-    let result : NodeComplete =
-      supplement_from_disk_then_extract_nodecomplete (
+    let result : Graphnode =
+      supplement_from_disk_then_extract_graphnode (
         &config, user_node ) . await ?;
     assert_eq! (
       result . hides_from_its_subscriptions,
       MSV::Specified ( vec![] ),
       "Specified ( [] ) hides_from_its_subscriptions from client should be preserved, not replaced by data from disk." ); }
 
-  { let mut user_node : NodeComplete = empty_node_complete ();
+  { let mut user_node : Graphnode = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . hides_from_its_subscriptions = rel_partners_at_relRepo_msv (
         & RepoName::from ("main"),
         MSV::Specified ( vec![ ID::new ("new_hide") ] ) ); }
-    let result : NodeComplete =
-      supplement_from_disk_then_extract_nodecomplete (
+    let result : Graphnode =
+      supplement_from_disk_then_extract_graphnode (
         &config, user_node ) . await ?;
     assert_eq! (
       members_msv (&result . hides_from_its_subscriptions),
@@ -227,12 +227,12 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
 
 ) -> Result < (), Box<dyn Error> > {
 
-  { let mut user_node : NodeComplete = empty_node_complete ();
+  { let mut user_node : Graphnode = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . overrides_view_of = MSV::Unspecified; }
-    let result : NodeComplete =
-      supplement_from_disk_then_extract_nodecomplete (
+    let result : Graphnode =
+      supplement_from_disk_then_extract_graphnode (
         &config, user_node ) . await ?;
     assert_eq! (
       members_msv (&result . overrides_view_of),
@@ -241,26 +241,26 @@ async fn test_none_overrides_view_of_get_replaced_with_disk_overrides_logic (
                    ID::new ("override_3_on_disk") ]),
       "Unspecified overrides_view_of from client should be replaced with overrides from disk." ); }
 
-  { let mut user_node : NodeComplete = empty_node_complete ();
+  { let mut user_node : Graphnode = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . overrides_view_of = MSV::Specified ( vec![] ); }
-    let result : NodeComplete =
-      supplement_from_disk_then_extract_nodecomplete (
+    let result : Graphnode =
+      supplement_from_disk_then_extract_graphnode (
         &config, user_node ) . await ?;
     assert_eq! (
       result . overrides_view_of,
       MSV::Specified ( vec![] ),
       "Specified ( [] ) overrides_view_of from client should be preserved, not replaced by data from disk." ); }
 
-  { let mut user_node : NodeComplete = empty_node_complete ();
+  { let mut user_node : Graphnode = empty_node_complete ();
     { user_node . title   = "Title from user" . to_string ();
       user_node . pid     = ID::new ("test_node");
       user_node . overrides_view_of = rel_partners_at_relRepo_msv (
         & RepoName::from ("main"),
         MSV::Specified ( vec![ ID::new ("new_override") ] ) ); }
-    let result : NodeComplete =
-      supplement_from_disk_then_extract_nodecomplete (
+    let result : Graphnode =
+      supplement_from_disk_then_extract_graphnode (
         &config, user_node ) . await ?;
     assert_eq! (
       members_msv (&result . overrides_view_of),

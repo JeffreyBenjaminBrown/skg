@@ -1,18 +1,18 @@
 // Tests for to_org util functions
 
 use skg::to_org::util::get_id_from_treenode;
-use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode, ActiveNode, default_activeNode};
+use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode, ActiveVognode, default_activeVognode};
 use skg::types::viewnode::PropertyFolder;
 use skg::types::misc::{ID, RepoName};
 use ego_tree::{NodeId,Tree};
 
 #[test]
 fn test_get_id_from_treenode_with_id() {
-  // ActiveNode with ID → returns the ID
+  // ActiveVognode with ID → returns the ID
   let id : ID =
     ID::new ("test-id-123");
-  let t : ActiveNode =
-    default_activeNode ( id . clone(),
+  let t : ActiveVognode =
+    default_activeVognode ( id . clone(),
                        RepoName::from ("main"),
                        "Test" . to_string() );
   let viewnode : Viewnode =

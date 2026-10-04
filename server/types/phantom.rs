@@ -2,13 +2,13 @@
 /// A phantom is a display-only placeholder for a removed node.
 
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
+use crate::dbs::node_lookup::graphnode_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use super::git::{NodeAxes, RelationshipAxes, NodeCompleteDiff, Sign, RepoDiff, node_axes_in_repo_diff};
+use super::git::{NodeAxes, RelationshipAxes, GraphnodeDiff, Sign, RepoDiff, node_axes_in_repo_diff};
 use super::list::Diff_Item;
 use super::misc::{ID, SkgConfig, SkgfileRepo, RepoName};
 
@@ -25,7 +25,7 @@ pub fn title_for_phantom (
     . and_then( |diffs| diffs . get (repo) )
     . and_then( |sd| sd . deleted_nodes . get (id) )
     . map( |n| n . title . clone() )
-    . or_else( || nodecomplete_rustFirst_by_pid_and_repo (
+    . or_else( || graphnode_rustFirst_by_pid_and_repo (
                     graph, config, id, repo )
                   . ok() . map( |n| n . title ) )
     . unwrap_or_else( || format!( "TITLE NOT FOUND for ID {}", id . 0 )) }
@@ -70,7 +70,7 @@ pub fn phantom_axes (
   let parent_sd : Option<&RepoDiff> =
     repo_diffs . and_then ( |d| d . get (parent_repo) );
   let sign_from_parent_stage =
-    | stage_map : &HashMap<PathBuf, NodeCompleteDiff> | -> Option<Sign> {
+    | stage_map : &HashMap<PathBuf, GraphnodeDiff> | -> Option<Sign> {
       let nc = stage_map . get (&parent_file)
         . and_then ( |d| d . node_changes . as_ref () ) ?;
       let diff_list : &[Diff_Item<ID>] =

@@ -154,7 +154,7 @@ where F: FnOnce(NodeMut<T>) -> R {
 /// If `preorder` is true, runs the function before descendants.
 /// If `preorder` is false, runs it after descendants.
 ///
-/// Example: Convert ActiveNodes to Aliases when parent is AliasFolder
+/// Example: Convert ActiveVognodes to Aliases when parent is AliasFolder
 /// ```ignore
 /// do_everywhere_in_tree_dfs(&mut tree, root_id, true, |mut node| {
 ///   if let Some(parent) = node.parent() {

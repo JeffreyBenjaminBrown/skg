@@ -32,7 +32,7 @@ use skg::to_org::render::content_view::{
   multi_root_view, multi_root_view_with_repo_set};
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::{ID, SkgConfig, RepoName, TantivyIndex, members_of};
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{DefineNode, SaveNode};
 use skg::types::views_state::OpenViews;
 
@@ -83,14 +83,14 @@ fn marked_lines<'a> (
 fn saved_node_by_id<'a> (
   instructions : &'a [DefineNode],
   id           : &str,
-) -> &'a NodeComplete {
+) -> &'a Graphnode {
   opt_saved_node_by_id (instructions, id)
     . unwrap_or_else ( || panic! ("SaveNode not found: {}", id) ) }
 
 fn opt_saved_node_by_id<'a> (
   instructions : &'a [DefineNode],
   id           : &str,
-) -> Option<&'a NodeComplete> {
+) -> Option<&'a Graphnode> {
   for instruction in instructions {
     if let DefineNode::Save (SaveNode (node)) = instruction {
       if node . pid == ID::from (id) {

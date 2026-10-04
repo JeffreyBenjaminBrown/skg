@@ -15,49 +15,49 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::repo_sets::ActiveRepoSet;
 use crate::types::misc::ID;
-use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{GraphNodeStats, RelationCounts};
+use crate::types::nodes::complete::Graphnode;
+use crate::types::viewnode::{GraphnodeStats, RelationCounts};
 
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
 /// Everything 'set_graphnodestats_in_viewforest' needs from the graph.
-pub struct AllGraphNodeStats {
+pub struct AllGraphnodeStats {
   pub counts                : HashMap < ID, RelationCounts >,
   pub container_to_contents : HashMap < ID, HashSet < ID > >,
   pub content_to_containers : HashMap < ID, HashSet < ID > >,
 }
 
-impl AllGraphNodeStats {
-  pub fn empty () -> AllGraphNodeStats {
-    AllGraphNodeStats {
+impl AllGraphnodeStats {
+  pub fn empty () -> AllGraphnodeStats {
+    AllGraphnodeStats {
       counts                : HashMap::new (),
       container_to_contents : HashMap::new (),
       content_to_containers : HashMap::new (),
     } } }
 
-/// Extract GraphNodeStats for a single PID from AllGraphNodeStats and
-/// an optional disk NodeComplete (the repo of the alias / extra-id /
+/// Extract GraphnodeStats for a single PID from AllGraphnodeStats and
+/// an optional disk Graphnode (the repo of the alias / extra-id /
 /// flag counts).
 pub fn graphnodestats_for_pid (
   pid          : &ID,
-  stats        : &AllGraphNodeStats,
-  nodecomplete : Option<&NodeComplete>,
-) -> GraphNodeStats {
+  stats        : &AllGraphnodeStats,
+  graphnode : Option<&Graphnode>,
+) -> GraphnodeStats {
   let aliases : usize =
-    nodecomplete
+    graphnode
     . map ( |n| n . aliases . or_default () . len () )
     . unwrap_or (0);
   let extra_ids : usize =
-    nodecomplete
+    graphnode
     . map ( |n| n . extra_ids . len () )
     . unwrap_or (0);
   let flags : usize =
-    nodecomplete
+    graphnode
     . map ( |n| n . misc . iter () . copied ()
       . collect::<HashSet<_>> () . len () )
     . unwrap_or (0);
-  GraphNodeStats {
+  GraphnodeStats {
     aliases,
     extra_ids,
     flags,
@@ -67,7 +67,7 @@ pub fn graphnodestats_for_pid (
 pub fn fetch_all_graphnodestats (
   graph : &InRustGraph,
   pids    : &[ID],
-) -> Result < AllGraphNodeStats, Box<dyn Error> > {
+) -> Result < AllGraphnodeStats, Box<dyn Error> > {
   fetch_all_graphnodestats_with_repo_set (
     graph, pids, None ) }
 
@@ -75,21 +75,21 @@ pub fn fetch_all_graphnodestats_with_repo_set (
   graph    : &InRustGraph,
   pids     : &[ID],
   active   : Option<&ActiveRepoSet>,
-) -> Result < AllGraphNodeStats, Box<dyn Error> > {
+) -> Result < AllGraphnodeStats, Box<dyn Error> > {
   if pids . is_empty () {
-    return Ok ( AllGraphNodeStats::empty() ); }
+    return Ok ( AllGraphnodeStats::empty() ); }
   let pid_set : HashSet < ID > =
     pids . iter () . cloned () . collect ();
   Ok ( fetch_all_graphnodestats_in_rust (
     graph, pids, &pid_set, active ) ) }
 
-/// In-Rust-graph implementation. Every field is computed from NodeRust
+/// In-Rust-graph implementation. Every field is computed from GraphnodeInRust
 /// and the inverse indexes, without I/O.
 ///
 /// relRepo gating (render-and-gating, 5_plan.org): counts and the
 /// container/content maps use the gated accessors
 /// ('outbound_pids_for_relation_gated' / 'inbound_pids_for_relation_gated'),
-/// not the raw NodeRust lists / inverse indexes -- a membership
+/// not the raw GraphnodeInRust lists / inverse indexes -- a membership
 /// recorded at a repo outside 'active' must not inflate a count or
 /// appear in these maps, in either direction, even when the member
 /// NODE itself is active (still checked separately via
@@ -100,7 +100,7 @@ fn fetch_all_graphnodestats_in_rust (
   pids    : &[ID],
   pid_set : &HashSet<ID>,
   active  : Option<&ActiveRepoSet>,
-) -> AllGraphNodeStats {
+) -> AllGraphnodeStats {
   let mut counts : HashMap<ID, RelationCounts> = HashMap::new ();
   let mut mentioner_link_facts : HashMap<ID, (HashSet<ID>, bool)> = HashMap::new ();
   let mut container_to_contents
@@ -175,7 +175,7 @@ fn fetch_all_graphnodestats_in_rust (
       if ! intersected . is_empty () {
         content_to_containers . insert ( pid . clone (),
                                          intersected ); }}}
-  AllGraphNodeStats {
+  AllGraphnodeStats {
     counts,
     container_to_contents,
     content_to_containers,
@@ -239,8 +239,8 @@ mod tests {
     id    : &str,
     title : &str,
     body  : Option<&str>,
-  ) -> NodeComplete {
-    NodeComplete {
+  ) -> Graphnode {
+    Graphnode {
       pid : ID::from (id),
       title : title . to_string (),
       body : body . map (str::to_string),
@@ -248,13 +248,13 @@ mod tests {
 
   #[test]
   fn links_count_distinct_resolved_identities_and_substantive_mentioners () {
-    let mut target : NodeComplete = node ("target", "A different title", None);
+    let mut target : Graphnode = node ("target", "A different title", None);
     target . extra_ids = vec![ ID::from ("old-target") ];
-    let mut with_content : NodeComplete =
+    let mut with_content : Graphnode =
       node ("with-content", "[[id:target][x]]", None);
     with_content . contains = vec![ RelPartner::at_relRepo (
       RepoName::from ("main"), ID::from ("target")) ];
-    let nodes : Vec<NodeComplete> = vec![
+    let nodes : Vec<Graphnode> = vec![
       target,
       node ("other", "Another distinct target", None),
       node ("repeated", "[[id:target][x]] [[id:old-target][y]]", None),
@@ -263,9 +263,9 @@ mod tests {
       node ("two-targets", "[[id:target][x]] [[id:other][y]]", None),
       node ("with-self-link", "[[id:target][x]] [[id:with-self-link][self]]", None),
       node ("with-dangling", "[[id:target][x]] [[id:missing][z]]", None) ];
-    let graph : InRustGraph = InRustGraph::from_nodecompletes (&nodes);
+    let graph : InRustGraph = InRustGraph::from_graphnodes (&nodes);
     let pids : Vec<ID> = nodes . iter () . map (|n| n . pid . clone ()) . collect ();
-    let stats : AllGraphNodeStats = fetch_all_graphnodestats (
+    let stats : AllGraphnodeStats = fetch_all_graphnodestats (
       &graph, &pids) . unwrap ();
     let target_counts : &RelationCounts = stats . counts . get (&ID::from ("target")) . unwrap ();
     assert_eq! (target_counts . link_total, 6);
@@ -282,21 +282,21 @@ mod tests {
       "tests/repo_sets/fixtures/skgconfig.toml") . unwrap ();
     let active : ActiveRepoSet = ActiveRepoSet::named (
       &config, RepoSetName::from ("public")) . unwrap ();
-    let mut mentioner : NodeComplete = node (
+    let mut mentioner : Graphnode = node (
       "mentioner", "[[id:target][d]] [[id:private-target][p]]", None);
     mentioner . home_repo = RepoName::from ("public");
     mentioner . contains = vec![RelPartner::at_relRepo (
       RepoName::from ("private"), ID::from ("visible-child"))];
-    let mut target : NodeComplete = node ("target", "destination", None);
+    let mut target : Graphnode = node ("target", "destination", None);
     target . home_repo = RepoName::from ("public");
-    let mut child : NodeComplete = node ("visible-child", "child", None);
+    let mut child : Graphnode = node ("visible-child", "child", None);
     child . home_repo = RepoName::from ("public");
-    let mut private_target : NodeComplete = node (
+    let mut private_target : Graphnode = node (
       "private-target", "private target", None);
     private_target . home_repo = RepoName::from ("private");
-    let graph : InRustGraph = InRustGraph::from_nodecompletes (
+    let graph : InRustGraph = InRustGraph::from_graphnodes (
       &[mentioner, target, child, private_target]);
-    let stats : AllGraphNodeStats = fetch_all_graphnodestats_with_repo_set (
+    let stats : AllGraphnodeStats = fetch_all_graphnodestats_with_repo_set (
       &graph, &[ID::from ("mentioner"), ID::from ("target")],
       Some (&active)) . unwrap ();
     assert_eq! (stats . counts [&ID::from ("target")] . link_total, 1);
@@ -307,7 +307,7 @@ mod tests {
   #[test]
   fn flag_count_is_the_number_of_distinct_true_flags () {
     let pid = ID::from ("node");
-    let node = NodeComplete {
+    let node = Graphnode {
       pid : pid . clone (),
       misc : vec![
         Flag::Had_ID_Before_Import,
@@ -315,7 +315,7 @@ mod tests {
         Flag::NoSearchMatching ],
       .. empty_node_complete () };
     let result = graphnodestats_for_pid (
-      &pid, &AllGraphNodeStats::empty (), Some (&node));
+      &pid, &AllGraphnodeStats::empty (), Some (&node));
     assert_eq! (result . flags, 2);
   }
 }

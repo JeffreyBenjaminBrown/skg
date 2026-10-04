@@ -6,7 +6,7 @@ use skg::import_org_roam::parse::{
   headline_title,
 };
 use skg::types::misc::{ID, members_of, members_msv};
-use skg::types::nodes::complete::{Flag, NodeComplete};
+use skg::types::nodes::complete::{Flag, Graphnode};
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -34,7 +34,7 @@ fn test_minimal_file () {
 ";
   let f : tempfile::NamedTempFile =
     write_temp_org (content, "minimal");
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     parse_org_file (f . path());
   assert_eq! (nodes . len(), 1);
   assert_eq! (nodes[0] . title, "My Node");
@@ -54,7 +54,7 @@ More body text.
 ";
   let f : tempfile::NamedTempFile =
     write_temp_org (content, "with-body");
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     parse_org_file (f . path());
   assert_eq! (nodes . len(), 1);
   assert_eq! (nodes[0] . body . as_deref(),
@@ -80,7 +80,7 @@ fn test_nested_id_headlines () {
 ";
   let f : tempfile::NamedTempFile =
     write_temp_org (content, "nested");
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     parse_org_file (f . path());
   assert_eq! (nodes . len(), 3);
   // File-level node
@@ -114,7 +114,7 @@ fn test_non_id_headline_becomes_node () {
 ";
   let f : tempfile::NamedTempFile =
     write_temp_org (content, "non-id-hl");
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     parse_org_file (f . path());
   // 3 nodes: file + headline + sub-headline
   assert_eq! (nodes . len(), 3);
@@ -153,7 +153,7 @@ fn test_id_headline_under_non_id_headline () {
 ";
   let f : tempfile::NamedTempFile =
     write_temp_org (content, "transitive");
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     parse_org_file (f . path());
   // 3 nodes: file, intermediary, deep-child
   assert_eq! (nodes . len(), 3);
@@ -185,7 +185,7 @@ fn test_roam_aliases () {
 ";
   let f : tempfile::NamedTempFile =
     write_temp_org (content, "aliases");
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     parse_org_file (f . path());
   assert_eq! (nodes . len(), 1);
   let aliases : Vec<String> =
@@ -197,7 +197,7 @@ fn test_roam_aliases () {
 fn test_empty_file () {
   let f : tempfile::NamedTempFile =
     write_temp_org ("", "empty");
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     parse_org_file (f . path());
   assert! (nodes . is_empty()); }
 
@@ -209,7 +209,7 @@ Some text.
 ";
   let f : tempfile::NamedTempFile =
     write_temp_org (content, "no-id");
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     parse_org_file (f . path());
   assert! (nodes . is_empty()); }
 
@@ -222,7 +222,7 @@ fn test_missing_title_uses_filename () {
 ";
   let f : tempfile::NamedTempFile =
     write_temp_org (content, "my_note");
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     parse_org_file (f . path());
   assert_eq! (nodes . len(), 1);
   // Title should be derived from filename
@@ -288,7 +288,7 @@ fn test_power_org_structure () {
 ";
   let f : tempfile::NamedTempFile =
     write_temp_org (content, "power");
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     parse_org_file (f . path());
   assert_eq! (nodes . len(), 6);
   // File-level node
@@ -338,7 +338,7 @@ fn test_music_and_consciousness () {
 ";
   let f : tempfile::NamedTempFile =
     write_temp_org (content, "music");
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     parse_org_file (f . path());
   // 3 nodes: file + 2 headlines
   assert_eq! (nodes . len(), 3);
@@ -379,7 +379,7 @@ fn test_had_id_before_import () {
 ";
   let f : tempfile::NamedTempFile =
     write_temp_org (content, "had-id");
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     parse_org_file (f . path());
   assert_eq! (nodes . len(), 3);
   // File-level node had :ID: → Had_ID_Before_Import.
@@ -409,7 +409,7 @@ fn test_body_whitespace_normalization () {
 ";
   let f : tempfile::NamedTempFile =
     write_temp_org (content, "ws-norm");
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     parse_org_file (f . path());
   assert_eq! (nodes . len(), 2);
   assert_eq! (nodes[1] . body . as_deref(),
@@ -430,7 +430,7 @@ fn test_body_whitespace_false_headline_gets_padded () {
 ";
   let f : tempfile::NamedTempFile =
     write_temp_org (content, "false-hl");
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     parse_org_file (f . path());
   assert_eq! (nodes . len(), 1);
   assert_eq! (nodes[0] . body . as_deref(),
@@ -451,19 +451,19 @@ fn test_body_whitespace_mixed_indent_with_false_headline () {
 ";
   let f : tempfile::NamedTempFile =
     write_temp_org (content, "mixed-fh");
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     parse_org_file (f . path());
   assert_eq! (nodes . len(), 1);
   assert_eq! (nodes[0] . body . as_deref(),
               Some ("  some text\n    indented\n  * sneaky bullet") ); }
 
-/// Render a tree of NodeCompletes as org text (no metadata),
+/// Render a tree of Graphnodes as org text (no metadata),
 /// starting from the given root ID, for test comparison.
-fn render_nodecompletes_as_org (
-  nodes   : &[NodeComplete],
+fn render_graphnodes_as_org (
+  nodes   : &[Graphnode],
   root_id : &ID,
 ) -> String {
-  let by_id : HashMap<&ID, &NodeComplete> =
+  let by_id : HashMap<&ID, &Graphnode> =
     nodes . iter() . map (|n| (&n . pid, n)) . collect();
   let mut out : String = String::new();
   if let Some (root) = by_id . get (root_id) {
@@ -471,8 +471,8 @@ fn render_nodecompletes_as_org (
   out . trim_end() . to_string() }
 
 fn render_node_recursive (
-  by_id : &HashMap<&ID, &NodeComplete>,
-  node  : &NodeComplete,
+  by_id : &HashMap<&ID, &Graphnode>,
+  node  : &Graphnode,
   level : usize,
   out   : &mut String,
 ) {
@@ -512,10 +512,10 @@ fn test_super_indentation_creates_grouping_nodes () {
 ";
   let f : tempfile::NamedTempFile =
     write_temp_org (input, "super-indent");
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     parse_org_file (f . path());
   let rendered : String =
-    render_nodecompletes_as_org (&nodes, &ID::new ("a-id"));
+    render_graphnodes_as_org (&nodes, &ID::new ("a-id"));
   let expected : &str = "\
 * a
 ** These are special!

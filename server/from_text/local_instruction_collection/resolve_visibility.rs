@@ -22,7 +22,7 @@
 /// elsewhere in the same map.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::node_lookup::opt_nodecomplete_by_id;
+use crate::dbs::node_lookup::opt_graphnode_by_id;
 use crate::from_text::local_instruction_collection::lower::LoweredIntents;
 use crate::from_text::local_instruction_collection::types::{
   HiddenOutsideEdit, SubscribeeVisibility };
@@ -30,7 +30,7 @@ use crate::from_text::weave::member_is_visible;
 use crate::repo_sets::ActiveRepoSet;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, members_of};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 use crate::types::save::PostCommitNoticeCandidate;
 
 use std::collections::{HashMap, HashSet};
@@ -55,11 +55,11 @@ pub fn resolve_visibility (
     restricted_repo_set ) ?;
   for (subscriber, signal) in visibility {
     let Some (subscribee_from_disk) =
-      opt_nodecomplete_by_id (
+      opt_graphnode_by_id (
         graph, config, &signal . subscribee ) ?
     else { continue; };
     let Some (subscriber_from_disk) =
-      opt_nodecomplete_by_id (
+      opt_graphnode_by_id (
         graph, config, subscriber ) ?
     else { continue; };
     if ! config . user_owns_repo (&subscriber_from_disk . home_repo) {
@@ -115,7 +115,7 @@ fn apply_hiddenoutside_edits (
       return Err (Box::new (BufferValidationError::Other (
         format! ("More than one HiddenOutsideOfSubscribee edit was submitted for subscriber {}", subscriber) ))); }
     let Some (subscriber_from_disk) =
-      opt_nodecomplete_by_id (graph, config, subscriber) ?
+      opt_graphnode_by_id (graph, config, subscriber) ?
     else { continue; };
     if ! config . user_owns_repo (&subscriber_from_disk . home_repo) {
       continue; }
@@ -127,7 +127,7 @@ fn apply_hiddenoutside_edits (
     let mut inside : HashSet<ID> = HashSet::new ();
     for subscribee_id in subscribee_ids {
       let Some (subscribee) =
-        opt_nodecomplete_by_id (graph, config, &subscribee_id) ?
+        opt_graphnode_by_id (graph, config, &subscribee_id) ?
       else { continue; };
       for member in &subscribee . contains {
         if restricted_repo_set . map_or (
@@ -199,7 +199,7 @@ fn infer_hides_from_contains_removals (
     in lowered . save_intents_with_specified_contains () {
     if ! config . user_owns_repo (&repo) { continue; }
     let Some (subscriber_from_disk) =
-      opt_nodecomplete_by_id (
+      opt_graphnode_by_id (
         graph, config, &subscriber_pid ) ?
     else { continue; };
     let subscriber_contains : Vec<ID> =
@@ -243,7 +243,7 @@ fn infer_hides_from_contains_removals (
           let mut content : HashSet<ID> = HashSet::new ();
           for subscribee in &subscribes {
             if let Some (subscribee_from_disk) =
-              opt_nodecomplete_by_id (
+              opt_graphnode_by_id (
                 graph, config, subscribee ) ?
             { content . extend (
                 members_of (& subscribee_from_disk . contains) ); }}
@@ -271,8 +271,8 @@ fn validate_no_overlapping_subscribee_hiderel_conflicts (
   // not just per visible child shown in the buffer.
   let mut seen : HashMap<(ID, ID), bool> = HashMap::new();
   for (subscriber, signal) in visibility {
-    let subscribee_from_disk : NodeComplete =
-      match opt_nodecomplete_by_id (
+    let subscribee_from_disk : Graphnode =
+      match opt_graphnode_by_id (
         graph, config, &signal . subscribee ) ?
       { Some (subscribee_from_disk) => subscribee_from_disk,
         None                        => continue, };

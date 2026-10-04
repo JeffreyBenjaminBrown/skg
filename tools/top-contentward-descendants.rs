@@ -15,7 +15,7 @@ use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use skg::types::misc::{ID, SkgConfig, members_of};
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::nodes::complete::Graphnode;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::env;
@@ -30,7 +30,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
       args[2] . parse () . unwrap_or (20) }
     else { 20 };
   let config : SkgConfig = load_config (config_path) ?;
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     read_all_skg_files_from_repos (&config) ?;
   error_unless_each_id_names_one_node (
     &nodes, &config . data_root) ?;
@@ -44,7 +44,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
     nodes . iter ()
     . map ( |n| (n . pid . clone (), n . title . as_str ()) )
     . collect ();
-  let mut by_descendants : Vec<(usize, &NodeComplete)> =
+  let mut by_descendants : Vec<(usize, &Graphnode)> =
     nodes . iter ()
     . map ( |n| {
       let count : usize = bfs_descendants_count (&adj, &n . pid);

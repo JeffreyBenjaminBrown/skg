@@ -4,7 +4,7 @@ use std::io::BufReader;
 use std::net::{TcpListener, TcpStream};
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::dbs::node_lookup::nodecomplete_from_graph;
+use skg::dbs::node_lookup::graphnode_from_graph;
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::ClientViewSnapshot;
 use skg::test_utils::{
@@ -89,7 +89,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
       assert_eq! (fs::read (&a_path) ?, a_before,
                   "a refused save must not write its file");
       assert_eq! (
-        nodecomplete_from_graph (&graph . load_full (), &ID::from ("A"))
+        graphnode_from_graph (&graph . load_full (), &ID::from ("A"))
           . unwrap () . title,
         "A links to [[id:X][X]]");
       assert! (messages . is_empty (),
@@ -130,7 +130,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
                "X's interesting-link herald must reflect A's new target: {}",
                collateral_text);
       assert_eq! (
-        nodecomplete_from_graph (&graph . load_full (), &ID::from ("A"))
+        graphnode_from_graph (&graph . load_full (), &ID::from ("A"))
           . unwrap () . title,
         "[[id:X][X]] [[id:A][A]]");
       Ok (( ))

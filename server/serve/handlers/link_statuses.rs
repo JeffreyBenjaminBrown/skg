@@ -95,7 +95,7 @@ mod tests {
   use crate::dbs::filesystem::not_nodes::load_config;
   use crate::repo_sets::RepoSetName;
   use crate::types::misc::RepoName;
-  use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
+  use crate::types::nodes::complete::{Graphnode, empty_node_complete};
   use crate::dbs::in_rust_graph::InRustGraphHandle;
   use arc_swap::ArcSwap;
   use std::sync::Arc;
@@ -108,18 +108,18 @@ mod tests {
       .unwrap () . abbreviation = Some ("pub" . to_string ());
     let active : ActiveRepoSet = ActiveRepoSet::named (
       &config, RepoSetName::from ("public")) . unwrap ();
-    let visible : NodeComplete = NodeComplete {
+    let visible : Graphnode = Graphnode {
       pid : ID::from ("visible"),
       extra_ids : vec![ID::from ("old-visible")],
       home_repo : RepoName::from ("public"),
       title : "A title that must stay out of lookup results" .to_string (),
       .. empty_node_complete () };
-    let private : NodeComplete = NodeComplete {
+    let private : Graphnode = Graphnode {
       pid : ID::from ("private"),
       home_repo : RepoName::from ("private"),
       title : "Private title" .to_string (),
       .. empty_node_complete () };
-    let graph : InRustGraph = InRustGraph::from_nodecompletes (
+    let graph : InRustGraph = InRustGraph::from_graphnodes (
       &[visible, private]);
     let ids : Vec<ID> = ["old-visible", "private", "unknown"]
       .into_iter () . map (ID::from) .collect ();
@@ -151,8 +151,8 @@ mod tests {
       &handle . load_full (), &config, &active, &requested),
       vec![(ID::from ("old-new"), LinkStatus::Missing)]);
 
-    let published : InRustGraph = InRustGraph::from_nodecompletes (&[
-      NodeComplete {
+    let published : InRustGraph = InRustGraph::from_graphnodes (&[
+      Graphnode {
         pid : ID::from ("new"),
         extra_ids : requested . clone (),
         home_repo : RepoName::from ("public"),

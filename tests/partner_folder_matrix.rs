@@ -34,10 +34,10 @@ use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::views_state::OpenViews;
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, members_of, members_msv};
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{DefineNode, SaveNode};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::dbs::node_lookup::nodecomplete_by_id;
+use skg::dbs::node_lookup::graphnode_by_id;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::types::errors::{SaveError, BufferValidationError};
 use skg::types::viewnode::Viewnode;
@@ -86,7 +86,7 @@ impl Fails {
 
 fn saved_node_by_id<'a> (
   instructions : &'a [DefineNode], id : &str,
-) -> Option<&'a NodeComplete> {
+) -> Option<&'a Graphnode> {
   for instruction in instructions {
     if let DefineNode::Save (SaveNode (node)) = instruction {
       if node . pid == ID::from (id) { return Some (node); }}}
@@ -520,7 +520,7 @@ async fn folder_request_scenarios (
 // Writable folders (subscribeeFolder, overriddenFolder): the membership
 // edits land on disk. Checked through buffer_to_validated_saveplan,
 // which builds (but does not write) the plan, so we read the
-// would-be NodeComplete for the owner.
+// would-be Graphnode for the owner.
 //////////////////////////////////////////////////////////////
 
 async fn saveplan_nodes (
@@ -589,7 +589,7 @@ async fn writable_subscribeeFolder (
       None => fails . record (s, "no SaveNode for wSub-owner" . into ()), } }
   Ok (( )) }
 
-fn override_set ( n : &NodeComplete ) -> Vec<ID> {
+fn override_set ( n : &Graphnode ) -> Vec<ID> {
   match &n . overrides_view_of {
     MSV::Specified (ids) => { let mut v = members_of (ids); v . sort (); v }
     MSV::Unspecified => Vec::new (), } }
@@ -775,8 +775,8 @@ fn buffer_save_rejects_second_user_owned_overrider
         "expected an override-invariant violation, got {:?}", save_error );
       // Disk unchanged: the override-invariant check runs before the
       // filesystem write, so mono-r2 still overrides nothing.
-      let r2 : NodeComplete =
-        nodecomplete_by_id (
+      let r2 : Graphnode =
+        graphnode_by_id (
           &skg::test_utils::graph_handle_from_config (config)? . load_full (),
           config, &ID::from ("mono-r2") ) ?;
       let overrides_empty : bool = match &r2 . overrides_view_of {

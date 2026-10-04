@@ -36,7 +36,7 @@ fn test_aliases_diff_shows_alias_folder()
 /// Regression for TODO/more.org, "aliases should be merged, not
 /// added": saving a diff-mode buffer that ALREADY shows its aliases
 /// (any rendered diff view does) must not duplicate them. The bug:
-/// process_activeNode_diff prepended a SECOND AliasFolder without
+/// process_activeVognode_diff prepended a SECOND AliasFolder without
 /// checking for the one the buffer carried, and both then reconciled
 /// to the full alias list.
 #[test]

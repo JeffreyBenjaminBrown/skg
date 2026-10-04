@@ -18,7 +18,7 @@ fn graph_with (pid : &str) -> InRustGraph {
   let mut node = empty_node_complete ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
-  InRustGraph::from_nodecompletes (&[node])
+  InRustGraph::from_graphnodes (&[node])
 }
 
 #[test]
@@ -80,7 +80,7 @@ fn rebuild_candidate_uses_a_sibling_directory_without_wiping_live_index () {
   assert! (! Arc::ptr_eq (&live_index . index, &generation_index . index));
 }
 
-fn node_for_generation (pid : &str) -> skg::types::nodes::complete::NodeComplete {
+fn node_for_generation (pid : &str) -> skg::types::nodes::complete::Graphnode {
   let mut node = empty_node_complete ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();

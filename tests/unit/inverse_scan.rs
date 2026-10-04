@@ -3,17 +3,17 @@ use crate::repo_sets::RepoSetName;
 use crate::types::git::NodeChanges;
 use crate::types::misc::MSV;
 use crate::types::nodes::complete::empty_node_complete;
-use crate::types::nodes::fs::NodeFS;
+use crate::types::nodes::fs::GraphnodeOnDisk;
 use std::collections::BTreeSet;
 
 fn id (s : &str) -> ID { ID ( s . to_string () ) }
 fn src (s : &str) -> RepoName { RepoName ( s . to_string () ) }
 
-fn nodecomplete (
+fn graphnode (
   pid       : &str,
   overrides : Vec<&str>,
-) -> NodeComplete {
-  let node_fs : NodeFS =
+) -> Graphnode {
+  let node_fs : GraphnodeOnDisk =
     serde_yaml::from_str ( & format! (
       "pid: '{}'\ntitle: \"{}\"\n{}",
       pid, pid,
@@ -27,8 +27,8 @@ fn nodecomplete (
 
 fn modified_entry (
   overrides_diff : Vec<Diff_Item<ID>>,
-) -> NodeCompleteDiff {
-  NodeCompleteDiff {
+) -> GraphnodeDiff {
+  GraphnodeDiff {
     status : GitDiffStatus::Modified,
     node_changes : Some ( NodeChanges {
       overrides_view_of_diff : overrides_diff,
@@ -37,18 +37,18 @@ fn modified_entry (
     after_node : None } }
 
 fn deleted_entry (
-  before : NodeComplete,
-) -> NodeCompleteDiff {
-  NodeCompleteDiff {
+  before : Graphnode,
+) -> GraphnodeDiff {
+  GraphnodeDiff {
     status : GitDiffStatus::Deleted,
     node_changes : None,
     before_node : Some (before),
     after_node : None } }
 
 fn added_entry (
-  after : NodeComplete,
-) -> NodeCompleteDiff {
-  NodeCompleteDiff {
+  after : Graphnode,
+) -> GraphnodeDiff {
+  GraphnodeDiff {
     status : GitDiffStatus::Added,
     node_changes : None,
     before_node : None,
@@ -74,15 +74,15 @@ fn signs_come_from_modified_deleted_and_added_files_per_stage () {
   // del-r's file was Deleted UNSTAGED; its before_node named N.
   sd . unstaged . insert (
     PathBuf::from ("del-r.skg"),
-    deleted_entry ( nodecomplete ("del-r", vec! ["N"]) ));
+    deleted_entry ( graphnode ("del-r", vec! ["N"]) ));
   // newfile-r's file was Added UNSTAGED; its after_node names N.
   sd . unstaged . insert (
     PathBuf::from ("newfile-r.skg"),
-    added_entry ( nodecomplete ("newfile-r", vec! ["N"]) ));
+    added_entry ( graphnode ("newfile-r", vec! ["N"]) ));
   // bystander: a Deleted file that never named N.
   sd . unstaged . insert (
     PathBuf::from ("bystander.skg"),
-    deleted_entry ( nodecomplete ("bystander", vec! []) ));
+    deleted_entry ( graphnode ("bystander", vec! []) ));
   let diffs : Option<HashMap<RepoName, RepoDiff>> =
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
   let scan : HashMap<ID, RelationshipAxes> =
@@ -123,7 +123,7 @@ fn each_relation_is_read_separately () {
   let mut sd : RepoDiff = empty_repo_diff ();
   sd . unstaged . insert (
     PathBuf::from ("m.skg"),
-    NodeCompleteDiff {
+    GraphnodeDiff {
       status : GitDiffStatus::Modified,
       node_changes : Some ( NodeChanges {
         subscribes_to_diff : vec! [
@@ -150,11 +150,11 @@ fn cross_repo_move_yields_no_membership_change () {
   let mut sd_a : RepoDiff = empty_repo_diff ();
   sd_a . unstaged . insert (
     PathBuf::from ("mover.skg"),
-    deleted_entry ( nodecomplete ("mover", vec! ["N"]) ));
+    deleted_entry ( graphnode ("mover", vec! ["N"]) ));
   let mut sd_b : RepoDiff = empty_repo_diff ();
   sd_b . unstaged . insert (
     PathBuf::from ("mover.skg"),
-    added_entry ( nodecomplete ("mover", vec! ["N"]) ));
+    added_entry ( graphnode ("mover", vec! ["N"]) ));
   let diffs : Option<HashMap<RepoName, RepoDiff>> =
     Some ( HashMap::from ([
       ( src ("a"), sd_a ),
@@ -174,7 +174,7 @@ fn relRepo_gates_deleted_stage_signs () {
   // active set must not see the resulting phantom sign; ungated
   // (None) still does.
   let owner : ID = id ("N");
-  let mut before : NodeComplete = empty_node_complete ();
+  let mut before : Graphnode = empty_node_complete ();
   before . pid = id ("del-r");
   before . title = "del-r" . to_string ();
   before . home_repo = src ("public");

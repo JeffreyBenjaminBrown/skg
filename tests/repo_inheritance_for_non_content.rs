@@ -33,7 +33,7 @@ fn two_repo_config () -> SkgConfig {
       user_owns_it : true } );
   SkgConfig::dummyFromRepos (repos) }
 
-/// When a node N has the same repo as its nearest activeNode ancestor,
+/// When a node N has the same repo as its nearest activeVognode ancestor,
 /// even if N is marked affectsParent=false,
 /// homeRepoAtBoundary should be false.
 #[test]
@@ -70,13 +70,13 @@ fn repo_inheritance_across_non_content_same_repo () {
     . first_child () . unwrap ();
   let ViewnodeKind::Vognode ( Vognode::Active (t) )
     = & b_ref . value () . kind
-    else { panic! ("expected ActiveNode") };
+    else { panic! ("expected ActiveVognode") };
   assert! ( ! t . viewStats . homeRepoAtBoundary,
             "Same repo across non-content boundary \
              should NOT be at boundary" ); }
 
 /// When a non-content child (affectsParent != Affected) has a different repo
-/// from its nearest activeNode ancestor,
+/// from its nearest activeVognode ancestor,
 /// homeRepoAtBoundary should be true.
 #[test]
 fn repo_inheritance_across_non_content_different_repo () {
@@ -110,7 +110,7 @@ fn repo_inheritance_across_non_content_different_repo () {
     . first_child () . unwrap ();
   let ViewnodeKind::Vognode ( Vognode::Active (t) )
     = & b_ref . value () . kind
-    else { panic! ("expected ActiveNode") };
+    else { panic! ("expected ActiveVognode") };
   assert! ( t . viewStats . homeRepoAtBoundary,
             "Different repo across non-content boundary \
              should be at boundary" ); }

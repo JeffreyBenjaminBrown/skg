@@ -366,7 +366,7 @@ fn rerender_collateral_view (
 /// (create_partnerFolders_for_fresh_nodes = true), expands content, reconciles
 /// folders, and applies the TODO/DONE/local-view-update/plan_v2.org §5.5 node budget.
 /// When diff_mode, the git diff is computed inline by view completion (per node,
-/// at its BFS visit, via process_activeNode_diff) -- the same path post-save uses.
+/// at its BFS visit, via process_activeVognode_diff) -- the same path post-save uses.
 /// The caller (multi_root_view_via_env) then adds containerward ancestry and
 /// stats.
 /// Returns the completed viewforest plus any warning strings the
@@ -405,7 +405,7 @@ pub fn render_initial_view (
   let mut errors : Vec<String> = Vec::new ();
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): de-novo diff is computed INLINE by view completion, exactly
   // like post-save -- compute the real diffs here and feed them via repo_diffs
-  // (which drives the inline process_activeNode_diff and the diff-aware PropertyFolder /
+  // (which drives the inline process_activeVognode_diff and the diff-aware PropertyFolder /
   // PartnerFolder reconcilers).
   let real_diffs : Option<HashMap<RepoName, RepoDiff>> =
     if diff_mode { Some ( compute_diff_for_every_repo (&runtime . config) ) }
@@ -454,7 +454,7 @@ pub fn rerender_view (
     let mut defmap : DefinitiveMap = DefinitiveMap::new ();
     let mut completion_context : CompletionContext = CompletionContext {
       defmap                         : &mut defmap,
-      // The real per-repo diffs drive ALL diff inline: process_activeNode_diff
+      // The real per-repo diffs drive ALL diff inline: process_activeVognode_diff
       // (content axes + phantom flip + TextChanged/IDFolder/AliasFolder) and the
       // diff-aware PropertyFolder / PartnerFolder reconcilers, each at its own BFS visit
       // (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3). The content reconcile itself stays worktree-only.
@@ -481,7 +481,7 @@ pub fn rerender_view (
       complete_viewforest (
         viewforest, &mut completion_context ) ? }; }
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the content/non-vognode diff was applied INLINE during the
-  // BFS above (process_activeNode_diff at each Active node's visit, driven by
+  // BFS above (process_activeVognode_diff at each Active node's visit, driven by
   // repo_diffs = the real diffs).
   let result : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
@@ -497,7 +497,7 @@ pub fn rerender_view (
 
 /// The shared post-completion tail for BOTH render paths (TODO/DONE/local-view-update/plan_v2.org §20.3): the de-novo
 /// view (multi_root_view_via_env, server/to_org/render/content_view.rs) and the
-/// post-save re-render (rerender_view, above). Given a viewforest whose ActiveNode
+/// post-save re-render (rerender_view, above). Given a viewforest whose ActiveVognode
 /// content + git diff have already been completed, it:
 ///   - fulfills a ViewRequest::Path (RelationRole::CONTAINER) carried by a view-ROOT (only de-novo
 ///     sets it; see render_initial_view), building that root's
@@ -567,7 +567,7 @@ pub fn finish_viewforest (
 /// to include the rest of the subscriber's content.
 ///
 /// PITFALL: The function does not actually remember the nodeMerge history.
-/// It merely identifies each ActiveNode in 'viewforest'
+/// It merely identifies each ActiveVognode in 'viewforest'
 /// whose pid is an extra_id of some distinct node in the snapshot.
 fn rewriteInPlace_viewnodes_whose_id_is_newly_extra (
   viewforest : &mut Tree<Viewnode>,
@@ -679,7 +679,7 @@ fn remove_branches_that_git_marked_removed (
 
 /// Remove non-vognodes that exist only to display diff information:
 /// TextChanged and IDFolder.
-/// These are regenerated from scratch by 'process_activeNode_diff' (the inline
+/// These are regenerated from scratch by 'process_activeVognode_diff' (the inline
 /// per-node diff) at each node's BFS visit, so stale ones must be stripped first.
 /// AliasFolder is NOT removed: it may have been requested by the user
 /// (not just injected by diff mode), and tracking which case applies
@@ -705,7 +705,7 @@ fn remove_diff_only_properties (
       } else { Ok (true) } } ) ?;
   Ok (( )) }
 
-/// Clear diff metadata from all ActiveNodes in the viewforest.
+/// Clear diff metadata from all ActiveVognodes in the viewforest.
 /// Diff-only non-vognodes (TextChanged, IDFolder) are
 /// removed by 'remove_diff_only_properties' before this runs.
 fn clear_diff_metadata (

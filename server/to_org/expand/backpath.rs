@@ -12,10 +12,10 @@ use crate::dbs::in_rust_graph::paths::{
   paths_to_first_nonlinearities_in_graph, PathToFirstNonlinearity};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::repo_sets::ActiveRepoSet;
-use crate::to_org::util::{ get_id_from_treenode, nodecomplete_and_viewnode_from_id, remove_completed_view_request};
+use crate::to_org::util::{ get_id_from_treenode, graphnode_and_viewnode_from_id, remove_completed_view_request};
 
 use crate::types::misc::{ID, SkgConfig, RepoName};
-use crate::types::tree::viewnode_nodecomplete::{ find_child_by_id, find_children_by_ids};
+use crate::types::tree::viewnode_graphnode::{ find_child_by_id, find_children_by_ids};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::viewnode::ViewRequest;
 use crate::types::viewnode::{ Birth, Viewnode, ViewnodeKind, AffectsParent, mk_writeProtected_from_viewnode, mk_unknown_viewnode };
@@ -336,11 +336,11 @@ fn attach_containerward_ancestries_for_birth_role (
   attach_containerward_ancestries_at_nodeids_with_repo_set (
     tree, &role_nodeids, graph, config, active ) }
 
-/// For each NodeId, look up its ActiveNode pid in the tree, fetch
+/// For each NodeId, look up its ActiveVognode pid in the tree, fetch
 /// every such pid's containerward ancestry from the graph (in
 /// parallel via `ancestry_by_id_from_ids`), and prepend any
 /// `Inner`-shaped ancestry under that NodeId as write-protected
-/// `Birth::Backpath(CONTAINER)` children. NodeIds that aren't ActiveNodes,
+/// `Birth::Backpath(CONTAINER)` children. NodeIds that aren't ActiveVognodes,
 /// or whose ancestry is `Root`/`Repeated`/`DepthTruncated`, are
 /// skipped.
 pub fn attach_containerward_ancestries_at_nodeids (
@@ -438,7 +438,7 @@ pub fn prepend_writeProtected_indep_child (
   birth         : Birth,
 ) -> Result < NodeId, Box<dyn Error> > {
   let viewnode : Viewnode = match
-    nodecomplete_and_viewnode_from_id (
+    graphnode_and_viewnode_from_id (
       graph, config, child_skgid
     ) ? {
       Some ((_nc, child_viewnode)) =>

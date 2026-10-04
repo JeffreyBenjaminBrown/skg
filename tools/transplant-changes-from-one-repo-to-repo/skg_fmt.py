@@ -25,7 +25,7 @@ they're just one line like any other scalar field.
 
 The on-disk format is defined (and must stay consistent with) skg's
 Rust code at:
-  server/types/nodes/fs.rs         NodeFS::to_yaml + block_scalar_for_body
+  server/types/nodes/fs.rs         GraphnodeOnDisk::to_yaml + block_scalar_for_body
 If that code changes (new field, different body rendering), this
 file must track the change to keep diffs minimal. Correctness (can
 skg still load the file?) is independent of that — skg always
@@ -134,7 +134,7 @@ def emit_body(body: str) -> str:
     """Emit 'body: ...' in the form skg would — block literal if possible,
     else single-line (quoted if necessary).
 
-    Mirrors NodeFS::to_yaml's branch: try block; if it doesn't round-trip
+    Mirrors GraphnodeOnDisk::to_yaml's branch: try block; if it doesn't round-trip
     (rare — CR or NUL), fall back to the default yaml serializer.
     """
     # Most strings can be block-emitted. The round-trip guard in skg rejects

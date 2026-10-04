@@ -5,7 +5,7 @@ use crate::diff_report::types::{
 use crate::types::list::{Diff_Item, compute_interleaved_diff};
 use crate::types::misc::{
   ID, MSV, RelPartner, RepoName, members_of, members_msv};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 use crate::types::links::links_from_node;
 
 use similar::{ChangeTag, TextDiff};
@@ -179,9 +179,9 @@ fn node_reports (
   let mut reports : Vec<NodeDiffReport> =
     Vec::new ();
   for pid in pids {
-    let before_node : Option<&NodeComplete> =
+    let before_node : Option<&Graphnode> =
       pair . before . nodes . get (&pid);
-    let after_node : Option<&NodeComplete> =
+    let after_node : Option<&Graphnode> =
       pair . after . nodes . get (&pid);
     let title_diff : Option<Vec<TextDiffLine>> =
       text_diff_option (
@@ -237,8 +237,8 @@ fn node_reports (
 }
 
 fn value_set_diffs (
-  before_node : Option<&NodeComplete>,
-  after_node  : Option<&NodeComplete>,
+  before_node : Option<&Graphnode>,
+  after_node  : Option<&Graphnode>,
 ) -> Vec<ValueSetDiff> {
   let mut result : Vec<ValueSetDiff> =
     Vec::new ();

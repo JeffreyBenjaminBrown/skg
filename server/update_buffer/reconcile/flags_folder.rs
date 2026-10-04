@@ -1,8 +1,8 @@
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
+use crate::dbs::node_lookup::graphnode_rustFirst_by_pid_and_repo;
 use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::nodes::complete::{
-  Flag, NodeComplete, flag_is_true};
+  Flag, Graphnode, flag_is_true};
 use crate::types::viewnode::{Property, Viewnode, ViewnodeKind};
 use crate::update_buffer::ancestry::pid_and_repo_from_required_ancestor;
 use crate::update_buffer::util::{
@@ -20,7 +20,7 @@ pub fn reconcile_flags_folder_children (
   let (pid, repo) : (ID, RepoName) =
     pid_and_repo_from_required_ancestor (
       tree, folder_id, 0, "reconcile_flags_folder_children") ?;
-  let node : NodeComplete = nodecomplete_rustFirst_by_pid_and_repo (
+  let node : Graphnode = graphnode_rustFirst_by_pid_and_repo (
     graph, config, &pid, &repo)
     . map_err (|_| "reconcile_flags_folder_children: parent not found") ?;
   let goals : Vec<Flag> = Flag::ALL . into_iter ()

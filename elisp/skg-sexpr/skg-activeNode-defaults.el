@@ -1,6 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; PURPOSE: Expand/strip default fields for ActiveNode metadata editing.
+;;; PURPOSE: Expand/strip default fields for ActiveVognode metadata editing.
 ;;; After sexp-to-org, expand inserts missing editable fields with defaults.
 ;;; Before org-to-sexp, strip removes default-valued fields.
 ;;;
@@ -35,7 +35,7 @@
 ;;
 
 (defun skg-activeNode-sexp-p (sexp)
-  "Return non-nil if SEXP is an ActiveNode sexp."
+  "Return non-nil if SEXP is an ActiveVognode sexp."
   (or (skg-sexp-subtree-p sexp '(skg (node)))
       (skg-sexp-subtree-p sexp '(skg node))))
 
@@ -57,7 +57,7 @@
 
 (defun skg-activeNode-expand-defaults-in-org
     (org-text &optional default-repo display-title)
-  "Expand default fields in ORG-TEXT for ActiveNode metadata editing.
+  "Expand default fields in ORG-TEXT for ActiveVognode metadata editing.
 Parses org text to headlines, finds the ** node section,
 reorders fields to canonical order, inserts missing editable
 fields with defaults, and expands bare boolean atoms to have

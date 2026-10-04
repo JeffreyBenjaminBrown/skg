@@ -16,7 +16,7 @@ use skg::context::{
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::types::misc::{ID, SkgConfig, SkgfileRepo, RepoName, rel_partners_at_relRepo};
-use skg::types::nodes::complete::{Flag, NodeComplete, empty_node_complete};
+use skg::types::nodes::complete::{Flag, Graphnode, empty_node_complete};
 use skg::types::save::{DefineNode, SaveNode};
 
 #[test]
@@ -39,34 +39,34 @@ fn test_label_roundtrip () {
 
 #[test]
 fn test_had_id_set_from_nodes_empty () {
-  let nodes : Vec<NodeComplete> = vec![];
+  let nodes : Vec<Graphnode> = vec![];
   let result : HashSet<ID> = had_id_set_from_nodes (&nodes);
   assert! (result . is_empty ()); }
 
 #[test]
 fn test_had_id_set_from_nodes_mixed () {
-  let mut node_with : NodeComplete = empty_node_complete ();
+  let mut node_with : Graphnode = empty_node_complete ();
   node_with . pid = ID::new ("has-id");
   node_with . misc = vec![Flag::Had_ID_Before_Import];
-  let mut node_without : NodeComplete = empty_node_complete ();
+  let mut node_without : Graphnode = empty_node_complete ();
   node_without . pid = ID::new ("no-id");
-  let nodes : Vec<NodeComplete> = vec![node_with, node_without];
+  let nodes : Vec<Graphnode> = vec![node_with, node_without];
   let result : HashSet<ID> = had_id_set_from_nodes (&nodes);
   assert_eq! (result . len (), 1);
   assert! (result . contains (&ID::new ("has-id"))); }
 
 #[test]
 fn test_mentioned_ids_from_nodes () {
-  let mut node1 : NodeComplete = empty_node_complete ();
+  let mut node1 : Graphnode = empty_node_complete ();
   node1 . pid = ID::new ("src");
   node1 . title =
     "see [[id:tgt1][target one]]" . to_string ();
   node1 . body = Some (
     "also [[id:tgt2][target two]]" . to_string () );
-  let mut node2 : NodeComplete = empty_node_complete ();
+  let mut node2 : Graphnode = empty_node_complete ();
   node2 . pid = ID::new ("other");
   node2 . title = "no links here" . to_string ();
-  let nodes : Vec<NodeComplete> = vec![node1, node2];
+  let nodes : Vec<Graphnode> = vec![node1, node2];
   let mentioned_ids : HashSet<ID> =
     mentioned_ids_from_nodes (&nodes);
   assert_eq! (mentioned_ids . len (), 2);
@@ -97,8 +97,8 @@ fn in_rust_context_types_for_saved_nodes () {
   // The save-time, in-Rust-graph origin-type computation. One node of
   // each kind, plus an ordinary (untyped) node and a 2-node cycle.
   let mk = | pid : &str, title : &str,
-            contains : &[&str], had_id : bool | -> NodeComplete {
-    let mut n : NodeComplete = empty_node_complete ();
+            contains : &[&str], had_id : bool | -> Graphnode {
+    let mut n : Graphnode = empty_node_complete ();
     n . pid = ID::new (pid);
     n . title = title . to_string ();
     n . home_repo = RepoName::from ("main");
@@ -107,7 +107,7 @@ fn in_rust_context_types_for_saved_nodes () {
       contains . iter () . map ( |c| ID::new (*c) ) . collect () );
     if had_id { n . misc = vec![Flag::Had_ID_Before_Import]; }
     n };
-  let nodes : Vec<NodeComplete> = vec![
+  let nodes : Vec<Graphnode> = vec![
     mk ("root",   "root",                &["ord","multi","hadid","tgt"], false),
     mk ("other",  "other",               &["multi"],                     false),
     mk ("ord",    "ordinary",            &[],                            false),
@@ -118,7 +118,7 @@ fn in_rust_context_types_for_saved_nodes () {
     mk ("cyc1",   "cyc1",                &["cyc2"],                      false),
     mk ("cyc2",   "cyc2",                &["cyc1"],                      false), ];
   let graph : InRustGraph =
-    InRustGraph::from_nodecompletes (&nodes);
+    InRustGraph::from_graphnodes (&nodes);
   let defs : Vec<DefineNode> =
     nodes . iter () . cloned ()
     . map ( |n| DefineNode::Save ( SaveNode (n) )) . collect ();
@@ -270,7 +270,7 @@ fn test_extend_contexts_for_cycles_detects_cycle () {
 /// See tests/contexts/fixtures/README.org
 #[test]
 fn test_full_context_pipeline () {
-  // Load NodeCompletes from fixture files.
+  // Load Graphnodes from fixture files.
   let config : SkgConfig =
     SkgConfig::dummyFromRepos (
       HashMap::from ([(
@@ -280,10 +280,10 @@ fn test_full_context_pipeline () {
           abbreviation : None,
           path         : PathBuf::from ("tests/contexts/fixtures"),
           user_owns_it : true } )]) );
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     read_all_skg_files_from_repos (&config)
     . expect ("failed to read fixture .skg files");
-  // Extract data from NodeCompletes.
+  // Extract data from Graphnodes.
   let ( map_to_content, map_to_containers )
     : ( MapToContent, MapToContainers )
     = content_maps_from_nodes (&nodes);

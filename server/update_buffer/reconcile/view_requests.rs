@@ -12,7 +12,7 @@ use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
-pub fn execute_activeNode_view_requests (
+pub fn execute_activeVognode_view_requests (
   node               : NodeId,
   tree               : &mut Tree<Viewnode>,
   graph              : &crate::dbs::in_rust_graph::InRustGraph,
@@ -25,7 +25,7 @@ pub fn execute_activeNode_view_requests (
     tree, node,
     |vn : &Viewnode| matches!( &vn . kind,
                                 ViewnodeKind::Vognode (Vognode::Active (_)) ),
-    "execute_activeNode_view_requests: expected ActiveNode" )
+    "execute_activeVognode_view_requests: expected ActiveVognode" )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   let requests : Vec<(NodeId, ViewRequest)> =
     extract_view_requests( tree, node ) ?;

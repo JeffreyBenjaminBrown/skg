@@ -1,10 +1,10 @@
 /// Per-node git-diff decoration for the git diff view.
-/// process_activeNode_diff decorates one Active vognode and generates its
+/// process_activeVognode_diff decorates one Active vognode and generates its
 /// diff-only children. TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): it is now called INLINE, at each
 /// node's own BFS visit (server/update_buffer/complete.rs), for both the
 /// post-save and de-novo paths.
 ///
-/// Each ActiveNode and Non-vognode is decorated with per-stage diff axes:
+/// Each ActiveVognode and Non-vognode is decorated with per-stage diff axes:
 ///   N (node) describes whether the node's '.skg' file changed
 ///     between HEAD↔index (staged) or index↔worktree (unstaged).
 ///   R (relationship) describes whether the node's appearance at this
@@ -13,13 +13,13 @@
 /// child but the worktree's parent.contains lacks it.
 
 use crate::types::env::find_repo_with_optional_tantivy;
-use crate::types::git::{NodeAxes, RelationshipAxes, Sign, RepoDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, added_relationship_axes_from_per_stage_diffs, node_axes_in_repo_diff, net_diff_from_per_stage, removed_relationship_axes_from_per_stage_diffs};
+use crate::types::git::{NodeAxes, RelationshipAxes, Sign, RepoDiff, GraphnodeDiff, GitDiffStatus, NodeChanges, added_relationship_axes_from_per_stage_diffs, node_axes_in_repo_diff, net_diff_from_per_stage, removed_relationship_axes_from_per_stage_diffs};
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, RepoName, TantivyIndex};
 use crate::types::phantom::title_for_phantom;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, mk_phantom_viewnode };
 use crate::types::viewnode::{Vognode, Phantom, PropertyFolder, Property};
-use crate::types::tree::viewnode_nodecomplete::pid_and_repo_from_treenode;
+use crate::types::tree::viewnode_graphnode::pid_and_repo_from_treenode;
 use crate::dbs::in_rust_graph::InRustGraph;
 
 use ego_tree::{NodeMut, NodeRef, NodeId};
@@ -27,11 +27,11 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Decorate a active vognode and generate any diff-only children
-/// implied by staged and unstaged NodeCompleteDiffs. Called inline per Normal
+/// implied by staged and unstaged GraphnodeDiffs. Called inline per Normal
 /// node at its own BFS visit (for both de-novo and post-save), TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3:
 /// the node flips to a phantom here and its folders then self-deaden via their own
 /// generalized-orphan check at their later visits.
-pub(crate) fn process_activeNode_diff (
+pub(crate) fn process_activeVognode_diff (
   mut node_mut                   : NodeMut<Viewnode>,
   graph                          : &InRustGraph,
   repo_diffs                   : &HashMap<RepoName, RepoDiff>,
@@ -43,7 +43,7 @@ pub(crate) fn process_activeNode_diff (
     node_mut . id();
   let (pid, skgrepo) : (ID, RepoName) =
     pid_and_repo_from_treenode (
-      node_mut . tree(), tree_node_id, "process_activeNode_diff"
+      node_mut . tree(), tree_node_id, "process_activeVognode_diff"
     ) . map_err ( |e| e . to_string() ) ?;
   let repo_diff : &RepoDiff =
     match repo_diffs . get (&skgrepo) {
@@ -56,9 +56,9 @@ pub(crate) fn process_activeNode_diff (
     return Ok (( )); }
   let file_path : PathBuf =
     PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-  let staged   : Option<&NodeCompleteDiff> =
+  let staged   : Option<&GraphnodeDiff> =
     repo_diff . staged   . get (&file_path);
-  let unstaged : Option<&NodeCompleteDiff> =
+  let unstaged : Option<&GraphnodeDiff> =
     repo_diff . unstaged . get (&file_path);
   if staged . is_none () && unstaged . is_none ()
     { return Ok (( )); }

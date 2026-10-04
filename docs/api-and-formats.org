@@ -1028,7 +1028,7 @@ See =example-data/skgconfig.toml=.
 
 It is a specialization of YAML -- every .skg file is valid YAML,
 although not vice versa. The definitive source of truth is
-=server/types/nodes/fs.rs= (=NodeFS=).
+=server/types/nodes/fs.rs= (=GraphnodeOnDisk=).
 
 Each file is one *telescope section*: the slice of one node
 recorded at one privacy level (see =docs/telescopes.org=). One node =

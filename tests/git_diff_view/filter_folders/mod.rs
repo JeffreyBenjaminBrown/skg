@@ -122,7 +122,7 @@ async fn run_filter_folder_test (
           &tantivy, &graph,
           true, &Err (String::new ()), &mut views_state ) . await ? };
       assert_buffer_contains (&second . saved_view, expected);
-      let s : NodeComplete = read_nodecomplete (gitrepo_path, "S")?;
+      let s : Graphnode = read_graphnode (gitrepo_path, "S")?;
       assert_eq! (
         members_msv (&s . hides_from_its_subscriptions) . or_default () . to_vec (),
         vec! [ ID::from ("h1"), ID::from ("h2"),

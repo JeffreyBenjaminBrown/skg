@@ -3,7 +3,7 @@
 /// the uniform-heralds surprising-links =bodyless= test relies on).
 ///
 /// YAML-aware by construction: each file is round-tripped through
-/// 'NodeFS' (the same serde type the server reads/writes), so a body
+/// 'GraphnodeOnDisk' (the same serde type the server reads/writes), so a body
 /// block scalar is never corrupted the way naive line-stripping could.
 /// 'skg::types::nodes::complete::normalize_body' drops leading and
 /// trailing whitespace-only lines and turns an all-whitespace body into
@@ -13,7 +13,7 @@
 /// Driven by 'data/bash/trim-node-bodies.org'.
 
 use skg::types::nodes::complete::normalize_body;
-use skg::types::nodes::fs::NodeFS;
+use skg::types::nodes::fs::GraphnodeOnDisk;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -56,7 +56,7 @@ fn trim_one_file (
   path : &Path,
 ) -> Result<bool, Box<dyn std::error::Error>> {
   let contents : String = fs::read_to_string (path) ?;
-  let mut node : NodeFS = serde_yaml::from_str (&contents) ?;
+  let mut node : GraphnodeOnDisk = serde_yaml::from_str (&contents) ?;
   let before : Option<String> = node . body . clone ();
   let after  : Option<String> = normalize_body (before . clone ());
   if before == after { return Ok (false); }

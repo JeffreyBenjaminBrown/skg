@@ -1,14 +1,14 @@
 //! Checked, creation-only publication for one approved import batch.
 
 use crate::dbs::filesystem::multiple_nodes::read_skg_sections_from_folder;
-use crate::dbs::filesystem::one_node::prepare_nodecomplete_telescope;
+use crate::dbs::filesystem::one_node::prepare_graphnode_telescope;
 use crate::dbs::in_rust_graph::prepared_update::{
   PreparedGraphUpdate, prepare_graph_update,
 };
 use crate::save::enqueue_tantivy_delta;
 use crate::types::env::SkgEnv;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 use crate::types::save::{DefineNode, SaveNode};
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File, OpenOptions};
@@ -26,7 +26,7 @@ struct CreatedFile {
 }
 
 pub(crate) fn prepare_import_publication (
-  nodes : &[NodeComplete],
+  nodes : &[Graphnode],
   env : &SkgEnv,
 ) -> Result<PreparedImportPublication, String> {
   let runtime = env . runtime_snapshot ();
@@ -52,7 +52,7 @@ pub(crate) fn prepare_import_publication (
     . map_err (|error| error . to_string ())?;
   let mut files : Vec<(PathBuf, String)> = Vec::new ();
   for node in nodes {
-    let prepared = prepare_nodecomplete_telescope (node, config, false)
+    let prepared = prepare_graphnode_telescope (node, config, false)
       .map_err (|error| format! ("Preparing {}: {}", node . pid, error))?;
     files . extend (prepared . creation_files ()); }
   let mut paths : HashSet<PathBuf> = HashSet::new ();

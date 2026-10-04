@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_saves -E 'test(save::write_protected_edits::)'
 
 use indoc::indoc;
-use skg::dbs::filesystem::one_node::nodecomplete_from_id;
+use skg::dbs::filesystem::one_node::graphnode_from_id;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::from_text::buffer_to_viewnodes::uninterpreted
   ::org_to_uninterpreted_viewforest;
@@ -12,7 +12,7 @@ use skg::serve::ViewsState;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::{members_of, ID, SkgConfig, TantivyIndex};
 use skg::types::nodes::complete::{
-  NodeComplete, Flag, flag_is_true};
+  Graphnode, Flag, flag_is_true};
 use skg::types::views_state::{OpenViews, ViewUri};
 
 use std::error::Error;
@@ -54,8 +54,8 @@ fn deleting_the_flags_folder_is_accepted_and_inert (
         &uri, &mut views_state ) . await ?;
       assert! (second . errors . is_empty ());
       assert! (! second . saved_view . contains ("flagsFolder"));
-      let saved : NodeComplete =
-        nodecomplete_from_id (config, &ID::from ("brie"))?;
+      let saved : Graphnode =
+        graphnode_from_id (config, &ID::from ("brie"))?;
       assert! (flag_is_true (
         &saved . misc, Flag::NoSearchMatching),
         "dismissing the projection must not clear the flag");
@@ -119,8 +119,8 @@ async fn saving_an_edited_writeProtected_occurrence_impl (
     &uri, &mut views_state ) . await ?;
   assert! (second . errors . is_empty (),
     "the new self occurrence should be accepted: {:?}", second . errors);
-  let saved_root : NodeComplete =
-    nodecomplete_from_id (config, &ID::from ("1"))?;
+  let saved_root : Graphnode =
+    graphnode_from_id (config, &ID::from ("1"))?;
   assert! (members_of (&saved_root . contains) . contains (&ID::from ("1")),
     "the accepted new occurrence should make node 1 content of itself");
 

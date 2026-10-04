@@ -2,7 +2,7 @@
 //! advisory; ownership and mutability are checked again by the save path.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::node_lookup::nodecomplete_from_graph;
+use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, value_from_request_sexp};
 use crate::types::env::SkgEnv;
@@ -51,7 +51,7 @@ pub fn flag_state (
 ) -> Result<(ID, RepoName, bool, bool), String> {
   let (pid, repo) : (ID, RepoName) = graph . pid_and_repo (id)
     . ok_or_else (|| format! ("id '{}' is not in the graph", id)) ?;
-  let node = nodecomplete_from_graph (graph, &pid)
+  let node = graphnode_from_graph (graph, &pid)
     . ok_or_else (|| format! ("canonical id '{}' is not in the graph", pid)) ?;
   let value : bool = flag_is_true (&node . misc, flag);
   let user_owned : bool = config . user_owns_repo (&repo);

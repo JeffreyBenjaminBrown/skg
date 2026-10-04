@@ -16,7 +16,7 @@
 use crate::repo_sets::{ActiveRepoSet, RepoSetName};
 use crate::types::misc::SkgConfig;
 use crate::types::misc::{ID, RelPartner};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 use crate::types::links::org_literal_ranges::org_literal_ranges;
 use crate::types::links::{
   replace_each_link_with_its_label, links_from_text,
@@ -132,11 +132,11 @@ struct Ev {
 /// filesystem writes only under `output_base`.
 pub fn export_to_org (
   active      : &ActiveRepoSet,
-  nodes       : &[NodeComplete],
+  nodes       : &[Graphnode],
   output_base : &Path,
 ) -> Result<ExportReport, Box<dyn Error>> {
   let mut warnings : Vec<String> = Vec::new ();
-  let by_pid : HashMap<ID, &NodeComplete> =
+  let by_pid : HashMap<ID, &Graphnode> =
     nodes . iter ()
     . map ( |n| (n . pid . clone (), n) )
     . collect ();
@@ -203,9 +203,9 @@ pub fn export_to_org (
 /// files and is therefore safe to use at the release preflight.
 pub fn export_candidate_pids (
   active : &ActiveRepoSet,
-  nodes  : &[NodeComplete],
+  nodes  : &[Graphnode],
 ) -> Vec<ID> {
-  let by_pid : HashMap<ID, &NodeComplete> =
+  let by_pid : HashMap<ID, &Graphnode> =
     nodes . iter ()
     . map ( |node| (node . pid . clone (), node) )
     . collect ();
@@ -235,7 +235,7 @@ pub fn export_candidate_pids (
 /// uses this read-only view to reject a new automatic target that would
 /// compete with an existing export root.
 pub(crate) fn claimed_export_targets (
-  nodes : &[NodeComplete],
+  nodes : &[Graphnode],
   config : &SkgConfig,
 ) -> Result<Vec<(ID, String)>, String> {
   let active : ActiveRepoSet = ActiveRepoSet::named (
@@ -279,14 +279,14 @@ fn write_export_file (
 /// A node is an export ROOT iff one of its `contains` children (in
 /// order) is a marker; that child's target_filepath is the file.
 fn discover_roots (
-  nodes        : &[NodeComplete],
+  nodes        : &[Graphnode],
   alias_to_pid : &HashMap<ID, ID>,
   active       : &ActiveRepoSet,
   warnings     : &mut Vec<String>,
 ) -> (HashMap<ID, ExportRoot>, HashSet<ID>) {
   let marker_id : ID = ID::from (EXPORT_MARKER_ID);
   // Sorted, so warnings and "first wins" are deterministic.
-  let mut sorted : Vec<&NodeComplete> = nodes . iter () . collect ();
+  let mut sorted : Vec<&Graphnode> = nodes . iter () . collect ();
   sorted . sort_by ( |a, b| a . pid . cmp (&b . pid) );
 
   let mut marker_pids   : HashSet<ID> = HashSet::new ();
@@ -350,7 +350,7 @@ fn discover_roots (
 /// traversal paths, so an extra-id link to the instruction node is
 /// still recognized.
 fn title_links_to (
-  node         : &NodeComplete,
+  node         : &Graphnode,
   id           : &ID,
   alias_to_pid : &HashMap<ID, ID>,
 ) -> bool {
@@ -417,7 +417,7 @@ fn parse_target_filepath (
 /// duplicated within a file.
 fn collect_events (
   root_pid     : &ID,
-  by_pid       : &HashMap<ID, &NodeComplete>,
+  by_pid       : &HashMap<ID, &Graphnode>,
   alias_to_pid : &HashMap<ID, ID>,
   roots_by_pid : &HashMap<ID, ExportRoot>,
   marker_pids  : &HashSet<ID>,
@@ -429,7 +429,7 @@ fn collect_events (
   let mut stack : Vec<(ID, usize, bool)> =
     vec! [ (root_pid . clone (), 1, true) ];
   while let Some ((pid, depth, is_root)) = stack . pop () {
-    let node : &NodeComplete = match by_pid . get (&pid) {
+    let node : &Graphnode = match by_pid . get (&pid) {
       Some (n) => n,
       None     => continue, };
     if ( ! is_root && roots_by_pid . contains_key (&pid) )
@@ -447,7 +447,7 @@ fn collect_events (
         // the child's home is active.
       let cpid : ID = resolve_pid (&member . member, alias_to_pid);
       if marker_pids . contains (&cpid) { continue; } // markers never render
-      let child : &NodeComplete = match by_pid . get (&cpid) {
+      let child : &Graphnode = match by_pid . get (&cpid) {
         Some (c) => c,
         None     => continue, }; // dangling contains entry: silently skip
       if ! node_active (child, active) { continue; } // omit inactive (recursive)
@@ -463,7 +463,7 @@ fn collect_events (
 fn build_homes (
   roots       : &[&ExportRoot],
   root_events : &[(&ExportRoot, Vec<Ev>)],
-  by_pid      : &HashMap<ID, &NodeComplete>,
+  by_pid      : &HashMap<ID, &Graphnode>,
 ) -> HashMap<ID, Home> {
   let mut homes : HashMap<ID, Home> = HashMap::new ();
   // A node that is itself a root always homes to its own file.
@@ -483,7 +483,7 @@ fn build_homes (
     let mut earlier_anchors : HashSet<String> = HashSet::new ();
     for ev in events {
       if ! matches! (ev . kind, EvKind::Normal) { continue; }
-      let node : &NodeComplete = match by_pid . get (&ev . pid) {
+      let node : &Graphnode = match by_pid . get (&ev . pid) {
         Some (n) => n,
         None     => continue, };
       let anchor_is_repeat : bool =
@@ -510,7 +510,7 @@ fn build_homes (
 fn custom_id_link_targets (
   root_events  : &[(&ExportRoot, Vec<Ev>)],
   homes        : &HashMap<ID, Home>,
-  by_pid       : &HashMap<ID, &NodeComplete>,
+  by_pid       : &HashMap<ID, &Graphnode>,
   alias_to_pid : &HashMap<ID, ID>,
 ) -> HashSet<ID> {
   let sink_pid : ID = ID::from (BROKEN_LINK_SINK_ID);
@@ -541,7 +541,7 @@ fn render_root (
   events       : &[Ev],
   homes        : &HashMap<ID, Home>,
   custom_id_targets : &HashSet<ID>,
-  by_pid       : &HashMap<ID, &NodeComplete>,
+  by_pid       : &HashMap<ID, &Graphnode>,
   alias_to_pid : &HashMap<ID, ID>,
   broken       : &mut usize,
   warnings     : &mut Vec<String>,
@@ -549,7 +549,7 @@ fn render_root (
   let target : &str = &root . target;
   let mut out : String = String::new ();
   for ev in events {
-    let node : &NodeComplete = match by_pid . get (&ev . pid) {
+    let node : &Graphnode = match by_pid . get (&ev . pid) {
       Some (n) => n,
       None     => continue, };
     let stars : String = "*" . repeat (ev . depth);
@@ -708,7 +708,7 @@ fn resolve_pid (
   alias_to_pid . get (id) . cloned () . unwrap_or_else (|| id . clone ()) }
 
 fn node_active (
-  node   : &NodeComplete,
+  node   : &Graphnode,
   active : &ActiveRepoSet,
 ) -> bool {
   active . is_all () || active . contains_repo (&node . home_repo) }
@@ -723,18 +723,18 @@ fn relRepo_is_active (
   active . is_all () || active . contains_repo (&member . relRepo) }
 
 fn title_has_link (
-  node : &NodeComplete,
+  node : &Graphnode,
 ) -> bool {
   LINK_PATTERN . is_match (&node . title) }
 
 fn org_search_for_heading (
-  node : &NodeComplete,
+  node : &Graphnode,
 ) -> String {
   if title_has_link (node) { format! ("#{}", node . pid) }
   else { format! ("*{}", anchor_text (node)) }}
 
 fn anchor_text (
-  node : &NodeComplete,
+  node : &Graphnode,
 ) -> String {
   replace_each_link_with_its_label (&node . title)
     . trim () . to_string () }

@@ -39,7 +39,7 @@ use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
 
-/// Collect (pid, affectsParent) pairs for all ActiveNode children of a node.
+/// Collect (pid, affectsParent) pairs for all ActiveVognode children of a node.
 fn children_info (
   tree : &Tree<Viewnode>,
   node_id : NodeId,
@@ -53,7 +53,7 @@ fn children_info (
       } else { None } } )
     . collect () }
 
-/// Find a child ActiveNode by pid, returning its NodeId.
+/// Find a child ActiveVognode by pid, returning its NodeId.
 fn find_child (
   tree : &Tree<Viewnode>,
   parent : NodeId,

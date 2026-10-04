@@ -16,9 +16,9 @@ use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_bra
 use crate::update_buffer::ancestry::{ folder_is_generalized_orphan, deaden_generalized_orphan_folder, is_folder_kind};
 use crate::update_buffer::util::detach_viewnode_transferring_focus;
 use crate::update_buffer::warnings::CompletionWarning;
-use crate::to_org::render::diff::process_activeNode_diff;
-use crate::types::tree::viewnode_nodecomplete::{
-  pid_and_repo_from_treenode, write_at_activeNode_in_tree};
+use crate::to_org::render::diff::process_activeVognode_diff;
+use crate::types::tree::viewnode_graphnode::{
+  pid_and_repo_from_treenode, write_at_activeVognode_in_tree};
 use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder, ViewRequest, Editability};
 use crate::types::viewnode::{Vognode, Phantom, PropertyFolder};
 use super::reconcile::hiddeninsubscribee_folder::reconcile_hiddenInSubscribeeFolder_children;
@@ -26,7 +26,7 @@ use super::reconcile::hiddenoutsideof_subscribeefolder::reconcile_hiddenoutsideS
 use super::reconcile::partner_folder::reconcile_partnerFolder_children;
 use super::reconcile::subscribee_folder::reconcile_subscribeeFolder_children;
 use super::reconcile::content::{
-  expand_true_content_at_activeNode, mutate_activeNode_to_deletednode};
+  expand_true_content_at_activeVognode, mutate_activeVognode_to_deletednode};
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -36,10 +36,10 @@ use std::sync::Arc;
 pub(super) struct CompletionContext<'a> {
   pub(super) defmap                         : &'a mut DefinitiveMap,
   /// The per-repo git diffs (Some in diff mode, None otherwise). This is the
-  /// single diff handle: it drives the per-node process_activeNode_diff (content
+  /// single diff handle: it drives the per-node process_activeVognode_diff (content
   /// axes, the phantom flip, TextChanged/IDFolder/AliasFolder), the diff-aware PropertyFolder
   /// reconcilers, and the PartnerFolders' removed-member phantoms. The content
-  /// reconcile itself produces only the pure worktree view; process_activeNode_diff
+  /// reconcile itself produces only the pure worktree view; process_activeVognode_diff
   /// applies every content diff effect afterward at the node's own visit (TODO/DONE/local-view-update/plan_v2.org §9
   /// reversal / #3).
   pub(super) repo_diffs                   : &'a Option<HashMap<RepoName, RepoDiff>>,
@@ -141,7 +141,7 @@ fn dispatch_node_update (
   // folder, self-check its required ancestry. If it is a generalized orphan (some
   // required ancestor is the wrong viewnode kind -- full chain, not just the
   // parent), deaden it and dispose its children instead of reconciling, so the
-  // reconcile never reads a since-deleted ancestor's missing NodeComplete.
+  // reconcile never reads a since-deleted ancestor's missing Graphnode.
   // The BFS visits every folder, and the check walks the folder's whole required
   // ancestry, so a folder whose grandparent (not just its parent) died is deadened.
   if is_folder_kind (&kind)
@@ -188,7 +188,7 @@ fn dispatch_node_update (
         context . active_repo_set,
         context . warning_sink . as_deref_mut () ) ?,
     // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the IDFolder/AliasFolder diff-only properties are created inline by
-    // process_activeNode_diff at the owner's BFS visit, so their reconcilers must
+    // process_activeVognode_diff at the owner's BFS visit, so their reconcilers must
     // see the real diffs (repo_diffs) or they would clobber the just-created
     // diff entries. Diffs flow inline for both de-novo and post-save.
     ViewnodeKind::PropertyFolder (PropertyFolder::Alias) =>
@@ -233,7 +233,7 @@ fn visit_normal_node (
     pid_and_repo_from_treenode (
       tree, treeid, "visit_normal_node deletion preflight" ) ?;
   if context . deleted_by_this_save_pids . contains (&pid) {
-    mutate_activeNode_to_deletednode (
+    mutate_activeVognode_to_deletednode (
       tree, treeid, &pid, &repo ) ?;
     return Ok (( )); }
   let had_dvr : bool =
@@ -245,7 +245,7 @@ fn visit_normal_node (
   let mut settled : bool = false; // TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule already ran
   let mut cascade : bool = false; // node is Final -> hand DVRs to children
   // TODO/DONE/local-view-update/plan_v2.org §5.5: the budget counts vognode *expansions* (each costs 1, charged in
-  // expand_true_content_at_activeNode); once it hits 0 every later vognode is left
+  // expand_true_content_at_activeVognode); once it hits 0 every later vognode is left
   // write-protected -- a visible, collapsed headline. We never truncate a group
   // mid-way (whole groups already drawn keep all their members); we only stop
   // STARTING new expansions. EXCEPTION: a view root (child of the BufferRoot) is
@@ -258,7 +258,7 @@ fn visit_normal_node (
     // Budget spent and this is not a view root: draw it write-protected and expand
     // nothing under it; strip any DVR so it is not treated as Final. The content
     // engine (settled) then clobbers+returns.
-    write_at_activeNode_in_tree (
+    write_at_activeVognode_in_tree (
       tree, treeid,
       |t| { t . view_requests . remove (& ViewRequest::Definitive);
             t . editability = Editability::WriteProtected; } )
@@ -274,7 +274,7 @@ fn visit_normal_node (
         settled = true; }
       DrawOutcome::MadeFinal => {
         settled = true; cascade = true; } } }
-  expand_true_content_at_activeNode (
+  expand_true_content_at_activeVognode (
     treeid, tree, context . defmap,
     &context . runtime . config, context . graph_snap,
     context . deleted_since_head_pid_src_map,
@@ -285,7 +285,7 @@ fn visit_normal_node (
     context . substitute_existing_content_overrides ) ?;
   // The steps below apply only while the node is still an Active vognode.
   // The flip to a Diff phantom happens at the END of this visit
-  // (process_activeNode_diff, below), after content + folders + view requests.
+  // (process_activeVognode_diff, below), after content + folders + view requests.
   let still_normal : bool =
     read_at_node_in_tree ( tree, treeid,
       |vn : &Viewnode| matches! ( &vn . kind,
@@ -304,7 +304,7 @@ fn visit_normal_node (
       context . repo_diffs ) ?; }
   // Remaining view requests (Aliases / Containerward / Mentionerward); the
   // Definitive request was already consumed by apply_definitive_draw_rule.
-  super::reconcile::view_requests::execute_activeNode_view_requests (
+  super::reconcile::view_requests::execute_activeVognode_view_requests (
     treeid, tree, &context . runtime . graph,
     &context . runtime . config,
     context . errors, context . active_repo_set,
@@ -318,7 +318,7 @@ fn visit_normal_node (
     context . repo_diffs ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3 / Jeff): compute this node's content+non-vognode diff LOCALLY,
   // at its own BFS visit. Runs last, after the node is fully completed as a
-  // worktree Active node (content, folders, view requests), so process_activeNode_diff
+  // worktree Active node (content, folders, view requests), so process_activeVognode_diff
   // sees its final children. The flip to a phantom happens here; the node's folders
   // (visited later, level-order) self-deaden via their own generalized-orphan
   // check. Gated on diff mode (repo_diffs = Some); both de-novo and post-save
@@ -326,7 +326,7 @@ fn visit_normal_node (
   if let Some (real_diffs) = context . repo_diffs {
     let node_mut : NodeMut<Viewnode> =
       tree . get_mut (treeid) . unwrap ();
-    process_activeNode_diff (
+    process_activeVognode_diff (
       node_mut, &context . runtime . graph, real_diffs,
       context . deleted_since_head_pid_src_map,
       context . diff_tantivy_index,

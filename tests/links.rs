@@ -8,7 +8,7 @@ use skg::types::links::{
 use skg::types::links::Link;
 use skg::types::errors::LinkParseError;
 use skg::types::misc::ID;
-use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
+use skg::types::nodes::complete::{Graphnode, empty_node_complete};
 
 #[test]
 fn test_link_to_string() {
@@ -114,7 +114,7 @@ fn test_links_from_text_with_nested_brackets() {
 
 #[test]
 fn test_links_from_node() {
-  let mut test_node : NodeComplete =
+  let mut test_node : Graphnode =
     empty_node_complete ();
   { test_node . title = "Title with two links: [[id:link1][First Link]] and [[id:link2][Second Link]]" . to_string();
     test_node . pid = ID::new ("id");
@@ -194,7 +194,7 @@ fn label_replacement_skips_example_links () {
 fn node_body_first_line_is_a_line_start () {
   // Were title and body joined on one line, the body's opening
   // '#+begin_example' would not start a line, and its link would count.
-  let mut node : NodeComplete = empty_node_complete ();
+  let mut node : Graphnode = empty_node_complete ();
   node . title = "title [[id:t][T]]" . to_string ();
   node . body = Some (
     "#+begin_example\n[[id:x][X]]\n#+end_example" . to_string () );

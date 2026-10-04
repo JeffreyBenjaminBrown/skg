@@ -98,7 +98,7 @@ fn non_vognode_ancestor_is_skipped () {
 fn fork_spec_n_edited (
   repo_confirmed : bool,
 ) -> ForkSpec {
-  let buffer_node : NodeComplete = NodeComplete {
+  let buffer_node : Graphnode = Graphnode {
     title  : "N-edited" . to_string (),
     home_repo : RepoName::from ("foreign"),
     pid    : ID::from ("N"),
@@ -112,7 +112,7 @@ fn fork_clone_hides_children_the_edit_deleted () {
   // N had [N1, N2] on disk; the forking edit kept only N1. The clone
   // must hide N2, or it would reappear under the clone as
   // unintegrated subscribed content the user just dismissed.
-  let buffer_node : NodeComplete = NodeComplete {
+  let buffer_node : Graphnode = Graphnode {
     title    : "N-edited" . to_string (),
     home_repo   : RepoName::from ("foreign"),
     pid      : ID::from ("N"),
@@ -197,7 +197,7 @@ fn fork_clone_preserves_only_the_search_matching_flag () {
       Flag::Was_Overloaded];
     if no_search_matching {
       misc . insert (1, Flag::NoSearchMatching); }
-    let buffer_node : NodeComplete = NodeComplete {
+    let buffer_node : Graphnode = Graphnode {
       home_repo : RepoName::from ("foreign"),
       pid    : ID::from ("N"),
       misc,

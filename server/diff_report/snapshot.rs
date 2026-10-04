@@ -12,8 +12,8 @@ use crate::git_ops::read_gitrepo::{
   head_is_merge_commit, open_gitrepo};
 use crate::types::misc::{
   ID, SkgConfig, SkgfileRepo, RepoName, members_msv, members_of};
-use crate::types::nodes::complete::NodeComplete;
-use crate::types::nodes::fs::NodeFS;
+use crate::types::nodes::complete::Graphnode;
+use crate::types::nodes::fs::GraphnodeOnDisk;
 use crate::types::links::links_from_node;
 
 use git2::{ObjectType, Repository, TreeWalkMode, TreeWalkResult};
@@ -129,11 +129,11 @@ fn read_graph_snapshot (
 ) -> Result<GraphSnapshot, String> {
   // Sections arrive in privacy order (ordered_repos) so each
   // telescope folds with its most public section first.
-  let mut sections : Vec<(RepoName, NodeFS)> = Vec::new ();
+  let mut sections : Vec<(RepoName, GraphnodeOnDisk)> = Vec::new ();
   for repo_name in config . ordered_repos () {
     let label : String =
       format! ("read repo '{}' from {:?}", repo_name, kind);
-    let mut repo_sections : Vec<(RepoName, NodeFS)> =
+    let mut repo_sections : Vec<(RepoName, GraphnodeOnDisk)> =
       profile_step_result (&label, || match kind {
         SnapshotKind::Head =>
           read_repo_from_head (config, &repo_name),
@@ -320,7 +320,7 @@ fn overlay_changed_after_snapshot (
       . collect ();
   // A changed SECTION re-folds its whole telescope, so read every
   // Skg repo's section for each changed pid at the after endpoint.
-  let mut sections_by_pid : HashMap<ID, Vec<(RepoName, NodeFS)>> =
+  let mut sections_by_pid : HashMap<ID, Vec<(RepoName, GraphnodeOnDisk)>> =
     HashMap::new ();
   for pid in &changed_pids {
     sections_by_pid . insert (
@@ -345,13 +345,13 @@ fn overlay_changed_after_snapshot (
     pid_of . get (id) . cloned ()
       . unwrap_or_else ( || id . clone () ) };
   for pid in &changed_pids {
-    let sections : Vec<(RepoName, NodeFS)> =
+    let sections : Vec<(RepoName, GraphnodeOnDisk)> =
       sections_by_pid . remove (pid)
       . expect ("changed_pids tracks sections_by_pid");
-    let before_node : Option<&NodeComplete> =
+    let before_node : Option<&Graphnode> =
       before . nodes . get (pid);
     remove_telescope_claims (&mut after, pid, before_node);
-    let after_node : Option<NodeComplete> =
+    let after_node : Option<Graphnode> =
       if sections . is_empty () { None }
       else {
         for (repo_name, node_fs) in &sections {
@@ -374,8 +374,8 @@ fn read_telescope_sections_at_endpoint (
   config : &SkgConfig,
   kind   : SnapshotKind,
   pid    : &ID,
-) -> Result<Vec<(RepoName, NodeFS)>, String> {
-  let mut sections : Vec<(RepoName, NodeFS)> = Vec::new ();
+) -> Result<Vec<(RepoName, GraphnodeOnDisk)>, String> {
+  let mut sections : Vec<(RepoName, GraphnodeOnDisk)> = Vec::new ();
   for repo_name in config . ordered_repos () {
     let skgrepo : &SkgfileRepo =
       config . repos . get (&repo_name) . ok_or_else ( || format! (
@@ -409,7 +409,7 @@ fn read_telescope_sections_at_endpoint (
 fn remove_telescope_claims (
   snapshot    : &mut GraphSnapshot,
   pid         : &ID,
-  before_node : Option<&NodeComplete>,
+  before_node : Option<&Graphnode>,
 ) {
   let Some (node) = before_node else { return; };
   for id in node . all_ids () {
@@ -420,8 +420,8 @@ fn remove_telescope_claims (
 }
 
 fn affected_pids_for_changed_node (
-  before_node : Option<&NodeComplete>,
-  after_node  : Option<&NodeComplete>,
+  before_node : Option<&Graphnode>,
+  after_node  : Option<&Graphnode>,
 ) -> BTreeSet<ID> {
   let mut pids : BTreeSet<ID> =
     BTreeSet::new ();
@@ -447,7 +447,7 @@ fn read_section_at_endpoint (
   gitrepo        : &Repository,
   repo_name : &RepoName,
   rel_path    : &Path,
-) -> Result<Option<NodeFS>, String> {
+) -> Result<Option<GraphnodeOnDisk>, String> {
   match kind {
     SnapshotKind::Head =>
       read_section_from_head (gitrepo, repo_name, rel_path),
@@ -461,7 +461,7 @@ fn read_section_from_head (
   gitrepo        : &Repository,
   repo_name : &RepoName,
   rel_path    : &Path,
-) -> Result<Option<NodeFS>, String> {
+) -> Result<Option<GraphnodeOnDisk>, String> {
   let tree : git2::Tree =
     gitrepo . head ()
       . and_then ( |h| h . peel_to_tree () )
@@ -489,7 +489,7 @@ fn read_section_from_index (
   gitrepo        : &Repository,
   repo_name : &RepoName,
   rel_path    : &Path,
-) -> Result<Option<NodeFS>, String> {
+) -> Result<Option<GraphnodeOnDisk>, String> {
   let index : git2::Index =
     gitrepo . index () . map_err ( |e| format! (
       "Reading index for repo '{}': {}", repo_name, e )) ?;
@@ -509,7 +509,7 @@ fn read_section_from_worktree (
   gitrepo        : &Repository,
   repo_name : &RepoName,
   rel_path    : &Path,
-) -> Result<Option<NodeFS>, String> {
+) -> Result<Option<GraphnodeOnDisk>, String> {
   let workdir : &Path =
     gitrepo . workdir () . ok_or_else ( || format! (
       "Repository for repo '{}' has no workdir", repo_name )) ?;
@@ -572,16 +572,16 @@ fn profile_log (
 /// and record the retained sections' id claims.
 fn snapshot_from_sections (
   config   : &SkgConfig,
-  sections : Vec<(RepoName, NodeFS)>,
+  sections : Vec<(RepoName, GraphnodeOnDisk)>,
 ) -> Result<GraphSnapshot, String> {
-  let mut sections_by_pid : HashMap<ID, Vec<(RepoName, NodeFS)>> =
+  let mut sections_by_pid : HashMap<ID, Vec<(RepoName, GraphnodeOnDisk)>> =
     HashMap::new ();
   for (repo_name, node_fs) in sections {
     sections_by_pid . entry (node_fs . pid . clone ())
       . or_insert_with (Vec::new)
       . push (( repo_name, node_fs )); }
   for (pid, telescope_sections) in &mut sections_by_pid {
-    let sections : Vec<(RepoName, NodeFS)> =
+    let sections : Vec<(RepoName, GraphnodeOnDisk)> =
       std::mem::take (telescope_sections);
     let (retained, collision) =
       retain_owned_sections_when_pid_folderlides (sections, config);
@@ -608,10 +608,10 @@ fn snapshot_from_sections (
   let resolve = |id : &ID| -> ID {
     pid_of . get (id) . cloned ()
       . unwrap_or_else ( || id . clone () ) };
-  let mut by_pid : HashMap<ID, NodeComplete> =
+  let mut by_pid : HashMap<ID, Graphnode> =
     HashMap::new ();
   for (pid, telescope_sections) in sections_by_pid {
-    let node : NodeComplete =
+    let node : Graphnode =
       fold_telescope_tolerating_homelessness (
         config, &pid, telescope_sections, &resolve ) ?;
     by_pid . insert (pid, node); }
@@ -627,10 +627,10 @@ fn snapshot_from_sections (
 fn fold_telescope_tolerating_homelessness (
   config   : &SkgConfig,
   pid      : &ID,
-  sections : Vec<(RepoName, NodeFS)>,
+  sections : Vec<(RepoName, GraphnodeOnDisk)>,
   resolve  : &dyn Fn (&ID) -> ID,
-) -> Result<NodeComplete, String> {
-  let retry : Vec<(RepoName, NodeFS)> =
+) -> Result<Graphnode, String> {
+  let retry : Vec<(RepoName, GraphnodeOnDisk)> =
     sections . clone ();
   let telescope : Telescope =
     Telescope::try_new ( pid . clone (), sections, config )
@@ -638,7 +638,7 @@ fn fold_telescope_tolerating_homelessness (
   match fold_telescope ( telescope, resolve )
   { Ok (node) => Ok (node),
     Err (_) => {
-      let mut retry : Vec<(RepoName, NodeFS)> = retry;
+      let mut retry : Vec<(RepoName, GraphnodeOnDisk)> = retry;
       match retry . first_mut () {
         Some ((_, node_fs)) =>
           node_fs . title =
@@ -656,7 +656,7 @@ fn fold_telescope_tolerating_homelessness (
 /// extra id it lists, all attributed to (pid, Skg repo).
 fn record_section_claims (
   id_claims : &mut HashMap<ID, BTreeMap<ID, BTreeSet<RepoName>>>,
-  node_fs   : &NodeFS,
+  node_fs   : &GraphnodeOnDisk,
   skgrepo    : &RepoName,
 ) {
   for id in std::iter::once (&node_fs . pid)
@@ -670,7 +670,7 @@ fn record_section_claims (
 fn read_repo_from_head (
   config      : &SkgConfig,
   repo_name : &RepoName,
-) -> Result<Vec<(RepoName, NodeFS)>, String> {
+) -> Result<Vec<(RepoName, GraphnodeOnDisk)>, String> {
   let skgrepo : &SkgfileRepo =
     config . repos . get (repo_name) . ok_or_else ( || format! (
       "Repo '{}' not found in config", repo_name )) ?;
@@ -686,7 +686,7 @@ fn read_repo_from_head (
       . and_then ( |h| h . peel_to_tree () )
       . map_err ( |e| format! (
         "Reading HEAD tree for repo '{}': {}", repo_name, e )) ?;
-  let mut sections : Vec<(RepoName, NodeFS)> = Vec::new ();
+  let mut sections : Vec<(RepoName, GraphnodeOnDisk)> = Vec::new ();
   let mut parse_error : Option<String> = None;
   let walk_result : Result<(), git2::Error> =
     tree . walk (TreeWalkMode::PreOrder, |root, entry| {
@@ -720,7 +720,7 @@ fn read_repo_from_head (
 fn read_repo_from_index (
   config      : &SkgConfig,
   repo_name : &RepoName,
-) -> Result<Vec<(RepoName, NodeFS)>, String> {
+) -> Result<Vec<(RepoName, GraphnodeOnDisk)>, String> {
   let skgrepo : &SkgfileRepo =
     config . repos . get (repo_name) . ok_or_else ( || format! (
       "Repo '{}' not found in config", repo_name )) ?;
@@ -734,7 +734,7 @@ fn read_repo_from_index (
   let index : git2::Index =
     gitrepo . index () . map_err ( |e| format! (
       "Reading index for repo '{}': {}", repo_name, e )) ?;
-  let mut sections : Vec<(RepoName, NodeFS)> =
+  let mut sections : Vec<(RepoName, GraphnodeOnDisk)> =
     Vec::new ();
   for entry in index . iter () {
     let rel_path : PathBuf =
@@ -745,7 +745,7 @@ fn read_repo_from_index (
       gitrepo . find_blob (entry . id) . map_err ( |e| format! (
         "Reading index blob {:?} for repo '{}': {}",
         rel_path, repo_name, e )) ?;
-    let node_fs : NodeFS =
+    let node_fs : GraphnodeOnDisk =
       parse_blob_section (blob . content (), &rel_path) ?;
     sections . push (( repo_name . clone (), node_fs )); }
   Ok (sections)
@@ -777,11 +777,11 @@ pub(super) fn path_is_repo_skg (
 pub(super) fn parse_blob_section (
   bytes    : &[u8],
   rel_path : &Path,
-) -> Result<NodeFS, String> {
+) -> Result<GraphnodeOnDisk, String> {
   let yaml : &str =
     from_utf8 (bytes) . map_err ( |e| format! (
       "Blob {:?} is not UTF-8: {}", rel_path, e )) ?;
-  let node_fs : NodeFS =
+  let node_fs : GraphnodeOnDisk =
     serde_yaml::from_str (yaml) . map_err ( |e| format! (
       "Parsing {:?}: {}", rel_path, e )) ?;
   let stem : String =
@@ -802,7 +802,7 @@ pub(super) fn parse_blob_node (
   bytes       : &[u8],
   repo_name : &RepoName,
   rel_path    : &Path,
-) -> Result<NodeComplete, String> {
+) -> Result<Graphnode, String> {
   parse_blob_section (bytes, rel_path)
     . map ( |node_fs|
             node_fs . into_complete_as_single_section (

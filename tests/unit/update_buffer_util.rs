@@ -19,8 +19,8 @@ fn relevant_child_of_wrong_kind_yields_err_not_panic () {
       &mut t, root,
       |_vn : &Viewnode| true, // relevance admits the Inactive child
       |vn : &Viewnode| match &vn . kind {
-        ViewnodeKind::Vognode (Vognode::Active (activeNode))
-          => Ok ( activeNode . id . clone () ),
+        ViewnodeKind::Vognode (Vognode::Active (activeVognode))
+          => Ok ( activeVognode . id . clone () ),
         _ => Err ( "child is not an Active vognode" . to_string () ) },
       & [] as &[ID],
       |id : &ID| Err ( format! ( "create_child should not run for {}",

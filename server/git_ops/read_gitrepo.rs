@@ -1,7 +1,7 @@
 use crate::types::git::PathDiffStatus;
 use crate::types::misc::{ID, SkgConfig, SkgfileRepo, RepoName};
-use crate::types::nodes::fs::NodeFS;
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::fs::GraphnodeOnDisk;
+use crate::types::nodes::complete::Graphnode;
 
 use git2::{Repository, Diff, DiffOptions, Error, ErrorCode, ObjectType};
 use std::error::Error as StdError;
@@ -11,15 +11,15 @@ use std::str::from_utf8;
 use super::misc::{diff_delta_to_entry, path_relative_to_gitrepo};
 
 
-/// Load a NodeComplete for a node whose worktree file is gone, preferring
+/// Load a Graphnode for a node whose worktree file is gone, preferring
 /// the index version over HEAD when both exist (since the index is
 /// staged and therefore more recent).
 /// Returns Err if neither location has the file.
-pub fn nodecomplete_from_index_or_head (
+pub fn graphnode_from_index_or_head (
   pid    : &ID,
   src    : &RepoName,
   config : &SkgConfig,
-) -> Result<NodeComplete, Box<dyn StdError>> {
+) -> Result<Graphnode, Box<dyn StdError>> {
   let repo_config : &SkgfileRepo =
     config . repos . get (src)
     . ok_or_else ( || format! ( "Repo '{}' not found in config",
@@ -36,16 +36,16 @@ pub fn nodecomplete_from_index_or_head (
     . unwrap_or (file_path . clone ());
   // Index first.
   if let Some (content) = get_file_content_at_index (&gitrepo, &rel_path) ? {
-    let node_fs : NodeFS = serde_yaml::from_str (&content) . map_err (
-      |e| format! ( "Failed to parse NodeComplete for {} from index: {}",
+    let node_fs : GraphnodeOnDisk = serde_yaml::from_str (&content) . map_err (
+      |e| format! ( "Failed to parse Graphnode for {} from index: {}",
                     pid . 0, e )) ?;
     return Ok ( node_fs . into_complete_as_single_section ( src . clone ())); }
   // HEAD fallback.
   let content : String = get_file_content_at_head (&gitrepo, &rel_path) ?
     . ok_or_else ( || format! (
       "File {:?} not found in index or HEAD", rel_path )) ?;
-  let node_fs : NodeFS = serde_yaml::from_str (&content) . map_err (
-    |e| format! ( "Failed to parse NodeComplete for {} from HEAD: {}",
+  let node_fs : GraphnodeOnDisk = serde_yaml::from_str (&content) . map_err (
+    |e| format! ( "Failed to parse Graphnode for {} from HEAD: {}",
                   pid . 0, e )) ?;
   Ok ( node_fs . into_complete_as_single_section ( src . clone ())) }
 

@@ -8,7 +8,7 @@ use skg::dbs::in_rust_graph::InRustGraph;
 use skg::test_utils::read_lp_message;
 use skg::types::git::RepoDiff;
 use skg::types::misc::{ID, MSV, SkgConfig, SkgfileRepo, RepoName, RepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
-use skg::types::nodes::complete::{empty_node_complete, NodeComplete};
+use skg::types::nodes::complete::{empty_node_complete, Graphnode};
 
 use std::collections::{BTreeSet, HashMap};
 use std::error::Error;
@@ -20,7 +20,7 @@ use tempfile::TempDir;
 #[test]
 fn titles_by_ids_handler_sends_parseable_titles (
 ) -> Result<(), Box<dyn Error>> {
-  let mut node : NodeComplete =
+  let mut node : Graphnode =
     empty_node_complete ();
   node . pid =
     ID::new ("11111111-1111-4111-8111-111111111111");
@@ -30,7 +30,7 @@ fn titles_by_ids_handler_sends_parseable_titles (
     RepoName::from ("main");
   node . aliases =
     rel_partners_at_relRepo_msv ( & node . home_repo, MSV::Specified (vec!["Alias One" . to_string ()]) );
-  let mut spaced_title_node : NodeComplete =
+  let mut spaced_title_node : Graphnode =
     empty_node_complete ();
   spaced_title_node . pid =
     ID::new ("44444444-4444-4444-8444-444444444444");
@@ -92,13 +92,13 @@ fn titles_by_ids_handler_sends_parseable_titles (
 fn restricted_title_lookup_challenges_without_releasing_text (
 ) -> Result<(), Box<dyn Error>> {
   let skgrepo : RepoName = RepoName::from ("main");
-  let mut node : NodeComplete = empty_node_complete ();
+  let mut node : Graphnode = empty_node_complete ();
   node . pid = ID::new ("overPrivateText-title-id");
   node . home_repo = skgrepo . clone ();
   node . title = "UNIQUE TITLE SECRET" . to_string ();
   node . overPrivateText_telescope = true;
   let graph : InRustGraph =
-    InRustGraph::from_nodecompletes (&[node . clone ()]);
+    InRustGraph::from_graphnodes (&[node . clone ()]);
   let (index, _) = wipe_then_init_tantivy_db (
     &[node], Path::new ("/tmp/tantivy-test-title-release") ) ?;
   let config : SkgConfig = SkgConfig::dummyFromRepos (HashMap::from ([
@@ -141,7 +141,7 @@ fn deleted_titles_supplement_tantivy_title_map (
     ID::new ("22222222-2222-4222-8222-222222222222");
   let extra_id : ID =
     ID::new ("33333333-3333-4333-8333-333333333333");
-  let mut deleted_node : NodeComplete =
+  let mut deleted_node : Graphnode =
     empty_node_complete ();
   deleted_node . pid =
     pid . clone ();
@@ -192,7 +192,7 @@ fn titles_by_ids_finds_deleted_git_file_title_without_diff_mode (
     repo_dir . join (format! ("{}.skg", id . 0)))?;
   let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
-      &Vec::<NodeComplete>::new (),
+      &Vec::<Graphnode>::new (),
       &temp_dir . path () . join ("tantivy"))?;
   let config : SkgConfig =
     SkgConfig::dummyFromRepos (HashMap::from ([
@@ -253,7 +253,7 @@ fn titles_by_ids_finds_untracked_git_file_title_without_diff_mode (
     format! ("title: Untracked Title\npid: {}\n", id . 0))?;
   let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
-      &Vec::<NodeComplete>::new (),
+      &Vec::<Graphnode>::new (),
       &temp_dir . path () . join ("tantivy"))?;
   let config : SkgConfig =
     SkgConfig::dummyFromRepos (HashMap::from ([

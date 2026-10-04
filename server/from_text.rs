@@ -36,8 +36,8 @@ use fork::{
 use local_instruction_collection::NonmergeSavePlan;
 use validate::{validate_and_filter_foreign_instructions, validate_no_simultaneous_move_and_nodeMerge};
 
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
-use crate::types::nodes::complete::NodeComplete;
+use crate::dbs::node_lookup::graphnode_rustFirst_by_pid_and_repo;
+use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{ViewnodeKind, Vognode, ViewRequest};
 use std::collections::{HashMap, HashSet};
 use crate::types::misc::RepoName;
@@ -301,7 +301,7 @@ pub fn buffer_to_validated_saveplan (
   let nodes = crate::dbs::filesystem::multiple_nodes
     ::read_all_skg_files_from_repos (config)
     . map_err (|e| SaveError::DatabaseError (Box::new (e)))?;
-  let graph = crate::dbs::in_rust_graph::InRustGraph::from_nodecompletes (&nodes);
+  let graph = crate::dbs::in_rust_graph::InRustGraph::from_graphnodes (&nodes);
   buffer_to_validated_saveplan_in_graph (
     buffer_text, &graph, config, active_repo_set ) }
 
@@ -315,7 +315,7 @@ pub fn buffer_to_validated_saveplan_with_fork_repos (
   let nodes = crate::dbs::filesystem::multiple_nodes
     ::read_all_skg_files_from_repos (config)
     . map_err (|e| SaveError::DatabaseError (Box::new (e)))?;
-  let graph = crate::dbs::in_rust_graph::InRustGraph::from_nodecompletes (&nodes);
+  let graph = crate::dbs::in_rust_graph::InRustGraph::from_graphnodes (&nodes);
   buffer_to_validated_saveplan_with_fork_repos_in_graph (
     buffer_text, &graph, config, active_repo_set, fork_repos ) }
 
@@ -333,7 +333,7 @@ fn dead_link_warnings (
   fork_specs   : &[ForkSpec],
 ) -> Vec<String> {
   use crate::types::links::links_from_node;
-  let saved_nodes : Vec<&NodeComplete> =
+  let saved_nodes : Vec<&Graphnode> =
     define_nodes . iter ()
     . filter_map ( |dn| match dn {
         crate::types::save::DefineNode::Save (
@@ -385,8 +385,8 @@ fn explicit_fork_specs_from_viewforest (
     // detached copies left by placement; dedup so one forked node yields
     // one spec. (D2 already rejected a genuine second fork request.)
     if ! seen . insert (pid . clone ()) { continue; }
-    let snapshot : NodeComplete =
-      match nodecomplete_rustFirst_by_pid_and_repo (
+    let snapshot : Graphnode =
+      match graphnode_rustFirst_by_pid_and_repo (
         graph, config, pid, & t . home_repo ) {
         Ok (nc) => nc,
         Err (e) => {

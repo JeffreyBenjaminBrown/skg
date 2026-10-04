@@ -16,7 +16,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::telescope::types::FoldWarning;
 use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, RepoName};
-use crate::types::nodes::rust::NodeRust;
+use crate::types::nodes::rust::GraphnodeInRust;
 
 use std::collections::HashSet;
 use std::fmt;
@@ -108,7 +108,7 @@ pub fn telescope_violations_of (
   graph  : &InRustGraph,
   pid    : &ID,
 ) -> Vec<TelescopeViolation> {
-  let Some (node) : Option<&NodeRust> =
+  let Some (node) : Option<&GraphnodeInRust> =
     graph . nodes . get (pid) else { return Vec::new (); };
   let mut violations : Vec<TelescopeViolation> = Vec::new ();
   let mut check = |relation : &'static str,

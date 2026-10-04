@@ -1,9 +1,9 @@
 /// Applying a repo-set switch to an already-drawn view
 /// (TODO/full-schema/9-2_repo-set-safety.org).  Two passes:
 /// convert every Active viewnode from a now-inactive repo into an
-/// InactiveNode, then prune (DFS postorder, so emptied parents prune
+/// InactiveVognode, then prune (DFS postorder, so emptied parents prune
 /// in the same sweep) every:
-/// - InactiveNode leaf;
+/// - InactiveVognode leaf;
 /// - Property leaf whose owning gnode (grandparent) is inactive;
 /// - write-protected leaf partner (child of a PartnerFolder), active or
 ///   inactive: a write-protected partner defines nothing, and

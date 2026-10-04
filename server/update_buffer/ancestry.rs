@@ -4,7 +4,7 @@
 //! single-visit BFS (complete.rs), each folder (a non-vognode viewnode: PropertyFolder,
 //! PartnerFolder) is reconciled at its own visit, and that reconcile reads its
 //! ancestor vognode(s). If a required ancestor died this save, the read would
-//! hit a missing NodeComplete, return Err, and abort the whole (often
+//! hit a missing Graphnode, return Err, and abort the whole (often
 //! collateral) rerender. To prevent that, every folder first self-checks its
 //! required ancestry; if it is a *generalized orphan* it deadens itself and
 //! disposes its children instead of reconciling.
@@ -16,7 +16,7 @@
 //! kind. Death is a VIEW property, not a graph property: a position that must
 //! be a vognode holding anything but Vognode::Active, or a position that must
 //! be a specific folder holding anything but that folder, is dead. No
-//! graph / NodeComplete read is involved. This is sound because, in BFS order,
+//! graph / Graphnode read is involved. This is sound because, in BFS order,
 //! an Active node converts to Deleted at its own visit, strictly before any
 //! descendant folder is visited; so by the time a folder checks, a dead ancestor
 //! already shows the wrong kind in the tree.
@@ -29,7 +29,7 @@
 
 use crate::types::misc::{ID, RepoName};
 use crate::types::tree::generic::{ read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree };
-use crate::types::tree::viewnode_nodecomplete::write_at_activeNode_in_tree;
+use crate::types::tree::viewnode_graphnode::write_at_activeVognode_in_tree;
 use crate::types::viewnode::{ AffectsParent, PartnerFolder, Viewnode, ViewnodeKind, Vognode };
 use crate::update_buffer::util::detach_viewnode_transferring_focus;
 
@@ -122,7 +122,7 @@ fn ancestor_nodeid (
 /// actual viewnode kind does not match the spec. Short-circuits on the first
 /// mismatch, so we only ever look past the parent when the parent is fine. A
 /// missing ancestor (chain shorter than required) also counts as orphaned.
-/// Purely view-based: no graph / NodeComplete read.
+/// Purely view-based: no graph / Graphnode read.
 pub fn folder_is_generalized_orphan (
   tree : &Tree<Viewnode>,
   folder  : NodeId,
@@ -234,7 +234,7 @@ fn dispose_orphaned_folder_child (
     : (bool, bool, bool, bool) = {
     let c : NodeRef<Viewnode> = tree . get (child)
       . ok_or ("dispose_orphaned_folder_child: child not found") ?;
-    ( c . value () . is_activeNode_and_affectsParent_true (),
+    ( c . value () . is_activeVognode_and_affectsParent_true (),
       c . children () . next () . is_none (),
       matches! ( &c . value () . kind,
                  ViewnodeKind::Vognode (_) ),
@@ -243,7 +243,7 @@ fn dispose_orphaned_folder_child (
     if is_leaf {
       detach_viewnode_transferring_focus (tree, child) ?;
     } else {
-      write_at_activeNode_in_tree ( tree, child,
+      write_at_activeVognode_in_tree ( tree, child,
         |t| { t . affectsParent = AffectsParent::False; } )
         . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   } else if is_folder {

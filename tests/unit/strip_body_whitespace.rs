@@ -3,9 +3,9 @@
 
 use super::{strip_body_whitespace_on_disk,
             strip_trailing_whitespace_from_body};
-use crate::dbs::filesystem::one_node::nodecomplete_from_pid_and_repo;
+use crate::dbs::filesystem::one_node::graphnode_from_pid_and_repo;
 use crate::types::misc::{ID, SkgConfig, SkgfileRepo, RepoName};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -69,7 +69,7 @@ fn strips_on_disk_only_where_needed () {
     SkgConfig::fromReposAndTantivyFolder (
       repos,
       & tmp . path () . join ("tantivy") . to_string_lossy () ) };
-  let (all_nodes, changed) : (Vec<NodeComplete>, Vec<NodeComplete>) =
+  let (all_nodes, changed) : (Vec<Graphnode>, Vec<Graphnode>) =
     strip_body_whitespace_on_disk (&config) . unwrap ();
   assert_eq! ( all_nodes . len (), 5 );
   { let changed_pids : HashSet<&str> =
@@ -77,8 +77,8 @@ fn strips_on_disk_only_where_needed () {
       . map ( |n| n . pid . as_str () ) . collect ();
     assert_eq! ( changed_pids,
                  HashSet::from ([ "dirty", "blank" ]) ); }
-  let from_disk = |pid : &str, repo : &str| -> NodeComplete {
-    nodecomplete_from_pid_and_repo (
+  let from_disk = |pid : &str, repo : &str| -> Graphnode {
+    graphnode_from_pid_and_repo (
       &config, ID::from (pid), & RepoName::from (repo)
     ) . unwrap () };
   assert_eq! ( from_disk ("dirty", "owned") . body,
@@ -100,7 +100,7 @@ fn strips_on_disk_only_where_needed () {
   assert_eq! ( // an already-clean file is not rewritten
     fs::read ( owned_dir . join ("clean.skg") ) . unwrap (),
     clean_bytes_before );
-  { let (_, changed_again) : (Vec<NodeComplete>, Vec<NodeComplete>) =
+  { let (_, changed_again) : (Vec<Graphnode>, Vec<Graphnode>) =
       // the pass is idempotent
       strip_body_whitespace_on_disk (&config) . unwrap ();
     assert! ( changed_again . is_empty () ); }}

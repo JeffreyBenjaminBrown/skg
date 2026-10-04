@@ -15,7 +15,7 @@ pub fn find_related_nodes (
     let pid : ID = match graph . pid_of (input_id) {
       Some (p) => p,
       None     => continue };
-    // Forward fields on NodeRust mirror disk and thus carry raw IDs;
+    // Forward fields on GraphnodeInRust mirror disk and thus carry raw IDs;
     // callers expect canonical pids; map
     // would return after its has_extra_id lookups). Map the ID of
     // each second member (see docs/data-model_technical.org) to its corresponding PID

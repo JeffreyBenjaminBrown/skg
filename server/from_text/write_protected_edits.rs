@@ -12,7 +12,7 @@ use crate::types::nodes::complete::Flag;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{PartnerFolder, Property, PropertyFolder, Phantom, Viewnode, ViewnodeKind, Vognode};
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::node_lookup::nodecomplete_from_graph;
+use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::types::nodes::complete::flag_is_true;
 
 use ego_tree::{NodeId, NodeRef};
@@ -276,7 +276,7 @@ pub fn flags_surface_errors_against_graph (
   let mut errors : Vec<BufferValidationError> = Vec::new ();
   for surface in flags_surfaces_in (current) {
     if surface . folders . is_empty () { continue; }
-    let Some (node) = nodecomplete_from_graph (graph, &surface . owner_id)
+    let Some (node) = graphnode_from_graph (graph, &surface . owner_id)
     else { continue; };
     let expected_viewnodes : Vec<(Flag, String, Option<String>)> =
       Flag::ALL

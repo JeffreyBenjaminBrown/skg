@@ -69,7 +69,7 @@ async fn test_dangling_reference_renders_unknown_node (
 
 // A view that the server rendered with an PhantomUnknown line in it
 // must round-trip through save without tripping the local-structure
-// validator. Previously, ActiveNode parent + PhantomUnknown child
+// validator. Previously, ActiveVognode parent + PhantomUnknown child
 // triggered LocalStructureViolation.
 async fn test_buffer_with_unknownnode_child_saves_cleanly (
   config : &SkgConfig,

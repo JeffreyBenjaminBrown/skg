@@ -30,7 +30,7 @@ use skg::test_utils::update_from_and_rerender_buffer_with_fork_repos_test;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::{ID, SkgConfig, RepoName, TantivyIndex, members_of};
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{DefineNode, ForkSpec, SaveNode};
 use skg::types::views_state::{OpenViews, ViewUri};
 
@@ -104,7 +104,7 @@ const EXPLICIT_FORK_UNKNOWN_BUFFER : &str = indoc! {"
 fn clone_overriding_on_disk (
   config : &SkgConfig,
   target : &str,
-) -> Result<NodeComplete, Box<dyn Error>> {
+) -> Result<Graphnode, Box<dyn Error>> {
   read_all_skg_files_from_repos (config) ?
     . into_iter ()
     . find ( |node| node . overrides_view_of . or_default () . iter ()
@@ -128,7 +128,7 @@ async fn fork_specs_from (
 fn node_from_disk (
   config : &SkgConfig,
   pid    : &str,
-) -> Result<NodeComplete, Box<dyn Error>> {
+) -> Result<Graphnode, Box<dyn Error>> {
   let id : ID = ID::from (pid);
   read_all_skg_files_from_repos (config) ?
     . into_iter ()
@@ -140,7 +140,7 @@ fn node_from_disk (
 /// do not know in advance.)
 fn clone_on_disk (
   config : &SkgConfig,
-) -> Result<NodeComplete, Box<dyn Error>> {
+) -> Result<Graphnode, Box<dyn Error>> {
   read_all_skg_files_from_repos (config) ?
     . into_iter ()
     . find ( |node|
@@ -232,7 +232,7 @@ async fn explicit_fork_save_instruction (
     "exactly one explicit fork (of P): {:?}", fork_specs );
   let spec : &ForkSpec = &fork_specs[0];
   assert_eq! ( spec . original_id, ID::from ("P") );
-  let c : &NodeComplete = &spec . clone . 0;
+  let c : &Graphnode = &spec . clone . 0;
   assert_eq! ( c . title, "P-container",
     "clone copies P's disk title (not a buffer edit)" );
   assert_eq! ( members_of (& c . contains), vec! [ ID::from ("N") ],
@@ -283,7 +283,7 @@ async fn explicit_fork_round_trip_and_monogamy (
     /* fork_approved = */ true ) . await ?;
   assert! ( response . errors . is_empty (),
     "the approved explicit fork must commit: {:?}", response . errors );
-  let clone : NodeComplete = clone_overriding_on_disk (config, "P") ?;
+  let clone : Graphnode = clone_overriding_on_disk (config, "P") ?;
   assert_eq! ( members_of ( clone . subscribes_to . or_default () ), vec! [ ID::from ("P") ],
     "the clone subscribes to P" );
   assert! ( config . user_owns_repo (& clone . home_repo),
@@ -370,7 +370,7 @@ async fn fork_no_owned_ancestor_defaults (
     &Err ( String::new () ), &mut views_state ) . await ?;
   assert! ( response . errors . is_empty (),
     "a fork with no owned ancestor must complete: {:?}", response . errors );
-  let c : NodeComplete = clone_on_disk (config) ?;
+  let c : Graphnode = clone_on_disk (config) ?;
   assert_eq! ( c . home_repo, RepoName::from ("owned"),
     "with no owned ancestor and no user-set repo, the clone defaults to \
      the first owned repo (alphabetically 'owned'); got {:?}", c . home_repo );
@@ -405,7 +405,7 @@ async fn fork_user_set_repo_overrides (
     /* fork_approved = */ true, &fork_repos ) . await ?;
   assert! ( response . errors . is_empty (),
     "the user-set fork must commit: {:?}", response . errors );
-  let c : NodeComplete = clone_on_disk (config) ?;
+  let c : Graphnode = clone_on_disk (config) ?;
   assert_eq! ( c . home_repo, RepoName::from ("owned2"),
     "the user-set repo 'owned2' must override the inferred 'owned'; \
      got {:?}", c . home_repo );
@@ -517,14 +517,14 @@ async fn fork_from_bare_new_child_plan (
   assert_eq! ( save_plan . fork_specs . len (), 1,
     "appending a bare new child must fork N: {:?}",
     save_plan . fork_specs );
-  let clone : &NodeComplete = & save_plan . fork_specs[0] . clone . 0;
+  let clone : &Graphnode = & save_plan . fork_specs[0] . clone . 0;
   assert_eq! ( save_plan . fork_specs[0] . original_id, ID::from ("N") );
   assert_eq! ( clone . contains . len (), 3,
     "the clone's contains must be N1, N2 and the new node: {:?}",
     clone . contains );
   assert_eq! ( members_of (& clone . contains [..2]),
                vec! [ ID::from ("N1"), ID::from ("N2") ] );
-  let new_node : &NodeComplete =
+  let new_node : &Graphnode =
     save_plan . define_nodes . iter ()
     . find_map ( |dn| match dn {
         DefineNode::Save ( SaveNode (n) )
@@ -546,7 +546,7 @@ async fn fork_new_parent_adopts_relationship_repos (
     save_plan . fork_specs . first ()
     . expect ("structural edit must fork N")
     . clone . 0 . home_repo . clone ();
-  let new_parent : &NodeComplete =
+  let new_parent : &Graphnode =
     save_plan . define_nodes . iter ()
     . find_map ( |dn| match dn {
         DefineNode::Save (SaveNode (n)) if n . title == "New parent" => Some (n),
@@ -580,8 +580,8 @@ async fn fork_from_bare_new_child_commits (
   assert! ( response . errors . is_empty (),
     "the approved bare-new-child fork must commit: {:?}",
     response . errors );
-  let clone : NodeComplete = clone_on_disk (config) ?;
-  let new_node : NodeComplete =
+  let clone : Graphnode = clone_on_disk (config) ?;
+  let new_node : Graphnode =
     read_all_skg_files_from_repos (config) ?
     . into_iter ()
     . find ( |node| node . title == "Can I add to this?" )
@@ -682,7 +682,7 @@ async fn fork_save_instruction (
     "exactly one fork (of N): {:?}", fork_specs );
   let spec : &ForkSpec = &fork_specs[0];
   assert_eq! ( spec . original_id, ID::from ("N") );
-  let c : &NodeComplete = &spec . clone . 0;
+  let c : &Graphnode = &spec . clone . 0;
   assert_eq! ( c . title, "N-edited",
     "clone copies the edited title" );
   assert_eq! ( members_of (& c . contains), vec! [ ID::from ("N1"), ID::from ("N2") ],
@@ -724,7 +724,7 @@ async fn fork_fixture_files (
   assert! ( response . errors . is_empty (),
     "fork save must not error: {:?}", response . errors );
 
-  let c : NodeComplete = clone_on_disk (config) ?;
+  let c : Graphnode = clone_on_disk (config) ?;
   assert_eq! ( c . title, "N-edited" );
   assert_eq! ( members_of (& c . contains), vec! [ ID::from ("N1"), ID::from ("N2") ] );
   assert_eq! ( members_of ( c . subscribes_to . or_default () ), vec! [ ID::from ("N") ] );
@@ -780,7 +780,7 @@ async fn fork_round_trip (
 
   // The load-bearing round-trip: P's stored contains was NOT rewritten
   // to the clone; it still lists N (the marker collected N, not C).
-  let p_disk : NodeComplete = node_from_disk (config, "P") ?;
+  let p_disk : Graphnode = node_from_disk (config, "P") ?;
   assert_eq! ( members_of (& p_disk . contains), vec! [ ID::from ("N") ],
     "P's contains must still point at N, not the clone {}", clone_id . 0 );
   Ok (( )) }

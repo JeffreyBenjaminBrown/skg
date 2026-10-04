@@ -2,7 +2,7 @@
 
 use crate::types::list::{Diff_Item, compute_interleaved_diff};
 use crate::types::misc::{ID, RepoName};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -46,32 +46,32 @@ pub struct RelationshipAxes {
 #[derive(Debug, Clone)]
 pub struct RepoDiff {
   pub is_gitrepo: bool,
-  pub staged   : HashMap<PathBuf, NodeCompleteDiff>,
-  pub unstaged : HashMap<PathBuf, NodeCompleteDiff>,
+  pub staged   : HashMap<PathBuf, GraphnodeDiff>,
+  pub unstaged : HashMap<PathBuf, GraphnodeDiff>,
   /// Nodes that exist in the index or worktree but not in the
   /// stage baseline. Used to title new/untracked files before the
   /// search index has seen them.
-  pub added_nodes: HashMap<ID, NodeComplete>,
+  pub added_nodes: HashMap<ID, Graphnode>,
   /// Nodes that existed in HEAD but not in worktree (deleted files).
   /// Loaded from git HEAD or from the index. Used for phantom titles.
-  pub deleted_nodes: HashMap<ID, NodeComplete>,
+  pub deleted_nodes: HashMap<ID, Graphnode>,
 }
 
 /// All the diff info for a single .skg file.
 #[derive(Debug, Clone)]
-pub struct NodeCompleteDiff {
-  // TODO ? Since we keep the nodecomplete around for deleted nodes already, why not just do that for everything, and dispense with the node_changes field?
+pub struct GraphnodeDiff {
+  // TODO ? Since we keep the graphnode around for deleted nodes already, why not just do that for everything, and dispense with the node_changes field?
   pub status: GitDiffStatus,
   pub node_changes: Option<NodeChanges>,
   /// The "before" state of this stage: HEAD for staged, INDEX for
   /// unstaged. Populated only for Deleted status; read by
   /// 'collect_deleted_nodes_for_both' to resolve phantom titles.
   /// Name reflects the stage's baseline rather than always-HEAD.
-  pub before_node: Option<NodeComplete>,
+  pub before_node: Option<Graphnode>,
   /// The "after" state of this stage: INDEX for staged, worktree for
   /// unstaged. Populated only for Added status; used for unindexed
   /// titles of new files.
-  pub after_node: Option<NodeComplete>,
+  pub after_node: Option<Graphnode>,
 }
 
 /// A single entry representing a changed file.
@@ -89,7 +89,7 @@ pub enum GitDiffStatus {
   Deleted,  // File was deleted (in HEAD but not on disk)
 }
 
-/// Represents changes to a single NodeComplete.
+/// Represents changes to a single Graphnode.
 #[derive(Debug, Clone, Default)]
 pub struct NodeChanges {
   pub text_changed  : bool,
@@ -202,14 +202,14 @@ impl GitDiffStatus {
 // Functions
 //
 
-/// Returns the (staged, unstaged) pair of NodeChanges for an ActiveNode.
+/// Returns the (staged, unstaged) pair of NodeChanges for an ActiveVognode.
 /// Either element may be None (that stage has no diff entry for this
 /// file, or the entry has 'node_changes: None').
 ///
 /// Consumers that need a flat HEAD→worktree view can compose both
 /// stages via 'net_diff_from_per_stage'. Consumers that need
 /// per-stage signs use 'axes_from_per_stage_diffs'.
-pub fn per_stage_node_changes_for_activeNode<'a> (
+pub fn per_stage_node_changes_for_activeVognode<'a> (
   repo_diffs : &'a Option<HashMap<RepoName, RepoDiff>>,
   pid          : &ID,
   skgrepo       : &RepoName,
@@ -335,7 +335,7 @@ pub fn added_relationship_axes_from_per_stage_diffs<T: Clone + Eq + std::hash::H
 /// Deleted → Minus, Modified / absent → None).
 ///
 /// Used by the definitive-expand path (extendDefinitiveSubtree_fromGit, for the
-/// ActiveNode's own node axes and for phantoms of a removed parent's
+/// ActiveVognode's own node axes and for phantoms of a removed parent's
 /// children).
 pub fn file_node_axes_from_repo_diff (
   repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,

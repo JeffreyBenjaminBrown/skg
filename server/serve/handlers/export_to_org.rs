@@ -14,7 +14,7 @@ use crate::serve::util::{
   value_from_request_sexp};
 use crate::repo_sets::{ActiveRepoSet, RepoSetName};
 use crate::types::misc::SkgConfig;
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 
 use std::net::TcpStream;
 use std::path::PathBuf;
@@ -36,13 +36,13 @@ pub fn handle_export_to_org_request (
   request : &str,
 ) {
   let prepared : Result<
-    (ActiveRepoSet, Vec<NodeComplete>, PathBuf), String> = ( || {
+    (ActiveRepoSet, Vec<Graphnode>, PathBuf), String> = ( || {
     let name : String =
       value_from_request_sexp ("repo-set", request) ?;
     let active : ActiveRepoSet =
       ActiveRepoSet::named (config, RepoSetName::from (name))
       . map_err ( |e| e . to_string () ) ?;
-    let nodes : Vec<NodeComplete> =
+    let nodes : Vec<Graphnode> =
       read_all_skg_files_from_repos (config)
       . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
     let output_dir : String =

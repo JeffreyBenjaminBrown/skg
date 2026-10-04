@@ -8,10 +8,10 @@ use tempfile::{tempdir, TempDir};
 
 use skg::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
-use skg::dbs::filesystem::one_node::write_nodecomplete_to_repo;
+use skg::dbs::filesystem::one_node::write_graphnode_to_repo;
 use skg::test_utils::set_repo_retagging_relRepos;
 use skg::types::misc::{SkgfileRepo, SkgConfig, ID, RepoName};
-use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
+use skg::types::nodes::complete::{Graphnode, empty_node_complete};
 
 /// Helper to create a minimal SkgConfig for tests.
 /// `data_root` should be each test's tempdir so that any
@@ -31,7 +31,7 @@ fn test_load_from_single_repo() {
   let repo_path : PathBuf = temp_dir . path() . join ("main");
   fs::create_dir_all (&repo_path) . unwrap();
 
-  let config : SkgConfig = { // Needed by write_nodecomplete_to_repo
+  let config : SkgConfig = { // Needed by write_graphnode_to_repo
     let mut repos : HashMap<RepoName, SkgfileRepo> =
       HashMap::new();
     repos . insert(
@@ -44,18 +44,18 @@ fn test_load_from_single_repo() {
     test_config (repos, temp_dir . path () . to_path_buf ()) };
 
   // Create a test node
-  let mut node : NodeComplete = empty_node_complete();
+  let mut node : Graphnode = empty_node_complete();
   node . pid = ID::new ("test1");
   node . title = "Test Node 1" . to_string();
   set_repo_retagging_relRepos ( &mut node, &RepoName::from ("main") );
-  write_nodecomplete_to_repo(&node, &config) . unwrap();
+  write_graphnode_to_repo(&node, &config) . unwrap();
 
-  let result : IoResult<Vec<NodeComplete>> =
+  let result : IoResult<Vec<Graphnode>> =
     read_all_skg_files_from_repos (&config);
   assert!(result . is_ok(),
           "Should successfully load from single repo");
 
-  let nodes : Vec<NodeComplete> = result . unwrap();
+  let nodes : Vec<Graphnode> = result . unwrap();
   assert_eq!(nodes . len(), 1, "Should have loaded 1 node");
   assert_eq!(&*nodes[0] . home_repo, "main", "Repo should be 'main'");
   assert_eq!(nodes[0] . title, "Test Node 1");
@@ -90,17 +90,17 @@ fn test_load_from_multiple_repos() {
     test_config (repos, temp_dir . path () . to_path_buf ()) };
 
   // Create nodes in main repo
-  let mut node1 : NodeComplete = empty_node_complete();
+  let mut node1 : Graphnode = empty_node_complete();
   node1 . pid = ID::new ("main1");
   node1 . title = "Main Node 1" . to_string();
   set_repo_retagging_relRepos ( &mut node1, &RepoName::from ("main") );
-  write_nodecomplete_to_repo(&node1, &config) . unwrap();
+  write_graphnode_to_repo(&node1, &config) . unwrap();
 
-  let mut node2 : NodeComplete = empty_node_complete();
+  let mut node2 : Graphnode = empty_node_complete();
   node2 . pid = ID::new ("main2");
   node2 . title = "Main Node 2" . to_string();
   set_repo_retagging_relRepos ( &mut node2, &RepoName::from ("main") );
-  write_nodecomplete_to_repo(&node2, &config) . unwrap();
+  write_graphnode_to_repo(&node2, &config) . unwrap();
 
   // Create a node in the shared repo. Written RAW: 'shared' is
   // foreign, and the node writer is the SAVE path, which refuses a
@@ -111,18 +111,18 @@ fn test_load_from_multiple_repos() {
       . unwrap () . path . join ("shared1.skg"),
     "pid: shared1\ntitle: Shared Node 1\n" ) . unwrap();
 
-  let result : IoResult<Vec<NodeComplete>> =
+  let result : IoResult<Vec<Graphnode>> =
     read_all_skg_files_from_repos (&config);
   assert!(result . is_ok(), "Should successfully load from multiple repos");
 
-  let nodes : Vec<NodeComplete> = result . unwrap();
+  let nodes : Vec<Graphnode> = result . unwrap();
   assert_eq!(nodes . len(), 3, "Should have loaded 3 nodes total");
 
   // Verify repos are set correctly
-  let main_nodes: Vec<&NodeComplete> = nodes . iter()
+  let main_nodes: Vec<&Graphnode> = nodes . iter()
     . filter(|n| &*n . home_repo == "main")
     . collect();
-  let shared_nodes: Vec<&NodeComplete> = nodes . iter()
+  let shared_nodes: Vec<&Graphnode> = nodes . iter()
     . filter(|n| &*n . home_repo == "shared")
     . collect();
 
@@ -166,7 +166,7 @@ fn test_telescope_is_not_a_conflict_but_two_pids_are() {
   // title is a fold warning, not an error. The section files are
   // written RAW: a whole-node write would (correctly) sweep the
   // pid's sections at other repos, so two sequential
-  // write_nodecomplete_to_repo calls cannot build a telescope.
+  // write_graphnode_to_repo calls cannot build a telescope.
   fs::write (
     config . repos . get (&RepoName::from ("main"))
       . unwrap () . path . join ("duplicate_id.skg"),
@@ -176,7 +176,7 @@ fn test_telescope_is_not_a_conflict_but_two_pids_are() {
       . unwrap () . path . join ("duplicate_id.skg"),
     "pid: duplicate_id\ntitle: Node in Shared\n" ) . unwrap ();
 
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     read_all_skg_files_from_repos (&config) . unwrap();
   assert_eq!( nodes . len(), 1,
     "same-pid files across repos fold into one telescope" );
@@ -189,12 +189,12 @@ fn test_telescope_is_not_a_conflict_but_two_pids_are() {
 
   { // What REMAINS a conflict: one id claimed by two distinct pids
     // (here via extra_ids).
-    let mut node_a : NodeComplete = empty_node_complete();
+    let mut node_a : Graphnode = empty_node_complete();
     node_a . pid = ID::new ("pid-a");
     node_a . title = "A" . to_string();
     node_a . extra_ids = vec! [ ID::new ("contested") ];
     set_repo_retagging_relRepos ( &mut node_a, &RepoName::from ("main") );
-    let mut node_b : NodeComplete = empty_node_complete();
+    let mut node_b : Graphnode = empty_node_complete();
     node_b . pid = ID::new ("pid-b");
     node_b . title = "B" . to_string();
     node_b . extra_ids = vec! [ ID::new ("contested") ];
@@ -241,12 +241,12 @@ fn test_one_id_claimed_by_a_pid_and_anothers_extra_id() {
     test_config (repos, temp_dir . path () . to_path_buf ()) };
 
   // Create node in main with multiple IDs
-  let mut node1 : NodeComplete = empty_node_complete();
+  let mut node1 : Graphnode = empty_node_complete();
   node1 . pid = ID::new ("id1");
   node1 . extra_ids = vec![ID::new ("id2")];
   node1 . title = "Node with Multiple IDs" . to_string();
   set_repo_retagging_relRepos ( &mut node1, &RepoName::from ("main") );
-  write_nodecomplete_to_repo(&node1, &config) . unwrap();
+  write_graphnode_to_repo(&node1, &config) . unwrap();
 
   // Create node in shared that has one overlapping ID. Written RAW:
   // 'shared' is foreign, and the node writer refuses a foreign home.
@@ -255,7 +255,7 @@ fn test_one_id_claimed_by_a_pid_and_anothers_extra_id() {
       . unwrap () . path . join ("id2.skg"),
     "pid: id2\ntitle: Another Node\nextra_ids:\n- id3\n" ) . unwrap();
 
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     read_all_skg_files_from_repos (&config) . unwrap();
   let result : IoResult<()> =
     error_unless_each_id_names_one_node (
@@ -273,7 +273,7 @@ fn test_load_from_empty_repos() {
   let repo_path : PathBuf = temp_dir . path() . join ("empty_repo");
   fs::create_dir_all (&repo_path) . unwrap();
 
-  let result : IoResult<Vec<NodeComplete>> = {
+  let result : IoResult<Vec<Graphnode>> = {
     let mut repos : HashMap<RepoName, SkgfileRepo> =
       HashMap::new();
     repos . insert(
@@ -289,7 +289,7 @@ fn test_load_from_empty_repos() {
   assert!(result . is_ok(),
           "Should successfully handle empty repo");
 
-  let nodes : Vec<NodeComplete> = result . unwrap();
+  let nodes : Vec<Graphnode> = result . unwrap();
   assert_eq!(nodes . len(), 0,
              "Should have loaded 0 nodes from empty repo");
 }
@@ -323,29 +323,29 @@ fn test_repo_field_set_correctly() {
     test_config (repos, temp_dir . path () . to_path_buf ()) };
 
   // Create nodes
-  let mut node_a : NodeComplete = empty_node_complete();
+  let mut node_a : Graphnode = empty_node_complete();
   node_a . pid = ID::new ("node_a");
   node_a . title = "Node A" . to_string();
   set_repo_retagging_relRepos ( &mut node_a, &RepoName::from ("repo_a") );
-  write_nodecomplete_to_repo(&node_a, &config) . unwrap();
+  write_graphnode_to_repo(&node_a, &config) . unwrap();
 
-  let mut node_b : NodeComplete = empty_node_complete();
+  let mut node_b : Graphnode = empty_node_complete();
   node_b . pid = ID::new ("node_b");
   node_b . title = "Node B" . to_string();
   set_repo_retagging_relRepos ( &mut node_b, &RepoName::from ("repo_b") );
-  write_nodecomplete_to_repo(&node_b, &config) . unwrap();
+  write_graphnode_to_repo(&node_b, &config) . unwrap();
 
-  let result : IoResult<Vec<NodeComplete>> =
+  let result : IoResult<Vec<Graphnode>> =
     read_all_skg_files_from_repos (&config);
   assert!(result . is_ok());
 
-  let nodes : Vec<NodeComplete> = result . unwrap();
+  let nodes : Vec<Graphnode> = result . unwrap();
   assert_eq!(nodes . len(), 2);
 
   // Find each node and verify repo
-  let node_a_result : Option<&NodeComplete> =
+  let node_a_result : Option<&Graphnode> =
     nodes . iter() . find(|n| n . pid . as_str() == "node_a");
-  let node_b_result : Option<&NodeComplete> =
+  let node_b_result : Option<&Graphnode> =
     nodes . iter() . find(|n| n . pid . as_str() == "node_b");
 
   assert!(node_a_result . is_some());
@@ -389,11 +389,11 @@ fn test_many_id_conflicts_create_org_file() {
   // are telescope sections now, so a conflict means one id claimed
   // by two DISTINCT pids -- here via extra_ids. In-memory nodes
   // suffice; the check takes the folded node list.
-  let mut nodes : Vec<NodeComplete> = Vec::new ();
+  let mut nodes : Vec<Graphnode> = Vec::new ();
   for i in 1..=15 {
     let id : String = format!("dup_id_{}", i);
-    let mut node_a : NodeComplete = empty_node_complete();
-    let mut node_b : NodeComplete = empty_node_complete();
+    let mut node_a : Graphnode = empty_node_complete();
+    let mut node_b : Graphnode = empty_node_complete();
     node_a . pid = ID::new (&format!("pid_a_{}", i));
     node_b . pid = ID::new (&format!("pid_b_{}", i));
     node_a . extra_ids = vec![ID::new (&id)];
@@ -475,11 +475,11 @@ fn test_unreadable_files_creates_org_file() {
                  temp_dir . path () . to_path_buf ());
 
   // Create a valid node in the good repo
-  let mut node : NodeComplete = empty_node_complete();
+  let mut node : Graphnode = empty_node_complete();
   node . pid = ID::new ("test1");
   node . title = "Test Node" . to_string();
   set_repo_retagging_relRepos ( &mut node, &RepoName::from ("repo_good") );
-  write_nodecomplete_to_repo(&node, &write_config) . unwrap();
+  write_graphnode_to_repo(&node, &write_config) . unwrap();
 
   // Create config with both repos for reading (including the bad one)
   let mut repos : HashMap<RepoName, SkgfileRepo> =
@@ -499,7 +499,7 @@ fn test_unreadable_files_creates_org_file() {
       path: repo_bad . clone(),
       user_owns_it: true, } );
 
-  let result : IoResult<Vec<NodeComplete>> =
+  let result : IoResult<Vec<Graphnode>> =
     read_all_skg_files_from_repos(
       &test_config (repos,
                     temp_dir . path () . to_path_buf () ));
@@ -546,7 +546,7 @@ fn test_unreadable_files_creates_org_file() {
 }
 
 /// The malformed scalar and foreign-home shapes
-/// 'write_nodecomplete_telescope' refuses. Neither
+/// 'write_graphnode_telescope' refuses. Neither
 /// arises from a skg save (every relRepo is clamped to at least the
 /// owner's home); both arrive from hand-edited files or a pull.
 /// Writing either would publish the node's text or lose it.
@@ -575,13 +575,13 @@ fn a_write_refuses_a_foreign_home_and_a_title_hoist() {
              RepoName::from ("public") ];
     config };
   { // FOREIGN HOME: refused, rather than silently dropping the title.
-    let mut node : NodeComplete = empty_node_complete();
+    let mut node : Graphnode = empty_node_complete();
     node . pid   = ID::new ("F");
     node . title = "foreign-homed" . to_string();
     set_repo_retagging_relRepos (
       &mut node, &RepoName::from ("foreign") );
     let err : IoError =
-      write_nodecomplete_to_repo (&node, &config)
+      write_graphnode_to_repo (&node, &config)
       . expect_err ("a foreign home is not writable");
     assert!( err . to_string() . contains ("do not own"),
              "the refusal says why: {}", err ); }
@@ -589,13 +589,13 @@ fn a_write_refuses_a_foreign_home_and_a_title_hoist() {
     // lives more privately and this write would publish it.
     fs::write ( public_path . join ("H.skg"),
                 "pid: H\ncontains:\n- C\n" ) . unwrap();
-    let mut node : NodeComplete = empty_node_complete();
+    let mut node : Graphnode = empty_node_complete();
     node . pid   = ID::new ("H");
     node . title = "private text" . to_string();
     set_repo_retagging_relRepos (
       &mut node, &RepoName::from ("public") );
     let err : IoError =
-      write_nodecomplete_to_repo (&node, &config)
+      write_graphnode_to_repo (&node, &config)
       . expect_err ("hoisting a title into a titleless home is refused");
     assert!( err . to_string() . contains ("would publish it"),
              "the refusal says why: {}", err );
@@ -604,12 +604,12 @@ fn a_write_refuses_a_foreign_home_and_a_title_hoist() {
                 "pid: H\ncontains:\n- C\n",
                 "and nothing was written" ); }
   { // The ordinary shape still writes: an owned, titled home.
-    let mut node : NodeComplete = empty_node_complete();
+    let mut node : Graphnode = empty_node_complete();
     node . pid   = ID::new ("N");
     node . title = "ordinary" . to_string();
     set_repo_retagging_relRepos (
       &mut node, &RepoName::from ("public") );
-    write_nodecomplete_to_repo (&node, &config)
+    write_graphnode_to_repo (&node, &config)
       . expect ("an owned titled home writes"); }
 }
 
@@ -647,25 +647,25 @@ fn ordinary_writers_refuse_body_only_hoists_and_preflight_the_batch() {
   fs::write (
     private_path . join ("B.skg"),
     "pid: B\nbody: hidden body\n" ) . unwrap ();
-  let mut body_hoist : NodeComplete = empty_node_complete ();
+  let mut body_hoist : Graphnode = empty_node_complete ();
   body_hoist . pid = ID::new ("B");
   body_hoist . title = "visible title" . to_string ();
   body_hoist . body = Some ("hidden body" . to_string ());
   set_repo_retagging_relRepos (
     &mut body_hoist, &RepoName::from ("public") );
-  let err : IoError = write_nodecomplete_to_repo (&body_hoist, &config)
+  let err : IoError = write_graphnode_to_repo (&body_hoist, &config)
     . expect_err ("a body below home requires interactive Hoist approval");
   assert! (err . to_string () . contains ("would publish it"));
   assert_eq! (
     fs::read_to_string (private_path . join ("B.skg")) . unwrap (),
     "pid: B\nbody: hidden body\n" );
 
-  let mut valid : NodeComplete = empty_node_complete ();
+  let mut valid : Graphnode = empty_node_complete ();
   valid . pid = ID::new ("V");
   valid . title = "valid" . to_string ();
   set_repo_retagging_relRepos (
     &mut valid, &RepoName::from ("public") );
-  let mut invalid : NodeComplete = empty_node_complete ();
+  let mut invalid : Graphnode = empty_node_complete ();
   invalid . pid = ID::new ("X");
   invalid . title = "invalid" . to_string ();
   set_repo_retagging_relRepos (

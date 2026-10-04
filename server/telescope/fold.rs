@@ -19,13 +19,13 @@
 
 use crate::telescope::types::{FoldWarning, ListItem, SectionSlices, Telescope};
 use crate::types::misc::{ID, MSV, RelPartner, RepoName};
-use crate::types::nodes::complete::{Flag, NodeComplete};
+use crate::types::nodes::complete::{Flag, Graphnode};
 
 use std::collections::HashMap;
 use std::io;
 
 /// The fold of one node's sections, as effective lists of relation partners plus
-/// title/body text. Field names mirror 'NodeComplete'.
+/// title/body text. Field names mirror 'Graphnode'.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FoldedNode {
   pub title                        : Option<String>,
@@ -35,7 +35,7 @@ pub struct FoldedNode {
   pub home                         : Option<RepoName>,
   // None = NO section mentioned the field (lowers to
   // MSV::Unspecified); contains has no such distinction, like
-  // NodeComplete's.
+  // Graphnode's.
   pub aliases                      : Option<Vec<RelPartner<String>>>,
   pub contains                     : Vec<RelPartner<ID>>,
   pub subscribes_to                : Option<Vec<RelPartner<ID>>>,
@@ -55,13 +55,13 @@ pub struct FoldedNode {
 pub fn fold_telescope_collecting_warnings (
   telescope : Telescope,
   resolve   : &dyn Fn (&ID) -> ID,
-) -> io::Result<(NodeComplete, Vec<FoldWarning>)> {
+) -> io::Result<(Graphnode, Vec<FoldWarning>)> {
   let pid       : ID                = telescope . pid () . clone ();
   let extra_ids : Vec<ID>           = telescope . extra_ids ();
   let misc      : Vec<Flag> = telescope . misc ();
   let (folded, warnings) : (FoldedNode, Vec<FoldWarning>) =
     fold_sections ( & telescope . into_slices (), resolve );
-  let mut node : NodeComplete = nodecomplete_from_fold (
+  let mut node : Graphnode = graphnode_from_fold (
     pid . clone (), extra_ids, misc, folded )
     . ok_or_else ( || io::Error::new (
       io::ErrorKind::InvalidData,
@@ -75,26 +75,26 @@ pub fn fold_telescope_collecting_warnings (
 pub fn fold_telescope (
   telescope : Telescope,
   resolve   : &dyn Fn (&ID) -> ID,
-) -> io::Result<NodeComplete> {
+) -> io::Result<Graphnode> {
   let pid : ID = telescope . pid () . clone ();
-  let (node, warnings) : (NodeComplete, Vec<FoldWarning>) =
+  let (node, warnings) : (Graphnode, Vec<FoldWarning>) =
     fold_telescope_collecting_warnings ( telescope, resolve ) ?;
   for w in &warnings {
     tracing::warn! ( pid = %pid, warning = %w,
                      "telescope fold warning" ); }
   Ok (node) }
 
-/// The fold as a NodeComplete. None iff the telescope has no
+/// The fold as a Graphnode. None iff the telescope has no
 /// sections at all, or no section carried a title anywhere -- the
 /// caller decides whether that is a hard load error (it is, at
 /// init) or a warning. A title present but BELOW the home is not
 /// such a case: it folds, carrying a 'TitleBelowHome' warning.
-pub fn nodecomplete_from_fold (
+pub fn graphnode_from_fold (
   pid       : ID,
   extra_ids : Vec<ID>,
   misc      : Vec<Flag>,
   folded    : FoldedNode,
-) -> Option<NodeComplete> {
+) -> Option<Graphnode> {
   let home : RepoName = folded . home ?;
   let overPrivateText_telescope : bool =
     folded . title_repo . as_ref () != Some (&home)
@@ -106,7 +106,7 @@ pub fn nodecomplete_from_fold (
     match o {
       None     => MSV::Unspecified,
       Some (v) => MSV::Specified (v), }};
-  Some ( NodeComplete {
+  Some ( Graphnode {
     title                        : folded . title ?,
     overPrivateText_telescope,
     aliases                      : match folded . aliases {

@@ -524,9 +524,9 @@ def main() -> None:
         "skg::dbs::in_rust_graph::apply_definenodes_to_inRustGraph")
     complete_candidates = callgrind_call_count(
         "validate_complete_graph_candidate")
-    full_graph_builds = callgrind_call_count("InRustGraph::from_nodecompletes")
-    noderust_conversions = callgrind_call_count(
-        "NodeRust as core::convert::From<&skg::types::nodes::complete::NodeComplete")
+    full_graph_builds = callgrind_call_count("InRustGraph::from_graphnodes")
+    graphnodeInRust_conversions = callgrind_call_count(
+        "GraphnodeInRust as core::convert::From<&skg::types::nodes::complete::Graphnode")
     context_derivations = callgrind_call_count(
         "context_origin_types_for_saved_from_in_rust_graph")
     tantivy_enqueues = callgrind_call_count("skg::save::enqueue_tantivy_delta")
@@ -594,8 +594,8 @@ def main() -> None:
         f"| candidate graph transform runs once per prepared phase | "
         f"{'PASS' if candidate_transforms == 1 else 'FAIL'} | transforms {candidate_transforms} |",
         f"| body/text-link graph conversion is restricted to saved nodes | "
-        f"{'PASS' if noderust_conversions == first_normalized_count * 2 else 'FAIL'} | "
-        f"NodeRust conversions {noderust_conversions} (candidate plus independent local check); "
+        f"{'PASS' if graphnodeInRust_conversions == first_normalized_count * 2 else 'FAIL'} | "
+        f"GraphnodeInRust conversions {graphnodeInRust_conversions} (candidate plus independent local check); "
         f"saved definitions {first_normalized_count} |",
         f"| ordinary context types derive once and definitions enqueue once | "
         f"{'PASS' if context_derivations == 1 and tantivy_enqueues == 1 else 'FAIL'} | "

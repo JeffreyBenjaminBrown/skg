@@ -1,6 +1,6 @@
 //! The in-Rust partial projection of the graph.
 //!
-//! A single 'InRustGraph' value holds every node (as a 'NodeRust') the
+//! A single 'InRustGraph' value holds every node (as a 'GraphnodeInRust') the
 //! render / save pipeline can read from, plus inverse indexes for
 //! every outbound relation and for extra_ids. It lives behind an
 //! 'ArcSwap' so readers never block writers and writers never block
@@ -24,13 +24,13 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::types::misc::{ID, RepoName, members_of};
-use crate::types::nodes::complete::NodeComplete;
-use crate::types::nodes::rust::NodeRust;
+use crate::types::nodes::complete::Graphnode;
+use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
 
 /// The in-Rust-graph projection of the graph.
 ///
-/// Values are 'NodeRust' — everything a 'NodeComplete' has except
+/// Values are 'GraphnodeInRust' — everything a 'Graphnode' has except
 /// 'misc', plus 'links_to' parsed from body text.
 ///
 /// The six inverse indexes mirror the five outbound relations and
@@ -38,7 +38,7 @@ use crate::types::save::{DefineNode, DeleteNode, SaveNode};
 /// O(1) / O(log n) lookups rather than walking every node.
 #[derive(Clone, Debug)]
 pub struct InRustGraph {
-  pub nodes            : im::HashMap<ID, NodeRust>,
+  pub nodes            : im::HashMap<ID, GraphnodeInRust>,
   /// 'X → {pids of nodes whose contains includes X}'
   pub contained_by     : im::HashMap<ID, im::HashSet<ID>>,
   /// 'X → {pids of nodes whose subscribes_to includes X}'
@@ -65,7 +65,7 @@ impl InRustGraph {
       mentioners_of     : im::HashMap::new (),
       extra_id_to_pid  : im::HashMap::new (), } }
 
-  /// Build from a slice of NodeCompletes. Typically called at
+  /// Build from a slice of Graphnodes. Typically called at
   /// startup after reading all .skg files from disk.
   ///
   /// Two-pass, because canonical-keyed inverse indexes need to
@@ -76,21 +76,21 @@ impl InRustGraph {
   /// extra_id of a not-yet-loaded node. First pass populates
   /// 'extra_id_to_pid' only; second pass inserts nodes and builds
   /// inverse entries with full lookup available.
-  pub fn from_nodecompletes (completes: &[NodeComplete]) -> Self {
+  pub fn from_graphnodes (completes: &[Graphnode]) -> Self {
     let mut g : InRustGraph = InRustGraph::new ();
     for c in completes {
       for extraid in c . normalized_extra_ids () {
         g . extra_id_to_pid . insert (
           extraid, c . pid . clone () ); } }
     for c in completes {
-      let rust : NodeRust = NodeRust::from (c);
+      let rust : GraphnodeInRust = GraphnodeInRust::from (c);
       g . nodes . insert ( rust . pid . clone (), rust ); }
     let identity : InRustGraph = g . clone ();
     for node in identity . nodes . values () {
       add_relationship_contributions (&mut g, node, &identity); }
     g }
 
-  pub fn get (&self, pid: &ID) -> Option<&NodeRust> {
+  pub fn get (&self, pid: &ID) -> Option<&GraphnodeInRust> {
     self . nodes . get (pid) }
 
   pub fn len (&self) -> usize {
@@ -108,7 +108,7 @@ impl InRustGraph {
   /// Returns None if the ID is unknown.
   pub fn pid_and_repo (&self, id: &ID) -> Option<(ID, RepoName)> {
     let pid : ID = self . pid_of (id) ?;
-    let node : &NodeRust = self . nodes . get (&pid) ?;
+    let node : &GraphnodeInRust = self . nodes . get (&pid) ?;
     Some ( ( pid, node . home_repo . clone () ) ) }
 }
 
@@ -125,7 +125,7 @@ fn canonical_key (
 /// installed separately, before relationship indexing begins.
 fn add_relationship_contributions (
   graph    : &mut InRustGraph,
-  node     : &NodeRust,
+  node     : &GraphnodeInRust,
   identity : &InRustGraph,
 ) {
   let pid : &ID = &node . pid;
@@ -145,11 +145,11 @@ fn add_relationship_contributions (
     let key : ID = canonical_key (identity, second_member);
     add_to_inverse_map (&mut graph . mentioners_of, &key, pid); } }
 
-/// Narrow fixture helper for unit tests that construct `NodeRust` directly.
+/// Narrow fixture helper for unit tests that construct `GraphnodeInRust` directly.
 #[cfg(test)]
 pub(crate) fn add_to_inverse_indexes (
   graph : &mut InRustGraph,
-  node  : &NodeRust,
+  node  : &GraphnodeInRust,
 ) {
   for extra in &node . extra_ids {
     graph . extra_id_to_pid . insert (
@@ -160,14 +160,14 @@ pub(crate) fn add_to_inverse_indexes (
 }
 
 /// Remove a node's contributions from every inverse index. Used
-/// during update (before inserting the new NodeRust) and during
+/// during update (before inserting the new GraphnodeInRust) and during
 /// delete.
 ///
 /// The resolver is explicit because inherited entries must be removed under
 /// base keys even after the batch's final identity claims are installed.
 fn remove_relationship_contributions (
   graph    : &mut InRustGraph,
-  node     : &NodeRust,
+  node     : &GraphnodeInRust,
   identity : &InRustGraph,
 ) {
   let pid : &ID = &node . pid;
@@ -278,7 +278,7 @@ pub fn apply_definenodes_to_inRustGraph (
     candidate . nodes . remove (pid); }
   for definition in &definitions {
     if let DefineNode::Save (SaveNode (node)) = definition {
-      let rust : NodeRust = NodeRust::from (node);
+      let rust : GraphnodeInRust = GraphnodeInRust::from (node);
       affected_ids . extend (rust . extra_ids . iter () . cloned ());
       candidate . nodes . insert (rust . pid . clone (), rust . clone ());
       for extra in &rust . extra_ids {

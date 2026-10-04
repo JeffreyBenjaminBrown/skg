@@ -1,16 +1,16 @@
 /// Node access utilities for ego_tree::Tree<Viewnode> and Tree<MpViewnode>
 
 use crate::to_org::util::get_id_from_treenode;
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
+use crate::dbs::node_lookup::graphnode_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, MSV, SkgConfig, RepoName};
 use crate::types::viewnode::{
-    Viewnode, ViewnodeKind, ActiveNode, AffectsParent };
+    Viewnode, ViewnodeKind, ActiveVognode, AffectsParent };
 use crate::types::viewnode::{Vognode, Phantom, PropertyFolder, Property, PartnerFolder};
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind };
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 use crate::types::list::dedup_vector;
 use super::generic::{ unique_non_vognode_child, write_at_node_in_tree, with_node_mut };
 
@@ -18,23 +18,23 @@ use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
-/// Apply a mutating function to the ActiveNode at the given tree position.
-/// Errors if the node is not found or is not an ActiveNode.
-pub fn write_at_activeNode_in_tree<F, R> (
+/// Apply a mutating function to the ActiveVognode at the given tree position.
+/// Errors if the node is not found or is not an ActiveVognode.
+pub fn write_at_activeVognode_in_tree<F, R> (
   tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
   f      : F,
 ) -> Result<R, String>
-where F: FnOnce (&mut ActiveNode) -> R {
+where F: FnOnce (&mut ActiveVognode) -> R {
   write_at_node_in_tree (
     tree, treeid,
     |viewnode| { match &mut viewnode . kind {
-      // TODO/DONE/local-view-update/plan_v2.org §11: a phantom is not an ActiveNode (it carries a slim PhantomDiff), so
+      // TODO/DONE/local-view-update/plan_v2.org §11: a phantom is not an ActiveVognode (it carries a slim PhantomDiff), so
       // this Normal-only mutator cannot apply to one (a phantom has no
       // view_requests/editability/etc).
       ViewnodeKind::Vognode (Vognode::Active (t))
         => Ok ( f (t) ),
-      _ => Err ( "write_at_activeNode_in_tree: expected ActiveNode"
+      _ => Err ( "write_at_activeVognode_in_tree: expected ActiveVognode"
                    . to_string () ) }} ) ? }
 
 /// Extract (ID, repo) from a non-phantom vognode that carries both.
@@ -58,7 +58,7 @@ pub fn pid_and_repo_from_treenode (
       caller_name ) . into() ),
   }}
 
-/// Get the ID from this node if it's an MpActiveNode with an ID,
+/// Get the ID from this node if it's an MpActiveVognode with an ID,
 /// otherwise recursively try ancestors.
 /// Returns an error if no ancestor has an ID (e.g., reached BufferRoot).
 pub fn id_from_self_or_nearest_ancestor (
@@ -120,11 +120,11 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
     pid_and_repo_from_treenode (
       tree, grandparent_ref . id (),
       "pid_for_subscribee_and_its_subscriber_grandparent" ) ?;
-  let nodecomplete : NodeComplete =
-    nodecomplete_rustFirst_by_pid_and_repo (
+  let graphnode : Graphnode =
+    graphnode_rustFirst_by_pid_and_repo (
       graph, config, &subscriber_id, &subscriber_repo ) ?;
   Ok (( subscribee_pid,
-        nodecomplete . pid . clone() )) }
+        graphnode . pid . clone() )) }
 
 pub fn insert_non_vognode_as_child (
   tree          : &mut Tree<Viewnode>,
@@ -215,7 +215,7 @@ pub fn find_children_by_ids (
 /// Check if all nodes at the specified generation satisfy the predicate.
 /// Returns true if the generation is empty (vacuously true).
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes ActiveNodes with affectsParent != Affected.
+/// If skip_non_content, excludes ActiveVognodes with affectsParent != Affected.
 pub fn generation_includes_only<F> (
   tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
@@ -231,7 +231,7 @@ where F: Fn (&MpViewnode) -> bool
 
 /// Check if the generation is nonempty and all nodes satisfy the predicate.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes ActiveNodes with affectsParent != Affected.
+/// If skip_non_content, excludes ActiveVognodes with affectsParent != Affected.
 pub fn generation_exists_and_includes<F> (
   tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
@@ -249,7 +249,7 @@ where F: Fn (&MpViewnode) -> bool
 
 /// Check if the specified generation is empty.
 /// Negative generations = ancestors; positive = descendants.
-/// If skip_non_content, excludes ActiveNodes with affectsParent != Affected.
+/// If skip_non_content, excludes ActiveVognodes with affectsParent != Affected.
 pub fn generation_does_not_exist (
   tree                : &Tree<MpViewnode>,
   node_id             : NodeId,
@@ -264,7 +264,7 @@ pub fn generation_does_not_exist (
 /// Positive generation = descendants (1 = children, 2 = grandchildren, etc.)
 /// Generation 0 returns just the node itself.
 /// If 'skip_non_content' is true and generation > 0,
-///   then we exclude ActiveNodes with affectsParent != Affected.
+///   then we exclude ActiveVognodes with affectsParent != Affected.
 fn collect_generation (
   tree               : &Tree<MpViewnode>,
   node_id            : NodeId,

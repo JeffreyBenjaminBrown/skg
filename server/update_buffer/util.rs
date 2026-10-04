@@ -175,7 +175,7 @@ where Relevant : Fn (&Viewnode) -> bool,
     |n: &mut Viewnode| { n . focused = true; };
   // TODO/DONE/local-view-update/plan_v2.org §6.0 stale-member rule: a stale member (relevant child not in the goal)
   // that is a Normal, affectsParent=true *branch* (has children) is demoted to
-  // Independent so the user's subtree survives; a stale InactiveNode
+  // Independent so the user's subtree survives; a stale InactiveVognode
   // *branch* is deadened to a DeadViewnode instead (it has no
   // affectsParent to demote; the orphan handling then preserves its
   // subtree as independent -- TODO/full-schema/9-2_repo-set-safety.org);

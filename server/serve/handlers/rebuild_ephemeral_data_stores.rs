@@ -13,7 +13,7 @@ use crate::serve::ViewsState;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, tag_text_response};
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 
 use futures::executor::block_on;
 use std::net::TcpStream;
@@ -62,7 +62,7 @@ pub fn rebuild_ephemeral_data_stores_in_place (
       . map_err ( |e| format! (
         "Reloading config from {}: {}", config_path, e) ) ?;
     let (nodes, load_violations)
-      : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
+      : (Vec<Graphnode>, Vec<(ID, TelescopeViolation)>) =
       read_all_skg_files_from_repos_collecting_violations (&fresh_config)
       . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
     let (fresh_graph, mut graph_warnings) =

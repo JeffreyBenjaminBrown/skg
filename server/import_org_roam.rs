@@ -6,8 +6,8 @@ use crate::types::misc::{
 use crate::telescope::unfold::{
   UnfoldInput, UnfoldedTelescope, unfold_node,
 };
-use crate::types::nodes::fs::NodeFS;
-use crate::types::nodes::complete::{Flag, NodeComplete};
+use crate::types::nodes::fs::GraphnodeOnDisk;
+use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::links::org_literal_ranges::{
   HEADLINES_INSIDE_BLOCKS_EXPLANATION, headlines_inside_blocks};
 
@@ -62,10 +62,10 @@ pub fn import_org_roam_directory (
   // Collect all nodes into a map keyed by primary ID.
   // When multiple org files define the same ID,
   // merge their children rather than clobbering.
-  let mut node_map : HashMap<ID, NodeComplete> = HashMap::new();
+  let mut node_map : HashMap<ID, Graphnode> = HashMap::new();
   for path in &org_files {
     stats . files_read += 1;
-    let nodes : Vec<NodeComplete> =
+    let nodes : Vec<Graphnode> =
       parse::parse_org_file (path);
     for mut node in nodes {
       node . home_repo = repo . clone();
@@ -86,7 +86,7 @@ pub fn import_org_roam_directory (
         else {
           node_map . insert (pid, node); }} }}
   for (_pid, node) in &node_map {
-    match write_nodecomplete_to_dir (node, output_dir) {
+    match write_graphnode_to_dir (node, output_dir) {
       Ok (()) => { stats . nodes_written += 1; }
       Err (e) => {
         let msg : String = format! (
@@ -136,8 +136,8 @@ fn refuse_headlines_inside_blocks (
 /// Appends children, body text, and aliases from the newcomer.
 /// Tags the result with Was_Overloaded.
 fn merge_into_existing (
-  existing : &mut NodeComplete,
-  newcomer : &NodeComplete,
+  existing : &mut Graphnode,
+  newcomer : &Graphnode,
 ) {
   if ! existing . misc . contains (&Flag::Was_Overloaded) {
     existing . misc . push (Flag::Was_Overloaded); }
@@ -178,8 +178,8 @@ fn merge_into_existing (
     { // Preserve Had_ID_Before_Import from either side.
       existing . misc . push (Flag::Had_ID_Before_Import); }}
 
-fn write_nodecomplete_to_dir (
-  node       : &NodeComplete,
+fn write_graphnode_to_dir (
+  node       : &Graphnode,
   output_dir : &Path,
 ) -> Result<(), Box<dyn Error>> {
   let pid : &ID = &node . pid;
@@ -187,7 +187,7 @@ fn write_nodecomplete_to_dir (
     format! ("{}.skg", &pid . 0);
   let path : std::path::PathBuf =
     output_dir . join (&filename);
-  let node_fs : NodeFS = {
+  let node_fs : GraphnodeOnDisk = {
     // An imported node is single-section by construction (every
     // member relRepo == its home), so the unfold yields exactly one
     // section. A one-repo config lets the importer use the same
@@ -219,7 +219,7 @@ fn write_nodecomplete_to_dir (
           overrides_view_of :
             node . overrides_view_of . or_default (), },
         &config ) ?;
-    let (_, node_fs) : (RepoName, NodeFS) =
+    let (_, node_fs) : (RepoName, GraphnodeOnDisk) =
       unfolded . into_sections () . into_iter () . next ()
       . expect ("an imported node has a home section");
     node_fs };

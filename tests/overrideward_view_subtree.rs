@@ -16,7 +16,7 @@ use ego_tree::{NodeId, NodeRef, Tree};
 
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::stats::{
-  AllGraphNodeStats, fetch_all_graphnodestats_with_repo_set};
+  AllGraphnodeStats, fetch_all_graphnodestats_with_repo_set};
 use skg::org_to_text::viewforest_to_string;
 use skg::serve::handlers::text_search::{
   MatchGroups, build_search_viewforest, suppressed_result_ids};
@@ -98,7 +98,7 @@ async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
       collect_overrideward_view_subtree_ids (
         &graph, &search_results, active ) );
     ids . into_iter () . collect () };
-  let stats : AllGraphNodeStats =
+  let stats : AllGraphnodeStats =
     fetch_all_graphnodestats_with_repo_set (
       &graph, &all_ids, Some (active) ) ?;
   // Phase 2: graft, then the same stats/herald/render passes as

@@ -9,14 +9,14 @@ use super::*;
 fn src () -> RepoName { RepoName::from ("main") }
 fn id  (s: &str) -> ID { ID ( s . to_string () ) }
 
-/// Build a NodeRust directly (no disk I/O) for fixture graphs.
+/// Build a GraphnodeInRust directly (no disk I/O) for fixture graphs.
 fn mk_node (
   pid          : &str,
   extra_ids    : &[&str],
   contains     : &[&str],
   links_to : &[&str],
-) -> NodeRust {
-  NodeRust {
+) -> GraphnodeInRust {
+  GraphnodeInRust {
     pid:          id (pid),
     home_repo:       src (),
     extra_ids:    extra_ids . iter () . map ( |s| id (s) ) . collect (),
@@ -35,7 +35,7 @@ fn mk_node (
   } }
 
 /// Insert nodes into a fresh InRustGraph.
-fn graph_with (nodes: Vec<NodeRust>) -> InRustGraph {
+fn graph_with (nodes: Vec<GraphnodeInRust>) -> InRustGraph {
   let mut g : InRustGraph = InRustGraph::new ();
   // Populate extra_id_to_pid first so inverse indexes resolve right.
   for n in &nodes {
@@ -55,7 +55,7 @@ fn affectsParent_if_normal (
 ) -> AffectsParent {
   match & viewforest . get (nid) . unwrap () . value () . kind {
     ViewnodeKind::Vognode (Vognode::Active (t)) => t . affectsParent,
-    _ => panic! ("expected ActiveNode") } }
+    _ => panic! ("expected ActiveVognode") } }
 
 fn birth_if_normal (
   viewforest : &Tree<Viewnode>,
@@ -63,7 +63,7 @@ fn birth_if_normal (
 ) -> Birth {
   match & viewforest . get (nid) . unwrap () . value () . kind {
     ViewnodeKind::Vognode (Vognode::Active (t)) => t . birth,
-    _ => panic! ("expected ActiveNode") } }
+    _ => panic! ("expected ActiveVognode") } }
 
 #[test]
 fn linksto_false_claim_flipped_to_independent () {

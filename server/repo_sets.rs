@@ -5,7 +5,7 @@ use crate::types::env::find_repo_with_optional_tantivy;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, RepoName, TantivyIndex};
 pub use crate::types::misc::RepoSetName;
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, mk_inactive_viewnode};
 use crate::types::viewnode::{Vognode, Phantom};
 use crate::test_utils::cleanup_test_tantivy;
@@ -157,7 +157,7 @@ pub fn titles_for_repo_set_for_test (
   active : &ActiveRepoSet,
   ids    : &[ID],
 ) -> Result<HashMap<ID, String>, Box<dyn Error>> {
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     read_all_skg_files_from_repos (config)?;
   let wanted : BTreeSet<ID> =
     ids . iter () . cloned () . collect ();

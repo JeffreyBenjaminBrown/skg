@@ -7,19 +7,19 @@ use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::dbs::tantivy::background_writer::lock_tantivy_writes;
 use crate::types::misc::{ID, RepoName, TantivyIndex};
 use crate::types::nodes::complete::{Flag, flag_is_true};
-use crate::types::nodes::tantivy::NodeTantivy;
+use crate::types::nodes::tantivy::GraphnodeInTantivy;
 use crate::types::links::replace_each_link_with_its_label;
 
 use tantivy::{IndexWriter, Term, TantivyDocument, doc};
 use std::collections::HashMap;
 use std::error::Error;
 
-/// Updates the index with the provided NodeTantivys.
+/// Updates the index with the provided GraphnodeInTantivys.
 ///   For existing IDs, updates the title.
 ///   For new IDs, adds new entries.
 /// Returns the number of documents processed.
 pub fn update_index_with_nodes (
-  nodes: &[NodeTantivy],
+  nodes: &[GraphnodeInTantivy],
   tantivy_index: &TantivyIndex,
 ) -> Result<usize, Box<dyn Error>> {
 
@@ -43,7 +43,7 @@ pub fn delete_nodes_from_index<'a, I>(
   writer: &mut IndexWriter,
   tantivy_index: &TantivyIndex,
 ) -> Result<(), Box<dyn Error>>
-where I: Iterator<Item = &'a NodeTantivy>, {
+where I: Iterator<Item = &'a GraphnodeInTantivy>, {
   for node in nodes_iter {
     { let primary_id : &ID = &node . pid;
       writer . delete_term (
@@ -69,7 +69,7 @@ pub fn add_documents_to_tantivy_writer<'a, I> (
   tantivy_index : &TantivyIndex,
   context_types : &HashMap<ID, String>, // pid -> context_origin_type label; pids absent here index with "" (filled at init/rebuild).
 ) -> Result<usize, Box<dyn Error>>
-where I: IntoIterator<Item = &'a NodeTantivy>, {
+where I: IntoIterator<Item = &'a GraphnodeInTantivy>, {
 
   let mut indexed_count: usize = 0;
   for node in nodes {
@@ -82,7 +82,7 @@ where I: IntoIterator<Item = &'a NodeTantivy>, {
   Ok (indexed_count) }
 
 fn create_documents_from_node (
-  node: &NodeTantivy,
+  node: &GraphnodeInTantivy,
   tantivy_index: &TantivyIndex,
   context_types : &HashMap<ID, String>,
 ) -> Result < Vec < TantivyDocument >,

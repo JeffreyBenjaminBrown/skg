@@ -1,6 +1,6 @@
 //! Save-time publication gate for malformed title/body-text placement.
 //!
-//! A buffer-authored NodeComplete has already lost the provenance of its
+//! A buffer-authored Graphnode has already lost the provenance of its
 //! title and body. Before writing it, reread the current disk telescope and
 //! fold the title/body text with the load path. If either selected title/body text lives below
 //! home, the save must carry an exact PID approval obtained from the typed
@@ -156,10 +156,10 @@ fn pair (key : &str, value : &str) -> Sexp {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::dbs::filesystem::one_node::nodecomplete_from_pid_and_repo;
+  use crate::dbs::filesystem::one_node::graphnode_from_pid_and_repo;
   use crate::save::update_fs_from_saveinstructions_with_hoist_approval;
   use crate::types::misc::SkgfileRepo;
-  use crate::types::nodes::fs::NodeFS;
+  use crate::types::nodes::fs::GraphnodeOnDisk;
   use std::collections::HashMap;
   use std::fs;
   use std::path::PathBuf;
@@ -192,7 +192,7 @@ mod tests {
     pid    : &str,
     config : &SkgConfig,
   ) -> DefineNode {
-    let mut node = nodecomplete_from_pid_and_repo (
+    let mut node = graphnode_from_pid_and_repo (
       config, ID::from (pid), &RepoName::from ("public") ) . unwrap ();
     // Buffer-authored nodes carry no disk overPrivateTextness authority. The save gate
     // has just rederived that fact from disk.
@@ -260,17 +260,17 @@ mod tests {
       .into_iter () . collect ();
     update_fs_from_saveinstructions_with_hoist_approval (
       &define_nodes, &[], config . clone (), &approved ) . unwrap ();
-    let reread = nodecomplete_from_pid_and_repo (
+    let reread = graphnode_from_pid_and_repo (
       &config, ID::from ("P"), &RepoName::from ("public") ) . unwrap ();
     assert! (! reread . overPrivateText_telescope);
     assert_eq! (reread . title, "lower title");
     assert_eq! (reread . body . as_deref (), Some ("lower body"));
 
-    let home : NodeFS = serde_yaml::from_str (&fs::read_to_string (
+    let home : GraphnodeOnDisk = serde_yaml::from_str (&fs::read_to_string (
       paths ["public"] . join ("P.skg") ) . unwrap ()) . unwrap ();
-    let middle : NodeFS = serde_yaml::from_str (&fs::read_to_string (
+    let middle : GraphnodeOnDisk = serde_yaml::from_str (&fs::read_to_string (
       paths ["middle"] . join ("P.skg") ) . unwrap ()) . unwrap ();
-    let lower : NodeFS = serde_yaml::from_str (&fs::read_to_string (
+    let lower : GraphnodeOnDisk = serde_yaml::from_str (&fs::read_to_string (
       paths ["private"] . join ("P.skg") ) . unwrap ()) . unwrap ();
     assert_eq! (home . title . as_deref (), Some ("lower title"));
     assert_eq! (home . body . as_deref (), Some ("lower body"));
@@ -281,7 +281,7 @@ mod tests {
     assert_eq! (lower . body, None);
     assert! (lower . to_yaml () . unwrap () . contains ("private-child"));
     for pid in ["T", "B"] {
-      assert! (! nodecomplete_from_pid_and_repo (
+      assert! (! graphnode_from_pid_and_repo (
         &config, ID::from (pid), &RepoName::from ("public") )
         .unwrap () . overPrivateText_telescope); }
   }

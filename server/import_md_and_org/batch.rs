@@ -11,7 +11,7 @@ use crate::export_org::claimed_export_targets;
 use crate::types::env::SkgEnv;
 use crate::types::links::org_literal_ranges::HEADLINES_INSIDE_BLOCKS_EXPLANATION;
 use crate::types::misc::{ID, MSV, SkgConfig, RepoName};
-use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
+use crate::types::nodes::complete::{Graphnode, empty_node_complete};
 use std::collections::HashMap;
 use std::collections::BTreeMap;
 use std::fs;
@@ -25,7 +25,7 @@ pub struct PreparedImportBatch {
   pub host_root : Option<PathBuf>,
   pub destination_repo : RepoName,
   pub documents : Vec<ParsedDocument>,
-  pub nodes : Vec<NodeComplete>,
+  pub nodes : Vec<Graphnode>,
   pub record_id : Option<ID>,
   pub export_targets : Vec<(PathBuf, String)>,
   config : Arc<SkgConfig>,
@@ -88,7 +88,7 @@ pub fn prepare_import_batch_with (
     .map (|(document, built)|
       (document . path . clone (), built . export_target . clone ()))
     .collect ();
-  let existing : Vec<NodeComplete> =
+  let existing : Vec<Graphnode> =
     existing_authoritative_nodes (&runtime . config)?;
   ensure_runtime_matches_disk (&existing, &runtime . graph)?;
   check_export_target_conflicts (
@@ -97,7 +97,7 @@ pub fn prepare_import_batch_with (
     . zip (built . iter ())
     . map (|(document, built)| (document . path . clone (), built . root_id . clone ()))
     . collect ();
-  let mut nodes : Vec<NodeComplete> = built . into_iter ()
+  let mut nodes : Vec<Graphnode> = built . into_iter ()
     .flat_map (|document| document . nodes) . collect ();
   let record_id : Option<ID> = if documents . is_empty () { None } else {
     let record_id : ID = new_id ();
@@ -177,17 +177,17 @@ impl PreparedImportBatch {
       return Err ("Input files changed; preview again" . to_string ()); }
     if repo_file_evidence (&runtime . config)? != self . destination_evidence {
       return Err ("Configured repo files changed; preview again" . to_string ()); }
-    let existing : Vec<NodeComplete> =
+    let existing : Vec<Graphnode> =
       existing_authoritative_nodes (&runtime . config)?;
     ensure_runtime_matches_disk (&existing, &runtime . graph)?;
     check_export_target_conflicts (
       &self . export_targets, &runtime . config, &existing)?;
     let record_id : ID = self . record_id . ok_or_else (||
       "An empty import has no approval token or record" . to_string ())?;
-    let mut nodes : Vec<NodeComplete> = self . nodes;
+    let mut nodes : Vec<Graphnode> = self . nodes;
     let execution_time : String = OffsetDateTime::now_utc ()
       .format (&Rfc3339) . map_err (|error| error . to_string ())?;
-    let record : &mut NodeComplete = nodes . iter_mut ()
+    let record : &mut Graphnode = nodes . iter_mut ()
       .find (|node| node . pid == record_id) .unwrap ();
     record . body = Some (import_record_body (
       &self . record_documents, &self . input_directory,
@@ -235,19 +235,19 @@ fn configured_identity_map (
 
 fn existing_authoritative_nodes (
   config : &SkgConfig,
-) -> Result<Vec<NodeComplete>, String> {
+) -> Result<Vec<Graphnode>, String> {
   read_all_skg_files_from_repos_read_only (config)
     . map_err (|error| format! ("Reading configured repos: {}", error))
 }
 
 fn ensure_runtime_matches_disk (
-  on_disk : &[NodeComplete],
+  on_disk : &[Graphnode],
   graph : &InRustGraph,
 ) -> Result<(), String> {
-  let disk : HashMap<ID, NodeComplete> = on_disk . iter ()
+  let disk : HashMap<ID, Graphnode> = on_disk . iter ()
     .map (|node| (node . pid . clone (),
       normalized_for_runtime_comparison (node . clone ()))) . collect ();
-  let runtime : HashMap<ID, NodeComplete> = graph . nodes . iter ()
+  let runtime : HashMap<ID, Graphnode> = graph . nodes . iter ()
     .map (|(id, node)| (id . clone (),
       normalized_for_runtime_comparison (complete_from_rust (node))))
     .collect ();
@@ -258,8 +258,8 @@ fn ensure_runtime_matches_disk (
 }
 
 fn normalized_for_runtime_comparison (
-  mut node : NodeComplete,
-) -> NodeComplete {
+  mut node : Graphnode,
+) -> Graphnode {
   // Folding omits an empty home alias field; the runtime graph stores the
   // same empty set as Specified([]). Neither makes an identity claim.
   if matches! (&node . aliases, MSV::Specified (values) if values . is_empty ()) {
@@ -290,7 +290,7 @@ fn repo_file_evidence (
 fn check_export_target_conflicts (
   proposed : &[(PathBuf, String)],
   config : &SkgConfig,
-  existing : &[NodeComplete],
+  existing : &[Graphnode],
 ) -> Result<(), String> {
   let mut targets : Vec<(String, PathBuf)> = claimed_export_targets (existing, config)?
     .into_iter () . map (|(id, target)|
@@ -317,8 +317,8 @@ fn import_record (
   host_root : Option<&Path>,
   repo : &RepoName,
   time : &str,
-) -> NodeComplete {
-  let mut node : NodeComplete = empty_node_complete ();
+) -> Graphnode {
+  let mut node : Graphnode = empty_node_complete ();
   node . pid = id;
   node . title = format! ("Imported Markdown and Org from {}",
     input_directory . display ());
@@ -397,7 +397,7 @@ mod tests {
     assert_eq! (prepared . documents . len (), 2);
     let record_id : ID = prepared . record_id . clone () . unwrap ();
     { // The record links to each document's file root; it contains none.
-      let record : &NodeComplete = prepared . nodes . iter ()
+      let record : &Graphnode = prepared . nodes . iter ()
         . find (|node| node . pid == record_id) . unwrap ();
       let body : &str = record . body . as_deref () . unwrap ();
       assert! (record . contains . is_empty ());
@@ -418,7 +418,7 @@ mod tests {
     assert! (repo . join (format! ("{}.skg", record_id)) . exists ());
     assert_eq! (fs::read_to_string (input . join ("empty.md")) . unwrap (), "");
     let runtime = env . runtime_snapshot ();
-    let disk : Vec<NodeComplete> =
+    let disk : Vec<Graphnode> =
       existing_authoritative_nodes (&runtime . config) . unwrap ();
     ensure_runtime_matches_disk (&disk, &runtime . graph) . unwrap ();
     wait_for_tantivy_writes_idle ();
@@ -537,7 +537,7 @@ mod tests {
     prepared . apply_under_mutation_gate (&env) . unwrap ();
     drop (_guard);
     let config = env . runtime_snapshot () . config . clone ();
-    let nodes : Vec<NodeComplete> =
+    let nodes : Vec<Graphnode> =
       read_all_skg_files_from_repos_read_only (&config) . unwrap ();
     let active : ActiveRepoSet = ActiveRepoSet::named (
       &config, RepoSetName::from ("all")) . unwrap ();

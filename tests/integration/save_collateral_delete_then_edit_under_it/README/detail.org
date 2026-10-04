@@ -430,7 +430,7 @@ All four parameters are already available in
 
 Note: the variable changes from =&RepoName= to =RepoName=
 (owned). The subsequent line that uses =child_repo= (passed to
-=nodecomplete_from_map_or_disk=) takes =&RepoName=, so use
+=graphnode_from_map_or_disk=) takes =&RepoName=, so use
 =&child_repo= there.
 
 Import =home_from_disk= at the top of the file from

@@ -115,7 +115,7 @@ There are three ways to test the code:
   - links_to: org-roam style [[id:...]] hyperlinks
 
   The view system is ephemeral non-vognode viewnodes rebuilt every save:
-  - ActiveNode: corresponds to an NodeComplete, can be Definitive (editable) or Write-protected
+  - ActiveVognode: corresponds to an Graphnode, can be Definitive (editable) or Write-protected
   - Non-vognode: display-only nodes; the relation folders are
     PartnerFolders (subscribeeFolder, subscriberFolder, overriddenFolder, ...),
     plus AliasFolder, IDFolder, etc. (see docs/glossary.org, "PartnerFolder")

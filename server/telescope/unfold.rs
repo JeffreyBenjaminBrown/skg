@@ -17,7 +17,7 @@ use crate::types::misc::{
   ID, RelPartner, SkgConfig, RepoName,
 };
 use crate::types::nodes::complete::Flag;
-use crate::types::nodes::fs::{NodeFS, nodefs_from_section};
+use crate::types::nodes::fs::{GraphnodeOnDisk, graphnode_on_disk_from_section};
 
 use std::collections::HashMap;
 use std::fmt;
@@ -46,7 +46,7 @@ pub struct UnfoldInput<'a> {
 pub struct UnfoldedTelescope {
   pid      : ID,
   home     : RepoName,
-  sections : Vec<(RepoName, NodeFS)>,
+  sections : Vec<(RepoName, GraphnodeOnDisk)>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -79,7 +79,7 @@ impl UnfoldedTelescope {
   pub fn try_new (
     pid      : ID,
     home     : RepoName,
-    sections : Vec<(RepoName, NodeFS)>,
+    sections : Vec<(RepoName, GraphnodeOnDisk)>,
     config   : &SkgConfig,
   ) -> Result<UnfoldedTelescope, UnfoldedTelescopeConstructionError> {
     let telescope : Telescope = Telescope::try_new (
@@ -97,10 +97,10 @@ impl UnfoldedTelescope {
 
   pub fn home (&self) -> &RepoName { &self . home }
 
-  pub fn sections (&self) -> &[(RepoName, NodeFS)] {
+  pub fn sections (&self) -> &[(RepoName, GraphnodeOnDisk)] {
     &self . sections }
 
-  pub fn into_sections (self) -> Vec<(RepoName, NodeFS)> {
+  pub fn into_sections (self) -> Vec<(RepoName, GraphnodeOnDisk)> {
     self . sections }
 }
 
@@ -163,13 +163,13 @@ pub fn unfold_node (
                  || s . overrides_view_of . is_some () )
          . unwrap_or (false) } ); }
   repo_names . sort_by_key ( |repo| rank (repo) );
-  let complete_sections : Vec<(RepoName, NodeFS)> =
+  let complete_sections : Vec<(RepoName, GraphnodeOnDisk)> =
     repo_names . into_iter ()
     . map ( |repo| {
       let slices : SectionSlices = sections . remove (&repo)
         . expect ("section exists");
       let is_home : bool = repo == * input . home;
-      let node_fs : NodeFS = nodefs_from_section (
+      let node_fs : GraphnodeOnDisk = graphnode_on_disk_from_section (
         input . pid, input . extra_ids, input . misc,
         is_home, slices );
       (repo, node_fs) } )

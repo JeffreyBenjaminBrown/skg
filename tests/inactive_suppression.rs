@@ -19,7 +19,7 @@ use indoc::indoc;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::repo_sets::{ActiveRepoSet, RepoSetName, run_with_repo_set_test_db};
 use skg::types::misc::{ID, members_of};
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{DefineNode, SaveNode};
 
 use std::error::Error;
@@ -34,7 +34,7 @@ fn save_ids (instructions : &[DefineNode]) -> Vec<ID> {
 fn saved_node_by_id<'a> (
   instructions : &'a [DefineNode],
   id           : &str,
-) -> &'a NodeComplete {
+) -> &'a Graphnode {
   instructions . iter ()
     . find_map ( |i| match i {
         DefineNode::Save (SaveNode (node))

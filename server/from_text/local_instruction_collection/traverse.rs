@@ -50,7 +50,7 @@ use crate::from_text::local_instruction_collection::types::{
 use crate::types::misc::{ID, RepoName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  NodeEditRequest, AffectsParent, Property, PropertyFolder, PartnerFolder, ActiveNode, Viewnode,
+  NodeEditRequest, AffectsParent, Property, PropertyFolder, PartnerFolder, ActiveVognode, Viewnode,
   ViewnodeKind, Vognode, Phantom };
 
 use ego_tree::NodeRef;
@@ -123,7 +123,7 @@ fn visit (
 
 fn visit_active_vognode (
   node_ref  : NodeRef<Viewnode>,
-  t         : &ActiveNode,
+  t         : &ActiveVognode,
   context   : &LocalContext,
   collected : &mut CollectedIntents,
 ) -> Result<(), String> {

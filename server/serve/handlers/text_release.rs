@@ -241,16 +241,16 @@ mod tests {
   use crate::repo_sets::RepoSetName;
   use crate::types::misc::RepoName;
   use crate::types::nodes::complete::{
-    NodeComplete, empty_node_complete};
+    Graphnode, empty_node_complete};
 
   fn graph_with_overPrivateText_node () -> InRustGraph {
-    let mut node : NodeComplete = empty_node_complete ();
+    let mut node : Graphnode = empty_node_complete ();
     node . pid = ID::from ("overPrivateText-pid");
     node . home_repo = RepoName::from ("home");
     node . title = "SECRET title" . to_string ();
     node . extra_ids = vec! [ID::from ("extra-id")];
     node . overPrivateText_telescope = true;
-    InRustGraph::from_nodecompletes (&[node])
+    InRustGraph::from_graphnodes (&[node])
   }
 
   fn restricted () -> ActiveRepoSet {

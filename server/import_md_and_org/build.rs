@@ -6,7 +6,7 @@ use crate::types::misc::{
   rel_partners_at_relRepo_msv,
 };
 use crate::types::nodes::complete::{
-  Flag, NodeComplete, normalize_body,
+  Flag, Graphnode, normalize_body,
 };
 use super::parse::{ParsedDocument, ParsedSection, rendered_range};
 use std::path::{Component, Path, PathBuf};
@@ -14,13 +14,13 @@ use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 struct OutlineNode {
-  node : NodeComplete,
+  node : Graphnode,
   original_level : usize,
   children : Vec<usize>,
 }
 
 pub struct BuiltDocument {
-  pub nodes : Vec<NodeComplete>,
+  pub nodes : Vec<Graphnode>,
   pub root_id : ID,
   pub export_target : String,
   pub footnote_node_indices : HashMap<String, usize>,
@@ -48,7 +48,7 @@ pub fn build_document (
     outline [parent] . children . push (index);
     ancestors . push (index); }
   group_super_indentation (0, &mut outline, repo, new_id);
-  let marker : NodeComplete = export_marker (&export_target, repo, new_id)?;
+  let marker : Graphnode = export_marker (&export_target, repo, new_id)?;
   let marker_index : usize = outline . len ();
   outline . push (OutlineNode {
     node : marker,
@@ -86,7 +86,7 @@ pub fn build_document (
       entry . children . iter () . map (|index| ids [*index] . clone ())
         . collect ()); }
   let root_id : ID = ids [0] . clone ();
-  let nodes : Vec<NodeComplete> = outline . into_iter () . map (|entry| entry . node)
+  let nodes : Vec<Graphnode> = outline . into_iter () . map (|entry| entry . node)
     . collect ();
   Ok (BuiltDocument { nodes, root_id, export_target, footnote_node_indices })
 }
@@ -96,11 +96,11 @@ fn node_for_section (
   section : &ParsedSection,
   repo : &RepoName,
   new_id : &mut impl FnMut () -> ID,
-) -> NodeComplete {
+) -> Graphnode {
   let id : ID = section . explicit_id . as_ref ()
     . map (|value| ID::new (value)) . unwrap_or_else (new_id);
   let body : String = rendered_range (document, section . body . clone ());
-  NodeComplete {
+  Graphnode {
     title : section . title . clone (),
     overPrivateText_telescope : false,
     aliases : rel_partners_at_relRepo_msv (
@@ -174,8 +174,8 @@ fn synthetic_node (
   body : &str,
   repo : &RepoName,
   new_id : &mut impl FnMut () -> ID,
-) -> NodeComplete {
-  let mut node : NodeComplete =
+) -> Graphnode {
+  let mut node : Graphnode =
     crate::types::nodes::complete::empty_node_complete ();
   node . pid = new_id ();
   node . title = title . to_string ();
@@ -188,12 +188,12 @@ fn export_marker (
   target : &str,
   repo : &RepoName,
   new_id : &mut impl FnMut () -> ID,
-) -> Result<NodeComplete, String> {
+) -> Result<Graphnode, String> {
   let quote : char = if ! target . contains ('"') { '"' }
     else if ! target . contains ('\'') { '\'' }
     else { return Err (format! (
       "Export target {:?} contains both quote styles", target)); };
-  let mut node : NodeComplete = crate::types::nodes::complete::empty_node_complete ();
+  let mut node : Graphnode = crate::types::nodes::complete::empty_node_complete ();
   node . pid = new_id ();
   node . title = format! ("[[id:{}][Export to Org]]", EXPORT_MARKER_ID);
   node . body = Some (format! ("target_filepath = {}{}{}", quote, target, quote));
@@ -235,7 +235,7 @@ mod tests {
     assert_eq! (built . nodes [0] . title, "start");
     assert_eq! (built . nodes [1] . body . as_deref (), Some ("A body"));
     let first_child : &ID = &built . nodes [1] . contains [0] . member;
-    let special : &NodeComplete = built . nodes . iter ()
+    let special : &Graphnode = built . nodes . iter ()
       . find (|node| &node . pid == first_child) . unwrap ();
     assert_eq! (special . title, "These are special!");
     assert! (built . nodes [0] . contains . iter () . any (|child|

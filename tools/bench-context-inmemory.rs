@@ -20,8 +20,8 @@ use skg::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
-use skg::types::nodes::tantivy::NodeTantivy;
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::nodes::tantivy::GraphnodeInTantivy;
+use skg::types::nodes::complete::Graphnode;
 
 use std::collections::HashSet;
 use std::env;
@@ -40,7 +40,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
 
   // Step 1: Read all .skg files
   let t0 : Instant = Instant::now ();
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     read_all_skg_files_from_repos (&config) ?;
   error_unless_each_id_names_one_node (
     &nodes, &config . data_root) ?;
@@ -92,8 +92,8 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
     create_empty_tantivy_index (tantivy_dir . path ()) ?;
   // Populate Tantivy with node titles so context types can be stored
   let t5 : Instant = Instant::now ();
-  let tantivy_nodes : Vec<NodeTantivy> =
-    nodes . iter () . map (NodeTantivy::from) . collect ();
+  let tantivy_nodes : Vec<GraphnodeInTantivy> =
+    nodes . iter () . map (GraphnodeInTantivy::from) . collect ();
   let indexed : usize =
     skg::dbs::tantivy::write::update_index_with_nodes (
       &tantivy_nodes, &tantivy_index ) ?;

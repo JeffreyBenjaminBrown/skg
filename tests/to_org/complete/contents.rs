@@ -1,27 +1,27 @@
 // Tests for to_org complete contents functions
 
 use skg::types::maps::add_v_to_map_if_absent;
-use skg::types::nodes::complete::{empty_node_complete, NodeComplete};
+use skg::types::nodes::complete::{empty_node_complete, Graphnode};
 
 use skg::types::misc::ID;
 use std::collections::HashMap;
 
 #[tokio::test]
 async fn test_add_v_to_map_if_absent_already_present() {
-  // If NodeComplete already in map, should not call fetch function
+  // If Graphnode already in map, should not call fetch function
   let id :
     ID =
     ID::new ("test-id-123");
-  let nodecomplete :
-    NodeComplete =
-    NodeComplete {
+  let graphnode :
+    Graphnode =
+    Graphnode {
       title : "Cached Node" . to_string(),
       pid : id . clone(),
       .. empty_node_complete()
     };
 
-  let mut map : HashMap<ID, NodeComplete> = HashMap::new();
-  map . insert(id . clone(), nodecomplete . clone());
+  let mut map : HashMap<ID, Graphnode> = HashMap::new();
+  map . insert(id . clone(), graphnode . clone());
 
   // Fetch function that would load from disk (not called since already cached)
   let fetch_fn = |_key: &ID| async {

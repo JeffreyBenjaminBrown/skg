@@ -11,7 +11,7 @@ use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::in_rust_graph::ancestry::AncestryTree;
-use skg::dbs::in_rust_graph::stats::AllGraphNodeStats;
+use skg::dbs::in_rust_graph::stats::AllGraphnodeStats;
 use skg::serve::ViewsState;
 use skg::serve::handlers::repo_sets::handle_repo_set_request;
 use skg::serve::handlers::text_search::SearchEnrichmentPayload;
@@ -22,7 +22,7 @@ use skg::repo_sets::{
   filter_branches_to_active_repos_for_test,
   prepare_git_diff_fixture,
   run_with_repo_set_test_db};
-use skg::dbs::node_lookup::nodecomplete_from_graph;
+use skg::dbs::node_lookup::graphnode_from_graph;
 use skg::to_org::render::content_view::multi_root_view;
 use skg::test_utils::{set_repo_retagging_relRepos, graph_handle_from_config};
 use skg::test_utils::run_with_shared_test_stores;
@@ -36,7 +36,7 @@ use skg::to_org::render::content_view::multi_root_view_with_repo_set;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::errors::SaveError;
 use skg::types::misc::{ID, MSV, SkgConfig, RepoName, TantivyIndex, members_of, rel_partners_at_relRepo_msv};
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{DefineNode, SaveNode};
 use skg::types::viewnode::{
   Birth,
@@ -234,7 +234,7 @@ fn save_ids (
 fn saved_node_by_id<'a> (
   instructions : &'a [DefineNode],
   id           : &str,
-) -> &'a NodeComplete {
+) -> &'a Graphnode {
   for instruction in instructions {
     if let DefineNode::Save (SaveNode (node)) = instruction {
       if node . pid == ID::from (id) {
@@ -245,12 +245,12 @@ fn saved_or_graph_node_by_id (
   instructions : &[DefineNode],
   id           : &str,
   graph        : &skg::dbs::in_rust_graph::InRustGraph,
-) -> NodeComplete {
+) -> Graphnode {
   instructions . iter () . find_map (|instruction| match instruction {
     DefineNode::Save (SaveNode (node)) if node . pid == ID::from (id) =>
       Some (node . clone ()),
     _ => None, })
-    . or_else (|| nodecomplete_from_graph (graph, &ID::from (id)))
+    . or_else (|| graphnode_from_graph (graph, &ID::from (id)))
     . unwrap_or_else (|| panic! ("Node not found in plan or graph: {}", id))
 }
 
@@ -358,7 +358,7 @@ async fn repo_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
           terms          : "shared ranking term" . to_string (),
           search_results : vec![ID::from ("active-search-hit")],
           ancestry_by_id : HashMap::new (),
-          graphnodestats : AllGraphNodeStats::empty (),
+          graphnodestats : AllGraphnodeStats::empty (),
           include_overPrivateText_telescopes : false, })));
       let search_cancelled : Arc<AtomicBool> =
         Arc::new (AtomicBool::new (false));
@@ -710,7 +710,7 @@ async fn containerward_expansion_truncates_before_inactive_container (
       assert! (
         ! rendered . contains ("private-container"),
         "inactive container should not render as a placeholder or \
-         ActiveNode: {}",
+         ActiveVognode: {}",
         rendered );
       assert! (
         ! rendered . contains ("active-root-after-private"),
@@ -785,7 +785,7 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
     ActiveRepoSet::named (
       &config,
       RepoSetName::from ("public"))?;
-  let mut result_node : NodeComplete =
+  let mut result_node : Graphnode =
     skg::types::nodes::complete::empty_node_complete ();
   result_node . pid = ID::from ("active-search-hit");
   result_node . title = "active search hit" . to_string ();
@@ -793,18 +793,18 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
   result_node . aliases = rel_partners_at_relRepo_msv (
     & result_node . home_repo,
     MSV::Specified (vec!["search term" . to_string ()]) );
-  let mut active_container : NodeComplete =
+  let mut active_container : Graphnode =
     skg::types::nodes::complete::empty_node_complete ();
   active_container . pid = ID::from ("active-container");
   active_container . title = "active-container" . to_string ();
   set_repo_retagging_relRepos ( &mut active_container, &RepoName::from ("public") );
-  let mut private_container : NodeComplete =
+  let mut private_container : Graphnode =
     skg::types::nodes::complete::empty_node_complete ();
   private_container . pid = ID::from ("private-container");
   private_container . title =
     "private container title must not leak" . to_string ();
   set_repo_retagging_relRepos ( &mut private_container, &RepoName::from ("private") );
-  let graph = skg::dbs::in_rust_graph::InRustGraph::from_nodecompletes (
+  let graph = skg::dbs::in_rust_graph::InRustGraph::from_graphnodes (
     &[result_node . clone (), active_container . clone (),
       private_container . clone ()]);
   let index_dir : &str =
@@ -890,7 +890,7 @@ async fn stale_inactive_placeholders_under_folders_save_without_error (
 ) -> Result<(), Box<dyn Error>> {
   // TODO/full-schema/9-2_repo-set-safety.org: the formerly-unsavable
   // buffer. A buffer rendered before a repo-set switch can hold
-  // InactiveNodes under folders; saving it must not error.
+  // InactiveVognodes under folders; saving it must not error.
       let buffer = indoc! {"
         * (skg (node (id root) (repo public))) root
         ** (skg subscriberFolder)
@@ -904,7 +904,7 @@ async fn stale_inactive_placeholders_under_folders_save_without_error (
         buffer_to_validated_saveplan (
           buffer, config, Some (&active) ) ;
       assert! ( result . is_ok (),
-        "an InactiveNode under a folder must not block saving: {:?}",
+        "an InactiveVognode under a folder must not block saving: {:?}",
         result . err () . map ( |e| format! ("{:?}", e)) );
       Ok (( )) }
 
@@ -1016,7 +1016,7 @@ async fn restricted_save_preserves_invisible_override_targets (
       let active : ActiveRepoSet =
         ActiveRepoSet::named (
           &config, RepoSetName::from ("public") )?;
-      let override_set = |node : &NodeComplete| -> Vec<ID> {
+      let override_set = |node : &Graphnode| -> Vec<ID> {
         match &node . overrides_view_of {
           MSV::Specified (ids) => {
             let mut v : Vec<ID> = members_of (ids); v . sort (); v }

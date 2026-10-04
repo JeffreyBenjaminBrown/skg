@@ -2,14 +2,14 @@ use crate::dbs::in_rust_graph::stats::{
   fetch_all_graphnodestats,
   fetch_all_graphnodestats_with_repo_set,
   graphnodestats_for_pid,
-  AllGraphNodeStats};
+  AllGraphnodeStats};
 use crate::repo_sets::ActiveRepoSet;
 use crate::to_org::util::ids_that_can_have_graphnodestats;
 use crate::types::misc::{ID, SkgConfig};
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
+use crate::dbs::node_lookup::graphnode_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{GraphNodeStats, Viewnode, ViewnodeKind};
+use crate::types::nodes::complete::Graphnode;
+use crate::types::viewnode::{GraphnodeStats, Viewnode, ViewnodeKind};
 use crate::types::viewnode::{Vognode, Phantom};
 
 use std::collections::{HashSet, HashMap};
@@ -52,7 +52,7 @@ fn set_graphnodestats_in_viewforest_inner (
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "ids_that_can_have_graphnodestats" ). entered();
       ids_that_can_have_graphnodestats (viewforest) };
-  let stats : AllGraphNodeStats =
+  let stats : AllGraphnodeStats =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "fetch_all_graphnodestats" ). entered();
       match active {
@@ -79,29 +79,29 @@ pub fn set_metadata_relationships_in_node_recursive (
   tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
   graph  : &InRustGraph,
-  stats  : &AllGraphNodeStats,
+  stats  : &AllGraphnodeStats,
   config : &SkgConfig,
 ) {
-  let new_stats : Option < GraphNodeStats > =
+  let new_stats : Option < GraphnodeStats > =
     { // Phantoms keep graphStats: these are node-global
       // decorations for the ID, not parent/content facts. Missing
       // current data still falls back to false rather than querying
       // historical graph context for a placeholder.
       match & tree . get (treeid) . unwrap () . value () . kind {
         ViewnodeKind::Vognode (Vognode::Active (t))
-          => { let nodecomplete_opt : Option<NodeComplete>
-                 = nodecomplete_rustFirst_by_pid_and_repo (
+          => { let graphnode_opt : Option<Graphnode>
+                 = graphnode_rustFirst_by_pid_and_repo (
                      graph, config, &t . id, &t . home_repo
                    ). ok ();
                Some ( graphnodestats_for_pid (
-                 &t . id, stats, nodecomplete_opt . as_ref () )) },
+                 &t . id, stats, graphnode_opt . as_ref () )) },
         ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
-          => { let nodecomplete_opt : Option<NodeComplete>
-                 = nodecomplete_rustFirst_by_pid_and_repo (
+          => { let graphnode_opt : Option<Graphnode>
+                 = graphnode_rustFirst_by_pid_and_repo (
                      graph, config, &p . id, &p . home_repo
                    ). ok ();
                Some ( graphnodestats_for_pid (
-                 &p . id, stats, nodecomplete_opt . as_ref () )) },
+                 &p . id, stats, graphnode_opt . as_ref () )) },
         _ => None }};
   match new_stats {
     Some (gs) =>

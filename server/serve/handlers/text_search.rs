@@ -18,7 +18,7 @@ use crate::dbs::in_rust_graph::ancestry::{ AncestryTree, ancestry_by_id_from_ids
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::in_rust_graph::stats::{
-  AllGraphNodeStats,
+  AllGraphnodeStats,
   fetch_all_graphnodestats_with_repo_set};
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
@@ -117,7 +117,7 @@ pub struct SearchEnrichmentPayload {
   pub terms          : String,
   pub search_results : Vec<ID>,
   pub ancestry_by_id : HashMap<ID, AncestryTree>,
-  pub graphnodestats : AllGraphNodeStats,
+  pub graphnodestats : AllGraphnodeStats,
   /// Load-bearing across the asynchronous snapshot exchange: enrichment
   /// must not broaden a preflight decision to exclude overPrivateText telescopes.
   pub include_overPrivateText_telescopes : bool,
@@ -356,14 +356,14 @@ fn spawn_enrichment_thread (
         render_enriched_search_buffer::collect_overrideward_view_subtree_ids (
           &runtime . graph, &ids_clone, &active_clone ) );
       id_set . into_iter () . collect () };
-    let graphnodestats : AllGraphNodeStats =
+    let graphnodestats : AllGraphnodeStats =
       fetch_all_graphnodestats_with_repo_set (
         &runtime . graph,
         &all_enriched_ids,
         Some (&active_clone) )
       . unwrap_or_else ( |e| {
         tracing::warn! ("search enrichment: graphnodestats failed: {}", e);
-        AllGraphNodeStats::empty () } );
+        AllGraphnodeStats::empty () } );
     tracing::info! ("search enrichment: graphnodestats fetched for {} IDs",
               all_enriched_ids . len ());
     if cancel_clone . load (Ordering::SeqCst) {

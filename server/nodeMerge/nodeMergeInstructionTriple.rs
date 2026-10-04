@@ -1,12 +1,12 @@
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::node_lookup::{nodecomplete_by_id, opt_nodecomplete_by_id};
+use crate::dbs::node_lookup::{graphnode_by_id, opt_graphnode_by_id};
 use crate::from_text::local_instruction_collection::lower::nodeMerge_pairs;
 use crate::from_text::local_instruction_collection::traverse::collect_instructions_locally;
 use crate::from_text::local_instruction_collection::types::CollectedIntents;
 use crate::types::save::{NodeMerge, SaveNode, DeleteNode};
 use crate::types::misc::{MSV, RelPartner, SkgConfig, RepoName, ID, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
-  Flag, NodeComplete, flag_is_true, set_flag};
+  Flag, Graphnode, flag_is_true, set_flag};
 use crate::types::list::dedup_vector;
 use crate::types::tree::forest::ViewForest;
 
@@ -56,13 +56,13 @@ fn nodeMerge_from_acquirer_and_acquiree (
   graph       : &InRustGraph,
   config      : &SkgConfig,
 ) -> Result<NodeMerge, Box<dyn Error>> {
-  let acquirer_from_disk : NodeComplete =
-    nodecomplete_by_id (
+  let acquirer_from_disk : Graphnode =
+    graphnode_by_id (
       graph, config, acquirer_id )?;
-  let acquiree_from_disk : NodeComplete =
-    nodecomplete_by_id (
+  let acquiree_from_disk : Graphnode =
+    graphnode_by_id (
       graph, config, &acquiree_id )?;
-  let acquiree_text_preserver : NodeComplete =
+  let acquiree_text_preserver : Graphnode =
     create_acquiree_text_preserver (&acquiree_from_disk);
   let shown_pre_merge : HashSet<ID> = {
     // Whatever EITHER member showed as unintegrated subscribed
@@ -77,8 +77,8 @@ fn nodeMerge_from_acquirer_and_acquiree (
       ids_shown_through_subscriptions (
         &acquiree_from_disk, graph, config ) ? );
     shown };
-  let updated_acquirer : NodeComplete =
-    three_nodeMerged_nodecompletes( config,
+  let updated_acquirer : Graphnode =
+    three_nodeMerged_graphnodes( config,
                            &acquirer_from_disk,
                            &acquiree_from_disk,
                            &acquiree_text_preserver,
@@ -94,7 +94,7 @@ fn nodeMerge_from_acquirer_and_acquiree (
         home_repo : acquiree_from_disk . home_repo . clone() }} ) }
 
 /// Computes the updated acquirer node with all fields properly merged.
-/// Returns a new NodeComplete with:
+/// Returns a new Graphnode with:
 /// - Combined IDs from both nodes
 /// - contains: [acquiree_text_preserver] + acquirer's + acquiree's novel contents
 ///   - 'Novel' = not among the acquirer's contents
@@ -102,14 +102,14 @@ fn nodeMerge_from_acquirer_and_acquiree (
 /// - Filtered hides_from_its_subscriptions: can't hide your own
 ///   content, and can't hide what either member SHOWED pre-merge
 ///   ('shown_pre_merge')
-fn three_nodeMerged_nodecompletes(
+fn three_nodeMerged_graphnodes(
   config: &SkgConfig,
-  acquirer_from_disk: &NodeComplete,
-  acquiree_from_disk: &NodeComplete,
-  acquiree_text_preserver: &NodeComplete,
+  acquirer_from_disk: &Graphnode,
+  acquiree_from_disk: &Graphnode,
+  acquiree_text_preserver: &Graphnode,
   shown_pre_merge: &HashSet<ID>,
-) -> Result<NodeComplete, String> {
-  let mut updated_acquirer: NodeComplete =
+) -> Result<Graphnode, String> {
+  let mut updated_acquirer: Graphnode =
     acquirer_from_disk . clone();
   // Search exclusion is conservative across a merge: the surviving node is
   // excluded only when both inputs were excluded.  The acquiree's original
@@ -228,7 +228,7 @@ fn three_nodeMerged_nodecompletes(
 /// docs/sharing-model.org). A subscribee with no disk entry
 /// contributes nothing.
 fn ids_shown_through_subscriptions (
-  node   : &NodeComplete,
+  node   : &Graphnode,
   graph  : &InRustGraph,
   config : &SkgConfig,
 ) -> Result<HashSet<ID>, Box<dyn Error>> {
@@ -238,7 +238,7 @@ fn ids_shown_through_subscriptions (
   let contains : Vec<ID> =
     members_of ( & node . contains );
   for subscribee_id in members_of ( node . subscribes_to . or_default () ) {
-    let Some (subscribee) = opt_nodecomplete_by_id (
+    let Some (subscribee) = opt_graphnode_by_id (
       graph, config, &subscribee_id ) ?
     else { continue; };
     for id in members_of ( & subscribee . contains ) {
@@ -248,8 +248,8 @@ fn ids_shown_through_subscriptions (
   Ok (shown) }
 
 /// Create an acquiree_text_preserver from the acquiree's data
-fn create_acquiree_text_preserver(acquiree: &NodeComplete) -> NodeComplete {
-  NodeComplete {
+fn create_acquiree_text_preserver(acquiree: &Graphnode) -> Graphnode {
+  Graphnode {
     title: format!("MERGED: {}", acquiree . title),
     overPrivateText_telescope: false,
     aliases: MSV::Unspecified,
@@ -294,11 +294,11 @@ mod flag_tests {
       (true,  false, false),
       (true,  true,  true),
     ] {
-      let mut acquirer : NodeComplete = NodeComplete {
+      let mut acquirer : Graphnode = Graphnode {
         pid    : ID::from ("A"),
         home_repo : RepoName::from ("owned"),
         .. empty_node_complete () };
-      let mut acquiree : NodeComplete = NodeComplete {
+      let mut acquiree : Graphnode = Graphnode {
         pid    : ID::from ("B"),
         home_repo : RepoName::from ("owned"),
         .. empty_node_complete () };
@@ -310,8 +310,8 @@ mod flag_tests {
         acquirer . misc . push (Flag::NoSearchMatching); }
       if acquiree_value {
         acquiree . misc . push (Flag::NoSearchMatching); }
-      let preserver : NodeComplete = create_acquiree_text_preserver (&acquiree);
-      let merged : NodeComplete = three_nodeMerged_nodecompletes (
+      let preserver : Graphnode = create_acquiree_text_preserver (&acquiree);
+      let merged : Graphnode = three_nodeMerged_graphnodes (
         &config (), &acquirer, &acquiree, &preserver, &HashSet::new ())
         . unwrap ();
       assert_eq! ( flag_is_true (

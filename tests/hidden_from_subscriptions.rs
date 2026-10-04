@@ -16,7 +16,7 @@ use skg::test_utils::{
   update_from_and_rerender_buffer_test as update_from_and_rerender_buffer };
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::misc::{SkgConfig, ID, TantivyIndex, members_of};
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::nodes::complete::Graphnode;
 
 use skg::serve::ViewsState;
 use skg::types::views_state::{OpenViews, ViewUri};
@@ -52,7 +52,7 @@ fn mk_test_tcp_stream_pair ()
 
 /// Add (viewRequests definitiveView) to all subscribee nodes in org text.
 /// Modifies the node section of each subscribee to request a definitive view.
-/// Subscribees are ActiveNode children of SubscribeeFolders.
+/// Subscribees are ActiveVognode children of SubscribeeFolders.
 ///
 /// KLUDGE: We identify subscribees by matching on "subscribee-" in the title.
 /// That's easier than navigating the org-tree's topoogy.
@@ -285,7 +285,7 @@ fn assert_line_order (
 fn node_from_disk (
   config : &SkgConfig,
   pid    : &str,
-) -> Result<NodeComplete, Box<dyn Error>> {
+) -> Result<Graphnode, Box<dyn Error>> {
   let id : ID = ID::from (pid);
   read_all_skg_files_from_repos (config)?
     . into_iter()
@@ -431,7 +431,7 @@ async fn test_deleting_foreign_subscribee_content_infers_hide (
     let rerendered : String = response . saved_view;
 
     assert_hides_e1_in_subscribee_folder (&rerendered);
-    let r_skg : NodeComplete =
+    let r_skg : Graphnode =
       node_from_disk (&config, "r")?;
     assert_eq!(
       members_of ( r_skg . hides_from_its_subscriptions . or_default() ),
@@ -462,7 +462,7 @@ async fn test_removing_subscribee_content_from_subscriber_contains_infers_hide (
     save_buffer_for_hidden_subscriptions_test (
       buffer, &config, tantivy, &graph, &mut views_state
     ) . await ?;
-    let f_skg : NodeComplete =
+    let f_skg : Graphnode =
       node_from_disk (&config, "f") ?;
     assert! ( f_skg . contains . is_empty (),
       "f's contains must be emptied by the save: {:?}",
@@ -495,7 +495,7 @@ async fn test_readding_subscribee_content_to_subscriber_contains_unhides (
     save_buffer_for_hidden_subscriptions_test (
       buffer, &config, tantivy, &graph, &mut views_state
     ) . await ?;
-    let g_skg : NodeComplete =
+    let g_skg : Graphnode =
       node_from_disk (&config, "g") ?;
     assert_eq! ( members_of (& g_skg . contains), vec! [ ID::from ("c") ],
       "g's contains must now hold c: {:?}", g_skg . contains );
@@ -702,7 +702,7 @@ async fn test_extra_view_child_under_foreign_subscribee_is_deleted (
       rerendered );
     assert_line_order (&rerendered, "(id e1)", "(id e2)");
     assert_does_not_hide_e1 (&rerendered);
-    let e_skg : NodeComplete =
+    let e_skg : Graphnode =
       node_from_disk (&config, "e")?;
     assert!(
       ! e_skg . contains . iter () . any ( |m| m . member == ID::from ("a") ),
@@ -747,7 +747,7 @@ async fn test_extra_view_child_under_owned_subscribee_is_deleted (
       ! rerendered . contains ("hiddenInSubscribeeFolder"),
       "Extra view-child should not infer a hide:\n{}",
       rerendered );
-    let r_skg : NodeComplete =
+    let r_skg : Graphnode =
       node_from_disk (&config, "r")?;
     assert!(
       ! r_skg . contains . iter () . any ( |m| m . member == ID::from ("e") ),
@@ -940,7 +940,7 @@ async fn test_moving_hidden_subscribee_content_to_visible_branch_infers_unhide (
         line . starts_with ("**** (skg (node (id H)") ),
       "Expected H to be visible subscribee-as-such content:\n{}",
       rerendered );
-    let r_skg : NodeComplete =
+    let r_skg : Graphnode =
       node_from_disk (&config, "R")?;
     assert!(
       ! r_skg . hides_from_its_subscriptions
@@ -1166,7 +1166,7 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
       "A newly hidden child inside a collapsed subscribee should not also \
        appear through an unrequested hiddenFolder:\n{}",
       rerendered );
-    let subscriber : NodeComplete = node_from_disk (config, "R") ?;
+    let subscriber : Graphnode = node_from_disk (config, "R") ?;
     assert! (
       members_of (subscriber . hides_from_its_subscriptions . or_default ())
         . contains (&ID::from ("E11")),
@@ -1193,7 +1193,7 @@ async fn test_adding_to_hiddenoutside_folder_hides_and_moves_inside (
     let _ : String = save_buffer_for_hidden_subscriptions_test (
       &without_h, &config, tantivy, &graph, &mut views_state
     ) . await ?;
-    let subscriber_after_removal : NodeComplete = node_from_disk (config, "R") ?;
+    let subscriber_after_removal : Graphnode = node_from_disk (config, "R") ?;
     assert! (
       ! members_of (
           subscriber_after_removal . hides_from_its_subscriptions . or_default ())

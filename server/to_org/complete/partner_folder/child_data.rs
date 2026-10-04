@@ -8,11 +8,11 @@
 /// - A `goal_list` is the ordered list of node IDs that a folder
 ///   should present after completion.  The list is computed from the
 ///   graph and, in diff views, from git-diff state.
-/// - A goal child is a child Viewnode whose ActiveNode ID appears in
+/// - A goal child is a child Viewnode whose ActiveVognode ID appears in
 ///   that `goal_list`, whether it already existed in the buffer or
 ///   was created during reconciliation.
 /// - A relevant child is one this reconciliation pass is allowed to
-///   manage: for PartnerFolders, an ActiveNode marked affectsParent=true.
+///   manage: for PartnerFolders, an ActiveVognode marked affectsParent=true.
 ///   Relevant children whose IDs are not in the goal list are removed
 ///   or otherwise demoted by the caller-specific cleanup step.
 /// - `ChildData` is the pre-fetched title/repo/phantom metadata
@@ -23,7 +23,7 @@ use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::git::{NodeAxes, RelationshipAxes, Sign, RepoDiff};
 use crate::types::misc::{ID, RepoName};
 use crate::types::phantom::title_for_phantom;
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
+use crate::dbs::node_lookup::graphnode_rustFirst_by_pid_and_repo;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
@@ -121,7 +121,7 @@ pub fn build_child_data (
           // do not let that stale hint turn a retained raw relationship member
           // into a failed disk read.  An unreadable, formerly indexed file
           // means precisely an Unknown relationship member.
-          match nodecomplete_rustFirst_by_pid_and_repo (
+          match graphnode_rustFirst_by_pid_and_repo (
             &runtime . graph, &runtime . config, child_skgid, &child_src ) {
             Ok (skg) => if let Some ( (s, t) ) = existing_children . get (child_skgid) {
               result . insert ( child_skgid . clone (),
@@ -188,7 +188,7 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
   let summary : RepairSummary<ID> =
     complete_relevant_children_in_viewnodetree (
     tree, folder_node,
-    // An InactiveNode child is IRRELEVANT
+    // An InactiveVognode child is IRRELEVANT
     // (TODO/full-schema/9-2_repo-set-safety.org): the goal omits
     // every inactive member, and a retained placeholder already in the
     // folder survives as an irrelevant child (preserved as-is, not

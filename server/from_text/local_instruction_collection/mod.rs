@@ -20,7 +20,7 @@ pub mod lower;
 pub mod resolve_visibility;
 pub mod validate_text_claims;
 
-use crate::dbs::node_lookup::nodecomplete_from_graph;
+use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::from_text::supplement_from_disk::{
   build_diskSupplemented_defineNodes,
@@ -128,7 +128,7 @@ pub fn extract_nonmergeSavePlan_locally (
 ) -> Result<(NonmergeSavePlan, Vec<(ID, ID)>), Box<dyn Error>> {
   let nodes = crate::dbs::filesystem::multiple_nodes
     ::read_all_skg_files_from_repos (config)?;
-  let graph = InRustGraph::from_nodecompletes (&nodes);
+  let graph = InRustGraph::from_graphnodes (&nodes);
   extract_nonmergeSavePlan_locally_in_graph (
     viewforest, &graph, config, restricted_repo_set ) }
 
@@ -147,7 +147,7 @@ fn filter_wouldbe_noop_defineNodes (
     . into_iter()
     . filter(|instr| match instr {
       DefineNode::Save(SaveNode (node)) => {
-        match nodecomplete_from_graph (graph, &node . pid) {
+        match graphnode_from_graph (graph, &node . pid) {
           Some (pre_save) =>
             buffernode_differs_from_disknode (node, &pre_save),
           None => true, }}
@@ -164,13 +164,13 @@ mod flag_noop_filter_tests {
   use super::*;
   use crate::types::misc::RepoName;
   use crate::types::nodes::complete::{
-    Flag, NodeComplete, empty_node_complete};
+    Flag, Graphnode, empty_node_complete};
 
   fn node (
     pid  : &str,
     misc : Vec<Flag>,
-  ) -> NodeComplete {
-    NodeComplete {
+  ) -> Graphnode {
+    Graphnode {
       pid    : ID::from (pid),
       home_repo : RepoName::from ("main"),
       title  : pid . to_string (),
@@ -179,11 +179,11 @@ mod flag_noop_filter_tests {
 
   #[test]
   fn flag_only_changes_survive_the_noop_filter () {
-    let disk_nodes : Vec<NodeComplete> = ["root", "left", "right"]
+    let disk_nodes : Vec<Graphnode> = ["root", "left", "right"]
       . into_iter ()
       . map (|pid| node (pid, Vec::new ()))
       . collect ();
-    let graph = InRustGraph::from_nodecompletes (&disk_nodes);
+    let graph = InRustGraph::from_graphnodes (&disk_nodes);
     let requested : Vec<DefineNode> = disk_nodes . iter ()
       . cloned ()
       . map (|mut candidate| {
@@ -204,7 +204,7 @@ mod flag_noop_filter_tests {
   fn clearing_the_only_flag_survives_the_noop_filter () {
     let disk = node (
       "root", vec![Flag::NoSearchMatching]);
-    let graph = InRustGraph::from_nodecompletes (&[disk . clone ()]);
+    let graph = InRustGraph::from_graphnodes (&[disk . clone ()]);
     let cleared = node ("root", Vec::new ());
     assert_eq! (filter_wouldbe_noop_defineNodes (
       &graph, vec![DefineNode::Save (SaveNode (cleared))]) . len (), 1);

@@ -1,6 +1,6 @@
 use crate::dbs::in_rust_graph::{
   in_rust_graph_coherent_with_save_instructions_in, new_handle };
-use crate::dbs::node_lookup::nodecomplete_from_graph;
+use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::from_text
   ::buffer_to_validated_saveplan_with_fork_repos_and_previous_view_in_graph;
 use crate::git_ops::diff::compute_diff_for_repo;
@@ -783,7 +783,7 @@ pub async fn update_from_and_rerender_buffer_with_approvals (
       "coherence_debug_assert" ). entered();
     debug_assert! (
       // TODO | PITFALL: This is quite a weak assertion.
-      // PURPOSE: The in-Rust graph must already reflect every Save and Delete in 'define_nodes' by the time this function runs. Violating this invariant (e.g. by reordering the save pipeline so that 'update_views_after_save' runs before prepared graph publication) would let the rerender read stale NodeCompletes from the in-Rust graph.
+      // PURPOSE: The in-Rust graph must already reflect every Save and Delete in 'define_nodes' by the time this function runs. Violating this invariant (e.g. by reordering the save pipeline so that 'update_views_after_save' runs before prepared graph publication) would let the rerender read stale Graphnodes from the in-Rust graph.
       in_rust_graph_coherent_with_save_instructions_in (
           &published . graph, &define_nodes
         ) . is_ok (),
@@ -828,7 +828,7 @@ fn post_commit_hiddenoutside_warnings (
     graph . pid_of (id)
       . unwrap_or_else (|| id . clone ()) };
   let label = |id : &ID| -> String {
-    match nodecomplete_from_graph (graph, id) {
+    match graphnode_from_graph (graph, id) {
       Some (node) => format! ("{} ({})", node . title, node . pid),
       None => id . to_string (), } };
   let mut warnings : Vec<String> = Vec::new ();
@@ -836,12 +836,12 @@ fn post_commit_hiddenoutside_warnings (
     let PostCommitNoticeCandidate::HiddenOutsideAdded {
       subscriber, member } = candidate;
     let Some (subscriber_node) =
-      nodecomplete_from_graph (graph, subscriber)
+      graphnode_from_graph (graph, subscriber)
     else { continue; };
     let mut containing_subscribees : Vec<String> = Vec::new ();
     for subscribee in subscriber_node . subscribes_to . or_default () {
       let Some (subscribee_node) =
-        nodecomplete_from_graph (graph, &subscribee . member)
+        graphnode_from_graph (graph, &subscribee . member)
       else { continue; };
       if subscribee_node . contains . iter ()
         . any (|content| key (&content . member) == key (member))
@@ -914,8 +914,8 @@ pub fn deleted_ids_to_repo (
       repo_diffs . get (&repo_name) else { continue; };
     for diffs in [ &repo_diff . staged,
                    &repo_diff . unstaged ] {
-      for (path, nodecomplete_diff) in diffs {
-        if nodecomplete_diff . status == GitDiffStatus::Deleted {
+      for (path, graphnode_diff) in diffs {
+        if graphnode_diff . status == GitDiffStatus::Deleted {
           if let Some (stem) = path . file_stem() {
             let id : ID = ID ( stem . to_string_lossy()
                                . into_owned() );

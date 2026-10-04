@@ -1,5 +1,5 @@
 use super::misc::{ID, RepoName};
-use super::nodes::complete::NodeComplete;
+use super::nodes::complete::Graphnode;
 use super::errors::{SaveError, BufferValidationError};
 
 
@@ -36,7 +36,7 @@ pub enum DefineNode {
 
 /// A Save instruction.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct SaveNode(pub NodeComplete);
+pub struct SaveNode(pub Graphnode);
 
 /// A Delete instruction.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -102,7 +102,7 @@ pub struct ForkSpec {
 #[derive(Debug, Clone)]
 pub struct NodeMerge {
   pub acquiree_text_preserver : SaveNode, // new node with acquiree's title and body
-  pub updated_acquirer        : SaveNode, // acquirer with acquiree's IDs, contents, and relationships merged in. (This is complex; see 'three_nodeMerged_nodecompletes'.)
+  pub updated_acquirer        : SaveNode, // acquirer with acquiree's IDs, contents, and relationships merged in. (This is complex; see 'three_nodeMerged_graphnodes'.)
   pub acquiree_to_delete      : DeleteNode,
 }
 
@@ -323,12 +323,12 @@ impl NodeMerge {
   }
 
   /// Extracts the three targets from a NodeMerge:
-  /// - acquiree_text_preserver -> &NodeComplete
-  /// - updated_acquirer -> &NodeComplete
+  /// - acquiree_text_preserver -> &Graphnode
+  /// - updated_acquirer -> &Graphnode
   /// - acquiree_to_delete -> (&ID, &RepoName)
   pub fn targets_from_nodeMerge (
     &self
-  ) -> (&NodeComplete, &NodeComplete, (&ID, &RepoName)) {
+  ) -> (&Graphnode, &Graphnode, (&ID, &RepoName)) {
     ( &self . acquiree_text_preserver . 0,
       &self . updated_acquirer . 0,
       (&self . acquiree_to_delete . id, &self . acquiree_to_delete . home_repo) )

@@ -8,7 +8,7 @@ use skg::telescope::invariants::TelescopeViolation;
 use skg::types::misc::{
   ID, MSV, RelPartner, SkgConfig, SkgfileRepo, RepoName,
 };
-use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
+use skg::types::nodes::complete::{Graphnode, empty_node_complete};
 use skg::types::save::{DefineNode, SaveNode};
 
 use std::collections::HashMap;
@@ -32,7 +32,7 @@ fn config () -> SkgConfig {
   config
 }
 
-fn node (pid : &str, repo : &str) -> NodeComplete {
+fn node (pid : &str, repo : &str) -> Graphnode {
   let mut node = empty_node_complete ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
@@ -139,7 +139,7 @@ fn canonical_entry_includes_override_monogamy_and_telescope_orientation () {
 
 #[test]
 fn save_candidate_is_rejected_before_publication () {
-  let current = InRustGraph::from_nodecompletes (&[
+  let current = InRustGraph::from_graphnodes (&[
     node ("existing", "public"),
     node ("edited", "public"),
   ]);

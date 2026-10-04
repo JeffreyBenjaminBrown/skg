@@ -4,12 +4,12 @@ use crate::telescope::types::{
 };
 use crate::telescope::invariants::TelescopeViolation;
 use crate::dbs::filesystem::one_node::{
-  PreparedTelescopeWrite, prepare_nodecomplete_telescope,
-  read_nodecomplete, validate_pid_matches_filename,
+  PreparedTelescopeWrite, prepare_graphnode_telescope,
+  read_graphnode, validate_pid_matches_filename,
 };
 use crate::types::misc::{SkgConfig, SkgfileRepo, ID, RepoName};
-use crate::types::nodes::fs::NodeFS;
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::fs::GraphnodeOnDisk;
+use crate::types::nodes::complete::Graphnode;
 
 use std::collections::{HashMap, HashSet};
 use std::io;
@@ -26,9 +26,9 @@ use std::fs::{self, DirEntry, ReadDir};
 /// 'read_all_skg_files_from_repos_collecting_violations' instead.
 pub fn read_all_skg_files_from_repos (
   config: &SkgConfig
-) -> io::Result<Vec<NodeComplete>> {
+) -> io::Result<Vec<Graphnode>> {
   let (nodes, violations)
-    : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
+    : (Vec<Graphnode>, Vec<(ID, TelescopeViolation)>) =
     read_all_skg_files_from_repos_collecting_violations (config) ?;
   for (pid, v) in &violations {
     tracing::warn! ( pid = %pid, violation = %v,
@@ -39,7 +39,7 @@ pub fn read_all_skg_files_from_repos (
 /// creating or removing the loader's diagnostic reports.
 pub(crate) fn read_all_skg_files_from_repos_read_only (
   config : &SkgConfig,
-) -> io::Result<Vec<NodeComplete>> {
+) -> io::Result<Vec<Graphnode>> {
   let (nodes, violations) =
     read_all_skg_files_from_repos_impl (config, false)?;
   if ! violations . is_empty () {
@@ -60,16 +60,16 @@ pub(crate) fn read_all_skg_files_from_repos_read_only (
 ///   use the same pid. The owned telescope wins before folding.
 pub fn read_all_skg_files_from_repos_collecting_violations (
   config: &SkgConfig
-) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
+) -> io::Result<(Vec<Graphnode>, Vec<(ID, TelescopeViolation)>)> {
   read_all_skg_files_from_repos_impl (config, true)
 }
 
 fn read_all_skg_files_from_repos_impl (
   config : &SkgConfig,
   report_errors : bool,
-) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
+) -> io::Result<(Vec<Graphnode>, Vec<(ID, TelescopeViolation)>)> {
   let mut sections_by_pid
-    : HashMap<ID, Vec<(RepoName, NodeFS)>> = HashMap::new();
+    : HashMap<ID, Vec<(RepoName, GraphnodeOnDisk)>> = HashMap::new();
   let mut pid_order : Vec<ID> = Vec::new(); // deterministic output
   let mut load_errors: Vec<(String, // repo name
                             String, // filename
@@ -104,7 +104,7 @@ fn read_all_skg_files_from_repos_impl (
     retain_owned_telescopes (
       &mut sections_by_pid, &pid_order, config );
   let (nodes, fold_violations)
-    : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
+    : (Vec<Graphnode>, Vec<(ID, TelescopeViolation)>) =
     fold_grouped_sections (sections_by_pid, pid_order, config) ?;
   Ok (( nodes,
         { let mut all : Vec<(ID, TelescopeViolation)> =
@@ -117,7 +117,7 @@ fn read_all_skg_files_from_repos_impl (
 /// owned files before folding or building the extra-id map. A pid
 /// represented entirely by non-owned files remains readable.
 fn retain_owned_telescopes (
-  sections_by_pid : &mut HashMap<ID, Vec<(RepoName, NodeFS)>>,
+  sections_by_pid : &mut HashMap<ID, Vec<(RepoName, GraphnodeOnDisk)>>,
   pid_order       : &[ID],
   config          : &SkgConfig,
 ) -> Vec<(ID, TelescopeViolation)> {
@@ -138,11 +138,11 @@ fn retain_owned_telescopes (
 
 /// One telescope, read fresh from disk by pid (all its sections,
 /// folded). Errors if no section exists or no section has a title.
-pub fn nodecomplete_from_telescope_on_disk (
+pub fn graphnode_from_telescope_on_disk (
   config : &SkgConfig,
   pid    : &ID,
-) -> io::Result<NodeComplete> {
-  crate::dbs::filesystem::one_node::nodecomplete_from_pid_and_repo (
+) -> io::Result<Graphnode> {
+  crate::dbs::filesystem::one_node::graphnode_from_pid_and_repo (
     config, pid . clone (),
     & RepoName::from ("(any)") ) }
 
@@ -154,10 +154,10 @@ pub fn nodecomplete_from_telescope_on_disk (
 /// fold complaint comes back as a violation for the caller to
 /// report.
 fn fold_grouped_sections (
-  mut sections_by_pid : HashMap<ID, Vec<(RepoName, NodeFS)>>,
+  mut sections_by_pid : HashMap<ID, Vec<(RepoName, GraphnodeOnDisk)>>,
   pid_order           : Vec<ID>,
   config              : &SkgConfig,
-) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
+) -> io::Result<(Vec<Graphnode>, Vec<(ID, TelescopeViolation)>)> {
   let pid_of : HashMap<ID, ID> = {
     let mut m : HashMap<ID, ID> = HashMap::new ();
     for (pid, sections) in sections_by_pid . iter () {
@@ -168,7 +168,7 @@ fn fold_grouped_sections (
   let resolve = |id : &ID| -> ID {
     pid_of . get (id) . cloned ()
       . unwrap_or_else ( || id . clone () ) };
-  let mut all_nodes : Vec<NodeComplete> = Vec::new ();
+  let mut all_nodes : Vec<Graphnode> = Vec::new ();
   let mut all_violations : Vec<(ID, TelescopeViolation)> = Vec::new ();
   for pid in pid_order {
     let telescope : Telescope = Telescope::try_new (
@@ -178,7 +178,7 @@ fn fold_grouped_sections (
       config )
       . map_err ( |e| io::Error::new (
         io::ErrorKind::InvalidData, e ) ) ?;
-    let (node, warnings) : (NodeComplete, Vec<FoldWarning>) =
+    let (node, warnings) : (Graphnode, Vec<FoldWarning>) =
       fold_telescope_collecting_warnings ( telescope, &resolve ) ?;
     all_nodes . push (node);
     for w in warnings {
@@ -199,7 +199,7 @@ fn fold_grouped_sections (
 /// a summary error. (Callers pass post-fold nodes, one per
 /// telescope.)
 pub fn error_unless_each_id_names_one_node (
-  nodes     : &[NodeComplete],
+  nodes     : &[Graphnode],
   data_root : &Path,
 ) -> io::Result<()> {
   let mut claimants: HashMap < ID, Vec<(ID, RepoName)> > =
@@ -238,13 +238,13 @@ pub fn error_unless_each_id_names_one_node (
 pub fn read_skg_sections_from_folder (
   repo_name : &RepoName,
   config      : &SkgConfig,
-) -> io::Result < Vec<(RepoName, NodeFS)> > {
+) -> io::Result < Vec<(RepoName, GraphnodeOnDisk)> > {
   let repo : &SkgfileRepo =
     config . repos . get (repo_name)
     . ok_or_else(|| io::Error::new(
       io::ErrorKind::NotFound,
       format!("Repo '{}' not found in config", repo_name)))?;
-  let mut sections : Vec<(RepoName, NodeFS)> = Vec::new ();
+  let mut sections : Vec<(RepoName, GraphnodeOnDisk)> = Vec::new ();
   let entries : ReadDir = // an iterator
     fs::read_dir (&repo . path) ?;
   for entry in entries {
@@ -254,8 +254,8 @@ pub fn read_skg_sections_from_folder (
          path . extension () . map_or (
            false,                  // None => no extension found
            |ext| ext == "skg") ) { // Some
-      let node_fs : NodeFS =
-        read_nodecomplete (&path) ?;
+      let node_fs : GraphnodeOnDisk =
+        read_graphnode (&path) ?;
       validate_pid_matches_filename (&node_fs, &path) ?;
       sections . push (( repo_name . clone (), node_fs )); }}
   Ok (sections) }
@@ -267,7 +267,7 @@ pub fn read_skg_sections_from_folder (
 pub fn read_recently_modified_skgfiles_from_repos (
   config : &SkgConfig,
   since  : std::time::SystemTime,
-) -> io::Result<Vec<NodeComplete>> {
+) -> io::Result<Vec<Graphnode>> {
   let mut modified_pids : Vec<ID> = Vec::new();
   let mut seen_ids      : HashSet<ID> = HashSet::new();
   for (_repo_name, repo) in config . repos . iter() {
@@ -283,17 +283,17 @@ pub fn read_recently_modified_skgfiles_from_repos (
       let mtime : std::time::SystemTime =
         fs::metadata (&path) ? . modified() ?;
       if mtime <= since { continue; }
-      let node_fs : NodeFS =
-        read_nodecomplete (&path) ?;
+      let node_fs : GraphnodeOnDisk =
+        read_graphnode (&path) ?;
       validate_pid_matches_filename (&node_fs, &path) ?;
       let pid : ID =
         node_fs . pid . clone();
       if seen_ids . insert (pid . clone()) {
         modified_pids . push (pid); }} }
-  let mut all_nodes : Vec<NodeComplete> = Vec::new();
+  let mut all_nodes : Vec<Graphnode> = Vec::new();
   for pid in modified_pids {
     all_nodes . push (
-      nodecomplete_from_telescope_on_disk (config, &pid) ? ); }
+      graphnode_from_telescope_on_disk (config, &pid) ? ); }
   Ok (all_nodes) }
 
 /// Reports each id claimed by more than one node, naming every
@@ -404,17 +404,17 @@ fn report_load_errors(
   Ok(())
 }
 
-/// Writes all given `NodeComplete`s to disk as telescopes: each
+/// Writes all given `Graphnode`s to disk as telescopes: each
 /// node's sections land in their repo directories, named
 /// by the primary ID followed by `.skg`.
 pub fn write_all_nodes_to_fs (
-  nodes  : Vec<NodeComplete>,
+  nodes  : Vec<Graphnode>,
   config : SkgConfig,
 ) -> io  ::Result<usize> { // number of nodes written
   let prepared : Vec<PreparedTelescopeWrite> =
     nodes . iter ()
     . map ( |node|
-      prepare_nodecomplete_telescope (node, &config, false) )
+      prepare_graphnode_telescope (node, &config, false) )
     . collect::<io::Result<Vec<PreparedTelescopeWrite>>> () ?;
   for telescope in &prepared {
     telescope . apply (&config) ?; }

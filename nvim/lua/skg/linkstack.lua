@@ -106,7 +106,7 @@ function M.org_stars_for_node_insertion ()
   return '*'
 end
 
----Insert a write-protected ActiveNode headline from ENTRY. In a view
+---Insert a write-protected ActiveVognode headline from ENTRY. In a view
 ---whose buffer has no writeable instance of the node, the headline
 ---also requests a definitive view, so the next save makes it writeable
 ---with its real title, body and content. (Saving a bare writeable

@@ -4,8 +4,8 @@ use crate::to_org::complete::partner_folder::child_data::{ChildData, apply_relat
 use crate::to_org::complete::partner_folder::goal_list::goal_list_for_hiddenOutsideOfSubscribee_folder;
 use crate::types::git::{NodeAxes, RelationshipAxes, Sign, RepoDiff, file_node_axes_from_repo_diff};
 use crate::types::misc::{ID, RepoName};
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
-use crate::types::nodes::complete::NodeComplete;
+use crate::dbs::node_lookup::graphnode_rustFirst_by_pid_and_repo;
+use crate::types::nodes::complete::Graphnode;
 use crate::update_buffer::ancestry::pid_and_repo_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::update_buffer::reconcile::partner_folder::push_repair_warnings;
@@ -28,12 +28,12 @@ struct HiddenOutsideContext {
 /// HiddenOutsideOfSubscribeeFolder completion (called at this folder's own BFS visit).
 ///
 /// Tree structure:
-///   Subscriber (ActiveNode)                       <- ancestor 2
+///   Subscriber (ActiveVognode)                       <- ancestor 2
 ///     └─ SubscribeeFolder (Non-vognode)               <- ancestor 1 = parent
-///          ├─ Subscribee_A (ActiveNode)           <- sibling
-///          ├─ Subscribee_B (ActiveNode)           <- sibling
+///          ├─ Subscribee_A (ActiveVognode)           <- sibling
+///          ├─ Subscribee_B (ActiveVognode)           <- sibling
 ///          └─ HiddenOutsideOfSubscribeeFolder      <- self
-///               └─ [hidden ActiveNode children]
+///               └─ [hidden ActiveVognode children]
 ///
 /// Collects nodes that the subscriber hides from its subscriptions
 /// but that are NOT top-level content of any subscribee.
@@ -125,8 +125,8 @@ fn read_hiddenoutside_context (
   let (subscriber_pid, subscriber_repo) : (ID, RepoName) =
     pid_and_repo_from_required_ancestor(
       tree, node, 1, kind . caller_label () ) ?;
-  let wt_subscriber_nodecomplete : NodeComplete =
-    nodecomplete_rustFirst_by_pid_and_repo (
+  let wt_subscriber_graphnode : Graphnode =
+    graphnode_rustFirst_by_pid_and_repo (
       &runtime . graph, &runtime . config,
       &subscriber_pid, &subscriber_repo ) ?;
   // relRepo gating (render-and-gating, 5_plan.org): both are the
@@ -137,7 +137,7 @@ fn read_hiddenoutside_context (
     None      => true,
     Some (a)  => a . is_all () || a . contains_repo (repo) };
   let wt_subscriber_hide_members =
-    wt_subscriber_nodecomplete . hides_from_its_subscriptions
+    wt_subscriber_graphnode . hides_from_its_subscriptions
     . or_default () . iter ()
     . filter ( |m| repo_active (& m . relRepo) )
     . collect::<Vec<_>> ();
@@ -149,7 +149,7 @@ fn read_hiddenoutside_context (
     . map ( |m| (m . member . clone (), m . relRepo . clone ()) )
     . collect ();
   let wt_subscribees : Vec<ID> =
-    wt_subscriber_nodecomplete . subscribes_to
+    wt_subscriber_graphnode . subscribes_to
     . or_default () . iter ()
     . filter ( |m| repo_active (& m . relRepo) )
     . map ( |m| m . member . clone () )

@@ -7,18 +7,18 @@ use std::path::PathBuf;
 
 use skg::dbs::filesystem::one_node::{
   fetch_aliases_from_file,
-  nodecomplete_from_pid_and_repo, write_nodecomplete_to_repo};
+  graphnode_from_pid_and_repo, write_graphnode_to_repo};
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::save::update_fs_from_saveinstructions;
-use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
-use skg::types::nodes::fs::NodeFS;
+use skg::types::nodes::complete::{Graphnode, empty_node_complete};
+use skg::types::nodes::fs::GraphnodeOnDisk;
 use skg::types::misc::{
   ID, MSV, RelPartner, SkgConfig, SkgfileRepo, RepoName,
   rel_partners_at_relRepo_msv,
 };
 use skg::types::save::{DefineNode, SaveNode};
 use skg::test_utils::set_repo_retagging_relRepos;
-use skg::test_utils::{run_with_test_stores, nodecomplete_example};
+use skg::test_utils::{run_with_test_stores, graphnode_example};
 
 const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
 
@@ -35,7 +35,7 @@ fn save_filesystem_preparation_writes_normalized_ids (
       path         : dir . path () . to_path_buf (),
       user_owns_it : true, }),
   ]));
-  let mut node : NodeComplete = empty_node_complete ();
+  let mut node : Graphnode = empty_node_complete ();
   node . pid = ID::from ("P");
   node . title = "P" . to_string ();
   node . home_repo = repo;
@@ -46,7 +46,7 @@ fn save_filesystem_preparation_writes_normalized_ids (
     &[DefineNode::Save (SaveNode (node))], &[], config ) ?;
 
   let yaml : String = fs::read_to_string (dir . path () . join ("P.skg")) ?;
-  let on_disk : NodeFS = serde_yaml::from_str (&yaml) ?;
+  let on_disk : GraphnodeOnDisk = serde_yaml::from_str (&yaml) ?;
   assert_eq! (on_disk . extra_ids, vec![ID::from ("B"), ID::from ("A")]);
   Ok (( ))
 }
@@ -67,19 +67,19 @@ fn test_node_io() {
   ) . unwrap();
 
   // Write the example node to a file
-  let mut example : NodeComplete = nodecomplete_example();
+  let mut example : Graphnode = graphnode_example();
   set_repo_retagging_relRepos ( &mut example, &RepoName::from ("output") );
-  write_nodecomplete_to_repo ( &example, &config )
+  write_graphnode_to_repo ( &example, &config )
     . unwrap ();
 
   // Read that file, reverse its lists, write to another file
-  let read_node : NodeComplete = nodecomplete_from_pid_and_repo (
+  let read_node : Graphnode = graphnode_from_pid_and_repo (
     &config, example . pid . clone(), &RepoName::from ("output") ) . unwrap ();
   let mut reversed = reverse_some_of_node (&read_node);
   set_repo_retagging_relRepos ( &mut reversed, &RepoName::from ("output") );
   reversed . pid = ID::new ("reversed");
 
-  write_nodecomplete_to_repo(&reversed, &config) . unwrap();
+  write_graphnode_to_repo(&reversed, &config) . unwrap();
   let out_filename: PathBuf =
     test_dir . join(&example . pid . 0) . with_extension ("skg");
   let reversed_filename : &str =
@@ -115,7 +115,7 @@ fn test_node_io() {
 }
 
 fn verify_body_not_needed() {
-  // If a NodeComplete's `body` is the empty string,
+  // If a Graphnode's `body` is the empty string,
   // then that field need not be written to disk.
 
   // Load config, overriding "output" to point to temp dir
@@ -128,12 +128,12 @@ fn verify_body_not_needed() {
   fs::copy ( // seed the output repo with the golden example
     "tests/file_io/fixtures/golden/example.skg",
     "/tmp/file_io_test/example.skg" ) . unwrap();
-  let mut node = nodecomplete_from_pid_and_repo (
+  let mut node = graphnode_from_pid_and_repo (
     &config, ID::new ("example"), &RepoName::from ("output") ) . unwrap();
   set_repo_retagging_relRepos ( &mut node, &RepoName::from ("output") );
   node . body = None; // mutate it
   node . pid = ID::new ("no_unindexed"); // match pid to filename
-  write_nodecomplete_to_repo(
+  write_graphnode_to_repo(
     &node, &config ) . unwrap();
   // Parse both files as YAML for semantic comparison
   let generated_yaml: serde_yaml::Value =
@@ -153,8 +153,8 @@ fn verify_body_not_needed() {
   );
 }
 
-pub fn reverse_some_of_node(node: &NodeComplete) -> NodeComplete {
-  // Create a new NodeComplete reversing two of its lists,
+pub fn reverse_some_of_node(node: &Graphnode) -> Graphnode {
+  // Create a new Graphnode reversing two of its lists,
   // `contains` and `subscribes_to`.
   // This is only for testing purposes,
   // to show reading from and writing to disk work;
@@ -168,7 +168,7 @@ pub fn reverse_some_of_node(node: &NodeComplete) -> NodeComplete {
     MSV::Specified (mut v) => {
       v . reverse();
       MSV::Specified (v) } };
-  NodeComplete {
+  Graphnode {
     contains          : reversed_contains,
     subscribes_to     : reversed_subscribes_to,
 
@@ -204,7 +204,7 @@ fn test_links_extracted_during_read() -> std::io::Result<()> {
       user_owns_it: true, });
     SkgConfig::dummyFromRepos (repos) };
 
-  let mut test_node : NodeComplete = empty_node_complete ();
+  let mut test_node : Graphnode = empty_node_complete ();
   { test_node . title = "Title with two links: [[(id link1][First) Link]] and [[(id link2][Second) Link]]"
       . to_string();
     test_node . home_repo = RepoName::from ("temp");
@@ -216,8 +216,8 @@ fn test_links_extracted_during_read() -> std::io::Result<()> {
     test_node . body = Some("Some text with a link [[(id link3][Third) Link]] and another [[(id link4][Fourth) Link]]" . to_string()); }
 
   { // Write to a file and read it back.
-    write_nodecomplete_to_repo(&test_node, &config)?;
-    let read_node : NodeComplete = nodecomplete_from_pid_and_repo(
+    write_graphnode_to_repo(&test_node, &config)?;
+    let read_node : Graphnode = graphnode_from_pid_and_repo(
       &config, ID::new ("test123"), &RepoName::from ("temp"))?;
     assert_eq!( test_node, read_node,
                 "Nodes should have matched." ); }

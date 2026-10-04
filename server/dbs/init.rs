@@ -8,8 +8,8 @@ use crate::dbs::tantivy::{mk_tantivy_schema, tantivy_index_from_index};
 use crate::dbs::tantivy::write::update_index_with_nodes;
 use crate::types::env::SkgEnv;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
-use crate::types::nodes::tantivy::NodeTantivy;
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::tantivy::GraphnodeInTantivy;
+use crate::types::nodes::complete::Graphnode;
 use crate::telescope::dependencies_manifest::{foreign_manifest_order_warnings, write_dependencies_manifests};
 use crate::telescope::invariants::{TelescopeViolation, report_telescope_violations};
 use crate::dbs::in_rust_graph::{
@@ -43,11 +43,11 @@ pub struct InitContextHandoff {
 /// files deleted while the server was stopped cannot leave orphaned records.
 pub fn initialize_dbs (
   config : &SkgConfig,
-) -> (SkgEnv, InitContextHandoff, Vec<NodeComplete>) {
+) -> (SkgEnv, InitContextHandoff, Vec<Graphnode>) {
   retire_stale_tantivy_generation_directories (&config . tantivy_folder);
   tracing::info! ("Reading authoritative .skg files from all repos...");
   let (nodes, load_violations)
-    : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
+    : (Vec<Graphnode>, Vec<(ID, TelescopeViolation)>) =
     read_all_skg_files_from_repos_collecting_violations (config)
     . unwrap_or_else (|e| {
       tracing::error! ("Failed to read .skg files: {}", e);
@@ -80,7 +80,7 @@ pub fn initialize_dbs (
 
 fn env_and_handoff_from_nodes (
   config        : &SkgConfig,
-  nodes         : &[NodeComplete],
+  nodes         : &[Graphnode],
   graph         : InRustGraph,
   tantivy_index : TantivyIndex,
 ) -> (SkgEnv, InitContextHandoff) {
@@ -106,7 +106,7 @@ fn env_and_handoff_from_nodes (
 
 fn wipe_then_init_tantivy_db_with_logs_and_errors (
   config : & SkgConfig,
-  nodes  : & [NodeComplete],
+  nodes  : & [Graphnode],
 ) -> TantivyIndex {
   tracing::info! ("Initializing Tantivy index...");
   let (tantivy_index, indexed_count)
@@ -127,7 +127,7 @@ fn wipe_then_init_tantivy_db_with_logs_and_errors (
 /// (and, if desired, checking for ids claimed by two nodes) beforehand.
 pub fn rebuild_tantivy_from_nodes (
   config : &SkgConfig,
-  nodes  : &[NodeComplete],
+  nodes  : &[Graphnode],
 ) -> Result<TantivyIndex, Box<dyn Error>> {
   let (tantivy_index, _indexed_count)
     : ( TantivyIndex, usize ) =
@@ -141,7 +141,7 @@ pub fn rebuild_tantivy_from_nodes (
 /// at the candidate directory and is published atomically with the index.
 pub fn rebuild_tantivy_as_generation (
   config : &SkgConfig,
-  nodes : &[NodeComplete],
+  nodes : &[Graphnode],
   generation : u64,
 ) -> Result<(SkgConfig, TantivyIndex), Box<dyn Error>> {
   let mut generation_config = config . clone ();
@@ -203,13 +203,13 @@ pub fn empty_in_ram_tantivy_index (
 /// PITFALL: The index is not the data it indexes.
 /// This only deletes the former.
 pub fn wipe_then_init_tantivy_db (
-  nodes      : &[NodeComplete],
+  nodes      : &[Graphnode],
   index_path : &Path,
 ) -> Result<(TantivyIndex, usize), Box<dyn Error>> {
   let tantivy_index : TantivyIndex =
     create_empty_tantivy_index (index_path)?;
-  let tantivy_nodes : Vec<NodeTantivy> =
-    nodes . iter () . map (NodeTantivy::from) . collect ();
+  let tantivy_nodes : Vec<GraphnodeInTantivy> =
+    nodes . iter () . map (GraphnodeInTantivy::from) . collect ();
   let indexed_count =
     update_index_with_nodes (&tantivy_nodes, &tantivy_index)?;
   Ok ((tantivy_index, indexed_count))

@@ -47,7 +47,7 @@ fn test_multi_repo_errors() -> Result<(), Box<dyn Error>> {
 
     { // Repo validation errors: one for dub-1 (nonexistent repo "dub")
       // and one for pub-1 (no repo at all).
-      let repo_re = Regex::new(r"(?i)activenod.*must.*repo") . unwrap();
+      let repo_re = Regex::new(r"(?i)activevognode.*must.*repo") . unwrap();
       let repo_errors: Vec<&BufferValidationError>
       = ( errors . iter()
           . filter(

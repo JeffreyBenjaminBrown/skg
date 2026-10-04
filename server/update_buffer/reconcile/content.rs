@@ -8,17 +8,17 @@ use crate::dbs::in_rust_graph::override_resolution::{
     OverrideResolution, resolve_override};
 use crate::types::env::find_repo_with_optional_tantivy;
 use crate::types::phantom::home_from_disk;
-use crate::types::nodes::complete::NodeComplete;
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
+use crate::types::nodes::complete::Graphnode;
+use crate::dbs::node_lookup::graphnode_rustFirst_by_pid_and_repo;
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
     Viewnode, ViewnodeKind, PhantomDeleted, Editability,
     AffectsParent, ViewRequest, mk_definitive_viewnode};
 use crate::types::viewnode::{Vognode, Phantom, PartnerFolder};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_repo_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
-use crate::types::tree::viewnode_nodecomplete::{
+use crate::types::tree::viewnode_graphnode::{
     pid_and_repo_from_treenode,
-    write_at_activeNode_in_tree};
+    write_at_activeVognode_in_tree};
 use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::update_buffer::util::{
     complete_relevant_children_in_viewnodetree,
@@ -54,7 +54,7 @@ struct ChildData {
   drawn_id : Option<ID>,
 }
 
-/// ActiveNode content reconcile + content-child creation, for one node, in the
+/// ActiveVognode content reconcile + content-child creation, for one node, in the
 /// TODO/DONE/local-view-update/plan_v2.org §3 level-order BFS visit. View completion (dispatch_node_update)
 /// settles the node's
 /// Finalizable state *before* calling this (via 'apply_definitive_draw_rule')
@@ -68,7 +68,7 @@ struct ChildData {
 ///   BFS draws each Final (clobbering competing Tentative occurrences).
 /// - `node_budget`: the TODO/DONE/local-view-update/plan_v2.org §5.5 remaining budget of new Viewnodes; content-child
 ///   creation is capped against it.
-pub fn expand_true_content_at_activeNode (
+pub fn expand_true_content_at_activeVognode (
   node               : NodeId,
   tree               : &mut Tree<Viewnode>,
   defmap             : &mut DefinitiveMap,
@@ -89,7 +89,7 @@ pub fn expand_true_content_at_activeNode (
     tree, node,
     |vn : &Viewnode| matches!( &vn . kind,
                                 ViewnodeKind::Vognode (Vognode::Active (_))),
-    "expand_true_content_at_activeNode: expected Active vognode" ) ?;
+    "expand_true_content_at_activeVognode: expected Active vognode" ) ?;
   if ! settled {
     // A DVR node was already resolved by apply_definitive_draw_rule; running
     // the dedup here would write-protect it against its own (just-inserted)
@@ -98,9 +98,9 @@ pub fn expand_true_content_at_activeNode (
       tree, node, defmap ) ?; }
   let (pid, initial_repo) : (ID, RepoName) =
     pid_and_repo_from_treenode( tree, node,
-                                  "expand_true_content_at_activeNode" ) ?;
+                                  "expand_true_content_at_activeVognode" ) ?;
   // This content path produces the pure worktree view; the node's git diff
-  // (axes, phantom flip, diff-only properties) is applied by process_activeNode_diff at
+  // (axes, phantom flip, diff-only properties) is applied by process_activeVognode_diff at
   // the end of the node's BFS visit (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3).
   { let is_writeProtected : bool =
       read_at_node_in_tree( tree, node,
@@ -117,16 +117,16 @@ pub fn expand_true_content_at_activeNode (
   // for free. visit_normal_node already forced this node write-protected if the
   // budget was 0, so here it is > 0; saturating_sub is defensive.
   *node_budget = node_budget . saturating_sub (1);
-  let nodecomplete : NodeComplete =
-    nodecomplete_rustFirst_by_pid_and_repo (
+  let graphnode : Graphnode =
+    graphnode_rustFirst_by_pid_and_repo (
       graph_snap, config, &pid, &initial_repo ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §8.3: EVERY definitive node re-syncs title/body/repo from the snapshot,
   // saved and collateral alike. (After extraction the snapshot already reflects
   // the saved buffer's text, so re-syncing the saved node yields the same
   // content it just defined -- a no-op.)
-  sync_activeNode_from_disk (tree, node, &nodecomplete) ?;
+  sync_activeVognode_from_disk (tree, node, &graphnode) ?;
   reconcile_content_children (
-    tree, node, &nodecomplete, config, graph_snap,
+    tree, node, &graphnode, config, graph_snap,
     deleted_since_head_pid_src_map,
     deleted_by_this_save_extra_ids,
     active_repo_set,
@@ -157,7 +157,7 @@ fn attach_cascade_dvrs_to_affected_content (
     . map ( |c| c . id () )
     . collect ();
   for cid in child_ids {
-    write_at_activeNode_in_tree (
+    write_at_activeVognode_in_tree (
       tree, cid,
       |t| { t . view_requests . insert ( ViewRequest::Definitive ); } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
@@ -167,15 +167,15 @@ fn attach_cascade_dvrs_to_affected_content (
 /// the snapshot. TODO/DONE/local-view-update/plan_v2.org §8.3: every definitive node re-syncs, saved and collateral
 /// alike -- after extraction the snapshot already holds the saved buffer's text,
 /// so the saved node re-syncs to the same content it just defined.
-fn sync_activeNode_from_disk (
+fn sync_activeVognode_from_disk (
   tree         : &mut Tree<Viewnode>,
   node         : NodeId,
-  nodecomplete : &NodeComplete,
+  graphnode : &Graphnode,
 ) -> Result<(), Box<dyn Error>> {
-  let disk_title : String = nodecomplete . title . clone ();
-  let disk_body  : Option<String> = nodecomplete . body . clone ();
-  let disk_repo : RepoName = nodecomplete . home_repo . clone ();
-  write_at_activeNode_in_tree (
+  let disk_title : String = graphnode . title . clone ();
+  let disk_body  : Option<String> = graphnode . body . clone ();
+  let disk_repo : RepoName = graphnode . home_repo . clone ();
+  write_at_activeVognode_in_tree (
     tree, node,
     |t| { t . title = disk_title;
           t . home_repo = disk_repo;
@@ -190,7 +190,7 @@ fn sync_activeNode_from_disk (
 fn reconcile_content_children (
   tree                           : &mut Tree<Viewnode>,
   node                           : NodeId,
-  nodecomplete                   : &NodeComplete,
+  graphnode                   : &Graphnode,
   config                         : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
   deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
@@ -207,7 +207,7 @@ fn reconcile_content_children (
   // subtree, even though the parent's containment logically points
   // at the acquirer. (Fresh views already got this for free from
   // 'pid_and_repo_from_id'; this makes the rerender consistent.)
-  let content_members = nodecomplete . contains . iter ()
+  let content_members = graphnode . contains . iter ()
     . filter ( |m| match active_repo_set {
       // relRepo gating (render-and-gating, 5_plan.org): a
       // membership whose REPO is inactive is invisible here even
@@ -247,12 +247,12 @@ fn reconcile_content_children (
                  . map ( |(_pid, src)| src )
                  . or_else ( || home_from_disk (id, config) ));
   // TODO/DONE/local-view-update/plan_v2.org §5.5: the content group is drawn WHOLE -- never truncated mid-group. The
-  // budget is spent once per expanding vognode (in expand_true_content_at_activeNode),
+  // budget is spent once per expanding vognode (in expand_true_content_at_activeVognode),
   // not per child, so a node either fully expands or is left write-protected; we
   // never create a silent partial sibling set.
   // A content child this save deleted stays here; at its own BFS visit it
   // becomes a PhantomDeleted whose folders generalized-orphan and deaden -- so no folder
-  // reconciles against a missing NodeComplete -- while any user subtree under it
+  // reconciles against a missing Graphnode -- while any user subtree under it
   // is preserved (demoted), and a now-childless PhantomDeleted is removed by the
   // TODO/DONE/local-view-update/plan_v2.org §6.6 prune sweep.
   let substitution_for_children : bool =
@@ -272,7 +272,7 @@ fn reconcile_content_children (
       substitution_for_children ) ?; }
   complete_content_children(
     tree, node, &apparent_content_ids, &relRepos,
-    &nodecomplete . home_repo, config, graph_snap,
+    &graphnode . home_repo, config, graph_snap,
     deleted_since_head_pid_src_map, deleted_by_this_save_extra_ids,
     active_repo_set,
     substitution_for_children ) ?;
@@ -300,10 +300,10 @@ fn replace_raw_content_children_with_visible_overriders (
   substitution_enabled : bool,
 ) -> Result<(), Box<dyn Error>> {
   if ! substitution_enabled { return Ok (()); }
-  let substitutions : Vec<(NodeId, ID, NodeComplete)> = {
+  let substitutions : Vec<(NodeId, ID, Graphnode)> = {
     let node_ref = tree . get (node)
       . ok_or ("replace_raw_content_children_with_visible_overriders: node not found") ?;
-    let mut result : Vec<(NodeId, ID, NodeComplete)> = Vec::new ();
+    let mut result : Vec<(NodeId, ID, Graphnode)> = Vec::new ();
     for child in node_ref . children () {
       let ViewnodeKind::Vognode (Vognode::Active (active)) =
         &child . value () . kind else { continue; };
@@ -319,13 +319,13 @@ fn replace_raw_content_children_with_visible_overriders (
         . ok_or_else (|| format! (
           "replace_raw_content_children_with_visible_overriders: no repo for overrider {}",
           effective . 0 )) ?;
-      let overrider : NodeComplete = nodecomplete_rustFirst_by_pid_and_repo (
+      let overrider : Graphnode = graphnode_rustFirst_by_pid_and_repo (
         graph_snap, config, &effective, &repo ) ?;
       result . push ((child . id (), original, overrider));
     }
     result };
   for (child, original, overrider) in substitutions {
-    write_at_activeNode_in_tree (
+    write_at_activeVognode_in_tree (
       tree, child,
       |active| {
         active . id = overrider . pid . clone ();
@@ -362,7 +362,7 @@ fn convert_nonmember_unknown_children_to_dead (
     |vn : &mut Viewnode| { vn . kind = ViewnodeKind::DeadViewnode; },
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
-pub(in crate::update_buffer) fn mutate_activeNode_to_deletednode (
+pub(in crate::update_buffer) fn mutate_activeVognode_to_deletednode (
   tree   : &mut Tree<Viewnode>,
   node   : NodeId,
   pid    : &ID,
@@ -467,7 +467,7 @@ fn is_subscribee (
 /// contains subtraction it would double-show, once as integrated content and
 /// once as unintegrated; forks plan.org Prerequisite / discussion.org Option B).
 /// The git-diff decorations (removed-member phantoms, relationship axes) are NOT
-/// computed here: they are applied per node by process_activeNode_diff at its BFS
+/// computed here: they are applied per node by process_activeVognode_diff at its BFS
 /// visit (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3), so the main content path produces only the pure
 /// worktree view.
 fn content_goal_list (
@@ -485,8 +485,8 @@ fn content_goal_list (
     let (grandparent_pid, grandparent_repo) : (ID, RepoName) =
       pid_and_repo_from_ancestor( tree, node, 2,
                                     "content_goal_list" ) ?;
-    let grandparent_nodecomplete : NodeComplete =
-      nodecomplete_rustFirst_by_pid_and_repo (
+    let grandparent_graphnode : Graphnode =
+      graphnode_rustFirst_by_pid_and_repo (
         graph_snap, config, &grandparent_pid, &grandparent_repo ) ?;
     // Resolve the subtrahends through extra_id -> pid the same way
     // 'content_ids' (the minuend) was resolved by the caller. Without
@@ -500,19 +500,19 @@ fn content_goal_list (
     // content here -- else a privately-contained/-hidden member
     // would vanish from a public view even though no ACTIVE edge
     // explains its absence (leak by omission). Mirrors the
-    // 'reconcile_content_children' gate on 'nodecomplete.contains'
+    // 'reconcile_content_children' gate on 'graphnode.contains'
     // just above.
     let repo_active = |repo : &RepoName| match active_repo_set {
       None      => true,
       Some (a)  => a . is_all () || a . contains_repo (repo) };
     let worktree_hidden : Vec<ID> =
-        grandparent_nodecomplete . hides_from_its_subscriptions
+        grandparent_graphnode . hides_from_its_subscriptions
         . or_default () . iter ()
         . filter ( |m| repo_active (& m . relRepo) )
         . map ( |m| m . member . clone () )
         . collect ();
     let subscriber_contains : Vec<ID> =
-        grandparent_nodecomplete . contains . iter ()
+        grandparent_graphnode . contains . iter ()
         . filter ( |m| repo_active (& m . relRepo) )
         . map ( |m| m . member . clone () )
         . collect ();
@@ -539,7 +539,7 @@ pub fn unintegrated_content_ids (
   setlike_vector_subtraction (
     setlike_vector_subtraction (contents, &hidden), &contained) }
 
-/// Reconcile the node's non-parentIgnored ActiveNode children
+/// Reconcile the node's non-parentIgnored ActiveVognode children
 /// against the goal list (content IDs, possibly interleaved with
 /// phantom IDs in diff view). Missing children are created as
 /// write-protected Viewnodes or phantom Viewnodes as appropriate.
@@ -579,7 +579,7 @@ fn complete_content_children (
         // its raw ID so a rerender retains one placeholder rather than
         // appending another one for the same dangling edge.
         => true,
-      // An InactiveNode is IRRELEVANT: never matched against the goal
+      // An InactiveVognode is IRRELEVANT: never matched against the goal
       // list, so it is preserved as-is (a retained placeholder hosting
       // already-drawn active descendants) and needs no id. The goal
       // omits every inactive member (omit_inactive_members), so it is
@@ -719,8 +719,8 @@ fn mark_erroneous_content_children_as_indep (
 
 /// Reorder children into three groups:
 /// - non-vognodes first
-/// - parentIgnored ActiveNodes
-/// - non-ignored ActiveNodes last
+/// - parentIgnored ActiveVognodes
+/// - non-ignored ActiveVognodes last
 /// Preserves relative order within each group.
 fn order_children_as_non_vognodes_then_ignored_then_content (
   tree    : &mut Tree<Viewnode>,
@@ -867,8 +867,8 @@ fn build_child_creation_data (
         . ok_or_else ( || format! (
           "build_child_creation_data: no repo for overrider {}",
           drawn . 0 )) ? };
-    let skg : NodeComplete =
-      nodecomplete_rustFirst_by_pid_and_repo (
+    let skg : Graphnode =
+      graphnode_rustFirst_by_pid_and_repo (
         graph_snap, config, fetch_id, &fetch_repo ) ?;
     result . insert( id . clone(),
                    ChildData { title: skg . title . clone(),

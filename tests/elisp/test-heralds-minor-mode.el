@@ -249,14 +249,14 @@ the C token 2aC: the multi-contains \"2\" (yellow), the ancestor \"a\"
 (ert-deftest test-heralds-diff-display ()
   "Test that staged/unstaged axes are displayed as staged:.../unstaged:... heralds."
   (with-temp-buffer
-    ;; ActiveNode with unstaged relationship removal (the v.1 'removed-here').
+    ;; ActiveVognode with unstaged relationship removal (the v.1 'removed-here').
     (erase-buffer)
     (insert "(skg (node (id 1) (repo s) (unstaged removedR)))")
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "unstaged" result))
       (should (string-match "R" result)))
 
-    ;; ActiveNode with unstaged file creation + relationship add (the v.1 'new').
+    ;; ActiveVognode with unstaged file creation + relationship add (the v.1 'new').
     (erase-buffer)
     (insert "(skg (node (id 2) (repo s) (unstaged addedN addedR)))")
     (let ((result (heralds-from-metadata (buffer-string))))

@@ -8,7 +8,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::types::misc::{
   ID, RelPartner, SkgConfig, SkgfileRepo, RepoName};
-use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
+use crate::types::nodes::complete::{Graphnode, empty_node_complete};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -35,8 +35,8 @@ fn config_with_order (
 fn node_at (
   pid    : &str,
   repo : &str,
-) -> NodeComplete {
-  let mut n : NodeComplete = empty_node_complete ();
+) -> Graphnode {
+  let mut n : Graphnode = empty_node_complete ();
   n . pid = ID::new (pid);
   n . title = pid . to_string ();
   n . home_repo = RepoName::from (repo);
@@ -54,12 +54,12 @@ fn default_is_more_private_of_homes_and_current_is_the_relRepo (
 ) {
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
-  let child : NodeComplete = node_at ("child", "trusted");
-  let mut owner : NodeComplete = node_at ("owner", "public");
+  let child : Graphnode = node_at ("child", "trusted");
+  let mut owner : Graphnode = node_at ("owner", "public");
   owner . contains = vec! [
     pm ("private", "child") ]; // recorded above its default
   let graph : InRustGraph =
-    InRustGraph::from_nodecompletes ( & [ owner, child ] );
+    InRustGraph::from_graphnodes ( & [ owner, child ] );
   let (default, current) =
     relRepo_info (
       &graph, &config,
@@ -78,10 +78,10 @@ fn current_is_none_for_an_unrecorded_edge (
   // default is still computable from the homes.
   let config : SkgConfig =
     config_with_order ( & ["public", "private"] );
-  let child : NodeComplete = node_at ("child", "private");
-  let owner : NodeComplete = node_at ("owner", "public");
+  let child : Graphnode = node_at ("child", "private");
+  let owner : Graphnode = node_at ("owner", "public");
   let graph : InRustGraph =
-    InRustGraph::from_nodecompletes ( & [ owner, child ] );
+    InRustGraph::from_graphnodes ( & [ owner, child ] );
   let (default, current) =
     relRepo_info (
       &graph, &config,
@@ -96,9 +96,9 @@ fn unknown_owner_is_an_error_but_unknown_member_uses_owner_home (
 ) {
   let config : SkgConfig =
     config_with_order ( & ["public"] );
-  let owner : NodeComplete = node_at ("owner", "public");
+  let owner : Graphnode = node_at ("owner", "public");
   let graph : InRustGraph =
-    InRustGraph::from_nodecompletes ( & [ owner ] );
+    InRustGraph::from_graphnodes ( & [ owner ] );
   assert! ( relRepo_info (
     &graph, &config,
     & ID::new ("ghost"), & ID::new ("owner"),
@@ -116,9 +116,9 @@ fn unknown_owner_is_an_error_but_unknown_member_uses_owner_home (
 fn raw_unresolved_member_keeps_its_exact_relRepo (
 ) {
   let config : SkgConfig = config_with_order ( & ["public", "private"] );
-  let mut owner : NodeComplete = node_at ("owner", "public");
+  let mut owner : Graphnode = node_at ("owner", "public");
   owner . contains = vec! [ pm ("private", "absent-raw") ];
-  let graph : InRustGraph = InRustGraph::from_nodecompletes ( & [owner] );
+  let graph : InRustGraph = InRustGraph::from_graphnodes ( & [owner] );
   let (default, current) = relRepo_info (
     &graph, &config, &ID::new ("owner"), &ID::new ("absent-raw"),
     NodeRelation::Contains ) . unwrap ();
@@ -149,10 +149,10 @@ fn owned_owner_with_foreign_member_defaults_to_owner_home (
       . unwrap () . user_owns_it = false;
     config . repos . get_mut (&RepoName::from (owner_home))
       . unwrap () . user_owns_it = true;
-    let owner : NodeComplete = node_at ("owner", owner_home);
-    let member : NodeComplete = node_at ("member", member_home);
+    let owner : Graphnode = node_at ("owner", owner_home);
+    let member : Graphnode = node_at ("member", member_home);
     let graph : InRustGraph =
-      InRustGraph::from_nodecompletes (&[owner, member]);
+      InRustGraph::from_graphnodes (&[owner, member]);
     let (default, current) = relRepo_info (
       &graph, &config, &ID::new ("owner"), &ID::new ("member"),
       NodeRelation::Contains ) . unwrap ();

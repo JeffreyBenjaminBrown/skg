@@ -99,7 +99,7 @@ async fn test_find_buffer_errors_for_saving (
         . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(_, _)))
         . collect();
 
-      // AliasFolder children must be Aliases (bad_child is an ActiveNode child of AliasFolder)
+      // AliasFolder children must be Aliases (bad_child is an ActiveVognode child of AliasFolder)
       { let aliasfolder_children_re =
           Regex::new(r"(?i)aliasFolder.*children.*must.*alias") . unwrap();
         let aliasfolder_children_errors: Vec<&BufferValidationError> =
@@ -181,28 +181,28 @@ async fn test_find_buffer_errors_for_saving (
                    if title == "Alias with body problem and orphaned" && kind == "alias")
         }), "Should find Body_of_NonVognode error for alias"); }
 
-      // View roots must be ActiveNodes or deleted nodes.
-      { let viewroot_re = Regex::new(r"(?i)view roots.*must.*activeNode.*deleted") . unwrap();
+      // View roots must be ActiveVognodes or deleted nodes.
+      { let viewroot_re = Regex::new(r"(?i)view roots.*must.*activeVognode.*deleted") . unwrap();
         let viewroot_errors: Vec<&BufferValidationError> =
           errors . iter()
           . filter(|e| matches!(e, BufferValidationError::Other (msg)
                                if viewroot_re . is_match (msg)))
           . collect();
         assert_eq!(viewroot_errors . len(), 1,
-                   "Should find 1 'View roots must be ActiveNodes or deleted nodes' error"); }
+                   "Should find 1 'View roots must be ActiveVognodes or deleted nodes' error"); }
 
-      // ActiveNode child belongs elsewhere (root has Alias children directly, not via AliasFolder)
-      { let activeNode_children_re =
-          Regex::new(r"(?i)activeNode.*child.*belongs.*elsewhere") . unwrap();
-        let activeNode_children_errors: Vec<&BufferValidationError> =
+      // ActiveVognode child belongs elsewhere (root has Alias children directly, not via AliasFolder)
+      { let activeVognode_children_re =
+          Regex::new(r"(?i)activeVognode.*child.*belongs.*elsewhere") . unwrap();
+        let activeVognode_children_errors: Vec<&BufferValidationError> =
           local_errors . iter() . copied()
         . filter( |e| matches!( e,
                                 BufferValidationError::LocalStructureViolation(
                                   msg, _)
-                               if activeNode_children_re . is_match (msg)))
+                               if activeVognode_children_re . is_match (msg)))
           . collect();
-        assert_eq!(activeNode_children_errors . len(), 1,
-                   "Should find 1 misplaced ActiveNode child error"); }
+        assert_eq!(activeVognode_children_errors . len(), 1,
+                   "Should find 1 misplaced ActiveVognode child error"); }
 
       // "Alias with body problem" fails two checks (no children + AliasFolder parent),
       // but multiple errors on one node combine into a single LocalStructureViolation.
@@ -663,7 +663,7 @@ fn test_inactive_placeholder_content_edits_rejected_at_parse_time () {
 fn test_inactive_placeholder_active_children_allowed_locally () {
   // TODO/full-schema/9-2_repo-set-safety.org, the retained case:
   // an inactive node stays on screen because of its active
-  // children, so an InactiveNode with active children must pass.
+  // children, so an InactiveVognode with active children must pass.
   let input : &str =
     indoc! {"
       * (skg (node (id root) (repo main))) parent
@@ -698,7 +698,7 @@ fn test_inactive_placeholder_active_children_allowed_locally () {
 }
 
 #[test]
-fn test_inactive_placeholder_under_activeNode_allowed_locally () {
+fn test_inactive_placeholder_under_activeVognode_allowed_locally () {
   let input : &str =
     indoc! {"
       * (skg (node (id root) (repo main))) parent
@@ -717,7 +717,7 @@ fn test_inactive_placeholder_under_activeNode_allowed_locally () {
     . expect ("root child should exist")
     . id ();
   validate_local_structure (&viewforest, root_id, &config)
-    . expect ("ActiveNode should accept an inactive placeholder child");
+    . expect ("ActiveVognode should accept an inactive placeholder child");
 }
 
 #[test]
@@ -800,7 +800,7 @@ fn duplicate_members_of_write_protected_folders_are_still_rejected () {
       . expect_err (
         "duplicate members of a write-protected folder should fail validation");
     assert!(
-      error . message . contains ("must not have duplicate ActiveNode children"),
+      error . message . contains ("must not have duplicate ActiveVognode children"),
       "Unexpected write-protected-folder validation error: {:?}",
       error ); }}
 

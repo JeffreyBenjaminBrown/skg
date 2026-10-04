@@ -2,11 +2,11 @@
 /// These check structural flags of individual nodes
 /// without requiring global context.
 
-use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpActiveNode, MpPhantomDiff};
+use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpActiveVognode, MpPhantomDiff};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 use crate::types::viewnode::{NodeEditRequest, Editability, AffectsParent, PartnerFolder, Property, PropertyFolder};
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::tree::viewnode_nodecomplete::{
+use crate::types::tree::viewnode_graphnode::{
   generation_includes_only,
   generation_exists_and_includes,
   generation_does_not_exist,
@@ -17,7 +17,7 @@ use ego_tree::{Tree, NodeId};
 use std::collections::HashSet;
 
 /// Error from local structure validation.
-/// Contains the error message and the ID of the nearest ActiveNode ancestor.
+/// Contains the error message and the ID of the nearest ActiveVognode ancestor.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LocalStructureError {
   pub message : String,
@@ -38,7 +38,7 @@ pub fn validate_local_structure (
   let errors : Vec<String> =
     match &node_ref . value() . kind
     { MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
-        validate_activeNode(tree, node_id, t, config),
+        validate_activeVognode(tree, node_id, t, config),
       MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) =>
         validate_phantom(tree, node_id, p),
       MpViewnodeKind::BufferRoot =>
@@ -119,7 +119,7 @@ fn validate_aliasfolder (
     |node| matches!(&node . kind,
                     MpViewnodeKind::Vognode (
                       MpVognode::Active (_) )))
-    { errors . push("AliasFolder must have an ActiveNode parent." . to_string()); }
+    { errors . push("AliasFolder must have an ActiveVognode parent." . to_string()); }
   if !siblings_cannot_include(
     tree, node_id,
     |node| matches!(&node . kind,
@@ -161,7 +161,7 @@ fn validate_flags_folder (
     tree, node_id, -1, false,
     |node| matches! (&node . kind,
       MpViewnodeKind::Vognode (MpVognode::Active (_))))
-  { errors . push ("FlagsFolder must have an ActiveNode parent."
+  { errors . push ("FlagsFolder must have an ActiveVognode parent."
                    . to_string ()); }
   if ! siblings_cannot_include (
     tree, node_id,
@@ -182,7 +182,7 @@ fn validate_hiddenInSubscribee_folder (
     tree, node_id, -1, false,
     |node| node . is_active_or_diff_phantom ())
     { errors . push(
-        "HiddenInSubscribeeFolder must have an ActiveNode parent (the subscribee)"
+        "HiddenInSubscribeeFolder must have an ActiveVognode parent (the subscribee)"
         . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
@@ -190,7 +190,7 @@ fn validate_hiddenInSubscribee_folder (
            || matches! ( &node . kind,
                          MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) ))
     { errors . push(
-        "HiddenInSubscribeeFolder's children can only be ActiveNodes or Unknown placeholders (to hide)."
+        "HiddenInSubscribeeFolder's children can only be ActiveVognodes or Unknown placeholders (to hide)."
         . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
@@ -203,7 +203,7 @@ fn validate_hiddenInSubscribee_folder (
         => true,
       _ => false, } )
     { errors . push(
-        "HiddenInSubscribeeFolder ActiveNode children must have affectsParent=true."
+        "HiddenInSubscribeeFolder ActiveVognode children must have affectsParent=true."
       . to_string()); }
   if !siblings_cannot_include(
     tree, node_id,
@@ -214,7 +214,7 @@ fn validate_hiddenInSubscribee_folder (
                     . to_string()); }
   if !partnerFolder_children_have_distinct_ids(tree, node_id)
     { errors . push(
-      "HiddenInSubscribeeFolder must not have duplicate ActiveNode children."
+      "HiddenInSubscribeeFolder must not have duplicate ActiveVognode children."
         . to_string() ); }
   errors }
 
@@ -236,7 +236,7 @@ fn validate_hiddenOutsideOfSubscribee_folder (
     |node| node . is_active_or_diff_phantom ()
            || matches! ( &node . kind,
                          MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) ))
-    { errors . push("HiddenOutsideOfSubscribeeFolder's children must include only ActiveNodes or Unknown placeholders." . to_string()); }
+    { errors . push("HiddenOutsideOfSubscribeeFolder's children must include only ActiveVognodes or Unknown placeholders." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
@@ -248,7 +248,7 @@ fn validate_hiddenOutsideOfSubscribee_folder (
         => true,
       _ => false, } )
     { errors . push(
-        "HiddenOutsideOfSubscribeeFolder ActiveNode children must be affectsParent=true."
+        "HiddenOutsideOfSubscribeeFolder ActiveVognode children must be affectsParent=true."
         . to_string()); }
   if !siblings_cannot_include(
     tree, node_id,
@@ -260,7 +260,7 @@ fn validate_hiddenOutsideOfSubscribee_folder (
         . to_string()); }
   if !partnerFolder_children_have_distinct_ids(tree, node_id)
     { errors . push(
-        "HiddenOutsideOfSubscribeeFolder must not have duplicate ActiveNode children."
+        "HiddenOutsideOfSubscribeeFolder must not have duplicate ActiveVognode children."
         . to_string() ); }
   errors }
 
@@ -272,7 +272,7 @@ fn validate_subscribeefolder (
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| node . is_active_or_diff_phantom ())
-    { errors . push("SubscribeeFolder must have an ActiveNode parent." . to_string()); }
+    { errors . push("SubscribeeFolder must have an ActiveVognode parent." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| node . is_active_or_diff_phantom ()
@@ -281,7 +281,7 @@ fn validate_subscribeefolder (
                       | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
                       | MpViewnodeKind::PartnerFolder (
                           PartnerFolder::HiddenOutsideOfSubscribee) ))
-    { errors . push( "SubscribeeFolder's children must include only ActiveNodes, Unknown or inactive placeholders, or HiddenOutsideOfSubscribeeFolder." . to_string()); }
+    { errors . push( "SubscribeeFolder's children must include only ActiveVognodes, Unknown or inactive placeholders, or HiddenOutsideOfSubscribeeFolder." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
@@ -297,7 +297,7 @@ fn validate_subscribeefolder (
         PartnerFolder::HiddenOutsideOfSubscribee)
         => true,
       _ => false, } )
-    { errors . push("SubscribeeFolder ActiveNode children must have affectsParent=true."
+    { errors . push("SubscribeeFolder ActiveVognode children must have affectsParent=true."
                     . to_string() ); }
   // There is no duplicate-member check here: SubscribeeFolder is a
   // defining folder, and duplicate members of defining folders are
@@ -317,7 +317,7 @@ fn validate_relation_folder (
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| node . is_active_or_diff_phantom ())
-    { errors . push(format!("{} must have an ActiveNode parent.", label)); }
+    { errors . push(format!("{} must have an ActiveVognode parent.", label)); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| node . is_active_or_diff_phantom ()
@@ -326,7 +326,7 @@ fn validate_relation_folder (
                               MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) ))
            || matches!(&node . kind,
                        MpViewnodeKind::Vognode (MpVognode::Inactive (_)))) // tolerated from stale buffers; the rerender removes it (TODO/full-schema/9-2_repo-set-safety.org)
-    { errors . push(format!("{}'s children must include only ActiveNodes, inactive placeholders, or (for OverriddenFolder) Unknown placeholders.", label)); }
+    { errors . push(format!("{}'s children must include only ActiveVognodes, inactive placeholders, or (for OverriddenFolder) Unknown placeholders.", label)); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
@@ -340,7 +340,7 @@ fn validate_relation_folder (
         if partnerFolder == PartnerFolder::Overridden => true,
       _ => false, } )
     { errors . push(format!(
-        "{} ActiveNode children must have affectsParent=true.", label)); }
+        "{} ActiveVognode children must have affectsParent=true.", label)); }
   if !siblings_cannot_include(
     tree, node_id,
     |node| matches!(&node . kind,
@@ -353,7 +353,7 @@ fn validate_relation_folder (
     // write-protected roles keep the check.
     && !partnerFolder_children_have_distinct_ids(tree, node_id) {
     errors . push(format!(
-      "{} must not have duplicate ActiveNode children.", label)); }
+      "{} must not have duplicate ActiveVognode children.", label)); }
   errors }
 
 fn validate_text_changed (
@@ -364,7 +364,7 @@ fn validate_text_changed (
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| node . is_active_or_diff_phantom ())
-    { errors . push("TextChanged must have an ActiveNode parent." . to_string()); }
+    { errors . push("TextChanged must have an ActiveVognode parent." . to_string()); }
   if !generation_does_not_exist(tree, node_id, 1, true) {
     errors . push("TextChanged must have no (non-ignored) children." . to_string()); }
   if !siblings_cannot_include(
@@ -382,7 +382,7 @@ fn validate_idFolder (
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| node . is_active_or_diff_phantom ())
-    { errors . push("IDFolder must have an ActiveNode parent." . to_string()); }
+    { errors . push("IDFolder must have an ActiveVognode parent." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| matches!(&node . kind,
@@ -414,7 +414,7 @@ fn validate_inactive_node (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
-  // TODO/full-schema/9-2_repo-set-safety.org: an InactiveNode may
+  // TODO/full-schema/9-2_repo-set-safety.org: an InactiveVognode may
   // sit under a folder (a stale buffer from before a repo-set
   // switch) or under another gnode, and it may have children (the
   // retained case: an inactive node kept on screen because of its
@@ -430,20 +430,20 @@ fn validate_inactive_node (
                          | MpViewnodeKind::PropertyFolder (_)
                          | MpViewnodeKind::PartnerFolder (_)
                          | MpViewnodeKind::DeadViewnode
-                         | MpViewnodeKind::BufferRoot )) // an InactiveNode can be a view root: a root that went inactive but was retained for its active children
-    { errors . push("Inactive placeholder must have an ActiveNode, folder or DeadViewnode parent, or be a view root."
+                         | MpViewnodeKind::BufferRoot )) // an InactiveVognode can be a view root: a root that went inactive but was retained for its active children
+    { errors . push("Inactive placeholder must have an ActiveVognode, folder or DeadViewnode parent, or be a view root."
                     . to_string()); }
   errors }
 
-/// The identity + child-structure checks shared by an ActiveNode and a phantom
+/// The identity + child-structure checks shared by an ActiveVognode and a phantom
 /// (TODO/DONE/local-view-update/plan_v2.org §20.4 dedup): id present, no
-/// wrong-structure child, and distinct content-child ids. `label` ("ActiveNode"
+/// wrong-structure child, and distinct content-child ids. `label` ("ActiveVognode"
 /// / "Phantom") is woven into the messages so each kind reports itself.
 /// Repo validity is NOT checked here: repo is load-bearing only for a
-/// ActiveNode (it is the node's .skg file path), so validate_activeNode adds that
+/// ActiveVognode (it is the node's .skg file path), so validate_activeVognode adds that
 /// check; a phantom writes nothing and is ignored at save, so its repo --
 /// which may be the NOT_FOUND sentinel for an unresolvable reference -- is
-/// inert and goes unchecked. (validate_activeNode also appends the
+/// inert and goes unchecked. (validate_activeVognode also appends the
 /// definitive-title check; a phantom is title-exempt, being write-protected.)
 fn validate_gnode_identity_and_structure (
   tree       : &Tree<MpViewnode>,
@@ -472,17 +472,17 @@ fn validate_gnode_identity_and_structure (
     errors . push( format!("{}'s non-ignored content children must be unique (no two sharing the same ID).", label) ); }
   errors }
 
-fn validate_activeNode (
+fn validate_activeVognode (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
-  t       : &MpActiveNode,
+  t       : &MpActiveVognode,
   config  : &SkgConfig,
 ) -> Vec<String> {
   let mut errors : Vec<String> =
     validate_gnode_identity_and_structure (
-      tree, node_id, has_id (t), "ActiveNode" );
+      tree, node_id, has_id (t), "ActiveVognode" );
   if !has_valid_repo (t, config) {
-    errors . push("ActiveNode must have a repo that exists in the config."
+    errors . push("ActiveVognode must have a repo that exists in the config."
                   . to_string()); }
   if t . id . is_none () && matches! (
     t . edit_request (), Some (NodeEditRequest::SetFlag { .. }))
@@ -494,8 +494,8 @@ fn validate_activeNode (
   errors }
 
 /// Validate a phantom (TODO/DONE/local-view-update/plan_v2.org §11): the same
-/// identity and child-structure checks as an ActiveNode, minus the two
-/// ActiveNode-only rules. The definitive-title rule does not apply (a phantom is
+/// identity and child-structure checks as an ActiveVognode, minus the two
+/// ActiveVognode-only rules. The definitive-title rule does not apply (a phantom is
 /// always write-protected, hence exempt). The repo-in-config rule does not
 /// apply either: a phantom writes nothing and is ignored at save, so its
 /// repo -- possibly the NOT_FOUND sentinel for a reference that resolves to
@@ -523,13 +523,13 @@ fn cannot_be_child_of_gnode (
        && matches!(&node . kind,
             MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)) ) }
 
-/// Check if an MpActiveNode has an ID.
-pub fn has_id ( t : &MpActiveNode ) -> bool {
+/// Check if an MpActiveVognode has an ID.
+pub fn has_id ( t : &MpActiveVognode ) -> bool {
   t . id . is_some() }
 
-/// Check if an MpActiveNode has a repo and it exists in the config.
+/// Check if an MpActiveVognode has a repo and it exists in the config.
 pub fn has_valid_repo (
-  t      : &MpActiveNode,
+  t      : &MpActiveVognode,
   config : &SkgConfig,
 ) -> bool {
   t . home_repo . as_ref()
@@ -537,7 +537,7 @@ pub fn has_valid_repo (
 
 /// A definitive node (not marked for deletion) must have a non-empty title.
 /// Nodes that are write-protected or carry a delete request are exempt.
-fn has_empty_title ( t : &MpActiveNode ) -> bool {
+fn has_empty_title ( t : &MpActiveVognode ) -> bool {
   let is_definitive : bool =
     matches! ( &t . editability, Editability::Definitive { .. } );
   let is_delete : bool =

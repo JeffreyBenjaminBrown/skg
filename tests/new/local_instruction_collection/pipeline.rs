@@ -24,7 +24,7 @@ use skg::types::maybe_placed_viewnode::{
   maybePlaced_to_placed_tree,
   maybePlaced_to_placed_viewforest };
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, members_of, members_msv};
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{DefineNode, NodeMerge, SaveNode, DeleteNode};
 use skg::types::tree::forest::{MpViewForest, ViewForest};
 use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
@@ -65,7 +65,7 @@ fn save_ids (
 fn saved_node_by_id<'a> (
   instructions : &'a [DefineNode],
   id           : &str,
-) -> &'a NodeComplete {
+) -> &'a Graphnode {
   for instruction in instructions {
     if let DefineNode::Save (SaveNode (node)) = instruction {
       if node . pid == ID::from (id) {
@@ -145,7 +145,7 @@ async fn pipeline_basic_mixed_tree (
         plan . define_nodes . last(),
         Some (DefineNode::Delete (DeleteNode { id, .. }))
           if id == &ID::from ("doomed") ));
-      { let root : &NodeComplete =
+      { let root : &Graphnode =
           saved_node_by_id (&plan . define_nodes, "root");
         assert_eq!( root . body,
                     Some ("Root body" . to_string()) );
@@ -158,7 +158,7 @@ async fn pipeline_basic_mixed_tree (
                     MSV::Specified (vec![ID::from ("s1")]) );
         assert_eq!( members_msv (&root . overrides_view_of),
                     MSV::Specified (vec![ID::from ("o1")]) ); }
-      { let explicit : &NodeComplete =
+      { let explicit : &Graphnode =
           saved_node_by_id (&plan . define_nodes, "explicit");
         // Present-but-empty folders are explicit emptiness.
         assert_eq!( explicit . aliases,

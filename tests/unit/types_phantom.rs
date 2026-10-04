@@ -7,8 +7,8 @@ fn id        (s: &str) -> ID         { ID ( s . to_string () ) }
 
 fn make_parent_diff (
   contains_diff : Vec<Diff_Item<ID>>,
-) -> NodeCompleteDiff {
-  NodeCompleteDiff {
+) -> GraphnodeDiff {
+  GraphnodeDiff {
     status: GitDiffStatus::Modified,
     node_changes: Some ( NodeChanges {
       contains_diff,
@@ -23,8 +23,8 @@ fn repo_diff_with_parent_contains (
 ) -> RepoDiff {
   let parent_file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", parent_pid . 0 ) );
-  let mut staged   : HashMap<PathBuf, NodeCompleteDiff> = HashMap::new ();
-  let mut unstaged : HashMap<PathBuf, NodeCompleteDiff> = HashMap::new ();
+  let mut staged   : HashMap<PathBuf, GraphnodeDiff> = HashMap::new ();
+  let mut unstaged : HashMap<PathBuf, GraphnodeDiff> = HashMap::new ();
   if !staged_ops . is_empty () {
     staged . insert ( parent_file . clone (),
                       make_parent_diff (staged_ops) ); }
@@ -122,8 +122,8 @@ fn each_relation_reads_its_own_diff_when_one_owner_bears_both () {
     PathBuf::from ( format! ( "{}.skg", parent . 0 ) );
   let diff_for = | contains_ops : Vec<Diff_Item<ID>>,
                    overrides_ops : Vec<Diff_Item<ID>> |
-    -> NodeCompleteDiff {
-    NodeCompleteDiff {
+    -> GraphnodeDiff {
+    GraphnodeDiff {
       status: GitDiffStatus::Modified,
       node_changes: Some ( NodeChanges {
         contains_diff          : contains_ops,

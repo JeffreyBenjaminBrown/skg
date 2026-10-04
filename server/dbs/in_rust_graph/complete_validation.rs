@@ -15,8 +15,8 @@ use crate::dbs::in_rust_graph::override_invariants::{
 };
 use crate::telescope::invariants::{TelescopeViolation, validate_all_telescopes};
 use crate::types::misc::{ID, SkgConfig, RepoName};
-use crate::types::nodes::complete::NodeComplete;
-use crate::types::nodes::rust::NodeRust;
+use crate::types::nodes::complete::Graphnode;
+use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -48,7 +48,7 @@ impl CompleteGraphValidation {
 /// dangling member IDs are deliberately retained and are not errors.
 pub fn validate_complete_graph (
   config : &SkgConfig,
-  nodes : &[NodeComplete],
+  nodes : &[Graphnode],
 ) -> CompleteGraphValidation {
   let mut primary_homes : BTreeMap<ID, Vec<RepoName>> = BTreeMap::new ();
   let mut extra_owners : BTreeMap<ID, BTreeSet<ID>> = BTreeMap::new ();
@@ -82,14 +82,14 @@ pub fn validate_complete_graph (
           id : id . clone (),
           primary_owners : vec![id . clone ()],
           extra_owners, }); }}}
-  let mut nodes_by_pid : Vec<&NodeComplete> = nodes . iter () . collect ();
+  let mut nodes_by_pid : Vec<&Graphnode> = nodes . iter () . collect ();
   nodes_by_pid . sort_by (|a, b| a . pid . cmp (&b . pid));
   for node in nodes_by_pid {
     if ! config . repos . contains_key (&node . home_repo) {
       errors . push (CompleteGraphError::UnconfiguredNodeHome {
         pid : node . pid . clone (), repo : node . home_repo . clone () }); }}
 
-  let graph = InRustGraph::from_nodecompletes (nodes);
+  let graph = InRustGraph::from_graphnodes (nodes);
   // Topology and derived-index diagnostics are meaningful only when identity
   // is unambiguous; otherwise graph construction necessarily chose winners.
   let identity_is_unambiguous = ! errors . iter () . any (|error| matches! (
@@ -156,7 +156,7 @@ pub fn format_complete_graph_errors (errors : &[CompleteGraphError]) -> String {
 /// constructed graph and warnings only when no hard error was found.
 pub fn validated_graph (
   config : &SkgConfig,
-  nodes : &[NodeComplete],
+  nodes : &[Graphnode],
 ) -> Result<(InRustGraph, Vec<(ID, TelescopeViolation)>), String> {
   let report = validate_complete_graph (config, nodes);
   if report . errors . is_empty () {
@@ -173,7 +173,7 @@ pub fn validate_complete_graph_candidate (
   current : &InRustGraph,
   definitions : &[DefineNode],
 ) -> CompleteGraphValidation {
-  let mut by_pid : BTreeMap<ID, NodeComplete> = current . nodes . iter ()
+  let mut by_pid : BTreeMap<ID, Graphnode> = current . nodes . iter ()
     . map (|(pid, node)| (pid . clone (), complete_from_rust (node)))
     . collect ();
   for definition in definitions {
@@ -183,12 +183,12 @@ pub fn validate_complete_graph_candidate (
       DefineNode::Delete (DeleteNode { id, .. }) => {
         by_pid . remove (id); }
     }}
-  let nodes : Vec<NodeComplete> = by_pid . into_values () . collect ();
+  let nodes : Vec<Graphnode> = by_pid . into_values () . collect ();
   validate_complete_graph (config, &nodes)
 }
 
-pub(crate) fn complete_from_rust (node : &NodeRust) -> NodeComplete {
-  NodeComplete {
+pub(crate) fn complete_from_rust (node : &GraphnodeInRust) -> Graphnode {
+  Graphnode {
     title : node . title . clone (),
     overPrivateText_telescope : node . overPrivateText_telescope,
     aliases : node . aliases . clone (),

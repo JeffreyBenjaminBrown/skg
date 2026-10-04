@@ -19,8 +19,8 @@ use skg::dbs::tantivy::background_writer::{
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::types::env::new_mutation_gate;
 use skg::types::misc::{ID, RelPartner, RepoName};
-use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
-use skg::types::nodes::rust::NodeRust;
+use skg::types::nodes::complete::{Graphnode, empty_node_complete};
+use skg::types::nodes::rust::GraphnodeInRust;
 use skg::types::save::{DefineNode, DeleteNode, SaveNode};
 
 use std::collections::HashMap;
@@ -31,15 +31,15 @@ use tokio::sync::{Barrier, Notify};
 fn save (pid : &str) -> DefineNode {
   DefineNode::Save ( SaveNode (node (pid, "", "main")) ) }
 
-fn node (pid : &str, title : &str, repo : &str) -> NodeComplete {
+fn node (pid : &str, title : &str, repo : &str) -> Graphnode {
   let mut node = empty_node_complete ();
   node . pid = ID::from (pid);
   node . title = title . to_string ();
   node . home_repo = RepoName::from (repo);
   node }
 
-fn complete_from_rust (node : &NodeRust) -> NodeComplete {
-  NodeComplete {
+fn complete_from_rust (node : &GraphnodeInRust) -> Graphnode {
+  Graphnode {
     title : node . title . clone (),
     overPrivateText_telescope : node . overPrivateText_telescope,
     aliases : node . aliases . clone (),
@@ -143,7 +143,7 @@ fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
     node ("acquiree", "old", "main"),
     node ("acquirer", "new", "main"),
   ];
-  let handle = new_handle (InRustGraph::from_nodecompletes (&initial));
+  let handle = new_handle (InRustGraph::from_graphnodes (&initial));
   let gate = new_mutation_gate ();
   let merge_entered = Arc::new (Notify::new ());
   let release_merge = Arc::new (Notify::new ());
@@ -197,7 +197,7 @@ fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
 #[test]
 fn save_plan_captured_after_repo_move_preserves_the_new_repo () {
   let initial = node ("moved", "old title", "main");
-  let handle = new_handle (InRustGraph::from_nodecompletes (&[initial]));
+  let handle = new_handle (InRustGraph::from_graphnodes (&[initial]));
   let gate = new_mutation_gate ();
   let move_entered = Arc::new (Notify::new ());
   let release_move = Arc::new (Notify::new ());
@@ -225,7 +225,7 @@ fn save_plan_captured_after_repo_move_preserves_the_new_repo () {
       // This represents save-plan construction: copy the node only after the
       // gate is acquired, then alter the field supplied by the edited buffer.
       let snapshot = handle . load_full ();
-      let mut edited : NodeComplete =
+      let mut edited : Graphnode =
         complete_from_rust (snapshot . get (&ID::from ("moved")) . unwrap ());
       edited . title = "edited after move" . to_string ();
       publish_from_snapshot (
@@ -240,7 +240,7 @@ fn save_plan_captured_after_repo_move_preserves_the_new_repo () {
 
 #[test]
 fn rebuild_started_after_a_mutation_publishes_a_snapshot_containing_it () {
-  let handle = new_handle (InRustGraph::from_nodecompletes (&[
+  let handle = new_handle (InRustGraph::from_graphnodes (&[
     node ("seed", "seed", "main") ]));
   let gate = new_mutation_gate ();
   let mutation_entered = Arc::new (Notify::new ());
@@ -265,9 +265,9 @@ fn rebuild_started_after_a_mutation_publishes_a_snapshot_containing_it () {
       let _guard = gate_b . lock () . await;
       // A real rebuild reads disk here.  Its candidate must therefore be
       // based on the state published by every earlier gated mutation.
-      let disk_nodes : Vec<NodeComplete> = handle . load_full () . nodes
+      let disk_nodes : Vec<Graphnode> = handle . load_full () . nodes
         . values () . map (complete_from_rust) . collect ();
-      handle . store (Arc::new (InRustGraph::from_nodecompletes (&disk_nodes))); };
+      handle . store (Arc::new (InRustGraph::from_graphnodes (&disk_nodes))); };
     join! (mutation, rebuild); });
 
   let graph = handle . load_full ();

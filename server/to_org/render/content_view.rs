@@ -14,7 +14,7 @@
 
 use crate::types::tree::forest::ViewForest;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::Viewnode;
 use crate::types::views_state::pids_from_viewforest;
 use crate::repo_sets::ActiveRepoSet;
@@ -76,11 +76,11 @@ fn multi_root_view_inner (
   // reference another node by an extra_id. Production's env carries the real
   // graph already; this shim is test-only, so a per-call file read is
   // fine.
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     read_all_skg_files_from_repos (config) ?;
   let env : SkgEnv = SkgEnv::new (
     config . clone (),
-    Arc::new (InRustGraph::from_nodecompletes (&nodes)),
+    Arc::new (InRustGraph::from_graphnodes (&nodes)),
     tantivy_owned);
   multi_root_view_via_env (
     &env, root_ids, diff_mode_enabled, active_repo_set,

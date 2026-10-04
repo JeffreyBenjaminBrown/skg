@@ -22,7 +22,7 @@ use crate::from_text::local_instruction_collection::types::{
 use crate::types::misc::{
   ID, MSV, RelPartner, RepoName, members_msv, members_of,
   rel_partners_at_relRepo, rel_partners_at_relRepo_msv };
-use crate::types::nodes::complete::{Flag, NodeComplete};
+use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 
 use std::collections::{HashMap, HashSet};
@@ -30,7 +30,7 @@ use std::collections::{HashMap, HashSet};
 /// What the user appears to intend for this node.
 /// Might eventually become a DefineNode.
 /// Uses MSV values in the Save variant (whereas DefineNode uses
-/// SaveNode, which uses NodeComplete, which specifies all values).
+/// SaveNode, which uses Graphnode, which specifies all values).
 pub enum NodeIntent {
   Save   (NodeSaveIntent),
   Delete (DeleteNode), // DefineNode uses the same DeleteNode type
@@ -44,9 +44,9 @@ pub struct NodeSaveIntent {
   // contains / subscribes_to / overrides_view_of pair each member
   // with an Option<RepoName>: Some when the buffer's headline
   // carried an '(editRequest (relRepo NAME))' request (see
-  // 'ActiveNode_Generic::relRepo_request', 'NodeIntent_Local'); None means
+  // 'ActiveVognode_Generic::relRepo_request', 'NodeIntent_Local'); None means
   // "derive" (sticky-else-default). 'requested_relRepos' extracts the
-  // Some entries into a side-channel BEFORE 'into_nodecomplete'
+  // Some entries into a side-channel BEFORE 'into_graphnode'
   // discards them, for 'apply_sticky_relRepos' to validate against
   // each edge's floor.
   pub contains          : MSV<(ID, Option<RepoName>)>,
@@ -65,7 +65,7 @@ pub struct NodeSaveIntent {
 /// absent: it is inferred, and the folder that shows it is write-protected --
 /// the set-relRepo gesture refuses there). Threaded
 /// separately from
-/// NodeComplete because NodeComplete's 'RelPartner::repo' is a
+/// Graphnode because Graphnode's 'RelPartner::repo' is a
 /// plain RepoName with no "was this explicit" flag, and gets
 /// unconditionally resolved by 'apply_sticky_relRepos' -- this is the
 /// side-channel that tells that pass which members carry a real,
@@ -126,8 +126,8 @@ impl NodeIntent {
              base_hides, inferred_hides, inferred_unhides),
       NodeIntent::Delete (_) => {}, }}
 
-  pub fn graph_save_from_nodecomplete (
-    node : NodeComplete,
+  pub fn graph_save_from_graphnode (
+    node : Graphnode,
   ) -> NodeIntent {
     // No explicit repos: this seeds an intent straight from disk
     // (a definitive rebuild for hide-delta application), not from a
@@ -182,7 +182,7 @@ impl NodeIntent {
         => Ok (DefineNode::Delete (intent)),
       NodeIntent::Save (intent)
         => Ok (DefineNode::Save (SaveNode (
-          intent . into_nodecomplete() ))) }}
+          intent . into_graphnode() ))) }}
 }
 
 impl NodeSaveIntent {
@@ -198,7 +198,7 @@ impl NodeSaveIntent {
                           . map ( |id| (id, None) ) . collect () ); }}
 
   /// The repos the buffer explicitly requested (its headlines'
-  /// '(relRepo NAME)' atoms), read out BEFORE 'into_nodecomplete'
+  /// '(relRepo NAME)' atoms), read out BEFORE 'into_graphnode'
   /// discards the Option<RepoName> payload. See 'RequestedRelRepos'.
   pub fn requested_relRepos (
     &self,
@@ -220,11 +220,11 @@ impl NodeSaveIntent {
       overrides_view_of : collect (self . overrides_view_of . or_default ()),
     }}
 
-  pub fn into_nodecomplete (
+  pub fn into_graphnode (
     self,
-  ) -> NodeComplete {
+  ) -> Graphnode {
     let repo : RepoName = self . home_repo . clone();
-    let mut node : NodeComplete = NodeComplete {
+    let mut node : Graphnode = Graphnode {
       title                        : self . title,
       overPrivateText_telescope               : false,
       aliases                      :
@@ -438,7 +438,7 @@ impl LoweredIntents {
   /// from disk.
   pub fn subscriber_contains_after_save (
     &self,
-    subscriber_from_disk : &NodeComplete,
+    subscriber_from_disk : &Graphnode,
   ) -> HashSet<ID> {
     match self . by_pid . get (&subscriber_from_disk . pid) {
       Some (NodeIntent::Save (intent)) =>
@@ -454,7 +454,7 @@ impl LoweredIntents {
   /// against a stale disk subscription that the same buffer removed.
   pub fn subscriber_subscribes_after_save (
     &self,
-    subscriber_from_disk : &NodeComplete,
+    subscriber_from_disk : &Graphnode,
   ) -> Vec<ID> {
     match self . by_pid . get (&subscriber_from_disk . pid) {
       Some (NodeIntent::Save (intent))
@@ -469,7 +469,7 @@ impl LoweredIntents {
   /// last, so they calculate their delta against this intermediate state.
   pub fn subscriber_hides_after_resolution (
     &self,
-    subscriber_from_disk : &NodeComplete,
+    subscriber_from_disk : &Graphnode,
   ) -> Vec<ID> {
     match self . by_pid . get (&subscriber_from_disk . pid) {
       Some (NodeIntent::Save (intent))
@@ -485,7 +485,7 @@ impl LoweredIntents {
   /// none. A Delete intent is left untouched, because deleting wins.
   pub fn apply_hiderel_delta_to_subscriber (
     &mut self,
-    subscriber       : NodeComplete,
+    subscriber       : Graphnode,
     inferred_hides   : &[ID],
     inferred_unhides : &[ID],
   ) {
@@ -499,7 +499,7 @@ impl LoweredIntents {
         inferred_unhides);
       return; }
     let mut intent : NodeIntent =
-      NodeIntent::graph_save_from_nodecomplete (
+      NodeIntent::graph_save_from_graphnode (
         subscriber . clone());
     intent . apply_hiderel_delta (
       &base_hides,

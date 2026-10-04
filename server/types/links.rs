@@ -8,7 +8,7 @@ use std::sync::LazyLock;
 
 use crate::types::misc::ID;
 use crate::types::errors::LinkParseError;
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 use org_literal_ranges::org_literal_ranges;
 
 // LazyLock<Regex> ensures each regex is compiled exactly once, on first use, rather than per call.
@@ -77,7 +77,7 @@ impl FromStr for Link {
 //
 
 pub fn links_from_node (
-  node : &NodeComplete )
+  node : &Graphnode )
   -> Vec<Link> {
   // All links in its title
   // and (if present) its body.

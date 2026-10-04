@@ -1,54 +1,54 @@
 /// Variations on a simple theme:
-/// Producing a NodeComplete from different kinds of information.
+/// Producing a Graphnode from different kinds of information.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, RepoName};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 
 use std::error::Error;
 
-pub fn nodecomplete_by_id (
+pub fn graphnode_by_id (
   graph  : &InRustGraph,
   _config : &SkgConfig,
   id     : &ID,
-) -> Result<NodeComplete, Box<dyn Error>> {
-  if let Some (n) = nodecomplete_from_graph (graph, id) { return Ok (n); }
+) -> Result<Graphnode, Box<dyn Error>> {
+  if let Some (n) = graphnode_from_graph (graph, id) { return Ok (n); }
   Err (format! ("Node '{}' not found in captured graph generation", id) . into ()) }
 
-/// Like nodecomplete_by_id, but gives None if not found.
-/// id-based. Preserves 'optnodecomplete_from_id' not-found behavior.
-pub fn opt_nodecomplete_by_id (
+/// Like graphnode_by_id, but gives None if not found.
+/// id-based. Preserves 'optgraphnode_from_id' not-found behavior.
+pub fn opt_graphnode_by_id (
   graph  : &InRustGraph,
   _config : &SkgConfig,
   id     : &ID,
-) -> Result<Option<NodeComplete>, Box<dyn Error>> {
-  Ok (nodecomplete_from_graph (graph, id)) }
+) -> Result<Option<Graphnode>, Box<dyn Error>> {
+  Ok (graphnode_from_graph (graph, id)) }
 
 /// Transitional disk lookup for callers not yet carrying an explicit graph.
-pub fn nodecomplete_rustFirst_by_pid_and_repo (
+pub fn graphnode_rustFirst_by_pid_and_repo (
   graph  : &InRustGraph,
   config : &SkgConfig,
   pid    : &ID,
   repo : &RepoName,
-) -> Result<NodeComplete, Box<dyn Error>> {
-  nodecomplete_graphFirst_by_pid_and_repo (graph, config, pid, repo) }
+) -> Result<Graphnode, Box<dyn Error>> {
+  graphnode_graphFirst_by_pid_and_repo (graph, config, pid, repo) }
 
-pub fn nodecomplete_graphFirst_by_pid_and_repo (
+pub fn graphnode_graphFirst_by_pid_and_repo (
   graph  : &InRustGraph,
   _config : &SkgConfig,
   pid    : &ID,
   _repo : &RepoName,
-) -> Result<NodeComplete, Box<dyn Error>> {
-  if let Some (n) = nodecomplete_from_graph (graph, pid) { return Ok (n); }
+) -> Result<Graphnode, Box<dyn Error>> {
+  if let Some (n) = graphnode_from_graph (graph, pid) { return Ok (n); }
   Err (format! ("Node '{}' not found in captured graph generation", pid) . into ()) }
 
-pub fn nodecomplete_from_graph (
+pub fn graphnode_from_graph (
   graph : &InRustGraph,
   id    : &ID,
-) -> Option<NodeComplete> {
+) -> Option<Graphnode> {
   let pid : ID = graph . pid_of (id) ?;
   let rust = graph . nodes . get (&pid) ?;
-  Some ( NodeComplete {
+  Some ( Graphnode {
     pid                          : rust . pid . clone (),
     home_repo                       : rust . home_repo . clone (),
     extra_ids                    : rust . extra_ids . clone (),

@@ -18,7 +18,7 @@ use skg::types::env::SkgEnv;
 use skg::import_org_roam::{ImportStats, import_org_roam_directory};
 use skg::serve::serve;
 use skg::types::misc::{ID, SkgConfig, RepoName, TantivyIndex};
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::nodes::complete::Graphnode;
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -129,7 +129,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                              map_to_content,
                              map_to_containers },
         nodes )
-      : (SkgEnv, InitContextHandoff, Vec<NodeComplete>) =
+      : (SkgEnv, InitContextHandoff, Vec<Graphnode>) =
     { let _span : tracing::span::EnteredSpan = tracing::info_span! (
         "initialize_dbs") . entered ();
       initialize_dbs (&config) };
@@ -259,7 +259,7 @@ fn install_shutdown_signal_handler (
   } ) . expect ("Error setting Ctrl+C handler"); }
 
 /// Compute context origin types for search ranking.
-/// Fully in-Rust-graph: all data is pre-computed from NodeCompletes at init.
+/// Fully in-Rust-graph: all data is pre-computed from Graphnodes at init.
 /// Consumes (and frees) the large lookup maps after use.
 fn compute_context_rankings (
   tantivy_index     : &TantivyIndex,
@@ -340,7 +340,7 @@ fn run_export_org (
     else { "org-exports" . to_string() };
   let active : ActiveRepoSet =
     ActiveRepoSet::named (&config, set_name) ?;
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     read_all_skg_files_from_repos (&config) ?;
   let candidates : HashSet<ID> =
     export_candidate_pids (&active, &nodes) . into_iter () . collect ();

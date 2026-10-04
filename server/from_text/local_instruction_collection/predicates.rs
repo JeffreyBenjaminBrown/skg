@@ -9,14 +9,14 @@
 /// error ('nonignored_children_have_distinct_ids'), and duplicate
 /// defining-folder members are silently deduplicated at emission.
 
-use crate::types::viewnode::{NodeEditRequest, AffectsParent, ActiveNode};
+use crate::types::viewnode::{NodeEditRequest, AffectsParent, ActiveVognode};
 
 /// This returns true iff the given Active vognode counts as a
 /// member of the writeable PartnerFolder (a SubscribeeFolder or
 /// OverriddenFolder) that is its parent. To count, it must be Affected,
 /// not a would-be diff phantom, and not marked for deletion.
 pub fn member_counts_for_partnerFolder (
-  t : &ActiveNode,
+  t : &ActiveVognode,
 ) -> bool {
   t . affectsParent == AffectsParent::True
     && !t . should_be_diffPhantom ()
@@ -31,7 +31,7 @@ pub fn member_counts_for_partnerFolder (
 /// (The caller must also know the child is in content position;
 /// that is context, not a fact about the node.)
 pub fn active_child_counts_as_content (
-  t : &ActiveNode,
+  t : &ActiveVognode,
 ) -> bool {
   member_counts_for_partnerFolder (t) }
 
@@ -43,7 +43,7 @@ pub fn active_child_counts_as_content (
 /// has no diff-phantom condition: an Active node whose diff axes
 /// have gone negative still counts as visible here.
 pub fn active_child_counts_as_visible_content (
-  t : &ActiveNode,
+  t : &ActiveVognode,
 ) -> bool {
   t . affectsParent == AffectsParent::True
     && !matches!( t . edit_request (),

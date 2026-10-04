@@ -1,4 +1,4 @@
-//! NodeFS: the on-disk shape of one telescope SECTION.
+//! GraphnodeOnDisk: the on-disk shape of one telescope SECTION.
 //!
 //! One node = one ID = one privacy telescope: same-ID .skg files, at
 //! most one per repo, each an "telescope section" holding the
@@ -13,10 +13,10 @@
 //! parse unchanged (title present, no anchors).
 //!
 //! Conversions:
-//! - 'NodeFS::into_section_slices' feeds the fold
-//!   ('server/telescope/fold.rs'), which is how NodeComplete values
-//!   are born; 'nodefs_from_section' is the unfold-side inverse.
-//! - 'NodeFS::into_complete_as_single_section (repo)' treats ONE
+//! - 'GraphnodeOnDisk::into_section_slices' feeds the fold
+//!   ('server/telescope/fold.rs'), which is how Graphnode values
+//!   are born; 'graphnode_on_disk_from_section' is the unfold-side inverse.
+//! - 'GraphnodeOnDisk::into_complete_as_single_section (repo)' treats ONE
 //!   section as a whole node. Used only where a single FILE is the
 //!   honest unit: historical blobs (the vanished-node search) and
 //!   diff MODE's per-file reads (safe because diff mode requires
@@ -26,13 +26,13 @@ use serde::{Serialize, Deserialize};
 
 use crate::telescope::types::{ListItem, SectionSlices};
 use crate::types::misc::{ID, MSV, RepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 use crate::types::nodes::complete::Flag;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
-pub struct NodeFS {
+pub struct GraphnodeOnDisk {
   // Field order fixes YAML output order. When anything here changes,
-  // update 'NodeComplete' (see [[./complete.rs][server/types/nodes/complete.rs]]) and vice versa.
+  // update 'Graphnode' (see [[./complete.rs][server/types/nodes/complete.rs]]) and vice versa.
 
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub title: Option<String>, // Some in the home section only.
@@ -64,7 +64,7 @@ pub struct NodeFS {
   pub misc: Vec<Flag>,
 }
 
-impl NodeFS {
+impl GraphnodeOnDisk {
   /// This section's contribution to the fold.
   pub fn into_section_slices (
     self,
@@ -97,7 +97,7 @@ impl NodeFS {
   pub fn into_complete_as_single_section (
     self,
     repo : RepoName,
-  ) -> NodeComplete {
+  ) -> Graphnode {
     let members_only = |items : Vec<ListItem>| -> Vec<ID> {
       items . into_iter ()
         . filter_map ( |i| match i {
@@ -107,7 +107,7 @@ impl NodeFS {
     let msv_ids = |ids : Vec<ID>| -> MSV<ID> {
       if ids . is_empty () { MSV::Unspecified }
       else { MSV::Specified (ids) }};
-    NodeComplete {
+    Graphnode {
       title                        :
         self . title . unwrap_or_default (),
       overPrivateText_telescope               : false,
@@ -151,7 +151,7 @@ impl NodeFS {
       serde_yaml::to_value (self)?;
     let mapping : &serde_yaml::Mapping =
       value . as_mapping ()
-      . expect ("NodeFS serializes as a YAML mapping");
+      . expect ("GraphnodeOnDisk serializes as a YAML mapping");
     let mut out : String = String::new();
     for (key, val) in mapping . iter () {
       let is_body : bool =
@@ -177,14 +177,14 @@ impl NodeFS {
 /// The unfold-side inverse of 'into_section_slices': one section's
 /// on-disk shape. 'pid' names the telescope; 'is_home' decides
 /// whether extra_ids ride along (they live in the home only).
-pub fn nodefs_from_section (
+pub fn graphnode_on_disk_from_section (
   pid       : &ID,
   extra_ids : &[ID],
   misc      : &[Flag],
   is_home   : bool,
   slices    : SectionSlices,
-) -> NodeFS {
-  NodeFS {
+) -> GraphnodeOnDisk {
+  GraphnodeOnDisk {
     title                        : slices . title,
     aliases                      :
       slices . aliases . unwrap_or_default (),

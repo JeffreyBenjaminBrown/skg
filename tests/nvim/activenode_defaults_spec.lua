@@ -35,7 +35,7 @@ local function strip_to_sexp (org_text)
 end
 
 describe('skg.sexpr.activenode_defaults.activeNode_sexp_p', function ()
-  it('recognizes an ActiveNode sexp', function ()
+  it('recognizes an ActiveVognode sexp', function ()
     assert.is_true(defaults.activeNode_sexp_p(
       sexpr.read('(skg (node (id abc) (repo jeff)))')))
   end)
@@ -61,7 +61,7 @@ describe('skg.sexpr.activenode_defaults.headlines_to_org', function ()
 end)
 
 describe('skg.sexpr.activenode_defaults expansion', function ()
-  it('inserts all default fields into a minimal ActiveNode', function ()
+  it('inserts all default fields into a minimal ActiveVognode', function ()
     local headlines =
       expanded_headlines('(skg (node (id abc) (repo jeff)))')
     -- skg, node, id/abc, repo/jeff, write-protected/false, affectsParent/true,

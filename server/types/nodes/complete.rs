@@ -1,16 +1,16 @@
-//! NodeComplete: the full in-Rust-graph node.
+//! Graphnode: the full in-Rust-graph node.
 //!
 //! Carries every field a node has: the on-disk fields (mirrored
-//! from NodeFS) plus 'repo', which is inferred from file
+//! from GraphnodeOnDisk) plus 'repo', which is inferred from file
 //! location and held only in the in-Rust graph.
 //!
-//! NodeComplete itself is NOT Serialize/Deserialize. The on-disk
-//! round-trip goes through 'NodeFS'
+//! Graphnode itself is NOT Serialize/Deserialize. The on-disk
+//! round-trip goes through 'GraphnodeOnDisk'
 //! ([[./fs.rs][server/types/nodes/fs.rs]]):
-//! read YAML as 'NodeFS', then attach repo via
-//! 'NodeFS::into_complete(repo)' to get a 'NodeComplete'. To
-//! write, convert 'NodeComplete' -> 'NodeFS' via 'From' (dropping
-//! 'repo'), then serialize the 'NodeFS'. This way the type
+//! read YAML as 'GraphnodeOnDisk', then attach repo via
+//! 'GraphnodeOnDisk::into_complete(repo)' to get a 'Graphnode'. To
+//! write, convert 'Graphnode' -> 'GraphnodeOnDisk' via 'From' (dropping
+//! 'repo'), then serialize the 'GraphnodeOnDisk'. This way the type
 //! system enforces that 'repo' never appears in YAML.
 
 use crate::types::misc::{ID, MSV, RelPartner, RepoName};
@@ -80,11 +80,11 @@ pub fn set_flag (
     misc . retain (|candidate| *candidate != flag); }}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct NodeComplete {
-  // There is a 1-to-1 correspondence between NodeCompletes and privacy TELESCOPES (families of same-pid .skg files, one section per repo; see docs/telescopes.org). Reading FOLDS the sections into a NodeComplete; writing UNFOLDS it back into sections, byte-stably. The files are the only permanent data. NodeComplete initializes the in-memory graph and Tantivy index.
+pub struct Graphnode {
+  // There is a 1-to-1 correspondence between Graphnodes and privacy TELESCOPES (families of same-pid .skg files, one section per repo; see docs/telescopes.org). Reading FOLDS the sections into a Graphnode; writing UNFOLDS it back into sections, byte-stably. The files are the only permanent data. Graphnode initializes the in-memory graph and Tantivy index.
   // The graph indexes this complete record for structural queries. Tantivy
   // receives the searchable subset. The filesystem remains authoritative.
-  // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/misc.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when reconciling multiple NodeCompletes (e.g. 'reconcile_same_id_instructions' and supplement_unspecified_fields_from_disk). PITFALL: since telescopes, the distinction is meaningful ON DISK too: a section that omits a field has no opinion about it (Unspecified), while under unfold each section records exactly the edges recorded there -- so what a given section file shows is not the node's whole list, and an absent field in one section says nothing about the fold.
+  // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/misc.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when reconciling multiple Graphnodes (e.g. 'reconcile_same_id_instructions' and supplement_unspecified_fields_from_disk). PITFALL: since telescopes, the distinction is meaningful ON DISK too: a section that omits a field has no opinion about it (Unspecified), while under unfold each section records exactly the edges recorded there -- so what a given section file shows is not the node's whole list, and an absent field in one section says nothing about the fold.
 
   pub title: String,
   /// True when the selected title or body came from below the home.
@@ -107,7 +107,7 @@ pub struct NodeComplete {
   pub misc: Vec<Flag>,
 }
 
-impl NodeComplete {
+impl Graphnode {
   pub fn all_ids (&self) -> impl Iterator<Item = &ID> {
     std::iter::once (&self . pid)
       . chain (self . extra_ids . iter()) }
@@ -141,8 +141,8 @@ impl NodeComplete {
 /// lines (a line is whitespace-only iff it trims to empty); if nothing
 /// remains, the body becomes 'None'. After this, "bodyless" is exactly
 /// 'body == None' -- the invariant the link-interestingness predicate
-/// relies on. Idempotent; enforced at every disk write ('NodeFS::from')
-/// and on the in-memory save NodeComplete ('into_nodecomplete'), with a
+/// relies on. Idempotent; enforced at every disk write ('GraphnodeOnDisk::from')
+/// and on the in-memory save Graphnode ('into_graphnode'), with a
 /// one-time migration ('data/bash/trim-node-bodies.org') for old data.
 pub fn normalize_body (
   body : Option<String>,
@@ -158,8 +158,8 @@ pub fn normalize_body (
     _ => None, }}
 
 /// Useful for making tests more readable.
-pub fn empty_node_complete () -> NodeComplete {
-  NodeComplete {
+pub fn empty_node_complete () -> Graphnode {
+  Graphnode {
     title                        : String::new (),
     overPrivateText_telescope               : false,
     aliases                      : MSV::Unspecified,
@@ -175,5 +175,5 @@ pub fn empty_node_complete () -> NodeComplete {
   }}
 
 #[cfg(test)]
-#[path = "../../../tests/unit/nodecomplete.rs"]
+#[path = "../../../tests/unit/graphnode.rs"]
 mod tests;

@@ -17,7 +17,7 @@ use skg::test_utils::{
   update_from_and_rerender_buffer_test as update_from_and_rerender_buffer};
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::nodes::complete::Graphnode;
 use skg::types::views_state::{OpenViews, ViewUri};
 use skg::types::viewnode::Viewnode;
 
@@ -42,13 +42,13 @@ fn test_repo_move_updates_collateral_view_metadata (
   let tantivy_folder : PathBuf =
     temp_dir . path() . join ("tantivy");
   let (config, tantivy, initial_nodes)
-    : (SkgConfig, TantivyIndex, Vec<NodeComplete>) =
+    : (SkgConfig, TantivyIndex, Vec<Graphnode>) =
     block_on ( setup_test_stores (
       test_name,
       temp_dir . path(),
       &tantivy_folder ) ) ?;
   let graph : InRustGraphHandle =
-    new_handle ( InRustGraph::from_nodecompletes (&initial_nodes) );
+    new_handle ( InRustGraph::from_graphnodes (&initial_nodes) );
 
   let (_save_response, collateral_buffer)
     : (SaveResponse, String) =
@@ -140,11 +140,11 @@ fn successful_save_consumes_relRepo_edit_request (
     Path::new ("tests/move_repo/fixtures"), temp_dir . path () ) ?;
   let tantivy_folder : PathBuf = temp_dir . path () . join ("tantivy");
   let (config, tantivy, initial_nodes)
-    : (SkgConfig, TantivyIndex, Vec<NodeComplete>) =
+    : (SkgConfig, TantivyIndex, Vec<Graphnode>) =
     block_on (setup_test_stores (
       test_name, temp_dir . path (), &tantivy_folder )) ?;
   let graph : InRustGraphHandle =
-    new_handle (InRustGraph::from_nodecompletes (&initial_nodes));
+    new_handle (InRustGraph::from_graphnodes (&initial_nodes));
 
   let saved : String = block_on ( async {
     let (initial_buffer, _pids, _viewforest) = multi_root_view (
@@ -182,7 +182,7 @@ async fn setup_test_stores (
   test_name        : &str,
   fixtures_root  : &Path,
   tantivy_folder : &Path,
-) -> Result<(SkgConfig, TantivyIndex, Vec<NodeComplete>),
+) -> Result<(SkgConfig, TantivyIndex, Vec<Graphnode>),
             Box<dyn Error>> {
   let config : SkgConfig =
     load_config_with_overrides (
@@ -196,7 +196,7 @@ async fn setup_test_stores (
     SkgConfig {
       tantivy_folder : tantivy_folder . to_path_buf(),
       .. config };
-  let nodes : Vec<NodeComplete> =
+  let nodes : Vec<Graphnode> =
     read_all_skg_files_from_repos (&config)?;
   let tantivy_index : TantivyIndex =
     create_empty_tantivy_index (&config . tantivy_folder)?;

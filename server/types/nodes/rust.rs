@@ -1,15 +1,15 @@
-//! NodeRust: the projection held in the in-Rust graph.
+//! GraphnodeInRust: the projection held in the in-Rust graph.
 //!
-//! Wide enough to match everything NodeComplete carries (except
+//! Wide enough to match everything Graphnode carries (except
 //! derived fields), plus links_to — derived from body parsing at
-//! NodeRust construction time.
+//! GraphnodeInRust construction time.
 
 use crate::types::misc::{ID, MSV, RelPartner, RepoName};
-use crate::types::nodes::complete::{Flag, NodeComplete};
+use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::links::links_from_node;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct NodeRust {
+pub struct GraphnodeInRust {
   pub pid                          : ID,
   pub home_repo                       : RepoName,
   pub extra_ids                    : Vec<ID>,
@@ -28,15 +28,15 @@ pub struct NodeRust {
   pub links_to                 : Vec<ID>,
 }
 
-impl From<&NodeComplete> for NodeRust {
+impl From<&Graphnode> for GraphnodeInRust {
   /// Derive 'links_to' by parsing title+body; copy everything else.
-  fn from (c: &NodeComplete) -> Self {
+  fn from (c: &Graphnode) -> Self {
     let links_to : Vec<ID> =
       links_from_node (c)
       . into_iter ()
       . map ( |tl| tl . id )
       . collect ();
-    NodeRust {
+    GraphnodeInRust {
       pid                          : c . pid . clone (),
       home_repo                       : c . home_repo . clone (),
       extra_ids                    : c . normalized_extra_ids (),

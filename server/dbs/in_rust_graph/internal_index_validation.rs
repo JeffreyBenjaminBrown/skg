@@ -8,7 +8,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::prepared_update::GraphChangeSet;
 use crate::types::misc::{ID, members_of};
-use crate::types::nodes::rust::NodeRust;
+use crate::types::nodes::rust::GraphnodeInRust;
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -101,7 +101,7 @@ fn validate_local_nodes (
   for definition in definitions {
     match definition {
       DefineNode::Save (SaveNode (node)) => {
-        let expected : NodeRust = NodeRust::from (node);
+        let expected : GraphnodeInRust = GraphnodeInRust::from (node);
         if candidate . nodes . get (&node . pid) != Some (&expected) {
           result . push (InternalIndexMismatch {
             index    : "nodes",
@@ -153,7 +153,7 @@ fn validate_local_identity (
 
 fn relationship_keys (
   identity : &InRustGraph,
-  node     : &NodeRust,
+  node     : &GraphnodeInRust,
 ) -> BTreeMap<&'static str, BTreeSet<ID>> {
   let canonical = |raw : &ID| -> ID {
     identity . pid_of (raw) . unwrap_or_else (|| raw . clone ()) };

@@ -1,12 +1,12 @@
 use crate::from_text::fork::{CloneRepoInputs, fork_spec_from_buffer_node};
 use crate::repo_sets::ActiveRepoSet;
-use crate::dbs::node_lookup::opt_nodecomplete_by_id;
+use crate::dbs::node_lookup::opt_graphnode_by_id;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{
   ID, MSV, RelPartner, SkgConfig, RepoName, members_of};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode, ForkSpec, NodeMerge, RepoMove};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 
 use std::collections::{HashMap, HashSet};
 
@@ -89,8 +89,8 @@ pub fn validate_and_filter_foreign_instructions(
 enum ForeignPolicyOutcome {
   Keep, // Safe to pass through to persistence.
   DropUnchangedForeignSave, // Safe to drop because the buffer expresses no change from disk.
-  ForkCandidate(NodeComplete, // An edited foreign node: clone it (the buffer node N becomes the clone's template). Dropped from the DefineNodes; a ForkSpec is collected instead.
-               NodeComplete), // N's DISK node -- the original, before the user's edit. Its title feeds the confirmation buffer's child line (which shows the original honestly, distinct from the clone's edited title); its contains feed the clone's creation-time hides (children the forking edit deleted).
+  ForkCandidate(Graphnode, // An edited foreign node: clone it (the buffer node N becomes the clone's template). Dropped from the DefineNodes; a ForkSpec is collected instead.
+               Graphnode), // N's DISK node -- the original, before the user's edit. Its title feeds the confirmation buffer's child line (which shows the original honestly, distinct from the clone's edited title); its contains feed the clone's creation-time hides (children the forking edit deleted).
   AdoptCloneRepo(ID), // A NEW node (bare headline) whose foreign repo was inherited from the named forked node N: kept, but rewritten to N's clone's repo once the ForkSpecs exist ('finalize_foreign_policy_instructions').
   Reject(BufferValidationError), // Must reject before persistence.
 }
@@ -116,7 +116,7 @@ fn apply_foreign_policy(
       if !repo_is_foreign (config, &node . home_repo) {
         // not foreign, so keep
         return Ok (ForeignPolicyOutcome::Keep); }
-      match opt_nodecomplete_by_id(
+      match opt_graphnode_by_id(
         graph, config, &node . pid
       ) {
         Ok(Some (disk_node)) => {
@@ -223,7 +223,7 @@ fn finalize_foreign_policy_instructions(
 /// Preserve members explicitly recorded at any OTHER repo. Only facts whose
 /// relRepo equals the inherited home are part of this implicit adoption.
 fn rehome_inherited_new_node (
-  node       : &mut NodeComplete,
+  node       : &mut Graphnode,
   new_repo : &RepoName,
 ) {
   fn retag<T> (
@@ -273,8 +273,8 @@ fn repo_is_foreign(
 /// (because the user did not mention it in the buffer),
 /// and therefore does not represent an edit.
 pub(crate) fn buffernode_differs_from_disknode(
-  buffer_node: &NodeComplete,
-  disk_node: &NodeComplete,
+  buffer_node: &Graphnode,
+  disk_node: &Graphnode,
 ) -> bool {
   fn fields_match<T: Clone + PartialEq>(
     buffer: &MSV<T>,

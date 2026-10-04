@@ -6,10 +6,10 @@ use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::to_org::complete::partner_folder::goal_list::{goal_list_for_outbound_folder, outbound_member_axes};
 use crate::types::git::{NodeAxes, RelationshipAxes, RepoDiff};
 use crate::types::phantom::phantom_axes;
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
+use crate::dbs::node_lookup::graphnode_rustFirst_by_pid_and_repo;
 use crate::types::misc::{ID, RelPartner, RepoName};
 use crate::types::tree::generic::{read_at_node_in_tree, with_node_mut};
-use crate::types::tree::viewnode_nodecomplete::{ unique_non_vognode_child_of_viewnode, insert_non_vognode_as_child};
+use crate::types::tree::viewnode_graphnode::{ unique_non_vognode_child_of_viewnode, insert_non_vognode_as_child};
 use crate::update_buffer::ancestry::required_ancestor;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, PartnerFolder};
 use crate::types::viewnode::Vognode;
@@ -140,14 +140,14 @@ fn read_subscribeeFolder_context (
                     t . home_repo . clone() )),
         _ => None } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
-    . ok_or ("reconcile_subscribeeFolder_children: parent is not an ActiveNode") ?;
+    . ok_or ("reconcile_subscribeeFolder_children: parent is not an ActiveVognode") ?;
   let worktree_members : Vec<RelPartner<ID>> =
     // relRepo gating (render-and-gating, 5_plan.org): this is the
     // OWNER's own outbound list (like 'contains' in
     // reconcile/content.rs), so a subscription recorded at an
     // inactive level must not appear here even though the
     // subscribee node itself may be active.
-    nodecomplete_rustFirst_by_pid_and_repo (
+    graphnode_rustFirst_by_pid_and_repo (
       &runtime . graph, &runtime . config, &parent_pid, &parent_repo )
       . ok ()
       . map ( |skg| skg . subscribes_to . or_default () . iter ()

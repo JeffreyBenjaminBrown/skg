@@ -6,7 +6,7 @@ pub mod kind;
 use crate::repo_sets::ActiveRepoSet;
 use crate::types::phantom::home_from_disk;
 use crate::update_buffer::reconcile::omit_inactive_members;
-use crate::dbs::node_lookup::nodecomplete_graphFirst_by_pid_and_repo;
+use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::to_org::complete::partner_folder::child_data::{
@@ -16,14 +16,14 @@ use crate::to_org::complete::partner_folder::goal_list::{
   goal_list_for_hiddenOutsideOfSubscribee_folder,
   goal_list_for_outbound_folder };
 use crate::to_org::complete::partner_folder::inverse_scan::inverse_scan_for_inbound_folder;
-use crate::to_org::util::nodecomplete_and_viewnode_from_id;
+use crate::to_org::util::graphnode_and_viewnode_from_id;
 use crate::types::git::RepoDiff;
 use crate::types::misc::{ID, SkgConfig, RepoName, members_of};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder};
 use crate::types::viewnode::Vognode;
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree, with_node_mut};
-use crate::types::tree::viewnode_nodecomplete::{
+use crate::types::tree::viewnode_graphnode::{
   insert_non_vognode_as_child,
   pid_for_subscribee_and_its_subscriber_grandparent,
   unique_non_vognode_child_of_viewnode };
@@ -36,7 +36,7 @@ use std::error::Error;
 /// collapse to their primary pid), keeping the original input order
 /// and de-duplicating, and build a 'ChildData' for each.
 ///
-/// Uses 'nodecomplete_and_viewnode_from_id' with the captured graph so
+/// Uses 'graphnode_and_viewnode_from_id' with the captured graph so
 /// cross-repo IDs and extra_id-to-primary resolution both work,
 /// matching the repo-resolution behavior of the per-id append
 /// loops this code replaced.
@@ -56,8 +56,8 @@ fn build_initial_render_child_data (
   let mut goal     : Vec<ID>                = Vec::with_capacity (ids . len ());
   let mut resolved : HashMap<ID, ChildData> = HashMap::new ();
   for id in ids {
-    let lookup : Option<(NodeComplete, Viewnode)> =
-      nodecomplete_and_viewnode_from_id (graph, config, id) ?;
+    let lookup : Option<(Graphnode, Viewnode)> =
+      graphnode_and_viewnode_from_id (graph, config, id) ?;
     let (primary_pid, repo, title, unknown) : (ID, RepoName, String, bool) = match lookup {
       Some ((nc, _vn)) =>
         ( nc . pid . clone (),
@@ -78,8 +78,8 @@ fn build_initial_render_child_data (
   Ok ((goal, resolved)) }
 
 /// Check if a node's type and parent type are consistent with being a Subscribee.
-/// A Subscribee is an ActiveNode whose parent is a SubscribeeFolder.
-/// (Checking that its grandparent (the subscriber) is an ActiveNode
+/// A Subscribee is an ActiveVognode whose parent is a SubscribeeFolder.
+/// (Checking that its grandparent (the subscriber) is an ActiveVognode
 /// happens from the SubscribeeFolder, so needn't be repeated here.)
 pub fn type_and_parent_type_consistent_with_subscribee (
   tree    : &Tree<Viewnode>,
@@ -88,15 +88,15 @@ pub fn type_and_parent_type_consistent_with_subscribee (
   let node_ref : NodeRef < Viewnode > =
     tree . get (node_id)
     . ok_or ("type_and_parent_type_consistent_with_subscribee: node not found") ?;
-  let is_activeNode_and_affectsParent_true : bool =
-    node_ref . value () . is_activeNode_and_affectsParent_true ();
+  let is_activeVognode_and_affectsParent_true : bool =
+    node_ref . value () . is_activeVognode_and_affectsParent_true ();
   let affects_parent_subscribeeFolder : bool =
     node_ref . parent ()
     . map ( |p| matches! (
               & p . value () . kind,
               ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)))
     . unwrap_or (false);
-  Ok ( is_activeNode_and_affectsParent_true
+  Ok ( is_activeVognode_and_affectsParent_true
        && affects_parent_subscribeeFolder ) }
 
 /// If appropriate, prepend a SubscribeeFolder child containing:
@@ -118,7 +118,7 @@ pub fn maybe_add_subscribeeFolder_branch (
     tree, node_id,
     |vn| matches!( &vn . kind,
                     ViewnodeKind::Vognode (Vognode::Active (_))),
-    "maybe_add_subscribeeFolder_branch: expected ActiveNode" ) ?;
+    "maybe_add_subscribeeFolder_branch: expected ActiveVognode" ) ?;
   { let is_writeProtected : bool =
       read_at_node_in_tree(
         tree, node_id,
@@ -142,7 +142,7 @@ pub fn maybe_add_subscribeeFolder_branch (
                      t . home_repo . clone () )),
         _ => None } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
-    . ok_or ("maybe_add_subscribeeFolder_branch: expected ActiveNode") ?;
+    . ok_or ("maybe_add_subscribeeFolder_branch: expected ActiveVognode") ?;
   let subscribee_ids : Vec<ID> = graph . outbound_ids_for_relation_gated (
     &subscriber_pid, NodeRelation::SubscribesTo, active_repo_set );
   let subscribee_ids : Vec<ID> =
@@ -204,7 +204,7 @@ pub fn maybe_add_subscribeeFolder_branch (
     hidden_outside_content . is_empty ()
     && repo_diffs . is_some ()
     && { let wt_hides : Vec<ID> =
-           nodecomplete_graphFirst_by_pid_and_repo (
+           graphnode_graphFirst_by_pid_and_repo (
              graph, config, &subscriber_pid, &subscriber_repo )
            . ok ()
            . map ( |skg| members_of (
@@ -257,7 +257,7 @@ pub fn maybe_add_default_partnerFolder_branches (
     tree, node_id,
     |vn| matches!( &vn . kind,
                     ViewnodeKind::Vognode (Vognode::Active (_) )),
-    "maybe_add_default_partnerFolder_branches: expected ActiveNode" ) ?;
+    "maybe_add_default_partnerFolder_branches: expected ActiveVognode" ) ?;
   { let is_writeProtected : bool =
       read_at_node_in_tree(
         tree, node_id,
@@ -300,7 +300,7 @@ pub fn maybe_add_one_partnerFolder (
       |vn| match &vn . kind {
         ViewnodeKind::Vognode (Vognode::Active (t))
           => Ok (( t . id . clone (), t . home_repo . clone () )),
-        _ => Err ("expected ActiveNode" . to_string ()), } )
+        _ => Err ("expected ActiveVognode" . to_string ()), } )
     .map_err( |e| -> Box<dyn Error> { e . into() } ) ??;
   let Some (member_role) = kind . relation_member_role ()
     // The two Hidden*SubscribeeFolders lack this, hence end here.
@@ -413,12 +413,12 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
            let subscriber_repo : RepoName =
              repo_of (&subscriber_pid);
            let subscribee_contains : Vec<ID> =
-             nodecomplete_graphFirst_by_pid_and_repo (
+             graphnode_graphFirst_by_pid_and_repo (
                graph, config, &subscribee_pid, &subscribee_repo )
              . ok () . map ( |skg| members_of (& skg . contains) )
              . unwrap_or_default ();
            let subscriber_hides : Vec<ID> =
-             nodecomplete_graphFirst_by_pid_and_repo (
+             graphnode_graphFirst_by_pid_and_repo (
                graph, config, &subscriber_pid, &subscriber_repo )
              . ok ()
              . map ( |skg| members_of (

@@ -1,4 +1,4 @@
-use crate::types::git::{GitDiffStatus, NodeChanges, NodeCompleteDiff, RepoDiff, per_stage_node_changes_for_activeNode};
+use crate::types::git::{GitDiffStatus, NodeChanges, GraphnodeDiff, RepoDiff, per_stage_node_changes_for_activeVognode};
 
 use super::*;
 use std::path::PathBuf;
@@ -6,8 +6,8 @@ use std::path::PathBuf;
 fn repo_name (s: &str) -> RepoName { RepoName ( s . to_string () ) }
 fn id          (s: &str) -> ID          { ID ( s . to_string () ) }
 
-fn make_diff_entry (text_changed: bool) -> NodeCompleteDiff {
-  NodeCompleteDiff {
+fn make_diff_entry (text_changed: bool) -> GraphnodeDiff {
+  GraphnodeDiff {
     status: GitDiffStatus::Modified,
     node_changes: Some ( NodeChanges {
       text_changed,
@@ -21,8 +21,8 @@ fn sd_with (
   unstag  : Option<bool>,
 ) -> RepoDiff {
   let file : PathBuf = PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-  let mut s : HashMap<PathBuf, NodeCompleteDiff> = HashMap::new ();
-  let mut u : HashMap<PathBuf, NodeCompleteDiff> = HashMap::new ();
+  let mut s : HashMap<PathBuf, GraphnodeDiff> = HashMap::new ();
+  let mut u : HashMap<PathBuf, GraphnodeDiff> = HashMap::new ();
   if let Some (t) = staged { s . insert (file . clone (), make_diff_entry (t)); }
   if let Some (t) = unstag { u . insert (file,           make_diff_entry (t)); }
   RepoDiff {
@@ -42,7 +42,7 @@ fn text_changed_both (
   pid   : &ID,
   src   : &RepoName,
 ) -> (bool, bool) {
-  let (s, u) = per_stage_node_changes_for_activeNode (diffs, pid, src);
+  let (s, u) = per_stage_node_changes_for_activeVognode (diffs, pid, src);
   ( s . map ( |n| n . text_changed ) . unwrap_or (false),
     u . map ( |n| n . text_changed ) . unwrap_or (false) )
 }

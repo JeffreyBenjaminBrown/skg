@@ -95,7 +95,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   let rel_t = match &unrel_node . kind {
     MpViewnodeKind::Vognode (
       MpVognode::Active (t)) => t,
-    _ => panic!("expected ActiveNode") };
+    _ => panic!("expected ActiveVognode") };
   assert_eq!(unrel_node . title(), "independent root node");
   assert_eq!(rel_t . affectsParent != AffectsParent::True, true);
   assert_eq!(rel_t . is_writeProtected (), true);
@@ -106,7 +106,7 @@ fn test_org_to_uninterpreted_nodes2_with_metadata() {
   let cycle_t = match &cycle_node . kind {
     MpViewnodeKind::Vognode (
       MpVognode::Active (t)) => t,
-    _ => panic!("expected ActiveNode") };
+    _ => panic!("expected ActiveVognode") };
   assert_eq!(cycle_node . title(), "cycling node");
   assert_eq!(cycle_t . viewStats . cycle, true);
   assert_eq!(cycle_node . body(),
@@ -131,7 +131,7 @@ fn test_org_to_uninterpreted_nodes2_inactive_placeholder() {
   assert_eq!(tree_roots . len(), 1);
   assert!( matches!( &tree_roots[0] . value() . kind,
     MpViewnodeKind::Vognode (MpVognode::Inactive (_)) ),
-    "expected an InactiveNode" );
+    "expected an InactiveVognode" );
   assert_eq!(tree_roots[0] . value() . title(), "");
   assert_eq!(tree_roots[0] . value() . body(), None);
 }
@@ -156,7 +156,7 @@ fn test_org_to_uninterpreted_nodes2_default_values() {
   let first_t = match &first_node . kind {
     MpViewnodeKind::Vognode (
       MpVognode::Active (t)) => t,
-    _ => panic!("expected ActiveNode") };
+    _ => panic!("expected ActiveVognode") };
   assert_eq!(first_node . title(), "simple node");
   assert_eq!(first_node . body(), Some(&"Simple body" . to_string()));
   assert_eq!(first_t . id . as_ref(), None);

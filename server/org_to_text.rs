@@ -3,8 +3,8 @@ use crate::types::git::RelationshipAxes;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  Viewnode, ViewnodeKind, Vognode, Phantom, Property, PropertyFolder, ActiveNode, PhantomDiff,
-  PhantomDeleted, PhantomUnknown, NodeEditRequest, GraphNodeStats,
+  Viewnode, ViewnodeKind, Vognode, Phantom, Property, PropertyFolder, ActiveVognode, PhantomDiff,
+  PhantomDeleted, PhantomUnknown, NodeEditRequest, GraphnodeStats,
   AffectsParent,
 };
 
@@ -165,10 +165,10 @@ pub fn viewnode_to_string (
       Ok ( dead_viewnode_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded )),
-    ViewnodeKind::Vognode (Vognode::Active (activeNode)) =>
-      Ok ( activeNode_metadata_to_string (
+    ViewnodeKind::Vognode (Vognode::Active (activeVognode)) =>
+      Ok ( activeVognode_metadata_to_string (
         viewnode . focused, viewnode . folded,
-        viewnode . body_folded, activeNode, config )),
+        viewnode . body_folded, activeVognode, config )),
     ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (phantom))) =>
       Ok ( phantomDiff_metadata_to_string (
         viewnode . focused, viewnode . folded,
@@ -256,41 +256,41 @@ fn append_relationship_axes_stage_forms (
   if let Some (atom) = relationship_axes . unstaged_atom ()
     { parts . push ( format! ( "(unstaged {})", atom ) ); } }
 
-/// Render metadata for an ActiveNode:
+/// Render metadata for an ActiveVognode:
 ///   (skg [focused] [folded] (node ...))
-fn activeNode_metadata_to_string (
+fn activeVognode_metadata_to_string (
   focused     : bool,
   folded      : bool,
   body_folded : bool,
-  activeNode   : & ActiveNode,
+  activeVognode   : & ActiveVognode,
   config      : & SkgConfig,
 ) -> String {
   fn node_sexp (
-    activeNode : & ActiveNode,
+    activeVognode : & ActiveVognode,
     config    : & SkgConfig,
   ) -> String {
-    fn rels_herald ( activeNode : & ActiveNode ) -> Option < String > {
+    fn rels_herald ( activeVognode : & ActiveVognode ) -> Option < String > {
       // The semantic (rels ...) sexp, assembled in the viewnodestats
       // pass (server/herald_tokens.rs); emitted verbatim.
-      activeNode . viewStats . rel_heralds . clone () }
+      activeVognode . viewStats . rel_heralds . clone () }
     fn view_stats (
-      activeNode : & ActiveNode,
+      activeVognode : & ActiveVognode,
       config    : & SkgConfig,
     ) -> Option < String > {
       let mut parts : Vec < String > = Vec::new ();
-      if activeNode . viewStats . cycle {
+      if activeVognode . viewStats . cycle {
         parts . push ( "cycle" . to_string () ); }
       if let Some (ref original) =
-        activeNode . viewStats . overridesHere {
+        activeVognode . viewStats . overridesHere {
         parts . push ( format! ("(overridesHere {})",
                                  original . 0 )); }
       if let Some (ref repo) =
-        activeNode . viewStats . relRepo {
+        activeVognode . viewStats . relRepo {
         parts . push ( format! (
           "(relRepo {})", metadata_value_atom (repo) )); }
-      if activeNode . viewStats . homeRepoAtBoundary {
+      if activeVognode . viewStats . homeRepoAtBoundary {
         if let Some (src_config)
-        = config . repos . get ( &activeNode . home_repo )
+        = config . repos . get ( &activeVognode . home_repo )
         { parts . push ( format! (
             "(homeRepoHerald {})",
             metadata_value_atom (
@@ -298,13 +298,13 @@ fn activeNode_metadata_to_string (
       if parts . is_empty () { None }
       else { Some ( format! (
                "(viewStats {})", parts . join (" ") )) }}
-    fn edit_request ( activeNode : & ActiveNode
+    fn edit_request ( activeVognode : & ActiveVognode
                     ) -> Option < String > {
-      if let Some (repo) = &activeNode . relRepo_request {
+      if let Some (repo) = &activeVognode . relRepo_request {
         return Some ( format! (
           "(editRequest (relRepo {}))",
           metadata_value_atom (repo) ) ); }
-      activeNode . edit_request () . map ( | edit_req | {
+      activeVognode . edit_request () . map ( | edit_req | {
         let edit_str : String = match edit_req {
           NodeEditRequest::NodeMerge (id) => format! ( "(merge {})", id . 0 ),
           NodeEditRequest::Delete => "delete" . to_string (),
@@ -312,80 +312,80 @@ fn activeNode_metadata_to_string (
             format! ( "(flag {} {})",
               flag . wire_name (), value ) };
         format! ( "(editRequest {})", edit_str ) } ) }
-    fn view_requests ( activeNode : & ActiveNode
+    fn view_requests ( activeVognode : & ActiveVognode
                      ) -> Option < String > {
-      if activeNode . view_requests . is_empty () { return None; }
+      if activeVognode . view_requests . is_empty () { return None; }
       let mut request_strings : Vec < String > =
-        activeNode . view_requests . iter ()
+        activeVognode . view_requests . iter ()
           . map ( | req | req . to_string () )
           . collect ();
       request_strings . sort ();
       Some ( format! ( "(viewRequests {})",
                        request_strings . join (" ") )) }
-    fn staged_axes ( activeNode : & ActiveNode ) -> Option < String > {
+    fn staged_axes ( activeVognode : & ActiveVognode ) -> Option < String > {
       let mut atoms : Vec<&'static str> = Vec::new ();
-      if let Some (a) = activeNode . node_axes  . staged_atom ()
+      if let Some (a) = activeVognode . node_axes  . staged_atom ()
         { atoms . push (a); }
-      if let Some (a) = activeNode . relationship_axes . staged_atom ()
+      if let Some (a) = activeVognode . relationship_axes . staged_atom ()
         { atoms . push (a); }
       if atoms . is_empty () { None }
       else { Some ( format! ( "(staged {})", atoms . join (" "))) } }
-    fn unstaged_axes ( activeNode : & ActiveNode ) -> Option < String > {
+    fn unstaged_axes ( activeVognode : & ActiveVognode ) -> Option < String > {
       let mut atoms : Vec<&'static str> = Vec::new ();
-      if let Some (a) = activeNode . node_axes  . unstaged_atom ()
+      if let Some (a) = activeVognode . node_axes  . unstaged_atom ()
         { atoms . push (a); }
-      if let Some (a) = activeNode . relationship_axes . unstaged_atom ()
+      if let Some (a) = activeVognode . relationship_axes . unstaged_atom ()
         { atoms . push (a); }
       if atoms . is_empty () { None }
       else { Some ( format! ( "(unstaged {})", atoms . join (" "))) } }
-    fn not_in_git_atom ( activeNode : & ActiveNode ) -> Option < String > {
-      if activeNode . not_in_git { Some ("notInGit" . to_string ()) }
+    fn not_in_git_atom ( activeVognode : & ActiveVognode ) -> Option < String > {
+      if activeVognode . not_in_git { Some ("notInGit" . to_string ()) }
       else                      { None } }
     let mut parts : Vec < String > =
       vec! [ "node" . to_string () ];
-    parts . push ( format! ( "(id {})", activeNode . id . 0 ));
+    parts . push ( format! ( "(id {})", activeVognode . id . 0 ));
     parts . push ( format! (
-      "(repo {})", metadata_value_atom (&activeNode . home_repo) ));
+      "(repo {})", metadata_value_atom (&activeVognode . home_repo) ));
     // AffectsParent::True is left implicit because it is the default
     // membership relation.
-    match activeNode . affectsParent {
+    match activeVognode . affectsParent {
       AffectsParent::True => {},
       AffectsParent::NA =>
         parts . push ( "(affectsParent na)" . to_string () ),
       AffectsParent::False =>
         parts . push ( "(affectsParent false)" . to_string () ) }
-    if activeNode . is_writeProtected () {
+    if activeVognode . is_writeProtected () {
       // `writeProtected` means "write-protected" -- a view of a node that
       // cannot be edited (see Editability in types/viewnode.rs). The metadata
       // sexp uses only this short form on both emission and parsing.
       parts . push ( "writeProtected" . to_string () );
-      if activeNode . viewStats . hidden_body {
+      if activeVognode . viewStats . hidden_body {
         // The rendering is hiding a body (herald "B" on the ☮).
         parts . push ( "hiddenBody" . to_string () ); }}
-    if let Some (s) = rels_herald (activeNode)
+    if let Some (s) = rels_herald (activeVognode)
     { parts . push (s); }
-    if let Some (s) = view_stats (activeNode, config)
+    if let Some (s) = view_stats (activeVognode, config)
     { parts . push (s); }
-    if let Some (s) = edit_request (activeNode)
+    if let Some (s) = edit_request (activeVognode)
     { parts . push (s); }
-    if let Some (s) = view_requests (activeNode)
+    if let Some (s) = view_requests (activeVognode)
     { parts . push (s); }
-    if let Some (s) = staged_axes (activeNode)
+    if let Some (s) = staged_axes (activeVognode)
     { parts . push (s); }
-    if let Some (s) = unstaged_axes (activeNode)
+    if let Some (s) = unstaged_axes (activeVognode)
     { parts . push (s); }
-    if let Some (s) = not_in_git_atom (activeNode)
+    if let Some (s) = not_in_git_atom (activeVognode)
     { parts . push (s); }
     format! ( "({})", parts . join (" ")) }
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  parts . push ( node_sexp (activeNode, config));
+  parts . push ( node_sexp (activeVognode, config));
   parts . join (" ") }
 
 /// Render metadata for a PhantomDiff (TODO/DONE/local-view-update/plan_v2.org §11). The root atom is
-/// `diffPhantom`, distinct from the `node` atom an ActiveNode emits, so the
+/// `diffPhantom`, distinct from the `node` atom an ActiveVognode emits, so the
 /// client can tell a moved/removed phantom apart from a live node without
 /// inferring it from the diff axes. A phantom is always write-protected (so always
 /// emits `writeProtected` and never a body, editRequest, or viewRequests) and its
@@ -426,7 +426,7 @@ fn phantomDiff_metadata_to_string (
       { parts . push ( format! ( "(unstaged {})", atoms . join (" "))); } }
     if phantom . not_in_git
     { parts . push ( "notInGit" . to_string () ); }
-    let _ = config; // reserved for parity with activeNode_metadata_to_string
+    let _ = config; // reserved for parity with activeVognode_metadata_to_string
     format! ( "({})", parts . join (" ")) }
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
@@ -481,7 +481,7 @@ fn phantomUnknown_metadata_to_string (
 /// like the other dataless non-vognode markers (aliasFolder, subscribeeFolder,
 /// ...). It carries no id/repo/etc. -- those describe content the
 /// user hid by restricting the repo-set, so emitting them would leak
-/// (see InactiveNode).
+/// (see InactiveVognode).
 fn inactive_node_metadata_to_string (
   focused       : bool,
   folded        : bool,
@@ -511,7 +511,7 @@ fn dead_viewnode_metadata_to_string (
 /// The relationship-herald atom for a phantom: counts-only semantic
 /// facts (no ancestor flags, no birth, no view position).
 fn phantom_rels_atom (
-  gs : &GraphNodeStats,
+  gs : &GraphnodeStats,
 ) -> Option < String > {
   gs . rels . as_ref () . and_then ( |counts|
     relationship_heralds_sexp (

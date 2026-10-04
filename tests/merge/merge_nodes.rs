@@ -8,10 +8,10 @@ use skg::nodeMerge::merge_nodes;
 use skg::test_utils::{run_with_shared_test_stores, tantivy_contains_id, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, RepoName};
 use skg::types::tree::forest::ViewForest;
-use skg::types::viewnode::{NodeEditRequest, Viewnode, ViewnodeKind, Vognode, ActiveNode, Editability, viewforest_root_viewnode, default_activeNode};
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::viewnode::{NodeEditRequest, Viewnode, ViewnodeKind, Vognode, ActiveVognode, Editability, viewforest_root_viewnode, default_activeVognode};
+use skg::types::nodes::complete::Graphnode;
 use skg::types::save::NodeMerge;
-use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_repo;
+use skg::dbs::filesystem::one_node::graphnode_from_pid_and_repo;
 use skg::util::path_from_pid_and_repo;
 use skg::dbs::in_rust_graph::query::find_related_nodes;
 
@@ -27,11 +27,11 @@ fn mk_test_viewnode (
   id           : &str,
   edit_request : Option<NodeEditRequest>,
 ) -> Viewnode {
-  let t : ActiveNode = ActiveNode {
+  let t : ActiveVognode = ActiveVognode {
     editability : Editability::Definitive {
       body         : None,
       edit_request },
-    .. default_activeNode ( ID::from (id),
+    .. default_activeVognode ( ID::from (id),
                           RepoName::from ("main"),
                           title . to_string() ) };
   Viewnode { focused     : false,
@@ -119,7 +119,7 @@ fn verify_filesystem_after_merge_2_into_1(
             "2.skg should be deleted" );
 
   // Node 1's file should be updated
-  let node_1: NodeComplete = nodecomplete_from_pid_and_repo(
+  let node_1: Graphnode = graphnode_from_pid_and_repo(
     config, ID::from ("1"), &RepoName::from ("main") )?;
   assert_eq!(&node_1 . pid, &ID::from ("1"));
   assert_eq!(node_1 . extra_ids . len(), 2, "Node 1 should have 2 extra_ids");
@@ -183,8 +183,8 @@ fn verify_filesystem_after_merge_2_into_1(
   assert!( Path::new (&acquiree_text_preserver_path) . exists(),
            "acquiree_text_preserver file should exist" );
 
-  let acquiree_text_preserver: NodeComplete =
-    nodecomplete_from_pid_and_repo( config,
+  let acquiree_text_preserver: Graphnode =
+    graphnode_from_pid_and_repo( config,
                                  acquiree_text_preserver_id . clone(),
                                  &RepoName::from ("main") )?;
   assert!(acquiree_text_preserver . title . starts_with ("MERGED: "));
@@ -295,7 +295,7 @@ fn verify_filesystem_after_merge_1_into_2(
             "1.skg should be deleted" );
 
   // Node 2's file should be updated
-  let node_2: NodeComplete = nodecomplete_from_pid_and_repo(
+  let node_2: Graphnode = graphnode_from_pid_and_repo(
     config, ID::from ("2"), &RepoName::from ("main") )?;
 
   // Should have pid=2, extra_ids=[2-extra-id, 1]
@@ -360,8 +360,8 @@ fn verify_filesystem_after_merge_1_into_2(
   assert!( Path::new (&acquiree_text_preserver_path) . exists(),
            "acquiree_text_preserver file should exist" );
 
-  let acquiree_text_preserver: NodeComplete =
-    nodecomplete_from_pid_and_repo( config,
+  let acquiree_text_preserver: Graphnode =
+    graphnode_from_pid_and_repo( config,
                                  acquiree_text_preserver_id . clone(),
                                  &RepoName::from ("main") )?;
   assert!(acquiree_text_preserver . title . starts_with ("MERGED: "));
@@ -547,9 +547,9 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
            "links-to-1's forward links should resolve to \
             canonical pid 2" );
 
-  let disk_nodes : Vec<NodeComplete> =
+  let disk_nodes : Vec<Graphnode> =
     read_all_skg_files_from_repos (config) ?;
-  let rebuilt : InRustGraph = InRustGraph::from_nodecompletes (&disk_nodes);
+  let rebuilt : InRustGraph = InRustGraph::from_graphnodes (&disk_nodes);
   assert_eq! (snap . contained_by, rebuilt . contained_by);
   assert_eq! (snap . subscribers_of, rebuilt . subscribers_of);
   assert_eq! (snap . hiders_of, rebuilt . hiders_of);

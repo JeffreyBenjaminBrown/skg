@@ -3,7 +3,7 @@
 
 use indoc::indoc;
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
-use skg::dbs::filesystem::one_node::nodecomplete_from_id;
+use skg::dbs::filesystem::one_node::graphnode_from_id;
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
@@ -12,7 +12,7 @@ use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config, aud
 use skg::types::errors::{SaveError, BufferValidationError};
 
 use skg::types::misc::{ID, SkgConfig, RepoName, TantivyIndex, members_of};
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::nodes::complete::Graphnode;
 use skg::types::save::DefineNode;
 use std::error::Error;
 use std::path::PathBuf;
@@ -129,12 +129,12 @@ async fn test_move_node_to_another_owned_repo (
       assert!( new_path . exists(),
                "b.skg should exist in private/"); }
 
-    { // FS: read NodeComplete back from disk via graph identity lookup
-      let node_b : NodeComplete =
-        nodecomplete_from_id (&config, &ID::new ("b"))
+    { // FS: read Graphnode back from disk via graph identity lookup
+      let node_b : Graphnode =
+        graphnode_from_id (&config, &ID::new ("b"))
 ?;
       assert_eq!(node_b . home_repo, RepoName::from ("private"),
-                 "NodeComplete read from disk should have repo=private"); }
+                 "Graphnode read from disk should have repo=private"); }
 
     { // Graph: repo should be updated
       let (pid, repo) : (ID, RepoName) =
@@ -151,23 +151,23 @@ async fn test_move_node_to_another_owned_repo (
                  "Tantivy should show repo=private for b"); }
 
     { // Other nodes unchanged
-      let node_a : NodeComplete =
-        nodecomplete_from_id (&config, &ID::new ("a"))
+      let node_a : Graphnode =
+        graphnode_from_id (&config, &ID::new ("a"))
 ?;
       assert_eq!(node_a . home_repo, RepoName::from ("public"));
-      let node_c : NodeComplete =
-        nodecomplete_from_id (&config, &ID::new ("c"))
+      let node_c : Graphnode =
+        graphnode_from_id (&config, &ID::new ("c"))
 ?;
       assert_eq!(node_c . home_repo, RepoName::from ("public")); }
 
     { // Containment relationships should be unchanged
-      let node_a : NodeComplete =
-        nodecomplete_from_id (&config, &ID::new ("a"))
+      let node_a : Graphnode =
+        graphnode_from_id (&config, &ID::new ("a"))
 ?;
       assert!(members_of ( &node_a . contains ) . contains (&ID::new ("b")),
               "a should still contain b after move");
-      let node_b : NodeComplete =
-        nodecomplete_from_id (&config, &ID::new ("b"))
+      let node_b : Graphnode =
+        graphnode_from_id (&config, &ID::new ("b"))
 ?;
       assert!(members_of ( &node_b . contains ) . contains (&ID::new ("c")),
               "b should still contain c after move"); }
@@ -413,7 +413,7 @@ async fn test_repo_only_change_with_populated_pool (
     let temp_fixtures : &PathBuf = &config . data_root;
 
     // Read all nodes (for test parity with earlier pool-populating variant).
-    let _nodes : Vec<NodeComplete> =
+    let _nodes : Vec<Graphnode> =
       read_all_skg_files_from_repos (&config)?;
 
     // Change only b's repo to private.

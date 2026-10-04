@@ -15,12 +15,12 @@ use skg::from_text::local_instruction_collection::lower::{
 use skg::from_text::local_instruction_collection::traverse::collect_instructions_locally;
 use skg::from_text::local_instruction_collection::types::SubscribeeVisibility;
 use skg::from_text::validate::validate_and_filter_foreign_instructions;
-use skg::test_utils::extract_nodecomplete_if_save_else_error;
+use skg::test_utils::extract_graphnode_if_save_else_error;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::types::errors::BufferValidationError;
 use skg::types::git::Sign;
 use skg::types::misc::{ID, MSV, SkgConfig, RepoName, members_of, members_msv};
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::maybe_placed_viewnode::{
   MpViewnode,
@@ -45,7 +45,7 @@ fn save_ids (
 fn saved_node_by_id<'a> (
   instructions : &'a [DefineNode],
   id           : &str,
-) -> &'a NodeComplete {
+) -> &'a Graphnode {
   for instruction in instructions {
     if let DefineNode::Save (SaveNode (node)) = instruction {
       if node . pid == ID::from (id) {
@@ -211,7 +211,7 @@ fn test_extract_nonmergeSavePlan_basic() {
   assert_eq!(instructions . len(), 3, "Should have 3 instructions");
 
   // Test root1
-  let root1_skg : &NodeComplete = match &instructions[0] {
+  let root1_skg : &Graphnode = match &instructions[0] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(root1_skg . title, "root node 1");
@@ -222,7 +222,7 @@ fn test_extract_nonmergeSavePlan_basic() {
                    DefineNode::Save (_)));
 
   // Test child1
-  let child1_skg : &NodeComplete = match &instructions[1] {
+  let child1_skg : &Graphnode = match &instructions[1] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(child1_skg . title, "child 1");
@@ -266,7 +266,7 @@ fn test_extract_nonmergeSavePlan_with_aliases() {
   assert_eq!(instructions . len(), 2, "Should have 2 instructions");
 
   // Test main node
-  let main_skg : &NodeComplete = match &instructions[0] {
+  let main_skg : &Graphnode = match &instructions[0] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(main_skg . title, "main node");
@@ -277,7 +277,7 @@ fn test_extract_nonmergeSavePlan_with_aliases() {
   assert_eq!(members_msv (&main_skg . aliases), MSV::Specified(vec!["first alias" . to_string(), "second alias" . to_string()]));
 
   // Test content child
-  let content_skg : &NodeComplete = match &instructions[1] {
+  let content_skg : &Graphnode = match &instructions[1] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(content_skg . title, "content child");
@@ -304,7 +304,7 @@ fn test_extract_nonmergeSavePlan_no_aliases() {
 
   assert_eq!(instructions . len(), 2);
 
-  let node1_skg : &NodeComplete = match &instructions[0] {
+  let node1_skg : &Graphnode = match &instructions[0] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(node1_skg . aliases, MSV::Unspecified, "Should have no aliases");
@@ -392,7 +392,7 @@ fn test_extract_nonmergeSavePlan_mixed_relations() {
   // AliasFolder and Alias should be skipped
   assert_eq!(instructions . len(), 5);
 
-  let root_skg : &NodeComplete = match &instructions[0] {
+  let root_skg : &Graphnode = match &instructions[0] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(root_skg . title, "root node");
@@ -764,7 +764,7 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
       ID::from ("root"),
       ID::from ("child"),
       ID::from ("doomed")]);
-  let root : &NodeComplete =
+  let root : &Graphnode =
     saved_node_by_id (&instructions, "root");
   assert_eq!(root . title, "root");
   assert_eq!(root . body, Some ("Root body" . to_string()));
@@ -809,7 +809,7 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
       ID::from ("independent"),
       ID::from ("content"),
       ID::from ("doomed")]);
-  let root : &NodeComplete =
+  let root : &Graphnode =
     saved_node_by_id (&instructions, "root");
   assert_eq!(root . title, "root");
   assert_eq!(root . body, Some ("Root body" . to_string()));
@@ -1125,7 +1125,7 @@ async fn ordinary_same_id_occurrence_keeps_contains_edit_when_also_as_subscribee
       Ok (()) }
 
 #[test]
-fn idfolder_resident_activeNode_saves_itself_but_is_not_content (
+fn idfolder_resident_activeVognode_saves_itself_but_is_not_content (
 ) {
   let input : &str =
     indoc! {"
@@ -1282,24 +1282,24 @@ fn test_extract_nonmergeSavePlan_deep_nesting() {
   assert_eq!(instructions . len(), 5);
 
   // Check contains relationships
-  let level1_skg : &NodeComplete =
-    extract_nodecomplete_if_save_else_error(&instructions[0]);
+  let level1_skg : &Graphnode =
+    extract_graphnode_if_save_else_error(&instructions[0]);
   assert_eq!(members_of (&level1_skg . contains), vec![ID::from ("level2a"), ID::from ("level2b")]);
 
-  let level2a_skg : &NodeComplete =
-    extract_nodecomplete_if_save_else_error(&instructions[1]);
+  let level2a_skg : &Graphnode =
+    extract_graphnode_if_save_else_error(&instructions[1]);
   assert_eq!(members_of (&level2a_skg . contains), vec![ID::from ("level3a")]);
 
-  let level3a_skg : &NodeComplete =
-    extract_nodecomplete_if_save_else_error(&instructions[2]);
+  let level3a_skg : &Graphnode =
+    extract_graphnode_if_save_else_error(&instructions[2]);
   assert_eq!(members_of (&level3a_skg . contains), vec![ID::from ("level4")]);
 
-  let level4_skg : &NodeComplete =
-    extract_nodecomplete_if_save_else_error(&instructions[3]);
+  let level4_skg : &Graphnode =
+    extract_graphnode_if_save_else_error(&instructions[3]);
   assert_eq!(level4_skg . contains, vec![]); // Leaf node
 
-  let level2b_skg : &NodeComplete =
-    extract_nodecomplete_if_save_else_error(&instructions[4]);
+  let level2b_skg : &Graphnode =
+    extract_graphnode_if_save_else_error(&instructions[4]);
   assert_eq!(level2b_skg . contains, vec![]); // Leaf node
 }
 
@@ -1351,7 +1351,7 @@ fn test_extract_nonmergeSavePlan_only_aliases() {
 
   assert_eq!(instructions . len(), 1); // Only main node
 
-  let main_skg : &NodeComplete = match &instructions[0] {
+  let main_skg : &Graphnode = match &instructions[0] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(members_msv (&main_skg . aliases), MSV::Specified(vec!["alias one" . to_string(), "alias two" . to_string()]));
@@ -1385,7 +1385,7 @@ fn test_extract_nonmergeSavePlan_complex_scenario() {
   assert_eq!(instructions . len(), 7); // doc1, section1, subsection1a, section2, section3, doc2, ref_section
 
   // Test doc1
-  let doc1_skg : &NodeComplete = match &instructions[0] {
+  let doc1_skg : &Graphnode = match &instructions[0] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(doc1_skg . title, "Document 1");
@@ -1408,7 +1408,7 @@ fn test_extract_nonmergeSavePlan_complex_scenario() {
       panic!("Expected Delete, got Save") };
 
   // Test that subsection1a is child of section1
-  let section1_skg : &NodeComplete = match &instructions[1] {
+  let section1_skg : &Graphnode = match &instructions[1] {
     DefineNode::Save(SaveNode (node)) => node,
     DefineNode::Delete (_) => panic!("Expected Save, got Delete") };
   assert_eq!(members_of (&section1_skg . contains), vec![ID::from ("subsection1a")]);
@@ -1564,7 +1564,7 @@ fn duplicate_members_of_defining_folders_are_silently_deduplicated (
     checked_viewforest_from_org (input);
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
-  let owner : &NodeComplete =
+  let owner : &Graphnode =
     saved_node_by_id (&instructions, "owner");
   assert_eq!(
     members_msv (&owner . aliases),
@@ -1644,7 +1644,7 @@ fn reordering_overridden_folder_is_harmless (
     checked_viewforest_from_org (input);
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
-  let owner : &NodeComplete =
+  let owner : &Graphnode =
     saved_node_by_id (&instructions, "owner");
   let overridden : Vec<ID> = match &owner . overrides_view_of {
     MSV::Specified (ids) => members_of (ids),

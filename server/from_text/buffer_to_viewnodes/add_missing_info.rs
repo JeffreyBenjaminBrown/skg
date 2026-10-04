@@ -46,7 +46,7 @@ pub fn add_missing_info_to_viewforest(
 ) -> Result<EnrichmentProvenance, Box<dyn Error>> {
   let nodes = crate::dbs::filesystem::multiple_nodes
     ::read_all_skg_files_from_repos (config)?;
-  let graph = InRustGraph::from_nodecompletes (&nodes);
+  let graph = InRustGraph::from_graphnodes (&nodes);
   add_missing_info_to_viewforest_in_graph (viewforest, &graph)
 }
 
@@ -119,7 +119,7 @@ pub fn na_affectsParent_under_visible_parent_becomes_isContainer (
       { t . affectsParent = AffectsParent::True; }}}
 
 /// Make it a Property::Alias if both:
-/// - it is an ActiveNode
+/// - it is an ActiveVognode
 /// - its parent is an AliasFolder
 fn make_alias_if_appropriate(
   node: &mut NodeMut<MpViewnode>
@@ -147,8 +147,8 @@ fn make_alias_if_appropriate(
   Ok (( )) }
 
 /// Inherit parent's repo if both:
-/// - this is a repoless ActiveNode
-/// - its parent is an ActiveNode with a repo
+/// - this is a repoless ActiveVognode
+/// - its parent is an ActiveVognode with a repo
 /// Returns whether it inherited one.
 fn inherit_parent_repo_if_possible(
   node: &mut NodeMut<MpViewnode>
@@ -173,7 +173,7 @@ fn inherit_parent_repo_if_possible(
   Ok (false) }
 
 /// Look up, from the graph, the repo of every repoless,
-/// write-protected ActiveNode that already carries an id (ids are pids
+/// write-protected ActiveVognode that already carries an id (ids are pids
 /// here). Ids the graph does not know resolve to nothing and are
 /// omitted from the map, so those nodes fall through to
 /// parent-inheritance in the DFS.
@@ -189,7 +189,7 @@ fn repos_for_repoless_ided_nodes_from_graph (
     . collect ()
 }
 
-/// Collect the ids of repoless, WRITE_PROTECTED ActiveNodes that
+/// Collect the ids of repoless, WRITE_PROTECTED ActiveVognodes that
 /// already carry an id. Definitive nodes are excluded on purpose (see
 /// 'resolve_repos_for_repoless_ided_nodes').
 fn collect_repoless_active_ids (
@@ -205,12 +205,12 @@ fn collect_repoless_active_ids (
   for child in node_ref . children () {
     collect_repoless_active_ids ( child, ids ); }}
 
-/// If the node is a repoless, WRITE_PROTECTED ActiveNode whose id the
+/// If the node is a repoless, WRITE_PROTECTED ActiveVognode whose id the
 /// graph resolved, set its repo from 'repo_of_id' (built before the
 /// DFS). This is how a bare folder-member reference acquires the repo of
 /// the existing node it names -- something
 /// 'inherit_parent_repo_if_possible' cannot do, since the org-parent
-/// is a non-vognode rather than an ActiveNode with a repo. The
+/// is a non-vognode rather than an ActiveVognode with a repo. The
 /// write-protected gate matches the folder above, so a definitive node
 /// sharing an id with a write-protected one is never filled.
 fn fill_repo_from_graph_map (
@@ -228,7 +228,7 @@ fn fill_repo_from_graph_map (
     if let Some (repo) = resolved {
       t . home_repo = Some (repo); }}}
 
-/// Assign a new UUID to an ActiveNode if it doesn't have an ID.
+/// Assign a new UUID to an ActiveVognode if it doesn't have an ID.
 /// Returns whether it assigned one.
 fn assign_new_id_if_absent(
   node: &mut NodeMut<MpViewnode>

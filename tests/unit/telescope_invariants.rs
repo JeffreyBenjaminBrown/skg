@@ -10,7 +10,7 @@ use crate::dbs::in_rust_graph::{InRustGraph, apply_definenodes_to_inRustGraph};
 use crate::types::misc::{
   ID, MSV, RelPartner, SkgConfig, SkgfileRepo, RepoName,
   rel_partners_at_relRepo};
-use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
+use crate::types::nodes::complete::{Graphnode, empty_node_complete};
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -40,8 +40,8 @@ fn two_repo_config () -> SkgConfig {
 fn node_at (
   pid    : &str,
   repo : &str,
-) -> NodeComplete {
-  let mut n : NodeComplete = empty_node_complete ();
+) -> Graphnode {
+  let mut n : Graphnode = empty_node_complete ();
   n . pid = ID::new (pid);
   n . title = pid . to_string ();
   n . home_repo = RepoName::from (repo);
@@ -51,9 +51,9 @@ fn node_at (
 fn leak_shaped_member_is_caught_and_honest_shapes_are_not (
 ) {
   let config : SkgConfig = two_repo_config ();
-  let mut container : NodeComplete = node_at ("container", "public");
-  let private_child : NodeComplete = node_at ("secret", "private");
-  let public_child  : NodeComplete = node_at ("open", "public");
+  let mut container : Graphnode = node_at ("container", "public");
+  let private_child : Graphnode = node_at ("secret", "private");
+  let public_child  : Graphnode = node_at ("open", "public");
   container . contains = vec! [
     // honest: public member in the public repo
     RelPartner::at_relRepo ( RepoName::from ("public"),
@@ -62,7 +62,7 @@ fn leak_shaped_member_is_caught_and_honest_shapes_are_not (
     RelPartner::at_relRepo ( RepoName::from ("public"),
                           ID::new ("secret") ) ];
   let graph : InRustGraph =
-    InRustGraph::from_nodecompletes (
+    InRustGraph::from_graphnodes (
       & [ container, private_child, public_child ] );
   let violations : Vec<TelescopeViolation> =
     telescope_violations_of (
@@ -78,13 +78,13 @@ fn leak_shaped_member_is_caught_and_honest_shapes_are_not (
 fn private_membership_of_a_public_member_is_fine (
 ) { // the private-reading-list shape: MORE private than the target
   let config : SkgConfig = two_repo_config ();
-  let mut container : NodeComplete = node_at ("container", "private");
-  let public_child  : NodeComplete = node_at ("open", "public");
+  let mut container : Graphnode = node_at ("container", "private");
+  let public_child  : Graphnode = node_at ("open", "public");
   container . contains = vec! [
     RelPartner::at_relRepo ( RepoName::from ("private"),
                           ID::new ("open") ) ];
   let graph : InRustGraph =
-    InRustGraph::from_nodecompletes (
+    InRustGraph::from_graphnodes (
       & [ container, public_child ] );
   assert! ( telescope_violations_of (
     &config, &graph, &ID::new ("container") ) . is_empty () );
@@ -94,14 +94,14 @@ fn private_membership_of_a_public_member_is_fine (
 fn leak_check_resolves_extra_ids (
 ) { // an edge naming a merged-away extra id judges the OWNER's home
   let config : SkgConfig = two_repo_config ();
-  let mut container : NodeComplete = node_at ("container", "public");
-  let mut private_child : NodeComplete = node_at ("secret", "private");
+  let mut container : Graphnode = node_at ("container", "public");
+  let mut private_child : Graphnode = node_at ("secret", "private");
   private_child . extra_ids = vec! [ ID::new ("old-name") ];
   container . contains = vec! [
     RelPartner::at_relRepo ( RepoName::from ("public"),
                           ID::new ("old-name") ) ];
   let graph : InRustGraph =
-    InRustGraph::from_nodecompletes (
+    InRustGraph::from_graphnodes (
       & [ container, private_child ] );
   let violations : Vec<TelescopeViolation> =
     telescope_violations_of (
@@ -113,8 +113,8 @@ fn leak_check_resolves_extra_ids (
 fn unconfigured_repo_and_msv_relations_are_covered (
 ) {
   let config : SkgConfig = two_repo_config ();
-  let mut node : NodeComplete = node_at ("n", "public");
-  let target : NodeComplete = node_at ("t", "private");
+  let mut node : Graphnode = node_at ("n", "public");
+  let target : Graphnode = node_at ("t", "private");
   node . subscribes_to = MSV::Specified ( vec! [
     // leak via a non-contains relation
     RelPartner::at_relRepo ( RepoName::from ("public"),
@@ -123,7 +123,7 @@ fn unconfigured_repo_and_msv_relations_are_covered (
     rel_partners_at_relRepo ( & RepoName::from ("nonexistent-repo"),
                     vec! [ ID::new ("t") ] ));
   let graph : InRustGraph =
-    InRustGraph::from_nodecompletes ( & [ node, target ] );
+    InRustGraph::from_graphnodes ( & [ node, target ] );
   let violations : Vec<TelescopeViolation> =
     validate_all_telescopes (&config, &graph)
     . into_iter () . map ( |(_, v)| v ) . collect ();
@@ -140,13 +140,13 @@ fn absent_targets_use_owner_home_for_all_four_relationships () {
   let config : SkgConfig = two_repo_config ();
   let member : RelPartner<ID> = RelPartner::at_relRepo (
     RepoName::from ("public"), ID::from ("absent"));
-  let mut owner : NodeComplete = node_at ("owner", "private");
+  let mut owner : Graphnode = node_at ("owner", "private");
   owner . contains = vec![member . clone ()];
   owner . subscribes_to = MSV::Specified (vec![member . clone ()]);
   owner . hides_from_its_subscriptions =
     MSV::Specified (vec![member . clone ()]);
   owner . overrides_view_of = MSV::Specified (vec![member]);
-  let graph : InRustGraph = InRustGraph::from_nodecompletes (&[owner]);
+  let graph : InRustGraph = InRustGraph::from_graphnodes (&[owner]);
   let violations : Vec<TelescopeViolation> = telescope_violations_of (
     &config, &graph, &ID::from ("owner"));
   assert_eq! (violations . len (), 4, "{violations:?}");
@@ -170,10 +170,10 @@ fn absent_target_at_or_below_owner_home_is_not_a_warning () {
     ("private", "private"),
     ("public", "private"),
   ] {
-    let mut owner : NodeComplete = node_at ("owner", owner_home);
+    let mut owner : Graphnode = node_at ("owner", owner_home);
     owner . contains = vec![RelPartner::at_relRepo (
       RepoName::from (relRepo), ID::from ("absent"))];
-    let graph : InRustGraph = InRustGraph::from_nodecompletes (&[owner]);
+    let graph : InRustGraph = InRustGraph::from_graphnodes (&[owner]);
     assert! (telescope_violations_of (
       &config, &graph, &ID::from ("owner")) . is_empty ()); }
 }
@@ -183,8 +183,8 @@ fn owner_with_relation (
   owner_home  : &str,
   relRepo : &str,
   target      : &str,
-) -> NodeComplete {
-  let mut owner : NodeComplete = node_at ("owner", owner_home);
+) -> Graphnode {
+  let mut owner : Graphnode = node_at ("owner", owner_home);
   let members : Vec<RelPartner<ID>> = vec![RelPartner::at_relRepo (
     RepoName::from (relRepo), ID::from (target))];
   match relation {
@@ -221,11 +221,11 @@ fn affected_owner_derivation_covers_warning_changes_exhaustively () {
           1 | 2 => "T",
           _     => "N2",
         };
-        let owner : NodeComplete = owner_with_relation (
+        let owner : Graphnode = owner_with_relation (
           relation, owner_home, relRepo, raw_target);
-        let mut target : NodeComplete = node_at ("T", "public");
+        let mut target : Graphnode = node_at ("T", "public");
         target . extra_ids = vec![ID::from ("E")];
-        let mut base_nodes : Vec<NodeComplete> = vec![owner, target . clone ()];
+        let mut base_nodes : Vec<Graphnode> = vec![owner, target . clone ()];
         let definitions : Vec<DefineNode> = match action {
           0 => vec![DefineNode::Save (SaveNode (node_at ("X", "public")))],
           1 => vec![DefineNode::Delete (DeleteNode {
@@ -239,7 +239,7 @@ fn affected_owner_derivation_covers_warning_changes_exhaustively () {
           _ => {
             base_nodes . push (node_at ("N1", "public"));
             base_nodes . push (node_at ("N2", "private"));
-            let mut acquirer : NodeComplete = node_at ("N1", "public");
+            let mut acquirer : Graphnode = node_at ("N1", "public");
             acquirer . extra_ids = vec![ID::from ("N2")];
             vec![
               DefineNode::Save (SaveNode (acquirer)),
@@ -249,7 +249,7 @@ fn affected_owner_derivation_covers_warning_changes_exhaustively () {
             ]
           },
         };
-        let base : InRustGraph = InRustGraph::from_nodecompletes (&base_nodes);
+        let base : InRustGraph = InRustGraph::from_graphnodes (&base_nodes);
         let mut candidate : InRustGraph = base . clone ();
         apply_definenodes_to_inRustGraph (&mut candidate, &definitions);
         let saved_pids : HashSet<ID> = definitions . iter ()
@@ -294,11 +294,11 @@ fn affected_owner_derivation_covers_warning_changes_exhaustively () {
 #[test]
 fn combined_warning_scope_reports_only_the_final_merge_state () {
   let config : SkgConfig = two_repo_config ();
-  let owner : NodeComplete = owner_with_relation (
+  let owner : Graphnode = owner_with_relation (
     0, "public", "public", "X");
-  let destination : NodeComplete = node_at ("Y", "public");
+  let destination : Graphnode = node_at ("Y", "public");
   let base : InRustGraph =
-    InRustGraph::from_nodecompletes (&[owner, destination]);
+    InRustGraph::from_graphnodes (&[owner, destination]);
   let ordinary : Vec<DefineNode> = vec![DefineNode::Save (SaveNode (
     node_at ("X", "private")))];
   let mut intermediate : InRustGraph = base . clone ();
@@ -306,7 +306,7 @@ fn combined_warning_scope_reports_only_the_final_merge_state () {
   assert! (! telescope_violations_of (
     &config, &intermediate, &ID::from ("owner")) . is_empty ());
 
-  let mut merged_destination : NodeComplete = node_at ("Y", "public");
+  let mut merged_destination : Graphnode = node_at ("Y", "public");
   merged_destination . extra_ids = vec![ID::from ("X")];
   let merge : Vec<DefineNode> = vec![
     DefineNode::Save (SaveNode (merged_destination)),

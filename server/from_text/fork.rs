@@ -18,7 +18,7 @@ use crate::repo_sets::ActiveRepoSet;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, RepoName, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
-  Flag, NodeComplete, flag_is_true};
+  Flag, Graphnode, flag_is_true};
 use crate::types::save::{ForkSpec, SaveNode};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewnodeKind, Vognode};
@@ -139,7 +139,7 @@ pub struct CloneRepoInputs {
 /// confirmation buffer rather than dead-ending on
 /// 'ForkRepoInactive'.)
 pub fn fork_spec_from_buffer_node (
-  buffer_node   : &NodeComplete,
+  buffer_node   : &Graphnode,
   disk_title    : &str, // N's original title (before the edit), for the confirmation buffer's child line.
   disk_contains : &[ID], // N's original contains (before the edit); children the edit deleted become the clone's hides.
   repos       : &CloneRepoInputs,
@@ -331,7 +331,7 @@ pub fn validate_fork_specs (
   restricted_repo_set : Option<&ActiveRepoSet>,
 ) -> Vec<BufferValidationError> {
   let graph = match read_all_skg_files_from_repos (config) {
-    Ok (nodes) => InRustGraph::from_nodecompletes (&nodes),
+    Ok (nodes) => InRustGraph::from_graphnodes (&nodes),
     Err (e) => return vec! [BufferValidationError::Other (
       format! ("Could not read graph for fork validation: {}", e))], };
   validate_fork_specs_in_graph (
@@ -351,7 +351,7 @@ pub fn validate_fork_specs (
 /// contains is stored RAW (the child IDs as the buffer collected them);
 /// override substitution applies at render time.
 pub fn build_fork_clone (
-  buffer_node   : &NodeComplete,
+  buffer_node   : &Graphnode,
   disk_title    : &str, // N's original (pre-edit) title, kept for the confirmation buffer's child line.
   disk_contains : &[ID], // N's original (pre-edit) contains.
   clone_repo  : RepoName,
@@ -359,7 +359,7 @@ pub fn build_fork_clone (
 ) -> ForkSpec {
   let buffer_contains_ids : Vec<ID> =
     members_of (& buffer_node . contains);
-  let clone : NodeComplete = NodeComplete {
+  let clone : Graphnode = Graphnode {
     title         : buffer_node . title . clone (),
     overPrivateText_telescope : false,
     aliases       : MSV::Unspecified,

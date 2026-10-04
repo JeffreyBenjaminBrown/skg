@@ -7,7 +7,7 @@ use skg::repo_sets::{ActiveRepoSet, RepoSetName};
 use skg::types::misc::{
   ID, MSV, RelPartner, SkgConfig, SkgfileRepo, RepoName,
   rel_partners_at_relRepo};
-use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
+use skg::types::nodes::complete::{Graphnode, empty_node_complete};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -41,8 +41,8 @@ fn node (
   pid       : &str,
   repo    : &str,
   overrides : &[&str],
-) -> NodeComplete {
-  let mut node : NodeComplete =
+) -> Graphnode {
+  let mut node : Graphnode =
     empty_node_complete ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
@@ -71,12 +71,12 @@ fn restricted_to (
   }}
 
 fn resolve (
-  nodes  : Vec<NodeComplete>,
+  nodes  : Vec<Graphnode>,
   active : Option<&ActiveRepoSet>,
   id     : &str,
 ) -> OverrideResolution {
   let graph : InRustGraph =
-    InRustGraph::from_nodecompletes (&nodes);
+    InRustGraph::from_graphnodes (&nodes);
   resolve_override (&config (), &graph, active, &ID::from (id)) }
 
 #[test]
@@ -160,7 +160,7 @@ fn an_active_owned_overrider_substitutes_under_a_restricted_set () {
 fn an_inactive_override_edge_between_active_nodes_does_not_substitute () {
   let active : ActiveRepoSet =
     restricted_to ( &["owned", "foreign"] );
-  let mut overrider : NodeComplete =
+  let mut overrider : Graphnode =
     node ("overrider", "owned", &[]);
   overrider . overrides_view_of = MSV::Specified (vec![
     RelPartner::at_relRepo (
@@ -229,16 +229,16 @@ fn a_cycle_is_detected_and_substitutes_nothing () {
 
 #[test]
 fn extra_id_input_and_extra_id_edge_both_resolve () {
-  let mut target : NodeComplete =
+  let mut target : Graphnode =
     node ("target", "foreign", &[]);
   target . extra_ids = vec![ ID::from ("target-extra") ];
-  let nodes : Vec<NodeComplete> = vec![
+  let nodes : Vec<Graphnode> = vec![
     target,
     // The override edge is written to the extra ID.
     node ("overrider", "owned", &["target-extra"]),
   ];
   let graph : InRustGraph =
-    InRustGraph::from_nodecompletes (&nodes);
+    InRustGraph::from_graphnodes (&nodes);
   let by_extra_id : OverrideResolution = // input is the extra ID
     resolve_override (
       &config (), &graph, None, &ID::from ("target-extra") );

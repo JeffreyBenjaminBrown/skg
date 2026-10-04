@@ -29,11 +29,11 @@ use std::sync::Arc;
 /// Reconciles one PartnerFolder (TODO/DONE/local-view-update/plan_v2.org §19 terminology: a folder = a collecting non-vognode)
 /// from a node in the view tree with the current in-Rust graph snapshot's data
 /// about that node.
-/// Makes the folder's ActiveNode children marked affectsParent=true match a goal list,
+/// Makes the folder's ActiveVognode children marked affectsParent=true match a goal list,
 /// preserving reusable children and creating missing ones,
 /// then demotes stale children marked affectsParent=true to 'affectsParent=false'.
 pub fn reconcile_partnerFolder_children (
-  node         : NodeId, // The PartnerFolder. Its parent is an ActiveNode.
+  node         : NodeId, // The PartnerFolder. Its parent is an ActiveVognode.
   tree         : &mut Tree<Viewnode>,
   kind         : PartnerFolder,
   repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
@@ -83,7 +83,7 @@ pub fn reconcile_partnerFolder_children (
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) = {
     let graph_members : Vec<ID> =
       // TODO/full-schema/9-2_repo-set-safety.org: these folders omit
-      // inactive members, with no retention (a stale InactiveNode
+      // inactive members, with no retention (a stale InactiveVognode
       // child gets the reconciler's delete-leaf / deaden-branch rule).
       omit_inactive_members (
         if outbound {

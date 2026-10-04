@@ -48,7 +48,7 @@ async fn run_path_and_root_tests (
   config : &SkgConfig,
 
 ) -> Result<(), Box<dyn std::error::Error>> {
-  let graph = InRustGraph::from_nodecompletes (
+  let graph = InRustGraph::from_graphnodes (
     &read_all_skg_files_from_repos (config)?);
 
   // Test the path from node "4" to the root container

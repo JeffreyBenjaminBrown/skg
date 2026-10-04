@@ -8,7 +8,7 @@
 //!   deterministically;
 //! - the silent-leak guard: no member ever changes repo.
 
-use super::fold::{FoldedNode, fold_sections, nodecomplete_from_fold};
+use super::fold::{FoldedNode, fold_sections, graphnode_from_fold};
 use super::types::{FoldWarning, ListItem, SectionSlices, Telescope};
 use super::unfold::{UnfoldInput, unfold_node};
 use crate::types::misc::{
@@ -429,9 +429,9 @@ fn a_titled_most_public_section_raises_no_title_warning (
 
 fn text_node (
   sections : Vec<(RepoName, SectionSlices)>,
-) -> (crate::types::nodes::complete::NodeComplete, Vec<FoldWarning>) {
+) -> (crate::types::nodes::complete::Graphnode, Vec<FoldWarning>) {
   let (folded, warnings) = fold_sections (&sections, &identity_resolve);
-  let node = nodecomplete_from_fold (
+  let node = graphnode_from_fold (
     ID::new ("text-node"), Vec::new (), Vec::new (), folded )
     .expect ("test cases carry a title");
   (node, warnings) }

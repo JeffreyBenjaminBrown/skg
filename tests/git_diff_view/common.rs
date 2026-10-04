@@ -16,8 +16,8 @@ pub use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and
 pub use skg::test_utils::graph_handle_from_config;
 pub use skg::types::misc::{ID, SkgConfig, SkgfileRepo, TantivyIndex, RepoName};
 pub use skg::dbs::in_rust_graph::InRustGraphHandle;
-pub use skg::types::nodes::fs::NodeFS;
-pub use skg::types::nodes::complete::NodeComplete;
+pub use skg::types::nodes::fs::GraphnodeOnDisk;
+pub use skg::types::nodes::complete::Graphnode;
 pub use skg::serve::ViewsState;
 pub use skg::types::views_state::OpenViews;
 
@@ -104,12 +104,12 @@ pub async fn cleanup_test_stores(
 // Disk verification helpers
 //
 
-pub fn read_nodecomplete(gitrepo_path: &Path, id: &str) -> Result<NodeComplete, Box<dyn Error>> {
-  // Read YAML as NodeFS, then attach Skg repo.
+pub fn read_graphnode(gitrepo_path: &Path, id: &str) -> Result<Graphnode, Box<dyn Error>> {
+  // Read YAML as GraphnodeOnDisk, then attach Skg repo.
   // Tests in this module use Skg repo "main".
   let path = gitrepo_path . join(format!("{}.skg", id));
   let content = fs::read_to_string (&path)?;
-  let node_fs: NodeFS = serde_yaml::from_str (&content)?;
+  let node_fs: GraphnodeOnDisk = serde_yaml::from_str (&content)?;
   Ok ( node_fs . into_complete_as_single_section ( RepoName::from ("main") ))
 }
 

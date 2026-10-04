@@ -13,7 +13,7 @@ use skg::from_text::local_instruction_collection::types::CollectedIntents;
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, maybePlaced_to_placed_tree };
 use skg::types::misc::{ID, MSV, members_of, members_msv};
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::nodes::complete::Graphnode;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::tree::forest::ViewForest;
 
@@ -57,7 +57,7 @@ fn lowering_produces_ordered_definenodes_and_signals () {
   // 'e' is a subscribee-as-such, holding only signals, so it
   // lowers to nothing.
   assert_eq!( definenodes . len(), 4 );
-  { let root : &NodeComplete = match &definenodes [0] {
+  { let root : &Graphnode = match &definenodes [0] {
       DefineNode::Save (SaveNode (node)) => node,
       _ => panic! ("expected Save for root") };
     assert_eq!( root . pid, ID::from ("root") );

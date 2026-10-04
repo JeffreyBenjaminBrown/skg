@@ -3,12 +3,12 @@ use skg::dbs::in_rust_graph::internal_index_validation::{
   format_internal_index_mismatches, validate_internal_indexes,
 };
 use skg::types::misc::{ID, MSV, RepoName, rel_partners_at_relRepo};
-use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
+use skg::types::nodes::complete::{Graphnode, empty_node_complete};
 use skg::types::save::{DefineNode, DeleteNode, SaveNode};
 
 use proptest::prelude::*;
 
-fn node (pid : &str) -> NodeComplete {
+fn node (pid : &str) -> Graphnode {
   let mut node = empty_node_complete ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
@@ -29,7 +29,7 @@ fn full_fixture () -> InRustGraph {
     "[[id:target-alias][target]] and [[id:text-dangling][missing]]" . to_string ());
   let mut target = node ("target");
   target . extra_ids = vec![ID::from ("target-alias")];
-  InRustGraph::from_nodecompletes (&[owner, target])
+  InRustGraph::from_graphnodes (&[owner, target])
 }
 
 fn assert_same_graph (
@@ -83,7 +83,7 @@ fn incremental_update_delete_and_extra_id_acquisition_remain_coherent () {
   let mut disposable = node ("disposable");
   disposable . contains = rel_partners_at_relRepo (
     &repo, vec![ID::from ("delete-target")]);
-  let mut graph = InRustGraph::from_nodecompletes (&[owner . clone (), disposable]);
+  let mut graph = InRustGraph::from_graphnodes (&[owner . clone (), disposable]);
   assert_eq! (validate_internal_indexes (&graph), vec![]);
 
   owner . subscribes_to = MSV::Specified (rel_partners_at_relRepo (
@@ -110,7 +110,7 @@ fn incremental_update_delete_and_extra_id_acquisition_remain_coherent () {
 #[test]
 fn alias_acquisition_rekeys_all_five_inverse_indexes () {
   let repo : RepoName = RepoName::from ("main");
-  let mut owner : NodeComplete = node ("owner");
+  let mut owner : Graphnode = node ("owner");
   owner . contains = rel_partners_at_relRepo (&repo, vec![ID::from ("future")]);
   owner . subscribes_to = MSV::Specified (rel_partners_at_relRepo (
     &repo, vec![ID::from ("future")]));
@@ -120,8 +120,8 @@ fn alias_acquisition_rekeys_all_five_inverse_indexes () {
     &repo, vec![ID::from ("future")]));
   owner . body = Some ("[[id:future][future]]" . to_string ());
   let mut graph : InRustGraph =
-    InRustGraph::from_nodecompletes (&[owner . clone ()]);
-  let mut target : NodeComplete = node ("target");
+    InRustGraph::from_graphnodes (&[owner . clone ()]);
+  let mut target : Graphnode = node ("target");
   target . extra_ids = vec![ID::from ("future")];
   apply_definenodes_to_inRustGraph (
     &mut graph, &[DefineNode::Save (SaveNode (target . clone ())) ]);
@@ -137,7 +137,7 @@ fn alias_acquisition_rekeys_all_five_inverse_indexes () {
       index . get (&ID::from ("target")),
       Some (&std::iter::once (ID::from ("owner")) . collect ()));
     assert! (! index . contains_key (&ID::from ("future"))); }
-  let rebuilt : InRustGraph = InRustGraph::from_nodecompletes (&[owner, target]);
+  let rebuilt : InRustGraph = InRustGraph::from_graphnodes (&[owner, target]);
   assert_same_graph (&graph, &rebuilt);
   assert_eq! (validate_internal_indexes (&graph), vec![]);
 }
@@ -145,16 +145,16 @@ fn alias_acquisition_rekeys_all_five_inverse_indexes () {
 #[test]
 fn merge_transfer_rekeys_primary_and_extra_spellings () {
   let repo : RepoName = RepoName::from ("main");
-  let mut owner : NodeComplete = node ("owner");
+  let mut owner : Graphnode = node ("owner");
   owner . contains = rel_partners_at_relRepo (
     &repo, vec![ID::from ("acquiree"), ID::from ("old-extra")]);
-  let mut acquiree : NodeComplete = node ("acquiree");
+  let mut acquiree : Graphnode = node ("acquiree");
   acquiree . extra_ids = vec![ID::from ("old-extra")];
-  let acquirer : NodeComplete = node ("acquirer");
-  let mut graph : InRustGraph = InRustGraph::from_nodecompletes (&[
+  let acquirer : Graphnode = node ("acquirer");
+  let mut graph : InRustGraph = InRustGraph::from_graphnodes (&[
     owner . clone (), acquiree, acquirer,
   ]);
-  let mut merged : NodeComplete = node ("acquirer");
+  let mut merged : Graphnode = node ("acquirer");
   merged . extra_ids = vec![ID::from ("acquiree"), ID::from ("old-extra")];
   apply_definenodes_to_inRustGraph (&mut graph, &[
     DefineNode::Save (SaveNode (merged . clone ())),
@@ -168,7 +168,7 @@ fn merge_transfer_rekeys_primary_and_extra_spellings () {
     graph . contained_by . get (&ID::from ("acquirer")),
     Some (&std::iter::once (ID::from ("owner")) . collect ()));
   assert! (! graph . contained_by . contains_key (&ID::from ("acquiree")));
-  let rebuilt : InRustGraph = InRustGraph::from_nodecompletes (&[owner, merged]);
+  let rebuilt : InRustGraph = InRustGraph::from_graphnodes (&[owner, merged]);
   assert_same_graph (&graph, &rebuilt);
   assert_eq! (validate_internal_indexes (&graph), vec![]);
 }
@@ -176,7 +176,7 @@ fn merge_transfer_rekeys_primary_and_extra_spellings () {
 #[test]
 fn deletion_rekeys_surviving_raw_primary_extra_and_text_references () {
   let repo : RepoName = RepoName::from ("main");
-  let mut owner : NodeComplete = node ("foreign-owner");
+  let mut owner : Graphnode = node ("foreign-owner");
   let raw_ids : Vec<ID> = vec![ID::from ("target"), ID::from ("extra")];
   owner . contains = rel_partners_at_relRepo (&repo, raw_ids . clone ());
   owner . subscribes_to = MSV::Specified (rel_partners_at_relRepo (
@@ -187,9 +187,9 @@ fn deletion_rekeys_surviving_raw_primary_extra_and_text_references () {
     &repo, raw_ids . clone ()));
   owner . body = Some (
     "[[id:target][primary]] [[id:extra][extra]]" . to_string ());
-  let mut target : NodeComplete = node ("target");
+  let mut target : Graphnode = node ("target");
   target . extra_ids = vec![ID::from ("extra")];
-  let mut graph : InRustGraph = InRustGraph::from_nodecompletes (&[
+  let mut graph : InRustGraph = InRustGraph::from_graphnodes (&[
     owner . clone (), target,
   ]);
   apply_definenodes_to_inRustGraph (&mut graph, &[
@@ -208,7 +208,7 @@ fn deletion_rekeys_surviving_raw_primary_extra_and_text_references () {
   ] {
     for raw in &raw_ids {
       assert! (index . get (raw) . unwrap () . contains (&ID::from ("foreign-owner"))); }}
-  let rebuilt : InRustGraph = InRustGraph::from_nodecompletes (&[owner]);
+  let rebuilt : InRustGraph = InRustGraph::from_graphnodes (&[owner]);
   assert_same_graph (&graph, &rebuilt);
   assert_eq! (validate_internal_indexes (&graph), vec![]);
 }
@@ -216,20 +216,20 @@ fn deletion_rekeys_surviving_raw_primary_extra_and_text_references () {
 #[test]
 fn changed_owner_removes_and_adds_all_five_inverse_contributions () {
   let repo : RepoName = RepoName::from ("main");
-  let mut old : NodeComplete = node ("owner");
+  let mut old : Graphnode = node ("owner");
   old . contains = rel_partners_at_relRepo (&repo, vec![ID::from ("old")]);
   old . subscribes_to = MSV::Specified (old . contains . clone ());
   old . hides_from_its_subscriptions = MSV::Specified (old . contains . clone ());
   old . overrides_view_of = MSV::Specified (old . contains . clone ());
   old . body = Some ("[[id:old][old]]" . to_string ());
-  let mut final_node : NodeComplete = node ("owner");
+  let mut final_node : Graphnode = node ("owner");
   final_node . contains = rel_partners_at_relRepo (&repo, vec![ID::from ("new")]);
   final_node . subscribes_to = MSV::Specified (final_node . contains . clone ());
   final_node . hides_from_its_subscriptions =
     MSV::Specified (final_node . contains . clone ());
   final_node . overrides_view_of = MSV::Specified (final_node . contains . clone ());
   final_node . body = Some ("[[id:new][new]]" . to_string ());
-  let mut graph : InRustGraph = InRustGraph::from_nodecompletes (&[old]);
+  let mut graph : InRustGraph = InRustGraph::from_graphnodes (&[old]);
   apply_definenodes_to_inRustGraph (
     &mut graph, &[DefineNode::Save (SaveNode (final_node . clone ())) ]);
 
@@ -243,7 +243,7 @@ fn changed_owner_removes_and_adds_all_five_inverse_contributions () {
     assert! (! index . contains_key (&ID::from ("old")));
     assert! (index . get (&ID::from ("new")) . unwrap ()
       . contains (&ID::from ("owner"))); }
-  let rebuilt : InRustGraph = InRustGraph::from_nodecompletes (&[final_node]);
+  let rebuilt : InRustGraph = InRustGraph::from_graphnodes (&[final_node]);
   assert_same_graph (&graph, &rebuilt);
 }
 
@@ -260,7 +260,7 @@ proptest! {
     let raw_ids : Vec<ID> = raw_indexes . iter ()
       . map (|index| ID::from (universe [*index]))
       . collect ();
-    let mut owner : NodeComplete = node ("owner");
+    let mut owner : Graphnode = node ("owner");
     owner . contains = rel_partners_at_relRepo (&repo, raw_ids . clone ());
     owner . subscribes_to = MSV::Specified (owner . contains . clone ());
     owner . hides_from_its_subscriptions = MSV::Specified (owner . contains . clone ());
@@ -268,20 +268,20 @@ proptest! {
     owner . body = Some (raw_indexes . iter ()
       . map (|index| format! ("[[id:{}][x]]", universe [*index]))
       . collect::<Vec<String>> () . join (" "));
-    let mut target : NodeComplete = node ("P");
+    let mut target : Graphnode = node ("P");
     target . extra_ids = vec![ID::from ("E")];
-    let acquirer : NodeComplete = node ("Q");
-    let mut graph : InRustGraph = InRustGraph::from_nodecompletes (&[
+    let acquirer : Graphnode = node ("Q");
+    let mut graph : InRustGraph = InRustGraph::from_graphnodes (&[
       owner . clone (), target . clone (), acquirer . clone (),
     ]);
-    let (definitions, final_nodes) : (Vec<DefineNode>, Vec<NodeComplete>) =
+    let (definitions, final_nodes) : (Vec<DefineNode>, Vec<Graphnode>) =
       match action {
         0 => (vec![DefineNode::Delete (DeleteNode {
                 id : ID::from ("P"), home_repo : repo . clone (),
               })],
               vec![owner, acquirer]),
         1 => {
-          let mut merged : NodeComplete = acquirer;
+          let mut merged : Graphnode = acquirer;
           merged . extra_ids = vec![ID::from ("P"), ID::from ("E")];
           (vec![
              DefineNode::Save (SaveNode (merged . clone ())),
@@ -291,14 +291,14 @@ proptest! {
            ], vec![owner, merged])
         },
         _ => {
-          let mut added : NodeComplete = node ("R");
+          let mut added : Graphnode = node ("R");
           added . extra_ids = vec![ID::from ("U")];
           (vec![DefineNode::Save (SaveNode (added . clone ()))],
            vec![owner, target, acquirer, added])
         },
       };
     apply_definenodes_to_inRustGraph (&mut graph, &definitions);
-    let rebuilt : InRustGraph = InRustGraph::from_nodecompletes (&final_nodes);
+    let rebuilt : InRustGraph = InRustGraph::from_graphnodes (&final_nodes);
     assert_same_graph (&graph, &rebuilt);
     prop_assert_eq! (validate_internal_indexes (&graph), vec![]);
   }

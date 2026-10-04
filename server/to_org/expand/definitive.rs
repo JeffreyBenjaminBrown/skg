@@ -3,15 +3,15 @@ use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_r
 use crate::to_org::expand::backpath::build_and_integrate_path_view_then_drop_request;
 use crate::to_org::expand::folder_request::build_and_integrate_folder_then_drop_request;
 use crate::to_org::expand::flags::build_and_integrate_flags_then_drop_request;
-use crate::to_org::util::{ DefinitiveMap, Finalizable, get_id_from_treenode, makeWriteProtectedAndClobber, activeNode_in_tree_is_writeProtected };
+use crate::to_org::util::{ DefinitiveMap, Finalizable, get_id_from_treenode, makeWriteProtectedAndClobber, activeVognode_in_tree_is_writeProtected };
 use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::git::RepoDiff;
 use crate::types::viewnode::{ Viewnode, ViewnodeKind, ViewRequest, FolderRelation, Editability, AffectsParent };
 use crate::types::viewnode::Vognode;
-use crate::types::nodes::complete::NodeComplete;
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
+use crate::types::nodes::complete::Graphnode;
+use crate::dbs::node_lookup::graphnode_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::tree::viewnode_nodecomplete::{write_at_activeNode_in_tree, pid_and_repo_from_treenode};
+use crate::types::tree::viewnode_graphnode::{write_at_activeVognode_in_tree, pid_and_repo_from_treenode};
 
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::HashMap;
@@ -102,7 +102,7 @@ pub fn apply_definitive_draw_rule (
       // cascade DVR landing on a freshly-created definitive child whose id
       // is already Final elsewhere; for a user DVR on an already-write-protected
       // node it is a no-op. The expand step then clobbers/refreshes it.)
-      write_at_activeNode_in_tree (
+      write_at_activeVognode_in_tree (
         viewforest, node_id,
         |t| { t . view_requests . remove (& ViewRequest::Definitive);
               t . editability = Editability::WriteProtected; } )
@@ -113,14 +113,14 @@ pub fn apply_definitive_draw_rule (
                                      prior . node_id (),
                                      visited, graph, config ) ?; }}
   { // Remove request, mark definitive, replace title/body, add to visited.
-    write_at_activeNode_in_tree (
+    write_at_activeVognode_in_tree (
       viewforest, node_id, |t| {
         t . view_requests . remove (& ViewRequest::Definitive);
         t . editability = Editability::Definitive {
           body         : None,
           edit_request : None }; } )
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
-    from_disk_replace_title_body_and_nodecomplete (
+    from_disk_replace_title_body_and_graphnode (
       viewforest, node_id, graph, config ) ?;
     // A DVR target is Final (TODO/DONE/local-view-update/plan_v2.org §5.2): later DVRs for this ID defer to it.
     visited . insert ( node_pid . clone(), Finalizable::Final (node_id) ); }
@@ -129,7 +129,7 @@ pub fn apply_definitive_draw_rule (
 /// Does two things:
 /// - Mark a node, and its entire content subtree, as write-protected.
 /// - Remove them from `visited`.
-/// Only recurses into non-ignored ActiveNode children;
+/// Only recurses into non-ignored ActiveVognode children;
 ///   ignored and non-vognode children persist unchanged.
 /// TODO : This will need complication to properly handle
 ///   sharing-related nodes among the input node's descendents.
@@ -155,7 +155,7 @@ fn writeProtect_content_subtree (
         . map ( |c| c . id () )
         . collect ();
       (node_pid, content_child_treeids) };
-  if ! activeNode_in_tree_is_writeProtected ( tree, node_id ) ? {
+  if ! activeVognode_in_tree_is_writeProtected ( tree, node_id ) ? {
     visited . remove (&node_pid);
     makeWriteProtectedAndClobber ( tree, node_id, graph, config ) ?; }
   for child_treeid in content_child_treeids { // recurse
@@ -163,10 +163,10 @@ fn writeProtect_content_subtree (
       tree, child_treeid, visited, graph, config ) ?; }
   Ok (( )) }
 
-/// Fetches NodeComplete from the in-Rust graph or disk.
+/// Fetches Graphnode from the in-Rust graph or disk.
 /// Updates title and body.
 /// Preserves all other Viewnode data.
-fn from_disk_replace_title_body_and_nodecomplete (
+fn from_disk_replace_title_body_and_graphnode (
   tree    : &mut Tree<Viewnode>,
   node_id : NodeId,
   graph   : &InRustGraph,
@@ -174,14 +174,14 @@ fn from_disk_replace_title_body_and_nodecomplete (
 ) -> Result < (), Box<dyn Error> > {
   let (pid, src) : (ID, RepoName) =
     pid_and_repo_from_treenode ( tree, node_id,
-      "from_disk_replace_title_body_and_nodecomplete" ) ?;
-  let nodecomplete : NodeComplete = nodecomplete_rustFirst_by_pid_and_repo (
+      "from_disk_replace_title_body_and_graphnode" ) ?;
+  let graphnode : Graphnode = graphnode_rustFirst_by_pid_and_repo (
     graph, config, &pid, &src ) ?;
-  let title : String = nodecomplete . title . clone();
+  let title : String = graphnode . title . clone();
   if title . is_empty () {
-    return Err ( format! ( "NodeComplete {} has empty title", pid ) . into () ); }
-  let body : Option < String > = nodecomplete . body . clone ();
-  write_at_activeNode_in_tree
+    return Err ( format! ( "Graphnode {} has empty title", pid ) . into () ); }
+  let body : Option < String > = graphnode . body . clone ();
+  write_at_activeVognode_in_tree
     ( tree, node_id,
       |t| { t . title = title;
             if let Editability::Definitive { body: ref mut b, .. }

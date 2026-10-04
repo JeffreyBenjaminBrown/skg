@@ -1,12 +1,12 @@
-use crate::dbs::node_lookup::nodecomplete_from_graph;
+use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
 use crate::types::git::RelationshipAxes;
 use crate::types::misc::{ID, RelPartner, SkgConfig, RepoName};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, ViewRequest, FolderRelation};
 use crate::types::viewnode::{PropertyFolder, Property};
-use crate::types::tree::viewnode_nodecomplete::{
+use crate::types::tree::viewnode_graphnode::{
   insert_non_vognode_as_child, unique_non_vognode_child_of_viewnode};
 
 use ego_tree::Tree;
@@ -54,8 +54,8 @@ pub fn build_and_integrate_aliases (
   { // If it already has an AliasFolder child,
     // then reconcile_aliasFolder_children (in update_buffer) already handled it.
     return Ok (( )); }
-  let node : Option<NodeComplete> =
-    nodecomplete_from_graph (graph, &node_id_val);
+  let node : Option<Graphnode> =
+    graphnode_from_graph (graph, &node_id_val);
   let home : Option<RepoName> =
     node . as_ref () . map ( |node| node . home_repo . clone () );
   let aliases : Vec<RelPartner<String>> = node

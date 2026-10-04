@@ -6,7 +6,7 @@ use crate::herald_tokens::{AncestorFlags, relationship_heralds_sexp};
 use crate::repo_sets::ActiveRepoSet;
 use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::viewnode::{
-  Birth, GraphNodeStats, AffectsParent, PartnerFolder, Viewnode, ViewnodeKind, Vognode };
+  Birth, GraphnodeStats, AffectsParent, PartnerFolder, Viewnode, ViewnodeKind, Vognode };
 use crate::update_buffer::ancestry::required_ancestor;
 use crate::update_buffer::reconcile::content::unintegrated_content_ids;
 use ego_tree::{Tree, NodeId};
@@ -113,7 +113,7 @@ fn set_herald_strings_in_viewnode (
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
   let (gstats, affectsParent, birth, overridesHere)
-    : (GraphNodeStats, AffectsParent, Birth, bool) = {
+    : (GraphnodeStats, AffectsParent, Birth, bool) = {
     let ViewnodeKind::Vognode (Vognode::Active (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
@@ -418,7 +418,7 @@ fn set_relRepo (
 mod relationship_default_tests {
   use super::*;
   use crate::types::misc::{RelPartner, SkgfileRepo};
-  use crate::types::nodes::complete::{empty_node_complete, NodeComplete};
+  use crate::types::nodes::complete::{empty_node_complete, Graphnode};
   use crate::types::viewnode::{
     mk_definitive_viewnode, viewforest_root_viewnode};
   use std::path::PathBuf;
@@ -441,18 +441,18 @@ mod relationship_default_tests {
     config . repo_order = ["public", "foreign", "private"]
       . into_iter () . map (RepoName::from) . collect ();
 
-    let mut owner : NodeComplete = empty_node_complete ();
+    let mut owner : Graphnode = empty_node_complete ();
     owner . pid = ID::new ("owner");
     owner . title = "owner" . to_string ();
     owner . home_repo = RepoName::from ("public");
     owner . contains = vec! [ RelPartner::at_relRepo (
       RepoName::from ("public"), ID::new ("member") ) ];
-    let mut member : NodeComplete = empty_node_complete ();
+    let mut member : Graphnode = empty_node_complete ();
     member . pid = ID::new ("member");
     member . title = "member" . to_string ();
     member . home_repo = RepoName::from ("foreign");
     let graph : InRustGraph =
-      InRustGraph::from_nodecompletes (&[owner, member]);
+      InRustGraph::from_graphnodes (&[owner, member]);
 
     let mut tree : Tree<Viewnode> =
       Tree::new (viewforest_root_viewnode ());
@@ -488,7 +488,7 @@ fn set_repo_at_boundary (
     else { return; };
     t . home_repo . clone () };
   let ancestor_repo : Option<RepoName> =
-    nearest_activeNode_ancestor_repo (tree, treeid);
+    nearest_activeVognode_ancestor_repo (tree, treeid);
   let at_boundary : bool =
     match ancestor_repo {
       None => true,
@@ -499,7 +499,7 @@ fn set_repo_at_boundary (
 
 /// Walk rootward from treeid (exclusive) to find
 /// the nearest active vognode ancestor's repo.
-fn nearest_activeNode_ancestor_repo (
+fn nearest_activeVognode_ancestor_repo (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Option<RepoName> {

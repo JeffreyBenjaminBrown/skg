@@ -17,7 +17,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::tantivy::context_update::update_context_origin_types;
 use crate::types::misc::{ID, TantivyIndex};
 use crate::types::save::{DefineNode, SaveNode};
-use crate::types::nodes::complete::{Flag, NodeComplete};
+use crate::types::nodes::complete::{Flag, Graphnode};
 use crate::types::links::links_from_node;
 
 use std::collections::{HashMap, HashSet};
@@ -74,7 +74,7 @@ pub type MapToContainers = HashMap<ID, Vec<ID>>;
 /// Compute context origin types for all nodes and update Tantivy.
 /// Returns the map from node ID to context origin type label.
 ///
-/// All data is precomputed from NodeCompletes at init. This is synchronous and
+/// All data is precomputed from Graphnodes at init. This is synchronous and
 /// near-instantaneous (sub-second on a 28k-node dataset).
 pub fn compute_and_store_context_types (
   tantivy_index : &TantivyIndex,
@@ -131,7 +131,7 @@ pub fn context_origin_types_for_saved_from_in_rust_graph (
   graph     : &InRustGraph,
   node_defs : &[DefineNode],
 ) -> HashMap<ID, String> {
-  let saved : Vec<&NodeComplete> =
+  let saved : Vec<&Graphnode> =
     node_defs . iter ()
     . filter_map ( |instr| match instr {
       DefineNode::Save (SaveNode (node)) => Some (node),
@@ -373,10 +373,10 @@ fn climb_containerward_to_cycle (
 //
 
 /// Build (map-to-content, map-to-containers) maps
-/// from loaded NodeCompletes.
+/// from loaded Graphnodes.
 /// This is a single linear pass over the already-loaded nodes.
 pub fn content_maps_from_nodes (
-  nodes : &[NodeComplete],
+  nodes : &[Graphnode],
 ) -> (MapToContent, MapToContainers) {
   let mut to_content    : MapToContent    = HashMap::new ();
   let mut to_containers : MapToContainers = HashMap::new ();
@@ -394,7 +394,7 @@ pub fn content_maps_from_nodes (
 /// Collect all link dest IDs from titles and bodies.
 /// This is a single linear pass over the already-loaded nodes.
 pub fn mentioned_ids_from_nodes (
-  nodes : &[NodeComplete],
+  nodes : &[Graphnode],
 ) -> HashSet<ID> {
   nodes . iter ()
   . flat_map ( |node| {
@@ -406,7 +406,7 @@ pub fn mentioned_ids_from_nodes (
 /// Collect the set of IDs of nodes whose misc field
 /// contains Had_ID_Before_Import.
 pub fn had_id_set_from_nodes (
-  nodes : &[NodeComplete],
+  nodes : &[Graphnode],
 ) -> HashSet<ID> {
   nodes . iter ()
   . filter ( |n|

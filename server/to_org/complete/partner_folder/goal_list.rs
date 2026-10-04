@@ -7,11 +7,11 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::types::git::{GitDiffStatus, RelationshipAxes, NodeChanges, NodeCompleteDiff, Sign, RepoDiff, axes_from_per_stage_diffs, net_diff_from_per_stage, per_stage_node_changes_for_activeNode};
+use crate::types::git::{GitDiffStatus, RelationshipAxes, NodeChanges, GraphnodeDiff, Sign, RepoDiff, axes_from_per_stage_diffs, net_diff_from_per_stage, per_stage_node_changes_for_activeVognode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
-use crate::dbs::node_lookup::nodecomplete_graphFirst_by_pid_and_repo;
+use crate::dbs::node_lookup::graphnode_graphFirst_by_pid_and_repo;
 use crate::types::misc::{ID, RelationshipMemberKey, SkgConfig, RepoName, members_of};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 use crate::types::phantom::home_from_disk;
 
 use std::collections::{HashMap, HashSet};
@@ -49,7 +49,7 @@ pub fn goal_list_for_outbound_folder (
     return (worktree_list . to_vec (), HashSet::new ()); }
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
-    per_stage_node_changes_for_activeNode (
+    per_stage_node_changes_for_activeVognode (
       repo_diffs, owner_pid, owner_repo );
   if staged_nc . is_none () && unstaged_nc . is_none () {
     return (worktree_list . to_vec (), HashSet::new ()); }
@@ -72,7 +72,7 @@ pub fn outbound_member_axes (
 ) -> HashMap<ID, RelationshipAxes> {
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
-    per_stage_node_changes_for_activeNode (
+    per_stage_node_changes_for_activeVognode (
       repo_diffs, owner_pid, owner_repo );
   axes_from_per_stage_diffs (
     staged_nc   . and_then ( |c| relation . diff_in_nodechanges (c) ),
@@ -104,7 +104,7 @@ pub fn three_snapshots_of_relation_list (
     repo_diffs . as_ref ()
     . and_then ( |d| d . get (skgrepo) )
     . filter ( |sd| sd . is_gitrepo );
-  let stage_before = | entry : Option<&NodeCompleteDiff>,
+  let stage_before = | entry : Option<&GraphnodeDiff>,
                        after_this_stage : &[ID] | -> Vec<ID> {
     match entry {
       None => after_this_stage . to_vec (), // stage changed nothing
@@ -121,7 +121,7 @@ pub fn three_snapshots_of_relation_list (
               . collect () },
         GitDiffStatus::Deleted =>
           ncd . before_node . as_ref ()
-          . map ( |nc| relation_list_of_nodecomplete (nc, relation) )
+          . map ( |nc| relation_list_of_graphnode (nc, relation) )
           . unwrap_or_default (),
         GitDiffStatus::Added =>
           Vec::new (), } } };
@@ -135,15 +135,15 @@ pub fn three_snapshots_of_relation_list (
       &index );
   [ head, index, worktree_list . to_vec () ] }
 
-/// The outbound list a NodeComplete holds for a relation, repos
+/// The outbound list a Graphnode holds for a relation, repos
 /// dropped.  (The inverse scan has a private sibling; this one serves
 /// the three-snapshot reconstruction.)
 /// NOTE: was '&'a [ID]' before the historical relation-partner change;
 /// a borrow can no longer be returned once the repos must be stripped, so this
 /// now returns an owned 'Vec<ID>' (its one caller already called
 /// '.to_vec()' on the result, so nothing downstream changed).
-fn relation_list_of_nodecomplete (
-  nc       : &NodeComplete,
+fn relation_list_of_graphnode (
+  nc       : &Graphnode,
   relation : NodeRelation,
 ) -> Vec<ID> {
   match relation {
@@ -267,7 +267,7 @@ pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
   let wt_subscribee_content_of = | pid : &ID | -> Vec<ID> {
     match graph_repo (graph, pid, config) {
       Some (src) =>
-        nodecomplete_graphFirst_by_pid_and_repo ( graph, config, pid, &src )
+        graphnode_graphFirst_by_pid_and_repo ( graph, config, pid, &src )
           . ok ()
           . map ( |skg| members_of (& skg . contains) )
           . unwrap_or_default (),

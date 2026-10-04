@@ -4,7 +4,7 @@ use indoc::indoc;
 use std::error::Error;
 use std::net::TcpStream;
 
-use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_repo;
+use skg::dbs::filesystem::one_node::graphnode_from_pid_and_repo;
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::serve::ViewsState;
 use skg::test_utils::{
@@ -67,11 +67,11 @@ async fn merge_preserves_acquiree_child_bodies_impl (
     println!("Errors: {:?}", response . errors); }
 
   let mut failures : Vec<String> = Vec::new();
-  let b1 : skg::types::nodes::complete::NodeComplete =
-    nodecomplete_from_pid_and_repo (
+  let b1 : skg::types::nodes::complete::Graphnode =
+    graphnode_from_pid_and_repo (
       config, ID::from ("b1"), &RepoName::from ("main") ) ?;
-  let b2 : skg::types::nodes::complete::NodeComplete =
-    nodecomplete_from_pid_and_repo (
+  let b2 : skg::types::nodes::complete::Graphnode =
+    graphnode_from_pid_and_repo (
       config, ID::from ("b2"), &RepoName::from ("main") ) ?;
   if b1 . body . as_deref () != Some ("b1 text") {
     failures . push (format!(

@@ -1,9 +1,9 @@
 use crate::types::git::{RelationshipAxes, NodeChanges};
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
+use crate::dbs::node_lookup::graphnode_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, RepoName};
-use crate::types::nodes::complete::NodeComplete;
-use crate::types::git::{RepoDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_activeNode};
+use crate::types::nodes::complete::Graphnode;
+use crate::types::git::{RepoDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_activeVognode};
 use crate::types::tree::generic::error_unless_node_satisfies;
 use crate::update_buffer::ancestry::pid_and_repo_from_required_ancestor;
 use crate::types::viewnode::{Viewnode, ViewnodeKind};
@@ -14,11 +14,11 @@ use std::collections::HashMap;
 use std::error::Error;
 
 /// Reconciles an IDFolder's children against
-///   the IDs on disk (via the map) for its parent ActiveNode.
+///   the IDs on disk (via the map) for its parent ActiveVognode.
 ///
 /// - Verify this node is an IDFolder
-/// - Verify its parent is an ActiveNode
-/// - Fetch the corresponding NodeComplete from the map
+/// - Verify its parent is an ActiveVognode
+/// - Fetch the corresponding Graphnode from the map
 /// - Read its IDs into a goal list
 /// - In diff view, also build a diff-status map from NodeChanges.ids_diff
 /// - Reconcile children via complete_relevant_children_in_viewnodetree
@@ -40,20 +40,20 @@ pub fn reconcile_idFolder_children (
     pid_and_repo_from_required_ancestor(
       tree, idfolder_node_id, 0,
       "reconcile_idFolder_children" ) ?;
-  let parent_nodecomplete : NodeComplete =
-    nodecomplete_rustFirst_by_pid_and_repo (
+  let parent_graphnode : Graphnode =
+    graphnode_rustFirst_by_pid_and_repo (
       graph, config, &parent_pid, &parent_repo )
-    . map_err ( |_| "reconcile_idFolder_children: parent NodeComplete not found" ) ?;
+    . map_err ( |_| "reconcile_idFolder_children: parent Graphnode not found" ) ?;
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
-    per_stage_node_changes_for_activeNode (
+    per_stage_node_changes_for_activeVognode (
       repo_diffs, &parent_pid, &parent_repo );
   let (goal_list, axes_map)
     : (Vec<ID>, HashMap<ID, RelationshipAxes>) =
     if staged_nc . is_none () && unstaged_nc . is_none () {
       // No git diff view, or no changes for this file in either stage.
       let goals : Vec<ID> =
-        parent_nodecomplete . all_ids()
+        parent_graphnode . all_ids()
           . cloned()
           . collect();
       ( goals, HashMap::new() )

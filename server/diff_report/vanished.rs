@@ -14,7 +14,7 @@ use crate::diff_report::types::{
   CommitStamp, GraphSnapshot, VanishedNodeReport, VanishedNodeSighting};
 use crate::git_ops::read_gitrepo::open_gitrepo;
 use crate::types::misc::{ID, MSV, SkgConfig, RepoName, members_msv, members_of};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 use crate::types::links::links_from_node;
 
 use git2::{Commit, ObjectType, Repository, TreeWalkMode, TreeWalkResult};
@@ -140,7 +140,7 @@ fn sighting_at_commit (
   descendant  : Option<git2::Oid>,
 ) -> Option<VanishedNodeSighting> {
   let tree = commit . tree () . ok () ?;
-  let own : NodeComplete = {
+  let own : Graphnode = {
     let file : PathBuf =
       prefix . join ( format! ("{}.skg", id . 0) );
     let entry = tree . get_path (&file) . ok () ?;

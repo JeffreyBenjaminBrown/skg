@@ -161,7 +161,7 @@ entirely from public/.
   doesn't check this but will produce a duplicate-file error from
   =git apply= if violated.
 - Skg's on-disk YAML format stays approximately as it is today
-  (=skg_fmt.py= mirrors it). If =NodeFS::to_yaml= changes,
+  (=skg_fmt.py= mirrors it). If =GraphnodeOnDisk::to_yaml= changes,
   =skg_fmt.emit_body_block= and =skg_fmt.FIELD_ORDER= may need
   updating to keep diffs minimal — but correctness is preserved
   regardless since skg re-reads on load.

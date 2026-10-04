@@ -142,8 +142,8 @@ async fn run_inbound_save_test (
       assert! (
         ! gitrepo_path . join ("del-r.skg") . exists (),
         "a deleted member's file must not resurrect" );
-      let edge_r : NodeComplete =
-        read_nodecomplete (gitrepo_path, "edge-r")?;
+      let edge_r : Graphnode =
+        read_graphnode (gitrepo_path, "edge-r")?;
       assert! (
         edge_r . overrides_view_of . or_default () . is_empty (),
         "a removed inbound edge must not return: the relation \

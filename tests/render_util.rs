@@ -4,7 +4,7 @@ use skg::assert_metadata_eq;
 use skg::org_to_text::viewnode_to_text;
 use skg::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
 use skg::types::misc::{ID, SkgConfig, SkgfileRepo, RepoName};
-use skg::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, ActiveNode, Editability, ViewnodeStats, default_activeNode };
+use skg::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, ActiveVognode, Editability, ViewnodeStats, default_activeVognode };
 use skg::types::viewnode::PropertyFolder;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -16,21 +16,21 @@ fn test_viewnode_to_text_no_metadata () {
     folded      : false,
     body_folded : false,
     kind    : ViewnodeKind::Vognode (Vognode::Active (
-      default_activeNode ( ID::from ("test"),
+      default_activeVognode ( ID::from ("test"),
                          RepoName::from ("main"),
                          "Test Title" . to_string() ))) };
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
-    . expect ("ActiveNode rendering never fails");
+    . expect ("ActiveVognode rendering never fails");
   assert_metadata_eq! ( result, "* (skg (node (id test) (repo main))) Test Title\n" ); }
 
 #[test]
 fn test_viewnode_to_text_with_body () {
-  let t : ActiveNode = ActiveNode {
+  let t : ActiveVognode = ActiveVognode {
     editability : Editability::Definitive {
       body         : Some ( "Test body content" . to_string() ),
       edit_request : None },
-    .. default_activeNode ( ID::from ("test"),
+    .. default_activeVognode ( ID::from ("test"),
                           RepoName::from ("main"),
                           "Test Title" . to_string() ) };
   let node : Viewnode = Viewnode {
@@ -40,7 +40,7 @@ fn test_viewnode_to_text_with_body () {
     kind    : ViewnodeKind::Vognode (Vognode::Active (t)), };
   let result : String =
     viewnode_to_text ( 2, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
-    . expect ("ActiveNode rendering never fails");
+    . expect ("ActiveVognode rendering never fails");
   assert_metadata_eq! ( result, "** (skg (node (id test) (repo main))) Test Title\nTest body content\n" ); }
 
 #[test]
@@ -59,9 +59,9 @@ fn test_viewnode_to_text_with_metadata () {
 
 #[test]
 fn test_viewnode_to_text_with_id_metadata () {
-  let t : ActiveNode = ActiveNode {
+  let t : ActiveVognode = ActiveVognode {
     editability : Editability::WriteProtected,
-    .. default_activeNode ( ID::from ("test123"),
+    .. default_activeVognode ( ID::from ("test123"),
                           RepoName::from ("main"),
                           "Test Title" . to_string() ) };
   let node : Viewnode = Viewnode {
@@ -71,14 +71,14 @@ fn test_viewnode_to_text_with_id_metadata () {
     kind    : ViewnodeKind::Vognode (Vognode::Active (t)), };
   let result : String =
     viewnode_to_text ( 3, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
-    . expect ("ActiveNode rendering never fails");
+    . expect ("ActiveVognode rendering never fails");
   assert_metadata_eq! ( result, "*** (skg (node (id test123) (repo main) writeProtected)) Test Title\n" ); }
 
 #[test]
 fn repo_name_with_whitespace_is_one_round_trippable_atom () {
   let repo : RepoName = RepoName::from ("Mr Cheese");
-  let mut active_node : ActiveNode =
-    default_activeNode (
+  let mut active_node : ActiveVognode =
+    default_activeVognode (
       ID::from ("cheese-node"), repo . clone (),
       "Cooking" . to_string () );
   active_node . viewStats . homeRepoAtBoundary = true;
@@ -95,7 +95,7 @@ fn repo_name_with_whitespace_is_one_round_trippable_atom () {
         user_owns_it : false } ) ]));
   let rendered : String =
     viewnode_to_text (1, &node, &config)
-    . expect ("ActiveNode rendering never fails");
+    . expect ("ActiveVognode rendering never fails");
   assert_eq! (
     rendered,
     "* (skg (node (id cheese-node) (repo \"Mr Cheese\") (viewStats (homeRepoHerald \"⌂:Mr Cheese\")))) Cooking\n" );
@@ -112,11 +112,11 @@ fn repo_name_with_whitespace_is_one_round_trippable_atom () {
 
 #[test]
 fn test_metadata_ordering () {
-  let t : ActiveNode = ActiveNode {
+  let t : ActiveVognode = ActiveVognode {
     viewStats : ViewnodeStats {
       cycle             : true,
       .. ViewnodeStats::default() },
-    .. default_activeNode ( ID::from ("xyz"),
+    .. default_activeVognode ( ID::from ("xyz"),
                           RepoName::from ("main"),
                           "Test" . to_string() ) };
   let node : Viewnode = Viewnode {
@@ -126,7 +126,7 @@ fn test_metadata_ordering () {
     kind    : ViewnodeKind::Vognode (Vognode::Active (t)), };
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
-    . expect ("ActiveNode rendering never fails");
+    . expect ("ActiveVognode rendering never fails");
   assert_metadata_eq! ( result, "* (skg (node (id xyz) (repo main) (viewStats cycle))) Test\n" ); }
 
 #[test]
@@ -134,11 +134,11 @@ fn test_rel_heralds_emitted () {
   // The semantic (rels ...) string round-trips verbatim; a node with
   // none emits no rels atom.
   let mk = | rels : Option<&str> | -> String {
-    let t : ActiveNode = ActiveNode {
+    let t : ActiveVognode = ActiveVognode {
       viewStats : ViewnodeStats {
         rel_heralds : rels . map ( |s| s . to_string () ),
         .. ViewnodeStats::default () },
-      .. default_activeNode ( ID::from ("n"),
+      .. default_activeVognode ( ID::from ("n"),
                             RepoName::from ("main"),
                             "N" . to_string () ) };
     let node = Viewnode {

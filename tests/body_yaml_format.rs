@@ -1,19 +1,19 @@
 // cargo nextest run --test grouped_unit -E 'test(body_yaml_format::)'
 //
-// Tests that NodeFS::to_yaml emits the 'body' field as a YAML block
+// Tests that GraphnodeOnDisk::to_yaml emits the 'body' field as a YAML block
 // literal (readable in diffs) even when the body contains tabs, and
 // that the output round-trips exactly via serde_yaml::from_str.
 // Also verifies field order is unchanged from the default serde_yaml
 // rendering.
 
-use skg::types::nodes::fs::NodeFS;
+use skg::types::nodes::fs::GraphnodeOnDisk;
 use skg::telescope::types::ListItem;
 use skg::types::misc::ID;
 
 fn node_with_body (
   body : &str,
-) -> NodeFS {
-  NodeFS {
+) -> GraphnodeOnDisk {
+  GraphnodeOnDisk {
     title                        : Some ("t" . to_string ()),
     aliases                      : vec! [],
     pid                          : ID::new ("p"),
@@ -30,9 +30,9 @@ fn assert_roundtrip (
   label : &str,
   body  : &str,
 ) {
-  let node : NodeFS = node_with_body (body);
+  let node : GraphnodeOnDisk = node_with_body (body);
   let yaml : String = node . to_yaml () . expect ("serializes");
-  let back : NodeFS =
+  let back : GraphnodeOnDisk =
     serde_yaml::from_str (&yaml)
     . unwrap_or_else (|e| panic! (
       "{}: re-parse failed: {}\n----\n{}\n----", label, e, yaml));
@@ -45,7 +45,7 @@ fn assert_roundtrip (
 #[test]
 fn block_scalar_for_body_without_tabs () {
   let body : &str = "line one\nline two\nline three";
-  let node : NodeFS = node_with_body (body);
+  let node : GraphnodeOnDisk = node_with_body (body);
   let yaml : String = node . to_yaml () . unwrap ();
   assert! (
     yaml . contains ("body: |"),
@@ -58,10 +58,10 @@ fn block_scalar_for_body_without_tabs () {
 fn block_scalar_for_body_with_tabs () {
   // Regression guard: serde_yaml's default emitter falls back to a
   // double-quoted scalar (with \n escapes) whenever the body contains
-  // a tab character. NodeFS::to_yaml must avoid that fallback.
+  // a tab character. GraphnodeOnDisk::to_yaml must avoid that fallback.
   let body : &str =
     "  prose line one\n\t(elisp-code)\n  prose line two";
-  let node : NodeFS = node_with_body (body);
+  let node : GraphnodeOnDisk = node_with_body (body);
   let yaml : String = node . to_yaml () . unwrap ();
   assert! (
     ! yaml . contains (r"\n"),
@@ -82,10 +82,10 @@ fn body_round_trips_across_many_shapes () {
 
 #[test]
 fn field_order_places_body_between_extra_ids_and_contains () {
-  // 'body' sits between 'extra_ids' and 'contains' in NodeFS. The
+  // 'body' sits between 'extra_ids' and 'contains' in GraphnodeOnDisk. The
   // to_yaml helper must preserve that ordering even though it takes
   // a custom path for 'body'.
-  let node : NodeFS = NodeFS {
+  let node : GraphnodeOnDisk = GraphnodeOnDisk {
     title                        : Some ("t" . to_string ()),
     aliases                      : vec! [],
     pid                          : ID::new ("p"),
@@ -121,9 +121,9 @@ fn body_with_only_literal_backslash_n_not_newlines () {
   // interpret it as a newline (that would be YAML double-quoted
   // behavior, which we're avoiding).
   let body : &str = "foo\\nbar\\nbaz";
-  let node : NodeFS = node_with_body (body);
+  let node : GraphnodeOnDisk = node_with_body (body);
   let yaml : String = node . to_yaml () . unwrap ();
-  let back : NodeFS = serde_yaml::from_str (&yaml) . unwrap ();
+  let back : GraphnodeOnDisk = serde_yaml::from_str (&yaml) . unwrap ();
   assert_eq! (back . body . as_deref (), Some (body));
   // The file should contain the literal bytes on disk.
   assert! (

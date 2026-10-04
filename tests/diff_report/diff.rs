@@ -3,7 +3,7 @@ use skg::diff_report::types::{
   DiffReport, GraphSnapshot, NodeBucket, NodeDiffReport, RelationshipDiff,
   SnapshotPair, ValueSetDiff};
 use skg::types::misc::{ID, MSV, RepoName, rel_partners_at_relRepo};
-use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
+use skg::types::nodes::complete::{Graphnode, empty_node_complete};
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -23,8 +23,8 @@ fn node (
   pid      : &str,
   title    : &str,
   contains : &[&str],
-) -> NodeComplete {
-  let mut node : NodeComplete =
+) -> Graphnode {
+  let mut node : Graphnode =
     empty_node_complete ();
   node . pid = id (pid);
   node . title = title . to_string ();
@@ -37,7 +37,7 @@ fn node (
 }
 
 fn snapshot (
-  nodes : Vec<NodeComplete>,
+  nodes : Vec<Graphnode>,
 ) -> GraphSnapshot {
   let mut snapshot : GraphSnapshot =
     GraphSnapshot::default ();
@@ -53,8 +53,8 @@ fn snapshot (
 }
 
 fn report_for (
-  before : Vec<NodeComplete>,
-  after  : Vec<NodeComplete>,
+  before : Vec<Graphnode>,
+  after  : Vec<Graphnode>,
 ) -> DiffReport {
   diff_snapshots (&SnapshotPair {
     before: snapshot (before),
@@ -80,10 +80,10 @@ fn bucket_names (
 
 #[test]
 fn gained_container_affects_child () {
-  let before : Vec<NodeComplete> =
+  let before : Vec<Graphnode> =
     vec! [ node ("a", "A", &[]),
            node ("b", "B", &[]) ];
-  let after : Vec<NodeComplete> =
+  let after : Vec<Graphnode> =
     vec! [ node ("a", "A", &["b"]),
            node ("b", "B", &[]) ];
   let report : DiffReport =
@@ -103,11 +103,11 @@ fn gained_container_affects_child () {
 
 #[test]
 fn lost_container_reports_current_existing_containers () {
-  let before : Vec<NodeComplete> =
+  let before : Vec<Graphnode> =
     vec! [ node ("old", "Old", &["child"]),
            node ("stay", "Stay", &["child"]),
            node ("child", "Child", &[]) ];
-  let after : Vec<NodeComplete> =
+  let after : Vec<Graphnode> =
     vec! [ node ("old", "Old", &[]),
            node ("stay", "Stay", &["child"]),
            node ("new", "New", &["child"]),
@@ -129,16 +129,16 @@ fn lost_container_reports_current_existing_containers () {
 
 #[test]
 fn backward_subscribee_reports_current_existing_related_nodes () {
-  let mut old : NodeComplete =
+  let mut old : Graphnode =
     node ("old", "Old", &[]);
   old . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&old . home_repo, vec! [id ("target")]));
-  let mut stay : NodeComplete =
+  let mut stay : Graphnode =
     node ("stay", "Stay", &[]);
   stay . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&stay . home_repo, vec! [id ("target")]));
-  let mut stay_after : NodeComplete =
+  let mut stay_after : Graphnode =
     node ("stay", "Stay", &[]);
   stay_after . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&stay_after . home_repo, vec! [id ("target")]));
-  let mut new : NodeComplete =
+  let mut new : Graphnode =
     node ("new", "New", &[]);
   new . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&new . home_repo, vec! [id ("target")]));
   let report : DiffReport =
@@ -160,11 +160,11 @@ fn backward_subscribee_reports_current_existing_related_nodes () {
 
 #[test]
 fn contained_order_change_gets_list_diff () {
-  let before : Vec<NodeComplete> =
+  let before : Vec<Graphnode> =
     vec! [ node ("a", "A", &["b", "c"]),
            node ("b", "B", &[]),
            node ("c", "C", &[]) ];
-  let after : Vec<NodeComplete> =
+  let after : Vec<Graphnode> =
     vec! [ node ("a", "A", &["c", "b"]),
            node ("b", "B", &[]),
            node ("c", "C", &[]) ];
@@ -179,13 +179,13 @@ fn contained_order_change_gets_list_diff () {
 
 #[test]
 fn links_are_reported_in_both_directions () {
-  let before : Vec<NodeComplete> =
+  let before : Vec<Graphnode> =
     vec! [ node ("a", "A", &[]),
            node ("b", "B", &[]) ];
-  let mut a_after : NodeComplete =
+  let mut a_after : Graphnode =
     node ("a", "A [[id:b][B]]", &[]);
   a_after . body = Some ("body".to_string ());
-  let after : Vec<NodeComplete> =
+  let after : Vec<Graphnode> =
     vec! [ a_after, node ("b", "B", &[]) ];
   let report : DiffReport =
     report_for (before, after);
@@ -207,12 +207,12 @@ fn links_are_reported_in_both_directions () {
 
 #[test]
 fn duplicate_ids_across_repos_are_omitted_from_node_buckets () {
-  let before : Vec<NodeComplete> =
+  let before : Vec<Graphnode> =
     vec! [];
-  let mut left : NodeComplete =
+  let mut left : Graphnode =
     node ("a", "A left", &[]);
   left . home_repo = repo ("left");
-  let mut right : NodeComplete =
+  let mut right : Graphnode =
     node ("b", "B right", &[]);
   right . home_repo = repo ("right");
   right . extra_ids = vec! [id ("a")];
@@ -228,7 +228,7 @@ fn duplicate_ids_across_repos_are_omitted_from_node_buckets () {
 fn telescope_shape_is_not_a_duplicate () {
   // One pid claimed from two REPOS is the normal telescope shape
   // (sections at two privacy levels), not a duplicate-ID violation.
-  let mut telescope : NodeComplete =
+  let mut telescope : Graphnode =
     node ("a", "A", &[]);
   telescope . home_repo = repo ("public");
   let mut snap_after : GraphSnapshot =
@@ -267,9 +267,9 @@ fn bucket_order_frontloads_problematic_categories () {
 
 #[test]
 fn deleted_pid_preserved_as_extra_id_is_probably_merged () {
-  let before : Vec<NodeComplete> =
+  let before : Vec<Graphnode> =
     vec! [ node ("old", "Old", &[]) ];
-  let mut merged : NodeComplete =
+  let mut merged : Graphnode =
     node ("merged", "Merged", &[]);
   merged . extra_ids = vec! [id ("old")];
   let report : DiffReport =
@@ -293,11 +293,11 @@ fn deleted_pid_preserved_as_extra_id_is_probably_merged () {
 
 #[test]
 fn aliases_use_set_diff () {
-  let mut before_node : NodeComplete =
+  let mut before_node : Graphnode =
     node ("a", "A", &[]);
   before_node . aliases =
     MSV::Specified (rel_partners_at_relRepo (&before_node . home_repo, vec! ["old".to_string ()]));
-  let mut after_node : NodeComplete =
+  let mut after_node : Graphnode =
     node ("a", "A", &[]);
   after_node . aliases =
     MSV::Specified (rel_partners_at_relRepo (&after_node . home_repo, vec! ["new".to_string ()]));
@@ -316,10 +316,10 @@ fn aliases_use_set_diff () {
 
 #[test]
 fn repo_move_is_reported () {
-  let mut before_node : NodeComplete =
+  let mut before_node : Graphnode =
     node ("a", "A", &[]);
   before_node . home_repo = repo ("left");
-  let mut after_node : NodeComplete =
+  let mut after_node : Graphnode =
     node ("a", "A", &[]);
   after_node . home_repo = repo ("right");
   let report : DiffReport =
@@ -333,10 +333,10 @@ fn repo_move_is_reported () {
 
 #[test]
 fn repo_move_uses_its_own_bucket () {
-  let mut before_node : NodeComplete =
+  let mut before_node : Graphnode =
     node ("a", "A", &[]);
   before_node . home_repo = repo ("left");
-  let mut after_node : NodeComplete =
+  let mut after_node : Graphnode =
     node ("a", "A", &[]);
   after_node . home_repo = repo ("right");
   let report : DiffReport =
@@ -360,10 +360,10 @@ fn repo_move_uses_its_own_bucket () {
 
 #[test]
 fn root_classification_detects_newly_orphaned_nodes () {
-  let before : Vec<NodeComplete> =
+  let before : Vec<Graphnode> =
     vec! [ node ("parent", "Parent", &["child"]),
            node ("child", "Child", &[]) ];
-  let after : Vec<NodeComplete> =
+  let after : Vec<Graphnode> =
     vec! [ node ("parent", "Parent", &[]),
            node ("child", "Child", &[]) ];
   let report : DiffReport =
@@ -379,11 +379,11 @@ fn root_classification_detects_newly_orphaned_nodes () {
 
 #[test]
 fn pure_contained_reorder_has_list_diff_without_set_diff () {
-  let before : Vec<NodeComplete> =
+  let before : Vec<Graphnode> =
     vec! [ node ("a", "A", &["b", "c"]),
            node ("b", "B", &[]),
            node ("c", "C", &[]) ];
-  let after : Vec<NodeComplete> =
+  let after : Vec<Graphnode> =
     vec! [ node ("a", "A", &["c", "b"]),
            node ("b", "B", &[]),
            node ("c", "C", &[]) ];

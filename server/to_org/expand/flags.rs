@@ -1,10 +1,10 @@
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::node_lookup::nodecomplete_from_graph;
+use crate::dbs::node_lookup::graphnode_from_graph;
 use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::nodes::complete::{
-  Flag, NodeComplete, flag_is_true};
-use crate::types::tree::viewnode_nodecomplete::{
+  Flag, Graphnode, flag_is_true};
+use crate::types::tree::viewnode_graphnode::{
   insert_non_vognode_as_child, unique_non_vognode_child_of_viewnode};
 use crate::types::viewnode::{
   Property, PropertyFolder, Viewnode, ViewnodeKind, ViewRequest};
@@ -39,7 +39,7 @@ pub fn build_and_integrate_flags (
     &ViewnodeKind::PropertyFolder (PropertyFolder::flags ())) ? . is_some ()
   { return Ok (()); }
   let pid : ID = get_id_from_treenode (tree, node_id) ?;
-  let node : Option<NodeComplete> = nodecomplete_from_graph (graph, &pid);
+  let node : Option<Graphnode> = graphnode_from_graph (graph, &pid);
   let folder : ego_tree::NodeId = insert_non_vognode_as_child (
     tree, node_id,
     ViewnodeKind::PropertyFolder (PropertyFolder::flags ()), false ) ?;
@@ -80,16 +80,16 @@ mod tests {
   #[test]
   fn builder_emits_true_viewnodes_in_registry_order_and_keeps_empty_folder () {
     let repo = RepoName::from ("main");
-    let rich = NodeComplete {
+    let rich = Graphnode {
       pid: ID::from ("rich"), title: "Rich" . to_string (),
       home_repo: repo . clone (),
       misc: vec![Flag::NoSearchMatching,
                  Flag::Had_ID_Before_Import],
       .. empty_node_complete () };
-    let empty = NodeComplete {
+    let empty = Graphnode {
       pid: ID::from ("empty"), title: "Empty" . to_string (),
       home_repo: repo . clone (), .. empty_node_complete () };
-    let graph = InRustGraph::from_nodecompletes (&[rich, empty]);
+    let graph = InRustGraph::from_graphnodes (&[rich, empty]);
     let mut tree = Tree::new (mk_definitive_viewnode (
       ID::from ("rich"), repo . clone (), "Rich" . to_string (), None));
     let root = tree . root () . id ();

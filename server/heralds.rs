@@ -186,7 +186,7 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///
 ///   * Two non-vognode-level staged/unstaged INTERC rules and two
 ///     node-level ones -- the non-vognode-level pair omits the N / -N
-///     axes because node-axis markers only apply to ActiveNodes,
+///     axes because node-axis markers only apply to ActiveVognodes,
 ///     not to non-vognodes.
 ///
 ///   * The 'affectsParent' sub-rule 'container' names an atom the server
@@ -259,7 +259,7 @@ pub fn herald_rule_table () -> HeraldRule {
           crule (Red, "relRepo", vec! [
             any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ]),
       // An inactive placeholder is anonymous and dataless: the bare
-      // atom 'inactiveNode' (see InactiveNode), like the other dataless
+      // atom 'inactiveNode' (see InactiveVognode), like the other dataless
       // non-vognode markers. Its id/repo would leak hidden content, so
       // they are not emitted.
       crule (Blue, "inactiveNode", vec! [
@@ -467,14 +467,14 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   atoms . extend ( ViewRequest::EMITTABLE_MATCH_ATOMS );
   atoms . into_iter () . collect () }
 
-/// GraphNodeStats emits no match atoms: its counts feed semantic
+/// GraphnodeStats emits no match atoms: its counts feed semantic
 /// '(rels ...)' facts. The
 /// destructuring pattern is the exhaustiveness guard -- a new field
 /// fails to compile here until it is accounted for.
 fn graphstats_atoms () -> Vec<&'static str> {
-  use crate::types::viewnode::GraphNodeStats;
-  fn guard ( g : GraphNodeStats ) {
-    let GraphNodeStats {
+  use crate::types::viewnode::GraphnodeStats;
+  fn guard ( g : GraphnodeStats ) {
+    let GraphnodeStats {
       aliases : _,    // -> Ak, inside semantic rels metadata
       extra_ids : _,  // -> Ik, inside semantic rels metadata
       flags : _, // -> Fk, inside semantic rels metadata
@@ -483,7 +483,7 @@ fn graphstats_atoms () -> Vec<&'static str> {
   let _ = guard;
   vec! [] }
 
-/// ViewnodeStats match atoms, from activeNode_metadata_to_string's
+/// ViewnodeStats match atoms, from activeVognode_metadata_to_string's
 /// view_stats (org_to_text.rs). Birth and relationship facts are
 /// node-level '(rels ...)' data, not viewStats sub-forms.
 fn viewstats_atoms () -> Vec<&'static str> {

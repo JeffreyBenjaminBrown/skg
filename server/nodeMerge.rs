@@ -17,7 +17,7 @@ use crate::telescope::invariants::{
 };
 use crate::types::env::MutationGate;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 use crate::types::save::{DefineNode, NodeMerge};
 use std::error::Error;
 use std::collections::HashSet;
@@ -136,7 +136,7 @@ pub(crate) fn apply_prepared_nodeMerges (
       Err (e) => {
         tracing::error!(
           "Tantivy merge failed: {}. Rebuilding from disk...", e);
-        let nodes : Vec<NodeComplete> =
+        let nodes : Vec<Graphnode> =
           read_all_skg_files_from_repos (&config)
           . map_err (|e2| -> Box<dyn Error> {
             format!("Tantivy rebuild also failed: {}. Restart the server.", e2)

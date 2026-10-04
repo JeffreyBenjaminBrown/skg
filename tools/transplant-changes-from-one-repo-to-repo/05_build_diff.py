@@ -35,7 +35,7 @@ Implementation notes:
   than yaml.safe_dump(value, ...) to avoid PyYAML emitting `...`
   document-end markers on scalar-only dumps.
 - Body is emitted by skg_fmt.emit_body, which mirrors skg's
-  NodeFS::to_yaml — block scalar `body: |2-` when round-trippable,
+  GraphnodeOnDisk::to_yaml — block scalar `body: |2-` when round-trippable,
   double-quoted single-line otherwise (for CR/NUL).
 - For an existing public/ file, edits are text-level so that the
   diff is minimal (one field's span replaced per changed field).

@@ -1,11 +1,11 @@
 // cargo test --test save birth_and_write_protected
 
-use skg::dbs::filesystem::one_node::nodecomplete_from_id;
+use skg::dbs::filesystem::one_node::graphnode_from_id;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::save::update_fs_from_saveinstructions;
 use skg::test_utils::run_with_test_stores;
 use skg::types::misc::{ID, members_of};
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::nodes::complete::Graphnode;
 
 
 use indoc::indoc;
@@ -54,8 +54,8 @@ fn test_birth_and_write_protected(
           config . clone(), )?;
 
         { // verify writeProtected is treated correctly
-          let node2 : NodeComplete =
-            nodecomplete_from_id(
+          let node2 : Graphnode =
+            graphnode_from_id(
               config, &ID("2" . to_string() ))
 ?;
         assert_eq!(
@@ -64,8 +64,8 @@ fn test_birth_and_write_protected(
           "Node 2 should only contain [3]. It might look like 4 was appended, but because node 2 is 'writeProtected', that node 4 child should be ignored by node 2." ); }
 
         { // verify affectsParent=false is treated correctly
-          let node1 : NodeComplete =
-            nodecomplete_from_id(
+          let node1 : Graphnode =
+            graphnode_from_id(
               config, &ID("1" . to_string() ))
 ?;
         assert!(

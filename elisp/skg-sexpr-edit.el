@@ -30,7 +30,7 @@
   "End position of the sexp in the source buffer.")
 
 (defvar-local skg-sexp-edit--is-activeNode nil
-  "Non-nil if the sexp being edited is an ActiveNode.")
+  "Non-nil if the sexp being edited is an ActiveVognode.")
 
 ;;
 ;; Minor mode for the edit buffer

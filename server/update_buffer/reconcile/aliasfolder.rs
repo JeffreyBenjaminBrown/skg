@@ -1,8 +1,8 @@
-use crate::types::git::{RelationshipAxes, NodeChanges, RepoDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_activeNode};
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
+use crate::types::git::{RelationshipAxes, NodeChanges, RepoDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_activeVognode};
+use crate::dbs::node_lookup::graphnode_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, RepoName, members_of};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 use crate::types::viewnode::{Viewnode, ViewnodeKind, AffectsParent};
 use crate::types::viewnode::{Vognode, PropertyFolder, Property};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
@@ -13,18 +13,18 @@ use std::collections::HashMap;
 use std::error::Error;
 
 /// Reconciles an AliasFolder's children against
-///   the aliases on disk (via the map) for its parent ActiveNode.
+///   the aliases on disk (via the map) for its parent ActiveVognode.
 ///
 /// Per the spec in buffer-update.org:
 /// - Verify this node is an AliasFolder
-/// - Verify its parent is an ActiveNode
-/// - Fetch the corresponding NodeComplete from the map
+/// - Verify its parent is an ActiveVognode
+/// - Fetch the corresponding Graphnode from the map
 /// - Read its aliases into 'aliases'
 /// - Partition the AliasFolder's children into:
-///   - ActiveNodes with affectsParent != Affected
+///   - ActiveVognodes with affectsParent != Affected
 ///   - Alias property nodes
 ///   (Error if any child does not fit these categories.)
-/// - Reorder children: ignored ActiveNodes first, then Alias nodes
+/// - Reorder children: ignored ActiveVognodes first, then Alias nodes
 /// - Among the Alias children, discard any not in 'aliases'
 /// - Create new Alias nodes for values in 'aliases' not already present
 /// - Order the final Alias children to match the order in 'aliases'
@@ -48,23 +48,23 @@ pub fn reconcile_aliasFolder_children (
     pid_and_repo_from_required_ancestor(
       tree, aliasfolder_node_id, 0,
       "reconcile_aliasFolder_children" ) ?;
-  let parent_nodecomplete : NodeComplete =
-    nodecomplete_rustFirst_by_pid_and_repo (
+  let parent_graphnode : Graphnode =
+    graphnode_rustFirst_by_pid_and_repo (
       graph, config, &parent_pid, &parent_repo )
-    . map_err ( |_| "reconcile_aliasFolder_children: parent NodeComplete not found" ) ?;
+    . map_err ( |_| "reconcile_aliasFolder_children: parent Graphnode not found" ) ?;
   let alias_relRepos : HashMap<String, RepoName> =
-    parent_nodecomplete . aliases . or_default () . iter ()
+    parent_graphnode . aliases . or_default () . iter ()
     .map ( |alias| (alias . member . clone (), alias . relRepo . clone ()) )
     .collect ();
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
-    per_stage_node_changes_for_activeNode (
+    per_stage_node_changes_for_activeVognode (
       repo_diffs, &parent_pid, &parent_repo );
   let (goal_list, axes_map)
     : (Vec<String>, HashMap<String, RelationshipAxes>) =
     if staged_nc . is_none () && unstaged_nc . is_none () {
       let goals : Vec<String> =
-        members_of ( parent_nodecomplete . aliases . or_default() );
+        members_of ( parent_graphnode . aliases . or_default() );
       ( goals, HashMap::new() )
     } else {
       let merged : Vec<(String, RelationshipAxes)> =
@@ -97,7 +97,7 @@ pub fn reconcile_aliasFolder_children (
                                                relRepo : alias_relRepos
                                                  . get (text)
                                                  . and_then ( |relRepo|
-                                                   if relRepo == &parent_nodecomplete . home_repo { None }
+                                                   if relRepo == &parent_graphnode . home_repo { None }
                                                    else { Some (relRepo . clone ()) } ),
                                                relRepo_request : None,
                                                relationship_axes } ), })};

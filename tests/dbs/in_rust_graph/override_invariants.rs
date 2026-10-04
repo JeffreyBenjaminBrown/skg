@@ -6,7 +6,7 @@ use skg::dbs::in_rust_graph::override_invariants::{
   validate_override_invariants,
 };
 use skg::types::misc::{ID, MSV, SkgConfig, SkgfileRepo, RepoName, rel_partners_at_relRepo};
-use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
+use skg::types::nodes::complete::{Graphnode, empty_node_complete};
 use skg::types::save::{DefineNode, DeleteNode, SaveNode};
 
 use proptest::prelude::*;
@@ -35,8 +35,8 @@ fn node (
   pid       : &str,
   repo    : &str,
   overrides : &[&str],
-) -> NodeComplete {
-  let mut node : NodeComplete =
+) -> Graphnode {
+  let mut node : Graphnode =
     empty_node_complete ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
@@ -55,17 +55,17 @@ fn node (
   node }
 
 fn violations_for (
-  nodes : Vec<NodeComplete>,
+  nodes : Vec<Graphnode>,
 ) -> Vec<OverrideInvariantViolation> {
   let graph : InRustGraph =
-    InRustGraph::from_nodecompletes (&nodes);
+    InRustGraph::from_graphnodes (&nodes);
   validate_override_invariants (&config (), &graph) }
 
 fn affected_and_full (
-  base_nodes  : Vec<NodeComplete>,
+  base_nodes  : Vec<Graphnode>,
   definitions : Vec<DefineNode>,
 ) -> (Vec<OverrideInvariantViolation>, Vec<OverrideInvariantViolation>) {
-  let base : InRustGraph = InRustGraph::from_nodecompletes (&base_nodes);
+  let base : InRustGraph = InRustGraph::from_graphnodes (&base_nodes);
   assert_eq! (validate_override_invariants (&config (), &base), vec![]);
   let mut candidate : InRustGraph = base . clone ();
   apply_definenodes_to_inRustGraph (&mut candidate, &definitions);
@@ -126,7 +126,7 @@ fn foreign_overriders_do_not_count_for_monogamy () {
 
 #[test]
 fn extra_id_targets_are_resolved_before_monogamy_check () {
-  let mut target : NodeComplete =
+  let mut target : Graphnode =
     node ("target", "owned", &[]);
   target . extra_ids = vec![ID::from ("target-extra")];
   let violations : Vec<OverrideInvariantViolation> =
@@ -237,7 +237,7 @@ fn chain_from_foreign_first_is_valid () {
 
 #[test]
 fn alias_redirection_that_closes_a_cycle_is_affected () {
-  let mut acquirer : NodeComplete = node ("B", "owned", &["A"]);
+  let mut acquirer : Graphnode = node ("B", "owned", &["A"]);
   acquirer . extra_ids = vec![ID::from ("future")];
   let (affected, full) = affected_and_full (
     vec![
@@ -315,7 +315,7 @@ proptest! {
     owned in any::<bool> (),
   ) {
     let ids : [&str; 4] = ["A", "B", "C", "D"];
-    let base : Vec<NodeComplete> = vec![
+    let base : Vec<Graphnode> = vec![
       node ("A", "owned", &["B"]),
       node ("B", "owned", &["C"]),
       node ("C", "owned", &[]),
@@ -324,7 +324,7 @@ proptest! {
     let targets : Vec<&str> =
       if target_index == 4 { Vec::new () }
       else { vec![ids [target_index]] };
-    let changed : NodeComplete = node (
+    let changed : Graphnode = node (
       ids [changed_index],
       if owned { "owned" } else { "foreign" },
       &targets);

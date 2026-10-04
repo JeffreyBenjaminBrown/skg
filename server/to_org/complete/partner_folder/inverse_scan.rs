@@ -25,10 +25,10 @@
 
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::repo_sets::ActiveRepoSet;
-use crate::types::git::{GitDiffStatus, RelationshipAxes, NodeCompleteDiff, Sign, RepoDiff};
+use crate::types::git::{GitDiffStatus, RelationshipAxes, GraphnodeDiff, Sign, RepoDiff};
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, RelPartner, RepoName};
-use crate::types::nodes::complete::NodeComplete;
+use crate::types::nodes::complete::Graphnode;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -42,7 +42,7 @@ use std::path::PathBuf;
 /// 'addedR' marks.
 ///
 /// 'active': relRepo gating (render-and-gating, 5_plan.org). A
-/// Deleted/Added file's before/after NodeComplete carries full
+/// Deleted/Added file's before/after Graphnode carries full
 /// RelPartner values, so those two stages gate on the specific
 /// edge's relRepo -- a phantom "used to link here" must not surface
 /// from a membership recorded outside the active set. The Modified
@@ -94,7 +94,7 @@ fn member_and_sign_for_owner (
   owner    : &ID,
   relation : NodeRelation,
   path     : &PathBuf,
-  ncd      : &NodeCompleteDiff,
+  ncd      : &GraphnodeDiff,
   active   : Option<&ActiveRepoSet>,
 ) -> Option<(ID, Sign)> {
   match ncd . status {
@@ -111,24 +111,24 @@ fn member_and_sign_for_owner (
         ID::from ( path . file_stem () ? . to_str () ? );
       Some ((member, sign)) },
     GitDiffStatus::Deleted => {
-      let before : &NodeComplete = ncd . before_node . as_ref () ?;
-      match outbound_member_relRepo_of_nodecomplete (before, relation, owner) {
+      let before : &Graphnode = ncd . before_node . as_ref () ?;
+      match outbound_member_relRepo_of_graphnode (before, relation, owner) {
         Some (relRepo) if repo_is_active (active, &relRepo) =>
           Some (( before . pid . clone (), Sign::Minus )),
         _ => None } },
     GitDiffStatus::Added => {
-      let after : &NodeComplete = ncd . after_node . as_ref () ?;
-      match outbound_member_relRepo_of_nodecomplete (after, relation, owner) {
+      let after : &Graphnode = ncd . after_node . as_ref () ?;
+      match outbound_member_relRepo_of_graphnode (after, relation, owner) {
         Some (relRepo) if repo_is_active (active, &relRepo) =>
           Some (( after . pid . clone (), Sign::Plus )),
         _ => None } } } }
 
 /// The relRepo of nc's outbound 'relation' edge to 'target', if nc's
-/// list names it. Sibling of 'outbound_ids_of_nodecomplete' below,
+/// list names it. Sibling of 'outbound_ids_of_graphnode' below,
 /// but keeps the RelPartner's relRepo instead of dropping it, so
 /// Deleted/Added-stage signs can be relRepo gated.
-fn outbound_member_relRepo_of_nodecomplete (
-  nc       : &NodeComplete,
+fn outbound_member_relRepo_of_graphnode (
+  nc       : &Graphnode,
   relation : NodeRelation,
   target   : &ID,
 ) -> Option<RepoName> {
@@ -143,7 +143,7 @@ fn outbound_member_relRepo_of_nodecomplete (
       nc . overrides_view_of . or_default (),
     NodeRelation::LinksTo =>
       // Links are inferred from body text, not stored as a list
-      // (see 'outbound_ids_of_nodecomplete'); this scan never fires
+      // (see 'outbound_ids_of_graphnode'); this scan never fires
       // for them from a Deleted/Added stage.
       return None, };
   rel_partners . iter ()

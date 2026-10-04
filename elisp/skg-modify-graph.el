@@ -109,8 +109,8 @@ outline heuristic, not a precise graph-content query."
 (defun skg-replace-content-with-link ()
   "Replace the branch at point with a link to its former root.
 Point may be on the headline or in its body.  The root must be an
-existing ActiveNode with an ID.  Its org-parent must be a definitive
-ActiveNode whose repo is owned by the user.  The whole org subtree
+existing ActiveVognode with an ID.  Its org-parent must be a definitive
+ActiveVognode whose repo is owned by the user.  The whole org subtree
 at point is replaced by a same-level headline whose title is an
 org id link to the former root, then the buffer is saved."
   (interactive)
@@ -130,9 +130,9 @@ org id link to the former root, then the buffer is saved."
   "Replace the leaf at point with content linked from that leaf.
 Point may be on the headline or in the body.  The leaf must have
 exactly one org bracket link in its title plus body, no
-org-descendents, and a definitive ActiveNode org-parent whose repo
+org-descendents, and a definitive ActiveVognode org-parent whose repo
 is owned by the user.  The link must be an id link.  The leaf is
-replaced by a write-protected same-level ActiveNode for the link
+replaced by a write-protected same-level ActiveVognode for the link
 target, then the buffer is saved."
   (interactive)
   (org-back-to-heading t)
@@ -148,7 +148,7 @@ target, then the buffer is saved."
     (skg-request-save-buffer)))
 
 (defun skg--content-link-replacement-node-data ()
-  "Return plist data for the ActiveNode headline at point."
+  "Return plist data for the ActiveVognode headline at point."
   (let* ((headline-text (skg-get-current-headline-text))
          (split (skg-split-as-stars-metadata-title headline-text))
          (metadata-sexp (skg--metadata-sexp-at-point-or-nil)))
@@ -248,7 +248,7 @@ one link is not an id link."
     (nreverse links)))
 
 (defun skg--replace-current-leaf-with-linked-content (link)
-  "Replace the current leaf with a write-protected ActiveNode for LINK."
+  "Replace the current leaf with a write-protected ActiveVognode for LINK."
   (let* ((stars (nth 0 (skg-split-as-stars-metadata-title
                        (skg-get-current-headline-text))))
          (id (plist-get link :id))

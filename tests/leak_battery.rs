@@ -33,7 +33,7 @@ use skg::to_org::expand::backpath::build_and_integrate_containerward_path_with_r
 use skg::to_org::render::content_view::multi_root_view_with_repo_set;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::misc::ID;
-use skg::types::nodes::complete::NodeComplete;
+use skg::types::nodes::complete::Graphnode;
 use skg::types::viewnode::{Phantom, RelationCounts, Viewnode, ViewnodeKind, Vognode};
 use skg::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
 
@@ -119,10 +119,10 @@ fn inbound_containerward_data_hides_N_at_public (
       // C's containerward data (who contains C) must not name N at
       // "public" -- the edge's relRepo (private) is what
       // gates it, not N's own (public) repo.
-      let nodes : Vec<NodeComplete> =
+      let nodes : Vec<Graphnode> =
         read_all_skg_files_from_repos (config)?;
       let graph : InRustGraph =
-        InRustGraph::from_nodecompletes (&nodes);
+        InRustGraph::from_graphnodes (&nodes);
       let inbound_public : Vec<ID> =
         graph . inbound_pids_for_relation_gated (
           &ID::from ("C"), NodeRelation::Contains, Some (&public) );
@@ -188,10 +188,10 @@ fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
         ActiveRepoSet::named (config, RepoSetName::from ("public"))?;
       let all : ActiveRepoSet =
         ActiveRepoSet::named (config, RepoSetName::from ("all"))?;
-      let nodes : Vec<NodeComplete> =
+      let nodes : Vec<Graphnode> =
         read_all_skg_files_from_repos (config)?;
       let graph : InRustGraph =
-        InRustGraph::from_nodecompletes (&nodes);
+        InRustGraph::from_graphnodes (&nodes);
 
       // C's subscriberFolder goal list: 'other_member_pids_gated' at
       // the SUBSCRIBEE role (C's own role -- who subscribes to C).
@@ -329,19 +329,19 @@ fn a_lowered_edge_is_governed_by_its_new_level (
   use skg::dbs::in_rust_graph::relation_accessors::BinaryRolePosition;
   use skg::types::misc::{RelPartner, RepoName};
   use skg::types::nodes::complete::empty_node_complete;
-  let node_at = |pid : &str, repo : &str| -> NodeComplete {
-    let mut n : NodeComplete = empty_node_complete ();
+  let node_at = |pid : &str, repo : &str| -> Graphnode {
+    let mut n : Graphnode = empty_node_complete ();
     n . pid = ID::from (pid);
     n . title = pid . to_string ();
     n . home_repo = RepoName::from (repo);
     n };
-  let mut owner : NodeComplete = node_at ("owner", "public");
+  let mut owner : Graphnode = node_at ("owner", "public");
   owner . contains = vec! [
     RelPartner::at_relRepo ( // as if just lowered to its default
       RepoName::from ("public"), ID::from ("lowered") ),
     RelPartner::at_relRepo ( // deliberately above its default
       RepoName::from ("private"), ID::from ("kept") ) ];
-  let graph : InRustGraph = InRustGraph::from_nodecompletes ( & [
+  let graph : InRustGraph = InRustGraph::from_graphnodes ( & [
     owner,
     node_at ("lowered", "public"),
     node_at ("kept",    "public") ] );

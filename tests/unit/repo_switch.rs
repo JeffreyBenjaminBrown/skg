@@ -30,7 +30,7 @@ fn folder (kind : PartnerFolder) -> Viewnode {
     kind        : ViewnodeKind::PartnerFolder (kind) } }
 
 // A now-inactive childless branch disappears; a now-inactive node
-// with an active child is retained as an InactiveNode (converted,
+// with an active child is retained as an InactiveVognode (converted,
 // not pruned); the active child survives.
 #[test]
 fn conversion_and_retention () {
@@ -52,7 +52,7 @@ fn conversion_and_retention () {
   assert! ( matches! (
       &t . get (kept) . unwrap () . value () . kind,
       ViewnodeKind::Vognode (Vognode::Inactive (_)) ),
-    "a now-inactive node with an active child is retained as an InactiveNode" );
+    "a now-inactive node with an active child is retained as an InactiveVognode" );
   assert! (
     t . get (kept) . unwrap () . children () . count () == 1,
     "the active child survives under the retained node" ); }
