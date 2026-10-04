@@ -1016,7 +1016,7 @@ make N contain a child node, called an /export marker/, such that:
   The node it names only documents this feature.
   The link works even if your sources do not contain that node.
   The link's label is up to you, for example:
-  : [[id:3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f][Export to Org]]
+  : [[id:3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f][Skg exports this document to org.]]
 - The marker's body contains a line saying where to write the file,
   relative to the output directory and without the =.org= extension:
   : target_filepath = docs/setup

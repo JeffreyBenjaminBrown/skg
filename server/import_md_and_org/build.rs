@@ -195,7 +195,7 @@ fn export_marker (
       "Export target {:?} contains both quote styles", target)); };
   let mut node : NodeComplete = crate::types::nodes::complete::empty_node_complete ();
   node . pid = new_id ();
-  node . title = format! ("[[id:{}][Export to Org]]", EXPORT_MARKER_ID);
+  node . title = format! ("[[id:{}][Skg exports this document to org.]]", EXPORT_MARKER_ID);
   node . body = Some (format! ("target_filepath = {}{}{}", quote, target, quote));
   node . source = source . clone ();
   Ok (node)
@@ -240,7 +240,7 @@ mod tests {
     assert_eq! (special . title, "These are special!");
     assert! (built . nodes [0] . contains . iter () . any (|child|
       built . nodes . iter () . any (|node|
-        node . pid == child . member && node . title . contains ("Export to Org"))));
+        node . pid == child . member && node . title . contains ("Skg exports this document to org."))));
   }
 
   #[test]
