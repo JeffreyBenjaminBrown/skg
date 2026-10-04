@@ -7,6 +7,7 @@
 (require 'skg-link-annotations)
 (require 'skg-sexpr-search)
 (require 'skg-keymaps-and-aliases)
+(require 'skg-shared)
 
 
 (defun skg--org-mode-with-options ()
@@ -19,8 +20,36 @@
 Rebinds C-x C-s to save via the skg server,
 and provides C-c prefix keybindings for skg commands."
   (setq-local org-adapt-indentation nil)
+  (skg--dictate-view-faces)
   (add-hook 'first-change-hook
             #'skg--confirm-before-dirtying-another-view nil t))
+
+(defun skg--view-face-attributes (entry default-background)
+  "The face attributes of ENTRY, one of the view_faces in
+'shared/herald-styles.json'. Every attribute the entry leaves out gets
+a fixed value, so nothing of the user's theme shows through: the
+background is DEFAULT-BACKGROUND, the weight normal, and so on."
+  (list :foreground (alist-get 'foreground entry)
+        :background (or (alist-get 'background entry) default-background)
+        :weight (intern (or (alist-get 'weight entry) "normal"))
+        :slant 'normal
+        :underline (and (alist-get 'underline entry) t)
+        :overline nil :strike-through nil :box nil :inverse-video nil))
+
+(defun skg--dictate-view-faces ()
+  "Remap, in this buffer, the faces a view uses to Skg's own, from the
+view_faces of 'shared/herald-styles.json'. Colors and weights only; the
+typeface stays the user's."
+  (let* ((entries (alist-get 'view_faces skg-shared-herald-styles))
+         (default-background
+          (alist-get 'background
+                     (cl-find "default" entries
+                              :key (lambda (entry) (alist-get 'name entry))
+                              :test #'equal))))
+    (dolist (entry entries)
+      (let ((attributes (skg--view-face-attributes entry default-background)))
+        (dolist (face (alist-get 'emacs entry))
+          (face-remap-add-relative (intern face) attributes))))))
 
 (defvar skg--inhibit-dirty-view-confirmation nil
   "Non-nil while skg itself edits view text (re-rendering, save

@@ -137,6 +137,23 @@ describe('skg.heralds', function ()
     assert.are.equal(0, #herald_extmarks(buf))
   end)
 
+  it('dictates the view faces in a heralded window', function ()
+    local buf = scratch_buffer_with({
+      '* (skg (node (id 1) (rels (contains (out 2))))) a headline' })
+    heralds.enable(buf)
+    local winhighlight = vim.wo.winhighlight
+    assert.is_truthy(winhighlight:find('Normal:SkgViewDefault', 1, true))
+    assert.is_truthy(winhighlight:find(
+      '@org.headline.level1:SkgViewHeadlineLevel1', 1, true))
+    local default = vim.api.nvim_get_hl(0, { name = 'SkgViewDefault' })
+    assert.are.equal(0xffffff, default.fg)
+    assert.are.equal(0x000000, default.bg)
+    local level1 = vim.api.nvim_get_hl(0, { name = 'SkgViewHeadlineLevel1' })
+    assert.is_true(level1.bold)
+    assert.are.equal(0x000000, level1.bg) -- the default's background
+    heralds.disable(buf)
+  end)
+
   it('displays the inactive-node placeholder as a message', function ()
     local chunks = heralds.chunks_from_metadata('(skg inactiveNode)')
     assert.are.equal('node from inactive repo',

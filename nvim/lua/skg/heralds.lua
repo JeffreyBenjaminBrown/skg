@@ -52,6 +52,48 @@ function M.define_highlight_groups ()
 end
 M.define_highlight_groups()
 
+-- ── view faces ──────────────────────────────────────────────────────
+-- Skg dictates every face in a view: the view_faces of
+-- shared/herald-styles.json (which the Emacs client reads too) define
+-- the highlight groups SkgViewNAME, and a view window's 'winhighlight'
+-- maps the groups the view uses (Normal, the org headline levels,
+-- links, ...) to them. Colors and weights only, not the typeface.
+
+---The highlight group of view face NAME: 'headline_level_1' ->
+---'SkgViewHeadlineLevel1'.
+---@param name string
+---@return string
+function M.view_face_group (name)
+  return 'SkgView' .. ('_' .. name):gsub('_(%w)', string.upper)
+end
+
+---Define the SkgViewNAME highlight groups. A face with no background
+---gets the default's, so nothing of the user's theme shows through.
+function M.define_view_face_groups ()
+  local default_background = nil
+  for _, entry in ipairs(shared.herald_styles.view_faces) do
+    if entry.name == 'default' then default_background = entry.background end
+  end
+  for _, entry in ipairs(shared.herald_styles.view_faces) do
+    vim.api.nvim_set_hl(0, M.view_face_group(entry.name),
+      { fg = entry.foreground, bg = entry.background or default_background,
+        bold = entry.weight == 'bold', underline = entry.underline,
+        default = true })
+  end
+end
+M.define_view_face_groups()
+
+---The 'winhighlight' value for a view window.
+M.view_winhighlight = (function ()
+  local pairs_list = {}
+  for _, entry in ipairs(shared.herald_styles.view_faces) do
+    for _, group in ipairs(entry.nvim) do
+      table.insert(pairs_list, group .. ':' .. M.view_face_group(entry.name))
+    end
+  end
+  return table.concat(pairs_list, ',')
+end)()
+
 ---@param style table|nil a lens style keyword symbol, e.g. GO
 ---@return string|nil highlight group name, or nil if it names no style
 function M.style_highlight_group (style)
@@ -613,13 +655,15 @@ function M.watch_buffer (buf)
     end })
 end
 
----Set the conceal options on windows currently showing BUF, and
----arrange (once per buffer) for future windows to get them too.
+---Set the conceal options and the view faces ('winhighlight') on
+---windows currently showing BUF, and arrange (once per buffer) for
+---future windows to get them too.
 ---@param buf integer
 function M.conceal_windows_showing (buf)
   local function apply (win)
     vim.wo[win][0].conceallevel = 2
     vim.wo[win][0].concealcursor = 'nc'
+    vim.wo[win][0].winhighlight = M.view_winhighlight
   end
   for _, win in ipairs(vim.api.nvim_list_wins()) do
     if vim.api.nvim_win_get_buf(win) == buf then apply(win) end
