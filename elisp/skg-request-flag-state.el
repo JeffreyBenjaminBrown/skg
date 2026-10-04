@@ -1,6 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 ;;;
-;;; Show and change the user-mutable NoSearchMatching file property.
+;;; Show and change the user-mutable NoSearchMatching flag.
 
 (require 'cl-lib)
 (require 'org)
@@ -11,20 +11,20 @@
 (defconst skg--search-matching-choices
   '("search matching" "no search matching"))
 
-(defun skg-set-property-search-matching (&optional recursive)
+(defun skg-set-flag-search-matching (&optional recursive)
   "Stage whether the node at point may match text searches.
 With prefix argument RECURSIVE, apply the selected desired state to the
 true-content subtree.  This modifies metadata but does not save."
   (interactive "P")
   (unless (org-at-heading-p) (user-error "Not on a headline"))
   (let* ((metadata (skg--metadata-sexp-at-point-or-nil))
-         (id (skg--boolprop-eligible-root-id metadata))
+         (id (skg--flag-eligible-root-id metadata))
          (buffer (current-buffer))
          (marker (point-marker)))
     (skg-register-response-handler
-     'property-state
+     'flag-state
      (lambda (_tcp-proc payload)
-       (skg--set-boolprop-search-matching-from-state
+       (skg--set-flag-search-matching-from-state
         buffer marker id recursive payload))
      t)
     (skg-lp-reset)
@@ -32,12 +32,12 @@ true-content subtree.  This modifies metadata but does not save."
      (skg-tcp-connect-to-rust)
      (concat
       (prin1-to-string
-       `((request . "property state")
+       `((request . "flag state")
          (id . ,id)
-         (property . "noSearchMatching")))
+         (flag . "noSearchMatching")))
       "\n"))))
 
-(defun skg--boolprop-eligible-root-id (metadata)
+(defun skg--flag-eligible-root-id (metadata)
   "Validate root METADATA and return its saved graph ID."
   (unless (skg--activeNode-sexp-p metadata)
     (user-error "Search matching can be set only on an active node"))
@@ -48,9 +48,9 @@ true-content subtree.  This modifies metadata but does not save."
   (or (skg--node-id metadata)
       (user-error "Save the node first; it has no graph ID")))
 
-(defun skg--set-boolprop-search-matching-from-state
+(defun skg--set-flag-search-matching-from-state
     (buffer marker expected-id recursive payload)
-  "Handle a property-state PAYLOAD, guarding BUFFER/MARKER against staleness."
+  "Handle a flag-state PAYLOAD, guarding BUFFER/MARKER against staleness."
   (let* ((response (read payload))
          (string-value (lambda (key)
                          (let ((entry (assoc key response)))
@@ -73,16 +73,16 @@ true-content subtree.  This modifies metadata but does not save."
            (let* ((metadata (skg--metadata-sexp-at-point-or-nil))
                   (current-id (and metadata (skg--node-id metadata))))
              (when error-message
-               (user-error "property state: %s" error-message))
+               (user-error "flag state: %s" error-message))
              (unless (and current-id
                           (or (string= current-id expected-id)
                               (and canonical-id
                                    (string= current-id canonical-id))))
-               (user-error "The headline changed while property state was loading"))
+               (user-error "The headline changed while flag state was loading"))
              (unless (string= owned "true")
                (user-error "Cannot set search matching on a foreign node"))
              ;; Re-run the local refusal after the network round trip.
-             (skg--boolprop-eligible-root-id metadata)
+             (skg--flag-eligible-root-id metadata)
              (let* ((initial (if (string= value "true")
                                  "no search matching"
                                "search matching"))
@@ -92,19 +92,19 @@ true-content subtree.  This modifies metadata but does not save."
                              nil nil nil skg--search-matching-choices))
                     (desired (string= choice "no search matching")))
                (if recursive
-                   (skg--stage-boolprop-search-matching-recursive desired)
+                   (skg--stage-flag-search-matching-recursive desired)
                  (skg--stamp-search-matching-request desired)
                  (message "Search matching staged for 1 node. Save to apply."))))))))))
 
 (defun skg--stamp-search-matching-request (no-search-matching)
   (skg-edit-metadata-at-point
    `(skg (node (editRequest
-                (property noSearchMatching
+                (flag noSearchMatching
                           ,(if no-search-matching 'true 'false)))))))
 
-(defun skg--stage-boolprop-search-matching-recursive (desired)
+(defun skg--stage-flag-search-matching-recursive (desired)
   "Stage DESIRED uniformly through the true-content subtree at point."
-  (let ((targets (skg--boolprop-recursive-targets))
+  (let ((targets (skg--flag-recursive-targets))
         (seen (make-hash-table :test #'equal))
         (changed 0)
         (skipped nil))
@@ -133,7 +133,7 @@ true-content subtree.  This modifies metadata but does not save."
              changed (if (= changed 1) "" "s")
              (if skipped (mapconcat #'identity (nreverse skipped) ", ") "none"))))
 
-(defun skg--boolprop-recursive-targets ()
+(defun skg--flag-recursive-targets ()
   "Return markers for root and active true-content descendants only."
   (save-excursion
     (org-back-to-heading t)
@@ -150,4 +150,4 @@ true-content subtree.  This modifies metadata but does not save."
             (skg--goto-next-heading-after-subtree))))
       (nreverse targets))))
 
-(provide 'skg-request-boolprop-state)
+(provide 'skg-request-flag-state)

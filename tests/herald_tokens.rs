@@ -156,12 +156,12 @@ fn aliases_and_extra_ids () {
 }
 
 #[test]
-fn true_properties_are_counted_and_zero_is_omitted () {
+fn true_flags_are_counted_and_zero_is_omitted () {
   assert_eq! (
     relationship_heralds_sexp (
       &counts (), 0, 0, 2, &AncestorFlags::default (), &[], None)
       . as_deref (),
-    Some ("(rels (properties 2))") );
+    Some ("(rels (flags 2))") );
   assert_eq! (emit (&counts (), 0, 0, &AncestorFlags::default (), &[]),
               None); }
 

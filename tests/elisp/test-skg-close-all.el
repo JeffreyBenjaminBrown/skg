@@ -83,28 +83,28 @@ in later loads of the file were silently dropped."
   (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c g RET"))
               #'skg-goto)))
 
-(ert-deftest test-skg-reload-refreshes-property-command-module ()
+(ert-deftest test-skg-reload-refreshes-flag-command-module ()
   "Reload must not leave a new key bound to an undefined command.
-This reproduces the stale-feature state seen when the property command was
+This reproduces the stale-feature state seen when the flag command was
 added to an already-running Emacs: its keymap was refreshed, but its request
 module was not unloaded and therefore `require' declined to load it again."
   (load-file (expand-file-name
               "../../elisp/skg-reload.el"
               test-skg-close-all--this-dir))
   (let ((old-definition
-         (and (fboundp 'skg-set-property-search-matching)
-              (symbol-function 'skg-set-property-search-matching))))
+         (and (fboundp 'skg-set-flag-search-matching)
+              (symbol-function 'skg-set-flag-search-matching))))
     (unwind-protect
         (progn
-          (fmakunbound 'skg-set-property-search-matching)
-          (should-not (commandp 'skg-set-property-search-matching))
+          (fmakunbound 'skg-set-flag-search-matching)
+          (should-not (commandp 'skg-set-flag-search-matching))
           (skg-reload)
-          (should (commandp 'skg-set-property-search-matching))
+          (should (commandp 'skg-set-flag-search-matching))
           (should (eq (lookup-key skg-content-view-mode-map (kbd "C-c s x"))
-                      #'skg-set-property-search-matching)))
-      (unless (fboundp 'skg-set-property-search-matching)
+                      #'skg-set-flag-search-matching)))
+      (unless (fboundp 'skg-set-flag-search-matching)
         (when old-definition
-          (fset 'skg-set-property-search-matching old-definition))))))
+          (fset 'skg-set-flag-search-matching old-definition))))))
 
 (ert-deftest test-skg-close-all-spares-org-buffer-with-skg-heading ()
   "A real file the user is editing must survive `skg-close-all-skg-buffers',

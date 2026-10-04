@@ -7,7 +7,7 @@ use crate::telescope::unfold::{
   UnfoldInput, UnfoldedTelescope, unfold_node,
 };
 use crate::types::nodes::fs::NodeFS;
-use crate::types::nodes::complete::{FileProperty, NodeComplete};
+use crate::types::nodes::complete::{Flag, NodeComplete};
 use crate::types::links::org_literal_ranges::{
   HEADLINES_INSIDE_BLOCKS_EXPLANATION, headlines_inside_blocks};
 
@@ -139,8 +139,8 @@ fn merge_into_existing (
   existing : &mut NodeComplete,
   newcomer : &NodeComplete,
 ) {
-  if ! existing . misc . contains (&FileProperty::Was_Overloaded) {
-    existing . misc . push (FileProperty::Was_Overloaded); }
+  if ! existing . misc . contains (&Flag::Was_Overloaded) {
+    existing . misc . push (Flag::Was_Overloaded); }
   { // Merge contents. New members are tagged with the owning
     // (existing) node's repo; DEGENERATE (see RelPartner).
     for child in &newcomer . contains {
@@ -173,10 +173,10 @@ fn merge_into_existing (
         if ! merged . iter () . any ( |m| &m . member == alias ) {
           merged . push ( RelPartner::at_relRepo (
             repo . clone (), alias . clone () )); }} } }
-  if newcomer . misc . contains (&FileProperty::Had_ID_Before_Import)
-    && ! existing . misc . contains (&FileProperty::Had_ID_Before_Import)
+  if newcomer . misc . contains (&Flag::Had_ID_Before_Import)
+    && ! existing . misc . contains (&Flag::Had_ID_Before_Import)
     { // Preserve Had_ID_Before_Import from either side.
-      existing . misc . push (FileProperty::Had_ID_Before_Import); }}
+      existing . misc . push (Flag::Had_ID_Before_Import); }}
 
 fn write_nodecomplete_to_dir (
   node       : &NodeComplete,

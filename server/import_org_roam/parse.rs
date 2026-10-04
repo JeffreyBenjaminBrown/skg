@@ -37,7 +37,7 @@
 
 use crate::types::misc::{
   ID, MSV, RelPartner, RepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
-use crate::types::nodes::complete::{FileProperty, NodeComplete};
+use crate::types::nodes::complete::{Flag, NodeComplete};
 
 use std::path::Path;
 use uuid::Uuid;
@@ -325,7 +325,7 @@ fn nodecomplete_from_section_tree (
     overrides_view_of            : MSV::Unspecified,
     misc :
       if tree . section . had_id {
-        vec![FileProperty::Had_ID_Before_Import] }
+        vec![Flag::Had_ID_Before_Import] }
       else { Vec::new () }, }}
 
 fn collect_body (

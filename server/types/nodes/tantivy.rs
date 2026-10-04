@@ -1,12 +1,12 @@
 //! NodeTantivy: what Tantivy indexes.
 //!
 //! Title, aliases, and body for full-text search. No relations.
-//! Includes node file properties because 'Had_ID_Before_Import' feeds the
+//! Includes node flags because 'Had_ID_Before_Import' feeds the
 //! context-ranking score multiplier and 'NoSearchMatching' feeds Tantivy's
 //! mandatory direct-match exclusion.
 
 use crate::types::misc::{ID, MSV, RelPartner, RepoName};
-use crate::types::nodes::complete::{FileProperty, NodeComplete};
+use crate::types::nodes::complete::{Flag, NodeComplete};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct NodeTantivy {
@@ -21,7 +21,7 @@ pub struct NodeTantivy {
   // node (dbs-and-search, 5_plan.org).
   pub aliases : MSV<RelPartner<String>>,
   pub body    : Option<String>,
-  pub misc    : Vec<FileProperty>,
+  pub misc    : Vec<Flag>,
 }
 
 impl From<&NodeComplete> for NodeTantivy {

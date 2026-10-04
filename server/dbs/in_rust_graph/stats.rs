@@ -1,6 +1,6 @@
 /// PURPOSE: Fetch all graph-node statistics for a set of PIDs from the
 /// in-Rust graph: directional member counts for the five relations, the
-/// alias / extra-id / true-property counts, and the substantive-mentioner subset.
+/// alias / extra-id / true-flag counts, and the substantive-mentioner subset.
 /// These feed the uniform-herald token grammar (server/herald_tokens.rs).
 ///
 /// PITFALL: Assumes input IDs are primary IDs, not extra IDs. Always
@@ -38,7 +38,7 @@ impl AllGraphNodeStats {
 
 /// Extract GraphNodeStats for a single PID from AllGraphNodeStats and
 /// an optional disk NodeComplete (the repo of the alias / extra-id /
-/// property counts).
+/// flag counts).
 pub fn graphnodestats_for_pid (
   pid          : &ID,
   stats        : &AllGraphNodeStats,
@@ -52,7 +52,7 @@ pub fn graphnodestats_for_pid (
     nodecomplete
     . map ( |n| n . extra_ids . len () )
     . unwrap_or (0);
-  let properties : usize =
+  let flags : usize =
     nodecomplete
     . map ( |n| n . misc . iter () . copied ()
       . collect::<HashSet<_>> () . len () )
@@ -60,7 +60,7 @@ pub fn graphnodestats_for_pid (
   GraphNodeStats {
     aliases,
     extra_ids,
-    properties,
+    flags,
     rels : stats . counts . get (pid) . cloned (), }}
 
 /// Compute graph-node statistics without I/O.
@@ -230,7 +230,7 @@ fn pid_repo_is_active (
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::types::nodes::complete::{FileProperty, empty_node_complete};
+  use crate::types::nodes::complete::{Flag, empty_node_complete};
   use crate::types::misc::{RelPartner, RepoName};
   use crate::dbs::filesystem::not_nodes::load_config;
   use crate::repo_sets::RepoSetName;
@@ -305,17 +305,17 @@ mod tests {
   }
 
   #[test]
-  fn property_count_is_the_number_of_distinct_true_properties () {
+  fn flag_count_is_the_number_of_distinct_true_flags () {
     let pid = ID::from ("node");
     let node = NodeComplete {
       pid : pid . clone (),
       misc : vec![
-        FileProperty::Had_ID_Before_Import,
-        FileProperty::Had_ID_Before_Import,
-        FileProperty::NoSearchMatching ],
+        Flag::Had_ID_Before_Import,
+        Flag::Had_ID_Before_Import,
+        Flag::NoSearchMatching ],
       .. empty_node_complete () };
     let result = graphnodestats_for_pid (
       &pid, &AllGraphNodeStats::empty (), Some (&node));
-    assert_eq! (result . properties, 2);
+    assert_eq! (result . flags, 2);
   }
 }

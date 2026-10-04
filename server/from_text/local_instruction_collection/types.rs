@@ -10,7 +10,7 @@
 /// resolution and disk supplementation.
 
 use crate::types::misc::{ID, RepoName};
-use crate::types::nodes::complete::FileProperty;
+use crate::types::nodes::complete::Flag;
 use std::collections::HashMap;
 
 /// A LocalContext is what flows down the traversal: each node
@@ -77,7 +77,7 @@ pub enum NodeIntent_Local {
   SetOverrides    (Vec<(ID, Option<RepoName>)>),
   Delete          { repo : RepoName },
   NodeMerge       { acquiree : ID },
-  SetBoolProp     { property : FileProperty, value : bool },
+  SetFlag     { flag : Flag, value : bool },
   // The remaining kinds are combineable.
   SubscribeeVisibility (SubscribeeVisibility),
   HiddenOutsideEdit  (HiddenOutsideEdit),
@@ -118,7 +118,7 @@ pub struct SubscribeeTextClaim {
 /// of the type (the Option slots), and combineability is visible as
 /// the Vec slots. One cross-slot rule stays procedural, in
 /// 'instructionMerge_intent': 'delete' excludes the other exclusive
-/// slots, and 'nodeMerge' excludes 'boolprop'.
+/// slots, and 'nodeMerge' excludes 'flag'.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct IntentsForOneId {
   pub home_repo         : Option<RepoName>, // This is filled by the self-emissions (SetTitleAndBody and Delete).
@@ -129,7 +129,7 @@ pub struct IntentsForOneId {
   pub overrides      : Option<Vec<(ID, Option<RepoName>)>>,
   pub delete         : bool,
   pub node_merge     : Option<ID>, // This holds the acquiree.
-  pub boolprop       : Option<(FileProperty, bool)>,
+  pub flag       : Option<(Flag, bool)>,
   pub visibility     : Vec<SubscribeeVisibility>,  // This slot is combineable.
   pub hidden_outside : Vec<HiddenOutsideEdit>,     // This slot is combineable.
   pub text_claims    : Vec<SubscribeeTextClaim>,   // This slot is combineable, and is consumed only by validation.
@@ -155,7 +155,7 @@ impl IntentsForOneId {
       || self . subscribes_to . is_some()
       || self . overrides     . is_some()
       || self . node_merge    . is_some()
-      || self . boolprop      . is_some() }}
+      || self . flag      . is_some() }}
 
 impl CollectedIntents {
   pub fn new (
@@ -175,7 +175,7 @@ impl CollectedIntents {
   /// - 'Delete' alongside any other filled exclusive slot (or vice
   ///   versa) is an error, matching the old "Cannot have both Delete
   ///   and Save for same ID";
-  /// - 'nodeMerge' and 'boolprop' are mutually exclusive, including
+  /// - 'nodeMerge' and 'flag' are mutually exclusive, including
   ///   when duplicate occurrences of an ID emit them separately;
   /// - 'visibility' and 'text_claims' coexist with anything,
   ///   including 'delete' (resolution ignores deleted subscribers).
@@ -243,21 +243,21 @@ impl CollectedIntents {
               &mut entry . overrides, members,
               "overrides_view_of", &target),
           NodeIntent_Local::NodeMerge { acquiree } => {
-            if entry . boolprop . is_some() {
+            if entry . flag . is_some() {
               return Err ( format!(
-                "Cannot combine nodeMerge and property requests for ID {}",
+                "Cannot combine nodeMerge and flag requests for ID {}",
                 target )); }
             fill_exclusive_slot (
               &mut entry . node_merge, acquiree,
               "nodeMerge acquiree", &target) },
-          NodeIntent_Local::SetBoolProp { property, value } => {
+          NodeIntent_Local::SetFlag { flag, value } => {
             if entry . node_merge . is_some() {
               return Err ( format!(
-                "Cannot combine nodeMerge and property requests for ID {}",
+                "Cannot combine nodeMerge and flag requests for ID {}",
                 target )); }
             fill_exclusive_slot (
-              &mut entry . boolprop, (property, value),
-              "property", &target) },
+              &mut entry . flag, (flag, value),
+              "flag", &target) },
           NodeIntent_Local::Delete { .. }
             | NodeIntent_Local::SubscribeeVisibility (_)
             | NodeIntent_Local::HiddenOutsideEdit (_)

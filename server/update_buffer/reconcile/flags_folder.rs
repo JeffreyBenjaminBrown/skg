@@ -2,7 +2,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::nodes::complete::{
-  FileProperty, NodeComplete, file_property_is_true};
+  Flag, NodeComplete, flag_is_true};
 use crate::types::viewnode::{Qual, ViewNode, ViewNodeKind};
 use crate::update_buffer::ancestry::pid_and_repo_from_required_ancestor;
 use crate::update_buffer::util::{
@@ -11,7 +11,7 @@ use crate::update_buffer::util::{
 use ego_tree::{NodeId, Tree};
 use std::error::Error;
 
-pub fn reconcile_boolprops_folder_children (
+pub fn reconcile_flags_folder_children (
   tree      : &mut Tree<ViewNode>,
   folder_id : NodeId,
   graph     : &InRustGraph,
@@ -19,27 +19,27 @@ pub fn reconcile_boolprops_folder_children (
 ) -> Result<(), Box<dyn Error>> {
   let (pid, repo) : (ID, RepoName) =
     pid_and_repo_from_required_ancestor (
-      tree, folder_id, 0, "reconcile_boolprops_folder_children") ?;
+      tree, folder_id, 0, "reconcile_flags_folder_children") ?;
   let node : NodeComplete = nodecomplete_rustFirst_by_pid_and_repo (
     graph, config, &pid, &repo)
-    . map_err (|_| "reconcile_boolprops_folder_children: parent not found") ?;
-  let goals : Vec<FileProperty> = FileProperty::ALL . into_iter ()
-    . filter (|property| file_property_is_true (&node . misc, *property))
+    . map_err (|_| "reconcile_flags_folder_children: parent not found") ?;
+  let goals : Vec<Flag> = Flag::ALL . into_iter ()
+    . filter (|flag| flag_is_true (&node . misc, *flag))
     . collect ();
   complete_relevant_children_in_viewnodetree (
     tree, folder_id,
     |viewnode| matches! (&viewnode . kind,
-      ViewNodeKind::Qual (Qual::BoolProp { .. })),
+      ViewNodeKind::Qual (Qual::Flag { .. })),
     |viewnode| match &viewnode . kind {
-      ViewNodeKind::Qual (Qual::BoolProp { property, .. }) => Ok (*property),
-      _ => Err ("relevant child is not a Property" . to_string ()), },
+      ViewNodeKind::Qual (Qual::Flag { flag, .. }) => Ok (*flag),
+      _ => Err ("relevant child is not a Flag" . to_string ()), },
     &goals,
-    |property| Ok (ViewNode {
+    |flag| Ok (ViewNode {
       focused     : false,
       folded      : false,
       body_folded : false,
-      kind        : ViewNodeKind::Qual (Qual::BoolProp {
-        property : *property,
+      kind        : ViewNodeKind::Qual (Qual::Flag {
+        flag : *flag,
         title    : String::new (),
         body     : None, }), })) ?;
   // The key-based reconciler retains an existing leaf. Restore its generated
@@ -47,8 +47,8 @@ pub fn reconcile_boolprops_folder_children (
   treat_certain_children (
     tree, folder_id,
     |viewnode| matches! (&viewnode . kind,
-      ViewNodeKind::Qual (Qual::BoolProp { .. })),
-    |viewnode| if let ViewNodeKind::Qual (Qual::BoolProp {
+      ViewNodeKind::Qual (Qual::Flag { .. })),
+    |viewnode| if let ViewNodeKind::Qual (Qual::Flag {
       title, body, .. }) = &mut viewnode . kind
     { *title = String::new ();
       *body = None; }) ?;

@@ -18,7 +18,7 @@ use crate::repo_sets::ActiveRepoSet;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, RepoName, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
-  FileProperty, NodeComplete, file_property_is_true};
+  Flag, NodeComplete, flag_is_true};
 use crate::types::save::{ForkSpec, SaveNode};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewNodeKind, Vognode};
@@ -380,9 +380,9 @@ pub fn build_fork_clone (
       &clone_repo, vec! [ buffer_node . pid . clone () ] )),
     // The clone preserves the original node's search-matching choice, but
     // importer provenance flags do not describe the newly-created clone.
-    misc          : if file_property_is_true (
-      &buffer_node . misc, FileProperty::NoSearchMatching)
-      { vec![FileProperty::NoSearchMatching] }
+    misc          : if flag_is_true (
+      &buffer_node . misc, Flag::NoSearchMatching)
+      { vec![Flag::NoSearchMatching] }
       else { Vec::new () },
     home_repo        : clone_repo,
   };

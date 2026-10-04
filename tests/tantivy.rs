@@ -15,7 +15,7 @@ use skg::dbs::tantivy::search::{
 use skg::dbs::tantivy::write::update_index_with_nodes;
 use skg::types::misc::{ID, MSV, RepoName, TantivyIndex, rel_partners_at_relRepo_msv};
 use skg::types::nodes::tantivy::NodeTantivy;
-use skg::types::nodes::complete::{FileProperty, NodeComplete, empty_node_complete};
+use skg::types::nodes::complete::{Flag, NodeComplete, empty_node_complete};
 
 #[test]
 fn test_many_tantivy_things (
@@ -425,7 +425,7 @@ fn no_search_matching_excludes_title_alias_and_body_in_every_query_mode (
     &excluded . home_repo,
     MSV::Specified (vec!["shaver aliastoken" . to_string ()]) );
   excluded . body = Some ("shaver bodytoken" . to_string ());
-  excluded . misc = vec![FileProperty::NoSearchMatching];
+  excluded . misc = vec![Flag::NoSearchMatching];
 
   let mut ordinary : NodeComplete = empty_node_complete ();
   ordinary . pid = ID::new ("ordinary");
@@ -471,13 +471,13 @@ fn no_search_matching_excludes_title_alias_and_body_in_every_query_mode (
   let (matches, _) = search_index (
     &index, "titletoken", &SearchOptions::default ()) ?;
   assert_eq! (matches . len (), 1,
-    "clearing the property must become searchable without restart");
-  excluded . misc . push (FileProperty::NoSearchMatching);
+    "clearing the flag must become searchable without restart");
+  excluded . misc . push (Flag::NoSearchMatching);
   update_index_with_nodes (&[NodeTantivy::from (&excluded)], &index) ?;
   let (matches, _) = search_index (
     &index, "titletoken", &SearchOptions::default ()) ?;
   assert! (matches . is_empty (),
-    "setting the property must stop matching without restart");
+    "setting the flag must stop matching without restart");
   Ok (( ))
 }
 
@@ -488,7 +488,7 @@ fn no_search_matching_overPrivateText_does_not_trigger_search_preflight (
   node . pid = ID::new ("excluded-private");
   node . title = "private excluded" . to_string ();
   node . overPrivateText_telescope = true;
-  node . misc = vec![FileProperty::NoSearchMatching];
+  node . misc = vec![Flag::NoSearchMatching];
   let (index, _) = wipe_then_init_tantivy_db (
     &[node . clone ()],
     Path::new ("/tmp/tantivy-test-no-search-private") ) ?;

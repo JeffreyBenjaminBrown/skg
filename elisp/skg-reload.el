@@ -85,7 +85,7 @@ rather than via `unload-feature'."
             skg-request-diff-report
             skg-request-delete-references-to-absent-node
             skg-request-edge-repo-info
-            skg-request-boolprop-state
+            skg-request-flag-state
             skg-request-export-org
             skg-request-import-md-and-org
             skg-request-git-diff-mode

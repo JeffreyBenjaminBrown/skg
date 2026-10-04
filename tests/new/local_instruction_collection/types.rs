@@ -6,7 +6,7 @@ use skg::from_text::local_instruction_collection::types::{
   CollectedIntents, IntentsForOneId, NodeIntent_Local,
   SubscribeeTextClaim, SubscribeeVisibility };
 use skg::types::misc::{ID, RepoName};
-use skg::types::nodes::complete::FileProperty;
+use skg::types::nodes::complete::Flag;
 
 fn title_intent (
   title : &str,
@@ -82,17 +82,17 @@ fn delete_excludes_other_exclusive_slots () {
              . delete ); }}
 
 #[test]
-fn boolprop_and_node_merge_are_mutually_exclusive () {
-  let boolprop : NodeIntent_Local =
-    NodeIntent_Local::SetBoolProp {
-      property : FileProperty::NoSearchMatching,
+fn flag_and_node_merge_are_mutually_exclusive () {
+  let flag : NodeIntent_Local =
+    NodeIntent_Local::SetFlag {
+      flag : Flag::NoSearchMatching,
       value    : true };
   let node_merge : NodeIntent_Local =
     NodeIntent_Local::NodeMerge {
       acquiree : ID::from ("b") };
   for (first, second) in [
-    (boolprop . clone(), node_merge . clone()),
-    (node_merge . clone(), boolprop . clone()) ] {
+    (flag . clone(), node_merge . clone()),
+    (node_merge . clone(), flag . clone()) ] {
     let mut acc : CollectedIntents =
       CollectedIntents::new();
     acc . instructionMerge_intent (
@@ -100,7 +100,7 @@ fn boolprop_and_node_merge_are_mutually_exclusive () {
     let error : String = acc . instructionMerge_intent (
       ID::from ("a"), second ) . unwrap_err();
     assert!( error . contains (
-      "Cannot combine nodeMerge and property requests") ); }}
+      "Cannot combine nodeMerge and flag requests") ); }}
 
 #[test]
 fn combineable_intents_always_combine () {

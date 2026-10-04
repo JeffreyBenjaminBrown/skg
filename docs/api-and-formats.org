@@ -417,13 +417,13 @@ So far there are these endpoints:
     in =apply_sticky_relRepos= stays load-bearing, since buffers go
     stale and the request is plain text.
 
-** Property state
-  - Request: =((request . "property state") (id . "ID")
-    (property . "noSearchMatching"))=.
-  - Response: =((response-type property-state) (id "CANONICAL-PID")
-    (property "noSearchMatching") (value "true") (Skg repo "REPO")
+** Flag state
+  - Request: =((request . "flag state") (id . "ID")
+    (flag . "noSearchMatching"))=.
+  - Response: =((response-type flag-state) (id "CANONICAL-PID")
+    (flag "noSearchMatching") (value "true") (Skg repo "REPO")
     (user-owned "true"))=. Extra IDs resolve to the canonical PID. Unknown IDs
-    or property atoms return =(error "...")= under the same response type.
+    or flag atoms return =(error "...")= under the same response type.
   - The endpoint is read-only and may report =hadId=, =wasOverloaded=, or
     =noSearchMatching=. Ownership is advisory; save-time validation remains
     authoritative.
@@ -754,9 +754,9 @@ node's heralds.
   backpath ROLENAME)=). ROLENAME is one of the nine in
   =PARTNER_ROLE_VOCAB=. Emitted by the =C-c p= commands.
 - =definitiveView= — make a write-protected, childless node editable.
-- =properties= — add one read-only =propertiesFolder=, retained even when empty.
-  Its true-only viewnodes use =(property hadId)=, =(property wasOverloaded)=, and
-  =(property noSearchMatching)= metadata in that order. Viewnodes have no Org title;
+- =flags= — add one read-only =flagsFolder=, retained even when empty.
+  Its true-only viewnodes use =(flag hadId)=, =(flag wasOverloaded)=, and
+  =(flag noSearchMatching)= metadata in that order. Viewnodes have no Org title;
   their friendly visible label comes from the herald. Deleting the entire
   folder dismisses this optional projection and has no persistence meaning;
   edits within a retained folder are rejected rather than silently ignored.
@@ -780,7 +780,7 @@ assembled glyphs, omitted numerals or colors. For example:
                    (substantive 2 (ancestors 1)))
                (out 3 (ancestors 2)))
   (overrides_view_of (out 1 (ancestors 1)))
-  (aliases 2) (extraIds 1) (properties 3)
+  (aliases 2) (extraIds 1) (flags 3)
   (birth overrides_view_of))
 #+end_example
 
@@ -799,14 +799,14 @@ are zero; absence of that subform means the role does not apply. The
 numerator counts members not already directly contained or hidden by that
 occurrence's subscriber. Subset counts cannot exceed their side's total.
 =(birth RELNAME...)= identifies the relation(s) behind this occurrence.
-Nonzero =(aliases K)=, =(extraIds K)= and =(properties K)= are action counts.
+Nonzero =(aliases K)=, =(extraIds K)= and =(flags K)= are action counts.
 See [[file:./heralds.org][heralds.org]] for the rendered notation and styles.
 
 There is no longer a
 =(graphStats ...)= sexp on an active node: its counts fold into the
 form above (=overriding= / =subscribing= / =hiding= become the =O= / =S= /
-=H= tokens; =aliasing= / =extraIDs=/true properties become the
-=Ak= / =Ik= / =Pk= action tokens),
+=H= tokens; =aliasing= / =extraIDs=/true flags become the
+=Ak= / =Ik= / =Fk= action tokens),
 and the per-relation view-position flags (=containsParent=,
 =overridesParent= / =parentOverrides=, =subscribesParent= /
 =parentSubscribes=, =hidesParent= / =parentHides=, =grandparentOverrides= /
@@ -842,8 +842,8 @@ under different parents):
   expose a flat/nested display =relRepo= fact and put write intent only
   under =editRequest=; copying a fact is harmless while copying a request
   deliberately requests it at the destination.
-- =(editRequest (property noSearchMatching true|false))= — an idempotent
-  save-only desired-state request. The provenance properties =hadId= and
+- =(editRequest (flag noSearchMatching true|false))= — an idempotent
+  save-only desired-state request. The provenance flags =hadId= and
   =wasOverloaded= are read-only and rejected here. A successful save consumes
   the request; a failed save leaves it in the buffer. Herald view presents the
   request as one red semantic state: =request:no search matching= for =true=,
@@ -851,7 +851,7 @@ under different parents):
 - =(overridesHere N)= — pink =ĥ= immediately after the =O= token; the load-bearing
   substitution marker, documented in the next subsection.
 
-** Node file properties
+** Node flags
 
 The YAML =misc= list stores =Had_ID_Before_Import=, =Was_Overloaded=, and
 =NoSearchMatching= using those exact spellings. Absence means false.

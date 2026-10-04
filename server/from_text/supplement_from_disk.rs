@@ -18,7 +18,7 @@ use crate::dbs::node_lookup::opt_nodecomplete_by_id;
 use crate::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgConfig, RepoName, members_of, rel_partners_at_relRepo};
 use crate::types::phantom::home_from_disk;
 use crate::types::nodes::complete::{
-  NodeComplete, empty_node_complete, set_file_property};
+  NodeComplete, empty_node_complete, set_flag};
 use crate::types::save::{DefineNode, SaveNode, RepoMove};
 use std::collections::HashMap;
 use std::error::Error;
@@ -131,11 +131,11 @@ fn supplement_saveintent_from_disk (
       // default every time).
       let requested_relRepos : RequestedRelRepos =
         from_buffer . requested_relRepos ();
-      let boolprop_request = from_buffer . boolprop_request;
+      let flag_request = from_buffer . flag_request;
       let mut supplemented : NodeComplete =
         from_buffer . into_nodecomplete ();
-      if let Some ((property, value)) = boolprop_request {
-        set_file_property (&mut supplemented . misc, property, value); }
+      if let Some ((flag, value)) = flag_request {
+        set_flag (&mut supplemented . misc, flag, value); }
       let empty_disk : NodeComplete = NodeComplete {
         pid    : supplemented . pid    . clone (),
         home_repo : supplemented . home_repo . clone (),
@@ -155,7 +155,7 @@ fn supplement_saveintent_from_disk (
         &members_of (&disk_node . contains));
       let requested_relRepos : RequestedRelRepos =
         from_buffer . requested_relRepos ();
-      let boolprop_request = from_buffer . boolprop_request;
+      let flag_request = from_buffer . flag_request;
       let from_buffer : NodeComplete =
         from_buffer . into_nodecomplete();
       let canonicalized : NodeComplete =
@@ -168,8 +168,8 @@ fn supplement_saveintent_from_disk (
         let mut supplemented : NodeComplete =
           supplement_unspecified_fields_from_disk (
             canonicalized, &disk_node);
-        if let Some ((property, value)) = boolprop_request {
-          set_file_property (&mut supplemented . misc, property, value); }
+        if let Some ((flag, value)) = flag_request {
+          set_flag (&mut supplemented . misc, flag, value); }
         let supplemented : NodeComplete =
           match restricted_repo_set {
             None => supplemented,

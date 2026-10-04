@@ -3,7 +3,7 @@
 // at its node's own BFS visit.
 
 pub mod aliasfolder;
-pub mod boolprops_folder;
+pub mod flags_folder;
 pub mod content;
 pub mod hiddeninsubscribee_folder;
 pub mod hiddenoutsideof_subscribeefolder;

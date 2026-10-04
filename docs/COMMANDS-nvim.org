@@ -346,12 +346,12 @@ hides nor is hidden, nothing appears.
 The subscribeeFolder (the nodes this node subscribes to -- WRITABLE, shown
 even when empty) and the subscriberFolder (the nodes that subscribe to
 this one -- read-only, ☮).
-*** <localleader>cp : :SkgShowFolderOfProperties
-Shows the read-only, true-only properties folder as titleless viewnodes whose
+*** <localleader>cp : :SkgShowFolderOfFlags
+Shows the read-only, true-only flags folder as titleless viewnodes whose
 heralds carry their labels, in canonical order.
 The empty folder is retained. Import provenance viewnodes have no setter; use the
 search-matching command below for =No search matching=. Delete the whole
-folder branch to dismiss this optional view without changing any property.
+folder branch to dismiss this optional view without changing any flag.
 ** <localleader>p : show a path (the backpath through one relation role)
 Like the folders, each inserts a request that, on save, grafts the
 partners reached through one relation role as inverted, read-only
@@ -432,11 +432,11 @@ Like 'SetRepo', but it also
 changes the Skg repo of every content descendent of the node at point
 whose Skg repo matches the original Skg repo of the node at point.
 Only descendents for which AffectsParent=True are traversed.
-*** <localleader>sx : :SkgSetPropertySearchMatching
+*** <localleader>sx : :SkgSetFlagSearchMatching
 Prompts between =search matching= and =no search matching= and stages the
 desired state without saving. Foreign/write-protected/unsaved roots and an
 existing =editRequest= are refused.
-*** <localleader>sX : :SkgSetPropertySearchMatchingRecursive
+*** <localleader>sX : :SkgSetFlagSearchMatchingRecursive
 Applies one selected state uniformly through the true-content subtree,
 deduplicating PIDs and reporting ineligible descendants. It prunes scaffolds,
 backpaths, independent branches, inactive nodes, and phantoms. Save with

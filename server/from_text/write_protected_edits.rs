@@ -8,12 +8,12 @@ use crate::from_text::local_instruction_collection::predicates::{
   active_child_counts_as_content, member_counts_for_partnerFolder};
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, RepoName};
-use crate::types::nodes::complete::FileProperty;
+use crate::types::nodes::complete::Flag;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{PartnerFolder, Qual, QualFolder, Phantom, ViewNode, ViewNodeKind, Vognode};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::nodecomplete_from_graph;
-use crate::types::nodes::complete::file_property_is_true;
+use crate::types::nodes::complete::flag_is_true;
 
 use ego_tree::{NodeId, NodeRef};
 use std::collections::HashSet;
@@ -28,7 +28,7 @@ enum OccurrencePathStep {
   QualFolder (QualFolder),
   Alias,
   ID,
-  BoolProp,
+  Flag,
   TextChanged,
   PartnerFolder (PartnerFolder),
   DeadScaffold,
@@ -66,7 +66,7 @@ pub fn errors_and_normalize_new_writeProtected_occurrences (
   previous : &ViewForest,
 ) -> Vec<BufferValidationError> {
   let mut errors : Vec<BufferValidationError> =
-    boolprops_surface_errors (current, previous);
+    flags_surface_errors (current, previous);
   let current_occurrences : Vec<LocatedWriteProtectedOccurrence> =
     occurrences_in (current);
   let previous_occurrences : Vec<LocatedWriteProtectedOccurrence> =
@@ -171,68 +171,68 @@ fn write_protected_changes (
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct BoolPropsFolderSurface {
+struct FlagsFolderSurface {
   title          : String,
   body           : Option<String>,
-  viewnodes      : Vec<(FileProperty, String, Option<String>)>,
+  viewnodes      : Vec<(Flag, String, Option<String>)>,
   other_children : Vec<String>,
 }
 
 #[derive(Clone, Debug)]
-struct LocatedBoolPropsSurface {
+struct LocatedFlagsSurface {
   owner_id    : ID,
   owner_title : String,
   owner_path  : Vec<OccurrencePathStep>,
-  folders     : Vec<BoolPropsFolderSurface>,
+  folders     : Vec<FlagsFolderSurface>,
 }
 
-fn boolprops_surfaces_in (forest : &ViewForest) -> Vec<LocatedBoolPropsSurface> {
-  let mut result : Vec<LocatedBoolPropsSurface> = Vec::new ();
+fn flags_surfaces_in (forest : &ViewForest) -> Vec<LocatedFlagsSurface> {
+  let mut result : Vec<LocatedFlagsSurface> = Vec::new ();
   for root in forest . roots () {
-    collect_boolprops_surfaces (root, &[], &mut result); }
+    collect_flags_surfaces (root, &[], &mut result); }
   result
 }
 
-fn collect_boolprops_surfaces (
+fn collect_flags_surfaces (
   node        : NodeRef<ViewNode>,
   parent_path : &[OccurrencePathStep],
-  result      : &mut Vec<LocatedBoolPropsSurface>,
+  result      : &mut Vec<LocatedFlagsSurface>,
 ) {
   let mut own_path : Vec<OccurrencePathStep> = parent_path . to_vec ();
   own_path . push (path_step (node . value ()));
   if let ViewNodeKind::Vognode (Vognode::Active (owner)) = &node . value () . kind {
-    let folders : Vec<BoolPropsFolderSurface> = node . children ()
+    let folders : Vec<FlagsFolderSurface> = node . children ()
       . filter_map (|child| {
-        let ViewNodeKind::QualFolder (QualFolder::BoolProps {
+        let ViewNodeKind::QualFolder (QualFolder::Flags {
           title, body }) = &child . value () . kind
         else { return None; };
-        let mut viewnodes : Vec<(FileProperty, String, Option<String>)> = Vec::new ();
+        let mut viewnodes : Vec<(Flag, String, Option<String>)> = Vec::new ();
         let mut other_children : Vec<String> = Vec::new ();
         for leaf in child . children () {
           match &leaf . value () . kind {
-            ViewNodeKind::Qual (Qual::BoolProp {
-              property, title, body }) =>
-              viewnodes . push ((*property, title . clone (), body . clone ())),
+            ViewNodeKind::Qual (Qual::Flag {
+              flag, title, body }) =>
+              viewnodes . push ((*flag, title . clone (), body . clone ())),
             other => other_children . push (format! ("{:?}", other)), } }
-        Some (BoolPropsFolderSurface {
+        Some (FlagsFolderSurface {
           title : title . clone (), body : body . clone (),
           viewnodes, other_children }) })
       . collect ();
-    result . push (LocatedBoolPropsSurface {
+    result . push (LocatedFlagsSurface {
       owner_id    : owner . id . clone (),
       owner_title : owner . title . clone (),
       owner_path  : parent_path . to_vec (),
       folders, }); }
   for child in node . children () {
-    collect_boolprops_surfaces (child, &own_path, result); }
+    collect_flags_surfaces (child, &own_path, result); }
 }
 
-fn boolprops_surface_errors (
+fn flags_surface_errors (
   current  : &ViewForest,
   previous : &ViewForest,
 ) -> Vec<BufferValidationError> {
-  let current_surfaces = boolprops_surfaces_in (current);
-  let previous_surfaces = boolprops_surfaces_in (previous);
+  let current_surfaces = flags_surfaces_in (current);
+  let previous_surfaces = flags_surfaces_in (previous);
   let mut errors : Vec<BufferValidationError> = Vec::new ();
   for before in &previous_surfaces {
     let Some (after) = current_surfaces . iter () . find (|surface|
@@ -241,14 +241,14 @@ fn boolprops_surface_errors (
     else { continue; };
     // Like an aliases or backpath branch, this is an optional projection:
     // deleting the whole folder dismisses it from the view and says nothing
-    // about the owner's properties.  A retained folder is still
+    // about the owner's flags.  A retained folder is still
     // server-owned, so edits within it remain validation errors.
     if ! before . folders . is_empty () && after . folders . is_empty () {
       continue; }
     if before . folders == after . folders { continue; }
-    let changes : Vec<String> = boolprops_surface_changes (
+    let changes : Vec<String> = flags_surface_changes (
       &before . folders, &after . folders);
-    errors . push (BufferValidationError::BoolPropsSurfaceEdited {
+    errors . push (BufferValidationError::FlagsSurfaceEdited {
       owner_id    : before . owner_id . clone (),
       owner_title : before . owner_title . clone (),
       changes, }); }
@@ -258,102 +258,102 @@ fn boolprops_surface_errors (
       surface . owner_id == after . owner_id
       && surface . owner_path == after . owner_path);
     if ! existed_before {
-      errors . push (BufferValidationError::BoolPropsSurfaceEdited {
+      errors . push (BufferValidationError::FlagsSurfaceEdited {
         owner_id    : after . owner_id . clone (),
         owner_title : after . owner_title . clone (),
-        changes     : vec!["added propertiesFolder" . to_string ()], }); }
+        changes     : vec!["added flagsFolder" . to_string ()], }); }
   }
   errors
 }
 
 /// Direct/internal save callers may have no last-rendered forest.  In that
-/// case validate every present properties folder against graph state.  Absence
+/// case validate every present flags folder against graph state.  Absence
 /// is fine (the user never requested the view); presence must be canonical.
-pub fn boolprops_surface_errors_against_graph (
+pub fn flags_surface_errors_against_graph (
   current : &ViewForest,
   graph   : &InRustGraph,
 ) -> Vec<BufferValidationError> {
   let mut errors : Vec<BufferValidationError> = Vec::new ();
-  for surface in boolprops_surfaces_in (current) {
+  for surface in flags_surfaces_in (current) {
     if surface . folders . is_empty () { continue; }
     let Some (node) = nodecomplete_from_graph (graph, &surface . owner_id)
     else { continue; };
-    let expected_viewnodes : Vec<(FileProperty, String, Option<String>)> =
-      FileProperty::ALL
+    let expected_viewnodes : Vec<(Flag, String, Option<String>)> =
+      Flag::ALL
       . into_iter ()
-      . filter (|property| file_property_is_true (&node . misc, *property))
-      . map (|property| (property, String::new (), None))
+      . filter (|flag| flag_is_true (&node . misc, *flag))
+      . map (|flag| (flag, String::new (), None))
       . collect ();
-    let expected = vec![BoolPropsFolderSurface {
+    let expected = vec![FlagsFolderSurface {
       title    : String::new (),
       body     : None,
       viewnodes : expected_viewnodes,
       other_children : Vec::new (), }];
     if surface . folders != expected {
-      errors . push (BufferValidationError::BoolPropsSurfaceEdited {
+      errors . push (BufferValidationError::FlagsSurfaceEdited {
         owner_id    : node . pid . clone (),
         owner_title : node . title . clone (),
-        changes     : boolprops_surface_changes (
+        changes     : flags_surface_changes (
           &expected, &surface . folders), }); }
   }
   errors
 }
 
-fn boolprops_surface_changes (
-  before : &[BoolPropsFolderSurface],
-  after  : &[BoolPropsFolderSurface],
+fn flags_surface_changes (
+  before : &[FlagsFolderSurface],
+  after  : &[FlagsFolderSurface],
 ) -> Vec<String> {
   if before . is_empty () && ! after . is_empty () {
-    return vec!["added propertiesFolder" . to_string ()]; }
+    return vec!["added flagsFolder" . to_string ()]; }
   if ! before . is_empty () && after . is_empty () {
-    return vec!["removed propertiesFolder" . to_string ()]; }
+    return vec!["removed flagsFolder" . to_string ()]; }
   if before . len () != after . len () {
-    return vec![format! ("changed propertiesFolder count from {} to {}",
+    return vec![format! ("changed flagsFolder count from {} to {}",
                          before . len (), after . len ())]; }
   let mut changes : Vec<String> = Vec::new ();
   for (old_folder, new_folder) in before . iter () . zip (after) {
     if old_folder . title != new_folder . title {
       changes . push (format! (
-        "changed propertiesFolder headline from {:?} to {:?}",
+        "changed flagsFolder headline from {:?} to {:?}",
         old_folder . title, new_folder . title)); }
     describe_body_change (
-      &mut changes, "propertiesFolder", &old_folder . body, &new_folder . body);
+      &mut changes, "flagsFolder", &old_folder . body, &new_folder . body);
     if old_folder . other_children != new_folder . other_children {
-      changes . push ("changed non-property children in propertiesFolder"
+      changes . push ("changed non-flag children in flagsFolder"
                       . to_string ()); }
-    for property in FileProperty::ALL {
+    for flag in Flag::ALL {
       let old = old_folder . viewnodes . iter ()
-        . position (|(p, _, _)| *p == property);
+        . position (|(p, _, _)| *p == flag);
       let new = new_folder . viewnodes . iter ()
-        . position (|(p, _, _)| *p == property);
+        . position (|(p, _, _)| *p == flag);
       match (old, new) {
         (Some (_), None) => changes . push (format! (
-          "removed {}", property . wire_name ())),
+          "removed {}", flag . wire_name ())),
         (None, Some (_)) => changes . push (format! (
-          "added {}", property . wire_name ())),
+          "added {}", flag . wire_name ())),
         (Some (old_pos), Some (new_pos)) => {
           if old_pos != new_pos { changes . push (format! (
-            "moved {} from position {} to position {} in propertiesFolder", property . wire_name (),
+            "moved {} from position {} to position {} in flagsFolder", flag . wire_name (),
             old_pos + 1, new_pos + 1)); }
           let old_title = &old_folder . viewnodes [old_pos] . 1;
           let new_title = &new_folder . viewnodes [new_pos] . 1;
           if old_title != new_title { changes . push (format! (
             "changed {} headline from {:?} to {:?}",
-            property . wire_name (), old_title, new_title)); } },
+            flag . wire_name (), old_title, new_title)); } },
         (None, None) => (), } }
-    for (property, _, old_body) in &old_folder . viewnodes {
+    for (flag, _, old_body) in &old_folder . viewnodes {
       if let Some ((_, _, new_body)) = new_folder . viewnodes . iter ()
-        . find (|(candidate, _, _)| candidate == property)
+        . find (|(candidate, _, _)| candidate == flag)
       { describe_body_change (
-          &mut changes, property . wire_name (), old_body, new_body); } }
-    for (index, ((old_property, _, _), (new_property, _, _))) in
+          &mut changes, flag . wire_name (), old_body, new_body); } }
+    for (index, ((old_flag, _, _), (new_flag, _, _))) in
       old_folder . viewnodes . iter () . zip (&new_folder . viewnodes) . enumerate ()
-    { if old_property != new_property { changes . push (format! (
-        "changed property metadata in viewnode {} from {} to {}", index + 1,
-        old_property . wire_name (), new_property . wire_name ())); } }
+    { if old_flag != new_flag { changes . push (format! (
+        "changed flag metadata in viewnode {} from {} to {}", index + 1,
+        old_flag . wire_name (), new_flag . wire_name ())); } }
   }
   if changes . is_empty () {
-    changes . push ("changed properties viewnodes" . to_string ()); }
+    changes . push ("changed flags viewnodes" . to_string ()); }
   changes
 }
 
@@ -428,8 +428,8 @@ fn path_step (
       OccurrencePathStep::Alias,
     ViewNodeKind::Qual (Qual::ID { .. }) =>
       OccurrencePathStep::ID,
-    ViewNodeKind::Qual (Qual::BoolProp { .. }) =>
-      OccurrencePathStep::BoolProp,
+    ViewNodeKind::Qual (Qual::Flag { .. }) =>
+      OccurrencePathStep::Flag,
     ViewNodeKind::Qual (Qual::TextChanged { .. }) =>
       OccurrencePathStep::TextChanged,
     ViewNodeKind::PartnerFolder (folder) =>
@@ -600,41 +600,41 @@ mod tests {
   }
 
   #[test]
-  fn boolprops_surface_edits_report_owner_identity_and_concrete_changes () {
+  fn flags_surface_edits_report_owner_identity_and_concrete_changes () {
     let original = forest (indoc! {"
       * (skg (node (id owner) (repo main))) Owner title
-      ** (skg propertiesFolder)
-      *** (skg (property hadId))
-      *** (skg (property noSearchMatching))
+      ** (skg flagsFolder)
+      *** (skg (flag hadId))
+      *** (skg (flag noSearchMatching))
     "});
     let mut changed = forest (indoc! {"
       * (skg (node (id owner) (repo main))) Owner title
-      ** (skg propertiesFolder) edited folder headline
+      ** (skg flagsFolder) edited folder headline
       added folder body
-      *** (skg (property noSearchMatching)) renamed
+      *** (skg (flag noSearchMatching)) renamed
       added leaf body
-      *** (skg (property wasOverloaded))
+      *** (skg (flag wasOverloaded))
     "});
     let errors = errors_and_normalize_new_writeProtected_occurrences (
       &mut changed, &original);
     assert! (matches! (&errors[..],
-      [BufferValidationError::BoolPropsSurfaceEdited {
+      [BufferValidationError::FlagsSurfaceEdited {
         owner_id, owner_title, changes }]
       if owner_id == &ID::from ("owner")
         && owner_title == "Owner title"
         && changes . iter () . any (|c| c . contains ("removed hadId"))
         && changes . iter () . any (|c| c . contains ("added wasOverloaded"))
         && changes . iter () . any (|c| c . contains ("headline"))
-        && changes . iter () . any (|c| c == "added body text to propertiesFolder")
+        && changes . iter () . any (|c| c == "added body text to flagsFolder")
         && changes . iter () . any (|c| c == "added body text to noSearchMatching")));
   }
 
   #[test]
-  fn deleting_the_properties_projection_is_inert () {
+  fn deleting_the_flags_projection_is_inert () {
     let original = forest (indoc! {"
       * (skg (node (id owner) (repo main))) Owner title
-      ** (skg propertiesFolder)
-      *** (skg (property noSearchMatching))
+      ** (skg flagsFolder)
+      *** (skg (flag noSearchMatching))
     "});
     let mut without_projection = forest (indoc! {"
       * (skg (node (id owner) (repo main))) Owner title
@@ -644,18 +644,18 @@ mod tests {
   }
 
   #[test]
-  fn deleting_an_optional_sibling_does_not_make_the_properties_surface_edited () {
+  fn deleting_an_optional_sibling_does_not_make_the_flags_surface_edited () {
     let original = forest (indoc! {"
       * (skg (node (id owner) (repo main))) Owner title
       ** (skg aliasFolder) aliases
       *** (skg alias) Another name
-      ** (skg propertiesFolder)
-      *** (skg (property noSearchMatching))
+      ** (skg flagsFolder)
+      *** (skg (flag noSearchMatching))
     "});
     let mut without_alias_projection = forest (indoc! {"
       * (skg (node (id owner) (repo main))) Owner title
-      ** (skg propertiesFolder)
-      *** (skg (property noSearchMatching))
+      ** (skg flagsFolder)
+      *** (skg (flag noSearchMatching))
     "});
     assert! (errors_and_normalize_new_writeProtected_occurrences (
       &mut without_alias_projection, &original) . is_empty ());

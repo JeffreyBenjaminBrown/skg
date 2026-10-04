@@ -19,7 +19,7 @@
 
 use crate::telescope::types::{FoldWarning, ListItem, SectionSlices, Telescope};
 use crate::types::misc::{ID, MSV, RelPartner, RepoName};
-use crate::types::nodes::complete::{FileProperty, NodeComplete};
+use crate::types::nodes::complete::{Flag, NodeComplete};
 
 use std::collections::HashMap;
 use std::io;
@@ -58,7 +58,7 @@ pub fn fold_telescope_collecting_warnings (
 ) -> io::Result<(NodeComplete, Vec<FoldWarning>)> {
   let pid       : ID                = telescope . pid () . clone ();
   let extra_ids : Vec<ID>           = telescope . extra_ids ();
-  let misc      : Vec<FileProperty> = telescope . misc ();
+  let misc      : Vec<Flag> = telescope . misc ();
   let (folded, warnings) : (FoldedNode, Vec<FoldWarning>) =
     fold_sections ( & telescope . into_slices (), resolve );
   let mut node : NodeComplete = nodecomplete_from_fold (
@@ -92,7 +92,7 @@ pub fn fold_telescope (
 pub fn nodecomplete_from_fold (
   pid       : ID,
   extra_ids : Vec<ID>,
-  misc      : Vec<FileProperty>,
+  misc      : Vec<Flag>,
   folded    : FoldedNode,
 ) -> Option<NodeComplete> {
   let home : RepoName = folded . home ?;

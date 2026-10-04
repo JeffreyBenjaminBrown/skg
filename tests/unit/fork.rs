@@ -11,7 +11,7 @@
 use super::*;
 use crate::types::misc::{SkgfileRepo, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
-  FileProperty, empty_node_complete};
+  Flag, empty_node_complete};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerFolder,
                              mk_definitive_viewnode};
@@ -190,13 +190,13 @@ fn confirmation_buffer_shows_a_confirmed_repo_as_settled () {
     "no suggestion comment when every repo is confirmed:\n{}", buf ); }
 
 #[test]
-fn fork_clone_preserves_only_the_search_matching_property () {
+fn fork_clone_preserves_only_the_search_matching_flag () {
   for no_search_matching in [false, true] {
     let mut misc = vec![
-      FileProperty::Had_ID_Before_Import,
-      FileProperty::Was_Overloaded];
+      Flag::Had_ID_Before_Import,
+      Flag::Was_Overloaded];
     if no_search_matching {
-      misc . insert (1, FileProperty::NoSearchMatching); }
+      misc . insert (1, Flag::NoSearchMatching); }
     let buffer_node : NodeComplete = NodeComplete {
       home_repo : RepoName::from ("foreign"),
       pid    : ID::from ("N"),
@@ -206,6 +206,6 @@ fn fork_clone_preserves_only_the_search_matching_property () {
       &buffer_node, "N", &[], RepoName::from ("owned2"), false );
     assert_eq! (
       spec . clone . 0 . misc,
-      if no_search_matching { vec![FileProperty::NoSearchMatching] }
+      if no_search_matching { vec![Flag::NoSearchMatching] }
       else { Vec::new () } ); }
 }

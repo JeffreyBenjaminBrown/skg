@@ -17,7 +17,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::tantivy::context_update::update_context_origin_types;
 use crate::types::misc::{ID, TantivyIndex};
 use crate::types::save::{DefineNode, SaveNode};
-use crate::types::nodes::complete::{FileProperty, NodeComplete};
+use crate::types::nodes::complete::{Flag, NodeComplete};
 use crate::types::links::links_from_node;
 
 use std::collections::{HashMap, HashSet};
@@ -151,10 +151,10 @@ pub fn context_origin_types_for_saved_from_in_rust_graph (
     . filter ( |id| graph . mentioners_of . get (id)
                . map ( |s| ! s . is_empty () ) . unwrap_or (false) )
     . cloned () . collect ();
-  let had_id_set : HashSet<ID> = // from each node's own file properties
+  let had_id_set : HashSet<ID> = // from each node's own flags
     saved . iter ()
     . filter ( |n| n . misc . contains (
-        &FileProperty::Had_ID_Before_Import ) )
+        &Flag::Had_ID_Before_Import ) )
     . map ( |n| n . pid . clone () )
     . collect ();
   let mut origin_types : HashMap<ID, ContextOriginType> =
@@ -194,7 +194,7 @@ fn node_is_in_containerward_cycle (
 // Step 1: identify origins (using the in-Rust graph)
 //
 
-/// Build the origin-types map from graph data and imported file properties.
+/// Build the origin-types map from graph data and imported flags.
 /// We impose priority order: If something is a Root,
 /// it doesn't matter that it's Mentioned, etc.
 /// Therefore higher-priority origin types are processed later.
@@ -410,6 +410,6 @@ pub fn had_id_set_from_nodes (
 ) -> HashSet<ID> {
   nodes . iter ()
   . filter ( |n|
-    n . misc . contains (&FileProperty::Had_ID_Before_Import) )
+    n . misc . contains (&Flag::Had_ID_Before_Import) )
   . map ( |n| n . pid . clone () )
   . collect () }

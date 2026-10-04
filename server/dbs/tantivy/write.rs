@@ -6,7 +6,7 @@
 use crate::consts::TANTIVY_WRITER_BUFFER_BYTES;
 use crate::dbs::tantivy::background_writer::lock_tantivy_writes;
 use crate::types::misc::{ID, RepoName, TantivyIndex};
-use crate::types::nodes::complete::{FileProperty, file_property_is_true};
+use crate::types::nodes::complete::{Flag, flag_is_true};
 use crate::types::nodes::tantivy::NodeTantivy;
 use crate::types::links::replace_each_link_with_its_label;
 
@@ -93,7 +93,7 @@ fn create_documents_from_node (
     . map ( |s| s . as_str () ) . unwrap_or ("");
   let had_id : &str =
     if node . misc . contains (
-      &FileProperty::Had_ID_Before_Import )
+      &Flag::Had_ID_Before_Import )
     { "true" } else { "false" };
   // Only the primary-title doc carries the body.
   // Alias docs share the id so body search still returns
@@ -138,8 +138,8 @@ fn create_documents_from_node (
         tantivy_index . overPrivateText_telescope_field =>
           if node . overPrivateText_telescope { "true" } else { "false" },
         tantivy_index . no_search_matching_field =>
-          if file_property_is_true (
-            &node . misc, FileProperty::NoSearchMatching )
+          if flag_is_true (
+            &node . misc, Flag::NoSearchMatching )
           { "true" } else { "false" },
         tantivy_index . repo_field =>
           doc_repo . as_str(),

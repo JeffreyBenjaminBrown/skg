@@ -1,6 +1,6 @@
 use super::{
-  FileProperty, NodeComplete, empty_node_complete,
-  file_property_is_true, set_file_property};
+  Flag, NodeComplete, empty_node_complete,
+  flag_is_true, set_flag};
 use crate::types::misc::ID;
 
 fn node_with_ids (
@@ -45,55 +45,55 @@ fn normalize_ids_leaves_an_already_normal_list_alone () {
 }
 
 #[test]
-fn file_property_registry_has_stable_public_names_and_order () {
+fn flag_registry_has_stable_public_names_and_order () {
   assert_eq! (
-    FileProperty::ALL . map (FileProperty::wire_name),
+    Flag::ALL . map (Flag::wire_name),
     ["hadId", "wasOverloaded", "noSearchMatching"] );
   assert_eq! (
-    FileProperty::ALL . map (FileProperty::herald_text),
+    Flag::ALL . map (Flag::herald_text),
     ["☮ had ID before import",
      "☮ was overloaded during org-roam import",
      "☮ no search matching"] );
-  for property in FileProperty::ALL {
+  for flag in Flag::ALL {
     assert_eq! (
-      FileProperty::from_wire_name (property . wire_name ()),
-      Some (property)); }
-  assert_eq! (FileProperty::from_wire_name ("NoIndex"), None);
-  assert! (! FileProperty::Had_ID_Before_Import . is_mutable ());
-  assert! (! FileProperty::Was_Overloaded . is_mutable ());
-  assert! (FileProperty::NoSearchMatching . is_mutable ());
+      Flag::from_wire_name (flag . wire_name ()),
+      Some (flag)); }
+  assert_eq! (Flag::from_wire_name ("NoIndex"), None);
+  assert! (! Flag::Had_ID_Before_Import . is_mutable ());
+  assert! (! Flag::Was_Overloaded . is_mutable ());
+  assert! (Flag::NoSearchMatching . is_mutable ());
 }
 
 #[test]
-fn setting_one_file_property_preserves_the_others_and_repairs_duplicates () {
-  let mut misc : Vec<FileProperty> = vec! [
-    FileProperty::Was_Overloaded,
-    FileProperty::NoSearchMatching,
-    FileProperty::Had_ID_Before_Import,
-    FileProperty::NoSearchMatching,
+fn setting_one_flag_preserves_the_others_and_repairs_duplicates () {
+  let mut misc : Vec<Flag> = vec! [
+    Flag::Was_Overloaded,
+    Flag::NoSearchMatching,
+    Flag::Had_ID_Before_Import,
+    Flag::NoSearchMatching,
   ];
-  set_file_property (
-    &mut misc, FileProperty::NoSearchMatching, false );
+  set_flag (
+    &mut misc, Flag::NoSearchMatching, false );
   assert_eq! (misc, vec! [
-    FileProperty::Was_Overloaded,
-    FileProperty::Had_ID_Before_Import]);
-  assert! (! file_property_is_true (
-    &misc, FileProperty::NoSearchMatching ));
+    Flag::Was_Overloaded,
+    Flag::Had_ID_Before_Import]);
+  assert! (! flag_is_true (
+    &misc, Flag::NoSearchMatching ));
 
-  set_file_property (
-    &mut misc, FileProperty::NoSearchMatching, true );
-  set_file_property (
-    &mut misc, FileProperty::NoSearchMatching, true );
+  set_flag (
+    &mut misc, Flag::NoSearchMatching, true );
+  set_flag (
+    &mut misc, Flag::NoSearchMatching, true );
   assert_eq! (misc, vec! [
-    FileProperty::Was_Overloaded,
-    FileProperty::Had_ID_Before_Import,
-    FileProperty::NoSearchMatching]);
+    Flag::Was_Overloaded,
+    Flag::Had_ID_Before_Import,
+    Flag::NoSearchMatching]);
 }
 
 #[test]
 fn no_search_matching_has_the_exact_persisted_yaml_spelling () {
-  assert_eq! (serde_yaml::to_string (&FileProperty::NoSearchMatching)
+  assert_eq! (serde_yaml::to_string (&Flag::NoSearchMatching)
               . unwrap (), "NoSearchMatching\n");
-  assert_eq! (serde_yaml::from_str::<FileProperty> ("NoSearchMatching")
-              . unwrap (), FileProperty::NoSearchMatching);
+  assert_eq! (serde_yaml::from_str::<Flag> ("NoSearchMatching")
+              . unwrap (), Flag::NoSearchMatching);
 }

@@ -6,7 +6,7 @@ use skg::import_org_roam::parse::{
   headline_title,
 };
 use skg::types::misc::{ID, members_of, members_msv};
-use skg::types::nodes::complete::{FileProperty, NodeComplete};
+use skg::types::nodes::complete::{Flag, NodeComplete};
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -384,10 +384,10 @@ fn test_had_id_before_import () {
   assert_eq! (nodes . len(), 3);
   // File-level node had :ID: → Had_ID_Before_Import.
   assert_eq! (nodes[0] . misc,
-              vec![FileProperty::Had_ID_Before_Import]);
+              vec![Flag::Had_ID_Before_Import]);
   // Child with :ID: → Had_ID_Before_Import.
   assert_eq! (nodes[1] . misc,
-              vec![FileProperty::Had_ID_Before_Import]);
+              vec![Flag::Had_ID_Before_Import]);
   // Child without :ID: → empty misc.
   assert! (nodes[2] . misc . is_empty()); }
 

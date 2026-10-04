@@ -126,7 +126,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c l o") #'skg-show-folderOf-overrides_view_of)
     (define-key map (kbd "C-c l h") #'skg-show-folderOf-hides_from_its_subscriptions)
     (define-key map (kbd "C-c l s") #'skg-show-folderOf-subscribes_to)
-    (define-key map (kbd "C-c l p") #'skg-show-folderOf-properties)
+    (define-key map (kbd "C-c l p") #'skg-show-folderOf-flags)
     ;; UPPER = the partner's active (first) role; lower = passive (second).
     (define-key map (kbd "C-c p C") #'skg-show-paths-through-containers)
     (define-key map (kbd "C-c p L") #'skg-show-paths-through-mentioners)
@@ -143,7 +143,7 @@ and hide INTERNAL from M-x completion."
     (define-key map (kbd "C-c s m") #'skg-set-merge-request)
     (define-key map (kbd "C-c s r") #'skg-set-relRepo)
     (define-key map (kbd "C-c s R") #'skg-set-relRepo-recursive)
-    (define-key map (kbd "C-c s x") #'skg-set-property-search-matching)
+    (define-key map (kbd "C-c s x") #'skg-set-flag-search-matching)
     (define-key map (kbd "C-c s s") #'skg-set-repo)
     (define-key map (kbd "C-c s S") #'skg-set-repo-recursive))
   (progn;; graph modifications

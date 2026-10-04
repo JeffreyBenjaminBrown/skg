@@ -22,7 +22,7 @@ use crate::from_text::local_instruction_collection::types::{
 use crate::types::misc::{
   ID, MSV, RelPartner, RepoName, members_msv, members_of,
   rel_partners_at_relRepo, rel_partners_at_relRepo_msv };
-use crate::types::nodes::complete::{FileProperty, NodeComplete};
+use crate::types::nodes::complete::{Flag, NodeComplete};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 
 use std::collections::{HashMap, HashSet};
@@ -55,8 +55,8 @@ pub struct NodeSaveIntent {
   pub subscribes_to     : MSV<(ID, Option<RepoName>)>,
   pub hides_from_its_subscriptions : MSV<ID>,
   pub overrides_view_of : MSV<(ID, Option<RepoName>)>,
-  pub misc              : Vec<FileProperty>,
-  pub boolprop_request  : Option<(FileProperty, bool)>,
+  pub misc              : Vec<Flag>,
+  pub flag_request  : Option<(Flag, bool)>,
 }
 
 /// Repos the buffer explicitly requested via '(editRequest
@@ -161,7 +161,7 @@ impl NodeIntent {
         members_msv (&node . hides_from_its_subscriptions),
       overrides_view_of            : no_explicit_msv (&node . overrides_view_of),
       misc                         : node . misc,
-      boolprop_request             : None,
+      flag_request             : None,
     }) }
 
   pub fn save_intent (
@@ -350,7 +350,7 @@ pub fn lower_collected_intents (
       || leftover . subscribes_to . is_some()
       || leftover . overrides     . is_some()
       || leftover . node_merge    . is_some()
-      || leftover . boolprop      . is_some()
+      || leftover . flag      . is_some()
     { return Err ( format!(
         "lower_collected_intents: entry for {} has field intents but no title/body",
         pid )); }}
@@ -392,7 +392,7 @@ fn lower_one_entry (
         overrides_view_of            :
           msv_from_slot (entry . overrides),
         misc                         : Vec::new(),
-        boolprop_request             : entry . boolprop,
+        flag_request             : entry . flag,
       })) }} }
 
 fn msv_from_slot<T> (

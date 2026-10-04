@@ -5,7 +5,7 @@
 //! NodeRust construction time.
 
 use crate::types::misc::{ID, MSV, RelPartner, RepoName};
-use crate::types::nodes::complete::{FileProperty, NodeComplete};
+use crate::types::nodes::complete::{Flag, NodeComplete};
 use crate::types::links::links_from_node;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -21,7 +21,7 @@ pub struct NodeRust {
   pub subscribes_to                : MSV<RelPartner<ID>>,
   pub hides_from_its_subscriptions : MSV<RelPartner<ID>>,
   pub overrides_view_of            : MSV<RelPartner<ID>>,
-  pub misc                         : Vec<FileProperty>,
+  pub misc                         : Vec<Flag>,
   // PITFALL: derived from the text.
   // Parsed from title+body via 'links_from_node' during
   // construction; never read from disk.

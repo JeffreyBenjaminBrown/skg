@@ -8,7 +8,7 @@
 
 use super::git::{ExistenceAxes, MembershipAxes, Sign};
 use super::misc::{ID, RepoName};
-use super::nodes::complete::FileProperty;
+use super::nodes::complete::Flag;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use std::collections::HashSet;
 use std::fmt;
@@ -338,7 +338,7 @@ pub struct RelationCounts {
 pub struct GraphNodeStats {
   pub aliases   : usize, // number of aliases (-> Ak)
   pub extra_ids : usize, // number of extra IDs from merging (-> Ik)
-  pub properties : usize, // number of logically true file properties (-> Pk)
+  pub flags : usize, // number of logically true flags (-> Fk)
   /// The directional member counts, or None for a node without stats
   /// (e.g. a repoless reference). Feeds the token grammar.
   pub rels      : Option<RelationCounts>,
@@ -401,7 +401,7 @@ pub struct ViewNodeStats {
 pub enum QualFolder {
   ID,
   Alias,
-  BoolProps { title : String, body : Option<String> },
+  Flags { title : String, body : Option<String> },
 }
 
 #[derive( Debug, Clone, PartialEq )]
@@ -412,9 +412,9 @@ pub enum Qual {
           membership: MembershipAxes },
   ID { id: ID, // an ID of grandparent (the parent being an IDFolder)
        membership: MembershipAxes },
-  /// A true file-level boolean property of the node's grandparent.
-  BoolProp {
-    property : FileProperty,
+  /// A true file-level boolean flag of the node's grandparent.
+  Flag {
+    flag : Flag,
     title    : String,
     body     : Option<String>,
   },
@@ -471,7 +471,7 @@ pub enum FolderPolicy {
 pub enum NodeEditRequest {
   NodeMerge (ID), // The node with this request is the acquirer. The node with the ID that this request specifies is the acquiree.
   Delete, // request to delete this node
-  SetBoolProp { property : FileProperty, value : bool },
+  SetFlag { flag : Flag, value : bool },
 }
 
 /// Which relation's folders a 'Folder' view-request builds. A Folder
@@ -521,7 +521,7 @@ impl FolderRelation {
 pub enum ViewRequest {
   Folder (FolderRelation),
   Path (RelationRole),
-  BoolProps,
+  Flags,
   Definitive,
   Fork,
 }
@@ -644,27 +644,27 @@ impl PartnerFolder {
 }
 
 impl QualFolder {
-  pub fn boolprops () -> QualFolder {
-    QualFolder::BoolProps { title : String::new (), body : None } }
+  pub fn flags () -> QualFolder {
+    QualFolder::Flags { title : String::new (), body : None } }
 
-  pub fn is_boolprops (&self) -> bool {
-    matches! (self, QualFolder::BoolProps { .. }) }
+  pub fn is_flags (&self) -> bool {
+    matches! (self, QualFolder::Flags { .. }) }
 
   pub fn repr_in_client (&self) -> &'static str {
     match self {
       QualFolder::Alias => "aliasFolder",
       QualFolder::ID    => "idFolder",
-      QualFolder::BoolProps { .. } => "propertiesFolder",
+      QualFolder::Flags { .. } => "flagsFolder",
     } }
 
   pub fn title (&self) -> &str {
     match self {
-      QualFolder::BoolProps { title, .. } => title,
+      QualFolder::Flags { title, .. } => title,
       QualFolder::Alias | QualFolder::ID => "", } }
 
   pub fn body (&self) -> Option<&String> {
     match self {
-      QualFolder::BoolProps { body, .. } => body . as_ref (),
+      QualFolder::Flags { body, .. } => body . as_ref (),
       QualFolder::Alias | QualFolder::ID => None, } }
 
 }
@@ -674,7 +674,7 @@ impl Qual {
     match self {
       Qual::Alias { .. }       => "alias",
       Qual::ID { .. }          => "id",
-      Qual::BoolProp { .. }    => "property",
+      Qual::Flag { .. }    => "flag",
       Qual::TextChanged { .. } => "textChanged",
     } }
 
@@ -682,13 +682,13 @@ impl Qual {
     match self {
       Qual::Alias { text, .. } => text,
       Qual::ID    { id, .. }   => id,
-      Qual::BoolProp { title, .. } => title,
+      Qual::Flag { title, .. } => title,
       Qual::TextChanged { .. } => "",
     } }
 
   pub fn body (&self) -> Option<&String> {
     match self {
-      Qual::BoolProp { body, .. } => body . as_ref (),
+      Qual::Flag { body, .. } => body . as_ref (),
       _ => None, } }
 }
 
@@ -736,7 +736,7 @@ impl ViewRequest {
   /// counts elsewhere. Enumerated for the herald conformance test
   /// (server/heralds.rs).
   pub const EMITTABLE_MATCH_ATOMS : [&'static str; 4] =
-    [ "folder", "path", "properties", "definitiveView" ];
+    [ "folder", "path", "flags", "definitiveView" ];
 }
 
 impl AsRef<ViewNode> for ViewNode {
@@ -852,8 +852,8 @@ impl fmt::Display for NodeEditRequest {
     match self {
       NodeEditRequest::NodeMerge (id) => write!(f, "(merge {})", id . 0),
       NodeEditRequest::Delete    => write!(f, "toDelete"),
-      NodeEditRequest::SetBoolProp { property, value } => write! (
-        f, "(property {} {})", property . wire_name (), value),
+      NodeEditRequest::SetFlag { flag, value } => write! (
+        f, "(flag {} {})", flag . wire_name (), value),
     }} }
 
 impl FromStr for NodeEditRequest {
@@ -880,7 +880,7 @@ impl fmt::Display for ViewRequest {
     match self {
       ViewRequest::Folder  (rel)  => write! (f, "(folder {})",  rel  . relname  ()),
       ViewRequest::Path (role) => write! (f, "(path {})", role . rolename ()),
-      ViewRequest::BoolProps   => write! (f, "properties"),
+      ViewRequest::Flags   => write! (f, "flags"),
       ViewRequest::Definitive  => write! (f, "definitiveView"),
       ViewRequest::Fork        => write! (f, "fork"), } } }
 
@@ -893,7 +893,7 @@ impl Default for GraphNodeStats {
     GraphNodeStats {
       aliases   : 0,
       extra_ids : 0,
-      properties : 0,
+      flags : 0,
       rels      : None,
     }} }
 

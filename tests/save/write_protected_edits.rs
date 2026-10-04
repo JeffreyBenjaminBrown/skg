@@ -12,19 +12,19 @@ use skg::serve::ViewsState;
 use skg::types::errors::{BufferValidationError, SaveError};
 use skg::types::misc::{members_of, ID, SkgConfig, TantivyIndex};
 use skg::types::nodes::complete::{
-  NodeComplete, FileProperty, file_property_is_true};
+  NodeComplete, Flag, flag_is_true};
 use skg::types::views_state::{OpenViews, ViewUri};
 
 use std::error::Error;
 use std::net::TcpStream;
 
 #[test]
-fn deleting_the_properties_folder_is_accepted_and_inert (
+fn deleting_the_flags_folder_is_accepted_and_inert (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
-    "skg-test-properties-folder-deletion",
+    "skg-test-flags-folder-deletion",
     "tests/save/properties_folder_deletion/fixtures",
-    "/tmp/tantivy-test-properties-folder-deletion",
+    "/tmp/tantivy-test-flags-folder-deletion",
     |config, tantivy| Box::pin (async move {
       let graph : InRustGraphHandle = graph_handle_from_config (config)?;
       let mut views_state : ViewsState = ViewsState {
@@ -35,30 +35,30 @@ fn deleting_the_properties_folder_is_accepted_and_inert (
       let mut stream : TcpStream =
         TcpStream::connect (listener . local_addr ()?)?;
       let uri : Result<ViewUri, String> = Ok (
-        ViewUri::ContentView ("properties-folder-deletion-test" . to_string ()));
-      let with_properties = indoc! {"
+        ViewUri::ContentView ("flags-folder-deletion-test" . to_string ()));
+      let with_flags = indoc! {"
         * (skg (node (id brie) (repo main))) brie
-        ** (skg propertiesFolder)
-        *** (skg (property noSearchMatching))
+        ** (skg flagsFolder)
+        *** (skg (flag noSearchMatching))
       "};
       let first = update_from_and_rerender_buffer (
-        &mut stream, with_properties, config, tantivy, &graph, false,
+        &mut stream, with_flags, config, tantivy, &graph, false,
         &uri, &mut views_state ) . await ?;
       assert! (first . errors . is_empty ());
-      assert! (first . saved_view . contains ("propertiesFolder"));
+      assert! (first . saved_view . contains ("flagsFolder"));
 
-      let without_properties =
+      let without_flags =
         "* (skg (node (id brie) (repo main))) brie\n";
       let second = update_from_and_rerender_buffer (
-        &mut stream, without_properties, config, tantivy, &graph, false,
+        &mut stream, without_flags, config, tantivy, &graph, false,
         &uri, &mut views_state ) . await ?;
       assert! (second . errors . is_empty ());
-      assert! (! second . saved_view . contains ("propertiesFolder"));
+      assert! (! second . saved_view . contains ("flagsFolder"));
       let saved : NodeComplete =
         nodecomplete_from_id (config, &ID::from ("brie"))?;
-      assert! (file_property_is_true (
-        &saved . misc, FileProperty::NoSearchMatching),
-        "dismissing the projection must not clear the property");
+      assert! (flag_is_true (
+        &saved . misc, Flag::NoSearchMatching),
+        "dismissing the projection must not clear the flag");
       Ok (( ))
     })) }
 

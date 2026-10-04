@@ -16,7 +16,7 @@ use crate::telescope::types::{
 use crate::types::misc::{
   ID, RelPartner, SkgConfig, RepoName,
 };
-use crate::types::nodes::complete::FileProperty;
+use crate::types::nodes::complete::Flag;
 use crate::types::nodes::fs::{NodeFS, nodefs_from_section};
 
 use std::collections::HashMap;
@@ -26,7 +26,7 @@ use std::fmt;
 pub struct UnfoldInput<'a> {
   pub pid                          : &'a ID,
   pub extra_ids                    : &'a [ID],
-  pub misc                         : &'a [FileProperty],
+  pub misc                         : &'a [Flag],
   pub title                        : Option<&'a str>,
   pub body                         : Option<&'a str>,
   pub home                         : &'a RepoName,

@@ -79,7 +79,7 @@ prompt and the result carries a warning.
 Text search across titles and aliases, returning every
 matching node.
 
-A node with the =NoSearchMatching= property will not be found
+A node with the =NoSearchMatching= flag will not be found
 (will not be a "hit") through
 its title, aliases, or body in any search mode. It may still appear as graph
 context around another hit and can still be opened by ID. This is a
@@ -345,14 +345,14 @@ hides nor is hidden, nothing appears.
 The subscribeeFolder (the nodes this node subscribes to -- WRITABLE, shown
 even when empty) and the subscriberFolder (the nodes that subscribe to
 this one -- read-only, ☮).
-*** C-c l p : skg-show-folderOf-properties
-Shows the read-only =propertiesFolder=. It lists only true node-file
-properties as titleless viewnodes whose heralds carry their labels, in canonical
+*** C-c l p : skg-show-folderOf-flags
+Shows the read-only =flagsFolder=. It lists only true node-file
+flags as titleless viewnodes whose heralds carry their labels, in canonical
 order, and remains visible when none are true.
 =Had ID before import= and =Was overloaded during org-roam import=
 are provenance; =No search matching= is the user setting. Edit none of these
 generated viewnodes directly. Delete the whole folder branch to dismiss this
-optional view; doing so does not change any property.
+optional view; doing so does not change any flag.
 ** C-c p : show a path (the backpath through one relation role)
 Like the folders, each inserts a request that, on save, grafts the
 partners reached through one relation role as inverted, read-only
@@ -443,7 +443,7 @@ whose Skg repo matches the original Skg repo of the node at point.
 Only descendents for which AffectsParent=True are traversed.
 The stuck-relationship offer and the write-protected warning described
 under =C-c s s= apply here too, across the whole subtree.
-*** C-c s x : skg-set-property-search-matching
+*** C-c s x : skg-set-flag-search-matching
 Prompts between =search matching= and =no search matching=, with shift-arrow
 cycling, and stages an idempotent request on the saved active node at point.
 It refuses foreign and write-protected nodes and conflicts with another
@@ -930,7 +930,7 @@ heading levels introduce grouping nodes titled 'These are special!' and
 'These are normal.' rather than reproducing the outline literally.
 
 'ROAM_ALIASES' becomes Skg aliases. Nodes with an original ID receive the
-'Had ID before import' property. Duplicate IDs within the input
+'Had ID before import' flag. Duplicate IDs within the input
 are merged: children and aliases are combined, and additional titles and
 bodies are appended with a separator. Such nodes receive 'Was overloaded
 during org-roam import'. This does not compare or merge with existing

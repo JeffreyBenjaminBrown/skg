@@ -1,5 +1,5 @@
 /// Local validation functions for ViewNode trees.
-/// These check structural properties of individual nodes
+/// These check structural flags of individual nodes
 /// without requiring global context.
 
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpActiveNode, MpPhantomDiff};
@@ -66,10 +66,10 @@ pub fn validate_local_structure (
           validate_idFolder(tree, node_id),
       MpViewnodeKind::Qual (Qual::ID { .. }) =>
           validate_idscaffold(tree, node_id),
-      MpViewnodeKind::QualFolder (QualFolder::BoolProps { .. }) =>
-          validate_boolprops_folder (tree, node_id),
-      MpViewnodeKind::Qual (Qual::BoolProp { .. }) =>
-          validate_boolprop (tree, node_id),
+      MpViewnodeKind::QualFolder (QualFolder::Flags { .. }) =>
+          validate_flags_folder (tree, node_id),
+      MpViewnodeKind::Qual (Qual::Flag { .. }) =>
+          validate_flag (tree, node_id),
       MpViewnodeKind::Phantom (MpPhantom::Deleted (_))
         => Vec::new(),
       MpViewnodeKind::DeadScaffold => Vec::new(),
@@ -128,24 +128,24 @@ fn validate_aliasfolder (
                     . to_string()); }
   errors }
 
-fn validate_boolprop (
+fn validate_flag (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new ();
   if ! generation_does_not_exist (tree, node_id, 1, true) {
-    errors . push ("Property must have no (non-ignored) children."
+    errors . push ("Flag must have no (non-ignored) children."
                    . to_string ()); }
   if ! generation_exists_and_includes (
     tree, node_id, -1, false,
     |node| matches! (&node . kind,
-      MpViewnodeKind::QualFolder (QualFolder::BoolProps { .. })))
-  { errors . push ("Property must have a PropertiesFolder parent."
+      MpViewnodeKind::QualFolder (QualFolder::Flags { .. })))
+  { errors . push ("Flag must have a FlagsFolder parent."
                    . to_string ()); }
   errors
 }
 
-fn validate_boolprops_folder (
+fn validate_flags_folder (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
@@ -153,22 +153,22 @@ fn validate_boolprops_folder (
   if ! generation_includes_only (
     tree, node_id, 1, true,
     |node| matches! (&node . kind,
-      MpViewnodeKind::Qual (Qual::BoolProp { .. })))
+      MpViewnodeKind::Qual (Qual::Flag { .. })))
   { errors . push (
-      "PropertiesFolder's children must include only Properties."
+      "FlagsFolder's children must include only Flags."
       . to_string ()); }
   if ! generation_exists_and_includes (
     tree, node_id, -1, false,
     |node| matches! (&node . kind,
       MpViewnodeKind::Vognode (MpVognode::Active (_))))
-  { errors . push ("PropertiesFolder must have an ActiveNode parent."
+  { errors . push ("FlagsFolder must have an ActiveNode parent."
                    . to_string ()); }
   if ! siblings_cannot_include (
     tree, node_id,
     |node| matches! (&node . kind,
-      MpViewnodeKind::QualFolder (QualFolder::BoolProps { .. })))
+      MpViewnodeKind::QualFolder (QualFolder::Flags { .. })))
   { errors . push (
-      "PropertiesFolder must be unique among its siblings." . to_string ()); }
+      "FlagsFolder must be unique among its siblings." . to_string ()); }
   errors
 }
 
@@ -485,9 +485,9 @@ fn validate_activeNode (
     errors . push("ActiveNode must have a repo that exists in the config."
                   . to_string()); }
   if t . id . is_none () && matches! (
-    t . edit_request (), Some (NodeEditRequest::SetBoolProp { .. }))
+    t . edit_request (), Some (NodeEditRequest::SetFlag { .. }))
   { errors . push (
-      "A property request requires a saved node ID; save the node first."
+      "A flag request requires a saved node ID; save the node first."
       . to_string ()); }
   if has_empty_title (t) {
     errors . push("Definitive node has an empty title." . to_string()); }
@@ -515,7 +515,7 @@ fn cannot_be_child_of_gnode (
   matches!(&node . kind,
     MpViewnodeKind::BufferRoot |
     MpViewnodeKind::Qual (
-      Qual::Alias { .. } | Qual::ID { .. } | Qual::BoolProp { .. }) |
+      Qual::Alias { .. } | Qual::ID { .. } | Qual::Flag { .. }) |
     MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee))
   || ( ! affects_parent_subscribee_as_such
        // validate_hiddenin REQUIRES a gnode parent; a

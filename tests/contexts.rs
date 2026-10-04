@@ -16,7 +16,7 @@ use skg::context::{
 use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::types::misc::{ID, SkgConfig, SkgfileRepo, RepoName, rel_partners_at_relRepo};
-use skg::types::nodes::complete::{FileProperty, NodeComplete, empty_node_complete};
+use skg::types::nodes::complete::{Flag, NodeComplete, empty_node_complete};
 use skg::types::save::{DefineNode, SaveNode};
 
 #[test]
@@ -47,7 +47,7 @@ fn test_had_id_set_from_nodes_empty () {
 fn test_had_id_set_from_nodes_mixed () {
   let mut node_with : NodeComplete = empty_node_complete ();
   node_with . pid = ID::new ("has-id");
-  node_with . misc = vec![FileProperty::Had_ID_Before_Import];
+  node_with . misc = vec![Flag::Had_ID_Before_Import];
   let mut node_without : NodeComplete = empty_node_complete ();
   node_without . pid = ID::new ("no-id");
   let nodes : Vec<NodeComplete> = vec![node_with, node_without];
@@ -105,7 +105,7 @@ fn in_rust_context_types_for_saved_nodes () {
     n . contains = rel_partners_at_relRepo (
       &n . home_repo,
       contains . iter () . map ( |c| ID::new (*c) ) . collect () );
-    if had_id { n . misc = vec![FileProperty::Had_ID_Before_Import]; }
+    if had_id { n . misc = vec![Flag::Had_ID_Before_Import]; }
     n };
   let nodes : Vec<NodeComplete> = vec![
     mk ("root",   "root",                &["ord","multi","hadid","tgt"], false),

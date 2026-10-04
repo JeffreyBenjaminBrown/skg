@@ -1,4 +1,4 @@
-local boolprop = require('skg.boolprop')
+local flag = require('skg.flag')
 local compare = require('skg.sexpr.compare')
 local config = require('skg.config')
 local metadata = require('skg.metadata')
@@ -18,10 +18,10 @@ end
 local function has_request (line, value)
   local meta = metadata.metadata_sexp_at_line_or_nil(line)
   return compare.subtree_p(meta, sexpr.read(string.format(
-    '(skg (node (editRequest (property noSearchMatching %s))))', value)))
+    '(skg (node (editRequest (flag noSearchMatching %s))))', value)))
 end
 
-describe('skg.boolprop staging', function ()
+describe('skg.flag staging', function ()
   local real_owned_repos = config.owned_repos
   local real_notify = vim.notify
   local real_send_string = client.send_string
@@ -37,7 +37,7 @@ describe('skg.boolprop staging', function ()
     vim.notify = real_notify
     client.send_string = real_send_string
     picker.completing_read_with_cycle = real_picker
-    state.response_handler_map['property-state'] = nil
+    state.response_handler_map['flag-state'] = nil
     state.lp_pending_count = 0
     pcall(vim.api.nvim_buf_delete,
           vim.api.nvim_get_current_buf(), { force = true })
@@ -45,11 +45,11 @@ describe('skg.boolprop staging', function ()
 
   it('stamps the exact set and clear request shapes', function ()
     buffer_with({ '* (skg (node (id root) (repo main))) root' })
-    boolprop._apply(1, true, false)
+    flag._apply(1, true, false)
     assert.is_true(has_request(1, 'true'))
 
     buffer_with({ '* (skg (node (id root) (repo main))) root' })
-    boolprop._apply(1, false, false)
+    flag._apply(1, false, false)
     assert.is_true(has_request(1, 'false'))
   end)
 
@@ -67,7 +67,7 @@ describe('skg.boolprop staging', function ()
       '*** (skg (node (id under-folder) (repo main))) under folder',
       '* (skg (node (id sibling) (repo main))) sibling' })
 
-    boolprop._apply(1, true, true)
+    flag._apply(1, true, true)
 
     assert.is_true(has_request(1, 'true'))
     assert.is_true(has_request(2, 'true'))
@@ -86,13 +86,13 @@ describe('skg.boolprop staging', function ()
     end
     local buf = buffer_with({
       '* (skg (node (id root) (repo main))) root' })
-    boolprop._request(false)
-    assert.is_truthy(sent:find('(request . "property state")', 1, true))
+    flag._request(false)
+    assert.is_truthy(sent:find('(request . "flag state")', 1, true))
     vim.api.nvim_buf_set_lines(buf, 0, 0, false, { 'preamble' })
-    local handler = state.response_handler_map['property-state'].handler
+    local handler = state.response_handler_map['flag-state'].handler
     handler('', sexpr.read(
-      '((response-type property-state) (id "root")'
-      .. ' (property "noSearchMatching") (value "false")'
+      '((response-type flag-state) (id "root")'
+      .. ' (flag "noSearchMatching") (value "false")'
       .. ' (repo "main") (user-owned "true"))'))
     assert.are.equal('search matching', initial)
     assert.is_true(has_request(2, 'true'))

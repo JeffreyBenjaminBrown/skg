@@ -262,7 +262,7 @@ fn repo_is_foreign(
     . unwrap_or (false)}
 
 /// Returns true if the buffer node differs from the disk node
-/// in any definitive field (title, body, contains), any file property, or
+/// in any definitive field (title, body, contains), any flag, or
 /// any non-definitive field that the buffer expresses an opinion on.
 ///
 /// For *definitive* fields (title, body, contains):
@@ -288,12 +288,12 @@ pub(crate) fn buffernode_differs_from_disknode(
   let repo_matches: bool = buffer_node . home_repo == disk_node . home_repo;
   let contains_matches: bool =
     buffer_node . contains == disk_node . contains;
-  let properties_match: bool = buffer_node . misc == disk_node . misc;
+  let flags_match: bool = buffer_node . misc == disk_node . misc;
   !( title_matches
      && body_matches
      && repo_matches
      && contains_matches
-     && properties_match
+     && flags_match
      && fields_match( &buffer_node . aliases,
                       &disk_node . aliases)
      && fields_match( &buffer_node . subscribes_to,

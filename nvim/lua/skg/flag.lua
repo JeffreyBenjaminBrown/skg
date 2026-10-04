@@ -1,4 +1,4 @@
--- Read and stage the user-mutable noSearchMatching file property.
+-- Read and stage the user-mutable noSearchMatching flag.
 
 local client = require('skg.client')
 local config = require('skg.config')
@@ -11,7 +11,7 @@ local state = require('skg.state')
 
 local M = {}
 local choices = { 'search matching', 'no search matching' }
-local request_namespace = vim.api.nvim_create_namespace('skg-boolprop-request')
+local request_namespace = vim.api.nvim_create_namespace('skg-flag-request')
 
 local function edit_request_p (meta)
   local values = metadata.sexp_cdr_at_path(meta,
@@ -33,7 +33,7 @@ end
 
 local function stamp (line, desired)
   metadata.edit_metadata_at_line(line, sexpr.read(string.format(
-    '(skg (node (editRequest (property noSearchMatching %s))))',
+    '(skg (node (editRequest (flag noSearchMatching %s))))',
     desired and 'true' or 'false')))
 end
 
@@ -95,7 +95,7 @@ local function request (recursive)
   local expected_id = eligible_root(line)
   local mark = vim.api.nvim_buf_set_extmark(
     buf, request_namespace, line - 1, 0, { right_gravity = true })
-  state.register_response_handler('property-state',
+  state.register_response_handler('flag-state',
     function (_payload_text, response)
       if not vim.api.nvim_buf_is_valid(buf) then
         vim.notify('skg: buffer vanished before the search-matching prompt')
@@ -108,7 +108,7 @@ local function request (recursive)
         return
       end
       local err = payload.field_text(response, 'error')
-      if err then vim.notify('property state: ' .. err) return end
+      if err then vim.notify('flag state: ' .. err) return end
       local canonical_id = payload.field_text(response, 'id')
       local value = payload.field_text(response, 'value')
       local user_owned = payload.field_text(response, 'user-owned')
@@ -120,10 +120,10 @@ local function request (recursive)
         local current_meta = metadata.metadata_sexp_at_line_or_nil(current_line)
         local current_id = current_meta and metadata.node_id(current_meta)
         if current_id ~= expected_id and current_id ~= canonical_id then
-          vim.notify('The headline changed while property state was loading') return end
+          vim.notify('The headline changed while flag state was loading') return end
         local ok = pcall(eligible_root, current_line)
         if not ok then
-          vim.notify('The headline is no longer eligible for a property edit') return end
+          vim.notify('The headline is no longer eligible for a flag edit') return end
         local initial = value == 'true'
           and 'no search matching' or 'search matching'
         local choice = picker.completing_read_with_cycle(
@@ -136,7 +136,7 @@ local function request (recursive)
     end, true)
   state.lp_reset()
   client.send_string(string.format(
-    '((request . "property state") (id . %q) (property . "noSearchMatching"))\n',
+    '((request . "flag state") (id . %q) (flag . "noSearchMatching"))\n',
     expected_id))
 end
 

@@ -6,7 +6,7 @@ use crate::types::misc::{
   rel_partners_at_relRepo_msv,
 };
 use crate::types::nodes::complete::{
-  FileProperty, NodeComplete, normalize_body,
+  Flag, NodeComplete, normalize_body,
 };
 use super::parse::{ParsedDocument, ParsedSection, rendered_range};
 use std::path::{Component, Path, PathBuf};
@@ -114,7 +114,7 @@ fn node_for_section (
     hides_from_its_subscriptions : MSV::Unspecified,
     overrides_view_of : MSV::Unspecified,
     misc : if section . explicit_id . is_some () {
-      vec![FileProperty::Had_ID_Before_Import]
+      vec![Flag::Had_ID_Before_Import]
     } else { Vec::new () },
   }
 }

@@ -433,23 +433,23 @@ Headline is a term from org-mode. It refers to a line that begins with some aste
 
 *** no search matching
 
-A node-file boolean property (=NoSearchMatching= in YAML,
+A node-file flag (=NoSearchMatching= in YAML,
 =noSearchMatching= on the wire) that prevents the node's title, aliases, and
 body from producing a direct text-search hit. The node remains indexed for
 exact-ID lookup and may appear as context around another hit. It is search
 decluttering, not privacy.
 
-*** properties folder and Property
+*** flags folder and Flag
 
-=propertiesFolder= is a generated, read-only scaffold under a graphnode. Its
-=(property PROPERTY)= leaves list the node's true file properties in canonical
+=flagsFolder= is a generated, read-only scaffold under a graphnode. Its
+=(flag FLAG)= leaves list the node's true flags in canonical
 order. Each leaf is titleless because its herald supplies the visible label.
 The folder stays visible when empty. Edits within a retained folder are
 rejected before save, but deleting the entire folder safely dismisses the
-optional projection and changes no property. =noSearchMatching= is changed
+optional projection and changes no flag. =noSearchMatching= is changed
 through the dedicated setter, while the two org-roam import provenance
-properties have no setter. A node with =n= true properties has the cyan =Pn=
-herald; no property herald is shown at zero.
+flags have no setter. A node with =n= true flags has the cyan =Fn=
+herald; no flag herald is shown at zero.
 
 *** Document
 

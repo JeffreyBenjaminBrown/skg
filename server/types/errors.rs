@@ -22,7 +22,7 @@ pub enum SaveError {
     warnings : Vec<String>, }, }
 
 /// If the user attempts to save a buffer
-/// with any of these properties, the server should refuse.
+/// with any of these flags, the server should refuse.
 #[derive(Debug, Clone, PartialEq)]
 pub enum BufferValidationError {
   Body_of_Scaffold               (String,   // Title from buffer
@@ -62,13 +62,13 @@ pub enum BufferValidationError {
     title   : String,
     changes : Vec<String>,
   }, // This occurrence was changed since the server rendered it, but a write-protected occurrence emits no save instruction for the changed data.
-  BoolPropsSurfaceEdited {
+  FlagsSurfaceEdited {
     owner_id    : ID,
     owner_title : String,
     changes     : Vec<String>,
   },
-  BoolPropEditOnForeignNode                 (ID, RepoName),
-  BoolPropEditOnUnknownNode                 (ID),
+  FlagEditOnForeignNode                 (ID, RepoName),
+  FlagEditOnUnknownNode                 (ID),
   IDFolder_Edited                   (ID,       // owner of the IDFolder
                                   Vec<ID>,  // ids the buffer's IDFolder claims
                                   Vec<ID>), // the owner's real ids (pid + extra_ids); empty if the owner is not in the graph
@@ -159,14 +159,14 @@ impl std::fmt::Display for BufferValidationError {
         id, title, changes } =>
         write!(f, "The write-protected occurrence of node {:?} ({:?}) was edited ({}) but is read-only. Re-render, then edit a definitive occurrence instead.",
                id, title, changes . join ("; ")),
-      BufferValidationError::BoolPropsSurfaceEdited {
+      BufferValidationError::FlagsSurfaceEdited {
         owner_id, owner_title, changes } =>
-        write!(f, "The properties surface under node {:?} ({:?}) was edited: {}. It is server-owned and no changes were saved. Use skg-set-property-search-matching for noSearchMatching; provenance properties have no setter.",
+        write!(f, "The flags surface under node {:?} ({:?}) was edited: {}. It is server-owned and no changes were saved. Use skg-set-flag-search-matching for noSearchMatching; provenance flags have no setter.",
                owner_id, owner_title, changes . join ("; ")),
-      BufferValidationError::BoolPropEditOnForeignNode (id, repo) =>
-        write! (f, "Cannot change properties of node {:?} from foreign repo '{}'; this gesture never creates an implicit fork.", id, repo),
-      BufferValidationError::BoolPropEditOnUnknownNode (id) =>
-        write! (f, "Cannot change properties of unsaved or unknown node {:?}; save the node first.", id),
+      BufferValidationError::FlagEditOnForeignNode (id, repo) =>
+        write! (f, "Cannot change flags of node {:?} from foreign repo '{}'; this gesture never creates an implicit fork.", id, repo),
+      BufferValidationError::FlagEditOnUnknownNode (id) =>
+        write! (f, "Cannot change flags of unsaved or unknown node {:?}; save the node first.", id),
       BufferValidationError::OverridesHere_Mismatch(carrier, original, effective) =>
         write!(f, "Node {:?} carries the marker (overridesHere {:?}), but it is not on the override chain of that original (which resolves to {:?}). The marker looks hand-edited or stale; saving it would rewrite a contains list. Re-render the view and retry.", carrier, original, effective),
       BufferValidationError::Other (msg) =>

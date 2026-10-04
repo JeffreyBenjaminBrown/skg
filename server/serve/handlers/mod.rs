@@ -2,7 +2,7 @@ pub mod close_view;
 pub mod delete_references_to_absent_node;
 pub mod diff_report;
 pub mod relRepo_info;
-pub mod boolprop_state;
+pub mod flag_state;
 pub mod export_to_org;
 pub mod import_md_and_org;
 pub mod get_file_path;

@@ -18,7 +18,7 @@
 use serde::{Serialize, Deserialize};
 
 use crate::types::misc::{ID, SkgConfig, RepoName};
-use crate::types::nodes::complete::FileProperty;
+use crate::types::nodes::complete::Flag;
 use crate::types::nodes::fs::NodeFS;
 
 use std::collections::{HashMap, HashSet};
@@ -194,12 +194,12 @@ impl Telescope {
           extra_ids . push ( e . clone () ); }} }
     extra_ids }
 
-  /// Every file property any section carries, first
+  /// Every flag any section carries, first
   /// occurrence first. Unioned defensively, like 'extra_ids'.
   pub fn misc (
     &self,
-  ) -> Vec<FileProperty> {
-    let mut misc : Vec<FileProperty> = Vec::new ();
+  ) -> Vec<Flag> {
+    let mut misc : Vec<Flag> = Vec::new ();
     for (_, node_fs) in &self . sections {
       for m in &node_fs . misc {
         if ! misc . contains (m) {

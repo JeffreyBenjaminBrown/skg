@@ -17,7 +17,7 @@ use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::delete_references_to_absent_node::handle_delete_references_to_absent_node_request;
 use crate::serve::handlers::diff_report::handle_diff_report_request_with_repo_set;
 use crate::serve::handlers::relRepo_info::handle_relRepo_info_request;
-use crate::serve::handlers::boolprop_state::handle_boolprop_state_request;
+use crate::serve::handlers::flag_state::handle_flag_state_request;
 use crate::serve::handlers::export_to_org::handle_export_to_org_request;
 use crate::serve::handlers::import_md_and_org::{
   PendingImport, handle_import_md_and_org_request};
@@ -220,8 +220,8 @@ fn handle_emacs (
           Ok (RequestType::RelRepoInfo) =>
             handle_relRepo_info_request (
               &mut stream, &request_header, &env ),
-          Ok (RequestType::BoolPropState) =>
-            handle_boolprop_state_request (
+          Ok (RequestType::FlagState) =>
+            handle_flag_state_request (
               &mut stream, &request_header, &env ),
           Ok (RequestType::ListRepoSets)
           | Ok (RequestType::ActiveRepoSet)

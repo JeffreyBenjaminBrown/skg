@@ -65,8 +65,8 @@ M.commands = {
                           desc = 'Request the hide folders (auto-saves)' },
   ShowFolderOfSubscribesTo = { module = 'skg.view_requests', fn = 'show_folderOf_subscribes_to',
                                desc = 'Request the subscribe folders (auto-saves)' },
-  ShowFolderOfProperties = { module = 'skg.view_requests', fn = 'show_folderOf_properties',
-                             desc = 'Request the properties folder (auto-saves)' },
+  ShowFolderOfFlags = { module = 'skg.view_requests', fn = 'show_folderOf_flags',
+                             desc = 'Request the flags folder (auto-saves)' },
   ShowPathsThroughContainers = { module = 'skg.view_requests', fn = 'show_paths_through_containers',
                                  desc = 'Graft the containment ancestry (auto-saves)' },
   ShowPathsThroughMentioners = { module = 'skg.view_requests', fn = 'show_paths_through_mentioners',
@@ -95,9 +95,9 @@ M.commands = {
                 desc = "Change the node's repo (in-buffer; save applies)" },
   SetRepoRecursive = { module = 'skg.metadata', fn = 'set_repo_recursive',
                          desc = 'Change repo here and in matching descendants' },
-  SetPropertySearchMatching = { module = 'skg.boolprop', fn = 'set_search_matching',
+  SetFlagSearchMatching = { module = 'skg.flag', fn = 'set_search_matching',
                                 desc = 'Stage search matching for this node' },
-  SetPropertySearchMatchingRecursive = { module = 'skg.boolprop',
+  SetFlagSearchMatchingRecursive = { module = 'skg.flag',
                                          fn = 'set_search_matching_recursive',
                                          desc = 'Stage search matching through true content' },
   ReplaceLinkWithContent = { module = 'skg.modify_graph', fn = 'replace_link_with_content',
@@ -228,7 +228,7 @@ M.content_view_bindings = {
   { 'co', 'ShowFolderOfOverridesViewOf' },
   { 'ch', 'ShowFolderOfHidesFromItsSubscriptions' },
   { 'cs', 'ShowFolderOfSubscribesTo' },
-  { 'cp', 'ShowFolderOfProperties' },
+  { 'cp', 'ShowFolderOfFlags' },
   { 'pC', 'ShowPathsThroughContainers' }, -- C-c p C
   { 'pL', 'ShowPathsThroughMentioners' }, -- C-c p L
   { 'pl', 'ShowPathsThroughMentioned' }, -- C-c p l
@@ -243,8 +243,8 @@ M.content_view_bindings = {
   { 'sm', 'SetMergeRequest' },           -- C-c s m
   { 'ss', 'SetRepo' },                 -- C-c s s
   { 'sS', 'SetRepoRecursive' },        -- C-c s S
-  { 'sx', 'SetPropertySearchMatching' },
-  { 'sX', 'SetPropertySearchMatchingRecursive' },
+  { 'sx', 'SetFlagSearchMatching' },
+  { 'sX', 'SetFlagSearchMatchingRecursive' },
   { 'mc', 'ReplaceLinkWithContent' },    -- C-c m c
   { 'mf', 'Fork' },                      -- C-c m f
   { 'ml', 'ReplaceContentWithLink' },    -- C-c m l

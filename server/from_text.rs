@@ -148,7 +148,7 @@ pub fn buffer_to_validated_saveplan_with_fork_repos_and_previous_view_in_graph (
         warnings : parsing_warnings, } ); }}
   else {
     let errors = write_protected_edits
-      ::boolprops_surface_errors_against_graph (&viewforest, graph);
+      ::flags_surface_errors_against_graph (&viewforest, graph);
     if ! errors . is_empty () {
       return Err ( SaveError::BufferValidationErrors {
         errors,
@@ -159,18 +159,18 @@ pub fn buffer_to_validated_saveplan_with_fork_repos_and_previous_view_in_graph (
       ::extract_nonmergeSavePlan_locally_in_graph (
         &viewforest, graph, config, restricted_repo_set )
  . map_err (SaveError::DatabaseError) ?;
-  { // A boolean-property preference is never an implicit-fork gesture.
+  { // A flag preference is never an implicit-fork gesture.
     // Validate while its side-channel identity is still available; the
     // ordinary foreign-write filter below sees only supplemented SaveNodes.
     let mut errors : Vec<BufferValidationError> = Vec::new ();
-    for target in &nonmerge_plan . boolprop_targets {
+    for target in &nonmerge_plan . flag_targets {
       match graph . pid_and_repo (target) {
         None => errors . push (
-          BufferValidationError::BoolPropEditOnUnknownNode (
+          BufferValidationError::FlagEditOnUnknownNode (
             target . clone () )),
         Some ((_pid, repo)) if ! config . user_owns_repo (&repo) =>
           errors . push (
-            BufferValidationError::BoolPropEditOnForeignNode (
+            BufferValidationError::FlagEditOnForeignNode (
               target . clone (), repo )),
         Some (_) => {}, }}
     if ! errors . is_empty () {

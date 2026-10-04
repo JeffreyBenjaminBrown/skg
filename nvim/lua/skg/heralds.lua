@@ -415,9 +415,9 @@ function M.render_rel_facts (sexp)
   if extra then
     add_token({ { 'I' .. tostring(first_number(extra)), 'SkgHeraldCyan' } })
   end
-  local properties = assq(rels, 'properties')
-  if properties then
-    add_token({ { 'P' .. tostring(first_number(properties)),
+  local flags = assq(rels, 'flags')
+  if flags then
+    add_token({ { 'F' .. tostring(first_number(flags)),
                   'SkgHeraldCyan' } })
   end
   if #chunks == 0 then return nil end

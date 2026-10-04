@@ -199,8 +199,8 @@ fn dispatch_node_update (
       super::reconcile::id_folder::reconcile_idFolder_children (
         treeid, tree, &context . runtime . graph,
         context . repo_diffs, &context . runtime . config ) ?,
-    ViewNodeKind::QualFolder (QualFolder::BoolProps { .. }) =>
-      super::reconcile::boolprops_folder::reconcile_boolprops_folder_children (
+    ViewNodeKind::QualFolder (QualFolder::Flags { .. }) =>
+      super::reconcile::flags_folder::reconcile_flags_folder_children (
         tree, treeid, &context . runtime . graph,
         &context . runtime . config ) ?,
     _ => {

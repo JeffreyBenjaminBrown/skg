@@ -6,7 +6,7 @@ use crate::from_text::local_instruction_collection::types::CollectedIntents;
 use crate::types::save::{NodeMerge, SaveNode, DeleteNode};
 use crate::types::misc::{MSV, RelPartner, SkgConfig, RepoName, ID, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
-  FileProperty, NodeComplete, file_property_is_true, set_file_property};
+  Flag, NodeComplete, flag_is_true, set_flag};
 use crate::types::list::dedup_vector;
 use crate::types::tree::forest::ViewForest;
 
@@ -114,13 +114,13 @@ fn three_nodeMerged_nodecompletes(
   // Search exclusion is conservative across a merge: the surviving node is
   // excluded only when both inputs were excluded.  The acquiree's original
   // text is preserved separately below, with its own value unchanged.
-  set_file_property (
+  set_flag (
     &mut updated_acquirer . misc,
-    FileProperty::NoSearchMatching,
-    file_property_is_true (
-      &acquirer_from_disk . misc, FileProperty::NoSearchMatching)
-    && file_property_is_true (
-      &acquiree_from_disk . misc, FileProperty::NoSearchMatching));
+    Flag::NoSearchMatching,
+    flag_is_true (
+      &acquirer_from_disk . misc, Flag::NoSearchMatching)
+    && flag_is_true (
+      &acquiree_from_disk . misc, Flag::NoSearchMatching));
   { // Append acquiree's IDs (esp. its PID) to acquirer's extra_ids.
     let mut combined_extra_ids : Vec<ID> =
       acquirer_from_disk . extra_ids . clone();
@@ -261,17 +261,17 @@ fn create_acquiree_text_preserver(acquiree: &NodeComplete) -> NodeComplete {
     subscribes_to                : MSV::Specified(vec![]),
     hides_from_its_subscriptions : MSV::Specified(vec![]),
     overrides_view_of            : MSV::Specified(vec![]),
-    misc                         : if file_property_is_true (
-      &acquiree . misc, FileProperty::NoSearchMatching)
-      { vec![FileProperty::NoSearchMatching] }
+    misc                         : if flag_is_true (
+      &acquiree . misc, Flag::NoSearchMatching)
+      { vec![Flag::NoSearchMatching] }
       else { Vec::new () },
   }}
 
 #[cfg(test)]
-mod boolprop_tests {
+mod flag_tests {
   use super::*;
   use crate::types::misc::SkgfileRepo;
-  use crate::types::nodes::complete::{empty_node_complete, file_property_is_true};
+  use crate::types::nodes::complete::{empty_node_complete, flag_is_true};
   use std::collections::HashMap;
   use std::path::PathBuf;
 
@@ -303,27 +303,27 @@ mod boolprop_tests {
         home_repo : RepoName::from ("owned"),
         .. empty_node_complete () };
       acquirer . misc . extend ([
-        FileProperty::Had_ID_Before_Import,
-        FileProperty::Was_Overloaded]);
-      acquiree . misc . push (FileProperty::Had_ID_Before_Import);
+        Flag::Had_ID_Before_Import,
+        Flag::Was_Overloaded]);
+      acquiree . misc . push (Flag::Had_ID_Before_Import);
       if acquirer_value {
-        acquirer . misc . push (FileProperty::NoSearchMatching); }
+        acquirer . misc . push (Flag::NoSearchMatching); }
       if acquiree_value {
-        acquiree . misc . push (FileProperty::NoSearchMatching); }
+        acquiree . misc . push (Flag::NoSearchMatching); }
       let preserver : NodeComplete = create_acquiree_text_preserver (&acquiree);
       let merged : NodeComplete = three_nodeMerged_nodecompletes (
         &config (), &acquirer, &acquiree, &preserver, &HashSet::new ())
         . unwrap ();
-      assert_eq! ( file_property_is_true (
-        &merged . misc, FileProperty::NoSearchMatching), expected );
-      assert! (file_property_is_true (
-        &merged . misc, FileProperty::Had_ID_Before_Import));
-      assert! (file_property_is_true (
-        &merged . misc, FileProperty::Was_Overloaded));
-      assert_eq! ( file_property_is_true (
-        &preserver . misc, FileProperty::NoSearchMatching), acquiree_value );
+      assert_eq! ( flag_is_true (
+        &merged . misc, Flag::NoSearchMatching), expected );
+      assert! (flag_is_true (
+        &merged . misc, Flag::Had_ID_Before_Import));
+      assert! (flag_is_true (
+        &merged . misc, Flag::Was_Overloaded));
+      assert_eq! ( flag_is_true (
+        &preserver . misc, Flag::NoSearchMatching), acquiree_value );
       assert_eq! (preserver . misc,
-        if acquiree_value { vec![FileProperty::NoSearchMatching] }
+        if acquiree_value { vec![Flag::NoSearchMatching] }
         else { Vec::new () }); }
   }
 }

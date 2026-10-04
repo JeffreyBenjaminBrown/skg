@@ -19,7 +19,7 @@
 use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, RepoName};
 use crate::types::errors::BufferValidationError;
-use crate::types::nodes::complete::FileProperty;
+use crate::types::nodes::complete::Flag;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
 use crate::types::viewnode::{
   GraphNodeStats, ViewNodeStats, NodeEditRequest, ViewRequest, FolderRelation,
@@ -170,19 +170,19 @@ pub fn viewnode_from_metadata (
             body,
           } ) ), None, None )
       } else if let Some ( ref non_vognode ) = metadata . non_vognode {
-        let is_boolprops_folder = matches! (non_vognode,
-          MpViewnodeKind::QualFolder (QualFolder::BoolProps { .. }));
-        let is_boolprop = matches! (non_vognode,
-          MpViewnodeKind::Qual (Qual::BoolProp { .. }));
+        let is_flags_folder = matches! (non_vognode,
+          MpViewnodeKind::QualFolder (QualFolder::Flags { .. }));
+        let is_flag = matches! (non_vognode,
+          MpViewnodeKind::Qual (Qual::Flag { .. }));
         let error : Option<BufferValidationError> =
-          if body . is_some () && ! is_boolprops_folder && ! is_boolprop {
+          if body . is_some () && ! is_flags_folder && ! is_flag {
             Some ( BufferValidationError::Body_of_Scaffold (
               title . clone (),
               maybeplaced_kind_error_label (non_vognode) ))
           } else { None };
         let folder_title_warning : Option<String> =
           if ! title . is_empty ()
-            && ! is_boolprops_folder
+            && ! is_flags_folder
             && matches! ( non_vognode,
                           MpViewnodeKind::QualFolder (_)
                           | MpViewnodeKind::PartnerFolder (_) )
@@ -205,13 +205,13 @@ pub fn viewnode_from_metadata (
             MpViewnodeKind::Qual (Qual::ID {
                               id: title . clone () . into (),
                               membership: metadata . scaffold_membership }),
-          MpViewnodeKind::Qual (Qual::BoolProp { property, .. }) =>
-            MpViewnodeKind::Qual (Qual::BoolProp {
-              property : *property,
+          MpViewnodeKind::Qual (Qual::Flag { flag, .. }) =>
+            MpViewnodeKind::Qual (Qual::Flag {
+              flag : *flag,
               title    : title . clone (),
               body     : body . clone () }),
-          MpViewnodeKind::QualFolder (QualFolder::BoolProps { .. }) =>
-            MpViewnodeKind::QualFolder (QualFolder::BoolProps {
+          MpViewnodeKind::QualFolder (QualFolder::Flags { .. }) =>
+            MpViewnodeKind::QualFolder (QualFolder::Flags {
               title : title . clone (), body : body . clone () }),
           MpViewnodeKind::Qual (Qual::TextChanged { .. }) =>
             MpViewnodeKind::Qual (Qual::TextChanged {
@@ -406,16 +406,16 @@ pub fn parse_metadata_to_viewnodemd (
             let _kind_str : String =
               atom_to_string ( &items[1] ) ?;
             result . is_dead_scaffold = true; },
-          "property" => {
+          "flag" => {
             if items . len () != 2 {
-              return Err ("property requires exactly one property name"
+              return Err ("flag requires exactly one flag name"
                           . to_string ()); }
             let name : String = atom_to_string (&items[1]) ?;
-            let property : FileProperty = FileProperty::from_wire_name (&name)
-              . ok_or_else (|| format! ("Unknown property: {}", name)) ?;
+            let flag : Flag = Flag::from_wire_name (&name)
+              . ok_or_else (|| format! ("Unknown flag: {}", name)) ?;
             result . non_vognode = Some (MpViewnodeKind::Qual (
-              Qual::BoolProp {
-                property, title: String::new (), body: None })); },
+              Qual::Flag {
+                flag, title: String::new (), body: None })); },
           // Note: "alias" as a list like (alias "string") is no longer supported.
           // Use bare "alias" atom instead - the alias string comes from headline title.
           // Legacy format detection - reject with helpful error
@@ -442,8 +442,8 @@ pub fn parse_metadata_to_viewnodemd (
           // Scaffold kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
           "alias"    => result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::Alias { text: String::new(), relRepo: None, relRepo_request: None, membership: MembershipAxes::default() } ) ),
           "aliasFolder" => result . non_vognode = Some (MpViewnodeKind::QualFolder (QualFolder::Alias)),
-          "propertiesFolder" => result . non_vognode = Some (
-            MpViewnodeKind::QualFolder (QualFolder::boolprops ())),
+          "flagsFolder" => result . non_vognode = Some (
+            MpViewnodeKind::QualFolder (QualFolder::flags ())),
           "forestRoot" => result . non_vognode = Some (MpViewnodeKind::BufferRoot),
           "hiddenInSubscribeeFolder" =>
             result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)),
@@ -773,26 +773,26 @@ fn parse_editrequest_sexp (
       },
       Sexp::List (subitems) if subitems . len () == 3 => {
         let key : String = atom_to_string (&subitems [0]) ?;
-        if key != "property" {
+        if key != "flag" {
           return Err ( format! (
             "Unknown three-part editRequest key: {}", key )); }
-        let property_name : String = atom_to_string (&subitems [1]) ?;
-        let property : FileProperty =
-          FileProperty::from_wire_name (&property_name)
+        let flag_name : String = atom_to_string (&subitems [1]) ?;
+        let flag : Flag =
+          Flag::from_wire_name (&flag_name)
           . ok_or_else (|| format! (
-            "Unknown property: {}", property_name )) ?;
-        if ! property . is_mutable () {
+            "Unknown flag: {}", flag_name )) ?;
+        if ! flag . is_mutable () {
           return Err ( format! (
-            "Property {} is read-only provenance and cannot be changed",
-            property_name )); }
+            "Flag {} is read-only provenance and cannot be changed",
+            flag_name )); }
         let value_name : String = atom_to_string (&subitems [2]) ?;
         let value : bool = match value_name . as_str () {
           "true"  => true,
           "false" => false,
           _ => return Err ( format! (
-            "Property value must be true or false, got: {}", value_name )), };
+            "Flag value must be true or false, got: {}", value_name )), };
         metadata . edit_request = Some (
-          NodeEditRequest::SetBoolProp { property, value });
+          NodeEditRequest::SetFlag { flag, value });
       },
       Sexp::Atom (_) => {
         let bare_value : String =
@@ -820,7 +820,7 @@ fn parse_viewrequests_sexp (
         let atom : String = atom_to_string (request_element) ?;
         if atom == "definitiveView" { ViewRequest::Definitive }
         else if atom == "fork" { ViewRequest::Fork }
-        else if atom == "properties" { ViewRequest::BoolProps }
+        else if atom == "flags" { ViewRequest::Flags }
         else { return Err ( format! (
           "Invalid view request atom: {}", atom )); } },
       Sexp::List (sub) if sub . len () == 2 => {

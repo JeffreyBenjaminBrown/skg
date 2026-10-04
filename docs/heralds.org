@@ -22,8 +22,8 @@ subscriptions. A number before the letter counts nodes pointing at this
 node; a number after it counts nodes this node points at. =2C3= thus
 means two containers and three direct contents. =C= and =L= are blue;
 =S=, =O= and =H= are purple. Missing sides and empty relations are
-omitted. =A3= counts aliases, =I2= extra IDs, and =P1= true file
-properties; these action counts are cyan.
+omitted. =A3= counts aliases, =I2= extra IDs, and =F1= true
+flags; these action counts are cyan.
 
 A yellow numeral inside =C= or =L= has a narrower meaning. In =2/5L3=,
 five visible nodes link here, two are substantive, and this node links
@@ -115,10 +115,10 @@ relRepo than its default. A red =request:~NAME= is an explicit
 pending request to change that relationship Skg repo on save. The
 home repo belongs to the node; relRepo belongs to an edge. Green
 folder labels, =ID= and =alias= describe their respective view
-positions. The properties view spells out =☮ had ID before org-roam
+positions. The flags view spells out =☮ had ID before org-roam
 import=, =☮ was overloaded during org-roam import=, and
 =☮ no search matching= when true. =req:folder:...=, =req:path:...=,
-=req:properties= and =req:definitive= request a view. Red =delete=,
+=req:flags= and =req:definitive= request a view. Red =delete=,
 =merge:...=, and =request:no search matching= or
 =request:search matching= are save requests.
 

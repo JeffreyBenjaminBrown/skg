@@ -27,7 +27,7 @@ use serde::{Serialize, Deserialize};
 use crate::telescope::types::{ListItem, SectionSlices};
 use crate::types::misc::{ID, MSV, RepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::nodes::complete::FileProperty;
+use crate::types::nodes::complete::Flag;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct NodeFS {
@@ -61,7 +61,7 @@ pub struct NodeFS {
   pub overrides_view_of: Vec<ID>,
 
   #[serde(default, skip_serializing_if = "Vec::is_empty")]
-  pub misc: Vec<FileProperty>,
+  pub misc: Vec<Flag>,
 }
 
 impl NodeFS {
@@ -180,7 +180,7 @@ impl NodeFS {
 pub fn nodefs_from_section (
   pid       : &ID,
   extra_ids : &[ID],
-  misc      : &[FileProperty],
+  misc      : &[Flag],
   is_home   : bool,
   slices    : SectionSlices,
 ) -> NodeFS {

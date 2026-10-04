@@ -1,4 +1,4 @@
-//! Property suite for the telescope fold/unfold pair. The
+//! Flag suite for the telescope fold/unfold pair. The
 //! load-bearing laws (5_plan.org, section-format-and-fold):
 //! - fold(unfold(x)) == x for every list of relation partners ("round-trip");
 //! - unfold(fold(sections)) is idempotent from the first application
@@ -14,7 +14,7 @@ use super::unfold::{UnfoldInput, unfold_node};
 use crate::types::misc::{
   ID, RelPartner, SkgConfig, SkgfileRepo, RepoName,
 };
-use crate::types::nodes::complete::FileProperty;
+use crate::types::nodes::complete::Flag;
 
 use proptest::prelude::*;
 use std::collections::HashMap;
@@ -121,12 +121,12 @@ fn unfold_then_fold (
   fold_sections ( &sections, &identity_resolve ) }
 
 #[test]
-fn file_properties_write_at_home_and_fold_defensively_from_all_sections () {
+fn flags_write_at_home_and_fold_defensively_from_all_sections () {
   let home = RepoName::from ("S0");
   let private = RepoName::from ("S2");
   let misc = vec![
-    FileProperty::Had_ID_Before_Import,
-    FileProperty::NoSearchMatching];
+    Flag::Had_ID_Before_Import,
+    Flag::NoSearchMatching];
   let contains = vec![RelPartner::at_relRepo (
     private . clone (), ID::from ("child"))];
   let mut sections = unfold_node (&UnfoldInput {
@@ -142,14 +142,14 @@ fn file_properties_write_at_home_and_fold_defensively_from_all_sections () {
   let private_section = sections . iter_mut ()
     . find (|(repo, _)| repo == &private) . unwrap ();
   private_section . 1 . misc = vec![
-    FileProperty::NoSearchMatching,
-    FileProperty::Was_Overloaded];
+    Flag::NoSearchMatching,
+    Flag::Was_Overloaded];
   let telescope = Telescope::try_new (
     ID::from ("p"), sections, &telescope_config ()) . unwrap ();
   assert_eq! (telescope . misc (), vec![
-    FileProperty::Had_ID_Before_Import,
-    FileProperty::NoSearchMatching,
-    FileProperty::Was_Overloaded]);
+    Flag::Had_ID_Before_Import,
+    Flag::NoSearchMatching,
+    Flag::Was_Overloaded]);
 }
 
 proptest! {

@@ -16,7 +16,7 @@ use skg::types::git::Sign;
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, maybePlaced_to_placed_tree };
 use skg::types::misc::ID;
-use skg::types::nodes::complete::FileProperty;
+use skg::types::nodes::complete::Flag;
 use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode};
 
@@ -45,7 +45,7 @@ fn entry<'a> (
 fn ordinary_definitive_emissions () {
   let collected : CollectedIntents =
     collected_from_org ( indoc! {"
-      * (skg (node (id root) (repo main) (editRequest (property noSearchMatching true)))) root
+      * (skg (node (id root) (repo main) (editRequest (flag noSearchMatching true)))) root
       Root body
       ** (skg (node (id child) (repo main))) child
       ** (skg (node (id independent) (repo main) (affectsParent false))) independent
@@ -67,8 +67,8 @@ fn ordinary_definitive_emissions () {
                 Some (vec![("nickname" . to_string(), None)]) );
     assert_eq!( root . subscribes_to, Some (vec![(ID::from ("s"), None)]) );
     assert_eq!( root . overrides, Some (vec![(ID::from ("o"), None)]) );
-    assert_eq!( root . boolprop,
-                Some ((FileProperty::NoSearchMatching, true)) );
+    assert_eq!( root . flag,
+                Some ((Flag::NoSearchMatching, true)) );
     assert!( ! root . delete ); }
   { let child : &IntentsForOneId = entry (&collected, "child");
     // A definitive leaf's contains is Specified and empty;

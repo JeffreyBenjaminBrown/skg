@@ -345,8 +345,8 @@ impl MpViewnode {
         format!("qual:alias({})", text),
       MpViewnodeKind::Qual (Qual::ID { id, .. }) =>
         format!("qual:id({})", id),
-      MpViewnodeKind::Qual (Qual::BoolProp { property, .. }) =>
-        format!("qual:property({})", property . wire_name ()),
+      MpViewnodeKind::Qual (Qual::Flag { flag, .. }) =>
+        format!("qual:flag({})", flag . wire_name ()),
       MpViewnodeKind::Qual (Qual::TextChanged { .. }) =>
         "qual:textChanged" . to_string (),
       MpViewnodeKind::QualFolder (folder) =>

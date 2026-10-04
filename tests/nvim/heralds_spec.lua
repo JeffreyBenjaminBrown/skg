@@ -178,35 +178,35 @@ describe('skg.heralds', function ()
     assert.is_truthy(many:find('req:path:?mentioner'))
   end)
 
-  it('displays the true-property count as Pn', function ()
+  it('displays the true-flag count as Fn', function ()
     local chunks = heralds.chunks_from_metadata(
-      '(skg (node (id 1) (rels (properties 2))))')
-    assert.are.equal('P2', heralds.chunks_text(chunks))
+      '(skg (node (id 1) (rels (flags 2))))')
+    assert.are.equal('F2', heralds.chunks_text(chunks))
     assert.are.equal('SkgHeraldCyan', chunks[1][2])
   end)
 
-  it('displays friendly colon-free property-viewnode heralds', function ()
+  it('displays friendly colon-free flag-viewnode heralds', function ()
     for _, case in ipairs({
-      { property = 'hadId',
+      { flag = 'hadId',
         expected = '☮ had ID before import' },
-      { property = 'wasOverloaded',
+      { flag = 'wasOverloaded',
         expected = '☮ was overloaded during org-roam import' },
-      { property = 'noSearchMatching',
+      { flag = 'noSearchMatching',
         expected = '☮ no search matching' } }) do
       local chunks = heralds.chunks_from_metadata(
-        '(skg (property ' .. case.property .. '))')
+        '(skg (flag ' .. case.flag .. '))')
       assert.are.equal(case.expected, heralds.chunks_text(chunks))
       assert.is_nil(heralds.chunks_text(chunks):find(':', 1, true))
       assert.are.equal('SkgHeraldGreen', chunks[1][2])
     end
   end)
 
-  it('displays a property request as one semantic state', function ()
+  it('displays a flag request as one semantic state', function ()
     for _, case in ipairs({
       { value = 'true',  expected = 'request:no search matching' },
       { value = 'false', expected = 'request:search matching' } }) do
       local chunks = heralds.chunks_from_metadata(
-        '(skg (node (id 1) (editRequest (property noSearchMatching '
+        '(skg (node (id 1) (editRequest (flag noSearchMatching '
         .. case.value .. '))))')
       assert.are.equal(case.expected, heralds.chunks_text(chunks))
       assert.are.equal('SkgHeraldRed', chunks[1][2])

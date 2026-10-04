@@ -2,7 +2,7 @@ use crate::repo_sets::ActiveRepoSet;
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::backpath::build_and_integrate_path_view_then_drop_request;
 use crate::to_org::expand::folder_request::build_and_integrate_folder_then_drop_request;
-use crate::to_org::expand::boolprops::build_and_integrate_boolprops_then_drop_request;
+use crate::to_org::expand::flags::build_and_integrate_flags_then_drop_request;
 use crate::to_org::util::{ DefinitiveMap, Finalizable, get_id_from_treenode, makeWriteProtectedAndClobber, activeNode_in_tree_is_writeProtected };
 use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::git::RepoDiff;
@@ -44,8 +44,8 @@ pub fn execute_view_requests (
         build_and_integrate_path_view_then_drop_request (
           viewforest, node_id, graph, role, config, errors,
           active_repo_set ) ?; },
-      ViewRequest::BoolProps => {
-        build_and_integrate_boolprops_then_drop_request (
+      ViewRequest::Flags => {
+        build_and_integrate_flags_then_drop_request (
           viewforest, node_id, graph, config, errors ) ?; },
       ViewRequest::Definitive =>
         // View completion (dispatch_node_update) settles every Definitive

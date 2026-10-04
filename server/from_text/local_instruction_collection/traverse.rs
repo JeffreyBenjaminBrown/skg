@@ -112,7 +112,7 @@ fn visit (
     ViewNodeKind::PartnerFolder (PartnerFolder::Overridden) =>
       visit_overridden_folder (node_ref, context, collected),
     ViewNodeKind::QualFolder (QualFolder::ID)
-      | ViewNodeKind::QualFolder (QualFolder::BoolProps { .. })
+      | ViewNodeKind::QualFolder (QualFolder::Flags { .. })
       | ViewNodeKind::Qual (_)
       | ViewNodeKind::PartnerFolder (_) =>
       // These are the read-only folders and the Qual leaves. Vognodes
@@ -196,12 +196,12 @@ fn visit_active_vognode (
               t . id . clone(),
               NodeIntent_Local::NodeMerge {
                 acquiree : acquiree . clone() } ) ?; }
-          if let Some (NodeEditRequest::SetBoolProp { property, value }) =
+          if let Some (NodeEditRequest::SetFlag { flag, value }) =
             t . edit_request()
           { collected . instructionMerge_intent (
               t . id . clone(),
-              NodeIntent_Local::SetBoolProp {
-                property : *property, value : *value } ) ?; }}},}}
+              NodeIntent_Local::SetFlag {
+                flag : *flag, value : *value } ) ?; }}},}}
   recurse_under_gnode (
     node_ref,
     Some ( DefiningFolderOwner {
@@ -239,7 +239,7 @@ fn recurse_under_gnode (
               LocalContext::UnderVognode {
                 parent_if_writeable : None } },
         ViewNodeKind::QualFolder (
-          QualFolder::ID | QualFolder::BoolProps { .. })
+          QualFolder::ID | QualFolder::Flags { .. })
           | ViewNodeKind::Qual (_)
           | ViewNodeKind::PartnerFolder (_) =>
           LocalContext::UnderReadOnlyFolder,

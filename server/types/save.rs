@@ -253,15 +253,15 @@ fn format_buffer_validation_error (
       id, title, changes } => {
       format!("Edited write-protected occurrence:\n- ID: {}\n- Title: {}\n- Changes: {}\n- This occurrence is read-only; no changes were saved.\n- Re-render, then edit a definitive occurrence instead.\n",
               id . 0, title, changes . join ("; ")) },
-    BufferValidationError::BoolPropsSurfaceEdited {
+    BufferValidationError::FlagsSurfaceEdited {
       owner_id, owner_title, changes } => {
-      format!("Edited server-owned properties surface:\n- Owner ID: {}\n- Owner title: {}\n- Changes: {}\n- No changes were saved. Use skg-set-property-search-matching for noSearchMatching. HadId and WasOverloaded are provenance and have no setter.\n",
+      format!("Edited server-owned flags surface:\n- Owner ID: {}\n- Owner title: {}\n- Changes: {}\n- No changes were saved. Use skg-set-flag-search-matching for noSearchMatching. HadId and WasOverloaded are provenance and have no setter.\n",
               owner_id . 0, owner_title, changes . join ("; ")) },
-    BufferValidationError::BoolPropEditOnForeignNode (id, repo) => {
-      format!("Cannot change a property on a foreign node:\n- ID: {}\n- Repo: {}\n- Property changes never create an implicit fork. Visit an owned node instead.\n",
+    BufferValidationError::FlagEditOnForeignNode (id, repo) => {
+      format!("Cannot change a flag on a foreign node:\n- ID: {}\n- Repo: {}\n- Flag changes never create an implicit fork. Visit an owned node instead.\n",
               id . 0, repo) },
-    BufferValidationError::BoolPropEditOnUnknownNode (id) => {
-      format!("Cannot change a property on an unsaved or unknown node:\n- ID: {}\n- Save the node first, then run the property setter.\n",
+    BufferValidationError::FlagEditOnUnknownNode (id) => {
+      format!("Cannot change a flag on an unsaved or unknown node:\n- ID: {}\n- Save the node first, then run the flag setter.\n",
               id . 0) },
     BufferValidationError::Other (msg) => {
       format!("{}\n", msg) }, }}

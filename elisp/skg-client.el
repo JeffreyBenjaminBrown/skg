@@ -17,7 +17,7 @@
 (require 'skg-request-diff-report)
 (require 'skg-request-delete-references-to-absent-node)
 (require 'skg-request-relRepo-info)
-(require 'skg-request-boolprop-state)
+(require 'skg-request-flag-state)
 (require 'skg-request-export-org)
 (require 'skg-request-import-md-and-org)
 (require 'skg-request-git-diff-mode)
