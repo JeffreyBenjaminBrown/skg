@@ -4,14 +4,14 @@
 -- might turn out to be useful for other things.
 -- The Lua port of elisp/skg-sexpr/skg-lens.el.
 --
--- TOKENS. The elisp engine emits propertized strings: an 'skg-color'
+-- TOKENS. The elisp engine emits propertized strings: an 'skg-style'
 -- text property on character ranges, and an 'skg-abut' property on a
 -- token's first character. Lua strings carry no properties, so here a
 -- token is a table
---     { chunks = { { text = STRING, color = COLOR|nil }, ... },
+--     { chunks = { { text = STRING, style = STYLE|nil }, ... },
 --       abut = BOOLEAN }
 -- which is exactly the shape nvim virtual text wants (a chunk list
--- with per-chunk highlights); the herald renderer maps colors to
+-- with per-chunk highlights); the herald renderer maps styles to
 -- highlight groups at display time. Rule semantics are unchanged:
 -- see the elisp docstring of 'skg-transform-sexp-flat', reproduced in
 -- spirit across the functions below, and the test suite, which
@@ -27,30 +27,29 @@ local IT = parse.symbol('IT')
 local ABUT = parse.symbol('ABUT')
 local INTERC = parse.symbol('INTERC')
 
-local color_keywords = {
-  [parse.symbol('RED')] = true,
-  [parse.symbol('GREEN')] = true,
-  [parse.symbol('BLUE')] = true,
-  [parse.symbol('YELLOW')] = true,
-  [parse.symbol('ORANGE')] = true }
+---The style keywords: each style name in 'shared/herald-styles.json',
+---in capitals, as the served rule table spells it.
+local style_keywords = {}
+for _, name in ipairs(require('skg.shared').style_names()) do
+  style_keywords[parse.symbol(name:upper())] = true end
 
 ---@param value any
 ---@return boolean
-function M.is_color_keyword (value)
-  return color_keywords[value] == true
+function M.is_style_keyword (value)
+  return style_keywords[value] == true
 end
 
 -- ── tokens ─────────────────────────────────────────────────────────
 
 ---@param text string
----@param color table|nil a color keyword symbol
+---@param style table|nil a style keyword symbol
 ---@return table a single-chunk token
-function M.token_of (text, color)
-  return { chunks = { { text = text, color = color } }, abut = false }
+function M.token_of (text, style)
+  return { chunks = { { text = text, style = style } }, abut = false }
 end
 
 ---@param token table
----@return string the token's full text, colors dropped
+---@return string the token's full text, styles dropped
 function M.token_text (token)
   local pieces = {}
   for _, chunk in ipairs(token.chunks) do
@@ -58,16 +57,16 @@ function M.token_text (token)
   return table.concat(pieces)
 end
 
----The color at 1-based byte position POSITION of TOKEN, or nil.
----(The test-suite analog of elisp's get-text-property on skg-color;
+---The style at 1-based byte position POSITION of TOKEN, or nil.
+---(The test-suite analog of elisp's get-text-property on skg-style;
 ---the herald renderer iterates chunks directly instead.)
 ---@param token table
 ---@param position integer
 ---@return table|nil
-function M.color_at (token, position)
+function M.style_at (token, position)
   local passed = 0
   for _, chunk in ipairs(token.chunks) do
-    if position <= passed + #chunk.text then return chunk.color end
+    if position <= passed + #chunk.text then return chunk.style end
     passed = passed + #chunk.text
   end
   return nil
@@ -86,9 +85,9 @@ end
 
 ---Apply RULES to OBJECT, generating a list of output tokens. No side
 ---effects. Both OBJECT and RULES are nested sexps whose first element
----at any level is an atom (the 'label'), except that a color
+---at any level is an atom (the 'label'), except that a style
 ---directive may precede a rule's label. See the file header and the
----test suite for the rule grammar (ANY, IT, ABUT, INTERC, colors).
+---test suite for the rule grammar (ANY, IT, ABUT, INTERC, styles).
 ---@param object any
 ---@param rules any
 ---@return table[] tokens
@@ -103,19 +102,19 @@ end
 
 ---Parse RULE once and classify it.
 ---Grammar:
----  RULE        ::= [COLOR] (INTERC-BODY | SIMPLE-BODY)
+---  RULE        ::= [STYLE] (INTERC-BODY | SIMPLE-BODY)
 ---  INTERC-BODY ::= INTERC SEP [LABEL] CHILDREN...
 ---  SIMPLE-BODY ::= LABEL [ABUT] CHILDREN...
 ---Classification for simple bodies: 'non_leaf' if any child is a
 ---list; 'any_leaf' if the label is ANY (and it is a leaf);
 ---'atomic_leaf' otherwise.
 ---@param rule any[]
----@return table header {kind, color, label, separator, abut, children}
+---@return table header {kind, style, label, separator, abut, children}
 function M.rule_header (rule)
   local index = 1
-  local color = nil
-  if M.is_color_keyword(rule[index]) then
-    color = rule[index]
+  local style = nil
+  if M.is_style_keyword(rule[index]) then
+    style = rule[index]
     index = index + 1 end
   if rule[index] == INTERC then
     local separator = rule[index + 1]
@@ -123,10 +122,10 @@ function M.rule_header (rule)
     local label = nil
     local candidate = rule[index]
     if parse.is_symbol(candidate)
-       and not M.is_color_keyword(candidate) then
+       and not M.is_style_keyword(candidate) then
       label = candidate
       index = index + 1 end
-    return { kind = 'interc', color = color, label = label,
+    return { kind = 'interc', style = style, label = label,
              separator = separator, abut = false,
              children = M.elements_from(rule, index) }
   end
@@ -144,7 +143,7 @@ function M.rule_header (rule)
       break end
   end
   if kind == 'atomic_leaf' and label == ANY then kind = 'any_leaf' end
-  return { kind = kind, color = color, label = label,
+  return { kind = kind, style = style, label = label,
            separator = nil, abut = abut, children = children }
 end
 
@@ -153,29 +152,29 @@ end
 ---When any list child fires, the prefix is concatenated (no
 ---separator) before each of its outputs. When no list child fires but
 ---the prefix is non-empty, the prefix is emitted alone -- so rules
----like (RED deleted "DELETED" (id) (repo)) serve as a label for the
+---like (STOP deleted "DELETED" (id) (repo)) serve as a label for the
 ---structure even when their sub-rules are vacuous.
 ---@param object any[]
 ---@param header table
----@param current_color table|nil
+---@param current_style table|nil
 ---@return table[] tokens
-function M.transform_from (object, header, current_color)
-  local new_color = header.color or current_color
+function M.transform_from (object, header, current_style)
+  local new_style = header.style or current_style
   local prefix = M.string_children_concatenated(header.children)
   local results = {}
   for _, rule_child in ipairs(header.children) do
     if parse.is_list(rule_child) then
       for _, token in ipairs(
-          M.dispatch(object, rule_child, new_color)) do
+          M.dispatch(object, rule_child, new_style)) do
         table.insert(results, token) end
     end
   end
   if prefix == '' then return results end
   if #results == 0 then
-    return { M.token_of(prefix, new_color) } end
+    return { M.token_of(prefix, new_style) } end
   local prefixed = {}
   for _, token in ipairs(results) do
-    table.insert(prefixed, M.with_prefix(token, prefix, new_color)) end
+    table.insert(prefixed, M.with_prefix(token, prefix, new_style)) end
   return prefixed
 end
 
@@ -184,10 +183,10 @@ end
 ---property off the first character and renderers read only that.
 ---@param token table
 ---@param prefix string
----@param color table|nil
+---@param style table|nil
 ---@return table
-function M.with_prefix (token, prefix, color)
-  local chunks = { { text = prefix, color = color } }
+function M.with_prefix (token, prefix, style)
+  local chunks = { { text = prefix, style = style } }
   for _, chunk in ipairs(token.chunks) do table.insert(chunks, chunk) end
   return { chunks = chunks, abut = false }
 end
@@ -195,18 +194,18 @@ end
 ---Dispatch RULE_CHILD application to OBJECT with CURRENT_COLOR.
 ---@param object any
 ---@param rule_child any
----@param current_color table|nil
+---@param current_style table|nil
 ---@return table[] tokens
-function M.dispatch (object, rule_child, current_color)
+function M.dispatch (object, rule_child, current_style)
   if not parse.is_list(rule_child) then return {} end
   local header = M.rule_header(rule_child)
   if header.kind == 'interc' then
-    return M.apply_interc(object, header, current_color) end
+    return M.apply_interc(object, header, current_style) end
   if header.kind == 'any_leaf' then
-    return M.apply_any_leaf(object, header, current_color) end
+    return M.apply_any_leaf(object, header, current_style) end
   if header.kind == 'atomic_leaf' then
-    return M.apply_ordinary_leaf(object, header, current_color) end
-  return M.apply_non_leaf(object, header, current_color)
+    return M.apply_ordinary_leaf(object, header, current_style) end
+  return M.apply_non_leaf(object, header, current_style)
 end
 
 ---Apply an INTERC HEADER to OBJECT. With a LABEL: one combined token
@@ -215,14 +214,14 @@ end
 ---contributes one slot (the concatenation of its outputs, possibly
 ---empty); slots are joined with SEPARATOR; a literal-string prefix is
 ---prepended; the token is suppressed if every slot is empty. The
----separator and prefix take the rule's inherited color context;
----each slot preserves its sub-rule's own colors per chunk.
+---separator and prefix take the rule's inherited style context;
+---each slot preserves its sub-rule's own styles per chunk.
 ---@param object any[]
 ---@param header table
----@param current_color table|nil
+---@param current_style table|nil
 ---@return table[] tokens
-function M.apply_interc (object, header, current_color)
-  local new_color = header.color or current_color
+function M.apply_interc (object, header, current_style)
+  local new_style = header.style or current_style
   local prefix = M.string_children_concatenated(header.children)
   local targets
   if header.label then
@@ -237,7 +236,7 @@ function M.apply_interc (object, header, current_color)
       if parse.is_list(rule_child) then
         local slot_chunks = {}
         for _, token in ipairs(
-            M.dispatch(target, rule_child, new_color)) do
+            M.dispatch(target, rule_child, new_style)) do
           for _, chunk in ipairs(token.chunks) do
             table.insert(slot_chunks, chunk) end
         end
@@ -248,26 +247,26 @@ function M.apply_interc (object, header, current_color)
     end
     if any_slot_nonempty then
       table.insert(results,
-        M.interc_token(prefix, header.separator, slots, new_color))
+        M.interc_token(prefix, header.separator, slots, new_style))
     end
   end
   return results
 end
 
 ---Build an INTERC token: PREFIX + JOIN(SLOTS, SEPARATOR). PREFIX and
----SEPARATOR both carry COLOR; each slot's own chunk colors survive.
+---SEPARATOR both carry STYLE; each slot's own chunk styles survive.
 ---@param prefix string
 ---@param separator string
 ---@param slots table[][] chunk lists
----@param color table|nil
+---@param style table|nil
 ---@return table
-function M.interc_token (prefix, separator, slots, color)
+function M.interc_token (prefix, separator, slots, style)
   local chunks = {}
   if #prefix > 0 then
-    table.insert(chunks, { text = prefix, color = color }) end
+    table.insert(chunks, { text = prefix, style = style }) end
   for i, slot_chunks in ipairs(slots) do
     if i > 1 and #separator > 0 then
-      table.insert(chunks, { text = separator, color = color }) end
+      table.insert(chunks, { text = separator, style = style }) end
     for _, chunk in ipairs(slot_chunks) do
       table.insert(chunks, chunk) end
   end
@@ -276,14 +275,14 @@ end
 
 ---@param object any[]
 ---@param header table
----@param current_color table|nil
+---@param current_style table|nil
 ---@return table[] tokens
-function M.apply_non_leaf (object, header, current_color)
+function M.apply_non_leaf (object, header, current_style)
   local results = {}
   for _, match in ipairs(
       M.object_children_with_label(object, header.label)) do
     for _, token in ipairs(
-        M.transform_from(match, header, current_color)) do
+        M.transform_from(match, header, current_style)) do
       table.insert(results, token) end
   end
   return results
@@ -291,15 +290,15 @@ end
 
 ---@param object any[]
 ---@param header table
----@param current_color table|nil
+---@param current_style table|nil
 ---@return table[] tokens
-function M.apply_ordinary_leaf (object, header, current_color)
-  local color = header.color or current_color
+function M.apply_ordinary_leaf (object, header, current_style)
+  local style = header.style or current_style
   local results = {}
   if #header.children == 0 then return results end
   for _ in ipairs(
       M.object_atomic_matches(object, header.label)) do
-    local token = M.joined_token(header.children, color)
+    local token = M.joined_token(header.children, style)
     token.abut = header.abut
     table.insert(results, token)
   end
@@ -308,10 +307,10 @@ end
 
 ---@param object any[]
 ---@param header table
----@param current_color table|nil
+---@param current_style table|nil
 ---@return table[] tokens
-function M.apply_any_leaf (object, header, current_color)
-  local color = header.color or current_color
+function M.apply_any_leaf (object, header, current_style)
+  local style = header.style or current_style
   local tokens = header.children
   if #tokens == 0 then return {} end
   local uses_it = false
@@ -319,7 +318,7 @@ function M.apply_any_leaf (object, header, current_color)
     if token == IT then uses_it = true break end
   end
   if not uses_it then
-    local token = M.joined_token(tokens, color)
+    local token = M.joined_token(tokens, style)
     token.abut = header.abut
     return { token } end
   local results = {}
@@ -328,22 +327,22 @@ function M.apply_any_leaf (object, header, current_color)
     local substituted = {}
     for _, token in ipairs(tokens) do
       table.insert(substituted, token == IT and tail_value or token) end
-    local token = M.joined_token(substituted, color)
+    local token = M.joined_token(substituted, style)
     token.abut = header.abut
     table.insert(results, token)
   end
   return results
 end
 
----Join rule-child atoms with ':' into one COLOR-colored token.
+---Join rule-child atoms with ':' into one STYLE-colored token.
 ---@param values any[]
----@param color table|nil
+---@param style table|nil
 ---@return table
-function M.joined_token (values, color)
+function M.joined_token (values, style)
   local pieces = {}
   for _, value in ipairs(values) do
     table.insert(pieces, M.value_display_text(value)) end
-  return M.token_of(table.concat(pieces, ':'), color)
+  return M.token_of(table.concat(pieces, ':'), style)
 end
 
 ---Symbols and strings are common (rule child labels); numbers reach

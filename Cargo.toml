@@ -122,3 +122,4 @@ non_camel_case_types = "allow"
 
 [dev-dependencies]
 proptest = "1"  # fold/unfold property suite; see server/telescope/
+serde_json = "1.0"  # conformance tests read the shared/ JSON files

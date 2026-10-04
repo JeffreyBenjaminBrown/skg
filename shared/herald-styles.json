@@ -1,0 +1,41 @@
+{
+  "comment": "Herald styles, read at load time by the server's tests and both clients. A style states a herald's importance tier, or for a few heralds a polarity or kind, never its hue. See docs/heralds.org.",
+  "styles_comment": "Each style is a foreground, an optional background and an optional underline (true). Foreground/background inversions of these styles are an unused reserve.",
+  "styles": {
+    "crucial":     { "foreground": "black",   "background": "#00ffff" },
+    "high":        { "foreground": "black",   "background": "yellow" },
+    "medium":      { "foreground": "white",   "background": "#d2691e" },
+    "low":         { "foreground": "white",   "background": "#5e5e20" },
+    "normal":      { "foreground": "white",   "background": "blue" },
+    "message":     { "foreground": "black",   "background": "white" },
+    "stop":        { "foreground": "white",   "background": "red" },
+    "go":          { "foreground": "white",   "background": "#006400" },
+    "nonstandard": { "foreground": "white",   "background": "#8b00ff" },
+    "yucky":       { "foreground": "#c84286" }
+  },
+  "tier_order": [ "normal", "low", "medium", "high", "crucial" ],
+  "relationship_heralds": {
+    "comment": "How the clients style relationship heralds. A side's tier is shown by its carrier: its numeral if it shows one, else its ancestor flags. See docs/heralds.org.",
+    "letter": "normal",
+    "birth_letter": "high",
+    "property_counts": "low",
+    "overrides_here": "crucial",
+    "side_tiers": {
+      "contains":                     { "in": "medium", "out": "normal",
+                                        "out_write_protected": "low",
+                                        "out_unintegrated": "medium" },
+      "links_to":                     { "in": "medium", "out": "normal",
+                                        "in_substantive": "high" },
+      "subscribes_to":                { "in": "high",   "out": "medium" },
+      "overrides_view_of":            { "in": "low",    "out": "medium" },
+      "hides_from_its_subscriptions": { "in": "medium", "out": "normal" }
+    },
+    "floors": {
+      "comment": "The least tier a glyph shows. Ancestor flag a is the parent; b is the grandparent, and so on.",
+      "ancestor_a": "low",
+      "ancestor_b_and_higher": "medium",
+      "other": "normal"
+    },
+    "birth_explained_side": "low"
+  }
+}

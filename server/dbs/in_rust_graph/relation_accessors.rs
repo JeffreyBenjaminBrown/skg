@@ -536,6 +536,56 @@ fn inbound_pid_set (
 mod tests {
   use super::*;
 
+  /// Every NodeRelation. The match makes a new variant a compile error
+  /// here until it is listed.
+  fn every_node_relation () -> Vec<NodeRelation> {
+    let every : Vec<NodeRelation> = vec! [
+      NodeRelation::Contains, NodeRelation::LinksTo,
+      NodeRelation::SubscribesTo, NodeRelation::HidesFromItsSubscriptions,
+      NodeRelation::OverridesViewOf ];
+    for relation in &every {
+      match relation {
+        NodeRelation::Contains | NodeRelation::LinksTo
+          | NodeRelation::SubscribesTo
+          | NodeRelation::HidesFromItsSubscriptions
+          | NodeRelation::OverridesViewOf => (), } }
+    every }
+
+  /// shared/relations.json, which both clients read, names the same
+  /// relations and roles, in the same order, as the enum and
+  /// OUTBOUND_RELATIONSHIP_TYPES.
+  #[test]
+  fn relations_match_the_shared_relations_file () {
+    let path : std::path::PathBuf =
+      std::path::Path::new ( env! ("CARGO_MANIFEST_DIR") )
+      . join ("shared/relations.json");
+    let file : serde_json::Value =
+      serde_json::from_str ( &std::fs::read_to_string (&path) . unwrap () )
+      . unwrap ();
+    let from_file : Vec<(String, String, String)> =
+      file ["relations"] . as_array () . unwrap () . iter ()
+      . map ( |relation| {
+        let roles : &Vec<serde_json::Value> =
+          relation ["roles"] . as_array () . unwrap ();
+        ( relation ["name"] . as_str () . unwrap () . to_string (),
+          roles [0] . as_str () . unwrap () . to_string (),
+          roles [1] . as_str () . unwrap () . to_string () ) } )
+      . collect ();
+    let from_rust : Vec<(String, String, String)> =
+      OUTBOUND_RELATIONSHIP_TYPES . iter ()
+      . map ( |(name, first, second)| (
+        name . to_string (), first . to_string (), second . to_string () ) )
+      . collect ();
+    assert_eq! ( from_file, from_rust );
+    let mut enum_names : Vec<&str> =
+      every_node_relation () . into_iter ()
+      . map ( |relation| relation . relation_name () ) . collect ();
+    let mut file_names : Vec<&str> =
+      from_file . iter () . map ( |(name, _, _)| name . as_str () ) . collect ();
+    enum_names . sort ();
+    file_names . sort ();
+    assert_eq! ( enum_names, file_names ); }
+
   /// Every PARTNER_ROLE_VOCAB row round-trips ROLENAME <-> RelationRole,
   /// resolves a glyph, and yields the expected backpath triple.
   #[test]

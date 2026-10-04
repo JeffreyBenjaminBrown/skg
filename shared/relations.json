@@ -1,0 +1,32 @@
+{
+  "comment": "The node-node relations, read by the server's tests and both clients. Rust keeps its own enum (NodeRelation) for exhaustive matching; a conformance test checks it against this file. 'roles' are [first, second]: the first role's node states the edge ('stored_by'). 'folders' maps a role to the partner folder that lists nodes playing that role, or null.",
+  "relations": [
+    { "name": "contains",
+      "letter": "C", "display_position": 0,
+      "roles": [ "container", "contained" ],
+      "stored_by": "container",
+      "folders": { "container": null, "contained": null } },
+    { "name": "links_to",
+      "letter": "L", "display_position": 1,
+      "roles": [ "mentioner", "mentioned" ],
+      "stored_by": "mentioner",
+      "folders": { "mentioner": null, "mentioned": null } },
+    { "name": "subscribes_to",
+      "letter": "S", "display_position": 2,
+      "roles": [ "subscriber", "subscribee" ],
+      "stored_by": "subscriber",
+      "folders": { "subscriber": "subscriberFolder",
+                   "subscribee": "subscribeeFolder" } },
+    { "name": "hides_from_its_subscriptions",
+      "letter": "H", "display_position": 4,
+      "roles": [ "hider", "hidden" ],
+      "stored_by": "hider",
+      "folders": { "hider": "hiderFolder", "hidden": "hiddenFolder" } },
+    { "name": "overrides_view_of",
+      "letter": "O", "display_position": 3,
+      "roles": [ "overrider", "overridden" ],
+      "stored_by": "overrider",
+      "folders": { "overrider": "overriderFolder",
+                   "overridden": "overriddenFolder" } }
+  ]
+}

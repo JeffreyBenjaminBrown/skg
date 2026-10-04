@@ -25,7 +25,7 @@
                (face (and broken (overlay-get broken 'face))))
           (should broken)
           (should (eq (plist-get face :inherit)
-                      'heralds-confusable-face))
+                      'heralds-yucky-face))
           (should (plist-get face :underline)))
         (should-not
          (cl-some (lambda (overlay) (overlay-get overlay 'after-string))

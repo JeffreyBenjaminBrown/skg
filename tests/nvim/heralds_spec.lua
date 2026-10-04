@@ -65,41 +65,41 @@ describe('skg.heralds', function ()
       '(skg (node (id x) (rels (overrides_view_of (out 1 (ancestors 8))))'
       .. ' (viewStats (overridesHere y))))')
     assert.are.equal('Oĥh', heralds.chunks_text(chunks))
-    assert.are.equal('SkgHeraldConfusable', chunks[2][2])
-    assert.are.equal('SkgHeraldModeratelyInteresting', chunks[3][2])
+    assert.are.equal('SkgHeraldYucky', chunks[2][2])
+    assert.are.equal('SkgHeraldMedium', chunks[3][2])
     chunks = heralds.chunks_from_metadata(
       '(skg (node (id x) (rels (links_to (in 5 (substantive 2))'
       .. ' (out 3)) (overrides_view_of (out 1)) (birth overrides_view_of))))')
     assert.are.equal('2/5L3 O1', heralds.chunks_text(chunks))
-    assert.are.equal('SkgHeraldHighlyInteresting', chunks[1][2])
-    for i = 2, 5 do assert.are.equal('SkgHeraldBlue', chunks[i][2]) end
-    assert.are.equal('SkgHeraldBirth', chunks[7][2])
-    assert.are.equal('SkgHeraldHighlyInteresting', chunks[8][2])
+    assert.are.equal('SkgHeraldHigh', chunks[1][2])
+    for i = 2, 5 do assert.are.equal('SkgHeraldNormal', chunks[i][2]) end
+    assert.are.equal('SkgHeraldMessage', chunks[7][2])
+    assert.are.equal('SkgHeraldHigh', chunks[8][2])
     chunks = heralds.chunks_from_metadata(
       '(skg (node (id x) (rels (links_to (in 2 (ancestors 1 2)'
       .. ' (substantive 1 (ancestors 1)))))))')
     assert.are.equal('a/bL', heralds.chunks_text(chunks))
-    assert.are.equal('SkgHeraldSlightlyInteresting', chunks[1][2])
-    assert.are.equal('SkgHeraldModeratelyInteresting', chunks[3][2])
+    assert.are.equal('SkgHeraldLow', chunks[1][2])
+    assert.are.equal('SkgHeraldMedium', chunks[3][2])
   end)
 
   it('styles only the birth relation letter with the birth highlight', function ()
     for _, case in ipairs({
       { '(contains (in 1) (out 2)) (birth contains)', '1C2',
-        { 'SkgHeraldBlue', 'SkgHeraldBirth', 'SkgHeraldBlue' } },
+        { 'SkgHeraldNormal', 'SkgHeraldMessage', 'SkgHeraldNormal' } },
       { '(links_to (in 5 (substantive 2)) (out 3)) (birth links_to)',
-        '2/5L3', { 'SkgHeraldHighlyInteresting', 'SkgHeraldBlue',
-                  'SkgHeraldBlue', 'SkgHeraldBirth', 'SkgHeraldBlue' } },
+        '2/5L3', { 'SkgHeraldHigh', 'SkgHeraldNormal',
+                  'SkgHeraldNormal', 'SkgHeraldMessage', 'SkgHeraldNormal' } },
       { '(contains (out 8 (unintegrated 2))) (birth contains)', 'C2/8',
-        { 'SkgHeraldBirth', 'SkgHeraldHighlyInteresting',
-          'SkgHeraldBlue', 'SkgHeraldBlue' } },
+        { 'SkgHeraldMessage', 'SkgHeraldHigh',
+          'SkgHeraldNormal', 'SkgHeraldNormal' } },
       { '(subscribes_to (in 1) (out 2)) (birth subscribes_to)', '1S2',
-        { 'SkgHeraldPurple', 'SkgHeraldBirth', 'SkgHeraldPurple' } },
+        { 'SkgHeraldNonstandard', 'SkgHeraldMessage', 'SkgHeraldNonstandard' } },
       { '(overrides_view_of (in 1) (out 2)) (birth overrides_view_of)', '1O2',
-        { 'SkgHeraldHighlyInteresting', 'SkgHeraldBirth',
-          'SkgHeraldHighlyInteresting' } },
+        { 'SkgHeraldHigh', 'SkgHeraldMessage',
+          'SkgHeraldHigh' } },
       { '(hides_from_its_subscriptions (in 1) (out 2)) (birth hides_from_its_subscriptions)', '1H2',
-        { 'SkgHeraldPurple', 'SkgHeraldBirth', 'SkgHeraldPurple' } },
+        { 'SkgHeraldNonstandard', 'SkgHeraldMessage', 'SkgHeraldNonstandard' } },
     }) do
       local chunks = heralds.chunks_from_metadata(
         '(skg (node (id x) (rels ' .. case[1] .. ')))')
@@ -156,9 +156,9 @@ describe('skg.heralds', function ()
     assert.is_truthy(text:find('⟳', 1, true))
     assert.is_truthy(text:find('delete', 1, true))
     -- per-span highlight groups on the 2aC token
-    assert.are.equal('SkgHeraldHighlyInteresting', hl_of['2'])
-    assert.are.equal('SkgHeraldSlightlyInteresting', hl_of['a'])
-    assert.are.equal('SkgHeraldBirth', hl_of['C'])
+    assert.are.equal('SkgHeraldHigh', hl_of['2'])
+    assert.are.equal('SkgHeraldLow', hl_of['a'])
+    assert.are.equal('SkgHeraldMessage', hl_of['C'])
     heralds.disable(buf)
     assert.are.equal(0, #herald_extmarks(buf))
   end)
@@ -182,7 +182,7 @@ describe('skg.heralds', function ()
     local chunks = heralds.chunks_from_metadata(
       '(skg (node (id 1) (rels (flags 2))))')
     assert.are.equal('F2', heralds.chunks_text(chunks))
-    assert.are.equal('SkgHeraldCyan', chunks[1][2])
+    assert.are.equal('SkgHeraldCrucial', chunks[1][2])
   end)
 
   it('displays friendly colon-free flag-viewnode heralds', function ()
@@ -197,7 +197,7 @@ describe('skg.heralds', function ()
         '(skg (flag ' .. case.flag .. '))')
       assert.are.equal(case.expected, heralds.chunks_text(chunks))
       assert.is_nil(heralds.chunks_text(chunks):find(':', 1, true))
-      assert.are.equal('SkgHeraldGreen', chunks[1][2])
+      assert.are.equal('SkgHeraldGo', chunks[1][2])
     end
   end)
 
@@ -209,7 +209,7 @@ describe('skg.heralds', function ()
         '(skg (node (id 1) (editRequest (flag noSearchMatching '
         .. case.value .. '))))')
       assert.are.equal(case.expected, heralds.chunks_text(chunks))
-      assert.are.equal('SkgHeraldRed', chunks[1][2])
+      assert.are.equal('SkgHeraldStop', chunks[1][2])
     end
   end)
 
@@ -244,7 +244,7 @@ describe('skg.heralds', function ()
     local chunks = heralds.chunks_from_metadata('(skg inactiveNode)')
     assert.are.equal('node from inactive repo',
                      heralds.chunks_text(chunks))
-    assert.are.equal('SkgHeraldBlue', chunks[1][2])
+    assert.are.equal('SkgHeraldNormal', chunks[1][2])
   end)
 
   it('self-heals a missing rule table via the fetcher', function ()

@@ -101,7 +101,7 @@ before each output that the rule's list children produce."
 
 (ert-deftest test-skg-transform-sexp-flat-string-prefix-no-children-match-emits-prefix ()
   "If no list child fires, a string-literal prefix is emitted alone.
-This lets rules like (RED deleted \"DELETED\" (id) (repo)) serve
+This lets rules like (STOP deleted \"DELETED\" (id) (repo)) serve
 as a label even when their sub-rules are vacuous."
   (should
     (equal
@@ -121,16 +121,16 @@ matching list child, not just the first."
       '("B: cc" "B: dd"))))
 
 ;;
-;; ORANGE color keyword
+;; HIGH style keyword
 ;;
 
-(ert-deftest test-skg-transform-sexp-flat-orange-is-a-color ()
-  "ORANGE is accepted alongside RED/GREEN/BLUE/YELLOW."
+(ert-deftest test-skg-transform-sexp-flat-orange-is-a-style ()
+  "HIGH is accepted alongside STOP/GO/NORMAL/MEDIUM."
   (let ((out (skg-transform-sexp-flat
-              '(a b) '(a (ORANGE b "bb")))))
+              '(a b) '(a (HIGH b "bb")))))
     (should (equal out '("bb")))
-    (should (eq (get-text-property 0 'skg-color (car out))
-                'ORANGE))))
+    (should (eq (get-text-property 0 'skg-style (car out))
+                'HIGH))))
 
 ;;
 ;; ABUT marker
@@ -199,36 +199,36 @@ nothing for that match -- avoids displaying a naked separator."
                   '(a (INTERC "{" pair (left (ANY IT)))))
                  '())))
 
-(ert-deftest test-skg-transform-sexp-flat-interc-preserves-per-subrule-colors ()
+(ert-deftest test-skg-transform-sexp-flat-interc-preserves-per-subrule-styles ()
   "Colors from INTERC sub-rules are preserved per-segment on the
-output token. The separator takes the INTERC rule's own color
-context (nil here, since the outer INTERC has no color directive)."
+output token. The separator takes the INTERC rule's own style
+context (nil here, since the outer INTERC has no style directive)."
   (let* ((out (skg-transform-sexp-flat
                '(a (pair (left 3) (right 8)))
                '(a (INTERC "{" pair
-                     (YELLOW left  (ANY IT))
-                     (BLUE   right (ANY IT))))))
+                     (MEDIUM left  (ANY IT))
+                     (NORMAL   right (ANY IT))))))
          (s   (car out)))
     (should (equal out '("3{8")))
-    (should (eq  (get-text-property 0 'skg-color s) 'YELLOW))
-    (should (null (get-text-property 1 'skg-color s))) ;; separator: no color
-    (should (eq  (get-text-property 2 'skg-color s) 'BLUE))))
+    (should (eq  (get-text-property 0 'skg-style s) 'MEDIUM))
+    (should (null (get-text-property 1 'skg-style s))) ;; separator: no style
+    (should (eq  (get-text-property 2 'skg-style s) 'NORMAL))))
 
-(ert-deftest test-skg-transform-sexp-flat-interc-with-own-color-colors-separator-and-prefix ()
-  "When INTERC carries its own color, the separator and any
-literal prefix inherit it; sub-rule colors still override."
+(ert-deftest test-skg-transform-sexp-flat-interc-with-own-style-styles-separator-and-prefix ()
+  "When INTERC carries its own style, the separator and any
+literal prefix inherit it; sub-rule styles still override."
   (let* ((out (skg-transform-sexp-flat
                '(a (pair (left 3) (right 8)))
-               '(a (BLUE INTERC "{" pair "P:"
-                     (YELLOW left  (ANY IT))
+               '(a (NORMAL INTERC "{" pair "P:"
+                     (MEDIUM left  (ANY IT))
                      (right        (ANY IT))))))
          (s   (car out)))
     (should (equal out '("P:3{8")))
-    (should (eq (get-text-property 0 'skg-color s) 'BLUE))   ;; prefix "P"
-    (should (eq (get-text-property 1 'skg-color s) 'BLUE))   ;; prefix ":"
-    (should (eq (get-text-property 2 'skg-color s) 'YELLOW)) ;; "3"
-    (should (eq (get-text-property 3 'skg-color s) 'BLUE))   ;; separator
-    (should (eq (get-text-property 4 'skg-color s) 'BLUE)))) ;; "8" via inherited
+    (should (eq (get-text-property 0 'skg-style s) 'NORMAL))   ;; prefix "P"
+    (should (eq (get-text-property 1 'skg-style s) 'NORMAL))   ;; prefix ":"
+    (should (eq (get-text-property 2 'skg-style s) 'MEDIUM)) ;; "3"
+    (should (eq (get-text-property 3 'skg-style s) 'NORMAL))   ;; separator
+    (should (eq (get-text-property 4 'skg-style s) 'NORMAL)))) ;; "8" via inherited
 
 (ert-deftest test-skg-transform-sexp-flat-interc-empty-separator-concatenates-slots ()
   "An empty-string separator makes INTERC concatenate slots with

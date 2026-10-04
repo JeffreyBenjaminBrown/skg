@@ -15,6 +15,7 @@
 
 (require 'cl-lib)
 (require 'skg-sexpr-search)
+(require 'skg-shared)
 
 ;; Defined in skg-request-herald-rules.el, which requires THIS file, so
 ;; we cannot require it back (circular). `heralds--ensure-rules' reaches
@@ -26,7 +27,7 @@
   "Rules for lensing `(skg ...)` metadata into a line of herald tokens.
 
 The table itself LIVES IN RUST (`server/heralds.rs`) and supplies
-non-relationship match atoms, labels, colors, and placement. This
+non-relationship match atoms, labels, styles, and placement. This
 client renders semantic relationship facts and their styles. Emacs fetches it
 over the \"herald rules\" endpoint at connect time
 (`skg-request-herald-rules', called by `skg-client-init') and caches
@@ -45,7 +46,7 @@ fails. There is deliberately no vendored fallback table, which
 would re-create the two-homes problem the Rust move ended.
 
 The table is interpreted by the generic engine in skg-lens.el
-\(`skg-transform-sexp-flat'), whose full semantics for colour
+\(`skg-transform-sexp-flat'), whose full semantics for styles
 directives, ANY/IT, ABUT, and INTERC are documented there. The rule
 patterns the table uses are documented on `herald_rule_table` in
 server/heralds.rs.
@@ -65,9 +66,9 @@ tests. Signals an error if RULES does not look like a rule table."
 
 (defun heralds--tokens->text (tokens)
   "Convert list of TOKENS (propertized strings) to a display string.
-Tokens carry `skg-color' on character ranges (single-color tokens
+Tokens carry `skg-style' on character ranges (single-style tokens
 propertize the whole string; INTERC-built tokens carry per-segment
-colors). Tokens separated by a space, except tokens whose position
+styles). Tokens separated by a space, except tokens whose position
 0 has an `skg-abut' property are joined to the preceding token
 with no separator (used to glue e.g. ☮ onto its affectsParent character).
 Structural colons added by the transform (like `3:{' -> `3{') are
@@ -90,38 +91,35 @@ A colon is structural when either the character before or after
 it is non-alphanumeric (and not `-', `+', or space, which we keep
 since they often appear as label values or separators).
 `replace-regexp-in-string' preserves text properties of the kept
-characters, which is what we need so ranges' colors survive."
+characters, which is what we need so ranges' styles survive."
   (replace-regexp-in-string
    "\\([^[:alnum:]+ -]\\):\\|:\\([^[:alnum:]+ -]\\)"
    "\\1\\2"
    s))
 
 (defun heralds--apply-faces-per-region (s)
-  "For each region in S where `skg-color' is non-nil, set `face'
-to the corresponding herald face. Works for both single-color
-tokens and per-segment-colored INTERC tokens."
+  "For each region in S where `skg-style' is non-nil, set `face'
+to the corresponding herald face. Works for both single-style
+tokens and per-segment-styled INTERC tokens."
   (let ((len (length s))
         (pos 0))
     (while (< pos len)
-      (let* ((color (get-text-property pos 'skg-color s))
-             (next  (or (next-single-property-change pos 'skg-color s)
+      (let* ((style (get-text-property pos 'skg-style s))
+             (next  (or (next-single-property-change pos 'skg-style s)
                         len)))
-        (when color
+        (when style
           (put-text-property pos next 'face
-                             (heralds--color-to-face color) s))
+                             (heralds--style-to-face style) s))
         (setq pos next)))
     s))
 
-(defun heralds--color-to-face
-  (color-keyword)
-  "Map COLOR-KEYWORD (RED, GREEN, BLUE, YELLOW, ORANGE) to a face."
-  (cond
-    ((eq color-keyword 'RED)    'heralds-red-face)
-    ((eq color-keyword 'GREEN)  'heralds-green-face)
-    ((eq color-keyword 'BLUE)   'heralds-blue-face)
-    ((eq color-keyword 'YELLOW) 'heralds-moderately-interesting-face)
-    ((eq color-keyword 'ORANGE) 'heralds-highly-interesting-face)
-    (t nil)))
+(defun heralds--style-to-face
+  (style-keyword)
+  "Map STYLE-KEYWORD, a style name in capitals (e.g. GO), to its face
+heralds-STYLE-face, or nil if it names no style."
+  (and (memq style-keyword (skg-shared-style-keywords))
+       (intern (format "heralds-%s-face"
+                       (downcase (symbol-name style-keyword))))))
 
 (defun heralds--ensure-rules ()
   "Return non-nil when the herald rule table is available for display.
@@ -258,7 +256,7 @@ in server/heralds.rs). The relationship heralds are per-CHARACTER styled
 spans -- more than the rule table's atom-level coloring can express -- so
 the rule only POSITIONS them by emitting this sentinel, and
 `heralds-from-metadata' swaps it for the spans it renders itself from the
-`(rels (COLOR \"text\") ...)' payload.")
+`(rels (STYLE \"text\") ...)' payload.")
 
 (defun heralds-from-metadata
     (metadata-sexp) ;; Begins with '(skg ' and ends with ')'.
@@ -301,23 +299,26 @@ na anyway) any stray sentinel token is dropped."
                when found return found))))
 
 ;; ── relationship heralds: render the server's SEMANTIC facts ─────────
-;; ALL presentation lives here (letters, colors, order, count-omission,
+;; ALL presentation lives here (letters, styles, order, count-omission,
 ;; link and subscribee fractions); the server sends only facts. See
 ;; TODO/heralds-semantic-wire.org. The nvim client mirrors this exactly
 ;; (nvim/lua/skg/heralds.lua).
 
-(defconst heralds--rel-order '(contains links_to subscribes_to overrides_view_of hides_from_its_subscriptions)
-  "Relationship display order: C L S O H.")
+(defconst heralds--rel-order
+  (mapcar (lambda (relation) (intern (alist-get 'name relation)))
+          (skg-shared-relations-in-display-order))
+  "Relation symbols in display order, from 'shared/relations.json'.")
 
 (defun heralds--rel-letter (rel)
-  "The display letter for relation symbol REL."
-  (pcase rel ('contains "C") ('links_to "L") ('subscribes_to "S")
-             ('overrides_view_of "O") ('hides_from_its_subscriptions "H") (_ "?")))
+  "The display letter for relation symbol REL, from
+'shared/relations.json'."
+  (let ((relation (skg-shared-relation (symbol-name rel))))
+    (if relation (alist-get 'letter relation) "?")))
 
 (defun heralds--rel-base-face (rel)
   "Group base face for REL's counts and slash: C/L blue, S/O/H purple."
-  (pcase rel ((or 'contains 'links_to) 'heralds-blue-face)
-             (_ 'heralds-purple-face)))
+  (pcase rel ((or 'contains 'links_to) 'heralds-normal-face)
+             (_ 'heralds-nonstandard-face)))
 
 (defun heralds--gen-list (gens)
   "Return sorted distinct generation integers from GENS."
@@ -330,8 +331,8 @@ na anyway) any stray sentinel token is dropped."
      (propertize (if (and (>= g 1) (<= g 26))
                      (char-to-string (+ ?a (1- g)))
                    (format "{%s}" g))
-                 'face (if (= g 1) 'heralds-slightly-interesting-face
-                         'heralds-moderately-interesting-face)))
+                 'face (if (= g 1) 'heralds-low-face
+                         'heralds-medium-face)))
    (heralds--gen-list gens) ""))
 
 (defun heralds--rel-side (form side)
@@ -344,7 +345,7 @@ return (COUNT . GENS) for SIDE (`in' or `out'), or nil if na."
 
 (defun heralds--rel-side-string (count gens base-face multi)
   "COUNT then ancestor letters, as a propertized string. Omit the count
-when it equals the number of ancestors (>=1). BASE-FACE colors the
+when it equals the number of ancestors (>=1). BASE-FACE styles the
 count, unless MULTI (the contains inbound side) and count > 1, which is
 yellow. The parent flag is muted; higher ancestors are orange."
   (let* ((gens (heralds--gen-list (or gens '())))
@@ -354,7 +355,7 @@ yellow. The parent flag is muted; higher ancestors are orange."
       (unless (and (> n 0) (= count n))
         (setq out (propertize (number-to-string count) 'face
                               (if (and multi (> count 1))
-                                  'heralds-highly-interesting-face base-face))))
+                                  'heralds-high-face base-face))))
       (when (> n 0)
         (setq out (concat out (heralds--ancestor-text gens)))))
     out))
@@ -370,7 +371,7 @@ yellow. The parent flag is muted; higher ancestors are orange."
          (numerator-text
           (concat (if (= numerator (length numerator-gens)) ""
                     (propertize (number-to-string numerator)
-                                'face 'heralds-highly-interesting-face))
+                                'face 'heralds-high-face))
                   (heralds--ancestor-text numerator-gens)))
          (denominator-text
           (if (= numerator total) ""
@@ -389,7 +390,7 @@ BASE-FACE styles ordinary counts; LETTER-FACE styles only the relation letter."
   (let* ((in  (heralds--rel-side form 'in))
          (out (heralds--rel-side form 'out))
          (number-face (if (eq rel 'overrides_view_of)
-                          'heralds-highly-interesting-face base-face))
+                          'heralds-high-face base-face))
          (in-s  (heralds--rel-side-string
                  (if in (car in) 0) (and in (cdr in)) number-face
                  (eq rel 'contains)))
@@ -409,7 +410,7 @@ BASE-FACE styles ordinary counts; LETTER-FACE styles only the relation letter."
                  (not (and (eq rel 'overrides_view_of) overrides-here)))
       (concat in-s (propertize (heralds--rel-letter rel) 'face letter-face)
               (if (and (eq rel 'overrides_view_of) overrides-here)
-                  (propertize "ĥ" 'face 'heralds-confusable-face) "")
+                  (propertize "ĥ" 'face 'heralds-yucky-face) "")
               out-s))))
 
 (defun heralds--link-rel-token (form base-face letter-face)
@@ -448,7 +449,7 @@ A/I/P cyan. Tokens are ordered C L S O H A I P and space-separated."
           (let ((form (assq rel (cdr rels))))
             (when (or form (and (eq rel 'overrides_view_of) overrides-here))
               (let* ((base (heralds--rel-base-face rel))
-                     (letter-face (if (memq rel birth) 'heralds-birth-face
+                     (letter-face (if (memq rel birth) 'heralds-message-face
                                     base))
                      (tok (if (eq rel 'links_to)
                               (heralds--link-rel-token form base letter-face)
@@ -456,13 +457,13 @@ A/I/P cyan. Tokens are ordered C L S O H A I P and space-separated."
                              rel form base letter-face overrides-here))))
                 (when tok (push tok tokens))))))
         (let ((a (cadr (assq 'aliases (cdr rels)))))
-          (when a (push (propertize (format "A%d" a) 'face 'heralds-cyan-face)
+          (when a (push (propertize (format "A%d" a) 'face 'heralds-crucial-face)
                         tokens)))
         (let ((i (cadr (assq 'extraIds (cdr rels)))))
-          (when i (push (propertize (format "I%d" i) 'face 'heralds-cyan-face)
+          (when i (push (propertize (format "I%d" i) 'face 'heralds-crucial-face)
                         tokens)))
         (let ((p (cadr (assq 'flags (cdr rels)))))
-          (when p (push (propertize (format "F%d" p) 'face 'heralds-cyan-face)
+          (when p (push (propertize (format "F%d" p) 'face 'heralds-crucial-face)
                         tokens)))
         (setq tokens (nreverse tokens))
         (when tokens (mapconcat #'identity tokens " "))))))
@@ -483,47 +484,25 @@ are rendered from `(rels ...)'."
        (overlay-start ov)
        (overlay-end ov)))
 
-(defface heralds-blue-face
-  '((t :foreground "white" :background "blue"))
-  "White-on-blue for blue values.")
+;; One face per herald style, heralds-STYLE-face, defined from
+;; shared/herald-styles.json, which the Neovim client also reads.
+(defun heralds--define-style-faces ()
+  "Define the face heralds-STYLE-face for each style in
+'shared/herald-styles.json'."
+  (dolist (style (skg-shared-styles))
+    (let* ((name (symbol-name (car style)))
+           (look (cdr style))
+           (foreground (alist-get 'foreground look))
+           (background (alist-get 'background look))
+           (underline (alist-get 'underline look)))
+      (custom-declare-face
+       (intern (format "heralds-%s-face" name))
+       `((t ,@(and foreground (list :foreground foreground))
+            ,@(and background (list :background background))
+            ,@(and underline (list :underline t))))
+       (format "The herald style %s; see shared/herald-styles.json." name)
+       :group 'faces))))
 
-(defface heralds-green-face
-  '((t :foreground "white" :background "#006400"))
-  "White-on-green for green values.")
-
-(defface heralds-red-face
-  '((t :foreground "white" :background "red"))
-  "White-on-red for problem markers like delete.")
-
-(defface heralds-highly-interesting-face
-  '((t :foreground "black" :background "yellow"))
-  "Highly interesting: black-on-yellow for interesting counts and markers.")
-
-(defface heralds-moderately-interesting-face
-  '((t :foreground "white" :background "#d2691e"))
-  "Moderately interesting: white-on-orange for ancestor flags b and higher
-inside relationship-herald spans.")
-
-(defface heralds-slightly-interesting-face
-  '((t :foreground "white" :background "#5e5e20"))
-  "Slightly interesting: muted yellow for the parent flag a.")
-
-(defface heralds-confusable-face
-  '((t :foreground "#c84286"))
-  "Pink marker for an override substitution or a confirmed broken link.")
-
-(defface heralds-purple-face
-  '((t :foreground "white" :background "#8b00ff"))
-  "White-on-purple for the S / O / H relationship-herald tokens.")
-
-(defface heralds-cyan-face
-  '((t :foreground "black" :background "#00ffff"))
-  "Black-on-cyan for the A / I count tokens (cyan is too light for
-white text).")
-
-(defface heralds-birth-face
-  '((t :foreground "black" :background "white"))
-  "Black-on-white for the birth relationship letter that explains why
-the node was drawn.")
+(heralds--define-style-faces)
 
 (provide 'heralds-minor-mode)

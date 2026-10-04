@@ -1,7 +1,7 @@
 -- Mirrors tests/elisp/test-skg-lens.el. Elisp compares propertized
 -- strings with 'equal' (which ignores properties), so the text
 -- comparisons here go through token_texts; the property assertions
--- (get-text-property N 'skg-color / 'skg-abut) become color_at(N+1)
+-- (get-text-property N 'skg-style / 'skg-abut) become style_at(N+1)
 -- and the token's abut flag.
 
 local sexpr = require('skg.sexpr.parse')
@@ -16,11 +16,11 @@ local function texts (object_text, rules_text)
   return lens.token_texts(transform(object_text, rules_text))
 end
 
-local RED = sexpr.symbol('RED')
-local GREEN = sexpr.symbol('GREEN')
-local BLUE = sexpr.symbol('BLUE')
-local YELLOW = sexpr.symbol('YELLOW')
-local ORANGE = sexpr.symbol('ORANGE')
+local STOP = sexpr.symbol('STOP')
+local GO = sexpr.symbol('GO')
+local NORMAL = sexpr.symbol('NORMAL')
+local MEDIUM = sexpr.symbol('MEDIUM')
+local HIGH = sexpr.symbol('HIGH')
 
 describe('skg.sexpr.lens basic rules', function ()
   it('one flat rule that applies', function ()
@@ -101,11 +101,11 @@ describe('skg.sexpr.lens string prefixes', function ()
   end)
 end)
 
-describe('skg.sexpr.lens colors and ABUT', function ()
-  it('accepts ORANGE alongside the other colors', function ()
-    local out = transform('(a b)', '(a (ORANGE b "bb"))')
+describe('skg.sexpr.lens styles and ABUT', function ()
+  it('accepts HIGH alongside the other styles', function ()
+    local out = transform('(a b)', '(a (HIGH b "bb"))')
     assert.are.same({ 'bb' }, lens.token_texts(out))
-    assert.are.equal(ORANGE, lens.color_at(out[1], 1))
+    assert.are.equal(HIGH, lens.style_at(out[1], 1))
   end)
 
   it('ABUT marks the emitted token', function ()
@@ -119,15 +119,15 @@ describe('skg.sexpr.lens colors and ABUT', function ()
     assert.is_false(out[1].abut)
   end)
 
-  it('a deeper color overrides a shallower one', function ()
+  it('a deeper style overrides a shallower one', function ()
     -- From the skg-transform-sexp-flat docstring: in
-    -- (a (RED b (c d) (GREEN e f))), d is red but f is green.
+    -- (a (STOP b (c d) (GO e f))), d is red but f is green.
     -- (Expected output verified against the elisp engine directly.)
     local out = transform('(a (b c e))',
-                          '(a (RED b (c d) (GREEN e f)))')
+                          '(a (STOP b (c d) (GO e f)))')
     assert.are.same({ 'd', 'f' }, lens.token_texts(out))
-    assert.are.equal(RED, lens.color_at(out[1], 1))
-    assert.are.equal(GREEN, lens.color_at(out[2], 1))
+    assert.are.equal(STOP, lens.style_at(out[1], 1))
+    assert.are.equal(GO, lens.style_at(out[2], 1))
   end)
 end)
 
@@ -159,28 +159,28 @@ describe('skg.sexpr.lens INTERC', function ()
             '(a (INTERC "{" pair (left (ANY IT))))'))
   end)
 
-  it('preserves per-sub-rule colors on the output token', function ()
+  it('preserves per-sub-rule styles on the output token', function ()
     local out = transform(
       '(a (pair (left 3) (right 8)))',
-      '(a (INTERC "{" pair (YELLOW left (ANY IT))'
-      .. ' (BLUE right (ANY IT))))')
+      '(a (INTERC "{" pair (MEDIUM left (ANY IT))'
+      .. ' (NORMAL right (ANY IT))))')
     assert.are.same({ '3{8' }, lens.token_texts(out))
-    assert.are.equal(YELLOW, lens.color_at(out[1], 1))
-    assert.is_nil(lens.color_at(out[1], 2)) -- separator: no color
-    assert.are.equal(BLUE, lens.color_at(out[1], 3))
+    assert.are.equal(MEDIUM, lens.style_at(out[1], 1))
+    assert.is_nil(lens.style_at(out[1], 2)) -- separator: no style
+    assert.are.equal(NORMAL, lens.style_at(out[1], 3))
   end)
 
-  it('with its own color, colors separator and prefix', function ()
+  it('with its own style, styles separator and prefix', function ()
     local out = transform(
       '(a (pair (left 3) (right 8)))',
-      '(a (BLUE INTERC "{" pair "P:" (YELLOW left (ANY IT))'
+      '(a (NORMAL INTERC "{" pair "P:" (MEDIUM left (ANY IT))'
       .. ' (right (ANY IT))))')
     assert.are.same({ 'P:3{8' }, lens.token_texts(out))
-    assert.are.equal(BLUE, lens.color_at(out[1], 1))   -- prefix 'P'
-    assert.are.equal(BLUE, lens.color_at(out[1], 2))   -- prefix ':'
-    assert.are.equal(YELLOW, lens.color_at(out[1], 3)) -- '3'
-    assert.are.equal(BLUE, lens.color_at(out[1], 4))   -- separator
-    assert.are.equal(BLUE, lens.color_at(out[1], 5))   -- '8' inherited
+    assert.are.equal(NORMAL, lens.style_at(out[1], 1))   -- prefix 'P'
+    assert.are.equal(NORMAL, lens.style_at(out[1], 2))   -- prefix ':'
+    assert.are.equal(MEDIUM, lens.style_at(out[1], 3)) -- '3'
+    assert.are.equal(NORMAL, lens.style_at(out[1], 4))   -- separator
+    assert.are.equal(NORMAL, lens.style_at(out[1], 5))   -- '8' inherited
   end)
 
   it('empty separator concatenates slots', function ()

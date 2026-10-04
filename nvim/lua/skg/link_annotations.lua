@@ -1,9 +1,10 @@
 -- Display-only repo suffixes and confirmed broken-link styling in views.
 
 local client = require('skg.client')
-local heralds = require('skg.heralds')
+require('skg.heralds') -- defines the SkgHerald* highlight groups used here
 local payload = require('skg.payload')
 local sexpr = require('skg.sexpr.parse')
+local shared = require('skg.shared')
 local state = require('skg.state')
 
 local M = {}
@@ -15,7 +16,8 @@ M.epoch = 0
 M.next_request = 0
 
 vim.api.nvim_set_hl(0, 'SkgBrokenLink',
-  { fg = heralds.confusable_fg, underline = true, default = true })
+  { fg = shared.herald_styles.styles.yucky.foreground, underline = true,
+    default = true })
 
 local function valid (buf)
   return vim.api.nvim_buf_is_valid(buf)
@@ -154,7 +156,7 @@ function M.paint (buf, positions)
       local label = ({ missing = '⌂:missing', inactive = '⌂:inactive',
                        lookup_failed = '⌂:lookup failed', pending = '⌂:…' })[kind]
                     or ('⌂:' .. status[3])
-      local group = kind == 'resolved' and 'SkgHeraldGreen' or 'Comment'
+      local group = kind == 'resolved' and 'SkgHeraldGo' or 'Comment'
       vim.api.nvim_buf_set_extmark(buf, M.namespace,
         position.row, position.link_end, {
           virt_text = { { ' [' .. label .. ']', group } },

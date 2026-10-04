@@ -157,7 +157,7 @@ character."
         (let ((overlay (make-overlay label-start label-end nil nil t)))
           (overlay-put overlay 'skg-link-annotation t)
           (overlay-put overlay 'face
-                       '(:inherit heralds-confusable-face :underline t))))
+                       '(:inherit heralds-yucky-face :underline t))))
       (when skg-link-annotations--repo-suffix-enabled
         (let* ((label (pcase kind
                         ('resolved (format "⌂:%s" (nth 2 status)))
@@ -166,7 +166,7 @@ character."
                         ('lookup-failed "⌂:lookup failed")
                         (_ "⌂:…")))
                (face (if (eq kind 'resolved)
-                         'heralds-green-face 'shadow))
+                         'heralds-go-face 'shadow))
                (overlay (make-overlay link-end link-end nil nil t)))
           (overlay-put overlay 'skg-link-annotation t)
           (overlay-put overlay 'after-string

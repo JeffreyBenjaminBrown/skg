@@ -32,41 +32,41 @@
          (plain (substring-no-properties display)))
     (should (equal plain "Oĥh"))
     (should (eq (get-text-property 1 'face display)
-                'heralds-confusable-face))
+                'heralds-yucky-face))
     (should (eq (get-text-property 2 'face display)
-                'heralds-moderately-interesting-face)))
+                'heralds-medium-face)))
   (let ((display (heralds-from-metadata
                   "(skg (node (id x) (rels (links_to (in 5 (substantive 2)) (out 3)) (overrides_view_of (out 1)) (birth overrides_view_of))))")))
     (should (equal (substring-no-properties display) "2/5L3 O1"))
-    (should (eq (get-text-property 0 'face display) 'heralds-highly-interesting-face))
+    (should (eq (get-text-property 0 'face display) 'heralds-high-face))
     (dolist (i '(1 2 3 4))
-      (should (eq (get-text-property i 'face display) 'heralds-blue-face)))
-    (should (eq (get-text-property 6 'face display) 'heralds-birth-face))
-    (should (eq (get-text-property 7 'face display) 'heralds-highly-interesting-face)))
+      (should (eq (get-text-property i 'face display) 'heralds-normal-face)))
+    (should (eq (get-text-property 6 'face display) 'heralds-message-face))
+    (should (eq (get-text-property 7 'face display) 'heralds-high-face)))
   (let ((display (heralds-from-metadata
                   "(skg (node (id x) (rels (links_to (in 2 (ancestors 1 2) (substantive 1 (ancestors 1)))))))")))
     (should (equal (substring-no-properties display) "a/bL"))
-    (should (eq (get-text-property 0 'face display) 'heralds-slightly-interesting-face))
-    (should (eq (get-text-property 2 'face display) 'heralds-moderately-interesting-face))))
+    (should (eq (get-text-property 0 'face display) 'heralds-low-face))
+    (should (eq (get-text-property 2 'face display) 'heralds-medium-face))))
 
 (ert-deftest test-herald-birth-face-covers-only-relation-letter ()
   "Counts and fraction slashes beside a birth letter keep their own faces."
   (dolist (case '(((contains (in 1) (out 2)) (birth contains)
-                  "1C2" (heralds-blue-face heralds-birth-face heralds-blue-face))
+                  "1C2" (heralds-normal-face heralds-message-face heralds-normal-face))
                  ((links_to (in 5 (substantive 2)) (out 3))
                   (birth links_to) "2/5L3"
-                  (heralds-highly-interesting-face heralds-blue-face
-                   heralds-blue-face heralds-birth-face heralds-blue-face))
+                  (heralds-high-face heralds-normal-face
+                   heralds-normal-face heralds-message-face heralds-normal-face))
                  ((contains (out 8 (unintegrated 2))) (birth contains)
-                  "C2/8" (heralds-birth-face heralds-highly-interesting-face
-                   heralds-blue-face heralds-blue-face))
+                  "C2/8" (heralds-message-face heralds-high-face
+                   heralds-normal-face heralds-normal-face))
                  ((subscribes_to (in 1) (out 2)) (birth subscribes_to)
-                  "1S2" (heralds-purple-face heralds-birth-face heralds-purple-face))
+                  "1S2" (heralds-nonstandard-face heralds-message-face heralds-nonstandard-face))
                  ((overrides_view_of (in 1) (out 2)) (birth overrides_view_of)
-                  "1O2" (heralds-highly-interesting-face heralds-birth-face
-                   heralds-highly-interesting-face))
+                  "1O2" (heralds-high-face heralds-message-face
+                   heralds-high-face))
                  ((hides_from_its_subscriptions (in 1) (out 2)) (birth hides_from_its_subscriptions)
-                  "1H2" (heralds-purple-face heralds-birth-face heralds-purple-face))))
+                  "1H2" (heralds-nonstandard-face heralds-message-face heralds-nonstandard-face))))
     (let ((display (heralds-from-metadata
                     (format "(skg (node (id x) (rels %s %s)))"
                             (prin1-to-string (car case))
@@ -137,11 +137,11 @@ the C token 2aC: the multi-contains \"2\" (yellow), the ancestor \"a\"
           ;; per-span faces on the 2aC relationship token
           (let ( ( i ( string-match "2aC" display-text )) )
             ( should ( eq ( get-text-property i 'face display-text )
-                          'heralds-highly-interesting-face )) ;; the "2"
+                          'heralds-high-face )) ;; the "2"
             ( should ( eq ( get-text-property (+ i 1) 'face display-text )
-                          'heralds-slightly-interesting-face )) ;; the "a"
+                          'heralds-low-face )) ;; the "a"
             ( should ( eq ( get-text-property (+ i 2) 'face display-text )
-                          'heralds-birth-face )) )))) ;; the "C"
+                          'heralds-message-face )) )))) ;; the "C"
     (progn ;; what happens upon disabling it
       (heralds-minor-mode -1)
       (let* ( ( herald-start
@@ -189,7 +189,7 @@ the C token 2aC: the multi-contains \"2\" (yellow), the ancestor \"a\"
                  "(skg (node (id 1) (rels (flags 2))))")))
     (should (equal (substring-no-properties result) "F2"))
     (should (eq (get-text-property 0 'face result)
-                'heralds-cyan-face))))
+                'heralds-crucial-face))))
 
 (ert-deftest test-heralds-flag-viewnodes-are-friendly-and-colon-free ()
   "Flag-viewnode heralds carry the whole titleless viewnode label."
@@ -201,7 +201,7 @@ the C token 2aC: the multi-contains \"2\" (yellow), the ancestor \"a\"
       (should (equal (substring-no-properties result) (cadr case)))
       (should-not (string-match-p ":" result))
       (should (eq (get-text-property 0 'face result)
-                  'heralds-green-face)))))
+                  'heralds-go-face)))))
 
 (ert-deftest test-heralds-flag-request-displays-one-semantic-state ()
   "A flag edit request is one state change, not one herald per argument."
@@ -214,7 +214,7 @@ the C token 2aC: the multi-contains \"2\" (yellow), the ancestor \"a\"
              (car case)))))
       (should (equal (substring-no-properties result) (cadr case)))
       (should (eq (get-text-property 0 'face result)
-                  'heralds-red-face)))))
+                  'heralds-stop-face)))))
 
 (ert-deftest test-heralds-non-vognode-display ()
   "Test that non-vognode kinds are displayed correctly."
@@ -289,7 +289,7 @@ would leak content the user hid by restricting the repo-set."
       (should (equal (substring-no-properties result)
                      "node from inactive repo"))
       (should (eq (get-text-property 0 'face result)
-                  'heralds-blue-face)))
+                  'heralds-normal-face)))
     (heralds-minor-mode 1)
     (let* ((display-overlay
             (cl-find-if (lambda (ov) (overlay-get ov 'display))
@@ -299,7 +299,7 @@ would leak content the user hid by restricting the repo-set."
       (should (equal (substring-no-properties display-text)
                      "node from inactive repo"))
       (should (eq (get-text-property 0 'face display-text)
-                  'heralds-blue-face)))))
+                  'heralds-normal-face)))))
 
 (ert-deftest test-heralds-survive-major-mode-switch ()
   "After a major-mode switch orphans overlays, disabling heralds

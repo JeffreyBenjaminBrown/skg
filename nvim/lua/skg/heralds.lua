@@ -26,11 +26,11 @@
 local herald_rules = require('skg.herald_rules')
 local lens = require('skg.sexpr.lens')
 local sexpr = require('skg.sexpr.parse')
+local shared = require('skg.shared')
 
 local M = {}
 
 M.namespace = vim.api.nvim_create_namespace('skg-heralds')
-M.confusable_fg = '#c84286'
 
 -- The placeholder token the server's `rels` rule emits
 -- (RELS_SPANS_SENTINEL in server/heralds.rs). The relationship heralds
@@ -41,44 +41,24 @@ M.confusable_fg = '#c84286'
 -- analog of `heralds--rels-sentinel' in elisp.
 M.RELS_SENTINEL = '__RELS_SPANS__'
 
----Map lens color keywords to highlight groups, mirroring the five
----heralds-*-face definitions.
-local color_to_highlight_group = {
-  RED = 'SkgHeraldRed',
-  GREEN = 'SkgHeraldGreen',
-  BLUE = 'SkgHeraldBlue',
-  YELLOW = 'SkgHeraldModeratelyInteresting',
-  ORANGE = 'SkgHeraldHighlyInteresting' }
-
+---Define the highlight group SkgHeraldSTYLE for each style in
+---'shared/herald-styles.json' (see shared.style_highlight_group).
 function M.define_highlight_groups ()
-  vim.api.nvim_set_hl(0, 'SkgHeraldRed',
-    { fg = 'white', bg = 'red', default = true })
-  vim.api.nvim_set_hl(0, 'SkgHeraldGreen',
-    { fg = 'white', bg = '#006400', default = true })
-  vim.api.nvim_set_hl(0, 'SkgHeraldBlue',
-    { fg = 'white', bg = 'blue', default = true })
-  vim.api.nvim_set_hl(0, 'SkgHeraldModeratelyInteresting',
-    { fg = 'white', bg = '#d2691e', default = true })
-  vim.api.nvim_set_hl(0, 'SkgHeraldHighlyInteresting',
-    { fg = 'black', bg = 'yellow', default = true })
-  vim.api.nvim_set_hl(0, 'SkgHeraldSlightlyInteresting',
-    { fg = 'white', bg = '#5e5e20', default = true })
-  vim.api.nvim_set_hl(0, 'SkgHeraldConfusable',
-    { fg = M.confusable_fg, default = true })
-  vim.api.nvim_set_hl(0, 'SkgHeraldPurple',
-    { fg = 'white', bg = '#8b00ff', default = true })
-  vim.api.nvim_set_hl(0, 'SkgHeraldCyan',
-    { fg = 'black', bg = '#00ffff', default = true })
-  vim.api.nvim_set_hl(0, 'SkgHeraldBirth',
-    { fg = 'black', bg = 'white', default = true })
+  for name, look in pairs(shared.herald_styles.styles) do
+    vim.api.nvim_set_hl(0, shared.style_highlight_group(name),
+      { fg = look.foreground, bg = look.background,
+        underline = look.underline, default = true })
+  end
 end
 M.define_highlight_groups()
 
----@param color table|nil a lens color keyword symbol
----@return string|nil highlight group name
-function M.color_highlight_group (color)
-  if color == nil then return nil end
-  return color_to_highlight_group[sexpr.atom_text(color)]
+---@param style table|nil a lens style keyword symbol, e.g. GO
+---@return string|nil highlight group name, or nil if it names no style
+function M.style_highlight_group (style)
+  if style == nil then return nil end
+  local name = sexpr.atom_text(style):lower()
+  if shared.herald_styles.styles[name] == nil then return nil end
+  return shared.style_highlight_group(name)
 end
 
 
@@ -96,7 +76,7 @@ function M.keeps_adjacent_colon (character)
   return vim.fn.match(character, '^[[:alnum:]]$') == 0
 end
 
----TOKEN's characters as a flat list of {character, color} cells.
+---TOKEN's characters as a flat list of {character, style} cells.
 ---@param token table a lens token
 ---@return table[]
 function M.token_character_cells (token)
@@ -104,7 +84,7 @@ function M.token_character_cells (token)
   for _, chunk in ipairs(token.chunks) do
     for _, character in ipairs(vim.fn.split(chunk.text, '\\zs')) do
       table.insert(cells, { character = character,
-                            color = chunk.color }) end
+                            style = chunk.style }) end
   end
   return cells
 end
@@ -139,8 +119,8 @@ end
 
 ---Convert lens TOKENS to virtual-text chunks: tokens separated by a
 ---space, except tokens marked abut, which join the preceding token
----with no separator; structural colons stripped; colors mapped to
----highlight groups, with consecutive same-color characters grouped.
+---with no separator; structural colons stripped; styles mapped to
+---highlight groups, with consecutive same-style characters grouped.
 ---Returns nil when TOKENS is empty (no herald, no extmark).
 ---@param tokens table[]
 ---@return table[]|nil chunks {{text, hlgroup_or_empty}, ...}
@@ -149,27 +129,27 @@ function M.tokens_to_chunks (tokens)
   local cells = {}
   for index, token in ipairs(tokens) do
     if index > 1 and not token.abut then
-      table.insert(cells, { character = ' ', color = nil }) end
+      table.insert(cells, { character = ' ', style = nil }) end
     for _, cell in ipairs(
         M.strip_structural_colons(M.token_character_cells(token))) do
       table.insert(cells, cell) end
   end
   local chunks = {}
   local current_text = nil
-  local current_color = nil
+  local current_style = nil
   local function flush ()
     if current_text and #current_text > 0 then
       table.insert(chunks,
         { current_text,
-          M.color_highlight_group(current_color) or 'Normal' }) end
+          M.style_highlight_group(current_style) or 'Normal' }) end
   end
   for _, cell in ipairs(cells) do
-    if current_text ~= nil and cell.color == current_color then
+    if current_text ~= nil and cell.style == current_style then
       current_text = current_text .. cell.character
     else
       flush()
       current_text = cell.character
-      current_color = cell.color end
+      current_style = cell.style end
   end
   flush()
   return chunks
@@ -208,22 +188,25 @@ function M.find_rels (sexp)
 end
 
 -- ── relationship heralds: render the server's SEMANTIC facts ─────────
--- ALL presentation lives here (letters, colors, order, count-omission,
+-- ALL presentation lives here (letters, styles, order, count-omission,
 -- link and subscribee fractions); the server sends only facts. See
 -- TODO/heralds-semantic-wire.org. Mirrors the elisp renderer
 -- (heralds--render-rel-facts et al.) exactly.
 
-local REL_ORDER = { 'contains', 'links_to', 'subscribes_to',
-                    'overrides_view_of', 'hides_from_its_subscriptions' }
+---Relation names in display order, from 'shared/relations.json'.
+local REL_ORDER = {}
+for _, relation in ipairs(shared.relations_in_display_order()) do
+  table.insert(REL_ORDER, relation.name) end
 
+---The display letter for relation REL, from 'shared/relations.json'.
 local function rel_letter (rel)
-  return ({ contains = 'C', links_to = 'L', subscribes_to = 'S',
-            overrides_view_of = 'O', hides_from_its_subscriptions = 'H' })[rel] or '?'
+  local relation = shared.relation(rel)
+  return relation and relation.letter or '?'
 end
 
 local function rel_base_hl (rel)
-  if rel == 'contains' or rel == 'links_to' then return 'SkgHeraldBlue' end
-  return 'SkgHeraldPurple' -- subscribes / overrides / hides
+  if rel == 'contains' or rel == 'links_to' then return 'SkgHeraldNormal' end
+  return 'SkgHeraldNonstandard' -- subscribes / overrides / hides
 end
 
 ---The child of SEXP (from index 2) whose head is the symbol NAME, or nil.
@@ -269,8 +252,8 @@ local function ancestor_chunks (gens)
   for _, g in ipairs(distinct_gens(gens)) do
     local letter = (type(g) == 'number' and g >= 1 and g <= 26)
       and string.char(96 + g) or '{' .. tostring(g) .. '}'
-    table.insert(out, { letter, g == 1 and 'SkgHeraldSlightlyInteresting'
-                                  or 'SkgHeraldModeratelyInteresting' })
+    table.insert(out, { letter, g == 1 and 'SkgHeraldLow'
+                                  or 'SkgHeraldMedium' })
   end
   return out
 end
@@ -284,7 +267,7 @@ local function side_chunks (count, gens, base_hl, multi)
   local chunks = {}
   if count > 0 or n > 0 then
     if not (n > 0 and count == n) then
-      local hl = (multi and count > 1) and 'SkgHeraldHighlyInteresting' or base_hl
+      local hl = (multi and count > 1) and 'SkgHeraldHigh' or base_hl
       table.insert(chunks, { tostring(count), hl })
     end
     for _, c in ipairs(ancestor_chunks(gens)) do table.insert(chunks, c) end
@@ -304,7 +287,7 @@ local function fraction_chunks (total, total_gens, numerator,
   for _, g in ipairs(numerator_gens) do numerator_set[g] = true end
   local chunks = {}
   if numerator ~= #numerator_gens then
-    table.insert(chunks, { tostring(numerator), 'SkgHeraldHighlyInteresting' }) end
+    table.insert(chunks, { tostring(numerator), 'SkgHeraldHigh' }) end
   for _, c in ipairs(ancestor_chunks(numerator_gens)) do
     table.insert(chunks, c) end
   table.insert(chunks, { '/', base_hl })
@@ -329,7 +312,7 @@ local function ordinary_rel_chunks (rel, form, base_hl, letter_hl,
                                     overrides_here)
   local inn = rel_side(form, 'in')
   local out = rel_side(form, 'out')
-  local number_hl = rel == 'overrides_view_of' and 'SkgHeraldHighlyInteresting'
+  local number_hl = rel == 'overrides_view_of' and 'SkgHeraldHigh'
                                        or base_hl
   local in_c = side_chunks(inn and inn.count or 0, inn and inn.gens or {},
                            number_hl, rel == 'contains')
@@ -348,7 +331,7 @@ local function ordinary_rel_chunks (rel, form, base_hl, letter_hl,
   for _, c in ipairs(in_c) do table.insert(chunks, c) end
   table.insert(chunks, { rel_letter(rel), letter_hl })
   if rel == 'overrides_view_of' and overrides_here then
-    table.insert(chunks, { 'ĥ', 'SkgHeraldConfusable' }) end
+    table.insert(chunks, { 'ĥ', 'SkgHeraldYucky' }) end
   for _, c in ipairs(out_c) do table.insert(chunks, c) end
   return chunks
 end
@@ -401,7 +384,7 @@ function M.render_rel_facts (sexp)
     local form = assq(rels, rel)
     if form or (rel == 'overrides_view_of' and overrides_here) then
       local base = rel_base_hl(rel)
-      local letter_hl = birth[rel] and 'SkgHeraldBirth' or base
+      local letter_hl = birth[rel] and 'SkgHeraldMessage' or base
       add_token((rel == 'links_to')
         and link_rel_chunks(form, base, letter_hl)
         or ordinary_rel_chunks(rel, form, base, letter_hl, overrides_here))
@@ -409,16 +392,16 @@ function M.render_rel_facts (sexp)
   end
   local aliases = assq(rels, 'aliases')
   if aliases then
-    add_token({ { 'A' .. tostring(first_number(aliases)), 'SkgHeraldCyan' } })
+    add_token({ { 'A' .. tostring(first_number(aliases)), 'SkgHeraldCrucial' } })
   end
   local extra = assq(rels, 'extraIds')
   if extra then
-    add_token({ { 'I' .. tostring(first_number(extra)), 'SkgHeraldCyan' } })
+    add_token({ { 'I' .. tostring(first_number(extra)), 'SkgHeraldCrucial' } })
   end
   local flags = assq(rels, 'flags')
   if flags then
     add_token({ { 'F' .. tostring(first_number(flags)),
-                  'SkgHeraldCyan' } })
+                  'SkgHeraldCrucial' } })
   end
   if #chunks == 0 then return nil end
   return chunks
@@ -451,19 +434,19 @@ function M.tokens_to_chunks_with_rels (tokens, rel_chunks)
         M.token_character_cells(token))
       if #cells > 0 then
         sep_if_needed(token.abut)
-        local cur_text, cur_color = nil, nil
+        local cur_text, cur_style = nil, nil
         local function flush ()
           if cur_text and #cur_text > 0 then
             table.insert(chunks,
               { cur_text,
-                M.color_highlight_group(cur_color) or 'Normal' }) end
+                M.style_highlight_group(cur_style) or 'Normal' }) end
         end
         for _, cell in ipairs(cells) do
-          if cur_text ~= nil and cell.color == cur_color then
+          if cur_text ~= nil and cell.style == cur_style then
             cur_text = cur_text .. cell.character
           else
             flush(); cur_text = cell.character
-            cur_color = cell.color end
+            cur_style = cell.style end
         end
         flush()
         emitted = true

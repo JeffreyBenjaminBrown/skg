@@ -6,6 +6,7 @@
 (require 'org-fold-core)
 (require 'skg-config)
 (require 'skg-sexpr-search)
+(require 'skg-shared)
 
 (defun skg-delete (&optional recursive)
   "Mark the headline at point for deletion.
@@ -519,41 +520,48 @@ next save will do with the edge."
       (format "relRepo set to '%s'. Save to apply."
               choice))))
 
-(defconst skg--relationship-kind-menu-tree
-  '(("contains"
-     ("container" nil
-      "The node would CONTAIN its view-parent -- the shape of a containerward ancestry graft. The edge belongs to the graft's own contains list, wherever that list is drawn definitively; it cannot be set from the graft's position.")
-     ("contained" contained
-      "The view-parent contains the node: ordinary content. Sets the repo of each parent-contains-child edge."))
-    ("links_to"
-     ("mentioner" nil
-      "Links are inferred from body text; they carry no false relRepo, so there is nothing to set.")
-     ("mentioned" nil
-      "Links are inferred from body text; they carry no false relRepo, so there is nothing to set."))
-    ("subscribes_to"
-     ("subscriber" nil
-      "A subscriberFolder member: the subscribes edge belongs to the member (the subscriber), not to the view-parent. Write-protected from here.")
-     ("subscribee" subscribee
-      "A member of the view-parent's subscribeeFolder. Sets the repo of each anchor-subscribes-to-member edge."))
-    ("hides_from_its_subscriptions"
-     ("hider" nil
-      "Hide repos are derived at save, floored at the most public explaining subscription; the hiderFolder is write-protected.")
-     ("hidden" nil
-      "Hide repos are derived at save, floored at the most public explaining subscription; the hiddenFolder is write-protected."))
-    ("overrides_view_of"
-     ("overrider" nil
-      "An overriderFolder member: the overrides edge belongs to the member (the overrider), not to the view-parent. Write-protected from here.")
-     ("overridden" overridden
-      "A member of the view-parent's overriddenFolder. Sets the repo of each anchor-overrides-view-of-member edge.")))
-  "The relationship-kind menu for
-`skg-set-relRepo-recursive': one entry per node-node
-relation in docs/data-model_technical.org, each listing its two roles as
-(ROLE-NAME KIND-OR-NIL DESCRIPTION). ROLE-NAME is the role the
+(defconst skg--relationship-role-menu-prose
+  '(("container" nil
+     "The node would CONTAIN its view-parent -- the shape of a containerward ancestry graft. The edge belongs to the graft's own contains list, wherever that list is drawn definitively; it cannot be set from the graft's position.")
+    ("contained" contained
+     "The view-parent contains the node: ordinary content. Sets the repo of each parent-contains-child edge.")
+    ("mentioner" nil
+     "Links are inferred from body text; they carry no false relRepo, so there is nothing to set.")
+    ("mentioned" nil
+     "Links are inferred from body text; they carry no false relRepo, so there is nothing to set.")
+    ("subscriber" nil
+     "A subscriberFolder member: the subscribes-to edge belongs to the member (the subscriber), not to the view-parent. Write-protected from here.")
+    ("subscribee" subscribee
+     "A member of the view-parent's subscribeeFolder. Sets the repo of each anchor-subscribes-to-member edge.")
+    ("hider" nil
+     "Hide repos are derived at save, floored at the most public explaining subscription; the hiderFolder is write-protected.")
+    ("hidden" nil
+     "Hide repos are derived at save, floored at the most public explaining subscription; the hiddenFolder is write-protected.")
+    ("overrider" nil
+     "An overriderFolder member: the overrides-view-of edge belongs to the member (the overrider), not to the view-parent. Write-protected from here.")
+    ("overridden" overridden
+     "A member of the view-parent's overriddenFolder. Sets the repo of each anchor-overrides-view-of-member edge."))
+  "For each relation role in 'shared/relations.json',
+(ROLE-NAME KIND-OR-NIL DESCRIPTION), as the relationship-kind menu of
+`skg-set-relRepo-recursive' shows it. ROLE-NAME is the role the
 VIEW-CHILD would play toward its view-parent. KIND-OR-NIL is the
 symbol the walk dispatches on (`contained', `subscribee' or
 `overridden') for the three roles whose edge is writable from the
 child's buffer position, and nil for the rest; DESCRIPTION then
 explains why the edge cannot be set from that position.")
+
+(defun skg--relationship-kind-menu-tree ()
+  "The relationship-kind menu for `skg-set-relRepo-recursive': one
+entry (RELATION-NAME ROLE...) per relation in 'shared/relations.json',
+each ROLE an entry of `skg--relationship-role-menu-prose'."
+  (mapcar
+   (lambda (relation)
+     (cons (alist-get 'name relation)
+           (mapcar (lambda (role)
+                     (or (assoc role skg--relationship-role-menu-prose)
+                         (error "No menu prose for relation role %s" role)))
+                   (alist-get 'roles relation))))
+   skg-shared-relations))
 
 (defvar-local skg--relationship-kind-menu-continuation nil
   "The continuation `skg--select-relationship-kind' stores in its
@@ -629,7 +637,7 @@ explains the refusal; q aborts."
         (insert "# What kind of relationships to the view-parent should qualify?\n"
                 "# Each level-2 headline is a role the view-CHILD would play toward\n"
                 "# its view-parent. RET on one picks it; q aborts.\n")
-        (dolist (relation skg--relationship-kind-menu-tree)
+        (dolist (relation (skg--relationship-kind-menu-tree))
           (insert (format "* %s\n" (car relation)))
           (dolist (role (cdr relation))
             (let ((headline-start (point)))

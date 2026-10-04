@@ -16,6 +16,7 @@ mkdir -p "$OUT/elisp"
   find . -type d -exec mkdir -p "../$OUT/elisp/{}" \;
   find . -type f ! -name '*~' -exec cp "{}" "../$OUT/elisp/{}" \;
 )
+cp -R shared "$OUT/shared" # read by elisp/ at load time, via ../shared
 mkdir -p "$OUT/docs"
 cp -R docs/. "$OUT/docs/"
 cp LICENSE.md "$OUT/LICENSE.md"
