@@ -213,16 +213,16 @@ end
 -- TODO/heralds-semantic-wire.org. Mirrors the elisp renderer
 -- (heralds--render-rel-facts et al.) exactly.
 
-local REL_ORDER = { 'contains', 'textlinksTo', 'subscribes',
-                    'overrides', 'hides' }
+local REL_ORDER = { 'contains', 'links_to', 'subscribes_to',
+                    'overrides_view_of', 'hides_from_its_subscriptions' }
 
 local function rel_letter (rel)
-  return ({ contains = 'C', textlinksTo = 'L', subscribes = 'S',
-            overrides = 'O', hides = 'H' })[rel] or '?'
+  return ({ contains = 'C', links_to = 'L', subscribes_to = 'S',
+            overrides_view_of = 'O', hides_from_its_subscriptions = 'H' })[rel] or '?'
 end
 
 local function rel_base_hl (rel)
-  if rel == 'contains' or rel == 'textlinksTo' then return 'SkgHeraldBlue' end
+  if rel == 'contains' or rel == 'links_to' then return 'SkgHeraldBlue' end
   return 'SkgHeraldPurple' -- subscribes / overrides / hides
 end
 
@@ -329,7 +329,7 @@ local function ordinary_rel_chunks (rel, form, base_hl, letter_hl,
                                     overrides_here)
   local inn = rel_side(form, 'in')
   local out = rel_side(form, 'out')
-  local number_hl = rel == 'overrides' and 'SkgHeraldHighlyInteresting'
+  local number_hl = rel == 'overrides_view_of' and 'SkgHeraldHighlyInteresting'
                                        or base_hl
   local in_c = side_chunks(inn and inn.count or 0, inn and inn.gens or {},
                            number_hl, rel == 'contains')
@@ -343,11 +343,11 @@ local function ordinary_rel_chunks (rel, form, base_hl, letter_hl,
     out_c = side_chunks(out and out.count or 0, out and out.gens or {},
                         number_hl, false) end
   if #in_c == 0 and #out_c == 0
-     and not (rel == 'overrides' and overrides_here) then return nil end
+     and not (rel == 'overrides_view_of' and overrides_here) then return nil end
   local chunks = {}
   for _, c in ipairs(in_c) do table.insert(chunks, c) end
   table.insert(chunks, { rel_letter(rel), letter_hl })
-  if rel == 'overrides' and overrides_here then
+  if rel == 'overrides_view_of' and overrides_here then
     table.insert(chunks, { 'ĥ', 'SkgHeraldConfusable' }) end
   for _, c in ipairs(out_c) do table.insert(chunks, c) end
   return chunks
@@ -356,10 +356,10 @@ end
 local function link_rel_chunks (form, base_hl, letter_hl)
   local inn = rel_side(form, 'in')
   local out = rel_side(form, 'out')
-  local interesting = assq(assq(form, 'in'), 'interesting')
+  local substantive = assq(assq(form, 'in'), 'substantive')
   local in_c = fraction_chunks(inn and inn.count or 0,
-    inn and inn.gens or {}, interesting and first_number(interesting) or 0,
-    interesting and ancestors_of(interesting) or {}, base_hl)
+    inn and inn.gens or {}, substantive and first_number(substantive) or 0,
+    substantive and ancestors_of(substantive) or {}, base_hl)
   local out_c = side_chunks(out and out.count or 0,
     out and out.gens or {}, base_hl, false)
   if #in_c == 0 and #out_c == 0 then return nil end
@@ -399,10 +399,10 @@ function M.render_rel_facts (sexp)
   end
   for _, rel in ipairs(REL_ORDER) do
     local form = assq(rels, rel)
-    if form or (rel == 'overrides' and overrides_here) then
+    if form or (rel == 'overrides_view_of' and overrides_here) then
       local base = rel_base_hl(rel)
       local letter_hl = birth[rel] and 'SkgHeraldBirth' or base
-      add_token((rel == 'textlinksTo')
+      add_token((rel == 'links_to')
         and link_rel_chunks(form, base, letter_hl)
         or ordinary_rel_chunks(rel, form, base, letter_hl, overrides_here))
     end

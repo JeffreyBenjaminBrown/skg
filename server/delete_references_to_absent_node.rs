@@ -8,7 +8,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::save::nodecomplete_from_noderust;
 use crate::types::misc::{ID, RelPartner, MSV, SkgConfig, SourceName};
 use crate::types::save::{DefineNode, SaveNode};
-use crate::types::textlinks::textlinks_with_ranges_from_text;
+use crate::types::links::links_with_ranges_from_text;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum StructuredField {
@@ -41,7 +41,7 @@ pub struct StructuralOccurrence {
 pub enum TextField { Title, Body }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TextLinkOccurrence {
+pub struct LinkOccurrence {
   pub owner_pid    : ID,
   pub owner_source : SourceName,
   pub field        : TextField,
@@ -53,7 +53,7 @@ pub struct TextLinkOccurrence {
 pub struct Preview {
   pub raw_id       : ID,
   pub structural   : Vec<StructuralOccurrence>,
-  pub text_links   : Vec<TextLinkOccurrence>,
+  pub links   : Vec<LinkOccurrence>,
 }
 
 impl Preview {
@@ -74,7 +74,7 @@ impl Preview {
         encode (&o . owner_pid . 0), encode (&o . owner_source . 0),
         encode (&o . owner_title), encode (o . field . label ()),
         encode (&o . raw_id . 0), encode (&o . relSource . 0))); }
-    for o in &self . text_links {
+    for o in &self . links {
       rows . push (format! ("T{}{}{:?}:{}{}",
         encode (&o . owner_pid . 0), encode (&o . owner_source . 0),
         o . field, o . line, encode (&o . label))); }
@@ -96,9 +96,9 @@ pub fn preview_warning_org (
     for o in &preview . structural {
       text . push_str (&format! ("- {} / {} / {} (source {})\n",
         o . owner_pid, o . field . label (), o . raw_id, o . relSource)); }}
-  if ! preview . text_links . is_empty () {
+  if ! preview . links . is_empty () {
     text . push_str ("** Text links left unchanged\n");
-    for o in &preview . text_links {
+    for o in &preview . links {
       text . push_str (&format! ("- {} {:?} line {}: {}\n",
         o . owner_pid, o . field, o . line, o . label)); }}
   text
@@ -145,31 +145,31 @@ pub fn preview (
             node . hides_from_its_subscriptions . or_default ());
     record (StructuredField::OverridesViewOf,
             node . overrides_view_of . or_default ());
-    record_text_links (&mut result . text_links, node, raw_id, TextField::Title,
+    record_links (&mut result . links, node, raw_id, TextField::Title,
                        &node . title);
     if let Some (body) = &node . body {
-      record_text_links (&mut result . text_links, node, raw_id, TextField::Body,
+      record_links (&mut result . links, node, raw_id, TextField::Body,
                          body); }}
   result . structural . sort_by (|a, b|
     (&a . owner_pid, a . field, &a . relSource)
       . cmp (&(&b . owner_pid, b . field, &b . relSource)));
-  result . text_links . sort_by (|a, b|
+  result . links . sort_by (|a, b|
     (&a . owner_pid, a . field, a . line, &a . label)
       . cmp (&(&b . owner_pid, b . field, b . line, &b . label)));
   Ok (result)
 }
 
-fn record_text_links (
-  occurrences : &mut Vec<TextLinkOccurrence>,
+fn record_links (
+  occurrences : &mut Vec<LinkOccurrence>,
   node        : &crate::types::nodes::rust::NodeRust,
   raw_id      : &ID,
   field       : TextField,
   text        : &str,
 ) {
-  for (range, link) in textlinks_with_ranges_from_text (text) . into_iter ()
+  for (range, link) in links_with_ranges_from_text (text) . into_iter ()
     . filter (|(_, link)| &link . id == raw_id) {
     let start : usize = range . start;
-    occurrences . push (TextLinkOccurrence {
+    occurrences . push (LinkOccurrence {
       owner_pid    : node . pid . clone (),
       owner_source : node . source . clone (),
       field,
@@ -265,10 +265,10 @@ mod tests {
 
     let scanned = preview (&graph, &config (), &id ("gone")) . unwrap ();
     assert_eq! (scanned . structural . len (), 4);
-    assert_eq! (scanned . text_links . len (), 2);
+    assert_eq! (scanned . links . len (), 2);
     assert! (scanned . structural . iter ()
               . all (|occurrence| occurrence . owner_pid == id ("owned")));
-    assert_eq! (scanned . text_links [1] . line, 3);
+    assert_eq! (scanned . links [1] . line, 3);
     let approval = scanned . opaque_approval ();
     assert_eq! (approval, preview (&graph, &config (), &id ("gone"))
                 . unwrap () . opaque_approval ());

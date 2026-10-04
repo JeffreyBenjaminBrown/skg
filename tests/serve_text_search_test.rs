@@ -172,18 +172,18 @@ fn test_text_search_org_format (
 /// Search results must show the full title text including
 /// `[[id:X][label]]` syntax, not the link-stripped version that
 /// Tantivy stores in `title_or_alias` for searching purposes.
-/// Otherwise a node titled "[[id:X][science]]" (a textlink whose
+/// Otherwise a node titled "[[id:X][science]]" (a link whose
 /// label is "science") is indistinguishable from a node titled
 /// just "science" in the user's results listing.
 #[test]
-fn test_search_results_preserve_textlinks_in_title (
+fn test_search_results_preserve_links_in_title (
 ) -> Result < (), Box < dyn std::error::Error >> {
   let index_dir : &str =
-    "tests/serve_text_search_test/temp_index_textlinks";
+    "tests/serve_text_search_test/temp_index_links";
   let test_result : Result < (), Box < dyn std::error::Error >>
     = ( || {
       // Two nodes; both will match a search for "science".
-      // node_link's title is a textlink with label "science"; its
+      // node_link's title is a link with label "science"; its
       // raw title carries the link syntax.
       let mut node_link : NodeComplete = empty_node_complete ();
       node_link . pid = ID::new ("link_node");
@@ -225,7 +225,7 @@ fn test_search_results_preserve_textlinks_in_title (
       assert_eq! (
         title, "[[id:other][science]]",
         "link_node's search-result title should preserve the \
-         textlink syntax; the bug was rendering it as 'science'." );
+         link syntax; the bug was rendering it as 'science'." );
       Ok (( ))
     }) ();
   match test_result {

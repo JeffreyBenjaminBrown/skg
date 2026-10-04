@@ -6,7 +6,7 @@ use crate::types::list::{Diff_Item, compute_interleaved_diff};
 use crate::types::misc::{
   ID, MSV, RelPartner, SourceName, members_of, members_msv};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::textlinks::textlinks_from_node;
+use crate::types::links::links_from_node;
 
 use similar::{ChangeTag, TextDiff};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -322,7 +322,7 @@ fn is_backward_relationship_role (
 ) -> bool {
   matches! (
     role,
-    "container" | "subscribee" | "hidden" | "overridden" | "dest" )
+    "container" | "subscribee" | "hidden" | "overridden" | "mentioned" )
 }
 
 fn contained_list_diff_for_pid (
@@ -511,11 +511,11 @@ impl GraphFacts {
           continue; }
         facts . add_edge ("overrider", &node . pid, overridden);
         facts . add_edge ("overridden", overridden, &node . pid); }
-      for textlink in textlinks_from_node (node) {
-        if ambiguous_pids . contains (&textlink . id) {
+      for link in links_from_node (node) {
+        if ambiguous_pids . contains (&link . id) {
           continue; }
-        facts . add_edge ("source", &node . pid, &textlink . id);
-        facts . add_edge ("dest", &textlink . id, &node . pid); } }
+        facts . add_edge ("mentioner", &node . pid, &link . id);
+        facts . add_edge ("mentioned", &link . id, &node . pid); } }
     facts
   }
 
@@ -585,13 +585,13 @@ impl GraphFacts {
           facts . add_edge ("overrider", &node . pid, overridden); }
         if tracked_pids . contains (overridden) {
           facts . add_edge ("overridden", overridden, &node . pid); }}
-      for textlink in textlinks_from_node (node) {
-        if ambiguous_pids . contains (&textlink . id) {
+      for link in links_from_node (node) {
+        if ambiguous_pids . contains (&link . id) {
           continue; }
         if track_outbound {
-          facts . add_edge ("source", &node . pid, &textlink . id); }
-        if tracked_pids . contains (&textlink . id) {
-          facts . add_edge ("dest", &textlink . id, &node . pid); }}}
+          facts . add_edge ("mentioner", &node . pid, &link . id); }
+        if tracked_pids . contains (&link . id) {
+          facts . add_edge ("mentioned", &link . id, &node . pid); }}}
     facts
   }
 
@@ -617,8 +617,8 @@ const ROLE_NAMES : &[&str] = &[
   "hidden",
   "overrider",
   "overridden",
-  "source",
-  "dest",
+  "mentioner",
+  "mentioned",
 ];
 
 const BUCKET_NAMES : &[&str] = &[

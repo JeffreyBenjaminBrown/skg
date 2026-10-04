@@ -2,7 +2,7 @@
 
 use pulldown_cmark::{Event, LinkType, Options, Parser, Tag, TagEnd};
 use serde_yaml::Value;
-use crate::types::textlinks::org_literal_ranges::{
+use crate::types::links::org_literal_ranges::{
   HeadlineInsideBlock, headlines_inside_blocks,
   org_literal_ranges_and_unclosed_block};
 use std::ops::Range;

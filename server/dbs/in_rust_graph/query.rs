@@ -27,7 +27,7 @@ pub fn find_related_nodes (
       ("contains",                     "container",   "contained")  =>
         if let Some (n) = graph . nodes . get (&pid) {
           out . extend ( members_of (& n . contains) . iter () . map (&pid_or_self) ); },
-      ("subscribes",                   "subscriber",  "subscribee") =>
+      ("subscribes_to",                "subscriber",  "subscribee") =>
         if let Some (n) = graph . nodes . get (&pid) {
           out . extend ( members_of ( n . subscribes_to . or_default () )
                          . iter () . map (&pid_or_self) ); },
@@ -39,15 +39,15 @@ pub fn find_related_nodes (
         if let Some (n) = graph . nodes . get (&pid) {
           out . extend ( members_of ( n . overrides_view_of . or_default () )
                          . iter () . map (&pid_or_self) ); },
-      ("textlinks_to",                 "source",      "dest")       =>
+      ("links_to",                     "mentioner",   "mentioned")  =>
         if let Some (n) = graph . nodes . get (&pid) {
-          out . extend ( n . textlinks_to
+          out . extend ( n . links_to
                          . iter () . map (&pid_or_self) ); },
       // Inverse lookups: consult the inverse index.
       ("contains",                     "contained",   "container")   =>
         if let Some (s) = graph . contained_by . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
-      ("subscribes",                   "subscribee",  "subscriber")  =>
+      ("subscribes_to",                "subscribee",  "subscriber")  =>
         if let Some (s) = graph . subscribers_of . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
       ("hides_from_its_subscriptions", "hidden",      "hider")       =>
@@ -56,8 +56,8 @@ pub fn find_related_nodes (
       ("overrides_view_of",            "overridden",  "overrider")   =>
         if let Some (s) = graph . overriders_of . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
-      ("textlinks_to",                 "dest",        "source")      =>
-        if let Some (s) = graph . textlinks_in . get (&pid) {
+      ("links_to",                     "mentioned",   "mentioner")  =>
+        if let Some (s) = graph . mentioners_of . get (&pid) {
           out . extend ( s . iter () . cloned () ); },
       // Unknown (relation, input, output) combination: shouldn't
       // happen — the five outbound types have exactly two roles

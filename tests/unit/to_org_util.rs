@@ -14,7 +14,7 @@ fn mk_node (
   pid          : &str,
   extra_ids    : &[&str],
   contains     : &[&str],
-  textlinks_to : &[&str],
+  links_to : &[&str],
 ) -> NodeRust {
   NodeRust {
     pid:          id (pid),
@@ -31,7 +31,7 @@ fn mk_node (
     hides_from_its_subscriptions: MSV::Unspecified,
     overrides_view_of:            MSV::Unspecified,
     misc:         Vec::new (),
-    textlinks_to: textlinks_to . iter () . map ( |s| id (s) ) . collect (),
+    links_to: links_to . iter () . map ( |s| id (s) ) . collect (),
   } }
 
 /// Insert nodes into a fresh InRustGraph.
@@ -42,7 +42,7 @@ fn graph_with (nodes: Vec<NodeRust>) -> InRustGraph {
     for eid in &n . extra_ids {
       g . extra_id_to_pid . insert (eid . clone (), n . pid . clone ()); } }
   for n in nodes {
-    // Build the inverse indexes too (contained_by, textlinks_in, ...),
+    // Build the inverse indexes too (contained_by, mentioners_of, ...),
     // so the graph is complete: 'relation_membership_is_real' (used by
     // the birth-claim validation) reads those inverse maps.
     add_to_inverse_indexes (&mut g, &n);
@@ -67,11 +67,11 @@ fn birth_if_normal (
 
 #[test]
 fn linksto_false_claim_flipped_to_independent () {
-  // Parent P, child C with birth=LinksToParent, but C's textlinks_to
+  // Parent P, child C with birth=LinksToParent, but C's links_to
   // does NOT include P. The claim is false → flip.
   let graph : InRustGraph = graph_with (vec! [
     mk_node ("P", &[], &[], &[]),
-    mk_node ("C", &[], &[], &[]),   // textlinks_to: empty
+    mk_node ("C", &[], &[], &[]),   // links_to: empty
   ]);
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
@@ -81,21 +81,21 @@ fn linksto_false_claim_flipped_to_independent () {
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::Backpath (RelationRole::LINK_SOURCE)) ) . id ();
+      AffectsParent::False, Birth::Backpath (RelationRole::MENTIONER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
   assert_eq! (affectsParent_if_normal (&viewforest, c_id), AffectsParent::False,
-    "LinksToParent claim with no backing textlink should flip to Independent");
+    "LinksToParent claim with no backing link should flip to Independent");
 }
 
 #[test]
 fn linksto_true_claim_preserved () {
-  // Parent P, child C with birth=LinksToParent and C's textlinks_to
+  // Parent P, child C with birth=LinksToParent and C's links_to
   // DOES include P. The claim is true → preserve.
   let graph : InRustGraph = graph_with (vec! [
     mk_node ("P", &[], &[], &[]),
-    mk_node ("C", &[], &[], &["P"]), // C textlinks to P
+    mk_node ("C", &[], &[], &["P"]), // C links to P
   ]);
   let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
@@ -105,12 +105,12 @@ fn linksto_true_claim_preserved () {
   let c_id : NodeId = viewforest . get_mut (p_id) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::Backpath (RelationRole::LINK_SOURCE)) ) . id ();
+      AffectsParent::False, Birth::Backpath (RelationRole::MENTIONER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::LINK_SOURCE),
-    "LinksToParent claim with a backing textlink must be preserved");
+  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::MENTIONER),
+    "LinksToParent claim with a backing link must be preserved");
 }
 
 #[test]
@@ -451,11 +451,11 @@ fn moved_linksto_relationship_holds_preserved () {
   let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::Backpath (RelationRole::LINK_SOURCE)) ) . id ();
+      AffectsParent::False, Birth::Backpath (RelationRole::MENTIONER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 
-  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::LINK_SOURCE),
+  assert_eq! (birth_if_normal (&viewforest, c_id), Birth::Backpath (RelationRole::MENTIONER),
     "Moved linksToParent: C still links to p_new — keep");
 }
 
@@ -475,7 +475,7 @@ fn moved_linksto_relationship_broken_flipped () {
   let c_id : NodeId = viewforest . get_mut (p_new_id) . unwrap () . append (
     mk_writeProtected_viewnode_with_birth (
       id ("C"), src (), "C" . to_string (),
-      AffectsParent::False, Birth::Backpath (RelationRole::LINK_SOURCE)) ) . id ();
+      AffectsParent::False, Birth::Backpath (RelationRole::MENTIONER)) ) . id ();
 
   validate_affectsParent_relationships (&mut viewforest, &graph);
 

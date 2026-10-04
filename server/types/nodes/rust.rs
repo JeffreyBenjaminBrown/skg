@@ -1,12 +1,12 @@
 //! NodeRust: the projection held in the in-Rust graph.
 //!
 //! Wide enough to match everything NodeComplete carries (except
-//! derived fields), plus textlinks_to — derived from body parsing at
+//! derived fields), plus links_to — derived from body parsing at
 //! NodeRust construction time.
 
 use crate::types::misc::{ID, MSV, RelPartner, SourceName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
-use crate::types::textlinks::textlinks_from_node;
+use crate::types::links::links_from_node;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct NodeRust {
@@ -23,16 +23,16 @@ pub struct NodeRust {
   pub overrides_view_of            : MSV<RelPartner<ID>>,
   pub misc                         : Vec<FileProperty>,
   // PITFALL: derived from the text.
-  // Parsed from title+body via 'textlinks_from_node' during
+  // Parsed from title+body via 'links_from_node' during
   // construction; never read from disk.
-  pub textlinks_to                 : Vec<ID>,
+  pub links_to                 : Vec<ID>,
 }
 
 impl From<&NodeComplete> for NodeRust {
-  /// Derive 'textlinks_to' by parsing title+body; copy everything else.
+  /// Derive 'links_to' by parsing title+body; copy everything else.
   fn from (c: &NodeComplete) -> Self {
-    let textlinks_to : Vec<ID> =
-      textlinks_from_node (c)
+    let links_to : Vec<ID> =
+      links_from_node (c)
       . into_iter ()
       . map ( |tl| tl . id )
       . collect ();
@@ -49,7 +49,7 @@ impl From<&NodeComplete> for NodeRust {
       hides_from_its_subscriptions : c . hides_from_its_subscriptions . clone (),
       overrides_view_of            : c . overrides_view_of . clone (),
       misc                         : c . misc . clone (),
-      textlinks_to,
+      links_to,
     }
   }
 }

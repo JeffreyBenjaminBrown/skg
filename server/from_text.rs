@@ -319,7 +319,7 @@ pub fn buffer_to_validated_saveplan_with_fork_sources (
   buffer_to_validated_saveplan_with_fork_sources_in_graph (
     buffer_text, &graph, config, active_source_set, fork_sources ) }
 
-/// One nonfatal warning per DEAD textlink this save writes: a
+/// One nonfatal warning per DEAD link this save writes: a
 /// '[[id:X][label]]' in a saved title or body where X is neither in
 /// the graph nor created by this same save (TODO/more.org, "Warn the
 /// user when they make dead links"). Only nodes the save actually
@@ -332,7 +332,7 @@ fn dead_link_warnings (
   define_nodes : &[DefineNode],
   fork_specs   : &[ForkSpec],
 ) -> Vec<String> {
-  use crate::types::textlinks::textlinks_from_node;
+  use crate::types::links::links_from_node;
   let saved_nodes : Vec<&NodeComplete> =
     define_nodes . iter ()
     . filter_map ( |dn| match dn {
@@ -349,7 +349,7 @@ fn dead_link_warnings (
     ids };
   let mut warnings : Vec<String> = Vec::new ();
   for node in &saved_nodes {
-    for link in textlinks_from_node (node) {
+    for link in links_from_node (node) {
       if created_this_save . contains (& link . id) { continue; }
       if graph . pid_of (& link . id) . is_some () { continue; }
       warnings . push ( format! (

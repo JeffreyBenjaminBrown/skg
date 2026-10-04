@@ -186,7 +186,7 @@ pub fn reverse_some_of_node(node: &NodeComplete) -> NodeComplete {
   }}
 
 #[test]
-fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
+fn test_links_extracted_during_read() -> std::io::Result<()> {
   use std::collections::HashMap;
   use skg::types::misc::SkgfileSource;
   use tempfile::tempdir;
@@ -205,7 +205,7 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
     SkgConfig::dummyFromSources (sources) };
 
   let mut test_node : NodeComplete = empty_node_complete ();
-  { test_node . title = "Title with two textlinks: [[(id textlink1][First) TextLink]] and [[(id textlink2][Second) TextLink]]"
+  { test_node . title = "Title with two links: [[(id link1][First) Link]] and [[(id link2][Second) Link]]"
       . to_string();
     test_node . source = SourceName::from ("temp");
     test_node . aliases = rel_partners_at_relSource_msv (
@@ -213,7 +213,7 @@ fn test_textlinks_extracted_during_read() -> std::io::Result<()> {
       MSV::Specified(vec![ "alias 1" . to_string(),
                            "alias 2" . to_string() ]));
     test_node . pid = ID::new ("test123");
-    test_node . body = Some("Some text with a link [[(id textlink3][Third) TextLink]] and another [[(id textlink4][Fourth) TextLink]]" . to_string()); }
+    test_node . body = Some("Some text with a link [[(id link3][Third) Link]] and another [[(id link4][Fourth) Link]]" . to_string()); }
 
   { // Write to a file and read it back.
     write_nodecomplete_to_source(&test_node, &config)?;

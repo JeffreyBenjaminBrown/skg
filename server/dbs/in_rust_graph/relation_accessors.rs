@@ -10,8 +10,8 @@ use crate::types::nodes::rust::NodeRust;
 /// This is domain vocabulary; storage adapters consume it rather than own it.
 pub const OUTBOUND_RELATIONSHIP_TYPES : &[(&str, &str, &str)] = &[
   ("contains",                      "container",  "contained"),
-  ("textlinks_to",                  "source",     "dest"),
-  ("subscribes",                    "subscriber", "subscribee"),
+  ("links_to",                      "mentioner",  "mentioned"),
+  ("subscribes_to",                 "subscriber", "subscribee"),
   ("hides_from_its_subscriptions",  "hider",      "hidden"),
   ("overrides_view_of",             "overrider",  "overridden"),
 ];
@@ -19,8 +19,8 @@ pub const OUTBOUND_RELATIONSHIP_TYPES : &[(&str, &str, &str)] = &[
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NodeRelation {
   Contains,
-  TextlinksTo,
-  Subscribes,
+  LinksTo,
+  SubscribesTo,
   HidesFromItsSubscriptions,
   OverridesViewOf,
 }
@@ -30,10 +30,10 @@ impl NodeRelation {
     match self {
       Self::Contains =>
         "contains",
-      Self::TextlinksTo =>
-        "textlinks_to",
-      Self::Subscribes =>
-        "subscribes",
+      Self::LinksTo =>
+        "links_to",
+      Self::SubscribesTo =>
+        "subscribes_to",
       Self::HidesFromItsSubscriptions =>
         "hides_from_its_subscriptions",
       Self::OverridesViewOf =>
@@ -43,7 +43,7 @@ impl NodeRelation {
 
   /// The per-stage diff of this relation's outbound list within a
   /// NodeChanges, or None for a relation NodeChanges does not diff
-  /// (textlinks are inferred from node text, not stored as a list).
+  /// (links are inferred from node text, not stored as a list).
   /// Membership-sign consumers (e.g. 'phantom_axes') call this with
   /// the one relation their folder represents, so a sign can never be
   /// read from a different relation that involves the same ID.
@@ -54,13 +54,13 @@ impl NodeRelation {
     match self {
       Self::Contains =>
         Some ( & nc . contains_diff ),
-      Self::Subscribes =>
+      Self::SubscribesTo =>
         Some ( & nc . subscribes_to_diff ),
       Self::HidesFromItsSubscriptions =>
         Some ( & nc . hides_diff ),
       Self::OverridesViewOf =>
         Some ( & nc . overrides_view_of_diff ),
-      Self::TextlinksTo =>
+      Self::LinksTo =>
         None, } }
 
   pub fn roles (self) -> (&'static str, &'static str) {
@@ -120,11 +120,11 @@ impl RelationRole {
   pub const CONTAINER : RelationRole =
     RelationRole { relation : NodeRelation::Contains,
                    position : BinaryRolePosition::First };
-  pub const LINK_SOURCE : RelationRole =
-    RelationRole { relation : NodeRelation::TextlinksTo,
+  pub const MENTIONER : RelationRole =
+    RelationRole { relation : NodeRelation::LinksTo,
                    position : BinaryRolePosition::First };
-  pub const LINK_DEST : RelationRole =
-    RelationRole { relation : NodeRelation::TextlinksTo,
+  pub const MENTIONED : RelationRole =
+    RelationRole { relation : NodeRelation::LinksTo,
                    position : BinaryRolePosition::Second };
   pub const OVERRIDER : RelationRole =
     RelationRole { relation : NodeRelation::OverridesViewOf,
@@ -139,10 +139,10 @@ impl RelationRole {
     RelationRole { relation : NodeRelation::HidesFromItsSubscriptions,
                    position : BinaryRolePosition::Second };
   pub const SUBSCRIBER : RelationRole =
-    RelationRole { relation : NodeRelation::Subscribes,
+    RelationRole { relation : NodeRelation::SubscribesTo,
                    position : BinaryRolePosition::First };
   pub const SUBSCRIBEE : RelationRole =
-    RelationRole { relation : NodeRelation::Subscribes,
+    RelationRole { relation : NodeRelation::SubscribesTo,
                    position : BinaryRolePosition::Second };
 
   /// The single ROLENAME token naming this partner role in the wire
@@ -196,8 +196,8 @@ impl RelationRole {
 pub const PARTNER_ROLE_VOCAB
   : &[ (&'static str, RelationRole, &'static str) ] = &[
   ("container",  RelationRole::CONTAINER,   "}"),
-  ("linkSource", RelationRole::LINK_SOURCE, "←"),
-  ("linkDest",   RelationRole::LINK_DEST,   "→"),
+  ("mentioner", RelationRole::MENTIONER, "←"),
+  ("mentioned",   RelationRole::MENTIONED,   "→"),
   ("overrider",  RelationRole::OVERRIDER,   "Op"),
   ("overridden", RelationRole::OVERRIDDEN,  "pO"),
   ("hider",      RelationRole::HIDER,       "Hp"),
@@ -222,8 +222,8 @@ impl InRustGraph {
     for seed in &seed_ids {
       for relation in [
         NodeRelation::Contains,
-        NodeRelation::TextlinksTo,
-        NodeRelation::Subscribes,
+        NodeRelation::LinksTo,
+        NodeRelation::SubscribesTo,
         NodeRelation::HidesFromItsSubscriptions,
       ] {
         result . extend (
@@ -286,13 +286,13 @@ impl InRustGraph {
     let members : Vec<RelPartner<ID>> = match relation {
       NodeRelation::Contains =>
         node . contains . clone (),
-      NodeRelation::Subscribes =>
+      NodeRelation::SubscribesTo =>
         node . subscribes_to . or_default () . to_vec (),
       NodeRelation::HidesFromItsSubscriptions =>
         node . hides_from_its_subscriptions . or_default () . to_vec (),
       NodeRelation::OverridesViewOf =>
         node . overrides_view_of . or_default () . to_vec (),
-      NodeRelation::TextlinksTo =>
+      NodeRelation::LinksTo =>
         return Vec::new (),
     };
     members . into_iter ()
@@ -311,7 +311,7 @@ impl InRustGraph {
     relation : NodeRelation,
     active   : Option<&crate::source_sets::ActiveSourceSet>,
   ) -> Vec<ID> {
-    if relation == NodeRelation::TextlinksTo {
+    if relation == NodeRelation::LinksTo {
       return self . outbound_ids_for_relation (pid, relation); }
     self . outbound_rel_partners_for_relation_gated (
       pid, relation, active ) . into_iter ()
@@ -337,14 +337,14 @@ impl InRustGraph {
     let rel_partners : Vec<RelPartner<ID>> = match relation {
       NodeRelation::Contains =>
         node . contains . clone (),
-      NodeRelation::Subscribes =>
+      NodeRelation::SubscribesTo =>
         node . subscribes_to . or_default () . to_vec (),
       NodeRelation::HidesFromItsSubscriptions =>
         node . hides_from_its_subscriptions . or_default () . to_vec (),
       NodeRelation::OverridesViewOf =>
         node . overrides_view_of . or_default () . to_vec (),
-      NodeRelation::TextlinksTo =>
-        // textlinks derive from the body, which is home-only, so
+      NodeRelation::LinksTo =>
+        // links derive from the body, which is home-only, so
         // their source is the owner's home by construction.
         return self . nodes . get (owner)
           . map ( |n| n . source . clone () ), };
@@ -492,9 +492,9 @@ fn outbound_ids_from_node (
   match relation {
     NodeRelation::Contains =>
       members_of ( &node . contains ),
-    NodeRelation::TextlinksTo =>
-      node . textlinks_to . clone (),
-    NodeRelation::Subscribes =>
+    NodeRelation::LinksTo =>
+      node . links_to . clone (),
+    NodeRelation::SubscribesTo =>
       members_of ( node . subscribes_to . or_default () ),
     NodeRelation::HidesFromItsSubscriptions =>
       members_of ( node . hides_from_its_subscriptions . or_default () ),
@@ -512,11 +512,11 @@ fn inbound_pid_set (
       graph . contained_by . get (pid)
       . map ( |s| s . iter () . cloned () . collect () )
       . unwrap_or_default (),
-    NodeRelation::TextlinksTo =>
-      graph . textlinks_in . get (pid)
+    NodeRelation::LinksTo =>
+      graph . mentioners_of . get (pid)
       . map ( |s| s . iter () . cloned () . collect () )
       . unwrap_or_default (),
-    NodeRelation::Subscribes =>
+    NodeRelation::SubscribesTo =>
       graph . subscribers_of . get (pid)
       . map ( |s| s . iter () . cloned () . collect () )
       . unwrap_or_default (),
@@ -545,10 +545,10 @@ mod tests {
                      (&str, &str, &str)); 9] = [
       ("container",  RelationRole::CONTAINER,   "}",
        ("contains", "contained", "container")),
-      ("linkSource", RelationRole::LINK_SOURCE, "←",
-       ("textlinks_to", "dest", "source")),
-      ("linkDest",   RelationRole::LINK_DEST,   "→",
-       ("textlinks_to", "source", "dest")),
+      ("mentioner", RelationRole::MENTIONER, "←",
+       ("links_to", "mentioned", "mentioner")),
+      ("mentioned",   RelationRole::MENTIONED,   "→",
+       ("links_to", "mentioner", "mentioned")),
       ("overrider",  RelationRole::OVERRIDER,   "Op",
        ("overrides_view_of", "overridden", "overrider")),
       ("overridden", RelationRole::OVERRIDDEN,  "pO",
@@ -558,9 +558,9 @@ mod tests {
       ("hidden",     RelationRole::HIDDEN,      "pH",
        ("hides_from_its_subscriptions", "hider", "hidden")),
       ("subscriber", RelationRole::SUBSCRIBER,  "Sp",
-       ("subscribes", "subscribee", "subscriber")),
+       ("subscribes_to", "subscribee", "subscriber")),
       ("subscribee", RelationRole::SUBSCRIBEE,  "pS",
-       ("subscribes", "subscriber", "subscribee")),
+       ("subscribes_to", "subscriber", "subscribee")),
     ];
     for (name, role, glyph, triple) in expected {
       assert_eq! ( role . rolename (), name );

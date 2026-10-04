@@ -9,7 +9,7 @@ use crate::dbs::in_rust_graph::{InRustGraph,
   complete_validation::complete_from_rust};
 use crate::export_org::claimed_export_targets;
 use crate::types::env::SkgEnv;
-use crate::types::textlinks::org_literal_ranges::HEADLINES_INSIDE_BLOCKS_EXPLANATION;
+use crate::types::links::org_literal_ranges::HEADLINES_INSIDE_BLOCKS_EXPLANATION;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 use std::collections::HashMap;

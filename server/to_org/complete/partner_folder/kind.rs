@@ -46,10 +46,10 @@ impl PartnerFolder {
     match self {
       PartnerFolder::Subscribee =>
         Some (RelationRole::new (
-          NodeRelation::Subscribes, BinaryRolePosition::Second)),
+          NodeRelation::SubscribesTo, BinaryRolePosition::Second)),
       PartnerFolder::Subscriber =>
         Some (RelationRole::new (
-          NodeRelation::Subscribes, BinaryRolePosition::First)),
+          NodeRelation::SubscribesTo, BinaryRolePosition::First)),
       PartnerFolder::Overridden =>
         Some (RelationRole::new (
           NodeRelation::OverridesViewOf, BinaryRolePosition::Second)),

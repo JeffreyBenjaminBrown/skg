@@ -8,7 +8,7 @@ use crate::dbs::tantivy::background_writer::lock_tantivy_writes;
 use crate::types::misc::{ID, SourceName, TantivyIndex};
 use crate::types::nodes::complete::{FileProperty, file_property_is_true};
 use crate::types::nodes::tantivy::NodeTantivy;
-use crate::types::textlinks::replace_each_link_with_its_label;
+use crate::types::links::replace_each_link_with_its_label;
 
 use tantivy::{IndexWriter, Term, TantivyDocument, doc};
 use std::collections::HashMap;

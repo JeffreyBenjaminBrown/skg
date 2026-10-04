@@ -77,10 +77,10 @@ pub(crate) fn tantivy_index_from_index (
 /// Fields:
 /// - "id":                  STRING | STORED — the node's primary ID.
 /// - "title_or_alias":      TEXT   | STORED — searchable titles and aliases,
-///                          with textlinks reduced to their labels.
+///                          with links reduced to their labels.
 /// - "raw_title":           STRING | STORED — the un-reduced title, stored
 ///                          only on is_title="true" docs. Preserves the
-///                          textlink syntax that 'title_or_alias' strips.
+///                          link syntax that 'title_or_alias' strips.
 /// - "overPrivateText_telescope":      STRING | STORED — "true" when title or body
 ///                          was selected below the node's home.
 /// - "no_search_matching":  STRING | STORED — "true" when this
@@ -127,7 +127,7 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
 /// Prefers the document marked is_title="true"; falls back to the
 /// first title_or_alias found if no title document exists.
 ///
-/// Returns the raw_title (with textlink syntax intact) when available,
+/// Returns the raw_title (with link syntax intact) when available,
 /// so the user sees `[[id:X][label]]` rather than just `label` -- this
 /// preserves the visual distinction between a node titled "science"
 /// and one whose title links to a different node also labelled

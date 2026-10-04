@@ -100,8 +100,8 @@ async fn run_overrides_view_test (
        view:\n{}", initial );
     let request : String = initial . replace (
       "(affectsParent na)",
-      "(affectsParent na) (viewRequests (folder overrides) \
-       (folder hides))" );
+      "(affectsParent na) (viewRequests (folder overrides_view_of) \
+       (folder hides_from_its_subscriptions))" );
     let mut views_state : ViewsState = ViewsState {
       diff_mode_enabled : true,
       open_views        : OpenViews::new (), };
@@ -158,11 +158,11 @@ async fn emptied_requested_folders_still_render_in_diff_mode (
         . replace (
           "(id E) (source main) (affectsParent na)",
           "(id E) (source main) (affectsParent na) \
-           (viewRequests (folder overrides) (folder hides))" )
+           (viewRequests (folder overrides_view_of) (folder hides_from_its_subscriptions))" )
         . replace (
           "(id EN) (source main) (affectsParent na)",
           "(id EN) (source main) (affectsParent na) \
-           (viewRequests (folder overrides))" );
+           (viewRequests (folder overrides_view_of))" );
       let mut views_state : ViewsState = ViewsState {
         diff_mode_enabled : true,
         open_views        : OpenViews::new (), };

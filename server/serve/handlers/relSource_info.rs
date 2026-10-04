@@ -88,14 +88,14 @@ pub fn relSource_info (
 
 /// The three relations an explicit '(editRequest (relSource ...))'
 /// request can name
-/// (matching 'RequestedRelSources'). Hides and textlinks have no
+/// (matching 'RequestedRelSources'). Hides and links have no
 /// explicit-relSource path, so asking about them is an error.
 fn relation_from_client_string (
   s : &str,
 ) -> Result<NodeRelation, String> {
   match s {
     "contains"          => Ok (NodeRelation::Contains),
-    "subscribes_to"     => Ok (NodeRelation::Subscribes),
+    "subscribes_to"     => Ok (NodeRelation::SubscribesTo),
     "overrides_view_of" => Ok (NodeRelation::OverridesViewOf),
     other => Err ( format! (
       "unsupported relation '{}': the explicit-relSource path covers \

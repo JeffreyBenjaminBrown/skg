@@ -144,7 +144,7 @@ pub fn maybe_add_subscribeeFolder_branch (
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?
     . ok_or ("maybe_add_subscribeeFolder_branch: expected ActiveNode") ?;
   let subscribee_ids : Vec<ID> = graph . outbound_ids_for_relation_gated (
-    &subscriber_pid, NodeRelation::Subscribes, active_source_set );
+    &subscriber_pid, NodeRelation::SubscribesTo, active_source_set );
   let subscribee_ids : Vec<ID> =
     // TODO/full-schema/9-2_source-set-safety.org: inactive
     // subscribees are omitted at de novo creation (no retained
@@ -164,7 +164,7 @@ pub fn maybe_add_subscribeeFolder_branch (
       source_diffs . is_some ()
       && ! goal_list_for_outbound_folder (
              &subscriber_pid, &subscriber_source,
-             NodeRelation::Subscribes,
+             NodeRelation::SubscribesTo,
              source_diffs, &subscribee_ids ) . 0 . is_empty ();
     if ! head_side_occupied && ! force_create_when_empty {
       return Ok (( )); }}

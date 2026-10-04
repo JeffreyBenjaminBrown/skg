@@ -52,7 +52,7 @@ pub fn build_and_integrate_path_view_then_drop_request (
 /// Build the backpath for one partner 'role', and -- for every role
 /// EXCEPT the container role -- attach each grafted partner's
 /// containerward ancestry beneath it, so the partner is shown in its
-/// own container context (as sourceward has always done for link
+/// own container context (as mentionerward has always done for link
 /// sources). The container role itself IS that ancestry, so it does not
 /// re-attach.
 pub fn build_and_integrate_path_with_source_set (
@@ -98,17 +98,17 @@ pub fn build_and_integrate_containerward_path_with_source_set (
   build_and_integrate_path_with_source_set (
     tree, node_id, graph, RelationRole::CONTAINER, config, active ) }
 
-/// Integrate sourceward paths (link sources of the node), attaching
+/// Integrate mentionerward paths (link sources of the node), attaching
 /// each source's containerward ancestry. Thin wrapper over the generic
-/// engine with the linkSource role.
-pub fn build_and_integrate_sourceward_path (
+/// engine with the mentioner role.
+pub fn build_and_integrate_mentionerward_path (
   tree      : &mut Tree<ViewNode>,
   node_id   : NodeId,
   graph     : &InRustGraph,
   config    : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   build_and_integrate_path_with_source_set (
-    tree, node_id, graph, RelationRole::LINK_SOURCE, config, None ) }
+    tree, node_id, graph, RelationRole::MENTIONER, config, None ) }
 
 /// Plural 'backpaths' because if the origin
 /// immediately forks in the backward direction,
@@ -117,7 +117,7 @@ pub fn build_and_integrate_sourceward_path (
 ///
 /// RETURNS the deduplicated set of pids that appear anywhere in
 /// the integrated paths (including branches and cycle nodes).
-/// Sourceward callers use this to fetch ancestries for each
+/// Mentionerward callers use this to fetch ancestries for each
 /// link source; containerward callers can ignore it.
 fn build_and_integrate_backpaths (
   tree        : &mut Tree<ViewNode>,

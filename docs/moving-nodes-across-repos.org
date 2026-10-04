@@ -52,7 +52,7 @@ source name isn't in =[[sources]]=, you'll get a "source not found"
 error, not a "move failed" error, and no =.skg= file will be moved.
 Add the source first and restart the server before doing the move.
 
-*** Containment, subscriptions, textlinks: all unaffected
+*** Containment, subscriptions, links: all unaffected
 All graph relationships are by ID, not =(ID, source)=. The set of
 edges to/from the moved node is invariant under a source move.
 Don't expect anything related to graph topology to change.

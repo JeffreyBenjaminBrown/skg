@@ -4,7 +4,7 @@
 // found": deleting a node whose viewnode is still present in ANOTHER
 // open view must not make the save response complain about that
 // collateral view. Fixture mirrors the reported shape: P contains the
-// linking node L (whose title is one big textlink to X); a view of P
+// linking node L (whose title is one big link to X); a view of P
 // is open; a second view of L alone is saved with (editRequest
 // delete) on L.
 

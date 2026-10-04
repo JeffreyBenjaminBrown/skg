@@ -84,7 +84,7 @@ async fn readonly_folder_repairs_warn_impl (
       &[ ID ("n" . to_string ()) ], false ) ?;
   let folder_request : String = initial_buffer . replace (
     "(affectsParent na)",
-    "(affectsParent na) (viewRequests (folder subscribes))" );
+    "(affectsParent na) (viewRequests (folder subscribes_to))" );
   let complete_buffer : String =
     save_buffer (&folder_request, config, tantivy, &graph)
     . await ? . saved_view;

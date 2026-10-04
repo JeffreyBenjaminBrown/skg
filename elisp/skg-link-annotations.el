@@ -67,7 +67,7 @@ Link syntax in text Org shows literally is an example, not a link."
 (defun skg-link-annotations--literal-ranges ()
   "Return (BEG . END) ranges of this buffer that Org shows literally.
 Mirrors the server's 'org_literal_ranges' in
-server/types/textlinks/org_literal_ranges.rs: #+begin_X ... #+end_X
+server/types/links/org_literal_ranges.rs: #+begin_X ... #+end_X
 blocks, ``` fences, fixed-width lines, and inline =verbatim= and
 ~code~. A headline ends any open block, as the end of a node's body
 does on the server. tests/shared/literal-link-cases.txt holds the cases

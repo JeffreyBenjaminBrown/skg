@@ -1,6 +1,6 @@
 /// PURPOSE: Fetch all graph-node statistics for a set of PIDs from the
 /// in-Rust graph: directional member counts for the five relations, the
-/// alias / extra-id / true-property counts, and the interesting-link subset.
+/// alias / extra-id / true-property counts, and the substantive-mentioner subset.
 /// These feed the uniform-herald token grammar (server/herald_tokens.rs).
 ///
 /// PITFALL: Assumes input IDs are primary IDs, not extra IDs. Always
@@ -102,7 +102,7 @@ fn fetch_all_graphnodestats_in_rust (
   active  : Option<&ActiveSourceSet>,
 ) -> AllGraphNodeStats {
   let mut counts : HashMap<ID, RelationCounts> = HashMap::new ();
-  let mut link_source_facts : HashMap<ID, (HashSet<ID>, bool)> = HashMap::new ();
+  let mut mentioner_link_facts : HashMap<ID, (HashSet<ID>, bool)> = HashMap::new ();
   let mut container_to_contents
     : HashMap<ID, HashSet<ID>> = HashMap::new ();
   let mut content_to_containers
@@ -126,33 +126,33 @@ fn fetch_all_graphnodestats_in_rust (
       inbound_count (NodeRelation::HidesFromItsSubscriptions);
     let hides : usize =
       outbound_count (NodeRelation::HidesFromItsSubscriptions);
-    let subscribers : usize = inbound_count (NodeRelation::Subscribes);
-    let subscribees : usize = outbound_count (NodeRelation::Subscribes);
+    let subscribers : usize = inbound_count (NodeRelation::SubscribesTo);
+    let subscribees : usize = outbound_count (NodeRelation::SubscribesTo);
     let overriders : usize = inbound_count (NodeRelation::OverridesViewOf);
     let overrides_out : usize =
       outbound_count (NodeRelation::OverridesViewOf);
-    let link_sources : HashSet<ID> =
+    let mentioners : HashSet<ID> =
       graph . inbound_pids_for_relation_gated (
-        pid, NodeRelation::TextlinksTo, active )
+        pid, NodeRelation::LinksTo, active )
       . into_iter ()
-      . filter (|source| pid_source_is_active (graph, active, source))
+      . filter (|mentioner| pid_source_is_active (graph, active, mentioner))
       . collect ();
-    let link_total : usize = link_sources . len ();
-    let link_interesting : usize = link_sources . iter ()
-      . filter (|source| {
+    let link_total : usize = mentioners . len ();
+    let link_substantive : usize = mentioners . iter ()
+      . filter (|mentioner| {
         let facts : &(HashSet<ID>, bool) =
-          link_source_facts . entry ((*source) . clone ())
-          . or_insert_with (|| link_facts_for_source (graph, active, source));
+          mentioner_link_facts . entry ((*mentioner) . clone ())
+          . or_insert_with (|| link_facts_for_mentioner (graph, active, mentioner));
         facts . 1 })
       . count ();
     let link_targets : usize =
-      link_source_facts . entry (pid . clone ())
-      . or_insert_with (|| link_facts_for_source (graph, active, pid))
+      mentioner_link_facts . entry (pid . clone ())
+      . or_insert_with (|| link_facts_for_mentioner (graph, active, pid))
       . 0 . len ();
     counts . insert ( pid . clone (), RelationCounts {
       containers, contents, hiders, hides,
       subscribers, subscribees, overriders, overrides_out,
-      link_total, link_interesting, link_targets } );
+      link_total, link_substantive, link_targets } );
     // container_to_contents[pid] = (pid's gated contents) ∩ pid_set.
     { let intersected : HashSet<ID> =
         graph . outbound_pids_for_relation_gated (
@@ -181,9 +181,9 @@ fn fetch_all_graphnodestats_in_rust (
     content_to_containers,
   } }
 
-/// Distinct visible resolved link targets and the source's interestingness.
-/// The graph already parsed title and body into textlinks_to.
-fn link_facts_for_source (
+/// Distinct visible resolved link targets, and whether the mentioner is substantive.
+/// The graph already parsed title and body into links_to.
+fn link_facts_for_mentioner (
   graph  : &InRustGraph,
   active : Option<&ActiveSourceSet>,
   pid    : &ID,
@@ -194,7 +194,7 @@ fn link_facts_for_source (
     return (HashSet::new (), false); };
   let targets : HashSet<ID> =
     graph . outbound_pids_for_relation_gated (
-      pid, NodeRelation::TextlinksTo, active )
+      pid, NodeRelation::LinksTo, active )
     . into_iter ()
     . filter (|target| pid_source_is_active (graph, active, target))
     . collect ();
@@ -204,15 +204,15 @@ fn link_facts_for_source (
       pid, NodeRelation::Contains, active )
     . iter ()
     . any (|member| pid_source_is_active (graph, active, member));
-  let interesting : bool = has_body || has_content || targets . len () > 1;
-  (targets, interesting) }
+  let substantive : bool = has_body || has_content || targets . len () > 1;
+  (targets, substantive) }
 
-pub(crate) fn link_source_is_interesting (
+pub(crate) fn mentioner_is_substantive (
   graph  : &InRustGraph,
   active : Option<&ActiveSourceSet>,
   pid    : &ID,
 ) -> bool {
-  link_facts_for_source (graph, active, pid) . 1 }
+  link_facts_for_mentioner (graph, active, pid) . 1 }
 
 fn pid_source_is_active (
   graph  : &InRustGraph,
@@ -247,7 +247,7 @@ mod tests {
       .. empty_node_complete () } }
 
   #[test]
-  fn links_count_distinct_resolved_identities_and_interesting_sources () {
+  fn links_count_distinct_resolved_identities_and_substantive_mentioners () {
     let mut target : NodeComplete = node ("target", "A different title", None);
     target . extra_ids = vec![ ID::from ("old-target") ];
     let mut with_content : NodeComplete =
@@ -269,7 +269,7 @@ mod tests {
       &graph, &pids) . unwrap ();
     let target_counts : &RelationCounts = stats . counts . get (&ID::from ("target")) . unwrap ();
     assert_eq! (target_counts . link_total, 6);
-    assert_eq! (target_counts . link_interesting, 4);
+    assert_eq! (target_counts . link_substantive, 4);
     assert_eq! (stats . counts [&ID::from ("repeated")] . link_targets, 1);
     assert_eq! (stats . counts [&ID::from ("two-targets")] . link_targets, 2);
     assert_eq! (stats . counts [&ID::from ("with-self-link")] . link_targets, 2);
@@ -277,31 +277,31 @@ mod tests {
   }
 
   #[test]
-  fn inactive_content_and_targets_do_not_make_a_link_source_interesting () {
+  fn inactive_content_and_targets_do_not_make_a_mentioner_substantive () {
     let config = load_config (
       "tests/source_sets/fixtures/skgconfig.toml") . unwrap ();
     let active : ActiveSourceSet = ActiveSourceSet::named (
       &config, SourceSetName::from ("public")) . unwrap ();
-    let mut source : NodeComplete = node (
-      "source", "[[id:dest][d]] [[id:private-target][p]]", None);
-    source . source = SourceName::from ("public");
-    source . contains = vec![RelPartner::at_relSource (
+    let mut mentioner : NodeComplete = node (
+      "mentioner", "[[id:target][d]] [[id:private-target][p]]", None);
+    mentioner . source = SourceName::from ("public");
+    mentioner . contains = vec![RelPartner::at_relSource (
       SourceName::from ("private"), ID::from ("visible-child"))];
-    let mut dest : NodeComplete = node ("dest", "destination", None);
-    dest . source = SourceName::from ("public");
+    let mut target : NodeComplete = node ("target", "destination", None);
+    target . source = SourceName::from ("public");
     let mut child : NodeComplete = node ("visible-child", "child", None);
     child . source = SourceName::from ("public");
     let mut private_target : NodeComplete = node (
       "private-target", "private target", None);
     private_target . source = SourceName::from ("private");
     let graph : InRustGraph = InRustGraph::from_nodecompletes (
-      &[source, dest, child, private_target]);
+      &[mentioner, target, child, private_target]);
     let stats : AllGraphNodeStats = fetch_all_graphnodestats_with_source_set (
-      &graph, &[ID::from ("source"), ID::from ("dest")],
+      &graph, &[ID::from ("mentioner"), ID::from ("target")],
       Some (&active)) . unwrap ();
-    assert_eq! (stats . counts [&ID::from ("dest")] . link_total, 1);
-    assert_eq! (stats . counts [&ID::from ("dest")] . link_interesting, 0);
-    assert_eq! (stats . counts [&ID::from ("source")] . link_targets, 1);
+    assert_eq! (stats . counts [&ID::from ("target")] . link_total, 1);
+    assert_eq! (stats . counts [&ID::from ("target")] . link_substantive, 0);
+    assert_eq! (stats . counts [&ID::from ("mentioner")] . link_targets, 1);
   }
 
   #[test]

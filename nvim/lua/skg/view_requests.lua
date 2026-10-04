@@ -27,13 +27,13 @@ end
 ---The two command families, generated like the elisp macro did.
 local command_rows = {
   { 'show_folderOf_aliases', '(folder aliases)' },
-  { 'show_folderOf_overrides', '(folder overrides)' },
-  { 'show_folderOf_hides', '(folder hides)' },
-  { 'show_folderOf_subscribes', '(folder subscribes)' },
+  { 'show_folderOf_overrides_view_of', '(folder overrides_view_of)' },
+  { 'show_folderOf_hides_from_its_subscriptions', '(folder hides_from_its_subscriptions)' },
+  { 'show_folderOf_subscribes_to', '(folder subscribes_to)' },
   { 'show_folderOf_properties', 'properties' },
   { 'show_paths_through_containers', '(path container)' },
-  { 'show_paths_through_link_sources', '(path linkSource)' },
-  { 'show_paths_through_link_dests', '(path linkDest)' },
+  { 'show_paths_through_mentioners', '(path mentioner)' },
+  { 'show_paths_through_mentioned', '(path mentioned)' },
   { 'show_paths_through_overriders', '(path overrider)' },
   { 'show_paths_through_overridden', '(path overridden)' },
   { 'show_paths_through_hiders', '(path hider)' },

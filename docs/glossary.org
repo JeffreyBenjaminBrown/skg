@@ -7,7 +7,7 @@ Some terms and abbreviations used in this code.
 
 For a set of IDs in one graph snapshot, the *update-relevant
 neighborhood* contains the IDs themselves, their immediate neighbors in
-both directions along =contains=, =textlinks_to=, =subscribes=, and
+both directions along =contains=, =links_to=, =subscribes=, and
 =hides_from_its_subscriptions=, and every node reachable by each of the
 two monotonic override walks. The overriderward and overriddenward walks
 start independently at the original IDs, never reverse direction, and
@@ -119,7 +119,7 @@ or the relationship between their parent and their children,
 or maybe something else.
 
 The Skg graph contains a few (currently five) formal relationships -- =contains=,
-=textlinks_to=, etc. In the graph, there is no concept of parent or child;
+=links_to=, etc. In the graph, there is no concept of parent or child;
 those are only meaningful in a view.
 Where the code says "child" or "parent", it means the relationship between viewnodes
 -- e.g., in Emacs, the relationship between headlines in an Org buffer
@@ -156,7 +156,7 @@ It exists only to name the relationship between its children and its parent.
 
 A *PartnerFolder* is the general concept.
 Recall that there are five relationships in the graph:
-containment, textlink, subscription, hiding, and overriding.
+containment, link, subscription, hiding, and overriding.
 Because a node can be on either side of each relationship --
 it can be the container or the content, the hider or the hidden, etc. --
 there are 5x2 = 10 kinds of partnerCols.
@@ -336,7 +336,7 @@ the end of the chain of user-owned, currently-VISIBLE
 'overrides_view_of' edges leading out of N. The chain is often one
 edge, but may be longer (a user-owned chain D overrides C overrides
 N is legal; only a cycle is forbidden), and visibility gating can
-stop it at a MIDDLE node when a later link's source is inactive --
+stop it at a MIDDLE node when a later link's mentioner is inactive --
 so the drawn node is the last visible link, not necessarily the
 chain's end. The resolver is 'resolve_override' in
 'server/dbs/in_rust_graph/override_resolution.rs'. Foreign override

@@ -123,8 +123,8 @@ fn related_nodes_from_graph_gated (
 }
 
 fn node_relation_from_name (name : &str) -> Option<NodeRelation> {
-  [ NodeRelation::Contains, NodeRelation::TextlinksTo,
-    NodeRelation::Subscribes, NodeRelation::HidesFromItsSubscriptions,
+  [ NodeRelation::Contains, NodeRelation::LinksTo,
+    NodeRelation::SubscribesTo, NodeRelation::HidesFromItsSubscriptions,
     NodeRelation::OverridesViewOf ]
     . into_iter () . find (|relation| relation . relation_name () == name)
 }

@@ -28,7 +28,7 @@ So far there are these endpoints:
     (regex . "BOOL") (body . "BOOL") (operators . "BOOL"))=, plus
     optional =(overPrivateText-telescopes . "include")= or
     =(overPrivateText-telescopes . "exclude")=.
-    - Search always returns every match. "Rooty" nodes (literal roots, cycle-roots, link dests, and things that had an ID when imported) are ranked higher, via their context-origin multiplier.
+    - Search always returns every match. "Rooty" nodes (literal roots, cycle-roots, mentioned nodes, and things that had an ID when imported) are ranked higher, via their context-origin multiplier.
     - =regex=, =body=, =operators= are optional; each defaults to "false".
       - "regex=true": interpret the query as a per-token regex; a RegexQuery is built directly and the QueryParser is bypassed.
       - "body=true": also search node bodies (titles are always searched).
@@ -717,8 +717,8 @@ the view regenerates it.
 - omitted =birth= means =unremarkable=;
 - =(birth backpath ROLENAME)= marks a node grafted by the backpath
   engine as an ancestry partner playing ROLENAME toward its org-parent
-  (e.g. =container= for a containerward ancestor, =linkSource= for a
-  node that links to it, also =linkDest=, =overrider=, =overridden=,
+  (e.g. =container= for a containerward ancestor, =mentioner= for a
+  node that links to it, also =mentioned=, =overrider=, =overridden=,
   =hider=, =hidden=, =subscriber=, =subscribee=). ROLENAME is one of the
   nine in =PARTNER_ROLE_VOCAB=
   (=server/dbs/in_rust_graph/relation_accessors.rs=). The graft's herald
@@ -776,12 +776,12 @@ assembled glyphs, omitted numerals or colors. For example:
 (rels
   (contains (in 2 (ancestors 1))
             (out 8 (ancestors 2) (unintegrated 3 (ancestors 2))))
-  (textlinksTo (in 5 (ancestors 1 2)
-                   (interesting 2 (ancestors 1)))
+  (links_to (in 5 (ancestors 1 2)
+                   (substantive 2 (ancestors 1)))
                (out 3 (ancestors 2)))
-  (overrides (out 1 (ancestors 1)))
+  (overrides_view_of (out 1 (ancestors 1)))
   (aliases 2) (extraIds 1) (properties 3)
-  (birth overrides))
+  (birth overrides_view_of))
 #+end_example
 
 Each relation side is =(in COUNT (ancestors GEN...))= or
@@ -789,8 +789,8 @@ Each relation side is =(in COUNT (ancestors GEN...))= or
 =COUNT= is the complete distinct visible node count even when ancestor
 flags let the client omit its numeral. Generation 1 is the visible parent,
 2 the grandparent, counting scaffold levels. Relation keys are =contains=,
-=textlinksTo=, =subscribes=, =overrides=, and =hides=. The =textlinksTo=
-incoming side adds =(interesting COUNT (ancestors GEN...))= for the subset
+=links_to=, =subscribes=, =overrides=, and =hides=. The =links_to=
+incoming side adds =(substantive COUNT (ancestors GEN...))= for the subset
 whose source has a nonempty body, visible direct content, or more than one
 distinct visible resolved target. Its outgoing side counts distinct visible
 resolved targets. An applicable subscribee-as-such =contains= outgoing side
@@ -903,7 +903,7 @@ A buffer whose marker the server would not have drawn (the carrier
 is not on N's user-owned override chain -- the ownership-gated,
 visibility-UNGATED walk out of N) aborts the save with an
 explanation. With chains the honest carrier may be a MIDDLE link
-(drawn when a later link's source is hidden), so the check accepts
+(drawn when a later link's mentioner is hidden), so the check accepts
 any node on the chain and rejects only off-chain markers. A
 source-set switch that makes a
 drawn substitute's source inactive turns it into an anonymous

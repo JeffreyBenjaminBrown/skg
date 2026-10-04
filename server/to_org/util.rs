@@ -249,7 +249,7 @@ pub fn mark_view_roots_parent_na (
 /// Three kinds of claim are checked:
 /// - 'Birth::Backpath(role)' on child C with ActiveNode parent P:
 ///   claim is "C plays 'role' toward P" (e.g. CONTAINER -> C contains
-///   P; LINK_SOURCE -> C's body/title links to P). Verified against the
+///   P; MENTIONER -> C's body/title links to P). Verified against the
 ///   in-Rust graph via 'relation_membership_is_real', keyed by the role.
 /// - 'AffectsParent::True' on child C with WRITE_PROTECTED ActiveNode
 ///   parent P: claim is "C is part of P's content". Verified

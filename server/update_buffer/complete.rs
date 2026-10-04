@@ -302,7 +302,7 @@ fn visit_normal_node (
       &context . runtime . config,
       context . active_source_set,
       context . source_diffs ) ?; }
-  // Remaining view requests (Aliases / Containerward / Sourceward); the
+  // Remaining view requests (Aliases / Containerward / Mentionerward); the
   // Definitive request was already consumed by apply_definitive_draw_rule.
   super::reconcile::view_requests::execute_activeNode_view_requests (
     treeid, tree, &context . runtime . graph,

@@ -4,5 +4,5 @@ mod complete_aliasfolder;
 #[path = "rebuild/integrate_backpath.rs"]
 mod integrate_backpath;
 
-#[path = "rebuild/sourceward_ancestry.rs"]
-mod sourceward_ancestry;
+#[path = "rebuild/mentionerward_ancestry.rs"]
+mod mentionerward_ancestry;

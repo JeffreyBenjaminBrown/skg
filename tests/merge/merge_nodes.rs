@@ -474,7 +474,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   let subscribers : HashSet<ID> =
     find_related_nodes (
       &snap, &input_acquirer,
-      "subscribes", "subscribee", "subscriber" );
+      "subscribes_to", "subscribee", "subscriber" );
   assert!( subscribers . contains (&ID::from ("subscribes-to-1")),
            "inverse subscribes under pid 2 should include \
             subscribes-to-1 (its subscribes_to = [1], which aliases 2)" );
@@ -501,12 +501,12 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
            "inverse overrides_view_of under pid 2 should include \
             overrider-of-1" );
 
-  let textlink_sources : HashSet<ID> =
+  let link_sources : HashSet<ID> =
     find_related_nodes (
       &snap, &input_acquirer,
-      "textlinks_to", "dest", "source" );
-  assert!( textlink_sources . contains (&ID::from ("links-to-1")),
-           "inverse textlinks_to under pid 2 should include \
+      "links_to", "mentioned", "mentioner" );
+  assert!( link_sources . contains (&ID::from ("links-to-1")),
+           "inverse links_to under pid 2 should include \
             links-to-1 (its body has a link to id 1, which aliases 2)" );
 
   // === Forward queries: neighbors' outbound should resolve 1 → 2 ===
@@ -514,7 +514,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   let subscribee_of_s2_1 : HashSet<ID> =
     find_related_nodes (
       &snap, &vec![ID::from ("subscribes-to-1")],
-      "subscribes", "subscriber", "subscribee" );
+      "subscribes_to", "subscriber", "subscribee" );
   assert!( subscribee_of_s2_1 . contains (&ID::from ("2")),
            "subscribes-to-1's forward subscribes should resolve to \
             canonical pid 2 (was raw 1 on disk)" );
@@ -542,9 +542,9 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   let destinations_of_l1 : HashSet<ID> =
     find_related_nodes (
       &snap, &vec![ID::from ("links-to-1")],
-      "textlinks_to", "source", "dest" );
+      "links_to", "mentioner", "mentioned" );
   assert!( destinations_of_l1 . contains (&ID::from ("2")),
-           "links-to-1's forward textlinks should resolve to \
+           "links-to-1's forward links should resolve to \
             canonical pid 2" );
 
   let disk_nodes : Vec<NodeComplete> =
@@ -554,7 +554,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   assert_eq! (snap . subscribers_of, rebuilt . subscribers_of);
   assert_eq! (snap . hiders_of, rebuilt . hiders_of);
   assert_eq! (snap . overriders_of, rebuilt . overriders_of);
-  assert_eq! (snap . textlinks_in, rebuilt . textlinks_in);
+  assert_eq! (snap . mentioners_of, rebuilt . mentioners_of);
   assert_eq! (snap . extra_id_to_pid, rebuilt . extra_id_to_pid);
 
   Ok (( )) }

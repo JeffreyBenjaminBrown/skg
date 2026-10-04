@@ -823,8 +823,8 @@ async fn fork_collateral_rerender_without_substitution (
     "the collateral view must retain raw N:\n{}", collateral_text );
   assert! ( ! collateral_text . contains ("(overridesHere N)"),
     "the collateral view must not substitute the clone:\n{}", collateral_text );
-  assert! ( collateral_text . contains ("(subscribes (in 1))")
-            && collateral_text . contains ("(overrides (in 1))"),
+  assert! ( collateral_text . contains ("(subscribes_to (in 1))")
+            && collateral_text . contains ("(overrides_view_of (in 1))"),
     "the raw original must show its new inbound relationship heralds:\n{}",
     collateral_text );
   Ok (( )) }

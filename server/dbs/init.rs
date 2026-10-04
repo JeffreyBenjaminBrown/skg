@@ -2,7 +2,7 @@
 
 use crate::context::{MapToContent, MapToContainers};
 use crate::context::{content_maps_from_nodes, had_id_set_from_nodes};
-use crate::context::link_dests_from_nodes;
+use crate::context::mentioned_ids_from_nodes;
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_collecting_violations;
 use crate::dbs::tantivy::{mk_tantivy_schema, tantivy_index_from_index};
 use crate::dbs::tantivy::write::update_index_with_nodes;
@@ -32,7 +32,7 @@ use tantivy::Index;
 pub struct InitContextHandoff {
   pub had_id_set        : HashSet<ID>,
   pub all_node_ids      : HashSet<ID>,
-  pub link_dests      : HashSet<ID>,
+  pub mentioned_ids      : HashSet<ID>,
   pub map_to_content    : MapToContent,
   pub map_to_containers : MapToContainers,
 }
@@ -90,8 +90,8 @@ fn env_and_handoff_from_nodes (
     nodes . iter ()
     . map ( |n| n . pid . clone () )
     . collect ();
-  let link_dests : HashSet<ID> =
-    link_dests_from_nodes (&nodes);
+  let mentioned_ids : HashSet<ID> =
+    mentioned_ids_from_nodes (&nodes);
   let ( map_to_content, map_to_containers )
     : ( MapToContent, MapToContainers )
     = content_maps_from_nodes (&nodes);
@@ -100,7 +100,7 @@ fn env_and_handoff_from_nodes (
     InitContextHandoff {
       had_id_set,
       all_node_ids,
-      link_dests,
+      mentioned_ids,
       map_to_content,
       map_to_containers } ) }
 

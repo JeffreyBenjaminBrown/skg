@@ -14,7 +14,7 @@ use crate::types::misc::{
   ID, SkgConfig, SkgfileSource, SourceName, members_msv, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::fs::NodeFS;
-use crate::types::textlinks::textlinks_from_node;
+use crate::types::links::links_from_node;
 
 use git2::{ObjectType, Repository, TreeWalkMode, TreeWalkResult};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -436,9 +436,9 @@ fn affected_pids_for_changed_node (
     pids . extend (
       members_msv (&node . overrides_view_of) . or_default () . iter () . cloned ());
     pids . extend (
-      textlinks_from_node (node)
+      links_from_node (node)
         . into_iter ()
-        . map ( |textlink| textlink . id )); }
+        . map ( |link| link . id )); }
   pids
 }
 

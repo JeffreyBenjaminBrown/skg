@@ -1,8 +1,8 @@
 # Which [[id:ID][LABEL]] links in Org body text are real links, and which
 # are examples in text Org shows literally. One contract, three
 # implementations, each tested against these cases:
-#   Rust:   server/types/textlinks/org_literal_ranges.rs
-#           (tests/textlinks.rs)
+#   Rust:   server/types/links/org_literal_ranges.rs
+#           (tests/links.rs)
 #   Emacs:  elisp/skg-link-annotations.el
 #           (tests/elisp/test-skg-link-annotations.el)
 #   Neovim: nvim/lua/skg/link_annotations.lua

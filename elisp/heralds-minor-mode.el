@@ -306,17 +306,17 @@ na anyway) any stray sentinel token is dropped."
 ;; TODO/heralds-semantic-wire.org. The nvim client mirrors this exactly
 ;; (nvim/lua/skg/heralds.lua).
 
-(defconst heralds--rel-order '(contains textlinksTo subscribes overrides hides)
+(defconst heralds--rel-order '(contains links_to subscribes_to overrides_view_of hides_from_its_subscriptions)
   "Relationship display order: C L S O H.")
 
 (defun heralds--rel-letter (rel)
   "The display letter for relation symbol REL."
-  (pcase rel ('contains "C") ('textlinksTo "L") ('subscribes "S")
-             ('overrides "O") ('hides "H") (_ "?")))
+  (pcase rel ('contains "C") ('links_to "L") ('subscribes_to "S")
+             ('overrides_view_of "O") ('hides_from_its_subscriptions "H") (_ "?")))
 
 (defun heralds--rel-base-face (rel)
   "Group base face for REL's counts and slash: C/L blue, S/O/H purple."
-  (pcase rel ((or 'contains 'textlinksTo) 'heralds-blue-face)
+  (pcase rel ((or 'contains 'links_to) 'heralds-blue-face)
              (_ 'heralds-purple-face)))
 
 (defun heralds--gen-list (gens)
@@ -388,7 +388,7 @@ yellow. The parent flag is muted; higher ancestors are orange."
 BASE-FACE styles ordinary counts; LETTER-FACE styles only the relation letter."
   (let* ((in  (heralds--rel-side form 'in))
          (out (heralds--rel-side form 'out))
-         (number-face (if (eq rel 'overrides)
+         (number-face (if (eq rel 'overrides_view_of)
                           'heralds-highly-interesting-face base-face))
          (in-s  (heralds--rel-side-string
                  (if in (car in) 0) (and in (cdr in)) number-face
@@ -406,23 +406,23 @@ BASE-FACE styles ordinary counts; LETTER-FACE styles only the relation letter."
                    (if out (car out) 0) (and out (cdr out))
                    number-face nil))))
     (unless (and (string-empty-p in-s) (string-empty-p out-s)
-                 (not (and (eq rel 'overrides) overrides-here)))
+                 (not (and (eq rel 'overrides_view_of) overrides-here)))
       (concat in-s (propertize (heralds--rel-letter rel) 'face letter-face)
-              (if (and (eq rel 'overrides) overrides-here)
+              (if (and (eq rel 'overrides_view_of) overrides-here)
                   (propertize "ĥ" 'face 'heralds-confusable-face) "")
               out-s))))
 
 (defun heralds--link-rel-token (form base-face letter-face)
-  "Render inbound interesting sources and outbound resolved targets.
+  "Render inbound substantive mentioners and outbound resolved targets.
 BASE-FACE styles ordinary counts and slash; LETTER-FACE styles only L."
   (let* ((in (heralds--rel-side form 'in))
          (out (heralds--rel-side form 'out))
-         (interesting-form (assq 'interesting (cdr (assq 'in (cdr form)))))
-         (interesting (or (and interesting-form
-                               (cl-find-if #'integerp (cdr interesting-form))) 0))
+         (substantive-form (assq 'substantive (cdr (assq 'in (cdr form)))))
+         (substantive (or (and substantive-form
+                               (cl-find-if #'integerp (cdr substantive-form))) 0))
          (in-s (heralds--fraction-side-string
                 (if in (car in) 0) (and in (cdr in))
-                interesting (cdr (assq 'ancestors (cdr interesting-form)))
+                substantive (cdr (assq 'ancestors (cdr substantive-form)))
                 base-face))
          (out-s (heralds--rel-side-string
                  (if out (car out) 0) (and out (cdr out)) base-face nil)))
@@ -446,11 +446,11 @@ A/I/P cyan. Tokens are ordered C L S O H A I P and space-separated."
             (tokens '()))
         (dolist (rel heralds--rel-order)
           (let ((form (assq rel (cdr rels))))
-            (when (or form (and (eq rel 'overrides) overrides-here))
+            (when (or form (and (eq rel 'overrides_view_of) overrides-here))
               (let* ((base (heralds--rel-base-face rel))
                      (letter-face (if (memq rel birth) 'heralds-birth-face
                                     base))
-                     (tok (if (eq rel 'textlinksTo)
+                     (tok (if (eq rel 'links_to)
                               (heralds--link-rel-token form base letter-face)
                             (heralds--ordinary-rel-token
                              rel form base letter-face overrides-here))))

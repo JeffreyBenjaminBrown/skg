@@ -455,7 +455,7 @@ fn mk_search_results_sexp (
 ///   mode, where the user has expressed explicit MUST/MUSTNOT
 ///   semantics that don't translate cleanly to "fraction
 ///   matched".
-/// - Context multiplier (Root, CycleMember, Dest, HadID,
+/// - Context multiplier (Root, CycleMember, Mentioned, HadID,
 ///   MultiContained, or 1.0 for none).
 ///
 /// adjusted_score = bm25_score * coverage * context_multiplier
@@ -481,7 +481,7 @@ pub fn group_matches_by_id (
             . and_then ( |v| v . as_str() )
             . map ( |s| ID::from (s) );
         // Prefer raw_title (un-reduced, only on is_title="true"
-        // docs) so a textlink in the title shows as
+        // docs) so a link in the title shows as
         // `[[id:X][label]]` in search results. For alias-doc hits
         // raw_title is empty/absent, so fall back to
         // title_or_alias, which holds the alias literal.

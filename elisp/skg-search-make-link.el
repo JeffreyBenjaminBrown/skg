@@ -27,7 +27,7 @@
 ;;; the search results buffer is just like any other.
 ;;;
 ;;; The label is the result's title with any inline [[id:Y][L]]
-;;; textlinks reduced to their labels (so the new link's label is
+;;; links reduced to their labels (so the new link's label is
 ;;; plain text, never nested links). Reduction is done by
 ;;; `skg-replace-links-with-labels' (see skg-id-search.el).
 
@@ -101,7 +101,7 @@ plain search doesn't accidentally inherit the state."
 Bound to C-c C-c by `skg-search-make-link-mode'. Uses
 `skg-nearest-id' to identify the chosen ID and label;
 `skg-replace-links-with-labels' normalises the label so it
-never contains nested textlinks. Then kills the search buffer
+never contains nested links. Then kills the search buffer
 and inserts [[id:ID][LABEL]] at the saved buffer:position."
   (interactive)
   (unless skg--link-from-search-target

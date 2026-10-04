@@ -7,7 +7,7 @@ use crate::types::maybe_placed_viewnode::{
   MpPhantom, MpViewnodeKind, MpVognode,
 };
 use crate::types::misc::ID;
-use crate::types::textlinks::textlinks_from_text;
+use crate::types::links::links_from_text;
 use crate::types::tree::forest::{MpViewForest, ViewForest};
 use crate::types::viewnode::{
   Editability, NodeEditRequest, Phantom, Qual, ViewNodeKind, Vognode,
@@ -128,8 +128,8 @@ fn dependencies_from_text (
       errors . iter () . map (ToString::to_string)
         .collect::<Vec<String>> () . join ("; "))); }
   let mut result : HashSet<ID> = dependencies_from_uninterpreted (&forest);
-  result . extend (textlinks_from_text (text) . into_iter ()
-    .map (|textlink| textlink . id));
+  result . extend (links_from_text (text) . into_iter ()
+    .map (|link| link . id));
   Ok (result)
 }
 

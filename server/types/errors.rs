@@ -4,7 +4,7 @@ use std::io;
 use std::collections::HashSet;
 
 #[derive (Debug)]
-pub enum TextLinkParseError {
+pub enum LinkParseError {
   InvalidFormat,
   MissingDivider,
 }
@@ -83,21 +83,21 @@ pub enum BufferValidationError {
 // Implementations
 //
 
-impl std::fmt::Display for TextLinkParseError {
+impl std::fmt::Display for LinkParseError {
   fn fmt (
     &self,
     f: &mut std::fmt::Formatter <'_>
   ) -> std::fmt::Result {
     match self {
-      TextLinkParseError::InvalidFormat =>
+      LinkParseError::InvalidFormat =>
         write! (
-          f, "Invalid textlink format. Expected [[id:ID][LABEL]]" ),
-      TextLinkParseError::MissingDivider =>
+          f, "Invalid link format. Expected [[id:ID][LABEL]]" ),
+      LinkParseError::MissingDivider =>
         write! (
           f, "Missing divider between ID and label. Expected ][" ),
     } } }
 
-impl Error for TextLinkParseError {}
+impl Error for LinkParseError {}
 
 impl std::fmt::Display for BufferValidationError {
   fn fmt(

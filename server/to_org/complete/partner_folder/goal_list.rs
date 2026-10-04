@@ -149,13 +149,13 @@ fn relation_list_of_nodecomplete (
   match relation {
     NodeRelation::Contains =>
       members_of ( & nc . contains ),
-    NodeRelation::Subscribes =>
+    NodeRelation::SubscribesTo =>
       members_of ( nc . subscribes_to . or_default () ),
     NodeRelation::HidesFromItsSubscriptions =>
       members_of ( nc . hides_from_its_subscriptions . or_default () ),
     NodeRelation::OverridesViewOf =>
       members_of ( nc . overrides_view_of . or_default () ),
-    NodeRelation::TextlinksTo =>
+    NodeRelation::LinksTo =>
       Vec::new (), } }
 
 /// Exact per-stage membership axes from three derived-membership
@@ -288,7 +288,7 @@ pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
   let subscribees3 : [Vec<ID>; 3] =
     three_snapshots_of_relation_list (
       subscriber_pid, subscriber_source,
-      NodeRelation::Subscribes,
+      NodeRelation::SubscribesTo,
       wt_subscribees, source_diffs );
   let content3_by_subscribee : HashMap<ID, [Vec<ID>; 3]> = {
     // The contains snapshots of every subscribee involved in ANY

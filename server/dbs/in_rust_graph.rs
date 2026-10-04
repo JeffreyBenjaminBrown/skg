@@ -31,7 +31,7 @@ use crate::types::save::{DefineNode, DeleteNode, SaveNode};
 /// The in-Rust-graph projection of the graph.
 ///
 /// Values are 'NodeRust' — everything a 'NodeComplete' has except
-/// 'misc', plus 'textlinks_to' parsed from body text.
+/// 'misc', plus 'links_to' parsed from body text.
 ///
 /// The six inverse indexes mirror the five outbound relations and
 /// the extra_ids list, so a reader can ask "who points at X?" in
@@ -47,8 +47,8 @@ pub struct InRustGraph {
   pub hiders_of        : im::HashMap<ID, im::HashSet<ID>>,
   /// 'X → {pids of nodes whose overrides_view_of includes X}'
   pub overriders_of    : im::HashMap<ID, im::HashSet<ID>>,
-  /// 'X → {pids of nodes whose textlinks_to includes X}'
-  pub textlinks_in     : im::HashMap<ID, im::HashSet<ID>>,
+  /// 'X → {pids of nodes whose links_to includes X}'
+  pub mentioners_of     : im::HashMap<ID, im::HashSet<ID>>,
   /// Maps any of a node's extra_ids to that node's pid. Invariant:
   /// an extra_id is on at most one node at any visible snapshot.
   pub extra_id_to_pid  : im::HashMap<ID, ID>,
@@ -62,7 +62,7 @@ impl InRustGraph {
       subscribers_of   : im::HashMap::new (),
       hiders_of        : im::HashMap::new (),
       overriders_of    : im::HashMap::new (),
-      textlinks_in     : im::HashMap::new (),
+      mentioners_of     : im::HashMap::new (),
       extra_id_to_pid  : im::HashMap::new (), } }
 
   /// Build from a slice of NodeCompletes. Typically called at
@@ -141,9 +141,9 @@ fn add_relationship_contributions (
   for second_member in members_of ( node . overrides_view_of . or_default () ) {
     let key : ID = canonical_key (identity, &second_member);
     add_to_inverse_map (&mut graph . overriders_of, &key, pid); }
-  for second_member in &node . textlinks_to {
+  for second_member in &node . links_to {
     let key : ID = canonical_key (identity, second_member);
-    add_to_inverse_map (&mut graph . textlinks_in, &key, pid); } }
+    add_to_inverse_map (&mut graph . mentioners_of, &key, pid); } }
 
 /// Narrow fixture helper for unit tests that construct `NodeRust` directly.
 #[cfg(test)]
@@ -183,9 +183,9 @@ fn remove_relationship_contributions (
   for second_member in members_of ( node . overrides_view_of . or_default () ) {
     let key : ID = canonical_key (identity, &second_member);
     remove_from_inverse_map (&mut graph . overriders_of, &key, pid); }
-  for second_member in &node . textlinks_to {
+  for second_member in &node . links_to {
     let key : ID = canonical_key (identity, second_member);
-    remove_from_inverse_map (&mut graph . textlinks_in, &key, pid); } }
+    remove_from_inverse_map (&mut graph . mentioners_of, &key, pid); } }
 
 pub(crate) fn inbound_owners_at (
   graph : &InRustGraph,
@@ -197,7 +197,7 @@ pub(crate) fn inbound_owners_at (
     &graph . subscribers_of,
     &graph . hiders_of,
     &graph . overriders_of,
-    &graph . textlinks_in,
+    &graph . mentioners_of,
   ] {
     if let Some (indexed) = index . get (key) {
       owners . extend (indexed . iter () . cloned ()); }}

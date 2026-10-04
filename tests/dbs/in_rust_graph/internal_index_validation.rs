@@ -41,7 +41,7 @@ fn assert_same_graph (
   assert_eq! (actual . subscribers_of, expected . subscribers_of);
   assert_eq! (actual . hiders_of, expected . hiders_of);
   assert_eq! (actual . overriders_of, expected . overriders_of);
-  assert_eq! (actual . textlinks_in, expected . textlinks_in);
+  assert_eq! (actual . mentioners_of, expected . mentioners_of);
   assert_eq! (actual . extra_id_to_pid, expected . extra_id_to_pid);
 }
 
@@ -51,8 +51,8 @@ fn construction_recomputes_every_role_alias_and_dangling_key () {
   assert_eq! (validate_internal_indexes (&graph), vec![]);
   assert! (graph . contained_by . contains_key (&ID::from ("target")));
   assert! (graph . contained_by . contains_key (&ID::from ("dangling")));
-  assert! (graph . textlinks_in . contains_key (&ID::from ("target")));
-  assert! (graph . textlinks_in . contains_key (&ID::from ("text-dangling")));
+  assert! (graph . mentioners_of . contains_key (&ID::from ("target")));
+  assert! (graph . mentioners_of . contains_key (&ID::from ("text-dangling")));
 }
 
 #[test]
@@ -62,14 +62,14 @@ fn exact_diagnostics_cover_all_six_corrupt_indexes_in_stable_order () {
   graph . subscribers_of . remove (&ID::from ("target"));
   graph . hiders_of . remove (&ID::from ("target"));
   graph . overriders_of . remove (&ID::from ("target"));
-  graph . textlinks_in . remove (&ID::from ("target"));
+  graph . mentioners_of . remove (&ID::from ("target"));
   graph . extra_id_to_pid . insert (
     ID::from ("target-alias"), ID::from ("wrong"));
   let mismatches = validate_internal_indexes (&graph);
   assert_eq! (
     mismatches . iter () . map (|m| m . index) . collect::<Vec<_>> (),
     vec!["contained_by", "subscribers_of", "hiders_of", "overriders_of",
-         "textlinks_in", "extra_id_to_pid"]);
+         "mentioners_of", "extra_id_to_pid"]);
   let formatted = format_internal_index_mismatches (&mismatches);
   assert! (formatted . contains (
     "index=extra_id_to_pid key=target-alias expected=[ID(\"target\")] actual=[ID(\"wrong\")]"));
@@ -131,7 +131,7 @@ fn alias_acquisition_rekeys_all_five_inverse_indexes () {
     &graph . subscribers_of,
     &graph . hiders_of,
     &graph . overriders_of,
-    &graph . textlinks_in,
+    &graph . mentioners_of,
   ] {
     assert_eq! (
       index . get (&ID::from ("target")),
@@ -204,7 +204,7 @@ fn deletion_rekeys_surviving_raw_primary_extra_and_text_references () {
     &graph . subscribers_of,
     &graph . hiders_of,
     &graph . overriders_of,
-    &graph . textlinks_in,
+    &graph . mentioners_of,
   ] {
     for raw in &raw_ids {
       assert! (index . get (raw) . unwrap () . contains (&ID::from ("foreign-owner"))); }}
@@ -238,7 +238,7 @@ fn changed_owner_removes_and_adds_all_five_inverse_contributions () {
     &graph . subscribers_of,
     &graph . hiders_of,
     &graph . overriders_of,
-    &graph . textlinks_in,
+    &graph . mentioners_of,
   ] {
     assert! (! index . contains_key (&ID::from ("old")));
     assert! (index . get (&ID::from ("new")) . unwrap ()

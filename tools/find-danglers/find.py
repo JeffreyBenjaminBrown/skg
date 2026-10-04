@@ -3,7 +3,7 @@
 
 A "dangling reference" here means: a current .skg file mentions an ID
 (via 'contains', 'subscribes_to', 'hides_from_its_subscriptions',
-'overrides_view_of', or a body/title '[[id:X]]' textlink) that was at
+'overrides_view_of', or a body/title '[[id:X]]' link) that was at
 some point checked into git as a 'pid' or 'extra_ids' entry, but is
 no longer owned by any current file (neither as 'pid' nor 'extra_ids').
 
@@ -27,7 +27,7 @@ REPO_DIR = "/home/ubuntu/data/public"
 LOG_PATH = "/home/ubuntu/danglers/find.log"
 OUT_PATH = "/home/ubuntu/danglers/found.org"
 
-TEXTLINK_RE = re . compile (r'\[\[id:([^\]]+)\]')
+LINK_RE = re . compile (r'\[\[id:([^\]]+)\]')
 
 OWNERSHIP_FIELDS = ('extra_ids',)
 REFERENCE_FIELDS = (
@@ -122,8 +122,8 @@ def parse_skg (text):
   return out
 
 
-def textlinked_ids (text):
-  return TEXTLINK_RE . findall (text)
+def linked_ids (text):
+  return LINK_RE . findall (text)
 
 
 # ============================================================
@@ -272,12 +272,12 @@ def find_dangling_refs (lost_ids):
       for ref in parsed [fld]:
         if ref in lost_ids:
           result [fname] . append ((fld, ref))
-    for ref in textlinked_ids (parsed ['title']):
+    for ref in linked_ids (parsed ['title']):
       if ref in lost_ids:
-        result [fname] . append (('title-textlink', ref))
-    for ref in textlinked_ids (parsed ['body']):
+        result [fname] . append (('title-link', ref))
+    for ref in linked_ids (parsed ['body']):
       if ref in lost_ids:
-        result [fname] . append (('body-textlink', ref))
+        result [fname] . append (('body-link', ref))
   log (f"phase 3: done; {len (result)} files with danglers")
   return result
 
@@ -306,8 +306,8 @@ def per_file_sentence (field, lost_phrase):
       'subscribes_to'                : f"Its ~subscribes_to~ field still lists {lost_phrase}.",
       'hides_from_its_subscriptions' : f"Its ~hides_from_its_subscriptions~ field still lists {lost_phrase}.",
       'overrides_view_of'            : f"Its ~overrides_view_of~ field still lists {lost_phrase}.",
-      'title-textlink'               : f"Its title embeds a textlink to {lost_phrase}.",
-      'body-textlink'                : f"Its body embeds a textlink to {lost_phrase}.",
+      'title-link'               : f"Its title embeds a link to {lost_phrase}.",
+      'body-link'                : f"Its body embeds a link to {lost_phrase}.",
   } . get (field, f"It references {lost_phrase} via {field}.")
 
 
@@ -321,8 +321,8 @@ def per_lost_id_sentence (field, fname, ref_title):
       'subscribes_to'                : f"{who} lists it in its ~subscribes_to~ field.",
       'hides_from_its_subscriptions' : f"{who} lists it in its ~hides_from_its_subscriptions~ field.",
       'overrides_view_of'            : f"{who} lists it in its ~overrides_view_of~ field.",
-      'title-textlink'               : f"{who} embeds a textlink to it in its title.",
-      'body-textlink'                : f"{who} embeds a textlink to it in its body.",
+      'title-link'               : f"{who} embeds a link to it in its title.",
+      'body-link'                : f"{who} embeds a link to it in its body.",
   } . get (field, f"{who} references it via {field}.")
 
 

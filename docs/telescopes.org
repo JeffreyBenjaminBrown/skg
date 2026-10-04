@@ -123,7 +123,7 @@ more public.
 
 Two things are documented inexpressibles, by design:
 
-- *Private textlinks.* A textlink lives in the body, and the body
+- *Private links.* A link lives in the body, and the body
   lives in the home section. A link in a public body is public;
   there is no per-link relSource. Keep the sentence in a
   private child instead.

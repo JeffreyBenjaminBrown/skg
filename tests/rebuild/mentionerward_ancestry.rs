@@ -1,9 +1,9 @@
-// cargo test --test rebuild -- sourceward_ancestry
+// cargo test --test rebuild -- mentionerward_ancestry
 //
-// Tests that sourceward view expansion inserts containerward
-// ancestry beneath each Birth::Backpath (RelationRole::LINK_SOURCE) source node.
+// Tests that mentionerward view expansion inserts containerward
+// ancestry beneath each Birth::Backpath (RelationRole::MENTIONER) source node.
 //
-// Graph (see fixtures-sourceward-ancestry/):
+// Graph (see fixtures-mentionerward-ancestry/):
 //   Links:        b -> a,  c -> b,  d -> a
 //     PITFALL: All IDs are single-character,
 //     but the titles for b, c and d must be longer than that,
@@ -12,11 +12,11 @@
 //     but that's not possible when the link includes a title.)
 //   Containment:  bb > b,  ccc > cc,  cc > c,  d > cc
 //
-// After sourceward expansion from "a", the expected tree is:
+// After mentionerward expansion from "a", the expected tree is:
 //   a
 //   +-- b  (LinkTarget)         — links to a
 //   |   +-- bb (Content) — b's container
-//   |   +-- c  (LinkTarget)     — links to b (sourceward chain)
+//   |   +-- c  (LinkTarget)     — links to b (mentionerward chain)
 //   |       +-- cc (Content)  — c's container
 //   |           +-- ccc (Content) — cc's container
 //   |           +-- d   (Content) — cc's other container
@@ -27,7 +27,7 @@
 // and child counts without depending on order.
 
 use indoc::indoc;
-use skg::to_org::expand::backpath::build_and_integrate_sourceward_path;
+use skg::to_org::expand::backpath::build_and_integrate_mentionerward_path;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::{graph_handle_from_config, run_with_test_stores};
@@ -69,17 +69,17 @@ fn find_child (
     . map ( |n| n . id () ) }
 
 #[test]
-fn test_sourceward_ancestry (
+fn test_mentionerward_ancestry (
 ) -> Result<(), Box<dyn Error>> {
   run_with_test_stores (
-    "skg-test-sourceward-ancestry",
-    "tests/rebuild/fixtures-sourceward-ancestry",
-    "/tmp/tantivy-test-sourceward-ancestry",
+    "skg-test-mentionerward-ancestry",
+    "tests/rebuild/fixtures-mentionerward-ancestry",
+    "/tmp/tantivy-test-mentionerward-ancestry",
     |config, _tantivy| Box::pin ( async move {
-      test_sourceward_ancestry_impl (config) . await
+      test_mentionerward_ancestry_impl (config) . await
     } )) }
 
-async fn test_sourceward_ancestry_impl (
+async fn test_mentionerward_ancestry_impl (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   // Start with a minimal tree containing just node "a".
@@ -93,8 +93,8 @@ async fn test_sourceward_ancestry_impl (
   let node_a : NodeId =
     viewforest . root () . first_child () . unwrap () . id ();
 
-  // Request sourceward expansion from "a".
-  build_and_integrate_sourceward_path (
+  // Request mentionerward expansion from "a".
+  build_and_integrate_mentionerward_path (
     &mut viewforest, node_a,
     &graph_handle_from_config (config)? . load_full (), config
   ) ?;
@@ -102,10 +102,10 @@ async fn test_sourceward_ancestry_impl (
   // --- a should have exactly 2 LinkTarget children: b and d ---
   let a_children = children_info (&viewforest, node_a);
   assert! ( a_children . contains (&("b" . into (),
-                                     Birth::Backpath (RelationRole::LINK_SOURCE))),
+                                     Birth::Backpath (RelationRole::MENTIONER))),
             "a should have LinkTarget child b" );
   assert! ( a_children . contains (&("d" . into (),
-                                     Birth::Backpath (RelationRole::LINK_SOURCE))),
+                                     Birth::Backpath (RelationRole::MENTIONER))),
             "a should have LinkTarget child d" );
   assert_eq! ( a_children . len (), 2,
                "a should have exactly 2 children" );
@@ -118,7 +118,7 @@ async fn test_sourceward_ancestry_impl (
                                      Birth::Backpath (RelationRole::CONTAINER))),
             "b should have Content child bb" );
   assert! ( b_children . contains (&("c" . into (),
-                                     Birth::Backpath (RelationRole::LINK_SOURCE))),
+                                     Birth::Backpath (RelationRole::MENTIONER))),
             "b should have LinkTarget child c" );
   assert_eq! ( b_children . len (), 2,
                "b should have exactly 2 children" );

@@ -7,19 +7,19 @@
 
 (ert-deftest test-herald-fractions-and-substitution-styles ()
   "L and C use the same subset grammar; ĥ is distinct from ancestor h."
-  (dolist (case '(("(textlinksTo (in 5 (interesting 2)) (out 3))" . "2/5L3")
-                  ("(textlinksTo (in 5 (interesting 0)) (out 3))" . "5L3")
-                  ("(textlinksTo (in 5 (interesting 2)))" . "2/5L")
-                  ("(textlinksTo (out 3))" . "L3")
-                  ("(textlinksTo (in 5 (interesting 5)))" . "5/L")
-                  ("(textlinksTo (in 1 (ancestors 1) (interesting 1 (ancestors 1))))" . "a/L")
-                  ("(textlinksTo (in 2 (ancestors 1 2) (interesting 1 (ancestors 1))))" . "a/bL")
-                  ("(textlinksTo (in 5 (ancestors 1) (interesting 1 (ancestors 1))))" . "a/5L")
-                  ("(textlinksTo (in 5 (ancestors 1) (interesting 1)))" . "1/5aL")
-                  ("(textlinksTo (in 1 (ancestors 1) (interesting 0)))" . "aL")
-                  ("(textlinksTo (out 1 (ancestors 1)))" . "La")
-                  ("(textlinksTo (out 3 (ancestors 1)))" . "L3a")
-                  ("(textlinksTo (in 1 (ancestors 27) (interesting 1 (ancestors 27))))" . "{27}/L")
+  (dolist (case '(("(links_to (in 5 (substantive 2)) (out 3))" . "2/5L3")
+                  ("(links_to (in 5 (substantive 0)) (out 3))" . "5L3")
+                  ("(links_to (in 5 (substantive 2)))" . "2/5L")
+                  ("(links_to (out 3))" . "L3")
+                  ("(links_to (in 5 (substantive 5)))" . "5/L")
+                  ("(links_to (in 1 (ancestors 1) (substantive 1 (ancestors 1))))" . "a/L")
+                  ("(links_to (in 2 (ancestors 1 2) (substantive 1 (ancestors 1))))" . "a/bL")
+                  ("(links_to (in 5 (ancestors 1) (substantive 1 (ancestors 1))))" . "a/5L")
+                  ("(links_to (in 5 (ancestors 1) (substantive 1)))" . "1/5aL")
+                  ("(links_to (in 1 (ancestors 1) (substantive 0)))" . "aL")
+                  ("(links_to (out 1 (ancestors 1)))" . "La")
+                  ("(links_to (out 3 (ancestors 1)))" . "L3a")
+                  ("(links_to (in 1 (ancestors 27) (substantive 1 (ancestors 27))))" . "{27}/L")
                   ("(contains (in 2) (out 8 (unintegrated 2)))" . "2C2/8")
                   ("(contains (out 8 (unintegrated 0)))" . "C8")
                   ("(contains (out 8 (unintegrated 8)))" . "C8/")
@@ -28,7 +28,7 @@
                     (format "(skg (node (id x) (rels %s)))" (car case)))))
       (should (equal (substring-no-properties display) (cdr case)))))
   (let* ((display (heralds-from-metadata
-                   "(skg (node (id x) (rels (overrides (out 1 (ancestors 8)))) (viewStats (overridesHere y))))"))
+                   "(skg (node (id x) (rels (overrides_view_of (out 1 (ancestors 8)))) (viewStats (overridesHere y))))"))
          (plain (substring-no-properties display)))
     (should (equal plain "Oĥh"))
     (should (eq (get-text-property 1 'face display)
@@ -36,7 +36,7 @@
     (should (eq (get-text-property 2 'face display)
                 'heralds-moderately-interesting-face)))
   (let ((display (heralds-from-metadata
-                  "(skg (node (id x) (rels (textlinksTo (in 5 (interesting 2)) (out 3)) (overrides (out 1)) (birth overrides))))")))
+                  "(skg (node (id x) (rels (links_to (in 5 (substantive 2)) (out 3)) (overrides_view_of (out 1)) (birth overrides_view_of))))")))
     (should (equal (substring-no-properties display) "2/5L3 O1"))
     (should (eq (get-text-property 0 'face display) 'heralds-highly-interesting-face))
     (dolist (i '(1 2 3 4))
@@ -44,7 +44,7 @@
     (should (eq (get-text-property 6 'face display) 'heralds-birth-face))
     (should (eq (get-text-property 7 'face display) 'heralds-highly-interesting-face)))
   (let ((display (heralds-from-metadata
-                  "(skg (node (id x) (rels (textlinksTo (in 2 (ancestors 1 2) (interesting 1 (ancestors 1)))))))")))
+                  "(skg (node (id x) (rels (links_to (in 2 (ancestors 1 2) (substantive 1 (ancestors 1)))))))")))
     (should (equal (substring-no-properties display) "a/bL"))
     (should (eq (get-text-property 0 'face display) 'heralds-slightly-interesting-face))
     (should (eq (get-text-property 2 'face display) 'heralds-moderately-interesting-face))))
@@ -53,19 +53,19 @@
   "Counts and fraction slashes beside a birth letter keep their own faces."
   (dolist (case '(((contains (in 1) (out 2)) (birth contains)
                   "1C2" (heralds-blue-face heralds-birth-face heralds-blue-face))
-                 ((textlinksTo (in 5 (interesting 2)) (out 3))
-                  (birth textlinksTo) "2/5L3"
+                 ((links_to (in 5 (substantive 2)) (out 3))
+                  (birth links_to) "2/5L3"
                   (heralds-highly-interesting-face heralds-blue-face
                    heralds-blue-face heralds-birth-face heralds-blue-face))
                  ((contains (out 8 (unintegrated 2))) (birth contains)
                   "C2/8" (heralds-birth-face heralds-highly-interesting-face
                    heralds-blue-face heralds-blue-face))
-                 ((subscribes (in 1) (out 2)) (birth subscribes)
+                 ((subscribes_to (in 1) (out 2)) (birth subscribes_to)
                   "1S2" (heralds-purple-face heralds-birth-face heralds-purple-face))
-                 ((overrides (in 1) (out 2)) (birth overrides)
+                 ((overrides_view_of (in 1) (out 2)) (birth overrides_view_of)
                   "1O2" (heralds-highly-interesting-face heralds-birth-face
                    heralds-highly-interesting-face))
-                 ((hides (in 1) (out 2)) (birth hides)
+                 ((hides_from_its_subscriptions (in 1) (out 2)) (birth hides_from_its_subscriptions)
                   "1H2" (heralds-purple-face heralds-birth-face heralds-purple-face))))
     (let ((display (heralds-from-metadata
                     (format "(skg (node (id x) (rels %s %s)))"
@@ -81,7 +81,7 @@
   (with-temp-buffer
     (progn ;; Insert test text with herald markers
       (insert "Test line with (skg (node (id 123) (rels (contains (out 2))) (viewStats cycle))) herald\n")
-      (insert "Another line (skg (node (id 456) (rels (textlinksTo (in 3 (interesting 3)))) (editRequest delete))) more text\n")
+      (insert "Another line (skg (node (id 456) (rels (links_to (in 3 (substantive 3)))) (editRequest delete))) more text\n")
       (insert "Plain line without heralds\n"))
     (progn ;; what happens upon enabling heralds-minor-mode
       (heralds-minor-mode 1)
@@ -169,19 +169,19 @@ the C token 2aC: the multi-contains \"2\" (yellow), the ancestor \"a\"
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "req:path:.*container" result)))
 
-    ;; Test (path linkSource) viewRequest
+    ;; Test (path mentioner) viewRequest
     (erase-buffer)
-    (insert "(skg (node (id 3) (viewRequests (path linkSource))))")
+    (insert "(skg (node (id 3) (viewRequests (path mentioner))))")
     (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "req:path:.*linkSource" result)))
+      (should (string-match "req:path:.*mentioner" result)))
 
     ;; Test multiple viewRequests
     (erase-buffer)
-    (insert "(skg (node (id 4) (viewRequests (folder aliases) (path container) (path linkSource))))")
+    (insert "(skg (node (id 4) (viewRequests (folder aliases) (path container) (path mentioner))))")
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "req:folder:.*aliases" result))
       (should (string-match "req:path:.*container" result))
-      (should (string-match "req:path:.*linkSource" result)))))
+      (should (string-match "req:path:.*mentioner" result)))))
 
 (ert-deftest test-heralds-property-count-display ()
   "True file properties are summarized as one cyan Pn herald."

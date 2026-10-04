@@ -1,4 +1,4 @@
--- Integration test for skg sourceward-view request functionality,
+-- Integration test for skg mentionerward-view request functionality,
 -- nvim client. The Lua mirror of test-emacs.el in this directory.
 --
 -- Unlike most view tests, the base buffer here is authored locally
@@ -37,27 +37,27 @@ end
 
 ---Reset the scratch view buffer to base_buffer_text under a fresh
 ---view uri, position the cursor at LINE_NUMBER (0-based, like the
----elisp), request the sourceward view (auto-saves), and return the
+---elisp), request the mentionerward view (auto-saves), and return the
 ---resulting full buffer text. Port of
----skg-sourceward--request-on-line.
+---skg-mentionerward--request-on-line.
 ---@param line_number integer
 ---@return string
 local function request_on_line (line_number)
   local uri = buffer.generate_uuid()
   local buf = buffer.open_org_buffer_from_text(
-    base_buffer_text, 'skg://sourceward-test-view', uri)
+    base_buffer_text, 'skg://mentionerward-test-view', uri)
   vim.api.nvim_win_set_cursor(0, { line_number + 1, 0 })
   print(string.format(
-    'requesting-sourceward-view-line-%d', line_number))
-  view_requests.show_paths_through_link_sources() -- auto-saves
+    'requesting-mentionerward-view-line-%d', line_number))
+  view_requests.show_paths_through_mentioners() -- auto-saves
   T.check(T.wait_for_response(),
-          string.format('sourceward view response arrived for line %d',
+          string.format('mentionerward view response arrived for line %d',
                         line_number))
   return T.buffer_text(buf)
 end
 
 ---Run the request at LINE_NUMBER and assert the resulting full and
----stripped text. Port of skg-sourceward--verify-view.
+---stripped text. Port of skg-mentionerward--verify-view.
 ---@param line_number integer
 ---@param expected_full string
 ---@param expected_stripped string
@@ -76,20 +76,20 @@ local function verify_view (line_number, expected_full, expected_stripped)
             line_number))
 end
 
-print('=== SKG Sourceward View Request Integration Test ===')
+print('=== SKG Mentionerward View Request Integration Test ===')
 
 local expected_line0 =
   '* (skg (node (id 1) (source main) (affectsParent na)'
   .. ' (rels (contains (out 2))))) 1\n'
-  .. '** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1 (interesting 0))) (birth contains)))) 11\n'
+  .. '** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (links_to (in 1 (substantive 0))) (birth contains)))) 11\n'
   .. '** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 12\n'
 local expected_line2 = expected_line0
 local expected_changed =
   '* (skg (node (id 1) (source main) (affectsParent na)'
   .. ' (rels (contains (out 2))))) 1\n'
-  .. '** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (textlinksTo (in 1 (interesting 0))) (birth contains)))) 11\n'
+  .. '** (skg (node (id 11) (source main) (rels (contains (in 1 (ancestors 1))) (links_to (in 1 (substantive 0))) (birth contains)))) 11\n'
   .. '*** (skg (node (id l-11) (source main) (affectsParent false)'
-  .. ' writeProtected (rels (textlinksTo (out 1 (ancestors 1))) (birth textlinksTo)))) [[id:11][a link to 11]]\n'
+  .. ' writeProtected (rels (links_to (out 1 (ancestors 1))) (birth links_to)))) [[id:11][a link to 11]]\n'
   .. '** (skg (node (id 12) (source main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 12\n'
 local expected_no_link = '* 1\n** 11\n** 12\n'
 local expected_with_link =
@@ -99,4 +99,4 @@ verify_view(0, expected_line0, expected_no_link)
 verify_view(1, expected_changed, expected_with_link)
 verify_view(2, expected_line2, expected_no_link)
 
-T.pass('PASS: Sourceward view scenarios verified')
+T.pass('PASS: Mentionerward view scenarios verified')

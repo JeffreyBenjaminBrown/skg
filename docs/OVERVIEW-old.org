@@ -105,7 +105,7 @@ Special glyphs on a node indicate when
 its relationship to its parent is not the default.
 **** Nodes link to each other.
 ***** language
-a 'source' node 'textlinks_to' a 'target' node.
+a 'mentioner' node 'links_to' a 'mentioned' node.
 ***** link representation
 These are encoded 'inline' in the text,
 just as in org-roam.
@@ -208,18 +208,18 @@ For instance, an orgnode C might represent the collection of aliases
 *** Some TypeDB data must be calculated from these.
 Each time the server starts,
 the "in-relationships" (for all relations)
-and the out-links (for textlinks specifically)
+and the out-links (for links specifically)
 must be computed for each node.
 
 That's because .skg files record relationships
   in at most one direction:
   what the node contains, but not what contains it;
   what it subscribes to, but not what subscribes to it; etc.
-And one kind of relationship, textlinks,
+And one kind of relationship, links,
   is not recorded explicitly in either direction;
   rather, link targets (sourced from this node)
     are parsed from any links in the text in the title and body,
-  and link sources (that target this node)
+  and mentioners (that link to this node)
     are similarly inferred from other files.
 ** viewing the data
 *** By default, a node's contents are displayed as its children.
@@ -240,12 +240,12 @@ recursing until it finds a cycle, a fork,
 or something with no container (a root).
 If it finds a cycle or a fork, that becomes the last thing
 displayed in the path.
-*** One can request a 'sourceward path view' at an orgnode.
+*** One can request a 'mentionerward path view' at an orgnode.
 This is similar to the containerward path view:
 It inserts one new child into the node
-for each link source that targets the node.
+for each mentioner that links to the node.
 If there is only one such node,
-it recurses by inserting a sourceward view for that node,
+it recurses by inserting a mentionerward view for that node,
 continuing until either it runs into:
   - a cycle
   - a 'fork': a node targeted by multiple nodes

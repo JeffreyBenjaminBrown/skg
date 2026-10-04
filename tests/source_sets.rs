@@ -89,8 +89,8 @@ fn all_tests
       s . reset ("containerward_expansion_truncates_before_inactive_container", fixtures) ?;
       containerward_expansion_truncates_before_inactive_container (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks", fixtures) ?;
-      sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
+      s . reset ("mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks", fixtures) ?;
+      mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("stale_inactive_placeholders_under_folders_save_without_error", fixtures) ?;
       stale_inactive_placeholders_under_folders_save_without_error (
@@ -718,7 +718,7 @@ async fn containerward_expansion_truncates_before_inactive_container (
         rendered );
       Ok (( )) }
 
-async fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
+async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -743,12 +743,12 @@ async fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
         HashSet::new (),
         &graph,
         config,
-        Birth::Backpath (RelationRole::LINK_SOURCE),
+        Birth::Backpath (RelationRole::MENTIONER),
         Some (&active)) ?;
       assert_eq! (
         true_child_ids (&viewforest, child_id),
         BTreeSet::from ([ID::from ("active-fork-branch")]),
-        "sourceward fork expansion should retain active branches \
+        "mentionerward fork expansion should retain active branches \
          independently and omit inactive branches" );
 
       let mut empty_fork_viewforest : Tree<ViewNode> =
@@ -767,12 +767,12 @@ async fn sourceward_expansion_filters_forks_per_branch_and_omits_empty_forks (
         HashSet::new (),
         &graph,
         config,
-        Birth::Backpath (RelationRole::LINK_SOURCE),
+        Birth::Backpath (RelationRole::MENTIONER),
         Some (&active)) ?;
       assert! (
         true_child_ids (&empty_fork_viewforest, empty_fork_child_id)
         . is_empty (),
-        "all-inactive sourceward forks should not leave children or \
+        "all-inactive mentionerward forks should not leave children or \
          empty fork scaffolding" );
       Ok (( )) }
 

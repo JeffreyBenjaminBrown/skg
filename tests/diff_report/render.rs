@@ -166,7 +166,7 @@ fn non_container_backward_relationships_render_as_signed_sets () {
   node . relationship_diffs =
     vec! [
       RelationshipDiff {
-        role: "dest",
+        role: "mentioned",
         lost: vec! [id ("old")],
         gained: vec! [id ("new")],
         unchanged: vec! [id ("stay")] } ];
@@ -185,7 +185,7 @@ fn non_container_backward_relationships_render_as_signed_sets () {
   let rendered : String =
     render_report (&report);
   assert! (
-    rendered . contains ("**** dest (with gains and losses)\n"),
+    rendered . contains ("**** mentioned (with gains and losses)\n"),
     "backward relationship should use signed-set heading: {}",
     rendered );
   assert! (

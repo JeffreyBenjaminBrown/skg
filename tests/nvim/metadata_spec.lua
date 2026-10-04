@@ -166,7 +166,7 @@ describe('skg.metadata commands', function ()
       '*** (skg (node (id content-grandchild) (source public))) content grandchild',
       '** (skg (node (id mismatched-content) (source foreign))) mismatched content',
       '*** (skg (node (id public-under-mismatch) (source public))) public under mismatch',
-      '** (skg (node (id link-child) (source public) (affectsParent false) (birth backpath linkSource))) link child',
+      '** (skg (node (id link-child) (source public) (affectsParent false) (birth backpath mentioner))) link child',
       '*** (skg (node (id under-link) (source public))) under link',
       '** (skg aliasFolder) aliases',
       '*** (skg (node (id under-scaffold) (source public))) under scaffold' },
@@ -238,13 +238,13 @@ describe('skg.metadata keybinding surface', function ()
       by_lhs[binding[1]] = binding[2]
     end
     assert.are.equal('ShowFolderOfAliases', by_lhs['ca'])
-    assert.are.equal('ShowFolderOfOverrides', by_lhs['co'])
-    assert.are.equal('ShowFolderOfSubscribes', by_lhs['cs'])
+    assert.are.equal('ShowFolderOfOverridesViewOf', by_lhs['co'])
+    assert.are.equal('ShowFolderOfSubscribesTo', by_lhs['cs'])
     assert.are.equal('ShowFolderOfProperties', by_lhs['cp'])
     assert.is_nil(by_lhs['cb'])
     assert.are.equal('ShowPathsThroughContainers', by_lhs['pC'])
-    assert.are.equal('ShowPathsThroughLinkSources', by_lhs['pL'])
-    assert.are.equal('ShowPathsThroughLinkDests', by_lhs['pl'])
+    assert.are.equal('ShowPathsThroughMentioners', by_lhs['pL'])
+    assert.are.equal('ShowPathsThroughMentioned', by_lhs['pl'])
     assert.are.equal('ShowPathsThroughOverriders', by_lhs['pO'])
     assert.are.equal('ShowPathsThroughOverridden', by_lhs['po'])
     assert.are.equal('ShowPathsThroughSubscribees', by_lhs['ps'])

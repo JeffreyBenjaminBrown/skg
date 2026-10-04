@@ -59,19 +59,19 @@ M.commands = {
                                   desc = 'Goto in git parent, closing this buffer' },
   ShowFolderOfAliases = { module = 'skg.view_requests', fn = 'show_folderOf_aliases',
                             desc = 'Request the alias folder (auto-saves)' },
-  ShowFolderOfOverrides = { module = 'skg.view_requests', fn = 'show_folderOf_overrides',
+  ShowFolderOfOverridesViewOf = { module = 'skg.view_requests', fn = 'show_folderOf_overrides_view_of',
                               desc = 'Request the override folders (auto-saves)' },
-  ShowFolderOfHides = { module = 'skg.view_requests', fn = 'show_folderOf_hides',
+  ShowFolderOfHidesFromItsSubscriptions = { module = 'skg.view_requests', fn = 'show_folderOf_hides_from_its_subscriptions',
                           desc = 'Request the hide folders (auto-saves)' },
-  ShowFolderOfSubscribes = { module = 'skg.view_requests', fn = 'show_folderOf_subscribes',
+  ShowFolderOfSubscribesTo = { module = 'skg.view_requests', fn = 'show_folderOf_subscribes_to',
                                desc = 'Request the subscribe folders (auto-saves)' },
   ShowFolderOfProperties = { module = 'skg.view_requests', fn = 'show_folderOf_properties',
                              desc = 'Request the properties folder (auto-saves)' },
   ShowPathsThroughContainers = { module = 'skg.view_requests', fn = 'show_paths_through_containers',
                                  desc = 'Graft the containment ancestry (auto-saves)' },
-  ShowPathsThroughLinkSources = { module = 'skg.view_requests', fn = 'show_paths_through_link_sources',
+  ShowPathsThroughMentioners = { module = 'skg.view_requests', fn = 'show_paths_through_mentioners',
                                   desc = 'Graft the nodes that link here (auto-saves)' },
-  ShowPathsThroughLinkDests = { module = 'skg.view_requests', fn = 'show_paths_through_link_dests',
+  ShowPathsThroughMentioned = { module = 'skg.view_requests', fn = 'show_paths_through_mentioned',
                                 desc = 'Graft the nodes this links to (auto-saves)' },
   ShowPathsThroughOverriders = { module = 'skg.view_requests', fn = 'show_paths_through_overriders',
                                  desc = 'Graft the nodes overriding this (auto-saves)' },
@@ -225,13 +225,13 @@ M.content_view_bindings = {
   { 'gM', 'GotoInGitParent' },           -- C-c g M
   { 'GM', 'GotoInGitParentAndCloseThis' }, -- C-c G M
   { 'ca', 'ShowFolderOfAliases' },
-  { 'co', 'ShowFolderOfOverrides' },
-  { 'ch', 'ShowFolderOfHides' },
-  { 'cs', 'ShowFolderOfSubscribes' },
+  { 'co', 'ShowFolderOfOverridesViewOf' },
+  { 'ch', 'ShowFolderOfHidesFromItsSubscriptions' },
+  { 'cs', 'ShowFolderOfSubscribesTo' },
   { 'cp', 'ShowFolderOfProperties' },
   { 'pC', 'ShowPathsThroughContainers' }, -- C-c p C
-  { 'pL', 'ShowPathsThroughLinkSources' }, -- C-c p L
-  { 'pl', 'ShowPathsThroughLinkDests' }, -- C-c p l
+  { 'pL', 'ShowPathsThroughMentioners' }, -- C-c p L
+  { 'pl', 'ShowPathsThroughMentioned' }, -- C-c p l
   { 'pO', 'ShowPathsThroughOverriders' }, -- C-c p O
   { 'po', 'ShowPathsThroughOverridden' }, -- C-c p o
   { 'pH', 'ShowPathsThroughHiders' },    -- C-c p H

@@ -38,7 +38,7 @@ pub fn execute_view_requests (
           active_source_set, source_diffs ) ?; },
       ViewRequest::Path (role) => {
         // Relation-generic: every partner role routes through the one
-        // backpath engine (container, linkSource, and the seven new
+        // backpath engine (container, mentioner, and the seven new
         // roles alike). A view-ROOT's container request is handled
         // separately (finish_viewforest) and removed before this pass.
         build_and_integrate_path_view_then_drop_request (

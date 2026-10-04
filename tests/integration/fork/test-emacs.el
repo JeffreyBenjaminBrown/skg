@@ -156,8 +156,8 @@
           (unless (and k-line
                        (string-match "(id \\([^ )]+\\))" k-line)
                        (string-match-p "(overridesHere F)" k-line)
-                       (string-match-p "(subscribes (out 1))" k-line)
-                       (string-match-p "(overrides (out 1))" k-line))
+                       (string-match-p "(subscribes_to (out 1))" k-line)
+                       (string-match-p "(overrides_view_of (out 1))" k-line))
             (test-fail "K lacks its expected F relationships:\n%s"
                        (buffer-string)))
         (setq k-id (match-string 1 k-line)))
@@ -182,8 +182,8 @@
       (with-current-buffer f-buf
         (let ((f-line (buffer-substring-no-properties
                        (line-beginning-position) (line-end-position))))
-          (unless (and (string-match-p "(subscribes (in 1))" f-line)
-                       (string-match-p "(overrides (in 1))" f-line)
+          (unless (and (string-match-p "(subscribes_to (in 1))" f-line)
+                       (string-match-p "(overrides_view_of (in 1))" f-line)
                        (string-match-p "(contains (out 1))" f-line))
             (test-fail "F's post-fork graph relationships are wrong:\n%s"
                        (buffer-string))))))

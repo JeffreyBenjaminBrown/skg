@@ -178,7 +178,7 @@ fn contained_order_change_gets_list_diff () {
 }
 
 #[test]
-fn textlinks_are_reported_in_both_directions () {
+fn links_are_reported_in_both_directions () {
   let before : Vec<NodeComplete> =
     vec! [ node ("a", "A", &[]),
            node ("b", "B", &[]) ];
@@ -194,12 +194,12 @@ fn textlinks_are_reported_in_both_directions () {
   let a_source : &RelationshipDiff =
     reports . get (&id ("a")) . unwrap ()
       . relationship_diffs . iter ()
-      . find ( |diff| diff . role == "source" )
+      . find ( |diff| diff . role == "mentioner" )
       . unwrap ();
   let b_dest : &RelationshipDiff =
     reports . get (&id ("b")) . unwrap ()
       . relationship_diffs . iter ()
-      . find ( |diff| diff . role == "dest" )
+      . find ( |diff| diff . role == "mentioned" )
       . unwrap ();
   assert_eq! (a_source . gained, vec! [id ("b")]);
   assert_eq! (b_dest . gained, vec! [id ("a")]);

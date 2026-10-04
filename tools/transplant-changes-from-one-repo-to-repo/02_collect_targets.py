@@ -98,7 +98,7 @@ def all_refs(node: dict) -> list[str]:
         "hides_from_its_subscriptions",
         "overrides_view_of",
         "extra_ids",
-        "textlinks_to",
+        "links_to",
     ):
         v = node.get(k)
         if not v:

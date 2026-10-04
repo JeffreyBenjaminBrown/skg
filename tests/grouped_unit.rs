@@ -61,8 +61,8 @@ mod tantivy;
 #[path = "test_utils.rs"]
 mod test_utils;
 
-#[path = "textlinks.rs"]
-mod textlinks;
+#[path = "links.rs"]
+mod links;
 
 #[path = "titles_by_ids.rs"]
 mod titles_by_ids;

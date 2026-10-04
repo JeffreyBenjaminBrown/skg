@@ -7,12 +7,12 @@ use std::str::FromStr;
 use std::sync::LazyLock;
 
 use crate::types::misc::ID;
-use crate::types::errors::TextLinkParseError;
+use crate::types::errors::LinkParseError;
 use crate::types::nodes::complete::NodeComplete;
 use org_literal_ranges::org_literal_ranges;
 
 // LazyLock<Regex> ensures each regex is compiled exactly once, on first use, rather than per call.
-static TEXTLINK_PATTERN : LazyLock<Regex> =
+static LINK_PATTERN : LazyLock<Regex> =
   LazyLock::new ( || Regex::new (
     r"\[\[id:(.*?)\]\[(.*?)\]\]") . unwrap () );
 static LINK_LABEL_PATTERN : LazyLock<Regex> =
@@ -24,8 +24,8 @@ static LINK_LABEL_PATTERN : LazyLock<Regex> =
 //
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TextLink {
-  // TextLinks are represented in, and must be parsed from, the raw text fields `title` and `body`.
+pub struct Link {
+  // Links are represented in, and must be parsed from, the raw text fields `title` and `body`.
   pub id: ID,
   pub label: String,
 }
@@ -34,15 +34,15 @@ pub struct TextLink {
 // Implementations
 //
 
-impl TextLink {
+impl Link {
   pub fn new ( skgid : impl Into<String>,
                label  : impl Into<String>)
              -> Self {
-    TextLink { id    : ID ( skgid . into () ),
+    Link { id    : ID ( skgid . into () ),
                label : label . into (),
     }} }
 
-impl fmt::Display for TextLink {
+impl fmt::Display for Link {
   // Format: [[id:ID][LABEL]], where allcaps terms are variables.
   // This is the same format org-roam uses.
   fn fmt ( &self,
@@ -50,60 +50,60 @@ impl fmt::Display for TextLink {
             -> fmt::Result {
     write! ( f, "[[id:{}][{}]]", self . id, self . label ) }}
 
-impl FromStr for TextLink {
-  type Err = TextLinkParseError;
+impl FromStr for Link {
+  type Err = LinkParseError;
 
   fn from_str ( text: &str )
                 -> Result <Self, Self::Err> {
     if ( !text . starts_with ("[[id:") ||
           !text . ends_with ("]]") ) {
-      return Err (TextLinkParseError::InvalidFormat); }
+      return Err (LinkParseError::InvalidFormat); }
 
     let interior : &str = &text [5 .. text . len () - 2];
 
     if let Some (idx) = interior . find ("][") {
       let skgid : &str = &interior [0..idx];
       let label  : &str = &interior [idx+2..];
-      Ok ( TextLink {
+      Ok ( Link {
         id    : ID ( skgid . to_string () ),
         label : label . to_string (),
       } )
     } else {
-      Err (TextLinkParseError::MissingDivider)
+      Err (LinkParseError::MissingDivider)
     } } }
 
 //
 // Functions
 //
 
-pub fn textlinks_from_node (
+pub fn links_from_node (
   node : &NodeComplete )
-  -> Vec<TextLink> {
-  // All textlinks in its title
+  -> Vec<Link> {
+  // All links in its title
   // and (if present) its body.
   // Scanned separately, so the body's first line is still a line start.
-  let mut textlinks : Vec<TextLink> = textlinks_from_text (&node . title);
-  textlinks . extend (
-    textlinks_from_text ( node . body . as_deref () . unwrap_or ("") ));
-  textlinks }
+  let mut links : Vec<Link> = links_from_text (&node . title);
+  links . extend (
+    links_from_text ( node . body . as_deref () . unwrap_or ("") ));
+  links }
 
-pub fn textlinks_from_text (
+pub fn links_from_text (
   text: &str )
-  -> Vec <TextLink> {
-  textlinks_with_ranges_from_text (text) . into_iter ()
-    . map ( |(_, textlink)| textlink )
+  -> Vec <Link> {
+  links_with_ranges_from_text (text) . into_iter ()
+    . map ( |(_, link)| link )
     . collect () }
 
-/// Each textlink in 'text' that Org treats as a link, with its byte
+/// Each link in 'text' that Org treats as a link, with its byte
 /// range. Link syntax in text Org shows literally (see
 /// 'org_literal_ranges') is an example, not a link.
-pub fn textlinks_with_ranges_from_text (
+pub fn links_with_ranges_from_text (
   text: &str )
-  -> Vec <(Range<usize>, TextLink)> {
-  captures_outside_literals (&TEXTLINK_PATTERN, text) . into_iter ()
+  -> Vec <(Range<usize>, Link)> {
+  captures_outside_literals (&LINK_PATTERN, text) . into_iter ()
     . map ( |capture| (
       capture . get (0) . unwrap () . range (),
-      TextLink::new ( capture [1] . to_string (),
+      Link::new ( capture [1] . to_string (),
                       capture [2] . to_string () )) )
     . collect () }
 
@@ -124,15 +124,15 @@ fn captures_outside_literals <'t> (
 pub fn replace_each_link_with_its_label (
   text : &str )
   -> String {
-  // Replaces each textlink with that textlink's label,
+  // Replaces each link with that link's label,
   // except examples in text Org shows literally.
-  // Strips some text from each textlink while adding nothing.
+  // Strips some text from each link while adding nothing.
   let mut result : String = String::from (text);
   let mut input_offset : usize = 0; // offset in the input string
   for cap in captures_outside_literals (&LINK_LABEL_PATTERN, text) {
     let whole_match : Match =
       cap . get (0) . unwrap ();
-    let textlink_label : Match =
+    let link_label : Match =
       cap . get (1) . unwrap ();
     let start_pos : usize =
       whole_match . start () - input_offset;
@@ -140,7 +140,7 @@ pub fn replace_each_link_with_its_label (
       whole_match . end ()   - input_offset;
     result . replace_range ( // the replacement
       start_pos .. end_pos,
-      textlink_label . as_str () );
+      link_label . as_str () );
     input_offset += whole_match . len ()
-      - textlink_label . len (); }
+      - link_label . len (); }
   result }

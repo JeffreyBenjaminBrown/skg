@@ -1,5 +1,5 @@
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::in_rust_graph::stats::link_source_is_interesting;
+use crate::dbs::in_rust_graph::stats::mentioner_is_substantive;
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole };
 use crate::herald_tokens::{AncestorFlags, relationship_heralds_sexp};
@@ -15,9 +15,9 @@ use std::collections::{HashMap, HashSet};
 /// The five graph relations whose flags the H/S/O/L checks consult via
 /// the in-Rust graph (contains is checked via the containment maps).
 const GRAPH_RELATIONS : [NodeRelation; 4] = [
-  NodeRelation::TextlinksTo,
+  NodeRelation::LinksTo,
   NodeRelation::HidesFromItsSubscriptions,
-  NodeRelation::Subscribes,
+  NodeRelation::SubscribesTo,
   NodeRelation::OverridesViewOf, ];
 
 pub fn set_viewnodestats_in_viewforest (
@@ -257,9 +257,9 @@ fn flag_ancestor_relations (
       node_pid, anc_pid,
       RelationRole::new (rel, BinaryRolePosition::First), active ) {
       flags . record (rel, true, generation);
-      if rel == NodeRelation::TextlinksTo
-        && link_source_is_interesting (graph, active, anc_pid) {
-        flags . links_interesting_in . push (generation); } }
+      if rel == NodeRelation::LinksTo
+        && mentioner_is_substantive (graph, active, anc_pid) {
+        flags . links_substantive_in . push (generation); } }
     // outbound: node R's ancestor (ancestor plays the second role).
     if graph . relation_membership_is_visible (
       node_pid, anc_pid,

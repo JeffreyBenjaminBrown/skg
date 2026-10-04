@@ -135,14 +135,14 @@ fn outbound_member_relSource_of_nodecomplete (
   let rel_partners : &[RelPartner<ID>] = match relation {
     NodeRelation::Contains =>
       & nc . contains,
-    NodeRelation::Subscribes =>
+    NodeRelation::SubscribesTo =>
       nc . subscribes_to . or_default (),
     NodeRelation::HidesFromItsSubscriptions =>
       nc . hides_from_its_subscriptions . or_default (),
     NodeRelation::OverridesViewOf =>
       nc . overrides_view_of . or_default (),
-    NodeRelation::TextlinksTo =>
-      // Textlinks are inferred from body text, not stored as a list
+    NodeRelation::LinksTo =>
+      // Links are inferred from body text, not stored as a list
       // (see 'outbound_ids_of_nodecomplete'); this scan never fires
       // for them from a Deleted/Added stage.
       return None, };

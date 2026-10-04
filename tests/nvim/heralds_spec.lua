@@ -36,23 +36,23 @@ describe('skg.heralds', function ()
 
   it('renders subset fractions and distinguishes ĥ from ancestor h', function ()
     for _, case in ipairs({
-      { '(textlinksTo (in 5 (interesting 2)) (out 3))', '2/5L3' },
-      { '(textlinksTo (in 5 (interesting 0)) (out 3))', '5L3' },
-      { '(textlinksTo (in 5 (interesting 2)))', '2/5L' },
-      { '(textlinksTo (out 3))', 'L3' },
-      { '(textlinksTo (in 5 (interesting 5)))', '5/L' },
-      { '(textlinksTo (in 1 (ancestors 1)'
-        .. ' (interesting 1 (ancestors 1))))', 'a/L' },
-      { '(textlinksTo (in 2 (ancestors 1 2)'
-        .. ' (interesting 1 (ancestors 1))))', 'a/bL' },
-      { '(textlinksTo (in 5 (ancestors 1)'
-        .. ' (interesting 1 (ancestors 1))))', 'a/5L' },
-      { '(textlinksTo (in 5 (ancestors 1) (interesting 1)))', '1/5aL' },
-      { '(textlinksTo (in 1 (ancestors 1) (interesting 0)))', 'aL' },
-      { '(textlinksTo (out 1 (ancestors 1)))', 'La' },
-      { '(textlinksTo (out 3 (ancestors 1)))', 'L3a' },
-      { '(textlinksTo (in 1 (ancestors 27)'
-        .. ' (interesting 1 (ancestors 27))))', '{27}/L' },
+      { '(links_to (in 5 (substantive 2)) (out 3))', '2/5L3' },
+      { '(links_to (in 5 (substantive 0)) (out 3))', '5L3' },
+      { '(links_to (in 5 (substantive 2)))', '2/5L' },
+      { '(links_to (out 3))', 'L3' },
+      { '(links_to (in 5 (substantive 5)))', '5/L' },
+      { '(links_to (in 1 (ancestors 1)'
+        .. ' (substantive 1 (ancestors 1))))', 'a/L' },
+      { '(links_to (in 2 (ancestors 1 2)'
+        .. ' (substantive 1 (ancestors 1))))', 'a/bL' },
+      { '(links_to (in 5 (ancestors 1)'
+        .. ' (substantive 1 (ancestors 1))))', 'a/5L' },
+      { '(links_to (in 5 (ancestors 1) (substantive 1)))', '1/5aL' },
+      { '(links_to (in 1 (ancestors 1) (substantive 0)))', 'aL' },
+      { '(links_to (out 1 (ancestors 1)))', 'La' },
+      { '(links_to (out 3 (ancestors 1)))', 'L3a' },
+      { '(links_to (in 1 (ancestors 27)'
+        .. ' (substantive 1 (ancestors 27))))', '{27}/L' },
       { '(contains (in 2) (out 8 (unintegrated 2)))', '2C2/8' },
       { '(contains (out 8 (unintegrated 0)))', 'C8' },
       { '(contains (out 8 (unintegrated 8)))', 'C8/' },
@@ -62,22 +62,22 @@ describe('skg.heralds', function ()
         '(skg (node (id x) (rels ' .. case[1] .. ')))'))
     end
     local chunks = heralds.chunks_from_metadata(
-      '(skg (node (id x) (rels (overrides (out 1 (ancestors 8))))'
+      '(skg (node (id x) (rels (overrides_view_of (out 1 (ancestors 8))))'
       .. ' (viewStats (overridesHere y))))')
     assert.are.equal('Oĥh', heralds.chunks_text(chunks))
     assert.are.equal('SkgHeraldConfusable', chunks[2][2])
     assert.are.equal('SkgHeraldModeratelyInteresting', chunks[3][2])
     chunks = heralds.chunks_from_metadata(
-      '(skg (node (id x) (rels (textlinksTo (in 5 (interesting 2))'
-      .. ' (out 3)) (overrides (out 1)) (birth overrides))))')
+      '(skg (node (id x) (rels (links_to (in 5 (substantive 2))'
+      .. ' (out 3)) (overrides_view_of (out 1)) (birth overrides_view_of))))')
     assert.are.equal('2/5L3 O1', heralds.chunks_text(chunks))
     assert.are.equal('SkgHeraldHighlyInteresting', chunks[1][2])
     for i = 2, 5 do assert.are.equal('SkgHeraldBlue', chunks[i][2]) end
     assert.are.equal('SkgHeraldBirth', chunks[7][2])
     assert.are.equal('SkgHeraldHighlyInteresting', chunks[8][2])
     chunks = heralds.chunks_from_metadata(
-      '(skg (node (id x) (rels (textlinksTo (in 2 (ancestors 1 2)'
-      .. ' (interesting 1 (ancestors 1)))))))')
+      '(skg (node (id x) (rels (links_to (in 2 (ancestors 1 2)'
+      .. ' (substantive 1 (ancestors 1)))))))')
     assert.are.equal('a/bL', heralds.chunks_text(chunks))
     assert.are.equal('SkgHeraldSlightlyInteresting', chunks[1][2])
     assert.are.equal('SkgHeraldModeratelyInteresting', chunks[3][2])
@@ -87,18 +87,18 @@ describe('skg.heralds', function ()
     for _, case in ipairs({
       { '(contains (in 1) (out 2)) (birth contains)', '1C2',
         { 'SkgHeraldBlue', 'SkgHeraldBirth', 'SkgHeraldBlue' } },
-      { '(textlinksTo (in 5 (interesting 2)) (out 3)) (birth textlinksTo)',
+      { '(links_to (in 5 (substantive 2)) (out 3)) (birth links_to)',
         '2/5L3', { 'SkgHeraldHighlyInteresting', 'SkgHeraldBlue',
                   'SkgHeraldBlue', 'SkgHeraldBirth', 'SkgHeraldBlue' } },
       { '(contains (out 8 (unintegrated 2))) (birth contains)', 'C2/8',
         { 'SkgHeraldBirth', 'SkgHeraldHighlyInteresting',
           'SkgHeraldBlue', 'SkgHeraldBlue' } },
-      { '(subscribes (in 1) (out 2)) (birth subscribes)', '1S2',
+      { '(subscribes_to (in 1) (out 2)) (birth subscribes_to)', '1S2',
         { 'SkgHeraldPurple', 'SkgHeraldBirth', 'SkgHeraldPurple' } },
-      { '(overrides (in 1) (out 2)) (birth overrides)', '1O2',
+      { '(overrides_view_of (in 1) (out 2)) (birth overrides_view_of)', '1O2',
         { 'SkgHeraldHighlyInteresting', 'SkgHeraldBirth',
           'SkgHeraldHighlyInteresting' } },
-      { '(hides (in 1) (out 2)) (birth hides)', '1H2',
+      { '(hides_from_its_subscriptions (in 1) (out 2)) (birth hides_from_its_subscriptions)', '1H2',
         { 'SkgHeraldPurple', 'SkgHeraldBirth', 'SkgHeraldPurple' } },
     }) do
       local chunks = heralds.chunks_from_metadata(
@@ -114,7 +114,7 @@ describe('skg.heralds', function ()
     local buf = scratch_buffer_with({
       'Test line with (skg (node (id 123) (rels (contains (out 2)))'
       .. ' (viewStats cycle))) herald',
-      'Another line (skg (node (id 456) (rels (textlinksTo (in 3 (interesting 3))))'
+      'Another line (skg (node (id 456) (rels (links_to (in 3 (substantive 3))))'
       .. ' (editRequest delete))) more text',
       'Plain line without heralds' })
     assert.is_true(heralds.enable(buf))
@@ -172,10 +172,10 @@ describe('skg.heralds', function ()
       :find('req:path:?container'))
     local many = herald_text(
       '(skg (node (id 4) (viewRequests (folder aliases)'
-      .. ' (path container) (path linkSource))))')
+      .. ' (path container) (path mentioner))))')
     assert.is_truthy(many:find('req:folder:?aliases'))
     assert.is_truthy(many:find('req:path:?container'))
-    assert.is_truthy(many:find('req:path:?linkSource'))
+    assert.is_truthy(many:find('req:path:?mentioner'))
   end)
 
   it('displays the true-property count as Pn', function ()

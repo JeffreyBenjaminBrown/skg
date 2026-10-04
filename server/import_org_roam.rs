@@ -8,7 +8,7 @@ use crate::telescope::unfold::{
 };
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
-use crate::types::textlinks::org_literal_ranges::{
+use crate::types::links::org_literal_ranges::{
   HEADLINES_INSIDE_BLOCKS_EXPLANATION, headlines_inside_blocks};
 
 use std::collections::HashMap;

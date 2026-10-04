@@ -6,7 +6,7 @@
 //! investigated in the git history of every source. If it was never
 //! there, the report says that; otherwise it names the commit at
 //! which it vanished and what it was connected to (in every possible
-//! way, textlinks included) when last present.
+//! way, links included) when last present.
 
 use crate::diff_report::snapshot::{
   parse_blob_node, path_is_source_skg, source_prefix_in_repo};
@@ -15,7 +15,7 @@ use crate::diff_report::types::{
 use crate::git_ops::read_repo::open_repo;
 use crate::types::misc::{ID, MSV, SkgConfig, SourceName, members_msv, members_of};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::textlinks::textlinks_from_node;
+use crate::types::links::links_from_node;
 
 use git2::{Commit, ObjectType, Repository, TreeWalkMode, TreeWalkResult};
 use std::collections::{BTreeSet, HashSet};
@@ -24,8 +24,8 @@ use std::path::{Path, PathBuf};
 /// Every id some node of 'snapshot' lists as a relationship member
 /// (contains, subscribes_to, hides_from_its_subscriptions,
 /// overrides_view_of) that no node of 'snapshot' answers to (as
-/// primary or extra id). Textlink targets are NOT collected here:
-/// a dead textlink degrades to text, not to an unknown-node phantom.
+/// primary or extra id). Link targets are NOT collected here:
+/// a dead link degrades to text, not to an unknown-node phantom.
 pub fn dangling_ids_in_snapshot (
   snapshot : &GraphSnapshot,
 ) -> BTreeSet<ID> {
@@ -130,7 +130,7 @@ fn commit_stamp (
 
 /// The whole picture of the id at 'commit' (where its file exists):
 /// its own title and outbound lists, plus every OTHER node in that
-/// tree that referenced it, by relation -- textlinks included.
+/// tree that referenced it, by relation -- links included.
 fn sighting_at_commit (
   repo        : &Repository,
   prefix      : &Path,
@@ -210,8 +210,8 @@ fn inbound_references_in_tree (
     note ("overrides_view_of",
           node . overrides_view_of . or_default () . iter ()
             . any ( |m| &m . member == id ));
-    note ("textlink",
-          textlinks_from_node (&node) . iter ()
+    note ("link",
+          links_from_node (&node) . iter ()
             . any ( |l| l . id == *id ));
     TreeWalkResult::Ok
   }) . ok ();

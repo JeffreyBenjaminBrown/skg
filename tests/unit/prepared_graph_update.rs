@@ -466,7 +466,7 @@ proptest! {
       prop_assert_eq! (&actual . subscribers_of, &full . graph . subscribers_of);
       prop_assert_eq! (&actual . hiders_of, &full . graph . hiders_of);
       prop_assert_eq! (&actual . overriders_of, &full . graph . overriders_of);
-      prop_assert_eq! (&actual . textlinks_in, &full . graph . textlinks_in);
+      prop_assert_eq! (&actual . mentioners_of, &full . graph . mentioners_of);
     }
   }
 }

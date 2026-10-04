@@ -308,12 +308,12 @@ fn ancestor_heralds_gate_privately_recorded_relations (
       let at_public : Option<String> = herald_of_S (&public) ?;
       assert! (
         ! at_public . as_deref () . unwrap_or ("")
-          . contains ("subscribes"),
+          . contains ("subscribes_to"),
         "S's privately-recorded subscription to its buffer-parent C \
          must not tint an ancestor herald at public: {:?}", at_public );
       let at_all : Option<String> = herald_of_S (&all) ?;
       assert! (
-        at_all . as_deref () . unwrap_or ("") . contains ("subscribes"),
+        at_all . as_deref () . unwrap_or ("") . contains ("subscribes_to"),
         "under 'all' the subscription flags S's herald: {:?}", at_all );
       Ok (( )) } )) }
 

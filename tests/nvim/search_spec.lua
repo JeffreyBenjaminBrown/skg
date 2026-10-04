@@ -174,7 +174,7 @@ describe('skg.search', function ()
     vim.api.nvim_win_set_cursor(0, { 1, 4 })
     search_make_link.finish()
     -- The search buffer died; we are back in the source; the link's
-    -- label had its inner textlink reduced.
+    -- label had its inner link reduced.
     assert.is_false(vim.api.nvim_buf_is_valid(search_buf))
     assert.are.equal(source, vim.api.nvim_get_current_buf())
     local text = table.concat(

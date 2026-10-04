@@ -8,14 +8,14 @@
 //! Wire shape (a relation/side/sub-list is omitted when it would be
 //! empty apart from its key):
 //!   (rels
-//!     (contains    (in  COUNT (ancestors GEN...))
-//!                  (out COUNT (ancestors GEN...)))
-//!     (subscribes  (in ...) (out ...))
-//!     (overrides   (in ...) (out ...))
-//!     (hides       (in ...) (out ...))
-//!     (textlinksTo (in COUNT (ancestors GEN...)
-//!                      (interesting COUNT (ancestors GEN...)))
-//!                  (out COUNT (ancestors GEN...)))
+//!     (contains          (in  COUNT (ancestors GEN...))
+//!                        (out COUNT (ancestors GEN...)))
+//!     (subscribes_to     (in ...) (out ...))
+//!     (overrides_view_of (in ...) (out ...))
+//!     (hides_from_its_subscriptions (in ...) (out ...))
+//!     (links_to          (in COUNT (ancestors GEN...)
+//!                            (substantive COUNT (ancestors GEN...)))
+//!                        (out COUNT (ancestors GEN...)))
 //!     (aliases  K)
 //!     (extraIds K)
 //!     (properties K)
@@ -35,7 +35,7 @@ use crate::types::viewnode::RelationCounts;
 pub struct AncestorFlags {
   pub contains_in    : Vec<usize>, pub contains_out    : Vec<usize>,
   pub contents_unintegrated_out : Vec<usize>,
-  pub links_in       : Vec<usize>, pub links_interesting_in : Vec<usize>,
+  pub links_in       : Vec<usize>, pub links_substantive_in : Vec<usize>,
   pub links_out      : Vec<usize>,
   pub hides_in       : Vec<usize>, pub hides_out       : Vec<usize>,
   pub subscribes_in  : Vec<usize>, pub subscribes_out  : Vec<usize>,
@@ -55,28 +55,17 @@ impl AncestorFlags {
     let slot : Option<&mut Vec<usize>> = match (rel, inbound) {
       (NodeRelation::Contains,                  true ) => Some (&mut self . contains_in),
       (NodeRelation::Contains,                  false) => Some (&mut self . contains_out),
-      (NodeRelation::TextlinksTo,               true ) => Some (&mut self . links_in),
-      (NodeRelation::TextlinksTo,               false) => Some (&mut self . links_out),
+      (NodeRelation::LinksTo,               true ) => Some (&mut self . links_in),
+      (NodeRelation::LinksTo,               false) => Some (&mut self . links_out),
       (NodeRelation::HidesFromItsSubscriptions, true ) => Some (&mut self . hides_in),
       (NodeRelation::HidesFromItsSubscriptions, false) => Some (&mut self . hides_out),
-      (NodeRelation::Subscribes,                true ) => Some (&mut self . subscribes_in),
-      (NodeRelation::Subscribes,                false) => Some (&mut self . subscribes_out),
+      (NodeRelation::SubscribesTo,                true ) => Some (&mut self . subscribes_in),
+      (NodeRelation::SubscribesTo,                false) => Some (&mut self . subscribes_out),
       (NodeRelation::OverridesViewOf,           true ) => Some (&mut self . overrides_in),
       (NodeRelation::OverridesViewOf,           false) => Some (&mut self . overrides_out), };
     if let Some (v) = slot {
       if ! v . contains (&generation) { v . push (generation); } } }
 }
-
-/// The wire key for a relation.
-pub fn relation_key (
-  r : NodeRelation,
-) -> &'static str {
-  match r {
-    NodeRelation::Contains                  => "contains",
-    NodeRelation::TextlinksTo               => "textlinksTo",
-    NodeRelation::HidesFromItsSubscriptions => "hides",
-    NodeRelation::Subscribes                => "subscribes",
-    NodeRelation::OverridesViewOf           => "overrides", } }
 
 /// `(ancestors GEN...)`, or None if empty. Generations are sorted and
 /// de-duped for a stable wire.
@@ -146,33 +135,33 @@ fn contains_sexp (
   if let Some (s) = out { sides . push (s); }
   Some (format! ("(contains {})", sides . join (" "))) }
 
-/// The textlinks_to relation reports the interesting inbound subset and
+/// The links_to relation reports the substantive inbound subset and
 /// distinct resolved outbound targets. All counts are complete facts.
 fn links_sexp (
   total             : usize,
-  interesting       : usize,
+  substantive       : usize,
   in_flags          : &[usize],
-  interesting_flags : &[usize],
+  substantive_flags : &[usize],
   targets           : usize,
   out_flags         : &[usize],
 ) -> Option<String> {
-  assert! (interesting <= total);
+  assert! (substantive <= total);
   let inb : Option<String> = if total == 0 && in_flags . is_empty () {
     None
   } else {
     let mut parts : Vec<String> = vec! [ total . to_string () ];
     if let Some (a) = ancestors_sexp (in_flags) { parts . push (a); }
-    let mut subset : Vec<String> = vec! [interesting . to_string ()];
-    if let Some (a) = ancestors_sexp (interesting_flags) {
+    let mut subset : Vec<String> = vec! [substantive . to_string ()];
+    if let Some (a) = ancestors_sexp (substantive_flags) {
       subset . push (a); }
-    parts . push (format! ("(interesting {})", subset . join (" ")));
+    parts . push (format! ("(substantive {})", subset . join (" ")));
     Some ( format! ("(in {})", parts . join (" ")) ) };
   let out : Option<String> = side_sexp ("out", targets, out_flags);
   if inb . is_none () && out . is_none () { return None; }
   let mut inner : Vec<String> = Vec::new ();
   if let Some (s) = inb { inner . push (s); }
   if let Some (s) = out { inner . push (s); }
-  Some ( format! ("(textlinksTo {})", inner . join (" ")) ) }
+  Some ( format! ("(links_to {})", inner . join (" ")) ) }
 
 /// Emit the semantic `(rels ...)` form for a node from its member
 /// counts, alias/extra-id/property counts, ancestor flags, and birth relations.
@@ -192,24 +181,24 @@ pub fn relationship_heralds_sexp (
   if let Some (s) = contains_sexp (
     counts, flags, unintegrated) { parts . push (s); }
   if let Some (s) = links_sexp (
-    counts . link_total, counts . link_interesting,
-    &flags . links_in, &flags . links_interesting_in,
+    counts . link_total, counts . link_substantive,
+    &flags . links_in, &flags . links_substantive_in,
     counts . link_targets, &flags . links_out) { parts . push (s); }
   if let Some (s) = relation_sexp (
-    "subscribes", counts . subscribers, &flags . subscribes_in,
+    NodeRelation::SubscribesTo . relation_name (), counts . subscribers, &flags . subscribes_in,
     counts . subscribees, &flags . subscribes_out) { parts . push (s); }
   if let Some (s) = relation_sexp (
-    "overrides", counts . overriders, &flags . overrides_in,
+    NodeRelation::OverridesViewOf . relation_name (), counts . overriders, &flags . overrides_in,
     counts . overrides_out, &flags . overrides_out) { parts . push (s); }
   if let Some (s) = relation_sexp (
-    "hides", counts . hiders, &flags . hides_in,
+    NodeRelation::HidesFromItsSubscriptions . relation_name (), counts . hiders, &flags . hides_in,
     counts . hides, &flags . hides_out) { parts . push (s); }
   if aliases   > 0 { parts . push ( format! ("(aliases {})",  aliases) ); }
   if extra_ids > 0 { parts . push ( format! ("(extraIds {})", extra_ids) ); }
   if properties > 0 {
     parts . push ( format! ("(properties {})", properties) ); }
   if ! birth . is_empty () {
-    let names : Vec<&str> = birth . iter () . map ( |&r| relation_key (r) ) . collect ();
+    let names : Vec<&str> = birth . iter () . map ( |&r| r . relation_name () ) . collect ();
     parts . push ( format! ("(birth {})", names . join (" ")) ); }
   if parts . is_empty () { None }
   else { Some ( format! ("(rels {})", parts . join (" ")) ) } }

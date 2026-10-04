@@ -75,7 +75,7 @@ pub struct VanishedNodeSighting {
   pub vanished_at  : Option<CommitStamp>, // its first-parent descendant, which lacks the file
   pub title        : String,             // the node's title when last present
   pub outbound     : Vec<(&'static str, Vec<ID>)>, // its own nonempty relation lists then
-  pub inbound      : Vec<(ID, &'static str)>,      // who referred to it then, and how (textlinks included)
+  pub inbound      : Vec<(ID, &'static str)>,      // who referred to it then, and how (links included)
 }
 
 #[derive(Clone, Debug)]

@@ -21,7 +21,7 @@ mod render;
 mod snapshot;
 
 #[test]
-fn diff_report_includes_inbound_and_textlink_changes (
+fn diff_report_includes_inbound_and_link_changes (
 ) -> Result<(), Box<dyn Error>> {
   let fixture : DiffFixture =
     DiffFixture::new () ?;
@@ -56,12 +56,12 @@ fn diff_report_includes_inbound_and_textlink_changes (
     "child node should report inbound container gains:\n{}",
     report );
   assert! (
-    report . contains ("**** source"),
-    "textlink source role should be reported:\n{}",
+    report . contains ("**** mentioner"),
+    "mentioner role should be reported:\n{}",
     report );
   assert! (
-    report . contains ("**** dest"),
-    "textlink dest role should be reported:\n{}",
+    report . contains ("**** mentioned"),
+    "mentioned role should be reported:\n{}",
     report );
   assert! (
     report . contains ("**** title"),

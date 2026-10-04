@@ -65,8 +65,8 @@ views which show a changed owner or the exact absent raw ID.
 The 'f' is for 'find'.
 *** how search works
 **** the search ranking rules
-"Rooty" nodes (roots, cycle members, link
-dests, and nodes that had an org-roam ID before import)
+"Rooty" nodes (roots, cycle members,
+mentioned nodes, and nodes that had an org-roam ID before import)
 are bumped in the ranking via their context-origin multiplier.
 **** how search treats data source restrictions
 If the source-set is restricted, if the search index contains any overPrivateText
@@ -202,7 +202,7 @@ Examples:
   match on an alias even when the title doesn't mention the
   searched word. The returned node is still the aliased one.
 - Results are ranked by BM25 times a context-origin factor
-  (Root 100×, CycleMember ~32×, Dest 10×, HadID 10×,
+  (Root 100×, CycleMember ~32×, Mentioned 10×, HadID 10×,
   MultiContained ~3.2×, everything else 1×). A weaker text
   match on a root can outrank a stronger match on a leaf,
   but every match is returned — search is never filtered by
@@ -333,15 +333,15 @@ subscribee-as-such); the heralds advertise other nonempty relations.
 The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:
 type an alias in and save.
-*** C-c l o : skg-show-folderOf-overrides
+*** C-c l o : skg-show-folderOf-overrides_view_of
 The overriddenFolder (the nodes this node overrides -- WRITABLE, shown
 even when empty as an "add an override here" surface) and the
 overriderFolder (the nodes that override this one -- read-only, ☮).
-*** C-c l h : skg-show-folderOf-hides
+*** C-c l h : skg-show-folderOf-hides_from_its_subscriptions
 The hiderFolder and hiddenFolder -- BOTH read-only (☮). Hiding is edited from
 a subscribee-as-such, never from these folders. On a node that neither
 hides nor is hidden, nothing appears.
-*** C-c l s : skg-show-folderOf-subscribes
+*** C-c l s : skg-show-folderOf-subscribes_to
 The subscribeeFolder (the nodes this node subscribes to -- WRITABLE, shown
 even when empty) and the subscriberFolder (the nodes that subscribe to
 this one -- read-only, ☮).
@@ -361,10 +361,10 @@ the partner's active (first) role; lower = its passive (second) role.
 Every command auto-saves.
 *** C-c p C : skg-show-paths-through-containers
 The nodes that contain this node (its containment ancestry).
-*** C-c p L : skg-show-paths-through-link-sources
-The nodes that link to this node (its textlink sources).
-*** C-c p l : skg-show-paths-through-link-dests
-The nodes this node links to (its textlink dests).
+*** C-c p L : skg-show-paths-through-mentioners
+The nodes that link to this node (its mentioners).
+*** C-c p l : skg-show-paths-through-mentioned
+The nodes this node links to (the nodes it mentions).
 *** C-c p O : skg-show-paths-through-overriders
 The nodes that override this node.
 *** C-c p o : skg-show-paths-through-overridden
@@ -539,7 +539,7 @@ view-parent. Only three roles are settable from the child's
 position -- =contained= (ordinary content), =subscribee= (a
 subscribeeFolder member) and =overridden= (an overriddenFolder member);
 RET on any other role explains why its edge cannot be set from
-there (read-only folders belong to the other end; textlinks carry no
+there (read-only folders belong to the other end; links carry no
 independent source; hide sources are derived at save). RET picks a
 role; q aborts.
 
@@ -582,7 +582,7 @@ org-descendents. Its org-parent must be a definitive activeNode
 whose source is owned in =skgconfig.toml=.
 
 The command replaces the whole leaf with a same-level
-write-protected activeNode for the link dest. The parent is
+write-protected activeNode for the link target. The parent is
 definitive, so saving records the dest as content of the
 parent; the replacement child is write-protected, so its own text is
 not rewritten from the link label.
@@ -806,7 +806,7 @@ A document whose only top-level heading has nothing before it
 is that heading, so the heading is its file root;
 otherwise the file root is titled after the document.
 It also creates two kinds of nodes that do not so correspond:
-- a single import-record node with textlinks to all file roots,
+- a single import-record node with links to all file roots,
   so you can see everything you just imported in one place.
   The import result buffer links to it; follow the link with =C-c g RET=.
 - an export marker under each root,

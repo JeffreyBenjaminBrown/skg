@@ -410,8 +410,8 @@ pub(crate) fn emit_telescope_warnings (
 /// - extra_ids of referencers: per the data model, an id can only
 ///   be an extra_id of ONE node, so a referencer cannot legitimately
 ///   carry a deleted node's id in its extra_ids.
-/// - textlinks_to: lives in body text; stripping requires body
-///   rewriting. Dangling textlink targets render as PhantomUnknown
+/// - links_to: lives in body text; stripping requires body
+///   rewriting. Dangling link targets render as PhantomUnknown
 ///   placeholders when followed, so this is non-fatal.
 pub(crate) fn apply_delete_propagation_cleanup (
   node_defs  : &mut Vec<DefineNode>,

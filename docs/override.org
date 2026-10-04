@@ -296,7 +296,7 @@ problem:
 - ordinary relationship folders, paths, backpaths, herald counts, and
   ancestor heralds use the generic gated accessors for every stored
   node-to-node relationship;
-- =textlinks_to= has no independently movable relationship source: it is
+- =links_to= has no independently movable relationship source: it is
   derived from the source node's title and body, so its effective relSource is
   that node's home source.
 

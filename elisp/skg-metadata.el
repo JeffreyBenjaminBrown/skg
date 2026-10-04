@@ -525,12 +525,12 @@ next save will do with the edge."
       "The node would CONTAIN its view-parent -- the shape of a containerward ancestry graft. The edge belongs to the graft's own contains list, wherever that list is drawn definitively; it cannot be set from the graft's position.")
      ("contained" contained
       "The view-parent contains the node: ordinary content. Sets the source of each parent-contains-child edge."))
-    ("textlinks_to"
-     ("source" nil
-      "Textlinks are inferred from body text; they carry no false relSource, so there is nothing to set.")
-     ("dest" nil
-      "Textlinks are inferred from body text; they carry no false relSource, so there is nothing to set."))
-    ("subscribes"
+    ("links_to"
+     ("mentioner" nil
+      "Links are inferred from body text; they carry no false relSource, so there is nothing to set.")
+     ("mentioned" nil
+      "Links are inferred from body text; they carry no false relSource, so there is nothing to set."))
+    ("subscribes_to"
      ("subscriber" nil
       "A subscriberFolder member: the subscribes edge belongs to the member (the subscriber), not to the view-parent. Read-only from here.")
      ("subscribee" subscribee

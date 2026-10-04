@@ -3,7 +3,7 @@
 /// consisting of 'origins' (usually a single rootlike node,
 /// but maybe a cycle) and potentially a lot of other nodes
 /// in the recursive content of the origin(s).
-/// Origins (roots, link dests, multiply-contained nodes, cycle members,
+/// Origins (roots, mentioned nodes, multiply-contained nodes, cycle members,
 /// nodes with Had_ID_Before_Import) get score multipliers at search time.
 
 use crate::consts::{
@@ -11,14 +11,14 @@ use crate::consts::{
   MULTIPLIER_HAD_ID,
   MULTIPLIER_MULTI_CONTAINED,
   MULTIPLIER_ROOT,
-  MULTIPLIER_DEST,
+  MULTIPLIER_MENTIONED,
 };
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::tantivy::context_update::update_context_origin_types;
 use crate::types::misc::{ID, TantivyIndex};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
-use crate::types::textlinks::textlinks_from_node;
+use crate::types::links::links_from_node;
 
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -32,7 +32,7 @@ use std::error::Error;
 pub enum ContextOriginType {
   Root,
   CycleMember, // A treelike set might have no single root, but rather a rootlike cycle. In that case every member of the cycle should be almost as prominent in search results as a true root. The multipliers reflect that.
-  Dest,
+  Mentioned,
   HadID, // If something had an org-roam ID when imported, even if it was not linked to, it was probably considered important enough at some point to be worth linking to.
   MultiContained,
 }
@@ -42,7 +42,7 @@ impl ContextOriginType {
     match self {
       ContextOriginType::Root           => "Root",
       ContextOriginType::CycleMember    => "CycleMember",
-      ContextOriginType::Dest         => "Dest",
+      ContextOriginType::Mentioned      => "Mentioned",
       ContextOriginType::HadID          => "HadID",
       ContextOriginType::MultiContained => "MultiContained", } }
   pub fn from_label ( label : &str, )
@@ -50,7 +50,7 @@ impl ContextOriginType {
     match label {
       "Root"           => Some (ContextOriginType::Root),
       "CycleMember"    => Some (ContextOriginType::CycleMember),
-      "Dest"         => Some (ContextOriginType::Dest),
+      "Mentioned"      => Some (ContextOriginType::Mentioned),
       "HadID"          => Some (ContextOriginType::HadID),
       "MultiContained" => Some (ContextOriginType::MultiContained),
       _                => None, } }
@@ -58,7 +58,7 @@ impl ContextOriginType {
     match self {
       ContextOriginType::Root           => MULTIPLIER_ROOT,
       ContextOriginType::CycleMember    => MULTIPLIER_CYCLE_MEMBER,
-      ContextOriginType::Dest         => MULTIPLIER_DEST,
+      ContextOriginType::Mentioned      => MULTIPLIER_MENTIONED,
       ContextOriginType::HadID          => MULTIPLIER_HAD_ID,
       ContextOriginType::MultiContained => MULTIPLIER_MULTI_CONTAINED, }} }
 
@@ -80,18 +80,18 @@ pub fn compute_and_store_context_types (
   tantivy_index : &TantivyIndex,
   had_id_set    : &HashSet<ID>,
   all_node_ids  : &HashSet<ID>,
-  link_dests  : &HashSet<ID>,
+  mentioned_ids  : &HashSet<ID>,
   map_to_content  : &MapToContent,
   map_to_containers   : &MapToContainers,
 ) -> Result<HashMap<ID, String>, Box<dyn Error>> {
   tracing::info! ("Computing context origin types...");
   let edge_count : usize =
     map_to_content . values () . map ( |v| v . len () ) . sum ();
-  tracing::info! ("  {} nodes, {} edges, {} link dests.",
-            all_node_ids . len (), edge_count, link_dests . len ());
+  tracing::info! ("  {} nodes, {} edges, {} mentioned nodes.",
+            all_node_ids . len (), edge_count, mentioned_ids . len ());
   let mut origin_types : HashMap<ID, ContextOriginType> =
     identify_origins (
-      all_node_ids, map_to_containers, link_dests, had_id_set );
+      all_node_ids, map_to_containers, mentioned_ids, had_id_set );
   tracing::info! ("  {} origins identified.", origin_types . len ());
   let mut all_contexts : Vec<HashSet<ID>> =
     grow_all_contexts (&origin_types, map_to_content);
@@ -146,9 +146,9 @@ pub fn context_origin_types_for_saved_from_in_rust_graph (
       . map ( |cs| ( id . clone (),
                      cs . iter () . cloned () . collect () )) )
     . collect ();
-  let link_dests : HashSet<ID> = // saved nodes that anything links to
+  let mentioned_ids : HashSet<ID> = // saved nodes that anything links to
     saved_ids . iter ()
-    . filter ( |id| graph . textlinks_in . get (id)
+    . filter ( |id| graph . mentioners_of . get (id)
                . map ( |s| ! s . is_empty () ) . unwrap_or (false) )
     . cloned () . collect ();
   let had_id_set : HashSet<ID> = // from each node's own file properties
@@ -159,7 +159,7 @@ pub fn context_origin_types_for_saved_from_in_rust_graph (
     . collect ();
   let mut origin_types : HashMap<ID, ContextOriginType> =
     identify_origins (
-      &saved_ids, &map_to_containers, &link_dests, &had_id_set );
+      &saved_ids, &map_to_containers, &mentioned_ids, &had_id_set );
   for id in &saved_ids {
     // CycleMember, only for nodes not already a higher-priority origin.
     if ! origin_types . contains_key (id)
@@ -196,7 +196,7 @@ fn node_is_in_containerward_cycle (
 
 /// Build the origin-types map from graph data and imported file properties.
 /// We impose priority order: If something is a Root,
-/// it doesn't matter that it's a Dest, etc.
+/// it doesn't matter that it's Mentioned, etc.
 /// Therefore higher-priority origin types are processed later.
 /// CycleMember is assigned later (step 3).
 /// (That's safe because the only higher-priority thing is a Root,
@@ -204,7 +204,7 @@ fn node_is_in_containerward_cycle (
 fn identify_origins (
   all_node_ids : &HashSet<ID>,
   map_to_containers  : &MapToContainers,
-  dests      : &HashSet<ID>,
+  mentioned_ids : &HashSet<ID>,
   had_id_set   : &HashSet<ID>,
 ) -> HashMap<ID, ContextOriginType> {
   let ( roots, multicontained ) : ( HashSet<ID>, HashSet<ID> ) =
@@ -218,9 +218,9 @@ fn identify_origins (
     for id in had_id_set {
       origin_types . insert (
         id . clone (), ContextOriginType::HadID ); }
-    for id in dests {
+    for id in mentioned_ids {
       origin_types . insert (
-        id . clone (), ContextOriginType::Dest ); }
+        id . clone (), ContextOriginType::Mentioned ); }
     for id in &roots {
       origin_types . insert (
         id . clone (), ContextOriginType::Root ); }}
@@ -393,12 +393,12 @@ pub fn content_maps_from_nodes (
 
 /// Collect all link dest IDs from titles and bodies.
 /// This is a single linear pass over the already-loaded nodes.
-pub fn link_dests_from_nodes (
+pub fn mentioned_ids_from_nodes (
   nodes : &[NodeComplete],
 ) -> HashSet<ID> {
   nodes . iter ()
   . flat_map ( |node| {
-    textlinks_from_node (node)
+    links_from_node (node)
     . into_iter ()
     . map ( |tl| tl . id ) } )
   . collect () }

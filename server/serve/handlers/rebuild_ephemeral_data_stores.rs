@@ -2,7 +2,7 @@ use crate::context::{
   compute_and_store_context_types,
   content_maps_from_nodes,
   had_id_set_from_nodes,
-  link_dests_from_nodes};
+  mentioned_ids_from_nodes};
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_collecting_violations;
 use crate::dbs::filesystem::not_nodes::load_config;
 use crate::dbs::init::rebuild_tantivy_as_generation;
@@ -84,12 +84,12 @@ pub fn rebuild_ephemeral_data_stores_in_place (
     let all_node_ids = nodes . iter ()
       . map ( |n| n . pid . clone () )
       . collect ();
-    let link_dests = link_dests_from_nodes (&nodes);
+    let mentioned_ids = mentioned_ids_from_nodes (&nodes);
     let (map_to_content, map_to_containers) =
       content_maps_from_nodes (&nodes);
     compute_and_store_context_types (
       &new_tantivy, &had_id_set, &all_node_ids,
-      &link_dests, &map_to_content, &map_to_containers )
+      &mentioned_ids, &map_to_content, &map_to_containers )
       . map_err ( |e| format! ("Context computation failed: {}", e) ) ?;
     tracing::info!("Context rankings recomputed.");
     { // Publish config, graph, and replacement index as one generation.

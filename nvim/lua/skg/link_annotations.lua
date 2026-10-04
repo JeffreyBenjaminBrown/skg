@@ -72,7 +72,7 @@ end
 
 ---For each line of LINES, true if the whole line is shown literally by
 ---Org, else its inline literal spans. Mirrors the server's
----'org_literal_ranges' (server/types/textlinks/org_literal_ranges.rs):
+---'org_literal_ranges' (server/types/links/org_literal_ranges.rs):
 ---#+begin_X ... #+end_X blocks, ``` fences, fixed-width lines, and
 ---inline =verbatim= and ~code~. A headline ends any open block, as the
 ---end of a node's body does on the server. tests/shared/literal-link-cases.txt

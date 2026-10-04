@@ -180,7 +180,7 @@ fn idFolder_membership_errors (
 /// ('carrier_on_user_owned_chain', VISIBILITY-UNGATED so ownership
 /// still gates but a marker honest when rendered does not start
 /// failing after a source-set switch). With chains the drawn node can
-/// be a MIDDLE link (when a later link's source is hidden), so the
+/// be a MIDDLE link (when a later link's mentioner is hidden), so the
 /// check accepts any honest carrier and rejects only an off-chain
 /// marker. Markers on retained InactiveNodes are checked identically.
 /// The explicit graph is required, so every present marker is checked against
@@ -280,7 +280,7 @@ fn validate_view_roots (
 /// - The node is write-protected.
 /// - It has no content children (ActiveNode children with affectsParent ==
 ///   Container). Non-content children — containerward ancestry stubs,
-///   link sources, scaffolds, etc. — don't block expansion:
+///   mentioners, scaffolds, etc. — don't block expansion:
 ///   they won't be clobbered by it.
 /// - No other node with the same ID has a definitive view request,
 ///   because there can only be one definitive view.

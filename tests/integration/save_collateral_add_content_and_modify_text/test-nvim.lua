@@ -43,9 +43,9 @@ end
 ---side, mapped to its role. Port of headline--graft-role-from-rels.
 local function graft_role_from_rels (rels_body)
   if not rels_body then return nil end
-  local roles = { { 'contains', 'container' }, { 'textlinksTo', 'linkSource' },
-                  { 'subscribes', 'subscribee' }, { 'overrides', 'overrider' },
-                  { 'hides', 'hider' } }
+  local roles = { { 'contains', 'container' }, { 'links_to', 'mentioner' },
+                  { 'subscribes_to', 'subscribee' }, { 'overrides_view_of', 'overrider' },
+                  { 'hides_from_its_subscriptions', 'hider' } }
   for _, pair in ipairs(roles) do
     local form = child_named(rels_body, pair[1])
     if form then

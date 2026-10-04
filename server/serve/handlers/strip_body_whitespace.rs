@@ -5,7 +5,7 @@
 //! make them diverge from their upstreams (Jeff settled on owned
 //! only) -- rewriting only the .skg files whose bodies changed. Bodies also live in two derived stores, the in-Rust graph
 //! and the Tantivy index; both are refreshed here. The graph is
-//! untouched: it stores no body text, and the textlinks it derives
+//! untouched: it stores no body text, and the links it derives
 //! from bodies cannot be changed by stripping trailing whitespace.
 
 use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;

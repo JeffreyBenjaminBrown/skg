@@ -135,7 +135,7 @@ fn only_atom_bearing_relations_are_accepted (
   assert! ( relation_from_client_string (
     "hides_from_its_subscriptions") . is_err (),
     "hides have no explicit-source path" );
-  assert! ( relation_from_client_string ("textlinks_to") . is_err () );
+  assert! ( relation_from_client_string ("links_to") . is_err () );
 }
 
 #[test]

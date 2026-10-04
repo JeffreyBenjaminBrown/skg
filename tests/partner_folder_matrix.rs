@@ -187,19 +187,19 @@ struct FolderSpec {
 
 const READONLY_FOLDERS : [FolderSpec; 4] = [
   FolderSpec { atom : "subscriberFolder", owner : "roSub-owner",
-            relation : "subscribes",
+            relation : "subscribes_to",
             member_a : "roSub-a", member_b : "roSub-b",
             intruder : "roSub-x" },
   FolderSpec { atom : "overriderFolder", owner : "roOvr-owner",
-            relation : "overrides",
+            relation : "overrides_view_of",
             member_a : "roOvr-a", member_b : "roOvr-b",
             intruder : "roOvr-x" },
   FolderSpec { atom : "hiderFolder", owner : "roHider-owner",
-            relation : "hides",
+            relation : "hides_from_its_subscriptions",
             member_a : "roHider-a", member_b : "roHider-b",
             intruder : "roHider-x" },
   FolderSpec { atom : "hiddenFolder", owner : "roHidden-owner",
-            relation : "hides",
+            relation : "hides_from_its_subscriptions",
             member_a : "roHidden-a", member_b : "roHidden-b",
             intruder : "roHidden-x" },
 ];
@@ -371,7 +371,7 @@ fn relationship_matrix
 // partners playing ROLENAME toward the node as inverted write-protected
 // children with a '(birth backpath ROLENAME)' marker. One generic
 // backpath engine serves all nine roles; these cover the seven new
-// ones (the container/linkSource roles keep their own golden tests).
+// ones (the container/mentioner roles keep their own golden tests).
 // An absent relation field stays MSV::Unspecified on save, so these
 // saves never disturb the graph the path then reads.
 //////////////////////////////////////////////////////////////
@@ -401,12 +401,12 @@ async fn path_request_scenarios (
   // overridden (the origin overrides it) from overrider (it overrides
   // the origin, among others).
   let sharing : [(&str, &str, &str, &str, &str); 6] = [
-    ("path/overridden", "wOvr-owner",     "overridden", "wOvr-a",         "(overrides (in 1 (ancestors 1)))"),
-    ("path/overrider",  "wOvr-a",         "overrider",  "wOvr-owner",     "(overrides (out 2 (ancestors 1)))"),
-    ("path/subscribee", "wSub-owner",     "subscribee", "wSub-a",         "(subscribes (in 1 (ancestors 1)))"),
-    ("path/subscriber", "wSub-a",         "subscriber", "wSub-owner",     "(subscribes (out 3 (ancestors 1)))"),
-    ("path/hidden",     "roHidden-owner", "hidden",     "roHidden-a",     "(hides (in 1 (ancestors 1)))"),
-    ("path/hider",      "roHidden-a",     "hider",      "roHidden-owner", "(hides (out 2 (ancestors 1)))"),
+    ("path/overridden", "wOvr-owner",     "overridden", "wOvr-a",         "(overrides_view_of (in 1 (ancestors 1)))"),
+    ("path/overrider",  "wOvr-a",         "overrider",  "wOvr-owner",     "(overrides_view_of (out 2 (ancestors 1)))"),
+    ("path/subscribee", "wSub-owner",     "subscribee", "wSub-a",         "(subscribes_to (in 1 (ancestors 1)))"),
+    ("path/subscriber", "wSub-a",         "subscriber", "wSub-owner",     "(subscribes_to (out 3 (ancestors 1)))"),
+    ("path/hidden",     "roHidden-owner", "hidden",     "roHidden-a",     "(hides_from_its_subscriptions (in 1 (ancestors 1)))"),
+    ("path/hider",      "roHidden-a",     "hider",      "roHidden-owner", "(hides_from_its_subscriptions (out 2 (ancestors 1)))"),
   ];
   for (s, owner, role, partner, birth_rel) in sharing {
     let _ = role;
@@ -426,28 +426,28 @@ async fn path_request_scenarios (
           partner, birth_rel, line )); },
       None => {}, // already recorded by want_contains above
     } }
-  { // (path linkDest) on a node whose TITLE carries [[id:pathLink-dst]]:
-    // the dest node is grafted. (linkSource is the existing sourceward
+  { // (path mentioned) on a node whose TITLE carries [[id:pathLink-dst]]:
+    // the dest node is grafted. (mentioner is the existing mentionerward
     // golden; this is its mirror.)
-    let s : &str = "path/linkDest";
+    let s : &str = "path/mentioned";
     let resp : SaveResponse = save (
-      &req ("pathLink-src", "linkDest", "[[id:pathLink-dst][to dst]]"),
+      &req ("pathLink-src", "mentioned", "[[id:pathLink-dst][to dst]]"),
       config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(id pathLink-dst)");
     // The grafted dest is born of a single inbound link (from the
     // origin), no outbound. (Replaces the gone "(birth backpath
-    // linkDest)" marker.)
+    // mentioned)" marker.)
     fails . want_contains (
-      s, &resp . saved_view, "(textlinksTo (in 1 (ancestors 1) (interesting 0)))" ); }
+      s, &resp . saved_view, "(links_to (in 1 (ancestors 1) (substantive 0)))" ); }
   { // Self-referential fixture: a node that links to ITSELF. A
     // non-container path role is cycle-guarded and needs NO view-root
     // special-case (unlike containerward) -- the build must not panic,
     // and the node reappears as its own grafted dest.
     let s : &str = "path/self-referential-no-special-case";
     let resp : SaveResponse = save (
-      &req ("pathSelf", "linkDest", "[[id:pathSelf][to self]]"),
+      &req ("pathSelf", "mentioned", "[[id:pathSelf][to self]]"),
       config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
@@ -472,43 +472,43 @@ async fn folder_request_scenarios (
     format! (
       "* (skg (node (id {}) (source public) (viewRequests (folder {})))) {}\n",
       owner, rel, owner ) };
-  { // (folder overrides) on wSub-owner, which overrides nothing and is
+  { // (folder overrides_view_of) on wSub-owner, which overrides nothing and is
     // overridden by nothing: the WRITABLE overriddenFolder appears EMPTY
     // (the "add an override here" surface); the read-only overriderFolder
     // does not appear (empty read-only folders are pruned).
     let s : &str = "folder-request/overrides-empty";
     let resp : SaveResponse = save (
-      &request_buf ("wSub-owner", "overrides"),
+      &request_buf ("wSub-owner", "overrides_view_of"),
       config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(skg overriddenFolder)");
     fails . want_absent  (s, &resp . saved_view, "overriderFolder"); }
-  { // (folder overrides) on wOvr-owner, which overrides wOvr-a and wOvr-b:
+  { // (folder overrides_view_of) on wOvr-owner, which overrides wOvr-a and wOvr-b:
     // the overriddenFolder appears POPULATED with both.
     let s : &str = "folder-request/overrides-populated";
     let resp : SaveResponse = save (
-      &request_buf ("wOvr-owner", "overrides"),
+      &request_buf ("wOvr-owner", "overrides_view_of"),
       config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(skg overriddenFolder)");
     fails . want_contains (s, &resp . saved_view, "(id wOvr-a)");
     fails . want_contains (s, &resp . saved_view, "(id wOvr-b)"); }
-  { // (folder subscribes) on wSub-owner: subscribeeFolder POPULATED (a,b,c).
+  { // (folder subscribes_to) on wSub-owner: subscribeeFolder POPULATED (a,b,c).
     let s : &str = "folder-request/subscribes-populated";
     let resp : SaveResponse = save (
-      &request_buf ("wSub-owner", "subscribes"),
+      &request_buf ("wSub-owner", "subscribes_to"),
       config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
     fails . want_contains (s, &resp . saved_view, "(skg subscribeeFolder)");
     fails . want_contains (s, &resp . saved_view, "(id wSub-a)"); }
-  { // (folder hides) on wSub-owner, which neither hides nor is hidden:
+  { // (folder hides_from_its_subscriptions) on wSub-owner, which neither hides nor is hidden:
     // both sides read-only and empty, so NOTHING appears.
     let s : &str = "folder-request/hides-empty";
     let resp : SaveResponse = save (
-      &request_buf ("wSub-owner", "hides"),
+      &request_buf ("wSub-owner", "hides_from_its_subscriptions"),
       config, tantivy, graph) . await ?;
     if ! resp . errors . is_empty () {
       fails . record (s, format! ("save errors: {:?}", resp . errors)); }
@@ -601,7 +601,7 @@ async fn writable_overriddenFolder (
   graph : &InRustGraphHandle,
 ) -> Result<(), Box<dyn Error>> {
   let buf : String = render_with_requested_relation_folders (
-    "wOvr-owner", "overrides", config, tantivy, graph ) . await ?;
+    "wOvr-owner", "overrides_view_of", config, tantivy, graph ) . await ?;
   let stars : usize = folder_member_stars (&buf, "(id wOvr-a)");
   { // reorder is harmless: order-free set unchanged
     let s : &str = "overriddenFolder/reorder";
@@ -656,7 +656,7 @@ async fn hiddenFolder_delete_does_not_unhide (
 ) -> Result<(), Box<dyn Error>> {
   let s : &str = "hiddenFolder/no-unhide-on-disk";
   let buf : String = render_with_requested_relation_folders (
-    "roHidden-owner", "hides", config, tantivy, graph ) . await ?;
+    "roHidden-owner", "hides_from_its_subscriptions", config, tantivy, graph ) . await ?;
   let a_line : String =
     line_containing (&buf, "(id roHidden-a)") . to_string ();
   let edited : String = buf . replace (&format! ("{}\n", a_line), "");

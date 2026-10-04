@@ -409,7 +409,7 @@ def is_transparent_frame(name: str) -> bool:
 
 def is_atomic_process(name: str) -> bool:
     return any(fragment in name for fragment in (
-        "textlinks_from_text",
+        "links_from_text",
         "im::hash::map::HashMap<K,V,S>::insert",
         "regex::regex::string::Regex::new",
         "tantivy::indexer::segment_writer::SegmentWriter::for_segment",

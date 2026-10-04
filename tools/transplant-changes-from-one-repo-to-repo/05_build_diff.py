@@ -139,7 +139,7 @@ def render_added_file(mangled_text: str, mangled_node: dict,
         "subscribes_to",
         "hides_from_its_subscriptions",
         "overrides_view_of",
-        "textlinks_to",
+        "links_to",
     ):
         v = node.get(field)
         if isinstance(v, list):

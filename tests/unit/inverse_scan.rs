@@ -137,7 +137,7 @@ fn each_relation_is_read_separately () {
       &owner, NodeRelation::OverridesViewOf, &diffs, None )
     . is_empty () );
   assert_eq! ( inverse_scan_for_inbound_folder (
-      &owner, NodeRelation::Subscribes, &diffs, None ) [ &id ("m") ],
+      &owner, NodeRelation::SubscribesTo, &diffs, None ) [ &id ("m") ],
     MembershipAxes { staged : None, unstaged : Some (Sign::Minus) } );
 }
 

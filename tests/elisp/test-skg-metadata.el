@@ -188,11 +188,11 @@ Returns the parsed s-expression or nil if not found."
 The UPPER/lower path letters select opposite roles, so C-c p O and
 C-c p o must bind to distinct commands."
   (dolist (pair '(("C-c l a" . skg-show-folderOf-aliases)
-                  ("C-c l o" . skg-show-folderOf-overrides)
-                  ("C-c l s" . skg-show-folderOf-subscribes)
+                  ("C-c l o" . skg-show-folderOf-overrides_view_of)
+                  ("C-c l s" . skg-show-folderOf-subscribes_to)
                   ("C-c p C" . skg-show-paths-through-containers)
-                  ("C-c p L" . skg-show-paths-through-link-sources)
-                  ("C-c p l" . skg-show-paths-through-link-dests)
+                  ("C-c p L" . skg-show-paths-through-mentioners)
+                  ("C-c p l" . skg-show-paths-through-mentioned)
                   ("C-c p O" . skg-show-paths-through-overriders)
                   ("C-c p o" . skg-show-paths-through-overridden)
                   ("C-c p s" . skg-show-paths-through-subscribees)))
@@ -307,7 +307,7 @@ C-c p o must bind to distinct commands."
       "*** (skg (node (id content-grandchild) (source public))) content grandchild\n"
       "** (skg (node (id mismatched-content) (source foreign))) mismatched content\n"
       "*** (skg (node (id public-under-mismatch) (source public))) public under mismatch\n"
-      "** (skg (node (id link-child) (source public) (affectsParent false) (birth backpath linkSource))) link child\n"
+      "** (skg (node (id link-child) (source public) (affectsParent false) (birth backpath mentioner))) link child\n"
       "*** (skg (node (id under-link) (source public))) under link\n"
       "** (skg aliasFolder) aliases\n"
       "*** (skg (node (id under-scaffold) (source public))) under scaffold\n"))

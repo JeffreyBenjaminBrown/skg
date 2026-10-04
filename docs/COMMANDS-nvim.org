@@ -77,8 +77,8 @@ run it again to rescan.
 The 'f' is for 'find'.
 *** <localleader>ff : :SkgSearch
 Text search across titles and aliases, returning every
-matching node. "Rooty" nodes (roots, cycle members, link
-dests, and nodes that had an org-roam ID before import)
+matching node. "Rooty" nodes (roots, cycle members,
+mentioned nodes, and nodes that had an org-roam ID before import)
 are bumped in the ranking via their context-origin multiplier.
 
 A node with =NoSearchMatching= cannot be a direct title, alias, or body hit
@@ -187,7 +187,7 @@ to MUST.
   match on an alias even when the title doesn't mention the
   searched word. The returned node is still the aliased one.
 - Results are ranked by BM25 times a context-origin factor
-  (Root 100×, CycleMember ~32×, Dest 10×, HadID 10×,
+  (Root 100×, CycleMember ~32×, Mentioned 10×, HadID 10×,
   MultiContained ~3.2×, everything else 1×). A weaker text
   match on a root can outrank a stronger match on a leaf,
   but every match is returned — search is never filtered by
@@ -334,15 +334,15 @@ subscribee-as-such); the heralds advertise other nonempty relations.
 The aliasFolder -- other text you could search for to find this node
 (you can always search for its title; most nodes have none). Writable:
 type an alias in and save.
-*** <localleader>co : :SkgShowFolderOfOverrides
+*** <localleader>co : :SkgShowFolderOfOverridesViewOf
 The overriddenFolder (the nodes this node overrides -- WRITABLE, shown
 even when empty as an "add an override here" surface) and the
 overriderFolder (the nodes that override this one -- read-only, ☮).
-*** <localleader>ch : :SkgShowFolderOfHides
+*** <localleader>ch : :SkgShowFolderOfHidesFromItsSubscriptions
 The hiderFolder and hiddenFolder -- BOTH read-only (☮). Hiding is edited from
 a subscribee-as-such, never from these folders. On a node that neither
 hides nor is hidden, nothing appears.
-*** <localleader>cs : :SkgShowFolderOfSubscribes
+*** <localleader>cs : :SkgShowFolderOfSubscribesTo
 The subscribeeFolder (the nodes this node subscribes to -- WRITABLE, shown
 even when empty) and the subscriberFolder (the nodes that subscribe to
 this one -- read-only, ☮).
@@ -360,10 +360,10 @@ the partner's active (first) role; lower = its passive (second) role.
 Every command auto-saves.
 *** <localleader>pC : :SkgShowPathsThroughContainers
 The nodes that contain this node (its containment ancestry).
-*** <localleader>pL : :SkgShowPathsThroughLinkSources
-The nodes that link to this node (its textlink sources).
-*** <localleader>pl : :SkgShowPathsThroughLinkDests
-The nodes this node links to (its textlink dests).
+*** <localleader>pL : :SkgShowPathsThroughMentioners
+The nodes that link to this node (its mentioners).
+*** <localleader>pl : :SkgShowPathsThroughMentioned
+The nodes this node links to (the nodes it mentions).
 *** <localleader>pO : :SkgShowPathsThroughOverriders
 The nodes that override this node.
 *** <localleader>po : :SkgShowPathsThroughOverridden
@@ -467,7 +467,7 @@ org-descendents. Its org-parent must be a definitive activeNode
 whose source is owned in =skgconfig.toml=.
 
 The command replaces the whole leaf with a same-level
-write-protected activeNode for the link dest. The parent is
+write-protected activeNode for the link target. The parent is
 definitive, so saving records the dest as content of the
 parent; the replacement child is write-protected, so its own text is
 not rewritten from the link label.

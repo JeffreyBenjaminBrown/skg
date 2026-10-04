@@ -26,8 +26,8 @@ to get excited about this idea:
 
 - [[file:usage.org][Usage: How to run Skg]]
 - Skg's data model and user experience
-  - Trees and textlinks: [[file:vocabulary.org][Some simple but important definitions]]
-  - [[file:hyperlinks.org][TextLinks can point to any part of a document.]]
+  - Trees and links: [[file:vocabulary.org][Some simple but important definitions]]
+  - [[file:hyperlinks.org][Links can point to any part of a document.]]
   - [[file:forks.org]["Forks": Subscription and overriding in detail]]
   - [[file:data-model-skg-extensions.org][The data model]].
   - [[file:sharing-model.org][The sharing model]].

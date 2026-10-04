@@ -55,7 +55,7 @@ end
 
 ---Pick the result at point: kill the search buffer, return to the
 ---source position, and insert the link, its label normalized so it
----never contains nested textlinks.
+---never contains nested links.
 function M.finish ()
   local search_buf = vim.api.nvim_get_current_buf()
   local target_buf = vim.b[search_buf].skg_link_target_buf

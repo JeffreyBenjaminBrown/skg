@@ -38,7 +38,7 @@ pub enum AffectsParent {
 /// A 'Backpath(role)' node was grafted by the backpath engine as an
 /// ancestry partner; the RelationRole names the role that partner plays
 /// toward its org-parent (the origin) -- e.g. 'CONTAINER' for a
-/// containerward ancestor, 'LINK_SOURCE' for a node that links to the
+/// containerward ancestor, 'MENTIONER' for a node that links to the
 /// origin. The role determines the wire ROLENAME and the herald glyph
 /// (see PARTNER_ROLE_VOCAB).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -327,7 +327,7 @@ pub struct RelationCounts {
   pub overriders    : usize, // O inbound: nodes that override it
   pub overrides_out : usize, // O outbound: nodes it overrides
   pub link_total       : usize, // L inbound: distinct visible sources
-  pub link_interesting : usize, // inbound sources with body, content, or multiple targets
+  pub link_substantive : usize, // inbound sources with body, content, or multiple targets
   pub link_targets     : usize, // L outbound: distinct visible resolved targets
 }
 
@@ -480,34 +480,33 @@ pub enum NodeEditRequest {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FolderRelation {
   Aliases,
-  Overrides,
-  Hides,
-  Subscribes,
+  OverridesViewOf,
+  HidesFromItsSubscriptions,
+  SubscribesTo,
 }
 
 impl FolderRelation {
   pub const ALL : [FolderRelation; 4] = [
-    FolderRelation::Aliases, FolderRelation::Overrides,
-    FolderRelation::Hides,   FolderRelation::Subscribes ];
+    FolderRelation::Aliases,
+    FolderRelation::OverridesViewOf,
+    FolderRelation::HidesFromItsSubscriptions,
+    FolderRelation::SubscribesTo ];
 
   pub fn relname (
     self,
   ) -> &'static str {
     match self {
-      FolderRelation::Aliases    => "aliases",
-      FolderRelation::Overrides  => "overrides",
-      FolderRelation::Hides      => "hides",
-      FolderRelation::Subscribes => "subscribes", } }
+      FolderRelation::Aliases                   => "aliases",
+      FolderRelation::OverridesViewOf           => "overrides_view_of",
+      FolderRelation::HidesFromItsSubscriptions => "hides_from_its_subscriptions",
+      FolderRelation::SubscribesTo              => "subscribes_to", } }
 
   pub fn from_relname (
     s : &str,
   ) -> Option<FolderRelation> {
-    match s {
-      "aliases"    => Some (FolderRelation::Aliases),
-      "overrides"  => Some (FolderRelation::Overrides),
-      "hides"      => Some (FolderRelation::Hides),
-      "subscribes" => Some (FolderRelation::Subscribes),
-      _            => None, } }
+    FolderRelation::ALL . iter ()
+      . find ( |relation| relation . relname () == s )
+      . copied () }
 }
 
 /// Requests for additional views related to a node.

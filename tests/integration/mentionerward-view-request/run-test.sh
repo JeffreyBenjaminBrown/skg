@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Integration test for sourceward-view request functionality
+# Integration test for mentionerward-view request functionality
 # This script prepares test data, runs the skg server, invokes
 # an Emacs batch test, and restores the environment afterwards.
 
@@ -11,7 +11,7 @@ PROJECT_ROOT="$(cd "$TEST_DIR/../../.." && pwd)"
 
 source "$TEST_DIR/../test-lib.sh"
 
-echo "=== SKG Sourceward View Request Integration Test ==="
+echo "=== SKG Mentionerward View Request Integration Test ==="
 echo "Test directory: $TEST_DIR"
 echo "Project root: $PROJECT_ROOT"
 

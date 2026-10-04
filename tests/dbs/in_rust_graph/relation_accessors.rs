@@ -44,15 +44,15 @@ fn node_with_all_relations (
   subscribes: &[&str],
   hides     : &[&str],
   overrides : &[&str],
-  textlinks : &[&str],
+  links : &[&str],
 ) -> NodeComplete {
   let mut result : NodeComplete =
     node (pid, &[], subscribes, hides, overrides);
   result . contains = rel_partners_at_relSource (
     &result . source,
     contains . iter () . map (|id| ID::from (*id)) . collect ());
-  if ! textlinks . is_empty () {
-    result . body = Some (textlinks . iter ()
+  if ! links . is_empty () {
+    result . body = Some (links . iter ()
       . map (|id| format! ("[[id:{}][{}]]", id, id))
       . collect::<Vec<String>> () . join (" ")); }
   result
@@ -80,12 +80,12 @@ fn relation_accessors_return_both_membership_directions () {
   assert_eq!(
     graph . other_member_pids (
       &ID::from ("owner"),
-      RelationRole::new (NodeRelation::Subscribes, BinaryRolePosition::First)),
+      RelationRole::new (NodeRelation::SubscribesTo, BinaryRolePosition::First)),
     vec![ID::from ("subscribee")] );
   assert_eq!(
     graph . other_member_pids (
       &ID::from ("owner"),
-      RelationRole::new (NodeRelation::Subscribes, BinaryRolePosition::Second)),
+      RelationRole::new (NodeRelation::SubscribesTo, BinaryRolePosition::Second)),
     vec![ID::from ("subscriber")] );
   assert_eq!(
     graph . other_member_pids (

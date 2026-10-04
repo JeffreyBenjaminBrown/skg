@@ -7,16 +7,17 @@ RELS-BODY is the cdr of the (rels ...) form -- a list of relation
 sub-forms like (contains (in ...) (out ...)) and (birth ...). A backpath
 graft relates OUTBOUND to a tracked ancestor: it has a relation with an
 (out ... (ancestors ...)) side. That relation names the role: contains
--> container, textlinksTo -> linkSource, subscribes -> subscribee,
-overrides -> overrider, hides -> hider. Only meaningful for a node
+-> container, links_to -> mentioner, subscribes_to -> subscribee,
+overrides_view_of -> overrider, hides_from_its_subscriptions -> hider. Only
+meaningful for a node
 already known to be a graft (affectsParent false); an ordinary content
 child can carry the same outbound ancestor (e.g. a cycle) yet is NOT a
 graft."
   (cl-loop for (rel . role) in '((contains    . container)
-                                 (textlinksTo . linkSource)
-                                 (subscribes  . subscribee)
-                                 (overrides   . overrider)
-                                 (hides       . hider))
+                                 (links_to . mentioner)
+                                 (subscribes_to . subscribee)
+                                 (overrides_view_of . overrider)
+                                 (hides_from_its_subscriptions . hider))
            for form = (assq rel rels-body)
            when (and form
                      (let ((out (assq 'out (cdr form))))
@@ -27,7 +28,7 @@ graft."
   "Classify a parsed metadata SEXP using current parent/provenance vocab.
 Birth provenance is more specific than affectsParent: a backpath graft (a node
 with (affectsParent false)) returns its ROLENAME from its (rels ...)
-facts (e.g. `container', `linkSource'); otherwise the result is the
+facts (e.g. `container', `mentioner'); otherwise the result is the
 explicit affectsParent or the implicit `true'."
   (let* ((affectsParent-list (when sexp
                           (skg-sexp-cdr-at-path sexp

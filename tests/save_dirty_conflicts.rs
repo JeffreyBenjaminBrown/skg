@@ -126,7 +126,7 @@ fn conflicting_dirty_view_refuses_before_mutation_and_disjoint_view_succeeds
         . expect ("X must receive a collateral view update");
       let collateral_text = extract_string_field_from_sexp (
         collateral, "content") . unwrap ();
-      assert! (collateral_text . contains ("(interesting 1)"),
+      assert! (collateral_text . contains ("(substantive 1)"),
                "X's interesting-link herald must reflect A's new target: {}",
                collateral_text);
       assert_eq! (

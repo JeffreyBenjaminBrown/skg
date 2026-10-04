@@ -7,7 +7,7 @@ if node A's ID is a prefix of node B's ID, then A contains B.
 
 Every node has a body equal to "ID body" where ID is the node's ID.
 
-There are no other relationships (no textlinks, subscriptions, hides, or overrides).
+There are no other relationships (no links, subscriptions, hides, or overrides).
 
 ```
 1

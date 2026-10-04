@@ -17,10 +17,10 @@ use crate::source_sets::{ActiveSourceSet, SourceSetName};
 use crate::types::misc::SkgConfig;
 use crate::types::misc::{ID, RelPartner};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::textlinks::org_literal_ranges::org_literal_ranges;
-use crate::types::textlinks::{
-  replace_each_link_with_its_label, textlinks_from_text,
-  textlinks_with_ranges_from_text};
+use crate::types::links::org_literal_ranges::org_literal_ranges;
+use crate::types::links::{
+  replace_each_link_with_its_label, links_from_text,
+  links_with_ranges_from_text};
 
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
@@ -41,7 +41,7 @@ pub const EXPORT_MARKER_ID : &str =
 pub const BROKEN_LINK_SINK_ID : &str =
   "9ff04e25-01e8-4634-8aa5-f5849bc1eb81";
 
-static TEXTLINK_PATTERN : LazyLock<Regex> =
+static LINK_PATTERN : LazyLock<Regex> =
   LazyLock::new ( || Regex::new (
     r"\[\[id:(.*?)\]\[(.*?)\]\]" ) . unwrap () );
 
@@ -345,7 +345,7 @@ fn discover_roots (
         target, } ); }
   (roots, marker_pids) }
 
-/// True if any textlink in `node`'s title points (after alias
+/// True if any link in `node`'s title points (after alias
 /// resolution) at `id`. Alias resolution matches the rewriting and
 /// traversal paths, so an extra-id link to the instruction node is
 /// still recognized.
@@ -354,7 +354,7 @@ fn title_links_to (
   id           : &ID,
   alias_to_pid : &HashMap<ID, ID>,
 ) -> bool {
-  TEXTLINK_PATTERN . captures_iter (&node . title)
+  LINK_PATTERN . captures_iter (&node . title)
     . any ( |c| resolve_pid (&ID::from (&c[1]), alias_to_pid) == *id ) }
 
 /// Tolerant parse of a marker body. Accepts `target_filepath = X`
@@ -505,7 +505,7 @@ fn build_homes (
 
 /// PIDs that some rendered link addresses by CUSTOM_ID. Only their
 /// headlines get a ':CUSTOM_ID:' drawer. Mirrors what 'render_root'
-/// emits: textlinks in titles and bodies of Normal events (broken
+/// emits: links in titles and bodies of Normal events (broken
 /// ones going to the sink), and LinkLeaf headlines.
 fn custom_id_link_targets (
   root_events  : &[(&ExportRoot, Vec<Ev>)],
@@ -525,8 +525,8 @@ fn custom_id_link_targets (
           let texts : [&str; 2] =
             [ &node . title, node . body . as_deref () . unwrap_or ("") ];
           for text in texts {
-            for textlink in textlinks_from_text (text) {
-              let pid : ID = resolve_pid (&textlink . id, alias_to_pid);
+            for link in links_from_text (text) {
+              let pid : ID = resolve_pid (&link . id, alias_to_pid);
               linked . push (
                 if homes . contains_key (&pid) { pid }
                 else { sink_pid . clone () } ); }} }, }}
@@ -590,11 +590,11 @@ fn rewrite_links (
   let sink_pid : ID = ID::from (BROKEN_LINK_SINK_ID);
   let mut out : String = String::new ();
   let mut copied_up_to : usize = 0;
-  for (range, textlink) in textlinks_with_ranges_from_text (text) {
+  for (range, link) in links_with_ranges_from_text (text) {
     out . push_str (&text [copied_up_to .. range . start]);
     copied_up_to = range . end;
-    let uid : ID = textlink . id;
-    let label : &str = &textlink . label;
+    let uid : ID = link . id;
+    let label : &str = &link . label;
     let pid : ID =
       alias_to_pid . get (&uid) . cloned () . unwrap_or (uid);
     out . push_str (& match homes . get (&pid) {
@@ -725,7 +725,7 @@ fn relSource_is_active (
 fn title_has_link (
   node : &NodeComplete,
 ) -> bool {
-  TEXTLINK_PATTERN . is_match (&node . title) }
+  LINK_PATTERN . is_match (&node . title) }
 
 fn org_search_for_heading (
   node : &NodeComplete,

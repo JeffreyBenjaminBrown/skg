@@ -29,7 +29,7 @@
       (message "✗ FAIL: leaf-b search root is content during %s: %S"
                phase line)
       (kill-emacs 1))
-    (when (string-match-p "(affectsParent false) writeProtected (rels (textlinksTo (out (ancestors 1))) (birth textlinksTo))" line)
+    (when (string-match-p "(affectsParent false) writeProtected (rels (links_to (out (ancestors 1))) (birth links_to))" line)
       (message "✗ FAIL: leaf-b search root is linksToParent during %s: %S"
                phase line)
       (kill-emacs 1))))

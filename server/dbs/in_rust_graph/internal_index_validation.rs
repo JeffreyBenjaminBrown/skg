@@ -56,7 +56,7 @@ pub(crate) fn validate_local_internal_indexes (
       . unwrap_or_default ();
     for index_name in [
       "contained_by", "subscribers_of", "hiders_of", "overriders_of",
-      "textlinks_in",
+      "mentioners_of",
     ] {
       let keys : BTreeSet<ID> = old_keys . get (index_name) . into_iter ()
         . flatten () . chain (
@@ -166,7 +166,7 @@ fn relationship_keys (
       . into_iter () . map (|raw| canonical (&raw)) . collect ()),
     ("overriders_of", members_of (node . overrides_view_of . or_default ())
       . into_iter () . map (|raw| canonical (&raw)) . collect ()),
-    ("textlinks_in", node . textlinks_to . iter ()
+    ("mentioners_of", node . links_to . iter ()
       . map (canonical) . collect ()),
   ])
 }
@@ -180,7 +180,7 @@ fn relationship_index<'a> (
     "subscribers_of" => &graph . subscribers_of,
     "hiders_of"      => &graph . hiders_of,
     "overriders_of"  => &graph . overriders_of,
-    "textlinks_in"   => &graph . textlinks_in,
+    "mentioners_of"   => &graph . mentioners_of,
     _ => unreachable! ("known relationship index"),
   }
 }
@@ -220,7 +220,7 @@ pub fn validate_internal_indexes (
   let mut subscribers_of : ExpectedIndex = BTreeMap::new ();
   let mut hiders_of : ExpectedIndex = BTreeMap::new ();
   let mut overriders_of : ExpectedIndex = BTreeMap::new ();
-  let mut textlinks_in : ExpectedIndex = BTreeMap::new ();
+  let mut mentioners_of : ExpectedIndex = BTreeMap::new ();
   let record = |index : &mut ExpectedIndex, member : &ID, owner : &ID| {
     index . entry (canonical (member)) . or_default ()
       . insert (owner . clone ()); };
@@ -233,8 +233,8 @@ pub fn validate_internal_indexes (
       record (&mut hiders_of, &member, &node . pid); }
     for member in members_of (node . overrides_view_of . or_default ()) {
       record (&mut overriders_of, &member, &node . pid); }
-    for member in &node . textlinks_to {
-      record (&mut textlinks_in, member, &node . pid); }}
+    for member in &node . links_to {
+      record (&mut mentioners_of, member, &node . pid); }}
 
   let mut result : Vec<InternalIndexMismatch> = Vec::new ();
   compare_set_index (
@@ -246,7 +246,7 @@ pub fn validate_internal_indexes (
   compare_set_index (
     "overriders_of", &overriders_of, &graph . overriders_of, &mut result);
   compare_set_index (
-    "textlinks_in", &textlinks_in, &graph . textlinks_in, &mut result);
+    "mentioners_of", &mentioners_of, &graph . mentioners_of, &mut result);
 
   let actual_extra_owners : ExpectedIndex = graph . extra_id_to_pid . iter ()
     . map (|(extra, pid)| {

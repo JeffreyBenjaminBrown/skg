@@ -14,12 +14,12 @@
                  "just words")))
 
 (ert-deftest test-skg-replace-links-with-labels-single ()
-  "A single textlink is reduced to its label."
+  "A single link is reduced to its label."
   (should (equal (skg-replace-links-with-labels "[[id:abc][hello]]")
                  "hello")))
 
 (ert-deftest test-skg-replace-links-with-labels-multiple ()
-  "Multiple textlinks are each reduced to their label, leaving non-link text intact."
+  "Multiple links are each reduced to their label, leaving non-link text intact."
   (should (equal (skg-replace-links-with-labels
                   "[[id:a][one]] and [[id:b][two]] together")
                  "one and two together")))

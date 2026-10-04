@@ -135,8 +135,8 @@ async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
       . unwrap_or ("") . to_string () };
   for title in ["cooking, forked once", "cooking, the original"] {
     let line : String = herald_line (title);
-    assert! ( line . contains ("(overrides (in 1 (ancestors 1))")
-              && line . contains ("(birth overrides)"),
+    assert! ( line . contains ("(overrides_view_of (in 1 (ancestors 1))")
+              && line . contains ("(birth overrides_view_of)"),
       "the override graft must render its override birth herald -- its \
        parent overrides it (overrides inbound from the gen-1 ancestor) \
        and overrides is its reason-for-being -- proving graphStats were \

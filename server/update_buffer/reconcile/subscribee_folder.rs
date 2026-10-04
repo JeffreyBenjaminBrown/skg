@@ -54,7 +54,7 @@ pub fn reconcile_subscribeeFolder_children (
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) =
     goal_list_for_outbound_folder (
       &context . parent_pid, &context . parent_source,
-      NodeRelation::Subscribes,
+      NodeRelation::SubscribesTo,
       source_diffs, &context . worktree_subscribees );
   let goal_list : Vec<ID> =
     // TODO/full-schema/9-2_source-set-safety.org: omit every inactive
@@ -95,7 +95,7 @@ pub fn reconcile_subscribeeFolder_children (
       -> (ExistenceAxes, MembershipAxes) {
       phantom_axes ( child, child_src,
                      &context . parent_pid, &context . parent_source,
-                     NodeRelation::Subscribes,
+                     NodeRelation::SubscribesTo,
                      source_diffs . as_ref () ) };
     let child_data : HashMap<ID, ChildData> =
       build_child_data (
@@ -113,7 +113,7 @@ pub fn reconcile_subscribeeFolder_children (
         tree, node,
         & outbound_member_axes (
           &context . parent_pid, &context . parent_source,
-          NodeRelation::Subscribes, source_diffs )) ?; }}
+          NodeRelation::SubscribesTo, source_diffs )) ?; }}
 
   ensure_hiddenOutsideOfSubscribeeFolder_is_last (tree, node) ?;
   Ok(( )) }

@@ -1,5 +1,5 @@
 pub mod sexp;
-pub mod textlinks;
+pub mod links;
 pub mod misc;
 pub mod env;
 pub mod errors;

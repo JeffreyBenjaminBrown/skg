@@ -42,7 +42,7 @@ pub fn handle_delete_references_to_absent_node_request (
   if let Some (approved) = approved . as_deref () {
     if approved != current . opaque_approval () {
       return refuse (stream, "Cleanup preview is stale; rescan before rewriting."); }}
-  if ! current . text_links . is_empty () && approved . is_none () {
+  if ! current . links . is_empty () && approved . is_none () {
     let content = preview_warning_org (&current);
     let response = format! (
       "((id \"{}\") (approved-preview \"{}\") (content \"{}\") (prompt \"Remove the structured references?\"))",

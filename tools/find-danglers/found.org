@@ -21,7 +21,7 @@ Each entry below names a current file and explains exactly how it still points a
 *** ~079127f8-accc-4ed8-82f0-c9e0a1440c38.skg~
 This file is currently titled "[[id:eb8af6d8-0491-48b0-b9bd-1dfe99f69adc][love & evidence]] => [[id:c893b584-5741-4987-876f-52bfa6c399b1][sacrifice]]".
 
-- Its title embeds a textlink to ~eb8af6d8-0491-48b0-b9bd-1dfe99f69adc~ (formerly titled "love & evidence").
+- Its title embeds a link to ~eb8af6d8-0491-48b0-b9bd-1dfe99f69adc~ (formerly titled "love & evidence").
 
 *** ~e097c809-372c-4d3d-92b7-7a017a607591.skg~
 This file is currently titled "evidence".
@@ -35,6 +35,6 @@ Each entry below names a vanished node and lists every current file that still c
 *** ~eb8af6d8-0491-48b0-b9bd-1dfe99f69adc~ (formerly titled "love & evidence")
 2 current files reference this lost ID:
 
-- ~079127f8-accc-4ed8-82f0-c9e0a1440c38.skg~ (titled "[[id:eb8af6d8-0491-48b0-b9bd-1dfe99f69adc][love & evidence]] => [[id:c893b584-5741-4987-876f-52bfa6c399b1][sacrifice]]") embeds a textlink to it in its title.
+- ~079127f8-accc-4ed8-82f0-c9e0a1440c38.skg~ (titled "[[id:eb8af6d8-0491-48b0-b9bd-1dfe99f69adc][love & evidence]] => [[id:c893b584-5741-4987-876f-52bfa6c399b1][sacrifice]]") embeds a link to it in its title.
 - ~e097c809-372c-4d3d-92b7-7a017a607591.skg~ (titled "evidence") lists it in its ~contains~ field.
 
