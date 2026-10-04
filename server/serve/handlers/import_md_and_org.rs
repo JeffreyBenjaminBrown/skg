@@ -82,7 +82,7 @@ pub fn handle_import_md_and_org_request (
             &report, token . as_deref (), None, &[], &warnings); }
         Err (error) => send_import_response (
           stream, TcpToClient::ImportMdAndOrgPreview,
-          &format! ("Import preview cannot be applied:\n{}", error),
+          &format! ("* Import preview cannot be applied\n{}", error),
           None, None, &[error], &[]), } }
     _ => refuse (stream, "Unknown import action"),
   }
