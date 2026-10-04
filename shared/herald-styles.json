@@ -9,7 +9,7 @@
     "normal":      { "foreground": "white",   "background": "blue" },
     "message":     { "foreground": "black",   "background": "white" },
     "stop":        { "foreground": "white",   "background": "red" },
-    "go":          { "foreground": "white",   "background": "#006400" },
+    "go":          { "foreground": "black",   "background": "#00bb00" },
     "nonstandard": { "foreground": "white",   "background": "#8b00ff" },
     "yucky":       { "foreground": "#c84286" }
   },
