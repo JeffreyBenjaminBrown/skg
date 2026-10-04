@@ -13,8 +13,8 @@ mod contexts;
 #[path = "dbs.rs"]
 mod dbs;
 
-#[path = "diff_analysis.rs"]
-mod diff_analysis;
+#[path = "diff_report.rs"]
+mod diff_report;
 
 #[path = "git_ops.rs"]
 mod git_ops;

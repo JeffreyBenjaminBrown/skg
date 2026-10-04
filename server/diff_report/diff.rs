@@ -1,4 +1,4 @@
-use crate::diff_analysis::types::{
+use crate::diff_report::types::{
   DiffReport, DuplicateIDReport, GraphSnapshot, ListDiffItem, NodeBucket,
   NodeDiffReport, RelationshipDiff, SnapshotPair, SourceForReport,
   TextDiffLine, ValueSetDiff};
@@ -103,10 +103,10 @@ fn profile_log (
   label    : &str,
   duration : Duration,
 ) {
-  if std::env::var_os ("SKG_PROFILE_DIFF_ANALYSIS") . is_none () {
+  if std::env::var_os ("SKG_PROFILE_DIFF_REPORT") . is_none () {
     return; }
   eprintln! (
-    "diff-analysis profile: {}: {}.{:03}s",
+    "diff-report profile: {}: {}.{:03}s",
     label,
     duration . as_secs (),
     duration . subsec_millis ()); }

@@ -187,10 +187,10 @@ and hide INTERNAL from M-x completion."
   (setcdr map nil)
   (define-key map (kbd "C-x C-s") #'skg--save-id-stack-buffer))
 
-(defvar skg-diff-analysis-mode-map (make-sparse-keymap)
-  "Keymap for `skg-diff-analysis-mode'.")
+(defvar skg-report-mode-map (make-sparse-keymap)
+  "Keymap for `skg-report-mode'.")
 
-(let ((map skg-diff-analysis-mode-map))
+(let ((map skg-report-mode-map))
   (setcdr map nil)
   (progn;; text search
     (define-key map (kbd "C-c f RET") #'skg-search)

@@ -8,6 +8,9 @@
   "Persistent TCP connection to the Rust backend. See
 https://www.gnu.org/software/emacs/manual/html_node/elisp/Network-Processes.html")
 
+(defvar skg-port nil
+  "TCP port of the skg server, read from skgconfig.toml by `skg-client-init'.")
+
 (defvar skg-response-handler-map nil
   "Alist from response-type symbols to handler entries.
 Each entry is (TYPE . (HANDLER . ONE-SHOT-P)).

@@ -1,14 +1,14 @@
-;;; test-skg-diff-analysis.el --- Tests for skg diff report requests.
+;;; test-skg-diff-report.el --- Tests for skg diff report requests.
 
-(defconst test-skg-diff-analysis--this-dir
+(defconst test-skg-diff-report--this-dir
   (file-name-directory load-file-name))
 
 (load-file (expand-file-name "../../elisp/skg-test-utils.el"
-                             test-skg-diff-analysis--this-dir))
+                             test-skg-diff-report--this-dir))
 (require 'ert)
-(require 'skg-request-diff-analysis)
+(require 'skg-request-diff-report)
 
-(defmacro test-skg-diff-analysis--capture-request (answers &rest body)
+(defmacro test-skg-diff-report--capture-request (answers &rest body)
   "Run BODY with y-or-n-p ANSWERS and capture the sent request."
   (declare (indent 1))
   `(let ((sent-request nil)
@@ -32,63 +32,63 @@
 
 (ert-deftest test-skg-diff-report-staged-no-sends-staged-false-unstaged-true ()
   (pcase-let ((`(,sent ,registered ,remaining)
-               (test-skg-diff-analysis--capture-request (list nil)
+               (test-skg-diff-report--capture-request (list nil)
                  (skg-diff-report))))
-    (should (equal registered 'diff-analysis))
+    (should (equal registered 'diff-report))
     (should (null remaining))
     (should (string-match-p "(include-staged \\. \"false\")" sent))
     (should (string-match-p "(include-unstaged \\. \"true\")" sent))))
 
 (ert-deftest test-skg-diff-report-staged-yes-unstaged-no ()
   (pcase-let ((`(,sent ,registered ,remaining)
-               (test-skg-diff-analysis--capture-request (list t nil)
+               (test-skg-diff-report--capture-request (list t nil)
                  (skg-diff-report))))
-    (should (equal registered 'diff-analysis))
+    (should (equal registered 'diff-report))
     (should (null remaining))
     (should (string-match-p "(include-staged \\. \"true\")" sent))
     (should (string-match-p "(include-unstaged \\. \"false\")" sent))))
 
 (ert-deftest test-skg-diff-report-staged-yes-unstaged-yes ()
   (pcase-let ((`(,sent ,registered ,remaining)
-               (test-skg-diff-analysis--capture-request (list t t)
+               (test-skg-diff-report--capture-request (list t t)
                  (skg-diff-report))))
-    (should (equal registered 'diff-analysis))
+    (should (equal registered 'diff-report))
     (should (null remaining))
     (should (string-match-p "(include-staged \\. \"true\")" sent))
     (should (string-match-p "(include-unstaged \\. \"true\")" sent))))
 
-(ert-deftest test-skg-diff-analysis-handler-enables-analysis-keymap ()
+(ert-deftest test-skg-diff-report-handler-enables-report-keymap ()
   (unwind-protect
       (progn
-        (skg--diff-analysis-handler
+        (skg--diff-report-handler
          nil
          (prin1-to-string '((content "* affected nodes\n")
                             (errors ())
                             (warnings ()))))
-        (with-current-buffer "*skg diff analysis*"
-          (should skg-diff-analysis-mode)
-          (should (eq (lookup-key skg-diff-analysis-mode-map
+        (with-current-buffer "*skg diff report*"
+          (should skg-report-mode)
+          (should (eq (lookup-key skg-report-mode-map
                                   (kbd "C-c f RET"))
                       #'skg-search))
-          (should (eq (lookup-key skg-diff-analysis-mode-map
+          (should (eq (lookup-key skg-report-mode-map
                                   (kbd "C-c g m"))
                       #'skg-goto-in-magit))
-          (should (eq (lookup-key skg-diff-analysis-mode-map
+          (should (eq (lookup-key skg-report-mode-map
                                   (kbd "C-c G M"))
                       #'skg-goto-in-magit-parent-and-close-this))
-          (should (eq (lookup-key skg-diff-analysis-mode-map
+          (should (eq (lookup-key skg-report-mode-map
                                   (kbd "C-c v e"))
                       #'skg-view-new-empty))
-          (should (eq (lookup-key skg-diff-analysis-mode-map
+          (should (eq (lookup-key skg-report-mode-map
                                   (kbd "C-c u"))
                       #'skg-id-push))
-          (should (eq (lookup-key skg-diff-analysis-mode-map
+          (should (eq (lookup-key skg-report-mode-map
                                   (kbd "C-c O l"))
                       #'skg-pop-link))))
-    (when (get-buffer "*skg diff analysis*")
-      (kill-buffer "*skg diff analysis*"))))
+    (when (get-buffer "*skg diff report*")
+      (kill-buffer "*skg diff report*"))))
 
-(ert-deftest test-skg-diff-analysis-handler-shows-warnings-separately ()
+(ert-deftest test-skg-diff-report-handler-shows-warnings-separately ()
   (unwind-protect
       (let ((messages nil))
         (cl-letf (((symbol-function 'skg-big-nonfatal-message)
@@ -97,7 +97,7 @@
                      (with-current-buffer (get-buffer-create buffer-name)
                        (erase-buffer)
                        (insert content)))))
-          (skg--diff-analysis-handler
+          (skg--diff-report-handler
            nil
            (prin1-to-string
             '((content "* affected nodes\n")
@@ -109,7 +109,7 @@
                                     message-content))
             (should (string-match-p "^\\* warnings\n\\*\\* nonfatal detail"
                                     message-content)))))
-    (dolist (name '("*skg diff analysis*"
-                   "*skg diff analysis messages*"))
+    (dolist (name '("*skg diff report*"
+                   "*skg diff report messages*"))
       (when (get-buffer name)
         (kill-buffer name)))))

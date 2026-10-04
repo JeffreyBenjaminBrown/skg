@@ -263,6 +263,51 @@ not the headline's metadata ID and title."
       (should (equal (buffer-string)
                      "** (skg (node (id id-1) writeProtected)) Title from stack")) )))
 
+;; In a view, paste-node requests a definitive view unless the buffer
+;; already has a writeable (or definitive-requesting) instance.
+(defun skg-test--paste-node-in-view (existing-text)
+  "Paste id-1 at the end of a view containing EXISTING-TEXT.
+Return (BUFFER-TEXT . LAST-MESSAGE)."
+  (let (( skg-id-stack '(("id-1" "Title from stack")) )
+        ( last-message nil ))
+    (with-temp-buffer
+      (org-mode)
+      (setq-local skg-view-uri "test-view")
+      (insert existing-text)
+      (cl-letf (( (symbol-function 'message)
+                  (lambda (fmt &rest args)
+                    (setq last-message (apply #'format fmt args))) ))
+        (skg-paste-node))
+      (cons (buffer-string) last-message)) ))
+
+(ert-deftest test-skg-paste-node-in-view-requests-definitive-view ()
+  "With no writeable instance present, the paste requests a definitive view."
+  (let (( result (skg-test--paste-node-in-view
+                  "* (skg (node (id id-1) writeProtected)) Elsewhere\n") ))
+    (should (equal (car result)
+                   (concat "* (skg (node (id id-1) writeProtected)) Elsewhere\n"
+                           "* (skg (node (id id-1) writeProtected (viewRequests definitiveView))) Title from stack\n")))
+    (should (null (cdr result))) ))
+
+(ert-deftest test-skg-paste-node-in-view-beside-writeable-instance ()
+  "With a writeable instance present, the paste stays write-protected and says why."
+  (let (( result (skg-test--paste-node-in-view
+                  "* (skg (node (id id-1) (source main))) Writeable\n") ))
+    (should (equal (car result)
+                   (concat "* (skg (node (id id-1) (source main))) Writeable\n"
+                           "* (skg (node (id id-1) writeProtected)) Title from stack\n")))
+    (should (equal (cdr result)
+                   "NOTE: Pasting node readonly because a writeable instance is already present in this same buffer.")) ))
+
+(ert-deftest test-skg-paste-node-in-view-twice ()
+  "A pending definitive view request counts as a writeable instance."
+  (let (( result (skg-test--paste-node-in-view
+                  "* (skg (node (id id-1) writeProtected (viewRequests definitiveView))) First\n") ))
+    (should (string-suffix-p
+             "\n* (skg (node (id id-1) writeProtected)) Title from stack\n"
+             (car result)))
+    (should (string-prefix-p "NOTE:" (cdr result))) ))
+
 (ert-deftest test-skg-view-id-stack ()
   "Test that skg-view-id-stack creates buffer with correct content."
   (let (( skg-id-stack '(("uuid-123" "My Node")) ))

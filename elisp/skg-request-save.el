@@ -1,5 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 
+(require 'skg-keymaps-and-aliases) ; for skg-report-mode-map
 (require 'skg-log)
 (require 'skg-length-prefix)
 (require 'skg-org-fold)
@@ -166,6 +167,7 @@ FOCUSED-HAD-METADATA records whether marker removal can leave a bare skg
 form.  The saved buffer's lock is suspended only during this synchronous
 internal edit; it is restored before any request is sent."
   (let ((was-save-locked skg--save-lock-overlay)
+        (skg--inhibit-dirty-view-confirmation t)
         snapshot)
     (when was-save-locked
       (skg--unlock-after-save))
@@ -680,6 +682,8 @@ its id-less clone-to-be parents would create bare nodes. Only C-c C-c
         (erase-buffer)
         (insert (or content ""))
         (skg-content-view-mode)
+        (setq mode-name ;; not "SKG": this is not a savable view
+              "skg-fork-ask")
         (when (fboundp 'heralds-minor-mode) (heralds-minor-mode))
         (goto-char (point-min)))
       ;; nil view-uri: not a registered view, and the ordinary-save guard
@@ -868,7 +872,8 @@ Expected shape: ((content ...) (errors (...)) (warnings (...)))."
   "Replace the current buffer contents with NEW-CONTENT from Rust.
 After inserting content, folds marked headlines, removes fold markers,
 moves point to focused headline, and removes focus marker."
-  (let ((inhibit-read-only t))
+  (let ((inhibit-read-only t)
+        (skg--inhibit-dirty-view-confirmation t))
     (erase-buffer)
     (insert new-content)
     (;; PITFALL: `erase-buffer' does NOT remove overlays — they collapse
@@ -953,8 +958,15 @@ COLUMN is a character offset from the line's start; nil means column 0."
       (with-selected-window window
         (recenter screen-line)))))
 
+(define-minor-mode skg-report-mode
+  "Minor mode for read-only skg report buffers, such as the diff report
+and the import result: links in them can be followed, and IDs used."
+  :lighter " skg-report"
+  :keymap skg-report-mode-map)
+
 (defun skg-big-nonfatal-message (buffer-name message-text content)
-  "Display CONTENT in BUFFER-NAME and show MESSAGE-TEXT in minibuffer."
+  "Display CONTENT in BUFFER-NAME and show MESSAGE-TEXT in minibuffer.
+Return the buffer."
   (with-current-buffer (get-buffer-create buffer-name)
     (let ((inhibit-read-only t))
       (erase-buffer)
@@ -963,7 +975,8 @@ COLUMN is a character offset from the line's start; nil means column 0."
       (set-buffer-modified-p nil)
       (goto-char (point-min)))
     (display-buffer buffer-name)
-    (message "%s" message-text)))
+    (message "%s" message-text)
+    (current-buffer)))
 
 (defun skg-show-save-errors-and-warnings
     (errors warnings content-present)

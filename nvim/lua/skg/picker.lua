@@ -87,14 +87,15 @@ end
 
 ---Choose an owned source, cycling with S-arrows; no prompt when only
 ---one source is owned. Nil when none are configured or user aborts.
+---@param prompt string|nil defaults to 'Source: '
 ---@return string|nil
-function M.prompt_for_owned_source ()
+function M.prompt_for_owned_source (prompt)
   local owned = config.owned_sources()
   if not owned or #owned == 0 then
     vim.notify('No owned skg sources found')
     return nil end
   if #owned == 1 then return owned[1] end
-  return M.completing_read_with_cycle('Source: ', owned, {
+  return M.completing_read_with_cycle(prompt or 'Source: ', owned, {
     require_match = true, cycle_values = owned })
 end
 

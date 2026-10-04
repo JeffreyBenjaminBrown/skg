@@ -294,6 +294,14 @@ function M.node_affectsParent_content_of_p (metadata_sexp)
 end
 
 ---@param metadata_sexp any
+---@return boolean does it request a definitive view?
+function M.node_requests_definitive_view_p (metadata_sexp)
+  return compare.subtree_p(metadata_sexp,
+    { SKG, { NODE, { sexpr.symbol('viewRequests'),
+                     sexpr.symbol('definitiveView') } } })
+end
+
+---@param metadata_sexp any
 ---@return boolean does it carry the bare write-protected marker?
 function M.node_write_protected_p (metadata_sexp)
   return compare.subtree_p(metadata_sexp,

@@ -1,12 +1,12 @@
 -- PURPOSE: Toggle git diff mode on the server and rerender all views.
 -- The Lua port of elisp/skg-request-git-diff-mode.el.
 
+local buffer = require('skg.buffer')
 local client = require('skg.client')
 local lock = require('skg.lock')
 local messages = require('skg.messages')
 local payload = require('skg.payload')
 local rerender = require('skg.rerender')
-local save = require('skg.save')
 local state = require('skg.state')
 
 local M = {}
@@ -15,7 +15,7 @@ local M = {}
 ---streams the rerender protocol. Refuses while any skg buffer has
 ---unsaved edits.
 function M.toggle (approved_pids)
-  local unsaved = save.other_unsaved_skg_buffers(-1)
+  local unsaved = buffer.other_unsaved_skg_buffers(-1)
   if #unsaved > 0 then
     local names = {}
     for _, buf in ipairs(unsaved) do

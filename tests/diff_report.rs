@@ -1,6 +1,6 @@
-use skg::diff_analysis::diff_analysis_report;
-use skg::diff_analysis::types::DiffSelection;
-use skg::serve::handlers::diff_analysis::handle_diff_analysis_request;
+use skg::diff_report::diff_report_as_org;
+use skg::diff_report::types::DiffSelection;
+use skg::serve::handlers::diff_report::handle_diff_report_request;
 use skg::test_utils::read_lp_message;
 use skg::types::misc::{SkgConfig, SkgfileSource, SourceName};
 
@@ -13,15 +13,15 @@ use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use tempfile::TempDir;
 
-#[path = "diff_analysis/diff.rs"]
+#[path = "diff_report/diff.rs"]
 mod diff;
-#[path = "diff_analysis/render.rs"]
+#[path = "diff_report/render.rs"]
 mod render;
-#[path = "diff_analysis/snapshot.rs"]
+#[path = "diff_report/snapshot.rs"]
 mod snapshot;
 
 #[test]
-fn diff_analysis_report_includes_inbound_and_textlink_changes (
+fn diff_report_includes_inbound_and_textlink_changes (
 ) -> Result<(), Box<dyn Error>> {
   let fixture : DiffFixture =
     DiffFixture::new () ?;
@@ -42,7 +42,7 @@ fn diff_analysis_report_includes_inbound_and_textlink_changes (
     "body changed",
     &["b"] ) ?;
   let report : String =
-    diff_analysis_report (
+    diff_report_as_org (
       &fixture . config,
       DiffSelection {
         include_staged: true,
@@ -70,11 +70,11 @@ fn diff_analysis_report_includes_inbound_and_textlink_changes (
   Ok (( )) }
 
 #[test]
-fn diff_analysis_reports_override_changes_on_raw_nodes (
+fn diff_report_shows_override_changes_on_raw_nodes (
 ) -> Result<(), Box<dyn Error>> {
   // No substitution in diff surfaces
-  // (TODO/full-schema/12-2_diff-mode-policy_discussion.org): diff
-  // analysis renders raw nodes -- each under its own title -- and
+  // (TODO/full-schema/12-2_diff-mode-policy_discussion.org): the diff
+  // report renders raw nodes -- each under its own title -- and
   // reports an overrides_view_of change in both roles.
   let fixture : DiffFixture =
     DiffFixture::new () ?;
@@ -85,7 +85,7 @@ fn diff_analysis_reports_override_changes_on_raw_nodes (
     fixture . source . join ("r.skg"),
     "title: Overrider\npid: r\noverrides_view_of:\n- n\n" ) ?;
   let report : String =
-    diff_analysis_report (
+    diff_report_as_org (
       &fixture . config,
       DiffSelection {
         include_staged: true,
@@ -105,7 +105,7 @@ fn diff_analysis_reports_override_changes_on_raw_nodes (
   Ok (( )) }
 
 #[test]
-fn diff_analysis_distinguishes_head_index_and_worktree (
+fn diff_report_distinguishes_head_index_and_worktree (
 ) -> Result<(), Box<dyn Error>> {
   let fixture : DiffFixture =
     DiffFixture::new () ?;
@@ -115,7 +115,7 @@ fn diff_analysis_distinguishes_head_index_and_worktree (
   fixture . stage_all () ?;
   fixture . write_node ("a", "worktree", "", &[]) ?;
   let staged_report : String =
-    diff_analysis_report (
+    diff_report_as_org (
       &fixture . config,
       DiffSelection {
         include_staged: true,
@@ -129,7 +129,7 @@ fn diff_analysis_distinguishes_head_index_and_worktree (
     "staged-only report should not include worktree-only title:\n{}",
     staged_report );
   let unstaged_report : String =
-    diff_analysis_report (
+    diff_report_as_org (
       &fixture . config,
       DiffSelection {
         include_staged: false,
@@ -145,7 +145,7 @@ fn diff_analysis_distinguishes_head_index_and_worktree (
   Ok (( )) }
 
 #[test]
-fn diff_analysis_handler_sends_length_prefixed_response (
+fn diff_report_handler_sends_length_prefixed_response (
 ) -> Result<(), Box<dyn Error>> {
   let fixture : DiffFixture =
     DiffFixture::new () ?;
@@ -160,9 +160,9 @@ fn diff_analysis_handler_sends_length_prefixed_response (
     TcpStream::connect (addr) ?;
   let (mut server, _peer) =
     listener . accept () ?;
-  handle_diff_analysis_request (
+  handle_diff_report_request (
     &mut server,
-    "((request . \"diff analysis\") \
+    "((request . \"diff report\") \
       (include-staged . \"true\") \
       (include-unstaged . \"true\"))",
     &fixture . config );
@@ -172,8 +172,8 @@ fn diff_analysis_handler_sends_length_prefixed_response (
   let response : String =
     read_lp_message (&mut reader) ?;
   assert! (
-    response . contains ("diff-analysis"),
-    "response should be tagged as diff-analysis:\n{}",
+    response . contains ("diff-report"),
+    "response should be tagged as diff-report:\n{}",
     response );
   assert! (
     response . contains ("* affected nodes"),
@@ -182,7 +182,7 @@ fn diff_analysis_handler_sends_length_prefixed_response (
   Ok (( )) }
 
 #[test]
-fn diff_analysis_reports_cross_source_inbound_relationships (
+fn diff_report_shows_cross_source_inbound_relationships (
 ) -> Result<(), Box<dyn Error>> {
   let multi : MultiSourceFixture =
     MultiSourceFixture::new () ?;
@@ -192,7 +192,7 @@ fn diff_analysis_reports_cross_source_inbound_relationships (
   multi . right . commit_all ("right initial") ?;
   multi . left . write_node ("a", "Alpha", "", &["b"]) ?;
   let report : String =
-    diff_analysis_report (
+    diff_report_as_org (
       &multi . config,
       DiffSelection {
         include_staged: true,
@@ -216,7 +216,7 @@ fn diff_analysis_reports_cross_source_inbound_relationships (
   Ok (( )) }
 
 #[test]
-fn diff_analysis_reports_source_move_across_repos (
+fn diff_report_shows_source_move_across_repos (
 ) -> Result<(), Box<dyn Error>> {
   let multi : MultiSourceFixture =
     MultiSourceFixture::new () ?;
@@ -227,7 +227,7 @@ fn diff_analysis_reports_source_move_across_repos (
   fs::remove_file (multi . left . source . join ("a.skg")) ?;
   multi . right . write_node ("a", "Moved", "", &[]) ?;
   let report : String =
-    diff_analysis_report (
+    diff_report_as_org (
       &multi . config,
       DiffSelection {
         include_staged: true,
@@ -247,7 +247,7 @@ fn diff_analysis_reports_source_move_across_repos (
   Ok (( )) }
 
 #[test]
-fn diff_analysis_reports_vanished_nodes (
+fn diff_report_shows_vanished_nodes (
 ) -> Result<(), Box<dyn Error>> {
   // TODO/more.org: a node the worktree still references, though its
   // file exists in no source, is investigated in git history: the
@@ -274,7 +274,7 @@ fn diff_analysis_reports_vanished_nodes (
     // An unstaged worktree change, so the diff has changed paths.
     "w", "Kept, retitled", "", &[] ) ?;
   let report : String =
-    diff_analysis_report (
+    diff_report_as_org (
       &fixture . config,
       DiffSelection {
         include_staged: true,
@@ -297,7 +297,7 @@ fn diff_analysis_reports_vanished_nodes (
   Ok (( )) }
 
 #[test]
-fn diff_analysis_refuses_non_git_sources (
+fn diff_report_refuses_non_git_sources (
 ) -> Result<(), Box<dyn Error>> {
   let tmp : TempDir =
     tempfile::tempdir () ?;
@@ -315,7 +315,7 @@ fn diff_analysis_refuses_non_git_sources (
          path: source_dir,
          user_owns_it: true }) ]));
   let error : String =
-    diff_analysis_report (
+    diff_report_as_org (
       &config,
       DiffSelection {
         include_staged: true,

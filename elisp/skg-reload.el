@@ -82,7 +82,7 @@ rather than via `unload-feature'."
             skg-org-fold
             skg-request-file-path
             skg-request-herald-rules
-            skg-request-diff-analysis
+            skg-request-diff-report
             skg-request-delete-references-to-absent-node
             skg-request-edge-source-info
             skg-request-boolprop-state

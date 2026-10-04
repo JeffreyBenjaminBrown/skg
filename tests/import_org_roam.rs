@@ -537,3 +537,21 @@ that were super-indented in org-roam.
 **** f
 **** g";
   assert_eq! (rendered, expected); }
+
+#[test]
+fn headline_inside_a_block_refuses_the_import_and_wipes_nothing () {
+  let input : tempfile::TempDir = tempfile::tempdir() . unwrap();
+  let output : tempfile::TempDir = tempfile::tempdir() . unwrap();
+  std::fs::write ( input . path() . join ("bad.org"),
+    ":PROPERTIES:\n:ID: bad\n:END:\n#+title: Bad\n#+begin_src\n* inside\n#+end_src\n" )
+    . unwrap();
+  let existing : std::path::PathBuf = output . path() . join ("keep.skg");
+  std::fs::write (&existing, "existing") . unwrap();
+  let error : String = skg::import_org_roam::import_org_roam_directory (
+    input . path(), output . path(),
+    &skg::types::misc::SourceName::from ("main") )
+    . err() . unwrap() . to_string();
+  assert! (error . starts_with ("Nothing was imported."), "{}", error);
+  assert! (error . contains ("bad.org:6: \"* inside\""), "{}", error);
+  assert_eq! (std::fs::read_to_string (&existing) . unwrap(), "existing");
+}

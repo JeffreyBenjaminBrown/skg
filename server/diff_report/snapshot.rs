@@ -4,7 +4,7 @@ use crate::telescope::fold::fold_telescope;
 use crate::telescope::types::{
   Telescope, retain_owned_sections_when_pid_folderlides,
 };
-use crate::diff_analysis::types::{
+use crate::diff_report::types::{
   ChangedSnapshotPair, DiffSelection, GraphSnapshot, SnapshotKind, SnapshotPair};
 use crate::git_ops::misc::path_relative_to_repo;
 use crate::git_ops::read_repo::{
@@ -94,7 +94,7 @@ fn endpoint_kinds (
     (true,  false) => Ok ((SnapshotKind::Head,  SnapshotKind::Index)),
     (false, true)  => Ok ((SnapshotKind::Index, SnapshotKind::Worktree)),
     (false, false) => Err (
-      "Diff analysis must include staged changes, unstaged changes, or both."
+      "Diff report must include staged changes, unstaged changes, or both."
         . to_string () ), } }
 
 fn validate_sources_for_selection (
@@ -110,16 +110,16 @@ fn validate_sources_for_selection (
       Path::new ( &source . path );
     let repo : Repository =
       open_repo (source_path) . ok_or_else ( || format! (
-        "Cannot compute diff analysis: source '{}' is not in a git repository.",
+        "Cannot compute diff report: source '{}' is not in a git repository.",
         source_name )) ?;
     repo . head () . map_err ( |e| format! (
-      "Cannot compute diff analysis: source '{}' has no HEAD commit: {}",
+      "Cannot compute diff report: source '{}' has no HEAD commit: {}",
       source_name, e )) ?;
     if needs_head && head_is_merge_commit (&repo) . map_err ( |e| format! (
-      "Cannot compute diff analysis: could not inspect HEAD for source '{}': {}",
+      "Cannot compute diff report: could not inspect HEAD for source '{}': {}",
       source_name, e )) ? {
       return Err ( format! (
-        "Cannot compute diff analysis: HEAD is a merge commit in source '{}'.",
+        "Cannot compute diff report: HEAD is a merge commit in source '{}'.",
         source_name )); }} 
   Ok (( )) }
 
@@ -160,7 +160,7 @@ fn read_graph_snapshot_maybe_cached (
     snapshot_cache ()
       . lock ()
       . map_err ( |e| format! (
-        "Diff analysis snapshot cache lock failed: {}", e )) ?
+        "Diff report snapshot cache lock failed: {}", e )) ?
       . get (&key)
       . cloned () {
     profile_log ("snapshot cache hit", Duration::from_millis (0));
@@ -171,7 +171,7 @@ fn read_graph_snapshot_maybe_cached (
   snapshot_cache ()
     . lock ()
     . map_err ( |e| format! (
-      "Diff analysis snapshot cache lock failed: {}", e )) ?
+      "Diff report snapshot cache lock failed: {}", e )) ?
     . insert (key, snapshot . clone ());
   Ok (snapshot)
 }
@@ -298,7 +298,7 @@ fn changed_paths_for_source (
         if path_is_source_skg (&entry . path, prefix) {
           paths . insert (entry . path); }}}
     _ => return Err ( format! (
-      "Unsupported diff-analysis endpoints: {:?} to {:?}",
+      "Unsupported diff-report endpoints: {:?} to {:?}",
       before_kind, after_kind )), }
   Ok (paths)
 }
@@ -559,10 +559,10 @@ fn profile_log (
   label    : &str,
   duration : Duration,
 ) {
-  if std::env::var_os ("SKG_PROFILE_DIFF_ANALYSIS") . is_none () {
+  if std::env::var_os ("SKG_PROFILE_DIFF_REPORT") . is_none () {
     return; }
   eprintln! (
-    "diff-analysis profile: {}: {}.{:03}s",
+    "diff-report profile: {}: {}.{:03}s",
     label,
     duration . as_secs (),
     duration . subsec_millis ()); }

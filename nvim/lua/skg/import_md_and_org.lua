@@ -58,8 +58,9 @@ local function send (fields, input_directory, destination_source)
   state.register_response_handler('import-md-and-org-result',
     function (_text, response)
       cleanup()
-      messages.big_nonfatal_message('skg://messages/import-result',
+      local buf = messages.big_nonfatal_message('skg://messages/import-result',
         'Import result', payload.field_text(response, 'content') or '')
+      require('skg.keymaps').attach_report(buf)
       if payload.field_text(response, 'record-id') then
         vim.schedule(function () rerender.request_rerender_clean_views_after_import() end)
       end
@@ -89,7 +90,7 @@ function M.import_md_and_org (input_directory, destination_source)
   if not destination_source then
     vim.notify('Choose an owned source; it determines privacy for every imported node.')
   end
-  destination_source = destination_source or picker.prompt_for_owned_source()
+  destination_source = destination_source or picker.prompt_for_owned_source('Import into source: ')
   if not destination_source then return end
   send({ action = 'preview', ['input-directory'] = input_directory,
     ['destination-source'] = destination_source },

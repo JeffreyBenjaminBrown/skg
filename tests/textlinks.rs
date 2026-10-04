@@ -154,19 +154,40 @@ fn test_replace_each_link_with_its_label() {
       "Failed for input: '{}'. Expected: '{}', Got: '{}'",
       input, expected, result ); }}
 
+/// (name, text, IDs of its real links) for each case in
+/// tests/shared/literal-link-cases.txt, which the Emacs and Neovim
+/// clients' tests read too.
+fn shared_literal_link_cases () -> Vec<(String, String, Vec<String>)> {
+  let path : std::path::PathBuf = std::path::Path::new (env! ("CARGO_MANIFEST_DIR"))
+    . join ("tests/shared/literal-link-cases.txt");
+  let mut cases : Vec<(String, String, Vec<String>)> = Vec::new ();
+  let mut current : Option<(String, Vec<String>)> = None;
+  for line in std::fs::read_to_string (&path) . unwrap () . lines () {
+    if let Some (name) = line . strip_prefix ("==== ") {
+      current = Some ((name . to_string (), Vec::new ()));
+    } else if let Some (live) = line . strip_prefix ("---- live:") {
+      let (name, text) : (String, Vec<String>) = current . take () . unwrap ();
+      cases . push ((name, text . join ("\n"),
+                     live . split_whitespace () . map (String::from) . collect ()));
+    } else if let Some ((_, text)) = current . as_mut () {
+      text . push (line . to_string ()); }}
+  cases }
+
 #[test]
-fn example_links_in_literal_org_text_are_not_textlinks () {
-  let text : &str = "\
-real [[id:a][A]] and =[[id:b][B]]=
-: [[id:c][C]]
-#+begin_src org
-[[id:d][D]]
-#+end_src";
-  assert_eq! ( textlinks_from_text (text),
-               vec! [ TextLink::new ("a", "A") ] );
-  assert_eq! (
-    replace_each_link_with_its_label (text),
-    text . replacen ("[[id:a][A]]", "A", 1) );
+fn shared_literal_link_cases_hold () {
+  let cases = shared_literal_link_cases ();
+  assert! (cases . len () > 5, "too few cases parsed");
+  for (name, text, live) in cases {
+    let found : Vec<String> = textlinks_from_text (&text) . into_iter ()
+      . map (|link| link . id . 0) . collect ();
+    assert_eq! (found, live, "case: {}", name); }
+}
+
+#[test]
+fn label_replacement_skips_example_links () {
+  assert_eq! ( replace_each_link_with_its_label (
+                 "real [[id:a][A]] and =[[id:b][B]]=" ),
+               "real A and =[[id:b][B]]=" );
 }
 
 #[test]
@@ -179,10 +200,4 @@ fn node_body_first_line_is_a_line_start () {
     "#+begin_example\n[[id:x][X]]\n#+end_example" . to_string () );
   assert_eq! ( textlinks_from_node (&node),
                vec! [ TextLink::new ("t", "T") ] );
-}
-
-#[test]
-fn verbatim_in_a_link_label_does_not_make_it_an_example () {
-  assert_eq! ( textlinks_from_text ("see [[id:a][=code= label]] and =x="),
-               vec! [ TextLink::new ("a", "=code= label") ] );
 }

@@ -58,6 +58,14 @@ describe('skg mixed Markdown/Org import', function ()
     assert.is_truthy(requests[4]:find('dirty-uri', 1, true))
     assert.is_true(vim.bo[dirty].modified)
     assert.is_nil(state.response_handler_map['import-md-and-org-preview'])
+    -- The result buffer can follow its record link.
+    local result = vim.fn.bufnr('skg://messages/import-result')
+    local has_goto = false
+    for _, map in ipairs(vim.api.nvim_buf_get_keymap(result, 'n')) do
+      if map.desc and map.desc:find('Open a view') then
+        has_goto = true end
+    end
+    assert.is_true(has_goto)
   end)
 
   it('declining a valid preview sends cancel and leaves no handlers', function ()

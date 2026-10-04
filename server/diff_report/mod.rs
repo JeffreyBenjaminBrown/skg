@@ -4,26 +4,26 @@ pub mod snapshot;
 pub mod types;
 pub mod vanished;
 
-use crate::diff_analysis::diff::{diff_snapshots, diff_snapshots_for_pids};
-use crate::diff_analysis::render::render_report;
-use crate::diff_analysis::snapshot::{read_changed_snapshot_pair, read_snapshot_pair};
-use crate::diff_analysis::types::{
+use crate::diff_report::diff::{diff_snapshots, diff_snapshots_for_pids};
+use crate::diff_report::render::render_report;
+use crate::diff_report::snapshot::{read_changed_snapshot_pair, read_snapshot_pair};
+use crate::diff_report::types::{
   ChangedSnapshotPair, DiffReport, DiffSelection, GraphSnapshot, SnapshotPair};
-use crate::diff_analysis::vanished::{
+use crate::diff_report::vanished::{
   dangling_ids_in_snapshot, investigate_vanished_ids};
 use crate::types::misc::SkgConfig;
 
-pub fn diff_analysis_report (
+pub fn diff_report_as_org (
   config    : &SkgConfig,
   selection : DiffSelection,
 ) -> Result<String, String> {
-  diff_analysis_report_with_overPrivateText_pids (config, selection)
+  diff_report_as_org_with_overPrivateText_pids (config, selection)
     . map ( |(report, _)| report )
 }
 
 /// Build the report and retain the telescope-coarse overPrivateText PIDs from both
 /// compared snapshots so the transport can attach a release warning.
-pub fn diff_analysis_report_with_overPrivateText_pids (
+pub fn diff_report_as_org_with_overPrivateText_pids (
   config    : &SkgConfig,
   selection : DiffSelection,
 ) -> Result<(String, Vec<crate::types::misc::ID>), String> {

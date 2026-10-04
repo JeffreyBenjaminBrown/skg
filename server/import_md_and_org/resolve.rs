@@ -25,12 +25,13 @@ struct AddressIndex {
 enum LinkTarget {
   Node (ID, Option<String>),
   External,
-  ExternalFile (String, String),
+  ExternalFile (String), // the replacement link
   Unresolved (String),
 }
 
-/// Returns true only for filesystem links whose path is absolute. Call this
-/// before asking the client for a host/container mapping.
+/// Returns true only for filesystem links to documents whose path is
+/// absolute: only those can need a host/container mapping to resolve.
+/// Call this before asking the client for one.
 pub fn contains_absolute_file_link (
   documents : &[ParsedDocument],
 ) -> bool {
@@ -40,7 +41,7 @@ pub fn contains_absolute_file_link (
         let path : String = if link . syntax == LinkSyntax::Markdown {
           percent_decode (path) . unwrap_or_else (|_| path . to_string ())
         } else { org_unescape (path) };
-        Path::new (&path) . is_absolute () })))
+        Path::new (&path) . is_absolute () && names_a_document (&path) })))
 }
 
 /// Apply internal-link replacements to every original section. Unresolved
@@ -87,9 +88,7 @@ pub fn resolve_document_links (
                   message : format! (
                     "External reference {:?} stays in Markdown syntax, but its definition is in another imported node",
                     reference_id), }); } } } }
-        LinkTarget::ExternalFile (replacement, warning) => {
-          document . diagnostics . push (Diagnostic {
-            range : link . range . clone (), message : warning });
+        LinkTarget::ExternalFile (replacement) => {
           if ! document . source_edits . iter () . any (|edit|
             edit . range . start < link . range . end &&
             link . range . start < edit . range . end) {
@@ -291,6 +290,9 @@ fn resolve_link (
       Ok (decoded) => decoded,
       Err (error) => return LinkTarget::Unresolved (error), },
     LinkSyntax::Org => org_unescape (path), };
+  if ! path . is_empty () && ! names_a_document (&path) {
+    return link_to_a_non_document (
+      document, &path, search, link, input_directory, host_root); }
   if path . starts_with ('~') { return LinkTarget::Unresolved (
     "Home-relative paths are unsupported; use a relative path or the configured host root"
       . to_string ()); }
@@ -302,23 +304,8 @@ fn resolve_link (
       return LinkTarget::Unresolved (format! (
         "Path {:?} is outside the imported input tree or host mapping", path)); };
     let Some (target) = index . files . get (&relative) else {
-      let attachment : PathBuf = input_directory . join (&relative);
-      if attachment . is_file () &&
-        ! matches! (relative . extension () . and_then (|ext| ext . to_str ()),
-          Some ("md" | "org")) && search . is_none () {
-        let usable_path : String = host_root
-          . map (|host| host . join (&relative) . display () . to_string ())
-          .unwrap_or_else (|| path . clone ());
-        let warning : String = if host_root . is_some () {
-          format! ("Attachment {:?} remains at its original host path; it is not copied",
-            path)
-        } else {
-          format! ("Attachment {:?} is not copied; its file link may be unusable from a different export directory or host",
-            path) };
-        return LinkTarget::ExternalFile (
-          format! ("[[file:{}][{}]]", usable_path, link . label), warning); }
       return LinkTarget::Unresolved (format! (
-        "Path {:?} does not name an imported document or readable attachment", path)); };
+        "Path {:?} does not name an imported document", path)); };
     *target };
   let root : ID = index . roots . get (&target_document) . unwrap () . clone ();
   if search . is_none () || search == Some ("") {
@@ -353,6 +340,37 @@ fn resolve_link (
     None => LinkTarget::Unresolved (format! (
       "Unresolved or ambiguous address {:?} in {:?}; HTML anchors are not interpreted",
       key, path)), }
+}
+
+/// Whether a link's path names a Markdown or Org document, which the
+/// importer resolves (or warns about). Discovery uses these exact
+/// extensions too.
+fn names_a_document (
+  path : &str,
+) -> bool {
+  matches! (Path::new (path) . extension () . and_then (|ext| ext . to_str ()),
+    Some ("md" | "org"))
+}
+
+/// A link to anything but a Markdown or Org document (source code, an
+/// image, a folder) keeps pointing where it pointed, in Org syntax, and
+/// draws no warning, wherever it points. Under a host mapping, a target
+/// inside the input tree gets its host path, since its container path
+/// would not work on the host. A search suffix is left as written.
+fn link_to_a_non_document (
+  document : &ParsedDocument,
+  path : &str,
+  search : Option<&str>,
+  link : &ParsedLink,
+  input_directory : &Path,
+  host_root : Option<&Path>,
+) -> LinkTarget {
+  if search . is_some () { return LinkTarget::External; }
+  let usable_path : String = match (host_root, normalized_input_path (
+    &document . path, path, input_directory, host_root)) {
+    (Some (host), Some (relative)) => host . join (relative) . display () . to_string (),
+    _ => path . to_string (), };
+  LinkTarget::ExternalFile (format! ("[[file:{}][{}]]", usable_path, link . label))
 }
 
 fn unique_address <'a> (
@@ -571,13 +589,14 @@ mod tests {
   }
 
   #[test]
-  fn attachment_links_use_host_path_when_available_and_warn_without_copying () {
+  fn only_links_to_documents_draw_path_warnings () {
     let temp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
     fs::create_dir (temp . path () . join ("assets")) . unwrap ();
     fs::write (temp . path () . join ("assets/chart.png"), "data") . unwrap ();
     let mut documents : Vec<ParsedDocument> = vec![parse_document (
       Path::new ("readme.md"),
-      "See [chart](assets/chart.png)." . to_string ())];
+      "See [chart](assets/chart.png), [code](../server/save.rs) and [gone](../gone.md)."
+        . to_string ())];
     let source : SourceName = SourceName::from ("owned");
     let mut next = || ID::new (&uuid::Uuid::new_v4 () . to_string ());
     let mut built : Vec<BuiltDocument> = documents . iter ()
@@ -585,10 +604,14 @@ mod tests {
       .collect ();
     resolve_document_links (&mut documents, &mut built,
       temp . path (), Some (Path::new ("/host/notes")), &HashMap::new ());
-    assert! (built [0] . nodes [0] . body . as_deref () . unwrap ()
-      . contains ("[[file:/host/notes/assets/chart.png][chart]]"));
-    assert! (documents [0] . diagnostics . iter () . any (|diagnostic|
-      diagnostic . message . contains ("not copied")));
+    let body : &str = built [0] . nodes [0] . body . as_deref () . unwrap ();
+    assert! (body . contains ("[[file:/host/notes/assets/chart.png][chart]]"), "{}", body);
+    assert! (body . contains ("[[file:../server/save.rs][code]]"), "{}", body);
+    assert! (body . contains ("[gone](../gone.md)"), "{}", body);
+    let messages : Vec<&str> = documents [0] . diagnostics . iter ()
+      . map (|diagnostic| diagnostic . message . as_str ()) . collect ();
+    assert_eq! (messages,
+      vec! ["Path \"../gone.md\" is outside the imported input tree or host mapping"]);
   }
 
   #[test]

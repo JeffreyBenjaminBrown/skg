@@ -70,7 +70,8 @@ Mirrors the server's 'org_literal_ranges' in
 server/types/textlinks/org_literal_ranges.rs: #+begin_X ... #+end_X
 blocks, ``` fences, fixed-width lines, and inline =verbatim= and
 ~code~. A headline ends any open block, as the end of a node's body
-does on the server."
+does on the server. tests/shared/literal-link-cases.txt holds the cases
+this, the server and the Neovim client must agree on."
   (let ((ranges nil)
         (open-start nil)
         (closing nil))

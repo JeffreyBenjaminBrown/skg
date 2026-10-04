@@ -1,5 +1,5 @@
-use skg::diff_analysis::render::render_report;
-use skg::diff_analysis::types::{
+use skg::diff_report::render::render_report;
+use skg::diff_report::types::{
   DiffReport, ListDiffItem, NodeBucket, NodeDiffReport, RelationshipDiff,
   SourceForReport};
 use skg::types::misc::{ID, SourceName};

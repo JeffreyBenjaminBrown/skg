@@ -292,13 +292,13 @@ So far there are these endpoints:
     of Tantivy title-index commits. =request-id= associates asynchronous
     responses with their requesting buffer and generation.
 
-** Diff analysis
-  - Request: =((request . "diff analysis") (include-staged . "BOOL") (include-unstaged . "BOOL"))=
+** Diff report
+  - Request: =((request . "diff report") (include-staged . "BOOL") (include-unstaged . "BOOL"))=
     - ~include-staged=true~, ~include-unstaged=true~: compare HEAD to worktree.
     - ~include-staged=true~, ~include-unstaged=false~: compare HEAD to index.
     - ~include-staged=false~, ~include-unstaged=true~: compare index to worktree.
     - Both false is rejected.
-  - Response: LP response-type "diff-analysis" with =((content "ORG") (errors ("..." ...)) (warnings ("..." ...)))=.
+  - Response: LP response-type "diff-report" with =((content "ORG") (errors ("..." ...)) (warnings ("..." ...)))=.
   - Behavior: Builds a semantic org report of affected nodes across all sources,
     including title/body node fields, aliases, extra IDs, all five schema relations
     in both role directions, text diffs for title/body, and
@@ -453,7 +453,8 @@ TCP connection:
 - Initial preview request: =((request . "import md and org")
   (action . "preview") (input-directory . "/absolute/server/path")
   (destination-source . "OWNED-SOURCE"))=.
-- If absolute filesystem links are found, the server responds with
+- If absolute filesystem links to =.md= or =.org= files are found, the
+  server responds with
   =response-type= =import-md-and-org-host-mapping-needed= and a =content=
   explanation. The client asks for the absolute host path corresponding to
   the input directory, then retries the same preview with

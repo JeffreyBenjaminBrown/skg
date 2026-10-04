@@ -106,14 +106,29 @@ function M.org_stars_for_node_insertion ()
   return '*'
 end
 
----Insert a write-protected ActiveNode headline from ENTRY. If point is
+---Insert a write-protected ActiveNode headline from ENTRY. In a view
+---whose buffer has no writeable instance of the node, the headline
+---also requests a definitive view, so the next save makes it writeable
+---with its real title, body and content. (Saving a bare writeable
+---headline would instead erase that body and content.) If point is
 ---already just after headline stars at the start of a line, insert
 ---only the metadata and title; otherwise insert a full same-level
 ---headline.
 ---@param entry table
 function M.insert_node_from_entry (entry)
-  local node_text = string.format('(skg (node (id %s) writeProtected)) %s',
-                                  entry[1], entry[2])
+  local request_definitive_view = false
+  if vim.b.skg_view_uri ~= nil then
+    if M.buffer_has_writeable_instance_p(entry[1]) then
+      vim.notify('NOTE: Pasting node readonly because a writeable'
+                 .. ' instance is already present in this same buffer.')
+    else
+      request_definitive_view = true end
+  end
+  local node_text = string.format(
+    request_definitive_view
+      and '(skg (node (id %s) writeProtected (viewRequests definitiveView))) %s'
+      or '(skg (node (id %s) writeProtected)) %s',
+    entry[1], entry[2])
   local line = metadata.line_text()
   local col = vim.api.nvim_win_get_cursor(0)[2]
   local stars = line:match('^(%*+[ \t]*)')
@@ -124,6 +139,23 @@ function M.insert_node_from_entry (entry)
     M.insert_text(string.format(
       '%s %s\n', M.org_stars_for_node_insertion(), node_text))
   end
+end
+
+---Does the current buffer have a headline for node ID that is
+---writeable, or that will become writeable at the next save because it
+---requests a definitive view? The server allows only one of those per ID.
+---@param id string
+---@return boolean
+function M.buffer_has_writeable_instance_p (id)
+  for line = 1, vim.api.nvim_buf_line_count(0) do
+    local sexp = metadata.metadata_sexp_at_line_or_nil(line)
+    if metadata.activeNode_sexp_p(sexp)
+       and metadata.node_id(sexp) == id
+       and (not metadata.node_write_protected_p(sexp)
+            or metadata.node_requests_definitive_view_p(sexp)) then
+      return true end
+  end
+  return false
 end
 
 function M.paste_id ()
