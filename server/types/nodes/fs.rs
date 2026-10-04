@@ -1,7 +1,7 @@
 //! NodeFS: the on-disk shape of one telescope SECTION.
 //!
 //! One node = one ID = one privacy telescope: same-ID .skg files, at
-//! most one per source, each an "telescope section" holding the
+//! most one per repo, each an "telescope section" holding the
 //! slice of the node recorded at that privacy level. The most public
 //! section (the HOME) alone carries title and body. Ordered
 //! relations are ONE flat sequence of 'ListItem's -- members render
@@ -16,16 +16,16 @@
 //! - 'NodeFS::into_section_slices' feeds the fold
 //!   ('server/telescope/fold.rs'), which is how NodeComplete values
 //!   are born; 'nodefs_from_section' is the unfold-side inverse.
-//! - 'NodeFS::into_complete_as_single_section (source)' treats ONE
+//! - 'NodeFS::into_complete_as_single_section (repo)' treats ONE
 //!   section as a whole node. Used only where a single FILE is the
 //!   honest unit: historical blobs (the vanished-node search) and
 //!   diff MODE's per-file reads (safe because diff mode requires
-//!   the active source-set "all", so no fold is hidden).
+//!   the active repo-set "all", so no fold is hidden).
 
 use serde::{Serialize, Deserialize};
 
 use crate::telescope::types::{ListItem, SectionSlices};
-use crate::types::misc::{ID, MSV, SourceName, rel_partners_at_relSource, rel_partners_at_relSource_msv};
+use crate::types::misc::{ID, MSV, RepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::complete::FileProperty;
 
@@ -96,7 +96,7 @@ impl NodeFS {
   /// missing-title reporting.
   pub fn into_complete_as_single_section (
     self,
-    source : SourceName,
+    repo : RepoName,
   ) -> NodeComplete {
     let members_only = |items : Vec<ListItem>| -> Vec<ID> {
       items . into_iter ()
@@ -111,24 +111,24 @@ impl NodeFS {
       title                        :
         self . title . unwrap_or_default (),
       overPrivateText_telescope               : false,
-      aliases                      : rel_partners_at_relSource_msv (
-        &source,
+      aliases                      : rel_partners_at_relRepo_msv (
+        &repo,
         if self . aliases . is_empty () { MSV::Unspecified }
         else { MSV::Specified ( self . aliases ) } ),
       pid                          : self . pid,
       extra_ids                    : self . extra_ids,
       body                         : self . body,
-      contains                     : rel_partners_at_relSource (
-        &source, members_only ( self . contains ) ),
-      subscribes_to                : rel_partners_at_relSource_msv (
-        &source, msv_ids ( members_only ( self . subscribes_to ) ) ),
-      hides_from_its_subscriptions : rel_partners_at_relSource_msv (
-        &source,
+      contains                     : rel_partners_at_relRepo (
+        &repo, members_only ( self . contains ) ),
+      subscribes_to                : rel_partners_at_relRepo_msv (
+        &repo, msv_ids ( members_only ( self . subscribes_to ) ) ),
+      hides_from_its_subscriptions : rel_partners_at_relRepo_msv (
+        &repo,
         msv_ids ( self . hides_from_its_subscriptions ) ),
-      overrides_view_of            : rel_partners_at_relSource_msv (
-        &source, msv_ids ( self . overrides_view_of ) ),
+      overrides_view_of            : rel_partners_at_relRepo_msv (
+        &repo, msv_ids ( self . overrides_view_of ) ),
       misc                         : self . misc,
-      source,
+      home_repo: repo,
     }}
 
   /// Serialize to YAML, emitting the 'body' field as a block literal

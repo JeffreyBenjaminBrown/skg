@@ -1,7 +1,7 @@
 mod guard;
 pub use guard::TestStoreGuard;
 
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
 use crate::dbs::init::create_empty_tantivy_index;
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle, new_handle};
@@ -16,7 +16,7 @@ use crate::serve::handlers::save_buffer::{
 };
 use crate::serve::parse_metadata_sexp::ViewnodeMetadata;
 use crate::types::views_state::ViewUri;
-use crate::types::misc::{MSV, SkgConfig, SkgfileSource, ID, TantivyIndex, SourceName, rel_partners_at_relSource, rel_partners_at_relSource_msv, RelPartner};
+use crate::types::misc::{MSV, SkgConfig, SkgfileRepo, ID, TantivyIndex, RepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv, RelPartner};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::maybe_placed_viewnode::{ MpViewnode, MpViewnodeKind };
@@ -109,7 +109,7 @@ where
 }
 
 /// Like run_with_test_stores, but loads config from a TOML file
-/// (supporting multi-source setups) and skips Tantivy.
+/// (supporting multi-repo setups) and skips Tantivy.
 pub fn run_with_test_stores_from_config<F>(
   test_name: &str,
   config_path: &str,
@@ -160,8 +160,8 @@ impl SharedStoreSession {
   /// Restore a pristine state for the next sub-test: wipe all data,
   /// copy `fixtures_folder` to the temp dir, point a config at it,
   /// repopulate, fresh Tantivy index. If the fixtures contain a
-  /// 'skgconfig.toml' (multi-source setups), that config is loaded
-  /// from the temp copy; otherwise a single-source ("main") config
+  /// 'skgconfig.toml' (multi-repo setups), that config is loaded
+  /// from the temp copy; otherwise a single-repo ("main") config
   /// is built around the copy. The shared session object survives;
   /// its graph snapshot and Tantivy index are replaced.
   /// `subtest_name` is printed so a failing group identifies which
@@ -177,7 +177,7 @@ impl SharedStoreSession {
   /// Like 'reset', but runs `prep` on the temp fixture copy BEFORE
   /// the config is loaded and the graph snapshot populated -- for
   /// sub-tests whose fixtures need mutation that the snapshot must
-  /// reflect (e.g. git-initializing a source and leaving a
+  /// reflect (e.g. git-initializing a repo and leaving a
   /// worktree-vs-HEAD diff).
   pub fn reset_with_fixture_prep<P> (
     &mut self,
@@ -205,45 +205,45 @@ impl SharedStoreSession {
         config . tantivy_folder = self . tantivy_folder . clone ();
         config
       } else {
-        let mut sources : HashMap<SourceName, SkgfileSource> =
+        let mut repos : HashMap<RepoName, SkgfileRepo> =
           HashMap::new ();
-        sources . insert (
-          SourceName::from ("main"),
-          SkgfileSource {
-            name         : SourceName::from ("main"),
+        repos . insert (
+          RepoName::from ("main"),
+          SkgfileRepo {
+            name         : RepoName::from ("main"),
             abbreviation : None,
             path         : self . temp_fixtures . clone (),
             user_owns_it : true, });
-        SkgConfig::fromSourcesAndTantivyFolder (
-          sources,
+        SkgConfig::fromReposAndTantivyFolder (
+          repos,
           self . tantivy_folder . to_str () . unwrap () ) }};
     self . wipe_then_repopulate () }
 
-  /// Like 'reset', but for sub-tests that prepare their own source
+  /// Like 'reset', but for sub-tests that prepare their own repo
   /// directory (e.g. a git repo in a TempDir): no fixture copy; the
-  /// single-source ("main") config points at `source_path` directly.
-  pub fn reset_with_source_path (
+  /// single-repo ("main") config points at `repo_path` directly.
+  pub fn reset_with_repo_path (
     &mut self,
     subtest_name : &str,
-    source_path  : &Path,
+    repo_path  : &Path,
   ) -> Result<(), Box<dyn Error>> {
     println! ("-- sub-test: {}", subtest_name);
     self . config = {
-      let mut sources : HashMap<SourceName, SkgfileSource> =
+      let mut repos : HashMap<RepoName, SkgfileRepo> =
         HashMap::new ();
-      sources . insert (
-        SourceName::from ("main"),
-        SkgfileSource {
-          name         : SourceName::from ("main"),
+      repos . insert (
+        RepoName::from ("main"),
+        SkgfileRepo {
+          name         : RepoName::from ("main"),
           abbreviation : None,
-          path         : source_path . to_path_buf (),
+          path         : repo_path . to_path_buf (),
           user_owns_it : true, });
-      SkgConfig::fromSourcesAndTantivyFolder (
-        sources,
+      SkgConfig::fromReposAndTantivyFolder (
+        repos,
         self . tantivy_folder . to_str () . unwrap () ) };
     self . wipe_then_repopulate () }
 
-  /// Like 'reset', but loads a (possibly multi-source) config from a
+  /// Like 'reset', but loads a (possibly multi-repo) config from a
   /// TOML file, reading fixtures in place -- the same convention as
   /// 'run_with_test_stores_from_config'.
   pub fn reset_from_config (
@@ -295,7 +295,7 @@ where
       temp_fixtures  : temp_fixtures . clone (),
       tantivy_folder : tantivy_folder . clone (),
       config         : // placeholder; every sub-test runs after a reset, which overwrites it
-        SkgConfig::fromSourcesAndTantivyFolder (
+        SkgConfig::fromReposAndTantivyFolder (
           HashMap::new (),
           tantivy_folder . to_str () . unwrap () ),
       tantivy        : create_empty_tantivy_index (&tantivy_folder) ?, };
@@ -369,7 +369,7 @@ pub fn graph_handle_from_config (
   config : &SkgConfig,
 ) -> Result<InRustGraphHandle, Box<dyn Error>> {
   let nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources (config) ?;
+    read_all_skg_files_from_repos (config) ?;
   Ok ( new_handle ( InRustGraph::from_nodecompletes (&nodes) )) }
 
 /// Bundle a test's existing handles into a 'SkgEnv'.
@@ -444,18 +444,18 @@ pub async fn update_from_and_rerender_buffer_with_fork_approval_test (
   views_state                 : &mut ViewsState,
   fork_approved               : bool,
 ) -> Result<SaveResponse, Box<dyn Error>> {
-  // No user-set clone sources: every fork's source resolves by
+  // No user-set clone repos: every fork's repo resolves by
   // inference-else-default.
-  update_from_and_rerender_buffer_with_fork_sources_test (
+  update_from_and_rerender_buffer_with_fork_repos_test (
     stream, org_buffer_text, config, tantivy_index, graph,
     diff_mode_enabled, viewuri_from_request_result, views_state,
     fork_approved, &HashMap::new () ) . await }
 
 /// As 'update_from_and_rerender_buffer_with_fork_approval_test', but also
-/// lets the test supply the per-fork clone sources (keyed by N's pid)
+/// lets the test supply the per-fork clone repos (keyed by N's pid)
 /// the user would have chosen in the confirmation buffer -- exercising
-/// the 'fork-sources' transport without an Emacs client.
-pub async fn update_from_and_rerender_buffer_with_fork_sources_test (
+/// the 'fork-repos' transport without an Emacs client.
+pub async fn update_from_and_rerender_buffer_with_fork_repos_test (
   stream                      : &mut std::net::TcpStream,
   org_buffer_text             : &str,
   config                      : &SkgConfig,
@@ -465,7 +465,7 @@ pub async fn update_from_and_rerender_buffer_with_fork_sources_test (
   viewuri_from_request_result : &Result<ViewUri, String>,
   views_state                 : &mut ViewsState,
   fork_approved               : bool,
-  fork_sources                : &HashMap<ID, SourceName>,
+  fork_repos                : &HashMap<ID, RepoName>,
 ) -> Result<SaveResponse, Box<dyn Error>> {
   let mut env : SkgEnv =
     skg_env_from_parts (config, tantivy_index, graph);
@@ -478,32 +478,32 @@ pub async fn update_from_and_rerender_buffer_with_fork_sources_test (
     views_state,
     None,
     fork_approved,
-    fork_sources ) . await }
+    fork_repos ) . await }
 
-/// Move NODE to SOURCE: set its home AND retag every relationship
-/// member and alias to that source. Under the historical
-/// relation-partner work, the invariant was relSource == home, so any
-/// test that reassigns a node's source must go through this, or the
-/// telescope write would emit sections at the old source. The real
-/// source-move rule (which member relSources follow a home move) is owned by
+/// Move NODE to REPO: set its home AND retag every relationship
+/// member and alias to that repo. Under the historical
+/// relation-partner work, the invariant was relRepo == home, so any
+/// test that reassigns a node's repo must go through this, or the
+/// telescope write would emit sections at the old repo. The real
+/// repo-move rule (which member relRepos follow a home move) is owned by
 /// work item save-leveling.
-pub fn set_source_retagging_relSources (
+pub fn set_repo_retagging_relRepos (
   node  : &mut NodeComplete,
-  source : &SourceName,
+  repo : &RepoName,
 ) {
-  node . source = source . clone ();
+  node . home_repo = repo . clone ();
   for m in node . contains . iter_mut () {
-    m . relSource = source . clone (); }
+    m . relRepo = repo . clone (); }
   let retag_msv = |msv : &mut MSV<RelPartner<ID>>| {
     if let MSV::Specified (v) = msv {
       for m in v . iter_mut () {
-        m . relSource = source . clone (); }} };
+        m . relRepo = repo . clone (); }} };
   retag_msv ( &mut node . subscribes_to );
   retag_msv ( &mut node . hides_from_its_subscriptions );
   retag_msv ( &mut node . overrides_view_of );
   if let MSV::Specified (v) = &mut node . aliases {
     for m in v . iter_mut () {
-      m . relSource = source . clone (); }} }
+      m . relRepo = repo . clone (); }} }
 
 /// Verify the published graph's inverse indexes after a mutation.
 pub fn audit_inrustgraph_or_panic (
@@ -518,7 +518,7 @@ pub fn audit_inrustgraph_or_panic (
 
 /// A converted fixture (author-folder layout) keeps its .skg files
 /// under owned/; a flat fixture keeps them at the root. The
-/// test-config synthesizers point their single "main" source at
+/// test-config synthesizers point their single "main" repo at
 /// whichever the fixture uses.
 pub fn prefer_owned_subdir (
   root : &Path,
@@ -533,16 +533,16 @@ pub fn setup_test_tantivy (
   fixtures_folder: &str,
   tantivy_folder: &str,
 ) -> Result<(SkgConfig, TantivyIndex), Box<dyn Error>> {
-  let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new();
-  sources . insert (
-    SourceName::from ("main"),
-    SkgfileSource {
-      name         : SourceName::from ("main"),
+  let mut repos : HashMap<RepoName, SkgfileRepo> = HashMap::new();
+  repos . insert (
+    RepoName::from ("main"),
+    SkgfileRepo {
+      name         : RepoName::from ("main"),
       abbreviation : None,
       path         : prefer_owned_subdir (Path::new (fixtures_folder)),
       user_owns_it : true, });
-  let config : SkgConfig = SkgConfig::fromSourcesAndTantivyFolder (
-    sources, tantivy_folder );
+  let config : SkgConfig = SkgConfig::fromReposAndTantivyFolder (
+    repos, tantivy_folder );
   let tantivy_index : TantivyIndex =
     create_empty_tantivy_index (&config . tantivy_folder) ?;
   Ok ((config, tantivy_index)) }
@@ -745,21 +745,21 @@ pub fn strip_org_comments(s: &str) -> String {
 
 /// Example NodeComplete for use in tests.
 pub fn nodecomplete_example () -> NodeComplete {
-  let source : SourceName = SourceName::from ("main");
+  let repo : RepoName = RepoName::from ("main");
   NodeComplete {
     title: "This text gets indexed." . to_string(),
     overPrivateText_telescope: false,
     aliases: MSV::Unspecified,
-    source: source . clone (),
+    home_repo: repo . clone (),
     pid: ID::new ("example"),
     extra_ids: vec![],
     body: Some( r#"This one string could span pages.
 It better be okay with newlines."# . to_string() ),
-    contains: rel_partners_at_relSource ( &source,
+    contains: rel_partners_at_relRepo ( &repo,
                     vec![ ID::new ("1"),
                           ID::new ("2"),
                           ID::new ("3")] ),
-    subscribes_to: rel_partners_at_relSource_msv ( &source,
+    subscribes_to: rel_partners_at_relRepo_msv ( &repo,
                     MSV::Specified(vec![ID::new ("11"),
                              ID::new ("12"),
                              ID::new ("13")])),

@@ -4,7 +4,7 @@
 ///   Scaffolds: (skg [focused] [folded] scaffoldKind)
 ///   ActiveNodes: (skg [focused] [folded]
 ///                   (node [(id ID)]
-///                         [(source SOURCE)]
+///                         [(repo REPO)]
 ///                         [(affectsParent true|false|na)]
 ///                         [(birth backpath ROLENAME)]
 ///                         [writeProtected]   ; marks the occurrence write-protected
@@ -17,7 +17,7 @@
 ///                         [(viewRequests REQUEST...)]))
 
 use crate::types::sexp::atom_to_string;
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, RepoName};
 use crate::types::errors::BufferValidationError;
 use crate::types::nodes::complete::FileProperty;
 use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
@@ -49,37 +49,37 @@ pub struct ViewnodeMetadata {
   pub non_vognode: Option<MpViewnodeKind>,
   // ActiveNode fields (ignored if scaffold is Some)
   pub id: Option<ID>,
-  pub source: Option<SourceName>,
+  pub home_repo: Option<RepoName>,
   pub affectsParent: AffectsParent,
   pub birth: Birth,
   pub writeProtected: bool,
   pub graphStats: GraphNodeStats,
   pub viewStats: ViewNodeStats,
   pub edit_request: Option<NodeEditRequest>,
-  pub relSource_request: Option<SourceName>,
+  pub relRepo_request: Option<RepoName>,
   pub view_requests: HashSet<ViewRequest>,
   pub activeNode_existence  : ExistenceAxes,
   pub activeNode_membership : MembershipAxes,
   pub activeNode_not_in_git : bool,
   pub scaffold_membership : MembershipAxes,
-  pub scaffold_relSource : Option<SourceName>,
-  pub scaffold_relSource_request : Option<SourceName>,
+  pub scaffold_relRepo : Option<RepoName>,
+  pub scaffold_relRepo_request : Option<RepoName>,
   pub textchanged_staged   : bool,
   pub textchanged_unstaged : bool,
-  // When true, this is a PhantomDeleted (id and source are used).
+  // When true, this is a PhantomDeleted (id and repo are used).
   pub is_deleted_node: bool,
   // When true, this is a deleted non-vognode placeholder.
   pub is_dead_scaffold: bool,
   // When Some, this is an PhantomUnknown (a placeholder for a missing
-  // referent). Carries only the id; no source/title/body apply.
+  // referent). Carries only the id; no repo/title/body apply.
   pub unknown_node_id: Option<ID>,
-  pub unknown_relSource : Option<SourceName>,
-  pub unknown_relSource_request : Option<SourceName>,
-  // When true, this is an inactive-source placeholder: an anonymous,
-  // dataless marker (see InactiveNode). It carries no id/source/etc.
+  pub unknown_relRepo : Option<RepoName>,
+  pub unknown_relRepo_request : Option<RepoName>,
+  // When true, this is an inactive-repo placeholder: an anonymous,
+  // dataless marker (see InactiveNode). It carries no id/repo/etc.
   pub is_inactive_node : bool,
   // When true, this is a PhantomDiff. It carries the same fields as a
-  // node (id/source/write-protected/graphStats/diff axes), parsed via
+  // node (id/repo/write-protected/graphStats/diff axes), parsed via
   // parse_node_sexp, but emits and is recognized by its own root atom
   // 'diffPhantom' rather than being inferred from the diff axes.
   pub is_diff_phantom : bool,
@@ -92,28 +92,28 @@ pub fn default_metadata() -> ViewnodeMetadata {
     body_folded: false,
     non_vognode: None,
     id: None,
-    source: None,
+    home_repo: None,
     affectsParent: AffectsParent::True,
     birth: Birth::Unremarkable,
     writeProtected: false,
     graphStats: GraphNodeStats::default(),
     viewStats: ViewNodeStats::default(),
     edit_request: None,
-    relSource_request: None,
+    relRepo_request: None,
     view_requests: HashSet::new(),
     activeNode_existence  : ExistenceAxes::default(),
     activeNode_membership : MembershipAxes::default(),
     activeNode_not_in_git : false,
     scaffold_membership : MembershipAxes::default(),
-    scaffold_relSource : None,
-    scaffold_relSource_request : None,
+    scaffold_relRepo : None,
+    scaffold_relRepo_request : None,
     textchanged_staged   : false,
     textchanged_unstaged : false,
     is_deleted_node: false,
     is_dead_scaffold: false,
     unknown_node_id: None,
-    unknown_relSource: None,
-    unknown_relSource_request: None,
+    unknown_relRepo: None,
+    unknown_relRepo_request: None,
     is_inactive_node: false,
     is_diff_phantom: false, }}
 
@@ -138,8 +138,8 @@ pub fn viewnode_from_metadata (
             MpPhantom::Unknown (
               PhantomUnknown {
                 id                 : uid . clone (),
-                relSource         : metadata . unknown_relSource . clone (),
-                relSource_request : metadata . unknown_relSource_request . clone (),
+                relRepo         : metadata . unknown_relRepo . clone (),
+                relRepo_request : metadata . unknown_relRepo_request . clone (),
               } ) ),
           if body . is_some () || ! title . is_empty () {
             Some ( BufferValidationError::Other (
@@ -164,8 +164,8 @@ pub fn viewnode_from_metadata (
             MpPhantom::Deleted ( PhantomDeleted {
             id     : metadata . id . clone ()
                        . unwrap_or_else ( || ID::from ("")),
-            source : metadata . source . clone ()
-                       . unwrap_or_else ( || SourceName::from ("")),
+            home_repo : metadata . home_repo . clone ()
+                       . unwrap_or_else ( || RepoName::from ("")),
             title,
             body,
           } ) ), None, None )
@@ -196,10 +196,10 @@ pub fn viewnode_from_metadata (
           MpViewnodeKind::Qual (Qual::Alias { .. }) =>
             MpViewnodeKind::Qual (Qual::Alias {
                               text: title . clone (),
-                              relSource:
-                                metadata . scaffold_relSource . clone (),
-                              relSource_request:
-                                metadata . scaffold_relSource_request . clone (),
+                              relRepo:
+                                metadata . scaffold_relRepo . clone (),
+                              relRepo_request:
+                                metadata . scaffold_relRepo_request . clone (),
                               membership: metadata . scaffold_membership }),
           MpViewnodeKind::Qual (Qual::ID { .. }) =>
             MpViewnodeKind::Qual (Qual::ID {
@@ -241,7 +241,7 @@ pub fn viewnode_from_metadata (
           { metadata . id . clone ()
             . map ( BufferValidationError::EditRequestOnWriteProtectedOccurrence ) }
           else if metadata . writeProtected
-               && metadata . relSource_request . is_some ()
+               && metadata . relRepo_request . is_some ()
           { Some ( BufferValidationError::Other (
               "relSource request on a write-protected node"
               . to_string () )) }
@@ -249,12 +249,12 @@ pub fn viewnode_from_metadata (
         let t : MpActiveNode = MpActiveNode {
             title,
             id               : metadata . id . clone (),
-            source           : metadata . source . clone (),
+            home_repo           : metadata . home_repo . clone (),
             affectsParent         : metadata . affectsParent,
             birth            : metadata . birth,
             graphStats       : metadata . graphStats . clone (),
             viewStats        : metadata . viewStats . clone (),
-            relSource_request : metadata . relSource_request . clone (),
+            relRepo_request : metadata . relRepo_request . clone (),
             view_requests    : metadata . view_requests . clone (),
             existence        : metadata . activeNode_existence,
             membership       : metadata . activeNode_membership,
@@ -341,7 +341,7 @@ pub fn parse_metadata_to_viewnodemd (
             parse_node_sexp ( &items[1..], &mut result ) ?; },
           "diffPhantom" => {
             // (diffPhantom ...) -- a moved/removed phantom in git-diff
-            // mode. Same field grammar as (node ...) (id/source/write-protected/
+            // mode. Same field grammar as (node ...) (id/repo/write-protected/
             // graphStats/diff axes), but its own root atom so the client
             // and round-trip never infer phantom-ness from the diff axes.
             parse_node_sexp ( &items[1..], &mut result ) ?;
@@ -351,7 +351,7 @@ pub fn parse_metadata_to_viewnodemd (
             parse_deleted_sexp ( &items[1..], &mut result ) ?; },
           "unknown" => {
             // (unknown (id X)) -- placeholder for a referenced
-            // node with no record anywhere. No source/title/body.
+            // node with no record anywhere. No repo/title/body.
             parse_unknownnode_sexp ( &items[1..], &mut result ) ?; },
           "inactiveNode" => {
             parse_inactivenode_sexp ( &items[1..], &mut result ) ?; },
@@ -371,10 +371,10 @@ pub fn parse_metadata_to_viewnodemd (
               return Err (
                 "relSource requires exactly one source name"
                 . to_string () ); }
-            if result . scaffold_relSource . is_some () {
+            if result . scaffold_relRepo . is_some () {
               return Err ( "Alias relSource may appear only once"
                            . to_string () ); }
-            result . scaffold_relSource = Some ( SourceName::from (
+            result . scaffold_relRepo = Some ( RepoName::from (
               atom_to_string (&items [1]) ? )); },
           "editRequest" => {
             let mut request_metadata : ViewnodeMetadata = default_metadata ();
@@ -383,11 +383,11 @@ pub fn parse_metadata_to_viewnodemd (
             if request_metadata . edit_request . is_some () {
               return Err ( "Only Alias may carry a top-level editRequest relSource"
                            . to_string () ); }
-            if result . scaffold_relSource_request . is_some () {
+            if result . scaffold_relRepo_request . is_some () {
               return Err ( "Alias editRequest may appear only once"
                            . to_string () ); }
-            result . scaffold_relSource_request =
-              request_metadata . relSource_request; },
+            result . scaffold_relRepo_request =
+              request_metadata . relRepo_request; },
           "textChanged" => {
             // (textChanged STAGE_TAGS) for the TextChanged qual.
             result . non_vognode = Some (
@@ -440,7 +440,7 @@ pub fn parse_metadata_to_viewnodemd (
           // above so a stale buffer round-trips.
           "inactiveNode" => result . is_inactive_node = true,
           // Scaffold kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
-          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::Alias { text: String::new(), relSource: None, relSource_request: None, membership: MembershipAxes::default() } ) ),
+          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::Alias { text: String::new(), relRepo: None, relRepo_request: None, membership: MembershipAxes::default() } ) ),
           "aliasFolder" => result . non_vognode = Some (MpViewnodeKind::QualFolder (QualFolder::Alias)),
           "propertiesFolder" => result . non_vognode = Some (
             MpViewnodeKind::QualFolder (QualFolder::boolprops ())),
@@ -477,8 +477,8 @@ pub fn parse_metadata_to_viewnodemd (
       _ => { return Err ( format! (
         "Unexpected element in metadata sexp: {}",
         sexp_str )); }} }
-  if ( result . scaffold_relSource . is_some ()
-       || result . scaffold_relSource_request . is_some () )
+  if ( result . scaffold_relRepo . is_some ()
+       || result . scaffold_relRepo_request . is_some () )
      && ! matches! ( result . non_vognode,
                      Some (MpViewnodeKind::Qual (Qual::Alias { .. })) )
   { return Err ( "relSource and its editRequest are valid only on Alias scaffolds"
@@ -508,7 +508,7 @@ fn parse_node_sexp (
               return Err ( "source requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
-            metadata . source = Some ( SourceName::from (value) ); },
+            metadata . home_repo = Some ( RepoName::from (value) ); },
           // Semantic relationship / birth facts are display-only.
           // The client strips them before save; the view regenerates them.
           "rels" => {},
@@ -516,7 +516,7 @@ fn parse_node_sexp (
             parse_viewstats_sexp ( &subitems[1..], &mut metadata . viewStats ) ?; },
           "editRequest" => {
             if metadata . edit_request . is_some ()
-               || metadata . relSource_request . is_some () {
+               || metadata . relRepo_request . is_some () {
               return Err ( "node editRequest may appear only once"
                            . to_string () ); }
             parse_editrequest_sexp ( &subitems[1..], metadata ) ?; },
@@ -636,17 +636,17 @@ fn parse_unknownnode_sexp (
             metadata . unknown_node_id =
               Some ( ID::from (value)); },
           "viewStats" => {
-            if metadata . unknown_relSource . is_some () {
+            if metadata . unknown_relRepo . is_some () {
               return Err ( "unknown viewStats may appear only once" . to_string () ); }
             let mut stats : ViewNodeStats = ViewNodeStats::default ();
             parse_viewstats_sexp ( &subitems[1..], &mut stats ) ?;
-            if stats . relSource . is_none ()
+            if stats . relRepo . is_none ()
                || stats . cycle || stats . overridesHere . is_some () {
               return Err ( "Unknown viewStats supports only relSource"
                            . to_string () ); }
-            metadata . unknown_relSource = stats . relSource; },
+            metadata . unknown_relRepo = stats . relRepo; },
           "editRequest" => {
-            if metadata . unknown_relSource_request . is_some () {
+            if metadata . unknown_relRepo_request . is_some () {
               return Err ( "unknown editRequest may appear only once"
                            . to_string () ); }
             let mut request_metadata : ViewnodeMetadata = default_metadata ();
@@ -655,8 +655,8 @@ fn parse_unknownnode_sexp (
             if request_metadata . edit_request . is_some () {
               return Err ( "Unknown supports only an editRequest relSource"
                            . to_string () ); }
-            metadata . unknown_relSource_request =
-              request_metadata . relSource_request; },
+            metadata . unknown_relRepo_request =
+              request_metadata . relRepo_request; },
           _ => { return Err ( format! (
             "Unknown 'unknown' key: {}", key )); }} },
       _ => { return Err ( "Unexpected element in unknown sexp"
@@ -666,7 +666,7 @@ fn parse_unknownnode_sexp (
 /// Parse the LEGACY list form '(inactiveNode ...)'. The server now
 /// emits the bare atom 'inactiveNode' (handled in the atom arm), but an
 /// older server's field-bearing list form is tolerated here -- its
-/// children (id/source/membership/overridesHere) are discarded -- so a
+/// children (id/repo/membership/overridesHere) are discarded -- so a
 /// stale buffer still round-trips. An inactive placeholder is an
 /// anonymous, dataless marker (see InactiveNode).
 fn parse_inactivenode_sexp (
@@ -676,7 +676,7 @@ fn parse_inactivenode_sexp (
   metadata . is_inactive_node = true;
   Ok (( )) }
 
-/// Parse the (deleted (id X) (source S)) s-expression contents.
+/// Parse the (deleted (id X) (repo S)) s-expression contents.
 fn parse_deleted_sexp (
   items    : &[Sexp],
   metadata : &mut ViewnodeMetadata,
@@ -698,7 +698,7 @@ fn parse_deleted_sexp (
               return Err ( "deleted source requires exactly one value" . to_string () ); }
             let value : String =
               atom_to_string ( &subitems[1] ) ?;
-            metadata . source = Some ( SourceName::from (value)); },
+            metadata . home_repo = Some ( RepoName::from (value)); },
           _ => { return Err ( format! ( "Unknown deleted key: {}",
                                          key )); }} },
       _ => { return Err ( "Unexpected element in deleted sexp"
@@ -707,7 +707,7 @@ fn parse_deleted_sexp (
 
 
 /// Parse the (viewStats ...) s-expression contents: the bare-atom
-/// 'cycle' stat and the keyed 'overridesHere' / 'sourceHerald'
+/// 'cycle' stat and the keyed 'overridesHere' / 'homeRepoHerald'
 /// sub-forms. Relationship stats are semantic display-only '(rels ...)'
 /// facts, parsed and discarded at node level instead.
 fn parse_viewstats_sexp (
@@ -735,11 +735,11 @@ fn parse_viewstats_sexp (
               atom_to_string ( &kv_pair[1] ) ?;
             stats . overridesHere = Some ( ID::from (value)); },
           "relSource" => {
-            // Display-only source fact.  A save request must instead
-            // appear as (editRequest (relSource SOURCE)).
+            // Display-only repo fact.  A save request must instead
+            // appear as (editRequest (relRepo REPO)).
             let value : String =
               atom_to_string ( &kv_pair[1] ) ?;
-            stats . relSource = Some ( SourceName::from (value)); },
+            stats . relRepo = Some ( RepoName::from (value)); },
           _ => { return Err ( format! (
             "Unknown viewStats key: {}", key )); }} },
       _ => { return Err ( "Unexpected element in viewStats"
@@ -765,9 +765,9 @@ fn parse_editrequest_sexp (
           metadata . edit_request = Some (
             NodeEditRequest::NodeMerge ( ID::from (id_str)));
         } else if key == "relSource" {
-          let source : String = atom_to_string ( &subitems[1] ) ?;
-          metadata . relSource_request =
-            Some ( SourceName::from (source) );
+          let repo : String = atom_to_string ( &subitems[1] ) ?;
+          metadata . relRepo_request =
+            Some ( RepoName::from (repo) );
         } else {
           return Err ( format! ( "Unknown editRequest key: {}", key )); }
       },

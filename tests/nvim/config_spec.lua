@@ -6,23 +6,23 @@
 local config = require('skg.config')
 
 local interleaved_config = table.concat({
-  '[[source_sets]]',
+  '[[repo_sets]]',
   'name = "public-set"',
   'sources = ["public"]',
   '',
-  '[[sources]]',
+  '[[repos]]',
   'name = "public"',
   'path = "owned/public-dir"',
   '',
-  '[[source_sets]]',
+  '[[repo_sets]]',
   'name = "private-set"',
   'sources = ["private"]',
   '',
-  '[[sources]]',
+  '[[repos]]',
   'name = "private"',
   'path = "owned/private-dir"',
   '',
-  '[[sources]]',
+  '[[repos]]',
   'name = "foreign"',
   'path = "foreign-dir"',
   '',
@@ -51,11 +51,11 @@ describe('skg.config', function ()
 
   it('errors when the port is missing', function ()
     local portless = config_dir .. '/portless.toml'
-    vim.fn.writefile({ '[[sources]]', 'name = "a"' }, portless)
+    vim.fn.writefile({ '[[repos]]', 'name = "a"' }, portless)
     assert.has_error(function () config.port_from_toml(portless) end)
   end)
 
-  it('does not confuse [[sources]] and [[source_sets]]', function ()
+  it('does not confuse [[repos]] and [[repo_sets]]', function ()
     assert.are.same({ 'public', 'private', 'foreign' },
                     config.source_names())
     assert.are.same({ 'public', 'private', 'foreign', 'all' },

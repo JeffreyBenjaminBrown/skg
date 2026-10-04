@@ -7,10 +7,10 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::types::git::{GitDiffStatus, MembershipAxes, NodeChanges, NodeCompleteDiff, Sign, SourceDiff, axes_from_per_stage_diffs, net_diff_from_per_stage, per_stage_node_changes_for_activeNode};
+use crate::types::git::{GitDiffStatus, MembershipAxes, NodeChanges, NodeCompleteDiff, Sign, RepoDiff, axes_from_per_stage_diffs, net_diff_from_per_stage, per_stage_node_changes_for_activeNode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
-use crate::dbs::node_lookup::nodecomplete_graphFirst_by_pid_and_source;
-use crate::types::misc::{ID, RelationshipMemberKey, SkgConfig, SourceName, members_of};
+use crate::dbs::node_lookup::nodecomplete_graphFirst_by_pid_and_repo;
+use crate::types::misc::{ID, RelationshipMemberKey, SkgConfig, RepoName, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::phantom::home_from_disk;
 
@@ -40,17 +40,17 @@ fn relationship_member_key (
 /// carry no membership marks from here.
 pub fn goal_list_for_outbound_folder (
   owner_pid     : &ID,
-  owner_source  : &SourceName,
+  owner_repo  : &RepoName,
   relation      : NodeRelation,
-  source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
+  repo_diffs  : &Option<HashMap<RepoName, RepoDiff>>,
   worktree_list : &[ID],
 ) -> (Vec<ID>, HashSet<ID>) {
-  if source_diffs . is_none () {
+  if repo_diffs . is_none () {
     return (worktree_list . to_vec (), HashSet::new ()); }
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
     per_stage_node_changes_for_activeNode (
-      source_diffs, owner_pid, owner_source );
+      repo_diffs, owner_pid, owner_repo );
   if staged_nc . is_none () && unstaged_nc . is_none () {
     return (worktree_list . to_vec (), HashSet::new ()); }
   let net : Vec<Diff_Item<ID>> =
@@ -66,14 +66,14 @@ pub fn goal_list_for_outbound_folder (
 /// Modified in neither stage map.
 pub fn outbound_member_axes (
   owner_pid    : &ID,
-  owner_source : &SourceName,
+  owner_repo : &RepoName,
   relation     : NodeRelation,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
 ) -> HashMap<ID, MembershipAxes> {
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
     per_stage_node_changes_for_activeNode (
-      source_diffs, owner_pid, owner_source );
+      repo_diffs, owner_pid, owner_repo );
   axes_from_per_stage_diffs (
     staged_nc   . and_then ( |c| relation . diff_in_nodechanges (c) ),
     unstaged_nc . and_then ( |c| relation . diff_in_nodechanges (c) ))
@@ -93,17 +93,17 @@ pub fn outbound_member_axes (
 /// comparison.
 pub fn three_snapshots_of_relation_list (
   pid           : &ID,
-  source        : &SourceName,
+  skgrepo        : &RepoName,
   relation      : NodeRelation,
   worktree_list : &[ID],
-  source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
+  repo_diffs  : &Option<HashMap<RepoName, RepoDiff>>,
 ) -> [Vec<ID>; 3] {
   let file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-  let sd : Option<&SourceDiff> =
-    source_diffs . as_ref ()
-    . and_then ( |d| d . get (source) )
-    . filter ( |sd| sd . is_git_repo );
+  let sd : Option<&RepoDiff> =
+    repo_diffs . as_ref ()
+    . and_then ( |d| d . get (skgrepo) )
+    . filter ( |sd| sd . is_gitrepo );
   let stage_before = | entry : Option<&NodeCompleteDiff>,
                        after_this_stage : &[ID] | -> Vec<ID> {
     match entry {
@@ -135,11 +135,11 @@ pub fn three_snapshots_of_relation_list (
       &index );
   [ head, index, worktree_list . to_vec () ] }
 
-/// The outbound list a NodeComplete holds for a relation, sources
+/// The outbound list a NodeComplete holds for a relation, repos
 /// dropped.  (The inverse scan has a private sibling; this one serves
 /// the three-snapshot reconstruction.)
 /// NOTE: was '&'a [ID]' before the historical relation-partner change;
-/// a borrow can no longer be returned once the sources must be stripped, so this
+/// a borrow can no longer be returned once the repos must be stripped, so this
 /// now returns an owned 'Vec<ID>' (its one caller already called
 /// '.to_vec()' on the result, so nothing downstream changed).
 fn relation_list_of_nodecomplete (
@@ -200,12 +200,12 @@ fn axes_from_three_snapshots (
 pub fn goal_list_for_hiddenInSubscribee_folder (
   graph                : &InRustGraph,
   subscribee_pid      : &ID,
-  subscribee_source   : &SourceName,
+  subscribee_repo   : &RepoName,
   subscriber_pid      : &ID,
-  subscriber_source   : &SourceName,
+  subscriber_repo   : &RepoName,
   subscribee_contains : &[ID],
   subscriber_hides    : &[ID],
-  source_diffs        : &Option<HashMap<SourceName, SourceDiff>>,
+  repo_diffs        : &Option<HashMap<RepoName, RepoDiff>>,
 ) -> (Vec<ID>, HashSet<ID>, HashMap<ID, MembershipAxes>) {
   let derived = | hides : &[ID], contains : &[ID] | -> Vec<ID> {
     // Intersection, preserving order from the hides list.
@@ -214,19 +214,19 @@ pub fn goal_list_for_hiddenInSubscribee_folder (
     hides . iter ()
       . filter ( |id| contains_set . contains (&relationship_member_key (graph, id)) )
       . cloned () . collect () };
-  if source_diffs . is_none () {
+  if repo_diffs . is_none () {
     return ( derived (subscriber_hides, subscribee_contains),
              HashSet::new (), HashMap::new () ); }
   let hides3 : [Vec<ID>; 3] =
     three_snapshots_of_relation_list (
-      subscriber_pid, subscriber_source,
+      subscriber_pid, subscriber_repo,
       NodeRelation::HidesFromItsSubscriptions,
-      subscriber_hides, source_diffs );
+      subscriber_hides, repo_diffs );
   let contains3 : [Vec<ID>; 3] =
     three_snapshots_of_relation_list (
-      subscribee_pid, subscribee_source,
+      subscribee_pid, subscribee_repo,
       NodeRelation::Contains,
-      subscribee_contains, source_diffs );
+      subscribee_contains, repo_diffs );
   let derived3 : [Vec<ID>; 3] =
     [ derived (&hides3 [0], &contains3 [0]),
       derived (&hides3 [1], &contains3 [1]),
@@ -252,10 +252,10 @@ pub fn goal_list_for_hiddenInSubscribee_folder (
 pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
   graph                : &InRustGraph,
   subscriber_pid       : &ID,
-  subscriber_source    : &SourceName,
+  subscriber_repo    : &RepoName,
   wt_subscriber_hides  : &[ID],
   wt_subscribees       : &[ID],
-  source_diffs         : &Option<HashMap<SourceName, SourceDiff>>,
+  repo_diffs         : &Option<HashMap<RepoName, RepoDiff>>,
   config               : &SkgConfig,
 ) -> (Vec<ID>, HashSet<ID>, HashMap<ID, MembershipAxes>) {
   let derived = | hides : &[ID],
@@ -265,14 +265,14 @@ pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
                 . contains (&relationship_member_key (graph, id)) )
       . cloned () . collect () };
   let wt_subscribee_content_of = | pid : &ID | -> Vec<ID> {
-    match graph_source (graph, pid, config) {
+    match graph_repo (graph, pid, config) {
       Some (src) =>
-        nodecomplete_graphFirst_by_pid_and_source ( graph, config, pid, &src )
+        nodecomplete_graphFirst_by_pid_and_repo ( graph, config, pid, &src )
           . ok ()
           . map ( |skg| members_of (& skg . contains) )
           . unwrap_or_default (),
       None => Vec::new () } };
-  if source_diffs . is_none () {
+  if repo_diffs . is_none () {
     let wt_all_subscribee_content : HashSet<RelationshipMemberKey> =
       wt_subscribees . iter ()
         . flat_map ( |pid| wt_subscribee_content_of (pid) )
@@ -282,14 +282,14 @@ pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
              HashSet::new (), HashMap::new () ); }
   let hides3 : [Vec<ID>; 3] =
     three_snapshots_of_relation_list (
-      subscriber_pid, subscriber_source,
+      subscriber_pid, subscriber_repo,
       NodeRelation::HidesFromItsSubscriptions,
-      wt_subscriber_hides, source_diffs );
+      wt_subscriber_hides, repo_diffs );
   let subscribees3 : [Vec<ID>; 3] =
     three_snapshots_of_relation_list (
-      subscriber_pid, subscriber_source,
+      subscriber_pid, subscriber_repo,
       NodeRelation::SubscribesTo,
-      wt_subscribees, source_diffs );
+      wt_subscribees, repo_diffs );
   let content3_by_subscribee : HashMap<ID, [Vec<ID>; 3]> = {
     // The contains snapshots of every subscribee involved in ANY
     // snapshot (a subscribee dropped since HEAD still shaped the
@@ -300,16 +300,16 @@ pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
       . map ( |pid| {
           let wt_contains : Vec<ID> =
             wt_subscribee_content_of (&pid);
-          let source : Option<SourceName> =
-            graph_source (graph, &pid, config)
-            . or_else ( || source_in_diffs_for_file (
-                &pid, source_diffs ));
-          let snapshots : [Vec<ID>; 3] = match source {
+          let skgrepo : Option<RepoName> =
+            graph_repo (graph, &pid, config)
+            . or_else ( || repo_in_diffs_for_file (
+                &pid, repo_diffs ));
+          let snapshots : [Vec<ID>; 3] = match skgrepo {
             Some (src) =>
               three_snapshots_of_relation_list (
                 &pid, &src, NodeRelation::Contains,
-                &wt_contains, source_diffs ),
-            None => // no source anywhere: treat as empty throughout
+                &wt_contains, repo_diffs ),
+            None => // no Skg repo anywhere: treat as empty throughout
               [ Vec::new (), Vec::new (), Vec::new () ] };
           (pid, snapshots) } )
       . collect () };
@@ -333,17 +333,17 @@ pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
     itemlist_and_removedset_from_diff (&diff);
   (goal, removed, axes) }
 
-/// Locate a file's source by scanning the diff maps for it: serves
+/// Locate a file's Skg repo by scanning the diff maps for it: serves
 /// nodes whose file is gone from both the graph and the disk (e.g. a
 /// subscribee deleted since HEAD), whose history nonetheless shaped
 /// a filter folder's HEAD-side membership.
-fn source_in_diffs_for_file (
+fn repo_in_diffs_for_file (
   pid          : &ID,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
-) -> Option<SourceName> {
+  repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
+) -> Option<RepoName> {
   let file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-  source_diffs . as_ref () ? . iter ()
+  repo_diffs . as_ref () ? . iter ()
     . find ( |(_src, sd)|
         sd . staged   . contains_key (&file)
         || sd . unstaged . contains_key (&file) )
@@ -353,16 +353,16 @@ fn source_in_diffs_for_file (
 #[path = "../../../../tests/unit/three_snapshots.rs"]
 mod three_snapshot_tests;
 
-/// Resolve a node's source: try the in-Rust graph snapshot first,
-/// fall back to scanning source directories for the matching '.skg'
+/// Resolve a node's Skg repo: try the in-Rust graph snapshot first,
+/// fall back to scanning Skg repo directories for the matching '.skg'
 /// file. The disk fallback handles diff/deletion states absent from the current
 /// graph snapshot.
-fn graph_source (
+fn graph_repo (
   graph  : &InRustGraph,
   pid    : &ID,
   config : &SkgConfig,
-) -> Option<SourceName> {
+) -> Option<RepoName> {
   if let Some (s) =
-    graph . pid_and_source (pid) . map ( |(_, s)| s )
+    graph . pid_and_repo (pid) . map ( |(_, s)| s )
   { return Some (s); }
   home_from_disk (pid, config) }

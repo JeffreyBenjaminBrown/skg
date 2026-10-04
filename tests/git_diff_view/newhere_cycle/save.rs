@@ -14,12 +14,12 @@ fn test_newhere_cycle_survives_save()
   let tantivy_folder = "/tmp/tantivy-test-git-diff-view-newhere-cycle-save";
 
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir . path();
-  setup_git_repo_with_fixtures (repo_path)?;
+  let gitrepo_path = temp_dir . path();
+  setup_gitrepo_with_fixtures (gitrepo_path)?;
 
   block_on(async {
     let (config, mut tantivy) =
-      setup_test_stores(test_name, repo_path . to_str() . unwrap(), tantivy_folder) . await?;
+      setup_test_stores(test_name, gitrepo_path . to_str() . unwrap(), tantivy_folder) . await?;
 
     // First render the initial view (view pipeline — known to work).
     let root_ids = vec![ID("1" . to_string())];
@@ -60,12 +60,12 @@ fn test_newhere_cycle_survives_save_staged()
   let tantivy_folder = "/tmp/tantivy-test-git-diff-view-newhere-cycle-save-staged";
 
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir . path();
-  setup_git_repo_with_fixtures_staged (repo_path)?;
+  let gitrepo_path = temp_dir . path();
+  setup_gitrepo_with_fixtures_staged (gitrepo_path)?;
 
   block_on(async {
     let (config, mut tantivy) =
-      setup_test_stores(test_name, repo_path . to_str() . unwrap(), tantivy_folder) . await?;
+      setup_test_stores(test_name, gitrepo_path . to_str() . unwrap(), tantivy_folder) . await?;
 
     // First render the initial view (view pipeline — known to work).
     let root_ids = vec![ID("1" . to_string())];

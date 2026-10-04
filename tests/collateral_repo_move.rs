@@ -1,7 +1,7 @@
-// cargo nextest run --test grouped_overrides -E 'test(collateral_source_move::)'
+// cargo nextest run --test grouped_overrides -E 'test(collateral_repo_move::)'
 
 use futures::executor::block_on;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::dbs::in_rust_graph::{
@@ -30,14 +30,14 @@ use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 #[test]
-fn test_source_move_updates_collateral_view_metadata (
+fn test_repo_move_updates_collateral_view_metadata (
 ) -> Result<(), Box<dyn Error>> {
   let test_name : &str =
     "skg-test-collateral-source-move";
   let temp_dir : TempDir =
     TempDir::new()?;
   copy_dir_all (
-    Path::new ("tests/move_source/fixtures"),
+    Path::new ("tests/move_repo/fixtures"),
     temp_dir . path() )?;
   let tantivy_folder : PathBuf =
     temp_dir . path() . join ("tantivy");
@@ -60,7 +60,7 @@ fn test_source_move_updates_collateral_view_metadata (
         multi_root_view (
           &config, None, &root_ids, false )?;
       assert! (
-        buffer_has_source_for_title (
+        buffer_has_repo_for_title (
           &initial_buffer, "b", "public" ),
         "initial view should show b in public:\n{}",
         initial_buffer );
@@ -121,7 +121,7 @@ fn test_source_move_updates_collateral_view_metadata (
         save_response, collateral_buffer )) } ) ?;
 
   assert! (
-    buffer_has_source_for_title (
+    buffer_has_repo_for_title (
       &collateral_buffer, "b", "private" ),
     "collateral view should show b's new source:\n{}",
     collateral_buffer );
@@ -131,13 +131,13 @@ fn test_source_move_updates_collateral_view_metadata (
   Ok (( )) }
 
 #[test]
-fn successful_save_consumes_relSource_edit_request (
+fn successful_save_consumes_relRepo_edit_request (
 ) -> Result<(), Box<dyn Error>> {
   let test_name : &str =
     "skg-test-consume-relSource-edit-request";
   let temp_dir : TempDir = TempDir::new () ?;
   copy_dir_all (
-    Path::new ("tests/move_source/fixtures"), temp_dir . path () ) ?;
+    Path::new ("tests/move_repo/fixtures"), temp_dir . path () ) ?;
   let tantivy_folder : PathBuf = temp_dir . path () . join ("tantivy");
   let (config, tantivy, initial_nodes)
     : (SkgConfig, TantivyIndex, Vec<NodeComplete>) =
@@ -197,7 +197,7 @@ async fn setup_test_stores (
       tantivy_folder : tantivy_folder . to_path_buf(),
       .. config };
   let nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources (&config)?;
+    read_all_skg_files_from_repos (&config)?;
   let tantivy_index : TantivyIndex =
     create_empty_tantivy_index (&config . tantivy_folder)?;
   Ok ((config, tantivy_index, nodes)) }
@@ -232,18 +232,18 @@ fn mk_test_tcp_stream_pair (
     listener . accept() . unwrap();
   (write_end, read_end) }
 
-fn buffer_has_source_for_title (
+fn buffer_has_repo_for_title (
   buffer : &str,
   title  : &str,
-  source : &str,
+  repo : &str,
 ) -> bool {
   let id_fragment : String =
     format! ("(id {})", title);
-  let source_fragment : String =
-    format! ("(source {})", source);
+  let repo_fragment : String =
+    format! ("(source {})", repo);
   let title_suffix : String =
     format! (") {}", title);
   buffer . lines() . any ( |line|
     line . contains (&id_fragment)
-    && line . contains (&source_fragment)
+    && line . contains (&repo_fragment)
     && line . ends_with (&title_suffix) ) }

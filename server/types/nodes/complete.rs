@@ -1,19 +1,19 @@
 //! NodeComplete: the full in-Rust-graph node.
 //!
 //! Carries every field a node has: the on-disk fields (mirrored
-//! from NodeFS) plus 'source', which is inferred from file
+//! from NodeFS) plus 'repo', which is inferred from file
 //! location and held only in the in-Rust graph.
 //!
 //! NodeComplete itself is NOT Serialize/Deserialize. The on-disk
 //! round-trip goes through 'NodeFS'
 //! ([[./fs.rs][server/types/nodes/fs.rs]]):
-//! read YAML as 'NodeFS', then attach source via
-//! 'NodeFS::into_complete(source)' to get a 'NodeComplete'. To
+//! read YAML as 'NodeFS', then attach repo via
+//! 'NodeFS::into_complete(repo)' to get a 'NodeComplete'. To
 //! write, convert 'NodeComplete' -> 'NodeFS' via 'From' (dropping
-//! 'source'), then serialize the 'NodeFS'. This way the type
-//! system enforces that 'source' never appears in YAML.
+//! 'repo'), then serialize the 'NodeFS'. This way the type
+//! system enforces that 'repo' never appears in YAML.
 
-use crate::types::misc::{ID, MSV, RelPartner, SourceName};
+use crate::types::misc::{ID, MSV, RelPartner, RepoName};
 
 use std::collections::HashSet;
 
@@ -81,18 +81,18 @@ pub fn set_file_property (
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct NodeComplete {
-  // There is a 1-to-1 correspondence between NodeCompletes and privacy TELESCOPES (families of same-pid .skg files, one section per source; see docs/telescopes.org). Reading FOLDS the sections into a NodeComplete; writing UNFOLDS it back into sections, byte-stably. The files are the only permanent data. NodeComplete initializes the in-memory graph and Tantivy index.
+  // There is a 1-to-1 correspondence between NodeCompletes and privacy TELESCOPES (families of same-pid .skg files, one section per repo; see docs/telescopes.org). Reading FOLDS the sections into a NodeComplete; writing UNFOLDS it back into sections, byte-stably. The files are the only permanent data. NodeComplete initializes the in-memory graph and Tantivy index.
   // The graph indexes this complete record for structural queries. Tantivy
   // receives the searchable subset. The filesystem remains authoritative.
-  // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/misc.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when reconciling multiple NodeCompletes (e.g. 'reconcile_same_id_instructions' and supplement_unspecified_fields_from_disk). PITFALL: since telescopes, the distinction is meaningful ON DISK too: a section that omits a field has no opinion about it (Unspecified), while under unfold each section records exactly the edges sourced there -- so what a given section file shows is not the node's whole list, and an absent field in one section says nothing about the fold.
+  // PITFALL: 'MSV<T>' (Maybe-Specified Vector; see types/misc.rs) distinguishes 'Unspecified' ("user didn't mention this field") from 'Specified(vec![...])' ("user wants it to be this value, even if empty"). This matters when reconciling multiple NodeCompletes (e.g. 'reconcile_same_id_instructions' and supplement_unspecified_fields_from_disk). PITFALL: since telescopes, the distinction is meaningful ON DISK too: a section that omits a field has no opinion about it (Unspecified), while under unfold each section records exactly the edges repod there -- so what a given section file shows is not the node's whole list, and an absent field in one section says nothing about the fold.
 
   pub title: String,
   /// True when the selected title or body came from below the home.
-  /// Precise title/body-text sources remain a fold/save-time fact; runtime
+  /// Precise title/body-text repos remain a fold/save-time fact; runtime
   /// release decisions intentionally use this coarse flag.
   pub overPrivateText_telescope: bool,
-  pub aliases: MSV<RelPartner<String>>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.) Each alias carries its relSource.
-  pub source: SourceName, // source name, inferred from file location and SkgConfig
+  pub aliases: MSV<RelPartner<String>>, // A node can be searched for using its title or any of its aliases, and so far using its body text too. (I might later decide not to index bodies, or to give the choice to the user.) Each alias carries its relRepo.
+  pub home_repo: RepoName, // repo name, inferred from file location and SkgConfig
   pub pid: ID, // Primary ID. Determines filename, graph identity, Tantivy key, and map key. Never changes.
   pub extra_ids: Vec<ID>, // Extra IDs accumulated through nodeMerges. Usually empty.
   pub body: Option<String>, // Not indexed by the structural graph. The body is all text (if any) between the preceding org headline, to which it belongs, and the next (if there is a next).
@@ -163,7 +163,7 @@ pub fn empty_node_complete () -> NodeComplete {
     title                        : String::new (),
     overPrivateText_telescope               : false,
     aliases                      : MSV::Unspecified,
-    source                       : SourceName::from ("main"),
+    home_repo                       : RepoName::from ("main"),
     pid                          : ID::new (""),
     extra_ids                    : Vec::new (),
     body                         : None,

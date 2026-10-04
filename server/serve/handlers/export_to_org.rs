@@ -1,4 +1,4 @@
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use crate::export_org::{
   export_candidate_pids, export_to_org, ExportReport};
 use crate::serve::handlers::text_release::{
@@ -12,16 +12,16 @@ use crate::serve::util::{
   send_response_with_length_prefix,
   tag_sexp_response,
   value_from_request_sexp};
-use crate::source_sets::{ActiveSourceSet, SourceSetName};
+use crate::repo_sets::{ActiveRepoSet, RepoSetName};
 use crate::types::misc::SkgConfig;
 use crate::types::nodes::complete::NodeComplete;
 
 use std::net::TcpStream;
 use std::path::PathBuf;
 
-/// Export every export root, limited to the requested source-set,
+/// Export every export root, limited to the requested repo-set,
 /// into a chosen directory. Two REQUIRED request fields:
-/// `(source-set . "NAME")` -- the set the client picked (with its
+/// `(repo-set . "NAME")` -- the set the client picked (with its
 /// circular selector) -- and `(output-dir . "PATH")` -- where to
 /// write, resolved against the server's working directory (its
 /// project root); a relative PATH lands under it, an absolute PATH
@@ -36,14 +36,14 @@ pub fn handle_export_to_org_request (
   request : &str,
 ) {
   let prepared : Result<
-    (ActiveSourceSet, Vec<NodeComplete>, PathBuf), String> = ( || {
+    (ActiveRepoSet, Vec<NodeComplete>, PathBuf), String> = ( || {
     let name : String =
       value_from_request_sexp ("source-set", request) ?;
-    let active : ActiveSourceSet =
-      ActiveSourceSet::named (config, SourceSetName::from (name))
+    let active : ActiveRepoSet =
+      ActiveRepoSet::named (config, RepoSetName::from (name))
       . map_err ( |e| e . to_string () ) ?;
     let nodes : Vec<NodeComplete> =
-      read_all_skg_files_from_sources (config)
+      read_all_skg_files_from_repos (config)
       . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
     let output_dir : String =
       value_from_request_sexp ("output-dir", request)

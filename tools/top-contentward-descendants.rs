@@ -13,7 +13,7 @@
 
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use skg::types::misc::{ID, SkgConfig, members_of};
 use skg::types::nodes::complete::NodeComplete;
 
@@ -31,7 +31,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
     else { 20 };
   let config : SkgConfig = load_config (config_path) ?;
   let nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources (&config) ?;
+    read_all_skg_files_from_repos (&config) ?;
   error_unless_each_id_names_one_node (
     &nodes, &config . data_root) ?;
   // Adjacency: pid -> list of pids it contains.

@@ -1,10 +1,10 @@
 use crate::diff_report::types::{
   DiffReport, DuplicateIDReport, GraphSnapshot, ListDiffItem, NodeBucket,
-  NodeDiffReport, RelationshipDiff, SnapshotPair, SourceForReport,
+  NodeDiffReport, RelationshipDiff, SnapshotPair, RepoForReport,
   TextDiffLine, ValueSetDiff};
 use crate::types::list::{Diff_Item, compute_interleaved_diff};
 use crate::types::misc::{
-  ID, MSV, RelPartner, SourceName, members_of, members_msv};
+  ID, MSV, RelPartner, RepoName, members_of, members_msv};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::links::links_from_node;
 
@@ -111,8 +111,8 @@ fn profile_log (
     duration . as_secs (),
     duration . subsec_millis ()); }
 
-/// Shape-aware: an id present in several SOURCES is the normal
-/// telescope shape (one pid, sections at several sources), not a
+/// Shape-aware: an id present in several REPOS is the normal
+/// telescope shape (one pid, sections at several repos), not a
 /// duplicate. The VIOLATION is one id claimed by two distinct pids
 /// at either endpoint.
 fn duplicate_id_reports (
@@ -136,8 +136,8 @@ fn duplicate_id_reports (
       title_for_id (&id, before, after);
     reports . push ( DuplicateIDReport {
       id : id . clone (),
-      before_sources : before . sources_claiming_id (&id),
-      after_sources  : after . sources_claiming_id (&id),
+      before_repos : before . repos_claiming_id (&id),
+      after_repos  : after . repos_claiming_id (&id),
       title }); }
   reports . sort_by_key ( |r| r . id . clone () );
   reports
@@ -191,10 +191,10 @@ fn node_reports (
       text_diff_option (
         before_node . and_then ( |n| n . body . as_deref () ) . unwrap_or (""),
         after_node  . and_then ( |n| n . body . as_deref () ) . unwrap_or (""));
-    let source_change : Option<(SourceName, SourceName)> =
+    let repo_change : Option<(RepoName, RepoName)> =
       match (before_node, after_node) {
-        (Some (b), Some (a)) if b . source != a . source =>
-          Some ((b . source . clone (), a . source . clone ())),
+        (Some (b), Some (a)) if b . home_repo != a . home_repo =>
+          Some ((b . home_repo . clone (), a . home_repo . clone ())),
         _ => None, };
     let value_set_diffs : Vec<ValueSetDiff> =
       value_set_diffs (before_node, after_node);
@@ -206,7 +206,7 @@ fn node_reports (
       before_node . is_none () || after_node . is_none () ||
       title_diff . is_some () ||
       body_diff . is_some () ||
-      source_change . is_some () ||
+      repo_change . is_some () ||
       value_set_diffs . iter () . any ( |d|
         ! d . lost . is_empty () || ! d . gained . is_empty () ) ||
       relationship_diffs . iter () . any ( |d|
@@ -214,10 +214,10 @@ fn node_reports (
       contained_list_diff . is_some ();
     if ! changed {
       continue; }
-    let source : SourceForReport =
+    let repo : RepoForReport =
       match (before_node, after_node) {
-        (_, Some (a)) => SourceForReport::After (a . source . clone ()),
-        (Some (b), None) => SourceForReport::Before (b . source . clone ()),
+        (_, Some (a)) => RepoForReport::After (a . home_repo . clone ()),
+        (Some (b), None) => RepoForReport::Before (b . home_repo . clone ()),
         (None, None) => continue, };
     let title : String =
       after_node . or (before_node)
@@ -225,11 +225,11 @@ fn node_reports (
         . unwrap_or_else ( || "[missing title]" . to_string () );
     reports . push ( NodeDiffReport {
       pid,
-      source,
+      home_repo: repo,
       title,
       title_diff,
       body_diff,
-      source_change,
+      repo_change,
       value_set_diffs,
       relationship_diffs,
       contained_list_diff }); }
@@ -392,12 +392,12 @@ fn bucket_reports (
       ! after_facts . role_sets ["container"] . contains_key (&report . pid);
     let pid_preserved_as_extra_id : bool =
       after_facts . extra_ids . contains (&report . pid);
-    let moved_across_sources : bool =
-      report . source_change . is_some ();
+    let moved_across_repos : bool =
+      report . repo_change . is_some ();
     let bucket : &'static str =
       match (existed_before, exists_after, root_before, root_after) {
         (true, true, false, true) => "modified, newly orphaned",
-        (true, true, _,     _) if moved_across_sources =>
+        (true, true, _,     _) if moved_across_repos =>
           "modified, moved across sources",
         (true, true, _,     _)    => "modified, other",
         (false, true, _,    true) => "new roots",

@@ -14,7 +14,7 @@ use crate::dbs::in_rust_graph::override_invariants::{
   validate_override_invariants,
 };
 use crate::telescope::invariants::{TelescopeViolation, validate_all_telescopes};
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
@@ -23,10 +23,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompleteGraphError {
-  DuplicatePrimaryId { pid : ID, homes : Vec<SourceName> },
+  DuplicatePrimaryId { pid : ID, homes : Vec<RepoName> },
   DuplicateExtraId { id : ID, owners : Vec<ID> },
   PrimaryExtraCollision { id : ID, primary_owners : Vec<ID>, extra_owners : Vec<ID> },
-  UnconfiguredNodeHome { pid : ID, source : SourceName },
+  UnconfiguredNodeHome { pid : ID, repo : RepoName },
   Override (OverrideInvariantViolation),
   InternalIndex (InternalIndexMismatch),
 }
@@ -50,11 +50,11 @@ pub fn validate_complete_graph (
   config : &SkgConfig,
   nodes : &[NodeComplete],
 ) -> CompleteGraphValidation {
-  let mut primary_homes : BTreeMap<ID, Vec<SourceName>> = BTreeMap::new ();
+  let mut primary_homes : BTreeMap<ID, Vec<RepoName>> = BTreeMap::new ();
   let mut extra_owners : BTreeMap<ID, BTreeSet<ID>> = BTreeMap::new ();
   for node in nodes {
     primary_homes . entry (node . pid . clone ()) . or_default ()
-      . push (node . source . clone ());
+      . push (node . home_repo . clone ());
     for extra in node . normalized_extra_ids () {
       extra_owners . entry (extra) . or_default ()
         . insert (node . pid . clone ()); }}
@@ -85,9 +85,9 @@ pub fn validate_complete_graph (
   let mut nodes_by_pid : Vec<&NodeComplete> = nodes . iter () . collect ();
   nodes_by_pid . sort_by (|a, b| a . pid . cmp (&b . pid));
   for node in nodes_by_pid {
-    if ! config . sources . contains_key (&node . source) {
+    if ! config . repos . contains_key (&node . home_repo) {
       errors . push (CompleteGraphError::UnconfiguredNodeHome {
-        pid : node . pid . clone (), source : node . source . clone () }); }}
+        pid : node . pid . clone (), repo : node . home_repo . clone () }); }}
 
   let graph = InRustGraph::from_nodecompletes (nodes);
   // Topology and derived-index diagnostics are meaningful only when identity
@@ -118,8 +118,8 @@ fn error_sort_key (error : &CompleteGraphError) -> (u8, String, String) {
       (1, id . to_string (), String::new ()),
     CompleteGraphError::PrimaryExtraCollision { id, .. } =>
       (2, id . to_string (), String::new ()),
-    CompleteGraphError::UnconfiguredNodeHome { pid, source } =>
-      (3, pid . to_string (), source . to_string ()),
+    CompleteGraphError::UnconfiguredNodeHome { pid, repo } =>
+      (3, pid . to_string (), repo . to_string ()),
     CompleteGraphError::Override (violation) =>
       (4, format!("{:?}", violation), String::new ()),
     CompleteGraphError::InternalIndex (mismatch) =>
@@ -139,8 +139,8 @@ pub fn format_complete_graph_errors (errors : &[CompleteGraphError]) -> String {
         id, primary_owners, extra_owners } => format! (
           "id '{}' is both primary {:?} and extra on {:?}",
           id, primary_owners, extra_owners),
-      CompleteGraphError::UnconfiguredNodeHome { pid, source } => format! (
-        "node '{}' has unconfigured home source '{}'", pid, source),
+      CompleteGraphError::UnconfiguredNodeHome { pid, repo } => format! (
+        "node '{}' has unconfigured home source '{}'", pid, repo),
       CompleteGraphError::Override (violation) =>
         format_override_invariant_violations (&[violation . clone ()])
           . lines () . skip (1) . collect::<Vec<&str>> () . join (" "),
@@ -192,7 +192,7 @@ pub(crate) fn complete_from_rust (node : &NodeRust) -> NodeComplete {
     title : node . title . clone (),
     overPrivateText_telescope : node . overPrivateText_telescope,
     aliases : node . aliases . clone (),
-    source : node . source . clone (),
+    home_repo : node . home_repo . clone (),
     pid : node . pid . clone (),
     extra_ids : node . extra_ids . clone (),
     body : node . body . clone (),

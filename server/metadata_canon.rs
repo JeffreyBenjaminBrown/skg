@@ -3,8 +3,8 @@
 //!
 //! Metadata is an "unordered tree after the first element": in any
 //! metadata list the first element is a keyword that must come first,
-//! but the remaining siblings carry no order -- `(node (id x) (source
-//! s))` means the same as `(node (source s) (id x))`. This holds
+//! but the remaining siblings carry no order -- `(node (id x) (repo
+//! s))` means the same as `(node (repo s) (id x))`. This holds
 //! recursively, to any depth: `(a (b c d) (e f g))` == `(a (e f g)
 //! (b c d))` == `(a (b d c) (e f g))`, but != `(a (c b d) (e f g))`
 //! (the inner head `b` is fixed) and != `(b a c ...)` (the outer head).
@@ -219,8 +219,8 @@ mod tests {
                  canonicalize_metadata_ordering (c) ); }
 
   #[test]
-  fn sourceherald_atom_with_colon_and_nonascii_round_trips () {
-    // The ⌂:LABEL sourceHerald and the ☮/⟳ glyphs must survive parse +
+  fn homerepoherald_atom_with_colon_and_nonascii_round_trips () {
+    // The ⌂:LABEL homeRepoHerald and the ☮/⟳ glyphs must survive parse +
     // canon (bytes preserved, just possibly reordered).
     let s : &str =
       "* (skg (node (id 1) (source main) (viewStats cycle (sourceHerald ⌂:main)))) t\n";

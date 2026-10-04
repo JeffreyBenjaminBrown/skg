@@ -5,21 +5,21 @@
 use skg::from_text::local_instruction_collection::types::{
   CollectedIntents, IntentsForOneId, NodeIntent_Local,
   SubscribeeTextClaim, SubscribeeVisibility };
-use skg::types::misc::{ID, SourceName};
+use skg::types::misc::{ID, RepoName};
 use skg::types::nodes::complete::FileProperty;
 
 fn title_intent (
   title : &str,
 ) -> NodeIntent_Local {
   NodeIntent_Local::SetTitleAndBody {
-    source : SourceName::from ("main"),
+    repo : RepoName::from ("main"),
     title  : title . to_string(),
     body   : None } }
 
 fn delete_intent (
 ) -> NodeIntent_Local {
   NodeIntent_Local::Delete {
-    source : SourceName::from ("main") } }
+    repo : RepoName::from ("main") } }
 
 #[test]
 fn exclusive_slot_rules () {

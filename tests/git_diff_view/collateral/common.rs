@@ -26,22 +26,22 @@ new body
 ";
 
 /// Create a git repo with head->worktree transition from collateral fixtures.
-pub fn setup_git_repo_with_fixtures(
-  repo_path: &Path,
+pub fn setup_gitrepo_with_fixtures(
+  gitrepo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {
-  super::super::common::setup_git_repo_with_fixtures(
-    repo_path,
+  super::super::common::setup_gitrepo_with_fixtures(
+    gitrepo_path,
     "tests/git_diff_view/collateral/fixtures/head",
     "tests/git_diff_view/collateral/fixtures/worktree",
   )
 }
 
 /// Same transition, but staged (index == worktree, both differ from HEAD).
-pub fn setup_git_repo_with_fixtures_staged(
-  repo_path: &Path,
+pub fn setup_gitrepo_with_fixtures_staged(
+  gitrepo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {
-  super::super::common::setup_git_repo_with_fixtures_staged(
-    repo_path,
+  super::super::common::setup_gitrepo_with_fixtures_staged(
+    gitrepo_path,
     "tests/git_diff_view/collateral/fixtures/head",
     "tests/git_diff_view/collateral/fixtures/worktree",
   )

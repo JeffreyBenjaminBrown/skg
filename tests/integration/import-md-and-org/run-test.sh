@@ -25,7 +25,7 @@ export SKG_TEST_SOURCE_DIR="$TEMP_ROOT/owned/source"
 
 AVAILABLE_PORT="$(find_available_port)"
 TEMP_CONFIG="$(mktemp "$TEMP_ROOT/skgconfig-XXXXXX.toml")"
-printf 'tantivy_folder = "%s"\nport = %s\nowned_folder = "owned"\nbeep_when_server_becomes_available = false\n\n[[sources]]\nname = "main"\npath = "owned/source"\n' \
+printf 'tantivy_folder = "%s"\nport = %s\nowned_folder = "owned"\nbeep_when_server_becomes_available = false\n\n[[repos]]\nname = "main"\npath = "owned/source"\n' \
   "$TEMP_ROOT/index" "$AVAILABLE_PORT" > "$TEMP_CONFIG"
 
 start_skg_server

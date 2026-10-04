@@ -31,7 +31,7 @@ local function trimmed_lines (file)
   return lines
 end
 
----The array-table name from LINE ('[[sources]]' -> 'sources'), or nil.
+---The array-table name from LINE ('[[repos]]' -> 'repos'), or nil.
 ---@param line string
 ---@return string|nil
 function M.toml_array_table_line_name (line)
@@ -90,7 +90,7 @@ function M.owned_sources_from_toml (file)
     current_name, current_path = nil, nil
   end
   for _, line in ipairs(trimmed_lines(file)) do
-    if line:match('^%[%[sources%]%]') then
+    if line:match('^%[%[repos%]%]') then
       flush(); in_sources = true
     elseif line:match('^%[%[') then
       flush(); in_sources = false
@@ -127,10 +127,10 @@ end
 ---@param file string
 ---@return string[] configured source names
 function M.source_names_from_toml (file)
-  return M.table_names_from_toml(file, 'sources')
+  return M.table_names_from_toml(file, 'repos')
 end
 
----Pairs of {name, absolute dir} for each [[sources]] entry in FILE.
+---Pairs of {name, absolute dir} for each [[repos]] entry in FILE.
 ---Relative source paths are resolved against the directory of FILE,
 ---matching what the server's 'make_paths_absolute' does at
 ---config-load time.
@@ -160,7 +160,7 @@ function M.source_paths_from_toml (file)
       current_table = new_table
       current_name = nil
       current_path = nil
-    elseif current_table == 'sources' then
+    elseif current_table == 'repos' then
       local path = line:match('^path[ \t]*=[ \t]*"([^"]+)"')
       local name = line:match('^name[ \t]*=[ \t]*"([^"]+)"')
       if path then current_path = path end

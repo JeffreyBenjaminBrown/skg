@@ -1,15 +1,15 @@
-tantivy_folder = "/tmp/tantivy-test-multi-source-errors"
+tantivy_folder = "/tmp/tantivy-test-multi-repo-errors"
 port = 1730
 beep_when_server_becomes_available = false
 
-[[sources]]
+[[repos]]
 name = "public"
 path = "owned/public"
 
-[[sources]]
+[[repos]]
 name = "private"
 path = "owned/private"
 
-[[sources]]
+[[repos]]
 name = "ext"
 path = "ext"

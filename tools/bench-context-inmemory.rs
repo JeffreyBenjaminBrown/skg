@@ -17,7 +17,7 @@ use skg::context::{
 };
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::filesystem::multiple_nodes::error_unless_each_id_names_one_node;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use skg::dbs::init::create_empty_tantivy_index;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::nodes::tantivy::NodeTantivy;
@@ -41,7 +41,7 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
   // Step 1: Read all .skg files
   let t0 : Instant = Instant::now ();
   let nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources (&config) ?;
+    read_all_skg_files_from_repos (&config) ?;
   error_unless_each_id_names_one_node (
     &nodes, &config . data_root) ?;
   let read_time : f64 = t0 . elapsed () . as_secs_f64 ();

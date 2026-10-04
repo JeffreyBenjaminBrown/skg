@@ -2,31 +2,31 @@
 /// A phantom is a display-only placeholder for a removed node.
 
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
+use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use super::git::{ExistenceAxes, MembershipAxes, NodeCompleteDiff, Sign, SourceDiff, existence_axes_in_source_diff};
+use super::git::{ExistenceAxes, MembershipAxes, NodeCompleteDiff, Sign, RepoDiff, existence_axes_in_repo_diff};
 use super::list::Diff_Item;
-use super::misc::{ID, SkgConfig, SkgfileSource, SourceName};
+use super::misc::{ID, SkgConfig, SkgfileRepo, RepoName};
 
 /// Unified title lookup for phantom nodes.
-/// Lookup order: source_diffs deleted_nodes → in-Rust graph/disk → fallback.
+/// Lookup order: repo_diffs deleted_nodes → in-Rust graph/disk → fallback.
 pub fn title_for_phantom (
   graph        : &InRustGraph,
   id           : &ID,
-  source       : &SourceName,
-  source_diffs : Option<&HashMap<SourceName, SourceDiff>>,
+  repo       : &RepoName,
+  repo_diffs : Option<&HashMap<RepoName, RepoDiff>>,
   config       : &SkgConfig,
 ) -> String {
-  source_diffs
-    . and_then( |diffs| diffs . get (source) )
+  repo_diffs
+    . and_then( |diffs| diffs . get (repo) )
     . and_then( |sd| sd . deleted_nodes . get (id) )
     . map( |n| n . title . clone() )
-    . or_else( || nodecomplete_rustFirst_by_pid_and_source (
-                    graph, config, id, source )
+    . or_else( || nodecomplete_rustFirst_by_pid_and_repo (
+                    graph, config, id, repo )
                   . ok() . map( |n| n . title ) )
     . unwrap_or_else( || format!( "TITLE NOT FOUND for ID {}", id . 0 )) }
 
@@ -45,18 +45,18 @@ pub fn title_for_phantom (
 /// then removed unstaged).
 pub fn phantom_axes (
   child_id      : &ID,
-  child_source  : &SourceName,
+  child_repo  : &RepoName,
   parent_id     : &ID,
-  parent_source : &SourceName,
+  parent_repo : &RepoName,
   relation      : NodeRelation, // the relation the caller's folder represents
-  source_diffs  : Option<&HashMap<SourceName, SourceDiff>>,
+  repo_diffs  : Option<&HashMap<RepoName, RepoDiff>>,
 ) -> (ExistenceAxes, MembershipAxes) {
   // Existence: the child's own file-level status in each stage.
   let child_file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", child_id . 0 ) );
   let existence : ExistenceAxes =
-    existence_axes_in_source_diff (
-      source_diffs . and_then ( |d| d . get (child_source) ),
+    existence_axes_in_repo_diff (
+      repo_diffs . and_then ( |d| d . get (child_repo) ),
       &child_file );
 
   // Membership: the child's presence in the parent's list for the
@@ -67,8 +67,8 @@ pub fn phantom_axes (
   // ID in two relations, changed in different stages).
   let parent_file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", parent_id . 0 ) );
-  let parent_sd : Option<&SourceDiff> =
-    source_diffs . and_then ( |d| d . get (parent_source) );
+  let parent_sd : Option<&RepoDiff> =
+    repo_diffs . and_then ( |d| d . get (parent_repo) );
   let sign_from_parent_stage =
     | stage_map : &HashMap<PathBuf, NodeCompleteDiff> | -> Option<Sign> {
       let nc = stage_map . get (&parent_file)
@@ -90,7 +90,7 @@ pub fn phantom_axes (
   // per-stage diff carries no signal for this child. A per-stage
   // signal is genuinely unavailable in two cases: (a) the parent's
   // file is not listed as Modified in either stage map (no
-  // NodeChanges exists -- e.g. its source_diff is absent entirely),
+  // NodeChanges exists -- e.g. its repo_diff is absent entirely),
   // yet the caller's goal-list computation still found a
   // HEAD-side-only member; (b) a filter folder, whose DERIVED membership
   // can change while no single input relation's diff names the child
@@ -105,11 +105,11 @@ pub fn phantom_axes (
 
 /// A node's HOME read from disk. When owned and non-owned files use
 /// the same pid, the owned telescope wins; otherwise the home is
-/// the most public source holding a section. Returns None if no
-/// source holds one.
+/// the most public repo holding a section. Returns None if no
+/// repo holds one.
 ///
-/// Walks 'ordered_sources' (the privacy order, most public first),
-/// never 'config.sources' -- that is a HashMap, whose iteration
+/// Walks 'ordered_repos' (the privacy order, most public first),
+/// never 'config.repos' -- that is a HashMap, whose iteration
 /// order Rust randomizes per process, so returning its first hit
 /// answered arbitrarily for any node with more than one section.
 /// Since the home is DEFINITIONALLY the most public section
@@ -119,19 +119,19 @@ pub fn phantom_axes (
 pub fn home_from_disk (
   id     : &ID,
   config : &SkgConfig,
-) -> Option<SourceName> {
+) -> Option<RepoName> {
   let filename : String = format!( "{}.skg", id . 0 );
-  let ordered_sources : Vec<SourceName> = config . ordered_sources ();
+  let ordered_repos : Vec<RepoName> = config . ordered_repos ();
   for owned_only in [true, false] {
-    for source_name in &ordered_sources {
-      if config . user_owns_source (source_name) != owned_only {
+    for repo_name in &ordered_repos {
+      if config . user_owns_repo (repo_name) != owned_only {
         continue; }
-      let Some (source_config) : Option<&SkgfileSource> =
-        config . sources . get (source_name) else { continue; };
+      let Some (repo_config) : Option<&SkgfileRepo> =
+        config . repos . get (repo_name) else { continue; };
       let path : PathBuf =
-        PathBuf::from( &source_config . path ) . join (&filename);
+        PathBuf::from( &repo_config . path ) . join (&filename);
       if path . exists() {
-        return Some( source_name . clone () ); }} }
+        return Some( repo_name . clone () ); }} }
   None }
 
 #[cfg(test)]

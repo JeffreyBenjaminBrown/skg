@@ -49,7 +49,7 @@ Returns the absolute data-root path."
       (insert "tantivy_folder = \".idx\"\n"
               "port = 9999\n"
               "beep_when_server_becomes_available = false\n\n"
-              "[[sources]]\n"
+              "[[repos]]\n"
               "name = \"main\"\n"
               "path = \"main\"\n"
               ""))

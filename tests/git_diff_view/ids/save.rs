@@ -32,7 +32,7 @@ async fn test_delete_id_folder_scaffold_respawns (
   run_save_test(
     s,
     "skg-test-save-del-idFolder",
-    |config, tantivy, repo_path| { Box::pin(async move {
+    |config, tantivy, gitrepo_path| { Box::pin(async move {
       // User deletes the entire idFolder scaffold (and its children)
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "skg id");
@@ -49,7 +49,7 @@ async fn test_delete_id_folder_scaffold_respawns (
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: 1.skg should still have the worktree ids
-      let node_1 = read_nodecomplete(repo_path, "1")?;
+      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
       assert!(node_1 . all_ids () . any(|id| id == &ID("1" . to_string())),
         "1.skg should still have id '1'");
       assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
@@ -74,7 +74,7 @@ async fn test_delete_id_scaffolds_aborts (
   run_save_test(
     s,
     "skg-test-save-del-ids",
-    |config, tantivy, repo_path| { Box::pin(async move {
+    |config, tantivy, gitrepo_path| { Box::pin(async move {
       // User deletes the id scaffolds but keeps the idFolder
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "(skg id)");
@@ -98,7 +98,7 @@ async fn test_delete_id_scaffolds_aborts (
         "the error should be IDFolder_Edited: {}", err);
 
       // DISK: 1.skg should still have the worktree ids
-      let node_1 = read_nodecomplete(repo_path, "1")?;
+      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
       assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
       Ok(()) }) }) . await
@@ -113,7 +113,7 @@ async fn test_edit_id_scaffold_aborts (
   run_save_test(
     s,
     "skg-test-save-edit-id",
-    |config, tantivy, repo_path| { Box::pin(async move {
+    |config, tantivy, gitrepo_path| { Box::pin(async move {
       // User tries to change an id value in the scaffold
       let input = GIT_DIFF_VIEW . replace(
         "(unstaged newM)) 2'", "(unstaged newM)) 2-modified");
@@ -137,7 +137,7 @@ async fn test_edit_id_scaffold_aborts (
         "the error should be IDFolder_Edited: {}", err);
 
       // DISK: 1.skg should still have the original worktree ids
-      let node_1 = read_nodecomplete(repo_path, "1")?;
+      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
       assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
       assert!(!node_1 . all_ids () . any(|id| id == &ID("2-modified" . to_string())),
@@ -154,7 +154,7 @@ async fn test_reorder_id_scaffolds_saves (
   run_save_test(
     s,
     "skg-test-save-reorder-ids",
-    |config, tantivy, _repo_path| { Box::pin(async move {
+    |config, tantivy, _gitrepo_path| { Box::pin(async move {
       let input = GIT_DIFF_VIEW
         // Swap the two plain id lines (1 and 3).
         . replace ("*** (skg id) 1", "*** (skg id) SWAP")
@@ -185,7 +185,7 @@ async fn test_move_id_scaffolds_to_child_aborts (
   run_save_test(
     s,
     "skg-test-save-move-ids",
-    |config, tantivy, repo_path| { Box::pin(async move {
+    |config, tantivy, gitrepo_path| { Box::pin(async move {
       // User moves id scaffolds to be children of 'child' node
       let input = "\
 * (skg (node (id 1) (source main))) 1
@@ -216,14 +216,14 @@ async fn test_move_id_scaffolds_to_child_aborts (
         "the error should be IDFolder_Edited: {}", err);
 
       // DISK: child.skg should not have any new ids
-      let node_child = read_nodecomplete(repo_path, "child")?;
+      let node_child = read_nodecomplete(gitrepo_path, "child")?;
       assert_eq!(1 + node_child . extra_ids . len(), 1,
         "child.skg should still only have its original id");
       assert_eq!(&node_child . pid, &ID("child" . to_string()),
         "child.skg should still have id 'child'");
 
       // DISK: 1.skg should still have its ids
-      let node_1 = read_nodecomplete(repo_path, "1")?;
+      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
       assert!(node_1 . all_ids () . any(|id| id == &ID("2'" . to_string())),
         "1.skg should still have id '2''");
       Ok(()) }) }) . await
@@ -242,7 +242,7 @@ async fn test_delete_id_folder_scaffold_respawns_staged (
   run_save_test_staged(
     s,
     "skg-test-save-del-idFolder-staged",
-    |config, tantivy, _repo_path| { Box::pin(async move {
+    |config, tantivy, _gitrepo_path| { Box::pin(async move {
       let input = without_lines_containing(
         GIT_DIFF_VIEW_STAGED, "skg id");
 
@@ -280,7 +280,7 @@ where
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 {
   run_save_test_with_setup(
-    s, subtest_name, setup_git_repo_with_fixtures, test_fn) . await
+    s, subtest_name, setup_gitrepo_with_fixtures, test_fn) . await
 }
 
 async fn run_save_test_staged<F>(
@@ -297,7 +297,7 @@ where
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 {
   run_save_test_with_setup(
-    s, subtest_name, setup_git_repo_with_fixtures_staged, test_fn) . await
+    s, subtest_name, setup_gitrepo_with_fixtures_staged, test_fn) . await
 }
 
 async fn run_save_test_with_setup<S, F>(
@@ -316,9 +316,9 @@ where
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 {
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir . path();
-  setup (repo_path)?;
-  s . reset_with_source_path (subtest_name, repo_path) ?;
+  let gitrepo_path = temp_dir . path();
+  setup (gitrepo_path)?;
+  s . reset_with_repo_path (subtest_name, gitrepo_path) ?;
 
-  test_fn(&s . config, &mut s . tantivy, repo_path) . await
+  test_fn(&s . config, &mut s . tantivy, gitrepo_path) . await
 }

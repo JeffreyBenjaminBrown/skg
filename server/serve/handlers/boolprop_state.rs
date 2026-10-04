@@ -6,7 +6,7 @@ use crate::dbs::node_lookup::nodecomplete_from_graph;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, value_from_request_sexp};
 use crate::types::env::SkgEnv;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::nodes::complete::{
   FileProperty, file_property_is_true};
 
@@ -34,13 +34,13 @@ fn boolprop_state_response_body (
   let property_name : String = value_from_request_sexp ("property", request) ?;
   let property : FileProperty = FileProperty::from_wire_name (&property_name)
     . ok_or_else (|| format! ("unknown property '{}'", property_name)) ?;
-  let (pid, source, value, owned) = boolprop_state (
+  let (pid, repo, value, owned) = boolprop_state (
     &runtime . graph, &runtime . config, &id, property) ?;
   Ok (format! (
     "(id {}) (property {}) (value {}) (source {}) (user-owned {})",
     quoted (&pid . 0), quoted (property . wire_name ()),
     quoted (if value { "true" } else { "false" }),
-    quoted (&source . 0), quoted (if owned { "true" } else { "false" })))
+    quoted (&repo . 0), quoted (if owned { "true" } else { "false" })))
 }
 
 pub fn boolprop_state (
@@ -48,14 +48,14 @@ pub fn boolprop_state (
   config   : &SkgConfig,
   id       : &ID,
   property : FileProperty,
-) -> Result<(ID, SourceName, bool, bool), String> {
-  let (pid, source) : (ID, SourceName) = graph . pid_and_source (id)
+) -> Result<(ID, RepoName, bool, bool), String> {
+  let (pid, repo) : (ID, RepoName) = graph . pid_and_repo (id)
     . ok_or_else (|| format! ("id '{}' is not in the graph", id)) ?;
   let node = nodecomplete_from_graph (graph, &pid)
     . ok_or_else (|| format! ("canonical id '{}' is not in the graph", pid)) ?;
   let value : bool = file_property_is_true (&node . misc, property);
-  let user_owned : bool = config . user_owns_source (&source);
-  Ok ((pid, source, value, user_owned))
+  let user_owned : bool = config . user_owns_repo (&repo);
+  Ok ((pid, repo, value, user_owned))
 }
 
 fn quoted (s : &str) -> String {

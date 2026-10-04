@@ -1,13 +1,13 @@
 //! The single release policy for textual data from overPrivateText telescopes.
 //!
-//! Folding may select a title or body below the node's home source. That is
-//! safe to hold internally, but a restricted source-set must not release it
+//! Folding may select a title or body below the node's home repo. That is
+//! safe to hold internally, but a restricted repo-set must not release it
 //! without an explicit approval for the affected PID. The reserved 'all'
-//! source-set may release it, with a warning.
+//! repo-set may release it, with a warning.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::protocol::TcpToClient;
-use crate::source_sets::ActiveSourceSet;
+use crate::repo_sets::ActiveRepoSet;
 use crate::types::misc::ID;
 use crate::types::sexp::extract_string_list_from_sexp;
 use crate::types::viewnode::{
@@ -89,7 +89,7 @@ pub fn search_challenge_response () -> String {
 /// extra ID cannot evade the telescope-coarse policy.
 pub fn decide (
   operation      : &str,
-  active         : &ActiveSourceSet,
+  active         : &ActiveRepoSet,
   candidate_pids : &[ID],
   graph          : &InRustGraph,
   approved_pids  : &HashSet<ID>,
@@ -101,10 +101,10 @@ pub fn decide (
 }
 
 /// Apply the shared policy when a caller has classified overPrivateTextness from a
-/// source other than the live graph, such as deleted-node diff data.
+/// repo other than the live graph, such as deleted-node diff data.
 pub fn decide_for_overPrivateText_pids (
   operation     : &str,
-  active        : &ActiveSourceSet,
+  active        : &ActiveRepoSet,
   mut overPrivateText_pids : Vec<ID>,
   approved_pids : &HashSet<ID>,
 ) -> TextReleaseDecision {
@@ -238,25 +238,25 @@ fn pair (
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::source_sets::SourceSetName;
-  use crate::types::misc::SourceName;
+  use crate::repo_sets::RepoSetName;
+  use crate::types::misc::RepoName;
   use crate::types::nodes::complete::{
     NodeComplete, empty_node_complete};
 
   fn graph_with_overPrivateText_node () -> InRustGraph {
     let mut node : NodeComplete = empty_node_complete ();
     node . pid = ID::from ("overPrivateText-pid");
-    node . source = SourceName::from ("home");
+    node . home_repo = RepoName::from ("home");
     node . title = "SECRET title" . to_string ();
     node . extra_ids = vec! [ID::from ("extra-id")];
     node . overPrivateText_telescope = true;
     InRustGraph::from_nodecompletes (&[node])
   }
 
-  fn restricted () -> ActiveSourceSet {
-    ActiveSourceSet {
-      name    : SourceSetName::from ("public"),
-      sources : [SourceName::from ("home")]
+  fn restricted () -> ActiveRepoSet {
+    ActiveRepoSet {
+      name    : RepoSetName::from ("public"),
+      repos : [RepoName::from ("home")]
                 . into_iter () . collect (),
     }
   }

@@ -3,7 +3,7 @@
 use crate::context::{MapToContent, MapToContainers};
 use crate::context::{content_maps_from_nodes, had_id_set_from_nodes};
 use crate::context::mentioned_ids_from_nodes;
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_collecting_violations;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos_collecting_violations;
 use crate::dbs::tantivy::{mk_tantivy_schema, tantivy_index_from_index};
 use crate::dbs::tantivy::write::update_index_with_nodes;
 use crate::types::env::SkgEnv;
@@ -48,7 +48,7 @@ pub fn initialize_dbs (
   tracing::info! ("Reading authoritative .skg files from all sources...");
   let (nodes, load_violations)
     : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
-    read_all_skg_files_from_sources_collecting_violations (config)
+    read_all_skg_files_from_repos_collecting_violations (config)
     . unwrap_or_else (|e| {
       tracing::error! ("Failed to read .skg files: {}", e);
       std::process::exit (1); });
@@ -64,7 +64,7 @@ pub fn initialize_dbs (
     &graph_warnings, &config . data_root ) {
     tracing::warn! (error = %e, "could not write the telescope report"); }
   tracing::info! (
-    files = nodes . len (), sources = config . sources . len (),
+    files = nodes . len (), repos = config . repos . len (),
     ".skg files read and graph validated");
   let tantivy_index = wipe_then_init_tantivy_db_with_logs_and_errors (
     config, &nodes);
@@ -189,7 +189,7 @@ pub fn create_empty_tantivy_index (
 
 /// An empty in-RAM Tantivy index (no folder IO, nothing wiped). Used to build a
 /// SkgEnv for a DE-NOVO render driven through post-save view completion in paths/tests
-/// that have no real tantivy on hand: find_source falls back past an empty index
+/// that have no real tantivy on hand: find_repo falls back past an empty index
 /// to the in-Rust graph / disk, so the index's contents don't matter there.
 pub fn empty_in_ram_tantivy_index (
 ) -> Result<TantivyIndex, Box<dyn Error>> {

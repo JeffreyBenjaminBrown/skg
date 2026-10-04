@@ -5,43 +5,43 @@
 //! dependencies-manifest; decided in 4_discussion, "lets Skg
 //! automatically generate a DEPENDENCIES.toml").
 //!
-//! PUBLISHER half: at init, every OWNED source directory gets a
+//! PUBLISHER half: at init, every OWNED Skg repo directory gets a
 //! DEPENDENCIES.toml whose `dependencies` is a list of pairs, one per
-//! source its telescope sections may reference -- itself and
-//! everything more public, in privacy order, the source itself last.
-//! Each pair says where a receiver can fetch that source: `path`
+//! Skg repo its telescope sections may reference -- itself and
+//! everything more public, in privacy order, the Skg repo itself last.
+//! Each pair says where a receiver can fetch that Skg repo: `path`
 //! (data-root-relative, author-namespaced, which is what a receiver
-//! actually downloads) and `git-remote` (the source repo's fetch URL,
+//! actually downloads) and `git-remote` (the Skg repo's fetch URL,
 //! `origin` preferred, else the first remote with its name recorded
-//! in `git-remote-name`; omitted when the source is not a git repo or
-//! has no remote). The last pair is the manifest's own source, so its
+//! in `git-remote-name`; omitted when the Skg repo is not a git repo or
+//! has no remote). The last pair is the manifest's own Skg repo, so its
 //! own remote falls out for free. skg makes no use of the git-remote
 //! values itself. Clobbering a preexisting manifest is a feature;
 //! writes are byte-stable.
 //!
-//! RECEIVER half: at config validation, a FOREIGN source carrying a
-//! manifest is read, its entries matched to the receiver's sources
+//! RECEIVER half: at config validation, a FOREIGN Skg repo carrying a
+//! manifest is read, its entries matched to the receiver's repos
 //! by final path component (the repo name -- the receiver's author
 //! folder for the publisher differs from the publisher's "owned").
 //! When the receiver's privacy order contradicts the manifest's
 //! relative order, warn and suggest the fix; never reorder
 //! automatically.
 
-use crate::git_ops::read_repo::source_git_remote;
-use crate::types::misc::{SkgConfig, SourceName};
+use crate::git_ops::read_gitrepo::repo_git_remote;
+use crate::types::misc::{SkgConfig, RepoName};
 
 use std::io;
 use std::path::PathBuf;
 
 /// Quote a value as a TOML basic string, escaping the two characters
 /// that would otherwise break out of the quotes. Enough for git
-/// remote URLs and source paths, which carry no control characters.
+/// remote URLs and Skg repo paths, which carry no control characters.
 fn toml_basic_string (s : &str) -> String {
   let escaped : String =
     s . replace ('\\', "\\\\") . replace ('"', "\\\"");
   format! ("\"{}\"", escaped) }
 
-/// One `dependencies` entry: a source a manifest's telescope sections
+/// One `dependencies` entry: a Skg repo a manifest's telescope sections
 /// may reference, and where a receiver can fetch it.
 struct DependencyEntry {
   path   : String,                    // data-root-relative directory
@@ -50,7 +50,7 @@ struct DependencyEntry {
 
 /// Render a `DependencyEntry` as one inline-table line of the
 /// `dependencies` list: `{ path = "...", git-remote = "..." },`.
-/// `git-remote` is omitted when the source has no remote;
+/// `git-remote` is omitted when the Skg repo has no remote;
 /// `git-remote-name` appears only for a non-`origin` remote.
 fn render_dependency_entry (entry : &DependencyEntry) -> String {
   let mut fields : String =
@@ -64,32 +64,32 @@ fn render_dependency_entry (entry : &DependencyEntry) -> String {
         toml_basic_string (remote_name) )); }}
   format! ("  {{ {} }},\n", fields) }
 
-/// The publisher half. Call after config load; returns the sources
+/// The publisher half. Call after config load; returns the repos
 /// whose manifests were (re)written.
 pub fn write_dependencies_manifests (
   config : &SkgConfig,
-) -> io::Result<Vec<SourceName>> {
-  let ordered : Vec<SourceName> = config . ordered_sources ();
-  let mut written : Vec<SourceName> = Vec::new ();
+) -> io::Result<Vec<RepoName>> {
+  let ordered : Vec<RepoName> = config . ordered_repos ();
+  let mut written : Vec<RepoName> = Vec::new ();
   for (position, name) in ordered . iter () . enumerate () {
-    if ! config . user_owns_source (name) { continue; }
-    let Some (source) = config . sources . get (name) else {
+    if ! config . user_owns_repo (name) { continue; }
+    let Some (skgrepo) = config . repos . get (name) else {
       continue; };
-    if ! source . path . is_dir () { continue; }
+    if ! skgrepo . path . is_dir () { continue; }
     let dependencies : Vec<DependencyEntry> =
       ordered [..= position] . iter ()
       . filter_map ( |n| {
-          let dep_source = config . sources . get (n) ?;
+          let dep_repo = config . repos . get (n) ?;
           let path : String =
-            dep_source . path
+            dep_repo . path
             . strip_prefix ( &config . data_root )
             . map ( |p| p . to_string_lossy () . into_owned () )
             . unwrap_or_else (
-              |_| dep_source . path
+              |_| dep_repo . path
                   . to_string_lossy () . into_owned () );
           Some ( DependencyEntry {
             path,
-            remote : source_git_remote (&dep_source . path), } ) } )
+            remote : repo_git_remote (&dep_repo . path), } ) } )
       . collect ();
     let content : String = {
       let mut c : String = String::new ();
@@ -114,7 +114,7 @@ pub fn write_dependencies_manifests (
       c . push_str ("]\n");
       c };
     let manifest_path : PathBuf =
-      source . path . join ("DEPENDENCIES.toml");
+      skgrepo . path . join ("DEPENDENCIES.toml");
     let unchanged : bool = // byte-stability
       std::fs::read_to_string (&manifest_path)
       . map ( |old| old == content )
@@ -141,7 +141,7 @@ fn dependency_entry_path (e : &toml::Value) -> Option<String> {
 pub fn foreign_manifest_order_warnings (
   config : &SkgConfig,
 ) -> Vec<String> {
-  let ordered : Vec<SourceName> = config . ordered_sources ();
+  let ordered : Vec<RepoName> = config . ordered_repos ();
   let final_component = |p : &std::path::Path| -> Option<String> {
     p . components () . next_back ()
       . and_then ( |c| match c {
@@ -149,18 +149,18 @@ pub fn foreign_manifest_order_warnings (
           Some ( s . to_string_lossy () . into_owned () ),
         _ => None } ) };
   // receiver position by repo name (final path component)
-  let receiver_position_of = |repo : &str| -> Option<usize> {
+  let receiver_position_of = |gitrepo : &str| -> Option<usize> {
     ordered . iter () . position ( |n|
-      config . sources . get (n)
+      config . repos . get (n)
       . and_then ( |s| final_component ( &s . path ))
-      . as_deref () == Some (repo) ) };
+      . as_deref () == Some (gitrepo) ) };
   let mut warnings : Vec<String> = Vec::new ();
   for name in &ordered {
-    if config . user_owns_source (name) { continue; }
-    let Some (source) = config . sources . get (name) else {
+    if config . user_owns_repo (name) { continue; }
+    let Some (skgrepo) = config . repos . get (name) else {
       continue; };
     let manifest_path : PathBuf =
-      source . path . join ("DEPENDENCIES.toml");
+      skgrepo . path . join ("DEPENDENCIES.toml");
     let Ok (contents) =
       std::fs::read_to_string (&manifest_path) else { continue; };
     let entries : Vec<String> =
@@ -176,17 +176,17 @@ pub fn foreign_manifest_order_warnings (
     // has, must appear in the receiver's order.
     let mut last : Option<(String, usize)> = None;
     for entry in &entries {
-      let repo : Option<String> =
+      let gitrepo : Option<String> =
         final_component ( std::path::Path::new (entry) );
-      let Some (repo) = repo else { continue; };
-      let Some (position) = receiver_position_of (&repo) else {
+      let Some (gitrepo) = gitrepo else { continue; };
+      let Some (position) = receiver_position_of (&gitrepo) else {
         continue; };
-      if let Some ((prev_repo, prev_position)) = &last {
+      if let Some ((prev_gitrepo, prev_position)) = &last {
         if position < *prev_position {
           warnings . push ( format! (
-            "Source '{}' ships a DEPENDENCIES.toml placing '{}' more public than '{}', but this config orders them the other way. Telescopes spanning them will fold in the publisher-unintended order; consider reordering [[sources]].",
-            name, prev_repo, repo )); }}
-      last = Some ((repo, position)); }}
+            "Source '{}' ships a DEPENDENCIES.toml placing '{}' more public than '{}', but this config orders them the other way. Telescopes spanning them will fold in the publisher-unintended order; consider reordering [[repos]].",
+            name, prev_gitrepo, gitrepo )); }}
+      last = Some ((gitrepo, position)); }}
   warnings }
 
 #[cfg(test)]

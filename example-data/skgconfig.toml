@@ -1,22 +1,22 @@
 tantivy_folder = ".index.tantivy"
 port = 1730 # TCP port for Rust-Emacs API communication.
-default_source_set = "public"
+default_repo_set = "public"
 
-# Sources are listed in PRIVACY ORDER: most public first, most
-# private last. That order defines the available source-sets: each
-# source names the set consisting of itself and everything more
+# Repos are listed in PRIVACY ORDER: most public first, most
+# private last. That order defines the available repo-sets: each
+# repo names the set consisting of itself and everything more
 # public (a prefix of this list), and the reserved name "all" means
-# every source. default_source_set above names the set active when a
-# client connects: here, just the "public" source.
+# every repo. default_repo_set above names the set active when a
+# client connects: here, just the "public" repo.
 
-[[sources]]
+[[repos]]
 name = "public"
 path = "owned/public"
 
-[[sources]]
+[[repos]]
 name = "private"
 path = "owned/private"
 
-[[sources]]
+[[repos]]
 name = "Fred"
 path = "Fred"

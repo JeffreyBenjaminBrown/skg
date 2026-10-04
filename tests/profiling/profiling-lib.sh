@@ -51,7 +51,7 @@ beep_when_server_becomes_available = false
 initial_node_limit = 5000
 timing_log = true
 
-[[sources]]
+[[repos]]
 nickname = "main"
 path = "$DATA_DIR"
 user_owns_it = true

@@ -18,7 +18,7 @@ use skg::dbs::tantivy::background_writer::{
 };
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::types::env::new_mutation_gate;
-use skg::types::misc::{ID, RelPartner, SourceName};
+use skg::types::misc::{ID, RelPartner, RepoName};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::nodes::rust::NodeRust;
 use skg::types::save::{DefineNode, DeleteNode, SaveNode};
@@ -31,11 +31,11 @@ use tokio::sync::{Barrier, Notify};
 fn save (pid : &str) -> DefineNode {
   DefineNode::Save ( SaveNode (node (pid, "", "main")) ) }
 
-fn node (pid : &str, title : &str, source : &str) -> NodeComplete {
+fn node (pid : &str, title : &str, repo : &str) -> NodeComplete {
   let mut node = empty_node_complete ();
   node . pid = ID::from (pid);
   node . title = title . to_string ();
-  node . source = SourceName::from (source);
+  node . home_repo = RepoName::from (repo);
   node }
 
 fn complete_from_rust (node : &NodeRust) -> NodeComplete {
@@ -43,7 +43,7 @@ fn complete_from_rust (node : &NodeRust) -> NodeComplete {
     title : node . title . clone (),
     overPrivateText_telescope : node . overPrivateText_telescope,
     aliases : node . aliases . clone (),
-    source : node . source . clone (),
+    home_repo : node . home_repo . clone (),
     pid : node . pid . clone (),
     extra_ids : node . extra_ids . clone (),
     body : node . body . clone (),
@@ -136,8 +136,8 @@ fn shared_mutation_gate_serializes_snapshot_capture_and_preserves_both_writes ()
 #[test]
 fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
   let mut owner = node ("owner", "owner", "main");
-  owner . contains = vec! [ RelPartner::at_relSource (
-    SourceName::from ("main"), ID::from ("acquiree")) ];
+  owner . contains = vec! [ RelPartner::at_relRepo (
+    RepoName::from ("main"), ID::from ("acquiree")) ];
   let initial = vec! [
     owner . clone (),
     node ("acquiree", "old", "main"),
@@ -165,7 +165,7 @@ fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
         DefineNode::Save (SaveNode (merged)),
         DefineNode::Save (SaveNode (rewritten_owner)),
         DefineNode::Delete (DeleteNode {
-          id : ID::from ("acquiree"), source : SourceName::from ("main") }),
+          id : ID::from ("acquiree"), home_repo : RepoName::from ("main") }),
       ];
       let mut candidate = (*snapshot) . clone ();
       apply_definenodes_to_inRustGraph (&mut candidate, &instructions);
@@ -181,8 +181,8 @@ fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
       let mut observer = node ("observer", "observer", "main");
       // The request still names the acquiree.  Applying against the
       // post-merge snapshot must canonicalize its inverse entry.
-      observer . contains = vec! [ RelPartner::at_relSource (
-        SourceName::from ("main"), ID::from ("acquiree")) ];
+      observer . contains = vec! [ RelPartner::at_relRepo (
+        RepoName::from ("main"), ID::from ("acquiree")) ];
       publish_from_snapshot (
         &handle, &snapshot, &DefineNode::Save (SaveNode (observer))); };
     join! (merge_delete, save_after); });
@@ -195,7 +195,7 @@ fn save_after_merge_delete_resolves_the_acquiree_to_the_merged_node () {
   assert! (inbound . contains (&ID::from ("observer"))); }
 
 #[test]
-fn save_plan_captured_after_source_move_preserves_the_new_source () {
+fn save_plan_captured_after_repo_move_preserves_the_new_repo () {
   let initial = node ("moved", "old title", "main");
   let handle = new_handle (InRustGraph::from_nodecompletes (&[initial]));
   let gate = new_mutation_gate ();
@@ -206,7 +206,7 @@ fn save_plan_captured_after_source_move_preserves_the_new_source () {
     let gate_a = gate . clone ();
     let entered_a = move_entered . clone ();
     let release_a = release_move . clone ();
-    let source_move = async {
+    let repo_move = async {
       let _guard = gate_a . lock () . await;
       let snapshot = handle . load_full ();
       entered_a . notify_one ();
@@ -230,11 +230,11 @@ fn save_plan_captured_after_source_move_preserves_the_new_source () {
       edited . title = "edited after move" . to_string ();
       publish_from_snapshot (
         &handle, &snapshot, &DefineNode::Save (SaveNode (edited))); };
-    join! (source_move, edit_after_move); });
+    join! (repo_move, edit_after_move); });
 
   let graph = handle . load_full ();
   let moved = graph . get (&ID::from ("moved")) . unwrap ();
-  assert_eq! (moved . source, SourceName::from ("private"));
+  assert_eq! (moved . home_repo, RepoName::from ("private"));
   assert_eq! (moved . title, "edited after move");
   assert_eq! (graph . pid_of (&ID::from ("former-id")), Some (ID::from ("moved"))); }
 

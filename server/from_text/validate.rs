@@ -1,11 +1,11 @@
-use crate::from_text::fork::{CloneSourceInputs, fork_spec_from_buffer_node};
-use crate::source_sets::ActiveSourceSet;
+use crate::from_text::fork::{CloneRepoInputs, fork_spec_from_buffer_node};
+use crate::repo_sets::ActiveRepoSet;
 use crate::dbs::node_lookup::opt_nodecomplete_by_id;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, SourceName, members_of};
-use crate::types::save::{DefineNode, SaveNode, DeleteNode, ForkSpec, NodeMerge, SourceMove};
+  ID, MSV, RelPartner, SkgConfig, RepoName, members_of};
+use crate::types::save::{DefineNode, SaveNode, DeleteNode, ForkSpec, NodeMerge, RepoMove};
 use crate::types::nodes::complete::NodeComplete;
 
 use std::collections::{HashMap, HashSet};
@@ -23,8 +23,8 @@ use std::collections::{HashMap, HashSet};
 ///
 /// ERRORS: if an instruction
 /// - Would DELETE a foreign node (deleting, unlike editing, is not a fork)
-/// - Would create a node in a foreign source
-/// - Requests a fork whose clone source cannot be resolved
+/// - Would create a node in a foreign repo
+/// - Requests a fork whose clone repo cannot be resolved
 ///
 /// Filters out foreign nodes without modifications (no need to write).
 ///
@@ -35,8 +35,8 @@ pub fn validate_and_filter_foreign_instructions(
   instructions       : Vec<DefineNode>,
   nodeMerge_instructions : &[NodeMerge],
   graph              : &InRustGraph,
-  clone_source_inputs : &CloneSourceInputs, // everything clone-source resolution can draw on, in priority order
-  adopt_clone_source : &HashMap<ID, ID>, // new node -> forked N whose clone's source it adopts (see 'new_foreign_nodes_adopting_clone_sources')
+  clone_repo_inputs : &CloneRepoInputs, // everything clone-repo resolution can draw on, in priority order
+  adopt_clone_repo : &HashMap<ID, ID>, // new node -> forked N whose clone's repo it adopts (see 'new_foreign_nodes_adopting_clone_repos')
   config             : &SkgConfig,
 ) -> Result<(Vec<DefineNode>, Vec<ForkSpec>),
             Vec<BufferValidationError>> {
@@ -53,7 +53,7 @@ pub fn validate_and_filter_foreign_instructions(
     outcomes . push (
       apply_foreign_policy(
         instruction, /* fork_eligible = */ true,
-        adopt_clone_source, graph, config
+        adopt_clone_repo, graph, config
       )? ); }
   { let no_adoptions : HashMap<ID, ID> = HashMap::new ();
     for instruction in nodeMerge_definenodes . iter () {
@@ -76,7 +76,7 @@ pub fn validate_and_filter_foreign_instructions(
       match fork_spec_from_buffer_node (
         buffer_node, & disk_node . title,
         & members_of (& disk_node . contains),
-        clone_source_inputs )
+        clone_repo_inputs )
       { Ok (spec)  => fork_specs . push (spec),
         Err (e)    => fork_errors . push (e), }}}
   if ! fork_errors . is_empty () { return Err (fork_errors); }
@@ -91,29 +91,29 @@ enum ForeignPolicyOutcome {
   DropUnchangedForeignSave, // Safe to drop because the buffer expresses no change from disk.
   ForkCandidate(NodeComplete, // An edited foreign node: clone it (the buffer node N becomes the clone's template). Dropped from the DefineNodes; a ForkSpec is collected instead.
                NodeComplete), // N's DISK node -- the original, before the user's edit. Its title feeds the confirmation buffer's child line (which shows the original honestly, distinct from the clone's edited title); its contains feed the clone's creation-time hides (children the forking edit deleted).
-  AdoptCloneSource(ID), // A NEW node (bare headline) whose foreign source was inherited from the named forked node N: kept, but rewritten to N's clone's source once the ForkSpecs exist ('finalize_foreign_policy_instructions').
+  AdoptCloneRepo(ID), // A NEW node (bare headline) whose foreign repo was inherited from the named forked node N: kept, but rewritten to N's clone's repo once the ForkSpecs exist ('finalize_foreign_policy_instructions').
   Reject(BufferValidationError), // Must reject before persistence.
 }
 
 fn apply_foreign_policy(
   instr: &DefineNode,
   fork_eligible: bool, // true for a direct buffer edit (which forks a changed foreign node); false for a nodeMerge-derived save (which still rejects).
-  adopt_clone_source: &HashMap<ID, ID>, // new node -> forked N (empty for nodeMerge-derived saves)
+  adopt_clone_repo: &HashMap<ID, ID>, // new node -> forked N (empty for nodeMerge-derived saves)
   graph: &InRustGraph,
   config: &SkgConfig,
 ) -> Result<ForeignPolicyOutcome,
             Vec<BufferValidationError>> {
   match instr {
-    DefineNode::Delete(DeleteNode { id, source }) => {
-      if source_is_foreign (config, source) {
+    DefineNode::Delete(DeleteNode { id, home_repo: repo }) => {
+      if repo_is_foreign (config, repo) {
         // can't delete foreign nodes
         Ok (ForeignPolicyOutcome::Reject(
           BufferValidationError::ModifiedForeignNode(
             id . clone(),
-            source . clone() )))
+            repo . clone() )))
       } else { Ok (ForeignPolicyOutcome::Keep) }}
     DefineNode::Save(SaveNode (node)) => {
-      if !source_is_foreign (config, &node . source) {
+      if !repo_is_foreign (config, &node . home_repo) {
         // not foreign, so keep
         return Ok (ForeignPolicyOutcome::Keep); }
       match opt_nodecomplete_by_id(
@@ -133,25 +133,25 @@ fn apply_foreign_policy(
               Ok (ForeignPolicyOutcome::Reject(
                 BufferValidationError::ModifiedForeignNode(
                   node . pid . clone(),
-                  node . source . clone() )))
+                  node . home_repo . clone() )))
             }
           } else {
             // drop a non-edit to a foreign node
             Ok (ForeignPolicyOutcome::DropUnchangedForeignSave)
           }}
         Ok (None) => {
-          // Foreign source & PID not found => trying to create a
+          // Foreign repo & PID not found => trying to create a
           // foreign node. Not allowed -- EXCEPT for a bare new
-          // headline whose foreign source was merely inherited from a
-          // forked parent: that one adopts the parent's clone's source.
-          if let Some (forked) = adopt_clone_source . get (&node . pid) {
-            Ok (ForeignPolicyOutcome::AdoptCloneSource(
+          // headline whose foreign repo was merely inherited from a
+          // forked parent: that one adopts the parent's clone's repo.
+          if let Some (forked) = adopt_clone_repo . get (&node . pid) {
+            Ok (ForeignPolicyOutcome::AdoptCloneRepo(
               forked . clone() ))
           } else {
             Ok (ForeignPolicyOutcome::Reject(
               BufferValidationError::CreatedForeignNode(
                 node . pid . clone(),
-                node . source . clone() ))) }},
+                node . home_repo . clone() ))) }},
         Err (e) =>
           Err (vec![BufferValidationError::Other(
             format!("Error reading foreign node {}: {}",
@@ -172,8 +172,8 @@ fn collect_foreign_policy_outcomes(
 /// Drop any DefineNode that defines a foreign node to be unchanged,
 /// and any that is a fork candidate (N's own save is never written --
 /// N stays untouched on disk; the clone C is committed separately,
-/// gated on confirmation). A new node adopting a clone's source is
-/// KEPT, rewritten into that source -- its fork must exist among the
+/// gated on confirmation). A new node adopting a clone's repo is
+/// KEPT, rewritten into that repo -- its fork must exist among the
 /// specs, else it degrades to the foreign-creation rejection it would
 /// otherwise have been.
 fn finalize_foreign_policy_instructions(
@@ -189,75 +189,75 @@ fn finalize_foreign_policy_instructions(
       ForeignPolicyOutcome::DropUnchangedForeignSave
         | ForeignPolicyOutcome::ForkCandidate (..) =>
         {},
-      ForeignPolicyOutcome::AdoptCloneSource (forked) => {
-        let clone_source : Option<&SourceName> =
+      ForeignPolicyOutcome::AdoptCloneRepo (forked) => {
+        let clone_repo : Option<&RepoName> =
           fork_specs . iter()
           . find ( |spec| spec . original_id == *forked )
-          . map ( |spec| & spec . clone . 0 . source );
-        match (instruction, clone_source) {
+          . map ( |spec| & spec . clone . 0 . home_repo );
+        match (instruction, clone_repo) {
           ( DefineNode::Save (SaveNode (mut node)),
-            Some (clone_source) ) => {
-            rehome_inherited_new_node (&mut node, clone_source);
+            Some (clone_repo) ) => {
+            rehome_inherited_new_node (&mut node, clone_repo);
             kept . push (DefineNode::Save (SaveNode (node))); }
           ( DefineNode::Save (SaveNode (node)), None ) =>
             errors . push (
               BufferValidationError::CreatedForeignNode(
                 node . pid . clone(),
-                node . source . clone() )),
+                node . home_repo . clone() )),
           ( DefineNode::Delete (d), _ ) =>
-            // Unreachable: only a Save earns AdoptCloneSource.
+            // Unreachable: only a Save earns AdoptCloneRepo.
             errors . push (
               BufferValidationError::ModifiedForeignNode(
                 d . id . clone(),
-                d . source . clone() )), }},
+                d . home_repo . clone() )), }},
       _ => kept . push (instruction), }}
   if errors . is_empty() { Ok (kept) } else { Err (errors) }}
 
 /// A bare new node beneath a foreign node initially inherits that foreign
-/// source everywhere: as its home and as the default recording source of its
+/// repo everywhere: as its home and as the default recording repo of its
 /// relationship members. When the node rides the parent's fork, adoption must
-/// therefore rehome both. Changing only `node.source` manufactures a mixed
+/// therefore rehome both. Changing only `node.repo` manufactures a mixed
 /// telescope whose old-home section is foreign (or can sort before the new
 /// home), and the checked writer correctly rejects it.
 ///
-/// Preserve members explicitly recorded at any OTHER source. Only facts whose
-/// relSource equals the inherited home are part of this implicit adoption.
+/// Preserve members explicitly recorded at any OTHER repo. Only facts whose
+/// relRepo equals the inherited home are part of this implicit adoption.
 fn rehome_inherited_new_node (
   node       : &mut NodeComplete,
-  new_source : &SourceName,
+  new_repo : &RepoName,
 ) {
   fn retag<T> (
     members    : &mut [RelPartner<T>],
-    old_source : &SourceName,
-    new_source : &SourceName,
+    old_repo : &RepoName,
+    new_repo : &RepoName,
   ) {
     for member in members {
-      if member . relSource == *old_source {
-        member . relSource = new_source . clone (); }} }
+      if member . relRepo == *old_repo {
+        member . relRepo = new_repo . clone (); }} }
 
   fn retag_msv<T> (
     members    : &mut MSV<RelPartner<T>>,
-    old_source : &SourceName,
-    new_source : &SourceName,
+    old_repo : &RepoName,
+    new_repo : &RepoName,
   ) {
     if let MSV::Specified (members) = members {
-      retag (members, old_source, new_source); }}
+      retag (members, old_repo, new_repo); }}
 
-  let old_source : SourceName = node . source . clone ();
-  node . source = new_source . clone ();
-  retag (&mut node . contains, &old_source, new_source);
-  retag_msv (&mut node . aliases, &old_source, new_source);
-  retag_msv (&mut node . subscribes_to, &old_source, new_source);
+  let old_repo : RepoName = node . home_repo . clone ();
+  node . home_repo = new_repo . clone ();
+  retag (&mut node . contains, &old_repo, new_repo);
+  retag_msv (&mut node . aliases, &old_repo, new_repo);
+  retag_msv (&mut node . subscribes_to, &old_repo, new_repo);
   retag_msv (
-    &mut node . hides_from_its_subscriptions, &old_source, new_source);
-  retag_msv (&mut node . overrides_view_of, &old_source, new_source);
+    &mut node . hides_from_its_subscriptions, &old_repo, new_repo);
+  retag_msv (&mut node . overrides_view_of, &old_repo, new_repo);
 }
 
-fn source_is_foreign(
+fn repo_is_foreign(
   config: &SkgConfig,
-  source: &SourceName,
+  repo: &RepoName,
 ) -> bool {
-  config . sources . get (source)
+  config . repos . get (repo)
     . map(|s| !s . user_owns_it)
     . unwrap_or (false)}
 
@@ -285,13 +285,13 @@ pub(crate) fn buffernode_differs_from_disknode(
 
   let title_matches: bool = buffer_node . title == disk_node . title;
   let body_matches: bool = buffer_node . body == disk_node . body;
-  let source_matches: bool = buffer_node . source == disk_node . source;
+  let repo_matches: bool = buffer_node . home_repo == disk_node . home_repo;
   let contains_matches: bool =
     buffer_node . contains == disk_node . contains;
   let properties_match: bool = buffer_node . misc == disk_node . misc;
   !( title_matches
      && body_matches
-     && source_matches
+     && repo_matches
      && contains_matches
      && properties_match
      && fields_match( &buffer_node . aliases,
@@ -315,17 +315,17 @@ pub(crate) fn flatten_ms<T: Clone>(
 /// Validates that no node is both moved and merged in the same save.
 ///
 /// Requires both completed non-nodeMerge extraction and nodeMerge extraction:
-/// source moves are detected during disk supplementation of
+/// repo moves are detected during disk supplementation of
 /// DefineNodes, while merge acquiree/acquirer ids come from merge
 /// requests in the "placed" (i.e. no longer "maybePlaced") viewforest.
 pub(super) fn validate_no_simultaneous_move_and_nodeMerge (
-  source_moves       : &[SourceMove],
+  repo_moves       : &[RepoMove],
   nodeMerge_instructions : &[NodeMerge],
 ) -> Result<(), Vec<BufferValidationError>> {
-  if source_moves . is_empty() || nodeMerge_instructions . is_empty() {
+  if repo_moves . is_empty() || nodeMerge_instructions . is_empty() {
     return Ok (()); }
   let move_ids : HashSet<&ID> =
-    source_moves . iter() . map(|sm| &sm . pid) . collect();
+    repo_moves . iter() . map(|sm| &sm . pid) . collect();
   let mut errors : Vec<BufferValidationError> = Vec::new();
   for nodeMerge in nodeMerge_instructions {
     if move_ids . contains (nodeMerge . acquirer_id()) {
@@ -339,10 +339,10 @@ pub(super) fn validate_no_simultaneous_move_and_nodeMerge (
   if errors . is_empty() { Ok (())
   } else { Err (errors) }}
 
-/// TODO/full-schema/9-2_source-set-safety.org, inactive-node rewrite
-/// suppression: under a restricted source-set, any instruction that
+/// TODO/full-schema/9-2_repo-set-safety.org, inactive-node rewrite
+/// suppression: under a restricted repo-set, any instruction that
 /// would modify an inactive node is DROPPED rather than executed or
-/// fatal.  A stale buffer (rendered before a source-set switch) can
+/// fatal.  A stale buffer (rendered before a repo-set switch) can
 /// legitimately hold whole now-inactive subtrees; aborting would
 /// force the user to delete them from view, which would itself be
 /// destructive.  Runs after the noop filter, so an untouched stale
@@ -353,29 +353,29 @@ pub(super) fn validate_no_simultaneous_move_and_nodeMerge (
 /// graph."
 pub fn suppress_writes_to_inactive_nodes (
   define_nodes : Vec<DefineNode>,
-  source_moves : Vec<SourceMove>,
-  restricted_source_set : Option<&ActiveSourceSet>,
-) -> (Vec<DefineNode>, Vec<SourceMove>, bool) {
-  let Some (active) = restricted_source_set else {
-    return (define_nodes, source_moves, false); };
+  repo_moves : Vec<RepoMove>,
+  restricted_repo_set : Option<&ActiveRepoSet>,
+) -> (Vec<DefineNode>, Vec<RepoMove>, bool) {
+  let Some (active) = restricted_repo_set else {
+    return (define_nodes, repo_moves, false); };
   let mut suppressed : bool = false;
   let define_nodes : Vec<DefineNode> =
     define_nodes . into_iter ()
     . filter ( |instruction| {
-        let source : &SourceName = match instruction {
-          DefineNode::Save (SaveNode (node)) => &node . source,
-          DefineNode::Delete (d)             => &d . source };
-        let keep : bool = active . contains_source (source);
+        let repo : &RepoName = match instruction {
+          DefineNode::Save (SaveNode (node)) => &node . home_repo,
+          DefineNode::Delete (d)             => &d . home_repo };
+        let keep : bool = active . contains_repo (repo);
         if ! keep { suppressed = true; }
         keep } )
     . collect ();
-  let source_moves : Vec<SourceMove> =
-    source_moves . into_iter ()
+  let repo_moves : Vec<RepoMove> =
+    repo_moves . into_iter ()
     . filter ( |mv| {
         let keep : bool =
-          active . contains_source (&mv . old_source)
-          && active . contains_source (&mv . new_source);
+          active . contains_repo (&mv . old_repo)
+          && active . contains_repo (&mv . new_repo);
         if ! keep { suppressed = true; }
         keep } )
     . collect ();
-  (define_nodes, source_moves, suppressed) }
+  (define_nodes, repo_moves, suppressed) }

@@ -1,7 +1,7 @@
-// cargo nextest run --test grouped_sources -E 'test(source_sets::)'
+// cargo nextest run --test grouped_repos -E 'test(repo_sets::)'
 //
-// These are feature-first tests for TODO/source-sets/plan.org. They
-// intentionally name the source-set API before the implementation
+// These are feature-first tests for TODO/repo-sets/plan.org. They
+// intentionally name the repo-set API before the implementation
 // exists, and should fail until that feature is wired in.
 
 use indoc::indoc;
@@ -13,29 +13,29 @@ use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::in_rust_graph::ancestry::AncestryTree;
 use skg::dbs::in_rust_graph::stats::AllGraphNodeStats;
 use skg::serve::ViewsState;
-use skg::serve::handlers::source_sets::handle_source_set_request;
+use skg::serve::handlers::repo_sets::handle_repo_set_request;
 use skg::serve::handlers::text_search::SearchEnrichmentPayload;
-use skg::source_sets::{
-  ActiveSourceSet,
-  SourceSetName,
-  filter_path_to_active_sources_for_test,
-  filter_branches_to_active_sources_for_test,
+use skg::repo_sets::{
+  ActiveRepoSet,
+  RepoSetName,
+  filter_path_to_active_repos_for_test,
+  filter_branches_to_active_repos_for_test,
   prepare_git_diff_fixture,
-  run_with_source_set_test_db};
+  run_with_repo_set_test_db};
 use skg::dbs::node_lookup::nodecomplete_from_graph;
 use skg::to_org::render::content_view::multi_root_view;
-use skg::test_utils::{set_source_retagging_relSources, graph_handle_from_config};
+use skg::test_utils::{set_repo_retagging_relRepos, graph_handle_from_config};
 use skg::test_utils::run_with_shared_test_stores;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::org_to_text::viewforest_to_string;
 use skg::to_org::expand::backpath::{
-  build_and_integrate_containerward_path_with_source_set,
-  integrate_path_that_might_fork_or_cycle_with_source_set};
-use skg::to_org::render::content_view::multi_root_view_with_source_set;
+  build_and_integrate_containerward_path_with_repo_set,
+  integrate_path_that_might_fork_or_cycle_with_repo_set};
+use skg::to_org::render::content_view::multi_root_view_with_repo_set;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::errors::SaveError;
-use skg::types::misc::{ID, MSV, SkgConfig, SourceName, TantivyIndex, members_of, rel_partners_at_relSource_msv};
+use skg::types::misc::{ID, MSV, SkgConfig, RepoName, TantivyIndex, members_of, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
 use skg::types::viewnode::{
@@ -57,25 +57,25 @@ use std::sync::{Arc, Mutex};
 #[test]
 fn all_tests
   () -> Result<(), Box<dyn Error>> {
-  let fixtures : &str = "tests/source_sets/fixtures";
+  let fixtures : &str = "tests/repo_sets/fixtures";
   run_with_shared_test_stores (
     "skg-test-source-sets",
     |s| Box::pin ( async move {
       s . reset ("source_set_switch_rerenders_views_and_cancels_stale_search_enrichment", fixtures) ?;
-      source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
+      repo_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("content_view_omits_inactive_contained_nodes", fixtures) ?;
       content_view_omits_inactive_contained_nodes (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset_with_fixture_prep (
-        // prepare_git_diff_fixture leaves the public source with a
+        // prepare_git_diff_fixture leaves the public repo with a
         // real worktree-vs-HEAD diff, which this sub-test renders.
         "diff_view_omits_inactive_members_without_content_leak", fixtures,
         |root| prepare_git_diff_fixture (root) ) ?;
       diff_view_omits_inactive_members_without_content_leak (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("search_filters_inactive_sources_before_ranking_and_truncation", fixtures) ?;
-      search_filters_inactive_sources_before_ranking_and_truncation (
+      search_filters_inactive_repos_before_ranking_and_truncation (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("inactive_placeholder_in_buffer_does_not_drive_contains", fixtures) ?;
       inactive_placeholder_in_buffer_does_not_drive_contains (
@@ -84,7 +84,7 @@ fn all_tests
       saving_edits_to_inactive_placeholder_content_are_rejected (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("restricted_source_search_and_save_work_together_end_to_end", fixtures) ?;
-      restricted_source_search_and_save_work_together_end_to_end (
+      restricted_repo_search_and_save_work_together_end_to_end (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("containerward_expansion_truncates_before_inactive_container", fixtures) ?;
       containerward_expansion_truncates_before_inactive_container (
@@ -108,7 +108,7 @@ fn all_tests
 
 /// PIN (the override-substitution-across-switch case discussed in
 /// TODO/strip-inactive-node-fields-progress.org): a drawn override
-/// substitute whose source goes inactive on a source-set switch
+/// substitute whose repo goes inactive on a repo-set switch
 /// becomes an anonymous bare-atom 'inactiveNode'; the rerender draws the
 /// original directly (an inactive overrider does not substitute) with
 /// NO leak of the overrider's title or id, retaining the overrider's
@@ -124,11 +124,11 @@ fn all_tests
 /// it), so it assumes per-test process isolation (nextest), like
 /// tests/override_substitution.rs.
 #[test]
-fn override_substitute_across_source_switch_anonymizes_and_keeps_original (
+fn override_substitute_across_repo_switch_anonymizes_and_keeps_original (
 ) -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
+  run_with_repo_set_test_db (
     "skg-test-ovr-sub-switch",
-    "tests/source_sets/fixtures/skgconfig.toml",
+    "tests/repo_sets/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-ovr-sub-switch",
     |config, tantivy| Box::pin ( async move {
       (
@@ -154,8 +154,8 @@ fn override_substitute_across_source_switch_anonymizes_and_keeps_original (
       let env : skg::types::env::SkgEnv =
         skg::test_utils::skg_env_from_parts (
           config, tantivy, &graph );
-      let mut active : ActiveSourceSet =
-        ActiveSourceSet::named (config, SourceSetName::from ("all")) ?;
+      let mut active : ActiveRepoSet =
+        ActiveRepoSet::named (config, RepoSetName::from ("all")) ?;
       let mut views_state : ViewsState =
         ViewsState { diff_mode_enabled : false,
                      open_views        : OpenViews::new () };
@@ -174,7 +174,7 @@ fn override_substitute_across_source_switch_anonymizes_and_keeps_original (
         connected_tcp_stream_pair ()?;
       std::thread::scope ( |scope| {
         scope . spawn ( || {
-          handle_source_set_request (
+          handle_repo_set_request (
             &mut server_stream,
             "((request . \"set active source set\") (name . \"public\"))",
             &env, &mut views_state, &mut active,
@@ -205,8 +205,8 @@ fn override_substitute_across_source_switch_anonymizes_and_keeps_original (
 
       // 4. Saving the switched view keeps N in the container's
       //    contains, and the inactive overrider writes nothing.
-      let public : ActiveSourceSet =
-        ActiveSourceSet::named (config, SourceSetName::from ("public")) ?;
+      let public : ActiveRepoSet =
+        ActiveRepoSet::named (config, RepoSetName::from ("public")) ?;
       let plan = buffer_to_validated_saveplan (
         &view_public, config, Some (&public) )  ? . 1;
       if let Some (c) = plan . define_nodes . iter () . find_map (
@@ -291,56 +291,56 @@ fn connected_tcp_stream_pair (
   Ok ((server, client)) }
 
 #[test]
-fn config_loads_default_source_set_and_prefix_source_sets (
+fn config_loads_default_repo_set_and_prefix_repo_sets (
 ) -> Result<(), Box<dyn Error>> {
-  // Source-sets are the prefixes of the privacy order: naming a
-  // source selects it and everything more public. The fixture lists
+  // Repo-sets are the prefixes of the privacy order: naming a
+  // repo selects it and everything more public. The fixture lists
   // public before private, so "public" selects only itself.
   let config =
-    load_config ("tests/source_sets/fixtures/skgconfig.toml")?;
+    load_config ("tests/repo_sets/fixtures/skgconfig.toml")?;
   assert_eq! (
-    config . default_source_set_name (),
-    &SourceSetName::from ("public"));
+    config . default_repo_set_name (),
+    &RepoSetName::from ("public"));
   assert_eq! (
-    config . source_set_sources (&SourceSetName::from ("public"))?,
-    BTreeSet::from ([SourceName::from ("public")]));
+    config . repo_set_repos (&RepoSetName::from ("public"))?,
+    BTreeSet::from ([RepoName::from ("public")]));
   assert_eq! (
-    config . source_set_sources (&SourceSetName::from ("all"))?,
+    config . repo_set_repos (&RepoSetName::from ("all"))?,
     BTreeSet::from ([
-      SourceName::from ("private"),
-      SourceName::from ("public")]));
+      RepoName::from ("private"),
+      RepoName::from ("public")]));
   Ok (( )) }
 
 #[test]
-fn config_rejects_reserved_all_source_and_source_set_names (
+fn config_rejects_reserved_all_repo_and_repo_set_names (
 ) {
-  let source_all =
-    load_config ("tests/source_sets/fixtures-invalid/source-all/skgconfig.toml");
+  let repo_all =
+    load_config ("tests/repo_sets/fixtures-invalid/repo-all/skgconfig.toml");
   assert! (
-    source_all . is_err (),
+    repo_all . is_err (),
     "configured source named all must be rejected" );
-  let source_set_all =
-    load_config ("tests/source_sets/fixtures-invalid/source-set-all/skgconfig.toml");
+  let repo_set_all =
+    load_config ("tests/repo_sets/fixtures-invalid/repo-set-all/skgconfig.toml");
   assert! (
-    source_set_all . is_err (),
-	    "a config still defining the retired [[source_sets]] must be rejected" );
+    repo_set_all . is_err (),
+	    "a config still defining the retired [[repo_sets]] must be rejected" );
 }
 
-async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
+async fn repo_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // TODO/full-schema/9-2_source-set-safety.org: a switch RE-RENDERS
+  // TODO/full-schema/9-2_repo-set-safety.org: a switch RE-RENDERS
   // open views in place instead of closing them.
       let graph : skg::dbs::in_rust_graph::InRustGraphHandle =
         skg::test_utils::graph_handle_from_config (config) ?;
       let env : skg::types::env::SkgEnv =
         skg::test_utils::skg_env_from_parts (
           config, tantivy, &graph );
-      let mut active : ActiveSourceSet =
-        ActiveSourceSet::named (
+      let mut active : ActiveRepoSet =
+        ActiveRepoSet::named (
           config,
-          SourceSetName::from ("public"))?;
+          RepoSetName::from ("public"))?;
       let mut views_state : ViewsState =
         ViewsState {
           diff_mode_enabled : false,
@@ -369,7 +369,7 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
         // real connection thread does); it cannot run inside this
         // test's executor, so give it its own thread.
         scope . spawn ( || {
-          handle_source_set_request (
+          handle_repo_set_request (
             &mut server_stream,
             "((request . \"set active source set\") (name . \"all\"))",
             &env,
@@ -379,7 +379,7 @@ async fn source_set_switch_rerenders_views_and_cancels_stale_search_enrichment (
             &search_cancelled); } ); } );
       assert_eq! (
         active . name,
-        SourceSetName::from ("all"),
+        RepoSetName::from ("all"),
         "source-set switch should update the active set" );
       assert! (
         views_state . open_views . views . contains_key (&uri),
@@ -397,15 +397,15 @@ async fn content_view_omits_inactive_contained_nodes (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // TODO/full-schema/9-2_source-set-safety.org: rendering OMITS
+  // TODO/full-schema/9-2_repo-set-safety.org: rendering OMITS
   // inactive children (no placeholders); the weave preserves their
   // memberships at save.
-      let active : ActiveSourceSet =
-        ActiveSourceSet::named (
+      let active : ActiveRepoSet =
+        ActiveRepoSet::named (
           &config,
-          SourceSetName::from ("public"))?;
+          RepoSetName::from ("public"))?;
       let (actual, pids, _viewforest) : (String, Vec<ID>, Tree<ViewNode>) =
-        multi_root_view_with_source_set (
+        multi_root_view_with_repo_set (
           config, None,
           &[ID::from ("root")],
           false,
@@ -430,19 +430,19 @@ async fn diff_view_omits_inactive_members_without_content_leak (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      let active : ActiveSourceSet =
-        ActiveSourceSet::named (
+      let active : ActiveRepoSet =
+        ActiveRepoSet::named (
           &config,
-          SourceSetName::from ("public"))?;
+          RepoSetName::from ("public"))?;
       let (actual, _pids, _viewforest) : (String, Vec<ID>, Tree<ViewNode>) =
-        multi_root_view_with_source_set (
+        multi_root_view_with_repo_set (
           config, None,
           &[ID::from ("diff-root")],
           true,
           &active ) ?;
       // Defense in depth: the connection-level refusals
       // (TODO/full-schema/12-2_diff-mode-policy_discussion.org) keep
-      // diff mode and restricted source-sets from combining through
+      // diff mode and restricted repo-sets from combining through
       // the two state doors, but this render seam remains directly
       // constructible (as this test does), so when the modes mix,
       // inactive members are omitted from restricted diff views
@@ -465,17 +465,17 @@ async fn diff_view_omits_inactive_members_without_content_leak (
         "active content still renders: {}", actual );
       Ok (( )) }
 
-async fn search_filters_inactive_sources_before_ranking_and_truncation (
+async fn search_filters_inactive_repos_before_ranking_and_truncation (
   config  : &SkgConfig,
 
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      let active : ActiveSourceSet =
-        ActiveSourceSet::named (
+      let active : ActiveRepoSet =
+        ActiveRepoSet::named (
           &config,
-          SourceSetName::from ("public"))?;
+          RepoSetName::from ("public"))?;
       let ids : Vec<ID> =
-        skg::serve::handlers::text_search::search_ids_for_source_set_for_test (
+        skg::serve::handlers::text_search::search_ids_for_repo_set_for_test (
           &tantivy,
           &config,
           &active,
@@ -498,10 +498,10 @@ async fn inactive_placeholder_in_buffer_does_not_drive_contains (
   // reordering the placeholder cannot move its disk member, and a
   // stale placeholder for a node absent from disk is not resurrected.
   // (Disk root.contains = [active-a, private-a, active-b]; private-a's
-  // source is inactive under the "public" set.)
-      let active : ActiveSourceSet =
-        ActiveSourceSet::named (
-          config, SourceSetName ("public" . to_string ())) ?;
+  // repo is inactive under the "public" set.)
+      let active : ActiveRepoSet =
+        ActiveRepoSet::named (
+          config, RepoSetName ("public" . to_string ())) ?;
       { // The user drags the placeholder to the end. The save keeps
         // private-a at its DISK position (after active-a), not the
         // buffer position, and writes no SaveNode for it.
@@ -571,16 +571,16 @@ async fn saving_edits_to_inactive_placeholder_content_are_rejected (
         result );
 	      Ok (( )) }
 
-async fn restricted_source_search_and_save_work_together_end_to_end (
+async fn restricted_repo_search_and_save_work_together_end_to_end (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      let active : ActiveSourceSet =
-        ActiveSourceSet::named (
+      let active : ActiveRepoSet =
+        ActiveRepoSet::named (
           &config,
-          SourceSetName::from ("public"))?;
+          RepoSetName::from ("public"))?;
       let ids : Vec<ID> =
-        skg::serve::handlers::text_search::search_ids_for_source_set_for_test (
+        skg::serve::handlers::text_search::search_ids_for_repo_set_for_test (
           tantivy,
           &config,
           &active,
@@ -591,7 +591,7 @@ async fn restricted_source_search_and_save_work_together_end_to_end (
         vec![ID::from ("active-search-hit")],
         "restricted search should only return active-source hits" );
       let (rendered, _pids, _viewforest) : (String, Vec<ID>, Tree<ViewNode>) =
-        multi_root_view_with_source_set (
+        multi_root_view_with_repo_set (
           config, None,
           &[ID::from ("root")],
           false,
@@ -630,11 +630,11 @@ async fn restricted_source_search_and_save_work_together_end_to_end (
 fn backward_path_truncates_before_first_inactive_node (
 ) -> Result<(), Box<dyn Error>> {
   let config =
-    load_config ("tests/source_sets/fixtures/skgconfig.toml")?;
-  let active : ActiveSourceSet =
-    ActiveSourceSet::named (
+    load_config ("tests/repo_sets/fixtures/skgconfig.toml")?;
+  let active : ActiveRepoSet =
+    ActiveRepoSet::named (
       &config,
-      SourceSetName::from ("public"))?;
+      RepoSetName::from ("public"))?;
   let graph = graph_handle_from_config (&config)? . load_full ();
   let path : Vec<ID> =
     vec![
@@ -642,7 +642,7 @@ fn backward_path_truncates_before_first_inactive_node (
       ID::from ("private-container"),
       ID::from ("active-root-after-private") ];
   assert_eq! (
-    filter_path_to_active_sources_for_test (&graph, &config, &active, path)?,
+    filter_path_to_active_repos_for_test (&graph, &config, &active, path)?,
     vec![ID::from ("active-container")],
     "mid-path filtering should keep exactly the active prefix \
      and stop before the first inactive node" );
@@ -652,18 +652,18 @@ fn backward_path_truncates_before_first_inactive_node (
 fn backward_path_filters_forks_per_branch_and_omits_empty_forks (
 ) -> Result<(), Box<dyn Error>> {
   let config =
-    load_config ("tests/source_sets/fixtures/skgconfig.toml")?;
-  let active : ActiveSourceSet =
-    ActiveSourceSet::named (
+    load_config ("tests/repo_sets/fixtures/skgconfig.toml")?;
+  let active : ActiveRepoSet =
+    ActiveRepoSet::named (
       &config,
-      SourceSetName::from ("public"))?;
+      RepoSetName::from ("public"))?;
   let graph = graph_handle_from_config (&config)? . load_full ();
   let mixed_branches : BTreeSet<ID> =
     BTreeSet::from ([
       ID::from ("active-fork-branch"),
       ID::from ("private-fork-branch")]);
   assert_eq! (
-    filter_branches_to_active_sources_for_test (
+    filter_branches_to_active_repos_for_test (
       &graph, &config, &active, mixed_branches)?,
     BTreeSet::from ([ID::from ("active-fork-branch")]),
     "partially inactive forks should render only active branches" );
@@ -672,7 +672,7 @@ fn backward_path_filters_forks_per_branch_and_omits_empty_forks (
       ID::from ("private-fork-branch"),
       ID::from ("private-other-branch")]);
   assert! (
-    filter_branches_to_active_sources_for_test (
+    filter_branches_to_active_repos_for_test (
       &graph, &config, &active, inactive_branches)?
     . is_empty (),
     "fully inactive forks should not render an empty fork scaffold" );
@@ -683,16 +683,16 @@ async fn containerward_expansion_truncates_before_inactive_container (
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let graph = skg::test_utils::graph_handle_from_config (config)? . load_full ();
-      let active : ActiveSourceSet =
-        ActiveSourceSet::named (
+      let active : ActiveRepoSet =
+        ActiveRepoSet::named (
           &config,
-          SourceSetName::from ("public"))?;
+          RepoSetName::from ("public"))?;
       let mut viewforest : Tree<ViewNode> =
         viewforest_from_org (indoc! {"
           * (skg (node (id child-for-backpath) (source public))) child-for-backpath
         "})?;
       let child_id : NodeId = first_child_id (&viewforest);
-      build_and_integrate_containerward_path_with_source_set (
+      build_and_integrate_containerward_path_with_repo_set (
         &mut viewforest,
         child_id,
         &graph,
@@ -723,16 +723,16 @@ async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks 
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
       let graph = skg::test_utils::graph_handle_from_config (config)? . load_full ();
-      let active : ActiveSourceSet =
-        ActiveSourceSet::named (
+      let active : ActiveRepoSet =
+        ActiveRepoSet::named (
           &config,
-          SourceSetName::from ("public"))?;
+          RepoSetName::from ("public"))?;
       let mut viewforest : Tree<ViewNode> =
         viewforest_from_org (indoc! {"
           * (skg (node (id child-with-fork) (source public))) child-with-fork
         "})?;
       let child_id : NodeId = first_child_id (&viewforest);
-      integrate_path_that_might_fork_or_cycle_with_source_set (
+      integrate_path_that_might_fork_or_cycle_with_repo_set (
         &mut viewforest,
         child_id,
         Vec::new (),
@@ -757,7 +757,7 @@ async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks 
         "})?;
       let empty_fork_child_id : NodeId =
         first_child_id (&empty_fork_viewforest);
-      integrate_path_that_might_fork_or_cycle_with_source_set (
+      integrate_path_that_might_fork_or_cycle_with_repo_set (
         &mut empty_fork_viewforest,
         empty_fork_child_id,
         Vec::new (),
@@ -780,30 +780,30 @@ async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks 
 fn search_enrichment_truncates_ancestry_before_inactive_container (
 ) -> Result<(), Box<dyn Error>> {
   let config =
-    load_config ("tests/source_sets/fixtures/skgconfig.toml")?;
-  let active : ActiveSourceSet =
-    ActiveSourceSet::named (
+    load_config ("tests/repo_sets/fixtures/skgconfig.toml")?;
+  let active : ActiveRepoSet =
+    ActiveRepoSet::named (
       &config,
-      SourceSetName::from ("public"))?;
+      RepoSetName::from ("public"))?;
   let mut result_node : NodeComplete =
     skg::types::nodes::complete::empty_node_complete ();
   result_node . pid = ID::from ("active-search-hit");
   result_node . title = "active search hit" . to_string ();
-  set_source_retagging_relSources ( &mut result_node, &SourceName::from ("public") );
-  result_node . aliases = rel_partners_at_relSource_msv (
-    & result_node . source,
+  set_repo_retagging_relRepos ( &mut result_node, &RepoName::from ("public") );
+  result_node . aliases = rel_partners_at_relRepo_msv (
+    & result_node . home_repo,
     MSV::Specified (vec!["search term" . to_string ()]) );
   let mut active_container : NodeComplete =
     skg::types::nodes::complete::empty_node_complete ();
   active_container . pid = ID::from ("active-container");
   active_container . title = "active-container" . to_string ();
-  set_source_retagging_relSources ( &mut active_container, &SourceName::from ("public") );
+  set_repo_retagging_relRepos ( &mut active_container, &RepoName::from ("public") );
   let mut private_container : NodeComplete =
     skg::types::nodes::complete::empty_node_complete ();
   private_container . pid = ID::from ("private-container");
   private_container . title =
     "private container title must not leak" . to_string ();
-  set_source_retagging_relSources ( &mut private_container, &SourceName::from ("private") );
+  set_repo_retagging_relRepos ( &mut private_container, &RepoName::from ("private") );
   let graph = skg::dbs::in_rust_graph::InRustGraph::from_nodecompletes (
     &[result_node . clone (), active_container . clone (),
       private_container . clone ()]);
@@ -817,7 +817,7 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
     skg::serve::handlers::text_search::MatchGroups::new ();
   matches_by_id . insert (
     ID::from ("active-search-hit"),
-    ( SourceName::from ("public"),
+    ( RepoName::from ("public"),
       vec![(1.0, "active search hit" . to_string ())] ));
   let ancestry_by_id : HashMap<ID, AncestryTree> =
     HashMap::from ([(
@@ -830,7 +830,7 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
             ID::from ("private-container"))])]))]);
   let rendered : String =
     skg::serve::handlers::text_search
-      ::enriched_search_buffer_for_source_set_for_test (
+      ::enriched_search_buffer_for_repo_set_for_test (
         &graph,
         "search term",
         &matches_by_id,
@@ -862,16 +862,16 @@ fn search_enrichment_truncates_ancestry_before_inactive_container (
   Ok (( )) }
 
 #[test]
-fn titles_by_ids_omits_inactive_source_titles (
+fn titles_by_ids_omits_inactive_repo_titles (
 ) -> Result<(), Box<dyn Error>> {
   let config =
-    load_config ("tests/source_sets/fixtures/skgconfig.toml")?;
-  let active : ActiveSourceSet =
-    ActiveSourceSet::named (
+    load_config ("tests/repo_sets/fixtures/skgconfig.toml")?;
+  let active : ActiveRepoSet =
+    ActiveRepoSet::named (
       &config,
-      SourceSetName::from ("public"))?;
+      RepoSetName::from ("public"))?;
   let titles =
-    skg::serve::handlers::titles_by_ids::titles_by_ids_for_source_set_for_test (
+    skg::serve::handlers::titles_by_ids::titles_by_ids_for_repo_set_for_test (
       &config,
       &active,
       &[ ID::from ("active-a"),
@@ -888,8 +888,8 @@ async fn stale_inactive_placeholders_under_folders_save_without_error (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // TODO/full-schema/9-2_source-set-safety.org: the formerly-unsavable
-  // buffer. A buffer rendered before a source-set switch can hold
+  // TODO/full-schema/9-2_repo-set-safety.org: the formerly-unsavable
+  // buffer. A buffer rendered before a repo-set switch can hold
   // InactiveNodes under folders; saving it must not error.
       let buffer = indoc! {"
         * (skg (node (id root) (source public))) root
@@ -897,9 +897,9 @@ async fn stale_inactive_placeholders_under_folders_save_without_error (
         *** (skg (inactiveNode (id private-a) (source private)))
         ** (skg (node (id active-b) (source public) writeProtected)) active-b
       "};
-      let active : ActiveSourceSet =
-        ActiveSourceSet::named (
-          config, SourceSetName ("public" . to_string ())) ?;
+      let active : ActiveRepoSet =
+        ActiveRepoSet::named (
+          config, RepoSetName ("public" . to_string ())) ?;
       let result =
         buffer_to_validated_saveplan (
           buffer, config, Some (&active) ) ;
@@ -924,9 +924,9 @@ async fn inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to (
         *** (skg (inactiveNode (id private-a) (source private)))
         *** (skg (node (id active-b) (source public) writeProtected)) active-b
       "};
-      let active : ActiveSourceSet =
-        ActiveSourceSet::named (
-          config, SourceSetName ("public" . to_string ())) ?;
+      let active : ActiveRepoSet =
+        ActiveRepoSet::named (
+          config, RepoSetName ("public" . to_string ())) ?;
       let instructions : Vec<DefineNode> =
         buffer_to_validated_saveplan (
           buffer, config, Some (&active) )  ?
@@ -943,12 +943,12 @@ async fn weave_preserves_omitted_inactive_content_members (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  // TODO/full-schema/9-2_source-set-safety.org: under a restricted
+  // TODO/full-schema/9-2_repo-set-safety.org: under a restricted
   // set, a buffer that omits inactive members must not delete them;
   // visible edits (reorder, delete) still land.
-      let active : ActiveSourceSet =
-        ActiveSourceSet::named (
-          config, SourceSetName ("public" . to_string ())) ?;
+      let active : ActiveRepoSet =
+        ActiveRepoSet::named (
+          config, RepoSetName ("public" . to_string ())) ?;
       let graph = graph_handle_from_config (config)? . load_full ();
       { // Disk: root contains [active-a, private-a, active-b].
         // The restricted buffer omits private-a; saving must keep it,
@@ -1009,13 +1009,13 @@ async fn restricted_save_preserves_invisible_override_targets (
 ) -> Result<(), Box<dyn Error>> {
   // The pipeline-level half of the second named regression
   // (TODO/full-schema/13_test-rel-matrix.org): a node overrides
-  // [ovr-visible, ovr-inactive] where ovr-inactive's source is
+  // [ovr-visible, ovr-inactive] where ovr-inactive's repo is
   // inactive. Rendering restricted shows only ovr-visible; the
   // set-difference merge must keep ovr-inactive across a restricted
   // save, even when the visible member is deleted.
-      let active : ActiveSourceSet =
-        ActiveSourceSet::named (
-          &config, SourceSetName::from ("public") )?;
+      let active : ActiveRepoSet =
+        ActiveRepoSet::named (
+          &config, RepoSetName::from ("public") )?;
       let override_set = |node : &NodeComplete| -> Vec<ID> {
         match &node . overrides_view_of {
           MSV::Specified (ids) => {

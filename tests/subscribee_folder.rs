@@ -11,8 +11,8 @@ use std::error::Error;
 
 const CONFIG_PATH: &str = "tests/subscribee_folder/fixtures/skgconfig.toml";
 
-/// Helper to set up multi-source test environment
-async fn setup_multi_source_test(
+/// Helper to set up multi-repo test environment
+async fn setup_multi_repo_test(
   test_name: &str,
 ) -> Result<SkgConfig, Box<dyn Error>> {
   let config: SkgConfig =
@@ -36,7 +36,7 @@ fn test_subscribee_folder_appears_for_subscribers(
   block_on(async {
     let test_name = "skg-test-subscribee-folder";
     let config =
-      setup_multi_source_test (test_name) . await?;
+      setup_multi_repo_test (test_name) . await?;
     let (result, _pids, _) : (String, Vec<ID>, _) =
       single_root_view( &config, None, &ID("1" . to_string()), false
                       )?;
@@ -49,7 +49,7 @@ fn test_subscribee_folder_appears_for_subscribers(
     // "away" nodes. Their default is the owner's home: that is writable
     // and deliberately exposes the foreign ID/relationship there. Since
     // the fixture records both edges at exactly that default, no
-    // (relSource ...) override appears.
+    // (relRepo ...) override appears.
     let expected = indoc! {
       "* (skg (node (id 1) (source home) (affectsParent na) (rels (contains (out 4))) (viewStats (sourceHerald ⌂:home)))) 1
       ** (skg (node (id 11) (source home) (rels (contains (in 1 (ancestors 1)) (out 1)) (subscribes_to (out 1)) (birth contains)))) 11

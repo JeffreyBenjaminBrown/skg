@@ -11,11 +11,11 @@ use crate::to_org::complete::partner_folder::goal_list::{
 };
 use crate::to_org::complete::partner_folder::inverse_scan::inverse_scan_for_inbound_folder;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, file_existence_axes_from_source_diff};
-use crate::types::misc::{ID, RelPartner, SourceName};
-use crate::source_sets::ActiveSourceSet;
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, RepoDiff, file_existence_axes_from_repo_diff};
+use crate::types::misc::{ID, RelPartner, RepoName};
+use crate::repo_sets::ActiveRepoSet;
 use crate::types::phantom::{phantom_axes, home_from_disk};
-use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
+use crate::update_buffer::ancestry::pid_and_repo_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::{CompletionWarning, RepairKind};
@@ -36,20 +36,20 @@ pub fn reconcile_partnerFolder_children (
   node         : NodeId, // The PartnerFolder. Its parent is an ActiveNode.
   tree         : &mut Tree<ViewNode>,
   kind         : PartnerFolder,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
   runtime      : &RuntimeGeneration,
   graph_snap   : &Arc<InRustGraph>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
-  active_source_set : Option<&ActiveSourceSet>,
+  active_repo_set : Option<&ActiveRepoSet>,
   warning_sink : Option<&mut Vec<CompletionWarning>>, // Some only when completing the view the user just saved.
 ) -> Result<(), Box<dyn Error>> {
   kind . error_unless_node_is_this_kind (tree, node) ?;
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: read the owner Active vognode *through* the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table
   // (index 0 = the parent), so this can never read an ancestor the table
   // does not list, and the death-check and this read share one spec.
-  let (owner_pid, owner_source) : (ID, SourceName) =
-    pid_and_source_from_required_ancestor (
+  let (owner_pid, owner_repo) : (ID, RepoName) =
+    pid_and_repo_from_required_ancestor (
       tree, node, 0, kind . caller_label () ) ?;
   let Some (member_role) = kind . relation_member_role () else {
     return Err (format!(
@@ -57,8 +57,8 @@ pub fn reconcile_partnerFolder_children (
       kind . caller_label (), kind) . into ()); };
   let owner_role =
     member_role . opposite_role ();
-  let source_resolver = |id : &ID| -> Option<SourceName> {
-    graph_snap . pid_and_source (id)
+  let repo_resolver = |id : &ID| -> Option<RepoName> {
+    graph_snap . pid_and_repo (id)
       . map ( |(_pid, src)| src )
       . or_else ( || home_from_disk (id, &runtime . config) ) };
   let outbound : bool = // the folder shows a list in the OWNER's file
@@ -68,21 +68,21 @@ pub fn reconcile_partnerFolder_children (
     // canonical-PID accessor is still right for inverse/read-only folders, but
     // would erase an Unknown from the writable OverriddenFolder.
     graph_snap . outbound_rel_partners_for_relation_gated (
-      &owner_pid, member_role . relation, active_source_set )
+      &owner_pid, member_role . relation, active_repo_set )
   } else { Vec::new () };
   let inbound_scan : HashMap<ID, MembershipAxes> =
     // Inbound folders' edges live in the MEMBERS' files; the inverse
     // scan reads those files' diffs (Modified relation diffs,
     // Deleted before_node lists, Added after_node lists). Empty
     // outside diff mode and for outbound folders.
-    if ! outbound && source_diffs . is_some () {
+    if ! outbound && repo_diffs . is_some () {
       inverse_scan_for_inbound_folder (
-        &owner_pid, member_role . relation, source_diffs,
-        active_source_set )
+        &owner_pid, member_role . relation, repo_diffs,
+        active_repo_set )
     } else { HashMap::new () };
   let (goal_list, removed_ids) : (Vec<ID>, HashSet<ID>) = {
     let graph_members : Vec<ID> =
-      // TODO/full-schema/9-2_source-set-safety.org: these folders omit
+      // TODO/full-schema/9-2_repo-set-safety.org: these folders omit
       // inactive members, with no retention (a stale InactiveNode
       // child gets the reconciler's delete-leaf / deaden-branch rule).
       omit_inactive_members (
@@ -92,10 +92,10 @@ pub fn reconcile_partnerFolder_children (
                    . unwrap_or_else ( || member . member . clone () ) )
             . collect ()
         } else { graph_snap . other_member_pids_gated (
-          &owner_pid, owner_role, active_source_set ) },
-        active_source_set,
-        source_resolver );
-    if outbound && source_diffs . is_some () {
+          &owner_pid, owner_role, active_repo_set ) },
+        active_repo_set,
+        repo_resolver );
+    if outbound && repo_diffs . is_some () {
       // Diff mode, outbound folder: the owner's per-stage relation diff
       // interleaves members removed since HEAD (phantom positions)
       // into the worktree list. This diff-derived order supersedes
@@ -104,11 +104,11 @@ pub fn reconcile_partnerFolder_children (
       // view-local reordering cannot express.
       let (goal, removed) : (Vec<ID>, HashSet<ID>) =
         goal_list_for_outbound_folder (
-          &owner_pid, &owner_source, member_role . relation,
-          source_diffs, &graph_members );
+          &owner_pid, &owner_repo, member_role . relation,
+          repo_diffs, &graph_members );
       let goal : Vec<ID> = // phantoms can be inactive too
         omit_inactive_members (
-          goal, active_source_set, source_resolver );
+          goal, active_repo_set, repo_resolver );
       (goal, removed)
     } else {
       let mut goal : Vec<ID> = match kind . policy () {
@@ -147,8 +147,8 @@ pub fn reconcile_partnerFolder_children (
             . collect () };
         tail = // phantoms of inactive members are omitted too
           omit_inactive_members (
-            tail, active_source_set,
-            |id : &ID| SkgEnv::find_source_in_generation (
+            tail, active_repo_set,
+            |id : &ID| SkgEnv::find_repo_in_generation (
               runtime, id, deleted_since_head_pid_src_map ));
         tail . sort_by ( |a, b| a . 0 . cmp (&b . 0) );
         let removed : HashSet<ID> =
@@ -157,40 +157,40 @@ pub fn reconcile_partnerFolder_children (
         removed };
       (goal, removed) }};
   let outbound_axes = // the owner's own relation diff
-    |child : &ID, child_src : &SourceName|
+    |child : &ID, child_src : &RepoName|
     -> (ExistenceAxes, MembershipAxes) {
     phantom_axes ( child, child_src,
-                   &owner_pid, &owner_source,
+                   &owner_pid, &owner_repo,
                    member_role . relation,
-                   source_diffs . as_ref () ) };
+                   repo_diffs . as_ref () ) };
   let inbound_axes = // membership from the inverse scan; existence
                      // from the member's own file statuses
-    |child : &ID, child_src : &SourceName|
+    |child : &ID, child_src : &RepoName|
     -> (ExistenceAxes, MembershipAxes) {
-    ( file_existence_axes_from_source_diff (
-        source_diffs, child, child_src ),
+    ( file_existence_axes_from_repo_diff (
+        repo_diffs, child, child_src ),
       inbound_scan . get (child) . copied ()
         . unwrap_or ( MembershipAxes {
             staged : None, unstaged : Some (Sign::Minus) } )) };
   let axes_for_removed // the relation this folder represents
-    : &dyn Fn (&ID, &SourceName) -> (ExistenceAxes, MembershipAxes) =
+    : &dyn Fn (&ID, &RepoName) -> (ExistenceAxes, MembershipAxes) =
     if outbound { &outbound_axes } else { &inbound_axes };
   // TODO/DONE/local-view-update/plan_v2.org §5.5: a folder fills its members WHOLE and is budget-neutral -- the owning
   // vognode already spent its budget unit when it expanded, so drawing all the
   // relation members here costs nothing and never truncates the group. (The
   // budget bounds how many vognodes EXPAND, not how big one group is.)
-  let relSources : HashMap<ID, SourceName> =
+  let relRepos : HashMap<ID, RepoName> =
     raw_outbound_members . iter ()
       . filter (|member| graph_snap . pid_of (&member . member) . is_none ())
-      . filter (|member| member . relSource != owner_source)
-      . map (|member| (member . member . clone (), member . relSource . clone ()))
+      . filter (|member| member . relRepo != owner_repo)
+      . map (|member| (member . member . clone (), member . relRepo . clone ()))
       . collect ();
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
       tree, node,
       &goal_list, &removed_ids, axes_for_removed,
-      source_diffs, deleted_since_head_pid_src_map,
-      &relSources, runtime ) ?;
+      repo_diffs, deleted_since_head_pid_src_map,
+      &relRepos, runtime ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §6.0/§16: the reconciler deletes a stale member that is a view-leaf and
   // demotes one that is a branch, so a read-only PartnerFolder
   // drops a stale leaf member instead of preserving it.
@@ -198,14 +198,14 @@ pub fn reconcile_partnerFolder_children (
     reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
       tree, node, kind, &goal_list, &child_data,
       deleted_by_this_save_extra_ids ) ?;
-  if source_diffs . is_some () {
+  if repo_diffs . is_some () {
     // Present members whose edge is New in some stage get that
     // stage's 'newM'; removed members are the phantoms above.
     let axes_by_id : HashMap<ID, MembershipAxes> =
       if outbound {
         outbound_member_axes (
-          &owner_pid, &owner_source, member_role . relation,
-          source_diffs )
+          &owner_pid, &owner_repo, member_role . relation,
+          repo_diffs )
       } else { inbound_scan . clone () };
     apply_membership_axes_to_folder_members (
       tree, node, &axes_by_id ) ?; }

@@ -31,7 +31,7 @@ tantivy_folder = "$TEST_DIR/data/.index.tantivy"
 port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
 
-[[sources]]
+[[repos]]
 name = "Mr Cheese"
 path = "$TEST_DIR/data/owned/skg-data"
 EOF

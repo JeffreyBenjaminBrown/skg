@@ -7,7 +7,7 @@ use skg::to_org::render::content_view::{multi_root_view, single_root_view};
 use skg::assert_metadata_eq;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::dbs::in_rust_graph::paths::path_containerward_to_first_nonlinearity;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::types::misc::{ID, SkgConfig};
 
@@ -49,7 +49,7 @@ async fn run_path_and_root_tests (
 
 ) -> Result<(), Box<dyn std::error::Error>> {
   let graph = InRustGraph::from_nodecompletes (
-    &read_all_skg_files_from_sources (config)?);
+    &read_all_skg_files_from_repos (config)?);
 
   // Test the path from node "4" to the root container
   match path_containerward_to_first_nonlinearity (

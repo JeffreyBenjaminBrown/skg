@@ -1,6 +1,6 @@
 use skg::diff_report::snapshot::read_snapshot_pair;
 use skg::diff_report::types::{DiffSelection, SnapshotPair};
-use skg::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
+use skg::types::misc::{ID, SkgConfig, SkgfileRepo, RepoName};
 
 use git2::Repository;
 use std::collections::HashMap;
@@ -9,49 +9,49 @@ use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 fn write_node (
-  source_dir : &Path,
+  repo_dir : &Path,
   pid        : &str,
   title      : &str,
 ) {
   fs::write (
-    source_dir . join (format! ("{}.skg", pid)),
+    repo_dir . join (format! ("{}.skg", pid)),
     format! ("title: {}\npid: {}\n", title, pid) )
     . unwrap ();
 }
 
 fn commit_all (
-  repo    : &Repository,
+  gitrepo    : &Repository,
   message : &str,
 ) {
   let mut index : git2::Index =
-    repo . index () . unwrap ();
+    gitrepo . index () . unwrap ();
   index . add_all (["*"].iter (), git2::IndexAddOption::DEFAULT, None)
     . unwrap ();
   index . write () . unwrap ();
   let tree_id : git2::Oid =
     index . write_tree () . unwrap ();
   let tree : git2::Tree =
-    repo . find_tree (tree_id) . unwrap ();
+    gitrepo . find_tree (tree_id) . unwrap ();
   let sig : git2::Signature =
     git2::Signature::now ("skg test", "skg@example.com") . unwrap ();
   let parent : Option<git2::Commit> =
-    repo . head () . ok ()
+    gitrepo . head () . ok ()
       . and_then ( |h| h . peel_to_commit () . ok () );
   match parent {
     Some (parent) => {
-      repo . commit (
+      gitrepo . commit (
         Some ("HEAD"), &sig, &sig, message, &tree, &[&parent] )
         . unwrap (); },
     None => {
-      repo . commit (
+      gitrepo . commit (
         Some ("HEAD"), &sig, &sig, message, &tree, &[] )
         . unwrap (); }}}
 
 fn stage_all (
-  repo : &Repository,
+  gitrepo : &Repository,
 ) {
   let mut index : git2::Index =
-    repo . index () . unwrap ();
+    gitrepo . index () . unwrap ();
   index . add_all (["*"].iter (), git2::IndexAddOption::DEFAULT, None)
     . unwrap ();
   index . write () . unwrap ();
@@ -59,21 +59,21 @@ fn stage_all (
 
 fn config_for (
   data_root  : &Path,
-  source_dir : &Path,
+  repo_dir : &Path,
 ) -> SkgConfig {
-  let source_name : SourceName =
-    SourceName::from ("main");
-  let mut sources : HashMap<SourceName, SkgfileSource> =
+  let repo_name : RepoName =
+    RepoName::from ("main");
+  let mut repos : HashMap<RepoName, SkgfileRepo> =
     HashMap::new ();
-  sources . insert (
-    source_name . clone (),
-    SkgfileSource {
-      name: source_name,
+  repos . insert (
+    repo_name . clone (),
+    SkgfileRepo {
+      name: repo_name,
       abbreviation: None,
-      path: source_dir . to_path_buf (),
+      path: repo_dir . to_path_buf (),
       user_owns_it: true });
   let mut config : SkgConfig =
-    SkgConfig::dummyFromSources (sources);
+    SkgConfig::dummyFromRepos (repos);
   config . data_root = data_root . to_path_buf ();
   config
 }
@@ -82,18 +82,18 @@ fn config_for (
 fn selected_snapshots_distinguish_head_index_and_worktree () {
   let tmp : TempDir =
     tempfile::tempdir () . unwrap ();
-  let repo : Repository =
+  let gitrepo : Repository =
     Repository::init (tmp . path ()) . unwrap ();
-  let source_dir : PathBuf =
+  let repo_dir : PathBuf =
     tmp . path () . join ("source");
-  fs::create_dir (&source_dir) . unwrap ();
-  write_node (&source_dir, "a", "head");
-  commit_all (&repo, "head");
-  write_node (&source_dir, "a", "index");
-  stage_all (&repo);
-  write_node (&source_dir, "a", "worktree");
+  fs::create_dir (&repo_dir) . unwrap ();
+  write_node (&repo_dir, "a", "head");
+  commit_all (&gitrepo, "head");
+  write_node (&repo_dir, "a", "index");
+  stage_all (&gitrepo);
+  write_node (&repo_dir, "a", "worktree");
   let config : SkgConfig =
-    config_for (tmp . path (), &source_dir);
+    config_for (tmp . path (), &repo_dir);
   let staged_only : SnapshotPair =
     read_snapshot_pair (
       &config,

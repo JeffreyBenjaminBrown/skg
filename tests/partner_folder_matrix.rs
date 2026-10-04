@@ -24,12 +24,12 @@
 use std::error::Error;
 use std::net::TcpStream;
 
-use skg::source_sets::{
-  ActiveSourceSet, SourceSetName, run_with_source_set_test_db};
+use skg::repo_sets::{
+  ActiveRepoSet, RepoSetName, run_with_repo_set_test_db};
 use skg::test_utils::graph_handle_from_config;
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::{
-  multi_root_view, multi_root_view_with_source_set};
+  multi_root_view, multi_root_view_with_repo_set};
 use skg::serve::ViewsState;
 use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::views_state::OpenViews;
@@ -158,7 +158,7 @@ fn swap_lines ( buf : &str, a : &str, b : &str ) -> String {
 /// member's indentation, plus a child one level deeper, so the repair
 /// is a demotion-to-independent rather than a removal. Built fresh
 /// (not cloned from a member line) so it never inherits a foreign
-/// source -- the overriderFolder's members are foreign.
+/// repo -- the overriderFolder's members are foreign.
 fn intruder_with_child (
   member_line : &str,
   intruder_id : &str,
@@ -334,7 +334,7 @@ async fn denovo_omits_unrequested_readonly_folders (
 #[test]
 fn relationship_matrix
   () -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
+  run_with_repo_set_test_db (
     "skg-test-partner-folder-matrix",
     "tests/partner_folder_matrix/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-partner-folder-matrix",
@@ -526,7 +526,7 @@ async fn folder_request_scenarios (
 async fn saveplan_nodes (
   buf    : &str,
   config : &SkgConfig,
-  active : Option<&ActiveSourceSet>,
+  active : Option<&ActiveRepoSet>,
 ) -> Result<Vec<DefineNode>, Box<dyn Error>> {
   let (_vf, plan, _warnings) =
     buffer_to_validated_saveplan (buf, config, active)  ?;
@@ -674,7 +674,7 @@ async fn hiddenFolder_delete_does_not_unhide (
   Ok (( )) }
 
 //////////////////////////////////////////////////////////////
-// Omission under a restricted source-set: an inactive-source member
+// Omission under a restricted repo-set: an inactive-repo member
 // beside an active one is omitted from the render (no placeholder);
 // for the writable folder, the save weaves the omitted member back.
 //////////////////////////////////////////////////////////////
@@ -683,12 +683,12 @@ async fn omission_scenarios (
   fails : &mut Fails,
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  let active : ActiveSourceSet =
-    ActiveSourceSet::named (config, SourceSetName::from ("public")) ?;
+  let active : ActiveRepoSet =
+    ActiveRepoSet::named (config, RepoSetName::from ("public")) ?;
   { // read-only subscriberFolder: inactive omitted, active shown
     let s : &str = "subscriberFolder/omission";
     let (buf, _p, _t) : (String, Vec<ID>, Tree<ViewNode>) =
-      multi_root_view_with_source_set (
+      multi_root_view_with_repo_set (
         config, None, &[ID::from ("omSub-owner")],
         false, &active ) ?;
     fails . want_absent (s, &buf, "subscriberFolder");
@@ -698,7 +698,7 @@ async fn omission_scenarios (
     // restricted save weaves it back into subscribes_to.
     let s : &str = "subscribeeFolder/omission";
     let (buf, _p, _t) : (String, Vec<ID>, Tree<ViewNode>) =
-      multi_root_view_with_source_set (
+      multi_root_view_with_repo_set (
         config, None, &[ID::from ("omWsub-owner")],
         false, &active ) ?;
     fails . want_contains (s, &buf, "(id omWsub-active)");
@@ -742,7 +742,7 @@ async fn omission_scenarios (
 #[test]
 fn buffer_save_rejects_second_user_owned_overrider
   () -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
+  run_with_repo_set_test_db (
     "skg-test-partner-folder-matrix-monogamy",
     "tests/partner_folder_matrix/fixtures-monogamy/skgconfig.toml",
     "/tmp/tantivy-test-partner-folder-matrix-monogamy",

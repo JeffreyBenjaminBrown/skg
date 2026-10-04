@@ -1,25 +1,25 @@
 use super::*;
-use crate::source_sets::SourceSetName;
-use crate::types::misc::{ID, SourceName};
+use crate::repo_sets::RepoSetName;
+use crate::types::misc::{ID, RepoName};
 use crate::types::viewnode::{
   mk_writeProtected_viewnode, mk_definitive_viewnode,
   viewforest_root_viewnode, AffectsParent };
 
 use std::collections::BTreeSet;
 
-fn active_public () -> ActiveSourceSet {
-  ActiveSourceSet {
-    name    : SourceSetName ("public" . to_string ()),
-    sources : BTreeSet::from ([ SourceName::from ("public") ]) }}
+fn active_public () -> ActiveRepoSet {
+  ActiveRepoSet {
+    name    : RepoSetName ("public" . to_string ()),
+    repos : BTreeSet::from ([ RepoName::from ("public") ]) }}
 
-fn def (id : &str, source : &str) -> ViewNode {
+fn def (id : &str, repo : &str) -> ViewNode {
   mk_definitive_viewnode (
-    ID::from (id), SourceName::from (source),
+    ID::from (id), RepoName::from (repo),
     id . to_string (), None ) }
 
-fn writeProtected (id : &str, source : &str) -> ViewNode {
+fn writeProtected (id : &str, repo : &str) -> ViewNode {
   mk_writeProtected_viewnode (
-    ID::from (id), SourceName::from (source),
+    ID::from (id), RepoName::from (repo),
     id . to_string (), AffectsParent::True ) }
 
 fn folder (kind : PartnerFolder) -> ViewNode {
@@ -44,7 +44,7 @@ fn conversion_and_retention () {
     . append (def ("kept", "private")) . id ();
   t . get_mut (kept) . unwrap ()
     . append (def ("survivor", "public"));
-  convert_and_prune_for_source_switch (
+  convert_and_prune_for_repo_switch (
     &mut t, &active_public ()) . unwrap ();
   assert! ( t . get (gone) . map ( |n| n . parent () . is_none () )
               . unwrap_or (true),
@@ -76,7 +76,7 @@ fn partners_and_folders_prune () {
     . append (folder (PartnerFolder::Subscribee)) . id ();
   t . get_mut (surviving_folder) . unwrap ()
     . append (def ("definitive-partner", "public"));
-  convert_and_prune_for_source_switch (
+  convert_and_prune_for_repo_switch (
     &mut t, &active_public ()) . unwrap ();
   assert! ( t . get (emptied_folder)
               . map ( |n| n . parent () . is_none () )
@@ -97,7 +97,7 @@ fn focus_transfers_to_surviving_parent () {
   let gone : NodeId = t . get_mut (parent) . unwrap ()
     . append (def ("gone", "private")) . id ();
   t . get_mut (gone) . unwrap () . value () . focused = true;
-  convert_and_prune_for_source_switch (
+  convert_and_prune_for_repo_switch (
     &mut t, &active_public ()) . unwrap ();
   assert! ( t . get (parent) . unwrap () . value () . focused,
     "focus transfers from a pruned subtree to its surviving parent" ); }

@@ -1,17 +1,17 @@
-//! Unit tests for the sticky-else-default relSource rule
-//! ('apply_sticky_relSources'), its home clamp, the hide floor, and the
+//! Unit tests for the sticky-else-default relRepo rule
+//! ('apply_sticky_relRepos'), its home clamp, the hide floor, and the
 //! restricted-set deletion refusal. Each test builds the exact graph fixture
-//! it passes to the source-resolution function.
+//! it passes to the repo-resolution function.
 
-use super::{apply_sticky_relSources_in_graph, build_diskSupplemented_defineNodes,
+use super::{apply_sticky_relRepos_in_graph, build_diskSupplemented_defineNodes,
             refuse_delete_with_inactive_sections};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::from_text::local_instruction_collection::lower::{
-  NodeIntent, RequestedRelSources};
-use crate::source_sets::ActiveSourceSet;
+  NodeIntent, RequestedRelRepos};
+use crate::repo_sets::ActiveRepoSet;
 use crate::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, SkgfileSource, SourceName,
-  SourceSetName};
+  ID, MSV, RelPartner, SkgConfig, SkgfileRepo, RepoName,
+  RepoSetName};
 use crate::types::nodes::complete::{
   FileProperty, NodeComplete, empty_node_complete};
 use crate::types::save::{DefineNode, SaveNode};
@@ -22,30 +22,30 @@ use std::path::PathBuf;
 fn config_with_order (
   names : &[&str],
 ) -> SkgConfig {
-  let mut sources : HashMap<SourceName, SkgfileSource> =
+  let mut repos : HashMap<RepoName, SkgfileRepo> =
     HashMap::new ();
   for name in names {
-    sources . insert (
-      SourceName::from (*name),
-      SkgfileSource {
-        name         : SourceName::from (*name),
+    repos . insert (
+      RepoName::from (*name),
+      SkgfileRepo {
+        name         : RepoName::from (*name),
         abbreviation : None,
         path         : PathBuf::from ( format! ("owned/{}", name) ),
         user_owns_it : true, } ); }
   let mut config : SkgConfig =
-    SkgConfig::dummyFromSources (sources);
-  config . source_order =
-    names . iter () . map ( |n| SourceName::from (*n) ) . collect ();
+    SkgConfig::dummyFromRepos (repos);
+  config . repo_order =
+    names . iter () . map ( |n| RepoName::from (*n) ) . collect ();
   config }
 
 fn node_at (
   pid    : &str,
-  source : &str,
+  repo : &str,
 ) -> NodeComplete {
   let mut n : NodeComplete = empty_node_complete ();
   n . pid = ID::new (pid);
   n . title = pid . to_string ();
-  n . source = SourceName::from (source);
+  n . home_repo = RepoName::from (repo);
   n }
 
 fn graph_from (
@@ -54,14 +54,14 @@ fn graph_from (
   InRustGraph::from_nodecompletes (nodes) }
 
 fn pm (
-  source : &str,
+  repo : &str,
   member : &str,
 ) -> RelPartner<ID> {
-  RelPartner::at_relSource (
-    SourceName::from (source), ID::new (member) ) }
+  RelPartner::at_relRepo (
+    RepoName::from (repo), ID::new (member) ) }
 
 #[test]
-fn sticky_preserves_disk_sources_and_default_takes_more_private_home (
+fn sticky_preserves_disk_repos_and_default_takes_more_private_home (
 ) {
   let config : SkgConfig =
     config_with_order ( & ["public", "private"] );
@@ -77,15 +77,15 @@ fn sticky_preserves_disk_sources_and_default_takes_more_private_home (
     pm ("public", "old"),    // degenerate intent tag
     pm ("public", "fresh") ]; // new edge to a private-homed target
   let resolved : NodeComplete =
-    apply_sticky_relSources_in_graph (
-      buffer, &disk, &RequestedRelSources::default (), &graph, &config) . unwrap ();
+    apply_sticky_relRepos_in_graph (
+      buffer, &disk, &RequestedRelRepos::default (), &graph, &config) . unwrap ();
   assert_eq! ( resolved . contains, vec! [
     pm ("private", "old"),    // STICKY: the disk's privatization survives
     pm ("private", "fresh") ] ); // DEFAULT: more private of the homes
 }
 
 #[test]
-fn boolprop_requests_apply_after_disk_misc_restore_and_survive_source_moves (
+fn boolprop_requests_apply_after_disk_misc_restore_and_survive_repo_moves (
 ) {
   let config : SkgConfig = config_with_order (&["public", "private"]);
   for (disk_no_search, request, expected) in [
@@ -109,7 +109,7 @@ fn boolprop_requests_apply_after_disk_misc_restore_and_survive_source_moves (
       disk . misc . push (FileProperty::NoSearchMatching); }
     let graph : InRustGraph = graph_from (&[disk . clone ()]);
     let mut buffer = disk;
-    buffer . source = SourceName::from ("private");
+    buffer . home_repo = RepoName::from ("private");
     buffer . title = "edited" . to_string ();
     let mut intent = NodeIntent::graph_save_from_nodecomplete (buffer);
     if let NodeIntent::Save (save) = &mut intent {
@@ -122,7 +122,7 @@ fn boolprop_requests_apply_after_disk_misc_restore_and_survive_source_moves (
     let DefineNode::Save (SaveNode (saved)) = &planned . instructions [0]
       else { panic! ("expected SaveNode"); };
     assert_eq! (&saved . misc, &expected);
-    assert_eq! (planned . source_moves . len (), 1);
+    assert_eq! (planned . repo_moves . len (), 1);
   }
 }
 
@@ -139,13 +139,13 @@ fn sticky_round_trip_restores_a_resolved_extra_ids_raw_disk_spelling () {
   // Rendering names the resolved node by PID, but the relationship on disk
   // names its extra ID.  A no-op save must preserve the raw stored value.
   buffer . contains = vec![pm ("public", "target")];
-  let resolved = apply_sticky_relSources_in_graph (
-    buffer, &disk, &RequestedRelSources::default (), &graph, &config ).unwrap ();
+  let resolved = apply_sticky_relRepos_in_graph (
+    buffer, &disk, &RequestedRelRepos::default (), &graph, &config ).unwrap ();
   assert_eq! (resolved . contains, vec![pm ("public", "target-extra")]);
 }
 
 #[test]
-fn home_move_to_more_private_clamps_relSources_up (
+fn home_move_to_more_private_clamps_relRepos_up (
 ) {
   let config : SkgConfig =
     config_with_order ( & ["public", "private"] );
@@ -158,8 +158,8 @@ fn home_move_to_more_private_clamps_relSources_up (
   // the buffer moved the node's home to private
   buffer . contains = vec! [ pm ("private", "child") ];
   let resolved : NodeComplete =
-    apply_sticky_relSources_in_graph (
-      buffer, &disk, &RequestedRelSources::default (), &graph, &config) . unwrap ();
+    apply_sticky_relRepos_in_graph (
+      buffer, &disk, &RequestedRelRepos::default (), &graph, &config) . unwrap ();
   assert_eq! ( resolved . contains, vec! [
     pm ("private", "child") ],
     "the sticky public source rises to the new, more private home" );
@@ -182,8 +182,8 @@ fn hide_floor_is_the_most_public_explaining_subscription (
     // be private, else it leaks the inference that the private
     // subscription exists. The privatized subscription is a DISK
     // fact (sticky preserves it); raising its privacy from the
-    // buffer would come through the (relSource ...) atom (see the
-    // explicit_source_* tests below), landed with render-and-gating.
+    // buffer would come through the (relRepo ...) atom (see the
+    // explicit_repo_* tests below), landed with render-and-gating.
     let mut disk : NodeComplete = owner . clone ();
     disk . subscribes_to = MSV::Specified ( vec! [
       pm ("private", "expl-a") ] );
@@ -193,8 +193,8 @@ fn hide_floor_is_the_most_public_explaining_subscription (
     buffer . hides_from_its_subscriptions = MSV::Specified ( vec! [
       pm ("public", "victim") ] ); // degenerate tag
     let resolved : NodeComplete =
-      apply_sticky_relSources_in_graph (
-        buffer, &disk, &RequestedRelSources::default (), &graph, &config) . unwrap ();
+      apply_sticky_relRepos_in_graph (
+        buffer, &disk, &RequestedRelRepos::default (), &graph, &config) . unwrap ();
     assert_eq! (
       resolved . subscribes_to . or_default (),
       & [ pm ("private", "expl-a") ] );
@@ -214,18 +214,18 @@ fn hide_floor_is_the_most_public_explaining_subscription (
     buffer . hides_from_its_subscriptions = MSV::Specified ( vec! [
       pm ("public", "victim") ] );
     let resolved : NodeComplete =
-      apply_sticky_relSources_in_graph (
-        buffer, &disk, &RequestedRelSources::default (), &graph, &config) . unwrap ();
+      apply_sticky_relRepos_in_graph (
+        buffer, &disk, &RequestedRelRepos::default (), &graph, &config) . unwrap ();
     assert_eq! (
       resolved . hides_from_its_subscriptions . or_default (),
       & [ pm ("public", "victim") ] ); }
 }
 
 #[test]
-fn explicit_source_at_or_more_private_than_floor_is_honored (
+fn explicit_repo_at_or_more_private_than_floor_is_honored (
 ) {
   // Allowed-side acceptance (render-and-gating, 5_plan.org): an
-  // explicit '(editRequest (relSource ...))' source that is at least as private as
+  // explicit '(editRequest (relRepo ...))' repo that is at least as private as
   // the default floor wins outright.
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
@@ -236,23 +236,23 @@ fn explicit_source_at_or_more_private_than_floor_is_honored (
   disk . contains = vec! [ pm ("public", "child") ];
   let mut buffer : NodeComplete = node_at ("owner", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
-  let explicit : RequestedRelSources = RequestedRelSources {
+  let explicit : RequestedRelRepos = RequestedRelRepos {
     contains : HashMap::from ([
-      ( ID::new ("child"), SourceName::from ("trusted") ) ]),
-    .. RequestedRelSources::default () };
+      ( ID::new ("child"), RepoName::from ("trusted") ) ]),
+    .. RequestedRelRepos::default () };
   let resolved : NodeComplete =
-    apply_sticky_relSources_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
+    apply_sticky_relRepos_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
   assert_eq! ( resolved . contains, vec! [
     pm ("trusted", "child") ],
     "an explicit source at or more private than the default wins outright" );
 }
 
 #[test]
-fn explicit_source_more_public_than_floor_is_rejected (
+fn explicit_repo_more_public_than_floor_is_rejected (
 ) {
   // More-public-than-floor rejection (render-and-gating, 5_plan.org): an
-  // explicit source more PUBLIC than the DEFAULT floor is a save
-  // error naming the member, the offered source, and the floor.
+  // explicit repo more PUBLIC than the DEFAULT floor is a save
+  // error naming the member, the offered repo, and the floor.
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
   let child : NodeComplete = node_at ("child", "private"); // forces the default floor to "private"
@@ -261,12 +261,12 @@ fn explicit_source_more_public_than_floor_is_rejected (
   let disk : NodeComplete = owner_before; // no sticky entry for "child"
   let mut buffer : NodeComplete = node_at ("owner", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
-  let explicit : RequestedRelSources = RequestedRelSources {
+  let explicit : RequestedRelRepos = RequestedRelRepos {
     contains : HashMap::from ([
-      ( ID::new ("child"), SourceName::from ("public") ) ]), // more public than the "private" floor
-    .. RequestedRelSources::default () };
+      ( ID::new ("child"), RepoName::from ("public") ) ]), // more public than the "private" floor
+    .. RequestedRelRepos::default () };
   let err : String =
-    apply_sticky_relSources_in_graph (buffer, &disk, &explicit, &graph, &config)
+    apply_sticky_relRepos_in_graph (buffer, &disk, &explicit, &graph, &config)
     . unwrap_err ();
   assert! ( err . contains ("child"),   "names the member: {}", err );
   assert! ( err . contains ("public"),  "names the offered relSource: {}", err );
@@ -274,10 +274,10 @@ fn explicit_source_more_public_than_floor_is_rejected (
 }
 
 #[test]
-fn explicit_relSource_moves_a_sticky_edge_to_its_default (
+fn explicit_relRepo_moves_a_sticky_edge_to_its_default (
 ) {
   // The BUG-and-fix_make-edge-more-public.org fix: an explicit
-  // relSource validates against the DEFAULT floor, not the disk relSource,
+  // relRepo validates against the DEFAULT floor, not the disk relRepo,
   // so it can lower a stuck edge's privacy back to the default.
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
@@ -289,19 +289,19 @@ fn explicit_relSource_moves_a_sticky_edge_to_its_default (
     pm ("private", "child") ]; // stuck more private than its default
   let mut buffer : NodeComplete = node_at ("owner", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
-  let explicit : RequestedRelSources = RequestedRelSources {
+  let explicit : RequestedRelRepos = RequestedRelRepos {
     contains : HashMap::from ([
-      ( ID::new ("child"), SourceName::from ("public") ) ]), // = default
-    .. RequestedRelSources::default () };
+      ( ID::new ("child"), RepoName::from ("public") ) ]), // = default
+    .. RequestedRelRepos::default () };
   let resolved : NodeComplete =
-    apply_sticky_relSources_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
+    apply_sticky_relRepos_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
   assert_eq! ( resolved . contains, vec! [
     pm ("public", "child") ],
     "an explicit source AT the default lowers the sticky edge's privacy" );
 }
 
 #[test]
-fn explicit_source_between_default_and_sticky_is_accepted (
+fn explicit_repo_between_default_and_sticky_is_accepted (
 ) {
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
@@ -312,12 +312,12 @@ fn explicit_source_between_default_and_sticky_is_accepted (
   disk . contains = vec! [ pm ("private", "child") ];
   let mut buffer : NodeComplete = node_at ("owner", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
-  let explicit : RequestedRelSources = RequestedRelSources {
+  let explicit : RequestedRelRepos = RequestedRelRepos {
     contains : HashMap::from ([
-      ( ID::new ("child"), SourceName::from ("trusted") ) ]),
-    .. RequestedRelSources::default () };
+      ( ID::new ("child"), RepoName::from ("trusted") ) ]),
+    .. RequestedRelRepos::default () };
   let resolved : NodeComplete =
-    apply_sticky_relSources_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
+    apply_sticky_relRepos_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
   assert_eq! ( resolved . contains, vec! [
     pm ("trusted", "child") ],
     "moving privacy partway toward the default is accepted" );
@@ -327,7 +327,7 @@ fn explicit_source_between_default_and_sticky_is_accepted (
 fn explicit_more_public_than_default_is_rejected_and_names_the_default (
 ) {
   // With the floors split, the error's floor is the DEFAULT, not
-  // the (more private) sticky disk relSource.
+  // the (more private) sticky disk relRepo.
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
   let child : NodeComplete = node_at ("child", "trusted"); // default floor: trusted
@@ -338,12 +338,12 @@ fn explicit_more_public_than_default_is_rejected_and_names_the_default (
     pm ("private", "child") ]; // sticky sits more private than the default
   let mut buffer : NodeComplete = node_at ("owner", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
-  let explicit : RequestedRelSources = RequestedRelSources {
+  let explicit : RequestedRelRepos = RequestedRelRepos {
     contains : HashMap::from ([
-      ( ID::new ("child"), SourceName::from ("public") ) ]), // more public than default
-    .. RequestedRelSources::default () };
+      ( ID::new ("child"), RepoName::from ("public") ) ]), // more public than default
+    .. RequestedRelRepos::default () };
   let err : String =
-    apply_sticky_relSources_in_graph (buffer, &disk, &explicit, &graph, &config)
+    apply_sticky_relRepos_in_graph (buffer, &disk, &explicit, &graph, &config)
     . unwrap_err ();
   assert! ( err . contains ("'trusted'"),
             "the floor named is the default: {}", err );
@@ -352,12 +352,12 @@ fn explicit_more_public_than_default_is_rejected_and_names_the_default (
 }
 
 #[test]
-fn explicit_at_a_more_public_than_default_disk_source_round_trips (
+fn explicit_at_a_more_public_than_default_disk_repo_round_trips (
 ) {
   // Legacy or hand-authored data can put an owned-to-owned edge at a
-  // source more public than its default. Render emits '(relSource ...)'
+  // repo more public than its default. Render emits '(relRepo ...)'
   // for every off-default edge, so that atom must save back unchanged
-  // (explicit == disk relSource), and moving it partway toward the
+  // (explicit == disk relRepo), and moving it partway toward the
   // default is fine; moving it still more public is forbidden.
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
@@ -367,27 +367,27 @@ fn explicit_at_a_more_public_than_default_disk_source_round_trips (
   let mut disk : NodeComplete = owner_before;
   disk . contains = vec! [
     pm ("public", "child") ]; // more public than the "private" default
-  { // Holding the disk relSource round-trips.
+  { // Holding the disk relRepo round-trips.
     let mut buffer : NodeComplete = node_at ("owner", "public");
     buffer . contains = vec! [ pm ("public", "child") ];
-    let explicit : RequestedRelSources = RequestedRelSources {
+    let explicit : RequestedRelRepos = RequestedRelRepos {
       contains : HashMap::from ([
-        ( ID::new ("child"), SourceName::from ("public") ) ]),
-      .. RequestedRelSources::default () };
+        ( ID::new ("child"), RepoName::from ("public") ) ]),
+      .. RequestedRelRepos::default () };
     let resolved : NodeComplete =
-      apply_sticky_relSources_in_graph (
+      apply_sticky_relRepos_in_graph (
         buffer, &disk, &explicit, &graph, &config ) . unwrap ();
     assert_eq! ( resolved . contains, vec! [ pm ("public", "child") ],
       "the rendered atom saves back unchanged" ); }
   { // Moving it partway toward the default is accepted.
     let mut buffer : NodeComplete = node_at ("owner", "public");
     buffer . contains = vec! [ pm ("public", "child") ];
-    let explicit : RequestedRelSources = RequestedRelSources {
+    let explicit : RequestedRelRepos = RequestedRelRepos {
       contains : HashMap::from ([
-        ( ID::new ("child"), SourceName::from ("trusted") ) ]),
-      .. RequestedRelSources::default () };
+        ( ID::new ("child"), RepoName::from ("trusted") ) ]),
+      .. RequestedRelRepos::default () };
     let resolved : NodeComplete =
-      apply_sticky_relSources_in_graph (
+      apply_sticky_relRepos_in_graph (
         buffer, &disk, &explicit, &graph, &config ) . unwrap ();
     assert_eq! ( resolved . contains, vec! [ pm ("trusted", "child") ],
       "making a legacy more-public edge more private is accepted" ); }
@@ -409,7 +409,7 @@ fn explicit_lowering_moves_the_edge_between_section_files (
   for name in ["public", "trusted", "private"] {
     let path : PathBuf = tmp . path () . join (name);
     std::fs::create_dir_all (&path) . unwrap ();
-    config . sources . get_mut ( &SourceName::from (name) )
+    config . repos . get_mut ( &RepoName::from (name) )
       . unwrap () . path = path; }
   let child : NodeComplete = node_at ("child", "trusted"); // home already moved
   let owner : NodeComplete = node_at ("owner", "public");
@@ -428,12 +428,12 @@ fn explicit_lowering_moves_the_edge_between_section_files (
             "before: no trusted section yet" );
   let mut buffer : NodeComplete = node_at ("owner", "public");
   buffer . contains = vec! [ pm ("public", "child") ]; // degenerate tag
-  let explicit : RequestedRelSources = RequestedRelSources {
+  let explicit : RequestedRelRepos = RequestedRelRepos {
     contains : HashMap::from ([
-      ( ID::new ("child"), SourceName::from ("trusted") ) ]), // the new default
-    .. RequestedRelSources::default () };
+      ( ID::new ("child"), RepoName::from ("trusted") ) ]), // the new default
+    .. RequestedRelRepos::default () };
   let resolved : NodeComplete =
-    apply_sticky_relSources_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
+    apply_sticky_relRepos_in_graph (buffer, &disk, &explicit, &graph, &config) . unwrap ();
   assert_eq! ( resolved . contains, vec! [ pm ("trusted", "child") ] );
   write_nodecomplete_telescope ( &resolved, &config ) . unwrap ();
   assert! ( ! private_file . is_file (),
@@ -451,7 +451,7 @@ fn explicit_lowering_moves_the_edge_between_section_files (
 #[test]
 fn same_save_child_home_move_allows_publicizing_its_parent_edge (
 ) {
-  // A source move and its parent's explicit relSource request occur in one
+  // A repo move and its parent's explicit relRepo request occur in one
   // save. The parent must calculate the edge default from the child's NEW
   // home, not the pre-save graph's old home.
   let config : SkgConfig = config_with_order ( & ["public", "pers-p"] );
@@ -464,7 +464,7 @@ fn same_save_child_home_move_allows_publicizing_its_parent_edge (
     NodeIntent::graph_save_from_nodecomplete (parent);
   if let NodeIntent::Save (intent) = &mut parent_intent {
     intent . contains = MSV::Specified (vec! [(
-      ID::new ("child"), Some (SourceName::from ("public"))) ]); }
+      ID::new ("child"), Some (RepoName::from ("public"))) ]); }
   let child_intent : NodeIntent = NodeIntent::graph_save_from_nodecomplete (
     node_at ("child", "public"));
 
@@ -478,15 +478,15 @@ fn same_save_child_home_move_allows_publicizing_its_parent_edge (
       _ => None })
     .expect ("parent save instruction");
   assert_eq! ( parent . contains, vec! [ pm ("public", "child") ] );
-  assert_eq! ( planned . source_moves . len (), 1 );
-  assert_eq! ( planned . source_moves [0] . pid, ID::new ("child") );
+  assert_eq! ( planned . repo_moves . len (), 1 );
+  assert_eq! ( planned . repo_moves [0] . pid, ID::new ("child") );
 }
 
 #[test]
-fn same_save_hidden_node_home_move_sets_the_new_hide_source (
+fn same_save_hidden_node_home_move_sets_the_new_hide_repo (
 ) {
-  // Hides have an inferred relSource rather than an explicit
-  // relSource request, but their endpoint floor must use the same pending
+  // Hides have an inferred relRepo rather than an explicit
+  // relRepo request, but their endpoint floor must use the same pending
   // home view as the other relationship kinds.
   let config : SkgConfig = config_with_order ( & ["public", "pers-p"] );
   let hider : NodeComplete = node_at ("hider", "public");
@@ -519,7 +519,7 @@ fn same_save_hidden_node_home_move_sets_the_new_hide_source (
 fn new_private_child_in_the_same_save_gets_a_private_edge (
 ) {
   // The child is absent from the pre-save graph, so its Save intent is the
-  // only available source of its home. Falling back to the public parent's
+  // only available repo of its home. Falling back to the public parent's
   // home here would create exactly the leak shape the endpoint floor forbids.
   let config : SkgConfig = config_with_order ( & ["public", "pers-p"] );
   let parent : NodeComplete = node_at ("parent", "public");
@@ -553,9 +553,9 @@ fn owned_to_foreign_new_edges_default_to_the_owner_home (
         [("public", "private"), ("private", "public")] {
       let mut config : SkgConfig =
         config_with_order (&["public", "private"]);
-      config . sources . get_mut (&SourceName::from (member_home))
+      config . repos . get_mut (&RepoName::from (member_home))
         . unwrap () . user_owns_it = false;
-      config . sources . get_mut (&SourceName::from (owner_home))
+      config . repos . get_mut (&RepoName::from (owner_home))
         . unwrap () . user_owns_it = true;
       let owner : NodeComplete = node_at ("owner", owner_home);
       let member : NodeComplete = node_at ("member", member_home);
@@ -569,25 +569,25 @@ fn owned_to_foreign_new_edges_default_to_the_owner_home (
         "overrides_view_of" => buffer . overrides_view_of =
           MSV::Specified (vec! [pm (owner_home, "member")]),
         _ => unreachable! (), }
-      let resolved : NodeComplete = apply_sticky_relSources_in_graph (
-        buffer, &disk, &RequestedRelSources::default (), &graph, &config ) . unwrap ();
-      let source : &SourceName = match relation {
-        "contains" => &resolved . contains [0] . relSource,
+      let resolved : NodeComplete = apply_sticky_relRepos_in_graph (
+        buffer, &disk, &RequestedRelRepos::default (), &graph, &config ) . unwrap ();
+      let repo : &RepoName = match relation {
+        "contains" => &resolved . contains [0] . relRepo,
         "subscribes_to" =>
-          &resolved . subscribes_to . or_default () [0] . relSource,
+          &resolved . subscribes_to . or_default () [0] . relRepo,
         "overrides_view_of" =>
-          &resolved . overrides_view_of . or_default () [0] . relSource,
+          &resolved . overrides_view_of . or_default () [0] . relRepo,
         _ => unreachable! (), };
-      assert_eq! (source, &SourceName::from (owner_home),
+      assert_eq! (repo, &RepoName::from (owner_home),
                   "relation {}", relation); }}
 }
 
 #[test]
-fn owned_to_foreign_explicit_owned_source_is_allowed_and_foreign_refused (
+fn owned_to_foreign_explicit_owned_repo_is_allowed_and_foreign_refused (
 ) {
   let mut config : SkgConfig =
     config_with_order (&["public", "foreign", "private"]);
-  config . sources . get_mut (&SourceName::from ("foreign"))
+  config . repos . get_mut (&RepoName::from ("foreign"))
     . unwrap () . user_owns_it = false;
   let mut owner : NodeComplete = node_at ("owner", "public");
   let member : NodeComplete = node_at ("member", "foreign");
@@ -595,26 +595,26 @@ fn owned_to_foreign_explicit_owned_source_is_allowed_and_foreign_refused (
 
   let disk : NodeComplete = owner . clone ();
   owner . contains = vec! [pm ("public", "member")];
-  let allowed : RequestedRelSources = RequestedRelSources {
+  let allowed : RequestedRelRepos = RequestedRelRepos {
     contains : HashMap::from ([
-      (ID::new ("member"), SourceName::from ("private")) ]),
-    .. RequestedRelSources::default () };
-  let resolved : NodeComplete = apply_sticky_relSources_in_graph (
+      (ID::new ("member"), RepoName::from ("private")) ]),
+    .. RequestedRelRepos::default () };
+  let resolved : NodeComplete = apply_sticky_relRepos_in_graph (
     owner . clone (), &disk, &allowed, &graph, &config ) . unwrap ();
-  assert_eq! (resolved . contains [0] . relSource,
-              SourceName::from ("private"));
+  assert_eq! (resolved . contains [0] . relRepo,
+              RepoName::from ("private"));
 
-  let refused : RequestedRelSources = RequestedRelSources {
+  let refused : RequestedRelRepos = RequestedRelRepos {
     contains : HashMap::from ([
-      (ID::new ("member"), SourceName::from ("foreign")) ]),
-    .. RequestedRelSources::default () };
-  let error : String = apply_sticky_relSources_in_graph (
+      (ID::new ("member"), RepoName::from ("foreign")) ]),
+    .. RequestedRelRepos::default () };
+  let error : String = apply_sticky_relRepos_in_graph (
     owner, &disk, &refused, &graph, &config ) . unwrap_err ();
   assert! (error . contains ("non-owned source 'foreign'"), "{}", error);
 }
 
 #[test]
-fn explicit_alias_relSource_is_load_bearing_and_validated (
+fn explicit_alias_relRepo_is_load_bearing_and_validated (
 ) {
   let config : SkgConfig =
     config_with_order (&["public", "trusted", "private"]);
@@ -622,26 +622,26 @@ fn explicit_alias_relSource_is_load_bearing_and_validated (
   let disk : NodeComplete = node_at ("owner", "public");
   let mut buffer : NodeComplete = disk . clone ();
   buffer . aliases = MSV::Specified (vec! [
-    crate::types::misc::RelPartner::at_relSource (
-      SourceName::from ("public"), "nickname" . to_string ()) ]);
-  let explicit : RequestedRelSources = RequestedRelSources {
+    crate::types::misc::RelPartner::at_relRepo (
+      RepoName::from ("public"), "nickname" . to_string ()) ]);
+  let explicit : RequestedRelRepos = RequestedRelRepos {
     aliases : HashMap::from ([
-      ("nickname" . to_string (), SourceName::from ("private")) ]),
-    .. RequestedRelSources::default () };
-  let resolved : NodeComplete = apply_sticky_relSources_in_graph (
+      ("nickname" . to_string (), RepoName::from ("private")) ]),
+    .. RequestedRelRepos::default () };
+  let resolved : NodeComplete = apply_sticky_relRepos_in_graph (
     buffer, &disk, &explicit, &graph, &config ) . unwrap ();
   assert_eq! (
-    resolved . aliases . or_default () [0] . relSource,
-    SourceName::from ("private") );
+    resolved . aliases . or_default () [0] . relRepo,
+    RepoName::from ("private") );
 
   let mut foreign_config : SkgConfig = config;
-  foreign_config . sources . get_mut (&SourceName::from ("private"))
+  foreign_config . repos . get_mut (&RepoName::from ("private"))
     . unwrap () . user_owns_it = false;
   let mut buffer : NodeComplete = disk . clone ();
   buffer . aliases = MSV::Specified (vec! [
-    crate::types::misc::RelPartner::at_relSource (
-      SourceName::from ("public"), "nickname" . to_string ()) ]);
-  let error : String = apply_sticky_relSources_in_graph (
+    crate::types::misc::RelPartner::at_relRepo (
+      RepoName::from ("public"), "nickname" . to_string ()) ]);
+  let error : String = apply_sticky_relRepos_in_graph (
     buffer, &disk, &explicit, &graph, &foreign_config ) . unwrap_err ();
   assert! (error . contains ("non-owned relSource 'private'"), "{}", error);
 }
@@ -655,14 +655,14 @@ fn restricted_delete_refusal_sees_inactive_sections (
   for (name, dir) in [("public", "public"), ("private", "private")] {
     let path : PathBuf = tmp . path () . join (dir);
     std::fs::create_dir_all (&path) . unwrap ();
-    config . sources . get_mut ( &SourceName::from (name) )
+    config . repos . get_mut ( &RepoName::from (name) )
       . unwrap () . path = path; }
   std::fs::write (
     tmp . path () . join ("private/n.skg"),
     "pid: n\n" ) . unwrap ();
-  let active : ActiveSourceSet = ActiveSourceSet {
-    name    : SourceSetName::from ("public"),
-    sources : [ SourceName::from ("public") ]
+  let active : ActiveRepoSet = ActiveRepoSet {
+    name    : RepoSetName::from ("public"),
+    repos : [ RepoName::from ("public") ]
       . into_iter () . collect (), };
   let refusal : Result<(), String> =
     refuse_delete_with_inactive_sections (
@@ -676,9 +676,9 @@ fn restricted_delete_refusal_sees_inactive_sections (
 }
 
 #[test]
-fn relsource_fact_and_request_round_trip_separately (
+fn relrepo_fact_and_request_round_trip_separately (
 ) {
-  // The rendered fact and a requested source are distinct: the fact
+  // The rendered fact and a requested repo are distinct: the fact
   // remains under viewStats, while only editRequest carries write intent.
   use crate::org_to_text::viewnode_to_string;
   use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
@@ -687,9 +687,9 @@ fn relsource_fact_and_request_round_trip_separately (
 
   let mut t : ActiveNode =
     default_activeNode (
-      ID::new ("n"), SourceName::from ("public"), "N" . to_string () );
-  t . viewStats . relSource = Some ( SourceName::from ("private") );
-  t . relSource_request = Some ( SourceName::from ("secret") );
+      ID::new ("n"), RepoName::from ("public"), "N" . to_string () );
+  t . viewStats . relRepo = Some ( RepoName::from ("private") );
+  t . relRepo_request = Some ( RepoName::from ("secret") );
   let viewnode : ViewNode = ViewNode {
     focused     : false,
     folded      : false,
@@ -706,16 +706,16 @@ fn relsource_fact_and_request_round_trip_separately (
     "expected a relSource request in: {}", rendered );
   let full_sexp : String = format! ("(skg {})", rendered);
   let parsed = parse_metadata_to_viewnodemd (&full_sexp) . unwrap ();
-  assert_eq! ( parsed . viewStats . relSource,
-               Some ( SourceName::from ("private") ),
+  assert_eq! ( parsed . viewStats . relRepo,
+               Some ( RepoName::from ("private") ),
                "relSource did not round-trip through render+parse" );
-  assert_eq! ( parsed . relSource_request,
-               Some ( SourceName::from ("secret") ),
+  assert_eq! ( parsed . relRepo_request,
+               Some ( RepoName::from ("secret") ),
                "relSource request did not round-trip" );
 }
 
 #[test]
-fn relsource_requests_are_contextual_and_singular (
+fn relrepo_requests_are_contextual_and_singular (
 ) {
   use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
 
@@ -754,7 +754,7 @@ fn boolprop_requests_parse_round_trip_and_reject_read_only_properties (
 
   for value in [false, true] {
     let mut active : ActiveNode = default_activeNode (
-      ID::new ("n"), SourceName::from ("public"), "N" . to_string () );
+      ID::new ("n"), RepoName::from ("public"), "N" . to_string () );
     if let crate::types::viewnode::Editability::Definitive {
       edit_request, .. } = &mut active . editability
     { *edit_request = Some (NodeEditRequest::SetBoolProp {
@@ -792,7 +792,7 @@ fn boolprop_requests_parse_round_trip_and_reject_read_only_properties (
 }
 
 #[test]
-fn unknown_relsource_fact_and_request_round_trip_separately (
+fn unknown_relrepo_fact_and_request_round_trip_separately (
 ) {
   use crate::org_to_text::viewnode_to_string;
   use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
@@ -800,8 +800,8 @@ fn unknown_relsource_fact_and_request_round_trip_separately (
 
   let mut unknown = mk_unknown_viewnode ( ID::new ("absent-raw") );
   if let ViewNodeKind::Phantom (Phantom::Unknown (u)) = &mut unknown . kind {
-    u . relSource = Some ( SourceName::from ("private") );
-    u . relSource_request = Some ( SourceName::from ("secret") );
+    u . relRepo = Some ( RepoName::from ("private") );
+    u . relRepo_request = Some ( RepoName::from ("secret") );
   } else { unreachable! (); }
   let config : SkgConfig = config_with_order ( & ["public", "private"] );
   let rendered : String = viewnode_to_string (&unknown, &config) . unwrap ();
@@ -810,8 +810,8 @@ fn unknown_relsource_fact_and_request_round_trip_separately (
             "Unknown facts and requests must serialize in stable order: {}", rendered );
   let parsed = parse_metadata_to_viewnodemd (
     &format! ("(skg {})", rendered) ) . unwrap ();
-  assert_eq! ( parsed . unknown_relSource,
-               Some (SourceName::from ("private")) );
-  assert_eq! ( parsed . unknown_relSource_request,
-               Some (SourceName::from ("secret")) );
+  assert_eq! ( parsed . unknown_relRepo,
+               Some (RepoName::from ("private")) );
+  assert_eq! ( parsed . unknown_relRepo_request,
+               Some (RepoName::from ("secret")) );
 }

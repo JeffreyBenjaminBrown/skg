@@ -3,7 +3,7 @@
 use indoc::indoc;
 use regex::Regex;
 use skg::types::errors::BufferValidationError;
-use skg::types::misc::{SkgConfig, SkgfileSource, SourceName, TantivyIndex};
+use skg::types::misc::{SkgConfig, SkgfileRepo, RepoName, TantivyIndex};
 use skg::types::tree::forest::MpViewForest;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
 use skg::from_text::buffer_to_viewnodes::local::validate_local_structure;
@@ -44,10 +44,10 @@ fn all_tests
       test_no_duplicated_content_error_for_phantom_siblings (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_root_without_source_validation", fixtures) ?;
-      test_root_without_source_validation (
+      test_root_without_repo_validation (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_nonexistent_source_validation", fixtures) ?;
-      test_nonexistent_source_validation (
+      test_nonexistent_repo_validation (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_empty_title_rejected_for_definitive_node", fixtures) ?;
       test_empty_title_rejected_for_definitive_node (
@@ -156,14 +156,14 @@ async fn test_find_buffer_errors_for_saving (
           assert_eq!(id . 0, "conflict",
                      "Multiple_Defining_Viewnodes error should come from conflicting ID"); }}
 
-      // Source validation (bad_child and alias_child have no sources)
-      { let source_re = Regex::new(r"(?i)must.*source") . unwrap();
-        let source_errors: Vec<&BufferValidationError> =
+      // Repo validation (bad_child and alias_child have no repos)
+      { let repo_re = Regex::new(r"(?i)must.*source") . unwrap();
+        let repo_errors: Vec<&BufferValidationError> =
           local_errors . iter() . copied()
           . filter(|e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
-                               if source_re . is_match (msg)))
+                               if repo_re . is_match (msg)))
           . collect();
-        assert_eq!(source_errors . len(), 2,
+        assert_eq!(repo_errors . len(), 2,
                    "Should find 2 source validation errors"); }
 
       // Body_of_Scaffold (from parsing phase)
@@ -373,11 +373,11 @@ async fn test_no_duplicated_content_error_for_phantom_siblings (
       Ok(())
 }
 
-async fn test_root_without_source_validation (
+async fn test_root_without_repo_validation (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      // root without source should be rejected
+      // root without repo should be rejected
       let input: &str =
         indoc! {"
                 * (skg (node (id root1) (source main))) Root with source (valid)
@@ -389,27 +389,27 @@ async fn test_root_without_source_validation (
       let errors: Vec<BufferValidationError> =
         find_buffer_errors_for_saving(&viewforest, config)?;
 
-      let source_re = Regex::new(r"(?i)must.*source") . unwrap();
-      let source_errors: Vec<&BufferValidationError> = errors . iter()
+      let repo_re = Regex::new(r"(?i)must.*source") . unwrap();
+      let repo_errors: Vec<&BufferValidationError> = errors . iter()
         . filter(
           |e| matches!(e,
                        BufferValidationError::LocalStructureViolation(msg, _)
-                       if source_re . is_match (msg)))
+                       if repo_re . is_match (msg)))
         . collect();
-      assert_eq!(source_errors . len(), 1,
+      assert_eq!(repo_errors . len(), 1,
                  "Should find 1 source validation error");
 
       if let BufferValidationError::LocalStructureViolation(_, id)
-        = source_errors[0]
+        = repo_errors[0]
       { assert_eq!(id . 0, "root2",
                    "Source error should be for root2"); }
       Ok(( )) }
 
-async fn test_nonexistent_source_validation (
+async fn test_nonexistent_repo_validation (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      { // Node with nonexistent source should be rejected
+      { // Node with nonexistent repo should be rejected
         let input: &str =
           indoc! {"
                   * (skg (node (id root1) (source main))) Root with valid source
@@ -421,31 +421,31 @@ async fn test_nonexistent_source_validation (
         let errors: Vec<BufferValidationError> =
           find_buffer_errors_for_saving(&viewforest, config)?;
 
-        let source_re = Regex::new(r"(?i)must.*source") . unwrap();
-        let nonexistent_source_errors: Vec<&BufferValidationError> =
+        let repo_re = Regex::new(r"(?i)must.*source") . unwrap();
+        let nonexistent_repo_errors: Vec<&BufferValidationError> =
           errors . iter()
           . filter(
             |e| matches!(e,
                          BufferValidationError::LocalStructureViolation(msg, _)
-                         if source_re . is_match (msg)))
+                         if repo_re . is_match (msg)))
           . collect();
 
-        assert_eq!(nonexistent_source_errors . len(), 2,
+        assert_eq!(nonexistent_repo_errors . len(), 2,
                    "Should find 2 source validation errors");
 
-        { // Check first error (child1, with source 'nonexistent')
+        { // Check first error (child1, with repo 'nonexistent')
           let found_child_error: bool =
-            nonexistent_source_errors . iter() . any(|e| {
+            nonexistent_repo_errors . iter() . any(|e| {
               matches!(e, BufferValidationError::LocalStructureViolation(msg, id)
-                       if source_re . is_match (msg) && id . 0 == "child1") });
+                       if repo_re . is_match (msg) && id . 0 == "child1") });
           assert!(found_child_error,
                   "Should find source error for child1"); }
 
-        { // Check second error (root2, with source 'invalid_source')
+        { // Check second error (root2, with repo 'invalid_repo')
           let found_root_error: bool =
-            nonexistent_source_errors . iter() . any(|e| {
+            nonexistent_repo_errors . iter() . any(|e| {
               matches!(e, BufferValidationError::LocalStructureViolation(msg, id)
-                       if source_re . is_match (msg) && id . 0 == "root2") });
+                       if repo_re . is_match (msg) && id . 0 == "root2") });
           assert!(found_root_error,
                   "Should find source error for root2"); }}
       Ok(( )) }
@@ -661,7 +661,7 @@ fn test_inactive_placeholder_content_edits_rejected_at_parse_time () {
 
 #[test]
 fn test_inactive_placeholder_active_children_allowed_locally () {
-  // TODO/full-schema/9-2_source-set-safety.org, the retained case:
+  // TODO/full-schema/9-2_repo-set-safety.org, the retained case:
   // an inactive node stays on screen because of its active
   // children, so an InactiveNode with active children must pass.
   let input : &str =
@@ -815,16 +815,16 @@ fn partner_folder_treeids (
     . collect () }
 
 fn validation_config () -> SkgConfig {
-  let mut sources : HashMap<SourceName, SkgfileSource> =
+  let mut repos : HashMap<RepoName, SkgfileRepo> =
     HashMap::new ();
-  for source in ["main", "private"] {
-    let source_name : SourceName = SourceName::from (source);
-    sources . insert (
-      source_name . clone (),
-      SkgfileSource {
-        name          : source_name,
+  for repo in ["main", "private"] {
+    let repo_name : RepoName = RepoName::from (repo);
+    repos . insert (
+      repo_name . clone (),
+      SkgfileRepo {
+        name          : repo_name,
         abbreviation  : None,
-        path          : PathBuf::from (format! ("/tmp/{}", source)),
+        path          : PathBuf::from (format! ("/tmp/{}", repo)),
         user_owns_it  : true,
       }); }
-  SkgConfig::dummyFromSources (sources) }
+  SkgConfig::dummyFromRepos (repos) }

@@ -1,10 +1,10 @@
-//! Batch existence and home-source lookup from the published graph snapshot.
-//! It exposes no title or inactive node source information.
+//! Batch existence and home-repo lookup from the published graph snapshot.
+//! It exposes no title or inactive node repo information.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{send_response_with_length_prefix, value_from_request_sexp};
-use crate::source_sets::ActiveSourceSet;
+use crate::repo_sets::ActiveRepoSet;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::sexp::extract_string_list_from_sexp;
 use sexp::Sexp;
@@ -12,7 +12,7 @@ use std::net::TcpStream;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum LinkStatus {
-  Resolved { pid : ID, source_label : String },
+  Resolved { pid : ID, repo_label : String },
   Inactive,
   Missing,
 }
@@ -20,19 +20,19 @@ pub enum LinkStatus {
 pub fn classify_link_ids (
   graph  : &InRustGraph,
   config : &SkgConfig,
-  active : &ActiveSourceSet,
+  active : &ActiveRepoSet,
   ids    : &[ID],
 ) -> Vec<(ID, LinkStatus)> {
   ids . iter () . map (|id| {
-    let status : LinkStatus = match graph . pid_and_source (id) {
+    let status : LinkStatus = match graph . pid_and_repo (id) {
       None => LinkStatus::Missing,
-      Some ((_pid, source)) if ! active . is_all ()
-        && ! active . contains_source (&source) => LinkStatus::Inactive,
-      Some ((pid, source)) => {
-        let source_label : String = config . sources . get (&source)
+      Some ((_pid, repo)) if ! active . is_all ()
+        && ! active . contains_repo (&repo) => LinkStatus::Inactive,
+      Some ((pid, repo)) => {
+        let repo_label : String = config . repos . get (&repo)
           .map (|s| s . herald_label () . to_string ())
-          .unwrap_or_else (|| source . 0 . clone ());
-        LinkStatus::Resolved { pid, source_label } } };
+          .unwrap_or_else (|| repo . 0 . clone ());
+        LinkStatus::Resolved { pid, repo_label } } };
     (id . clone (), status) }) . collect () }
 
 pub fn handle_link_statuses_request (
@@ -40,7 +40,7 @@ pub fn handle_link_statuses_request (
   request : &str,
   graph   : &InRustGraph,
   config  : &SkgConfig,
-  active  : &ActiveSourceSet,
+  active  : &ActiveRepoSet,
 ) {
   let response : String = match link_statuses_response (
     request, graph, config, active ) {
@@ -54,7 +54,7 @@ fn link_statuses_response (
   request : &str,
   graph   : &InRustGraph,
   config  : &SkgConfig,
-  active  : &ActiveSourceSet,
+  active  : &ActiveRepoSet,
 ) -> Result<String, String> {
   let request_id : String = value_from_request_sexp (
     "request-id", request) ?;
@@ -69,9 +69,9 @@ fn link_statuses_response (
     .map (|(id, status)| match status {
       LinkStatus::Missing => format! ("({} missing)", quoted (&id . 0)),
       LinkStatus::Inactive => format! ("({} inactive)", quoted (&id . 0)),
-      LinkStatus::Resolved { pid, source_label } => format! (
+      LinkStatus::Resolved { pid, repo_label } => format! (
         "({} resolved {} {})",
-        quoted (&id . 0), quoted (&pid . 0), quoted (&source_label)), })
+        quoted (&id . 0), quoted (&pid . 0), quoted (&repo_label)), })
     .collect ();
   Ok (format! ("(request-id {}) (results ({}))",
     quoted (&request_id), rows . join (" "))) }
@@ -93,30 +93,30 @@ fn quoted (s : &str) -> String {
 mod tests {
   use super::*;
   use crate::dbs::filesystem::not_nodes::load_config;
-  use crate::source_sets::SourceSetName;
-  use crate::types::misc::SourceName;
+  use crate::repo_sets::RepoSetName;
+  use crate::types::misc::RepoName;
   use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
   use crate::dbs::in_rust_graph::InRustGraphHandle;
   use arc_swap::ArcSwap;
   use std::sync::Arc;
 
   #[test]
-  fn statuses_use_the_published_graph_and_hide_inactive_sources () {
+  fn statuses_use_the_published_graph_and_hide_inactive_repos () {
     let mut config : SkgConfig = load_config (
-      "tests/source_sets/fixtures/skgconfig.toml") . unwrap ();
-    config . sources . get_mut (&SourceName::from ("public"))
+      "tests/repo_sets/fixtures/skgconfig.toml") . unwrap ();
+    config . repos . get_mut (&RepoName::from ("public"))
       .unwrap () . abbreviation = Some ("pub" . to_string ());
-    let active : ActiveSourceSet = ActiveSourceSet::named (
-      &config, SourceSetName::from ("public")) . unwrap ();
+    let active : ActiveRepoSet = ActiveRepoSet::named (
+      &config, RepoSetName::from ("public")) . unwrap ();
     let visible : NodeComplete = NodeComplete {
       pid : ID::from ("visible"),
       extra_ids : vec![ID::from ("old-visible")],
-      source : SourceName::from ("public"),
+      home_repo : RepoName::from ("public"),
       title : "A title that must stay out of lookup results" .to_string (),
       .. empty_node_complete () };
     let private : NodeComplete = NodeComplete {
       pid : ID::from ("private"),
-      source : SourceName::from ("private"),
+      home_repo : RepoName::from ("private"),
       title : "Private title" .to_string (),
       .. empty_node_complete () };
     let graph : InRustGraph = InRustGraph::from_nodecompletes (
@@ -125,7 +125,7 @@ mod tests {
       .into_iter () . map (ID::from) .collect ();
     assert_eq! (classify_link_ids (&graph, &config, &active, &ids), vec![
       (ID::from ("old-visible"), LinkStatus::Resolved {
-        pid : ID::from ("visible"), source_label : "pub" .to_string () }),
+        pid : ID::from ("visible"), repo_label : "pub" .to_string () }),
       (ID::from ("private"), LinkStatus::Inactive),
       (ID::from ("unknown"), LinkStatus::Missing) ]);
     let response : String = link_statuses_response (
@@ -141,9 +141,9 @@ mod tests {
   #[test]
   fn a_newly_published_graph_answers_before_any_title_index_update () {
     let config : SkgConfig = load_config (
-      "tests/source_sets/fixtures/skgconfig.toml") . unwrap ();
-    let active : ActiveSourceSet = ActiveSourceSet::named (
-      &config, SourceSetName::from ("public")) . unwrap ();
+      "tests/repo_sets/fixtures/skgconfig.toml") . unwrap ();
+    let active : ActiveRepoSet = ActiveRepoSet::named (
+      &config, RepoSetName::from ("public")) . unwrap ();
     let handle : InRustGraphHandle = Arc::new (ArcSwap::from_pointee (
       InRustGraph::new ()));
     let requested : Vec<ID> = vec![ID::from ("old-new")];
@@ -155,7 +155,7 @@ mod tests {
       NodeComplete {
         pid : ID::from ("new"),
         extra_ids : requested . clone (),
-        source : SourceName::from ("public"),
+        home_repo : RepoName::from ("public"),
         .. empty_node_complete () } ]);
     handle . store (Arc::new (published));
     let result = classify_link_ids (
@@ -163,8 +163,8 @@ mod tests {
     assert_eq! (result, vec![(ID::from ("old-new"),
       LinkStatus::Resolved {
         pid : ID::from ("new"),
-        source_label : config . sources
-          [&SourceName::from ("public")] . herald_label () . to_string (),
+        repo_label : config . repos
+          [&RepoName::from ("public")] . herald_label () . to_string (),
       })]);
   }
 }

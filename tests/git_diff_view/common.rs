@@ -14,7 +14,7 @@ pub use skg::dbs::init::create_empty_tantivy_index;
 pub use skg::to_org::render::content_view::multi_root_view;
 pub use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 pub use skg::test_utils::graph_handle_from_config;
-pub use skg::types::misc::{ID, SkgConfig, SkgfileSource, TantivyIndex, SourceName};
+pub use skg::types::misc::{ID, SkgConfig, SkgfileRepo, TantivyIndex, RepoName};
 pub use skg::dbs::in_rust_graph::InRustGraphHandle;
 pub use skg::types::nodes::fs::NodeFS;
 pub use skg::types::nodes::complete::NodeComplete;
@@ -39,27 +39,27 @@ pub fn copy_dir_all ( src: &Path,
       fs::copy(&src_path, &dst_path)?; }}
   Ok (( )) }
 
-pub fn configure_git_user(repo: &Repository) {
-  let mut config = repo . config() . unwrap();
+pub fn configure_git_user(gitrepo: &Repository) {
+  let mut config = gitrepo . config() . unwrap();
   config . set_str("user.email", "test@test.com") . unwrap();
   config . set_str("user.name", "Test") . unwrap();
 }
 
-pub fn commit_all(repo: &Repository, message: &str) {
-  let mut index = repo . index() . unwrap();
+pub fn commit_all(gitrepo: &Repository, message: &str) {
+  let mut index = gitrepo . index() . unwrap();
   index . add_all(["*.skg"], git2::IndexAddOption::DEFAULT, None) . unwrap();
   index . write() . unwrap();
   let tree_id = index . write_tree() . unwrap();
-  let tree = repo . find_tree (tree_id) . unwrap();
-  let sig = repo . signature() . unwrap();
+  let tree = gitrepo . find_tree (tree_id) . unwrap();
+  let sig = gitrepo . signature() . unwrap();
 
-  match repo . head() {
+  match gitrepo . head() {
     Ok (head) => {
       let parent = head . peel_to_commit() . unwrap();
-      repo . commit(Some ("HEAD"), &sig, &sig, message, &tree, &[&parent]) . unwrap();
+      gitrepo . commit(Some ("HEAD"), &sig, &sig, message, &tree, &[&parent]) . unwrap();
     },
     Err (_) => {
-      repo . commit(Some ("HEAD"), &sig, &sig, message, &tree, &[]) . unwrap();
+      gitrepo . commit(Some ("HEAD"), &sig, &sig, message, &tree, &[]) . unwrap();
     }
   }
 }
@@ -70,17 +70,17 @@ pub fn commit_all(repo: &Repository, message: &str) {
 
 pub async fn setup_test_stores(
   _test_name: &str,
-  source_path: &str,
+  repo_path: &str,
   tantivy_folder: &str,
 ) -> Result<(SkgConfig, TantivyIndex), Box<dyn Error>> {
-  let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new();
-  sources . insert (SourceName::from ("main"), SkgfileSource {
-    name: SourceName::from ("main"),
+  let mut repos : HashMap<RepoName, SkgfileRepo> = HashMap::new();
+  repos . insert (RepoName::from ("main"), SkgfileRepo {
+    name: RepoName::from ("main"),
     abbreviation: None,
-    path: PathBuf::from (source_path),
+    path: PathBuf::from (repo_path),
     user_owns_it: true, });
-  let config = SkgConfig::fromSourcesAndTantivyFolder (
-    sources, tantivy_folder );
+  let config = SkgConfig::fromReposAndTantivyFolder (
+    repos, tantivy_folder );
   let tantivy_index =
     create_empty_tantivy_index (&config . tantivy_folder) ?;
   Ok ((config, tantivy_index)) }
@@ -104,13 +104,13 @@ pub async fn cleanup_test_stores(
 // Disk verification helpers
 //
 
-pub fn read_nodecomplete(repo_path: &Path, id: &str) -> Result<NodeComplete, Box<dyn Error>> {
-  // Read YAML as NodeFS, then attach source.
-  // Tests in this module use source "main".
-  let path = repo_path . join(format!("{}.skg", id));
+pub fn read_nodecomplete(gitrepo_path: &Path, id: &str) -> Result<NodeComplete, Box<dyn Error>> {
+  // Read YAML as NodeFS, then attach Skg repo.
+  // Tests in this module use Skg repo "main".
+  let path = gitrepo_path . join(format!("{}.skg", id));
   let content = fs::read_to_string (&path)?;
   let node_fs: NodeFS = serde_yaml::from_str (&content)?;
-  Ok ( node_fs . into_complete_as_single_section ( SourceName::from ("main") ))
+  Ok ( node_fs . into_complete_as_single_section ( RepoName::from ("main") ))
 }
 
 //
@@ -252,47 +252,47 @@ pub fn insert_after(buffer: &str, after_substring: &str, new_line: &str) -> Stri
 
 /// Create a git repo with head->worktree transition from fixture directories.
 /// The worktree changes land unstaged (index == HEAD).
-pub fn setup_git_repo_with_fixtures(
-  repo_path: &Path,
+pub fn setup_gitrepo_with_fixtures(
+  gitrepo_path: &Path,
   head_fixtures: &str,
   worktree_fixtures: &str,
 ) -> Result<Repository, Box<dyn Error>> {
-  copy_dir_all(Path::new (head_fixtures), repo_path)?;
-  let repo = Repository::init (repo_path)?;
-  configure_git_user (&repo);
-  commit_all(&repo, "Initial commit");
+  copy_dir_all(Path::new (head_fixtures), gitrepo_path)?;
+  let gitrepo = Repository::init (gitrepo_path)?;
+  configure_git_user (&gitrepo);
+  commit_all(&gitrepo, "Initial commit");
 
-  for entry in fs::read_dir (repo_path)? {
+  for entry in fs::read_dir (gitrepo_path)? {
     let path = entry?. path();
     if path . extension() . map_or(false, |ext| ext == "skg") {
       fs::remove_file (&path)?;
     }
   }
-  copy_dir_all(Path::new (worktree_fixtures), repo_path)?;
+  copy_dir_all(Path::new (worktree_fixtures), gitrepo_path)?;
 
-  Ok (repo)
+  Ok (gitrepo)
 }
 
-/// Like 'setup_git_repo_with_fixtures' but then 'git add .' after
+/// Like 'setup_gitrepo_with_fixtures' but then 'git add .' after
 /// switching the worktree, so the transition lands staged (index == worktree,
 /// both differ from HEAD) rather than unstaged.
-pub fn setup_git_repo_with_fixtures_staged(
-  repo_path: &Path,
+pub fn setup_gitrepo_with_fixtures_staged(
+  gitrepo_path: &Path,
   head_fixtures: &str,
   worktree_fixtures: &str,
 ) -> Result<Repository, Box<dyn Error>> {
-  let repo = setup_git_repo_with_fixtures(
-    repo_path, head_fixtures, worktree_fixtures )?;
-  stage_everything(&repo)?;
-  Ok (repo)
+  let gitrepo = setup_gitrepo_with_fixtures(
+    gitrepo_path, head_fixtures, worktree_fixtures )?;
+  stage_everything(&gitrepo)?;
+  Ok (gitrepo)
 }
 
 /// Stage every .skg change currently in the worktree (including
 /// deletions) so that the full diff lives on the staged side.
 pub fn stage_everything(
-  repo: &Repository,
+  gitrepo: &Repository,
 ) -> Result<(), Box<dyn Error>> {
-  let mut index = repo . index ()?;
+  let mut index = gitrepo . index ()?;
   index . add_all(
     ["*.skg"],
     git2::IndexAddOption::DEFAULT,

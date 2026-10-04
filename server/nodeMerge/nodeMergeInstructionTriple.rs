@@ -4,7 +4,7 @@ use crate::from_text::local_instruction_collection::lower::nodeMerge_pairs;
 use crate::from_text::local_instruction_collection::traverse::collect_instructions_locally;
 use crate::from_text::local_instruction_collection::types::CollectedIntents;
 use crate::types::save::{NodeMerge, SaveNode, DeleteNode};
-use crate::types::misc::{MSV, RelPartner, SkgConfig, SourceName, ID, members_of, rel_partners_at_relSource};
+use crate::types::misc::{MSV, RelPartner, SkgConfig, RepoName, ID, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
   FileProperty, NodeComplete, file_property_is_true, set_file_property};
 use crate::types::list::dedup_vector;
@@ -91,7 +91,7 @@ fn nodeMerge_from_acquirer_and_acquiree (
     acquiree_to_delete :
       DeleteNode {
         id     : acquiree_id . clone(),
-        source : acquiree_from_disk . source . clone() }} ) }
+        home_repo : acquiree_from_disk . home_repo . clone() }} ) }
 
 /// Computes the updated acquirer node with all fields properly merged.
 /// Returns a new NodeComplete with:
@@ -132,26 +132,26 @@ fn three_nodeMerged_nodecompletes(
       dedup_vector (combined_extra_ids); }
   // Combining lists of relation partners (5_plan.org, work item interactions;
   // "fold both, concatenate acquiree-after-acquirer, dedup,
-  // unfold"): relSources are PRESERVED, so a merge cannot silently
+  // unfold"): relRepos are PRESERVED, so a merge cannot silently
   // de-privatize an edge. On a member both sides carry, the more
-  // PRIVATE source wins (the safe tie-break); every source clamps at
+  // PRIVATE repo wins (the safe tie-break); every repo clamps at
   // the acquirer's home, since no section may be more public than
   // its home.
   let combine_rel_partners =
     |lists : &[&[RelPartner<ID>]]| -> Vec<RelPartner<ID>> {
-      let home : &SourceName = & updated_acquirer . source;
+      let home : &RepoName = & updated_acquirer . home_repo;
       let mut out : Vec<RelPartner<ID>> = Vec::new ();
       for list in lists {
         for m in *list {
-          let source : SourceName = config . more_private_of (
-            m . relSource . clone (), home . clone () );
+          let repo : RepoName = config . more_private_of (
+            m . relRepo . clone (), home . clone () );
           match out . iter_mut ()
             . find ( |o| o . member == m . member ) {
             Some (existing) => {
-              existing . relSource = config . more_private_of (
-                existing . relSource . clone (), source ); }
-            None => out . push ( RelPartner::at_relSource (
-              source, m . member . clone () )), }} }
+              existing . relRepo = config . more_private_of (
+                existing . relRepo . clone (), repo ); }
+            None => out . push ( RelPartner::at_relRepo (
+              repo, m . member . clone () )), }} }
       out };
   let new_contains : Vec<ID> = {
     // [preserver] + acquirer's old content + acquiree's old content
@@ -164,7 +164,7 @@ fn three_nodeMerged_nodecompletes(
     dedup_vector (combined) };
   updated_acquirer . contains = {
     let mut combined : Vec<RelPartner<ID>> = combine_rel_partners (
-      & [ & rel_partners_at_relSource ( & updated_acquirer . source,
+      & [ & rel_partners_at_relRepo ( & updated_acquirer . home_repo,
                             vec! [ acquiree_text_preserver . pid . clone() ] ),
           & acquirer_from_disk . contains,
           & acquiree_from_disk . contains ] );
@@ -179,16 +179,16 @@ fn three_nodeMerged_nodecompletes(
     for list in [ acquirer_from_disk . aliases . or_default (),
                   acquiree_from_disk . aliases . or_default () ] {
       for m in list {
-        let source : SourceName = config . more_private_of (
-          m . relSource . clone (),
-          updated_acquirer . source . clone () );
+        let repo : RepoName = config . more_private_of (
+          m . relRepo . clone (),
+          updated_acquirer . home_repo . clone () );
         match combined . iter_mut ()
           . find ( |o| o . member == m . member ) {
           Some (existing) => {
-            existing . relSource = config . more_private_of (
-              existing . relSource . clone (), source ); }
-          None => combined . push ( RelPartner::at_relSource (
-            source, m . member . clone () )), }} }
+            existing . relRepo = config . more_private_of (
+              existing . relRepo . clone (), repo ); }
+          None => combined . push ( RelPartner::at_relRepo (
+            repo, m . member . clone () )), }} }
     updated_acquirer . aliases =
       MSV::Specified (combined); }
   { // Combine subscribes_to
@@ -253,7 +253,7 @@ fn create_acquiree_text_preserver(acquiree: &NodeComplete) -> NodeComplete {
     title: format!("MERGED: {}", acquiree . title),
     overPrivateText_telescope: false,
     aliases: MSV::Unspecified,
-    source: acquiree . source . clone(),
+    home_repo: acquiree . home_repo . clone(),
     pid: ID(uuid::Uuid::new_v4() . to_string()),
     extra_ids: vec![],
     body: acquiree . body . clone(),
@@ -270,16 +270,16 @@ fn create_acquiree_text_preserver(acquiree: &NodeComplete) -> NodeComplete {
 #[cfg(test)]
 mod boolprop_tests {
   use super::*;
-  use crate::types::misc::SkgfileSource;
+  use crate::types::misc::SkgfileRepo;
   use crate::types::nodes::complete::{empty_node_complete, file_property_is_true};
   use std::collections::HashMap;
   use std::path::PathBuf;
 
   fn config () -> SkgConfig {
-    let source : SourceName = SourceName::from ("owned");
-    SkgConfig::fromSourcesAndTantivyFolder (
-      HashMap::from ([(source . clone (), SkgfileSource {
-        name         : source,
+    let repo : RepoName = RepoName::from ("owned");
+    SkgConfig::fromReposAndTantivyFolder (
+      HashMap::from ([(repo . clone (), SkgfileRepo {
+        name         : repo,
         abbreviation : None,
         path         : PathBuf::from ("owned"),
         user_owns_it : true, })]),
@@ -296,11 +296,11 @@ mod boolprop_tests {
     ] {
       let mut acquirer : NodeComplete = NodeComplete {
         pid    : ID::from ("A"),
-        source : SourceName::from ("owned"),
+        home_repo : RepoName::from ("owned"),
         .. empty_node_complete () };
       let mut acquiree : NodeComplete = NodeComplete {
         pid    : ID::from ("B"),
-        source : SourceName::from ("owned"),
+        home_repo : RepoName::from ("owned"),
         .. empty_node_complete () };
       acquirer . misc . extend ([
         FileProperty::Had_ID_Before_Import,

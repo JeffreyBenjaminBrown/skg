@@ -4,7 +4,7 @@ use crate::types::git::GitDiffStatus;
 fn id (s : &str) -> ID { ID ( s . to_string () ) }
 fn ids (ss : &[&str]) -> Vec<ID> {
   ss . iter () . map ( |s| id (s) ) . collect () }
-fn src (s : &str) -> SourceName { SourceName ( s . to_string () ) }
+fn src (s : &str) -> RepoName { RepoName ( s . to_string () ) }
 
 fn modified_hides_entry (
   hides_diff : Vec<Diff_Item<ID>>,
@@ -18,12 +18,12 @@ fn modified_hides_entry (
     after_node : None } }
 
 fn diffs_with_one_entry (
-  source   : &SourceName,
+  skgrepo   : &RepoName,
   staged   : Option<(PathBuf, NodeCompleteDiff)>,
   unstaged : Option<(PathBuf, NodeCompleteDiff)>,
-) -> Option<HashMap<SourceName, SourceDiff>> {
-  Some ( HashMap::from ([ ( source . clone (), SourceDiff {
-    is_git_repo   : true,
+) -> Option<HashMap<RepoName, RepoDiff>> {
+  Some ( HashMap::from ([ ( skgrepo . clone (), RepoDiff {
+    is_gitrepo   : true,
     staged        : staged   . into_iter () . collect (),
     unstaged      : unstaged . into_iter () . collect (),
     added_nodes   : HashMap::new (),

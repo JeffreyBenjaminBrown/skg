@@ -3,8 +3,8 @@
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::headline_to_triple;
 use skg::org_to_text::viewforest_to_string;
-use skg::source_sets::ActiveSourceSet;
-use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, SourceName, SourceSetName, TantivyIndex, rel_partners_at_relSource_msv};
+use skg::repo_sets::ActiveRepoSet;
+use skg::types::misc::{ID, MSV, RelPartner, SkgConfig, RepoName, RepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::serve::handlers::text_search::{
@@ -40,7 +40,7 @@ fn test_text_search_org_format (
       node1 . title =
         "the bear eats cheese" . to_string ();
       node1 . aliases =
-        rel_partners_at_relSource_msv ( & node1 . source, MSV::Specified ( vec! [
+        rel_partners_at_relRepo_msv ( & node1 . home_repo, MSV::Specified ( vec! [
           "bear cheese" . to_string (),
           "the cheese" . to_string ()
         ] ) );
@@ -80,7 +80,7 @@ fn test_text_search_org_format (
           &matches_by_id,
           &std::collections::HashSet::new () );
       let dummy_config : SkgConfig =
-        SkgConfig::dummyFromSources (HashMap::new ());
+        SkgConfig::dummyFromRepos (HashMap::new ());
       let result : String =
         viewforest_to_string ( &viewforest, &dummy_config )
         . expect ("search viewforest rendering never fails");
@@ -206,7 +206,7 @@ fn test_search_results_preserve_links_in_title (
       let (viewforest, _ids) = build_search_viewforest (
         "science", &matches_by_id, &std::collections::HashSet::new () );
       let dummy_config : SkgConfig =
-        SkgConfig::dummyFromSources (HashMap::new ());
+        SkgConfig::dummyFromRepos (HashMap::new ());
       let result : String =
         viewforest_to_string ( &viewforest, &dummy_config )
         . expect ("search viewforest rendering never fails");
@@ -352,7 +352,7 @@ fn private_alias_documents_are_filtered_before_grouping (
 ) -> Result < (), Box < dyn std::error::Error >> {
   // A node's home is "main" but one alias lives at level
   // "private". A search restricted to "main" must drop the
-  // alias DOCUMENT itself (per-document source filtering, before
+  // alias DOCUMENT itself (per-document repo filtering, before
   // group_matches_by_id groups by ID) -- not merely drop whole
   // ID-groups whose home is inactive.
   let index_dir : &str =
@@ -364,16 +364,16 @@ fn private_alias_documents_are_filtered_before_grouping (
       node . pid = ID::new ("id_leveled");
       node . title = "public title" . to_string ();
       node . aliases = MSV::Specified ( vec! [
-        RelPartner::at_relSource (
-          SourceName::from ("private"),
+        RelPartner::at_relRepo (
+          RepoName::from ("private"),
           "secret zanzibar" . to_string () ) ] );
       let nodes : Vec<NodeComplete> = vec! [ node ];
       let ( tantivy_index, _ ) : ( TantivyIndex, usize ) =
         wipe_then_init_tantivy_db (
           &nodes, Path::new (index_dir) ) ?;
-      let public_only : ActiveSourceSet = ActiveSourceSet {
-        name    : SourceSetName::from ("main"),
-        sources : [ SourceName::from ("main") ]
+      let public_only : ActiveRepoSet = ActiveRepoSet {
+        name    : RepoSetName::from ("main"),
+        repos : [ RepoName::from ("main") ]
           . into_iter () . collect (), };
       { // Restricted search: the private alias doc must not match.
         let ( best_matches, searcher ) =

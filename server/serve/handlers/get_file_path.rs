@@ -3,20 +3,20 @@ use crate::serve::util::{
   value_from_request_sexp,
   send_response_with_length_prefix,
   tag_text_response};
-use crate::source_sets::ActiveSourceSet;
-use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::util::path_from_pid_and_source;
+use crate::repo_sets::ActiveRepoSet;
+use crate::types::misc::{ID, SkgConfig, RepoName};
+use crate::util::path_from_pid_and_repo;
 
 use std::fs;
 use std::net::TcpStream;
 use std::path::PathBuf;
 
 
-pub fn handle_get_file_path_request_with_source_set (
+pub fn handle_get_file_path_request_with_repo_set (
   stream  : &mut TcpStream,
   request : &str,
   config  : &SkgConfig,
-  active  : &ActiveSourceSet,
+  active  : &ActiveRepoSet,
 ) {
   let id : ID = match value_from_request_sexp (
     "id", request ) {
@@ -28,9 +28,9 @@ pub fn handle_get_file_path_request_with_source_set (
           TcpToClient::GetFilePath,
           &format! ( "Error: {}", e ) ));
       return; } };
-  let source : SourceName = match value_from_request_sexp (
+  let repo : RepoName = match value_from_request_sexp (
     "source", request ) {
-    Ok  (v) => SourceName (v),
+    Ok  (v) => RepoName (v),
     Err (e) => {
       send_response_with_length_prefix (
         stream,
@@ -38,18 +38,18 @@ pub fn handle_get_file_path_request_with_source_set (
           TcpToClient::GetFilePath,
           &format! ( "Error: {}", e ) ));
       return; } };
-  if ! active . contains_source (&source) {
+  if ! active . contains_repo (&repo) {
     send_response_with_length_prefix (
       stream,
       & tag_text_response (
         TcpToClient::GetFilePath,
         &format! (
           "Error: source {} is not in active source-set {}",
-          source, active . name ) ));
+          repo, active . name ) ));
     return; }
-  let raw_path : String = match path_from_pid_and_source (
+  let raw_path : String = match path_from_pid_and_repo (
     config,
-    & source,
+    & repo,
     id ) {
     Ok  (p) => p,
     Err (e) => {

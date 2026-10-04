@@ -23,7 +23,7 @@ use arc_swap::ArcSwap;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::types::misc::{ID, SourceName, members_of};
+use crate::types::misc::{ID, RepoName, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
@@ -104,12 +104,12 @@ impl InRustGraph {
     } else {
       self . extra_id_to_pid . get (id) . cloned () } }
 
-  /// Resolve an ID (primary or extra) to its '(pid, source)'.
+  /// Resolve an ID (primary or extra) to its '(pid, repo)'.
   /// Returns None if the ID is unknown.
-  pub fn pid_and_source (&self, id: &ID) -> Option<(ID, SourceName)> {
+  pub fn pid_and_repo (&self, id: &ID) -> Option<(ID, RepoName)> {
     let pid : ID = self . pid_of (id) ?;
     let node : &NodeRust = self . nodes . get (&pid) ?;
-    Some ( ( pid, node . source . clone () ) ) }
+    Some ( ( pid, node . home_repo . clone () ) ) }
 }
 
 /// Resolve a raw relationship ID to its inverse-index key under an explicit

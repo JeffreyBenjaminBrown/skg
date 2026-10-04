@@ -1,4 +1,4 @@
-use super::misc::{ID, SourceName};
+use super::misc::{ID, RepoName};
 use super::nodes::complete::NodeComplete;
 use super::errors::{SaveError, BufferValidationError};
 
@@ -7,14 +7,14 @@ use super::errors::{SaveError, BufferValidationError};
 /// Types
 /////////////////
 
-/// When a user changes a node's source,
+/// When a user changes a node's repo,
 /// one of these is generated
 /// (in addition to the usual DefineNode).
 #[derive(Debug)]
-pub struct SourceMove {
+pub struct RepoMove {
   pub pid        : ID,
-  pub old_source : SourceName,
-  pub new_source : SourceName,
+  pub old_repo : RepoName,
+  pub new_repo : RepoName,
 }
 
 /// Defines what to do with a single node: save it or delete it.
@@ -42,7 +42,7 @@ pub struct SaveNode(pub NodeComplete);
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct DeleteNode {
   pub id: ID,
-  pub source: SourceName,
+  pub home_repo: RepoName,
 }
 
 /// The whole plan a save applies to the graph, with no view attached: the
@@ -56,7 +56,7 @@ pub struct DeleteNode {
 pub struct SavePlan {
   pub define_nodes       : Vec<DefineNode>,
   pub nodeMerge_instructions : Vec<NodeMerge>,
-  pub source_moves       : Vec<SourceMove>,
+  pub repo_moves       : Vec<RepoMove>,
   /// Forks detected this save: editing a foreign node N is read as a
   /// request to clone it. Held SEPARATE from 'define_nodes' because a
   /// save carrying forks is gated on the user's confirmation -- the
@@ -74,10 +74,10 @@ pub enum PostCommitNoticeCandidate {
   HiddenOutsideAdded { subscriber : ID, member : ID },
 }
 
-/// One fork: the user made a foreign node N (read-only, in a source
+/// One fork: the user made a foreign node N (read-only, in a repo
 /// they do not own) definitive and edited it; that edit is read as a
 /// request to clone N. 'clone' is the new OWNED node C, built from the
-/// edited buffer node -- a fresh pid, an owned source, the edited
+/// edited buffer node -- a fresh pid, an owned repo, the edited
 /// title/body/contains, 'subscribes_to = [N]' and
 /// 'overrides_view_of = [N]', no hides. N itself is left untouched on
 /// disk (its foreign SaveNode is dropped). The 'original_*' fields name
@@ -87,14 +87,14 @@ pub struct ForkSpec {
   pub clone           : SaveNode,
   pub original_id     : ID,
   pub original_title  : String,
-  pub original_source : SourceName,
-  /// True iff the clone's source was SPECIFIED by the user (in the
-  /// confirmation buffer, or via explicit sources on N's new children
+  pub original_repo : RepoName,
+  /// True iff the clone's repo was SPECIFIED by the user (in the
+  /// confirmation buffer, or via explicit repos on N's new children
   /// in the saved metadata), as opposed to inferred or defaulted. A
-  /// confirmed source renders as settled in the confirmation buffer;
-  /// an unconfirmed one renders as the PICK-A-SOURCE placeholder plus
+  /// confirmed repo renders as settled in the confirmation buffer;
+  /// an unconfirmed one renders as the PICK-A-REPO placeholder plus
   /// a suggestion, and the client asks before approving.
-  pub source_confirmed : bool,
+  pub repo_confirmed : bool,
 }
 
 /// When an 'acquiree' merges into an 'acquirer',
@@ -191,38 +191,38 @@ fn format_buffer_validation_error (
     BufferValidationError::DuplicatedContent (id) => {
       format!("Node has multiple Content children with the same ID:\n- ID: {}\n",
               id . 0) },
-    BufferValidationError::InconsistentSources(id, sources) => {
-      let source_list: Vec<String> =
-        sources . iter() . map(|s| s . 0 . clone()) . collect();
+    BufferValidationError::InconsistentRepos(id, repos) => {
+      let repo_list: Vec<String> =
+        repos . iter() . map(|s| s . 0 . clone()) . collect();
       format!( "Multiple viewnodes with ID {} have inconsistent sources:\n- Sources: {:?}\n- All instances of the same ID must have the same source.\n",
-              id . 0, source_list) },
-    BufferValidationError::ModifiedForeignNode(id, source) => {
+              id . 0, repo_list) },
+    BufferValidationError::ModifiedForeignNode(id, repo) => {
       format!("Cannot modify node from foreign (read-only) source:\n- ID: {}\n- Source: {}\n- Foreign sources can only be viewed, not modified.\n",
-              id . 0, source) },
-    BufferValidationError::CreatedForeignNode(id, source) => {
+              id . 0, repo) },
+    BufferValidationError::CreatedForeignNode(id, repo) => {
       format!("Cannot create node in foreign (read-only) source:\n- ID: {}\n- Source: {}\n- Foreign sources can only be viewed, not modified.\n",
-              id . 0, source) },
-    BufferValidationError::CannotMoveToOrFromForeignSource(id, disk_source, buffer_source) => {
+              id . 0, repo) },
+    BufferValidationError::CannotMoveToOrFromForeignRepo(id, disk_repo, buffer_repo) => {
       format!("Cannot move node between sources:\n- ID: {}\n- Source on disk: {}\n- Source from buffer: {}\n- One or both sources are foreign (read-only).\n",
-              id . 0, disk_source, buffer_source) },
+              id . 0, disk_repo, buffer_repo) },
     BufferValidationError::CannotMoveAndMergeSimultaneously(id) => {
       format!("Cannot move and merge a node simultaneously:\n- ID: {}\n- Please save the move and merge in separate operations.\n",
               id . 0) },
-    BufferValidationError::SourceNotInConfig(id, source) => {
+    BufferValidationError::RepoNotInConfig(id, repo) => {
       format!("Node references a source that does not exist in config:\n- ID: {}\n- Source: {}\n- Please check your config file and ensure this source is defined.\n",
-              id . 0, source) },
-    BufferValidationError::ForkSourceUnresolved(id) => {
+              id . 0, repo) },
+    BufferValidationError::ForkRepoUnresolved(id) => {
       format!("Cannot fork a foreign node -- no owned source for the clone:\n- Foreign node: {}\n- It has no owned ancestor in the view to inherit a source from.\n- Set the clone's source in the fork-confirmation buffer (C-c s s), then approve.\n",
               id . 0) },
     BufferValidationError::ForkAlreadyExists(original, existing) => {
       format!("Cannot fork a node you have already forked:\n- Foreign node: {}\n- Your existing clone: {}\n- A node may have at most one user-owned override. Edit the existing clone instead.\n",
               original . 0, existing . 0) },
-    BufferValidationError::ForkSourceInactive(id, source) => {
+    BufferValidationError::ForkRepoInactive(id, repo) => {
       format!("Cannot fork into an inactive source:\n- Foreign node: {}\n- Clone's resolved source: {}\n- That source is not in the active source-set. Activate it first; an invisible clone is never created silently.\n",
-              id . 0, source) },
-    BufferValidationError::ForkSourceNotOwned(id, source) => {
+              id . 0, repo) },
+    BufferValidationError::ForkRepoNotOwned(id, repo) => {
       format!("Cannot fork into a source you do not own:\n- Foreign node: {}\n- Clone's chosen source: {}\n- Pick an owned source for the clone (C-c s s in the confirmation buffer).\n",
-              id . 0, source) },
+              id . 0, repo) },
     BufferValidationError::ForkRequestOnUnknownNode(id) => {
       format!("Cannot fork an unsaved node:\n- Node: {}\n- It is not in the graph. Only a saved node can be forked; save it first, then fork.\n",
               id . 0) },
@@ -257,9 +257,9 @@ fn format_buffer_validation_error (
       owner_id, owner_title, changes } => {
       format!("Edited server-owned properties surface:\n- Owner ID: {}\n- Owner title: {}\n- Changes: {}\n- No changes were saved. Use skg-set-property-search-matching for noSearchMatching. HadId and WasOverloaded are provenance and have no setter.\n",
               owner_id . 0, owner_title, changes . join ("; ")) },
-    BufferValidationError::BoolPropEditOnForeignNode (id, source) => {
+    BufferValidationError::BoolPropEditOnForeignNode (id, repo) => {
       format!("Cannot change a property on a foreign node:\n- ID: {}\n- Source: {}\n- Property changes never create an implicit fork. Visit an owned node instead.\n",
-              id . 0, source) },
+              id . 0, repo) },
     BufferValidationError::BoolPropEditOnUnknownNode (id) => {
       format!("Cannot change a property on an unsaved or unknown node:\n- ID: {}\n- Save the node first, then run the property setter.\n",
               id . 0) },
@@ -325,12 +325,12 @@ impl NodeMerge {
   /// Extracts the three targets from a NodeMerge:
   /// - acquiree_text_preserver -> &NodeComplete
   /// - updated_acquirer -> &NodeComplete
-  /// - acquiree_to_delete -> (&ID, &SourceName)
+  /// - acquiree_to_delete -> (&ID, &RepoName)
   pub fn targets_from_nodeMerge (
     &self
-  ) -> (&NodeComplete, &NodeComplete, (&ID, &SourceName)) {
+  ) -> (&NodeComplete, &NodeComplete, (&ID, &RepoName)) {
     ( &self . acquiree_text_preserver . 0,
       &self . updated_acquirer . 0,
-      (&self . acquiree_to_delete . id, &self . acquiree_to_delete . source) )
+      (&self . acquiree_to_delete . id, &self . acquiree_to_delete . home_repo) )
   }
 }

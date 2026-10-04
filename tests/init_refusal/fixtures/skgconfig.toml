@@ -1,5 +1,5 @@
 tantivy_folder = "/tmp/placeholder"
 
-[[sources]]
+[[repos]]
 name = "owned"
 path = "owned/owned"

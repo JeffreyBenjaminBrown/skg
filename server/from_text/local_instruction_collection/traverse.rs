@@ -12,10 +12,10 @@
 /// .
 /// The traversal ASSUMES that 'find_buffer_errors_for_saving' has
 /// passed. In particular it assumes that:
-/// - every vognode has a PID and a config-valid source;
+/// - every vognode has a PID and a config-valid repo;
 /// - each ID has at most one definitive instance
 ///   ('Multiple_Defining_Viewnodes');
-/// - same-ID instances have consistent toDelete values and sources;
+/// - same-ID instances have consistent toDelete values and repos;
 /// - folder shapes are valid: each folder holds only the child kinds it
 ///   permits, each folder is unique among its siblings, content members
 ///   have distinct IDs per
@@ -47,7 +47,7 @@ use crate::from_text::local_instruction_collection::predicates::{
 use crate::from_text::local_instruction_collection::types::{
   CollectedIntents, DefiningFolderOwner, LocalContext, NodeIntent_Local,
   HiddenOutsideEdit, SubscribeeTextClaim, SubscribeeVisibility };
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, RepoName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
   NodeEditRequest, AffectsParent, Qual, QualFolder, PartnerFolder, ActiveNode, ViewNode,
@@ -176,12 +176,12 @@ fn visit_active_vognode (
           collected . instructionMerge_intent (
             t . id . clone(),
             NodeIntent_Local::Delete {
-              source : t . source . clone() } ) ?;
+              repo : t . home_repo . clone() } ) ?;
         } else {
           collected . instructionMerge_intent (
             t . id . clone(),
             NodeIntent_Local::SetTitleAndBody {
-              source : t . source . clone(),
+              repo : t . home_repo . clone(),
               title  : t . title . clone(),
               body   : t . body() . cloned() } ) ?;
           collected . instructionMerge_intent (
@@ -265,16 +265,16 @@ fn visit_aliasFolder (
 ) -> Result<(), String> {
   if let LocalContext::UnderDefiningFolder (owner) = context {
     if owner . is_saveEligible {
-      let aliases : Vec<(String, Option<SourceName>)> = {
-        let mut aliases : Vec<(String, Option<SourceName>)> = Vec::new();
+      let aliases : Vec<(String, Option<RepoName>)> = {
+        let mut aliases : Vec<(String, Option<RepoName>)> = Vec::new();
         let mut seen : HashSet<String> = HashSet::new ();
         for child in node_ref . children() {
           if let ViewNodeKind::Qual (Qual::Alias {
-            text, relSource_request, .. })
+            text, relRepo_request, .. })
             = &child . value() . kind
           { if seen . insert (text . clone ()) {
               aliases . push (( text . clone (),
-                                relSource_request . clone () )); }} }
+                                relRepo_request . clone () )); }} }
         aliases };
       // The MSV semantics are: an absent folder emits no intent, which
       // lowers to Unspecified, while a present-but-empty folder emits
@@ -338,11 +338,11 @@ fn visit_hiddenOutside_folder (
         match &child . value() . kind {
           ViewNodeKind::Vognode (Vognode::Active (t))
             if member_counts_for_partnerFolder (t) => {
-              if t . relSource_request . is_some () {
+              if t . relRepo_request . is_some () {
                 return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relSources are derived." . to_string ()); }
               members . push (t . id . clone ()); },
           ViewNodeKind::Phantom (Phantom::Unknown (unknown)) => {
-            if unknown . relSource_request . is_some () {
+            if unknown . relRepo_request . is_some () {
               return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relSources are derived." . to_string ()); }
             members . push (unknown . id . clone ()); },
           _ => {}, }}
@@ -371,43 +371,43 @@ fn visit_overridden_folder (
     &LocalContext::UnderVognode { parent_if_writeable : None },
     collected) }
 
-/// As 'dedup_vector', but dedups members carrying sources by ID ALONE
-/// (first occurrence wins) rather than by the full (ID, source) pair: a
-/// duplicate ID with a DIFFERENT source request must still
+/// As 'dedup_vector', but dedups members carrying repos by ID ALONE
+/// (first occurrence wins) rather than by the full (ID, repo) pair: a
+/// duplicate ID with a DIFFERENT repo request must still
 /// be silently dropped, matching the existing defining-folder dedup
 /// policy ("duplicate defining-folder members are silently deduped").
 fn dedup_members_by_id (
-  members : Vec<(ID, Option<SourceName>)>,
-) -> Vec<(ID, Option<SourceName>)> {
+  members : Vec<(ID, Option<RepoName>)>,
+) -> Vec<(ID, Option<RepoName>)> {
   let mut seen   : std::collections::HashSet<ID> = std::collections::HashSet::new();
-  let mut result : Vec<(ID, Option<SourceName>)> = Vec::new();
-  for (id, source) in members {
+  let mut result : Vec<(ID, Option<RepoName>)> = Vec::new();
+  for (id, repo) in members {
     if seen . insert (id . clone()) {
-      result . push ((id, source)); }}
+      result . push ((id, repo)); }}
   result }
 
 /// This returns the members of an OverriddenFolder: its Active
 /// children that pass the PartnerFolder membership predicate, silently
 /// deduplicated (by ID; see 'dedup_members_by_id'), preserving
 /// first-occurrence order. Each member is paired with its headline's
-/// explicit '(editRequest (relSource NAME))' request, if any (see
+/// explicit '(editRequest (relRepo NAME))' request, if any (see
 /// 'NodeIntent_Local').  (Inactive
 /// children are NOT members here: the overriddenFolder omits inactive
 /// members from display, and the set-difference merge preserves
-/// them at save.  TODO/full-schema/9-2_source-set-safety.org.)
+/// them at save.  TODO/full-schema/9-2_repo-set-safety.org.)
 fn partnerFolder_members (
   node_ref : NodeRef<ViewNode>,
-) -> Vec<(ID, Option<SourceName>)> {
-  let mut members : Vec<(ID, Option<SourceName>)> = Vec::new();
+) -> Vec<(ID, Option<RepoName>)> {
+  let mut members : Vec<(ID, Option<RepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
       ViewNodeKind::Vognode (Vognode::Active (t))
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . id . clone(),
-                           t . relSource_request . clone())),
+                           t . relRepo_request . clone())),
       ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
           members . push ((unknown . id . clone(),
-                           unknown . relSource_request . clone())),
+                           unknown . relRepo_request . clone())),
       _ => {}, }}
   dedup_members_by_id (members) }
 
@@ -419,21 +419,21 @@ fn partnerFolder_members (
 /// already restores invisible subscribees at their disk position, so
 /// a buffer-present inactive placeholder must not feed this list.
 /// Each member is paired with its headline's explicit
-/// '(editRequest (relSource NAME))' request, if any.
+/// '(editRequest (relRepo NAME))' request, if any.
 #[allow(non_snake_case)]
 fn subscribeeFolder_members (
   node_ref : NodeRef<ViewNode>,
-) -> Vec<(ID, Option<SourceName>)> {
-  let mut members : Vec<(ID, Option<SourceName>)> = Vec::new();
+) -> Vec<(ID, Option<RepoName>)> {
+  let mut members : Vec<(ID, Option<RepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
       ViewNodeKind::Vognode (Vognode::Active (t))
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . id . clone(),
-                           t . relSource_request . clone())),
+                           t . relRepo_request . clone())),
       ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
           members . push ((unknown . id . clone(),
-                           unknown . relSource_request . clone())),
+                           unknown . relRepo_request . clone())),
       _ => {}, }}
   dedup_members_by_id (members) }
 
@@ -441,7 +441,7 @@ fn subscribeeFolder_members (
 /// children that pass the contains predicate. It does not dedup,
 /// because validation ('nonignored_children_have_distinct_ids')
 /// already guarantees distinctness. Each member is paired with its
-/// headline's explicit '(editRequest (relSource NAME))' request, if any (see
+/// headline's explicit '(editRequest (relRepo NAME))' request, if any (see
 /// 'NodeIntent_Local').
 ///
 /// Inactive children contribute NOTHING here: an inactive node emits
@@ -456,8 +456,8 @@ fn subscribeeFolder_members (
 /// nodes emit positional save intentions for their container".)
 fn content_members (
   node_ref : NodeRef<ViewNode>,
-) -> Vec<(ID, Option<SourceName>)> {
-  let mut contents : Vec<(ID, Option<SourceName>)> = Vec::new();
+) -> Vec<(ID, Option<RepoName>)> {
+  let mut contents : Vec<(ID, Option<RepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
       ViewNodeKind::Vognode (Vognode::Active (t)) => {
@@ -466,13 +466,13 @@ fn content_members (
             // collected_id, not id: a drawn overrider stands for
             // the original member it was drawn in place of.
             t . collected_id (),
-            t . relSource_request . clone() )); }},
+            t . relRepo_request . clone() )); }},
       ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
         // An Unknown is inert as a node, but its raw ID is load-bearing
         // membership data at a structured relationship position. `None` asks
-        // disk supplementation to keep an existing destination source sticky.
+        // disk supplementation to keep an existing destination repo sticky.
         contents . push (( unknown . id . clone(),
-                           unknown . relSource_request . clone() )),
+                           unknown . relRepo_request . clone() )),
       _ => {}, }}
   contents }
 

@@ -5,15 +5,15 @@
 //! the instruction node EXPORT_MARKER_ID and whose body yields a
 //! `target_filepath` -- is written to
 //! `<output_base>/<target_filepath>.org` as a recursive content
-//! view, limited to a chosen source-set, stripped of skg metadata,
+//! view, limited to a chosen repo-set, stripped of skg metadata,
 //! with `[[id:..][label]]` links rewritten to relative org links.
 //!
-//! The core (`export_to_org`) takes nodes + an ActiveSourceSet + an
+//! The core (`export_to_org`) takes nodes + an ActiveRepoSet + an
 //! output base, so it needs neither the live graph nor Tantivy and is
 //! unit-testable. The server handler and the `export-org`
 //! subcommand both call it.
 
-use crate::source_sets::{ActiveSourceSet, SourceSetName};
+use crate::repo_sets::{ActiveRepoSet, RepoSetName};
 use crate::types::misc::SkgConfig;
 use crate::types::misc::{ID, RelPartner};
 use crate::types::nodes::complete::NodeComplete;
@@ -37,7 +37,7 @@ pub const EXPORT_MARKER_ID : &str =
   "3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f";
 
 /// Broken links (whose target is not exported under the chosen
-/// source-set) point at the export of this node.
+/// repo-set) point at the export of this node.
 pub const BROKEN_LINK_SINK_ID : &str =
   "9ff04e25-01e8-4634-8aa5-f5849bc1eb81";
 
@@ -131,7 +131,7 @@ struct Ev {
 /// `active`, into `output_base`. Independent of the live graph and Tantivy; does
 /// filesystem writes only under `output_base`.
 pub fn export_to_org (
-  active      : &ActiveSourceSet,
+  active      : &ActiveRepoSet,
   nodes       : &[NodeComplete],
   output_base : &Path,
 ) -> Result<ExportReport, Box<dyn Error>> {
@@ -202,7 +202,7 @@ pub fn export_to_org (
 /// where its file is written. This performs discovery only; it writes no
 /// files and is therefore safe to use at the release preflight.
 pub fn export_candidate_pids (
-  active : &ActiveSourceSet,
+  active : &ActiveRepoSet,
   nodes  : &[NodeComplete],
 ) -> Vec<ID> {
   let by_pid : HashMap<ID, &NodeComplete> =
@@ -231,15 +231,15 @@ pub fn export_candidate_pids (
   candidates
 }
 
-/// All currently valid export-root claims across configured sources. Import
+/// All currently valid export-root claims across configured repos. Import
 /// uses this read-only view to reject a new automatic target that would
 /// compete with an existing export root.
 pub(crate) fn claimed_export_targets (
   nodes : &[NodeComplete],
   config : &SkgConfig,
 ) -> Result<Vec<(ID, String)>, String> {
-  let active : ActiveSourceSet = ActiveSourceSet::named (
-    config, SourceSetName::from ("all"))
+  let active : ActiveRepoSet = ActiveRepoSet::named (
+    config, RepoSetName::from ("all"))
     .map_err (|error| error . to_string ())?;
   let aliases : HashMap<ID, ID> = nodes . iter ()
     .flat_map (|node| node . extra_ids . iter ()
@@ -281,7 +281,7 @@ fn write_export_file (
 fn discover_roots (
   nodes        : &[NodeComplete],
   alias_to_pid : &HashMap<ID, ID>,
-  active       : &ActiveSourceSet,
+  active       : &ActiveRepoSet,
   warnings     : &mut Vec<String>,
 ) -> (HashMap<ID, ExportRoot>, HashSet<ID>) {
   let marker_id : ID = ID::from (EXPORT_MARKER_ID);
@@ -311,7 +311,7 @@ fn discover_roots (
   for parent in &sorted {
     let marker_children : Vec<String> =
       parent . contains . iter ()
-      . filter ( |m| relSource_is_active (m, active) )
+      . filter ( |m| relRepo_is_active (m, active) )
       . map ( |m| &m . member )
       . filter_map ( |cid|
         marker_target . get (
@@ -329,7 +329,7 @@ fn discover_roots (
       warnings . push ( format! (
         "export root {} is in source {} which is inactive under \
          source-set {}; skipping",
-        parent . pid, parent . source, active . name ) );
+        parent . pid, parent . home_repo, active . name ) );
       continue; }
     if let Some (owner) = target_owner . get (&target) {
       warnings . push ( format! (
@@ -421,7 +421,7 @@ fn collect_events (
   alias_to_pid : &HashMap<ID, ID>,
   roots_by_pid : &HashMap<ID, ExportRoot>,
   marker_pids  : &HashSet<ID>,
-  active       : &ActiveSourceSet,
+  active       : &ActiveRepoSet,
 ) -> Vec<Ev> {
   let mut out : Vec<Ev> = Vec::new ();
   let mut rendered : HashSet<ID> = HashSet::new ();
@@ -442,8 +442,8 @@ fn collect_events (
     // pop (and thus render) in forward order.
     let mut kids : Vec<ID> = Vec::new ();
     for member in node . contains . iter () {
-      if ! relSource_is_active (member, active) { continue; } // the EDGE's
-        // source is inactive: the visible fold omits it, even when
+      if ! relRepo_is_active (member, active) { continue; } // the EDGE's
+        // repo is inactive: the visible fold omits it, even when
         // the child's home is active.
       let cpid : ID = resolve_pid (&member . member, alias_to_pid);
       if marker_pids . contains (&cpid) { continue; } // markers never render
@@ -709,18 +709,18 @@ fn resolve_pid (
 
 fn node_active (
   node   : &NodeComplete,
-  active : &ActiveSourceSet,
+  active : &ActiveRepoSet,
 ) -> bool {
-  active . is_all () || active . contains_source (&node . source) }
+  active . is_all () || active . contains_repo (&node . home_repo) }
 
 /// Whether an EDGE is visible under the active set: its recorded
-/// relSource must be active. (The visible fold = active
+/// relRepo must be active. (The visible fold = active
 /// sections' lists only.)
-fn relSource_is_active (
+fn relRepo_is_active (
   member : &RelPartner<ID>,
-  active : &ActiveSourceSet,
+  active : &ActiveRepoSet,
 ) -> bool {
-  active . is_all () || active . contains_source (&member . relSource) }
+  active . is_all () || active . contains_repo (&member . relRepo) }
 
 fn title_has_link (
   node : &NodeComplete,

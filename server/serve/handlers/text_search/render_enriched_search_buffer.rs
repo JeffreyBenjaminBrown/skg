@@ -1,9 +1,9 @@
-use crate::dbs::tantivy::title_and_source_by_id;
+use crate::dbs::tantivy::title_and_repo_by_id;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::in_rust_graph::ancestry::AncestryTree;
-use crate::source_sets::ActiveSourceSet;
-use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
+use crate::repo_sets::ActiveRepoSet;
+use crate::types::misc::{ID, SkgConfig, RepoName, TantivyIndex};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::viewnode::{Birth, ViewNode, ViewNodeKind, AffectsParent, mk_writeProtected_viewnode_with_birth};
 use crate::types::viewnode::Vognode;
@@ -21,7 +21,7 @@ pub(crate) fn insert_containerward_ancestries_into_search_view (
   ancestry_by_id : &HashMap<ID, AncestryTree>,
   tantivy_index  : &TantivyIndex,
   config         : &SkgConfig,
-  active         : &ActiveSourceSet,
+  active         : &ActiveRepoSet,
 ) {
   // Search results ("hits") are forest roots.
   // Match them by ID from search_results.
@@ -57,19 +57,19 @@ fn insert_containerward_ancestry_tree(
   graph          : &InRustGraph,
   tantivy_index : &TantivyIndex,
   config        : &SkgConfig,
-  active        : &ActiveSourceSet,
+  active        : &ActiveRepoSet,
 ) {
   if ! active . is_all () {
-    // relSource gating (render-and-gating, 5_plan.org): a private
+    // relRepo gating (render-and-gating, 5_plan.org): a private
     // MEMBERSHIP must not surface through enrichment ancestry even
     // when both nodes are public. The edge's owner is the
     // container (this ancestry step).
     let rel_is_visible : bool =
-      graph . relSource (
+      graph . relRepo (
         node . id (), NodeRelation::Contains, contained_id )
-      . map ( |source| active . contains_source (&source) )
+      . map ( |repo| active . contains_repo (&repo) )
       . unwrap_or (true); // unknown edge: fall through to the
-                          // node-source gate below, as before
+                          // node-repo gate below, as before
     if ! rel_is_visible { return; }}
   let child_nid : NodeId = match
     prepend_containing_child_from_tantivy (
@@ -103,12 +103,12 @@ enum OverrideDir {
 /// its own one-directional chain hanging under the result, recursive
 /// and cycle-guarded. Reads the in-Rust graph (override edges are
 /// direct index lookups); a relative whose override EDGE is
-/// relSource-hidden, or whose own source is inactive, is skipped.
+/// relRepo-hidden, or whose own repo is inactive, is skipped.
 pub fn insert_overrideward_view_subtrees (
   viewforest     : &mut Tree<ViewNode>,
   graph          : &InRustGraph,
   search_results : &[ID],
-  active         : &ActiveSourceSet,
+  active         : &ActiveRepoSet,
 ) {
   let level1_ids : Vec<(NodeId, ID)> = {
     let root_ref : NodeRef<ViewNode> = viewforest . root ();
@@ -136,11 +136,11 @@ pub fn insert_overrideward_view_subtrees (
 /// herald-less (their graphStats would never be fetched, since the
 /// grafts do not exist yet when the pre-fetch runs). MUST stay in sync
 /// with 'graft_override_chain' (same directions, same gated accessors,
-/// same node-source gate). Returns empty without a graph handle.
+/// same node-repo gate). Returns empty without a graph handle.
 pub fn collect_overrideward_view_subtree_ids (
   graph          : &InRustGraph,
   search_results : &[ID],
-  active         : &ActiveSourceSet,
+  active         : &ActiveRepoSet,
 ) -> HashSet<ID> {
   let mut out : HashSet<ID> = HashSet::new ();
   for root in search_results {
@@ -159,7 +159,7 @@ pub fn collect_overrideward_view_subtree_ids (
         for rel in relatives {
           let visible : bool = graph . nodes . get (&rel)
             . map_or ( false,
-                       |n| active . contains_source (&n . source) );
+                       |n| active . contains_repo (&n . home_repo) );
           if ! visible { continue; }
           out . insert ( rel . clone () );
           if seen . insert ( rel . clone () ) {
@@ -177,7 +177,7 @@ fn graft_override_chain (
   dir        : OverrideDir,
   graph      : &InRustGraph,
   viewforest : &mut Tree<ViewNode>,
-  active     : &ActiveSourceSet,
+  active     : &ActiveRepoSet,
   path       : &mut HashSet<ID>,
 ) {
   let relatives : Vec<ID> = match dir {
@@ -192,9 +192,9 @@ fn graft_override_chain (
     OverrideDir::Overriderward  => RelationRole::OVERRIDER, };
   for rel in relatives {
     let Some (node) = graph . nodes . get (&rel) else { continue; };
-    if ! active . contains_source (&node . source) { continue; }
+    if ! active . contains_repo (&node . home_repo) { continue; }
     let child : ViewNode = mk_writeProtected_viewnode_with_birth (
-      rel . clone (), node . source . clone (), node . title . clone (),
+      rel . clone (), node . home_repo . clone (), node . title . clone (),
       AffectsParent::False, Birth::Backpath (birth_role) );
     let child_nid : NodeId = {
       let mut parent_mut : NodeMut<ViewNode> =
@@ -205,7 +205,7 @@ fn graft_override_chain (
         &rel, child_nid, dir, graph, viewforest, active, path );
       path . remove (&rel); }} }
 
-/// Looks up a node's title and source from Tantivy,
+/// Looks up a node's title and repo from Tantivy,
 /// prepends a write-protected independent ActiveNode child
 /// under the given parent.
 /// Returns the new child's NodeId.
@@ -215,20 +215,20 @@ fn prepend_containing_child_from_tantivy (
   viewforest        : &mut Tree<ViewNode>,
   tantivy_index : &TantivyIndex,
   _config       : &SkgConfig,
-  active        : &ActiveSourceSet,
+  active        : &ActiveRepoSet,
 ) -> Option<NodeId> {
   let viewnode : ViewNode =
-    match title_and_source_by_id ( tantivy_index, node_id ) {
-      Some ((title, source)) => {
-        if ! active . contains_source (&source) {
+    match title_and_repo_by_id ( tantivy_index, node_id ) {
+      Some ((title, repo)) => {
+        if ! active . contains_repo (&repo) {
           return None;
         } else {
           mk_writeProtected_viewnode_with_birth (
-            node_id . clone (), source, title,
+            node_id . clone (), repo, title,
             AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER) ) }},
       None =>
         mk_writeProtected_viewnode_with_birth (
-          node_id . clone (), SourceName::from ("search"),
+          node_id . clone (), RepoName::from ("search"),
           node_id . as_str () . to_string (),
           AffectsParent::False, Birth::Backpath (RelationRole::CONTAINER) ) };
   let mut parent_mut : NodeMut<ViewNode> =

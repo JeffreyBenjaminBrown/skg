@@ -3,12 +3,12 @@ use crate::types::viewnode::{mk_writeProtected_viewnode, viewforest_root_viewnod
 
 fn active_affected (id_str : &str) -> ViewNode {
   mk_writeProtected_viewnode (
-    ID::from (id_str), SourceName::from ("main"),
+    ID::from (id_str), RepoName::from ("main"),
     id_str . to_string (), AffectsParent::True ) }
 
 fn active_independent (id_str : &str) -> ViewNode {
   mk_writeProtected_viewnode (
-    ID::from (id_str), SourceName::from ("main"),
+    ID::from (id_str), RepoName::from ("main"),
     id_str . to_string (), AffectsParent::False ) }
 
 fn mk_folder (kind : PartnerFolder) -> ViewNode {

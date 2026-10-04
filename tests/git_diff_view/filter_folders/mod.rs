@@ -28,18 +28,18 @@ use skg::test_utils::{run_with_shared_test_stores, SharedStoreSession};
 use skg::types::misc::members_msv;
 
 fn setup_filter_fixtures (
-  repo_path : &Path,
+  gitrepo_path : &Path,
 ) -> Result<Repository, Box<dyn Error>> {
-  super::common::setup_git_repo_with_fixtures (
-    repo_path,
+  super::common::setup_gitrepo_with_fixtures (
+    gitrepo_path,
     "tests/git_diff_view/filter_folders/fixtures/head",
     "tests/git_diff_view/filter_folders/fixtures/worktree" ) }
 
 fn setup_filter_fixtures_staged (
-  repo_path : &Path,
+  gitrepo_path : &Path,
 ) -> Result<Repository, Box<dyn Error>> {
-  super::common::setup_git_repo_with_fixtures_staged (
-    repo_path,
+  super::common::setup_gitrepo_with_fixtures_staged (
+    gitrepo_path,
     "tests/git_diff_view/filter_folders/fixtures/head",
     "tests/git_diff_view/filter_folders/fixtures/worktree" ) }
 
@@ -96,10 +96,10 @@ async fn run_filter_folder_test (
   expected : &str,
 ) -> Result<(), Box<dyn Error>> {
   let temp_dir : TempDir = TempDir::new ()?;
-  let repo_path : &Path = temp_dir . path ();
-  if staged { setup_filter_fixtures_staged (repo_path)?; }
-  else      { setup_filter_fixtures        (repo_path)?; }
-  s . reset_with_source_path (subtest_name, repo_path) ?;
+  let gitrepo_path : &Path = temp_dir . path ();
+  if staged { setup_filter_fixtures_staged (gitrepo_path)?; }
+  else      { setup_filter_fixtures        (gitrepo_path)?; }
+  s . reset_with_repo_path (subtest_name, gitrepo_path) ?;
   let (config, tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
@@ -122,7 +122,7 @@ async fn run_filter_folder_test (
           &tantivy, &graph,
           true, &Err (String::new ()), &mut views_state ) . await ? };
       assert_buffer_contains (&second . saved_view, expected);
-      let s : NodeComplete = read_nodecomplete (repo_path, "S")?;
+      let s : NodeComplete = read_nodecomplete (gitrepo_path, "S")?;
       assert_eq! (
         members_msv (&s . hides_from_its_subscriptions) . or_default () . to_vec (),
         vec! [ ID::from ("h1"), ID::from ("h2"),
@@ -145,11 +145,11 @@ async fn emptied_filter_folders_still_render_in_diff_mode (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   let temp_dir : TempDir = TempDir::new ()?;
-  let repo_path : &Path = temp_dir . path ();
-  setup_filter_fixtures (repo_path)?;
-  s . reset_with_source_path (
+  let gitrepo_path : &Path = temp_dir . path ();
+  setup_filter_fixtures (gitrepo_path)?;
+  s . reset_with_repo_path (
     "emptied_filter_folders_still_render_in_diff_mode",
-    repo_path ) ?;
+    gitrepo_path ) ?;
   let (config, tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);

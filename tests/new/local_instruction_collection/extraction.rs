@@ -19,7 +19,7 @@ use skg::test_utils::extract_nodecomplete_if_save_else_error;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::types::errors::BufferValidationError;
 use skg::types::git::Sign;
-use skg::types::misc::{ID, MSV, SkgConfig, SourceName, members_of, members_msv};
+use skg::types::misc::{ID, MSV, SkgConfig, RepoName, members_of, members_msv};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use skg::types::maybe_placed_viewnode::{
@@ -313,12 +313,12 @@ fn test_extract_nonmergeSavePlan_no_aliases() {
 
 #[test]
 fn inactive_placeholders_emit_neither_savenode_nor_contains () {
-  // Raw extraction (no source set / weave): an inactive placeholder
+  // Raw extraction (no repo set / weave): an inactive placeholder
   // emits no save intention at all. It produces no SaveNode, and it
   // does NOT appear in its container's extracted contains -- the
   // container's membership of an invisible node is owned by the disk
-  // merge (weave), exercised under a restricted source set in
-  // tests/source_sets.rs. Position in the buffer is irrelevant here.
+  // merge (weave), exercised under a restricted repo set in
+  // tests/repo_sets.rs. Position in the buffer is irrelevant here.
   let input : &str =
     indoc! {"
             * (skg (node (id root) (source main))) root
@@ -934,22 +934,22 @@ async fn subscribee_as_such_child_removal_is_not_foreign_contains_edit (
       // Editing within a subscribee-as-such is not a foreign-contains
       // edit of e: e is neither rejected as a ModifiedForeignNode, nor
       // written, nor forked. (e2, the foreign content shown under it, may
-      // fork -- now resolving to the default owned source rather than
+      // fork -- now resolving to the default owned repo rather than
       // erroring, which is why this no longer returns Err.)
-      // Supply a default clone source (as the production caller does),
+      // Supply a default clone repo (as the production caller does),
       // so the foreign grandchild e2 forks cleanly and the call returns
       // Ok -- this test is about e, not e2.
-      let clone_source_inputs : skg::from_text::fork::CloneSourceInputs =
-        skg::from_text::fork::CloneSourceInputs {
+      let clone_repo_inputs : skg::from_text::fork::CloneRepoInputs =
+        skg::from_text::fork::CloneRepoInputs {
           user_set          : std::collections::HashMap::new(),
           explicit_child    : std::collections::HashMap::new(),
           inferred_ancestor : std::collections::HashMap::new(),
-          default           : Some (SourceName::from ("owned")), };
+          default           : Some (RepoName::from ("owned")), };
       let ( define_nodes, fork_specs ) =
         validate_and_filter_foreign_instructions (
           instructions, &[],
           &graph_handle_from_config (config)? . load_full (),
-          &clone_source_inputs,
+          &clone_repo_inputs,
           &std::collections::HashMap::new(),
           config)
         . expect ("the subscribee-as-such edit must not error");

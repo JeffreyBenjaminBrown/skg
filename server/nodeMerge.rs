@@ -3,7 +3,7 @@ pub mod validate_nodeMerge;
 
 use crate::dbs::filesystem::multiple_nodes::{
   error_unless_each_id_names_one_node,
-  read_all_skg_files_from_sources};
+  read_all_skg_files_from_repos};
 use crate::dbs::init::rebuild_tantivy_from_nodes;
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
 use crate::dbs::in_rust_graph::prepared_update::{
@@ -137,7 +137,7 @@ pub(crate) fn apply_prepared_nodeMerges (
         tracing::error!(
           "Tantivy merge failed: {}. Rebuilding from disk...", e);
         let nodes : Vec<NodeComplete> =
-          read_all_skg_files_from_sources (&config)
+          read_all_skg_files_from_repos (&config)
           . map_err (|e2| -> Box<dyn Error> {
             format!("Tantivy rebuild also failed: {}. Restart the server.", e2)
             . into () }) ?;

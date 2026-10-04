@@ -12,7 +12,7 @@ use ego_tree::{NodeRef, Tree};
 use sexp::{Atom, Sexp};
 use std::error::Error;
 
-/// Render a metadata value as one S-expression atom. Most IDs and source
+/// Render a metadata value as one S-expression atom. Most IDs and repo
 /// names print in the familiar bare form; values containing whitespace or
 /// other S-expression syntax are quoted and escaped by the `sexp` crate.
 pub(crate) fn metadata_value_atom (
@@ -219,15 +219,15 @@ fn qual_metadata_to_string (
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   match qual {
-    Qual::Alias { relSource, relSource_request, membership, .. } => {
+    Qual::Alias { relRepo, relRepo_request, membership, .. } => {
       parts . push ( "alias" . to_string () );
-      if let Some (source) = relSource {
+      if let Some (repo) = relRepo {
         parts . push ( format! (
-          "(relSource {})", metadata_value_atom (source) ) ); }
-      if let Some (source) = relSource_request {
+          "(relSource {})", metadata_value_atom (repo) ) ); }
+      if let Some (repo) = relRepo_request {
         parts . push ( format! (
           "(editRequest (relSource {}))",
-          metadata_value_atom (source) ) ); }
+          metadata_value_atom (repo) ) ); }
       append_membership_stage_forms (&mut parts, membership); }
     Qual::TextChanged { staged, unstaged } => {
       let mut tags : Vec<&'static str> = Vec::new ();
@@ -284,13 +284,13 @@ fn activeNode_metadata_to_string (
         activeNode . viewStats . overridesHere {
         parts . push ( format! ("(overridesHere {})",
                                  original . 0 )); }
-      if let Some (ref source) =
-        activeNode . viewStats . relSource {
+      if let Some (ref repo) =
+        activeNode . viewStats . relRepo {
         parts . push ( format! (
-          "(relSource {})", metadata_value_atom (source) )); }
-      if activeNode . viewStats . sourceAtBoundary {
+          "(relSource {})", metadata_value_atom (repo) )); }
+      if activeNode . viewStats . homeRepoAtBoundary {
         if let Some (src_config)
-        = config . sources . get ( &activeNode . source )
+        = config . repos . get ( &activeNode . home_repo )
         { parts . push ( format! (
             "(sourceHerald {})",
             metadata_value_atom (
@@ -300,10 +300,10 @@ fn activeNode_metadata_to_string (
                "(viewStats {})", parts . join (" ") )) }}
     fn edit_request ( activeNode : & ActiveNode
                     ) -> Option < String > {
-      if let Some (source) = &activeNode . relSource_request {
+      if let Some (repo) = &activeNode . relRepo_request {
         return Some ( format! (
           "(editRequest (relSource {}))",
-          metadata_value_atom (source) ) ); }
+          metadata_value_atom (repo) ) ); }
       activeNode . edit_request () . map ( | edit_req | {
         let edit_str : String = match edit_req {
           NodeEditRequest::NodeMerge (id) => format! ( "(merge {})", id . 0 ),
@@ -345,7 +345,7 @@ fn activeNode_metadata_to_string (
       vec! [ "node" . to_string () ];
     parts . push ( format! ( "(id {})", activeNode . id . 0 ));
     parts . push ( format! (
-      "(source {})", metadata_value_atom (&activeNode . source) ));
+      "(source {})", metadata_value_atom (&activeNode . home_repo) ));
     // AffectsParent::True is left implicit because it is the default
     // membership relation.
     match activeNode . affectsParent {
@@ -391,7 +391,7 @@ fn activeNode_metadata_to_string (
 /// emits `writeProtected` and never a body, editRequest, or viewRequests) and its
 /// affectsParent is implicit Affected and birth Unremarkable (so neither atom
 /// appears, and graphStats is rendered as if Affected / Unremarkable). It
-/// carries no viewStats. What remains: id, source, write-protected, graphStats, the
+/// carries no viewStats. What remains: id, repo, write-protected, graphStats, the
 /// staged/unstaged diff axes, and notInGit.
 fn phantomDiff_metadata_to_string (
   focused     : bool,
@@ -408,7 +408,7 @@ fn phantomDiff_metadata_to_string (
       vec! [ "diffPhantom" . to_string () ];
     parts . push ( format! ( "(id {})", phantom . id . 0 ));
     parts . push ( format! (
-      "(source {})", metadata_value_atom (&phantom . source) ));
+      "(source {})", metadata_value_atom (&phantom . home_repo) ));
     // affectsParent is implicit Affected and birth Unremarkable on a phantom, so
     // neither atom is emitted; both are passed as such to graphnodestats.
     parts . push ( "writeProtected" . to_string () );
@@ -436,7 +436,7 @@ fn phantomDiff_metadata_to_string (
   parts . join (" ") }
 
 /// Render metadata for a PhantomDeleted:
-///   (skg [focused] [folded] (deleted (id X) (source S)))
+///   (skg [focused] [folded] (deleted (id X) (repo S)))
 fn phantomDeleted_metadata_to_string (
   focused      : bool,
   folded       : bool,
@@ -450,7 +450,7 @@ fn phantomDeleted_metadata_to_string (
   parts . push ( format! (
     "(deleted (id {}) (source {}))",
     deleted_node . id . 0,
-    metadata_value_atom (&deleted_node . source) ));
+    metadata_value_atom (&deleted_node . home_repo) ));
   parts . join (" ") }
 
 /// Render metadata for an PhantomUnknown:
@@ -468,19 +468,19 @@ fn phantomUnknown_metadata_to_string (
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   let mut unknown_parts : Vec<String> = vec! [
     format! ("(id {})", unknown_node . id . 0) ];
-  if let Some (source) = &unknown_node . relSource {
+  if let Some (repo) = &unknown_node . relRepo {
     unknown_parts . push ( format! (
-      "(viewStats (relSource {}))", metadata_value_atom (source)) ); }
-  if let Some (source) = &unknown_node . relSource_request {
+      "(viewStats (relSource {}))", metadata_value_atom (repo)) ); }
+  if let Some (repo) = &unknown_node . relRepo_request {
     unknown_parts . push ( format! (
-      "(editRequest (relSource {}))", metadata_value_atom (source)) ); }
+      "(editRequest (relSource {}))", metadata_value_atom (repo)) ); }
   parts . push ( format! ( "(unknown {})", unknown_parts . join (" ") ) );
   parts . join (" ") }
 
 /// Render an inactive placeholder as the bare atom 'inactiveNode',
 /// like the other dataless scaffold markers (aliasFolder, subscribeeFolder,
-/// ...). It carries no id/source/etc. -- those describe content the
-/// user hid by restricting the source-set, so emitting them would leak
+/// ...). It carries no id/repo/etc. -- those describe content the
+/// user hid by restricting the repo-set, so emitting them would leak
 /// (see InactiveNode).
 fn inactive_node_metadata_to_string (
   focused       : bool,

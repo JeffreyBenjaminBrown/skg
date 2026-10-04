@@ -4,7 +4,7 @@ use skg::dbs::in_rust_graph::relation_accessors::{
   NodeRelation,
   RelationRole,
 };
-use skg::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SourceName, rel_partners_at_relSource};
+use skg::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, RepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
 fn node (
@@ -18,23 +18,23 @@ fn node (
     empty_node_complete ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
-  node . source = SourceName::from ("main");
+  node . home_repo = RepoName::from ("main");
   node . extra_ids =
     extra_ids . iter () . map ( |id| ID::from (*id) ) . collect ();
   node . subscribes_to =
     if subscribes . is_empty () { MSV::Unspecified }
-    else { MSV::Specified ( rel_partners_at_relSource (
-      &node . source,
+    else { MSV::Specified ( rel_partners_at_relRepo (
+      &node . home_repo,
       subscribes . iter () . map ( |id| ID::from (*id) ) . collect ())) };
   node . hides_from_its_subscriptions =
     if hides . is_empty () { MSV::Unspecified }
-    else { MSV::Specified ( rel_partners_at_relSource (
-      &node . source,
+    else { MSV::Specified ( rel_partners_at_relRepo (
+      &node . home_repo,
       hides . iter () . map ( |id| ID::from (*id) ) . collect ())) };
   node . overrides_view_of =
     if overrides . is_empty () { MSV::Unspecified }
-    else { MSV::Specified ( rel_partners_at_relSource (
-      &node . source,
+    else { MSV::Specified ( rel_partners_at_relRepo (
+      &node . home_repo,
       overrides . iter () . map ( |id| ID::from (*id) ) . collect ())) };
   node }
 
@@ -48,8 +48,8 @@ fn node_with_all_relations (
 ) -> NodeComplete {
   let mut result : NodeComplete =
     node (pid, &[], subscribes, hides, overrides);
-  result . contains = rel_partners_at_relSource (
-    &result . source,
+  result . contains = rel_partners_at_relRepo (
+    &result . home_repo,
     contains . iter () . map (|id| ID::from (*id)) . collect ());
   if ! links . is_empty () {
     result . body = Some (links . iter ()
@@ -117,10 +117,10 @@ fn stored_outbound_accessor_retains_unresolved_raw_members () {
   owner . contains = vec! [
     RelPartner {
       member : ID::from ("known-extra"),
-      relSource : SourceName::from ("main"), },
+      relRepo : RepoName::from ("main"), },
     RelPartner {
       member : ID::from ("absent-raw"),
-      relSource : SourceName::from ("main"), },
+      relRepo : RepoName::from ("main"), },
   ];
   let graph : InRustGraph = InRustGraph::from_nodecompletes (&[
     owner,
@@ -132,10 +132,10 @@ fn stored_outbound_accessor_retains_unresolved_raw_members () {
     vec! [
       RelPartner {
         member : ID::from ("known-extra"),
-        relSource : SourceName::from ("main"), },
+        relRepo : RepoName::from ("main"), },
       RelPartner {
         member : ID::from ("absent-raw"),
-        relSource : SourceName::from ("main"), },
+        relRepo : RepoName::from ("main"), },
     ] );
   assert_eq! (
     graph . outbound_ids_for_relation_gated (

@@ -22,18 +22,18 @@ use skg::types::env::SkgEnv;
 use skg::types::misc::members_msv;
 
 fn setup_overrides_fixtures (
-  repo_path : &Path,
+  gitrepo_path : &Path,
 ) -> Result<Repository, Box<dyn Error>> {
-  super::common::setup_git_repo_with_fixtures (
-    repo_path,
+  super::common::setup_gitrepo_with_fixtures (
+    gitrepo_path,
     "tests/git_diff_view/overrides/fixtures/head",
     "tests/git_diff_view/overrides/fixtures/worktree" ) }
 
 fn setup_overrides_fixtures_staged (
-  repo_path : &Path,
+  gitrepo_path : &Path,
 ) -> Result<Repository, Box<dyn Error>> {
-  super::common::setup_git_repo_with_fixtures_staged (
-    repo_path,
+  super::common::setup_gitrepo_with_fixtures_staged (
+    gitrepo_path,
     "tests/git_diff_view/overrides/fixtures/head",
     "tests/git_diff_view/overrides/fixtures/worktree" ) }
 
@@ -78,10 +78,10 @@ async fn run_overrides_view_test (
   expected : &str,
 ) -> Result<(), Box<dyn Error>> {
   let temp_dir : TempDir = TempDir::new ()?;
-  let repo_path : &Path = temp_dir . path ();
-  if staged { setup_overrides_fixtures_staged (repo_path)?; }
-  else      { setup_overrides_fixtures        (repo_path)?; }
-  s . reset_with_source_path (subtest_name, repo_path) ?;
+  let gitrepo_path : &Path = temp_dir . path ();
+  if staged { setup_overrides_fixtures_staged (gitrepo_path)?; }
+  else      { setup_overrides_fixtures        (gitrepo_path)?; }
+  s . reset_with_repo_path (subtest_name, gitrepo_path) ?;
   let (config, tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
@@ -130,11 +130,11 @@ async fn emptied_requested_folders_still_render_in_diff_mode (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   let temp_dir : TempDir = TempDir::new ()?;
-  let repo_path : &Path = temp_dir . path ();
-  setup_overrides_fixtures (repo_path)?;
-  s . reset_with_source_path (
+  let gitrepo_path : &Path = temp_dir . path ();
+  setup_overrides_fixtures (gitrepo_path)?;
+  s . reset_with_repo_path (
     "emptied_requested_folders_still_render_in_diff_mode",
-    repo_path ) ?;
+    gitrepo_path ) ?;
   let (config, tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
@@ -212,11 +212,11 @@ async fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   let temp_dir : TempDir = TempDir::new ()?;
-  let repo_path : &Path = temp_dir . path ();
-  setup_overrides_fixtures (repo_path)?;
-  s . reset_with_source_path (
+  let gitrepo_path : &Path = temp_dir . path ();
+  setup_overrides_fixtures (gitrepo_path)?;
+  s . reset_with_repo_path (
     "diff_mode_save_is_noop_and_regenerates_outbound_phantoms",
-    repo_path ) ?;
+    gitrepo_path ) ?;
   let (config, tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
@@ -251,7 +251,7 @@ async fn diff_mode_save_is_noop_and_regenerates_outbound_phantoms (
           true, &Err (String::new ()), &mut views_state ) . await ? };
       assert_buffer_contains (
         &second . saved_view, EXPECTED_UNSTAGED );
-      let r : NodeComplete = read_nodecomplete (repo_path, "R")?;
+      let r : NodeComplete = read_nodecomplete (gitrepo_path, "R")?;
       assert_eq! (
         members_msv (&r . overrides_view_of) . or_default () . to_vec (),
         vec! [ ID::from ("Z"), ID::from ("O") ],

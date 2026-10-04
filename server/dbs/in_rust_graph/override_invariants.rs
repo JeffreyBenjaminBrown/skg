@@ -1,12 +1,12 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::override_resolution::resolve_override;
-use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
+use crate::types::misc::{ID, SkgConfig, RepoName, members_of};
 
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct OverrideCheckScope {
-  pub sources : HashSet<ID>,
+  pub repos : HashSet<ID>,
   pub targets : HashSet<ID>,
 }
 
@@ -17,9 +17,9 @@ pub(crate) struct AffectedOverrideValidation {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OverrideInvariantViolation {
-  UnknownSource {
+  UnknownRepo {
     node: ID,
-    source: SourceName },
+    repo: RepoName },
   MultipleUserOwnedOverriders {
     overridden: ID,
     overriders: Vec<ID> },
@@ -50,8 +50,8 @@ pub fn validate_override_invariants (
 
   for (pid, node) in graph . nodes . iter () {
     let Some (user_owns_node) = user_owns_node (
-      // A missing source means we cannot know whether this node's override edges should be automatic. We record such an offense in 'violations' rather than guessing "foreign".
-      config, pid, &node . source, &mut violations )
+      // A missing repo means we cannot know whether this node's override edges should be automatic. We record such an offense in 'violations' rather than guessing "foreign".
+      config, pid, &node . home_repo, &mut violations )
     else { continue; };
     if ! user_owns_node { continue; }
     for target in members_of ( node . overrides_view_of . or_default () ) {
@@ -77,15 +77,15 @@ pub fn validate_override_invariants (
 
   { // No cycles constraint. For each user-owned node, walk its
     // user-owned overrider edges (the shared 'resolve_override' walk,
-    // ungated so it is source-set-independent); a returned cycle is a
+    // ungated so it is repo-set-independent); a returned cycle is a
     // violation. Different entry points into the same cycle yield
     // rotations of one trail, so canonicalizing collapses them.
     let mut seen_cycles : HashSet<Vec<ID>> = HashSet::new ();
     for (pid, node) in graph . nodes . iter () {
       let user_owned : bool =
-        config . sources . get (&node . source)
+        config . repos . get (&node . home_repo)
         . map ( |sc| sc . user_owns_it )
-        . unwrap_or (false); // unknown source reported by pass 1 above
+        . unwrap_or (false); // unknown repo reported by pass 1 above
       if ! user_owned { continue; }
       let resolution = resolve_override (config, graph, None, pid);
       if resolution . cycle_detected {
@@ -115,7 +115,7 @@ fn canonicalize_cycle (
   out . extend_from_slice ( &cycle [.. min_index] );
   out }
 
-/// Derive every override source and target whose invariant truth can change
+/// Derive every override repo and target whose invariant truth can change
 /// between two valid graph snapshots. Canonicalization changes pull in
 /// untouched inbound overriders, which is the case a touched-only check misses
 /// during node merge.
@@ -125,7 +125,7 @@ pub fn derive_affected_override_scope (
   touched_pids : &HashSet<ID>,
   affected_ids : &HashSet<ID>,
 ) -> OverrideCheckScope {
-  let mut sources : HashSet<ID> = touched_pids . clone ();
+  let mut repos : HashSet<ID> = touched_pids . clone ();
   for raw in affected_ids {
     let old_key : ID = base . pid_of (raw)
       . unwrap_or_else (|| raw . clone ());
@@ -137,23 +137,23 @@ pub fn derive_affected_override_scope (
       (candidate, &old_key), (candidate, &final_key),
     ] {
       if let Some (overriders) = graph . overriders_of . get (key) {
-        sources . extend (overriders . iter () . cloned ()); }} }
+        repos . extend (overriders . iter () . cloned ()); }} }
 
   let mut targets : HashSet<ID> = HashSet::new ();
-  for source in &sources {
-    if let Some (node) = base . nodes . get (source) {
+  for repo in &repos {
+    if let Some (node) = base . nodes . get (repo) {
       targets . extend (
         members_of (node . overrides_view_of . or_default ()) . into_iter ()
           . map (|raw| base . pid_of (&raw) . unwrap_or (raw))); }
-    if let Some (node) = candidate . nodes . get (source) {
+    if let Some (node) = candidate . nodes . get (repo) {
       targets . extend (
         members_of (node . overrides_view_of . or_default ()) . into_iter ()
           . map (|raw| candidate . pid_of (&raw) . unwrap_or (raw))); }}
-  OverrideCheckScope { sources, targets }
+  OverrideCheckScope { repos, targets }
 }
 
 /// Check monogamy at affected targets and acyclicity from affected owned
-/// sources. A valid base makes violations elsewhere irrelevant to this delta.
+/// repos. A valid base makes violations elsewhere irrelevant to this delta.
 pub fn validate_affected_override_invariants (
   config : &SkgConfig,
   graph  : &InRustGraph,
@@ -180,13 +180,13 @@ pub(crate) fn validate_affected_override_invariants_with_counts (
           overridden : target . clone (),
           overriders,
         }); }}
-  for source in &scope . sources {
-    let Some (node) = graph . nodes . get (source) else { continue; };
+  for repo in &scope . repos {
+    let Some (node) = graph . nodes . get (repo) else { continue; };
     let Some (user_owned) = user_owns_node (
-      config, source, &node . source, &mut violations)
+      config, repo, &node . home_repo, &mut violations)
       else { continue; };
     if ! user_owned { continue; }
-    let resolution = resolve_override (config, graph, None, source);
+    let resolution = resolve_override (config, graph, None, repo);
     chain_steps += if resolution . cycle_detected {
       resolution . cycle . len ()
     } else {
@@ -223,8 +223,8 @@ pub fn existing_user_owned_overrider_of (
 
 /// The user-owned nodes (by pid) that override 'overridden' (a pid), via
 /// the in-Rust graph's 'overriders_of' inverse index. Overriders whose
-/// source is unknown are treated as not-user-owned here: a touched
-/// node's own unknown source is still reported by 'user_owns_node' at
+/// repo is unknown are treated as not-user-owned here: a touched
+/// node's own unknown repo is still reported by 'user_owns_node' at
 /// the call site, and untouched neighbors are validated at init.
 fn user_owned_overriders_of (
   config     : &SkgConfig,
@@ -235,7 +235,7 @@ fn user_owned_overriders_of (
   if let Some (overriders) = graph . overriders_of . get (overridden) {
     for overrider in overriders {
       if let Some (overrider_node) = graph . nodes . get (overrider) {
-        if config . sources . get (&overrider_node . source)
+        if config . repos . get (&overrider_node . home_repo)
           . map ( |sc| sc . user_owns_it )
           . unwrap_or (false)
         { result . push (overrider . clone ()); } } } }
@@ -246,16 +246,16 @@ fn user_owned_overriders_of (
 fn user_owns_node (
   config     : &SkgConfig,
   pid        : &ID,
-  source     : &SourceName,
+  repo     : &RepoName,
   violations : &mut Vec<OverrideInvariantViolation>,
 ) -> Option<bool> {
-  match config . sources . get (source) {
-    Some (source_config) => Some (source_config . user_owns_it),
+  match config . repos . get (repo) {
+    Some (repo_config) => Some (repo_config . user_owns_it),
     None => {
       violations . push (
-        OverrideInvariantViolation::UnknownSource {
+        OverrideInvariantViolation::UnknownRepo {
           node: pid . clone (),
-          source: source . clone (), } );
+          repo: repo . clone (), } );
       None }}}
 
 fn dedup_violations (
@@ -276,9 +276,9 @@ pub fn format_override_invariant_violations (
   ];
   for violation in violations {
     match violation {
-      OverrideInvariantViolation::UnknownSource { node, source } => {
+      OverrideInvariantViolation::UnknownRepo { node, repo } => {
         lines . push (format!(
-          "* node {} has unknown source {}", node, source ));
+          "* node {} has unknown source {}", node, repo ));
       }
       OverrideInvariantViolation::MultipleUserOwnedOverriders {
         overridden,

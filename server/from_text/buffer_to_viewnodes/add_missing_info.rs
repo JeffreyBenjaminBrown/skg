@@ -8,7 +8,7 @@ use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::viewnode::AffectsParent;
 use crate::types::viewnode::{Editability, QualFolder, Qual};
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, RepoName};
 use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
 use crate::dbs::in_rust_graph::InRustGraph;
@@ -22,14 +22,14 @@ use uuid::Uuid;
 
 /// Which nodes enrichment INVENTED data for, as opposed to reading it
 /// from the buffer: 'new_nodes' had no id (so they got fresh UUIDs);
-/// 'inherited_source_nodes' had no source (so they inherited their
+/// 'inherited_repo_nodes' had no repo (so they inherited their
 /// parent's). Downstream policy needs the distinction the enriched
-/// tree itself has erased -- e.g. a NEW node whose INHERITED source is
+/// tree itself has erased -- e.g. a NEW node whose INHERITED repo is
 /// foreign is not a foreign-creation error but a rider on its
 /// parent's fork, whereas an explicitly foreign new node is the error.
 pub struct EnrichmentProvenance {
   pub new_nodes              : HashSet<ID>,
-  pub inherited_source_nodes : HashSet<ID>,
+  pub inherited_repo_nodes : HashSet<ID>,
 }
 
 /// PURPOSE:
@@ -45,7 +45,7 @@ pub fn add_missing_info_to_viewforest(
   config      : &SkgConfig,
 ) -> Result<EnrichmentProvenance, Box<dyn Error>> {
   let nodes = crate::dbs::filesystem::multiple_nodes
-    ::read_all_skg_files_from_sources (config)?;
+    ::read_all_skg_files_from_repos (config)?;
   let graph = InRustGraph::from_nodecompletes (&nodes);
   add_missing_info_to_viewforest_in_graph (viewforest, &graph)
 }
@@ -57,39 +57,39 @@ pub fn add_missing_info_to_viewforest_in_graph(
 ) -> Result<EnrichmentProvenance, Box<dyn Error>> {
   let root_id : NodeId = viewforest . internal_root_id ();
   replace_ids_with_pids (viewforest, root_id, graph);
-  let source_of_id : HashMap<ID, SourceName> =
-    sources_for_sourceless_ided_nodes_from_graph (viewforest, graph);
-  finish_missing_info_enrichment (viewforest, root_id, &source_of_id)
+  let repo_of_id : HashMap<ID, RepoName> =
+    repos_for_repoless_ided_nodes_from_graph (viewforest, graph);
+  finish_missing_info_enrichment (viewforest, root_id, &repo_of_id)
 }
 
 fn finish_missing_info_enrichment(
   viewforest  : &mut MpViewForest,
   root_id     : NodeId,
-  source_of_id : &HashMap<ID, SourceName>,
+  repo_of_id : &HashMap<ID, RepoName>,
 ) -> Result<EnrichmentProvenance, Box<dyn Error>> {
   let mut provenance : EnrichmentProvenance =
     EnrichmentProvenance {
       new_nodes              : HashSet::new (),
-      inherited_source_nodes : HashSet::new (), };
+      inherited_repo_nodes : HashSet::new (), };
   do_everywhere_in_tree_dfs(
     viewforest,
     root_id,
     true,
     &mut |mut node| {
       make_alias_if_appropriate (&mut node)?;
-      fill_source_from_graph_map (&mut node, source_of_id);
-      let source_inherited : bool =
-        inherit_parent_source_if_possible (&mut node)?;
+      fill_repo_from_graph_map (&mut node, repo_of_id);
+      let repo_inherited : bool =
+        inherit_parent_repo_if_possible (&mut node)?;
       let id_assigned : bool =
         assign_new_id_if_absent (&mut node)?; // Do this *after* PID replacement, so fresh UUIDs do not trigger a pointless graph lookup.
-      if source_inherited || id_assigned {
+      if repo_inherited || id_assigned {
         if let MpViewnodeKind::Vognode (MpVognode::Active (t))
           = & node . value () . kind
         { if let Some (id) = & t . id {
             if id_assigned {
               provenance . new_nodes . insert (id . clone ()); }
-            if source_inherited {
-              provenance . inherited_source_nodes
+            if repo_inherited {
+              provenance . inherited_repo_nodes
                 . insert (id . clone ()); }} }}
       Ok (( )) } )?;
   Ok (provenance) }
@@ -141,92 +141,92 @@ fn make_alias_if_appropriate(
       else { unreachable!() };
       org . kind = MpViewnodeKind::Qual (
         Qual::Alias { text: t . title . clone(),
-                      relSource: t . viewStats . relSource . clone (),
-                      relSource_request: t . relSource_request . clone (),
+                      relRepo: t . viewStats . relRepo . clone (),
+                      relRepo_request: t . relRepo_request . clone (),
                       membership: MembershipAxes::default () } ); }}
   Ok (( )) }
 
-/// Inherit parent's source if both:
-/// - this is a sourceless ActiveNode
-/// - its parent is an ActiveNode with a source
+/// Inherit parent's repo if both:
+/// - this is a repoless ActiveNode
+/// - its parent is an ActiveNode with a repo
 /// Returns whether it inherited one.
-fn inherit_parent_source_if_possible(
+fn inherit_parent_repo_if_possible(
   node: &mut NodeMut<MpViewnode>
 ) -> Result<bool, String> {
-  let needs_source : bool =
+  let needs_repo : bool =
     match &node . value() . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t))
-        => t . source . is_none(),
+        => t . home_repo . is_none(),
       _ => false, };
-  if needs_source {
-    let parent_source : Option<SourceName> =
+  if needs_repo {
+    let parent_repo : Option<RepoName> =
       node . parent() . and_then(|mut p| {
         match &p . value() . kind {
           MpViewnodeKind::Vognode (MpVognode::Active (pt))
-            => pt . source . clone(),
+            => pt . home_repo . clone(),
           _ => None, }} );
-    if let Some (source) = parent_source {
+    if let Some (repo) = parent_repo {
       if let MpViewnodeKind::Vognode (MpVognode::Active (t))
         = &mut node . value() . kind
-      { t . source = Some (source);
+      { t . home_repo = Some (repo);
         return Ok (true); }}}
   Ok (false) }
 
-/// Look up, from the graph, the source of every sourceless,
+/// Look up, from the graph, the repo of every repoless,
 /// write-protected ActiveNode that already carries an id (ids are pids
 /// here). Ids the graph does not know resolve to nothing and are
 /// omitted from the map, so those nodes fall through to
 /// parent-inheritance in the DFS.
-fn sources_for_sourceless_ided_nodes_from_graph (
+fn repos_for_repoless_ided_nodes_from_graph (
   viewforest : &MpViewForest,
   graph      : &InRustGraph,
-) -> HashMap<ID, SourceName> {
+) -> HashMap<ID, RepoName> {
   let mut ids : HashSet<ID> = HashSet::new ();
-  collect_sourceless_active_ids (viewforest . root (), &mut ids);
+  collect_repoless_active_ids (viewforest . root (), &mut ids);
   ids . into_iter ()
-    . filter_map (|id| graph . pid_and_source (&id)
-      . map (|(_pid, source)| (id, source)))
+    . filter_map (|id| graph . pid_and_repo (&id)
+      . map (|(_pid, repo)| (id, repo)))
     . collect ()
 }
 
-/// Collect the ids of sourceless, WRITE_PROTECTED ActiveNodes that
+/// Collect the ids of repoless, WRITE_PROTECTED ActiveNodes that
 /// already carry an id. Definitive nodes are excluded on purpose (see
-/// 'resolve_sources_for_sourceless_ided_nodes').
-fn collect_sourceless_active_ids (
+/// 'resolve_repos_for_repoless_ided_nodes').
+fn collect_repoless_active_ids (
   node_ref : NodeRef<MpViewnode>,
   ids      : &mut HashSet<ID>,
 ) {
   if let MpViewnodeKind::Vognode (MpVognode::Active (t))
     = &node_ref . value () . kind
-    { if t . source . is_none ()
+    { if t . home_repo . is_none ()
          && matches! ( t . editability, Editability::WriteProtected )
       { if let Some (id) = &t . id {
           ids . insert ( id . clone () ); }}}
   for child in node_ref . children () {
-    collect_sourceless_active_ids ( child, ids ); }}
+    collect_repoless_active_ids ( child, ids ); }}
 
-/// If the node is a sourceless, WRITE_PROTECTED ActiveNode whose id the
-/// graph resolved, set its source from 'source_of_id' (built before the
-/// DFS). This is how a bare folder-member reference acquires the source of
+/// If the node is a repoless, WRITE_PROTECTED ActiveNode whose id the
+/// graph resolved, set its repo from 'repo_of_id' (built before the
+/// DFS). This is how a bare folder-member reference acquires the repo of
 /// the existing node it names -- something
-/// 'inherit_parent_source_if_possible' cannot do, since the org-parent
-/// is a scaffold rather than an ActiveNode with a source. The
+/// 'inherit_parent_repo_if_possible' cannot do, since the org-parent
+/// is a scaffold rather than an ActiveNode with a repo. The
 /// write-protected gate matches the folder above, so a definitive node
 /// sharing an id with a write-protected one is never filled.
-fn fill_source_from_graph_map (
+fn fill_repo_from_graph_map (
   node         : &mut NodeMut<MpViewnode>,
-  source_of_id : &HashMap<ID, SourceName>,
+  repo_of_id : &HashMap<ID, RepoName>,
 ) {
   if let MpViewnodeKind::Vognode (MpVognode::Active (t))
     = &mut node . value () . kind
-  { if t . source . is_some ()
+  { if t . home_repo . is_some ()
        || ! matches! ( t . editability, Editability::WriteProtected )
     { return; }
-    let resolved : Option<SourceName> =
+    let resolved : Option<RepoName> =
       t . id . as_ref ()
-      . and_then ( |id| source_of_id . get (id) . cloned () );
-    if let Some (source) = resolved {
-      t . source = Some (source); }}}
+      . and_then ( |id| repo_of_id . get (id) . cloned () );
+    if let Some (repo) = resolved {
+      t . home_repo = Some (repo); }}}
 
 /// Assign a new UUID to an ActiveNode if it doesn't have an ID.
 /// Returns whether it assigned one.

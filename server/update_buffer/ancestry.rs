@@ -27,7 +27,7 @@
 //! reads share one spec (the per-folder *field* each reconcile then pulls --
 //! subscriber.hides vs subscribee.contains -- stays per-folder).
 
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, RepoName};
 use crate::types::tree::generic::{ read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree };
 use crate::types::tree::viewnode_nodecomplete::write_at_activeNode_in_tree;
 use crate::types::viewnode::{ AffectsParent, PartnerFolder, ViewNode, ViewNodeKind, Vognode };
@@ -162,17 +162,17 @@ pub fn required_ancestor (
   if i >= spec . len () { return Ok (None); }
   Ok ( ancestor_nodeid (tree, folder, i + 1) ) }
 
-/// The (pid, source) of the folder's i-th required ancestor, read *through* the
+/// The (pid, repo) of the folder's i-th required ancestor, read *through* the
 /// TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 table. Errors if that ancestor is absent (the folder is a generalized
 /// orphan up to i) -- unreachable in practice, since the BFS dispatch runs the
 /// orphan pre-check and deadens an orphan before its reconcile is ever called,
 /// but the contract is what keeps a reconcile from reading an unlisted ancestor.
-pub fn pid_and_source_from_required_ancestor (
+pub fn pid_and_repo_from_required_ancestor (
   tree   : &Tree<ViewNode>,
   folder    : NodeId,
   i      : usize,
   caller : &str,
-) -> Result<(ID, SourceName), Box<dyn Error>> {
+) -> Result<(ID, RepoName), Box<dyn Error>> {
   let anc : NodeId =
     required_ancestor (tree, folder, i) ?
     . ok_or_else ( || format! (
@@ -182,8 +182,8 @@ pub fn pid_and_source_from_required_ancestor (
     tree, anc,
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (v) =>
-        v . pid_and_source ()
-        . map ( |(pid, source)| (pid . clone (), source . clone ()) ),
+        v . pid_and_repo ()
+        . map ( |(pid, repo)| (pid . clone (), repo . clone ()) ),
       _ => None } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?
     . ok_or_else ( || format! (

@@ -12,7 +12,7 @@
 //
 // After the save, a.skg still lists b in its contains, and b has
 // become an extra_id of d. The fresh-view path resolves that
-// extra_id transparently (pid_and_source_from_id does a primary-
+// extra_id transparently (pid_and_repo_from_id does a primary-
 // or-extra lookup), so opening a afresh shows a -> d correctly.
 //
 // The rerender path (rerender_view -> complete_viewtree ->

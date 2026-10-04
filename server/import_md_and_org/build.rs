@@ -2,8 +2,8 @@
 
 use crate::export_org::EXPORT_MARKER_ID;
 use crate::types::misc::{
-  ID, MSV, SourceName, rel_partners_at_relSource,
-  rel_partners_at_relSource_msv,
+  ID, MSV, RepoName, rel_partners_at_relRepo,
+  rel_partners_at_relRepo_msv,
 };
 use crate::types::nodes::complete::{
   FileProperty, NodeComplete, normalize_body,
@@ -28,13 +28,13 @@ pub struct BuiltDocument {
 
 pub fn build_document (
   document : &ParsedDocument,
-  source : &SourceName,
+  repo : &RepoName,
   new_id : &mut impl FnMut () -> ID,
 ) -> Result<BuiltDocument, String> {
   let export_target : String = export_target (&document . path)?;
   let mut outline : Vec<OutlineNode> = document . sections . iter ()
     . map (|section| OutlineNode {
-      node : node_for_section (document, section, source, new_id),
+      node : node_for_section (document, section, repo, new_id),
       original_level : section . level,
       children : Vec::new (),
     }) . collect ();
@@ -47,8 +47,8 @@ pub fn build_document (
     let parent : usize = *ancestors . last () . unwrap ();
     outline [parent] . children . push (index);
     ancestors . push (index); }
-  group_super_indentation (0, &mut outline, source, new_id);
-  let marker : NodeComplete = export_marker (&export_target, source, new_id)?;
+  group_super_indentation (0, &mut outline, repo, new_id);
+  let marker : NodeComplete = export_marker (&export_target, repo, new_id)?;
   let marker_index : usize = outline . len ();
   outline . push (OutlineNode {
     node : marker,
@@ -62,7 +62,7 @@ pub fn build_document (
   if ! definitions . is_empty () {
     let footnotes_index : usize = outline . len ();
     outline . push (OutlineNode {
-      node : synthetic_node ("Footnotes", "", source, new_id),
+      node : synthetic_node ("Footnotes", "", repo, new_id),
       original_level : 0,
       children : Vec::new (),
     });
@@ -71,7 +71,7 @@ pub fn build_document (
       let child_index : usize = outline . len ();
       outline . push (OutlineNode {
         node : synthetic_node (&format! ("Footnote {}", definition . name),
-          &document . text [definition . range . clone ()], source, new_id),
+          &document . text [definition . range . clone ()], repo, new_id),
         original_level : 0,
         children : Vec::new (),
       });
@@ -81,8 +81,8 @@ pub fn build_document (
   let ids : Vec<ID> = outline . iter () . map (|entry| entry . node . pid . clone ())
     . collect ();
   for entry in &mut outline {
-    entry . node . contains = rel_partners_at_relSource (
-      source,
+    entry . node . contains = rel_partners_at_relRepo (
+      repo,
       entry . children . iter () . map (|index| ids [*index] . clone ())
         . collect ()); }
   let root_id : ID = ids [0] . clone ();
@@ -94,7 +94,7 @@ pub fn build_document (
 fn node_for_section (
   document : &ParsedDocument,
   section : &ParsedSection,
-  source : &SourceName,
+  repo : &RepoName,
   new_id : &mut impl FnMut () -> ID,
 ) -> NodeComplete {
   let id : ID = section . explicit_id . as_ref ()
@@ -103,9 +103,9 @@ fn node_for_section (
   NodeComplete {
     title : section . title . clone (),
     overPrivateText_telescope : false,
-    aliases : rel_partners_at_relSource_msv (
-      source, MSV::Specified (section . aliases . clone ())),
-    source : source . clone (),
+    aliases : rel_partners_at_relRepo_msv (
+      repo, MSV::Specified (section . aliases . clone ())),
+    home_repo : repo . clone (),
     pid : id,
     extra_ids : Vec::new (),
     body : normalize_body (Some (body)),
@@ -122,21 +122,21 @@ fn node_for_section (
 fn group_super_indentation (
   index : usize,
   outline : &mut Vec<OutlineNode>,
-  source : &SourceName,
+  repo : &RepoName,
   new_id : &mut impl FnMut () -> ID,
 ) {
   let children : Vec<usize> = outline [index] . children . clone ();
   for child in children {
-    group_super_indentation (child, outline, source, new_id); }
+    group_super_indentation (child, outline, repo, new_id); }
   let children : Vec<usize> = outline [index] . children . clone ();
   outline [index] . children =
-    group_children (children, outline, source, new_id);
+    group_children (children, outline, repo, new_id);
 }
 
 fn group_children (
   children : Vec<usize>,
   outline : &mut Vec<OutlineNode>,
-  source : &SourceName,
+  repo : &RepoName,
   new_id : &mut impl FnMut () -> ID,
 ) -> Vec<usize> {
   let mut levels : Vec<usize> = children . iter ()
@@ -152,17 +152,17 @@ fn group_children (
     node : synthetic_node (
       "These are special!",
       "They were super-indented in the original document.",
-      source, new_id),
+      repo, new_id),
     original_level : 0,
     children : special,
   });
-  let normal : Vec<usize> = group_children (normal, outline, source, new_id);
+  let normal : Vec<usize> = group_children (normal, outline, repo, new_id);
   let normal_index : usize = outline . len ();
   outline . push (OutlineNode {
     node : synthetic_node (
       "These are normal.",
       "They have been buried to encourage reading the nodes that were super-indented in the original document.",
-      source, new_id),
+      repo, new_id),
     original_level : 0,
     children : normal,
   });
@@ -172,7 +172,7 @@ fn group_children (
 fn synthetic_node (
   title : &str,
   body : &str,
-  source : &SourceName,
+  repo : &RepoName,
   new_id : &mut impl FnMut () -> ID,
 ) -> NodeComplete {
   let mut node : NodeComplete =
@@ -180,13 +180,13 @@ fn synthetic_node (
   node . pid = new_id ();
   node . title = title . to_string ();
   node . body = Some (body . to_string ());
-  node . source = source . clone ();
+  node . home_repo = repo . clone ();
   node
 }
 
 fn export_marker (
   target : &str,
-  source : &SourceName,
+  repo : &RepoName,
   new_id : &mut impl FnMut () -> ID,
 ) -> Result<NodeComplete, String> {
   let quote : char = if ! target . contains ('"') { '"' }
@@ -197,7 +197,7 @@ fn export_marker (
   node . pid = new_id ();
   node . title = format! ("[[id:{}][Export to Org]]", EXPORT_MARKER_ID);
   node . body = Some (format! ("target_filepath = {}{}{}", quote, target, quote));
-  node . source = source . clone ();
+  node . home_repo = repo . clone ();
   Ok (node)
 }
 
@@ -227,10 +227,10 @@ mod tests {
     let document : ParsedDocument = parse_document (
       Path::new ("tutorials/start.md"),
       "Introduction\n# A\nA body\n### Deep\nDeep body\n## Normal\nNormal body\n" . to_string ());
-    let source : SourceName = SourceName::from ("owned");
+    let repo : RepoName = RepoName::from ("owned");
     let mut counter : usize = 0;
     let mut next = || { counter += 1; ID::new (&format! ("generated-{}", counter)) };
-    let built : BuiltDocument = build_document (&document, &source, &mut next) . unwrap ();
+    let built : BuiltDocument = build_document (&document, &repo, &mut next) . unwrap ();
     assert_eq! (built . export_target, "tutorials/start");
     assert_eq! (built . nodes [0] . title, "start");
     assert_eq! (built . nodes [1] . body . as_deref (), Some ("A body"));
@@ -248,9 +248,9 @@ mod tests {
     let document : ParsedDocument = parse_document (
       Path::new ("line-breaks.md"),
       "First  \nSecond\\\nThird\n\n```\nLiteral  \n```\n" . to_string ());
-    let source : SourceName = SourceName::from ("owned");
+    let repo : RepoName = RepoName::from ("owned");
     let mut next = || ID::new (&uuid::Uuid::new_v4 () . to_string ());
-    let built : BuiltDocument = build_document (&document, &source, &mut next) . unwrap ();
+    let built : BuiltDocument = build_document (&document, &repo, &mut next) . unwrap ();
     let body : &str = built . nodes [0] . body . as_deref () . unwrap ();
     assert_eq! (body, "First\\\\\nSecond\\\\\nThird\n\n```\nLiteral  \n```");
   }

@@ -1,8 +1,8 @@
 pub mod parse;
 
 use crate::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, SkgfileSource, SourceName,
-  members_msv, rel_partners_at_relSource_msv};
+  ID, MSV, RelPartner, SkgConfig, SkgfileRepo, RepoName,
+  members_msv, rel_partners_at_relRepo_msv};
 use crate::telescope::unfold::{
   UnfoldInput, UnfoldedTelescope, unfold_node,
 };
@@ -45,7 +45,7 @@ impl fmt::Display for ImportStats {
 pub fn import_org_roam_directory (
   org_dir    : &Path,
   output_dir : &Path,
-  source     : &SourceName,
+  repo     : &RepoName,
 ) -> Result<ImportStats, Box<dyn Error>> {
   let org_files : Vec<PathBuf> = org_files_in (org_dir);
   refuse_headlines_inside_blocks (&org_files)?; // before wiping anything
@@ -68,14 +68,14 @@ pub fn import_org_roam_directory (
     let nodes : Vec<NodeComplete> =
       parse::parse_org_file (path);
     for mut node in nodes {
-      node . source = source . clone();
-      { // Re-tag the parse-time placeholder sources with the real
-        // source, so the sources are honest even before the FS
+      node . home_repo = repo . clone();
+      { // Re-tag the parse-time placeholder repos with the real
+        // repo, so the repos are honest even before the FS
         // boundary drops them (see RelPartner's INTERIM note).
         for m in node . contains . iter_mut () {
-          m . relSource = source . clone (); }
-        node . aliases = rel_partners_at_relSource_msv (
-          &source, members_msv ( &node . aliases )); }
+          m . relRepo = repo . clone (); }
+        node . aliases = rel_partners_at_relRepo_msv (
+          &repo, members_msv ( &node . aliases )); }
       { let pid : ID = node . pid . clone();
         if let Some (existing) = node_map . get_mut (&pid) {
           merge_into_existing (existing, &node);
@@ -142,13 +142,13 @@ fn merge_into_existing (
   if ! existing . misc . contains (&FileProperty::Was_Overloaded) {
     existing . misc . push (FileProperty::Was_Overloaded); }
   { // Merge contents. New members are tagged with the owning
-    // (existing) node's source; DEGENERATE (see RelPartner).
+    // (existing) node's repo; DEGENERATE (see RelPartner).
     for child in &newcomer . contains {
       let child_id : &ID = & child . member;
       if ! existing . contains . iter ()
            . any ( |m| &m . member == child_id ) {
-        existing . contains . push ( RelPartner::at_relSource (
-          existing . source . clone (), child_id . clone () )); }} }
+        existing . contains . push ( RelPartner::at_relRepo (
+          existing . home_repo . clone (), child_id . clone () )); }} }
   { // Append the newcomer's title and body into the existing body,
     // separated by an informative marker.
     let separator : &str =
@@ -162,17 +162,17 @@ fn merge_into_existing (
       existing . body . get_or_insert_with (String::new);
     body . push_str (&appendage); }
   { // Merge aliases. New members are tagged with the owning
-    // (existing) node's source; DEGENERATE (see RelPartner).
+    // (existing) node's repo; DEGENERATE (see RelPartner).
     let newcomer_aliases : MSV<String> = members_msv (&newcomer . aliases);
     let new_aliases : &[String] = newcomer_aliases . or_default();
     if ! new_aliases . is_empty() {
-      let source : SourceName = existing . source . clone();
+      let repo : RepoName = existing . home_repo . clone();
       let merged : &mut Vec<RelPartner<String>> =
         existing . aliases . ensure_specified();
       for alias in new_aliases {
         if ! merged . iter () . any ( |m| &m . member == alias ) {
-          merged . push ( RelPartner::at_relSource (
-            source . clone (), alias . clone () )); }} } }
+          merged . push ( RelPartner::at_relRepo (
+            repo . clone (), alias . clone () )); }} } }
   if newcomer . misc . contains (&FileProperty::Had_ID_Before_Import)
     && ! existing . misc . contains (&FileProperty::Had_ID_Before_Import)
     { // Preserve Had_ID_Before_Import from either side.
@@ -189,18 +189,18 @@ fn write_nodecomplete_to_dir (
     output_dir . join (&filename);
   let node_fs : NodeFS = {
     // An imported node is single-section by construction (every
-    // member relSource == its home), so the unfold yields exactly one
-    // section. A one-source config lets the importer use the same
+    // member relRepo == its home), so the unfold yields exactly one
+    // section. A one-repo config lets the importer use the same
     // checked boundary as the ordinary filesystem writer.
-    let source_name : SourceName = node . source . clone ();
-    let mut config : SkgConfig = SkgConfig::dummyFromSources (
-      [ ( source_name . clone (), SkgfileSource {
-            name         : source_name . clone (),
+    let repo_name : RepoName = node . home_repo . clone ();
+    let mut config : SkgConfig = SkgConfig::dummyFromRepos (
+      [ ( repo_name . clone (), SkgfileRepo {
+            name         : repo_name . clone (),
             abbreviation : None,
             path         : output_dir . to_path_buf (),
             user_owns_it : true, } ) ]
       . into_iter () . collect () );
-    config . source_order = vec! [source_name];
+    config . repo_order = vec! [repo_name];
     let unfolded : UnfoldedTelescope =
       unfold_node (
         & UnfoldInput {
@@ -209,7 +209,7 @@ fn write_nodecomplete_to_dir (
           misc      : & node . misc,
           title    : Some ( & node . title ),
           body     : node . body . as_deref (),
-          home     : & node . source,
+          home     : & node . home_repo,
           aliases  : node . aliases . or_default (),
           contains : & node . contains,
           subscribes_to :
@@ -219,7 +219,7 @@ fn write_nodecomplete_to_dir (
           overrides_view_of :
             node . overrides_view_of . or_default (), },
         &config ) ?;
-    let (_, node_fs) : (SourceName, NodeFS) =
+    let (_, node_fs) : (RepoName, NodeFS) =
       unfolded . into_sections () . into_iter () . next ()
       . expect ("an imported node has a home section");
     node_fs };

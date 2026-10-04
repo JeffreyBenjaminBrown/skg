@@ -7,10 +7,10 @@
 //!
 //! Two gates, applied per edge:
 //! - OWNERSHIP is set-independent: an edge is followed only if its
-//!   overrider's source has 'user_owns_it = true', regardless of the
-//!   active source-set.
-//! - VISIBILITY: when an 'ActiveSourceSet' is supplied, an edge is
-//!   followed only if both its relSource and its overrider's home source
+//!   overrider's repo has 'user_owns_it = true', regardless of the
+//!   active repo-set.
+//! - VISIBILITY: when an 'ActiveRepoSet' is supplied, an edge is
+//!   followed only if both its relRepo and its overrider's home repo
 //!   are active. An inactive relationship cannot affect visible topology,
 //!   and an inactive overrider cannot be drawn; either one stops the walk
 //!   at the last visible node. Callers that ask "what marker would the
@@ -30,7 +30,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
-use crate::source_sets::ActiveSourceSet;
+use crate::repo_sets::ActiveRepoSet;
 use crate::types::misc::{ID, SkgConfig};
 
 use std::collections::HashSet;
@@ -62,7 +62,7 @@ pub struct OverrideResolution {
 pub fn resolve_override (
   config : &SkgConfig,
   graph  : &InRustGraph,
-  active : Option<&ActiveSourceSet>,
+  active : Option<&ActiveRepoSet>,
   id     : &ID,
 ) -> OverrideResolution {
   let input_pid : ID = // extra-ID safety: resolve before walking
@@ -112,10 +112,10 @@ pub fn resolve_override (
 /// '(overridesHere original)', wherever 'original' would appear as
 /// content. The tamper check at save uses this: with chains the drawn
 /// node can be any link of the chain (a MIDDLE carrier, when a later
-/// link's source is hidden), not only the end, so it must accept any
+/// link's repo is hidden), not only the end, so it must accept any
 /// honest carrier and reject only an off-chain (faked/stale) marker.
 /// VISIBILITY-UNGATED ('active' = None) so a marker that was honest
-/// when rendered does not start failing after a source-set switch;
+/// when rendered does not start failing after a repo-set switch;
 /// 'path' is the full user-owned chain (ownership still gates).
 pub fn carrier_on_user_owned_chain (
   config   : &SkgConfig,
@@ -127,8 +127,8 @@ pub fn carrier_on_user_owned_chain (
     . path . contains (carrier) }
 
 /// The overriders of 'pid' that substitution may follow: the edge's
-/// relSource is active, and the overrider is both user-owned and at an
-/// active home source. Relationship visibility comes from the same
+/// relRepo is active, and the overrider is both user-owned and at an
+/// active home repo. Relationship visibility comes from the same
 /// directional gated accessor used by folders, paths, and counts.
 /// Ownership is modeled on 'user_owned_overriders_of' in
 /// [[./override_invariants.rs]], which serves validation and so applies no
@@ -136,7 +136,7 @@ pub fn carrier_on_user_owned_chain (
 fn followable_overriders_of (
   config : &SkgConfig,
   graph  : &InRustGraph,
-  active : Option<&ActiveSourceSet>,
+  active : Option<&ActiveRepoSet>,
   pid    : &ID,
 ) -> Vec<ID> {
   let mut result : Vec<ID> = Vec::new ();
@@ -144,13 +144,13 @@ fn followable_overriders_of (
     pid, RelationRole::OVERRIDDEN, active ) {
     if let Some (overrider_node) = graph . nodes . get (&overrider) {
       let user_owned : bool =
-        config . sources . get (&overrider_node . source)
+        config . repos . get (&overrider_node . home_repo)
         . map ( |sc| sc . user_owns_it )
         . unwrap_or (false);
       let home_visible : bool =
         active
         . map ( |a| a . is_all ()
-                || a . contains_source (&overrider_node . source) )
+                || a . contains_repo (&overrider_node . home_repo) )
         . unwrap_or (true);
       if user_owned && home_visible {
         result . push (overrider); }} }

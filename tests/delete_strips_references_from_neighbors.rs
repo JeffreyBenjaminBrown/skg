@@ -28,8 +28,8 @@ use std::net::TcpStream;
 use std::path::Path;
 
 use skg::dbs::filesystem::one_node::{
-  nodecomplete_from_pid_and_source,
-  nodecomplete_from_pid_and_source as load_nc};
+  nodecomplete_from_pid_and_repo,
+  nodecomplete_from_pid_and_repo as load_nc};
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::save::update_graph_minus_nodeMerges;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config,
@@ -39,14 +39,14 @@ use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rer
 use skg::serve::ViewsState;
 use skg::serve::handlers::delete_references_to_absent_node::
   handle_delete_references_to_absent_node_request;
-use skg::source_sets::ActiveSourceSet;
+use skg::repo_sets::ActiveRepoSet;
 use skg::to_org::render::content_view::single_root_view;
 use skg::types::env::SkgEnv;
 use skg::types::views_state::{OpenViews, ViewUri};
-use skg::types::misc::{ID, SkgConfig, TantivyIndex, SourceName, members_of, members_msv};
+use skg::types::misc::{ID, SkgConfig, TantivyIndex, RepoName, members_of, members_msv};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
-use skg::util::path_from_pid_and_source;
+use skg::util::path_from_pid_and_repo;
 
 
 #[test]
@@ -100,7 +100,7 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
   let mut env : SkgEnv = skg_env_from_parts (
     config, tantivy, &graph );
-  let active : ActiveSourceSet = ActiveSourceSet::default_from_config (config) ?;
+  let active : ActiveRepoSet = ActiveRepoSet::default_from_config (config) ?;
   let mut views_state : ViewsState = ViewsState {
     diff_mode_enabled : false, open_views : OpenViews::new (), };
   for (uri, root) in [("affected", "owner"),
@@ -140,8 +140,8 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
       messages . push (message); }
     Ok (messages) };
 
-  let owner_path : String = path_from_pid_and_source (
-    config, &SourceName::from ("main"), ID::from ("owner")) ?;
+  let owner_path : String = path_from_pid_and_repo (
+    config, &RepoName::from ("main"), ID::from ("owner")) ?;
   let owner_before : Vec<u8> = fs::read (&owner_path) ?;
   let confirmation : Vec<String> = invoke (&request (None), &mut env, &mut views_state) ?;
   assert_eq! (confirmation . len (), 3, "{:?}", confirmation);
@@ -160,8 +160,8 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
 
   // Change a previewed field through the normal save path.  The old token must
   // not authorize a rewrite against this new graph snapshot.
-  let mut changed_owner : NodeComplete = nodecomplete_from_pid_and_source (
-    config, ID::from ("owner"), &SourceName::from ("main")) ?;
+  let mut changed_owner : NodeComplete = nodecomplete_from_pid_and_repo (
+    config, ID::from ("owner"), &RepoName::from ("main")) ?;
   changed_owner . title . push_str (" changed after preview");
   let runtime = env . runtime_snapshot ();
   let working_graph = skg::dbs::in_rust_graph::new_handle (
@@ -176,8 +176,8 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
   let stale : Vec<String> = invoke (
     &request (Some (&approval)), &mut env, &mut views_state) ?;
   assert! (stale [0] . contains ("Cleanup preview is stale"), "{:?}", stale);
-  let unchanged : NodeComplete = nodecomplete_from_pid_and_source (
-    config, ID::from ("owner"), &SourceName::from ("main")) ?;
+  let unchanged : NodeComplete = nodecomplete_from_pid_and_repo (
+    config, ID::from ("owner"), &RepoName::from ("main")) ?;
   assert_eq! (members_of (&unchanged . contains), vec![ID::from ("gone"), ID::from ("kept")],
               "a stale approval must not partially rewrite the owner");
   let renewed_confirmation : Vec<String> = invoke (
@@ -200,8 +200,8 @@ async fn absent_reference_cleanup_handler_confirms_then_rewrites (
             && completed [2] . contains ("affected"), "{:?}", completed);
   assert! (completed [3] . contains ("rerender-done"), "{:?}", completed);
 
-  let owner : NodeComplete = nodecomplete_from_pid_and_source (
-    config, ID::from ("owner"), &SourceName::from ("main")) ?;
+  let owner : NodeComplete = nodecomplete_from_pid_and_repo (
+    config, ID::from ("owner"), &RepoName::from ("main")) ?;
   assert_eq! (members_of (&owner . contains), vec! [ID::from ("kept")]);
   assert! (owner . subscribes_to . or_default () . is_empty ());
   assert! (owner . hides_from_its_subscriptions . or_default () . is_empty ());
@@ -215,9 +215,9 @@ async fn delete_preserves_foreign_referencer (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let owned : SourceName = SourceName::from ("owned");
-  let foreign : SourceName = SourceName::from ("foreign");
-  let foreign_path : String = path_from_pid_and_source (
+  let owned : RepoName = RepoName::from ("owned");
+  let foreign : RepoName = RepoName::from ("foreign");
+  let foreign_path : String = path_from_pid_and_repo (
     config, &foreign, ID::from ("cheese") ) ?;
   let foreign_before : Vec<u8> = fs::read (&foreign_path) ?;
   let graph : InRustGraphHandle = graph_handle_from_config (config) ?;
@@ -243,7 +243,7 @@ async fn delete_preserves_foreign_referencer (
     response . saved_view );
   assert_eq! ( fs::read (&foreign_path) ?, foreign_before,
     "deleting an owned target must not rewrite foreign data" );
-  let owned_referencer : NodeComplete = nodecomplete_from_pid_and_source (
+  let owned_referencer : NodeComplete = nodecomplete_from_pid_and_repo (
     config, ID::from ("owned-referencer"), &owned ) ?;
   assert! ( ! members_of (&owned_referencer . contains)
             . contains (&ID::from ("victim-alt")),
@@ -309,8 +309,8 @@ async fn delete_in_foreign_overridden_rerenders_as_unknown (
   assert! (response . saved_view . contains ("(overridesHere overrider)"),
     "the buffer whose foreign root was forked must immediately show the fork: {}",
     response . saved_view);
-  let original : NodeComplete = nodecomplete_from_pid_and_source (
-    config, ID::from ("overrider"), &SourceName::from ("foreign")) ?;
+  let original : NodeComplete = nodecomplete_from_pid_and_repo (
+    config, ID::from ("overrider"), &RepoName::from ("foreign")) ?;
   assert! (members_msv (&original . overrides_view_of)
            . into_vec ()
            . contains (&ID::from ("victim-alt")),
@@ -379,11 +379,11 @@ async fn delete_strips_references_impl (
     &Err ( String::new () ), &mut views_state ) . await ?;
 
   let mut failures : Vec<String> = Vec::new ();
-  let main : SourceName = SourceName::from ("main");
+  let main : RepoName = RepoName::from ("main");
 
   // 1. victim.skg deleted.
   let victim_path : String =
-    path_from_pid_and_source (
+    path_from_pid_and_repo (
       config, &main, ID::from ("victim") ) ?;
   if Path::new (&victim_path) . exists () {
     failures . push (
@@ -391,7 +391,7 @@ async fn delete_strips_references_impl (
 
   // 2. container.skg's contains has only sibling now.
   let container : NodeComplete =
-    nodecomplete_from_pid_and_source (
+    nodecomplete_from_pid_and_repo (
       config, ID::from ("container"), &main ) ?;
   if members_of ( &container . contains ) . contains (&ID::from ("victim")) {
     failures . push ( format! (
@@ -404,7 +404,7 @@ async fn delete_strips_references_impl (
 
   // 3. subscriber.skg's subscribes_to has only sibling.
   let subscriber : NodeComplete =
-    nodecomplete_from_pid_and_source (
+    nodecomplete_from_pid_and_repo (
       config, ID::from ("subscriber"), &main ) ?;
   let sub_vec : Vec<ID> =
     members_msv ( &subscriber . subscribes_to ) . into_vec ();
@@ -419,7 +419,7 @@ async fn delete_strips_references_impl (
 
   // 4. sibling.skg unchanged.
   let sibling : NodeComplete =
-    nodecomplete_from_pid_and_source (
+    nodecomplete_from_pid_and_repo (
       config, ID::from ("sibling"), &main ) ?;
   if sibling . title != "sibling" {
     failures . push ( format! (
@@ -456,7 +456,7 @@ async fn strip_pass_amends_user_supplied_savenode_impl (
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-  let main : SourceName = SourceName::from ("main");
+  let main : RepoName = RepoName::from ("main");
   // Build the SaveNode for container by reading the on-disk node
   // verbatim -- contents are still [victim] -- and pair with a
   // DeleteNode for victim.
@@ -468,7 +468,7 @@ async fn strip_pass_amends_user_supplied_savenode_impl (
     DefineNode::Save ( SaveNode (container_nc) ),
     DefineNode::Delete ( DeleteNode {
       id: ID::from ("victim"),
-      source: main . clone (), } ), ];
+      home_repo: main . clone (), } ), ];
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
   update_graph_minus_nodeMerges (
@@ -481,7 +481,7 @@ async fn strip_pass_amends_user_supplied_savenode_impl (
     panic! ("container.contains still has victim after strip pass: {:?}",
             container . contains ); }
   let victim_path : String =
-    path_from_pid_and_source (
+    path_from_pid_and_repo (
       config, &main, ID::from ("victim") ) ?;
   if Path::new (&victim_path) . exists () {
     panic! ("victim.skg should have been deleted"); }
@@ -529,9 +529,9 @@ async fn strip_pass_handles_extra_ids_impl (
     &mut stream,
     input_org_text, config, tantivy, &graph, false,
     &Err ( String::new () ), &mut views_state ) . await ?;
-  let main : SourceName = SourceName::from ("main");
+  let main : RepoName = RepoName::from ("main");
   let referencer : NodeComplete =
-    nodecomplete_from_pid_and_source (
+    nodecomplete_from_pid_and_repo (
       config, ID::from ("referencer"), &main ) ?;
   if members_of ( &referencer . contains ) . contains (&ID::from ("aliased_alt")) {
     panic! ("referencer.contains still has aliased_alt (an extra_id of \
@@ -540,7 +540,7 @@ async fn strip_pass_handles_extra_ids_impl (
   if members_of ( &referencer . contains ) . contains (&ID::from ("aliased")) {
     panic! ("referencer.contains has aliased (primary pid of deleted node)"); }
   let aliased_path : String =
-    path_from_pid_and_source (
+    path_from_pid_and_repo (
       config, &main, ID::from ("aliased") ) ?;
   if Path::new (&aliased_path) . exists () {
     panic! ("aliased.skg should have been deleted"); }

@@ -3,8 +3,8 @@ use crate::dbs::in_rust_graph::stats::mentioner_is_substantive;
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole };
 use crate::herald_tokens::{AncestorFlags, relationship_heralds_sexp};
-use crate::source_sets::ActiveSourceSet;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::repo_sets::ActiveRepoSet;
+use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::viewnode::{
   Birth, GraphNodeStats, AffectsParent, PartnerFolder, ViewNode, ViewNodeKind, Vognode };
 use crate::update_buffer::ancestry::required_ancestor;
@@ -26,15 +26,15 @@ pub fn set_viewnodestats_in_viewforest (
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
   config                : &SkgConfig,
-  active                : Option<&ActiveSourceSet>,
+  active                : Option<&ActiveRepoSet>,
 ) {
-  let multi_source : bool = config . sources . len () > 1;
+  let multi_repo : bool = config . repos . len () > 1;
   let mut ancestor_ids : HashSet<ID> = HashSet::new ();
   let root_treeid : NodeId = viewforest . root () . id ();
   set_viewnodestats_recursive (
     viewforest,
     root_treeid,
-    multi_source,
+    multi_repo,
     Some (graph),
     config,
     active,
@@ -45,10 +45,10 @@ pub fn set_viewnodestats_in_viewforest (
 fn set_viewnodestats_recursive (
   tree                  : &mut Tree<ViewNode>,
   treeid                : NodeId,
-  multi_source          : bool,
+  multi_repo          : bool,
   graph                 : Option<&InRustGraph>,
   config                : &SkgConfig,
-  active                : Option<&ActiveSourceSet>,
+  active                : Option<&ActiveRepoSet>,
   ancestor_ids          : &mut HashSet<ID>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
@@ -59,13 +59,13 @@ fn set_viewnodestats_recursive (
     { let node_pid : ID = t . id . clone ();
       detect_and_mark_cycle_v2 (
         tree, treeid, &node_pid, ancestor_ids );
-      if multi_source {
-        set_source_at_boundary (tree, treeid); }
+      if multi_repo {
+        set_repo_at_boundary (tree, treeid); }
       set_herald_strings_in_viewnode (
         tree, treeid, &node_pid, graph, active,
         container_to_contents, content_to_containers );
       set_hidden_body (tree, treeid, &node_pid, graph);
-      set_relSource (tree, treeid, graph, config);
+      set_relRepo (tree, treeid, graph, config);
       Some (node_pid)
     } else { None };
   let was_new : bool =
@@ -79,7 +79,7 @@ fn set_viewnodestats_recursive (
     set_viewnodestats_recursive (
       tree,
       child_treeid,
-      multi_source,
+      multi_repo,
       graph,
       config,
       active,
@@ -108,7 +108,7 @@ fn set_herald_strings_in_viewnode (
   treeid                : NodeId,
   node_pid              : &ID,
   graph                 : Option<&InRustGraph>,
-  active                : Option<&ActiveSourceSet>,
+  active                : Option<&ActiveRepoSet>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
@@ -142,7 +142,7 @@ fn set_herald_strings_in_viewnode (
             None => true,
             Some (a) if a . is_all () => true,
             Some (a) => g . nodes . get (id)
-              .is_some_and (|n| a . contains_source (&n . source)), }};
+              .is_some_and (|n| a . contains_repo (&n . home_repo)), }};
         let contents : Vec<ID> = g . outbound_pids_for_relation_gated (
           node_pid, NodeRelation::Contains, active )
           . into_iter () . filter (|id| visible (id)) . collect ();
@@ -216,9 +216,9 @@ fn active_vognode_pid (
 
 /// Record, for the tracked ancestor 'anc_pid' at 'generation', every
 /// relation it is a member of on each side relative to 'node_pid'.
-/// Contains membership is read from the source-filtered containment
+/// Contains membership is read from the repo-filtered containment
 /// maps; the other four relations from the in-Rust graph. Every flag
-/// is relSource gated: an edge recorded outside the active prefix
+/// is relRepo gated: an edge recorded outside the active prefix
 /// must not tint an ancestor herald in a more public view (it would
 /// reveal the very relationship the user privatized). The contains
 /// gate needs the graph (the maps carry no levels); without one
@@ -226,7 +226,7 @@ fn active_vognode_pid (
 fn flag_ancestor_relations (
   flags                 : &mut AncestorFlags,
   graph                 : Option<&InRustGraph>,
-  active                : Option<&ActiveSourceSet>,
+  active                : Option<&ActiveRepoSet>,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
   node_pid              : &ID,
@@ -236,8 +236,8 @@ fn flag_ancestor_relations (
   let contains_rel_is_visible = |owner : &ID, target : &ID| -> bool {
     match (graph, active) {
       (Some (g), Some (a)) if ! a . is_all () =>
-        g . relSource (owner, NodeRelation::Contains, target)
-          . map ( |source| a . contains_source (&source) )
+        g . relRepo (owner, NodeRelation::Contains, target)
+          . map ( |repo| a . contains_repo (&repo) )
           . unwrap_or (false),
       _ => true }};
   // Contains, via the maps. inbound: ancestor contains node.
@@ -341,27 +341,27 @@ fn set_hidden_body (
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . hidden_body = hidden_body; }}
 
-/// Sets relSource on the active vognode at treeid (render-and-gating,
-/// 5_plan.org; see 'ViewNodeStats::relSource' for the full contract).
+/// Sets relRepo on the active vognode at treeid (render-and-gating,
+/// 5_plan.org; see 'ViewNodeStats::relRepo' for the full contract).
 /// Computes the (owner, relation, target) triple that identifies the
 /// binding edge this position represents -- contains for an ordinary
 /// Gnode-parent content child; the folder's relation for a simple
 /// PartnerFolder member, oriented by which side owns the outbound edge
 /// (see 'RelationRole::is_first_role') -- then compares the edge's
-/// actual source ('InRustGraph::relSource') against its applicable
+/// actual repo ('InRustGraph::relRepo') against its applicable
 /// relationship default. None on any of: no
 /// graph handle; affectsParent != Affected or a backpath graft (not a
 /// genuine member here); a compound filter folder
 /// (HiddenInSubscribee / HiddenOutsideOfSubscribee: no single
 /// 'relation_member_role'); no recorded edge; unresolvable homes;
-/// or the source equalling the default.
-fn set_relSource (
+/// or the repo equalling the default.
+fn set_relRepo (
   tree   : &mut Tree<ViewNode>,
   treeid : NodeId,
   graph  : Option<&InRustGraph>,
   config : &SkgConfig,
 ) {
-  let relSource : Option<SourceName> = 'compute : {
+  let relRepo : Option<RepoName> = 'compute : {
     let graph : &InRustGraph = match graph {
       Some (g) => g, None => break 'compute None, };
     let (node_pid, affectsParent, birth) : (ID, AffectsParent, Birth) = {
@@ -373,7 +373,7 @@ fn set_relSource (
       || birth != Birth::Unremarkable {
       // Not a genuine member at this position (a
       // self-writer parked under a folder, or a backpath graft): there
-      // is no binding edge here to have a source at all.
+      // is no binding edge here to have a repo at all.
       break 'compute None; }
     let (owner_pid, relation, target_pid) : (ID, NodeRelation, ID) =
       match parent_kind_of (tree, treeid) {
@@ -397,27 +397,27 @@ fn set_relSource (
             (anchor_pid, role . relation, node_pid . clone ())
           }},
         ParentKind::Other => break 'compute None, };
-    let source : SourceName =
-      match graph . relSource (&owner_pid, relation, &target_pid) {
+    let repo : RepoName =
+      match graph . relRepo (&owner_pid, relation, &target_pid) {
         Some (l) => l, None => break 'compute None, };
-    let default : SourceName = {
-      let owner_home : Option<SourceName> =
-        graph . pid_and_source (&owner_pid) . map ( |(_, s)| s );
-      let target_home : Option<SourceName> =
-        graph . pid_and_source (&target_pid) . map ( |(_, s)| s );
+    let default : RepoName = {
+      let owner_home : Option<RepoName> =
+        graph . pid_and_repo (&owner_pid) . map ( |(_, s)| s );
+      let target_home : Option<RepoName> =
+        graph . pid_and_repo (&target_pid) . map ( |(_, s)| s );
       match (owner_home, target_home) {
         (Some (a), Some (b)) =>
-          config . default_relSource (&a, &b),
+          config . default_relRepo (&a, &b),
         _ => break 'compute None, }};
-    if source == default { None } else { Some (source) } };
+    if repo == default { None } else { Some (repo) } };
   if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
-  { t . viewStats . relSource = relSource; }}
+  { t . viewStats . relRepo = relRepo; }}
 
 #[cfg(test)]
 mod relationship_default_tests {
   use super::*;
-  use crate::types::misc::{RelPartner, SkgfileSource};
+  use crate::types::misc::{RelPartner, SkgfileRepo};
   use crate::types::nodes::complete::{empty_node_complete, NodeComplete};
   use crate::types::viewnode::{
     mk_definitive_viewnode, viewforest_root_viewnode};
@@ -426,31 +426,31 @@ mod relationship_default_tests {
   #[test]
   fn owned_to_foreign_owner_home_edge_has_no_override_herald () {
     let mut config : SkgConfig = {
-      let mut sources : HashMap<SourceName, SkgfileSource> =
+      let mut repos : HashMap<RepoName, SkgfileRepo> =
         HashMap::new ();
       for (name, owned) in
           [("public", true), ("foreign", false), ("private", true)] {
-        sources . insert (
-          SourceName::from (name),
-          SkgfileSource {
-            name         : SourceName::from (name),
+        repos . insert (
+          RepoName::from (name),
+          SkgfileRepo {
+            name         : RepoName::from (name),
             abbreviation : None,
             path         : PathBuf::from (name),
             user_owns_it : owned, } ); }
-      SkgConfig::dummyFromSources (sources) };
-    config . source_order = ["public", "foreign", "private"]
-      . into_iter () . map (SourceName::from) . collect ();
+      SkgConfig::dummyFromRepos (repos) };
+    config . repo_order = ["public", "foreign", "private"]
+      . into_iter () . map (RepoName::from) . collect ();
 
     let mut owner : NodeComplete = empty_node_complete ();
     owner . pid = ID::new ("owner");
     owner . title = "owner" . to_string ();
-    owner . source = SourceName::from ("public");
-    owner . contains = vec! [ RelPartner::at_relSource (
-      SourceName::from ("public"), ID::new ("member") ) ];
+    owner . home_repo = RepoName::from ("public");
+    owner . contains = vec! [ RelPartner::at_relRepo (
+      RepoName::from ("public"), ID::new ("member") ) ];
     let mut member : NodeComplete = empty_node_complete ();
     member . pid = ID::new ("member");
     member . title = "member" . to_string ();
-    member . source = SourceName::from ("foreign");
+    member . home_repo = RepoName::from ("foreign");
     let graph : InRustGraph =
       InRustGraph::from_nodecompletes (&[owner, member]);
 
@@ -458,58 +458,58 @@ mod relationship_default_tests {
       Tree::new (viewforest_root_viewnode ());
     let owner_treeid : NodeId = tree . root_mut () . append (
       mk_definitive_viewnode (
-        ID::new ("owner"), SourceName::from ("public"),
+        ID::new ("owner"), RepoName::from ("public"),
         "owner" . to_string (), None ) ) . id ();
     let member_treeid : NodeId = tree . get_mut (owner_treeid)
       . unwrap () . append ( mk_definitive_viewnode (
-        ID::new ("member"), SourceName::from ("foreign"),
+        ID::new ("member"), RepoName::from ("foreign"),
         "member" . to_string (), None ) ) . id ();
 
-    set_relSource (
+    set_relRepo (
       &mut tree, member_treeid, Some (&graph), &config );
     let ViewNodeKind::Vognode (Vognode::Active (rendered_member)) =
       & tree . get (member_treeid) . unwrap () . value () . kind
     else { panic! ("member should be active"); };
-    assert_eq! ( rendered_member . viewStats . relSource, None,
+    assert_eq! ( rendered_member . viewStats . relRepo, None,
       "the owner-home default must not render a fake relSource override" );
   }
 }
 
-/// Sets sourceAtBoundary on the active vognode at treeid.
+/// Sets homeRepoAtBoundary on the active vognode at treeid.
 /// True if no active vognode ancestor exists (i.e. a root),
-/// or if the nearest active vognode ancestor has a different source.
-fn set_source_at_boundary (
+/// or if the nearest active vognode ancestor has a different repo.
+fn set_repo_at_boundary (
   tree   : &mut Tree<ViewNode>,
   treeid : NodeId,
 ) {
-  let node_source : SourceName = {
+  let node_repo : RepoName = {
     let ViewNodeKind::Vognode (Vognode::Active (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
-    t . source . clone () };
-  let ancestor_source : Option<SourceName> =
-    nearest_activeNode_ancestor_source (tree, treeid);
+    t . home_repo . clone () };
+  let ancestor_repo : Option<RepoName> =
+    nearest_activeNode_ancestor_repo (tree, treeid);
   let at_boundary : bool =
-    match ancestor_source {
+    match ancestor_repo {
       None => true,
-      Some (s) => s != node_source };
+      Some (s) => s != node_repo };
   if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
-  { t . viewStats . sourceAtBoundary = at_boundary; }}
+  { t . viewStats . homeRepoAtBoundary = at_boundary; }}
 
 /// Walk rootward from treeid (exclusive) to find
-/// the nearest active vognode ancestor's source.
-fn nearest_activeNode_ancestor_source (
+/// the nearest active vognode ancestor's repo.
+fn nearest_activeNode_ancestor_repo (
   tree   : &Tree<ViewNode>,
   treeid : NodeId,
-) -> Option<SourceName> {
+) -> Option<RepoName> {
   let mut current : NodeId = treeid;
   while let Some (parent_ref)
     = tree . get (current) . unwrap () . parent ()
     { current = parent_ref . id ();
       if let ViewNodeKind::Vognode (Vognode::Active (t))
         = & parent_ref . value () . kind
-        { return Some ( t . source . clone () ); }}
+        { return Some ( t . home_repo . clone () ); }}
   None }
 
 /// The node's 'cycle' field becomes equal to

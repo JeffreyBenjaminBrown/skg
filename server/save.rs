@@ -20,7 +20,7 @@ use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, TantivyIndex};
 use crate::types::errors::{BufferValidationError, SaveError};
 use crate::types::nodes::rust::NodeRust;
 use crate::types::nodes::tantivy::NodeTantivy;
-use crate::types::save::{DefineNode, SaveNode, DeleteNode, NodeMerge, SourceMove};
+use crate::types::save::{DefineNode, SaveNode, DeleteNode, NodeMerge, RepoMove};
 use crate::types::nodes::complete::NodeComplete;
 
 use std::collections::{HashMap, HashSet};
@@ -56,7 +56,7 @@ fn graph_preparation_save_error (
 /// Returns `Some(new_index)` when Tantivy had to be rebuilt.
 pub async fn update_graph_minus_nodeMerges (
   node_defs     : Vec<DefineNode>,
-  source_moves  : &[SourceMove],
+  repo_moves  : &[RepoMove],
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
   graph         : &InRustGraphHandle,
@@ -64,13 +64,13 @@ pub async fn update_graph_minus_nodeMerges (
 ) -> Result < Option<TantivyIndex>, Box<dyn Error> > {
   let _mutation_guard = mutation_gate . lock () . await;
   update_graph_minus_nodeMerges_with_hoist_approval (
-    node_defs, source_moves, config, tantivy_index, graph,
+    node_defs, repo_moves, config, tantivy_index, graph,
     &HashSet::new () )
 }
 
 pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
   mut node_defs : Vec<DefineNode>,
-  source_moves  : &[SourceMove],
+  repo_moves  : &[RepoMove],
   config        : SkgConfig,
   tantivy_index : &TantivyIndex,
   graph         : &InRustGraphHandle,
@@ -87,7 +87,7 @@ pub(crate) fn update_graph_minus_nodeMerges_with_hoist_approval (
     &config, base . clone (), node_defs)
     . map_err (|error| -> Box<dyn Error> { Box::new (error) }) ?;
   let prepared_filesystem : PreparedFilesystemUpdate = prepare_fs_update (
-    prepared . definitions (), source_moves, &config, hoist_approved_pids) ?;
+    prepared . definitions (), repo_moves, &config, hoist_approved_pids) ?;
   let telescope_warnings : Vec<(ID, TelescopeViolation)> =
     affected_telescope_warnings (
       &config, &base, prepared . candidate (),
@@ -113,7 +113,7 @@ fn apply_defineNodes (
     . map_err ( |message| -> Box<dyn Error> { message . into () } ) ?;
 
   { // FS (source of truth)
-    // TODO: Print per-source write information
+    // TODO: Print per-repo write information
     tracing::info!( "Writing {} instruction(s) to disk ...",
                { let total_input : usize = prepared . definitions () . len ();
                  total_input } );
@@ -172,7 +172,7 @@ pub(crate) fn enqueue_tantivy_delta (
 pub async fn update_graph_including_nodeMerges (
   save_instructions  : Vec<DefineNode>,
   nodeMerge_instructions : &[NodeMerge],
-  source_moves       : &[SourceMove],
+  repo_moves       : &[RepoMove],
   config             : SkgConfig,
   tantivy_index      : &mut TantivyIndex,
   graph              : &InRustGraphHandle,
@@ -181,7 +181,7 @@ pub async fn update_graph_including_nodeMerges (
 ) -> Result<HashMap<ID, HashSet<ID>>, Box<dyn Error>> {
   let _mutation_guard = mutation_gate . lock () . await;
   update_graph_including_nodeMerges_under_mutation_gate (
-    save_instructions, nodeMerge_instructions, source_moves, config,
+    save_instructions, nodeMerge_instructions, repo_moves, config,
     tantivy_index, graph, hoist_approved_pids )
 }
 
@@ -191,14 +191,14 @@ pub async fn update_graph_including_nodeMerges (
 pub(crate) fn update_graph_including_nodeMerges_under_mutation_gate (
   save_instructions  : Vec<DefineNode>,
   nodeMerge_instructions : &[NodeMerge],
-  source_moves       : &[SourceMove],
+  repo_moves       : &[RepoMove],
   config             : SkgConfig,
   tantivy_index      : &mut TantivyIndex,
   graph              : &InRustGraphHandle,
   hoist_approved_pids : &HashSet<ID>,
 ) -> Result<HashMap<ID, HashSet<ID>>, Box<dyn Error>> {
   let prepared : PreparedSave = prepare_save_under_mutation_gate (
-    save_instructions, nodeMerge_instructions, source_moves, &config,
+    save_instructions, nodeMerge_instructions, repo_moves, &config,
     graph, hoist_approved_pids) ?;
   prepared . apply (config, tantivy_index, graph)
 }
@@ -268,7 +268,7 @@ impl PreparedSave {
 pub(crate) fn prepare_save_under_mutation_gate (
   mut save_instructions  : Vec<DefineNode>,
   nodeMerge_instructions : &[NodeMerge],
-  source_moves       : &[SourceMove],
+  repo_moves       : &[RepoMove],
   config             : &SkgConfig,
   graph              : &InRustGraphHandle,
   hoist_approved_pids : &HashSet<ID>,
@@ -306,7 +306,7 @@ pub(crate) fn prepare_save_under_mutation_gate (
   // shape, path, and serialization work.
   let prepared_save_filesystem : Option<PreparedFilesystemUpdate> =
     prepared_save . as_ref () . map (|prepared| prepare_fs_update (
-      prepared . definitions (), source_moves, config, hoist_approved_pids))
+      prepared . definitions (), repo_moves, config, hoist_approved_pids))
     . transpose () ?;
   let prepared_nodeMerge_filesystem : Option<PreparedFilesystemUpdate> =
     prepared_nodeMerge . as_ref () . map (|prepared| prepare_fs_update (
@@ -343,8 +343,8 @@ pub(crate) fn prepare_save_under_mutation_gate (
     .chain (prepared_nodeMerge . iter ()
       .flat_map (|prepared| prepared . definitions () . iter ()))
     .flat_map (identities_in_definition)
-    .chain (source_moves . iter () . map (|source_move|
-      source_move . pid . clone ()))
+    .chain (repo_moves . iter () . map (|repo_move|
+      repo_move . pid . clone ()))
     .chain (affected_ids_for_telescope)
     .collect ();
   Ok (PreparedSave {
@@ -451,7 +451,7 @@ pub(crate) fn apply_delete_propagation_cleanup (
             referencer_pids . insert ( pid . clone () ); }} } }
     referencer_pids . retain ( |p|
       graph_snap . get (p)
-      . map ( |node| config . user_owns_source (&node . source) )
+      . map ( |node| config . user_owns_repo (&node . home_repo) )
       . unwrap_or (false)
       && ! user_save_pids . contains (p)
       && ! deleted_primary_pids . contains (p) );
@@ -469,7 +469,7 @@ pub(crate) fn apply_delete_propagation_cleanup (
     // remains intact so ordinary validation/preflight can reject the write.
     for nd in node_defs . iter_mut () {
       if let DefineNode::Save ( SaveNode (nc) ) = nd {
-        if ! config . user_owns_source (&nc . source) { continue; }
+        if ! config . user_owns_repo (&nc . home_repo) { continue; }
         nc . contains . retain ( |id|
           ! deleted_id_set . contains (& id . member) );
         nc . subscribes_to = remove_from_msv (
@@ -487,7 +487,7 @@ pub(crate) fn nodecomplete_from_noderust (
 ) -> NodeComplete {
   NodeComplete {
     pid                          : rust . pid . clone (),
-    source                       : rust . source . clone (),
+    home_repo                       : rust . home_repo . clone (),
     extra_ids                    : rust . extra_ids . clone (),
     title                        : rust . title . clone (),
     overPrivateText_telescope               : rust . overPrivateText_telescope,
@@ -514,11 +514,11 @@ fn remove_from_msv (
 
 pub fn update_fs_from_saveinstructions (
   node_defs    : &[DefineNode],
-  source_moves : &[SourceMove],
+  repo_moves : &[RepoMove],
   config       : SkgConfig,
 ) -> io::Result<(usize, usize)> { // (deleted, written)
   update_fs_from_saveinstructions_with_hoist_approval (
-    node_defs, source_moves, config, &HashSet::new () )
+    node_defs, repo_moves, config, &HashSet::new () )
 }
 
 /// Save-only variant. Every delete target and every serialized telescope is
@@ -528,12 +528,12 @@ pub fn update_fs_from_saveinstructions (
 /// closed on overPrivateText disk telescopes.
 pub(crate) fn update_fs_from_saveinstructions_with_hoist_approval (
   node_defs             : &[DefineNode],
-  source_moves          : &[SourceMove],
+  repo_moves          : &[RepoMove],
   config                : SkgConfig,
   hoist_approved_pids   : &HashSet<ID>,
 ) -> io::Result<(usize, usize)> { // (deleted, written)
   prepare_fs_update (
-    node_defs, source_moves, &config, hoist_approved_pids ) ?
+    node_defs, repo_moves, &config, hoist_approved_pids ) ?
   . apply (&config)
 }
 
@@ -565,7 +565,7 @@ impl PreparedFilesystemUpdate {
 
 pub(crate) fn prepare_fs_update (
   node_defs           : &[DefineNode],
-  source_moves        : &[SourceMove],
+  repo_moves        : &[RepoMove],
   config              : &SkgConfig,
   hoist_approved_pids : &HashSet<ID>,
 ) -> io::Result<PreparedFilesystemUpdate> {
@@ -590,23 +590,23 @@ pub(crate) fn prepare_fs_update (
   let mut prepared_deletions : Vec<String> = Vec::new ();
   let mut deleted_pids : HashSet<ID> = HashSet::new ();
   for DeleteNode { id, .. } in &to_delete {
-    for source in config . ordered_sources () {
-      if ! config . user_owns_source (&source) { continue; }
-      let path : String = crate::util::path_from_pid_and_source (
-        config, &source, id . clone () )
+    for repo in config . ordered_repos () {
+      if ! config . user_owns_repo (&repo) { continue; }
+      let path : String = crate::util::path_from_pid_and_repo (
+        config, &repo, id . clone () )
         . map_err ( |e| io::Error::new (io::ErrorKind::NotFound, e) ) ?;
       if std::path::Path::new (&path) . is_file () {
         deleted_pids . insert ( id . clone () ); }
       prepared_deletions . push (path); }}
 
-  let _ = source_moves;
-  // Source moves need no file relocation of their own anymore: the
-  // telescope write above places every section in its source and
-  // sweeps owned sections whose source lost its last member. An
+  let _ = repo_moves;
+  // Repo moves need no file relocation of their own anymore: the
+  // telescope write above places every section in its repo and
+  // sweeps owned sections whose repo lost its last member. An
   // explicit old-path delete here would even be WRONG for a
-  // private->public home move, where the old (more private) source
+  // private->public home move, where the old (more private) repo
   // legitimately retains a section holding the node's private
-  // memberships. (source_moves still matter to Tantivy, handled elsewhere.)
+  // memberships. (repo_moves still matter to Tantivy, handled elsewhere.)
   Ok ( PreparedFilesystemUpdate {
     writes       : prepared_writes,
     deletions    : prepared_deletions,

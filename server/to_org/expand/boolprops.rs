@@ -62,7 +62,7 @@ mod tests {
   use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_viewforest;
   use crate::org_to_text::viewforest_to_string;
   use crate::types::maybe_placed_viewnode::maybePlaced_to_placed_viewforest;
-  use crate::types::misc::{SourceName, SkgfileSource};
+  use crate::types::misc::{RepoName, SkgfileRepo};
   use crate::types::nodes::complete::empty_node_complete;
   use crate::types::viewnode::mk_definitive_viewnode;
   use std::collections::HashMap;
@@ -70,28 +70,28 @@ mod tests {
   use indoc::indoc;
 
   fn config () -> SkgConfig {
-    let source = SourceName::from ("main");
-    SkgConfig::fromSourcesAndTantivyFolder (HashMap::from ([
-      (source . clone (), SkgfileSource {
-        name: source, abbreviation: None, path: PathBuf::from ("main"),
+    let repo = RepoName::from ("main");
+    SkgConfig::fromReposAndTantivyFolder (HashMap::from ([
+      (repo . clone (), SkgfileRepo {
+        name: repo, abbreviation: None, path: PathBuf::from ("main"),
         user_owns_it: true })]), "/tmp/none")
   }
 
   #[test]
   fn builder_emits_true_viewnodes_in_registry_order_and_keeps_empty_folder () {
-    let source = SourceName::from ("main");
+    let repo = RepoName::from ("main");
     let rich = NodeComplete {
       pid: ID::from ("rich"), title: "Rich" . to_string (),
-      source: source . clone (),
+      home_repo: repo . clone (),
       misc: vec![FileProperty::NoSearchMatching,
                  FileProperty::Had_ID_Before_Import],
       .. empty_node_complete () };
     let empty = NodeComplete {
       pid: ID::from ("empty"), title: "Empty" . to_string (),
-      source: source . clone (), .. empty_node_complete () };
+      home_repo: repo . clone (), .. empty_node_complete () };
     let graph = InRustGraph::from_nodecompletes (&[rich, empty]);
     let mut tree = Tree::new (mk_definitive_viewnode (
-      ID::from ("rich"), source . clone (), "Rich" . to_string (), None));
+      ID::from ("rich"), repo . clone (), "Rich" . to_string (), None));
     let root = tree . root () . id ();
     build_and_integrate_boolprops (&mut tree, root, &graph, &config ())
       . unwrap ();
@@ -107,7 +107,7 @@ mod tests {
       (FileProperty::NoSearchMatching, String::new ())]);
 
     let mut empty_tree = Tree::new (mk_definitive_viewnode (
-      ID::from ("empty"), source, "Empty" . to_string (), None));
+      ID::from ("empty"), repo, "Empty" . to_string (), None));
     let empty_root = empty_tree . root () . id ();
     build_and_integrate_boolprops (
       &mut empty_tree, empty_root, &graph, &config ()) . unwrap ();

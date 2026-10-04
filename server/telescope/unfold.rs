@@ -1,6 +1,6 @@
 //! The UNFOLD: a node's effective lists of relation partners ->
-//! per-source sections. Placements are DERIVED, never stored in
-//! memory: a source-s run is a maximal streak of source-s members, anchored to
+//! per-repo sections. Placements are DERIVED, never stored in
+//! memory: a repo-s run is a maximal streak of repo-s members, anchored to
 //! the nearest preceding STRICTLY more public member (or joining the
 //! prepend if none precedes it). Derivation is canonical and stable:
 //! if the more-public members did not move, the derived anchors do
@@ -14,7 +14,7 @@ use crate::telescope::types::{
   ListItem, SectionSlices, Telescope, TelescopeConstructionError,
 };
 use crate::types::misc::{
-  ID, RelPartner, SkgConfig, SourceName,
+  ID, RelPartner, SkgConfig, RepoName,
 };
 use crate::types::nodes::complete::FileProperty;
 use crate::types::nodes::fs::{NodeFS, nodefs_from_section};
@@ -29,7 +29,7 @@ pub struct UnfoldInput<'a> {
   pub misc                         : &'a [FileProperty],
   pub title                        : Option<&'a str>,
   pub body                         : Option<&'a str>,
-  pub home                         : &'a SourceName,
+  pub home                         : &'a RepoName,
   pub aliases                      : &'a [RelPartner<String>],
   pub contains                     : &'a [RelPartner<ID>],
   pub subscribes_to                : &'a [RelPartner<ID>],
@@ -39,22 +39,22 @@ pub struct UnfoldInput<'a> {
 
 /// A complete on-disk telescope prepared by the unfold boundary.
 /// Construction proves that it is nonempty, starts at HOME, and
-/// contains same-pid sections at configured unique sources in
+/// contains same-pid sections at configured unique repos in
 /// privacy order. Ownership is deliberately not part of this type;
 /// the filesystem writer checks it before mutation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UnfoldedTelescope {
   pid      : ID,
-  home     : SourceName,
-  sections : Vec<(SourceName, NodeFS)>,
+  home     : RepoName,
+  sections : Vec<(RepoName, NodeFS)>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum UnfoldedTelescopeConstructionError {
   InvalidTelescope (TelescopeConstructionError),
   HomeMismatch {
-    expected : SourceName,
-    actual   : SourceName,
+    expected : RepoName,
+    actual   : RepoName,
   },
 }
 
@@ -78,8 +78,8 @@ impl std::error::Error for UnfoldedTelescopeConstructionError {
 impl UnfoldedTelescope {
   pub fn try_new (
     pid      : ID,
-    home     : SourceName,
-    sections : Vec<(SourceName, NodeFS)>,
+    home     : RepoName,
+    sections : Vec<(RepoName, NodeFS)>,
     config   : &SkgConfig,
   ) -> Result<UnfoldedTelescope, UnfoldedTelescopeConstructionError> {
     let telescope : Telescope = Telescope::try_new (
@@ -95,12 +95,12 @@ impl UnfoldedTelescope {
 
   pub fn pid (&self) -> &ID { &self . pid }
 
-  pub fn home (&self) -> &SourceName { &self . home }
+  pub fn home (&self) -> &RepoName { &self . home }
 
-  pub fn sections (&self) -> &[(SourceName, NodeFS)] {
+  pub fn sections (&self) -> &[(RepoName, NodeFS)] {
     &self . sections }
 
-  pub fn into_sections (self) -> Vec<(SourceName, NodeFS)> {
+  pub fn into_sections (self) -> Vec<(RepoName, NodeFS)> {
     self . sections }
 }
 
@@ -108,50 +108,50 @@ pub fn unfold_node (
   input  : &UnfoldInput,
   config : &SkgConfig,
 ) -> Result<UnfoldedTelescope, UnfoldedTelescopeConstructionError> {
-  let mut sections : HashMap<SourceName, SectionSlices> =
+  let mut sections : HashMap<RepoName, SectionSlices> =
     HashMap::new ();
-  let mut source_names : Vec<SourceName> = Vec::new ();
-  { let mut note = |source : &SourceName| {
-      if ! sections . contains_key (source) {
-        source_names . push ( source . clone () );
+  let mut repo_names : Vec<RepoName> = Vec::new ();
+  { let mut note = |repo : &RepoName| {
+      if ! sections . contains_key (repo) {
+        repo_names . push ( repo . clone () );
         sections . insert (
-          source . clone (), SectionSlices::default () ); }};
+          repo . clone (), SectionSlices::default () ); }};
     note ( input . home );
-    for m in input . contains          { note ( &m . relSource ); }
-    for m in input . subscribes_to     { note ( &m . relSource ); }
+    for m in input . contains          { note ( &m . relRepo ); }
+    for m in input . subscribes_to     { note ( &m . relRepo ); }
     for m in input . hides_from_its_subscriptions
-                                       { note ( &m . relSource ); }
-    for m in input . overrides_view_of { note ( &m . relSource ); }
-    for m in input . aliases           { note ( &m . relSource ); }}
+                                       { note ( &m . relRepo ); }
+    for m in input . overrides_view_of { note ( &m . relRepo ); }
+    for m in input . aliases           { note ( &m . relRepo ); }}
   { // title/body text live in the home section
     let home : &mut SectionSlices =
       sections . get_mut ( input . home )
       . expect ("home section was just noted");
     home . title = input . title . map ( str::to_string );
     home . body  = input . body  . map ( str::to_string ); }
-  let rank = |source : &SourceName| -> usize {
-    config . source_position (source) . unwrap_or (usize::MAX) };
-  for (source, section) in sections . iter_mut () {
-    let is_more_public = |a : &SourceName, b : &SourceName| -> bool {
+  let rank = |repo : &RepoName| -> usize {
+    config . repo_position (repo) . unwrap_or (usize::MAX) };
+  for (repo, section) in sections . iter_mut () {
+    let is_more_public = |a : &RepoName, b : &RepoName| -> bool {
       rank (a) < rank (b) };
     section . contains = unfold_ordered (
-      input . contains, source, &is_more_public );
+      input . contains, repo, &is_more_public );
     section . subscribes_to = unfold_ordered (
-      input . subscribes_to, source, &is_more_public );
+      input . subscribes_to, repo, &is_more_public );
     section . hides_from_its_subscriptions = unfold_unordered (
-      input . hides_from_its_subscriptions, source );
+      input . hides_from_its_subscriptions, repo );
     section . overrides_view_of = unfold_unordered (
-      input . overrides_view_of, source );
+      input . overrides_view_of, repo );
     section . aliases = {
       let mine : Vec<String> =
         input . aliases . iter ()
-        . filter ( |m| &m . relSource == source )
+        . filter ( |m| &m . relRepo == repo )
         . map ( |m| m . member . clone () )
         . collect ();
       if mine . is_empty () { None } else { Some (mine) }}; }
-  { // Drop empty sections (a source with nothing left ceases to be),
+  { // Drop empty sections (a repo with nothing left ceases to be),
     // except the home, which persists while the node exists.
-    source_names . retain ( |l| {
+    repo_names . retain ( |l| {
       l == input . home
       || sections . get (l)
          . map ( |s| s . title . is_some ()
@@ -162,50 +162,50 @@ pub fn unfold_node (
                  || s . hides_from_its_subscriptions . is_some ()
                  || s . overrides_view_of . is_some () )
          . unwrap_or (false) } ); }
-  source_names . sort_by_key ( |source| rank (source) );
-  let complete_sections : Vec<(SourceName, NodeFS)> =
-    source_names . into_iter ()
-    . map ( |source| {
-      let slices : SectionSlices = sections . remove (&source)
+  repo_names . sort_by_key ( |repo| rank (repo) );
+  let complete_sections : Vec<(RepoName, NodeFS)> =
+    repo_names . into_iter ()
+    . map ( |repo| {
+      let slices : SectionSlices = sections . remove (&repo)
         . expect ("section exists");
-      let is_home : bool = source == * input . home;
+      let is_home : bool = repo == * input . home;
       let node_fs : NodeFS = nodefs_from_section (
         input . pid, input . extra_ids, input . misc,
         is_home, slices );
-      (source, node_fs) } )
+      (repo, node_fs) } )
     . collect ();
   UnfoldedTelescope::try_new (
     input . pid . clone (), input . home . clone (),
     complete_sections, config ) }
 
-/// One ordered relation's slice for SOURCE: maximal streaks of
-/// partners with that relSource, each anchored to the nearest preceding strictly
+/// One ordered relation's slice for REPO: maximal streaks of
+/// partners with that relRepo, each anchored to the nearest preceding strictly
 /// more public member; a streak with none joins the prepend. The
-/// most public source mentioning the relation yields an anchor-free base by
+/// most public repo mentioning the relation yields an anchor-free base by
 /// construction (nothing precedes its members more publicly ONLY
-/// when it is first -- middle sources can and do anchor). Returns
-/// None when the source has no members of this relation.
+/// when it is first -- middle repos can and do anchor). Returns
+/// None when the repo has no members of this relation.
 fn unfold_ordered (
   effective      : &[RelPartner<ID>],
-  source         : &SourceName,
-  is_more_public : &dyn Fn (&SourceName, &SourceName) -> bool,
+  repo         : &RepoName,
+  is_more_public : &dyn Fn (&RepoName, &RepoName) -> bool,
 ) -> Option<Vec<ListItem>> {
-  if ! effective . iter () . any ( |m| &m . relSource == source ) {
+  if ! effective . iter () . any ( |m| &m . relRepo == repo ) {
     return None; }
-  let is_base : bool = { // the most public source mentioning the relation?
-    let mut most_public : Option<&SourceName> = None;
+  let is_base : bool = { // the most public repo mentioning the relation?
+    let mut most_public : Option<&RepoName> = None;
     for m in effective {
       match most_public {
-        None => { most_public = Some ( &m . relSource ); }
+        None => { most_public = Some ( &m . relRepo ); }
         Some (mp) => {
-          if is_more_public ( &m . relSource, mp ) {
-            most_public = Some ( &m . relSource ); }} }}
-    most_public == Some (source) };
+          if is_more_public ( &m . relRepo, mp ) {
+            most_public = Some ( &m . relRepo ); }} }}
+    most_public == Some (repo) };
   let mut items : Vec<ListItem> = Vec::new ();
   let mut last_anchor_emitted : Option<ID> = None;
   let mut last_more_public : Option<ID> = None;
   for m in effective {
-    if &m . relSource == source {
+    if &m . relRepo == repo {
       match &last_more_public {
         None => {} // prepend: emit the member with no anchor first
         Some (a) => {
@@ -214,19 +214,19 @@ fn unfold_ordered (
             items . push ( ListItem::Anchor { anchor : a . clone () });
             last_anchor_emitted = Some ( a . clone () ); }} }
       items . push ( ListItem::Member ( m . member . clone () ));
-    } else if is_more_public ( &m . relSource, source ) {
+    } else if is_more_public ( &m . relRepo, repo ) {
       last_more_public = Some ( m . member . clone () ); }}
   Some (items) }
 
-/// One unordered relation's slice for SOURCE: just its members, in
+/// One unordered relation's slice for REPO: just its members, in
 /// effective order. None when empty.
 fn unfold_unordered (
   effective : &[RelPartner<ID>],
-  source    : &SourceName,
+  repo    : &RepoName,
 ) -> Option<Vec<ID>> {
   let mine : Vec<ID> =
     effective . iter ()
-    . filter ( |m| &m . relSource == source )
+    . filter ( |m| &m . relRepo == repo )
     . map ( |m| m . member . clone () )
     . collect ();
   if mine . is_empty () { None } else { Some (mine) }}

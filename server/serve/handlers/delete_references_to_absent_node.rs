@@ -8,7 +8,7 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{
   send_response_with_length_prefix, tag_sexp_response, tag_text_response,
   value_from_request_sexp };
-use crate::source_sets::ActiveSourceSet;
+use crate::repo_sets::ActiveRepoSet;
 use crate::types::env::SkgEnv;
 use crate::types::misc::ID;
 use crate::serve::ViewsState;
@@ -22,7 +22,7 @@ pub fn handle_delete_references_to_absent_node_request (
   request : &str,
   env : &mut SkgEnv,
   views_state : &mut ViewsState,
-  active_source_set : &ActiveSourceSet,
+  active_repo_set : &ActiveRepoSet,
 ) {
   let raw_id = match value_from_request_sexp ("id", request) {
     Ok (id) => ID::from (id),
@@ -73,7 +73,7 @@ pub fn handle_delete_references_to_absent_node_request (
   let affected_owner_pids : HashSet<ID> = current . structural . iter ()
     . map (|occurrence| occurrence . owner_pid . clone ()) . collect ();
   stream_rerender_views_after_absent_reference_cleanup (
-    stream, env, views_state, active_source_set, &raw_id, &affected_owner_pids );
+    stream, env, views_state, active_repo_set, &raw_id, &affected_owner_pids );
 }
 
 fn refuse (stream : &mut TcpStream, error : &str) {

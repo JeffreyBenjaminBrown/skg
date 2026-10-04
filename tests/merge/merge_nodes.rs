@@ -2,17 +2,17 @@
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::in_rust_graph::InRustGraph;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use skg::nodeMerge::nodeMergeInstructionTriple::nodeMerge_instructions_from_viewforest;
 use skg::nodeMerge::merge_nodes;
 use skg::test_utils::{run_with_shared_test_stores, tantivy_contains_id, graph_handle_from_config, audit_inrustgraph_or_panic};
-use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, SourceName};
+use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, RepoName};
 use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{NodeEditRequest, ViewNode, ViewNodeKind, Vognode, ActiveNode, Editability, viewforest_root_viewnode, default_activeNode};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::NodeMerge;
-use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source;
-use skg::util::path_from_pid_and_source;
+use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_repo;
+use skg::util::path_from_pid_and_repo;
 use skg::dbs::in_rust_graph::query::find_related_nodes;
 
 use ego_tree::Tree;
@@ -32,7 +32,7 @@ fn mk_test_viewnode (
       body         : None,
       edit_request },
     .. default_activeNode ( ID::from (id),
-                          SourceName::from ("main"),
+                          RepoName::from ("main"),
                           title . to_string() ) };
   ViewNode { focused     : false,
             folded      : false,
@@ -112,15 +112,15 @@ fn verify_filesystem_after_merge_2_into_1(
   nodeMerge_instructions: &[NodeMerge],
 ) -> Result<(), Box<dyn Error>> {
   let node_2_path: String =
-    path_from_pid_and_source ( config,
-                               &SourceName::from ("main"),
+    path_from_pid_and_repo ( config,
+                               &RepoName::from ("main"),
                                ID::from ("2")) ?;
   assert!( !Path::new (&node_2_path) . exists(),
             "2.skg should be deleted" );
 
   // Node 1's file should be updated
-  let node_1: NodeComplete = nodecomplete_from_pid_and_source(
-    config, ID::from ("1"), &SourceName::from ("main") )?;
+  let node_1: NodeComplete = nodecomplete_from_pid_and_repo(
+    config, ID::from ("1"), &RepoName::from ("main") )?;
   assert_eq!(&node_1 . pid, &ID::from ("1"));
   assert_eq!(node_1 . extra_ids . len(), 2, "Node 1 should have 2 extra_ids");
   assert_eq!(&node_1 . extra_ids[0], &ID::from ("2"));
@@ -177,16 +177,16 @@ fn verify_filesystem_after_merge_2_into_1(
              &ID::from ("overridden-by-1"));
 
   let acquiree_text_preserver_path: String =
-    path_from_pid_and_source ( config,
-                               &SourceName::from ("main"),
+    path_from_pid_and_repo ( config,
+                               &RepoName::from ("main"),
                                acquiree_text_preserver_id . clone() ) ?;
   assert!( Path::new (&acquiree_text_preserver_path) . exists(),
            "acquiree_text_preserver file should exist" );
 
   let acquiree_text_preserver: NodeComplete =
-    nodecomplete_from_pid_and_source( config,
+    nodecomplete_from_pid_and_repo( config,
                                  acquiree_text_preserver_id . clone(),
-                                 &SourceName::from ("main") )?;
+                                 &RepoName::from ("main") )?;
   assert!(acquiree_text_preserver . title . starts_with ("MERGED: "));
   assert_eq!(acquiree_text_preserver . title, "MERGED: 2");
   assert_eq!(acquiree_text_preserver . body, Some("2 body" . to_string()));
@@ -288,15 +288,15 @@ fn verify_filesystem_after_merge_1_into_2(
   nodeMerge_instructions: &[NodeMerge],
 ) -> Result<(), Box<dyn Error>> {
   let node_1_path: String =
-    path_from_pid_and_source ( config,
-                               &SourceName::from ("main"),
+    path_from_pid_and_repo ( config,
+                               &RepoName::from ("main"),
                                ID::from ("1")) ?;
   assert!( !Path::new (&node_1_path) . exists(),
             "1.skg should be deleted" );
 
   // Node 2's file should be updated
-  let node_2: NodeComplete = nodecomplete_from_pid_and_source(
-    config, ID::from ("2"), &SourceName::from ("main") )?;
+  let node_2: NodeComplete = nodecomplete_from_pid_and_repo(
+    config, ID::from ("2"), &RepoName::from ("main") )?;
 
   // Should have pid=2, extra_ids=[2-extra-id, 1]
   assert_eq!(&node_2 . pid, &ID::from ("2"));
@@ -354,16 +354,16 @@ fn verify_filesystem_after_merge_1_into_2(
              "Node 2 should override view of overridden-by-1");
 
   let acquiree_text_preserver_path: String =
-    path_from_pid_and_source( config,
-                              &SourceName::from ("main"),
+    path_from_pid_and_repo( config,
+                              &RepoName::from ("main"),
                               acquiree_text_preserver_id . clone() ) ?;
   assert!( Path::new (&acquiree_text_preserver_path) . exists(),
            "acquiree_text_preserver file should exist" );
 
   let acquiree_text_preserver: NodeComplete =
-    nodecomplete_from_pid_and_source( config,
+    nodecomplete_from_pid_and_repo( config,
                                  acquiree_text_preserver_id . clone(),
-                                 &SourceName::from ("main") )?;
+                                 &RepoName::from ("main") )?;
   assert!(acquiree_text_preserver . title . starts_with ("MERGED: "));
   assert_eq!(acquiree_text_preserver . title, "MERGED: 1");
   assert_eq!(acquiree_text_preserver . body,
@@ -450,7 +450,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
     "hides-1-from-subscriptions.skg", "overrider-of-1.skg",
     "links-to-1.skg",
   ] . iter () . map (|name|
-    config . sources [&SourceName::from ("main")] . path . join (name))
+    config . repos [&RepoName::from ("main")] . path . join (name))
     . collect ();
   let neighbor_before : Vec<(Vec<u8>, SystemTime)> = neighbor_paths . iter ()
     . map (|path| Ok ((fs::read (path) ?, fs::metadata (path) ? . modified () ?)))
@@ -501,11 +501,11 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
            "inverse overrides_view_of under pid 2 should include \
             overrider-of-1" );
 
-  let link_sources : HashSet<ID> =
+  let link_repos : HashSet<ID> =
     find_related_nodes (
       &snap, &input_acquirer,
       "links_to", "mentioned", "mentioner" );
-  assert!( link_sources . contains (&ID::from ("links-to-1")),
+  assert!( link_repos . contains (&ID::from ("links-to-1")),
            "inverse links_to under pid 2 should include \
             links-to-1 (its body has a link to id 1, which aliases 2)" );
 
@@ -548,7 +548,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
             canonical pid 2" );
 
   let disk_nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources (config) ?;
+    read_all_skg_files_from_repos (config) ?;
   let rebuilt : InRustGraph = InRustGraph::from_nodecompletes (&disk_nodes);
   assert_eq! (snap . contained_by, rebuilt . contained_by);
   assert_eq! (snap . subscribers_of, rebuilt . subscribers_of);

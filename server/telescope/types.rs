@@ -1,11 +1,11 @@
 //! Core values of the privacy telescope (in comments: "telescope" =
 //! privacy telescope and "section" = telescope section; recording
-//! positions are named by sources, ordered by privacy.
+//! positions are named by repos, ordered by privacy.
 //!
 //! One node = one ID = one telescope: a set of same-ID .skg files,
-//! at most one per source ("sections"). Every relationship instance
-//! is recorded in exactly one section, whose source is the edge's
-//! relSource. On disk each ordered relation is ONE flat sequence of
+//! at most one per repo ("sections"). Every relationship instance
+//! is recorded in exactly one section, whose repo is the edge's
+//! relRepo. On disk each ordered relation is ONE flat sequence of
 //! items -- members and anchors -- whose role (base list vs
 //! placement) follows from WHICH section holds it, not from its
 //! shape: the most public section mentioning a relation holds its
@@ -17,7 +17,7 @@
 
 use serde::{Serialize, Deserialize};
 
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::nodes::complete::FileProperty;
 use crate::types::nodes::fs::NodeFS;
 
@@ -30,22 +30,22 @@ use std::fmt;
 /// The point of the type is that "several files, one node" is a
 /// VALUE rather than a condition to be discovered. Before it,
 /// grouping the same-pid files ended in an anonymous
-/// 'Vec<(SourceName, NodeFS)>', and any function tempted to answer a
+/// 'Vec<(RepoName, NodeFS)>', and any function tempted to answer a
 /// one-file question about a many-file node could do so without
 /// anything forcing it to say which section it meant --- which is
-/// how 'source_from_disk' went on answering the pre-telescope
+/// how 'repo_from_disk' went on answering the pre-telescope
 /// question long after telescopes arrived (see
 /// TODO/dup-ids-maybe-bad/1_discussion.org). New code meets a
 /// 'Telescope' and has to choose.
 ///
 /// Construction is checked against the config, so a value is always
 /// nonempty, contains only same-pid sections at configured unique
-/// sources, and is ordered most public first. The HOME is therefore
+/// repos, and is ordered most public first. The HOME is therefore
 /// unambiguously the first section.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Telescope {
   pid      : ID,
-  sections : Vec<(SourceName, NodeFS)>,
+  sections : Vec<(RepoName, NodeFS)>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -56,23 +56,23 @@ pub enum TelescopeConstructionError {
   MixedPid {
     expected : ID,
     actual   : ID,
-    source   : SourceName,
+    repo   : RepoName,
   },
-  UnknownSource {
-    source : SourceName,
+  UnknownRepo {
+    repo : RepoName,
   },
-  DuplicateSource {
-    source : SourceName,
+  DuplicateRepo {
+    repo : RepoName,
   },
   OutOfOrder {
-    previous : SourceName,
-    next     : SourceName,
+    previous : RepoName,
+    next     : RepoName,
   },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IgnoredForeignPidFolderlision {
-  pub ignored_sources : Vec<SourceName>,
+  pub ignored_repos : Vec<RepoName>,
 }
 
 /// If a pid has any owned section, its owned sections are the
@@ -80,24 +80,24 @@ pub struct IgnoredForeignPidFolderlision {
 /// with no owned section remains an ordinary foreign telescope.
 /// Input order is preserved.
 pub fn retain_owned_sections_when_pid_folderlides (
-  sections : Vec<(SourceName, NodeFS)>,
+  sections : Vec<(RepoName, NodeFS)>,
   config   : &SkgConfig,
-) -> ( Vec<(SourceName, NodeFS)>,
+) -> ( Vec<(RepoName, NodeFS)>,
        Option<IgnoredForeignPidFolderlision> ) {
   let has_owned : bool = sections . iter ()
-    . any ( |(source, _)| config . user_owns_source (source) );
+    . any ( |(repo, _)| config . user_owns_repo (repo) );
   if ! has_owned {
     return (sections, None); }
-  let mut retained : Vec<(SourceName, NodeFS)> = Vec::new ();
-  let mut ignored_sources : Vec<SourceName> = Vec::new ();
-  for (source, node_fs) in sections {
-    if config . user_owns_source (&source) {
-      retained . push (( source, node_fs )); }
+  let mut retained : Vec<(RepoName, NodeFS)> = Vec::new ();
+  let mut ignored_repos : Vec<RepoName> = Vec::new ();
+  for (repo, node_fs) in sections {
+    if config . user_owns_repo (&repo) {
+      retained . push (( repo, node_fs )); }
     else {
-      ignored_sources . push (source); }}
+      ignored_repos . push (repo); }}
   let warning : Option<IgnoredForeignPidFolderlision> =
-    if ignored_sources . is_empty () { None }
-    else { Some ( IgnoredForeignPidFolderlision { ignored_sources } ) };
+    if ignored_repos . is_empty () { None }
+    else { Some ( IgnoredForeignPidFolderlision { ignored_repos } ) };
   (retained, warning) }
 
 impl fmt::Display for TelescopeConstructionError {
@@ -109,18 +109,18 @@ impl fmt::Display for TelescopeConstructionError {
       TelescopeConstructionError::Empty { pid } =>
         write! ( f, "Telescope '{}' has no sections.", pid ),
       TelescopeConstructionError::MixedPid {
-        expected, actual, source } =>
+        expected, actual, repo } =>
         write! ( f,
           "Telescope '{}' contains a section from source '{}' whose embedded pid is '{}'.",
-          expected, source, actual ),
-      TelescopeConstructionError::UnknownSource { source } =>
+          expected, repo, actual ),
+      TelescopeConstructionError::UnknownRepo { repo } =>
         write! ( f,
           "Telescope contains a section from unconfigured source '{}'.",
-          source ),
-      TelescopeConstructionError::DuplicateSource { source } =>
+          repo ),
+      TelescopeConstructionError::DuplicateRepo { repo } =>
         write! ( f,
           "Telescope contains more than one section from source '{}'.",
-          source ),
+          repo ),
       TelescopeConstructionError::OutOfOrder { previous, next } =>
         write! ( f,
           "Telescope sections are out of privacy order: '{}' precedes '{}'.",
@@ -132,35 +132,35 @@ impl std::error::Error for TelescopeConstructionError {
 impl Telescope {
   pub fn try_new (
     pid      : ID,
-    sections : Vec<(SourceName, NodeFS)>,
+    sections : Vec<(RepoName, NodeFS)>,
     config   : &SkgConfig,
   ) -> Result<Telescope, TelescopeConstructionError> {
     if sections . is_empty () {
       return Err ( TelescopeConstructionError::Empty { pid } ); }
-    let positions : HashMap<SourceName, usize> =
-      config . ordered_sources () . into_iter () . enumerate ()
-      . map ( |(position, source)| (source, position) )
+    let positions : HashMap<RepoName, usize> =
+      config . ordered_repos () . into_iter () . enumerate ()
+      . map ( |(position, repo)| (repo, position) )
       . collect ();
-    let mut seen_sources : HashSet<SourceName> = HashSet::new ();
-    let mut previous : Option<(usize, SourceName)> = None;
-    for (source, node_fs) in &sections {
+    let mut seen_repos : HashSet<RepoName> = HashSet::new ();
+    let mut previous : Option<(usize, RepoName)> = None;
+    for (repo, node_fs) in &sections {
       if node_fs . pid != pid {
         return Err ( TelescopeConstructionError::MixedPid {
           expected : pid,
           actual   : node_fs . pid . clone (),
-          source   : source . clone (), } ); }
-      let position : usize = * positions . get (source)
-        . ok_or_else ( || TelescopeConstructionError::UnknownSource {
-          source : source . clone (), } ) ?;
-      if ! seen_sources . insert ( source . clone () ) {
-        return Err ( TelescopeConstructionError::DuplicateSource {
-          source : source . clone (), } ); }
-      if let Some ((previous_position, previous_source)) = &previous {
+          repo   : repo . clone (), } ); }
+      let position : usize = * positions . get (repo)
+        . ok_or_else ( || TelescopeConstructionError::UnknownRepo {
+          repo : repo . clone (), } ) ?;
+      if ! seen_repos . insert ( repo . clone () ) {
+        return Err ( TelescopeConstructionError::DuplicateRepo {
+          repo : repo . clone (), } ); }
+      if let Some ((previous_position, previous_repo)) = &previous {
         if *previous_position >= position {
           return Err ( TelescopeConstructionError::OutOfOrder {
-            previous : previous_source . clone (),
-            next     : source . clone (), } ); }}
-      previous = Some (( position, source . clone () )); }
+            previous : previous_repo . clone (),
+            next     : repo . clone (), } ); }}
+      previous = Some (( position, repo . clone () )); }
     Ok ( Telescope { pid, sections } ) }
 
   pub fn pid (
@@ -168,16 +168,16 @@ impl Telescope {
   ) -> &ID {
     &self . pid }
 
-  /// The most public section's source.
+  /// The most public section's repo.
   pub fn home (
     &self,
-  ) -> &SourceName {
+  ) -> &RepoName {
     & self . sections . first ()
       . expect ("Telescope construction guarantees a section") . 0 }
 
   pub fn sections (
     &self,
-  ) -> &[(SourceName, NodeFS)] {
+  ) -> &[(RepoName, NodeFS)] {
     &self . sections }
 
   /// Every extra id any section claims, first occurrence first.
@@ -209,10 +209,10 @@ impl Telescope {
   /// The sections in the form the fold consumes, order preserved.
   pub fn into_slices (
     self,
-  ) -> Vec<(SourceName, SectionSlices)> {
+  ) -> Vec<(RepoName, SectionSlices)> {
     self . sections . into_iter ()
-      . map ( |(source, node_fs)|
-              (source, node_fs . into_section_slices ()) )
+      . map ( |(repo, node_fs)|
+              (repo, node_fs . into_section_slices ()) )
       . collect () }
 }
 
@@ -307,33 +307,33 @@ pub enum FoldWarning {
   /// the relation -- there is no more-public fold to anchor into.
   /// Handled exactly like a dangling anchor.
   AnchorInBase { anchor : ID },
-  /// The same member appeared in two sources; the more public
+  /// The same member appeared in two repos; the more public
   /// occurrence won.
   DuplicateMember { member : ID },
   /// The home -- the most public section -- carries no title, so
   /// the text sits at 'title_at', where a reader restricted to the
-  /// home source cannot see it. Distinct from 'NonHomeTitle' (a
+  /// home repo cannot see it. Distinct from 'NonHomeTitle' (a
   /// stray SECOND title) and 'MissingTitle' (no title anywhere).
   TitleBelowHome {
-    home     : crate::types::misc::SourceName,
-    title_at : crate::types::misc::SourceName,
+    home     : crate::types::misc::RepoName,
+    title_at : crate::types::misc::RepoName,
   },
   /// The selected body is below the home. Title and body select
   /// independently, so this may occur with a title at home.
   BodyBelowHome {
-    home    : crate::types::misc::SourceName,
-    body_at : crate::types::misc::SourceName,
+    home    : crate::types::misc::RepoName,
+    body_at : crate::types::misc::RepoName,
   },
   /// A section below the one holding the title carried a title too;
   /// the more public one won.
   NonHomeTitle {
-    source      : crate::types::misc::SourceName,
-    selected_at : crate::types::misc::SourceName,
+    repo      : crate::types::misc::RepoName,
+    selected_at : crate::types::misc::RepoName,
   },
   /// A later section carried a body; the more-public selected body won.
   NonHomeBody {
-    source      : crate::types::misc::SourceName,
-    selected_at : crate::types::misc::SourceName,
+    repo      : crate::types::misc::RepoName,
+    selected_at : crate::types::misc::RepoName,
   },
   /// No section carried a title.
   MissingTitle,
@@ -365,14 +365,14 @@ impl std::fmt::Display for FoldWarning {
         write! ( f,
           "body below the home: the home is '{}', but the selected body sits at '{}'; restricted readers at '{}' cannot see it",
           home, body_at, home ),
-      FoldWarning::NonHomeTitle { source, selected_at } =>
+      FoldWarning::NonHomeTitle { repo, selected_at } =>
         write! ( f,
           "section '{}' carried a later title; the more public title selected from '{}' won",
-          source, selected_at ),
-      FoldWarning::NonHomeBody { source, selected_at } =>
+          repo, selected_at ),
+      FoldWarning::NonHomeBody { repo, selected_at } =>
         write! ( f,
           "section '{}' carried a later body; the more public body selected from '{}' won",
-          source, selected_at ),
+          repo, selected_at ),
       FoldWarning::MissingTitle =>
         write! ( f, "no section carried a title" ), }}}
 
@@ -380,16 +380,16 @@ impl std::fmt::Display for FoldWarning {
 mod telescope_construction_tests {
   use super::{Telescope, TelescopeConstructionError};
   use crate::types::misc::{
-    ID, SkgConfig, SkgfileSource, SourceName};
+    ID, SkgConfig, SkgfileRepo, RepoName};
   use crate::types::nodes::fs::NodeFS;
 
   use std::collections::HashMap;
   use std::path::PathBuf;
 
-  fn source (
+  fn repo (
     name : &str,
-  ) -> SourceName {
-    SourceName::from (name) }
+  ) -> RepoName {
+    RepoName::from (name) }
 
   fn node_fs (
     pid : &str,
@@ -407,22 +407,22 @@ mod telescope_construction_tests {
       misc                         : Vec::new (), } }
 
   fn config () -> SkgConfig {
-    let ordered : Vec<SourceName> =
+    let ordered : Vec<RepoName> =
       ["public", "trusted", "private"] . into_iter ()
-      . map (source) . collect ();
-    let sources : HashMap<SourceName, SkgfileSource> =
+      . map (repo) . collect ();
+    let repos : HashMap<RepoName, SkgfileRepo> =
       ordered . iter () . cloned ()
       . map ( |name| {
         ( name . clone (),
-          SkgfileSource {
+          SkgfileRepo {
             path         : PathBuf::from ( &name . 0 ),
             name,
             abbreviation : None,
             user_owns_it : true, } ) } )
       . collect ();
     let mut config : SkgConfig =
-      SkgConfig::dummyFromSources (sources);
-    config . source_order = ordered;
+      SkgConfig::dummyFromRepos (repos);
+    config . repo_order = ordered;
     config }
 
   #[test]
@@ -430,11 +430,11 @@ mod telescope_construction_tests {
     let config : SkgConfig = config ();
     let valid : Telescope = Telescope::try_new (
       ID::from ("N"),
-      vec! [ (source ("public"), node_fs ("N")),
-             (source ("private"), node_fs ("N")) ],
+      vec! [ (repo ("public"), node_fs ("N")),
+             (repo ("private"), node_fs ("N")) ],
       &config ) . unwrap ();
     assert_eq! ( valid . pid (), &ID::from ("N") );
-    assert_eq! ( valid . home (), &source ("public") );
+    assert_eq! ( valid . home (), &repo ("public") );
     assert_eq! ( valid . sections () . len (), 2 );
 
     assert! ( matches! (
@@ -443,27 +443,27 @@ mod telescope_construction_tests {
     assert! ( matches! (
       Telescope::try_new (
         ID::from ("N"),
-        vec! [ (source ("private"), node_fs ("N")),
-               (source ("public"), node_fs ("N")) ],
+        vec! [ (repo ("private"), node_fs ("N")),
+               (repo ("public"), node_fs ("N")) ],
         &config ),
       Err (TelescopeConstructionError::OutOfOrder { .. }) ));
     assert! ( matches! (
       Telescope::try_new (
         ID::from ("N"),
-        vec! [ (source ("public"), node_fs ("N")),
-               (source ("public"), node_fs ("N")) ],
+        vec! [ (repo ("public"), node_fs ("N")),
+               (repo ("public"), node_fs ("N")) ],
         &config ),
-      Err (TelescopeConstructionError::DuplicateSource { .. }) ));
+      Err (TelescopeConstructionError::DuplicateRepo { .. }) ));
     assert! ( matches! (
       Telescope::try_new (
         ID::from ("N"),
-        vec! [ (source ("unknown"), node_fs ("N")) ],
+        vec! [ (repo ("unknown"), node_fs ("N")) ],
         &config ),
-      Err (TelescopeConstructionError::UnknownSource { .. }) ));
+      Err (TelescopeConstructionError::UnknownRepo { .. }) ));
     assert! ( matches! (
       Telescope::try_new (
         ID::from ("N"),
-        vec! [ (source ("public"), node_fs ("other")) ],
+        vec! [ (repo ("public"), node_fs ("other")) ],
         &config ),
       Err (TelescopeConstructionError::MixedPid { .. }) ));
   }

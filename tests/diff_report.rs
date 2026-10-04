@@ -2,7 +2,7 @@ use skg::diff_report::diff_report_as_org;
 use skg::diff_report::types::DiffSelection;
 use skg::serve::handlers::diff_report::handle_diff_report_request;
 use skg::test_utils::read_lp_message;
-use skg::types::misc::{SkgConfig, SkgfileSource, SourceName};
+use skg::types::misc::{SkgConfig, SkgfileRepo, RepoName};
 
 use git2::Repository;
 use std::collections::HashMap;
@@ -82,7 +82,7 @@ fn diff_report_shows_override_changes_on_raw_nodes (
   fixture . write_node ("r", "Overrider", "", &[]) ?;
   fixture . commit_all ("initial") ?;
   fs::write (
-    fixture . source . join ("r.skg"),
+    fixture . skgrepo . join ("r.skg"),
     "title: Overrider\npid: r\noverrides_view_of:\n- n\n" ) ?;
   let report : String =
     diff_report_as_org (
@@ -182,10 +182,10 @@ fn diff_report_handler_sends_length_prefixed_response (
   Ok (( )) }
 
 #[test]
-fn diff_report_shows_cross_source_inbound_relationships (
+fn diff_report_shows_cross_repo_inbound_relationships (
 ) -> Result<(), Box<dyn Error>> {
-  let multi : MultiSourceFixture =
-    MultiSourceFixture::new () ?;
+  let multi : MultiRepoFixture =
+    MultiRepoFixture::new () ?;
   multi . left . write_node ("a", "Alpha", "", &[]) ?;
   multi . right . write_node ("b", "Beta", "", &[]) ?;
   multi . left . commit_all ("left initial") ?;
@@ -216,15 +216,15 @@ fn diff_report_shows_cross_source_inbound_relationships (
   Ok (( )) }
 
 #[test]
-fn diff_report_shows_source_move_across_repos (
+fn diff_report_shows_repo_move_across_repos (
 ) -> Result<(), Box<dyn Error>> {
-  let multi : MultiSourceFixture =
-    MultiSourceFixture::new () ?;
+  let multi : MultiRepoFixture =
+    MultiRepoFixture::new () ?;
   multi . left . write_node ("a", "Moved", "", &[]) ?;
   multi . right . write_node ("keep", "Keep", "", &[]) ?;
   multi . left . commit_all ("left initial") ?;
   multi . right . commit_all ("right initial") ?;
-  fs::remove_file (multi . left . source . join ("a.skg")) ?;
+  fs::remove_file (multi . left . skgrepo . join ("a.skg")) ?;
   multi . right . write_node ("a", "Moved", "", &[]) ?;
   let report : String =
     diff_report_as_org (
@@ -250,7 +250,7 @@ fn diff_report_shows_source_move_across_repos (
 fn diff_report_shows_vanished_nodes (
 ) -> Result<(), Box<dyn Error>> {
   // TODO/more.org: a node the worktree still references, though its
-  // file exists in no source, is investigated in git history: the
+  // file exists in no Skg repo, is investigated in git history: the
   // report names the commit it vanished at and what it was connected
   // to when last present. A reference that NEVER existed is reported
   // as such.
@@ -265,8 +265,8 @@ fn diff_report_shows_vanished_nodes (
   fixture . commit_all ("initial") ?;
   { // Delete v's file (p still refers to it) and commit. The commit
     // helper's add_all does not stage deletions, so stage explicitly.
-    fs::remove_file ( fixture . source . join ("v.skg") ) ?;
-    let mut index : git2::Index = fixture . repo . index () ?;
+    fs::remove_file ( fixture . skgrepo . join ("v.skg") ) ?;
+    let mut index : git2::Index = fixture . gitrepo . index () ?;
     index . update_all (["*"].iter (), None) ?;
     index . write () ?;
     fixture . commit_all ("delete v") ?; }
@@ -297,22 +297,22 @@ fn diff_report_shows_vanished_nodes (
   Ok (( )) }
 
 #[test]
-fn diff_report_refuses_non_git_sources (
+fn diff_report_refuses_non_git_repos (
 ) -> Result<(), Box<dyn Error>> {
   let tmp : TempDir =
     tempfile::tempdir () ?;
-  let source_dir : PathBuf =
+  let repo_dir : PathBuf =
     tmp . path () . join ("main");
-  fs::create_dir (&source_dir) ?;
-  let source_name : SourceName =
-    SourceName::from ("main");
+  fs::create_dir (&repo_dir) ?;
+  let repo_name : RepoName =
+    RepoName::from ("main");
   let config : SkgConfig =
-    SkgConfig::dummyFromSources (HashMap::from ([
-      (source_name . clone (),
-       SkgfileSource {
-         name: source_name,
+    SkgConfig::dummyFromRepos (HashMap::from ([
+      (repo_name . clone (),
+       SkgfileRepo {
+         name: repo_name,
          abbreviation: None,
-         path: source_dir,
+         path: repo_dir,
          user_owns_it: true }) ]));
   let error : String =
     diff_report_as_org (
@@ -329,28 +329,28 @@ fn diff_report_refuses_non_git_sources (
 
 struct DiffFixture {
   _tmp    : TempDir,
-  repo    : Repository,
-  source  : PathBuf,
+  gitrepo    : Repository,
+  skgrepo  : PathBuf,
   config  : SkgConfig,
 }
 
-struct SourceRepo {
-  repo   : Repository,
-  source : PathBuf,
+struct SkgrepoWithGitrepo {
+  gitrepo   : Repository,
+  skgrepo : PathBuf,
 }
 
-impl SourceRepo {
+impl SkgrepoWithGitrepo {
   fn new (
     root : &PathBuf,
     name : &str,
   ) -> Result<Self, Box<dyn Error>> {
-    let source : PathBuf =
+    let skgrepo : PathBuf =
       root . join (name);
-    fs::create_dir (&source) ?;
-    let repo : Repository =
-      Repository::init (&source) ?;
-    configure_git_user (&repo) ?;
-    Ok ( SourceRepo { repo, source } )
+    fs::create_dir (&skgrepo) ?;
+    let gitrepo : Repository =
+      Repository::init (&skgrepo) ?;
+    configure_git_user (&gitrepo) ?;
+    Ok ( SkgrepoWithGitrepo { gitrepo, skgrepo } )
   }
 
   fn write_node (
@@ -360,52 +360,52 @@ impl SourceRepo {
     body     : &str,
     contains : &[&str],
   ) -> Result<(), Box<dyn Error>> {
-    write_node_file (&self . source, pid, title, body, contains)
+    write_node_file (&self . skgrepo, pid, title, body, contains)
   }
 
   fn commit_all (
     &self,
     message : &str,
   ) -> Result<(), Box<dyn Error>> {
-    commit_repo_all (&self . repo, message)
+    commit_gitrepo_all (&self . gitrepo, message)
   }
 }
 
-struct MultiSourceFixture {
+struct MultiRepoFixture {
   _tmp   : TempDir,
-  left   : SourceRepo,
-  right  : SourceRepo,
+  left   : SkgrepoWithGitrepo,
+  right  : SkgrepoWithGitrepo,
   config : SkgConfig,
 }
 
-impl MultiSourceFixture {
+impl MultiRepoFixture {
   fn new (
   ) -> Result<Self, Box<dyn Error>> {
     let tmp : TempDir =
       tempfile::tempdir () ?;
-    let left : SourceRepo =
-      SourceRepo::new (&tmp . path () . to_path_buf (), "left") ?;
-    let right : SourceRepo =
-      SourceRepo::new (&tmp . path () . to_path_buf (), "right") ?;
-    let left_name : SourceName =
-      SourceName::from ("left");
-    let right_name : SourceName =
-      SourceName::from ("right");
+    let left : SkgrepoWithGitrepo =
+      SkgrepoWithGitrepo::new (&tmp . path () . to_path_buf (), "left") ?;
+    let right : SkgrepoWithGitrepo =
+      SkgrepoWithGitrepo::new (&tmp . path () . to_path_buf (), "right") ?;
+    let left_name : RepoName =
+      RepoName::from ("left");
+    let right_name : RepoName =
+      RepoName::from ("right");
     let config : SkgConfig =
-      SkgConfig::dummyFromSources (HashMap::from ([
+      SkgConfig::dummyFromRepos (HashMap::from ([
         (left_name . clone (),
-         SkgfileSource {
+         SkgfileRepo {
            name: left_name,
            abbreviation: None,
-           path: left . source . clone (),
+           path: left . skgrepo . clone (),
            user_owns_it: true }),
         (right_name . clone (),
-         SkgfileSource {
+         SkgfileRepo {
            name: right_name,
            abbreviation: None,
-           path: right . source . clone (),
+           path: right . skgrepo . clone (),
            user_owns_it: true }) ]));
-    Ok ( MultiSourceFixture {
+    Ok ( MultiRepoFixture {
       _tmp: tmp,
       left,
       right,
@@ -418,26 +418,26 @@ impl DiffFixture {
   ) -> Result<Self, Box<dyn Error>> {
     let tmp : TempDir =
       tempfile::tempdir () ?;
-    let repo : Repository =
+    let gitrepo : Repository =
       Repository::init (tmp . path ()) ?;
-    configure_git_user (&repo) ?;
-    let source : PathBuf =
+    configure_git_user (&gitrepo) ?;
+    let skgrepo : PathBuf =
       tmp . path () . join ("main");
-    fs::create_dir (&source) ?;
-    let source_name : SourceName =
-      SourceName::from ("main");
+    fs::create_dir (&skgrepo) ?;
+    let repo_name : RepoName =
+      RepoName::from ("main");
     let config : SkgConfig =
-      SkgConfig::dummyFromSources (HashMap::from ([
-        (source_name . clone (),
-         SkgfileSource {
-           name: source_name,
+      SkgConfig::dummyFromRepos (HashMap::from ([
+        (repo_name . clone (),
+         SkgfileRepo {
+           name: repo_name,
            abbreviation: None,
-           path: source . clone (),
+           path: skgrepo . clone (),
            user_owns_it: true }) ]));
     Ok ( DiffFixture {
       _tmp: tmp,
-      repo,
-      source,
+      gitrepo,
+      skgrepo,
       config } )
   }
 
@@ -448,23 +448,23 @@ impl DiffFixture {
     body     : &str,
     contains : &[&str],
   ) -> Result<(), Box<dyn Error>> {
-    write_node_file (&self . source, pid, title, body, contains)
+    write_node_file (&self . skgrepo, pid, title, body, contains)
   }
 
   fn stage_all (
     &self,
   ) -> Result<(), Box<dyn Error>> {
-    stage_repo_all (&self . repo) }
+    stage_gitrepo_all (&self . gitrepo) }
 
   fn commit_all (
     &self,
     message : &str,
   ) -> Result<(), Box<dyn Error>> {
-    commit_repo_all (&self . repo, message) }
+    commit_gitrepo_all (&self . gitrepo, message) }
 }
 
 fn write_node_file (
-  source   : &PathBuf,
+  skgrepo   : &PathBuf,
   pid      : &str,
   title    : &str,
   body     : &str,
@@ -486,41 +486,41 @@ fn write_node_file (
     } else {
       format! ("body: {}\n", body) };
   fs::write (
-    source . join (format! ("{}.skg", pid)),
+    skgrepo . join (format! ("{}.skg", pid)),
     format! (
       "title: {}\npid: {}\n{}{}",
       title, pid, body_yaml, contains_yaml )) ?;
   Ok (( )) }
 
-fn stage_repo_all (
-  repo : &Repository,
+fn stage_gitrepo_all (
+  gitrepo : &Repository,
 ) -> Result<(), Box<dyn Error>> {
   let mut index : git2::Index =
-    repo . index () ?;
+    gitrepo . index () ?;
   index . add_all (["*"].iter (), git2::IndexAddOption::DEFAULT, None) ?;
   index . write () ?;
   Ok (( )) }
 
-fn commit_repo_all (
-  repo    : &Repository,
+fn commit_gitrepo_all (
+  gitrepo    : &Repository,
   message : &str,
 ) -> Result<(), Box<dyn Error>> {
-  stage_repo_all (repo) ?;
+  stage_gitrepo_all (gitrepo) ?;
   let mut index : git2::Index =
-    repo . index () ?;
+    gitrepo . index () ?;
   let tree_id : git2::Oid =
     index . write_tree () ?;
   let tree : git2::Tree =
-    repo . find_tree (tree_id) ?;
+    gitrepo . find_tree (tree_id) ?;
   let sig : git2::Signature =
-    repo . signature () ?;
+    gitrepo . signature () ?;
   let parents : Vec<git2::Commit> =
-    match repo . head () {
+    match gitrepo . head () {
       Ok (head) => vec! [head . peel_to_commit () ?],
       Err (_)   => Vec::new () };
   let parent_refs : Vec<&git2::Commit> =
     parents . iter () . collect ();
-  repo . commit (
+  gitrepo . commit (
     Some ("HEAD"),
     &sig, &sig,
     message,
@@ -529,10 +529,10 @@ fn commit_repo_all (
   Ok (( )) }
 
 fn configure_git_user (
-  repo : &Repository,
+  gitrepo : &Repository,
 ) -> Result<(), Box<dyn Error>> {
   let mut config : git2::Config =
-    repo . config () ?;
+    gitrepo . config () ?;
   config . set_str ("user.email", "test@test.com") ?;
   config . set_str ("user.name", "Test") ?;
   Ok (( )) }

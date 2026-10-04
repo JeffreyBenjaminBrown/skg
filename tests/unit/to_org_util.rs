@@ -1,4 +1,4 @@
-use crate::types::misc::{MSV, rel_partners_at_relSource};
+use crate::types::misc::{MSV, rel_partners_at_relRepo};
 use crate::types::viewnode::{ mk_writeProtected_viewnode, mk_writeProtected_viewnode_with_birth };
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::dbs::in_rust_graph::add_to_inverse_indexes;
@@ -6,7 +6,7 @@ use crate::types::viewnode::viewforest_root_viewnode;
 
 use super::*;
 
-fn src () -> SourceName { SourceName::from ("main") }
+fn src () -> RepoName { RepoName::from ("main") }
 fn id  (s: &str) -> ID { ID ( s . to_string () ) }
 
 /// Build a NodeRust directly (no disk I/O) for fixture graphs.
@@ -18,13 +18,13 @@ fn mk_node (
 ) -> NodeRust {
   NodeRust {
     pid:          id (pid),
-    source:       src (),
+    home_repo:       src (),
     extra_ids:    extra_ids . iter () . map ( |s| id (s) ) . collect (),
     title:        pid . to_string (),
     overPrivateText_telescope: false,
     aliases:      MSV::Unspecified,
     body:         None,
-    contains:     rel_partners_at_relSource (
+    contains:     rel_partners_at_relRepo (
       & src (),
       contains . iter () . map ( |s| id (s) ) . collect () ),
     subscribes_to:                MSV::Unspecified,

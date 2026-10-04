@@ -19,11 +19,11 @@ async fn test_title_diff_shows_text_changed_scaffolds (
 ) -> Result<(), Box<dyn Error>>
 {
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir . path();
-  setup_git_repo_with_fixtures (repo_path)?;
-  s . reset_with_source_path (
+  let gitrepo_path = temp_dir . path();
+  setup_gitrepo_with_fixtures (gitrepo_path)?;
+  s . reset_with_repo_path (
     "test_title_diff_shows_text_changed_scaffolds",
-    repo_path ) ?;
+    gitrepo_path ) ?;
   let (config, _tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
@@ -47,11 +47,11 @@ async fn test_title_diff_staged_shows_staged_scaffolds (
 ) -> Result<(), Box<dyn Error>>
 {
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir . path();
-  setup_git_repo_with_fixtures_staged (repo_path)?;
-  s . reset_with_source_path (
+  let gitrepo_path = temp_dir . path();
+  setup_gitrepo_with_fixtures_staged (gitrepo_path)?;
+  s . reset_with_repo_path (
     "test_title_diff_staged_shows_staged_scaffolds",
-    repo_path ) ?;
+    gitrepo_path ) ?;
   let (config, _tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);

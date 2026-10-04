@@ -3,7 +3,7 @@ use crate::context::{
   content_maps_from_nodes,
   had_id_set_from_nodes,
   mentioned_ids_from_nodes};
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources_collecting_violations;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos_collecting_violations;
 use crate::dbs::filesystem::not_nodes::load_config;
 use crate::dbs::init::rebuild_tantivy_as_generation;
 use crate::telescope::invariants::{TelescopeViolation, report_telescope_violations};
@@ -63,7 +63,7 @@ pub fn rebuild_ephemeral_data_stores_in_place (
         "Reloading config from {}: {}", config_path, e) ) ?;
     let (nodes, load_violations)
       : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
-      read_all_skg_files_from_sources_collecting_violations (&fresh_config)
+      read_all_skg_files_from_repos_collecting_violations (&fresh_config)
       . map_err ( |e| format! ("Reading .skg files: {}", e) ) ?;
     let (fresh_graph, mut graph_warnings) =
       validated_graph (&fresh_config, &nodes)

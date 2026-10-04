@@ -23,7 +23,7 @@ SKG_LIB_DIR="$(dirname "${BASH_SOURCE[0]}")"
 SKG_DATA_DIR="$SKG_LIB_DIR/.."
 SKG_CONFIG="${SKG_CONFIG:-$SKG_DATA_DIR/skgconfig.toml}"
 
-# Print the `path` of each [[sources]] block in skgconfig.toml.
+# Print the `path` of each [[repos]] block in skgconfig.toml.
 # $1 = "all" (every source) or "owned". A source is owned iff its
 # path sits under the config's owned_folder (default "owned") --
 # the author-folder layout; the per-source user_owns_it key is
@@ -49,7 +49,7 @@ _skg_sources() {
       }
       have = 0; path = ""
     }
-    # A [[sources]] header opens a new block...
+    # A [[repos]] header opens a new block...
     /^[[:space:]]*\[\[sources\]\][[:space:]]*$/ { flush(); have = 1; next }
     # ...any other table header ([x] or [[x]]) closes the current one.
     /^[[:space:]]*\[/                           { flush(); next }

@@ -4,7 +4,7 @@ use std::error::Error;
 use crate::dbs::in_rust_graph::query::find_related_nodes;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::source_sets::ActiveSourceSet;
+use crate::repo_sets::ActiveRepoSet;
 use crate::types::misc::ID;
 
 /// Most paths probably end without a fork or a cycle, but the same path can actually end in both: If it ends in a fork, any of the nodes in that fork might be cycles.
@@ -19,7 +19,7 @@ pub struct PathToFirstNonlinearity {
 /// forks, cycles, or extra path length.
 pub fn paths_to_first_nonlinearities_in_graph (
   graph       : &InRustGraph,
-  active      : Option<&ActiveSourceSet>,
+  active      : Option<&ActiveRepoSet>,
   node        : &ID,
   relation    : &str,
   input_role  : &str,
@@ -51,7 +51,7 @@ pub fn path_containerward_to_first_nonlinearity_in_graph (
 
 fn path_to_first_nonlinearity_in_graph (
   graph       : &InRustGraph,
-  active      : Option<&ActiveSourceSet>,
+  active      : Option<&ActiveRepoSet>,
   node        : &ID,
   relation    : &str,
   input_role  : &str,
@@ -94,7 +94,7 @@ fn path_to_first_nonlinearity_in_graph (
 
 fn related_nodes_from_graph_gated (
   graph       : &InRustGraph,
-  active      : Option<&ActiveSourceSet>,
+  active      : Option<&ActiveRepoSet>,
   origin      : &ID,
   relation    : NodeRelation,
   origin_is_first_role : bool,
@@ -109,15 +109,15 @@ fn related_nodes_from_graph_gated (
       None => true,
       Some (set) if set . is_all () => true,
       Some (set) => {
-        let target_is_active = graph . pid_and_source (partner)
-          . map (|(_, source)| set . contains_source (&source))
+        let target_is_active = graph . pid_and_repo (partner)
+          . map (|(_, repo)| set . contains_repo (&repo))
           . unwrap_or (false);
-        let relSource = if origin_is_first_role {
-          graph . relSource (origin, relation, partner)
+        let relRepo = if origin_is_first_role {
+          graph . relRepo (origin, relation, partner)
         } else {
-          graph . relSource (partner, relation, origin) };
-        target_is_active && relSource
-          . map (|source| set . contains_source (&source))
+          graph . relRepo (partner, relation, origin) };
+        target_is_active && relRepo
+          . map (|repo| set . contains_repo (&repo))
           . unwrap_or (false) } })
     . collect ()
 }

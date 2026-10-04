@@ -10,7 +10,7 @@ use std::error::Error;
 
 use futures::executor::block_on;
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use skg::dbs::in_rust_graph::complete_validation::validated_graph;
 use skg::types::misc::SkgConfig;
 use skg::types::nodes::complete::NodeComplete;
@@ -25,7 +25,7 @@ fn init_refuses_two_user_owned_overriders
         Some ("skg-test-init-refusal"),
         &[] ) ?;
     let nodes : Vec<NodeComplete> =
-      read_all_skg_files_from_sources (&config) ?;
+      read_all_skg_files_from_repos (&config) ?;
     let result = validated_graph (&config, &nodes);
     let msg : String = match result {
       Ok (_)  => panic! (

@@ -6,7 +6,7 @@ use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::override_invariants::OverrideInvariantViolation;
 use skg::telescope::invariants::TelescopeViolation;
 use skg::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, SkgfileSource, SourceName,
+  ID, MSV, RelPartner, SkgConfig, SkgfileRepo, RepoName,
 };
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::save::{DefineNode, SaveNode};
@@ -15,28 +15,28 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 fn config () -> SkgConfig {
-  let mut sources = HashMap::new ();
+  let mut repos = HashMap::new ();
   for (name, owned) in [("public", true), ("private", true), ("foreign", false)] {
-    sources . insert (SourceName::from (name), SkgfileSource {
-      name : SourceName::from (name),
+    repos . insert (RepoName::from (name), SkgfileRepo {
+      name : RepoName::from (name),
       abbreviation : None,
       path : PathBuf::from (format! ("{}-path", name)),
       user_owns_it : owned,
     }); }
-  let mut config = SkgConfig::dummyFromSources (sources);
-  config . source_order = vec![
-    SourceName::from ("public"),
-    SourceName::from ("private"),
-    SourceName::from ("foreign"),
+  let mut config = SkgConfig::dummyFromRepos (repos);
+  config . repo_order = vec![
+    RepoName::from ("public"),
+    RepoName::from ("private"),
+    RepoName::from ("foreign"),
   ];
   config
 }
 
-fn node (pid : &str, source : &str) -> NodeComplete {
+fn node (pid : &str, repo : &str) -> NodeComplete {
   let mut node = empty_node_complete ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
-  node . source = SourceName::from (source);
+  node . home_repo = RepoName::from (repo);
   node
 }
 
@@ -89,8 +89,8 @@ fn repeated_ids_of_one_owner_are_normalized_not_rejected () {
 fn unknown_home_is_hard_but_edge_provenance_is_a_warning () {
   let mut owner = node ("owner", "public");
   owner . contains = vec![
-    RelPartner::at_relSource (
-      SourceName::from ("unconfigured-relSource"), ID::from ("dangling")),
+    RelPartner::at_relRepo (
+      RepoName::from ("unconfigured-relSource"), ID::from ("dangling")),
   ];
   let unknown_home = node ("unknown-home", "unconfigured-home");
   let report = validate_complete_graph (&config (), &[owner, unknown_home]);
@@ -99,7 +99,7 @@ fn unknown_home_is_hard_but_edge_provenance_is_a_warning () {
       if pid == &ID::from ("unknown-home"))));
   assert! (report . warnings . iter () . any (|(pid, warning)|
     pid == &ID::from ("owner") && matches! (
-      warning, TelescopeViolation::UnconfiguredRelSource { member, .. }
+      warning, TelescopeViolation::UnconfiguredRelRepo { member, .. }
         if member == &ID::from ("dangling"))));
   // The unresolved member itself is retained, not diagnosed as an error.
   assert! (report . graph . contained_by . contains_key (&ID::from ("dangling")));
@@ -108,8 +108,8 @@ fn unknown_home_is_hard_but_edge_provenance_is_a_warning () {
 #[test]
 fn configured_dangling_members_are_tolerated_without_warning () {
   let mut owner = node ("owner", "public");
-  owner . subscribes_to = MSV::Specified (vec![RelPartner::at_relSource (
-    SourceName::from ("public"), ID::from ("absent"))]);
+  owner . subscribes_to = MSV::Specified (vec![RelPartner::at_relRepo (
+    RepoName::from ("public"), ID::from ("absent"))]);
   let report = validate_complete_graph (&config (), &[owner]);
   assert! (report . is_valid ());
   assert! (report . warnings . is_empty ());
@@ -123,8 +123,8 @@ fn canonical_entry_includes_override_monogamy_and_telescope_orientation () {
   let mut b = node ("b", "public");
   for overrider in [&mut a, &mut b] {
     overrider . overrides_view_of = MSV::Specified (vec![
-      RelPartner::at_relSource (
-        SourceName::from ("public"), ID::from ("target")),
+      RelPartner::at_relRepo (
+        RepoName::from ("public"), ID::from ("target")),
     ]); }
   let report = validate_complete_graph (&config (), &[target, a, b]);
   assert! (report . errors . iter () . any (|error| matches! (
@@ -154,6 +154,6 @@ fn save_candidate_is_rejected_before_publication () {
     error, CompleteGraphError::UnconfiguredNodeHome { pid, .. }
       if pid == &ID::from ("edited"))));
   // Validation is pure: the caller's current graph remains untouched.
-  assert_eq! (current . get (&ID::from ("edited")) . unwrap () . source,
-              SourceName::from ("public"));
+  assert_eq! (current . get (&ID::from ("edited")) . unwrap () . home_repo,
+              RepoName::from ("public"));
 }

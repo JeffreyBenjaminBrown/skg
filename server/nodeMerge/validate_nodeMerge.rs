@@ -102,16 +102,16 @@ fn validate_nodeMerge_pair(
 ) -> Result<Vec<String>, Box<dyn Error>> {
   let mut errors: Vec<String> = Vec::new();
   let acquirer_pid : ID = (
-    match graph . pid_and_source (acquirer_id)
-    { Some((pid, _source)) => pid,
+    match graph . pid_and_repo (acquirer_id)
+    { Some((pid, _repo)) => pid,
       None      => {
         errors . push(format!(
           "Acquirer ID '{}' not found in database",
           acquirer_id . as_str() ));
         return Ok (errors); }} );
   let acquiree_pid : ID = (
-    match graph . pid_and_source (acquiree_id)
-    { Some((pid, _source)) => pid,
+    match graph . pid_and_repo (acquiree_id)
+    { Some((pid, _repo)) => pid,
       None => {
         errors . push(format!(
           "Acquiree ID '{}' (requested by '{}') not found in database",

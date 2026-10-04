@@ -22,18 +22,18 @@ use skg::test_utils::graph_handle_from_config;
 use skg::test_utils::{run_with_shared_test_stores, SharedStoreSession};
 
 fn setup_inbound_fixtures (
-  repo_path : &Path,
+  gitrepo_path : &Path,
 ) -> Result<Repository, Box<dyn Error>> {
-  super::common::setup_git_repo_with_fixtures (
-    repo_path,
+  super::common::setup_gitrepo_with_fixtures (
+    gitrepo_path,
     "tests/git_diff_view/inbound/fixtures/head",
     "tests/git_diff_view/inbound/fixtures/worktree" ) }
 
 fn setup_inbound_fixtures_staged (
-  repo_path : &Path,
+  gitrepo_path : &Path,
 ) -> Result<Repository, Box<dyn Error>> {
-  super::common::setup_git_repo_with_fixtures_staged (
-    repo_path,
+  super::common::setup_gitrepo_with_fixtures_staged (
+    gitrepo_path,
     "tests/git_diff_view/inbound/fixtures/head",
     "tests/git_diff_view/inbound/fixtures/worktree" ) }
 
@@ -112,10 +112,10 @@ async fn run_inbound_save_test (
   expected : &str,
 ) -> Result<(), Box<dyn Error>> {
   let temp_dir : TempDir = TempDir::new ()?;
-  let repo_path : &Path = temp_dir . path ();
-  if staged { setup_inbound_fixtures_staged (repo_path)?; }
-  else      { setup_inbound_fixtures        (repo_path)?; }
-  s . reset_with_source_path (subtest_name, repo_path) ?;
+  let gitrepo_path : &Path = temp_dir . path ();
+  if staged { setup_inbound_fixtures_staged (gitrepo_path)?; }
+  else      { setup_inbound_fixtures        (gitrepo_path)?; }
+  s . reset_with_repo_path (subtest_name, gitrepo_path) ?;
   let (config, tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
@@ -140,10 +140,10 @@ async fn run_inbound_save_test (
           true, &Err (String::new ()), &mut views_state ) . await ? };
       assert_buffer_contains (&second . saved_view, expected);
       assert! (
-        ! repo_path . join ("del-r.skg") . exists (),
+        ! gitrepo_path . join ("del-r.skg") . exists (),
         "a deleted member's file must not resurrect" );
       let edge_r : NodeComplete =
-        read_nodecomplete (repo_path, "edge-r")?;
+        read_nodecomplete (gitrepo_path, "edge-r")?;
       assert! (
         edge_r . overrides_view_of . or_default () . is_empty (),
         "a removed inbound edge must not return: the relation \

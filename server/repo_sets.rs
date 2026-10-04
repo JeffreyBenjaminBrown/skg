@@ -1,10 +1,10 @@
-use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use crate::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use crate::dbs::filesystem::not_nodes::load_config_with_overrides;
 use crate::dbs::init::create_empty_tantivy_index;
-use crate::types::env::find_source_with_optional_tantivy;
+use crate::types::env::find_repo_with_optional_tantivy;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
-pub use crate::types::misc::SourceSetName;
+use crate::types::misc::{ID, SkgConfig, RepoName, TantivyIndex};
+pub use crate::types::misc::RepoSetName;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, mk_inactive_viewnode};
 use crate::types::viewnode::{Vognode, Phantom};
@@ -22,39 +22,39 @@ use std::pin::Pin;
 use std::process::Command;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ActiveSourceSet {
-  pub name    : SourceSetName,
-  pub sources : BTreeSet<SourceName>,
+pub struct ActiveRepoSet {
+  pub name    : RepoSetName,
+  pub repos : BTreeSet<RepoName>,
 }
 
-impl ActiveSourceSet {
+impl ActiveRepoSet {
   pub fn default_from_config (
     config : &SkgConfig,
-  ) -> Result<ActiveSourceSet, Box<dyn Error>> {
-    ActiveSourceSet::named (
+  ) -> Result<ActiveRepoSet, Box<dyn Error>> {
+    ActiveRepoSet::named (
       config,
-      config . default_source_set_name () . clone ()) }
+      config . default_repo_set_name () . clone ()) }
 
   pub fn named (
     config : &SkgConfig,
-    name   : SourceSetName,
-  ) -> Result<ActiveSourceSet, Box<dyn Error>> {
-    Ok ( ActiveSourceSet {
-      sources : config . source_set_sources (&name)?,
+    name   : RepoSetName,
+  ) -> Result<ActiveRepoSet, Box<dyn Error>> {
+    Ok ( ActiveRepoSet {
+      repos : config . repo_set_repos (&name)?,
       name } ) }
 
-  pub fn contains_source (
+  pub fn contains_repo (
     &self,
-    source : &SourceName,
+    repo : &RepoName,
   ) -> bool {
-    self . sources . contains (source) }
+    self . repos . contains (repo) }
 
   pub fn is_all (
     &self,
   ) -> bool {
     self . name . 0 == "all" }
 
-  pub fn id_source_is_active (
+  pub fn id_repo_is_active (
     &self,
     graph  : &InRustGraph,
     config : &SkgConfig,
@@ -62,56 +62,56 @@ impl ActiveSourceSet {
   ) -> Result<bool, Box<dyn Error>> {
     if self . is_all () {
       return Ok (true); }
-    let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
+    let deleted_since_head_pid_src_map : HashMap<ID, RepoName> =
       HashMap::new ();
-    Ok ( match find_source_with_optional_tantivy (
+    Ok ( match find_repo_with_optional_tantivy (
       graph, id, &deleted_since_head_pid_src_map, None, config ) {
-      Some (source) => self . contains_source (&source),
+      Some (repo) => self . contains_repo (&repo),
       None          => false } ) }
 }
 
-pub fn filter_path_to_active_sources_for_test (
+pub fn filter_path_to_active_repos_for_test (
   graph  : &InRustGraph,
   config : &SkgConfig,
-  active : &ActiveSourceSet,
+  active : &ActiveRepoSet,
   path   : Vec<ID>,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
   let mut result : Vec<ID> = Vec::new ();
-  let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
+  let deleted_since_head_pid_src_map : HashMap<ID, RepoName> =
     HashMap::new ();
   for id in path {
-    let source : SourceName =
-      match find_source_with_optional_tantivy (
+    let repo : RepoName =
+      match find_repo_with_optional_tantivy (
         graph, &id, &deleted_since_head_pid_src_map, None, config ) {
-        Some (source) => source,
+        Some (repo) => repo,
         None => break };
-    if active . contains_source (&source) {
+    if active . contains_repo (&repo) {
       result . push (id);
     } else {
       break; }}
   Ok (result) }
 
-pub fn filter_branches_to_active_sources_for_test (
+pub fn filter_branches_to_active_repos_for_test (
   graph    : &InRustGraph,
   config   : &SkgConfig,
-  active   : &ActiveSourceSet,
+  active   : &ActiveRepoSet,
   branches : BTreeSet<ID>,
 ) -> Result<BTreeSet<ID>, Box<dyn Error>> {
   let mut result : BTreeSet<ID> = BTreeSet::new ();
-  let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
+  let deleted_since_head_pid_src_map : HashMap<ID, RepoName> =
     HashMap::new ();
   for id in branches {
-    if let Some (source) =
-      find_source_with_optional_tantivy (
+    if let Some (repo) =
+      find_repo_with_optional_tantivy (
         graph, &id, &deleted_since_head_pid_src_map, None, config )
     {
-      if active . contains_source (&source) {
+      if active . contains_repo (&repo) {
         result . insert (id); }}}
   Ok (result) }
 
-pub fn apply_source_set_to_viewforest (
+pub fn apply_repo_set_to_viewforest (
   viewforest : &mut Tree<ViewNode>,
-  active     : &ActiveSourceSet,
+  active     : &ActiveRepoSet,
 ) {
   if active . is_all () {
     return; }
@@ -126,11 +126,11 @@ pub fn apply_source_set_to_viewforest (
       let has_children : bool = n . has_children ();
       match &n . value () . kind {
         ViewNodeKind::Vognode (Vognode::Active (t))
-          if ! active . contains_source (&t . source)
+          if ! active . contains_repo (&t . home_repo)
           => Some ( Treatment::Convert ),
         ViewNodeKind::Phantom (Phantom::Diff (p))
-          if ! active . contains_source (&p . source)
-          // TODO/full-schema/9-2_source-set-safety.org (interim,
+          if ! active . contains_repo (&p . home_repo)
+          // TODO/full-schema/9-2_repo-set-safety.org (interim,
           // until diff mode and restricted sets refuse to combine):
           // a removed-member phantom for an inactive node is
           // quietly omitted, like every other inactive member. One
@@ -152,33 +152,33 @@ pub fn apply_source_set_to_viewforest (
         node_mut . detach (); }, }}}
 
 
-pub fn titles_for_source_set_for_test (
+pub fn titles_for_repo_set_for_test (
   config : &SkgConfig,
-  active : &ActiveSourceSet,
+  active : &ActiveRepoSet,
   ids    : &[ID],
 ) -> Result<HashMap<ID, String>, Box<dyn Error>> {
   let nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources (config)?;
+    read_all_skg_files_from_repos (config)?;
   let wanted : BTreeSet<ID> =
     ids . iter () . cloned () . collect ();
   let mut result : HashMap<ID, String> = HashMap::new ();
   for node in nodes {
-    if active . contains_source (&node . source)
+    if active . contains_repo (&node . home_repo)
     && wanted . contains (&node . pid) {
       result . insert (node . pid, node . title); }}
   Ok (result) }
 
-pub fn search_ids_for_source_set_for_test (
+pub fn search_ids_for_repo_set_for_test (
   _tantivy : &TantivyIndex,
   config   : &SkgConfig,
-  active   : &ActiveSourceSet,
+  active   : &ActiveRepoSet,
   terms    : &str,
   limit    : usize,
 ) -> Result<Vec<ID>, Box<dyn Error>> {
   let mut hits : Vec<ID> =
-    read_all_skg_files_from_sources (config)?
+    read_all_skg_files_from_repos (config)?
     . into_iter ()
-    . filter ( |n| active . contains_source (&n . source) )
+    . filter ( |n| active . contains_repo (&n . home_repo) )
     . filter ( |n| {
       n . title . contains (terms)
       || n . aliases . or_default () . iter () . any ( |a|
@@ -189,7 +189,7 @@ pub fn search_ids_for_source_set_for_test (
   hits . truncate (limit);
   Ok (hits) }
 
-pub fn run_with_source_set_test_db<F>(
+pub fn run_with_repo_set_test_db<F>(
   test_name        : &str,
   config_path    : &str,
   tantivy_folder : &str,
@@ -203,7 +203,7 @@ where
 {
   block_on ( async {
     let fixture_config_path : PathBuf =
-      prepare_source_set_fixture_copy (test_name, config_path)?;
+      prepare_repo_set_fixture_copy (test_name, config_path)?;
     let mut config : SkgConfig =
       load_config_with_overrides (
         fixture_config_path . to_str ()
@@ -219,52 +219,52 @@ where
       Some (config . tantivy_folder . as_path ())) ?;
     result }) }
 
-fn prepare_source_set_fixture_copy (
+fn prepare_repo_set_fixture_copy (
   test_name     : &str,
   config_path : &str,
 ) -> Result<PathBuf, Box<dyn Error>> {
-  let source_config_path : PathBuf =
+  let repo_config_path : PathBuf =
     PathBuf::from (config_path);
-  let source_root : &Path =
-    source_config_path . parent ()
+  let repo_root : &Path =
+    repo_config_path . parent ()
     . ok_or ("source set fixture config has no parent")?;
   let target_root : PathBuf =
     PathBuf::from (format! (
       "/tmp/skg-source-set-fixtures-{}", test_name));
   if target_root . exists () {
     fs::remove_dir_all (&target_root)?; }
-  copy_dir_recursively (source_root, &target_root)?;
+  copy_dir_recursively (repo_root, &target_root)?;
   prepare_git_diff_fixture (&target_root)?;
   Ok (target_root . join (
-    source_config_path . file_name ()
+    repo_config_path . file_name ()
     . ok_or ("source set fixture config has no filename")?)) }
 
 fn copy_dir_recursively (
-  source : &Path,
+  repo : &Path,
   target : &Path,
 ) -> Result<(), Box<dyn Error>> {
   fs::create_dir_all (target)?;
-  for entry in fs::read_dir (source)? {
+  for entry in fs::read_dir (repo)? {
     let entry : fs::DirEntry = entry?;
-    let source_path : PathBuf =
+    let repo_path : PathBuf =
       entry . path ();
     let target_path : PathBuf =
       target . join (entry . file_name ());
     if entry . file_type ()? . is_dir () {
-      copy_dir_recursively (&source_path, &target_path)?;
+      copy_dir_recursively (&repo_path, &target_path)?;
     } else {
-      fs::copy (&source_path, &target_path)?; }}
+      fs::copy (&repo_path, &target_path)?; }}
   Ok (( )) }
 
-/// Public so source-set diff tests can replay this prep on a
+/// Public so repo-set diff tests can replay this prep on a
 /// SharedStoreSession's fixture copy (reset_with_fixture_prep).
 pub fn prepare_git_diff_fixture (
   fixture_root : &Path,
 ) -> Result<(), Box<dyn Error>> {
-  let public_source : PathBuf =
+  let public_repo : PathBuf =
     fixture_root . join ("owned/public");
   let diff_root : PathBuf =
-    public_source . join ("diff-root.skg");
+    public_repo . join ("diff-root.skg");
   if ! diff_root . exists () {
     return Ok (( )); }
   fs::write (&diff_root, indoc::indoc! {"
@@ -274,11 +274,11 @@ pub fn prepare_git_diff_fixture (
     - active-a
     - private-removed
   "})?;
-  run_git (&public_source, &["init"])?;
-  run_git (&public_source, &["config", "user.email", "tests@example.invalid"])?;
-  run_git (&public_source, &["config", "user.name", "skg tests"])?;
-  run_git (&public_source, &["add", "."])?;
-  run_git (&public_source, &["commit", "-m", "baseline"])?;
+  run_git (&public_repo, &["init"])?;
+  run_git (&public_repo, &["config", "user.email", "tests@example.invalid"])?;
+  run_git (&public_repo, &["config", "user.name", "skg tests"])?;
+  run_git (&public_repo, &["add", "."])?;
+  run_git (&public_repo, &["commit", "-m", "baseline"])?;
   fs::write (&diff_root, indoc::indoc! {"
     pid: diff-root
     title: diff-root

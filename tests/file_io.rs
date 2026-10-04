@@ -7,17 +7,17 @@ use std::path::PathBuf;
 
 use skg::dbs::filesystem::one_node::{
   fetch_aliases_from_file,
-  nodecomplete_from_pid_and_source, write_nodecomplete_to_source};
+  nodecomplete_from_pid_and_repo, write_nodecomplete_to_repo};
 use skg::dbs::filesystem::not_nodes::load_config_with_overrides;
 use skg::save::update_fs_from_saveinstructions;
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::nodes::fs::NodeFS;
 use skg::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, SkgfileSource, SourceName,
-  rel_partners_at_relSource_msv,
+  ID, MSV, RelPartner, SkgConfig, SkgfileRepo, RepoName,
+  rel_partners_at_relRepo_msv,
 };
 use skg::types::save::{DefineNode, SaveNode};
-use skg::test_utils::set_source_retagging_relSources;
+use skg::test_utils::set_repo_retagging_relRepos;
 use skg::test_utils::{run_with_test_stores, nodecomplete_example};
 
 const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
@@ -26,11 +26,11 @@ const CONFIG_PATH: &str = "tests/file_io/fixtures/skgconfig.toml";
 fn save_filesystem_preparation_writes_normalized_ids (
 ) -> Result<(), Box<dyn std::error::Error>> {
   let dir : tempfile::TempDir = tempfile::tempdir () ?;
-  let source : SourceName = SourceName::from ("temp");
-  let config : SkgConfig = SkgConfig::dummyFromSources (
+  let repo : RepoName = RepoName::from ("temp");
+  let config : SkgConfig = SkgConfig::dummyFromRepos (
     std::collections::HashMap::from ([
-    (source . clone (), SkgfileSource {
-      name         : source . clone (),
+    (repo . clone (), SkgfileRepo {
+      name         : repo . clone (),
       abbreviation : None,
       path         : dir . path () . to_path_buf (),
       user_owns_it : true, }),
@@ -38,7 +38,7 @@ fn save_filesystem_preparation_writes_normalized_ids (
   let mut node : NodeComplete = empty_node_complete ();
   node . pid = ID::from ("P");
   node . title = "P" . to_string ();
-  node . source = source;
+  node . home_repo = repo;
   node . extra_ids = vec![
     ID::from ("B"), ID::from ("P"), ID::from ("A"), ID::from ("B")];
 
@@ -68,18 +68,18 @@ fn test_node_io() {
 
   // Write the example node to a file
   let mut example : NodeComplete = nodecomplete_example();
-  set_source_retagging_relSources ( &mut example, &SourceName::from ("output") );
-  write_nodecomplete_to_source ( &example, &config )
+  set_repo_retagging_relRepos ( &mut example, &RepoName::from ("output") );
+  write_nodecomplete_to_repo ( &example, &config )
     . unwrap ();
 
   // Read that file, reverse its lists, write to another file
-  let read_node : NodeComplete = nodecomplete_from_pid_and_source (
-    &config, example . pid . clone(), &SourceName::from ("output") ) . unwrap ();
+  let read_node : NodeComplete = nodecomplete_from_pid_and_repo (
+    &config, example . pid . clone(), &RepoName::from ("output") ) . unwrap ();
   let mut reversed = reverse_some_of_node (&read_node);
-  set_source_retagging_relSources ( &mut reversed, &SourceName::from ("output") );
+  set_repo_retagging_relRepos ( &mut reversed, &RepoName::from ("output") );
   reversed . pid = ID::new ("reversed");
 
-  write_nodecomplete_to_source(&reversed, &config) . unwrap();
+  write_nodecomplete_to_repo(&reversed, &config) . unwrap();
   let out_filename: PathBuf =
     test_dir . join(&example . pid . 0) . with_extension ("skg");
   let reversed_filename : &str =
@@ -125,15 +125,15 @@ fn verify_body_not_needed() {
     &[("output", PathBuf::from ("/tmp/file_io_test"))],
   ) . unwrap();
 
-  fs::copy ( // seed the output source with the golden example
+  fs::copy ( // seed the output repo with the golden example
     "tests/file_io/fixtures/golden/example.skg",
     "/tmp/file_io_test/example.skg" ) . unwrap();
-  let mut node = nodecomplete_from_pid_and_source (
-    &config, ID::new ("example"), &SourceName::from ("output") ) . unwrap();
-  set_source_retagging_relSources ( &mut node, &SourceName::from ("output") );
+  let mut node = nodecomplete_from_pid_and_repo (
+    &config, ID::new ("example"), &RepoName::from ("output") ) . unwrap();
+  set_repo_retagging_relRepos ( &mut node, &RepoName::from ("output") );
   node . body = None; // mutate it
   node . pid = ID::new ("no_unindexed"); // match pid to filename
-  write_nodecomplete_to_source(
+  write_nodecomplete_to_repo(
     &node, &config ) . unwrap();
   // Parse both files as YAML for semantic comparison
   let generated_yaml: serde_yaml::Value =
@@ -175,7 +175,7 @@ pub fn reverse_some_of_node(node: &NodeComplete) -> NodeComplete {
     title             : node . title             . clone(),
     overPrivateText_telescope    : node . overPrivateText_telescope,
     aliases           : node . aliases           . clone(),
-    source            : node . source            . clone(),
+    home_repo            : node . home_repo            . clone(),
     pid               : node . pid               . clone(),
     extra_ids         : node . extra_ids         . clone(),
     body              : node . body              . clone(),
@@ -188,37 +188,37 @@ pub fn reverse_some_of_node(node: &NodeComplete) -> NodeComplete {
 #[test]
 fn test_links_extracted_during_read() -> std::io::Result<()> {
   use std::collections::HashMap;
-  use skg::types::misc::SkgfileSource;
+  use skg::types::misc::SkgfileRepo;
   use tempfile::tempdir;
 
   // Create a temporary directory
   let dir : tempfile::TempDir = tempdir()?;
 
-  // Create a config with the temp directory as a source
+  // Create a config with the temp directory as a repo
   let config: SkgConfig = {
-    let mut sources: HashMap<SourceName, SkgfileSource> = HashMap::new();
-    sources . insert(SourceName::from ("temp"), SkgfileSource {
-      name: SourceName::from ("temp"),
+    let mut repos: HashMap<RepoName, SkgfileRepo> = HashMap::new();
+    repos . insert(RepoName::from ("temp"), SkgfileRepo {
+      name: RepoName::from ("temp"),
         abbreviation: None,
       path: dir . path() . to_path_buf(),
       user_owns_it: true, });
-    SkgConfig::dummyFromSources (sources) };
+    SkgConfig::dummyFromRepos (repos) };
 
   let mut test_node : NodeComplete = empty_node_complete ();
   { test_node . title = "Title with two links: [[(id link1][First) Link]] and [[(id link2][Second) Link]]"
       . to_string();
-    test_node . source = SourceName::from ("temp");
-    test_node . aliases = rel_partners_at_relSource_msv (
-      &test_node . source,
+    test_node . home_repo = RepoName::from ("temp");
+    test_node . aliases = rel_partners_at_relRepo_msv (
+      &test_node . home_repo,
       MSV::Specified(vec![ "alias 1" . to_string(),
                            "alias 2" . to_string() ]));
     test_node . pid = ID::new ("test123");
     test_node . body = Some("Some text with a link [[(id link3][Third) Link]] and another [[(id link4][Fourth) Link]]" . to_string()); }
 
   { // Write to a file and read it back.
-    write_nodecomplete_to_source(&test_node, &config)?;
-    let read_node : NodeComplete = nodecomplete_from_pid_and_source(
-      &config, ID::new ("test123"), &SourceName::from ("temp"))?;
+    write_nodecomplete_to_repo(&test_node, &config)?;
+    let read_node : NodeComplete = nodecomplete_from_pid_and_repo(
+      &config, ID::new ("test123"), &RepoName::from ("temp"))?;
     assert_eq!( test_node, read_node,
                 "Nodes should have matched." ); }
   Ok (( ))

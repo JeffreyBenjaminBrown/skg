@@ -1,7 +1,7 @@
 // cargo nextest run --test grouped_overrides -E 'test(inactive_suppression::)'
 //
-// TODO/full-schema/9-2_source-set-safety.org, inactive-node rewrite
-// suppression: under a restricted source-set, any instruction that
+// TODO/full-schema/9-2_repo-set-safety.org, inactive-node rewrite
+// suppression: under a restricted repo-set, any instruction that
 // would modify an inactive node is dropped, not executed and not
 // fatal, with the warning "Inactive nodes present in saved buffer
 // remain unchanged in graph." -- and only when something was
@@ -17,7 +17,7 @@
 use indoc::indoc;
 
 use skg::from_text::buffer_to_validated_saveplan;
-use skg::source_sets::{ActiveSourceSet, SourceSetName, run_with_source_set_test_db};
+use skg::repo_sets::{ActiveRepoSet, RepoSetName, run_with_repo_set_test_db};
 use skg::types::misc::{ID, members_of};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
@@ -45,16 +45,16 @@ fn saved_node_by_id<'a> (
 #[test]
 fn writes_to_inactive_nodes_are_suppressed_with_warning (
 ) -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
+  run_with_repo_set_test_db (
     "skg-test-inactive-suppression",
-    "tests/source_sets/fixtures/skgconfig.toml",
+    "tests/repo_sets/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-inactive-suppression",
     |config, _tantivy| Box::pin ( async move {
       (
         skg::test_utils::graph_handle_from_config (config) ? );
-      let active : ActiveSourceSet =
-        ActiveSourceSet::named (
-          config, SourceSetName ("public" . to_string ())) ?;
+      let active : ActiveRepoSet =
+        ActiveRepoSet::named (
+          config, RepoSetName ("public" . to_string ())) ?;
       { // An EDITED now-inactive definitive node: write suppressed,
         // warning attached, containment preserved.
         let buffer = indoc! {"
@@ -97,7 +97,7 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
             "remain unchanged in graph")),
           "an untouched stale buffer saves without the suppression \
            warning: {:?}", warnings ); }
-      { // Moving a node into an inactive source: move suppressed,
+      { // Moving a node into an inactive repo: move suppressed,
         // warning attached, node unmoved.
         let buffer = indoc! {"
           * (skg (node (id root) (source public))) root
@@ -107,7 +107,7 @@ fn writes_to_inactive_nodes_are_suppressed_with_warning (
           buffer_to_validated_saveplan (
             buffer, config, Some (&active) )  ?;
         assert! (
-          plan . source_moves . is_empty (),
+          plan . repo_moves . is_empty (),
           "a move into an inactive source must be suppressed" );
         assert! (
           ! save_ids (&plan . define_nodes)

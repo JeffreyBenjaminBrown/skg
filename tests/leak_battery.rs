@@ -1,12 +1,12 @@
-// cargo nextest run --test grouped_sources -E 'test(leak_battery::)'
+// cargo nextest run --test grouped_repos -E 'test(leak_battery::)'
 //
 // THE LEAK BATTERY (TODO/user-owned_autofork_chain/5_plan.org, work
-// item render-and-gating): a membership's relSource, not just the
-// member node's own source, gates whether it renders. Fixtures pin
+// item render-and-gating): a membership's relRepo, not just the
+// member node's own repo, gates whether it renders. Fixtures pin
 // the shape the sweep exists to close: a PUBLIC node (N) whose
 // PRIVATE section privately contains/subscribes-to another PUBLIC
 // node (C) -- a private reading-list entry between two nodes that
-// are each individually visible at every source. Without relSource
+// are each individually visible at every repo. Without relRepo
 // gating this leaks by omission (a public session would still show
 // the private membership) or by appearance (inbound surfaces would
 // reveal N/S even though the content direction hides them).
@@ -22,15 +22,15 @@ use ego_tree::{NodeId, Tree};
 use std::collections::BTreeSet;
 use std::error::Error;
 
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use skg::dbs::in_rust_graph::relation_accessors::{NodeRelation, RelationRole};
 use skg::dbs::in_rust_graph::{InRustGraph};
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::org_to_text::viewforest_to_string;
-use skg::source_sets::{ActiveSourceSet, SourceSetName, run_with_source_set_test_db};
+use skg::repo_sets::{ActiveRepoSet, RepoSetName, run_with_repo_set_test_db};
 use skg::test_utils::graph_handle_from_config;
-use skg::to_org::expand::backpath::build_and_integrate_containerward_path_with_source_set;
-use skg::to_org::render::content_view::multi_root_view_with_source_set;
+use skg::to_org::expand::backpath::build_and_integrate_containerward_path_with_repo_set;
+use skg::to_org::render::content_view::multi_root_view_with_repo_set;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::misc::ID;
 use skg::types::nodes::complete::NodeComplete;
@@ -67,21 +67,21 @@ fn true_child_ids (
 #[test]
 fn content_view_of_N_gates_privately_contained_C (
 ) -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
+  run_with_repo_set_test_db (
     "skg-test-leak-battery-content",
     "tests/leak_battery/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-leak-battery-content",
     |config, tantivy| Box::pin ( async move {
-      let public : ActiveSourceSet =
-        ActiveSourceSet::named (config, SourceSetName::from ("public"))?;
-      let all : ActiveSourceSet =
-        ActiveSourceSet::named (config, SourceSetName::from ("all"))?;
+      let public : ActiveRepoSet =
+        ActiveRepoSet::named (config, RepoSetName::from ("public"))?;
+      let all : ActiveRepoSet =
+        ActiveRepoSet::named (config, RepoSetName::from ("all"))?;
 
       // At "public": N's private membership of C must not render --
       // neither C's id nor its title -- even though C itself is a
       // fully public, individually-visible node.
       let (at_public, _pids, _tree) : (String, Vec<ID>, Tree<ViewNode>) =
-        multi_root_view_with_source_set (
+        multi_root_view_with_repo_set (
           config, Some (tantivy),
           &[ ID::from ("N") ], false, &public ) ?;
       assert! (
@@ -94,7 +94,7 @@ fn content_view_of_N_gates_privately_contained_C (
 
       // At "all": the private membership is visible.
       let (at_all, _pids, _tree) : (String, Vec<ID>, Tree<ViewNode>) =
-        multi_root_view_with_source_set (
+        multi_root_view_with_repo_set (
           config, Some (tantivy),
           &[ ID::from ("N") ], false, &all ) ?;
       assert! (
@@ -105,22 +105,22 @@ fn content_view_of_N_gates_privately_contained_C (
 #[test]
 fn inbound_containerward_data_hides_N_at_public (
 ) -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
+  run_with_repo_set_test_db (
     "skg-test-leak-battery-inbound",
     "tests/leak_battery/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-leak-battery-inbound",
     |config, _tantivy| Box::pin ( async move {
-      let public : ActiveSourceSet =
-        ActiveSourceSet::named (config, SourceSetName::from ("public"))?;
-      let all : ActiveSourceSet =
-        ActiveSourceSet::named (config, SourceSetName::from ("all"))?;
+      let public : ActiveRepoSet =
+        ActiveRepoSet::named (config, RepoSetName::from ("public"))?;
+      let all : ActiveRepoSet =
+        ActiveRepoSet::named (config, RepoSetName::from ("all"))?;
 
       // Unit-style pin: the gated in-Rust-graph accessor directly.
       // C's containerward data (who contains C) must not name N at
-      // "public" -- the edge's relSource (private) is what
-      // gates it, not N's own (public) source.
+      // "public" -- the edge's relRepo (private) is what
+      // gates it, not N's own (public) repo.
       let nodes : Vec<NodeComplete> =
-        read_all_skg_files_from_sources (config)?;
+        read_all_skg_files_from_repos (config)?;
       let graph : InRustGraph =
         InRustGraph::from_nodecompletes (&nodes);
       let inbound_public : Vec<ID> =
@@ -148,7 +148,7 @@ fn inbound_containerward_data_hides_N_at_public (
           viewforest_from_org (
             "* (skg (node (id C) (source public))) leak-battery-C\n" )?;
         let c_id : NodeId = first_child_id (&viewforest);
-        build_and_integrate_containerward_path_with_source_set (
+        build_and_integrate_containerward_path_with_repo_set (
           &mut viewforest, c_id, &graph, config, Some (&public) ) ?;
         let ancestors : BTreeSet<ID> = true_child_ids (&viewforest, c_id);
         assert! (
@@ -166,7 +166,7 @@ fn inbound_containerward_data_hides_N_at_public (
           viewforest_from_org (
             "* (skg (node (id C) (source public))) leak-battery-C\n" )?;
         let c_id : NodeId = first_child_id (&viewforest);
-        build_and_integrate_containerward_path_with_source_set (
+        build_and_integrate_containerward_path_with_repo_set (
           &mut viewforest, c_id, &graph, config, Some (&all) ) ?;
         let ancestors : BTreeSet<ID> = true_child_ids (&viewforest, c_id);
         assert! (
@@ -179,17 +179,17 @@ fn inbound_containerward_data_hides_N_at_public (
 #[test]
 fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
 ) -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
+  run_with_repo_set_test_db (
     "skg-test-leak-battery-subscriber",
     "tests/leak_battery/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-leak-battery-subscriber",
     |config, _tantivy| Box::pin ( async move {
-      let public : ActiveSourceSet =
-        ActiveSourceSet::named (config, SourceSetName::from ("public"))?;
-      let all : ActiveSourceSet =
-        ActiveSourceSet::named (config, SourceSetName::from ("all"))?;
+      let public : ActiveRepoSet =
+        ActiveRepoSet::named (config, RepoSetName::from ("public"))?;
+      let all : ActiveRepoSet =
+        ActiveRepoSet::named (config, RepoSetName::from ("all"))?;
       let nodes : Vec<NodeComplete> =
-        read_all_skg_files_from_sources (config)?;
+        read_all_skg_files_from_repos (config)?;
       let graph : InRustGraph =
         InRustGraph::from_nodecompletes (&nodes);
 
@@ -218,21 +218,21 @@ fn subscriberFolder_style_inbound_gates_privately_recorded_subscription (
 #[test]
 fn default_subscribeeFolder_requires_an_active_subscription_edge (
 ) -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
+  run_with_repo_set_test_db (
     "skg-test-leak-battery-default-subscribee-folder",
     "tests/leak_battery/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-leak-battery-default-subscribee-folder",
     |config, tantivy| Box::pin ( async move {
-      let public : ActiveSourceSet =
-        ActiveSourceSet::named (config, SourceSetName::from ("public"))?;
-      let all : ActiveSourceSet =
-        ActiveSourceSet::named (config, SourceSetName::from ("all"))?;
+      let public : ActiveRepoSet =
+        ActiveRepoSet::named (config, RepoSetName::from ("public"))?;
+      let all : ActiveRepoSet =
+        ActiveRepoSet::named (config, RepoSetName::from ("all"))?;
 
       // S and C are both public, but S's subscription to C is recorded
       // only in private.  The default folder's existence must follow the
-      // edge source, not merely the visibility of its endpoints.
+      // edge repo, not merely the visibility of its endpoints.
       let (at_public, _pids, _tree) : (String, Vec<ID>, Tree<ViewNode>) =
-        multi_root_view_with_source_set (
+        multi_root_view_with_repo_set (
           config, Some (tantivy),
           &[ ID::from ("S") ], false, &public ) ?;
       assert! (
@@ -241,7 +241,7 @@ fn default_subscribeeFolder_requires_an_active_subscription_edge (
          subscribeeFolder behind:\n{}", at_public );
 
       let (at_all, _pids, _tree) : (String, Vec<ID>, Tree<ViewNode>) =
-        multi_root_view_with_source_set (
+        multi_root_view_with_repo_set (
           config, Some (tantivy),
           &[ ID::from ("S") ], false, &all ) ?;
       assert! (
@@ -257,15 +257,15 @@ fn default_subscribeeFolder_requires_an_active_subscription_edge (
 #[test]
 fn ancestor_heralds_gate_privately_recorded_relations (
 ) -> Result<(), Box<dyn Error>> {
-  run_with_source_set_test_db (
+  run_with_repo_set_test_db (
     "skg-test-leak-battery-heralds",
     "tests/leak_battery/fixtures/skgconfig.toml",
     "/tmp/tantivy-test-leak-battery-heralds",
     |config, _tantivy| Box::pin ( async move {
-      let public : ActiveSourceSet =
-        ActiveSourceSet::named (config, SourceSetName::from ("public"))?;
-      let all : ActiveSourceSet =
-        ActiveSourceSet::named (config, SourceSetName::from ("all"))?;
+      let public : ActiveRepoSet =
+        ActiveRepoSet::named (config, RepoSetName::from ("public"))?;
+      let all : ActiveRepoSet =
+        ActiveRepoSet::named (config, RepoSetName::from ("all"))?;
       let graph_handle = (
         graph_handle_from_config (config)? );
       let graph = graph_handle . load_full ();
@@ -273,7 +273,7 @@ fn ancestor_heralds_gate_privately_recorded_relations (
       // recorded only in S's PRIVATE section, so the ancestor-flag
       // pass must not tint S's herald with the 'S' token at public.
       // (Both nodes are individually public; the EDGE is what gates.)
-      let herald_of_S = | active : &ActiveSourceSet |
+      let herald_of_S = | active : &ActiveRepoSet |
       -> Result<Option<String>, Box<dyn Error>> {
         let mut viewforest : Tree<ViewNode> =
           viewforest_from_org (
@@ -322,32 +322,32 @@ fn a_lowered_edge_is_governed_by_its_new_level (
 ) {
   // BUG-and-fix_make-edge-more-public.org: after the explicit
   // gesture lowers an edge's privacy to its default, the gated
-  // surfaces follow the NEW source -- the edge appears under sets
-  // that include that source, while a sibling edge still more private than its
+  // surfaces follow the NEW repo -- the edge appears under sets
+  // that include that repo, while a sibling edge still more private than its
   // default stays hidden. Lowering to the default cannot leak: by
   // definition both endpoints' homes are at least as public as it.
   use skg::dbs::in_rust_graph::relation_accessors::BinaryRolePosition;
-  use skg::types::misc::{RelPartner, SourceName};
+  use skg::types::misc::{RelPartner, RepoName};
   use skg::types::nodes::complete::empty_node_complete;
-  let node_at = |pid : &str, source : &str| -> NodeComplete {
+  let node_at = |pid : &str, repo : &str| -> NodeComplete {
     let mut n : NodeComplete = empty_node_complete ();
     n . pid = ID::from (pid);
     n . title = pid . to_string ();
-    n . source = SourceName::from (source);
+    n . home_repo = RepoName::from (repo);
     n };
   let mut owner : NodeComplete = node_at ("owner", "public");
   owner . contains = vec! [
-    RelPartner::at_relSource ( // as if just lowered to its default
-      SourceName::from ("public"), ID::from ("lowered") ),
-    RelPartner::at_relSource ( // deliberately above its default
-      SourceName::from ("private"), ID::from ("kept") ) ];
+    RelPartner::at_relRepo ( // as if just lowered to its default
+      RepoName::from ("public"), ID::from ("lowered") ),
+    RelPartner::at_relRepo ( // deliberately above its default
+      RepoName::from ("private"), ID::from ("kept") ) ];
   let graph : InRustGraph = InRustGraph::from_nodecompletes ( & [
     owner,
     node_at ("lowered", "public"),
     node_at ("kept",    "public") ] );
-  let public : ActiveSourceSet = ActiveSourceSet {
-    name    : SourceSetName::from ("public"),
-    sources : [ SourceName::from ("public") ]
+  let public : ActiveRepoSet = ActiveRepoSet {
+    name    : RepoSetName::from ("public"),
+    repos : [ RepoName::from ("public") ]
       . into_iter () . collect () };
   let member_role : RelationRole = RelationRole::new (
     NodeRelation::Contains, BinaryRolePosition::Second );

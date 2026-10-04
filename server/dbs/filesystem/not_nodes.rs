@@ -1,55 +1,55 @@
-use crate::types::misc::{SkgConfig, SkgfileSource, SourceName};
+use crate::types::misc::{SkgConfig, SkgfileRepo, RepoName};
 
 use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-/// If a source path does not exist:
+/// If a repo path does not exist:
 /// - If it is marked owned (in the config), create it.
 /// - If it is foreign, fail.
-pub fn validate_source_paths_creating_owned_ones_if_needed (
-  sources: &HashMap<SourceName, SkgfileSource>
+pub fn validate_repo_paths_creating_owned_ones_if_needed (
+  repos: &HashMap<RepoName, SkgfileRepo>
 ) -> io::Result<()> {
-  for (source_name, source) in sources . iter() {
-    if !source . path . exists() { // If it doesn't exist
-      if source . user_owns_it { // and it's owned, create it
-        fs::create_dir_all(&source . path)?;
+  for (repo_name, repo) in repos . iter() {
+    if !repo . path . exists() { // If it doesn't exist
+      if repo . user_owns_it { // and it's owned, create it
+        fs::create_dir_all(&repo . path)?;
         tracing::info!("Created directory for source '{}': {:?}",
-                  source_name, source . path);
+                  repo_name, repo . path);
       } else { // and it's foreign, fail
         return Err(io::Error::new(
           io::ErrorKind::NotFound,
           format!("Foreign source '{}' path does not exist: {:?}",
-                  source_name, source . path )) ); }} }
+                  repo_name, repo . path )) ); }} }
   Ok(( )) }
 
-/// The source names in TOML declaration order, read from the raw
-/// '[[sources]]' array. The parsed 'SkgConfig.sources' is a HashMap and
+/// The repo names in TOML declaration order, read from the raw
+/// '[[repos]]' array. The parsed 'SkgConfig.repos' is a HashMap and
 /// loses order, so the loaders re-extract it here to fill
-/// 'SkgConfig.source_order'. LOAD-BEARING: declaration order is the
+/// 'SkgConfig.repo_order'. LOAD-BEARING: declaration order is the
 /// privacy order, most public first (see the chokepoint methods on
-/// 'SkgConfig'). Empty when the TOML has no parseable sources array.
-fn source_order_from_toml (
+/// 'SkgConfig'). Empty when the TOML has no parseable repos array.
+fn repo_order_from_toml (
   contents : &str,
-) -> Vec<SourceName> {
+) -> Vec<RepoName> {
   toml::from_str::<toml::Value> (contents) . ok ()
     . as_ref ()
-    . and_then ( |v| v . get ("sources") )
+    . and_then ( |v| v . get ("repos") )
     . and_then ( |s| s . as_array () )
     . map ( |arr| arr . iter ()
             . filter_map ( |t| t . get ("name")
                            . and_then ( |n| n . as_str () )
-                           . map (SourceName::from) )
+                           . map (RepoName::from) )
             . collect () )
     . unwrap_or_default () }
 
-/// Named source-sets are retired: source-sets are now the prefixes of
+/// Named repo-sets are retired: repo-sets are now the prefixes of
 /// the config's privacy order (see TODO/user-owned_autofork_chain/
 /// 5_plan.org, work item privacy-order). A config still defining
-/// '[[source_sets]]' would silently mean something else than its
+/// '[[repo_sets]]' would silently mean something else than its
 /// author intended, so its presence is a hard error. Likewise
-/// 'user_owns_it': ownership is now derived from the source's path
+/// 'user_owns_it': ownership is now derived from the repo's path
 /// (under 'owned_folder' = owned), and serde would silently IGNORE
 /// the unknown key -- a silent ownership flip -- so it too is a hard
 /// error.
@@ -69,23 +69,23 @@ fn reject_retired_config_keys (
     return Err (format! (
       "This config sets retired TypeDB keys: {}. TypeDB has been removed; delete these keys from skgconfig.toml.",
       retired . join (", ")) . into ()); }
-  let has_source_sets : bool =
+  let has_repo_sets : bool =
     parsed . as_ref ()
-    . map ( |v| v . get ("source_sets") . is_some () )
+    . map ( |v| v . get ("repo_sets") . is_some () )
     . unwrap_or (false);
-  if has_source_sets {
+  if has_repo_sets {
     return Err ( concat! (
-      "This config defines [[source_sets]], a retired mechanism. ",
-      "Source-sets are now the PREFIXES of the [[sources]] order: ",
+      "This config defines [[repo_sets]], a retired mechanism. ",
+      "Source-sets are now the PREFIXES of the [[repos]] order: ",
       "list your sources most-public-first, and select a set by ",
       "naming the most private source to make available (or 'all'). ",
       "See TODO/user-owned_autofork_chain/5_plan.org, work item ",
-      "privacy-order. Delete the [[source_sets]] entries and, if a ",
-      "deleted set was your default_source_set, replace that with a ",
+      "privacy-order. Delete the [[repo_sets]] entries and, if a ",
+      "deleted set was your default_repo_set, replace that with a ",
       "source name or 'all'." ) . into () ); }
   let has_user_owns_it : bool =
     parsed . as_ref ()
-    . and_then ( |v| v . get ("sources") )
+    . and_then ( |v| v . get ("repos") )
     . and_then ( |s| s . as_array () )
     . map ( |arr| arr . iter ()
             . any ( |t| t . get ("user_owns_it") . is_some () ))
@@ -104,42 +104,42 @@ fn reject_retired_config_keys (
       "privacy-order." ) . into () ); }
   Ok (( )) }
 
-/// Fills the DERIVED parts of each source. Must run AFTER
+/// Fills the DERIVED parts of each repo. Must run AFTER
 /// 'make_paths_absolute' (so 'data_root' and absolute paths exist),
-/// with 'raw_paths' captured from the sources BEFORE it:
-/// - 'user_owns_it': true iff the source's absolute path sits under
+/// with 'raw_paths' captured from the repos BEFORE it:
+/// - 'user_owns_it': true iff the repo's absolute path sits under
 ///   DATA_ROOT/OWNED_FOLDER (the author-folder layout: the user's
-///   own author folder holds exactly the owned sources).
-/// - herald-label defaulting: a source whose 'name' was defaulted
+///   own author folder holds exactly the owned repos).
+/// - herald-label defaulting: a repo whose 'name' was defaulted
 ///   (== its raw path string) and which has no configured
-///   abbreviation gets one -- for an owned source, the path
+///   abbreviation gets one -- for an owned repo, the path
 ///   relative to the owned folder (e.g. "owned/notes" reads as
-///   "notes"); a foreign source keeps the full "author/repo" form,
+///   "notes"); a foreign repo keeps the full "author/repo" form,
 ///   mirroring the folder layout.
 fn derive_ownership_and_labels (
   config    : &mut SkgConfig,
-  raw_paths : &HashMap<SourceName, PathBuf>,
+  raw_paths : &HashMap<RepoName, PathBuf>,
 ) {
   let owned_root : PathBuf =
     config . data_root . join ( &config . owned_folder );
-  for source in config . sources . values_mut () {
-    source . user_owns_it =
-      source . path . starts_with (&owned_root);
+  for repo in config . repos . values_mut () {
+    repo . user_owns_it =
+      repo . path . starts_with (&owned_root);
     let raw_path_string : Option<String> =
-      raw_paths . get ( &source . name )
+      raw_paths . get ( &repo . name )
       . map ( |p| p . to_string_lossy () . into_owned () );
     let name_was_defaulted : bool =
-      Some ( source . name . 0 . as_str () )
+      Some ( repo . name . 0 . as_str () )
       == raw_path_string . as_deref ();
     if name_was_defaulted
-    && source . abbreviation . is_none ()
-    && source . user_owns_it {
+    && repo . abbreviation . is_none ()
+    && repo . user_owns_it {
       let trimmed : String =
-        source . path . strip_prefix (&owned_root)
+        repo . path . strip_prefix (&owned_root)
         . map ( |p| p . to_string_lossy () . into_owned () )
         . unwrap_or_default ();
       if ! trimmed . is_empty () { // path == owned folder: keep full
-        source . abbreviation = Some (trimmed); }}}}
+        repo . abbreviation = Some (trimmed); }}}}
 
 pub fn load_config (
   path: &str )
@@ -154,9 +154,9 @@ pub fn load_config (
   
   let mut config: SkgConfig =
     toml::from_str (&contents) ?;
-  config . source_order = source_order_from_toml (&contents);
-  let raw_paths : HashMap<SourceName, PathBuf> =
-    config . sources . iter ()
+  config . repo_order = repo_order_from_toml (&contents);
+  let raw_paths : HashMap<RepoName, PathBuf> =
+    config . repos . iter ()
     . map ( |(name, s)| (name . clone (), s . path . clone ()) )
     . collect ();
   config . config_path =
@@ -164,7 +164,7 @@ pub fn load_config (
     . unwrap_or_else ( |_| PathBuf::from (path) );
   config . data_root = {
     // Canonicalized so that downstream joins (make_paths_absolute,
-    // path_from_pid_and_source, strip_prefix in get_file_path) yield
+    // path_from_pid_and_repo, strip_prefix in get_file_path) yield
     // absolute paths uniformly -- matters for paths whose files do
     // not exist on disk (e.g. Deleted phantoms), where the
     // canonicalize-in-handler fallback would otherwise leave the
@@ -177,19 +177,19 @@ pub fn load_config (
     fs::canonicalize (&raw) . unwrap_or (raw) };
   make_paths_absolute (&mut config);
   derive_ownership_and_labels (&mut config, &raw_paths);
-  validate_source_sets (&config)?;
-  validate_source_paths_creating_owned_ones_if_needed(
-    &config . sources)?;
+  validate_repo_sets (&config)?;
+  validate_repo_paths_creating_owned_ones_if_needed(
+    &config . repos)?;
   Ok (config) }
 
 /// Load config from TOML file with optional overrides for testing.
 ///
 /// - If `test_name` is Some, sets tantivy_folder to /tmp/tantivy-{test_name}
-/// - `source_overrides` replaces paths for the specified source names
+/// - `repo_overrides` replaces paths for the specified repo names
 ///
 /// # Examples
 /// ```ignore
-/// // Override just source paths:
+/// // Override just repo paths:
 /// let config = load_config_with_overrides(
 ///   "tests/my_test/fixtures/skgconfig.toml",
 ///   None,
@@ -213,7 +213,7 @@ pub fn load_config (
 pub fn load_config_with_overrides (
   path             : &str,
   test_name        : Option<&str>,
-  source_overrides : &[(&str, std::path::PathBuf)],
+  repo_overrides : &[(&str, std::path::PathBuf)],
 ) -> Result <SkgConfig, Box<dyn std::error::Error>> {
   if !Path::new (path) . exists() {
     return Err(format!("Config file not found: {}", path) . into()); }
@@ -221,9 +221,9 @@ pub fn load_config_with_overrides (
   reject_retired_config_keys (&contents)?;
   let mut config: SkgConfig =
     toml::from_str (&contents)?;
-  config . source_order = source_order_from_toml (&contents);
-  let raw_paths : HashMap<SourceName, PathBuf> =
-    config . sources . iter ()
+  config . repo_order = repo_order_from_toml (&contents);
+  let raw_paths : HashMap<RepoName, PathBuf> =
+    config . repos . iter ()
     . map ( |(name, s)| (name . clone (), s . path . clone ()) )
     . collect ();
   config . config_path =
@@ -238,32 +238,32 @@ pub fn load_config_with_overrides (
     fs::canonicalize (&raw) . unwrap_or (raw) };
   make_paths_absolute (&mut config);
   derive_ownership_and_labels (&mut config, &raw_paths);
-  validate_source_sets (&config)?;
+  validate_repo_sets (&config)?;
   if let Some (name) = test_name {
     config . tantivy_folder =
       std::path::PathBuf::from(format!("/tmp/tantivy-{}", name)); }
-  for (source_name, new_path) in source_overrides {
-    let key : SourceName = SourceName::from (*source_name);
-    if let Some (source) = config . sources . get_mut (&key) {
-      source . path = new_path . clone();
+  for (repo_name, new_path) in repo_overrides {
+    let key : RepoName = RepoName::from (*repo_name);
+    if let Some (repo) = config . repos . get_mut (&key) {
+      repo . path = new_path . clone();
     } else {
       return Err(format!(
-        "Source '{}' not found in config", source_name) . into()); }}
-  validate_source_paths_creating_owned_ones_if_needed(
-    &config . sources)?;
+        "Source '{}' not found in config", repo_name) . into()); }}
+  validate_repo_paths_creating_owned_ones_if_needed(
+    &config . repos)?;
   Ok (config) }
 
-fn validate_source_sets (
+fn validate_repo_sets (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-  if config . sources . contains_key (&SourceName::from ("all")) {
+  if config . repos . contains_key (&RepoName::from ("all")) {
     return Err ("Configured source may not be named 'all'" . into ()); }
-  if config . default_source_set . 0 != "all"
-  && ! config . sources . contains_key (
-       &SourceName::from ( config . default_source_set . 0 . as_str () )) {
+  if config . default_repo_set . 0 != "all"
+  && ! config . repos . contains_key (
+       &RepoName::from ( config . default_repo_set . 0 . as_str () )) {
     return Err (format! (
-      "default_source_set '{}' names no configured source. It must be 'all' or the name of the most private source to make available.",
-      config . default_source_set
+      "default_repo_set '{}' names no configured source. It must be 'all' or the name of the most private source to make available.",
+      config . default_repo_set
     ) . into ()); }
   Ok (()) }
 
@@ -276,10 +276,10 @@ fn make_paths_absolute (
   if config . tantivy_folder . is_relative () {
     config . tantivy_folder = root . join (
       &config . tantivy_folder ); }
-  for source in config . sources . values_mut () {
-    if source . path . is_relative () {
-      source . path = root . join (
-        &source . path ); } } }
+  for repo in config . repos . values_mut () {
+    if repo . path . is_relative () {
+      repo . path = root . join (
+        &repo . path ); } } }
 
 #[cfg(test)]
 mod retired_typedb_config_tests {

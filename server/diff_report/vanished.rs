@@ -1,19 +1,19 @@
 //! TODO/more.org, "The skg diff report should report what vanished
 //! nodes used to be": a node id that the worktree still REFERENCES
 //! (in some contains / subscribes_to / hides_from_its_subscriptions /
-//! overrides_view_of list) but that exists in NO source -- the kind
+//! overrides_view_of list) but that exists in NO Skg repo -- the kind
 //! that renders as "Parent references unknown node." -- is
-//! investigated in the git history of every source. If it was never
+//! investigated in the git history of every Skg repo. If it was never
 //! there, the report says that; otherwise it names the commit at
 //! which it vanished and what it was connected to (in every possible
 //! way, links included) when last present.
 
 use crate::diff_report::snapshot::{
-  parse_blob_node, path_is_source_skg, source_prefix_in_repo};
+  parse_blob_node, path_is_repo_skg, repo_prefix_in_gitrepo};
 use crate::diff_report::types::{
   CommitStamp, GraphSnapshot, VanishedNodeReport, VanishedNodeSighting};
-use crate::git_ops::read_repo::open_repo;
-use crate::types::misc::{ID, MSV, SkgConfig, SourceName, members_msv, members_of};
+use crate::git_ops::read_gitrepo::open_gitrepo;
+use crate::types::misc::{ID, MSV, SkgConfig, RepoName, members_msv, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::links::links_from_node;
 
@@ -52,12 +52,12 @@ pub fn dangling_ids_in_snapshot (
         dangling . insert ( id . clone () ); }} }
   dangling }
 
-/// Investigate each id of 'ids' in the git history of every source:
+/// Investigate each id of 'ids' in the git history of every Skg repo:
 /// walk each repo's FIRST-PARENT chain from HEAD looking for the most
-/// recent commit whose tree holds '<id>.skg'. A source that cannot be
+/// recent commit whose tree holds '<id>.skg'. A Skg repo that cannot be
 /// opened or walked contributes nothing (the ordinary diff-report
-/// refusals have already vetted the sources the selection needs).
-/// One walk per source covers all ids.
+/// refusals have already vetted the repos the selection needs).
+/// One walk per Skg repo covers all ids.
 pub fn investigate_vanished_ids (
   config : &SkgConfig,
   ids    : &BTreeSet<ID>,
@@ -68,21 +68,21 @@ pub fn investigate_vanished_ids (
     . map ( |id| VanishedNodeReport {
         id : id . clone (), sightings : Vec::new () } )
     . collect ();
-  let source_names : Vec<&SourceName> = {
-    let mut names : Vec<&SourceName> =
-      config . sources . keys () . collect ();
+  let repo_names : Vec<&RepoName> = {
+    let mut names : Vec<&RepoName> =
+      config . repos . keys () . collect ();
     names . sort (); // deterministic report order
     names };
-  for source_name in source_names {
-    let Some (source) = config . sources . get (source_name)
+  for repo_name in repo_names {
+    let Some (skgrepo) = config . repos . get (repo_name)
       else { continue; };
-    let Some (repo) = open_repo ( Path::new (& source . path) )
+    let Some (gitrepo) = open_gitrepo ( Path::new (& skgrepo . path) )
       else { continue; };
     let Ok (prefix) =
-      source_prefix_in_repo (&repo, Path::new (& source . path))
+      repo_prefix_in_gitrepo (&gitrepo, Path::new (& skgrepo . path))
       else { continue; };
-    sight_ids_in_repo (
-      &repo, &prefix, source_name, ids, &mut reports ); }
+    sight_ids_in_gitrepo (
+      &gitrepo, &prefix, repo_name, ids, &mut reports ); }
   reports }
 
 /// One first-parent walk from HEAD. The first commit (i.e. the most
@@ -91,21 +91,21 @@ pub fn investigate_vanished_ids (
 /// first-parent descendant, which lacks the file -- is 'vanished_at'
 /// (None if the file is present at HEAD itself, which cannot happen
 /// for a genuinely dangling id).
-fn sight_ids_in_repo (
-  repo        : &Repository,
+fn sight_ids_in_gitrepo (
+  gitrepo        : &Repository,
   prefix      : &Path,
-  source_name : &SourceName,
+  repo_name : &RepoName,
   ids         : &BTreeSet<ID>,
   reports     : &mut [VanishedNodeReport],
 ) {
-  let mut walk = match repo . revwalk () {
+  let mut walk = match gitrepo . revwalk () {
     Ok (w) => w, Err (_) => return, };
   if walk . push_head () . is_err () { return; }
   walk . simplify_first_parent () . ok ();
   let mut remaining : BTreeSet<ID> = ids . clone ();
   let mut descendant : Option<git2::Oid> = None;
   for oid in walk . flatten () {
-    let Ok (commit) = repo . find_commit (oid) else { break; };
+    let Ok (commit) = gitrepo . find_commit (oid) else { break; };
     let Ok (tree) = commit . tree () else { break; };
     for id in remaining . clone () {
       let file : PathBuf =
@@ -113,7 +113,7 @@ fn sight_ids_in_repo (
       if tree . get_path (&file) . is_ok () {
         remaining . remove (&id);
         if let Some (sighting) = sighting_at_commit (
-          repo, prefix, source_name, &id, &commit, descendant )
+          gitrepo, prefix, repo_name, &id, &commit, descendant )
         { if let Some (report) =
             reports . iter_mut () . find ( |r| r . id == id )
           { report . sightings . push (sighting); }} }}
@@ -132,9 +132,9 @@ fn commit_stamp (
 /// its own title and outbound lists, plus every OTHER node in that
 /// tree that referenced it, by relation -- links included.
 fn sighting_at_commit (
-  repo        : &Repository,
+  gitrepo        : &Repository,
   prefix      : &Path,
-  source_name : &SourceName,
+  repo_name : &RepoName,
   id          : &ID,
   commit      : &Commit,
   descendant  : Option<git2::Oid>,
@@ -144,8 +144,8 @@ fn sighting_at_commit (
     let file : PathBuf =
       prefix . join ( format! ("{}.skg", id . 0) );
     let entry = tree . get_path (&file) . ok () ?;
-    let blob = repo . find_blob ( entry . id () ) . ok () ?;
-    parse_blob_node ( blob . content (), source_name, &file ) . ok () ? };
+    let blob = gitrepo . find_blob ( entry . id () ) . ok () ?;
+    parse_blob_node ( blob . content (), repo_name, &file ) . ok () ? };
   let outbound : Vec<(&'static str, Vec<ID>)> = {
     let mut outbound : Vec<(&'static str, Vec<ID>)> = Vec::new ();
     let mut keep = |name : &'static str, members : &[ID]| {
@@ -162,12 +162,12 @@ fn sighting_at_commit (
     keep ("overrides_view_of",            overrides_ids . or_default ());
     outbound };
   let inbound : Vec<(ID, &'static str)> =
-    inbound_references_in_tree (repo, prefix, source_name, id, &tree);
+    inbound_references_in_tree (gitrepo, prefix, repo_name, id, &tree);
   Some ( VanishedNodeSighting {
-    source       : source_name . clone (),
+    home_repo       : repo_name . clone (),
     last_present : commit_stamp (commit),
     vanished_at  : descendant
-      . and_then ( |oid| repo . find_commit (oid) . ok () )
+      . and_then ( |oid| gitrepo . find_commit (oid) . ok () )
       . map ( |c| commit_stamp (&c) ),
     title        : own . title,
     outbound,
@@ -176,9 +176,9 @@ fn sighting_at_commit (
 /// Every node in 'tree' (other than the id's own file) that refers to
 /// the id, with the relation(s) it does so by.
 fn inbound_references_in_tree (
-  repo        : &Repository,
+  gitrepo        : &Repository,
   prefix      : &Path,
-  source_name : &SourceName,
+  repo_name : &RepoName,
   id          : &ID,
   tree        : &git2::Tree,
 ) -> Vec<(ID, &'static str)> {
@@ -188,12 +188,12 @@ fn inbound_references_in_tree (
       return TreeWalkResult::Ok; }
     let rel_path : PathBuf =
       PathBuf::from (root) . join ( entry . name () . unwrap_or ("") );
-    if ! path_is_source_skg (&rel_path, prefix) {
+    if ! path_is_repo_skg (&rel_path, prefix) {
       return TreeWalkResult::Ok; }
-    let Ok (blob) = repo . find_blob ( entry . id () )
+    let Ok (blob) = gitrepo . find_blob ( entry . id () )
       else { return TreeWalkResult::Ok; };
     let Ok (node) = parse_blob_node (
-      blob . content (), source_name, &rel_path )
+      blob . content (), repo_name, &rel_path )
       else { return TreeWalkResult::Ok; }; // an unparseable neighbor cannot hide the parseable ones
     if node . pid == *id {
       return TreeWalkResult::Ok; }

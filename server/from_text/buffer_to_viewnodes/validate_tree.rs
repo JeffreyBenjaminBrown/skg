@@ -32,7 +32,7 @@ use std::collections::HashSet;
 /// - IDs have been replaced with PIDs, per
 ///   'assign_pids_throughout_viewforest'. (Otherwise two org nodes
 ///   might refer to the same skg node, yet appear not to.)
-/// - All nodes have sources, per 'inherit_parent_source_if_possible'.
+/// - All nodes have repos, per 'inherit_parent_repo_if_possible'.
 ///
 /// This is the maybePlaced tree validation stage: metadata is complete,
 /// but role classification, save-intent extraction, and disk
@@ -50,10 +50,10 @@ pub fn find_buffer_errors_for_saving_in_graph (
   // performs only local structural verifications:
   // each ID belongs to an IDFolder, etc.
   let mut errors: Vec<BufferValidationError> = Vec::new();
-  { // inconsistent instructions (deletion, defining containers, and sources)
+  { // inconsistent instructions (deletion, defining containers, and repos)
     let (ambiguous_deletion_ids,
          problematic_defining_ids,
-         inconsistent_source_ids) =
+         inconsistent_repo_ids) =
       find_inconsistent_instructions (viewforest);
     { // transfer the relevant IDs, in the appropriate constructors.
       for id in ambiguous_deletion_ids {
@@ -62,9 +62,9 @@ pub fn find_buffer_errors_for_saving_in_graph (
       for id in problematic_defining_ids {
         errors . push(
           BufferValidationError::Multiple_Defining_Viewnodes (id)); }
-      for (id, sources) in inconsistent_source_ids {
+      for (id, repos) in inconsistent_repo_ids {
         errors . push(
-          BufferValidationError::InconsistentSources(id, sources));
+          BufferValidationError::InconsistentRepos(id, repos));
       }} }
   { // merge validation
     for error_msg in {
@@ -104,7 +104,7 @@ pub fn find_buffer_errors_for_saving (
   config     : &SkgConfig,
 ) -> Result<Vec<BufferValidationError>, Box<dyn std::error::Error>> {
   let nodes = crate::dbs::filesystem::multiple_nodes
-    ::read_all_skg_files_from_sources (config)?;
+    ::read_all_skg_files_from_repos (config)?;
   let graph = InRustGraph::from_nodecompletes (&nodes);
   find_buffer_errors_for_saving_in_graph (
     viewforest, &graph, config ) }
@@ -179,7 +179,7 @@ fn idFolder_membership_errors (
 /// must be ON N's user-owned override chain
 /// ('carrier_on_user_owned_chain', VISIBILITY-UNGATED so ownership
 /// still gates but a marker honest when rendered does not start
-/// failing after a source-set switch). With chains the drawn node can
+/// failing after a repo-set switch). With chains the drawn node can
 /// be a MIDDLE link (when a later link's mentioner is hidden), so the
 /// check accepts any honest carrier and rejects only an off-chain
 /// marker. Markers on retained InactiveNodes are checked identically.
@@ -267,7 +267,7 @@ fn validate_view_roots (
     if ! matches! (
       &root . value () . kind,
         MpViewnodeKind::Vognode (MpVognode::Active (_))
-        | MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive root (TODO/full-schema/9-2_source-set-safety.org)
+        | MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive root (TODO/full-schema/9-2_repo-set-safety.org)
         | MpViewnodeKind::Phantom (MpPhantom::Deleted (_))
         | MpViewnodeKind::Phantom (MpPhantom::Unknown (_)))
     { errors . push (

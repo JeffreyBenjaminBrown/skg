@@ -1,9 +1,9 @@
 /// Node access utilities for ego_tree::Tree<ViewNode> and Tree<MpViewnode>
 
 use crate::to_org::util::get_id_from_treenode;
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
+use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
+use crate::types::misc::{ID, MSV, SkgConfig, RepoName};
 use crate::types::viewnode::{
     ViewNode, ViewNodeKind, ActiveNode, AffectsParent };
 use crate::types::viewnode::{Vognode, Phantom, QualFolder, Qual, PartnerFolder};
@@ -37,20 +37,20 @@ where F: FnOnce (&mut ActiveNode) -> R {
       _ => Err ( "write_at_activeNode_in_tree: expected ActiveNode"
                    . to_string () ) }} ) ? }
 
-/// Extract (ID, source) from a vognode that carries both.
+/// Extract (ID, repo) from a vognode that carries both.
 /// Returns an error if the node is not found or cannot provide both fields.
-pub fn pid_and_source_from_treenode (
+pub fn pid_and_repo_from_treenode (
   tree        : &Tree<ViewNode>,
   treeid      : NodeId,
   caller_name : &str,
-) -> Result<(ID, SourceName), Box<dyn Error>> {
+) -> Result<(ID, RepoName), Box<dyn Error>> {
   let node_ref : NodeRef<ViewNode> =
     tree . get (treeid) . ok_or_else ( ||
       format! ( "{}: node not found", caller_name ) ) ?;
   match &node_ref . value() . kind {
     ViewNodeKind::Vognode (v) =>
-      v . pid_and_source ()
-      . map ( |(pid, source)| (pid . clone (), source . clone ()) )
+      v . pid_and_repo ()
+      . map ( |(pid, repo)| (pid . clone (), repo . clone ()) )
       . ok_or_else (|| format!(
         "{}: vognode has no source", caller_name ) . into () ),
     _ => Err ( format! (
@@ -116,13 +116,13 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
   let grandparent_ref : NodeRef < ViewNode > =
     parent_ref . parent ()
     . ok_or ("SubscribeeFolder has no parent (subscriber)") ?;
-  let (subscriber_id, subscriber_source) : (ID, SourceName) =
-    pid_and_source_from_treenode (
+  let (subscriber_id, subscriber_repo) : (ID, RepoName) =
+    pid_and_repo_from_treenode (
       tree, grandparent_ref . id (),
       "pid_for_subscribee_and_its_subscriber_grandparent" ) ?;
   let nodecomplete : NodeComplete =
-    nodecomplete_rustFirst_by_pid_and_source (
-      graph, config, &subscriber_id, &subscriber_source ) ?;
+    nodecomplete_rustFirst_by_pid_and_repo (
+      graph, config, &subscriber_id, &subscriber_repo ) ?;
   Ok (( subscribee_pid,
         nodecomplete . pid . clone() )) }
 

@@ -2,12 +2,12 @@ use skg::dbs::init::wipe_then_init_tantivy_db;
 use skg::serve::handlers::titles_by_ids::{
   add_deleted_node_titles_by_ids,
   handle_titles_by_ids_request,
-  handle_titles_by_ids_request_with_source_set};
-use skg::source_sets::ActiveSourceSet;
+  handle_titles_by_ids_request_with_repo_set};
+use skg::repo_sets::ActiveRepoSet;
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::test_utils::read_lp_message;
-use skg::types::git::SourceDiff;
-use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, SourceSetName, TantivyIndex, rel_partners_at_relSource_msv};
+use skg::types::git::RepoDiff;
+use skg::types::misc::{ID, MSV, SkgConfig, SkgfileRepo, RepoName, RepoSetName, TantivyIndex, rel_partners_at_relRepo_msv};
 use skg::types::nodes::complete::{empty_node_complete, NodeComplete};
 
 use std::collections::{BTreeSet, HashMap};
@@ -26,18 +26,18 @@ fn titles_by_ids_handler_sends_parseable_titles (
     ID::new ("11111111-1111-4111-8111-111111111111");
   node . title =
     "?" . to_string ();
-  node . source =
-    SourceName::from ("main");
+  node . home_repo =
+    RepoName::from ("main");
   node . aliases =
-    rel_partners_at_relSource_msv ( & node . source, MSV::Specified (vec!["Alias One" . to_string ()]) );
+    rel_partners_at_relRepo_msv ( & node . home_repo, MSV::Specified (vec!["Alias One" . to_string ()]) );
   let mut spaced_title_node : NodeComplete =
     empty_node_complete ();
   spaced_title_node . pid =
     ID::new ("44444444-4444-4444-8444-444444444444");
   spaced_title_node . title =
     "The Real Title, with spaces" . to_string ();
-  spaced_title_node . source =
-    SourceName::from ("main");
+  spaced_title_node . home_repo =
+    RepoName::from ("main");
   let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
       &vec![node, spaced_title_node],
@@ -59,7 +59,7 @@ fn titles_by_ids_handler_sends_parseable_titles (
     request,
     &InRustGraph::new (),
     &tantivy_index,
-    &SkgConfig::dummyFromSources (HashMap::new ()),
+    &SkgConfig::dummyFromRepos (HashMap::new ()),
     false );
   drop (server);
   let mut reader =
@@ -91,33 +91,33 @@ fn titles_by_ids_handler_sends_parseable_titles (
 #[test]
 fn restricted_title_lookup_challenges_without_releasing_text (
 ) -> Result<(), Box<dyn Error>> {
-  let source : SourceName = SourceName::from ("main");
+  let skgrepo : RepoName = RepoName::from ("main");
   let mut node : NodeComplete = empty_node_complete ();
   node . pid = ID::new ("overPrivateText-title-id");
-  node . source = source . clone ();
+  node . home_repo = skgrepo . clone ();
   node . title = "UNIQUE TITLE SECRET" . to_string ();
   node . overPrivateText_telescope = true;
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes (&[node . clone ()]);
   let (index, _) = wipe_then_init_tantivy_db (
     &[node], Path::new ("/tmp/tantivy-test-title-release") ) ?;
-  let config : SkgConfig = SkgConfig::dummyFromSources (HashMap::from ([
-    (source . clone (), SkgfileSource {
-      name         : source . clone (),
+  let config : SkgConfig = SkgConfig::dummyFromRepos (HashMap::from ([
+    (skgrepo . clone (), SkgfileRepo {
+      name         : skgrepo . clone (),
       abbreviation : None,
       path         : Path::new ("/tmp") . to_path_buf (),
       user_owns_it : true,
     })
   ]));
-  let active = ActiveSourceSet {
-    name    : SourceSetName::from ("public"),
-    sources : BTreeSet::from ([source]),
+  let active = ActiveRepoSet {
+    name    : RepoSetName::from ("public"),
+    repos : BTreeSet::from ([skgrepo]),
   };
   let respond = |request : &str| -> Result<String, Box<dyn Error>> {
     let listener : TcpListener = TcpListener::bind ("127.0.0.1:0")?;
     let client : TcpStream = TcpStream::connect (listener . local_addr ()?)?;
     let (mut server, _) = listener . accept ()?;
-    handle_titles_by_ids_request_with_source_set (
+    handle_titles_by_ids_request_with_repo_set (
       &mut server, request, &index, &config, false, &active, &graph );
     drop (server);
     Ok (read_lp_message (&mut std::io::BufReader::new (client))?)
@@ -149,19 +149,19 @@ fn deleted_titles_supplement_tantivy_title_map (
     vec! [extra_id . clone ()];
   deleted_node . title =
     "Deleted Title" . to_string ();
-  let mut source_diff : SourceDiff =
-    SourceDiff::new_not_git_repo ();
-  source_diff . deleted_nodes . insert (
+  let mut repo_diff : RepoDiff =
+    RepoDiff::new_not_gitrepo ();
+  repo_diff . deleted_nodes . insert (
     pid . clone (), deleted_node );
-  let source_diffs : HashMap<SourceName, SourceDiff> =
+  let repo_diffs : HashMap<RepoName, RepoDiff> =
     HashMap::from ([
-      (SourceName::from ("main"), source_diff) ]);
+      (RepoName::from ("main"), repo_diff) ]);
   let mut title_map : HashMap<ID, String> =
     HashMap::new ();
   add_deleted_node_titles_by_ids (
     &mut title_map,
     &[pid . clone (), extra_id . clone ()],
-    &source_diffs );
+    &repo_diffs );
   assert_eq! (
     title_map . get (&pid),
     Some (&"Deleted Title" . to_string ()));
@@ -175,32 +175,32 @@ fn titles_by_ids_finds_deleted_git_file_title_without_diff_mode (
 ) -> Result<(), Box<dyn Error>> {
   let id : ID =
     ID::new ("a782564f-029a-45d7-b96e-1986d8759924");
-  let source_name : SourceName =
-    SourceName::from ("main");
+  let repo_name : RepoName =
+    RepoName::from ("main");
   let temp_dir : TempDir =
     TempDir::new ()?;
-  let source_dir : &Path =
+  let repo_dir : &Path =
     temp_dir . path ();
-  let repo : git2::Repository =
-    git2::Repository::init (source_dir)?;
-  configure_git_user (&repo)?;
+  let gitrepo : git2::Repository =
+    git2::Repository::init (repo_dir)?;
+  configure_git_user (&gitrepo)?;
   fs::write (
-    source_dir . join (format! ("{}.skg", id . 0)),
+    repo_dir . join (format! ("{}.skg", id . 0)),
     format! ("title: Deleted From Git\npid: {}\n", id . 0))?;
-  commit_all (&repo, "initial commit")?;
+  commit_all (&gitrepo, "initial commit")?;
   fs::remove_file (
-    source_dir . join (format! ("{}.skg", id . 0)))?;
+    repo_dir . join (format! ("{}.skg", id . 0)))?;
   let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
       &Vec::<NodeComplete>::new (),
       &temp_dir . path () . join ("tantivy"))?;
   let config : SkgConfig =
-    SkgConfig::dummyFromSources (HashMap::from ([
-      (source_name . clone (),
-       SkgfileSource {
-         name          : source_name,
+    SkgConfig::dummyFromRepos (HashMap::from ([
+      (repo_name . clone (),
+       SkgfileRepo {
+         name          : repo_name,
          abbreviation  : None,
-         path          : source_dir . to_path_buf (),
+         path          : repo_dir . to_path_buf (),
          user_owns_it  : true }) ]));
   let listener : TcpListener =
     TcpListener::bind ("127.0.0.1:0")?;
@@ -237,31 +237,31 @@ fn titles_by_ids_finds_untracked_git_file_title_without_diff_mode (
 ) -> Result<(), Box<dyn Error>> {
   let id : ID =
     ID::new ("abf5bac1-de1c-4026-868a-60a51a5a3176");
-  let source_name : SourceName =
-    SourceName::from ("main");
+  let repo_name : RepoName =
+    RepoName::from ("main");
   let temp_dir : TempDir =
     TempDir::new ()?;
-  let source_dir : &Path =
+  let repo_dir : &Path =
     temp_dir . path ();
-  let repo : git2::Repository =
-    git2::Repository::init (source_dir)?;
-  configure_git_user (&repo)?;
-  fs::write (source_dir . join ("README.md"), "initial\n")?;
-  commit_all (&repo, "initial commit")?;
+  let gitrepo : git2::Repository =
+    git2::Repository::init (repo_dir)?;
+  configure_git_user (&gitrepo)?;
+  fs::write (repo_dir . join ("README.md"), "initial\n")?;
+  commit_all (&gitrepo, "initial commit")?;
   fs::write (
-    source_dir . join (format! ("{}.skg", id . 0)),
+    repo_dir . join (format! ("{}.skg", id . 0)),
     format! ("title: Untracked Title\npid: {}\n", id . 0))?;
   let (tantivy_index, _indexed_count) : (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
       &Vec::<NodeComplete>::new (),
       &temp_dir . path () . join ("tantivy"))?;
   let config : SkgConfig =
-    SkgConfig::dummyFromSources (HashMap::from ([
-      (source_name . clone (),
-       SkgfileSource {
-         name          : source_name,
+    SkgConfig::dummyFromRepos (HashMap::from ([
+      (repo_name . clone (),
+       SkgfileRepo {
+         name          : repo_name,
          abbreviation  : None,
-         path          : source_dir . to_path_buf (),
+         path          : repo_dir . to_path_buf (),
          user_owns_it  : true }) ]));
   let listener : TcpListener =
     TcpListener::bind ("127.0.0.1:0")?;
@@ -294,35 +294,35 @@ fn titles_by_ids_finds_untracked_git_file_title_without_diff_mode (
   Ok (( )) }
 
 fn configure_git_user (
-  repo : &git2::Repository,
+  gitrepo : &git2::Repository,
 ) -> Result<(), Box<dyn Error>> {
   let mut config : git2::Config =
-    repo . config ()?;
+    gitrepo . config ()?;
   config . set_str ("user.email", "test@test.com")?;
   config . set_str ("user.name", "Test")?;
   Ok (( )) }
 
 fn commit_all (
-  repo    : &git2::Repository,
+  gitrepo    : &git2::Repository,
   message : &str,
 ) -> Result<(), Box<dyn Error>> {
   let mut index : git2::Index =
-    repo . index ()?;
+    gitrepo . index ()?;
   index . add_all (["*.skg"], git2::IndexAddOption::DEFAULT, None)?;
   index . write ()?;
   let tree_id : git2::Oid =
     index . write_tree ()?;
   let tree : git2::Tree =
-    repo . find_tree (tree_id)?;
+    gitrepo . find_tree (tree_id)?;
   let sig : git2::Signature =
-    repo . signature ()?;
+    gitrepo . signature ()?;
   let parents : Vec<git2::Commit> =
-    match repo . head () {
+    match gitrepo . head () {
       Ok (head) => vec! [head . peel_to_commit ()?],
       Err (_)   => Vec::new () };
   let parent_refs : Vec<&git2::Commit> =
     parents . iter () . collect ();
-  repo . commit (
+  gitrepo . commit (
     Some ("HEAD"),
     &sig, &sig,
     message,

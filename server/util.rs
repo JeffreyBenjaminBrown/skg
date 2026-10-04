@@ -1,18 +1,18 @@
-use crate::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
+use crate::types::misc::{ID, SkgConfig, SkgfileRepo, RepoName};
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::path::PathBuf;
 
-pub fn path_from_pid_and_source (
+pub fn path_from_pid_and_repo (
   config : &SkgConfig,
-  source : &SourceName,
+  repo : &RepoName,
   pid    : ID,
 ) -> Result < String, String > {
-  let source_config : &SkgfileSource =
-    config . sources . get (source)
+  let repo_config : &SkgfileRepo =
+    config . repos . get (repo)
     . ok_or_else ( || format! ("Source '{}' not found in config",
-                               source) ) ?;
-  let f : PathBuf = source_config . path . clone() ;
+                               repo) ) ?;
+  let f : PathBuf = repo_config . path . clone() ;
   let s: String = pid . 0;
   Ok ( f . join (s)
        . with_extension ("skg")

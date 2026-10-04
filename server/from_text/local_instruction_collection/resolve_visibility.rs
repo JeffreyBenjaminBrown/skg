@@ -27,7 +27,7 @@ use crate::from_text::local_instruction_collection::lower::LoweredIntents;
 use crate::from_text::local_instruction_collection::types::{
   HiddenOutsideEdit, SubscribeeVisibility };
 use crate::from_text::weave::member_is_visible;
-use crate::source_sets::ActiveSourceSet;
+use crate::repo_sets::ActiveRepoSet;
 use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, MSV, SkgConfig, members_of};
 use crate::types::nodes::complete::NodeComplete;
@@ -44,7 +44,7 @@ pub fn resolve_visibility (
   hidden_outside : &[(ID, HiddenOutsideEdit)],
   graph       : &InRustGraph,
   config      : &SkgConfig,
-  restricted_source_set : Option<&ActiveSourceSet>, // None means no restriction; callers normalize 'all' to None.
+  restricted_repo_set : Option<&ActiveRepoSet>, // None means no restriction; callers normalize 'all' to None.
 ) -> Result<(LoweredIntents, Vec<PostCommitNoticeCandidate>), Box<dyn Error>> {
   validate_no_overlapping_subscribee_hiderel_conflicts (
     visibility, graph, config ) ?;
@@ -52,7 +52,7 @@ pub fn resolve_visibility (
     // Before the signal loop below, so that an explicit
     // subscribee-as-such gesture about the same child wins.
     &mut lowered, visibility, graph, config,
-    restricted_source_set ) ?;
+    restricted_repo_set ) ?;
   for (subscriber, signal) in visibility {
     let Some (subscribee_from_disk) =
       opt_nodecomplete_by_id (
@@ -62,7 +62,7 @@ pub fn resolve_visibility (
       opt_nodecomplete_by_id (
         graph, config, subscriber ) ?
     else { continue; };
-    if ! config . user_owns_source (&subscriber_from_disk . source) {
+    if ! config . user_owns_repo (&subscriber_from_disk . home_repo) {
       continue; }
     let subscriber_contains : HashSet<ID> =
       lowered . subscriber_contains_after_save (
@@ -94,7 +94,7 @@ pub fn resolve_visibility (
       &inferred_unhides ); }
   let post_commit_notice_candidates = apply_hiddenoutside_edits (
     &mut lowered, hidden_outside, graph, config,
-    restricted_source_set ) ?;
+    restricted_repo_set ) ?;
   Ok ((lowered, post_commit_notice_candidates)) }
 
 /// Applies the submitted visible-outside subset after all ordinary hide
@@ -106,7 +106,7 @@ fn apply_hiddenoutside_edits (
   edits   : &[(ID, HiddenOutsideEdit)],
   graph   : &InRustGraph,
   config  : &SkgConfig,
-  restricted_source_set : Option<&ActiveSourceSet>,
+  restricted_repo_set : Option<&ActiveRepoSet>,
 ) -> Result<Vec<PostCommitNoticeCandidate>, Box<dyn Error>> {
   let mut seen : HashSet<ID> = HashSet::new ();
   let mut candidates : Vec<PostCommitNoticeCandidate> = Vec::new ();
@@ -117,7 +117,7 @@ fn apply_hiddenoutside_edits (
     let Some (subscriber_from_disk) =
       opt_nodecomplete_by_id (graph, config, subscriber) ?
     else { continue; };
-    if ! config . user_owns_source (&subscriber_from_disk . source) {
+    if ! config . user_owns_repo (&subscriber_from_disk . home_repo) {
       continue; }
 
     let key = |id : &ID| -> ID {
@@ -130,8 +130,8 @@ fn apply_hiddenoutside_edits (
         opt_nodecomplete_by_id (graph, config, &subscribee_id) ?
       else { continue; };
       for member in &subscribee . contains {
-        if restricted_source_set . map_or (
-          true, |active| active . contains_source (&member . relSource))
+        if restricted_repo_set . map_or (
+          true, |active| active . contains_repo (&member . relRepo))
         { inside . insert (key (&member . member)); }} }
 
     // The replacement domain is intentionally built from disk, rather than
@@ -140,8 +140,8 @@ fn apply_hiddenoutside_edits (
     let replaceable_outside : HashSet<ID> =
       subscriber_from_disk . hides_from_its_subscriptions . or_default ()
       . iter ()
-      . filter (|member| restricted_source_set . map_or (
-        true, |active| active . contains_source (&member . relSource)))
+      . filter (|member| restricted_repo_set . map_or (
+        true, |active| active . contains_repo (&member . relRepo)))
       .map (|member| key (&member . member))
       .filter (|member_key| ! inside . contains (member_key))
       .collect ();
@@ -180,7 +180,7 @@ fn apply_hiddenoutside_edits (
 /// dismissed (docs/sharing-model.org: branches deleted from a clone
 /// become hides). Symmetrically, re-adding such a child to F's
 /// contains drops a stale hide of it by F. Details:
-/// - Members invisible under the restricted source-set were OMITTED
+/// - Members invisible under the restricted repo-set were OMITTED
 ///   from the buffer, not removed, so they never count as removals.
 /// - A child the same save explicitly shows through one of F's
 ///   subscriptions (a subscribee-as-such signal) is not hidden here:
@@ -193,11 +193,11 @@ fn infer_hides_from_contains_removals (
   visibility : &[(ID, SubscribeeVisibility)],
   graph      : &InRustGraph,
   config     : &SkgConfig,
-  restricted_source_set : Option<&ActiveSourceSet>,
+  restricted_repo_set : Option<&ActiveRepoSet>,
 ) -> Result<(), Box<dyn Error>> {
-  for (subscriber_pid, source, new_contains, subscribes_msv)
+  for (subscriber_pid, repo, new_contains, subscribes_msv)
     in lowered . save_intents_with_specified_contains () {
-    if ! config . user_owns_source (&source) { continue; }
+    if ! config . user_owns_repo (&repo) { continue; }
     let Some (subscriber_from_disk) =
       opt_nodecomplete_by_id (
         graph, config, &subscriber_pid ) ?
@@ -215,7 +215,7 @@ fn infer_hides_from_contains_removals (
       subscriber_contains . iter ()
         . filter ( |id| ! new_contains_set . contains (id) )
         . filter ( |id| ! signal_visible . contains (id) )
-        . filter ( |id| restricted_source_set . map_or (
+        . filter ( |id| restricted_repo_set . map_or (
             true, |active| member_is_visible (graph, id, config, active) ))
         . cloned () . collect () };
     let inferred_unhides : Vec<ID> = {

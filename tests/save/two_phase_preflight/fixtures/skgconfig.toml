@@ -1,9 +1,9 @@
 tantivy_folder = "/tmp/unused-two-phase-preflight"
 
-[[sources]]
+[[repos]]
 name = "main"
 path = "owned/main"
 
-[[sources]]
+[[repos]]
 name = "foreign"
 path = "foreign"

@@ -17,14 +17,14 @@ use std::error::Error;
 use std::net::TcpStream;
 use std::path::Path;
 
-use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_source;
+use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_repo;
 use skg::test_utils::{run_with_test_stores, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::serve::ViewsState;
 use skg::types::views_state::OpenViews;
 
 use skg::dbs::in_rust_graph::InRustGraphHandle;
-use skg::types::misc::{ID, SkgConfig, TantivyIndex, SourceName};
+use skg::types::misc::{ID, SkgConfig, TantivyIndex, RepoName};
 
 
 #[test]
@@ -79,16 +79,16 @@ async fn merge_container_into_content_impl (
 
   // a.skg should be deleted from disk.
   let a_path : String =
-    skg::util::path_from_pid_and_source (
-      config, &SourceName::from ("main"), ID::from ("a") ) ?;
+    skg::util::path_from_pid_and_repo (
+      config, &RepoName::from ("main"), ID::from ("a") ) ?;
   if Path::new (&a_path) . exists() {
     failures . push (
       "a.skg should be deleted after merge" . to_string() ); }
 
   // aa.skg should exist and have the merged content.
   let aa_nodecomplete =
-    nodecomplete_from_pid_and_source (
-      config, ID::from ("aa"), &SourceName::from ("main") ) ?;
+    nodecomplete_from_pid_and_repo (
+      config, ID::from ("aa"), &RepoName::from ("main") ) ?;
   if !aa_nodecomplete . extra_ids . contains (&ID::from ("a")) {
     failures . push (
       "aa should have 'a' as an extra_id" . to_string() ); }
@@ -118,17 +118,17 @@ async fn merge_container_into_content_impl (
   } else {
     let preserver_pid : &ID = preserver_candidates[0];
     let preserver_nodecomplete =
-      nodecomplete_from_pid_and_source (
+      nodecomplete_from_pid_and_repo (
         config, preserver_pid . clone(),
-        &SourceName::from ("main") ) ?;
+        &RepoName::from ("main") ) ?;
     if preserver_nodecomplete . title != "MERGED: a" {
       failures . push ( format!(
         "Text preserver title should be 'MERGED: a', got '{}'",
         preserver_nodecomplete . title )); }
-    if preserver_nodecomplete . source != SourceName::from ("main") {
+    if preserver_nodecomplete . home_repo != RepoName::from ("main") {
       failures . push ( format!(
         "Text preserver source should be 'main', got '{:?}'",
-        preserver_nodecomplete . source )); }
+        preserver_nodecomplete . home_repo )); }
     if !preserver_nodecomplete . contains . is_empty() {
       failures . push ( format!(
         "Text preserver should have no contents, got {:?}",

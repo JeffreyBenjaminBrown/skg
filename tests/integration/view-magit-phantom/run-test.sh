@@ -87,7 +87,7 @@ tantivy_folder = "$TEST_DIR/data/.index.tantivy"
 port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
 
-[[sources]]
+[[repos]]
 name = "main"
 path = "$SKG_DATA"
 EOF

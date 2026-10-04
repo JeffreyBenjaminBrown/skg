@@ -1,4 +1,4 @@
-// cargo test multi_source_errors
+// cargo test multi_repo_errors
 
 use indoc::indoc;
 use regex::Regex;
@@ -17,12 +17,12 @@ use std::path::PathBuf;
 use futures::executor::block_on;
 
 #[test]
-fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
+fn test_multi_repo_errors() -> Result<(), Box<dyn Error>> {
   block_on(async {
-    // Load the multi-source fixture config.
+    // Load the multi-repo fixture config.
     let mut config: SkgConfig =
       load_config(
-        "tests/multi_source_errors/fixtures/skgconfig.toml")?;
+        "tests/multi_repo_errors/fixtures/skgconfig.toml")?;
     config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-source-errors-1");
 
 
@@ -45,18 +45,18 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       find_buffer_errors_for_saving(
         &viewforest, &config)?;
 
-    { // Source validation errors: one for dub-1 (nonexistent source "dub")
-      // and one for pub-1 (no source at all).
-      let source_re = Regex::new(r"(?i)activenod.*must.*source") . unwrap();
-      let source_errors: Vec<&BufferValidationError>
+    { // Repo validation errors: one for dub-1 (nonexistent repo "dub")
+      // and one for pub-1 (no repo at all).
+      let repo_re = Regex::new(r"(?i)activenod.*must.*source") . unwrap();
+      let repo_errors: Vec<&BufferValidationError>
       = ( errors . iter()
           . filter(
             |e| matches!(e, BufferValidationError::LocalStructureViolation(msg, _)
-                         if source_re . is_match (msg)))
+                         if repo_re . is_match (msg)))
           . collect() );
-      assert_eq!(source_errors . len(), 2,
+      assert_eq!(repo_errors . len(), 2,
                  "Expected 2 source validation errors (pub-1 and dub-1)");
-      let ids: Vec<&str> = source_errors . iter()
+      let ids: Vec<&str> = repo_errors . iter()
         . filter_map(|e| {
           if let BufferValidationError::LocalStructureViolation(_, id) = e {
             Some(id . 0 . as_str())
@@ -75,16 +75,16 @@ fn test_multi_source_errors() -> Result<(), Box<dyn Error>> {
       if let BufferValidationError::Multiple_Defining_Viewnodes (id) = multiple_defining_errors[0] {
         assert_eq!(id . 0, "priv-1", "Multiple_Defining_Viewnodes should be for priv-1"); }}
 
-    { let inconsistent_source_errors: Vec<&BufferValidationError>
+    { let inconsistent_repo_errors: Vec<&BufferValidationError>
       = ( errors . iter()
           . filter(
-            |e| matches!(e, BufferValidationError::InconsistentSources(_, _)))
+            |e| matches!(e, BufferValidationError::InconsistentRepos(_, _)))
           . collect() );
-      assert_eq!(inconsistent_source_errors . len(), 1,
+      assert_eq!(inconsistent_repo_errors . len(), 1,
                  "Expected exactly 1 InconsistentSources error for priv-1");
-      if let BufferValidationError::InconsistentSources(id, sources) = inconsistent_source_errors[0] {
+      if let BufferValidationError::InconsistentRepos(id, repos) = inconsistent_repo_errors[0] {
         assert_eq!(id . 0, "priv-1", "InconsistentSources should be for priv-1");
-        assert_eq!(sources . len(), 2, "Should have 2 different sources for priv-1"); }}
+        assert_eq!(repos . len(), 2, "Should have 2 different sources for priv-1"); }}
 
     assert_eq!(errors . len(), 4,
                "Expected exactly 4 errors: 2 LocalStructureViolation (source errors), 1 Multiple_Defining_Viewnodes, 1 InconsistentSources");
@@ -100,7 +100,7 @@ fn test_foreign_node_modification_errors(
   block_on(async {
     let mut config: SkgConfig =
       load_config(
-        "tests/multi_source_errors/fixtures/skgconfig.toml")?;
+        "tests/multi_repo_errors/fixtures/skgconfig.toml")?;
     config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-source-errors-2");
 
     // Test 1: Foreign node modifications
@@ -250,15 +250,15 @@ fn test_foreign_node_modification_errors(
 #[test]
 fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
   block_on(async {
-    // Load the multi-source fixture config.
+    // Load the multi-repo fixture config.
     let mut config: SkgConfig = load_config(
-      "tests/multi_source_errors/fixtures/skgconfig.toml")?;
+      "tests/multi_repo_errors/fixtures/skgconfig.toml")?;
     config . tantivy_folder = PathBuf::from ("/tmp/tantivy-test-multi-source-errors-3");
 
 
-    // Test 1: Source move between owned sources is now allowed
-    // priv-1 exists on disk in "private" source, but buffer specifies "public"
-    // Both sources are owned, so this should succeed (producing a SourceMove).
+    // Test 1: Repo move between owned repos is now allowed
+    // priv-1 exists on disk in "private" repo, but buffer specifies "public"
+    // Both repos are owned, so this should succeed (producing a RepoMove).
     {
       let buffer_with_move: &str = indoc! {"
         * (skg (node (id priv-1) (source public))) priv-1  # disk has 'private', buffer says 'public'
@@ -277,23 +277,23 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
               result . err());
 
       let ( _viewforest, save_plan, _warnings ) = result?;
-      assert_eq!(save_plan . source_moves . len(), 1,
+      assert_eq!(save_plan . repo_moves . len(), 1,
                  "Expected exactly 1 source move");
-      assert_eq!(save_plan . source_moves[0] . pid . 0, "priv-1");
-      assert_eq!(save_plan . source_moves[0] . old_source . as_str(), "private");
-      assert_eq!(save_plan . source_moves[0] . new_source . as_str(), "public");
+      assert_eq!(save_plan . repo_moves[0] . pid . 0, "priv-1");
+      assert_eq!(save_plan . repo_moves[0] . old_repo . as_str(), "private");
+      assert_eq!(save_plan . repo_moves[0] . new_repo . as_str(), "public");
     }
 
-    // Test 2: InconsistentSources
-    // Two instances of pub-1 with different sources (validation should catch this)
+    // Test 2: InconsistentRepos
+    // Two instances of pub-1 with different repos (validation should catch this)
     {
-      let buffer_with_inconsistent_sources: &str = indoc! {"
+      let buffer_with_inconsistent_repos: &str = indoc! {"
         * (skg (node (id pub-1) (source public))) pub-1                # definitive instance with 'public'
         * (skg (node (id pub-1) (source private) writeProtected)) pub-1  # write-protected instance with 'private'
       "};
 
       let buffer_text: String =
-        strip_org_comments (buffer_with_inconsistent_sources);
+        strip_org_comments (buffer_with_inconsistent_repos);
 
       // This should fail during validation (before write-protected_occurrences are filtered)
       let result = buffer_to_validated_saveplan(
@@ -310,11 +310,11 @@ fn test_reconciliation_errors() -> Result<(), Box<dyn Error>> {
 
         match e {
           SaveError::BufferValidationErrors { errors, .. } => {
-            // Should contain InconsistentSources error
-            let source_errors: Vec<&BufferValidationError> = errors . iter()
-              . filter(|e| matches!(e, BufferValidationError::InconsistentSources(_, _)))
+            // Should contain InconsistentRepos error
+            let repo_errors: Vec<&BufferValidationError> = errors . iter()
+              . filter(|e| matches!(e, BufferValidationError::InconsistentRepos(_, _)))
               . collect();
-            assert!(!source_errors . is_empty(),
+            assert!(!repo_errors . is_empty(),
                     "Expected InconsistentSources error in validation");
             println!("Successfully caught InconsistentSources error during validation");
           }

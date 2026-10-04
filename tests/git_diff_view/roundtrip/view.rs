@@ -25,9 +25,9 @@ async fn reorder_within_parent_shows_move_and_roundtrips (
 ) -> Result<(), Box<dyn Error>>
 {
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir . path();
-  setup_git_repo_with_reorder_fixtures (repo_path)?;
-  s . reset_with_source_path ( "roundtrip_reorder", repo_path ) ?;
+  let gitrepo_path = temp_dir . path();
+  setup_gitrepo_with_reorder_fixtures (gitrepo_path)?;
+  s . reset_with_repo_path ( "roundtrip_reorder", gitrepo_path ) ?;
   let (config, tantivy)
     : (&SkgConfig, &TantivyIndex)
     = (&s . config, &s . tantivy);
@@ -54,18 +54,18 @@ async fn reorder_within_parent_shows_move_and_roundtrips (
   assert_diff_buffer_roundtrips ( &actual, config, tantivy ) . await ?;
   Ok (( )) }
 
-/// A contains member referenced at HEAD whose .skg file exists in no source
-/// renders as a removedM phantom carrying the NOT_FOUND source sentinel; that
+/// A contains member referenced at HEAD whose .skg file exists in no Skg repo
+/// renders as a removedM phantom carrying the NOT_FOUND Skg repo sentinel; that
 /// buffer must save with no validation errors. Regression: validate_phantom
-/// used to reject a phantom whose source is not in the config.
+/// used to reject a phantom whose Skg repo is not in the config.
 async fn dangling_at_head_member_roundtrips (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir . path();
-  setup_git_repo_with_dangling_fixtures (repo_path)?;
-  s . reset_with_source_path ( "roundtrip_dangling", repo_path ) ?;
+  let gitrepo_path = temp_dir . path();
+  setup_gitrepo_with_dangling_fixtures (gitrepo_path)?;
+  s . reset_with_repo_path ( "roundtrip_dangling", gitrepo_path ) ?;
   let (config, tantivy)
     : (&SkgConfig, &TantivyIndex)
     = (&s . config, &s . tantivy);

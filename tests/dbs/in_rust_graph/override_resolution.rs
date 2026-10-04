@@ -3,34 +3,34 @@ use skg::dbs::in_rust_graph::override_resolution::{
   OverrideResolution,
   resolve_override,
 };
-use skg::source_sets::{ActiveSourceSet, SourceSetName};
+use skg::repo_sets::{ActiveRepoSet, RepoSetName};
 use skg::types::misc::{
-  ID, MSV, RelPartner, SkgConfig, SkgfileSource, SourceName,
-  rel_partners_at_relSource};
+  ID, MSV, RelPartner, SkgConfig, SkgfileRepo, RepoName,
+  rel_partners_at_relRepo};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 fn config () -> SkgConfig {
-  SkgConfig::dummyFromSources (HashMap::from ([
-    ( SourceName::from ("owned"),
-      SkgfileSource {
-        name: SourceName::from ("owned"),
+  SkgConfig::dummyFromRepos (HashMap::from ([
+    ( RepoName::from ("owned"),
+      SkgfileRepo {
+        name: RepoName::from ("owned"),
         abbreviation: None,
         path: PathBuf::from ("/tmp/owned"),
         user_owns_it: true,
       }),
-    ( SourceName::from ("owned2"),
-      SkgfileSource {
-        name: SourceName::from ("owned2"),
+    ( RepoName::from ("owned2"),
+      SkgfileRepo {
+        name: RepoName::from ("owned2"),
         abbreviation: None,
         path: PathBuf::from ("/tmp/owned2"),
         user_owns_it: true,
       }),
-    ( SourceName::from ("foreign"),
-      SkgfileSource {
-        name: SourceName::from ("foreign"),
+    ( RepoName::from ("foreign"),
+      SkgfileRepo {
+        name: RepoName::from ("foreign"),
         abbreviation: None,
         path: PathBuf::from ("/tmp/foreign"),
         user_owns_it: false,
@@ -39,21 +39,21 @@ fn config () -> SkgConfig {
 
 fn node (
   pid       : &str,
-  source    : &str,
+  repo    : &str,
   overrides : &[&str],
 ) -> NodeComplete {
   let mut node : NodeComplete =
     empty_node_complete ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
-  node . source = SourceName::from (source);
+  node . home_repo = RepoName::from (repo);
   node . overrides_view_of =
     if overrides . is_empty () {
       MSV::Unspecified
     } else {
       MSV::Specified (
-        rel_partners_at_relSource (
-          &node . source,
+        rel_partners_at_relRepo (
+          &node . home_repo,
           overrides . iter ()
           . map ( |id| ID::from (*id) )
           . collect () ) )
@@ -61,18 +61,18 @@ fn node (
   node }
 
 fn restricted_to (
-  sources : &[&str],
-) -> ActiveSourceSet {
-  ActiveSourceSet {
-    name    : SourceSetName ( "restricted" . to_string () ),
-    sources : sources . iter ()
-      . map ( |s| SourceName::from (*s) )
+  repos : &[&str],
+) -> ActiveRepoSet {
+  ActiveRepoSet {
+    name    : RepoSetName ( "restricted" . to_string () ),
+    repos : repos . iter ()
+      . map ( |s| RepoName::from (*s) )
       . collect (),
   }}
 
 fn resolve (
   nodes  : Vec<NodeComplete>,
-  active : Option<&ActiveSourceSet>,
+  active : Option<&ActiveRepoSet>,
   id     : &str,
 ) -> OverrideResolution {
   let graph : InRustGraph =
@@ -123,8 +123,8 @@ fn a_single_owned_overrider_substitutes () {
 
 #[test]
 fn an_inactive_owned_overrider_does_not_substitute () {
-  let active : ActiveSourceSet =
-    // 'owned2' (the overrider's source) is not in the active set.
+  let active : ActiveRepoSet =
+    // 'owned2' (the overrider's repo) is not in the active set.
     restricted_to ( &["owned", "foreign"] );
   assert_eq! (
     resolve (
@@ -141,7 +141,7 @@ fn an_inactive_owned_overrider_does_not_substitute () {
 
 #[test]
 fn an_active_owned_overrider_substitutes_under_a_restricted_set () {
-  let active : ActiveSourceSet =
+  let active : ActiveRepoSet =
     restricted_to ( &["owned", "owned2"] );
   assert_eq! (
     resolve (
@@ -158,13 +158,13 @@ fn an_active_owned_overrider_substitutes_under_a_restricted_set () {
 
 #[test]
 fn an_inactive_override_edge_between_active_nodes_does_not_substitute () {
-  let active : ActiveSourceSet =
+  let active : ActiveRepoSet =
     restricted_to ( &["owned", "foreign"] );
   let mut overrider : NodeComplete =
     node ("overrider", "owned", &[]);
   overrider . overrides_view_of = MSV::Specified (vec![
-    RelPartner::at_relSource (
-      SourceName::from ("owned2"), ID::from ("target")) ]);
+    RelPartner::at_relRepo (
+      RepoName::from ("owned2"), ID::from ("target")) ]);
   assert_eq! (
     resolve (
       vec![ node ("target", "owned", &[]), overrider ],
@@ -195,8 +195,8 @@ fn a_chain_of_two_resolves_transitively_with_path () {
 
 #[test]
 fn inactive_overrider_home_stops_a_chain_at_that_edge () {
-  let active : ActiveSourceSet =
-    // y's source 'owned2' is inactive; x's source 'owned' is active.
+  let active : ActiveRepoSet =
+    // y's repo 'owned2' is inactive; x's repo 'owned' is active.
     restricted_to ( &["owned", "foreign"] );
   assert_eq! (
     resolve (

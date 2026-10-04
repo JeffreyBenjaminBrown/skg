@@ -10,9 +10,9 @@ use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
 use skg::types::viewnode::ViewNode;
 use skg::types::misc::SkgConfig;
-use skg::types::misc::SourceName;
+use skg::types::misc::RepoName;
 use skg::types::misc::TantivyIndex;
-use skg::types::git::SourceDiff;
+use skg::types::git::RepoDiff;
 
 use ego_tree::{Tree, NodeId};
 
@@ -43,7 +43,7 @@ async fn test_reconcile_alias_folder_children_logic (
 
 ) -> Result < (), Box<dyn Error> > {
 
-  let source_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
+  let repo_diffs : Option<HashMap<RepoName, RepoDiff>> = None;
   let graph = graph_handle_from_config (config)? . load_full ();
 
   // Create org text with three AliasFolder scenarios
@@ -86,7 +86,7 @@ async fn test_reconcile_alias_folder_children_logic (
 
   // Test 1: First AliasFolder should have b and c (deduped, valid only, disk order)
   reconcile_aliasFolder_children (
-    &mut viewforest, aliasfolder_1_id, &graph, &source_diffs, config )?;
+    &mut viewforest, aliasfolder_1_id, &graph, &repo_diffs, config )?;
 
   {
     let aliasfolder_1_ref =
@@ -115,7 +115,7 @@ async fn test_reconcile_alias_folder_children_logic (
 
   // Test 2: Second AliasFolder should have b and c, and gain focus
   reconcile_aliasFolder_children (
-    &mut viewforest, aliasfolder_2_id, &graph, &source_diffs, config )?;
+    &mut viewforest, aliasfolder_2_id, &graph, &repo_diffs, config )?;
 
   {
     let aliasfolder_2_ref =
@@ -159,7 +159,7 @@ async fn test_reconcile_alias_folder_children_logic (
       &mut viewforest,
       aliasfolder_3_id,
       &graph,
-      &source_diffs,
+      &repo_diffs,
       config
     );
 
@@ -182,7 +182,7 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
 
 ) -> Result < (), Box<dyn Error> > {
 
-  let source_diffs : Option<HashMap<SourceName, SourceDiff>> = None;
+  let repo_diffs : Option<HashMap<RepoName, RepoDiff>> = None;
   let graph = graph_handle_from_config (config)? . load_full ();
 
   let org_text : &str =
@@ -222,7 +222,7 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
     &mut viewforest,
     first_aliasfolder_id,
     &graph,
-    &source_diffs,
+    &repo_diffs,
     config
   )?;
 
@@ -269,7 +269,7 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
     &mut viewforest,
     second_aliasfolder_id,
     &graph,
-    &source_diffs,
+    &repo_diffs,
     config
   )?;
 

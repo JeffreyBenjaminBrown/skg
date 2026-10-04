@@ -178,7 +178,7 @@ where Relevant : Fn (&ViewNode) -> bool,
   // Independent so the user's subtree survives; a stale InactiveNode
   // *branch* is deadened to a DeadScaffold instead (it has no
   // affectsParent to demote; the orphan handling then preserves its
-  // subtree as independent -- TODO/full-schema/9-2_source-set-safety.org);
+  // subtree as independent -- TODO/full-schema/9-2_repo-set-safety.org);
   // everything else stale -- a leaf, a diff-phantom, a qual -- is
   // deleted by the reconciler. Returns true iff it kept the node.
   let demote_invalid =

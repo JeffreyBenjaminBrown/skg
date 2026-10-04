@@ -26,7 +26,7 @@ on scratch data instead. Instances share nothing but the binary.
    port = 1750                      # any free port; 1731 is Jeff's
    timing_log = false
 
-   [[sources]]
+   [[repos]]
    name = "main"
    path = "owned/main"
    ```

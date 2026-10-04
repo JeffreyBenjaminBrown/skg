@@ -13,11 +13,11 @@ tantivy_folder = ".index.tantivy"
 port = $SKG_TEST_PORT
 beep_when_server_becomes_available = false
 
-[[sources]]
+[[repos]]
 name = "public"
 path = "owned/public"
 
-[[sources]]
+[[repos]]
 name = "private"
 path = "owned/private"
 EOF

@@ -5,12 +5,12 @@
 // `FnMut` closure which cannot ``.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::source_sets::ActiveSourceSet;
+use crate::repo_sets::ActiveRepoSet;
 use crate::to_org::expand::definitive::{ apply_definitive_draw_rule, DrawOutcome};
 use crate::to_org::util::DefinitiveMap;
 use crate::types::env::RuntimeGeneration;
-use crate::types::git::SourceDiff;
-use crate::types::misc::{ID, SourceName, TantivyIndex};
+use crate::types::git::RepoDiff;
+use crate::types::misc::{ID, RepoName, TantivyIndex};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, read_at_ancestor_in_tree};
 use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_branches;
 use crate::update_buffer::ancestry::{ folder_is_generalized_orphan, deaden_generalized_orphan_folder, is_folder_kind};
@@ -18,7 +18,7 @@ use crate::update_buffer::util::detach_scaffold_transferring_focus;
 use crate::update_buffer::warnings::CompletionWarning;
 use crate::to_org::render::diff::process_activeNode_diff;
 use crate::types::tree::viewnode_nodecomplete::{
-  pid_and_source_from_treenode, write_at_activeNode_in_tree};
+  pid_and_repo_from_treenode, write_at_activeNode_in_tree};
 use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerFolder, ViewRequest, Editability};
 use crate::types::viewnode::{Vognode, Phantom, QualFolder};
 use super::reconcile::hiddeninsubscribee_folder::reconcile_hiddenInSubscribeeFolder_children;
@@ -35,21 +35,21 @@ use std::sync::Arc;
 
 pub(super) struct CompletionContext<'a> {
   pub(super) defmap                         : &'a mut DefinitiveMap,
-  /// The per-source git diffs (Some in diff mode, None otherwise). This is the
+  /// The per-repo git diffs (Some in diff mode, None otherwise). This is the
   /// single diff handle: it drives the per-node process_activeNode_diff (content
   /// axes, the phantom flip, TextChanged/IDFolder/AliasFolder), the diff-aware QualFolder
   /// reconcilers, and the PartnerFolders' removed-member phantoms. The content
   /// reconcile itself produces only the pure worktree view; process_activeNode_diff
   /// applies every content diff effect afterward at the node's own visit (TODO/DONE/local-view-update/plan_v2.org §9
   /// reversal / #3).
-  pub(super) source_diffs                   : &'a Option<HashMap<SourceName, SourceDiff>>,
+  pub(super) repo_diffs                   : &'a Option<HashMap<RepoName, RepoDiff>>,
   pub(super) runtime                        : &'a RuntimeGeneration,
   pub(super) graph_snap                     : &'a Arc<InRustGraph>,
   pub(super) errors                         : &'a mut Vec<String>,
-  pub(super) deleted_since_head_pid_src_map : &'a HashMap<ID, SourceName>,
+  pub(super) deleted_since_head_pid_src_map : &'a HashMap<ID, RepoName>,
   pub(super) deleted_by_this_save_pids      : &'a HashSet<ID>,
   pub(super) deleted_by_this_save_extra_ids : &'a HashMap<ID, HashSet<ID>>,
-  pub(super) active_source_set              : Option<&'a ActiveSourceSet>,
+  pub(super) active_repo_set              : Option<&'a ActiveRepoSet>,
   /// TODO/DONE/local-view-update/plan_v2.org §5.5 per-buffer node limit: the remaining budget of *new* ViewNodes
   /// the ordinary update pass may create. Initialized once per rerender to
   /// `config.initial_node_limit` and decremented as content children are
@@ -65,7 +65,7 @@ pub(super) struct CompletionContext<'a> {
   /// from the saved buffer. A node made definitive by a request still gets its
   /// defaults independently of this flag.
   pub(super) create_partnerFolders_for_fresh_nodes : bool,
-  /// TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the tantivy index for the inline diff's phantom-source
+  /// TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the tantivy index for the inline diff's phantom-repo
   /// resolution. None on the post-save path (the deleted-id map + disk scan
   /// suffice); Some on the de-novo path.
   pub(super) diff_tantivy_index : Option<&'a TantivyIndex>,
@@ -156,23 +156,23 @@ fn dispatch_node_update (
       // vognode already spent its 1 budget unit when it expanded, so drawing all
       // the members here costs nothing more and never truncates a group.
       reconcile_subscribeeFolder_children (
-        treeid, tree, context . source_diffs, context . runtime,
+        treeid, tree, context . repo_diffs, context . runtime,
         context . deleted_since_head_pid_src_map,
         context . deleted_by_this_save_extra_ids,
-        context . active_source_set ) ?,
+        context . active_repo_set ) ?,
     ViewNodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee) =>
       reconcile_hiddenInSubscribeeFolder_children (
-        treeid, tree, context . source_diffs, context . runtime,
+        treeid, tree, context . repo_diffs, context . runtime,
         context . deleted_since_head_pid_src_map,
         context . deleted_by_this_save_extra_ids,
-        context . active_source_set,
+        context . active_repo_set,
         context . warning_sink . as_deref_mut () ) ?,
     ViewNodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutsideSubscribeeFolder_children (
-        treeid, tree, context . source_diffs, context . runtime,
+        treeid, tree, context . repo_diffs, context . runtime,
         context . deleted_since_head_pid_src_map,
         context . deleted_by_this_save_extra_ids,
-        context . active_source_set,
+        context . active_repo_set,
         context . warning_sink . as_deref_mut () ) ?,
     ViewNodeKind::PartnerFolder (role)
       // This arm serves one FolderPolicy::WritableSet folder (Overridden;
@@ -181,24 +181,24 @@ fn dispatch_node_update (
       // 'PartnerFolder::policy' where their treatment differs.
       if role . relation_member_role () . is_some () =>
       reconcile_partnerFolder_children (
-        treeid, tree, *role, context . source_diffs,
+        treeid, tree, *role, context . repo_diffs,
         context . runtime, context . graph_snap,
         context . deleted_since_head_pid_src_map,
         context . deleted_by_this_save_extra_ids,
-        context . active_source_set,
+        context . active_repo_set,
         context . warning_sink . as_deref_mut () ) ?,
     // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the IDFolder/AliasFolder diff scaffolds are created inline by
     // process_activeNode_diff at the owner's BFS visit, so their reconcilers must
-    // see the real diffs (source_diffs) or they would clobber the just-created
+    // see the real diffs (repo_diffs) or they would clobber the just-created
     // diff entries. Diffs flow inline for both de-novo and post-save.
     ViewNodeKind::QualFolder (QualFolder::Alias) =>
       super::reconcile::aliasfolder::reconcile_aliasFolder_children (
         tree, treeid, &context . runtime . graph,
-        context . source_diffs, &context . runtime . config ) ?,
+        context . repo_diffs, &context . runtime . config ) ?,
     ViewNodeKind::QualFolder (QualFolder::ID) =>
       super::reconcile::id_folder::reconcile_idFolder_children (
         treeid, tree, &context . runtime . graph,
-        context . source_diffs, &context . runtime . config ) ?,
+        context . repo_diffs, &context . runtime . config ) ?,
     ViewNodeKind::QualFolder (QualFolder::BoolProps { .. }) =>
       super::reconcile::boolprops_folder::reconcile_boolprops_folder_children (
         tree, treeid, &context . runtime . graph,
@@ -229,12 +229,12 @@ fn visit_normal_node (
   // write-protected refresh: all of those paths may consult the post-save
   // graph, where the node is necessarily absent. This also ensures every
   // indefinitive/read-only image becomes Deleted rather than Unknown.
-  let (pid, source) : (ID, SourceName) =
-    pid_and_source_from_treenode (
+  let (pid, repo) : (ID, RepoName) =
+    pid_and_repo_from_treenode (
       tree, treeid, "visit_normal_node deletion preflight" ) ?;
   if context . deleted_by_this_save_pids . contains (&pid) {
     mutate_activeNode_to_deletednode (
-      tree, treeid, &pid, &source ) ?;
+      tree, treeid, &pid, &repo ) ?;
     return Ok (( )); }
   let had_dvr : bool =
     read_at_node_in_tree ( tree, treeid,
@@ -279,9 +279,9 @@ fn visit_normal_node (
     &context . runtime . config, context . graph_snap,
     context . deleted_since_head_pid_src_map,
     context . deleted_by_this_save_extra_ids,
-    context . active_source_set,
+    context . active_repo_set,
     settled, cascade, &mut context . node_budget,
-    context . source_diffs . is_none (), // substitution is off in diff mode: diff surfaces show raw graph facts
+    context . repo_diffs . is_none (), // substitution is off in diff mode: diff surfaces show raw graph facts
     context . substitute_existing_content_overrides ) ?;
   // The steps below apply only while the node is still an Active vognode.
   // The flip to a Diff phantom happens at the END of this visit
@@ -300,30 +300,30 @@ fn visit_normal_node (
     maybe_add_default_partnerFolder_branches (
       tree, treeid, &context . runtime . graph,
       &context . runtime . config,
-      context . active_source_set,
-      context . source_diffs ) ?; }
+      context . active_repo_set,
+      context . repo_diffs ) ?; }
   // Remaining view requests (Aliases / Containerward / Mentionerward); the
   // Definitive request was already consumed by apply_definitive_draw_rule.
   super::reconcile::view_requests::execute_activeNode_view_requests (
     treeid, tree, &context . runtime . graph,
     &context . runtime . config,
-    context . errors, context . active_source_set,
-    context . source_diffs ) ?;
+    context . errors, context . active_repo_set,
+    context . repo_diffs ) ?;
   // Ensure a definitive subscribee's HiddenInSubscribeeFolder exists; the BFS
   // reconciles it on reaching it.
   super::reconcile::view_requests::ensure_hiddenInFolder_under_definitive_subscribee (
     tree, treeid, &context . runtime . graph,
     &context . runtime . config,
-    context . active_source_set,
-    context . source_diffs ) ?;
+    context . active_repo_set,
+    context . repo_diffs ) ?;
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3 / Jeff): compute this node's content+scaffold diff LOCALLY,
   // at its own BFS visit. Runs last, after the node is fully completed as a
   // worktree Active node (content, folders, view requests), so process_activeNode_diff
   // sees its final children. The flip to a phantom happens here; the node's folders
   // (visited later, level-order) self-deaden via their own generalized-orphan
-  // check. Gated on diff mode (source_diffs = Some); both de-novo and post-save
+  // check. Gated on diff mode (repo_diffs = Some); both de-novo and post-save
   // feed the real diffs here, so the diff is computed inline for both.
-  if let Some (real_diffs) = context . source_diffs {
+  if let Some (real_diffs) = context . repo_diffs {
     let node_mut : NodeMut<ViewNode> =
       tree . get_mut (treeid) . unwrap ();
     process_activeNode_diff (

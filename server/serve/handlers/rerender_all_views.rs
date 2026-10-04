@@ -1,4 +1,4 @@
-use crate::git_ops::read_repo::open_repo;
+use crate::git_ops::read_gitrepo::open_gitrepo;
 use crate::serve::ViewsState;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision,
@@ -7,7 +7,7 @@ use crate::serve::handlers::text_release::{
   decide as decide_text_release};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_errors_warnings_sexp, format_lock_views_sexp, format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response, tag_text_response};
-use crate::source_sets::ActiveSourceSet;
+use crate::repo_sets::ActiveRepoSet;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
@@ -38,7 +38,7 @@ pub fn handle_rerender_all_views_request (
   request    : &str,
   env        : &SkgEnv,
   views_state : &mut ViewsState,
-  active_source_set : &ActiveSourceSet,
+  active_repo_set : &ActiveRepoSet,
 ) {
   let excluded : HashSet<ViewUri> =
     match excluded_view_uris_from_request (request) {
@@ -52,7 +52,7 @@ pub fn handle_rerender_all_views_request (
             &format_errors_warnings_sexp (&[error], &[])));
         return; } };
   stream_rerender_views_excluding (
-    stream, env, views_state, active_source_set,
+    stream, env, views_state, active_repo_set,
     &approved_pids_from_request (request), &excluded); }
 
 fn excluded_view_uris_from_request (
@@ -93,17 +93,17 @@ fn stream_rerender_views_excluding (
   stream : &mut TcpStream,
   env : &SkgEnv,
   views_state : &mut ViewsState,
-  active_source_set : &ActiveSourceSet,
+  active_repo_set : &ActiveRepoSet,
   approved_pids : &HashSet<crate::types::misc::ID>,
   excluded : &HashSet<ViewUri>,
 ) {
   let mut prepared : PreparedRerenders = prepare_rerender_views (
     env, views_state, views_state . diff_mode_enabled,
-    Some (active_source_set), None, false);
+    Some (active_repo_set), None, false);
   prepared . uris . retain (|uri| ! excluded . contains (uri));
   prepared . views . retain (|view| ! excluded . contains (&view . uri));
   if ! authorize_prepared_rerenders (
-    stream, &mut prepared, Some (active_source_set),
+    stream, &mut prepared, Some (active_repo_set),
     "rerender-all-views", approved_pids) {
     return; }
   stream_prepared_rerenders (stream, views_state, prepared);
@@ -112,15 +112,15 @@ fn stream_rerender_views_excluding (
 /// Stream re-rendered views to Emacs.
 /// Sends: rerender-lock → rerender-view* → rerender-done.
 /// Shared by 'handle_rerender_all_views_request',
-/// 'handle_git_diff_toggle_and_rerender', and the source-set switch
-/// ('set_active_source_set'), which passes a per-view prepass (the
+/// 'handle_git_diff_toggle_and_rerender', and the repo-set switch
+/// ('set_active_repo_set'), which passes a per-view prepass (the
 /// convert-and-prune step) and asks for PartnerFolder re-creation
-/// (TODO/full-schema/9-2_source-set-safety.org).
+/// (TODO/full-schema/9-2_repo-set-safety.org).
 pub fn stream_rerender_views (
   stream     : &mut TcpStream,
   env        : &SkgEnv,
   views_state : &mut ViewsState,
-  active_source_set : Option<&ActiveSourceSet>,
+  active_repo_set : Option<&ActiveRepoSet>,
   prepass    : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
   create_partnerFolders : bool,
   operation          : &str,
@@ -128,9 +128,9 @@ pub fn stream_rerender_views (
 ) {
   let mut prepared : PreparedRerenders = prepare_rerender_views (
     env, views_state, views_state . diff_mode_enabled,
-    active_source_set, prepass, create_partnerFolders );
+    active_repo_set, prepass, create_partnerFolders );
   if ! authorize_prepared_rerenders (
-    stream, &mut prepared, active_source_set,
+    stream, &mut prepared, active_repo_set,
     operation, approved_pids ) {
     return; }
   stream_prepared_rerenders (stream, views_state, prepared);
@@ -143,13 +143,13 @@ pub fn stream_rerender_views_after_absent_reference_cleanup (
   stream     : &mut TcpStream,
   env        : &SkgEnv,
   views_state : &mut ViewsState,
-  active_source_set : &ActiveSourceSet,
+  active_repo_set : &ActiveRepoSet,
   raw_id     : &crate::types::misc::ID,
   affected_owner_pids : &HashSet<crate::types::misc::ID>,
 ) {
   let prepared = prepare_rerender_views_where (
     env, env . runtime_snapshot (), views_state, views_state . diff_mode_enabled,
-    Some (active_source_set), None, false,
+    Some (active_repo_set), None, false,
     |viewforest| view_can_display_absent_reference_change (
       viewforest, raw_id, affected_owner_pids ));
   stream_prepared_rerenders (stream, views_state, prepared);
@@ -162,13 +162,13 @@ pub(crate) fn prepare_rerender_views (
   env                 : &SkgEnv,
   views_state         : &ViewsState,
   diff_mode_enabled   : bool,
-  active_source_set   : Option<&ActiveSourceSet>,
+  active_repo_set   : Option<&ActiveRepoSet>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
   create_partnerFolders  : bool,
 ) -> PreparedRerenders {
   let runtime = env . runtime_snapshot ();
   prepare_rerender_views_with_runtime (
-    env, runtime, views_state, diff_mode_enabled, active_source_set, prepass,
+    env, runtime, views_state, diff_mode_enabled, active_repo_set, prepass,
     create_partnerFolders)
 }
 
@@ -177,12 +177,12 @@ pub(crate) fn prepare_rerender_views_with_runtime (
   runtime             : std::sync::Arc<RuntimeGeneration>,
   views_state         : &ViewsState,
   diff_mode_enabled   : bool,
-  active_source_set   : Option<&ActiveSourceSet>,
+  active_repo_set   : Option<&ActiveRepoSet>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
   create_partnerFolders  : bool,
 ) -> PreparedRerenders {
   prepare_rerender_views_where (
-    env, runtime, views_state, diff_mode_enabled, active_source_set, prepass,
+    env, runtime, views_state, diff_mode_enabled, active_repo_set, prepass,
     create_partnerFolders, |_| true )
 }
 
@@ -194,7 +194,7 @@ fn prepare_rerender_views_where (
   runtime             : std::sync::Arc<RuntimeGeneration>,
   views_state         : &ViewsState,
   diff_mode_enabled   : bool,
-  active_source_set   : Option<&ActiveSourceSet>,
+  active_repo_set   : Option<&ActiveRepoSet>,
   prepass             : Option<&dyn Fn (&mut ViewForest) -> Result<(), Box<dyn std::error::Error>>>,
   create_partnerFolders  : bool,
   include             : impl Fn (&ViewForest) -> bool,
@@ -204,7 +204,7 @@ fn prepare_rerender_views_where (
     .map (|(uri, _)| uri . clone ()) . collect ();
   let mut context : RerenderAfterSaveContext =
     RerenderAfterSaveContext::without_save_with_runtime (
-      env, runtime, diff_mode_enabled, active_source_set );
+      env, runtime, diff_mode_enabled, active_repo_set );
   let mut rendered_views : Vec<PreparedView> = Vec::new ();
   for uri in &uris {
     let mut viewforest : ViewForest = match
@@ -270,11 +270,11 @@ fn view_can_display_absent_reference_change (
 pub(crate) fn authorize_prepared_rerenders (
   stream            : &mut TcpStream,
   prepared          : &mut PreparedRerenders,
-  active_source_set : Option<&ActiveSourceSet>,
+  active_repo_set : Option<&ActiveRepoSet>,
   operation         : &str,
   approved_pids     : &HashSet<crate::types::misc::ID>,
 ) -> bool {
-  let Some (active) = active_source_set else { return true; };
+  let Some (active) = active_repo_set else { return true; };
   let candidates : Vec<crate::types::misc::ID> =
     prepared . views . iter ()
     . flat_map ( |view|
@@ -327,7 +327,7 @@ pub(crate) fn stream_prepared_rerenders (
 /// Send an EMPTY rerender stream: a "rerender-lock" naming no views,
 /// then "rerender-done" with no errors or warnings.  Used after a
 /// refusal: Emacs locks every Skg buffer and sets its stream guard
-/// BEFORE sending a diff-mode toggle or source-set switch, and only
+/// BEFORE sending a diff-mode toggle or repo-set switch, and only
 /// the rerender stream unwinds them.  The empty lock list makes
 /// Emacs unlock every buffer; the done message clears the guard.
 pub fn stream_empty_rerender (
@@ -352,11 +352,11 @@ pub fn handle_git_diff_toggle_and_rerender (
   request    : &str,
   env        : &SkgEnv,
   views_state : &mut ViewsState,
-  active_source_set : &ActiveSourceSet,
+  active_repo_set : &ActiveRepoSet,
 ) {
   if ! views_state . diff_mode_enabled
-     && ! active_source_set . is_all () {
-    { // Refuse to ENABLE diff mode under a restricted source-set.
+     && ! active_repo_set . is_all () {
+    { // Refuse to ENABLE diff mode under a restricted repo-set.
       // (Disabling is always allowed: it only makes state legal.)
       // The refusal takes the quiet shape: the endpoint's normal
       // first message carries the refusal text, then an empty
@@ -366,7 +366,7 @@ pub fn handle_git_diff_toggle_and_rerender (
       // as a window-pop trigger.
       let msg : String = format! (
         "Git diff mode requires active source-set all; current active source-set is {}. Switch the source-set to all first.",
-        active_source_set . name . 0 );
+        active_repo_set . name . 0 );
       tracing::info! ( msg = %msg, "Git diff mode toggle refused" );
       send_response_with_length_prefix (
         stream,
@@ -375,10 +375,10 @@ pub fn handle_git_diff_toggle_and_rerender (
       return; }}
   let next_diff_mode : bool = ! views_state . diff_mode_enabled;
   let mut prepared : PreparedRerenders = prepare_rerender_views (
-    env, views_state, next_diff_mode, Some (active_source_set),
+    env, views_state, next_diff_mode, Some (active_repo_set),
     None, false );
   if ! authorize_prepared_rerenders (
-    stream, &mut prepared, Some (active_source_set),
+    stream, &mut prepared, Some (active_repo_set),
     "diff-mode-rerender", &approved_pids_from_request (request) ) {
     return; }
   views_state . diff_mode_enabled = next_diff_mode;
@@ -392,7 +392,7 @@ pub fn handle_git_diff_toggle_and_rerender (
   stream_prepared_rerenders (stream, views_state, prepared); }
 
 /// Build the human-readable message for a diff-mode toggle,
-/// including warnings for sources not tracked in git.
+/// including warnings for repos not tracked in git.
 fn git_diff_mode_message (
   enabled : bool,
   config  : &SkgConfig,
@@ -403,7 +403,7 @@ fn git_diff_mode_message (
     else { "Git diff mode disabled" . to_string () };
   if enabled {
     let warnings : Vec<String> =
-      sources_not_tracked_in_git (config);
+      repos_not_tracked_in_git (config);
     if ! warnings . is_empty () {
       msg . push_str ("\n\nWarning: diff mode will be incomplete. \
         These sources are not fully tracked in git:\n");
@@ -411,30 +411,30 @@ fn git_diff_mode_message (
         msg . push_str (&format! ("  - {}\n", w)); }} }
   msg }
 
-/// Check each configured source for git-readiness.
-/// Returns a list of human-readable warnings for sources
+/// Check each configured Skg repo for git-readiness.
+/// Returns a list of human-readable warnings for repos
 /// that are not in a git repo or have no commits yet.
-fn sources_not_tracked_in_git (
+fn repos_not_tracked_in_git (
   config : &SkgConfig,
 ) -> Vec<String> {
   let mut warnings : Vec<String> = Vec::new ();
-  for (source_name, source_config) in &config . sources {
-    let source_path : &std::path::Path =
-      std::path::Path::new ( &source_config . path );
-    match open_repo (source_path) {
+  for (repo_name, repo_config) in &config . repos {
+    let repo_path : &std::path::Path =
+      std::path::Path::new ( &repo_config . path );
+    match open_gitrepo (repo_path) {
       None => {
         warnings . push ( format! (
-          "{}: not in a git repository", source_name )); },
-      Some (repo) => {
-        if repo . head () . is_err () {
+          "{}: not in a git repository", repo_name )); },
+      Some (gitrepo) => {
+        if gitrepo . head () . is_err () {
           warnings . push ( format! (
-            "{}: git repo has no commits yet", source_name )); } } } }
+            "{}: git repo has no commits yet", repo_name )); } } } }
   warnings }
 
 #[cfg(test)]
 mod tests {
   use super::view_can_display_absent_reference_change;
-  use crate::types::misc::{ID, SourceName};
+  use crate::types::misc::{ID, RepoName};
   use crate::types::tree::forest::ViewForest;
   use crate::types::viewnode::{mk_definitive_viewnode, mk_unknown_viewnode};
   use std::collections::HashSet;
@@ -444,7 +444,7 @@ mod tests {
   fn active_view (pid : &str) -> ViewForest {
     let mut view : ViewForest = ViewForest::new ();
     view . append_root (mk_definitive_viewnode (
-      id (pid), SourceName::from ("main"), pid . to_string (), None ));
+      id (pid), RepoName::from ("main"), pid . to_string (), None ));
     view
   }
 

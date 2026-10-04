@@ -7,7 +7,7 @@ use crate::dbs::filesystem::one_node::{
   PreparedTelescopeWrite, prepare_nodecomplete_telescope,
   read_nodecomplete, validate_pid_matches_filename,
 };
-use crate::types::misc::{SkgConfig, SkgfileSource, ID, SourceName};
+use crate::types::misc::{SkgConfig, SkgfileRepo, ID, RepoName};
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::NodeComplete;
 
@@ -16,20 +16,20 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::fs::{self, DirEntry, ReadDir};
 
-/// Reads all .skg files from all configured sources.
-/// Sets each node's source field to the appropriate source name.
+/// Reads all .skg files from all configured repos.
+/// Sets each node's repo field to the appropriate repo name.
 /// If any files fail to load, writes a detailed report to an
 /// org file in the config's data_root and returns a summary error.
 ///
 /// Load-time telescope violations are LOGGED here and dropped.
 /// Callers that report them to the user (init and rebuild) take
-/// 'read_all_skg_files_from_sources_collecting_violations' instead.
-pub fn read_all_skg_files_from_sources (
+/// 'read_all_skg_files_from_repos_collecting_violations' instead.
+pub fn read_all_skg_files_from_repos (
   config: &SkgConfig
 ) -> io::Result<Vec<NodeComplete>> {
   let (nodes, violations)
     : (Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>) =
-    read_all_skg_files_from_sources_collecting_violations (config) ?;
+    read_all_skg_files_from_repos_collecting_violations (config) ?;
   for (pid, v) in &violations {
     tracing::warn! ( pid = %pid, violation = %v,
                      "telescope violation found at load" ); }
@@ -37,18 +37,18 @@ pub fn read_all_skg_files_from_sources (
 
 /// Import preflight must inspect authoritative export claims without
 /// creating or removing the loader's diagnostic reports.
-pub(crate) fn read_all_skg_files_from_sources_read_only (
+pub(crate) fn read_all_skg_files_from_repos_read_only (
   config : &SkgConfig,
 ) -> io::Result<Vec<NodeComplete>> {
   let (nodes, violations) =
-    read_all_skg_files_from_sources_impl (config, false)?;
+    read_all_skg_files_from_repos_impl (config, false)?;
   if ! violations . is_empty () {
     return Err (io::Error::new (io::ErrorKind::InvalidData,
       "Configured sources have telescope violations; resolve them before import")); }
   Ok (nodes)
 }
 
-/// As 'read_all_skg_files_from_sources', but hands back the
+/// As 'read_all_skg_files_from_repos', but hands back the
 /// load-time telescope violations rather than logging them, so
 /// init and rebuild can report them alongside the graph-level ones
 /// in DATA_ROOT/telescope-warnings.org.
@@ -58,39 +58,39 @@ pub(crate) fn read_all_skg_files_from_sources_read_only (
 /// - every 'FoldWarning' (wrapped as 'TelescopeViolation::Fold'),
 /// - 'IgnoredForeignPidFolderlision', where owned and non-owned files
 ///   use the same pid. The owned telescope wins before folding.
-pub fn read_all_skg_files_from_sources_collecting_violations (
+pub fn read_all_skg_files_from_repos_collecting_violations (
   config: &SkgConfig
 ) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
-  read_all_skg_files_from_sources_impl (config, true)
+  read_all_skg_files_from_repos_impl (config, true)
 }
 
-fn read_all_skg_files_from_sources_impl (
+fn read_all_skg_files_from_repos_impl (
   config : &SkgConfig,
   report_errors : bool,
 ) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
   let mut sections_by_pid
-    : HashMap<ID, Vec<(SourceName, NodeFS)>> = HashMap::new();
+    : HashMap<ID, Vec<(RepoName, NodeFS)>> = HashMap::new();
   let mut pid_order : Vec<ID> = Vec::new(); // deterministic output
-  let mut load_errors: Vec<(String, // source name
+  let mut load_errors: Vec<(String, // repo name
                             String, // filename
                             String)> // error message
     = Vec::new();
-  for source_name in config . ordered_sources () {
-    let Some (source) : Option<&SkgfileSource> =
-      config . sources . get (&source_name) else { continue; };
-    match read_skg_sections_from_folder (&source_name, config) {
+  for repo_name in config . ordered_repos () {
+    let Some (repo) : Option<&SkgfileRepo> =
+      config . repos . get (&repo_name) else { continue; };
+    match read_skg_sections_from_folder (&repo_name, config) {
       Ok (sections) => {
-        for (source, node_fs) in sections {
+        for (repo, node_fs) in sections {
           let pid : ID = node_fs . pid . clone ();
           if ! sections_by_pid . contains_key (&pid) {
             pid_order . push ( pid . clone () ); }
           sections_by_pid . entry (pid)
             . or_insert_with (Vec::new)
-            . push ((source, node_fs)); }}
+            . push ((repo, node_fs)); }}
       Err (e) => {
         load_errors . push ((
-          source_name . to_string(),
-          source . path . display() . to_string(),
+          repo_name . to_string(),
+          repo . path . display() . to_string(),
           e . to_string()
         )); }} }
   if report_errors {
@@ -117,7 +117,7 @@ fn read_all_skg_files_from_sources_impl (
 /// owned files before folding or building the extra-id map. A pid
 /// represented entirely by non-owned files remains readable.
 fn retain_owned_telescopes (
-  sections_by_pid : &mut HashMap<ID, Vec<(SourceName, NodeFS)>>,
+  sections_by_pid : &mut HashMap<ID, Vec<(RepoName, NodeFS)>>,
   pid_order       : &[ID],
   config          : &SkgConfig,
 ) -> Vec<(ID, TelescopeViolation)> {
@@ -132,7 +132,7 @@ fn retain_owned_telescopes (
       violations . push ((
         pid . clone (),
         TelescopeViolation::IgnoredForeignPidFolderlision {
-          ignored_sources : collision . ignored_sources,
+          ignored_repos : collision . ignored_repos,
         } )); }}
   violations }
 
@@ -142,19 +142,19 @@ pub fn nodecomplete_from_telescope_on_disk (
   config : &SkgConfig,
   pid    : &ID,
 ) -> io::Result<NodeComplete> {
-  crate::dbs::filesystem::one_node::nodecomplete_from_pid_and_source (
+  crate::dbs::filesystem::one_node::nodecomplete_from_pid_and_repo (
     config, pid . clone (),
-    & SourceName::from ("(any)") ) }
+    & RepoName::from ("(any)") ) }
 
 /// Fold each telescope (already grouped by pid; sections arrive in
-/// privacy order because the caller iterated 'ordered_sources').
+/// privacy order because the caller iterated 'ordered_repos').
 /// Anchors resolve through the extra-id map built from every
 /// section, so a nodeMerge cannot dangle an anchor. A telescope
 /// with no title in any section is a hard load error; every other
 /// fold complaint comes back as a violation for the caller to
 /// report.
 fn fold_grouped_sections (
-  mut sections_by_pid : HashMap<ID, Vec<(SourceName, NodeFS)>>,
+  mut sections_by_pid : HashMap<ID, Vec<(RepoName, NodeFS)>>,
   pid_order           : Vec<ID>,
   config              : &SkgConfig,
 ) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
@@ -186,15 +186,15 @@ fn fold_grouped_sections (
         ( pid . clone (), TelescopeViolation::Fold (w) )); }}
   Ok (( all_nodes, all_violations )) }
 
-/// NOT AN ERROR: same-id files across sources. Those are the
+/// NOT AN ERROR: same-id files across repos. Those are the
 /// SECTIONS of one privacy telescope, grouped and folded at load,
 /// and they are the feature -- see docs/telescopes.org. Sections of
 /// one telescope share a pid, so they can never trip this check.
 ///
 /// THE ERROR: one id claimed by two DIFFERENT nodes -- an id
 /// (primary or extra) appearing among the all_ids() of two nodes
-/// with distinct pids. Nothing about it is cross-source; both
-/// claimants can sit in one source. If any exists, writes a detailed
+/// with distinct pids. Nothing about it is cross-repo; both
+/// claimants can sit in one repo. If any exists, writes a detailed
 /// report (to stderr for ≤10, to an org file otherwise) and returns
 /// a summary error. (Callers pass post-fold nodes, one per
 /// telescope.)
@@ -202,15 +202,15 @@ pub fn error_unless_each_id_names_one_node (
   nodes     : &[NodeComplete],
   data_root : &Path,
 ) -> io::Result<()> {
-  let mut claimants: HashMap < ID, Vec<(ID, SourceName)> > =
+  let mut claimants: HashMap < ID, Vec<(ID, RepoName)> > =
     // Maps each ID to the (pid, home) of every node claiming it
     HashMap::new();
   for node in nodes {
     for id in node . all_ids() {
       claimants . entry (id . clone())
         . or_insert_with (Vec::new)
-        . push ((node . pid . clone(), node . source . clone())); }}
-  let contested: HashMap<ID, Vec<(ID, SourceName)>> =
+        . push ((node . pid . clone(), node . home_repo . clone())); }}
+  let contested: HashMap<ID, Vec<(ID, RepoName)>> =
     claimants . into_iter()
     . filter ( |(_, owners)| {
       let distinct_pids : HashSet<&ID> =
@@ -236,17 +236,17 @@ pub fn error_unless_each_id_names_one_node (
     io::ErrorKind::InvalidData, msg )) }
 
 pub fn read_skg_sections_from_folder (
-  source_name : &SourceName,
+  repo_name : &RepoName,
   config      : &SkgConfig,
-) -> io::Result < Vec<(SourceName, NodeFS)> > {
-  let source : &SkgfileSource =
-    config . sources . get (source_name)
+) -> io::Result < Vec<(RepoName, NodeFS)> > {
+  let repo : &SkgfileRepo =
+    config . repos . get (repo_name)
     . ok_or_else(|| io::Error::new(
       io::ErrorKind::NotFound,
-      format!("Source '{}' not found in config", source_name)))?;
-  let mut sections : Vec<(SourceName, NodeFS)> = Vec::new ();
+      format!("Source '{}' not found in config", repo_name)))?;
+  let mut sections : Vec<(RepoName, NodeFS)> = Vec::new ();
   let entries : ReadDir = // an iterator
-    fs::read_dir (&source . path) ?;
+    fs::read_dir (&repo . path) ?;
   for entry in entries {
     let entry : DirEntry = entry ?;
     let path : PathBuf = entry . path () ;
@@ -257,22 +257,22 @@ pub fn read_skg_sections_from_folder (
       let node_fs : NodeFS =
         read_nodecomplete (&path) ?;
       validate_pid_matches_filename (&node_fs, &path) ?;
-      sections . push (( source_name . clone (), node_fs )); }}
+      sections . push (( repo_name . clone (), node_fs )); }}
   Ok (sections) }
 
-/// Like `read_all_skg_files_from_sources` but only for telescopes
+/// Like `read_all_skg_files_from_repos` but only for telescopes
 /// with at least one section file whose mtime is more recent than
 /// `since`. A touched SECTION reloads its WHOLE telescope (all its
-/// sections, however old), since the fold needs every source.
-pub fn read_recently_modified_skgfiles_from_sources (
+/// sections, however old), since the fold needs every repo.
+pub fn read_recently_modified_skgfiles_from_repos (
   config : &SkgConfig,
   since  : std::time::SystemTime,
 ) -> io::Result<Vec<NodeComplete>> {
   let mut modified_pids : Vec<ID> = Vec::new();
   let mut seen_ids      : HashSet<ID> = HashSet::new();
-  for (_source_name, source) in config . sources . iter() {
+  for (_repo_name, repo) in config . repos . iter() {
     let entries : ReadDir =
-      fs::read_dir (&source . path) ?;
+      fs::read_dir (&repo . path) ?;
     for entry in entries {
       let entry : DirEntry = entry ?;
       let path  : PathBuf  = entry . path();
@@ -306,16 +306,16 @@ pub fn read_recently_modified_skgfiles_from_sources (
 /// also lists each conflict on stderr; for >10, logs the count and
 /// the file path.
 fn report_ids_claimed_by_two_nodes(
-  contested : &HashMap<ID, Vec<(ID, SourceName)>>,
+  contested : &HashMap<ID, Vec<(ID, RepoName)>>,
   data_root : &Path,
 ) -> io::Result<()> {
   let count: usize = contested . len();
-  // DANGER: The report path is fixed per data_root, so two tests sharing a data_root (notably any test using SkgConfig::dummyFromSources,which defaults to ".") can still clobber each other's report.
+  // DANGER: The report path is fixed per data_root, so two tests sharing a data_root (notably any test using SkgConfig::dummyFromRepos,which defaults to ".") can still clobber each other's report.
   let report_path: PathBuf = data_root . join (
     "initialization-error_ids-claimed-by-two-nodes.org");
   if count == 0 {
     return remove_stale_report (&report_path); }
-  let claimant_lines = | claimants : &Vec<(ID, SourceName)> |
+  let claimant_lines = | claimants : &Vec<(ID, RepoName)> |
                        -> Vec<String> {
     let mut lines : Vec<String> = // for deterministic output
       claimants . iter ()
@@ -331,7 +331,7 @@ fn report_ids_claimed_by_two_nodes(
     content . push_str( &format!(
       "{} id(s) claimed by more than one node. Same-id files ACROSS SOURCES are not this: those are the sections of one privacy telescope (docs/telescopes.org). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n",
       count));
-    let mut sorted_ids: Vec<(&ID, &Vec<(ID, SourceName)>)> =
+    let mut sorted_ids: Vec<(&ID, &Vec<(ID, RepoName)>)> =
       // for deterministic output
       contested . iter() . collect();
     sorted_ids . sort_by_key(|(id, _)| *id);
@@ -374,7 +374,7 @@ fn report_load_errors(
   data_root : &Path,
 ) -> io::Result<()> {
   let count: usize = errors . len();
-  let report_path: PathBuf = data_root . join ( // DANGER: The report path is fixed per data_root, so two tests sharing a data_root (notably any test using SkgConfig::dummyFromSources,which defaults to ".") can still clobber each other's report.
+  let report_path: PathBuf = data_root . join ( // DANGER: The report path is fixed per data_root, so two tests sharing a data_root (notably any test using SkgConfig::dummyFromRepos,which defaults to ".") can still clobber each other's report.
 
     "initialization-error_unreadable-skg-files.org");
   if count == 0 {
@@ -391,9 +391,9 @@ fn report_load_errors(
     errors . to_vec();
   sorted_errors . sort_by(|a, b| a . 1 . cmp(&b . 1));
 
-  for (source, filename_or_path, error_msg) in sorted_errors {
+  for (repo, filename_or_path, error_msg) in sorted_errors {
     content . push_str(&format!("* {}\n", filename_or_path));
-    content . push_str(&format!("** {}\n", source));
+    content . push_str(&format!("** {}\n", repo));
     content . push_str(&format!("*** Error: {}\n", error_msg));
   }
 
@@ -405,7 +405,7 @@ fn report_load_errors(
 }
 
 /// Writes all given `NodeComplete`s to disk as telescopes: each
-/// node's sections land in their source directories, named
+/// node's sections land in their repo directories, named
 /// by the primary ID followed by `.skg`.
 pub fn write_all_nodes_to_fs (
   nodes  : Vec<NodeComplete>,
@@ -423,22 +423,22 @@ pub fn write_all_nodes_to_fs (
   Ok (prepared . len ()) }
 
 /// Deleting a node deletes its whole TELESCOPE: every owned
-/// section file of that pid, in whatever source. (The SourceName in
+/// section file of that pid, in whatever repo. (The RepoName in
 /// each target is the caller's belief about the home; kept in the
-/// signature for its callers, but every owned source is swept.)
+/// signature for its callers, but every owned repo is swept.)
 pub fn delete_all_nodes_from_fs (
-  delete_targets : Vec<(ID, SourceName)>,
+  delete_targets : Vec<(ID, RepoName)>,
   config         : SkgConfig,
 ) -> io::Result<usize> { // number of nodes deleted
 
   let mut deleted : usize = 0;
-  for (pid, _source) in delete_targets {
+  for (pid, _repo) in delete_targets {
     let mut any_removed : bool = false;
-    for source_name in config . ordered_sources () {
-      if ! config . user_owns_source (&source_name) { continue; }
+    for repo_name in config . ordered_repos () {
+      if ! config . user_owns_repo (&repo_name) { continue; }
       let path : String =
-        match crate::util::path_from_pid_and_source (
-          & config, & source_name, pid . clone () ) {
+        match crate::util::path_from_pid_and_repo (
+          & config, & repo_name, pid . clone () ) {
           Ok (p) => p,
           Err (_) => continue, };
       match fs::remove_file ( &path )
@@ -446,7 +446,7 @@ pub fn delete_all_nodes_from_fs (
         Ok ( () ) => {
           any_removed = true; },
         Err (e) if e . kind () == io::ErrorKind::NotFound => {
-          // No section at this source, which is fine.
+          // No section at this repo, which is fine.
         },
         Err (e) => {
           // TODO : Should return a list of IDs not found.

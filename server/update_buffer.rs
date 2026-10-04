@@ -1,5 +1,5 @@
 pub mod ancestry;
-pub mod source_switch;
+pub mod repo_switch;
 pub mod warnings;
 pub mod complete;
 pub mod reconcile;
@@ -9,7 +9,7 @@ pub mod viewnodestats;
 
 pub use graphnodestats::{
   set_graphnodestats_in_viewforest,
-  set_graphnodestats_in_viewforest_with_source_set};
+  set_graphnodestats_in_viewforest_with_repo_set};
 pub use viewnodestats::set_viewnodestats_in_viewforest;
 
 use complete::{complete_viewforest, CompletionContext};
@@ -17,18 +17,18 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::ViewsState;
-use crate::serve::handlers::save_buffer::{ SaveResponse, compute_diff_for_every_source, deleted_ids_to_source};
+use crate::serve::handlers::save_buffer::{ SaveResponse, compute_diff_for_every_repo, deleted_ids_to_repo};
 use crate::serve::handlers::text_release::{
   TextReleaseDecision, challenge_response, decide,
 };
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ format_single_view_sexp, send_response_with_length_prefix, tag_sexp_response};
-use crate::source_sets::{ActiveSourceSet, apply_source_set_to_viewforest};
-use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids_with_source_set;
+use crate::repo_sets::{ActiveRepoSet, apply_repo_set_to_viewforest};
+use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids_with_repo_set;
 use crate::to_org::util::DefinitiveMap;
-use crate::types::git::{ExistenceAxes, MembershipAxes, SourceDiff};
+use crate::types::git::{ExistenceAxes, MembershipAxes, RepoDiff};
 use crate::types::views_state::ViewUri;
-use crate::types::misc::{ID, SourceName, SkgConfig};
+use crate::types::misc::{ID, RepoName, SkgConfig};
 use crate::types::save::{DefineNode, ForkSpec};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_tree_dfs_prunable };
 use crate::types::tree::forest::ViewForest;
@@ -47,19 +47,19 @@ use std::time::Instant;
 pub struct RerenderAfterSaveContext<'a> {
   pub env          : &'a SkgEnv,
   pub runtime      : Arc<RuntimeGeneration>,
-  pub source_diffs : Option<HashMap<SourceName, SourceDiff>>,
+  pub repo_diffs : Option<HashMap<RepoName, RepoDiff>>,
   pub graph_snap   : Arc<InRustGraph>,
   pub errors       : Vec<String>,
   pub warnings     : Vec<String>,
   /// Files deleted since HEAD, keyed by pid, for diff-mode rendering.
-  pub deleted_since_head_pid_src_map : HashMap<ID, SourceName>,
+  pub deleted_since_head_pid_src_map : HashMap<ID, RepoName>,
   /// Pids deleted by this save; not necessarily a subset of git deletes.
   pub deleted_by_this_save_pids      : HashSet<ID>,
   /// Raw extra IDs that belonged to each pid deleted by this save, captured
   /// before graph mutation.  A still-stored relationship can name one of
   /// these IDs after the pid itself has disappeared.
   pub deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
-  pub active_source_set              : Option<&'a ActiveSourceSet>,
+  pub active_repo_set              : Option<&'a ActiveRepoSet>,
 }
 
 impl<'a> RerenderAfterSaveContext<'a> {
@@ -68,12 +68,12 @@ impl<'a> RerenderAfterSaveContext<'a> {
     diff_mode_enabled : bool,
     define_nodes      : &[DefineNode],
     deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
-    active_source_set : Option<&'a ActiveSourceSet>,
+    active_repo_set : Option<&'a ActiveRepoSet>,
   ) -> RerenderAfterSaveContext<'a> {
     let runtime = env . runtime_snapshot ();
     Self::for_save_with_runtime (
       env, runtime, diff_mode_enabled, define_nodes,
-      deleted_by_this_save_extra_ids, active_source_set)
+      deleted_by_this_save_extra_ids, active_repo_set)
   }
 
   fn for_save_with_runtime (
@@ -82,16 +82,16 @@ impl<'a> RerenderAfterSaveContext<'a> {
     diff_mode_enabled : bool,
     define_nodes : &[DefineNode],
     deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
-    active_source_set : Option<&'a ActiveSourceSet>,
+    active_repo_set : Option<&'a ActiveRepoSet>,
   ) -> RerenderAfterSaveContext<'a> {
-    let source_diffs
-      : Option<HashMap<SourceName, SourceDiff>>
+    let repo_diffs
+      : Option<HashMap<RepoName, RepoDiff>>
       = if diff_mode_enabled
-        { Some ( compute_diff_for_every_source (&runtime . config)) }
+        { Some ( compute_diff_for_every_repo (&runtime . config)) }
         else {None};
-    let deleted_since_head_pid_src_map : HashMap<ID, SourceName> =
-      source_diffs . as_ref()
-      . map ( |d| deleted_ids_to_source (d, &runtime . config))
+    let deleted_since_head_pid_src_map : HashMap<ID, RepoName> =
+      repo_diffs . as_ref()
+      . map ( |d| deleted_ids_to_repo (d, &runtime . config))
       . unwrap_or_default();
     let deleted_by_this_save_pids : HashSet<ID> =
       // PITFALL: Can overlap deleted_since_head_pid_src_map, but neither is necessarily a subset of the other. If you delete something that you added since head, it will only be here. And if you deleted something since head but not in this save, it will only be there.
@@ -105,31 +105,31 @@ impl<'a> RerenderAfterSaveContext<'a> {
       env,
       graph_snap : runtime . graph . clone (),
       runtime,
-      source_diffs,
+      repo_diffs,
       errors : Vec::new (),
       warnings : Vec::new (),
       deleted_since_head_pid_src_map,
       deleted_by_this_save_pids,
       deleted_by_this_save_extra_ids,
-      active_source_set,
+      active_repo_set,
     }}
 
   pub fn without_save (
     env               : &'a SkgEnv,
     diff_mode_enabled : bool,
-    active_source_set : Option<&'a ActiveSourceSet>,
+    active_repo_set : Option<&'a ActiveRepoSet>,
   ) -> RerenderAfterSaveContext<'a> {
     RerenderAfterSaveContext::for_save (
-      env, diff_mode_enabled, &[], HashMap::new (), active_source_set ) }
+      env, diff_mode_enabled, &[], HashMap::new (), active_repo_set ) }
 
   pub fn without_save_with_runtime (
     env : &'a SkgEnv,
     runtime : Arc<RuntimeGeneration>,
     diff_mode_enabled : bool,
-    active_source_set : Option<&'a ActiveSourceSet>,
+    active_repo_set : Option<&'a ActiveRepoSet>,
   ) -> RerenderAfterSaveContext<'a> {
     RerenderAfterSaveContext::for_save_with_runtime (
-      env, runtime, diff_mode_enabled, &[], HashMap::new (), active_source_set ) }
+      env, runtime, diff_mode_enabled, &[], HashMap::new (), active_repo_set ) }
 }
 
 struct RenderedCollateralView {
@@ -156,7 +156,7 @@ pub fn update_views_after_save (
   runtime                     : Arc<RuntimeGeneration>,
   viewuri_from_request_result : &Result<ViewUri, String>,
   views_state                 : &mut ViewsState,
-  active_source_set           : Option<&ActiveSourceSet>,
+  active_repo_set           : Option<&ActiveRepoSet>,
   deleted_by_this_save_extra_ids : HashMap<ID, HashSet<ID>>,
   text_approved_pids        : &HashSet<ID>,
   fork_specs                  : &[ForkSpec],
@@ -171,7 +171,7 @@ pub fn update_views_after_save (
         "RerenderAfterSaveContext::for_save" ). entered();
       RerenderAfterSaveContext::for_save_with_runtime (
         env, runtime, diff_mode_enabled, &define_nodes,
-        deleted_by_this_save_extra_ids, active_source_set ) };
+        deleted_by_this_save_extra_ids, active_repo_set ) };
   let mut saved_view_mut : ViewForest = saved_view;
   replace_saved_view_fork_roots (&mut saved_view_mut, fork_specs) ?;
   // The graph mutation has committed, so every `(editRequest ...)` in the
@@ -186,7 +186,7 @@ pub fn update_views_after_save (
   // Gate the forests' existing active nodes before rendering, so even a
   // rendering error cannot echo protected title/body text. A second decision
   // below covers nodes introduced by completion/expansion.
-  if let Some (active) = active_source_set {
+  if let Some (active) = active_repo_set {
     let mut input_candidates : Vec<ID> =
       active_ids_in_viewforest (&saved_view_mut);
     for uri in &collateral_uris {
@@ -234,7 +234,7 @@ pub fn update_views_after_save (
   for collateral in &collateral_views {
     release_candidates . extend (
       active_ids_in_viewforest (&collateral . viewforest) ); }
-  if let Some (active) = active_source_set {
+  if let Some (active) = active_repo_set {
     let release : TextReleaseDecision = decide (
       "save-rerender", active, &release_candidates,
       &context . graph_snap, text_approved_pids );
@@ -315,7 +315,7 @@ fn replace_saved_view_fork_roots (
     if let ViewNodeKind::Vognode (Vognode::Active (active)) =
       &mut root . value () . kind
     { active . id = clone . pid . clone ();
-      active . source = clone . source . clone ();
+      active . home_repo = clone . home_repo . clone ();
       active . title = clone . title . clone ();
       if let Editability::Definitive { body, .. } = &mut active . editability
       { *body = clone . body . clone (); }
@@ -376,7 +376,7 @@ fn rerender_collateral_view (
 pub fn render_initial_view (
   runtime   : &RuntimeGeneration,
   root_ids  : &[ID],
-  active    : Option<&ActiveSourceSet>,
+  active    : Option<&ActiveRepoSet>,
   diff_mode : bool,
 ) -> Result<(ViewForest, Vec<String>), Box<dyn Error>> {
   // Build the stub roots. Its DefinitiveMap is discarded: view completion below uses
@@ -404,27 +404,27 @@ pub fn render_initial_view (
   let mut defmap : DefinitiveMap = DefinitiveMap::new ();
   let mut errors : Vec<String> = Vec::new ();
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): de-novo diff is computed INLINE by view completion, exactly
-  // like post-save -- compute the real diffs here and feed them via source_diffs
+  // like post-save -- compute the real diffs here and feed them via repo_diffs
   // (which drives the inline process_activeNode_diff and the diff-aware QualFolder /
   // PartnerFolder reconcilers).
-  let real_diffs : Option<HashMap<SourceName, SourceDiff>> =
-    if diff_mode { Some ( compute_diff_for_every_source (&runtime . config) ) }
+  let real_diffs : Option<HashMap<RepoName, RepoDiff>> =
+    if diff_mode { Some ( compute_diff_for_every_repo (&runtime . config) ) }
     else         { None };
-  let deleted_src : HashMap<ID, SourceName> =
-    real_diffs . as_ref () . map ( |d| deleted_ids_to_source (d, &runtime . config) )
+  let deleted_src : HashMap<ID, RepoName> =
+    real_diffs . as_ref () . map ( |d| deleted_ids_to_repo (d, &runtime . config) )
       . unwrap_or_default ();
   let empty_deleted_pids : HashSet<ID> = HashSet::new ();
   let mut sink : Vec<CompletionWarning> = Vec::new ();
   let mut context : CompletionContext = CompletionContext {
     defmap                         : &mut defmap,
-    source_diffs                   : &real_diffs,
+    repo_diffs                   : &real_diffs,
     runtime,
     graph_snap                     : &graph_snap,
     errors                         : &mut errors,
     deleted_since_head_pid_src_map : &deleted_src,
     deleted_by_this_save_pids      : &empty_deleted_pids,
     deleted_by_this_save_extra_ids : &HashMap::new (),
-    active_source_set              : active,
+    active_repo_set              : active,
     node_budget                    : runtime . config . initial_node_limit,
     create_partnerFolders_for_fresh_nodes : true,
     diff_tantivy_index : if diff_mode { Some (&runtime . tantivy_index) }
@@ -444,7 +444,7 @@ pub fn rerender_view (
   viewforest    : &mut ViewForest,
   context       : &mut RerenderAfterSaveContext<'_>,
   warning_sink  : Option<&mut Vec<CompletionWarning>>, // Some only for the view the user just saved.
-  create_partnerFolders : bool, // false post-save (folders round-trip from the buffer); true for the source-switch rerender, where pruning removed them and the new set decides which return.
+  create_partnerFolders : bool, // false post-save (folders round-trip from the buffer); true for the repo-switch rerender, where pruning removed them and the new set decides which return.
   substitute_existing_content_overrides : bool, // true only for the view whose edit created the override.
 ) -> Result<String, Box<dyn Error>> {
   let t_rerender : Instant = Instant::now ();
@@ -454,24 +454,24 @@ pub fn rerender_view (
     let mut defmap : DefinitiveMap = DefinitiveMap::new ();
     let mut completion_context : CompletionContext = CompletionContext {
       defmap                         : &mut defmap,
-      // The real per-source diffs drive ALL diff inline: process_activeNode_diff
+      // The real per-repo diffs drive ALL diff inline: process_activeNode_diff
       // (content axes + phantom flip + TextChanged/IDFolder/AliasFolder) and the
       // diff-aware QualFolder / PartnerFolder reconcilers, each at its own BFS visit
       // (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3). The content reconcile itself stays worktree-only.
-      source_diffs                   : &context . source_diffs,
+      repo_diffs                   : &context . repo_diffs,
       runtime                        : &context . runtime,
       graph_snap                     : &context . graph_snap,
       errors                         : &mut context . errors,
       deleted_since_head_pid_src_map : &context . deleted_since_head_pid_src_map,
       deleted_by_this_save_pids      : &context . deleted_by_this_save_pids,
       deleted_by_this_save_extra_ids : &context . deleted_by_this_save_extra_ids,
-      active_source_set              : context . active_source_set,
+      active_repo_set              : context . active_repo_set,
       node_budget                    : context . runtime . config . initial_node_limit,
       // Post-save (and rerender-all) reuse the saved buffer's PartnerFolders
-      // and pass false. The source-switch rerender passes true: its prune
+      // and pass false. The repo-switch rerender passes true: its prune
       // removed the folders, and the new set decides which defaults return.
       create_partnerFolders_for_fresh_nodes : create_partnerFolders,
-      // Post-save: phantom sources resolve via the deleted-id map + disk scan
+      // Post-save: phantom repos resolve via the deleted-id map + disk scan
       // (the de-novo path passes the tantivy index instead).
       diff_tantivy_index : None,
       substitute_existing_content_overrides,
@@ -482,7 +482,7 @@ pub fn rerender_view (
         viewforest, &mut completion_context ) ? }; }
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the content/scaffold diff was applied INLINE during the
   // BFS above (process_activeNode_diff at each Active node's visit, driven by
-  // source_diffs = the real diffs).
+  // repo_diffs = the real diffs).
   let result : String =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "finish_viewforest" ). entered();
@@ -490,7 +490,7 @@ pub fn rerender_view (
         viewforest,
         &context . runtime . graph,
         &context . runtime . config,
-        context . active_source_set ) } ?;
+        context . active_repo_set ) } ?;
   tracing::debug!("rerender_view: done ({:.3}s)",
             t_rerender . elapsed () . as_secs_f64 ());
   Ok (result) }
@@ -509,7 +509,7 @@ pub fn rerender_view (
 ///   - validates affectsParent against the captured graph (the de-novo path could
 ///     skip it for speed, but running it in both keeps the tails one),
 ///   - computes graph- then view-node stats,
-///   - applies the active source set, and renders to a buffer string.
+///   - applies the active repo set, and renders to a buffer string.
 /// Step order is immaterial between the affectsParent marks and graphnodestats:
 /// affectsParent is a view property and graphnodestats reads only the in-Rust graph,
 /// never affectsParent, so the final state is identical either way.
@@ -517,16 +517,16 @@ pub fn finish_viewforest (
   viewforest        : &mut ViewForest,
   graph             : &InRustGraph,
   config            : &SkgConfig,
-  active_source_set : Option<&ActiveSourceSet>,
+  active_repo_set : Option<&ActiveRepoSet>,
 ) -> Result<String, Box<dyn Error>> {
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "fulfill_root_containerward_requests" ). entered();
     fulfill_root_containerward_requests (
-      viewforest, graph, config, active_source_set ) ? ; }
+      viewforest, graph, config, active_repo_set ) ? ; }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "attach_containerward_ancestries_to_removedhere_phantoms" ). entered();
     attach_containerward_ancestries_to_removedhere_phantoms (
-      viewforest, graph, config, active_source_set ) ? ; }
+      viewforest, graph, config, active_repo_set ) ? ; }
   mark_view_roots_parent_na ( viewforest );
   // §A (Jeff's invariant): an Active survivor left under a non-container parent
   // (a phantom / Deleted / DeadScaffold) is a non-dead generalized orphan and
@@ -537,9 +537,9 @@ pub fn finish_viewforest (
   // under a new parent it doesn't link to).
   validate_affectsParent_relationships ( viewforest, graph );
   let ( container_to_contents, content_to_containers ) =
-    match active_source_set {
+    match active_repo_set {
       Some (active) =>
-        set_graphnodestats_in_viewforest_with_source_set (
+        set_graphnodestats_in_viewforest_with_repo_set (
           viewforest, graph, config, active ),
       None =>
         set_graphnodestats_in_viewforest (
@@ -547,9 +547,9 @@ pub fn finish_viewforest (
     } ?;
   set_viewnodestats_in_viewforest (
     viewforest, graph, &container_to_contents, &content_to_containers, config,
-    active_source_set );
-  if let Some (active) = active_source_set {
-    apply_source_set_to_viewforest ( viewforest, active ); }
+    active_repo_set );
+  if let Some (active) = active_repo_set {
+    apply_repo_set_to_viewforest ( viewforest, active ); }
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "viewforest_to_string" ). entered();
     viewforest_to_string ( viewforest, config ) } }
@@ -560,7 +560,7 @@ pub fn finish_viewforest (
 /// After a nodeMerge, the acquiree is gone, and what was the ViewNode
 /// onto it now an extra_id of the acquirer, not a PID.
 /// This is intended to replaces such a
-/// viewnode to carry the primary's pid, source, title, and body.
+/// viewnode to carry the primary's pid, repo, title, and body.
 ///
 /// The modified viewnode's subtree is left attached.
 /// 'reconcile_content_children' will later update it
@@ -578,7 +578,7 @@ fn rewriteInPlace_viewnodes_whose_id_is_newly_extra (
     . map ( |n| n . id () )
     . collect ();
   for nid in nodeids {
-    let swap : Option<(ID, SourceName, String, Option<String>)> = {
+    let swap : Option<(ID, RepoName, String, Option<String>)> = {
       let n_ref = viewforest . get (nid) . ok_or (
         "rewriteInPlace_viewnodes_whose_id_is_newly_extra: node not found") ?;
       match &n_ref . value () . kind {
@@ -589,18 +589,18 @@ fn rewriteInPlace_viewnodes_whose_id_is_newly_extra (
                { Some (primary) if primary != t . id => {
                      graph_snap . get (&primary) . map ( |r| (
                        primary . clone (),
-                       r . source . clone (),
+                       r . home_repo . clone (),
                        r . title . clone (),
                        r . body . clone () )) },
                  _ => None } },
         _ => None } };
-    if let Some ((new_pid, new_source, new_title, new_body)) = swap
+    if let Some ((new_pid, new_repo, new_title, new_body)) = swap
     { let mut n_mut = viewforest . get_mut (nid)
         . ok_or ("rewriteInPlace_viewnodes_whose_id_is_newly_extra: node_mut failed") ?;
       if let ViewNodeKind::Vognode (Vognode::Active (t))
       = &mut n_mut . value () . kind
       { t . id = new_pid;
-        t . source = new_source;
+        t . home_repo = new_repo;
         t . title = new_title;
         if let Editability::Definitive { body, .. }
         = &mut t . editability
@@ -751,7 +751,7 @@ fn fulfill_root_containerward_requests (
   viewforest : &mut ViewForest,
   graph      : &InRustGraph,
   config     : &SkgConfig,
-  active     : Option<&ActiveSourceSet>,
+  active     : Option<&ActiveRepoSet>,
 ) -> Result<(), Box<dyn Error>> {
   let requesting_root_nodeids : Vec<NodeId> =
     viewforest . root_ids () . into_iter ()
@@ -763,7 +763,7 @@ fn fulfill_root_containerward_requests (
           . unwrap_or (false) )
       . collect ();
   if requesting_root_nodeids . is_empty () { return Ok (( )); }
-  attach_containerward_ancestries_at_nodeids_with_source_set (
+  attach_containerward_ancestries_at_nodeids_with_repo_set (
     viewforest, &requesting_root_nodeids, graph, config, active ) ?;
   for nid in requesting_root_nodeids { // drop the now-fulfilled request
     if let Some (mut node_mut) = viewforest . get_mut (nid) {
@@ -779,7 +779,7 @@ fn attach_containerward_ancestries_to_removedhere_phantoms (
   viewforest    : &mut ViewForest,
   graph         : &InRustGraph,
   config        : &SkgConfig,
-  active        : Option<&ActiveSourceSet>,
+  active        : Option<&ActiveRepoSet>,
 ) -> Result<(), Box<dyn Error>> {
   let phantom_nodeids : Vec<NodeId> = {
     let mut result : Vec<NodeId> = Vec::new ();
@@ -794,5 +794,5 @@ fn attach_containerward_ancestries_to_removedhere_phantoms (
         if is_removedhere
         { result . push ( node_ref . id () ); }} }
     result };
-  attach_containerward_ancestries_at_nodeids_with_source_set (
+  attach_containerward_ancestries_at_nodeids_with_repo_set (
     viewforest, &phantom_nodeids, graph, config, active ) }

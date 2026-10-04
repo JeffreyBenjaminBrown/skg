@@ -7,7 +7,7 @@
 use crate::from_text::local_instruction_collection::predicates::{
   active_child_counts_as_content, member_counts_for_partnerFolder};
 use crate::types::errors::BufferValidationError;
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, RepoName};
 use crate::types::nodes::complete::FileProperty;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{PartnerFolder, Qual, QualFolder, Phantom, ViewNode, ViewNodeKind, Vognode};
@@ -43,11 +43,11 @@ enum OccurrencePathStep {
 struct WriteProtectedOccurrence {
   id       : ID,
   title    : String,
-  source   : SourceName,
-  content  : Vec<(ID, Option<SourceName>)>,
-  aliases  : Option<Vec<(String, Option<SourceName>)>>,
-  subscribes : Option<Vec<(ID, Option<SourceName>)>>,
-  overrides  : Option<Vec<(ID, Option<SourceName>)>>,
+  home_repo : RepoName,
+  content  : Vec<(ID, Option<RepoName>)>,
+  aliases  : Option<Vec<(String, Option<RepoName>)>>,
+  subscribes : Option<Vec<(ID, Option<RepoName>)>>,
+  overrides  : Option<Vec<(ID, Option<RepoName>)>>,
   hidden_outside : Option<Vec<ID>>,
 }
 
@@ -153,8 +153,8 @@ fn write_protected_changes (
     "changed ID from {} to {}", previous . id, current . id)); }
   if previous . title != current . title { changes . push (format! (
     "changed title from {:?} to {:?}", previous . title, current . title)); }
-  if previous . source != current . source { changes . push (format! (
-    "changed source from {} to {}", previous . source, current . source)); }
+  if previous . home_repo != current . home_repo { changes . push (format! (
+    "changed source from {} to {}", previous . home_repo, current . home_repo)); }
   if previous . content != current . content {
     changes . push ("changed content membership" . to_string ()); }
   if previous . aliases != current . aliases {
@@ -397,7 +397,7 @@ fn collect_occurrences (
       state       : WriteProtectedOccurrence {
         id       : active . id . clone (),
         title    : active . title . clone (),
-        source   : active . source . clone (),
+        home_repo   : active . home_repo . clone (),
         content  : content_members (node),
         aliases  : aliases (node),
         subscribes : partner_members (node, PartnerFolder::Subscribee),
@@ -459,42 +459,42 @@ fn make_direct_active_children_independent (
 
 fn content_members (
   node : NodeRef<ViewNode>,
-) -> Vec<(ID, Option<SourceName>)> {
+) -> Vec<(ID, Option<RepoName>)> {
   node . children () . filter_map ( |child| match &child . value () . kind {
     ViewNodeKind::Vognode (Vognode::Active (active))
       if active_child_counts_as_content (active) =>
-        Some ((active . collected_id (), active . relSource_request . clone ())),
+        Some ((active . collected_id (), active . relRepo_request . clone ())),
     ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
-      Some ((unknown . id . clone (), unknown . relSource_request . clone ())),
+      Some ((unknown . id . clone (), unknown . relRepo_request . clone ())),
     _ => None,
   }) . collect ()
 }
 
 fn aliases (
   node : NodeRef<ViewNode>,
-) -> Option<Vec<(String, Option<SourceName>)>> {
+) -> Option<Vec<(String, Option<RepoName>)>> {
   node . children () . find ( |child| matches! (
     &child . value () . kind, ViewNodeKind::QualFolder (QualFolder::Alias)))
     . map ( |alias_folder| alias_folder . children () . filter_map ( |alias| {
-      let ViewNodeKind::Qual (Qual::Alias { text, relSource_request, .. }) =
+      let ViewNodeKind::Qual (Qual::Alias { text, relRepo_request, .. }) =
         &alias . value () . kind else { return None; };
-      Some ((text . clone (), relSource_request . clone ()))
+      Some ((text . clone (), relRepo_request . clone ()))
     }) . collect () )
 }
 
 fn partner_members (
   node : NodeRef<ViewNode>,
   wanted : PartnerFolder,
-) -> Option<Vec<(ID, Option<SourceName>)>> {
+) -> Option<Vec<(ID, Option<RepoName>)>> {
   node . children () . find ( |child| matches! (
     &child . value () . kind, ViewNodeKind::PartnerFolder (folder) if *folder == wanted))
     . map ( |folder| folder . children () . filter_map ( |member| {
       match &member . value () . kind {
         ViewNodeKind::Vognode (Vognode::Active (active))
           if member_counts_for_partnerFolder (active) =>
-            Some ((active . id . clone (), active . relSource_request . clone ())),
+            Some ((active . id . clone (), active . relRepo_request . clone ())),
         ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
-          Some ((unknown . id . clone (), unknown . relSource_request . clone ())),
+          Some ((unknown . id . clone (), unknown . relRepo_request . clone ())),
         _ => None,
       }
     }) . collect () )

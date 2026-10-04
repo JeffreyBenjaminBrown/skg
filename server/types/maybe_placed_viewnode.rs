@@ -1,6 +1,6 @@
 /// Mp variants of ViewNode and ViewNodeKind,
 /// plus conversions between placed and maybePlaced trees.
-/// 'Mp' means id and source might be absent.
+/// 'Mp' means id and repo might be absent.
 /// Only needed briefly after parsing a buffer from the client;
 /// after validation, converted to placed types.
 
@@ -19,7 +19,7 @@ use std::collections::{HashMap, HashSet};
 // Type declarations
 //
 
-/// Every ViewNode has an ID and a source.
+/// Every ViewNode has an ID and a repo.
 /// In MpViewnode, those two fields are optional.
 /// That's the only difference.
 #[derive(Debug, Clone, PartialEq)]
@@ -66,17 +66,17 @@ impl TryFrom<MpActiveNode> for ActiveNode {
   fn try_from(u: MpActiveNode) -> Result<Self, Self::Error> {
     let id = u . id . ok_or_else(
       || format!("Node '{}' has no ID", u . title))?;
-    let source = u . source . ok_or_else(
+    let repo = u . home_repo . ok_or_else(
       || format!("Node '{}' has no source", u . title))?;
     Ok(ActiveNode {
       title          : u . title,
       id,
-      source,
+      home_repo: repo,
       affectsParent          : u . affectsParent,
       birth          : u . birth,
       graphStats     : u . graphStats,
       viewStats      : u . viewStats,
-      relSource_request : u . relSource_request,
+      relRepo_request : u . relRepo_request,
       view_requests  : u . view_requests,
       existence      : u . existence,
       membership     : u . membership,
@@ -92,12 +92,12 @@ impl TryFrom<MpPhantomDiff> for PhantomDiff {
   fn try_from(u: MpPhantomDiff) -> Result<Self, Self::Error> {
     let id = u . id . ok_or_else(
       || format!("Phantom '{}' has no ID", u . title))?;
-    let source = u . source . ok_or_else(
+    let repo = u . home_repo . ok_or_else(
       || format!("Phantom '{}' has no source", u . title))?;
     Ok(PhantomDiff {
       title      : u . title,
       id,
-      source,
+      home_repo: repo,
       existence  : u . existence,
       membership : u . membership,
       not_in_git : u . not_in_git,
@@ -111,7 +111,7 @@ impl From<PhantomDiff> for MpPhantomDiff {
     MpPhantomDiff {
       title      : p . title,
       id         : Some(p . id),
-      source     : Some(p . source),
+      home_repo     : Some(p . home_repo),
       existence  : p . existence,
       membership : p . membership,
       not_in_git : p . not_in_git,
@@ -169,12 +169,12 @@ impl From<ActiveNode> for MpActiveNode {
     MpActiveNode {
       title          : t . title,
       id             : Some(t . id),
-      source         : Some(t . source),
+      home_repo         : Some(t . home_repo),
       affectsParent          : t . affectsParent,
       birth          : t . birth,
       graphStats     : t . graphStats,
       viewStats      : t . viewStats,
-      relSource_request : t . relSource_request,
+      relRepo_request : t . relRepo_request,
       view_requests  : t . view_requests,
       existence      : t . existence,
       membership     : t . membership,
@@ -222,10 +222,10 @@ impl From<ViewNode> for MpViewnode {
   }
 }
 
-/// Does *not* compute missing source or ID.
+/// Does *not* compute missing repo or ID.
 /// Merely converts a Tree<MpViewnode>
 ///              to a Tree<ViewNode>,
-/// failing if it finds any source or ID missing.
+/// failing if it finds any repo or ID missing.
 pub fn maybePlaced_to_placed_tree (
   unchecked: Tree<MpViewnode>
 ) -> Result<Tree<ViewNode>, String> {
@@ -284,12 +284,12 @@ impl Default for MpActiveNode {
     MpActiveNode {
       title          : String::new(),
       id             : None,
-      source         : None,
+      home_repo         : None,
       affectsParent       : AffectsParent::True,
       birth          : Birth::Unremarkable,
       graphStats     : GraphNodeStats::default(),
       viewStats      : ViewNodeStats::default(),
-      relSource_request : None,
+      relRepo_request : None,
       view_requests  : HashSet::new(),
       existence      : ExistenceAxes::default(),
       membership     : MembershipAxes::default(),

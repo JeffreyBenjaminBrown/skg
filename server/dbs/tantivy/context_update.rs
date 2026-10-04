@@ -9,7 +9,7 @@
 use crate::consts::{TANTIVY_PER_ID_LOOKUP_LIMIT, TANTIVY_WRITER_BUFFER_BYTES};
 use crate::dbs::tantivy::background_writer::lock_tantivy_writes;
 use crate::dbs::tantivy::write::commit_with_status;
-use crate::types::misc::{ID, SourceName, TantivyIndex};
+use crate::types::misc::{ID, RepoName, TantivyIndex};
 
 use tantivy::{IndexWriter, Searcher, Term, TantivyDocument, doc};
 use tantivy::collector::TopDocs;
@@ -63,9 +63,9 @@ pub fn update_context_origin_types (
           . get_first ( tantivy_index . raw_title_field )
           . and_then ( |v| v . as_str () )
           . unwrap_or ("") . to_string ();
-      let source : SourceName =
+      let repo : RepoName =
         retrieved_doc
-          . get_first ( tantivy_index . source_field )
+          . get_first ( tantivy_index . repo_field )
           . and_then ( |v| v . as_str () )
           . unwrap_or ("") . into ();
       let overPrivateText_telescope : String =
@@ -104,8 +104,8 @@ pub fn update_context_origin_types (
           overPrivateText_telescope . as_str (),
         tantivy_index . no_search_matching_field =>
           no_search_matching . as_str (),
-        tantivy_index . source_field =>
-          source . as_str (),
+        tantivy_index . repo_field =>
+          repo . as_str (),
         tantivy_index . context_origin_type_field =>
           context_type . as_str (),
         tantivy_index . is_title_field =>

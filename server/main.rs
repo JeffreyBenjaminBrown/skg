@@ -3,21 +3,21 @@
 /// See docs/api-and-formats.org § skgconfig.toml,
 /// or the example at data/skgconfig.toml.
 ///
-/// Subcommand: import-org-roam <org-dir> <skg-output-dir> <source-name>
+/// Subcommand: import-org-roam <org-dir> <skg-output-dir> <repo-name>
 /// Converts org-roam .org files to .skg files.
 
 use skg::consts::{BUSYSIGNAL_POLL_INTERVAL_MS, BUSYSIGNAL_READ_TIMEOUT_MS};
 use skg::context::{compute_and_store_context_types, MapToContent, MapToContainers};
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::export_org::{
   export_candidate_pids, export_to_org, ExportReport};
-use skg::source_sets::{ActiveSourceSet, SourceSetName};
+use skg::repo_sets::{ActiveRepoSet, RepoSetName};
 use skg::dbs::init::{InitContextHandoff, initialize_dbs};
 use skg::types::env::SkgEnv;
 use skg::import_org_roam::{ImportStats, import_org_roam_directory};
 use skg::serve::serve;
-use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
+use skg::types::misc::{ID, SkgConfig, RepoName, TantivyIndex};
 use skg::types::nodes::complete::NodeComplete;
 
 use std::collections::HashSet;
@@ -54,7 +54,7 @@ fn main() -> Result<(), Box<dyn Error>> {
   if args . len() > 1 && args[1] == "check-config" {
     // Pre-flight used by bash/start-servers.sh: run the same
     // 'load_config' the server runs at startup (TOML parse +
-    // source-set/path validation) and exit 0/1, reporting a bad config
+    // repo-set/path validation) and exit 0/1, reporting a bad config
     // exactly the way the real startup does (via 'die_bad_config'). No
     // tracing and no file walk.
     let config_path: String =
@@ -293,9 +293,9 @@ fn run_import (
     std::process::exit (1); }
   let org_dir    : &Path       = Path::new (&args[2]);
   let output_dir : &Path       = Path::new (&args[3]);
-  let source     : SourceName  = SourceName::from (&args[4]);
+  let repo     : RepoName  = RepoName::from (&args[4]);
   let stats : ImportStats =
-    match import_org_roam_directory (org_dir, output_dir, &source) {
+    match import_org_roam_directory (org_dir, output_dir, &repo) {
       Ok (stats) => stats,
       Err (e) => { // printed plainly; a returned error's newlines would be escaped
         eprintln! ("{}", e);
@@ -314,8 +314,8 @@ fn run_import (
 /// 'skg-export-some-to-org' (the "export to org" TCP endpoint); this
 /// subcommand runs the same core for scripting and testing.
 ///
-/// USAGE: cargo run --bin skg -- export-org [config-path] [source-set] [output-dir] [--include-overPrivateText-telescopes]
-/// (source-set defaults to "all", output-dir to "org-exports").
+/// USAGE: cargo run --bin skg -- export-org [config-path] [repo-set] [output-dir] [--include-overPrivateText-telescopes]
+/// (repo-set defaults to "all", output-dir to "org-exports").
 /// output-dir is resolved against the current working directory; an
 /// absolute path is used as-is.
 fn run_export_org (
@@ -331,17 +331,17 @@ fn run_export_org (
     else { "data/skgconfig.toml" . to_string() };
   let config : SkgConfig =
     load_config (&config_path) ?;
-  let set_name : SourceSetName =
+  let set_name : RepoSetName =
     if positional . len () > 1 {
-      SourceSetName::from (positional[1] . as_str()) }
-    else { SourceSetName::from ("all") };
+      RepoSetName::from (positional[1] . as_str()) }
+    else { RepoSetName::from ("all") };
   let output_dir : String =
     if positional . len () > 2 { positional[2] . clone () }
     else { "org-exports" . to_string() };
-  let active : ActiveSourceSet =
-    ActiveSourceSet::named (&config, set_name) ?;
+  let active : ActiveRepoSet =
+    ActiveRepoSet::named (&config, set_name) ?;
   let nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources (&config) ?;
+    read_all_skg_files_from_repos (&config) ?;
   let candidates : HashSet<ID> =
     export_candidate_pids (&active, &nodes) . into_iter () . collect ();
   let mut overPrivateText_pids : Vec<ID> = nodes . iter ()

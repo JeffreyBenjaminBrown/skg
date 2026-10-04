@@ -13,9 +13,9 @@ use skg::context::{
   extend_context,
   extend_contexts_for_cycles,
 };
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use skg::dbs::in_rust_graph::InRustGraph;
-use skg::types::misc::{ID, SkgConfig, SkgfileSource, SourceName, rel_partners_at_relSource};
+use skg::types::misc::{ID, SkgConfig, SkgfileRepo, RepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{FileProperty, NodeComplete, empty_node_complete};
 use skg::types::save::{DefineNode, SaveNode};
 
@@ -101,9 +101,9 @@ fn in_rust_context_types_for_saved_nodes () {
     let mut n : NodeComplete = empty_node_complete ();
     n . pid = ID::new (pid);
     n . title = title . to_string ();
-    n . source = SourceName::from ("main");
-    n . contains = rel_partners_at_relSource (
-      &n . source,
+    n . home_repo = RepoName::from ("main");
+    n . contains = rel_partners_at_relRepo (
+      &n . home_repo,
       contains . iter () . map ( |c| ID::new (*c) ) . collect () );
     if had_id { n . misc = vec![FileProperty::Had_ID_Before_Import]; }
     n };
@@ -272,16 +272,16 @@ fn test_extend_contexts_for_cycles_detects_cycle () {
 fn test_full_context_pipeline () {
   // Load NodeCompletes from fixture files.
   let config : SkgConfig =
-    SkgConfig::dummyFromSources (
+    SkgConfig::dummyFromRepos (
       HashMap::from ([(
-        SourceName::from ("test"),
-        SkgfileSource {
-          name         : SourceName::from ("test"),
+        RepoName::from ("test"),
+        SkgfileRepo {
+          name         : RepoName::from ("test"),
           abbreviation : None,
           path         : PathBuf::from ("tests/contexts/fixtures"),
           user_owns_it : true } )]) );
   let nodes : Vec<NodeComplete> =
-    read_all_skg_files_from_sources (&config)
+    read_all_skg_files_from_repos (&config)
     . expect ("failed to read fixture .skg files");
   // Extract data from NodeCompletes.
   let ( map_to_content, map_to_containers )

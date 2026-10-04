@@ -5,7 +5,7 @@
 // walks it.
 //
 // Graph fixture:
-//   b and d, both leaves, both at the main source.
+//   b and d, both leaves, both at the main repo.
 //
 // The saved buffer has both b and d as top-level roots (i.e. not
 // content-children of anything), and puts (editRequest (merge b))

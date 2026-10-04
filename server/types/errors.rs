@@ -1,4 +1,4 @@
-use super::misc::{ID, SourceName};
+use super::misc::{ID, RepoName};
 use std::error::Error;
 use std::io;
 use std::collections::HashSet;
@@ -30,24 +30,24 @@ pub enum BufferValidationError {
   Multiple_Defining_Viewnodes     (ID), // For any given ID, at most one occurrence can be definitive. (Its contents are intended to define those of the node.)
   AmbiguousDeletion              (ID),
   DuplicatedContent              (ID), // A node has multiple Content children with the same ID
-  InconsistentSources            (ID, HashSet<SourceName>), // Multiple viewnodes with same ID have different sources
-  ModifiedForeignNode            (ID, SourceName), // Attempted to modify a node from a foreign (read-only) source - (node_id, source_name)
-  CreatedForeignNode             (ID, SourceName), // Attempted to create a node in a foreign (read-only) source - (node_id, source_name)
-  CannotMoveToOrFromForeignSource (ID,
-                                   SourceName, // disk source
-                                   SourceName), // buffer source
+  InconsistentRepos            (ID, HashSet<RepoName>), // Multiple viewnodes with same ID have different repos
+  ModifiedForeignNode            (ID, RepoName), // Attempted to modify a node from a foreign (read-only) repo - (node_id, repo_name)
+  CreatedForeignNode             (ID, RepoName), // Attempted to create a node in a foreign (read-only) repo - (node_id, repo_name)
+  CannotMoveToOrFromForeignRepo (ID,
+                                   RepoName, // disk repo
+                                   RepoName), // buffer repo
   CannotMoveAndMergeSimultaneously (ID),
-  SourceNotInConfig              (ID, SourceName),
+  RepoNotInConfig              (ID, RepoName),
   // Fork errors. Editing a foreign node N is read as a request to
-  // clone it (the clone C lives in an owned source, subscribes to and
+  // clone it (the clone C lives in an owned repo, subscribes to and
   // overrides N). These are the ways that request can be refused.
-  ForkSourceUnresolved           (ID), // N's pid: no OWNED vognode ancestor in the view to inherit C's source from, and the user set none in the confirmation buffer.
+  ForkRepoUnresolved           (ID), // N's pid: no OWNED vognode ancestor in the view to inherit C's repo from, and the user set none in the confirmation buffer.
   ForkAlreadyExists              (ID,   // N's pid
                                   ID),  // the existing user-owned clone that already overrides N (monogamy: a node may have at most one user-owned overrider)
-  ForkSourceInactive             (ID,           // N's pid
-                                  SourceName),  // C's resolved owned source, which is INACTIVE under the active source-set
-  ForkSourceNotOwned             (ID,           // N's pid
-                                  SourceName),  // C's chosen source, which the user does NOT own (a typed or hand-edited source the rotation would never offer)
+  ForkRepoInactive             (ID,           // N's pid
+                                  RepoName),  // C's resolved owned repo, which is INACTIVE under the active repo-set
+  ForkRepoNotOwned             (ID,           // N's pid
+                                  RepoName),  // C's chosen repo, which the user does NOT own (a typed or hand-edited repo the rotation would never offer)
   ForkRequestOnUnknownNode       (ID),  // An explicit 'skg-fork-node' request on a node whose id is not in the graph (an unsaved headline): nothing exists to override.
   ForkRequestMultiple            (ID),  // Two headlines for the same id both carry an explicit fork request; at most one is allowed.
   OverrideInvariantViolation     (String),
@@ -67,7 +67,7 @@ pub enum BufferValidationError {
     owner_title : String,
     changes     : Vec<String>,
   },
-  BoolPropEditOnForeignNode                 (ID, SourceName),
+  BoolPropEditOnForeignNode                 (ID, RepoName),
   BoolPropEditOnUnknownNode                 (ID),
   IDFolder_Edited                   (ID,       // owner of the IDFolder
                                   Vec<ID>,  // ids the buffer's IDFolder claims
@@ -114,27 +114,27 @@ impl std::fmt::Display for BufferValidationError {
         write!(f, "Ambiguous deletion request for ID {:?}", id),
       BufferValidationError::DuplicatedContent (id) =>
         write!(f, "Node has multiple Content children with the same ID {:?}", id),
-      BufferValidationError::InconsistentSources(id, sources) => {
-        let source_list: Vec<&SourceName> = sources . iter() . collect();
-        write!(f, "Multiple viewnodes with ID {:?} have inconsistent sources: {:?}", id, source_list) },
-      BufferValidationError::ModifiedForeignNode(id, source) =>
-        write!(f, "Cannot modify node {:?} from foreign (read-only) source '{}'", id, source),
-      BufferValidationError::CreatedForeignNode(id, source) =>
-        write!(f, "Cannot create node {:?} in foreign (read-only) source '{}'", id, source),
-      BufferValidationError::CannotMoveToOrFromForeignSource(id, disk_source, buffer_source) =>
-        write!(f, "Cannot move node {:?} between sources '{}' and '{}': one or both are foreign (read-only)", id, disk_source, buffer_source),
+      BufferValidationError::InconsistentRepos(id, repos) => {
+        let repo_list: Vec<&RepoName> = repos . iter() . collect();
+        write!(f, "Multiple viewnodes with ID {:?} have inconsistent sources: {:?}", id, repo_list) },
+      BufferValidationError::ModifiedForeignNode(id, repo) =>
+        write!(f, "Cannot modify node {:?} from foreign (read-only) source '{}'", id, repo),
+      BufferValidationError::CreatedForeignNode(id, repo) =>
+        write!(f, "Cannot create node {:?} in foreign (read-only) source '{}'", id, repo),
+      BufferValidationError::CannotMoveToOrFromForeignRepo(id, disk_repo, buffer_repo) =>
+        write!(f, "Cannot move node {:?} between sources '{}' and '{}': one or both are foreign (read-only)", id, disk_repo, buffer_repo),
       BufferValidationError::CannotMoveAndMergeSimultaneously(id) =>
         write!(f, "Cannot move and merge node {:?} in the same save", id),
-      BufferValidationError::SourceNotInConfig(id, source) =>
-        write!(f, "Node {:?} references source '{}' which does not exist in config", id, source),
-      BufferValidationError::ForkSourceUnresolved(id) =>
+      BufferValidationError::RepoNotInConfig(id, repo) =>
+        write!(f, "Node {:?} references source '{}' which does not exist in config", id, repo),
+      BufferValidationError::ForkRepoUnresolved(id) =>
         write!(f, "Cannot fork node {:?}: no owned source to put the clone in. It has no owned ancestor in the view to inherit a source from; set the clone's source in the confirmation buffer (C-c s s).", id),
       BufferValidationError::ForkAlreadyExists(original, existing) =>
         write!(f, "Cannot fork node {:?}: you have already forked it. Your clone is {:?}. Edit that clone instead (a node may have at most one user-owned override).", original, existing),
-      BufferValidationError::ForkSourceInactive(id, source) =>
-        write!(f, "Cannot fork node {:?}: the clone's source '{}' is inactive under the current source-set. Activate it first; an invisible clone is never created silently.", id, source),
-      BufferValidationError::ForkSourceNotOwned(id, source) =>
-        write!(f, "Cannot fork node {:?}: the clone's source '{}' is not one you own. Choose an owned source for the clone (C-c s s in the confirmation buffer).", id, source),
+      BufferValidationError::ForkRepoInactive(id, repo) =>
+        write!(f, "Cannot fork node {:?}: the clone's source '{}' is inactive under the current source-set. Activate it first; an invisible clone is never created silently.", id, repo),
+      BufferValidationError::ForkRepoNotOwned(id, repo) =>
+        write!(f, "Cannot fork node {:?}: the clone's source '{}' is not one you own. Choose an owned source for the clone (C-c s s in the confirmation buffer).", id, repo),
       BufferValidationError::ForkRequestOnUnknownNode(id) =>
         write!(f, "Cannot fork node {:?}: it is not in the graph. Only a saved node can be forked; save it first, then fork.", id),
       BufferValidationError::ForkRequestMultiple(id) =>
@@ -163,8 +163,8 @@ impl std::fmt::Display for BufferValidationError {
         owner_id, owner_title, changes } =>
         write!(f, "The properties surface under node {:?} ({:?}) was edited: {}. It is server-owned and no changes were saved. Use skg-set-property-search-matching for noSearchMatching; provenance properties have no setter.",
                owner_id, owner_title, changes . join ("; ")),
-      BufferValidationError::BoolPropEditOnForeignNode (id, source) =>
-        write! (f, "Cannot change properties of node {:?} from foreign source '{}'; this gesture never creates an implicit fork.", id, source),
+      BufferValidationError::BoolPropEditOnForeignNode (id, repo) =>
+        write! (f, "Cannot change properties of node {:?} from foreign source '{}'; this gesture never creates an implicit fork.", id, repo),
       BufferValidationError::BoolPropEditOnUnknownNode (id) =>
         write! (f, "Cannot change properties of unsaved or unknown node {:?}; save the node first.", id),
       BufferValidationError::OverridesHere_Mismatch(carrier, original, effective) =>

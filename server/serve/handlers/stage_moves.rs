@@ -8,11 +8,11 @@ use crate::types::misc::SkgConfig;
 
 use std::net::TcpStream;
 
-/// Build, for every detected single-source-to-single-source node
+/// Build, for every detected single-repo-to-single-repo node
 /// move, a shell script that stages it, and send it to the client as
-/// a buffer. Scans all configured sources irrespective of the active
-/// source-set: a move can cross source-set boundaries, so restricting
-/// would hide moves. Non-git sources simply contribute nothing.
+/// a buffer. Scans all configured repos irrespective of the active
+/// repo-set: a move can cross repo-set boundaries, so restricting
+/// would hide moves. Non-git repos simply contribute nothing.
 pub fn handle_stage_moves_request (
   stream : &mut TcpStream,
   config : &SkgConfig,

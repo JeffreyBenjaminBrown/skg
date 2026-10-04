@@ -20,8 +20,8 @@
 use crate::from_text::local_instruction_collection::types::{
   CollectedIntents, HiddenOutsideEdit, IntentsForOneId, SubscribeeVisibility };
 use crate::types::misc::{
-  ID, MSV, RelPartner, SourceName, members_msv, members_of,
-  rel_partners_at_relSource, rel_partners_at_relSource_msv };
+  ID, MSV, RelPartner, RepoName, members_msv, members_of,
+  rel_partners_at_relRepo, rel_partners_at_relRepo_msv };
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::save::{DefineNode, SaveNode, DeleteNode};
 
@@ -38,53 +38,53 @@ pub enum NodeIntent {
 
 pub struct NodeSaveIntent {
   pub pid               : ID,
-  pub source            : SourceName,
+  pub home_repo            : RepoName,
   pub title             : String,
   pub body              : Option<String>,
   // contains / subscribes_to / overrides_view_of pair each member
-  // with an Option<SourceName>: Some when the buffer's headline
-  // carried an '(editRequest (relSource NAME))' request (see
-  // 'ActiveNode_Generic::relSource_request', 'NodeIntent_Local'); None means
-  // "derive" (sticky-else-default). 'requested_relSources' extracts the
+  // with an Option<RepoName>: Some when the buffer's headline
+  // carried an '(editRequest (relRepo NAME))' request (see
+  // 'ActiveNode_Generic::relRepo_request', 'NodeIntent_Local'); None means
+  // "derive" (sticky-else-default). 'requested_relRepos' extracts the
   // Some entries into a side-channel BEFORE 'into_nodecomplete'
-  // discards them, for 'apply_sticky_relSources' to validate against
+  // discards them, for 'apply_sticky_relRepos' to validate against
   // each edge's floor.
-  pub contains          : MSV<(ID, Option<SourceName>)>,
+  pub contains          : MSV<(ID, Option<RepoName>)>,
   pub extra_ids         : Vec<ID>,
-  pub aliases           : MSV<(String, Option<SourceName>)>,
-  pub subscribes_to     : MSV<(ID, Option<SourceName>)>,
+  pub aliases           : MSV<(String, Option<RepoName>)>,
+  pub subscribes_to     : MSV<(ID, Option<RepoName>)>,
   pub hides_from_its_subscriptions : MSV<ID>,
-  pub overrides_view_of : MSV<(ID, Option<SourceName>)>,
+  pub overrides_view_of : MSV<(ID, Option<RepoName>)>,
   pub misc              : Vec<FileProperty>,
   pub boolprop_request  : Option<(FileProperty, bool)>,
 }
 
-/// Sources the buffer explicitly requested via '(editRequest
-/// (relSource NAME))', keyed by member
-/// ID, one map per relation that carries per-member relSources (hides is
+/// Repos the buffer explicitly requested via '(editRequest
+/// (relRepo NAME))', keyed by member
+/// ID, one map per relation that carries per-member relRepos (hides is
 /// absent: it is inferred, and the folder that shows it is read-only --
-/// the set-relSource gesture refuses there). Threaded
+/// the set-relRepo gesture refuses there). Threaded
 /// separately from
-/// NodeComplete because NodeComplete's 'RelPartner::source' is a
-/// plain SourceName with no "was this explicit" flag, and gets
-/// unconditionally resolved by 'apply_sticky_relSources' -- this is the
+/// NodeComplete because NodeComplete's 'RelPartner::repo' is a
+/// plain RepoName with no "was this explicit" flag, and gets
+/// unconditionally resolved by 'apply_sticky_relRepos' -- this is the
 /// side-channel that tells that pass which members carry a real,
-/// user-requested source to validate against the default
+/// user-requested repo to validate against the default
 /// floor, rather than deriving normally (render-and-gating,
 /// TODO/user-owned_autofork_chain/5_plan.org).
 #[derive(Clone, Debug, Default)]
-pub struct RequestedRelSources {
-  pub contains          : HashMap<ID, SourceName>,
-  pub aliases           : HashMap<String, SourceName>,
-  pub subscribes_to     : HashMap<ID, SourceName>,
-  pub overrides_view_of : HashMap<ID, SourceName>,
+pub struct RequestedRelRepos {
+  pub contains          : HashMap<ID, RepoName>,
+  pub aliases           : HashMap<String, RepoName>,
+  pub subscribes_to     : HashMap<ID, RepoName>,
+  pub overrides_view_of : HashMap<ID, RepoName>,
 }
 
-/// Strip the per-member explicit-source payload down to plain IDs, by
+/// Strip the per-member explicit-repo payload down to plain IDs, by
 /// reference (read-only consumers, e.g.
 /// 'save_intents_with_specified_contains').
 fn ids_only_msv_ref (
-  msv : &MSV<(ID, Option<SourceName>)>,
+  msv : &MSV<(ID, Option<RepoName>)>,
 ) -> MSV<ID> {
   match msv {
     MSV::Unspecified   => MSV::Unspecified,
@@ -93,7 +93,7 @@ fn ids_only_msv_ref (
 
 /// As 'ids_only_msv_ref', consuming.
 fn ids_only_msv (
-  msv : MSV<(ID, Option<SourceName>)>,
+  msv : MSV<(ID, Option<RepoName>)>,
 ) -> MSV<ID> {
   match msv {
     MSV::Unspecified   => MSV::Unspecified,
@@ -102,7 +102,7 @@ fn ids_only_msv (
 
 /// As above, for the non-MSV 'contains' slice.
 fn ids_only (
-  list : &[(ID, Option<SourceName>)],
+  list : &[(ID, Option<RepoName>)],
 ) -> Vec<ID> {
   list . iter () . map ( |(id, _)| id . clone () ) . collect () }
 
@@ -129,21 +129,21 @@ impl NodeIntent {
   pub fn graph_save_from_nodecomplete (
     node : NodeComplete,
   ) -> NodeIntent {
-    // No explicit sources: this seeds an intent straight from disk
+    // No explicit repos: this seeds an intent straight from disk
     // (a definitive rebuild for hide-delta application), not from a
-    // buffer headline that could carry a '(relSource ...)' atom.
+    // buffer headline that could carry a '(relRepo ...)' atom.
     // Preserves the MSV Unspecified/Specified distinction, unlike a
     // plain 'or_default()' round-trip.
     fn no_explicit_msv (
       msv : &MSV<RelPartner<ID>>,
-    ) -> MSV<(ID, Option<SourceName>)> {
+    ) -> MSV<(ID, Option<RepoName>)> {
       match msv {
         MSV::Unspecified   => MSV::Unspecified,
         MSV::Specified (v) => MSV::Specified (
           v . iter () . map ( |m| (m . member . clone (), None) ) . collect () ), }}
     NodeIntent::Save (NodeSaveIntent {
       pid                          : node . pid,
-      source                       : node . source,
+      home_repo                       : node . home_repo,
       title                        : node . title,
       body                         : node . body,
       contains                     : MSV::Specified (
@@ -191,30 +191,30 @@ impl NodeSaveIntent {
     contains : &[ID],
   ) {
     if self . contains . is_unspecified() {
-      // Disk-derived filler: no per-member explicit source (that only
-      // ever comes from a buffer headline's own '(relSource ...)').
+      // Disk-derived filler: no per-member explicit repo (that only
+      // ever comes from a buffer headline's own '(relRepo ...)').
       self . contains =
         MSV::Specified ( contains . iter () . cloned ()
                           . map ( |id| (id, None) ) . collect () ); }}
 
-  /// The sources the buffer explicitly requested (its headlines'
-  /// '(relSource NAME)' atoms), read out BEFORE 'into_nodecomplete'
-  /// discards the Option<SourceName> payload. See 'RequestedRelSources'.
-  pub fn requested_relSources (
+  /// The repos the buffer explicitly requested (its headlines'
+  /// '(relRepo NAME)' atoms), read out BEFORE 'into_nodecomplete'
+  /// discards the Option<RepoName> payload. See 'RequestedRelRepos'.
+  pub fn requested_relRepos (
     &self,
-  ) -> RequestedRelSources {
+  ) -> RequestedRelRepos {
     fn collect (
-      list : &[(ID, Option<SourceName>)],
-    ) -> HashMap<ID, SourceName> {
+      list : &[(ID, Option<RepoName>)],
+    ) -> HashMap<ID, RepoName> {
       list . iter ()
-        . filter_map ( |(id, source)| source . clone ()
+        . filter_map ( |(id, repo)| repo . clone ()
                        . map ( |s| (id . clone (), s) ) )
         . collect () }
-    RequestedRelSources {
+    RequestedRelRepos {
       contains          : collect (self . contains . or_default ()),
       aliases           : self . aliases . or_default () . iter ()
-        . filter_map ( |(text, source)| source . clone ()
-          . map ( |source| (text . clone (), source) ) )
+        . filter_map ( |(text, repo)| repo . clone ()
+          . map ( |repo| (text . clone (), repo) ) )
         . collect (),
       subscribes_to     : collect (self . subscribes_to . or_default ()),
       overrides_view_of : collect (self . overrides_view_of . or_default ()),
@@ -223,32 +223,32 @@ impl NodeSaveIntent {
   pub fn into_nodecomplete (
     self,
   ) -> NodeComplete {
-    let source : SourceName = self . source . clone();
+    let repo : RepoName = self . home_repo . clone();
     let mut node : NodeComplete = NodeComplete {
       title                        : self . title,
       overPrivateText_telescope               : false,
       aliases                      :
-        rel_partners_at_relSource_msv (
-          &source,
+        rel_partners_at_relRepo_msv (
+          &repo,
           match self . aliases {
             MSV::Unspecified => MSV::Unspecified,
             MSV::Specified (aliases) => MSV::Specified (
               aliases . into_iter ()
               . map ( |(text, _)| text ) . collect () ), } ),
-      source                       : self . source,
+      home_repo                       : self . home_repo,
       pid                          : self . pid,
       extra_ids                    : self . extra_ids,
       body                         :
         crate::types::nodes::complete::normalize_body ( self . body ),
       contains                     :
-        rel_partners_at_relSource (
-          &source, ids_only (self . contains . or_default ()) ),
+        rel_partners_at_relRepo (
+          &repo, ids_only (self . contains . or_default ()) ),
       subscribes_to                :
-        rel_partners_at_relSource_msv (&source, ids_only_msv (self . subscribes_to)),
+        rel_partners_at_relRepo_msv (&repo, ids_only_msv (self . subscribes_to)),
       hides_from_its_subscriptions :
-        rel_partners_at_relSource_msv (&source, self . hides_from_its_subscriptions),
+        rel_partners_at_relRepo_msv (&repo, self . hides_from_its_subscriptions),
       overrides_view_of            :
-        rel_partners_at_relSource_msv (&source, ids_only_msv (self . overrides_view_of)),
+        rel_partners_at_relRepo_msv (&repo, ids_only_msv (self . overrides_view_of)),
       misc                         : self . misc,
     };
     node . normalize_ids ();
@@ -365,7 +365,7 @@ fn lower_one_entry (
   if entry . delete {
     return Ok (NodeIntent::Delete (DeleteNode {
       id     : pid . clone(),
-      source : entry . source . ok_or_else ( || format!(
+      home_repo : entry . home_repo . ok_or_else ( || format!(
         "lower_collected_intents: delete entry for {} lacks a source",
         pid )) ?, } )); }
   match entry . title_and_body {
@@ -376,7 +376,7 @@ fn lower_one_entry (
     Some (( title, body )) => {
       Ok (NodeIntent::Save (NodeSaveIntent {
         pid    : pid . clone(),
-        source : entry . source . ok_or_else ( || format!(
+        home_repo : entry . home_repo . ok_or_else ( || format!(
           "lower_collected_intents: save entry for {} lacks a source",
           pid )) ?,
         title,
@@ -411,7 +411,7 @@ impl LoweredIntents {
       . filter_map ( |pid| by_pid . remove (&pid) )
       . collect() }
 
-  /// One (pid, source, contains, subscribes_to) tuple per Save
+  /// One (pid, repo, contains, subscribes_to) tuple per Save
   /// intent whose contains is Specified -- the candidates for
   /// inferring hides from contains removals (see
   /// 'infer_hides_from_contains_removals'). Cloned out so the caller
@@ -419,14 +419,14 @@ impl LoweredIntents {
   /// iterating.
   pub fn save_intents_with_specified_contains (
     &self,
-  ) -> Vec<(ID, SourceName, Vec<ID>, MSV<ID>)> {
+  ) -> Vec<(ID, RepoName, Vec<ID>, MSV<ID>)> {
     self . order . iter ()
       . filter_map ( |pid| match self . by_pid . get (pid) {
           Some (NodeIntent::Save (intent)) =>
             match & intent . contains {
               MSV::Specified (contains) => Some ((
                 pid . clone (),
-                intent . source . clone (),
+                intent . home_repo . clone (),
                 ids_only (contains),
                 ids_only_msv_ref (&intent . subscribes_to) )),
               _ => None },

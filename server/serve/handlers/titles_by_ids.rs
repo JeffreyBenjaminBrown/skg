@@ -5,29 +5,29 @@ use crate::serve::handlers::text_release::{
   approved_pids_from_request,
   challenge_response,
   decide_for_overPrivateText_pids};
-use crate::serve::handlers::save_buffer::compute_diff_for_every_source;
+use crate::serve::handlers::save_buffer::compute_diff_for_every_repo;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::send_response_with_length_prefix;
-use crate::source_sets::{
-  ActiveSourceSet,
-  SourceSetName,
-  titles_for_source_set_for_test,
+use crate::repo_sets::{
+  ActiveRepoSet,
+  RepoSetName,
+  titles_for_repo_set_for_test,
 };
 use crate::types::phantom::home_from_disk;
-use crate::types::git::SourceDiff;
-use crate::types::misc::{ID, SourceName, SkgConfig, TantivyIndex};
+use crate::types::git::RepoDiff;
+use crate::types::misc::{ID, RepoName, SkgConfig, TantivyIndex};
 use crate::types::sexp::extract_string_list_from_sexp;
 
 use sexp::{Sexp, Atom};
 use std::collections::{HashMap, HashSet};
 use std::net::TcpStream;
 
-pub fn titles_by_ids_for_source_set_for_test (
+pub fn titles_by_ids_for_repo_set_for_test (
   config : &SkgConfig,
-  active : &ActiveSourceSet,
+  active : &ActiveRepoSet,
   ids    : &[ID],
 ) -> Result<HashMap<ID, String>, Box<dyn std::error::Error>> {
-  titles_for_source_set_for_test (config, active, ids) }
+  titles_for_repo_set_for_test (config, active, ids) }
 
 /// Handle a "titles by ids" request from Emacs.
 /// Parses the ID list, performs a bulk Tantivy lookup, supplements
@@ -41,22 +41,22 @@ pub fn handle_titles_by_ids_request (
   config            : &SkgConfig,
   diff_mode_enabled : bool,
 ) {
-  let active : ActiveSourceSet =
-    ActiveSourceSet::named (
+  let active : ActiveRepoSet =
+    ActiveRepoSet::named (
       config,
-      SourceSetName::from ("all"))
+      RepoSetName::from ("all"))
     . expect ("reserved source-set all should always resolve");
-  handle_titles_by_ids_request_with_source_set (
+  handle_titles_by_ids_request_with_repo_set (
     stream, request, tantivy_index, config,
     diff_mode_enabled, &active, graph ) }
 
-pub fn handle_titles_by_ids_request_with_source_set (
+pub fn handle_titles_by_ids_request_with_repo_set (
   stream            : &mut TcpStream,
   request           : &str,
   tantivy_index     : &TantivyIndex,
   config            : &SkgConfig,
   diff_mode_enabled : bool,
-  active            : &ActiveSourceSet,
+  active            : &ActiveRepoSet,
   graph             : &InRustGraph,
 ) {
   let parsed : Sexp =
@@ -83,24 +83,24 @@ pub fn handle_titles_by_ids_request_with_source_set (
     . collect ();
   let mut title_map : HashMap<ID, String> =
     titles_by_ids (tantivy_index, &ids);
-  let source_diffs : Option<HashMap<SourceName, SourceDiff>> =
+  let repo_diffs : Option<HashMap<RepoName, RepoDiff>> =
     if diff_mode_enabled || title_map . len () < ids . len () {
-      Some (compute_diff_for_every_source (config))
+      Some (compute_diff_for_every_repo (config))
     } else { None };
-  if let Some (source_diffs) = &source_diffs {
+  if let Some (repo_diffs) = &repo_diffs {
     add_addedNode_titles_by_ids (
-      &mut title_map, &ids, source_diffs );
+      &mut title_map, &ids, repo_diffs );
     add_deleted_node_titles_by_ids (
-      &mut title_map, &ids, source_diffs ); }
+      &mut title_map, &ids, repo_diffs ); }
   title_map . retain ( |id, _| {
     if active . is_all () {
       true
     } else {
-      graph . pid_and_source (id) . map (|(_, source)| source)
-      . or_else (|| crate::dbs::tantivy::title_and_source_by_id (
-        tantivy_index, id ) . map (|(_, source)| source))
+      graph . pid_and_repo (id) . map (|(_, repo)| repo)
+      . or_else (|| crate::dbs::tantivy::title_and_repo_by_id (
+        tantivy_index, id ) . map (|(_, repo)| repo))
       . or_else (|| home_from_disk (id, config))
-      . map ( |source| active . contains_source (&source) )
+      . map ( |repo| active . contains_repo (&repo) )
       . unwrap_or (false) } } );
   let requested : HashSet<ID> = ids . iter () . cloned () . collect ();
   let mut overPrivateText_pids : Vec<ID> = ids . iter ()
@@ -109,10 +109,10 @@ pub fn handle_titles_by_ids_request_with_source_set (
       . map ( |node| node . overPrivateText_telescope )
       . unwrap_or (false) )
     . collect ();
-  if let Some (source_diffs) = &source_diffs {
-    for source_diff in source_diffs . values () {
-      for node in source_diff . added_nodes . values ()
-        . chain (source_diff . deleted_nodes . values ()) {
+  if let Some (repo_diffs) = &repo_diffs {
+    for repo_diff in repo_diffs . values () {
+      for node in repo_diff . added_nodes . values ()
+        . chain (repo_diff . deleted_nodes . values ()) {
         if node . overPrivateText_telescope
            && node . all_ids () . any ( |id| requested . contains (id) ) {
           overPrivateText_pids . push (node . pid . clone ()); }}}}
@@ -163,12 +163,12 @@ fn elisp_string_literal (
 pub fn add_deleted_node_titles_by_ids (
   title_map    : &mut HashMap<ID, String>,
   ids          : &[ID],
-  source_diffs : &HashMap<SourceName, SourceDiff>,
+  repo_diffs : &HashMap<RepoName, RepoDiff>,
 ) {
   let requested_ids : HashSet<ID> =
     ids . iter () . cloned () . collect ();
-  for source_diff in source_diffs . values () {
-    for node in source_diff . deleted_nodes . values () {
+  for repo_diff in repo_diffs . values () {
+    for node in repo_diff . deleted_nodes . values () {
       for id in node . all_ids () {
         if requested_ids . contains (id) {
           title_map
@@ -178,12 +178,12 @@ pub fn add_deleted_node_titles_by_ids (
 pub fn add_addedNode_titles_by_ids (
   title_map    : &mut HashMap<ID, String>,
   ids          : &[ID],
-  source_diffs : &HashMap<SourceName, SourceDiff>,
+  repo_diffs : &HashMap<RepoName, RepoDiff>,
 ) {
   let requested_ids : HashSet<ID> =
     ids . iter () . cloned () . collect ();
-  for source_diff in source_diffs . values () {
-    for node in source_diff . added_nodes . values () {
+  for repo_diff in repo_diffs . values () {
+    for node in repo_diff . added_nodes . values () {
       for id in node . all_ids () {
         if requested_ids . contains (id) {
           title_map

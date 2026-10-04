@@ -4,8 +4,8 @@
 //!
 
 use crate::dbs::in_rust_graph::{InRustGraph, InRustGraphHandle};
-use crate::dbs::tantivy::title_and_source_by_id;
-use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
+use crate::dbs::tantivy::title_and_repo_by_id;
+use crate::types::misc::{ID, SkgConfig, RepoName, TantivyIndex};
 use crate::types::phantom::home_from_disk;
 
 use std::collections::HashMap;
@@ -131,7 +131,7 @@ impl SkgEnv {
     self . runtime . mutation_gate . clone ()
   }
 
-  /// Resolve an ID to its source by checking, in order:
+  /// Resolve an ID to its repo by checking, in order:
   ///
   /// 1. The in-Rust graph snapshot (freshest; reflects in-flight
   ///    edits before they reach the indexed DBs or disk).
@@ -143,37 +143,37 @@ impl SkgEnv {
   ///    out-of-band since the last index sync).
   ///
   /// Tantivy is only an optimization here: the graph is authoritative for
-  /// identity and source lookup, and this helper stays synchronous.
-  pub fn find_source_in_generation (
+  /// identity and repo lookup, and this helper stays synchronous.
+  pub fn find_repo_in_generation (
     runtime : &RuntimeGeneration,
     id : &ID,
-    deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
-  ) -> Option<SourceName> {
+    deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
+  ) -> Option<RepoName> {
     if let Some ((_pid, src)) =
-      runtime . graph . pid_and_source (id)
+      runtime . graph . pid_and_repo (id)
     { return Some (src); }
     if let Some (s) = deleted_since_head_pid_src_map . get (id)
     { return Some (s . clone ()); }
     if let Some ((_title, src)) =
-      title_and_source_by_id (&runtime . tantivy_index, id)
+      title_and_repo_by_id (&runtime . tantivy_index, id)
     { return Some (src); }
     home_from_disk (id, &runtime . config) }
 }
 
-/// Source lookup against one explicit graph snapshot, with optional Tantivy
+/// Repo lookup against one explicit graph snapshot, with optional Tantivy
 /// and disk fallbacks for deleted or out-of-band nodes.
-pub fn find_source_with_optional_tantivy (
+pub fn find_repo_with_optional_tantivy (
   graph                          : &InRustGraph,
   id                             : &ID,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
   tantivy_index                  : Option<&TantivyIndex>,
   config                         : &SkgConfig,
-) -> Option<SourceName> {
-  if let Some ((_pid, src)) = graph . pid_and_source (id)
+) -> Option<RepoName> {
+  if let Some ((_pid, src)) = graph . pid_and_repo (id)
     { return Some (src); }
   if let Some (s) = deleted_since_head_pid_src_map . get (id)
   { return Some (s . clone ()); }
   if let Some (idx) = tantivy_index {
-    if let Some ((_title, src)) = title_and_source_by_id (idx, id)
+    if let Some ((_title, src)) = title_and_repo_by_id (idx, id)
     { return Some (src); } }
   home_from_disk (id, config) }

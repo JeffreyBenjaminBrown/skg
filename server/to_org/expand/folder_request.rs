@@ -9,13 +9,13 @@
 /// 'aliases' is handled by the AliasFolder builder ('expand/aliases.rs'),
 /// not here -- the dispatch in 'execute_view_requests' routes it there.
 
-use crate::source_sets::ActiveSourceSet;
+use crate::repo_sets::ActiveRepoSet;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::complete::partner_folder::{
   maybe_add_one_partnerFolder, maybe_add_subscribeeFolder_branch };
 use crate::to_org::util::remove_completed_view_request;
-use crate::types::git::SourceDiff;
-use crate::types::misc::{SkgConfig, SourceName};
+use crate::types::git::RepoDiff;
+use crate::types::misc::{SkgConfig, RepoName};
 use crate::types::viewnode::{ViewNode, ViewRequest, FolderRelation, PartnerFolder};
 
 use ego_tree::{NodeId, Tree};
@@ -29,13 +29,13 @@ pub fn build_and_integrate_folder_then_drop_request (
   rel           : FolderRelation,
   config        : &SkgConfig,
   errors        : &mut Vec < String >,
-  active_source_set : Option<&ActiveSourceSet>,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  active_repo_set : Option<&ActiveRepoSet>,
+  repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
     build_and_integrate_folder (
-      tree, node_id, rel, graph, config, active_source_set,
-      source_diffs );
+      tree, node_id, rel, graph, config, active_repo_set,
+      repo_diffs );
   remove_completed_view_request (
     tree, node_id,
     ViewRequest::Folder (rel),
@@ -52,8 +52,8 @@ fn build_and_integrate_folder (
   rel     : FolderRelation,
   graph   : &InRustGraph,
   config  : &SkgConfig,
-  active_source_set : Option<&ActiveSourceSet>,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  active_repo_set : Option<&ActiveRepoSet>,
+  repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   match rel {
     FolderRelation::Aliases =>
@@ -66,25 +66,25 @@ fn build_and_integrate_folder (
       // overriddenFolder (writable) -- forced empty; overriderFolder (read-only).
       maybe_add_one_partnerFolder (
         tree, node_id, PartnerFolder::Overridden, config, graph,
-        active_source_set, source_diffs, true ) ?;
+        active_repo_set, repo_diffs, true ) ?;
       maybe_add_one_partnerFolder (
         tree, node_id, PartnerFolder::Overrider, config, graph,
-        active_source_set, source_diffs, false ) ?; },
+        active_repo_set, repo_diffs, false ) ?; },
     FolderRelation::HidesFromItsSubscriptions => {
       // Both sides read-only: hiding is editable only from a
       // subscribee-as-such, never from a hider/hidden folder.
       maybe_add_one_partnerFolder (
         tree, node_id, PartnerFolder::Hider, config, graph,
-        active_source_set, source_diffs, false ) ?;
+        active_repo_set, repo_diffs, false ) ?;
       maybe_add_one_partnerFolder (
         tree, node_id, PartnerFolder::Hidden, config, graph,
-        active_source_set, source_diffs, false ) ?; },
+        active_repo_set, repo_diffs, false ) ?; },
     FolderRelation::SubscribesTo => {
       // subscribeeFolder (writable) -- forced empty; subscriberFolder (read-only).
       maybe_add_subscribeeFolder_branch (
         tree, node_id, graph, config,
-        active_source_set, source_diffs, true ) ?;
+        active_repo_set, repo_diffs, true ) ?;
       maybe_add_one_partnerFolder (
         tree, node_id, PartnerFolder::Subscriber, config, graph,
-        active_source_set, source_diffs, false ) ?; }, }
+        active_repo_set, repo_diffs, false ) ?; }, }
   Ok (( )) }

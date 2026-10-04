@@ -20,11 +20,11 @@ async fn test_content_diff_with_moved_and_deleted_nodes (
 ) -> Result<(), Box<dyn Error>>
 {
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir . path();
-  setup_git_repo_with_fixtures (repo_path)?;
-  s . reset_with_source_path (
+  let gitrepo_path = temp_dir . path();
+  setup_gitrepo_with_fixtures (gitrepo_path)?;
+  s . reset_with_repo_path (
     "test_content_diff_with_moved_and_deleted_nodes",
-    repo_path ) ?;
+    gitrepo_path ) ?;
   let (config, _tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
@@ -48,11 +48,11 @@ async fn test_no_ghosts_under_writeProtected_occurrence (
 ) -> Result<(), Box<dyn Error>>
 {
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir . path();
-  setup_git_repo_with_fixtures (repo_path)?;
-  s . reset_with_source_path (
+  let gitrepo_path = temp_dir . path();
+  setup_gitrepo_with_fixtures (gitrepo_path)?;
+  s . reset_with_repo_path (
     "test_no_ghosts_under_writeProtected_occurrence",
-    repo_path ) ?;
+    gitrepo_path ) ?;
   let (config, _tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
@@ -79,11 +79,11 @@ async fn test_content_diff_staged (
 ) -> Result<(), Box<dyn Error>>
 {
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir . path();
-  setup_git_repo_with_fixtures_staged (repo_path)?;
-  s . reset_with_source_path (
+  let gitrepo_path = temp_dir . path();
+  setup_gitrepo_with_fixtures_staged (gitrepo_path)?;
+  s . reset_with_repo_path (
     "test_content_diff_staged",
-    repo_path ) ?;
+    gitrepo_path ) ?;
   let (config, _tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);

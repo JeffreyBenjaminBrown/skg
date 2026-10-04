@@ -8,7 +8,7 @@
 
 use crate::dbs::filesystem::one_node::telescope_from_disk;
 use crate::telescope::fold::fold_telescope_collecting_warnings;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::save::{DefineNode, NodeMerge, SaveNode};
 use crate::types::sexp::extract_string_list_from_sexp;
 
@@ -19,7 +19,7 @@ use std::io;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HoistCandidate {
   pub pid  : ID,
-  pub home : SourceName,
+  pub home : RepoName,
 }
 
 /// Exact approvals have their own field because permission to release overPrivateText
@@ -72,8 +72,8 @@ pub fn candidates_from_disk (
   for pid in touched {
     let Some (telescope) = telescope_from_disk (config, &pid) ?
       else { continue; };
-    let home : SourceName = telescope . home () . clone ();
-    if ! config . user_owns_source (&home) {
+    let home : RepoName = telescope . home () . clone ();
+    if ! config . user_owns_repo (&home) {
       return Err ( io::Error::new (
         io::ErrorKind::PermissionDenied,
         format! (
@@ -156,9 +156,9 @@ fn pair (key : &str, value : &str) -> Sexp {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::dbs::filesystem::one_node::nodecomplete_from_pid_and_source;
+  use crate::dbs::filesystem::one_node::nodecomplete_from_pid_and_repo;
   use crate::save::update_fs_from_saveinstructions_with_hoist_approval;
-  use crate::types::misc::SkgfileSource;
+  use crate::types::misc::SkgfileRepo;
   use crate::types::nodes::fs::NodeFS;
   use std::collections::HashMap;
   use std::fs;
@@ -167,7 +167,7 @@ mod tests {
 
   fn config_and_paths () -> (TempDir, SkgConfig, HashMap<&'static str, PathBuf>) {
     let temp : TempDir = tempdir () . unwrap ();
-    let mut sources : HashMap<SourceName, SkgfileSource> = HashMap::new ();
+    let mut repos : HashMap<RepoName, SkgfileRepo> = HashMap::new ();
     let mut paths : HashMap<&'static str, PathBuf> = HashMap::new ();
     for (name, owned) in [
         ("public", true), ("middle", true),
@@ -175,16 +175,16 @@ mod tests {
       let path : PathBuf = temp . path () . join (name);
       fs::create_dir_all (&path) . unwrap ();
       paths . insert (name, path . clone ());
-      sources . insert ( SourceName::from (name), SkgfileSource {
-        name         : SourceName::from (name),
+      repos . insert ( RepoName::from (name), SkgfileRepo {
+        name         : RepoName::from (name),
         abbreviation : None,
         path,
         user_owns_it : owned,
       } ); }
-    let mut config : SkgConfig = SkgConfig::dummyFromSources (sources);
+    let mut config : SkgConfig = SkgConfig::dummyFromRepos (repos);
     config . data_root = temp . path () . to_path_buf ();
-    config . source_order = ["public", "middle", "private", "foreign"]
-      . into_iter () . map (SourceName::from) . collect ();
+    config . repo_order = ["public", "middle", "private", "foreign"]
+      . into_iter () . map (RepoName::from) . collect ();
     (temp, config, paths)
   }
 
@@ -192,8 +192,8 @@ mod tests {
     pid    : &str,
     config : &SkgConfig,
   ) -> DefineNode {
-    let mut node = nodecomplete_from_pid_and_source (
-      config, ID::from (pid), &SourceName::from ("public") ) . unwrap ();
+    let mut node = nodecomplete_from_pid_and_repo (
+      config, ID::from (pid), &RepoName::from ("public") ) . unwrap ();
     // Buffer-authored nodes carry no disk overPrivateTextness authority. The save gate
     // has just rederived that fact from disk.
     node . overPrivateText_telescope = false;
@@ -216,7 +216,7 @@ mod tests {
     let response : String = confirmation_response (&[
       HoistCandidate {
         pid  : ID::from ("P"),
-        home : SourceName::from ("public"),
+        home : RepoName::from ("public"),
       },
     ]);
     assert! (response . contains ("P"));
@@ -260,8 +260,8 @@ mod tests {
       .into_iter () . collect ();
     update_fs_from_saveinstructions_with_hoist_approval (
       &define_nodes, &[], config . clone (), &approved ) . unwrap ();
-    let reread = nodecomplete_from_pid_and_source (
-      &config, ID::from ("P"), &SourceName::from ("public") ) . unwrap ();
+    let reread = nodecomplete_from_pid_and_repo (
+      &config, ID::from ("P"), &RepoName::from ("public") ) . unwrap ();
     assert! (! reread . overPrivateText_telescope);
     assert_eq! (reread . title, "lower title");
     assert_eq! (reread . body . as_deref (), Some ("lower body"));
@@ -281,8 +281,8 @@ mod tests {
     assert_eq! (lower . body, None);
     assert! (lower . to_yaml () . unwrap () . contains ("private-child"));
     for pid in ["T", "B"] {
-      assert! (! nodecomplete_from_pid_and_source (
-        &config, ID::from (pid), &SourceName::from ("public") )
+      assert! (! nodecomplete_from_pid_and_repo (
+        &config, ID::from (pid), &RepoName::from ("public") )
         .unwrap () . overPrivateText_telescope); }
   }
 

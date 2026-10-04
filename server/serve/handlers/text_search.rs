@@ -19,7 +19,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::dbs::in_rust_graph::stats::{
   AllGraphNodeStats,
-  fetch_all_graphnodestats_with_source_set};
+  fetch_all_graphnodestats_with_repo_set};
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::org_to_text::viewforest_to_string;
 use crate::update_buffer::set_viewnodestats_in_viewforest;
@@ -34,8 +34,8 @@ use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
 use crate::types::git::MembershipAxes;
 use crate::types::views_state::ViewUri;
-use crate::types::misc::{TantivyIndex, SkgConfig, ID, SourceName};
-use crate::source_sets::{ActiveSourceSet, search_ids_for_source_set_for_test as search_ids_for_source_set_for_test_impl};
+use crate::types::misc::{TantivyIndex, SkgConfig, ID, RepoName};
+use crate::repo_sets::{ActiveRepoSet, search_ids_for_repo_set_for_test as search_ids_for_repo_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, AffectsParent, mk_writeProtected_viewnode};
@@ -57,21 +57,21 @@ use tantivy::schema::document::Value;
 /// the multiplier corresponding to its context_origin_type.
 /// Non-origins keep their raw score (multiplier = 1).
 pub type MatchGroups =
-  HashMap < ID, ( SourceName,
+  HashMap < ID, ( RepoName,
                   Vec < ( f32,           // score (after multiplier)
                           String ) >) >; // title or alias
 
-pub fn search_ids_for_source_set_for_test (
+pub fn search_ids_for_repo_set_for_test (
   tantivy_index : &TantivyIndex,
   config        : &SkgConfig,
-  active        : &ActiveSourceSet,
+  active        : &ActiveRepoSet,
   terms         : &str,
   limit         : usize,
 ) -> Result<Vec<ID>, Box<dyn std::error::Error>> {
-  search_ids_for_source_set_for_test_impl (
+  search_ids_for_repo_set_for_test_impl (
     tantivy_index, config, active, terms, limit ) }
 
-pub fn enriched_search_buffer_for_source_set_for_test (
+pub fn enriched_search_buffer_for_repo_set_for_test (
   graph          : &InRustGraph,
   terms          : &str,
   matches_by_id  : &MatchGroups,
@@ -79,7 +79,7 @@ pub fn enriched_search_buffer_for_source_set_for_test (
   ancestry_by_id : &HashMap<ID, AncestryTree>,
   tantivy_index  : &TantivyIndex,
   config         : &SkgConfig,
-  active         : &ActiveSourceSet,
+  active         : &ActiveRepoSet,
 ) -> Result<String, Box<dyn std::error::Error>> {
   let (mut viewforest, _ids) : (ViewForest, Vec<ID>) =
     build_search_viewforest (terms, matches_by_id, &HashSet::new ());
@@ -99,8 +99,8 @@ pub fn enriched_search_buffer_for_source_set_for_test (
   set_viewnodestats_in_viewforest (
     // Mirror the production enrichment path (handle_snapshot_response):
     // compute view-relative stats so the rendered buffer carries the
-    // sourceHerald at source boundaries. Empty containment maps suffice
-    // here -- sourceAtBoundary is derived from the tree alone; the maps
+    // homeRepoHerald at repo boundaries. Empty containment maps suffice
+    // here -- homeRepoAtBoundary is derived from the tree alone; the maps
     // only feed the containsParent stat, which this test does not assert.
     &mut viewforest,
     graph,
@@ -134,7 +134,7 @@ pub fn handle_text_search_request (
   enrichment_slot  : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   search_cancelled : &Arc<AtomicBool>,
   views_state       : &mut ViewsState,
-  active            : &ActiveSourceSet,
+  active            : &ActiveRepoSet,
 ) {
   let parsed_sexp : Result < Sexp, String > =
     sexp::parse (request)
@@ -203,7 +203,7 @@ pub fn handle_text_search_request (
                 "No matches found." ));
             return; }
           let matches_by_id : MatchGroups =
-            filter_match_groups_to_active_sources (
+            filter_match_groups_to_active_repos (
               group_matches_by_id (
               best_matches,
               searcher,
@@ -293,15 +293,15 @@ fn bool_key (
     . unwrap_or_default ()
     == "true" }
 
-fn filter_match_groups_to_active_sources (
+fn filter_match_groups_to_active_repos (
   matches_by_id : MatchGroups,
-  active        : &ActiveSourceSet,
+  active        : &ActiveRepoSet,
 ) -> MatchGroups {
   if active . is_all () {
     return matches_by_id; }
   matches_by_id . into_iter ()
-    . filter ( |(_, (source, _))|
-      active . contains_source (source) )
+    . filter ( |(_, (repo, _))|
+      active . contains_repo (repo) )
     . collect () }
 
 /// Spawn a background thread to compute containerward acnestries
@@ -314,7 +314,7 @@ fn spawn_enrichment_thread (
   runtime          : Arc<RuntimeGeneration>,
   search_terms     : &str,
   search_results   : &[ID],
-  active           : &ActiveSourceSet,
+  active           : &ActiveRepoSet,
   include_overPrivateText_telescopes : bool,
 ) {
   { // Clear stale enrichment before spawning.
@@ -326,7 +326,7 @@ fn spawn_enrichment_thread (
   let slot_clone    : Arc<Mutex<Option<SearchEnrichmentPayload>>> =
     Arc::clone (enrichment_slot);
   let cancel_clone  : Arc<AtomicBool>   = Arc::clone (search_cancelled);
-  let active_clone  : ActiveSourceSet   = active . clone ();
+  let active_clone  : ActiveRepoSet   = active . clone ();
   let terms_clone   : String            = search_terms . to_string ();
   let ids_clone     : Vec<ID>           = search_results . to_vec ();
   let max_depth : usize = runtime . config . max_ancestry_depth;
@@ -357,7 +357,7 @@ fn spawn_enrichment_thread (
           &runtime . graph, &ids_clone, &active_clone ) );
       id_set . into_iter () . collect () };
     let graphnodestats : AllGraphNodeStats =
-      fetch_all_graphnodestats_with_source_set (
+      fetch_all_graphnodestats_with_repo_set (
         &runtime . graph,
         &all_enriched_ids,
         Some (&active_clone) )
@@ -465,7 +465,7 @@ pub fn group_matches_by_id (
   tantivy_index : &TantivyIndex,
   search_terms  : &str,
   search_opts   : &SearchOptions,
-  active        : Option<&ActiveSourceSet>,
+  active        : Option<&ActiveRepoSet>,
 ) -> MatchGroups {
   let matcher : CoverageMatcher = // pre-build once
     build_coverage_matcher (search_terms, search_opts);
@@ -504,21 +504,21 @@ pub fn group_matches_by_id (
             . and_then ( |v| v . as_str () )
             . map ( |s| s . to_string () )
             . unwrap_or_default ();
-        let source : SourceName =
-          SourceName::from (
+        let repo : RepoName =
+          RepoName::from (
             retrieved_doc
-              . get_first ( tantivy_index . source_field )
+              . get_first ( tantivy_index . repo_field )
               . and_then ( |v| v . as_str () )
               . unwrap_or ("") );
         if let Some (a) = active {
-          // Per-DOCUMENT source filtering, BEFORE grouping: an
-          // alias document carries the ALIAS's relSource as
-          // its source, so a restricted search must drop it here
+          // Per-DOCUMENT repo filtering, BEFORE grouping: an
+          // alias document carries the ALIAS's relRepo as
+          // its repo, so a restricted search must drop it here
           // -- a private alias of a public node must neither match
           // nor shift ranking (dbs-and-search, 5_plan.org). The
           // group-level filter below survives as a backstop.
           if ! a . is_all ()
-          && ! a . contains_source (&source) {
+          && ! a . contains_repo (&repo) {
             continue; }}
         let origin_type : Option < ContextOriginType > =
           retrieved_doc
@@ -534,7 +534,7 @@ pub fn group_matches_by_id (
           result_acc
             . entry (id)
             . or_insert_with ( || (
-              source,
+              repo,
               Vec::new () ))
             . 1
             . push (( adjusted_score, title )); }},
@@ -553,7 +553,7 @@ pub fn group_matches_by_id (
 /// (TODO/override-ancestry-in-search-results.org, "Suppression"). A
 /// FOREIGN overrider never suppresses -- so a pure-foreign mutual
 /// override shows both, and a "boring" foreign overrider does not hide
-/// the node it overrides. Reachability follows relSource-visible
+/// the node it overrides. Reachability follows relRepo-visible
 /// outbound overrides, matching what the graft will actually draw.
 /// Only search hits ('matches_by_id' keys) are ever suppressed. A
 /// user-owned overrider that matched the query but ranks past the
@@ -563,14 +563,14 @@ pub fn suppressed_result_ids (
   matches_by_id : &MatchGroups,
   graph         : &InRustGraph,
   config        : &SkgConfig,
-  active         : &ActiveSourceSet,
+  active         : &ActiveRepoSet,
 ) -> HashSet<ID> {
   let candidates : HashSet<ID> =
     matches_by_id . keys () . cloned () . collect ();
   let mut suppressed : HashSet<ID> = HashSet::new ();
   for owned in candidates . iter () . filter ( |id|
     graph . nodes . get (*id)
-      . map_or ( false, |n| config . user_owns_source (&n . source) ) )
+      . map_or ( false, |n| config . user_owns_repo (&n . home_repo) ) )
   { // Walk owned's overriddenward closure; any HIT in it is suppressed
     // (it will hang under 'owned'). Cycle-guarded: foreign edges in the
     // chain can form cycles even though user-owned ones cannot.
@@ -593,11 +593,11 @@ pub fn build_search_viewforest (
   let mut viewforest : ViewForest =
     ViewForest::new ();
   let mut id_entries : Vec < ( &ID,
-                               &SourceName,
+                               &RepoName,
                                &Vec < ( f32, String ) > ) > =
     matches_by_id . iter ()
-    . map ( |(id, (source, matches))| // flatten
-             (id, source, matches) )
+    . map ( |(id, (repo, matches))| // flatten
+             (id, repo, matches) )
     . collect ();
   id_entries . sort_by ( |a, b| { // sort by best score (descending)
     let score_a : f32 =
@@ -607,7 +607,7 @@ pub fn build_search_viewforest (
     score_b . partial_cmp (& score_a)
     . unwrap_or (std::cmp::Ordering::Equal) } );
   let mut search_results : Vec < ID > = Vec::new ();
-  for (id, source, matches) in id_entries . iter ()
+  for (id, repo, matches) in id_entries . iter ()
         // Suppress before truncation, so a dropped result frees a slot
         // for the next-ranked hit (design corner O2).
         . filter ( |entry| ! suppressed . contains (entry . 0) )
@@ -624,7 +624,7 @@ pub fn build_search_viewforest (
         viewforest . append_root (
           mk_writeProtected_viewnode (
             (*id) . clone (),
-            (*source) . clone (),
+            (*repo) . clone (),
             title . clone (),
             AffectsParent::NA ) );
       if sorted_matches . len () > 1 {
@@ -650,7 +650,7 @@ pub fn build_search_viewforest (
             body_folded : false,
             kind        : ViewNodeKind::Qual (Qual::Alias {
                 text       : title . clone (),
-                relSource : None,
-                relSource_request : None,
+                relRepo : None,
+                relRepo_request : None,
                 membership : MembershipAxes::default () } ) } ); }} }
   (viewforest, search_results) }

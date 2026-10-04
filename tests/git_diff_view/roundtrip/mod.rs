@@ -5,8 +5,8 @@
 /// - a contains member REORDERED within one parent (its old slot used to come
 ///   out as a second live vognode -- 'newM' -- tripping the content-child
 ///   uniqueness check; it must be a 'removedM' phantom);
-/// - a contains member referenced at HEAD whose .skg file exists in no source
-///   (deleted by an earlier commit), which renders with the NOT_FOUND source
+/// - a contains member referenced at HEAD whose .skg file exists in no repo
+///   (deleted by an earlier commit), which renders with the NOT_FOUND repo
 ///   sentinel (validate_phantom used to reject that).
 
 mod common;

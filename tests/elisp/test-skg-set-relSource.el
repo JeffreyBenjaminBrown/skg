@@ -20,15 +20,15 @@
 (require 'skg-request-relSource-info)
 
 (defvar test--config-public-private-trusted
-  (concat "[[sources]]\n"
+  (concat "[[repos]]\n"
           "name = \"public\"\n"
           "path = \"owned/public\"\n"
           "\n"
-          "[[sources]]\n"
+          "[[repos]]\n"
           "name = \"private\"\n"
           "path = \"owned/private\"\n"
           "\n"
-          "[[sources]]\n"
+          "[[repos]]\n"
           "name = \"trusted\"\n"
           "path = \"owned/trusted\"\n"
           "")

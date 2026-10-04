@@ -9,7 +9,7 @@
 /// and they become DefineNode *instructions* only after downstream
 /// resolution and disk supplementation.
 
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, RepoName};
 use crate::types::nodes::complete::FileProperty;
 use std::collections::HashMap;
 
@@ -52,30 +52,30 @@ pub struct DefiningFolderOwner {
 /// the shape of 'IntentsForOneId': each exclusive kind gets an
 /// Option slot there, and each combineable kind gets a Vec slot.
 /// .
-/// 'SetTitleAndBody' and 'Delete' carry the emitting node's source.
+/// 'SetTitleAndBody' and 'Delete' carry the emitting node's repo.
 /// They are the self-emissions, and lowering a map entry to a
-/// DefineNode needs to know which source's file it concerns.
+/// DefineNode needs to know which repo's file it concerns.
 /// .
 /// 'SetContains' / 'SetSubscribesTo' / 'SetOverrides' pair each
-/// member with an Option<SourceName>: Some when the position's
-/// headline carried an explicit '(editRequest (relSource NAME))'
-/// request (the 'skg-set-relSource' gesture), None meaning
+/// member with an Option<RepoName>: Some when the position's
+/// headline carried an explicit '(editRequest (relRepo NAME))'
+/// request (the 'skg-set-relRepo' gesture), None meaning
 /// "derive" (the usual
 /// sticky-else-default rule). 'server/from_text/supplement_from_disk.rs'
-/// validates the explicit sources against each edge's DEFAULT floor
+/// validates the explicit repos against each edge's DEFAULT floor
 /// at save time (render-and-gating, 5_plan.org;
 /// BUG-and-fix_make-edge-more-public.org).
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
 pub enum NodeIntent_Local {
-  SetTitleAndBody { source : SourceName,
+  SetTitleAndBody { repo : RepoName,
                     title  : String,
                     body   : Option<String>, },
-  SetContains     (Vec<(ID, Option<SourceName>)>),
-  SetAliases      (Vec<(String, Option<SourceName>)>),
-  SetSubscribesTo (Vec<(ID, Option<SourceName>)>),
-  SetOverrides    (Vec<(ID, Option<SourceName>)>),
-  Delete          { source : SourceName },
+  SetContains     (Vec<(ID, Option<RepoName>)>),
+  SetAliases      (Vec<(String, Option<RepoName>)>),
+  SetSubscribesTo (Vec<(ID, Option<RepoName>)>),
+  SetOverrides    (Vec<(ID, Option<RepoName>)>),
+  Delete          { repo : RepoName },
   NodeMerge       { acquiree : ID },
   SetBoolProp     { property : FileProperty, value : bool },
   // The remaining kinds are combineable.
@@ -96,8 +96,8 @@ pub struct SubscribeeVisibility {
 }
 
 /// The explicitly submitted visible-outside subset for one subscriber.
-/// Unlike direct relationship sets it carries no source request: hide
-/// sources are derived after subscriptions and visibility are resolved.
+/// Unlike direct relationship sets it carries no repo request: hide
+/// repos are derived after subscriptions and visibility are resolved.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HiddenOutsideEdit {
   pub members : Vec<ID>,
@@ -121,12 +121,12 @@ pub struct SubscribeeTextClaim {
 /// slots, and 'nodeMerge' excludes 'boolprop'.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct IntentsForOneId {
-  pub source         : Option<SourceName>, // This is filled by the self-emissions (SetTitleAndBody and Delete).
+  pub home_repo         : Option<RepoName>, // This is filled by the self-emissions (SetTitleAndBody and Delete).
   pub title_and_body : Option<(String, Option<String>)>,
-  pub contains       : Option<Vec<(ID, Option<SourceName>)>>,
-  pub aliases        : Option<Vec<(String, Option<SourceName>)>>,
-  pub subscribes_to  : Option<Vec<(ID, Option<SourceName>)>>,
-  pub overrides      : Option<Vec<(ID, Option<SourceName>)>>,
+  pub contains       : Option<Vec<(ID, Option<RepoName>)>>,
+  pub aliases        : Option<Vec<(String, Option<RepoName>)>>,
+  pub subscribes_to  : Option<Vec<(ID, Option<RepoName>)>>,
+  pub overrides      : Option<Vec<(ID, Option<RepoName>)>>,
   pub delete         : bool,
   pub node_merge     : Option<ID>, // This holds the acquiree.
   pub boolprop       : Option<(FileProperty, bool)>,
@@ -145,7 +145,7 @@ pub struct CollectedIntents {
 
 impl IntentsForOneId {
   /// True iff some exclusive slot other than 'delete' (and other than
-  /// 'source', which 'delete' itself fills) is occupied.
+  /// 'repo', which 'delete' itself fills) is occupied.
   fn some_nondelete_exclusive_slot_is_filled (
     &self,
   ) -> bool {
@@ -200,13 +200,13 @@ impl CollectedIntents {
       NodeIntent_Local::SubscribeeTextClaim (c) => {
         entry . text_claims . push (c);
         Ok (( )) },
-      NodeIntent_Local::Delete { source } => {
+      NodeIntent_Local::Delete { repo } => {
         if entry . some_nondelete_exclusive_slot_is_filled() {
           return Err ( format!(
             "Cannot have both Delete and Save for same ID: {}",
             target )); }
         fill_exclusive_slot (
-          &mut entry . source, source, "source", &target) ?;
+          &mut entry . home_repo, repo, "source", &target) ?;
         if ! entry . delete {
           entry . delete = true;
           self . lowerable_order . push (target); }
@@ -217,9 +217,9 @@ impl CollectedIntents {
             "Cannot have both Delete and Save for same ID: {}",
             target )); }
         match intent {
-          NodeIntent_Local::SetTitleAndBody { source, title, body } => {
+          NodeIntent_Local::SetTitleAndBody { repo, title, body } => {
             fill_exclusive_slot (
-              &mut entry . source, source, "source", &target) ?;
+              &mut entry . home_repo, repo, "source", &target) ?;
             let was_empty : bool =
               entry . title_and_body . is_none();
             fill_exclusive_slot (

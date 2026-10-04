@@ -1,8 +1,8 @@
 // These tests have not been human-verified.
-// cargo nextest run --test grouped_sources -E 'test(move_source::)'
+// cargo nextest run --test grouped_repos -E 'test(move_repo::)'
 
 use indoc::indoc;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use skg::dbs::filesystem::one_node::nodecomplete_from_id;
 use skg::dbs::tantivy::search::{SearchOptions, search_index};
 use skg::from_text::buffer_to_validated_saveplan;
@@ -11,7 +11,7 @@ use skg::save::update_graph_minus_nodeMerges;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::errors::{SaveError, BufferValidationError};
 
-use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex, members_of};
+use skg::types::misc::{ID, SkgConfig, RepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::DefineNode;
 use std::error::Error;
@@ -19,8 +19,8 @@ use std::path::PathBuf;
 use tantivy::{DocAddress, TantivyDocument};
 use tantivy::schema::document::Value;
 
-/// Query Tantivy for a node by title and return its source.
-fn tantivy_source_for_id (
+/// Query Tantivy for a node by title and return its repo.
+fn tantivy_repo_for_id (
   tantivy_index : &TantivyIndex,
   query         : &str,
   expected_id   : &str,
@@ -39,10 +39,10 @@ fn tantivy_source_for_id (
       doc . get_first (tantivy_index . id_field)
       . and_then (|v| v . as_str() . map (String::from));
     if id_value . as_deref() == Some (expected_id) {
-      let source_value : Option<String> =
-        doc . get_first (tantivy_index . source_field)
+      let repo_value : Option<String> =
+        doc . get_first (tantivy_index . repo_field)
         . and_then (|v| v . as_str() . map (String::from));
-      return Ok (source_value); }}
+      return Ok (repo_value); }}
   Ok (None) }
 
 
@@ -56,43 +56,43 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-move-source",
     |s| Box::pin ( async move {
-      s . reset ("test_move_node_to_another_owned_source", "tests/move_source/fixtures") ?;
-      test_move_node_to_another_owned_source (
+      s . reset ("test_move_node_to_another_owned_source", "tests/move_repo/fixtures") ?;
+      test_move_node_to_another_owned_repo (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_move_node_referenced_by_extra_id", "tests/move_source/fixtures") ?;
+      s . reset ("test_move_node_referenced_by_extra_id", "tests/move_repo/fixtures") ?;
       test_move_node_referenced_by_extra_id (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_move_multiple_nodes", "tests/move_source/fixtures") ?;
+      s . reset ("test_move_multiple_nodes", "tests/move_repo/fixtures") ?;
       test_move_multiple_nodes (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_move_to_foreign_source_rejected", "tests/move_source/fixtures") ?;
-      test_move_to_foreign_source_rejected (
+      s . reset ("test_move_to_foreign_source_rejected", "tests/move_repo/fixtures") ?;
+      test_move_to_foreign_repo_rejected (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_move_from_foreign_source_rejected", "tests/move_source/fixtures") ?;
-      test_move_from_foreign_source_rejected (
+      s . reset ("test_move_from_foreign_source_rejected", "tests/move_repo/fixtures") ?;
+      test_move_from_foreign_repo_rejected (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_move_and_merge_simultaneously_rejected", "tests/move_source/fixtures") ?;
+      s . reset ("test_move_and_merge_simultaneously_rejected", "tests/move_repo/fixtures") ?;
       test_move_and_merge_simultaneously_rejected (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_no_source_change_produces_no_moves", "tests/move_source/fixtures") ?;
-      test_no_source_change_produces_no_moves (
+      s . reset ("test_no_source_change_produces_no_moves", "tests/move_repo/fixtures") ?;
+      test_no_repo_change_produces_no_moves (
         &s . config, &mut s . tantivy ) . await ?;
-      s . reset ("test_source_only_change_with_populated_pool", "tests/move_source/fixtures") ?;
-      test_source_only_change_with_populated_pool (
+      s . reset ("test_source_only_change_with_populated_pool", "tests/move_repo/fixtures") ?;
+      test_repo_only_change_with_populated_pool (
         &s . config, &mut s . tantivy ) . await ?;
       Ok (( )) } )) }
 
-/// Basic move: change b's source from public to private.
+/// Basic move: change b's repo from public to private.
 /// Verify FS (old file gone, new file present),
-/// the graph, and Tantivy all reflect the new source.
-async fn test_move_node_to_another_owned_source (
+/// the graph, and Tantivy all reflect the new repo.
+async fn test_move_node_to_another_owned_repo (
   config : &SkgConfig,
   tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let temp_fixtures : &PathBuf = &config . data_root;
 
     // a (public) contains b (public) contains c (public).
-    // Edit b's source to private.
+    // Edit b's repo to private.
     let org_text : &str = indoc! {"
       * (skg (node (id a) (source public))) a
       ** (skg (node (id b) (source private))) b
@@ -102,17 +102,17 @@ async fn test_move_node_to_another_owned_source (
       = buffer_to_validated_saveplan (
           org_text, &config
           , None ) ?;
-    assert_eq!(save_plan . source_moves . len(), 1,
+    assert_eq!(save_plan . repo_moves . len(), 1,
                "Expected exactly 1 source move");
-    assert_eq!(save_plan . source_moves[0] . pid . 0, "b");
-    assert_eq!(save_plan . source_moves[0] . old_source . as_str(), "public");
-    assert_eq!(save_plan . source_moves[0] . new_source . as_str(), "private");
+    assert_eq!(save_plan . repo_moves[0] . pid . 0, "b");
+    assert_eq!(save_plan . repo_moves[0] . old_repo . as_str(), "public");
+    assert_eq!(save_plan . repo_moves[0] . new_repo . as_str(), "private");
 
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
       update_graph_minus_nodeMerges (
-        save_plan . define_nodes, &save_plan . source_moves,
+        save_plan . define_nodes, &save_plan . repo_moves,
         config . clone(), &tantivy_index,
         &graph, &skg::types::env::new_mutation_gate () ) . await?;
     if let Some (new_idx) = replacement {
@@ -133,32 +133,32 @@ async fn test_move_node_to_another_owned_source (
       let node_b : NodeComplete =
         nodecomplete_from_id (&config, &ID::new ("b"))
 ?;
-      assert_eq!(node_b . source, SourceName::from ("private"),
+      assert_eq!(node_b . home_repo, RepoName::from ("private"),
                  "NodeComplete read from disk should have source=private"); }
 
-    { // Graph: source should be updated
-      let (pid, source) : (ID, SourceName) =
-        graph . load_full () . pid_and_source (&ID::new ("b"))
+    { // Graph: repo should be updated
+      let (pid, repo) : (ID, RepoName) =
+        graph . load_full () . pid_and_repo (&ID::new ("b"))
         . expect ("b should exist in graph");
       assert_eq!(pid . 0, "b");
-      assert_eq!(source . as_str(), "private",
+      assert_eq!(repo . as_str(), "private",
                  "graph should show source=private for b"); }
 
-    { // Tantivy: source should be updated
-      let source : Option<String> =
-        tantivy_source_for_id (&tantivy_index, "b", "b")?;
-      assert_eq!(source . as_deref(), Some ("private"),
+    { // Tantivy: repo should be updated
+      let repo : Option<String> =
+        tantivy_repo_for_id (&tantivy_index, "b", "b")?;
+      assert_eq!(repo . as_deref(), Some ("private"),
                  "Tantivy should show source=private for b"); }
 
     { // Other nodes unchanged
       let node_a : NodeComplete =
         nodecomplete_from_id (&config, &ID::new ("a"))
 ?;
-      assert_eq!(node_a . source, SourceName::from ("public"));
+      assert_eq!(node_a . home_repo, RepoName::from ("public"));
       let node_c : NodeComplete =
         nodecomplete_from_id (&config, &ID::new ("c"))
 ?;
-      assert_eq!(node_c . source, SourceName::from ("public")); }
+      assert_eq!(node_c . home_repo, RepoName::from ("public")); }
 
     { // Containment relationships should be unchanged
       let node_a : NodeComplete =
@@ -193,17 +193,17 @@ async fn test_move_node_referenced_by_extra_id (
       = buffer_to_validated_saveplan (
           org_text, &config , None ) ?;
 
-    // source_moves should use the PID, not the extra_id
-    assert_eq!(save_plan . source_moves . len(), 1,
+    // repo_moves should use the PID, not the extra_id
+    assert_eq!(save_plan . repo_moves . len(), 1,
                "Expected exactly 1 source move");
-    assert_eq!(save_plan . source_moves[0] . pid . 0, "b",
+    assert_eq!(save_plan . repo_moves[0] . pid . 0, "b",
                "SourceMove should use PID, not extra_id");
 
     let graph : InRustGraphHandle =
       graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
       update_graph_minus_nodeMerges (
-        save_plan . define_nodes, &save_plan . source_moves,
+        save_plan . define_nodes, &save_plan . repo_moves,
         config . clone(), &tantivy_index,
         &graph, &skg::types::env::new_mutation_gate () ) . await?;
     if let Some (new_idx) = replacement {
@@ -220,20 +220,20 @@ async fn test_move_node_referenced_by_extra_id (
       assert!( new_path . exists(),
                "b.skg should exist in private/"); }
 
-    { // Graph: source updated, extra_ids preserved
+    { // Graph: repo updated, extra_ids preserved
       let snapshot = graph . load_full ();
-      let (pid, source) : (ID, SourceName) =
-        snapshot . pid_and_source (&ID::new ("b"))
+      let (pid, repo) : (ID, RepoName) =
+        snapshot . pid_and_repo (&ID::new ("b"))
         . expect ("b should exist in graph");
       assert_eq!(pid . 0, "b");
-      assert_eq!(source . as_str(), "private");
+      assert_eq!(repo . as_str(), "private");
       assert_eq!(snapshot . pid_of (&ID::new ("b-alias")), Some (pid),
               "extra_id b-alias should be preserved after move"); }
 
-    { // Tantivy: source updated
-      let source : Option<String> =
-        tantivy_source_for_id (&tantivy_index, "b", "b")?;
-      assert_eq!(source . as_deref(), Some ("private")); }
+    { // Tantivy: repo updated
+      let repo : Option<String> =
+        tantivy_repo_for_id (&tantivy_index, "b", "b")?;
+      assert_eq!(repo . as_deref(), Some ("private")); }
 
     Ok (()) }
 
@@ -254,11 +254,11 @@ async fn test_move_multiple_nodes (
       = buffer_to_validated_saveplan (
           org_text, &config
           , None ) ?;
-    assert_eq!(save_plan . source_moves . len(), 2,
+    assert_eq!(save_plan . repo_moves . len(), 2,
                "Expected 2 source moves");
 
     let move_pids : Vec<&str> =
-      save_plan . source_moves . iter()
+      save_plan . repo_moves . iter()
       . map (|sm| sm . pid . 0 . as_str()) . collect();
     assert!(move_pids . contains (&"b"), "Should move b");
     assert!(move_pids . contains (&"c"), "Should move c");
@@ -267,7 +267,7 @@ async fn test_move_multiple_nodes (
       graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
       update_graph_minus_nodeMerges (
-        save_plan . define_nodes, &save_plan . source_moves,
+        save_plan . define_nodes, &save_plan . repo_moves,
         config . clone(), &_tantivy_index,
         &graph, &skg::types::env::new_mutation_gate () ) . await?;
     if let Some (new_idx) = replacement {
@@ -284,23 +284,23 @@ async fn test_move_multiple_nodes (
 
     { // Graph
       let snapshot = graph . load_full ();
-      let (_, source_b) = snapshot . pid_and_source (&ID::new ("b"))
+      let (_, repo_b) = snapshot . pid_and_repo (&ID::new ("b"))
         . expect ("b should exist");
-      let (_, source_c) = snapshot . pid_and_source (&ID::new ("c"))
+      let (_, repo_c) = snapshot . pid_and_repo (&ID::new ("c"))
         . expect ("c should exist");
-      assert_eq!(source_b . as_str(), "private");
-      assert_eq!(source_c . as_str(), "private"); }
+      assert_eq!(repo_b . as_str(), "private");
+      assert_eq!(repo_c . as_str(), "private"); }
 
     Ok (()) }
 
-/// Moving to a foreign source should be rejected.
-async fn test_move_to_foreign_source_rejected (
+/// Moving to a foreign repo should be rejected.
+async fn test_move_to_foreign_repo_rejected (
   config : &SkgConfig,
   _tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
     let temp_fixtures : &PathBuf = &config . data_root;
 
-    // Try to move b to foreign source.
+    // Try to move b to foreign repo.
     let org_text : &str = indoc! {"
       * (skg (node (id a) (source public))) a
       ** (skg (node (id b) (source foreign))) b
@@ -316,7 +316,7 @@ async fn test_move_to_foreign_source_rejected (
       let inner : &dyn Error = e . as_ref();
       assert!(inner . downcast_ref::<BufferValidationError>()
               . map_or (false, |bve| matches!(
-                bve, BufferValidationError::CannotMoveToOrFromForeignSource(_, _, _))),
+                bve, BufferValidationError::CannotMoveToOrFromForeignRepo(_, _, _))),
               "Expected CannotMoveToOrFromForeignSource, got: {}", e);
     } else if let Err (other) = &result {
       panic!("Expected DatabaseError wrapping CannotMoveToOrFromForeignSource, got: {:?}", other);
@@ -328,8 +328,8 @@ async fn test_move_to_foreign_source_rejected (
 
     Ok (()) }
 
-/// Moving from a foreign source should be rejected.
-async fn test_move_from_foreign_source_rejected (
+/// Moving from a foreign repo should be rejected.
+async fn test_move_from_foreign_repo_rejected (
   config : &SkgConfig,
   _tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -383,12 +383,12 @@ async fn test_move_and_merge_simultaneously_rejected (
 
     Ok (()) }
 
-/// No source change: no SourceMove should be produced.
-async fn test_no_source_change_produces_no_moves (
+/// No repo change: no RepoMove should be produced.
+async fn test_no_repo_change_produces_no_moves (
   config : &SkgConfig,
   _tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-    // Save with same sources as on disk.
+    // Save with same repos as on disk.
     let org_text : &str = indoc! {"
       * (skg (node (id a) (source public))) a
       ** (skg (node (id b) (source public))) b
@@ -398,15 +398,15 @@ async fn test_no_source_change_produces_no_moves (
       = buffer_to_validated_saveplan (
           org_text, &config
           , None ) ?;
-    assert_eq!(save_plan . source_moves . len(), 0,
+    assert_eq!(save_plan . repo_moves . len(), 0,
                "No source changes => no source moves");
 
     Ok (()) }
 
-/// Reproduces the bug: changing only the source (nothing else)
+/// Reproduces the bug: changing only the repo (nothing else)
 /// with a populated pool caused the instruction to be filtered out
-/// by filter_wouldbe_noop_defineNodes (which didn't compare source).
-async fn test_source_only_change_with_populated_pool (
+/// by filter_wouldbe_noop_defineNodes (which didn't compare repo).
+async fn test_repo_only_change_with_populated_pool (
   config : &SkgConfig,
   tantivy_index : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
@@ -414,9 +414,9 @@ async fn test_source_only_change_with_populated_pool (
 
     // Read all nodes (for test parity with earlier pool-populating variant).
     let _nodes : Vec<NodeComplete> =
-      read_all_skg_files_from_sources (&config)?;
+      read_all_skg_files_from_repos (&config)?;
 
-    // Change only b's source to private.
+    // Change only b's repo to private.
     // Title, body, contains — all identical to disk.
     let org_text : &str = indoc! {"
       * (skg (node (id a) (source public))) a
@@ -427,10 +427,10 @@ async fn test_source_only_change_with_populated_pool (
       = buffer_to_validated_saveplan (
           org_text, &config , None ) ?;
 
-    // The source move must be detected even with populated pool.
-    assert_eq!(save_plan . source_moves . len(), 1,
+    // The repo move must be detected even with populated pool.
+    assert_eq!(save_plan . repo_moves . len(), 1,
                "Source-only change should produce a SourceMove");
-    assert_eq!(save_plan . source_moves[0] . pid . 0, "b");
+    assert_eq!(save_plan . repo_moves[0] . pid . 0, "b");
 
     // The save instruction for b must not have been filtered out.
     let b_in_instructions : bool =
@@ -445,7 +445,7 @@ async fn test_source_only_change_with_populated_pool (
       graph_handle_from_config (&config) ?;
     let replacement : Option<TantivyIndex> =
       update_graph_minus_nodeMerges (
-        save_plan . define_nodes, &save_plan . source_moves,
+        save_plan . define_nodes, &save_plan . repo_moves,
         config . clone(), &tantivy_index,
         &graph, &skg::types::env::new_mutation_gate () ) . await?;
     if let Some (new_idx) = replacement {
@@ -458,15 +458,15 @@ async fn test_source_only_change_with_populated_pool (
       assert!( temp_fixtures . join ("owned/private/b.skg") . exists(),
                "b.skg should exist in private/"); }
 
-    { // Graph: source updated
-      let (_, source) = graph . load_full ()
-        . pid_and_source (&ID::new ("b"))
+    { // Graph: repo updated
+      let (_, repo) = graph . load_full ()
+        . pid_and_repo (&ID::new ("b"))
         . expect ("b should exist in graph");
-      assert_eq!(source . as_str(), "private"); }
+      assert_eq!(repo . as_str(), "private"); }
 
-    { // Tantivy: source updated
-      let source : Option<String> =
-        tantivy_source_for_id (&tantivy_index, "b", "b")?;
-      assert_eq!(source . as_deref(), Some ("private")); }
+    { // Tantivy: repo updated
+      let repo : Option<String> =
+        tantivy_repo_for_id (&tantivy_index, "b", "b")?;
+      assert_eq!(repo . as_deref(), Some ("private")); }
 
     Ok (()) }

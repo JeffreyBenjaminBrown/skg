@@ -2,7 +2,7 @@ use skg::dbs::in_rust_graph::{InRustGraph, apply_definenodes_to_inRustGraph};
 use skg::dbs::in_rust_graph::internal_index_validation::{
   format_internal_index_mismatches, validate_internal_indexes,
 };
-use skg::types::misc::{ID, MSV, SourceName, rel_partners_at_relSource};
+use skg::types::misc::{ID, MSV, RepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::save::{DefineNode, DeleteNode, SaveNode};
 
@@ -15,16 +15,16 @@ fn node (pid : &str) -> NodeComplete {
   node }
 
 fn full_fixture () -> InRustGraph {
-  let source = SourceName::from ("main");
+  let repo = RepoName::from ("main");
   let mut owner = node ("owner");
-  owner . contains = rel_partners_at_relSource (
-    &source, vec![ID::from ("target-alias"), ID::from ("dangling")]);
-  owner . subscribes_to = MSV::Specified (rel_partners_at_relSource (
-    &source, vec![ID::from ("target-alias")]));
-  owner . hides_from_its_subscriptions = MSV::Specified (rel_partners_at_relSource (
-    &source, vec![ID::from ("target-alias")]));
-  owner . overrides_view_of = MSV::Specified (rel_partners_at_relSource (
-    &source, vec![ID::from ("target-alias")]));
+  owner . contains = rel_partners_at_relRepo (
+    &repo, vec![ID::from ("target-alias"), ID::from ("dangling")]);
+  owner . subscribes_to = MSV::Specified (rel_partners_at_relRepo (
+    &repo, vec![ID::from ("target-alias")]));
+  owner . hides_from_its_subscriptions = MSV::Specified (rel_partners_at_relRepo (
+    &repo, vec![ID::from ("target-alias")]));
+  owner . overrides_view_of = MSV::Specified (rel_partners_at_relRepo (
+    &repo, vec![ID::from ("target-alias")]));
   owner . body = Some (
     "[[id:target-alias][target]] and [[id:text-dangling][missing]]" . to_string ());
   let mut target = node ("target");
@@ -77,17 +77,17 @@ fn exact_diagnostics_cover_all_six_corrupt_indexes_in_stable_order () {
 
 #[test]
 fn incremental_update_delete_and_extra_id_acquisition_remain_coherent () {
-  let source = SourceName::from ("main");
+  let repo = RepoName::from ("main");
   let mut owner = node ("owner");
-  owner . contains = rel_partners_at_relSource (&source, vec![ID::from ("future-alias")]);
+  owner . contains = rel_partners_at_relRepo (&repo, vec![ID::from ("future-alias")]);
   let mut disposable = node ("disposable");
-  disposable . contains = rel_partners_at_relSource (
-    &source, vec![ID::from ("delete-target")]);
+  disposable . contains = rel_partners_at_relRepo (
+    &repo, vec![ID::from ("delete-target")]);
   let mut graph = InRustGraph::from_nodecompletes (&[owner . clone (), disposable]);
   assert_eq! (validate_internal_indexes (&graph), vec![]);
 
-  owner . subscribes_to = MSV::Specified (rel_partners_at_relSource (
-    &source, vec![ID::from ("future-alias")]));
+  owner . subscribes_to = MSV::Specified (rel_partners_at_relRepo (
+    &repo, vec![ID::from ("future-alias")]));
   apply_definenodes_to_inRustGraph (
     &mut graph, &[DefineNode::Save (SaveNode (owner))]);
   assert_eq! (validate_internal_indexes (&graph), vec![]);
@@ -101,7 +101,7 @@ fn incremental_update_delete_and_extra_id_acquisition_remain_coherent () {
     . contains (&ID::from ("owner")));
 
   apply_definenodes_to_inRustGraph (&mut graph, &[DefineNode::Delete (DeleteNode {
-    id : ID::from ("disposable"), source,
+    id : ID::from ("disposable"), home_repo: repo,
   })]);
   assert_eq! (validate_internal_indexes (&graph), vec![]);
   assert! (! graph . contained_by . contains_key (&ID::from ("delete-target")));
@@ -109,15 +109,15 @@ fn incremental_update_delete_and_extra_id_acquisition_remain_coherent () {
 
 #[test]
 fn alias_acquisition_rekeys_all_five_inverse_indexes () {
-  let source : SourceName = SourceName::from ("main");
+  let repo : RepoName = RepoName::from ("main");
   let mut owner : NodeComplete = node ("owner");
-  owner . contains = rel_partners_at_relSource (&source, vec![ID::from ("future")]);
-  owner . subscribes_to = MSV::Specified (rel_partners_at_relSource (
-    &source, vec![ID::from ("future")]));
-  owner . hides_from_its_subscriptions = MSV::Specified (rel_partners_at_relSource (
-    &source, vec![ID::from ("future")]));
-  owner . overrides_view_of = MSV::Specified (rel_partners_at_relSource (
-    &source, vec![ID::from ("future")]));
+  owner . contains = rel_partners_at_relRepo (&repo, vec![ID::from ("future")]);
+  owner . subscribes_to = MSV::Specified (rel_partners_at_relRepo (
+    &repo, vec![ID::from ("future")]));
+  owner . hides_from_its_subscriptions = MSV::Specified (rel_partners_at_relRepo (
+    &repo, vec![ID::from ("future")]));
+  owner . overrides_view_of = MSV::Specified (rel_partners_at_relRepo (
+    &repo, vec![ID::from ("future")]));
   owner . body = Some ("[[id:future][future]]" . to_string ());
   let mut graph : InRustGraph =
     InRustGraph::from_nodecompletes (&[owner . clone ()]);
@@ -144,10 +144,10 @@ fn alias_acquisition_rekeys_all_five_inverse_indexes () {
 
 #[test]
 fn merge_transfer_rekeys_primary_and_extra_spellings () {
-  let source : SourceName = SourceName::from ("main");
+  let repo : RepoName = RepoName::from ("main");
   let mut owner : NodeComplete = node ("owner");
-  owner . contains = rel_partners_at_relSource (
-    &source, vec![ID::from ("acquiree"), ID::from ("old-extra")]);
+  owner . contains = rel_partners_at_relRepo (
+    &repo, vec![ID::from ("acquiree"), ID::from ("old-extra")]);
   let mut acquiree : NodeComplete = node ("acquiree");
   acquiree . extra_ids = vec![ID::from ("old-extra")];
   let acquirer : NodeComplete = node ("acquirer");
@@ -160,7 +160,7 @@ fn merge_transfer_rekeys_primary_and_extra_spellings () {
     DefineNode::Save (SaveNode (merged . clone ())),
     DefineNode::Delete (DeleteNode {
       id     : ID::from ("acquiree"),
-      source : source,
+      home_repo : repo,
     }),
   ]);
 
@@ -175,16 +175,16 @@ fn merge_transfer_rekeys_primary_and_extra_spellings () {
 
 #[test]
 fn deletion_rekeys_surviving_raw_primary_extra_and_text_references () {
-  let source : SourceName = SourceName::from ("main");
+  let repo : RepoName = RepoName::from ("main");
   let mut owner : NodeComplete = node ("foreign-owner");
   let raw_ids : Vec<ID> = vec![ID::from ("target"), ID::from ("extra")];
-  owner . contains = rel_partners_at_relSource (&source, raw_ids . clone ());
-  owner . subscribes_to = MSV::Specified (rel_partners_at_relSource (
-    &source, raw_ids . clone ()));
-  owner . hides_from_its_subscriptions = MSV::Specified (rel_partners_at_relSource (
-    &source, raw_ids . clone ()));
-  owner . overrides_view_of = MSV::Specified (rel_partners_at_relSource (
-    &source, raw_ids . clone ()));
+  owner . contains = rel_partners_at_relRepo (&repo, raw_ids . clone ());
+  owner . subscribes_to = MSV::Specified (rel_partners_at_relRepo (
+    &repo, raw_ids . clone ()));
+  owner . hides_from_its_subscriptions = MSV::Specified (rel_partners_at_relRepo (
+    &repo, raw_ids . clone ()));
+  owner . overrides_view_of = MSV::Specified (rel_partners_at_relRepo (
+    &repo, raw_ids . clone ()));
   owner . body = Some (
     "[[id:target][primary]] [[id:extra][extra]]" . to_string ());
   let mut target : NodeComplete = node ("target");
@@ -195,7 +195,7 @@ fn deletion_rekeys_surviving_raw_primary_extra_and_text_references () {
   apply_definenodes_to_inRustGraph (&mut graph, &[
     DefineNode::Delete (DeleteNode {
       id     : ID::from ("target"),
-      source,
+      home_repo: repo,
     }),
   ]);
 
@@ -215,15 +215,15 @@ fn deletion_rekeys_surviving_raw_primary_extra_and_text_references () {
 
 #[test]
 fn changed_owner_removes_and_adds_all_five_inverse_contributions () {
-  let source : SourceName = SourceName::from ("main");
+  let repo : RepoName = RepoName::from ("main");
   let mut old : NodeComplete = node ("owner");
-  old . contains = rel_partners_at_relSource (&source, vec![ID::from ("old")]);
+  old . contains = rel_partners_at_relRepo (&repo, vec![ID::from ("old")]);
   old . subscribes_to = MSV::Specified (old . contains . clone ());
   old . hides_from_its_subscriptions = MSV::Specified (old . contains . clone ());
   old . overrides_view_of = MSV::Specified (old . contains . clone ());
   old . body = Some ("[[id:old][old]]" . to_string ());
   let mut final_node : NodeComplete = node ("owner");
-  final_node . contains = rel_partners_at_relSource (&source, vec![ID::from ("new")]);
+  final_node . contains = rel_partners_at_relRepo (&repo, vec![ID::from ("new")]);
   final_node . subscribes_to = MSV::Specified (final_node . contains . clone ());
   final_node . hides_from_its_subscriptions =
     MSV::Specified (final_node . contains . clone ());
@@ -255,13 +255,13 @@ proptest! {
     raw_indexes in proptest::collection::vec (0usize..6, 0..10),
     action in 0usize..3,
   ) {
-    let source : SourceName = SourceName::from ("main");
+    let repo : RepoName = RepoName::from ("main");
     let universe : [&str; 6] = ["P", "E", "Q", "U", "X", "Y"];
     let raw_ids : Vec<ID> = raw_indexes . iter ()
       . map (|index| ID::from (universe [*index]))
       . collect ();
     let mut owner : NodeComplete = node ("owner");
-    owner . contains = rel_partners_at_relSource (&source, raw_ids . clone ());
+    owner . contains = rel_partners_at_relRepo (&repo, raw_ids . clone ());
     owner . subscribes_to = MSV::Specified (owner . contains . clone ());
     owner . hides_from_its_subscriptions = MSV::Specified (owner . contains . clone ());
     owner . overrides_view_of = MSV::Specified (owner . contains . clone ());
@@ -277,7 +277,7 @@ proptest! {
     let (definitions, final_nodes) : (Vec<DefineNode>, Vec<NodeComplete>) =
       match action {
         0 => (vec![DefineNode::Delete (DeleteNode {
-                id : ID::from ("P"), source : source . clone (),
+                id : ID::from ("P"), home_repo : repo . clone (),
               })],
               vec![owner, acquirer]),
         1 => {
@@ -286,7 +286,7 @@ proptest! {
           (vec![
              DefineNode::Save (SaveNode (merged . clone ())),
              DefineNode::Delete (DeleteNode {
-               id : ID::from ("P"), source : source . clone (),
+               id : ID::from ("P"), home_repo : repo . clone (),
              }),
            ], vec![owner, merged])
         },

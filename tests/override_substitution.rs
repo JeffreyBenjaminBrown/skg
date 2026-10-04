@@ -7,13 +7,13 @@
 // round-trips to the ORIGINAL IDs, so a container's contains list is
 // never silently rewritten from N to R.
 //
-// Fixture (tests/override_substitution/fixtures, single source
+// Fixture (tests/override_substitution/fixtures, single Skg repo
 // "main", user-owned): Q contains P and P2; P contains N and M;
 // R overrides N and contains W; S subscribes to E; E contains N.
 //
-// The multi-source fixture (fixtures-multi) adds the ownership and
-// visibility gates: FR (source "foreign", not user-owned) overrides
-// N1; R2 (source "other", user-owned) overrides N2; N3 lives in
+// The multi-repo fixture (fixtures-multi) adds the ownership and
+// visibility gates: FR (Skg repo "foreign", not user-owned) overrides
+// N1; R2 (Skg repo "other", user-owned) overrides N2; N3 lives in
 // "other" while P3 and its overrider R3 live in "main".
 
 use indoc::indoc;
@@ -23,15 +23,15 @@ use std::net::TcpStream;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::assert_metadata_eq;
 use skg::serve::ViewsState;
-use skg::source_sets::{ActiveSourceSet, SourceSetName};
+use skg::repo_sets::{ActiveRepoSet, RepoSetName};
 use skg::test_utils::{
   run_with_shared_test_stores,
   graph_handle_from_config};
 use skg::test_utils::update_from_and_rerender_buffer_test as update_from_and_rerender_buffer;
 use skg::to_org::render::content_view::{
-  multi_root_view, multi_root_view_with_source_set};
+  multi_root_view, multi_root_view_with_repo_set};
 use skg::types::errors::{BufferValidationError, SaveError};
-use skg::types::misc::{ID, SkgConfig, SourceName, TantivyIndex, members_of};
+use skg::types::misc::{ID, SkgConfig, RepoName, TantivyIndex, members_of};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
 use skg::types::views_state::OpenViews;
@@ -133,7 +133,7 @@ fn read_fixture_file (
   pid    : &str,
 ) -> String {
   let path : std::path::PathBuf =
-    config . sources . values () . next () . unwrap ()
+    config . repos . values () . next () . unwrap ()
     . path . join ( format! ("{}.skg", pid) );
   std::fs::read_to_string (&path)
     . unwrap_or_else ( |e| panic! ("reading {:?}: {}", path, e) ) }
@@ -344,21 +344,21 @@ async fn marked_view_is_shape_stable_across_diff_toggle (
         graph_handle_from_config (config) ? );
       { // git-init the temp fixture copy, so the toggle's diff is
         // real (and clean: HEAD == worktree).
-        let source_path : &std::path::Path =
-          & config . sources . values () . next () . unwrap () . path;
-        let repo : git2::Repository =
-          git2::Repository::init (source_path) ?;
-        { let mut git_config : git2::Config = repo . config () ?;
+        let repo_path : &std::path::Path =
+          & config . repos . values () . next () . unwrap () . path;
+        let gitrepo : git2::Repository =
+          git2::Repository::init (repo_path) ?;
+        { let mut git_config : git2::Config = gitrepo . config () ?;
           git_config . set_str ("user.email", "test@test.invalid") ?;
           git_config . set_str ("user.name", "skg tests") ?; }
-        let mut index : git2::Index = repo . index () ?;
+        let mut index : git2::Index = gitrepo . index () ?;
         index . add_all (
           ["*.skg"] . iter (), git2::IndexAddOption::DEFAULT, None ) ?;
         index . write () ?;
         let tree_id : git2::Oid = index . write_tree () ?;
-        let tree : git2::Tree = repo . find_tree (tree_id) ?;
-        let sig : git2::Signature = repo . signature () ?;
-        repo . commit (
+        let tree : git2::Tree = gitrepo . find_tree (tree_id) ?;
+        let sig : git2::Signature = gitrepo . signature () ?;
+        gitrepo . commit (
           Some ("HEAD"), &sig, &sig, "baseline", &tree, &[] ) ?; }
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
@@ -399,8 +399,8 @@ async fn marked_view_is_shape_stable_across_diff_toggle (
               &mut server,
               "((request . \"git diff mode toggle\"))",
               &env, views_state,
-              & ActiveSourceSet::named (
-                  config, SourceSetName ("all" . to_string ()))
+              & ActiveRepoSet::named (
+                  config, RepoSetName ("all" . to_string ()))
                 . expect ("set all resolves") ); } ); } );
         drop (server);
         let mut reader : std::io::BufReader<TcpStream> =
@@ -467,18 +467,18 @@ async fn ownership_and_visibility_gate_substitution (
         assert! ( marked_lines (&view, "N1") . is_empty (),
           "FR is foreign; N1 draws raw:\n{}", view );
         assert! ( view . contains ("(id N1)"), "{}", view ); }
-      let active : ActiveSourceSet =
-        ActiveSourceSet::named (
-          config, SourceSetName ("main" . to_string ())) ?;
+      let active : ActiveRepoSet =
+        ActiveRepoSet::named (
+          config, RepoSetName ("main" . to_string ())) ?;
       { // An inactive owned overrider does not substitute.
         let (view, _pids, _tree) =
-          multi_root_view_with_source_set (
+          multi_root_view_with_repo_set (
             config, None,
             &[ ID::from ("P2") ], false, &active ) ?;
         assert! ( marked_lines (&view, "N2") . is_empty (),
           "R2's source is inactive; N2 draws raw:\n{}", view );
         assert! ( view . contains ("(id N2)"), "{}", view ); }
-      { // The same overrider substitutes when its source is active.
+      { // The same overrider substitutes when its Skg repo is active.
         let (view, _pids, _tree) =
           multi_root_view (
             config, None,
@@ -489,7 +489,7 @@ async fn ownership_and_visibility_gate_substitution (
       { // Omission beats substitution: inactive original, active
         // overrider -> neither is drawn.
         let (view, _pids, _tree) =
-          multi_root_view_with_source_set (
+          multi_root_view_with_repo_set (
             config, None,
             &[ ID::from ("P3") ], false, &active ) ?;
         assert! ( ! view . contains ("(id N3)"),
@@ -499,14 +499,14 @@ async fn ownership_and_visibility_gate_substitution (
            marker would name an inactive node):\n{}", view ); }
       Ok (( )) }
 
-/// Save 'buf' under a specific active source-set (the test shims save
+/// Save 'buf' under a specific active repo-set (the test shims save
 /// under 'all'). Asserts no save errors and returns the rerendered
 /// view.
 async fn save_under_set (
   buf     : &str,
   config : &SkgConfig,
   tantivy : &mut TantivyIndex,
-  set     : &ActiveSourceSet,
+  set     : &ActiveRepoSet,
 ) -> Result<String, Box<dyn Error>> {
   let graph : InRustGraphHandle =
     graph_handle_from_config (config) ?;
@@ -531,7 +531,7 @@ async fn save_under_set (
   Ok ( response . saved_view ) }
 
 /// A half-visible user-owned chain: D overrides C overrides N, with the
-/// end D in source 'other'. Under 'all' the END D substitutes for N;
+/// end D in Skg repo 'other'. Under 'all' the END D substitutes for N;
 /// under 'main' (hiding 'other') the MIDDLE C substitutes. Saving the
 /// half-visible view accepts the middle carrier (it is on N's chain)
 /// and keeps N in P's contains; an off-chain marker is rejected.
@@ -551,14 +551,14 @@ async fn chain_half_visible_keeps_the_original (
           "one substitute for N under all:\n{}", view );
         assert! ( marked [0] . contains ("(id D)"),
           "the chain end D is drawn under all:\n{}", view ); }
-      let main_set : ActiveSourceSet =
-        ActiveSourceSet::named (
-          config, SourceSetName ("main" . to_string ())) ?;
+      let main_set : ActiveRepoSet =
+        ActiveRepoSet::named (
+          config, RepoSetName ("main" . to_string ())) ?;
       let view_main : String = {
-        // Under 'main', D's source 'other' is inactive, so the MIDDLE
+        // Under 'main', D's Skg repo 'other' is inactive, so the MIDDLE
         // C is drawn instead.
         let (view, _p, _t) =
-          multi_root_view_with_source_set (
+          multi_root_view_with_repo_set (
             config, Some (tantivy),
             &[ ID::from ("P") ], false, &main_set ) ?;
         let marked : Vec<&str> = marked_lines (&view, "N");
@@ -577,8 +577,8 @@ async fn chain_half_visible_keeps_the_original (
            for N:\n{}", saved );
         let p_file : String = {
           let main_path : &std::path::Path =
-            & config . sources
-              . get ( &SourceName::from ("main") ) . unwrap () . path;
+            & config . repos
+              . get ( &RepoName::from ("main") ) . unwrap () . path;
           std::fs::read_to_string ( main_path . join ("P.skg") )
             . unwrap () };
         assert! ( p_file . contains ("- N"),

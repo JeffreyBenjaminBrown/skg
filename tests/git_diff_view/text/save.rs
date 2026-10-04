@@ -27,7 +27,7 @@ async fn test_delete_text_changed_scaffold_respawns (
   run_save_test(
     s,
     "skg-test-save-del-textchanged",
-    |config, tantivy, repo_path| { Box::pin(async move {
+    |config, tantivy, gitrepo_path| { Box::pin(async move {
       // User deletes the textChanged scaffold under node 1
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "textChanged");
@@ -44,12 +44,12 @@ async fn test_delete_text_changed_scaffold_respawns (
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: 1.skg should still have the new title
-      let node_1 = read_nodecomplete(repo_path, "1")?;
+      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
       assert_eq!(node_1 . title, "1 has a new title.",
         "1.skg should still have the new title");
 
       // DISK: 11.skg should still have the new body
-      let node_11 = read_nodecomplete(repo_path, "11")?;
+      let node_11 = read_nodecomplete(gitrepo_path, "11")?;
       assert_eq!(node_11 . body, Some("11 has a new body." . to_string()),
         "11.skg should still have the new body");
 
@@ -64,7 +64,7 @@ async fn test_edit_text_changed_node_updates_disk (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
-  run_save_test(s, "skg-test-save-edit-textchanged", |config, tantivy, repo_path| {
+  run_save_test(s, "skg-test-save-edit-textchanged", |config, tantivy, gitrepo_path| {
     Box::pin(async move {
       // User changes the title of node 1 again
       let input = GIT_DIFF_VIEW . replace(
@@ -82,7 +82,7 @@ async fn test_edit_text_changed_node_updates_disk (
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: 1.skg should have the newest title
-      let node_1 = read_nodecomplete(repo_path, "1")?;
+      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
       assert_eq!(node_1 . title, "1 has an even newer title.",
         "1.skg should have the edited title");
 
@@ -104,7 +104,7 @@ async fn test_edit_text_changed_scaffold_respawns (
   run_save_test(
     s,
     "skg-test-save-edit-scaffold",
-    |config, tantivy, repo_path| { Box::pin(async move {
+    |config, tantivy, gitrepo_path| { Box::pin(async move {
       // User tries to change the title of a textChanged scaffold
       let input = GIT_DIFF_VIEW . replace(
         "** (skg (textChanged unstaged))",
@@ -122,7 +122,7 @@ async fn test_edit_text_changed_scaffold_respawns (
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: No changes should occur
-      let node_1 = read_nodecomplete(repo_path, "1")?;
+      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
       assert_eq!(node_1 . title, "1 has a new title.",
         "1.skg should be unchanged");
 
@@ -140,7 +140,7 @@ async fn test_move_text_changed_scaffold_respawns (
   run_save_test(
     s,
     "skg-test-save-move-scaffold",
-    |config, tantivy, repo_path| { Box::pin(async move {
+    |config, tantivy, gitrepo_path| { Box::pin(async move {
       // Below, user moves the textChanged scaffold
       // from first among its siblings to last.
       let input = "\
@@ -164,7 +164,7 @@ async fn test_move_text_changed_scaffold_respawns (
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: No changes should occur
-      let node_1 = read_nodecomplete(repo_path, "1")?;
+      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
       assert_eq!(node_1 . title, "1 has a new title.",
         "1.skg should be unchanged");
 
@@ -183,7 +183,7 @@ async fn test_move_text_changed_to_unedited_node_respawns (
   run_save_test(
     s,
     "skg-test-save-move-to-unedited",
-    |config, tantivy, repo_path| { Box::pin(async move {
+    |config, tantivy, gitrepo_path| { Box::pin(async move {
       // User moves a textChanged scaffold to under node 12 (which wasn't edited)
       let input = without_lines_containing(GIT_DIFF_VIEW, "textChanged");
       let input = insert_after(&input, "(id 12)",
@@ -201,7 +201,7 @@ async fn test_move_text_changed_to_unedited_node_respawns (
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: No changes should occur
-      let node_12 = read_nodecomplete(repo_path, "12")?;
+      let node_12 = read_nodecomplete(gitrepo_path, "12")?;
       assert_eq!(node_12 . title, "12",
         "12.skg should be unchanged");
       let contains_12 = node_12 . contains;
@@ -228,7 +228,7 @@ async fn test_delete_text_changed_scaffold_respawns_staged (
   run_save_test_staged(
     s,
     "skg-test-save-del-textchanged-staged",
-    |config, tantivy, repo_path| { Box::pin(async move {
+    |config, tantivy, gitrepo_path| { Box::pin(async move {
       // User deletes the textChanged scaffold under node 1
       let input = without_lines_containing(
         GIT_DIFF_VIEW_STAGED, "textChanged");
@@ -245,12 +245,12 @@ async fn test_delete_text_changed_scaffold_respawns_staged (
         &Err ( String::new () ), &mut views_state ) . await?;
 
       // DISK: 1.skg should still have the new title
-      let node_1 = read_nodecomplete(repo_path, "1")?;
+      let node_1 = read_nodecomplete(gitrepo_path, "1")?;
       assert_eq!(node_1 . title, "1 has a new title.",
         "1.skg should still have the new title");
 
       // DISK: 11.skg should still have the new body
-      let node_11 = read_nodecomplete(repo_path, "11")?;
+      let node_11 = read_nodecomplete(gitrepo_path, "11")?;
       assert_eq!(node_11 . body, Some("11 has a new body." . to_string()),
         "11.skg should still have the new body");
 
@@ -277,7 +277,7 @@ where
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 {
   run_save_test_with_setup(
-    s, subtest_name, setup_git_repo_with_fixtures, test_fn) . await
+    s, subtest_name, setup_gitrepo_with_fixtures, test_fn) . await
 }
 
 async fn run_save_test_staged<F>(
@@ -294,7 +294,7 @@ where
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 {
   run_save_test_with_setup(
-    s, subtest_name, setup_git_repo_with_fixtures_staged, test_fn) . await
+    s, subtest_name, setup_gitrepo_with_fixtures_staged, test_fn) . await
 }
 
 async fn run_save_test_with_setup<S, F>(
@@ -313,9 +313,9 @@ where
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 {
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir . path();
-  setup (repo_path)?;
-  s . reset_with_source_path (subtest_name, repo_path) ?;
+  let gitrepo_path = temp_dir . path();
+  setup (gitrepo_path)?;
+  s . reset_with_repo_path (subtest_name, gitrepo_path) ?;
 
-  test_fn(&s . config, &mut s . tantivy, repo_path) . await
+  test_fn(&s . config, &mut s . tantivy, gitrepo_path) . await
 }

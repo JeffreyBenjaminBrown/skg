@@ -15,32 +15,32 @@ pub const GIT_DIFF_VIEW: &str = "\
 ";
 
 /// Create a git repo with head->worktree transition from content fixtures.
-pub fn setup_git_repo_with_fixtures(
-  repo_path: &Path,
+pub fn setup_gitrepo_with_fixtures(
+  gitrepo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {
-  super::super::common::setup_git_repo_with_fixtures(
-    repo_path,
+  super::super::common::setup_gitrepo_with_fixtures(
+    gitrepo_path,
     "tests/git_diff_view/content/fixtures/head",
     "tests/git_diff_view/content/fixtures/worktree",
   )
 }
 
 /// Same transition, staged.
-pub fn setup_git_repo_with_fixtures_staged(
-  repo_path: &Path,
+pub fn setup_gitrepo_with_fixtures_staged(
+  gitrepo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {
-  super::super::common::setup_git_repo_with_fixtures_staged(
-    repo_path,
+  super::super::common::setup_gitrepo_with_fixtures_staged(
+    gitrepo_path,
     "tests/git_diff_view/content/fixtures/head",
     "tests/git_diff_view/content/fixtures/worktree",
   )
 }
 
-pub fn setup_git_repo_with_subscribee_fixtures(
-  repo_path: &Path,
+pub fn setup_gitrepo_with_subscribee_fixtures(
+  gitrepo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {
-  super::super::common::setup_git_repo_with_fixtures(
-    repo_path,
+  super::super::common::setup_gitrepo_with_fixtures(
+    gitrepo_path,
     "tests/git_diff_view/content/fixtures-subscribee/head",
     "tests/git_diff_view/content/fixtures-subscribee/worktree",
   )
@@ -51,11 +51,11 @@ pub fn setup_git_repo_with_subscribee_fixtures(
 /// membership-only). The removed subscribee 22 must render as a phantom with
 /// (unstaged removedM) -- its relation is subscribes_to, not contains, so the
 /// marker comes from build_child_data's net-removal fallback, not phantom_axes.
-pub fn setup_git_repo_with_removed_subscribee_fixtures(
-  repo_path: &Path,
+pub fn setup_gitrepo_with_removed_subscribee_fixtures(
+  gitrepo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {
-  super::super::common::setup_git_repo_with_fixtures(
-    repo_path,
+  super::super::common::setup_gitrepo_with_fixtures(
+    gitrepo_path,
     "tests/git_diff_view/content/fixtures-removed-subscribee/head",
     "tests/git_diff_view/content/fixtures-removed-subscribee/worktree",
   )
@@ -64,11 +64,11 @@ pub fn setup_git_repo_with_removed_subscribee_fixtures(
 /// §C: the same removed-subscribee transition, but STAGED -- so the phantom's
 /// membership axis must report (staged removedM), proving per-stage works for a
 /// sharing relation (subscribes_to), not just the net unstaged fallback.
-pub fn setup_git_repo_with_removed_subscribee_fixtures_staged(
-  repo_path: &Path,
+pub fn setup_gitrepo_with_removed_subscribee_fixtures_staged(
+  gitrepo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {
-  super::super::common::setup_git_repo_with_fixtures_staged(
-    repo_path,
+  super::super::common::setup_gitrepo_with_fixtures_staged(
+    gitrepo_path,
     "tests/git_diff_view/content/fixtures-removed-subscribee/head",
     "tests/git_diff_view/content/fixtures-removed-subscribee/worktree",
   )
@@ -78,11 +78,11 @@ pub fn setup_git_repo_with_removed_subscribee_fixtures_staged(
 /// between HEAD and worktree, so the present member 22 must carry
 /// (unstaged newM) (TODO/full-schema/12-2_diff-mode-policy_discussion.org,
 /// outbound folder completeness).
-pub fn setup_git_repo_with_added_subscribee_fixtures(
-  repo_path: &Path,
+pub fn setup_gitrepo_with_added_subscribee_fixtures(
+  gitrepo_path: &Path,
 ) -> Result<Repository, Box<dyn Error>> {
-  super::super::common::setup_git_repo_with_fixtures(
-    repo_path,
+  super::super::common::setup_gitrepo_with_fixtures(
+    gitrepo_path,
     "tests/git_diff_view/content/fixtures-added-subscribee/head",
     "tests/git_diff_view/content/fixtures-added-subscribee/worktree",
   )

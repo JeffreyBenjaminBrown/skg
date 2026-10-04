@@ -1,12 +1,12 @@
-use crate::types::git::{MembershipAxes, NodeChanges, SourceDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_activeNode};
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
+use crate::types::git::{MembershipAxes, NodeChanges, RepoDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_activeNode};
+use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
+use crate::types::misc::{ID, SkgConfig, RepoName, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, AffectsParent};
 use crate::types::viewnode::{Vognode, QualFolder, Qual};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
-use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
+use crate::update_buffer::ancestry::pid_and_repo_from_required_ancestor;
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, treat_certain_children};
 use ego_tree::{NodeId, Tree};
 use std::collections::HashMap;
@@ -32,7 +32,7 @@ pub fn reconcile_aliasFolder_children (
   tree             : &mut Tree<ViewNode>,
   aliasfolder_node_id : NodeId,
   graph            : &InRustGraph,
-  source_diffs     : &Option<HashMap<SourceName, SourceDiff>>,
+  repo_diffs     : &Option<HashMap<RepoName, RepoDiff>>,
   config           : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   { let is_aliasFolder : bool = // barf if not an aliasFolder
@@ -44,22 +44,22 @@ pub fn reconcile_aliasFolder_children (
     if !is_aliasFolder { return Err(
       "reconcile_aliasFolder_children: Node is not an AliasFolder" . into() ); }}
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: parent Active vognode read through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 0).
-  let (parent_pid, parent_source) : (ID, SourceName) =
-    pid_and_source_from_required_ancestor(
+  let (parent_pid, parent_repo) : (ID, RepoName) =
+    pid_and_repo_from_required_ancestor(
       tree, aliasfolder_node_id, 0,
       "reconcile_aliasFolder_children" ) ?;
   let parent_nodecomplete : NodeComplete =
-    nodecomplete_rustFirst_by_pid_and_source (
-      graph, config, &parent_pid, &parent_source )
+    nodecomplete_rustFirst_by_pid_and_repo (
+      graph, config, &parent_pid, &parent_repo )
     . map_err ( |_| "reconcile_aliasFolder_children: parent NodeComplete not found" ) ?;
-  let alias_relSources : HashMap<String, SourceName> =
+  let alias_relRepos : HashMap<String, RepoName> =
     parent_nodecomplete . aliases . or_default () . iter ()
-    .map ( |alias| (alias . member . clone (), alias . relSource . clone ()) )
+    .map ( |alias| (alias . member . clone (), alias . relRepo . clone ()) )
     .collect ();
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
     per_stage_node_changes_for_activeNode (
-      source_diffs, &parent_pid, &parent_source );
+      repo_diffs, &parent_pid, &parent_repo );
   let (goal_list, axes_map)
     : (Vec<String>, HashMap<String, MembershipAxes>) =
     if staged_nc . is_none () && unstaged_nc . is_none () {
@@ -94,12 +94,12 @@ pub fn reconcile_aliasFolder_children (
       folded      : false,
       body_folded : false,
       kind : ViewNodeKind::Qual (Qual::Alias { text : text . clone(),
-                                               relSource : alias_relSources
+                                               relRepo : alias_relRepos
                                                  . get (text)
-                                                 . and_then ( |relSource|
-                                                   if relSource == &parent_nodecomplete . source { None }
-                                                   else { Some (relSource . clone ()) } ),
-                                               relSource_request : None,
+                                                 . and_then ( |relRepo|
+                                                   if relRepo == &parent_nodecomplete . home_repo { None }
+                                                   else { Some (relRepo . clone ()) } ),
+                                               relRepo_request : None,
                                                membership } ), })};
   complete_relevant_children_in_viewnodetree(
     tree,

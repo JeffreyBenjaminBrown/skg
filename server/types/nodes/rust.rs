@@ -4,14 +4,14 @@
 //! derived fields), plus links_to — derived from body parsing at
 //! NodeRust construction time.
 
-use crate::types::misc::{ID, MSV, RelPartner, SourceName};
+use crate::types::misc::{ID, MSV, RelPartner, RepoName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 use crate::types::links::links_from_node;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct NodeRust {
   pub pid                          : ID,
-  pub source                       : SourceName,
+  pub home_repo                       : RepoName,
   pub extra_ids                    : Vec<ID>,
   pub title                        : String,
   pub overPrivateText_telescope               : bool,
@@ -38,7 +38,7 @@ impl From<&NodeComplete> for NodeRust {
       . collect ();
     NodeRust {
       pid                          : c . pid . clone (),
-      source                       : c . source . clone (),
+      home_repo                       : c . home_repo . clone (),
       extra_ids                    : c . normalized_extra_ids (),
       title                        : c . title . clone (),
       overPrivateText_telescope               : c . overPrivateText_telescope,

@@ -9,112 +9,112 @@
 /// and inserted into the NodeComplete.
 
 use crate::from_text::local_instruction_collection::lower::{
-  RequestedRelSources, NodeIntent, NodeSaveIntent };
+  RequestedRelRepos, NodeIntent, NodeSaveIntent };
 use crate::from_text::weave::{relationship_member_is_visible, set_difference_merge, weave};
-use crate::source_sets::ActiveSourceSet;
+use crate::repo_sets::ActiveRepoSet;
 use crate::types::errors::BufferValidationError;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::opt_nodecomplete_by_id;
-use crate::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgConfig, SourceName, members_of, rel_partners_at_relSource};
+use crate::types::misc::{ID, MSV, RelPartner, RelationshipMemberKey, SkgConfig, RepoName, members_of, rel_partners_at_relRepo};
 use crate::types::phantom::home_from_disk;
 use crate::types::nodes::complete::{
   NodeComplete, empty_node_complete, set_file_property};
-use crate::types::save::{DefineNode, SaveNode, SourceMove};
+use crate::types::save::{DefineNode, SaveNode, RepoMove};
 use std::collections::HashMap;
 use std::error::Error;
 
-pub struct Definenodes_with_Sourcemoves {
+pub struct Definenodes_with_Repomoves {
   pub instructions : Vec<DefineNode>,
-  pub source_moves : Vec<SourceMove>,
+  pub repo_moves : Vec<RepoMove>,
 }
 
-struct Definenode_with_Opt_Sourcemove {
+struct Definenode_with_Opt_Repomove {
   instruction : DefineNode,
-  source_move : Option<SourceMove>,
+  repo_move : Option<RepoMove>,
 }
 
-impl Definenodes_with_Sourcemoves {
+impl Definenodes_with_Repomoves {
   fn with_capacity (
     capacity : usize,
-  ) -> Definenodes_with_Sourcemoves {
-    Definenodes_with_Sourcemoves {
+  ) -> Definenodes_with_Repomoves {
+    Definenodes_with_Repomoves {
       instructions : Vec::with_capacity (capacity),
-      source_moves : Vec::new(),
+      repo_moves : Vec::new(),
     }}
 
   fn push (
     &mut self,
-    node : Definenode_with_Opt_Sourcemove,
+    node : Definenode_with_Opt_Repomove,
   ) {
     self . instructions . push (node . instruction);
-    if let Some (sm) = node . source_move {
-      let sm : SourceMove = sm;
-      self . source_moves . push (sm); }}
+    if let Some (sm) = node . repo_move {
+      let sm : RepoMove = sm;
+      self . repo_moves . push (sm); }}
 }
 
 pub fn build_diskSupplemented_defineNodes (
   intents : Vec<NodeIntent>,
   graph   : &InRustGraph,
   config  : &SkgConfig,
-  restricted_source_set : Option<&ActiveSourceSet>, // None means no restriction; callers normalize 'all' to None.
-) -> Result<Definenodes_with_Sourcemoves, Box<dyn Error>> {
-  let mut result : Definenodes_with_Sourcemoves =
-    Definenodes_with_Sourcemoves::with_capacity (intents . len());
-  let prospective_homes : HashMap<ID, SourceName> =
+  restricted_repo_set : Option<&ActiveRepoSet>, // None means no restriction; callers normalize 'all' to None.
+) -> Result<Definenodes_with_Repomoves, Box<dyn Error>> {
+  let mut result : Definenodes_with_Repomoves =
+    Definenodes_with_Repomoves::with_capacity (intents . len());
+  let prospective_homes : HashMap<ID, RepoName> =
     homes_declared_by_save_intents (&intents);
   for intent in intents {
-    let supplemented : Definenode_with_Opt_Sourcemove =
+    let supplemented : Definenode_with_Opt_Repomove =
       supplement_nodeeditintent_from_disk (
-        intent, graph, config, restricted_source_set, &prospective_homes ) ?;
+        intent, graph, config, restricted_repo_set, &prospective_homes ) ?;
     result . push (supplemented); }
   Ok (result) }
 
-/// Each Save intent's source is the node home after this save. Relationship
+/// Each Save intent's repo is the node home after this save. Relationship
 /// floors must see these homes across the entire batch: a parent may name a
 /// child before the child intent is supplemented, and a same-save home move
 /// must make its newly public edge legal.
 fn homes_declared_by_save_intents (
   intents : &[NodeIntent],
-) -> HashMap<ID, SourceName> {
-  let mut homes : HashMap<ID, SourceName> = HashMap::new ();
+) -> HashMap<ID, RepoName> {
+  let mut homes : HashMap<ID, RepoName> = HashMap::new ();
   for intent in intents {
     let NodeIntent::Save (intent) = intent else { continue; };
     for id in std::iter::once (&intent . pid) . chain (
       intent . extra_ids . iter ()) {
-      homes . insert (id . clone (), intent . source . clone ()); }}
+      homes . insert (id . clone (), intent . home_repo . clone ()); }}
   homes }
 
 fn supplement_nodeeditintent_from_disk (
   intent : NodeIntent,
   graph  : &InRustGraph,
   config : &SkgConfig,
-  restricted_source_set : Option<&ActiveSourceSet>,
-  prospective_homes : &HashMap<ID, SourceName>,
-) -> Result<Definenode_with_Opt_Sourcemove, Box<dyn Error>> {
+  restricted_repo_set : Option<&ActiveRepoSet>,
+  prospective_homes : &HashMap<ID, RepoName>,
+) -> Result<Definenode_with_Opt_Repomove, Box<dyn Error>> {
   match intent {
     NodeIntent::Delete (ref delete) => {
-      if let Some (active) = restricted_source_set {
+      if let Some (active) = restricted_repo_set {
         refuse_delete_with_inactive_sections (
           config, active, & delete . id )
           . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
-      Ok (Definenode_with_Opt_Sourcemove {
+      Ok (Definenode_with_Opt_Repomove {
         instruction : intent . into_define_node()
           . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
-        source_move : None,
+        repo_move : None,
       }) },
     _ => supplement_saveintent_from_disk (
       intent . save_intent()
         . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?,
-      graph, config, restricted_source_set, prospective_homes ),
+      graph, config, restricted_repo_set, prospective_homes ),
   }}
 
 fn supplement_saveintent_from_disk (
   from_buffer : NodeSaveIntent,
   graph       : &InRustGraph,
   config      : &SkgConfig,
-  restricted_source_set : Option<&ActiveSourceSet>,
-  prospective_homes : &HashMap<ID, SourceName>,
-) -> Result<Definenode_with_Opt_Sourcemove, Box<dyn Error>> {
+  restricted_repo_set : Option<&ActiveRepoSet>,
+  prospective_homes : &HashMap<ID, RepoName>,
+) -> Result<Definenode_with_Opt_Repomove, Box<dyn Error>> {
   let pid : ID =
     from_buffer . pid . clone();
   let from_disk : Option<NodeComplete> =
@@ -122,15 +122,15 @@ fn supplement_saveintent_from_disk (
       graph, config, &pid) ?;
   match from_disk {
     None => {
-      // A brand-new node has no sticky sources (no disk edges to be
-      // sticky about), but an explicit '(editRequest (relSource ...))'
+      // A brand-new node has no sticky repos (no disk edges to be
+      // sticky about), but an explicit '(editRequest (relRepo ...))'
       // request must
       // still be validated against the DEFAULT floor -- an empty
-      // disk stand-in reuses 'apply_sticky_relSources' unchanged (its
+      // disk stand-in reuses 'apply_sticky_relRepos' unchanged (its
       // sticky lookups simply find nothing, falling through to
       // default every time).
-      let requested_relSources : RequestedRelSources =
-        from_buffer . requested_relSources ();
+      let requested_relRepos : RequestedRelRepos =
+        from_buffer . requested_relRepos ();
       let boolprop_request = from_buffer . boolprop_request;
       let mut supplemented : NodeComplete =
         from_buffer . into_nodecomplete ();
@@ -138,32 +138,32 @@ fn supplement_saveintent_from_disk (
         set_file_property (&mut supplemented . misc, property, value); }
       let empty_disk : NodeComplete = NodeComplete {
         pid    : supplemented . pid    . clone (),
-        source : supplemented . source . clone (),
+        home_repo : supplemented . home_repo . clone (),
         .. empty_node_complete () };
       let supplemented : NodeComplete =
-        apply_sticky_relSources_in_graph_with_prospective_homes (
-          supplemented, &empty_disk, &requested_relSources,
+        apply_sticky_relRepos_in_graph_with_prospective_homes (
+          supplemented, &empty_disk, &requested_relRepos,
           graph, config, prospective_homes )
         . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
-      Ok (Definenode_with_Opt_Sourcemove {
+      Ok (Definenode_with_Opt_Repomove {
         instruction : DefineNode::Save (SaveNode (supplemented)),
-        source_move : None, } ) },
+        repo_move : None, } ) },
     Some (disk_node) => {
       let disk_node : NodeComplete = disk_node;
       let mut from_buffer : NodeSaveIntent = from_buffer;
       from_buffer . fill_unspecified_contains (
         &members_of (&disk_node . contains));
-      let requested_relSources : RequestedRelSources =
-        from_buffer . requested_relSources ();
+      let requested_relRepos : RequestedRelRepos =
+        from_buffer . requested_relRepos ();
       let boolprop_request = from_buffer . boolprop_request;
       let from_buffer : NodeComplete =
         from_buffer . into_nodecomplete();
       let canonicalized : NodeComplete =
         canonicalize_ids_from_disk (from_buffer, &disk_node) ?;
-      let maybe_move : Option<SourceMove> =
-        detect_source_move ( config,  &pid,
-                             &canonicalized . source,
-                             &disk_node . source) ?;
+      let maybe_move : Option<RepoMove> =
+        detect_repo_move ( config,  &pid,
+                             &canonicalized . home_repo,
+                             &disk_node . home_repo) ?;
       let supplemented : NodeComplete = {
         let mut supplemented : NodeComplete =
           supplement_unspecified_fields_from_disk (
@@ -171,23 +171,23 @@ fn supplement_saveintent_from_disk (
         if let Some ((property, value)) = boolprop_request {
           set_file_property (&mut supplemented . misc, property, value); }
         let supplemented : NodeComplete =
-          match restricted_source_set {
+          match restricted_repo_set {
             None => supplemented,
             Some (active) => preserve_invisible_members (
               supplemented, &disk_node, graph, config, active ) };
-        apply_sticky_relSources_in_graph_with_prospective_homes (
-          supplemented, &disk_node, &requested_relSources,
+        apply_sticky_relRepos_in_graph_with_prospective_homes (
+          supplemented, &disk_node, &requested_relRepos,
           graph, config, prospective_homes )
           . map_err ( |e| -> Box<dyn Error> { e . into () } ) ? };
-      Ok (Definenode_with_Opt_Sourcemove {
+      Ok (Definenode_with_Opt_Repomove {
         instruction : DefineNode::Save (SaveNode (supplemented)),
-        source_move : maybe_move,
+        repo_move : maybe_move,
       }) }}}
 
-/// Under a restricted source-set, the buffer shows only some of a
+/// Under a restricted repo-set, the buffer shows only some of a
 /// node's relationship-list members, so its lists describe only the
 /// visible subset.  This merges each list with its disk counterpart
-/// (TODO/full-schema/9-2_source-set-safety.org): the anchored
+/// (TODO/full-schema/9-2_repo-set-safety.org): the anchored
 /// 'weave' for the order-meaningful 'contains' and 'subscribes_to',
 /// the 'set_difference_merge' for the order-meaningless
 /// 'overrides_view_of'.  A field is replaced only when the merge
@@ -198,7 +198,7 @@ fn preserve_invisible_members (
   disk_node        : &NodeComplete,
   graph            : &InRustGraph,
   config           : &SkgConfig,
-  active           : &ActiveSourceSet,
+  active           : &ActiveRepoSet,
 ) -> NodeComplete {
   let member_key = |id : &ID| -> RelationshipMemberKey {
     graph . relationship_member_key (id) };
@@ -229,7 +229,7 @@ fn preserve_invisible_members (
         . map (|member| member . member . clone ())
         . unwrap_or_else (|| id . clone ())
     }) . collect::<Vec<ID>>() };
-  let owner_source : SourceName = supplemented . source . clone ();
+  let owner_repo : RepoName = supplemented . home_repo . clone ();
   { let disk_contains : Vec<ID> = members_of (&disk_node . contains);
     let buffer_contains : Vec<ID> = normalize_to_disk_raw (
       &members_of (&supplemented . contains), &disk_node . contains);
@@ -237,7 +237,7 @@ fn preserve_invisible_members (
       &disk_contains, &contains_visible,
       &buffer_contains );
     supplemented . contains =
-      rel_partners_at_relSource (&owner_source, merged); }
+      rel_partners_at_relRepo (&owner_repo, merged); }
   { let disk_subscribes : Vec<ID> =
       members_of (disk_node . subscribes_to . or_default ());
     let submitted_subscribes : Vec<ID> =
@@ -250,7 +250,7 @@ fn preserve_invisible_members (
       &buffer_subscribes );
     if merged != submitted_subscribes {
       supplemented . subscribes_to =
-        MSV::Specified (rel_partners_at_relSource (&owner_source, merged)); }}
+        MSV::Specified (rel_partners_at_relRepo (&owner_repo, merged)); }}
   { let disk_overrides : Vec<ID> =
       members_of (disk_node . overrides_view_of . or_default ());
     let submitted_overrides : Vec<ID> =
@@ -263,22 +263,22 @@ fn preserve_invisible_members (
       &buffer_overrides );
     if merged != submitted_overrides {
       supplemented . overrides_view_of =
-        MSV::Specified (rel_partners_at_relSource (&owner_source, merged)); }}
+        MSV::Specified (rel_partners_at_relRepo (&owner_repo, merged)); }}
   supplemented }
 
 /// Deleting a node deletes its whole TELESCOPE, including sections
-/// the active source-set cannot see; refuse rather than silently
+/// the active repo-set cannot see; refuse rather than silently
 /// destroy them. (The agreed small leak: the refusal reveals that
 /// inactive sections exist.)
 pub fn refuse_delete_with_inactive_sections (
   config : &SkgConfig,
-  active : &ActiveSourceSet,
+  active : &ActiveRepoSet,
   pid    : &ID,
 ) -> Result<(), String> {
-  for source_name in config . ordered_sources () {
-    if active . contains_source (&source_name) { continue; }
-    if let Ok (path) = crate::util::path_from_pid_and_source (
-      config, &source_name, pid . clone () ) {
+  for repo_name in config . ordered_repos () {
+    if active . contains_repo (&repo_name) { continue; }
+    if let Ok (path) = crate::util::path_from_pid_and_repo (
+      config, &repo_name, pid . clone () ) {
       if std::path::Path::new (&path) . is_file () {
         return Err ( format! (
           "Cannot delete '{}': it has telescope sections in inactive sources. Widen the source-set (e.g. to 'all') and retry.",
@@ -288,96 +288,96 @@ pub fn refuse_delete_with_inactive_sections (
 /// THE STICKY-ELSE-DEFAULT RULE (5_plan.org, work item
 /// save-leveling), extended by an EXPLICIT third path (work item
 /// render-and-gating). The lowering stages tag every edge with the
-/// node's own source (a placeholder); this pass resolves the real
-/// relSources:
+/// node's own repo (a placeholder); this pass resolves the real
+/// relRepos:
 /// - EXPLICIT: a member named in 'explicit' (the buffer headline's
-///   '(relSource NAME)' atom, threaded in as a side-channel because
-///   NodeComplete's 'RelPartner::source' carries no "was this
+///   '(relRepo NAME)' atom, threaded in as a side-channel because
+///   NodeComplete's 'RelPartner::repo' carries no "was this
 ///   explicit" flag) wins outright, PROVIDED it is at least as
 ///   private as the DEFAULT floor -- normally the more private of
-///   the two endpoints' homes, NOT the disk relSource. An explicit atom
+///   the two endpoints' homes, NOT the disk relRepo. An explicit atom
 ///   is therefore the one path that can make an existing edge more
 ///   public, down to but never more public than its default
 ///   (BUG-and-fix_make-edge-more-public.org). One exception keeps
-///   the render->save round-trip lossless: when the DISK relSource
+///   the render->save round-trip lossless: when the DISK relRepo
 ///   already sits more public than the default (a legacy or
 ///   hand-authored shape), the explicit floor relaxes to that disk
-///   source -- such an edge can be held or made more private, never
+///   repo -- such an edge can be held or made more private, never
 ///   moved still more public. A choice more public than its floor
-///   fails with a validation error naming the member, offered source,
+///   fails with a validation error naming the member, offered repo,
 ///   and floor.
-/// - STICKY: absent an explicit source, an edge that already exists
+/// - STICKY: absent an explicit repo, an edge that already exists
 ///   on disk (same relation, same endpoints, through 'pid_of')
-///   keeps its DISK relSource. Renormalization never lowers an edge's
+///   keeps its DISK relRepo. Renormalization never lowers an edge's
 ///   privacy silently; removing the atom means "no opinion", not
 ///   "reset to default".
 /// - DEFAULT: a new edge between owned nodes gets the more private
 ///   endpoint home. If the member is foreign and the owner is owned,
 ///   the edge instead stays at the owner's home: the relationship
-///   and foreign ID are intentionally shared with that source.
+///   and foreign ID are intentionally shared with that repo.
 /// - HIDES additionally floor at the most public EXPLAINING
-///   subscription (see 'hide_source'): a hide is only as public as
+///   subscription (see 'hide_repo'): a hide is only as public as
 ///   some subscription that makes it meaningful, else it leaks the
 ///   inference that a private subscription exists. Hides carry no
-///   explicit-source path: the folder that displays them is read-only
-///   (the set-relSource gesture refuses there).
+///   explicit-repo path: the folder that displays them is read-only
+///   (the set-relRepo gesture refuses there).
 #[cfg(test)]
-pub(crate) fn apply_sticky_relSources_in_graph (
+pub(crate) fn apply_sticky_relRepos_in_graph (
   supplemented : NodeComplete,
   disk_node    : &NodeComplete,
-  explicit     : &RequestedRelSources,
+  explicit     : &RequestedRelRepos,
   graph        : &InRustGraph,
   config       : &SkgConfig,
 ) -> Result<NodeComplete, String> {
-  apply_sticky_relSources_in_graph_with_prospective_homes (
+  apply_sticky_relRepos_in_graph_with_prospective_homes (
     supplemented, disk_node, explicit, graph, config, &HashMap::new ()) }
 
-fn apply_sticky_relSources_in_graph_with_prospective_homes (
+fn apply_sticky_relRepos_in_graph_with_prospective_homes (
   mut supplemented : NodeComplete,
   disk_node        : &NodeComplete,
-  explicit         : &RequestedRelSources,
+  explicit         : &RequestedRelRepos,
   graph            : &InRustGraph,
   config           : &SkgConfig,
-  prospective_homes : &HashMap<ID, SourceName>,
+  prospective_homes : &HashMap<ID, RepoName>,
 ) -> Result<NodeComplete, String> {
   let owner_pid  : ID         = supplemented . pid    . clone ();
-  let owner_home : SourceName = supplemented . source . clone ();
+  let owner_home : RepoName = supplemented . home_repo . clone ();
   let resolve = |id : &ID| -> ID {
     graph . pid_of (id)
       . unwrap_or_else ( || id . clone () ) };
   let member_key = |id : &ID| -> RelationshipMemberKey {
     graph . relationship_member_key (id) };
-  let home_of = |id : &ID| -> Option<SourceName> {
+  let home_of = |id : &ID| -> Option<RepoName> {
     prospective_homes . get ( &resolve (id) ) . cloned ()
       .or_else ( || prospective_homes . get (id) . cloned () )
-      .or_else ( || graph . pid_and_source (id)
+      .or_else ( || graph . pid_and_repo (id)
       . map ( |(_pid, src)| src )
       . or_else ( || home_from_disk (id, config) ) ) };
   // The DEFAULT floor for one member. Owned-to-owned edges use the
   // more private endpoint home. An owned-to-foreign edge stays at
   // the owner's home; Skg never proposes writing a foreign section.
   // An unknown target also falls back to the owner's home.
-  let default_floor_for = |member : &ID| -> SourceName {
+  let default_floor_for = |member : &ID| -> RepoName {
     match home_of (member) {
       Some (target_home) =>
-        config . default_relSource (
+        config . default_relRepo (
           &owner_home, &target_home ),
       None => owner_home . clone (), }};
-  // The sticky-else-default relSource for one member -- what an ABSENT
+  // The sticky-else-default relRepo for one member -- what an ABSENT
   // atom resolves to.
-  let sticky_source_for = |disk_list : &[RelPartner<ID>],
+  let sticky_repo_for = |disk_list : &[RelPartner<ID>],
                             member    : &ID|
-  -> SourceName {
+  -> RepoName {
     let key : RelationshipMemberKey = member_key (member);
-    let unclamped : SourceName = 'unclamped : {
+    let unclamped : RepoName = 'unclamped : {
       for d in disk_list { // sticky
         if member_key ( &d . member ) == key {
-          break 'unclamped d . relSource . clone (); }}
+          break 'unclamped d . relRepo . clone (); }}
       default_floor_for (member) };
     // Clamp: no section may be more public than the home (the
     // "extends on the other side" junk shape), so when a HOME MOVE
     // makes the node more private, its edges rise with it. (The
-    // converse move leaves old, more-private sources in place:
+    // converse move leaves old, more-private repos in place:
     // publicizing memberships takes the explicit gesture.)
     config . more_private_of (unclamped, owner_home . clone ()) };
   let raw_disk_member = |disk_list : &[RelPartner<ID>], member : &ID| {
@@ -387,42 +387,42 @@ fn apply_sticky_relSources_in_graph_with_prospective_homes (
       . map (|disk| disk . member . clone ())
       . unwrap_or_else (|| member . clone ()) };
   // EXPLICIT wins when at least as private as its floor: the more PUBLIC of the
-  // DEFAULT floor and the sticky source. Flooring at the default
+  // DEFAULT floor and the sticky repo. Flooring at the default
   // (not at sticky) is what lets an atom LOWER a stuck edge's
   // privacy back down to the default
   // (BUG-and-fix_make-edge-more-public.org); admitting the sticky
-  // source when IT sits more public than the default covers legacy
-  // or hand-authored data. Render emits the '(relSource ...)' atom
+  // repo when IT sits more public than the default covers legacy
+  // or hand-authored data. Render emits the '(relRepo ...)' atom
   // for every off-default edge, and that atom must round-trip through
   // save unchanged. Net: a normal edge never moves more public than
   // the default, and a preexisting more-public edge can only be held
   // or made more private. Absent an atom, sticky-else-default.
-  let resolve_source = |disk_list      : &[RelPartner<ID>],
+  let resolve_repo = |disk_list      : &[RelPartner<ID>],
                         member         : &ID,
-                        explicit_here  : &HashMap<ID, SourceName>,
+                        explicit_here  : &HashMap<ID, RepoName>,
                         relation_label : &str|
-  -> Result<SourceName, String> {
+  -> Result<RepoName, String> {
     match explicit_here . get (member) {
-      Some (source) => {
-        if config . source_position (source) . is_none () {
+      Some (repo) => {
+        if config . repo_position (repo) . is_none () {
           return Err ( format! (
             "Cannot save {} (relation '{}'): member '{}' requested unconfigured source '{}'.",
-            owner_pid, relation_label, member, source )); }
-        if ! config . user_owns_source (source) {
+            owner_pid, relation_label, member, repo )); }
+        if ! config . user_owns_repo (repo) {
           return Err ( format! (
             "Cannot save {} (relation '{}'): member '{}' requested non-owned source '{}'. relSources must be owned.",
-            owner_pid, relation_label, member, source )); }
-        if config . is_strictly_more_public (source, &owner_home) {
+            owner_pid, relation_label, member, repo )); }
+        if config . is_strictly_more_public (repo, &owner_home) {
           return Err ( format! (
             "Cannot save {} (relation '{}'): member '{}' requested source '{}', which is more public than the owner's home '{}'.",
-            owner_pid, relation_label, member, source, owner_home )); }
-        let default : SourceName = default_floor_for (member);
-        let sticky  : SourceName =
-          sticky_source_for (disk_list, member);
-        let floor : SourceName = // the more PUBLIC of the two
+            owner_pid, relation_label, member, repo, owner_home )); }
+        let default : RepoName = default_floor_for (member);
+        let sticky  : RepoName =
+          sticky_repo_for (disk_list, member);
+        let floor : RepoName = // the more PUBLIC of the two
           if config . is_strictly_more_public (&sticky, &default) {
             sticky } else { default };
-        if config . is_strictly_more_public (source, &floor) {
+        if config . is_strictly_more_public (repo, &floor) {
           Err ( format! (
             "Cannot save {} (relation '{}'): member '{}' requested \
              source '{}', but this edge's floor is '{}'. An edge's \
@@ -431,13 +431,13 @@ fn apply_sticky_relSources_in_graph_with_prospective_homes (
              that source already precedes the default. To publicize \
              the edge further, first \
              publicize the more private endpoint's home.",
-            owner_pid, relation_label, member, source, floor ))
-        } else { Ok ( source . clone () ) } },
-      None => Ok ( sticky_source_for (disk_list, member) ), }};
+            owner_pid, relation_label, member, repo, floor ))
+        } else { Ok ( repo . clone () ) } },
+      None => Ok ( sticky_repo_for (disk_list, member) ), }};
   { let disk : &[RelPartner<ID>] = &disk_node . contains;
     for m in supplemented . contains . iter_mut () {
       let submitted : ID = m . member . clone ();
-      m . relSource = resolve_source (
+      m . relRepo = resolve_repo (
         disk, &submitted, &explicit . contains, "contains") ?;
       m . member = raw_disk_member (disk, &submitted); }}
   { let disk : &[RelPartner<ID>] =
@@ -445,7 +445,7 @@ fn apply_sticky_relSources_in_graph_with_prospective_homes (
     if let MSV::Specified (v) = &mut supplemented . subscribes_to {
       for m in v . iter_mut () {
         let submitted : ID = m . member . clone ();
-        m . relSource = resolve_source (
+        m . relRepo = resolve_repo (
           disk, &submitted, &explicit . subscribes_to,
           "subscribes_to") ?;
         m . member = raw_disk_member (disk, &submitted); }} }
@@ -454,7 +454,7 @@ fn apply_sticky_relSources_in_graph_with_prospective_homes (
     if let MSV::Specified (v) = &mut supplemented . overrides_view_of {
       for m in v . iter_mut () {
         let submitted : ID = m . member . clone ();
-        m . relSource = resolve_source (
+        m . relRepo = resolve_repo (
           disk, &submitted, &explicit . overrides_view_of,
           "overrides_view_of") ?;
         m . member = raw_disk_member (disk, &submitted); }} }
@@ -467,75 +467,75 @@ fn apply_sticky_relSources_in_graph_with_prospective_homes (
       for m in v . iter_mut () {
         let submitted : ID = m . member . clone ();
         let key : RelationshipMemberKey = member_key ( &submitted );
-        let sticky : Option<SourceName> =
+        let sticky : Option<RepoName> =
           disk . iter ()
           . find ( |d| member_key ( &d . member ) == key )
-          . map ( |d| d . relSource . clone () );
-        let unclamped : SourceName = match sticky {
-          Some (source) => source,
-          None => hide_source (
+          . map ( |d| d . relRepo . clone () );
+        let unclamped : RepoName = match sticky {
+          Some (repo) => repo,
+          None => hide_repo (
             graph, config, &owner_home, &m . member, &subscribes,
             &resolve, &home_of ), };
-        m . relSource = config . more_private_of (
+        m . relRepo = config . more_private_of (
           unclamped, owner_home . clone () );
         m . member = raw_disk_member (disk, &submitted); }} }
   { // Aliases are relation partners too: explicit request, then
-    // sticky source by alias text, then the owner's home. Their
+    // sticky repo by alias text, then the owner's home. Their
     // floor is always the owner home because aliases have no target.
     let disk : &[RelPartner<String>] =
       disk_node . aliases . or_default ();
     if let MSV::Specified (v) = &mut supplemented . aliases {
       for m in v . iter_mut () {
-        let explicit_source : Option<&SourceName> =
+        let explicit_repo : Option<&RepoName> =
           explicit . aliases . get (&m . member);
-        if let Some (source) = explicit_source {
-          if config . source_position (source) . is_none () {
+        if let Some (repo) = explicit_repo {
+          if config . repo_position (repo) . is_none () {
             return Err ( format! (
               "Cannot save {} (alias '{}'): requested unconfigured source '{}'.",
-              owner_pid, m . member, source )); }
-          if ! config . user_owns_source (source) {
+              owner_pid, m . member, repo )); }
+          if ! config . user_owns_repo (repo) {
             return Err ( format! (
               "Cannot save {} (alias '{}'): requested non-owned relSource '{}'. Alias relSources must be owned.",
-              owner_pid, m . member, source )); }
-          if config . is_strictly_more_public (source, &owner_home) {
+              owner_pid, m . member, repo )); }
+          if config . is_strictly_more_public (repo, &owner_home) {
             return Err ( format! (
               "Cannot save {} (alias '{}'): requested source '{}' is more public than the owner's home '{}'.",
-              owner_pid, m . member, source, owner_home )); }
-          m . relSource = source . clone ();
+              owner_pid, m . member, repo, owner_home )); }
+          m . relRepo = repo . clone ();
         } else {
-          let sticky_or_default : SourceName = disk . iter ()
+          let sticky_or_default : RepoName = disk . iter ()
             . find ( |d| d . member == m . member )
-            . map ( |d| d . relSource . clone () )
+            . map ( |d| d . relRepo . clone () )
             . unwrap_or_else ( || owner_home . clone () );
-          m . relSource = config . more_private_of (
+          m . relRepo = config . more_private_of (
             sticky_or_default, owner_home . clone () ); } }} }
   Ok (supplemented) }
 
-/// A NEW hide's relSource: at least the more private of the endpoints'
+/// A NEW hide's relRepo: at least the more private of the endpoints'
 /// homes, and at least the most PUBLIC subscription of the hider
 /// that explains it (one whose subscribee contains the hidden
 /// node). The most public explanation is the floor because the
 /// inference "the hider subscribes to something containing X" is
 /// innocent whenever any explanation is visible; with no
 /// explanation found, fall back to the most private subscription
-/// source, and with no subscriptions at all, to the endpoint rule
+/// repo, and with no subscriptions at all, to the endpoint rule
 /// alone (junk-tolerant; the validators report residue).
-fn hide_source (
+fn hide_repo (
   graph      : &InRustGraph,
   config     : &SkgConfig,
-  owner_home : &SourceName,
+  owner_home : &RepoName,
   hidden     : &ID,
   subscribes : &[RelPartner<ID>],
   resolve    : &dyn Fn (&ID) -> ID,
-  home_of    : &dyn Fn (&ID) -> Option<SourceName>,
-) -> SourceName {
-  let endpoint_floor : SourceName = {
+  home_of    : &dyn Fn (&ID) -> Option<RepoName>,
+) -> RepoName {
+  let endpoint_floor : RepoName = {
     match home_of (hidden) {
       Some (h) => config . more_private_of (
         owner_home . clone (), h ),
       None => owner_home . clone (), }};
   let hidden_key : ID = resolve (hidden);
-  let explaining_sources : Vec<SourceName> = {
+  let explaining_repos : Vec<RepoName> = {
     subscribes . iter ()
       . filter ( |sub| {
         graph . pid_of ( & sub . member )
@@ -543,10 +543,10 @@ fn hide_source (
           . map ( |subscribee| subscribee . contains . iter ()
                   . any ( |c| resolve ( &c . member ) == hidden_key ))
           . unwrap_or (false) } )
-      . map ( |sub| sub . relSource . clone () )
+      . map ( |sub| sub . relRepo . clone () )
       . collect () };
-  let subscription_floor : Option<SourceName> =
-    explaining_sources . into_iter ()
+  let subscription_floor : Option<RepoName> =
+    explaining_repos . into_iter ()
     . reduce ( |a, b| // keep the more PUBLIC of the two
                if config . is_strictly_more_public (&a, &b) { a }
                else { b } );
@@ -570,28 +570,28 @@ pub fn canonicalize_ids_from_disk (
   from_buffer . extra_ids = disk_node . extra_ids . clone();
   Ok (from_buffer) }
 
-/// Return a SourceMove when the source changes
-/// between two owned sources.
-pub fn detect_source_move (
+/// Return a RepoMove when the repo changes
+/// between two owned repos.
+pub fn detect_repo_move (
   config        : &SkgConfig,
   pid           : &ID,
-  buffer_source : &SourceName,
-  disk_source   : &SourceName,
-) -> Result<Option<SourceMove>, Box<dyn Error>> {
-  if buffer_source == disk_source {
+  buffer_repo : &RepoName,
+  disk_repo   : &RepoName,
+) -> Result<Option<RepoMove>, Box<dyn Error>> {
+  if buffer_repo == disk_repo {
     return Ok (None); }
-  if config . user_owns_source (disk_source)
-  && config . user_owns_source (buffer_source) {
-    Ok (Some (SourceMove {
+  if config . user_owns_repo (disk_repo)
+  && config . user_owns_repo (buffer_repo) {
+    Ok (Some (RepoMove {
       pid        : pid . clone(),
-      old_source : disk_source . clone(),
-      new_source : buffer_source . clone() }))
+      old_repo : disk_repo . clone(),
+      new_repo : buffer_repo . clone() }))
   } else {
     Err(Box::new(
-      BufferValidationError::CannotMoveToOrFromForeignSource(
+      BufferValidationError::CannotMoveToOrFromForeignRepo(
         pid . clone(),
-        disk_source . clone(),
-        buffer_source . clone() )) ) }}
+        disk_repo . clone(),
+        buffer_repo . clone() )) ) }}
 
 /// Fill buffer fields that the buffer left unspecified.
 pub fn supplement_unspecified_fields_from_disk (

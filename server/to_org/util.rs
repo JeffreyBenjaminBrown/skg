@@ -1,9 +1,9 @@
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::source_sets::ActiveSourceSet;
+use crate::repo_sets::ActiveRepoSet;
 use crate::to_org::complete::contents::clobberWriteProtectedViewnode;
 use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_branches;
-use crate::dbs::node_lookup::nodecomplete_graphFirst_by_pid_and_source;
-use crate::types::misc::{ID, SkgConfig, SourceName, members_of};
+use crate::dbs::node_lookup::nodecomplete_graphFirst_by_pid_and_repo;
+use crate::types::misc::{ID, SkgConfig, RepoName, members_of};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::nodes::rust::NodeRust;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
@@ -58,8 +58,8 @@ pub type DefinitiveMap =
 // Fetching, building and modifying NodeCompletes and ViewNodes
 // ======================================================
 
-/// Fetch a NodeComplete from the in-Rust graph or disk. Resolves id→(pid,source)
-/// via 'pid_and_source_from_id', then reads. Makes a ViewNode with
+/// Fetch a NodeComplete from the in-Rust graph or disk. Resolves id→(pid,repo)
+/// via 'pid_and_repo_from_id', then reads. Makes a ViewNode with
 /// validated title. Returns both.
 /// Returns Ok(None) when SKGID has no record anywhere -- not as a
 /// primary pid or extra_id in the captured graph.
@@ -70,15 +70,15 @@ pub fn nodecomplete_and_viewnode_from_id (
   config : &SkgConfig,
   skgid  : &ID,
 ) -> Result < Option<( NodeComplete, ViewNode )>, Box<dyn Error> > {
-  let resolved : Option<(ID, SourceName)> =
+  let resolved : Option<(ID, RepoName)> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "nodecomplete_and_viewnode_from_id" ). entered();
-      graph . pid_and_source (skgid) };
+      graph . pid_and_repo (skgid) };
   match resolved {
     None => Ok (None),
-    Some ((pid_resolved, source)) =>
-      match nodecomplete_and_viewnode_from_pid_and_source (
-        graph, config, &pid_resolved, &source ) {
+    Some ((pid_resolved, repo)) =>
+      match nodecomplete_and_viewnode_from_pid_and_repo (
+        graph, config, &pid_resolved, &repo ) {
         Ok (node) => Ok ( Some (node) ),
         // A graph member can be dangling when its file is absent. This is not
         // a render failure: callers turn `None` into Unknown.
@@ -87,17 +87,17 @@ pub fn nodecomplete_and_viewnode_from_id (
           => Ok (None),
         Err (e) => Err (e), } } }
 
-/// Fetch a NodeComplete from the in-Rust graph or disk given PID and source.
+/// Fetch a NodeComplete from the in-Rust graph or disk given PID and repo.
 /// Makes an ViewNode with validated title. Returns both.
-pub(super) fn nodecomplete_and_viewnode_from_pid_and_source (
+pub(super) fn nodecomplete_and_viewnode_from_pid_and_repo (
   graph  : &InRustGraph,
   config : &SkgConfig,
   pid    : &ID,
-  source : &SourceName,
+  repo : &RepoName,
 ) -> Result < ( NodeComplete, ViewNode ), Box<dyn Error> > {
   let nodecomplete : NodeComplete =
-    nodecomplete_graphFirst_by_pid_and_source (
-      graph, config, pid, source )?;
+    nodecomplete_graphFirst_by_pid_and_repo (
+      graph, config, pid, repo )?;
   let title : String = nodecomplete . title . replace ( '\n', " " );
   if title . is_empty () {
     return Err ( Box::new ( io::Error::new (
@@ -106,13 +106,13 @@ pub(super) fn nodecomplete_and_viewnode_from_pid_and_source (
                  pid ), )) ); }
   let viewnode : ViewNode = mk_definitive_viewnode (
     pid . clone (),
-    source . clone (),
+    repo . clone (),
     title,
     nodecomplete . body . clone () );
   Ok (( nodecomplete, viewnode )) }
 
 /// Set node to write-protected,
-/// and reset title and source.
+/// and reset title and repo.
 pub(super) fn makeWriteProtectedAndClobber (
   tree    : &mut Tree<ViewNode>,
   node_id : NodeId,
@@ -139,7 +139,7 @@ pub fn complete_branch_minus_content (
   visited  : &mut DefinitiveMap,
   graph    : &crate::dbs::in_rust_graph::InRustGraph,
   config   : &SkgConfig,
-  active_source_set : Option<&ActiveSourceSet>,
+  active_repo_set : Option<&ActiveRepoSet>,
 ) -> Result<(), Box<dyn Error>> {
   detect_and_mark_cycle_v1 ( tree, node_id ) ?;
   make_writeProtected_if_repeat_then_extend_defmap (
@@ -150,7 +150,7 @@ pub fn complete_branch_minus_content (
   { let _span : tracing::span::EnteredSpan = tracing::info_span!(
       "maybe_add_default_partnerFolder_branches" ). entered();
     maybe_add_default_partnerFolder_branches (
-      tree, node_id, graph, config, active_source_set,
+      tree, node_id, graph, config, active_repo_set,
       // This birth path runs outside the diff-aware BFS (search
       // results, ancestry attachment, stubs); diff-mode folder
       // existence is decided at each node's completion visit, which
@@ -212,7 +212,7 @@ pub fn stub_viewforest_from_root_ids (
   graph    : &crate::dbs::in_rust_graph::InRustGraph,
   config   : &SkgConfig,
   visited  : &mut DefinitiveMap,
-  active_source_set : Option<&ActiveSourceSet>,
+  active_repo_set : Option<&ActiveRepoSet>,
 ) -> Result < ViewForest, Box<dyn Error> > {
   let mut viewforest : ViewForest =
     ViewForest::new ();
@@ -222,7 +222,7 @@ pub fn stub_viewforest_from_root_ids (
     build_node_branch_minus_content (
       Some ( (viewforest . as_internal_tree_mut (),
               viewforest_root_treeid) ),
-      root_skgid, graph, config, visited, active_source_set
+      root_skgid, graph, config, visited, active_repo_set
     ) ?; }
   Ok (viewforest) }
 
@@ -463,7 +463,7 @@ pub fn build_node_branch_minus_content (
   graph           : &crate::dbs::in_rust_graph::InRustGraph,
   config          : &SkgConfig,
   visited         : &mut DefinitiveMap,
-  active_source_set : Option<&ActiveSourceSet>,
+  active_repo_set : Option<&ActiveRepoSet>,
 ) -> Result < NodeId, Box<dyn Error> > {
   let t0 : time::Instant = time::Instant::now();
   let result : Result < NodeId, Box<dyn Error> > =
@@ -482,7 +482,7 @@ pub fn build_node_branch_minus_content (
               . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
             complete_branch_minus_content (
               tree, child_treeid, visited,
-              graph, config, active_source_set ) ?;
+              graph, config, active_repo_set ) ?;
             Ok (child_treeid) },
           None => { // Uknown node. Add it, don't 'complete' it.
             let viewnode : ViewNode =
@@ -505,7 +505,7 @@ pub fn build_node_branch_minus_content (
             let root_treeid : NodeId = tree . root () . id ();
             complete_branch_minus_content (
               &mut tree, root_treeid, visited,
-              graph, config, active_source_set ) ?;
+              graph, config, active_repo_set ) ?;
             Ok (root_treeid) },
           None => { // A singleton tree with an PhantomUnknown.
             let viewnode : ViewNode =

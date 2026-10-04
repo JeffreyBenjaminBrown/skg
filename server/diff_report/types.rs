@@ -1,4 +1,4 @@
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, RepoName};
 use crate::types::nodes::complete::NodeComplete;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -32,20 +32,20 @@ pub struct ChangedSnapshotPair {
 pub struct GraphSnapshot {
   /// One entry per TELESCOPE (keyed by pid, sections folded).
   pub nodes     : HashMap<ID, NodeComplete>,
-  /// id -> claiming pid -> sources whose section for that pid
+  /// id -> claiming pid -> repos whose section for that pid
   /// claims the id (as its pid or among its extra_ids). One pid
-  /// claiming an id from several sources is the normal telescope
+  /// claiming an id from several repos is the normal telescope
   /// shape; TWO pids claiming one id is the duplicate-ID VIOLATION
   /// the report warns about.
-  pub id_claims : HashMap<ID, BTreeMap<ID, BTreeSet<SourceName>>>,
+  pub id_claims : HashMap<ID, BTreeMap<ID, BTreeSet<RepoName>>>,
 }
 
 impl GraphSnapshot {
-  /// Sources holding any claim on this id, across claiming pids.
-  pub fn sources_claiming_id (
+  /// Repos holding any claim on this id, across claiming pids.
+  pub fn repos_claiming_id (
     &self,
     id : &ID,
-  ) -> BTreeSet<SourceName> {
+  ) -> BTreeSet<RepoName> {
     self . id_claims . get (id)
       . map ( |by_pid| by_pid . values () . flatten ()
               . cloned () . collect () )
@@ -57,7 +57,7 @@ pub struct DiffReport {
   pub duplicate_ids : Vec<DuplicateIDReport>,
   pub titles        : HashMap<ID, String>,
   pub buckets       : Vec<NodeBucket>,
-  /// Ids the worktree references though they exist in no source,
+  /// Ids the worktree references though they exist in no repo,
   /// investigated in git history (diff_report/vanished.rs).
   pub vanished      : Vec<VanishedNodeReport>,
 }
@@ -65,12 +65,12 @@ pub struct DiffReport {
 #[derive(Clone, Debug)]
 pub struct VanishedNodeReport {
   pub id        : ID,
-  pub sightings : Vec<VanishedNodeSighting>, // empty means: never in any source's git history
+  pub sightings : Vec<VanishedNodeSighting>, // empty means: never in any repo's git history
 }
 
 #[derive(Clone, Debug)]
 pub struct VanishedNodeSighting {
-  pub source       : SourceName,
+  pub home_repo       : RepoName,
   pub last_present : CommitStamp,
   pub vanished_at  : Option<CommitStamp>, // its first-parent descendant, which lacks the file
   pub title        : String,             // the node's title when last present
@@ -88,8 +88,8 @@ pub struct CommitStamp {
 #[derive(Clone, Debug)]
 pub struct DuplicateIDReport {
   pub id             : ID,
-  pub before_sources : BTreeSet<SourceName>,
-  pub after_sources  : BTreeSet<SourceName>,
+  pub before_repos : BTreeSet<RepoName>,
+  pub after_repos  : BTreeSet<RepoName>,
   pub title          : String,
 }
 
@@ -102,20 +102,20 @@ pub struct NodeBucket {
 #[derive(Clone, Debug)]
 pub struct NodeDiffReport {
   pub pid                 : ID,
-  pub source              : SourceForReport,
+  pub home_repo              : RepoForReport,
   pub title               : String,
   pub title_diff          : Option<Vec<TextDiffLine>>,
   pub body_diff           : Option<Vec<TextDiffLine>>,
-  pub source_change       : Option<(SourceName, SourceName)>,
+  pub repo_change       : Option<(RepoName, RepoName)>,
   pub value_set_diffs     : Vec<ValueSetDiff>,
   pub relationship_diffs  : Vec<RelationshipDiff>,
   pub contained_list_diff : Option<Vec<ListDiffItem>>,
 }
 
 #[derive(Clone, Debug)]
-pub enum SourceForReport {
-  Before (SourceName),
-  After  (SourceName),
+pub enum RepoForReport {
+  Before (RepoName),
+  After  (RepoName),
 }
 
 #[derive(Clone, Debug)]

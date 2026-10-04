@@ -14,12 +14,12 @@ fn test_aliases_diff_shows_alias_folder_scaffold()
   let tantivy_folder = "/tmp/tantivy-test-git-diff-aliases";
 
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir . path();
-  setup_git_repo_with_fixtures (repo_path)?;
+  let gitrepo_path = temp_dir . path();
+  setup_gitrepo_with_fixtures (gitrepo_path)?;
 
   block_on(async {
     let (config, _tantivy) =
-      setup_test_stores(test_name, repo_path . to_str() . unwrap(), tantivy_folder) . await?;
+      setup_test_stores(test_name, gitrepo_path . to_str() . unwrap(), tantivy_folder) . await?;
 
     let root_ids = vec![ID("1" . to_string())];
     let (actual, _pids, _) : (String, Vec<ID>, _) =
@@ -47,12 +47,12 @@ fn test_saving_a_diff_view_with_aliases_shown_does_not_duplicate_them()
   let tantivy_folder = "/tmp/tantivy-test-git-diff-aliases-resave";
 
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir . path();
-  setup_git_repo_with_fixtures (repo_path)?;
+  let gitrepo_path = temp_dir . path();
+  setup_gitrepo_with_fixtures (gitrepo_path)?;
 
   block_on(async {
     let (config, mut tantivy) =
-      setup_test_stores(test_name, repo_path . to_str() . unwrap(), tantivy_folder) . await?;
+      setup_test_stores(test_name, gitrepo_path . to_str() . unwrap(), tantivy_folder) . await?;
 
     let root_ids = vec![ID("1" . to_string())];
     let (rendered, _pids, _) : (String, Vec<ID>, _) =

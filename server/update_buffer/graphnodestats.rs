@@ -1,12 +1,12 @@
 use crate::dbs::in_rust_graph::stats::{
   fetch_all_graphnodestats,
-  fetch_all_graphnodestats_with_source_set,
+  fetch_all_graphnodestats_with_repo_set,
   graphnodestats_for_pid,
   AllGraphNodeStats};
-use crate::source_sets::ActiveSourceSet;
+use crate::repo_sets::ActiveRepoSet;
 use crate::to_org::util::ids_that_can_have_graphnodestats;
 use crate::types::misc::{ID, SkgConfig};
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
+use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{GraphNodeStats, ViewNode, ViewNodeKind};
@@ -29,11 +29,11 @@ pub fn set_graphnodestats_in_viewforest (
   set_graphnodestats_in_viewforest_inner (
     viewforest, graph, config, None ) }
 
-pub fn set_graphnodestats_in_viewforest_with_source_set (
+pub fn set_graphnodestats_in_viewforest_with_repo_set (
   viewforest : &mut Tree<ViewNode>,
   graph : &InRustGraph,
   config : &SkgConfig,
-  active : &ActiveSourceSet,
+  active : &ActiveRepoSet,
 ) -> Result < ( HashMap < ID, HashSet < ID > >,
 	               HashMap < ID, HashSet < ID > > ),
 	             Box<dyn Error> > {
@@ -44,7 +44,7 @@ fn set_graphnodestats_in_viewforest_inner (
   viewforest : &mut Tree<ViewNode>,
   graph : &InRustGraph,
   config : &SkgConfig,
-  active : Option<&ActiveSourceSet>,
+  active : Option<&ActiveRepoSet>,
 ) -> Result < ( HashMap < ID, HashSet < ID > >,
 	               HashMap < ID, HashSet < ID > > ),
 	             Box<dyn Error> > {
@@ -57,7 +57,7 @@ fn set_graphnodestats_in_viewforest_inner (
         "fetch_all_graphnodestats" ). entered();
       match active {
         Some (active) =>
-          fetch_all_graphnodestats_with_source_set (
+          fetch_all_graphnodestats_with_repo_set (
             graph, & pids, Some (active) ),
         None =>
           fetch_all_graphnodestats (
@@ -90,15 +90,15 @@ pub fn set_metadata_relationships_in_node_recursive (
       match & tree . get (treeid) . unwrap () . value () . kind {
         ViewNodeKind::Vognode (Vognode::Active (t))
           => { let nodecomplete_opt : Option<NodeComplete>
-                 = nodecomplete_rustFirst_by_pid_and_source (
-                     graph, config, &t . id, &t . source
+                 = nodecomplete_rustFirst_by_pid_and_repo (
+                     graph, config, &t . id, &t . home_repo
                    ). ok ();
                Some ( graphnodestats_for_pid (
                  &t . id, stats, nodecomplete_opt . as_ref () )) },
         ViewNodeKind::Phantom (Phantom::Diff (p))
           => { let nodecomplete_opt : Option<NodeComplete>
-                 = nodecomplete_rustFirst_by_pid_and_source (
-                     graph, config, &p . id, &p . source
+                 = nodecomplete_rustFirst_by_pid_and_repo (
+                     graph, config, &p . id, &p . home_repo
                    ). ok ();
                Some ( graphnodestats_for_pid (
                  &p . id, stats, nodecomplete_opt . as_ref () )) },

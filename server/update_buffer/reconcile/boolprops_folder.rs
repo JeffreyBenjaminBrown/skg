@@ -1,10 +1,10 @@
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
+use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::nodes::complete::{
   FileProperty, NodeComplete, file_property_is_true};
 use crate::types::viewnode::{Qual, ViewNode, ViewNodeKind};
-use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
+use crate::update_buffer::ancestry::pid_and_repo_from_required_ancestor;
 use crate::update_buffer::util::{
   complete_relevant_children_in_viewnodetree, treat_certain_children};
 
@@ -17,11 +17,11 @@ pub fn reconcile_boolprops_folder_children (
   graph     : &InRustGraph,
   config    : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  let (pid, source) : (ID, SourceName) =
-    pid_and_source_from_required_ancestor (
+  let (pid, repo) : (ID, RepoName) =
+    pid_and_repo_from_required_ancestor (
       tree, folder_id, 0, "reconcile_boolprops_folder_children") ?;
-  let node : NodeComplete = nodecomplete_rustFirst_by_pid_and_source (
-    graph, config, &pid, &source)
+  let node : NodeComplete = nodecomplete_rustFirst_by_pid_and_repo (
+    graph, config, &pid, &repo)
     . map_err (|_| "reconcile_boolprops_folder_children: parent not found") ?;
   let goals : Vec<FileProperty> = FileProperty::ALL . into_iter ()
     . filter (|property| file_property_is_true (&node . misc, *property))

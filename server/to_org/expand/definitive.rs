@@ -1,17 +1,17 @@
-use crate::source_sets::ActiveSourceSet;
+use crate::repo_sets::ActiveRepoSet;
 use crate::to_org::expand::aliases::build_and_integrate_aliases_view_then_drop_request;
 use crate::to_org::expand::backpath::build_and_integrate_path_view_then_drop_request;
 use crate::to_org::expand::folder_request::build_and_integrate_folder_then_drop_request;
 use crate::to_org::expand::boolprops::build_and_integrate_boolprops_then_drop_request;
 use crate::to_org::util::{ DefinitiveMap, Finalizable, get_id_from_treenode, makeWriteProtectedAndClobber, activeNode_in_tree_is_writeProtected };
-use crate::types::misc::{ID, SkgConfig, SourceName};
-use crate::types::git::SourceDiff;
+use crate::types::misc::{ID, SkgConfig, RepoName};
+use crate::types::git::RepoDiff;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, FolderRelation, Editability, AffectsParent };
 use crate::types::viewnode::Vognode;
 use crate::types::nodes::complete::NodeComplete;
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
+use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::tree::viewnode_nodecomplete::{write_at_activeNode_in_tree, pid_and_source_from_treenode};
+use crate::types::tree::viewnode_nodecomplete::{write_at_activeNode_in_tree, pid_and_repo_from_treenode};
 
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::HashMap;
@@ -23,8 +23,8 @@ pub fn execute_view_requests (
   graph         : &crate::dbs::in_rust_graph::InRustGraph,
   config        : &SkgConfig,
   errors        : &mut Vec < String >,
-  active_source_set : Option<&ActiveSourceSet>,
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  active_repo_set : Option<&ActiveRepoSet>,
+  repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
 ) -> Result < (), Box<dyn Error> > {
   for (node_id, request) in requests {
     match request {
@@ -35,7 +35,7 @@ pub fn execute_view_requests (
       ViewRequest::Folder (rel) => {
         build_and_integrate_folder_then_drop_request (
           viewforest, node_id, graph, rel, config, errors,
-          active_source_set, source_diffs ) ?; },
+          active_repo_set, repo_diffs ) ?; },
       ViewRequest::Path (role) => {
         // Relation-generic: every partner role routes through the one
         // backpath engine (container, mentioner, and the seven new
@@ -43,7 +43,7 @@ pub fn execute_view_requests (
         // separately (finish_viewforest) and removed before this pass.
         build_and_integrate_path_view_then_drop_request (
           viewforest, node_id, graph, role, config, errors,
-          active_source_set ) ?; },
+          active_repo_set ) ?; },
       ViewRequest::BoolProps => {
         build_and_integrate_boolprops_then_drop_request (
           viewforest, node_id, graph, config, errors ) ?; },
@@ -172,10 +172,10 @@ fn from_disk_replace_title_body_and_nodecomplete (
   graph   : &InRustGraph,
   config  : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  let (pid, src) : (ID, SourceName) =
-    pid_and_source_from_treenode ( tree, node_id,
+  let (pid, src) : (ID, RepoName) =
+    pid_and_repo_from_treenode ( tree, node_id,
       "from_disk_replace_title_body_and_nodecomplete" ) ?;
-  let nodecomplete : NodeComplete = nodecomplete_rustFirst_by_pid_and_source (
+  let nodecomplete : NodeComplete = nodecomplete_rustFirst_by_pid_and_repo (
     graph, config, &pid, &src ) ?;
   let title : String = nodecomplete . title . clone();
   if title . is_empty () {

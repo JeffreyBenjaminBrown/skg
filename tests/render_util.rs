@@ -3,7 +3,7 @@
 use skg::assert_metadata_eq;
 use skg::org_to_text::viewnode_to_text;
 use skg::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
-use skg::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
+use skg::types::misc::{ID, SkgConfig, SkgfileRepo, RepoName};
 use skg::types::viewnode::{ ViewNode, ViewNodeKind, Vognode, ActiveNode, Editability, ViewNodeStats, default_activeNode };
 use skg::types::viewnode::QualFolder;
 use std::collections::HashMap;
@@ -17,10 +17,10 @@ fn test_viewnode_to_text_no_metadata () {
     body_folded : false,
     kind    : ViewNodeKind::Vognode (Vognode::Active (
       default_activeNode ( ID::from ("test"),
-                         SourceName::from ("main"),
+                         RepoName::from ("main"),
                          "Test Title" . to_string() ))) };
   let result : String =
-    viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
+    viewnode_to_text ( 1, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
     . expect ("ActiveNode rendering never fails");
   assert_metadata_eq! ( result, "* (skg (node (id test) (source main))) Test Title\n" ); }
 
@@ -31,7 +31,7 @@ fn test_viewnode_to_text_with_body () {
       body         : Some ( "Test body content" . to_string() ),
       edit_request : None },
     .. default_activeNode ( ID::from ("test"),
-                          SourceName::from ("main"),
+                          RepoName::from ("main"),
                           "Test Title" . to_string() ) };
   let node : ViewNode = ViewNode {
     focused     : false,
@@ -39,7 +39,7 @@ fn test_viewnode_to_text_with_body () {
     body_folded : false,
     kind    : ViewNodeKind::Vognode (Vognode::Active (t)), };
   let result : String =
-    viewnode_to_text ( 2, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
+    viewnode_to_text ( 2, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
     . expect ("ActiveNode rendering never fails");
   assert_metadata_eq! ( result, "** (skg (node (id test) (source main))) Test Title\nTest body content\n" ); }
 
@@ -53,7 +53,7 @@ fn test_viewnode_to_text_with_metadata () {
       QualFolder::Alias) };
   node . folded = true;
   let result : String =
-    viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
+    viewnode_to_text ( 1, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
     . expect ("AliasFolder rendering never fails");
   assert_metadata_eq! ( result, "* (skg folded aliasFolder)\n" ); }
 
@@ -62,7 +62,7 @@ fn test_viewnode_to_text_with_id_metadata () {
   let t : ActiveNode = ActiveNode {
     editability : Editability::WriteProtected,
     .. default_activeNode ( ID::from ("test123"),
-                          SourceName::from ("main"),
+                          RepoName::from ("main"),
                           "Test Title" . to_string() ) };
   let node : ViewNode = ViewNode {
     focused     : false,
@@ -70,26 +70,26 @@ fn test_viewnode_to_text_with_id_metadata () {
     body_folded : false,
     kind    : ViewNodeKind::Vognode (Vognode::Active (t)), };
   let result : String =
-    viewnode_to_text ( 3, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
+    viewnode_to_text ( 3, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
     . expect ("ActiveNode rendering never fails");
   assert_metadata_eq! ( result, "*** (skg (node (id test123) (source main) writeProtected)) Test Title\n" ); }
 
 #[test]
-fn source_name_with_whitespace_is_one_round_trippable_atom () {
-  let source : SourceName = SourceName::from ("Mr Cheese");
+fn repo_name_with_whitespace_is_one_round_trippable_atom () {
+  let repo : RepoName = RepoName::from ("Mr Cheese");
   let mut active_node : ActiveNode =
     default_activeNode (
-      ID::from ("cheese-node"), source . clone (),
+      ID::from ("cheese-node"), repo . clone (),
       "Cooking" . to_string () );
-  active_node . viewStats . sourceAtBoundary = true;
+  active_node . viewStats . homeRepoAtBoundary = true;
   let node : ViewNode = ViewNode {
     focused     : false,
     folded      : false,
     body_folded : false,
     kind : ViewNodeKind::Vognode (Vognode::Active (active_node)) };
-  let config = SkgConfig::dummyFromSources (HashMap::from ([
-    ( source . clone (), SkgfileSource {
-        name         : source,
+  let config = SkgConfig::dummyFromRepos (HashMap::from ([
+    ( repo . clone (), SkgfileRepo {
+        name         : repo,
         abbreviation : None,
         path         : PathBuf::from ("cheese"),
         user_owns_it : false } ) ]));
@@ -107,7 +107,7 @@ fn source_name_with_whitespace_is_one_round_trippable_atom () {
       . expect ("rendered headline has bullet") )
     . expect ("quoted source should parse");
   assert_eq! (
-    metadata . source, Some (SourceName::from ("Mr Cheese")) );
+    metadata . home_repo, Some (RepoName::from ("Mr Cheese")) );
 }
 
 #[test]
@@ -117,7 +117,7 @@ fn test_metadata_ordering () {
       cycle             : true,
       .. ViewNodeStats::default() },
     .. default_activeNode ( ID::from ("xyz"),
-                          SourceName::from ("main"),
+                          RepoName::from ("main"),
                           "Test" . to_string() ) };
   let node : ViewNode = ViewNode {
     focused     : false,
@@ -125,7 +125,7 @@ fn test_metadata_ordering () {
     body_folded : false,
     kind    : ViewNodeKind::Vognode (Vognode::Active (t)), };
   let result : String =
-    viewnode_to_text ( 1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
+    viewnode_to_text ( 1, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
     . expect ("ActiveNode rendering never fails");
   assert_metadata_eq! ( result, "* (skg (node (id xyz) (source main) (viewStats cycle))) Test\n" ); }
 
@@ -139,13 +139,13 @@ fn test_rel_heralds_emitted () {
         rel_heralds : rels . map ( |s| s . to_string () ),
         .. ViewNodeStats::default () },
       .. default_activeNode ( ID::from ("n"),
-                            SourceName::from ("main"),
+                            RepoName::from ("main"),
                             "N" . to_string () ) };
     let node = ViewNode {
       focused : false, folded : false, body_folded : false,
       kind : ViewNodeKind::Vognode (Vognode::Active (t)) };
     viewnode_to_text (
-      1, &node, &SkgConfig::dummyFromSources (HashMap::new ()) )
+      1, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
       . unwrap () };
   let with_rels : String =
     mk ( Some ("(rels (contains (in 2 (ancestors 1)) (out 1)) (birth contains))") );

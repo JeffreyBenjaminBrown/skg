@@ -1,15 +1,15 @@
-tantivy_folder = "/tmp/tantivy-test-move-source"
+tantivy_folder = "/tmp/tantivy-test-move-repo"
 port = 1730
 beep_when_server_becomes_available = false
 
-[[sources]]
+[[repos]]
 name = "public"
 path = "owned/public"
 
-[[sources]]
+[[repos]]
 name = "private"
 path = "owned/private"
 
-[[sources]]
+[[repos]]
 name = "foreign"
 path = "foreign"

@@ -6,7 +6,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::save::nodecomplete_from_noderust;
-use crate::types::misc::{ID, RelPartner, MSV, SkgConfig, SourceName};
+use crate::types::misc::{ID, RelPartner, MSV, SkgConfig, RepoName};
 use crate::types::save::{DefineNode, SaveNode};
 use crate::types::links::links_with_ranges_from_text;
 
@@ -30,11 +30,11 @@ impl StructuredField {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StructuralOccurrence {
   pub owner_pid    : ID,
-  pub owner_source : SourceName,
+  pub owner_repo : RepoName,
   pub owner_title  : String,
   pub field        : StructuredField,
   pub raw_id       : ID,
-  pub relSource : SourceName,
+  pub relRepo : RepoName,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -43,7 +43,7 @@ pub enum TextField { Title, Body }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LinkOccurrence {
   pub owner_pid    : ID,
-  pub owner_source : SourceName,
+  pub owner_repo : RepoName,
   pub field        : TextField,
   pub line         : usize,
   pub label        : String,
@@ -71,12 +71,12 @@ impl Preview {
     let mut rows : Vec<String> = Vec::new ();
     for o in &self . structural {
       rows . push (format! ("S{}{}{}{}{}{}",
-        encode (&o . owner_pid . 0), encode (&o . owner_source . 0),
+        encode (&o . owner_pid . 0), encode (&o . owner_repo . 0),
         encode (&o . owner_title), encode (o . field . label ()),
-        encode (&o . raw_id . 0), encode (&o . relSource . 0))); }
+        encode (&o . raw_id . 0), encode (&o . relRepo . 0))); }
     for o in &self . links {
       rows . push (format! ("T{}{}{:?}:{}{}",
-        encode (&o . owner_pid . 0), encode (&o . owner_source . 0),
+        encode (&o . owner_pid . 0), encode (&o . owner_repo . 0),
         o . field, o . line, encode (&o . label))); }
     // Rows are self-delimiting: their leading kind and length-prefixed fields
     // make a separator unnecessary.  In particular, an actual newline would
@@ -95,7 +95,7 @@ pub fn preview_warning_org (
     text . push_str ("** Structured relationships to remove\n");
     for o in &preview . structural {
       text . push_str (&format! ("- {} / {} / {} (source {})\n",
-        o . owner_pid, o . field . label (), o . raw_id, o . relSource)); }}
+        o . owner_pid, o . field . label (), o . raw_id, o . relRepo)); }}
   if ! preview . links . is_empty () {
     text . push_str ("** Text links left unchanged\n");
     for o in &preview . links {
@@ -113,7 +113,7 @@ pub fn result_org (
   for occurrence in &preview . structural {
     result . push_str (&format! ("- {}: {} in source {}\n",
       occurrence . owner_pid, occurrence . field . label (),
-      occurrence . relSource)); }
+      occurrence . relRepo)); }
   result
 }
 
@@ -129,16 +129,16 @@ pub fn preview (
       "Cannot remove references to {}: it currently resolves to a graph node.", raw_id)); }
   let mut result : Preview = Preview { raw_id : raw_id . clone (), ..Preview::default () };
   for node in graph . nodes . values () {
-    if ! config . user_owns_source (&node . source) { continue; }
+    if ! config . user_owns_repo (&node . home_repo) { continue; }
     let mut record = |field : StructuredField, members : &[RelPartner<ID>]| {
       for member in members . iter () . filter (|m| &m . member == raw_id) {
         result . structural . push (StructuralOccurrence {
           owner_pid       : node . pid . clone (),
-          owner_source    : node . source . clone (),
+          owner_repo    : node . home_repo . clone (),
           owner_title     : node . title . clone (),
           field,
           raw_id          : raw_id . clone (),
-          relSource : member . relSource . clone (), }); }};
+          relRepo : member . relRepo . clone (), }); }};
     record (StructuredField::Contains, &node . contains);
     record (StructuredField::SubscribesTo, node . subscribes_to . or_default ());
     record (StructuredField::HidesFromItsSubscriptions,
@@ -151,8 +151,8 @@ pub fn preview (
       record_links (&mut result . links, node, raw_id, TextField::Body,
                          body); }}
   result . structural . sort_by (|a, b|
-    (&a . owner_pid, a . field, &a . relSource)
-      . cmp (&(&b . owner_pid, b . field, &b . relSource)));
+    (&a . owner_pid, a . field, &a . relRepo)
+      . cmp (&(&b . owner_pid, b . field, &b . relRepo)));
   result . links . sort_by (|a, b|
     (&a . owner_pid, a . field, a . line, &a . label)
       . cmp (&(&b . owner_pid, b . field, b . line, &b . label)));
@@ -171,14 +171,14 @@ fn record_links (
     let start : usize = range . start;
     occurrences . push (LinkOccurrence {
       owner_pid    : node . pid . clone (),
-      owner_source : node . source . clone (),
+      owner_repo : node . home_repo . clone (),
       field,
       line         : text [..start] . bytes () . filter (|b| *b == b'\n') . count () + 1,
       label        : link . label, }); }
 }
 
 /// Build one verbatim SaveNode per owned affected telescope.  It removes only
-/// exact raw-ID matches and preserves all list order, relSources, and
+/// exact raw-ID matches and preserves all list order, relRepos, and
 /// MSV shapes.  The caller must use the same fresh snapshot it previewed.
 pub fn rewrite (
   graph  : &InRustGraph,
@@ -220,30 +220,30 @@ fn remove_exact (
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::types::misc::{SkgfileSource};
+  use crate::types::misc::{SkgfileRepo};
   use crate::types::nodes::complete::{empty_node_complete, NodeComplete};
   use std::collections::HashMap;
   use std::path::PathBuf;
 
   fn id (text : &str) -> ID { ID::from (text) }
-  fn member (source : &str, raw : &str) -> RelPartner<ID> {
-    RelPartner::at_relSource (SourceName::from (source), id (raw)) }
+  fn member (repo : &str, raw : &str) -> RelPartner<ID> {
+    RelPartner::at_relRepo (RepoName::from (repo), id (raw)) }
 
   fn config () -> SkgConfig {
-    let source = |name : &str, owned : bool| SkgfileSource {
-      name: SourceName::from (name), abbreviation: None,
+    let repo = |name : &str, owned : bool| SkgfileRepo {
+      name: RepoName::from (name), abbreviation: None,
       path: PathBuf::from (if owned { "owned/main" } else { "foreign/other" }),
       user_owns_it: owned };
-    SkgConfig::dummyFromSources (HashMap::from ([
-      (SourceName::from ("main"), source ("main", true)),
-      (SourceName::from ("foreign"), source ("foreign", false)),
+    SkgConfig::dummyFromRepos (HashMap::from ([
+      (RepoName::from ("main"), repo ("main", true)),
+      (RepoName::from ("foreign"), repo ("foreign", false)),
     ]))
   }
 
-  fn node (pid : &str, source : &str) -> NodeComplete {
+  fn node (pid : &str, repo : &str) -> NodeComplete {
     let mut node : NodeComplete = empty_node_complete ();
     node . pid = id (pid);
-    node . source = SourceName::from (source);
+    node . home_repo = RepoName::from (repo);
     node . title = format! ("{} [[id:gone][title label]]", pid);
     node . body = Some ( // the verbatim example is not a reference
       "line one\n=[[id:gone][body label]]= example\n[[id:gone][body label]]"

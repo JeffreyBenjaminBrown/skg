@@ -5,15 +5,15 @@ use std::collections::HashMap;
 use tantivy::schema as schema;
 use tantivy::TantivyDocument;
 use tantivy::schema::document::Value;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use skg::dbs::filesystem::not_nodes::load_config;
 use skg::dbs::init::wipe_then_init_tantivy_db;
-use skg::dbs::tantivy::title_and_source_by_id;
+use skg::dbs::tantivy::title_and_repo_by_id;
 use skg::dbs::tantivy::escape::{escape_tantivy_intra_word, escape_tantivy_literal};
 use skg::dbs::tantivy::search::{
   SearchOptions, has_overPrivateText_telescope, search_index};
 use skg::dbs::tantivy::write::update_index_with_nodes;
-use skg::types::misc::{ID, MSV, SourceName, TantivyIndex, rel_partners_at_relSource_msv};
+use skg::types::misc::{ID, MSV, RepoName, TantivyIndex, rel_partners_at_relRepo_msv};
 use skg::types::nodes::tantivy::NodeTantivy;
 use skg::types::nodes::complete::{FileProperty, NodeComplete, empty_node_complete};
 
@@ -27,7 +27,7 @@ fn test_many_tantivy_things (
 
   let config = load_config ("tests/tantivy/fixtures/skgconfig.toml")?;
   let nodes: Vec<NodeComplete> =
-    read_all_skg_files_from_sources (&config)?;
+    read_all_skg_files_from_repos (&config)?;
 
   let (tantivy_index, indexed_count): (TantivyIndex, usize) =
     wipe_then_init_tantivy_db (
@@ -183,17 +183,17 @@ fn test_aliases() -> Result<(), Box<dyn std::error::Error>> {
   let mut apple  = empty_node . clone();
   { apple . pid      = ID::new ("apple");
     apple . title    =               "eat apple" . to_string();
-    apple . aliases  = rel_partners_at_relSource_msv ( & apple . source, MSV::Specified(vec![    "munch apple" . to_string(),
+    apple . aliases  = rel_partners_at_relRepo_msv ( & apple . home_repo, MSV::Specified(vec![    "munch apple" . to_string(),
                                     "chomp apple" . to_string() ])); }
   let mut banana = empty_node . clone();
   { banana . pid     = ID::new ("banana");
     banana . title   =               "eat banana" . to_string();
-    banana . aliases = rel_partners_at_relSource_msv ( & banana . source, MSV::Specified(vec![    "chomp banana" . to_string(),
+    banana . aliases = rel_partners_at_relRepo_msv ( & banana . home_repo, MSV::Specified(vec![    "chomp banana" . to_string(),
                                     "throw banana" . to_string()])); }
   let mut kiwi   = empty_node . clone();
   { kiwi . pid       = ID::new ("kiwi");
     kiwi . title     =               "eat kiwi" . to_string();
-    kiwi . aliases   = rel_partners_at_relSource_msv ( & kiwi . source, MSV::Specified(vec![    "munch kiwi" . to_string()])); }
+    kiwi . aliases   = rel_partners_at_relRepo_msv ( & kiwi . home_repo, MSV::Specified(vec![    "munch kiwi" . to_string()])); }
   let nodes = vec![apple, banana, kiwi];
 
   // Create Tantivy index - use a separate directory to avoid conflicts with test_many_tantivy_things
@@ -421,8 +421,8 @@ fn no_search_matching_excludes_title_alias_and_body_in_every_query_mode (
   let mut excluded : NodeComplete = empty_node_complete ();
   excluded . pid = ID::new ("excluded");
   excluded . title = "shaver titletoken" . to_string ();
-  excluded . aliases = rel_partners_at_relSource_msv (
-    &excluded . source,
+  excluded . aliases = rel_partners_at_relRepo_msv (
+    &excluded . home_repo,
     MSV::Specified (vec!["shaver aliastoken" . to_string ()]) );
   excluded . body = Some ("shaver bodytoken" . to_string ());
   excluded . misc = vec![FileProperty::NoSearchMatching];
@@ -461,7 +461,7 @@ fn no_search_matching_excludes_title_alias_and_body_in_every_query_mode (
       . and_then (|value| value . as_str ()),
     Some ("ordinary"));
   assert_eq! (
-    title_and_source_by_id (&index, &ID::new ("excluded"))
+    title_and_repo_by_id (&index, &ID::new ("excluded"))
       . map (|(title, _)| title),
     Some ("shaver titletoken" . to_string ()),
     "supporting Tantivy documents remain available to exact-ID lookup");
@@ -511,8 +511,8 @@ fn overPrivateText_telescope_filter_runs_inside_the_search_query (
   overPrivateText . pid = ID::new ("overPrivateText");
   overPrivateText . title = "shared privacy term" . to_string ();
   overPrivateText . overPrivateText_telescope = true;
-  overPrivateText . aliases = rel_partners_at_relSource_msv (
-    &SourceName::from ("main"),
+  overPrivateText . aliases = rel_partners_at_relRepo_msv (
+    &RepoName::from ("main"),
     MSV::Specified (vec! ["dirty alias secret" . to_string ()]) );
   let (index, _) = wipe_then_init_tantivy_db (
     &[clean, overPrivateText], Path::new ("/tmp/tantivy-test-overPrivateText-filter") ) ?;
@@ -785,7 +785,7 @@ fn test_title_by_id_returns_title_not_alias (
   let mut node = empty_node . clone ();
   { node . pid     = ID::new ("node-with-aliases");
     node . title   =               "The Real Title" . to_string ();
-    node . aliases = rel_partners_at_relSource_msv ( & node . source, MSV::Specified (vec![   "Alias One" . to_string (),
+    node . aliases = rel_partners_at_relRepo_msv ( & node . home_repo, MSV::Specified (vec![   "Alias One" . to_string (),
                                    "Alias Two" . to_string () ])); }
   let nodes : Vec<NodeComplete> = vec![node];
   let index_dir : &str =
@@ -796,15 +796,15 @@ fn test_title_by_id_returns_title_not_alias (
       Path::new (index_dir) )?;
   assert_eq! (indexed_count, 3,
     "Expected 3 documents (1 title + 2 aliases)");
-  let result : Option<(String, SourceName)> =
-    title_and_source_by_id (
+  let result : Option<(String, RepoName)> =
+    title_and_repo_by_id (
       &tantivy_index,
       &ID::new ("node-with-aliases") );
   assert_eq! (result . as_ref () . map ( |(t, _)| t . as_str () ),
     Some ("The Real Title"),
     "title_and_source_by_id should return the title, not an alias");
-  let missing : Option<(String, SourceName)> =
-    title_and_source_by_id (
+  let missing : Option<(String, RepoName)> =
+    title_and_repo_by_id (
       &tantivy_index,
       &ID::new ("nonexistent-id") );
   assert_eq! (missing, None,

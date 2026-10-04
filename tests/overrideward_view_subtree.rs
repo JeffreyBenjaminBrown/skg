@@ -3,7 +3,7 @@
 // Overrideward view-subtrees + suppression in search results
 // (TODO/override-ancestry-in-search-results.org).
 //
-// Fixture (tests/overrideward_view_subtree/fixtures): owned source
+// Fixture (tests/overrideward_view_subtree/fixtures): owned repo
 // "main" holds U, which overrides foreign F, which overrides foreign
 // G; foreign M1 and M2 mutually override; foreign B overrides foreign
 // E. Ownership is by location -- "main" lives under owned/, so it is
@@ -16,18 +16,18 @@ use ego_tree::{NodeId, NodeRef, Tree};
 
 use skg::dbs::in_rust_graph::InRustGraph;
 use skg::dbs::in_rust_graph::stats::{
-  AllGraphNodeStats, fetch_all_graphnodestats_with_source_set};
+  AllGraphNodeStats, fetch_all_graphnodestats_with_repo_set};
 use skg::org_to_text::viewforest_to_string;
 use skg::serve::handlers::text_search::{
   MatchGroups, build_search_viewforest, suppressed_result_ids};
 use skg::serve::handlers::text_search::render_enriched_search_buffer::{
   collect_overrideward_view_subtree_ids,
   insert_overrideward_view_subtrees};
-use skg::source_sets::{
-  ActiveSourceSet, SourceSetName, apply_source_set_to_viewforest};
+use skg::repo_sets::{
+  ActiveRepoSet, RepoSetName, apply_repo_set_to_viewforest};
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::to_org::util::mark_view_roots_parent_na;
-use skg::types::misc::{ID, SkgConfig, SourceName};
+use skg::types::misc::{ID, SkgConfig, RepoName};
 use skg::types::tree::forest::ViewForest;
 use skg::types::viewnode::{Birth, ViewNode, ViewNodeKind, Vognode};
 use skg::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
@@ -35,10 +35,10 @@ use skg::update_buffer::set_viewnodestats_in_viewforest;
 
 /// One search hit, as a MatchGroups entry.
 fn hit (
-  id : &str, source : &str, title : &str,
-) -> (ID, (SourceName, Vec<(f32, String)>)) {
+  id : &str, repo : &str, title : &str,
+) -> (ID, (RepoName, Vec<(f32, String)>)) {
   ( ID::from (id),
-    ( SourceName::from (source),
+    ( RepoName::from (repo),
       vec![ (1.0_f32, title . to_string ()) ] ) ) }
 
 #[test]
@@ -50,9 +50,9 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
         "overrideward_view_subtree",
         "tests/overrideward_view_subtree/fixtures/skgconfig.toml"
         ) ?;
-      let active : ActiveSourceSet =
-        ActiveSourceSet::named (
-          &s . config, SourceSetName::from ("all") ) ?;
+      let active : ActiveRepoSet =
+        ActiveRepoSet::named (
+          &s . config, RepoSetName::from ("all") ) ?;
       let graph = graph_handle_from_config (&s . config) ? . load_full ();
       suppression_anchors_at_user_owned (
         &graph, &s . config, &active ) ?;
@@ -73,7 +73,7 @@ fn all_tests () -> Result<(), Box<dyn Error>> {
 async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
   graph  : &InRustGraph,
   config : &SkgConfig,
-  active : &ActiveSourceSet,
+  active : &ActiveRepoSet,
 ) -> Result<(), Box<dyn Error>> {
   let matches : MatchGroups = [
     hit ("U", "main",    "cooking the owned way"),
@@ -99,7 +99,7 @@ async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
         &graph, &search_results, active ) );
     ids . into_iter () . collect () };
   let stats : AllGraphNodeStats =
-    fetch_all_graphnodestats_with_source_set (
+    fetch_all_graphnodestats_with_repo_set (
       &graph, &all_ids, Some (active) ) ?;
   // Phase 2: graft, then the same stats/herald/render passes as
   // handle_snapshot_response.
@@ -115,7 +115,7 @@ async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
     & stats . container_to_contents,
     & stats . content_to_containers,
     config, Some (active) );
-  apply_source_set_to_viewforest ( &mut viewforest, active );
+  apply_repo_set_to_viewforest ( &mut viewforest, active );
   let buffer : String = viewforest_to_string ( &viewforest, config ) ?;
 
   let level_of = |needle : &str| -> usize {
@@ -148,7 +148,7 @@ async fn end_to_end_render_shows_suppressed_grafts_with_heralds (
 fn suppression_anchors_at_user_owned (
   graph  : &InRustGraph,
   config : &SkgConfig,
-  active : &ActiveSourceSet,
+  active : &ActiveRepoSet,
 ) -> Result<(), Box<dyn Error>> {
   let matches : MatchGroups = [
     hit ("U",  "main",    "cooking the owned way"),
@@ -175,7 +175,7 @@ fn suppression_anchors_at_user_owned (
 /// marked with the OVERRIDDEN backpath role: U -> F -> G.
 fn override_relatives_graft_as_descendants (
   graph : &InRustGraph,
-  active : &ActiveSourceSet,
+  active : &ActiveRepoSet,
 ) -> Result<(), Box<dyn Error>> {
   let matches : MatchGroups =
     [ hit ("U", "main", "cooking the owned way") ]

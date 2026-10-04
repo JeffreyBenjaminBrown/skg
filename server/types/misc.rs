@@ -68,12 +68,12 @@ pub enum RelationshipMemberKey {
 }
 
 #[derive(Serialize, Clone, PartialEq, Eq, Hash)]
-pub struct SkgfileSource {
-  pub name         : SourceName,
+pub struct SkgfileRepo {
+  pub name         : RepoName,
   pub abbreviation : Option<String>,
   pub path         : PathBuf,
   // DERIVED at config load, never written in TOML (a raw
-  // 'user_owns_it' key is rejected): true iff the source's
+  // 'user_owns_it' key is rejected): true iff the repo's
   // as-written path sits under the config's 'owned_folder' (its
   // first component equals it). See 'derive_ownership_and_labels'
   // in server/dbs/filesystem/not_nodes.rs. Rust constructors (tests)
@@ -81,26 +81,26 @@ pub struct SkgfileSource {
   pub user_owns_it : bool,
 }
 
-/// The TOML shape of a '[[sources]]' entry: 'name' is optional,
+/// The TOML shape of a '[[repos]]' entry: 'name' is optional,
 /// defaulting to the path as written (e.g. "eggman/eggs"), which the
-/// herald-label defaulting then abbreviates for owned sources.
+/// herald-label defaulting then abbreviates for owned repos.
 #[derive(Deserialize)]
-struct SkgfileSourceToml {
-  name         : Option<SourceName>,
+struct SkgfileRepoToml {
+  name         : Option<RepoName>,
   #[serde(default)]
   abbreviation : Option<String>,
   path         : PathBuf,
 }
 
-impl From<SkgfileSourceToml> for SkgfileSource {
+impl From<SkgfileRepoToml> for SkgfileRepo {
   fn from (
-    raw : SkgfileSourceToml
-  ) -> SkgfileSource {
-    let name : SourceName =
+    raw : SkgfileRepoToml
+  ) -> SkgfileRepo {
+    let name : RepoName =
       raw . name . unwrap_or_else (
-        || SourceName (
+        || RepoName (
           raw . path . to_string_lossy () . into_owned () ));
-    SkgfileSource {
+    SkgfileRepo {
       name,
       abbreviation : raw . abbreviation,
       path         : raw . path,
@@ -108,41 +108,41 @@ impl From<SkgfileSourceToml> for SkgfileSource {
     }}}
 
 /// One entry in a node's relationship list: the member and the
-/// relationship instance's relSource (the source whose telescope
-/// section records the relationship). The relSource is about the
+/// relationship instance's relRepo (the repo whose telescope
+/// section records the relationship). The relRepo is about the
 /// RELATIONSHIP, not the member node (a public node can be a private
-/// member). Its default comes from the applicable relSource rule;
-/// 'skg-set-relSource' may move its privacy anywhere at least as
+/// member). Its default comes from the applicable relRepo rule;
+/// 'skg-set-relRepo' may move its privacy anywhere at least as
 /// private as that default;
 /// renormalization never lowers its privacy (the sticky rule). See
 /// TODO/user-owned_autofork_chain/5_plan.org and
 /// BUG-and-fix_make-edge-more-public.org.
 ///
-/// Every value records the relSource whose section contains it.
+/// Every value records the relRepo whose section contains it.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct RelPartner<T> {
-  pub relSource : SourceName,
+  pub relRepo : RepoName,
   pub member    : T,
 }
 
 impl<T> RelPartner<T> {
-  pub fn at_relSource (
-    relSource : SourceName,
+  pub fn at_relRepo (
+    relRepo : RepoName,
     member    : T,
   ) -> RelPartner<T> {
-    RelPartner { relSource, member }}}
+    RelPartner { relRepo, member }}}
 
-/// Tag every member of a list with one relSource.
-pub fn rel_partners_at_relSource<T> (
-  relSource : &SourceName,
+/// Tag every member of a list with one relRepo.
+pub fn rel_partners_at_relRepo<T> (
+  relRepo : &RepoName,
   members   : Vec<T>,
 ) -> Vec<RelPartner<T>> {
   members . into_iter ()
-    . map ( |m| RelPartner::at_relSource (
-      relSource . clone (), m ) )
+    . map ( |m| RelPartner::at_relRepo (
+      relRepo . clone (), m ) )
     . collect () }
 
-/// The values in a list of relation partners, sources dropped.
+/// The values in a list of relation partners, repos dropped.
 pub fn members_of<T : Clone> (
   list : &[RelPartner<T>],
 ) -> Vec<T> {
@@ -150,15 +150,15 @@ pub fn members_of<T : Clone> (
     . map ( |m| m . member . clone () )
     . collect () }
 
-/// 'rel_partners_at_relSource' lifted over MSV.
-pub fn rel_partners_at_relSource_msv<T> (
-  relSource : &SourceName,
+/// 'rel_partners_at_relRepo' lifted over MSV.
+pub fn rel_partners_at_relRepo_msv<T> (
+  relRepo : &RepoName,
   msv       : MSV<T>,
 ) -> MSV<RelPartner<T>> {
   match msv {
     MSV::Unspecified     => MSV::Unspecified,
     MSV::Specified (v)   =>
-      MSV::Specified ( rel_partners_at_relSource (relSource, v) ), }}
+      MSV::Specified ( rel_partners_at_relRepo (relRepo, v) ), }}
 
 /// 'members_of' lifted over MSV.
 pub fn members_msv<T : Clone> (
@@ -169,15 +169,15 @@ pub fn members_msv<T : Clone> (
     MSV::Specified (v)   =>
       MSV::Specified ( members_of (v) ), }}
 
-/// Identifies a source-set CHOICE. Source-sets are no longer defined
-/// by hand: they are the PREFIXES of the config's source order (most
-/// public first), so a choice is either "all" (every source) or the
-/// name of a configured source -- meaning "that source and everything
-/// more public", i.e. the most private source to make available.
+/// Identifies a repo-set CHOICE. Repo-sets are no longer defined
+/// by hand: they are the PREFIXES of the config's repo order (most
+/// public first), so a choice is either "all" (every repo) or the
+/// name of a configured repo -- meaning "that repo and everything
+/// more public", i.e. the most private repo to make available.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct SourceSetName ( pub String );
+pub struct RepoSetName ( pub String );
 
-impl SkgfileSource {
+impl SkgfileRepo {
   pub fn herald_label (&self) -> &str {
     self . abbreviation . as_deref ()
       . unwrap_or ( &self . name ) }}
@@ -188,29 +188,29 @@ pub struct SkgConfig {
   pub config_path    : PathBuf, // Path to skgconfig.toml. Used to reload config without changing which file governs this server.
 
   #[serde (skip)]
-  pub data_root      : PathBuf, // Directory containing skgconfig.toml. Other relative paths (tantivy_folder, source paths) are resolved against this at load time.
+  pub data_root      : PathBuf, // Directory containing skgconfig.toml. Other relative paths (tantivy_folder, repo paths) are resolved against this at load time.
 
-  #[serde ( deserialize_with = "deserialize_sources" )]
-  pub sources        : HashMap<SourceName, SkgfileSource>,
+  #[serde ( deserialize_with = "deserialize_repos" )]
+  pub repos        : HashMap<RepoName, SkgfileRepo>,
 
-  // The source names in TOML declaration order ('sources' is a HashMap,
+  // The repo names in TOML declaration order ('repos' is a HashMap,
   // which loses it). Filled at parse time by the config loaders; empty
   // for dummy/test configs, where the config-order helpers fall back to
   // alphabetical. LOAD-BEARING: declaration order is the privacy order
-  // (most public first); the fold, the relSource defaults, the
-  // validators, and prefix source-sets all read it, through the
-  // comparison chokepoint methods below ('ordered_sources',
-  // 'source_position', 'is_strictly_more_public', 'more_private_of',
-  // 'prefix_through'). No other code may compare source positions.
+  // (most public first); the fold, the relRepo defaults, the
+  // validators, and prefix repo-sets all read it, through the
+  // comparison chokepoint methods below ('ordered_repos',
+  // 'repo_position', 'is_strictly_more_public', 'more_private_of',
+  // 'prefix_through'). No other code may compare repo positions.
   #[serde (skip)]
-  pub source_order   : Vec<SourceName>,
+  pub repo_order   : Vec<RepoName>,
 
-  #[serde(default = "default_source_set_name")]
-  pub default_source_set : SourceSetName,
+  #[serde(default = "default_repo_set_name")]
+  pub default_repo_set : RepoSetName,
 
   // The directory (as a first path component under the data root)
-  // whose sources the user OWNS; every other source is foreign
-  // (read-only). Replaces the retired per-source 'user_owns_it'
+  // whose repos the user OWNS; every other repo is foreign
+  // (read-only). Replaces the retired per-repo 'user_owns_it'
   // TOML key. The intended layout is data/AUTHOR/REPO, with this
   // field naming the user's own author folder.
   #[serde(default = "default_owned_folder")]
@@ -238,21 +238,21 @@ impl SkgConfig {
   pub fn logs_dir ( &self ) -> PathBuf {
     self . data_root . join ("logs") } }
 
-/// Each source has a unique name, defined in the SkgConfig,
+/// Each repo has a unique name, defined in the SkgConfig,
 /// used in ViewNode metadata to track provenance.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct SourceName ( pub String );
+pub struct RepoName ( pub String );
 
-impl SourceName {
-  /// Reserved sentinel source for a *non-Active* viewnode (e.g. a
-  /// Diff phantom) whose source could not be determined. It renders like
-  /// any other source -- the all-caps name alone flags it to the user --
+impl RepoName {
+  /// Reserved sentinel repo for a *non-Active* viewnode (e.g. a
+  /// Diff phantom) whose repo could not be determined. It renders like
+  /// any other repo -- the all-caps name alone flags it to the user --
   /// so that one unresolvable reference does not abort an entire render
-  /// (TODO/DONE/local-view-update/plan_v2.org §7.6). Active-vognode source failures are caught by
+  /// (TODO/DONE/local-view-update/plan_v2.org §7.6). Active-vognode repo failures are caught by
   /// validation (pre-save) or are catastrophic (post-save), never this.
   pub const NOT_FOUND_STR : &'static str = "NOT_FOUND";
   pub fn not_found () -> Self {
-    SourceName ( Self::NOT_FOUND_STR . to_string () ) } }
+    RepoName ( Self::NOT_FOUND_STR . to_string () ) } }
 
 #[derive (Clone)]
 pub struct TantivyIndex {
@@ -271,7 +271,7 @@ pub struct TantivyIndex {
   pub raw_title_field           : Field, // Un-reduced title for is_title=true docs: preserves link syntax (e.g. "[[id:X][label]]") that 'title_or_alias_field' strips to bare labels. Populated only on primary-title docs; empty for alias docs. Used by the 'titles by ids' endpoint so clients can tell link-titles from plain titles.
   pub overPrivateText_telescope_field      : Field,
   pub no_search_matching_field  : Field,
-  pub source_field              : Field,
+  pub repo_field              : Field,
   pub context_origin_type_field : Field,
   pub is_title_field            : Field,
   pub had_id_field              : Field,
@@ -282,29 +282,29 @@ pub struct TantivyIndex {
 // Helper Functions
 //
 
-fn deserialize_sources<'de, D> (
+fn deserialize_repos<'de, D> (
   deserializer : D
-) -> Result <HashMap<SourceName, SkgfileSource>, D::Error>
+) -> Result <HashMap<RepoName, SkgfileRepo>, D::Error>
 where
   D : Deserializer<'de>
 {
-  let sources_vec : Vec<SkgfileSourceToml> =
+  let repos_vec : Vec<SkgfileRepoToml> =
     Vec::deserialize (deserializer) ?;
-  let mut map : HashMap<SourceName, SkgfileSource> =
+  let mut map : HashMap<RepoName, SkgfileRepo> =
     HashMap::new ();
-  for raw in sources_vec {
-    let source : SkgfileSource =
-      SkgfileSource::from (raw);
+  for raw in repos_vec {
+    let repo : SkgfileRepo =
+      SkgfileRepo::from (raw);
     if map . insert (
-         source . name . clone (),
-         source . clone () ) . is_some () {
+         repo . name . clone (),
+         repo . clone () ) . is_some () {
       return Err (serde::de::Error::custom (
-        format! ("Duplicate source name '{}'", source . name))); }}
+        format! ("Duplicate source name '{}'", repo . name))); }}
   Ok (map)
 }
 
-fn default_source_set_name () -> SourceSetName {
-  SourceSetName::from ("all") }
+fn default_repo_set_name () -> RepoSetName {
+  RepoSetName::from ("all") }
 
 fn default_owned_folder () -> String {
   "owned" . to_string () }
@@ -389,8 +389,8 @@ impl AsRef<str> for ID {
   fn as_ref (&self) -> &str {
     &self . 0 }}
 
-impl Deref for SourceName {
-  // lets SourceName be used like a String
+impl Deref for RepoName {
+  // lets RepoName be used like a String
   type Target = String;
   fn deref (&self) -> &Self::Target {
     &self . 0 }}
@@ -401,13 +401,13 @@ impl fmt::Display for ID {
          -> fmt::Result {
     write! ( f, "{}", self . 0 ) }}
 
-impl fmt::Display for SourceName {
+impl fmt::Display for RepoName {
   fn fmt ( &self,
             f: &mut fmt::Formatter<'_> )
          -> fmt::Result {
     write! ( f, "{}", self . 0 ) }}
 
-impl fmt::Display for SourceSetName {
+impl fmt::Display for RepoSetName {
   fn fmt ( &self,
             f: &mut fmt::Formatter<'_> )
          -> fmt::Result {
@@ -421,46 +421,46 @@ impl From<&String> for ID {
   fn from ( s : &String ) -> Self {
     ID ( s . clone () ) }}
 
-impl From<String> for SourceName {
+impl From<String> for RepoName {
   fn from ( s : String ) -> Self {
-    SourceName (s) }}
+    RepoName (s) }}
 
-impl From<String> for SourceSetName {
+impl From<String> for RepoSetName {
   fn from ( s : String ) -> Self {
-    SourceSetName (s) }}
+    RepoSetName (s) }}
 
-impl From<&String> for SourceName {
+impl From<&String> for RepoName {
   fn from ( s : &String ) -> Self {
-    SourceName ( s . clone () ) }}
+    RepoName ( s . clone () ) }}
 
-impl From<&String> for SourceSetName {
+impl From<&String> for RepoSetName {
   fn from ( s : &String ) -> Self {
-    SourceSetName ( s . clone () ) }}
+    RepoSetName ( s . clone () ) }}
 
 impl From <&str> for ID {
   fn from(s: &str) -> Self {
     ID ( s . to_string () ) }}
 
-impl From <&str> for SourceName {
+impl From <&str> for RepoName {
   fn from(s: &str) -> Self {
-    SourceName ( s . to_string () ) }}
+    RepoName ( s . to_string () ) }}
 
-impl From <&str> for SourceSetName {
+impl From <&str> for RepoSetName {
   fn from(s: &str) -> Self {
-    SourceSetName ( s . to_string () ) }}
+    RepoSetName ( s . to_string () ) }}
 
 impl SkgConfig {
-  /// Creates a SkgConfig with dummy values for everything except sources.
+  /// Creates a SkgConfig with dummy values for everything except repos.
   /// Useful for tests that only need to read .skg files.
-  pub fn dummyFromSources (
-    sources : HashMap<SourceName, SkgfileSource>
+  pub fn dummyFromRepos (
+    repos : HashMap<RepoName, SkgfileRepo>
   ) -> Self {
     SkgConfig {
       config_path        : PathBuf::from (""),
       data_root          : PathBuf::from ("."),
-      sources,
-      source_order       : Vec::new (),
-      default_source_set : SourceSetName::from ("all"),
+      repos,
+      repo_order       : Vec::new (),
+      default_repo_set : RepoSetName::from ("all"),
       owned_folder       : "owned" . to_string (),
       tantivy_folder     : PathBuf::from ("/tmp/unused"),
       port               : 0,
@@ -470,16 +470,16 @@ impl SkgConfig {
       max_ancestry_depth : default_max_ancestry_depth(), }}
 
   /// Creates a SkgConfig with a test-specific Tantivy folder.
-  pub fn fromSourcesAndTantivyFolder (
-    sources        : HashMap<SourceName, SkgfileSource>,
+  pub fn fromReposAndTantivyFolder (
+    repos        : HashMap<RepoName, SkgfileRepo>,
     tantivy_folder : &str,
   ) -> Self {
     SkgConfig {
       config_path        : PathBuf::from (""),
       data_root          : PathBuf::from ("."),
-      sources,
-      source_order       : Vec::new (),
-      default_source_set : SourceSetName::from ("all"),
+      repos,
+      repo_order       : Vec::new (),
+      default_repo_set : RepoSetName::from ("all"),
       owned_folder       : "owned" . to_string (),
       tantivy_folder     : PathBuf::from (tantivy_folder),
       port               : DEFAULT_PORT,
@@ -488,139 +488,139 @@ impl SkgConfig {
       beep_when_server_becomes_available : false,
       max_ancestry_depth : default_max_ancestry_depth(), }}
 
-  pub fn user_owns_source (
+  pub fn user_owns_repo (
     &self,
-    source_name : &SourceName
+    repo_name : &RepoName
   ) -> bool {
-    self . sources . get (source_name)
+    self . repos . get (repo_name)
       . map ( |s| s . user_owns_it )
       . unwrap_or (false)
   }
 
-  /// The owned source names in privacy order (see 'ordered_sources').
-  pub fn owned_sources_in_config_order (
+  /// The owned repo names in privacy order (see 'ordered_repos').
+  pub fn owned_repos_in_config_order (
     &self,
-  ) -> Vec<SourceName> {
-    self . ordered_sources () . into_iter ()
-      . filter ( |name| self . user_owns_source (name) )
+  ) -> Vec<RepoName> {
+    self . ordered_repos () . into_iter ()
+      . filter ( |name| self . user_owns_repo (name) )
       . collect () }
 
-  /// The default owned source for a fork's clone when its source could
-  /// not be inferred or user-set: the user's CONFIG-FIRST owned source
-  /// (matching the Emacs client's 'skg--default-source', which is
-  /// TOML-first). None only when the user owns no source at all -- the
-  /// one case 'ForkSourceUnresolved' still fires.
-  pub fn first_owned_source_in_config_order (
+  /// The default owned repo for a fork's clone when its repo could
+  /// not be inferred or user-set: the user's CONFIG-FIRST owned repo
+  /// (matching the Emacs client's 'skg--default-repo', which is
+  /// TOML-first). None only when the user owns no repo at all -- the
+  /// one case 'ForkRepoUnresolved' still fires.
+  pub fn first_owned_repo_in_config_order (
     &self,
-  ) -> Option<SourceName> {
-    self . owned_sources_in_config_order () . into_iter () . next () }
+  ) -> Option<RepoName> {
+    self . owned_repos_in_config_order () . into_iter () . next () }
 
-  /// Backwards-compatible name for the config-first owned source
-  /// default; see 'first_owned_source_in_config_order'.
-  pub fn first_owned_source (
+  /// Backwards-compatible name for the config-first owned repo
+  /// default; see 'first_owned_repo_in_config_order'.
+  pub fn first_owned_repo (
     &self,
-  ) -> Option<SourceName> {
-    self . first_owned_source_in_config_order () }
+  ) -> Option<RepoName> {
+    self . first_owned_repo_in_config_order () }
 
-  pub fn default_source_set_name (
+  pub fn default_repo_set_name (
     &self,
-  ) -> &SourceSetName {
-    &self . default_source_set }
+  ) -> &RepoSetName {
+    &self . default_repo_set }
 
   /// THE COMPARISON CHOKEPOINT, with the methods below it. Every
-  /// source name, in privacy order: most public first, most private
+  /// repo name, in privacy order: most public first, most private
   /// last (TOML declaration order). Falls back to alphabetical when
   /// declaration order is unavailable (a dummy/test config, whose
-  /// 'source_order' is empty), so the result is always deterministic.
-  /// No code outside these methods may compare source positions.
-  pub fn ordered_sources (
+  /// 'repo_order' is empty), so the result is always deterministic.
+  /// No code outside these methods may compare repo positions.
+  pub fn ordered_repos (
     &self,
-  ) -> Vec<SourceName> {
-    if self . source_order . is_empty () {
+  ) -> Vec<RepoName> {
+    if self . repo_order . is_empty () {
       // No declaration order recorded: alphabetical, for determinism.
-      let mut names : Vec<SourceName> =
-        self . sources . keys () . cloned () . collect ();
+      let mut names : Vec<RepoName> =
+        self . repos . keys () . cloned () . collect ();
       names . sort ();
       names
-    } else { self . source_order . clone () }}
+    } else { self . repo_order . clone () }}
 
   /// Position in the privacy order: 0 = most public.
-  /// None for a source absent from the config.
-  pub fn source_position (
+  /// None for a repo absent from the config.
+  pub fn repo_position (
     &self,
-    source : &SourceName,
+    repo : &RepoName,
   ) -> Option<usize> {
-    self . ordered_sources () . iter ()
-      . position ( |s| s == source ) }
+    self . ordered_repos () . iter ()
+      . position ( |s| s == repo ) }
 
   /// True iff 'a' is STRICTLY more public than 'b' (earlier in the
-  /// privacy order). A source absent from the config counts as
+  /// privacy order). A repo absent from the config counts as
   /// maximally private, so nothing is less public than it.
   pub fn is_strictly_more_public (
     &self,
-    a : &SourceName,
-    b : &SourceName,
+    a : &RepoName,
+    b : &RepoName,
   ) -> bool {
-    match ( self . source_position (a),
-            self . source_position (b) ) {
+    match ( self . repo_position (a),
+            self . repo_position (b) ) {
       (Some (pa), Some (pb)) => pa < pb,
       (Some (_),  None     ) => true,
       _                      => false, }}
 
   /// The more private of the two (the later in the privacy order);
-  /// 'b' on a tie. This is the relSource default rule's core: a
-  /// relationship instance normally defaults to the source of the more private
+  /// 'b' on a tie. This is the relRepo default rule's core: a
+  /// relationship instance normally defaults to the repo of the more private
   /// of its two endpoints' homes.
   pub fn more_private_of (
     &self,
-    a : SourceName,
-    b : SourceName,
-  ) -> SourceName {
+    a : RepoName,
+    b : RepoName,
+  ) -> RepoName {
     if self . is_strictly_more_public (&b, &a) { a } else { b }}
 
-  /// The default relSource for a writable node-to-node
+  /// The default relRepo for a writable node-to-node
   /// relationship. Between owned nodes, use the more-private home.
   /// From an owned owner to a foreign member, use the owner's home:
   /// Skg may expose the foreign ID there, but never proposes writing
-  /// a relationship into the foreign source.
-  pub fn default_relSource (
+  /// a relationship into the foreign repo.
+  pub fn default_relRepo (
     &self,
-    owner_home : &SourceName,
-    member_home : &SourceName,
-  ) -> SourceName {
-    if ( self . user_owns_source (owner_home) &&
-         ! self . user_owns_source (member_home) ) {
+    owner_home : &RepoName,
+    member_home : &RepoName,
+  ) -> RepoName {
+    if ( self . user_owns_repo (owner_home) &&
+         ! self . user_owns_repo (member_home) ) {
       owner_home . clone ()
     } else {
       self . more_private_of (
         owner_home . clone (), member_home . clone () ) }}
 
-  /// The prefix of the privacy order through 'source', inclusive:
-  /// that source and everything more public. Errors if the source is
+  /// The prefix of the privacy order through 'repo', inclusive:
+  /// that repo and everything more public. Errors if the repo is
   /// not configured.
   pub fn prefix_through (
     &self,
-    source : &SourceName,
-  ) -> Result<Vec<SourceName>, String> {
-    let ordered : Vec<SourceName> =
-      self . ordered_sources ();
+    repo : &RepoName,
+  ) -> Result<Vec<RepoName>, String> {
+    let ordered : Vec<RepoName> =
+      self . ordered_repos ();
     let position : usize =
-      ordered . iter () . position ( |s| s == source )
+      ordered . iter () . position ( |s| s == repo )
       . ok_or_else ( || format! (
-        "Source '{}' not found in config", source )) ?;
+        "Source '{}' not found in config", repo )) ?;
     Ok ( ordered [..= position] . to_vec () ) }
 
-  /// The sources a source-set choice makes available: everything for
-  /// "all"; for a source name, the prefix of the privacy order
-  /// through it (that source and everything more public).
-  pub fn source_set_sources (
+  /// The repos a repo-set choice makes available: everything for
+  /// "all"; for a repo name, the prefix of the privacy order
+  /// through it (that repo and everything more public).
+  pub fn repo_set_repos (
     &self,
-    name : &SourceSetName,
-  ) -> Result<BTreeSet<SourceName>, String> {
+    name : &RepoSetName,
+  ) -> Result<BTreeSet<RepoName>, String> {
     if name . 0 == "all" {
-      return Ok ( self . sources . keys () . cloned () . collect () ); }
+      return Ok ( self . repos . keys () . cloned () . collect () ); }
     Ok ( self
-         . prefix_through ( &SourceName::from ( name . 0 . as_str () ))
+         . prefix_through ( &RepoName::from ( name . 0 . as_str () ))
          . map_err ( |_| format! (
            "Source-set '{}' names no configured source. A source-set is 'all' or the name of the most private source to make available.",
            name )) ?

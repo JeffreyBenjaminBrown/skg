@@ -25,11 +25,11 @@ async fn test_collateral_view_preserves_diff_annotations (
 ) -> Result<(), Box<dyn Error>>
 {
   let temp_dir : TempDir = TempDir::new()?;
-  let repo_path : &Path = temp_dir . path();
-  setup_git_repo_with_fixtures (repo_path)?;
-  s . reset_with_source_path (
+  let gitrepo_path : &Path = temp_dir . path();
+  setup_gitrepo_with_fixtures (gitrepo_path)?;
+  s . reset_with_repo_path (
     "test_collateral_view_preserves_diff_annotations",
-    repo_path ) ?;
+    gitrepo_path ) ?;
   let (config, tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
@@ -45,7 +45,7 @@ async fn test_collateral_view_preserves_diff_annotations (
   assert_buffer_contains(&initial_buffer, GIT_DIFF_VIEW);
 
   // 2. Build a ViewsState with diff_mode_enabled.
-  // (Fixture nodes are on disk via setup_git_repo_with_fixtures;
+  // (Fixture nodes are on disk via setup_gitrepo_with_fixtures;
   // the rerender pipeline reads them as needed.)
   let graph : InRustGraphHandle =
     graph_handle_from_config (&config)?;
@@ -114,7 +114,7 @@ async fn test_collateral_view_preserves_diff_annotations (
     "** (skg (node (id c) (unstaged newX newM))) c" );
 
   // DISK: c.skg should exist (created by the save).
-  assert!( repo_path . join ("c.skg") . exists (),
+  assert!( gitrepo_path . join ("c.skg") . exists (),
     "c.skg should have been created on disk" );
 
   Ok (( ))
@@ -136,11 +136,11 @@ async fn test_collateral_view_staged_text_and_unstaged_add (
 ) -> Result<(), Box<dyn Error>>
 {
   let temp_dir : TempDir = TempDir::new()?;
-  let repo_path : &Path = temp_dir . path();
-  setup_git_repo_with_fixtures_staged (repo_path)?;
-  s . reset_with_source_path (
+  let gitrepo_path : &Path = temp_dir . path();
+  setup_gitrepo_with_fixtures_staged (gitrepo_path)?;
+  s . reset_with_repo_path (
     "test_collateral_view_staged_text_and_unstaged_add",
-    repo_path ) ?;
+    gitrepo_path ) ?;
   let (config, tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
@@ -213,7 +213,7 @@ async fn test_collateral_view_staged_text_and_unstaged_add (
   assert_buffer_contains ( &collateral_buffer,
     "** (skg (node (id c) (unstaged newX newM))) c" );
 
-  assert!( repo_path . join ("c.skg") . exists (),
+  assert!( gitrepo_path . join ("c.skg") . exists (),
     "c.skg should have been created on disk" );
 
   Ok (( ))

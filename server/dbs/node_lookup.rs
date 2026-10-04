@@ -2,7 +2,7 @@
 /// Producing a NodeComplete from different kinds of information.
 
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::nodes::complete::NodeComplete;
 
 use std::error::Error;
@@ -25,19 +25,19 @@ pub fn opt_nodecomplete_by_id (
   Ok (nodecomplete_from_graph (graph, id)) }
 
 /// Transitional disk lookup for callers not yet carrying an explicit graph.
-pub fn nodecomplete_rustFirst_by_pid_and_source (
+pub fn nodecomplete_rustFirst_by_pid_and_repo (
   graph  : &InRustGraph,
   config : &SkgConfig,
   pid    : &ID,
-  source : &SourceName,
+  repo : &RepoName,
 ) -> Result<NodeComplete, Box<dyn Error>> {
-  nodecomplete_graphFirst_by_pid_and_source (graph, config, pid, source) }
+  nodecomplete_graphFirst_by_pid_and_repo (graph, config, pid, repo) }
 
-pub fn nodecomplete_graphFirst_by_pid_and_source (
+pub fn nodecomplete_graphFirst_by_pid_and_repo (
   graph  : &InRustGraph,
   _config : &SkgConfig,
   pid    : &ID,
-  _source : &SourceName,
+  _repo : &RepoName,
 ) -> Result<NodeComplete, Box<dyn Error>> {
   if let Some (n) = nodecomplete_from_graph (graph, pid) { return Ok (n); }
   Err (format! ("Node '{}' not found in captured graph generation", pid) . into ()) }
@@ -50,7 +50,7 @@ pub fn nodecomplete_from_graph (
   let rust = graph . nodes . get (&pid) ?;
   Some ( NodeComplete {
     pid                          : rust . pid . clone (),
-    source                       : rust . source . clone (),
+    home_repo                       : rust . home_repo . clone (),
     extra_ids                    : rust . extra_ids . clone (),
     title                        : rust . title . clone (),
     overPrivateText_telescope               : rust . overPrivateText_telescope,

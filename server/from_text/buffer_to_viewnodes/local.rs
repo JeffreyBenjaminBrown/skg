@@ -277,7 +277,7 @@ fn validate_subscribeefolder (
     tree, node_id, 1, true,
     |node| node . is_active_or_diff_phantom ()
            || matches!(&node . kind,
-                    MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive subscribee may sit here as an inert display placeholder; it emits no subscribes_to membership (TODO/full-schema/9-2_source-set-safety.org)
+                    MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive subscribee may sit here as an inert display placeholder; it emits no subscribes_to membership (TODO/full-schema/9-2_repo-set-safety.org)
                       | MpViewnodeKind::Phantom (MpPhantom::Unknown (_))
                       | MpViewnodeKind::PartnerFolder (
                           PartnerFolder::HiddenOutsideOfSubscribee) ))
@@ -325,7 +325,7 @@ fn validate_relation_folder (
                 && matches! ( &node . kind,
                               MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) ))
            || matches!(&node . kind,
-                       MpViewnodeKind::Vognode (MpVognode::Inactive (_)))) // tolerated from stale buffers; the rerender removes it (TODO/full-schema/9-2_source-set-safety.org)
+                       MpViewnodeKind::Vognode (MpVognode::Inactive (_)))) // tolerated from stale buffers; the rerender removes it (TODO/full-schema/9-2_repo-set-safety.org)
     { errors . push(format!("{}'s children must include only ActiveNodes, inactive placeholders, or (for OverriddenFolder) Unknown placeholders.", label)); }
   if !generation_includes_only(
     tree, node_id, 1, true,
@@ -414,8 +414,8 @@ fn validate_inactive_node (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
-  // TODO/full-schema/9-2_source-set-safety.org: an InactiveNode may
-  // sit under a folder (a stale buffer from before a source-set
+  // TODO/full-schema/9-2_repo-set-safety.org: an InactiveNode may
+  // sit under a folder (a stale buffer from before a repo-set
   // switch) or under another gnode, and it may have children (the
   // retained case: an inactive node kept on screen because of its
   // active children).  Its own content stays read-only -- the
@@ -439,9 +439,9 @@ fn validate_inactive_node (
 /// (TODO/DONE/local-view-update/plan_v2.org §20.4 dedup): id present, no
 /// wrong-structure child, and distinct content-child ids. `label` ("ActiveNode"
 /// / "Phantom") is woven into the messages so each kind reports itself.
-/// Source validity is NOT checked here: source is load-bearing only for a
+/// Repo validity is NOT checked here: repo is load-bearing only for a
 /// ActiveNode (it is the node's .skg file path), so validate_activeNode adds that
-/// check; a phantom writes nothing and is ignored at save, so its source --
+/// check; a phantom writes nothing and is ignored at save, so its repo --
 /// which may be the NOT_FOUND sentinel for an unresolvable reference -- is
 /// inert and goes unchecked. (validate_activeNode also appends the
 /// definitive-title check; a phantom is title-exempt, being write-protected.)
@@ -481,7 +481,7 @@ fn validate_activeNode (
   let mut errors : Vec<String> =
     validate_gnode_identity_and_structure (
       tree, node_id, has_id (t), "ActiveNode" );
-  if !has_valid_source (t, config) {
+  if !has_valid_repo (t, config) {
     errors . push("ActiveNode must have a source that exists in the config."
                   . to_string()); }
   if t . id . is_none () && matches! (
@@ -496,10 +496,10 @@ fn validate_activeNode (
 /// Validate a phantom (TODO/DONE/local-view-update/plan_v2.org §11): the same
 /// identity and child-structure checks as an ActiveNode, minus the two
 /// ActiveNode-only rules. The definitive-title rule does not apply (a phantom is
-/// always write-protected, hence exempt). The source-in-config rule does not
+/// always write-protected, hence exempt). The repo-in-config rule does not
 /// apply either: a phantom writes nothing and is ignored at save, so its
-/// source -- possibly the NOT_FOUND sentinel for a reference that resolves to
-/// no source -- is inert.
+/// repo -- possibly the NOT_FOUND sentinel for a reference that resolves to
+/// no repo -- is inert.
 fn validate_phantom (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
@@ -527,13 +527,13 @@ fn cannot_be_child_of_gnode (
 pub fn has_id ( t : &MpActiveNode ) -> bool {
   t . id . is_some() }
 
-/// Check if an MpActiveNode has a source and it exists in the config.
-pub fn has_valid_source (
+/// Check if an MpActiveNode has a repo and it exists in the config.
+pub fn has_valid_repo (
   t      : &MpActiveNode,
   config : &SkgConfig,
 ) -> bool {
-  t . source . as_ref()
-    . is_some_and( |s| config . sources . contains_key (s) ) }
+  t . home_repo . as_ref()
+    . is_some_and( |s| config . repos . contains_key (s) ) }
 
 /// A definitive node (not marked for deletion) must have a non-empty title.
 /// Nodes that are write-protected or carry a delete request are exempt.

@@ -10,7 +10,7 @@ use crate::dbs::in_rust_graph::internal_index_validation::{
   LocalIndexValidation, validate_local_internal_indexes,
 };
 use crate::types::misc::{
-  ID, MSV, SkgConfig, SkgfileSource, SourceName, rel_partners_at_relSource,
+  ID, MSV, SkgConfig, SkgfileRepo, RepoName, rel_partners_at_relRepo,
 };
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 use crate::types::save::{DefineNode, DeleteNode, SaveNode};
@@ -22,10 +22,10 @@ use std::sync::Arc;
 use proptest::prelude::*;
 
 fn config () -> SkgConfig {
-  let source : SourceName = SourceName::from ("main");
-  SkgConfig::dummyFromSources (HashMap::from ([
-    (source . clone (), SkgfileSource {
-      name         : source,
+  let repo : RepoName = RepoName::from ("main");
+  SkgConfig::dummyFromRepos (HashMap::from ([
+    (repo . clone (), SkgfileRepo {
+      name         : repo,
       abbreviation : None,
       path         : PathBuf::from ("unused"),
       user_owns_it : true,
@@ -46,15 +46,15 @@ fn changed_edge_fixture (
   unrelated_count : usize,
 ) -> (InRustGraph, InRustGraph, Vec<DefineNode>, GraphChangeSet) {
   let mut old_owner : NodeComplete = node ("owner");
-  old_owner . contains = rel_partners_at_relSource (
-    &SourceName::from ("main"), vec![ID::from ("old")]);
+  old_owner . contains = rel_partners_at_relRepo (
+    &RepoName::from ("main"), vec![ID::from ("old")]);
   let mut base_nodes : Vec<NodeComplete> = vec![old_owner];
   base_nodes . extend ((0..unrelated_count)
     . map (|i| node (&format! ("unrelated-{i}"))));
   let base : InRustGraph = InRustGraph::from_nodecompletes (&base_nodes);
   let mut final_owner : NodeComplete = node ("owner");
-  final_owner . contains = rel_partners_at_relSource (
-    &SourceName::from ("main"), vec![ID::from ("new")]);
+  final_owner . contains = rel_partners_at_relRepo (
+    &RepoName::from ("main"), vec![ID::from ("new")]);
   let definitions : Vec<DefineNode> =
     vec![DefineNode::Save (SaveNode (final_owner))];
   let (changes, errors, revocations)
@@ -179,7 +179,7 @@ fn simultaneous_overlay_accepts_merge_style_primary_transfer () {
       DefineNode::Save (SaveNode (acquirer)),
       DefineNode::Delete (DeleteNode {
         id     : ID::from ("N2"),
-        source : SourceName::from ("main"),
+        home_repo : RepoName::from ("main"),
       }),
     ]) . unwrap ();
   assert_eq! (
@@ -202,7 +202,7 @@ fn repeated_definitions_use_the_last_graph_state () {
       DefineNode::Save (SaveNode (first)),
       DefineNode::Delete (DeleteNode {
         id     : ID::from ("P"),
-        source : SourceName::from ("main"),
+        home_repo : RepoName::from ("main"),
       }),
       DefineNode::Save (SaveNode (last)),
     ]) . unwrap ();
@@ -219,7 +219,7 @@ fn repeated_save_then_delete_leaves_no_graph_node () {
       DefineNode::Save (SaveNode (node ("P"))),
       DefineNode::Delete (DeleteNode {
         id     : ID::from ("P"),
-        source : SourceName::from ("main"),
+        home_repo : RepoName::from ("main"),
       }),
     ]) . unwrap ();
   assert! (prepared . candidate () . get (&ID::from ("P")) . is_none ());
@@ -235,7 +235,7 @@ fn repeated_delete_then_save_leaves_the_saved_graph_node () {
     &config (), base, vec![
       DefineNode::Delete (DeleteNode {
         id     : ID::from ("P"),
-        source : SourceName::from ("main"),
+        home_repo : RepoName::from ("main"),
       }),
       DefineNode::Save (SaveNode (saved)),
     ]) . unwrap ();
@@ -322,8 +322,8 @@ fn local_index_check_catches_an_omitted_insertion () {
 #[test]
 fn local_index_check_catches_an_omitted_canonical_migration () {
   let mut owner : NodeComplete = node ("owner");
-  owner . contains = rel_partners_at_relSource (
-    &SourceName::from ("main"), vec![ID::from ("future")]);
+  owner . contains = rel_partners_at_relRepo (
+    &RepoName::from ("main"), vec![ID::from ("future")]);
   let base : InRustGraph = InRustGraph::from_nodecompletes (&[owner]);
   let mut target : NodeComplete = node ("target");
   target . extra_ids = vec![ID::from ("future")];
@@ -376,19 +376,19 @@ fn local_index_check_work_does_not_grow_with_unrelated_nodes () {
 
 #[test]
 fn merge_override_collision_names_participants_and_both_repairs () {
-  let source : SourceName = SourceName::from ("main");
+  let repo : RepoName = RepoName::from ("main");
   let mut n1 : NodeComplete = node ("N1");
   n1 . title = "Acquirer title" . to_string ();
   let mut n2 : NodeComplete = node ("N2");
   n2 . title = "Acquiree title" . to_string ();
   let mut r1 : NodeComplete = node ("R1");
   r1 . title = "Existing overrider title" . to_string ();
-  r1 . overrides_view_of = MSV::Specified (rel_partners_at_relSource (
-    &source, vec![ID::from ("N1")]));
+  r1 . overrides_view_of = MSV::Specified (rel_partners_at_relRepo (
+    &repo, vec![ID::from ("N1")]));
   let mut r2 : NodeComplete = node ("R2");
   r2 . title = "Redirected overrider title" . to_string ();
-  r2 . overrides_view_of = MSV::Specified (rel_partners_at_relSource (
-    &source, vec![ID::from ("N2")]));
+  r2 . overrides_view_of = MSV::Specified (rel_partners_at_relRepo (
+    &repo, vec![ID::from ("N2")]));
   let base : Arc<InRustGraph> = Arc::new (
     InRustGraph::from_nodecompletes (&[n1 . clone (), n2, r1, r2]));
   n1 . extra_ids = vec![ID::from ("N2")];
@@ -396,7 +396,7 @@ fn merge_override_collision_names_participants_and_both_repairs () {
     &config (), base, vec![
       DefineNode::Save (SaveNode (n1)),
       DefineNode::Delete (DeleteNode {
-        id : ID::from ("N2"), source,
+        id : ID::from ("N2"), home_repo: repo,
       }),
     ]) . expect_err ("merge redirection must violate monogamy");
   assert_eq! (error . merge_override_collisions . len (), 1);

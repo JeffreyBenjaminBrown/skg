@@ -196,7 +196,7 @@ its name to its path, also mirroring the server."
                         (line-beginning-position)
                         (line-end-position)))))
             (cond
-             ((string-match "^\\[\\[sources\\]\\]" line)
+             ((string-match "^\\[\\[repos\\]\\]" line)
               (funcall flush)
               (setq in-sources t))
              ((string-match "^\\[\\[" line) ;; a different array table
@@ -243,10 +243,10 @@ its name to its path, also mirroring the server."
 
 (defun skg-source-names-from-toml (file)
   "Return configured source names from FILE."
-  (skg-table-names-from-toml file "sources"))
+  (skg-table-names-from-toml file "repos"))
 
 (defun skg-source-paths-from-toml (file)
-  "Return an alist of (name . absolute-dir) for each [[sources]] entry
+  "Return an alist of (name . absolute-dir) for each [[repos]] entry
 in FILE. Relative source paths are resolved against the directory of
 FILE, matching what the server's `make_paths_absolute' does at
 config-load time."
@@ -275,10 +275,10 @@ config-load time."
             (funcall flush)
             (setq current-table new-table)
             (setq cur-name nil cur-path nil))
-           ((and (equal current-table "sources")
+           ((and (equal current-table "repos")
                  (string-match "^path[ \t]*=[ \t]*\"\\([^\"]+\\)\"" line))
             (setq cur-path (match-string 1 line)))
-           ((and (equal current-table "sources")
+           ((and (equal current-table "repos")
                  (string-match "^name[ \t]*=[ \t]*\"\\([^\"]+\\)\"" line))
             (setq cur-name (match-string 1 line)))))
         (forward-line 1))

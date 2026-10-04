@@ -27,10 +27,10 @@ skg-config-dir is set and skg--owned-sources works."
       (delete-directory config-dir))))
 
 (defvar test--config-two-owned-sources
-  (concat "[[sources]]\n"
+  (concat "[[repos]]\n"
           "name = \"public\"\n"
           "path = \"owned/public\"\n\n"
-          "[[sources]]\n"
+          "[[repos]]\n"
           "name = \"private\"\n"
           "path = \"owned/private\"\n"
           "")

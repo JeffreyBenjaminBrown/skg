@@ -11,10 +11,10 @@ use crate::dbs::in_rust_graph::ancestry::{ AncestryTree, ancestry_by_id_from_ids
 use crate::dbs::in_rust_graph::paths::{
   paths_to_first_nonlinearities_in_graph, PathToFirstNonlinearity};
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::source_sets::ActiveSourceSet;
+use crate::repo_sets::ActiveRepoSet;
 use crate::to_org::util::{ get_id_from_treenode, nodecomplete_and_viewnode_from_id, remove_completed_view_request};
 
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::tree::viewnode_nodecomplete::{ find_child_by_id, find_children_by_ids};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::viewnode::ViewRequest;
@@ -38,10 +38,10 @@ pub fn build_and_integrate_path_view_then_drop_request (
   role          : RelationRole,
   config        : &SkgConfig,
   errors        : &mut Vec < String >,
-  active        : Option<&ActiveSourceSet>,
+  active        : Option<&ActiveRepoSet>,
 ) -> Result < (), Box<dyn Error> > {
   let result : Result<(), Box<dyn Error>> =
-    build_and_integrate_path_with_source_set (
+    build_and_integrate_path_with_repo_set (
       tree, node_id, graph, role, config, active );
   remove_completed_view_request (
     tree, node_id,
@@ -53,15 +53,15 @@ pub fn build_and_integrate_path_view_then_drop_request (
 /// EXCEPT the container role -- attach each grafted partner's
 /// containerward ancestry beneath it, so the partner is shown in its
 /// own container context (as mentionerward has always done for link
-/// sources). The container role itself IS that ancestry, so it does not
+/// repos). The container role itself IS that ancestry, so it does not
 /// re-attach.
-pub fn build_and_integrate_path_with_source_set (
+pub fn build_and_integrate_path_with_repo_set (
   tree      : &mut Tree<ViewNode>,
   node_id   : NodeId,
   graph     : &InRustGraph,
   role      : RelationRole,
   config    : &SkgConfig,
-  active    : Option<&ActiveSourceSet>,
+  active    : Option<&ActiveRepoSet>,
 ) -> Result < (), Box<dyn Error> > {
   let (relation, input_role, output_role)
     : (&'static str, &'static str, &'static str) =
@@ -78,28 +78,28 @@ pub fn build_and_integrate_path_with_source_set (
 
 /// Integrate a containerward path into a ViewNode tree (no ancestry
 /// re-attach). Thin wrapper kept for callers/tests; the engine is the
-/// generic 'build_and_integrate_path_with_source_set'.
+/// generic 'build_and_integrate_path_with_repo_set'.
 pub fn build_and_integrate_containerward_path (
   tree      : &mut Tree<ViewNode>,
   node_id   : NodeId,
   graph     : &InRustGraph,
   config    : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  build_and_integrate_path_with_source_set (
+  build_and_integrate_path_with_repo_set (
     tree, node_id, graph, RelationRole::CONTAINER, config, None ) }
 
-pub fn build_and_integrate_containerward_path_with_source_set (
+pub fn build_and_integrate_containerward_path_with_repo_set (
   tree      : &mut Tree<ViewNode>,
   node_id   : NodeId,
   graph     : &InRustGraph,
   config    : &SkgConfig,
-  active    : Option<&ActiveSourceSet>,
+  active    : Option<&ActiveRepoSet>,
 ) -> Result < (), Box<dyn Error> > {
-  build_and_integrate_path_with_source_set (
+  build_and_integrate_path_with_repo_set (
     tree, node_id, graph, RelationRole::CONTAINER, config, active ) }
 
-/// Integrate mentionerward paths (link sources of the node), attaching
-/// each source's containerward ancestry. Thin wrapper over the generic
+/// Integrate mentionerward paths (link repos of the node), attaching
+/// each repo's containerward ancestry. Thin wrapper over the generic
 /// engine with the mentioner role.
 pub fn build_and_integrate_mentionerward_path (
   tree      : &mut Tree<ViewNode>,
@@ -107,7 +107,7 @@ pub fn build_and_integrate_mentionerward_path (
   graph     : &InRustGraph,
   config    : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
-  build_and_integrate_path_with_source_set (
+  build_and_integrate_path_with_repo_set (
     tree, node_id, graph, RelationRole::MENTIONER, config, None ) }
 
 /// Plural 'backpaths' because if the origin
@@ -118,7 +118,7 @@ pub fn build_and_integrate_mentionerward_path (
 /// RETURNS the deduplicated set of pids that appear anywhere in
 /// the integrated paths (including branches and cycle nodes).
 /// Mentionerward callers use this to fetch ancestries for each
-/// link source; containerward callers can ignore it.
+/// link repo; containerward callers can ignore it.
 fn build_and_integrate_backpaths (
   tree        : &mut Tree<ViewNode>,
   node_id     : NodeId,
@@ -128,7 +128,7 @@ fn build_and_integrate_backpaths (
   input_role  : &str,
   output_role : &str,
   birth       : Birth,
-  active      : Option<&ActiveSourceSet>,
+  active      : Option<&ActiveRepoSet>,
 ) -> Result < Vec<ID>, Box<dyn Error> > {
   let terminus_pid : ID =
     get_id_from_treenode ( tree, node_id ) ?;
@@ -150,10 +150,10 @@ fn integrate_backpaths (
   paths   : Vec<PathToFirstNonlinearity>,
   birth   : Birth,
   config  : &SkgConfig,
-  active  : Option<&ActiveSourceSet>,
+  active  : Option<&ActiveRepoSet>,
 ) -> Result < (), Box<dyn Error> > {
   for p in paths {
-    integrate_path_that_might_fork_or_cycle_with_source_set (
+    integrate_path_that_might_fork_or_cycle_with_repo_set (
       tree, node_id,
       p.path, p.branches, p.cycle_nodes,
       graph, config, birth, active
@@ -172,12 +172,12 @@ pub fn integrate_path_that_might_fork_or_cycle (
   config      : &SkgConfig,
   birth       : Birth,
 ) -> Result < (), Box<dyn Error> > {
-  integrate_path_that_might_fork_or_cycle_with_source_set (
+  integrate_path_that_might_fork_or_cycle_with_repo_set (
     tree, node_id, path, branches, cycle_nodes,
     graph, config, birth, None )
 }
 
-pub fn integrate_path_that_might_fork_or_cycle_with_source_set (
+pub fn integrate_path_that_might_fork_or_cycle_with_repo_set (
   tree        : &mut Tree<ViewNode>,
   node_id     : NodeId,
   path        : Vec < ID >,
@@ -186,7 +186,7 @@ pub fn integrate_path_that_might_fork_or_cycle_with_source_set (
   graph       : &InRustGraph,
   config      : &SkgConfig,
   birth       : Birth,
-  active      : Option<&ActiveSourceSet>,
+  active      : Option<&ActiveRepoSet>,
 ) -> Result < (), Box<dyn Error> > {
   let last_node_id : NodeId =
     integrate_linear_portion_of_path (
@@ -213,7 +213,7 @@ fn integrate_linear_portion_of_path (
   graph   : &InRustGraph,
   config  : &SkgConfig,
   birth   : Birth,
-  active  : Option<&ActiveSourceSet>,
+  active  : Option<&ActiveRepoSet>,
 ) -> Result<NodeId, Box<dyn Error>> {
     if path . is_empty () {
       return Ok (node_id); }
@@ -224,7 +224,7 @@ fn integrate_linear_portion_of_path (
         Some (child_treeid) => child_treeid,
         None => {
           match
-            prepend_writeProtected_indep_child_with_source_set (
+            prepend_writeProtected_indep_child_with_repo_set (
                     tree, node_id, path_head, graph, config, birth
                     , active ) ?
           {
@@ -250,7 +250,7 @@ fn integrate_branches_in_node (
   graph    : &InRustGraph,
   config   : &SkgConfig,
   birth    : Birth,
-  active   : Option<&ActiveSourceSet>,
+  active   : Option<&ActiveRepoSet>,
 ) -> Result < (), Box<dyn Error> > {
   let found_children : HashMap < ID, NodeId > =
     find_children_by_ids ( tree, node_id, &branches );
@@ -262,7 +262,7 @@ fn integrate_branches_in_node (
   { // Simplifies testing. Not necessary in production.
     branches_to_add . sort (); }
   for branch_id in branches_to_add {
-    prepend_writeProtected_indep_child_with_source_set (
+    prepend_writeProtected_indep_child_with_repo_set (
       tree, node_id, &branch_id, graph, config, birth
       , active ) ?; }
   Ok (( )) }
@@ -276,7 +276,7 @@ fn integrate_cycle_nodes (
   graph       : &InRustGraph,
   config      : &SkgConfig,
   birth       : Birth,
-  active      : Option<&ActiveSourceSet>,
+  active      : Option<&ActiveRepoSet>,
 ) -> Result < (), Box<dyn Error> > {
   let found_children : HashMap < ID, NodeId > =
     find_children_by_ids ( tree, node_id, &cycle_nodes );
@@ -287,7 +287,7 @@ fn integrate_cycle_nodes (
     . collect ();
   { to_add . sort (); }
   for cycle_id in to_add {
-    prepend_writeProtected_indep_child_with_source_set (
+    prepend_writeProtected_indep_child_with_repo_set (
       tree, node_id, &cycle_id, graph, config, birth
       , active ) ?; }
   Ok (( )) }
@@ -321,7 +321,7 @@ fn attach_containerward_ancestries_for_birth_role (
   role    : RelationRole,
   graph   : &InRustGraph,
   config  : &SkgConfig,
-  active  : Option<&ActiveSourceSet>,
+  active  : Option<&ActiveRepoSet>,
 ) -> Result<(), Box<dyn Error>> {
   // Collect the role's grafted partner nodes before mutating the tree.
   let role_nodeids : Vec<NodeId> = {
@@ -333,7 +333,7 @@ fn attach_containerward_ancestries_for_birth_role (
         { if t . birth == Birth::Backpath (role) {
             result . push ( node_ref . id () ); }} }}
     result };
-  attach_containerward_ancestries_at_nodeids_with_source_set (
+  attach_containerward_ancestries_at_nodeids_with_repo_set (
     tree, &role_nodeids, graph, config, active ) }
 
 /// For each NodeId, look up its ActiveNode pid in the tree, fetch
@@ -349,16 +349,16 @@ pub fn attach_containerward_ancestries_at_nodeids (
   graph   : &InRustGraph,
   config  : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  attach_containerward_ancestries_at_nodeids_with_source_set (
+  attach_containerward_ancestries_at_nodeids_with_repo_set (
     tree, nodeids, graph, config, None )
 }
 
-pub fn attach_containerward_ancestries_at_nodeids_with_source_set (
+pub fn attach_containerward_ancestries_at_nodeids_with_repo_set (
   tree    : &mut Tree<ViewNode>,
   nodeids : &[NodeId],
   graph   : &InRustGraph,
   config  : &SkgConfig,
-  active  : Option<&ActiveSourceSet>,
+  active  : Option<&ActiveRepoSet>,
 ) -> Result<(), Box<dyn Error>> {
   let pairs : Vec<(NodeId, ID)> =
     nodeids . iter ()
@@ -388,7 +388,7 @@ fn attach_containerward_ancestries_from_map (
   ancestry_map : &HashMap<ID, AncestryTree>,
   graph        : &InRustGraph,
   config       : &SkgConfig,
-  active       : Option<&ActiveSourceSet>,
+  active       : Option<&ActiveRepoSet>,
 ) -> Result<(), Box<dyn Error>> {
   for ( treeid, pid ) in pairs {
     let ancestry : &AncestryTree = match ancestry_map . get (pid) {
@@ -411,10 +411,10 @@ pub fn insert_containerward_ancestry_tree_recursive (
   tree       : &mut Tree<ViewNode>,
   graph      : &InRustGraph,
   config     : &SkgConfig,
-  active     : Option<&ActiveSourceSet>,
+  active     : Option<&ActiveRepoSet>,
 ) -> Result<(), Box<dyn Error>> {
     let child_nid : NodeId = match
-      prepend_writeProtected_indep_child_with_source_set (
+      prepend_writeProtected_indep_child_with_repo_set (
         tree, parent_nid, node . id (),
         graph, config, Birth::Backpath (RelationRole::CONTAINER), active
       ) ?
@@ -451,45 +451,45 @@ pub fn prepend_writeProtected_indep_child (
     . prepend (viewnode) . id ();
   Ok (new_child_treeid) }
 
-pub fn prepend_writeProtected_indep_child_with_source_set (
+pub fn prepend_writeProtected_indep_child_with_repo_set (
   tree          : &mut Tree<ViewNode>,
   parent_treeid : NodeId,
   child_skgid   : &ID,
   graph         : &InRustGraph,
   config        : &SkgConfig,
   birth         : Birth,
-  active        : Option<&ActiveSourceSet>,
+  active        : Option<&ActiveRepoSet>,
 ) -> Result < Option<NodeId>, Box<dyn Error> > {
   if let Some (active) = active {
     if ! active . is_all () {
-      if let Some (source) = graph . pid_and_source (child_skgid)
-        . map (|(_, source)| source)
+      if let Some (repo) = graph . pid_and_repo (child_skgid)
+        . map (|(_, repo)| repo)
         . or_else (|| crate::types::phantom::home_from_disk (child_skgid, config))
-      { if ! active . contains_source (&source)
+      { if ! active . contains_repo (&repo)
         { return Ok (None); }} }
-    // relSource gating (render-and-gating, 5_plan.org): the partner
-    // NODE's source (above) is not enough -- the EDGE grafting it
-    // here can be recorded in a more private source than either
+    // relRepo gating (render-and-gating, 5_plan.org): the partner
+    // NODE's repo (above) is not enough -- the EDGE grafting it
+    // here can be recorded in a more private repo than either
     // endpoint's home (a private reading-list membership between two
     // public nodes). 'birth' names the role the partner plays toward
     // whatever sits at 'parent_treeid' (the origin, for the first
     // hop; a previously-grafted partner, for a later hop or an
     // ancestry step), so the edge and its owner are derivable.
-    // The captured graph is the authoritative home of edge relSources.
+    // The captured graph is the authoritative home of edge relRepos.
     if let Birth::Backpath (role) = birth {
       if let Ok (parent_pid) = get_id_from_treenode (tree, parent_treeid) {
-          let source_active : bool =
-            backpath_relSource (graph, &parent_pid, child_skgid, role)
-            . map ( |source| active . contains_source (&source) )
+          let repo_active : bool =
+            backpath_relRepo (graph, &parent_pid, child_skgid, role)
+            . map ( |repo| active . contains_repo (&repo) )
             . unwrap_or (false);
-          if ! source_active { return Ok (None); }}}}
+          if ! repo_active { return Ok (None); }}}}
   let new_child_treeid : NodeId =
     prepend_writeProtected_indep_child (
       tree, parent_treeid, child_skgid, graph, config, birth )
  ?;
   Ok (Some (new_child_treeid)) }
 
-/// The relSource of the edge grafting 'partner' at backpath role 'role'
+/// The relRepo of the edge grafting 'partner' at backpath role 'role'
 /// toward 'origin' (the node the partner is being attached under).
 /// 'role' names the role the PARTNER plays (per RelationRole's doc:
 /// "output_role is THIS (partner) role") -- the inverse of
@@ -498,14 +498,14 @@ pub fn prepend_writeProtected_indep_child_with_source_set (
 /// FIRST position (e.g. CONTAINER), the partner owns the edge (an
 /// inbound partner of origin, in the "someone else's outbound list
 /// names me" sense); otherwise origin owns it.
-fn backpath_relSource (
+fn backpath_relRepo (
   graph   : &InRustGraph,
   origin  : &ID,
   partner : &ID,
   role    : RelationRole,
-) -> Option<SourceName> {
+) -> Option<RepoName> {
   if role . is_first_role () {
-    graph . relSource ( partner, role . relation, origin )
+    graph . relRepo ( partner, role . relation, origin )
   } else {
-    graph . relSource ( origin, role . relation, partner )
+    graph . relRepo ( origin, role . relation, partner )
   } }

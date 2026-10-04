@@ -3,8 +3,8 @@
 //! so `super::*` reaches the module's private items.
 
 use super::*;
-use crate::source_sets::{ActiveSourceSet, SourceSetName};
-use crate::types::misc::{ID, SourceName, rel_partners_at_relSource};
+use crate::repo_sets::{ActiveRepoSet, RepoSetName};
+use crate::types::misc::{ID, RepoName, rel_partners_at_relRepo};
 use crate::types::nodes::complete::empty_node_complete;
 
 use std::collections::BTreeSet;
@@ -22,15 +22,15 @@ fn node (
   n . pid      = ID::from (pid);
   n . title    = title . to_string ();
   n . body     = body . map ( |s| s . to_string () );
-  n . source   = SourceName::from ("main");
-  n . contains = rel_partners_at_relSource (
-    & n . source,
+  n . home_repo   = RepoName::from ("main");
+  n . contains = rel_partners_at_relRepo (
+    & n . home_repo,
     contains . iter () . map ( |c| ID::from (*c) ) . collect () );
   n }
 
-fn active_all () -> ActiveSourceSet {
-  ActiveSourceSet { name    : SourceSetName::from ("all"),
-                    sources : BTreeSet::new () } }
+fn active_all () -> ActiveRepoSet {
+  ActiveRepoSet { name    : RepoSetName::from ("all"),
+                    repos : BTreeSet::new () } }
 
 //
 // relpath
@@ -301,21 +301,21 @@ fn marker_child_is_excluded_from_content () {
 }
 
 //
-// relSource gating (visible fold)
+// relRepo gating (visible fold)
 //
 
 #[test]
-fn private_source_edge_is_omitted_from_restricted_export () {
+fn private_repo_edge_is_omitted_from_restricted_export () {
   // Root and both children live in "main", but the edge to "priv"
-  // is RECORDED in source "private". A main-only export renders the
+  // is RECORDED in repo "private". A main-only export renders the
   // visible fold: "pub" appears, "priv" does not -- even though
   // priv's home is active.
   let mut root : NodeComplete =
     node ("r", "Root", None, &["ma"]);
-  root . contains . push ( RelPartner::at_relSource (
-    SourceName::from ("main"), ID::from ("pub") ));
-  root . contains . push ( RelPartner::at_relSource (
-    SourceName::from ("private"), ID::from ("priv") ));
+  root . contains . push ( RelPartner::at_relRepo (
+    RepoName::from ("main"), ID::from ("pub") ));
+  root . contains . push ( RelPartner::at_relRepo (
+    RepoName::from ("private"), ID::from ("priv") ));
   let nodes : Vec<NodeComplete> = vec! [
     root,
     node ("ma", &format! ("[[id:{}][how]]", MAGIC),
@@ -323,9 +323,9 @@ fn private_source_edge_is_omitted_from_restricted_export () {
     node ("pub",  "Public child",  None, &[]),
     node ("priv", "Private child", None, &[]),
   ];
-  let main_only : ActiveSourceSet = ActiveSourceSet {
-    name    : SourceSetName::from ("main"),
-    sources : [ SourceName::from ("main") ]
+  let main_only : ActiveRepoSet = ActiveRepoSet {
+    name    : RepoSetName::from ("main"),
+    repos : [ RepoName::from ("main") ]
       . into_iter () . collect () };
   let dir : tempfile::TempDir = tempfile::tempdir () . unwrap ();
   export_to_org (&main_only, &nodes, dir . path ()) . unwrap ();

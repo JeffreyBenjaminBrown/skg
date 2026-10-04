@@ -1,28 +1,28 @@
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, RepoName};
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
 
 use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
 use std::error::Error;
 
-/// ERRORS if the ancestor is not found or cannot provide both PID and source.
-pub fn pid_and_source_from_ancestor (
+/// ERRORS if the ancestor is not found or cannot provide both PID and repo.
+pub fn pid_and_repo_from_ancestor (
   tree       : &Tree<ViewNode>,
   node       : NodeId,
   generation : usize,
   caller     : &str,
-) -> Result<(ID, SourceName), Box<dyn Error>> {
+) -> Result<(ID, RepoName), Box<dyn Error>> {
   read_at_ancestor_in_tree(
     tree, node, generation,
     |vn : &ViewNode| match &vn . kind {
       ViewNodeKind::Vognode (v) =>
-        v . pid_and_source ()
-        . map ( |(pid, source)| (pid . clone (), source . clone ()) )
+        v . pid_and_repo ()
+        . map ( |(pid, repo)| (pid . clone (), repo . clone ()) )
         . ok_or_else (|| format!(
           "{}: ancestor {} has no source",
           caller, generation )),
       ViewNodeKind::Phantom (p) =>
-        p . pid_and_source ()
-        . map ( |(pid, source)| (pid . clone (), source . clone ()) )
+        p . pid_and_repo ()
+        . map ( |(pid, repo)| (pid . clone (), repo . clone ()) )
         . ok_or_else (|| format!(
           "{}: ancestor {} has no source",
           caller, generation )),

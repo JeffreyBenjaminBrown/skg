@@ -8,7 +8,7 @@ use skg::from_text::local_instruction_collection::predicates::{
   active_child_counts_as_visible_content,
   member_counts_for_partnerFolder };
 use skg::types::git::Sign;
-use skg::types::misc::{ID, SourceName};
+use skg::types::misc::{ID, RepoName};
 use skg::types::viewnode::{
   default_activeNode, NodeEditRequest, Editability, AffectsParent,
   ActiveNode };
@@ -17,7 +17,7 @@ fn base_activeNode (
 ) -> ActiveNode {
   default_activeNode (
     ID::from ("n"),
-    SourceName::from ("main"),
+    RepoName::from ("main"),
     "n" . to_string() ) }
 
 fn with_edit_request (

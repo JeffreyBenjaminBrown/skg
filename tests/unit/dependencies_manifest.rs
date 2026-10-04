@@ -1,10 +1,10 @@
 //! DEPENDENCIES.toml: publisher generation (byte-stable, owned
-//! sources only, prefix-in-order) and receiver order warnings
+//! repos only, prefix-in-order) and receiver order warnings
 //! (matched by repo name, contradiction detected, no false alarm
 //! on agreement).
 
 use super::{foreign_manifest_order_warnings, write_dependencies_manifests};
-use crate::types::misc::{SkgConfig, SkgfileSource, SourceName};
+use crate::types::misc::{SkgConfig, SkgfileRepo, RepoName};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -13,29 +13,29 @@ fn config_at (
   data_root : &std::path::Path,
   entries   : &[(&str, &str, bool)], // (name, relative path, owned)
 ) -> SkgConfig {
-  let mut sources : HashMap<SourceName, SkgfileSource> =
+  let mut repos : HashMap<RepoName, SkgfileRepo> =
     HashMap::new ();
   for (name, rel, owned) in entries {
     let path : PathBuf = data_root . join (rel);
     std::fs::create_dir_all (&path) . unwrap ();
-    sources . insert (
-      SourceName::from (*name),
-      SkgfileSource {
-        name         : SourceName::from (*name),
+    repos . insert (
+      RepoName::from (*name),
+      SkgfileRepo {
+        name         : RepoName::from (*name),
         abbreviation : None,
         path,
         user_owns_it : *owned, } ); }
   let mut config : SkgConfig =
-    SkgConfig::dummyFromSources (sources);
+    SkgConfig::dummyFromRepos (repos);
   config . data_root = data_root . to_path_buf ();
-  config . source_order =
+  config . repo_order =
     entries . iter ()
-    . map ( |(name, _, _)| SourceName::from (*name) )
+    . map ( |(name, _, _)| RepoName::from (*name) )
     . collect ();
   config }
 
 #[test]
-fn manifests_list_prefixes_for_owned_sources_only (
+fn manifests_list_prefixes_for_owned_repos_only (
 ) {
   let tmp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
   let config : SkgConfig = config_at (
@@ -43,7 +43,7 @@ fn manifests_list_prefixes_for_owned_sources_only (
     & [ ("public",  "owned/public",  true),
         ("eggs",    "eggman/eggs",   false),
         ("private", "owned/private", true) ] );
-  let written : Vec<SourceName> =
+  let written : Vec<RepoName> =
     write_dependencies_manifests (&config) . unwrap ();
   assert_eq! ( written . len (), 2, "owned sources only" );
   let private_manifest : String =
@@ -82,11 +82,11 @@ fn dependency_pair_records_origin_remote_without_naming_it (
   let config : SkgConfig = config_at (
     tmp . path (),
     & [ ("public", "owned/public", true) ] );
-  { // Make the owned source its own git repo with an `origin`.
-    let repo : git2::Repository =
+  { // Make the owned Skg repo its own git repo with an `origin`.
+    let gitrepo : git2::Repository =
       git2::Repository::init (
         tmp . path () . join ("owned/public") ) . unwrap ();
-    repo . remote (
+    gitrepo . remote (
       "origin",
       "git@github.com:me/public-notes.git" ) . unwrap (); }
   write_dependencies_manifests (&config) . unwrap ();
@@ -113,10 +113,10 @@ fn dependency_pair_names_a_non_origin_remote (
     tmp . path (),
     & [ ("public", "owned/public", true) ] );
   { // A repo whose only remote is not called `origin`.
-    let repo : git2::Repository =
+    let gitrepo : git2::Repository =
       git2::Repository::init (
         tmp . path () . join ("owned/public") ) . unwrap ();
-    repo . remote (
+    gitrepo . remote (
       "upstream",
       "https://example.com/notes.git" ) . unwrap (); }
   write_dependencies_manifests (&config) . unwrap ();
@@ -132,7 +132,7 @@ fn dependency_pair_names_a_non_origin_remote (
 }
 
 #[test]
-fn dependency_pair_omits_git_remote_when_source_is_not_a_git_repo (
+fn dependency_pair_omits_git_remote_when_repo_is_not_a_gitrepo (
 ) {
   let tmp : tempfile::TempDir = tempfile::tempdir () . unwrap ();
   let config : SkgConfig = config_at (

@@ -549,7 +549,7 @@ fn headline_inside_a_block_refuses_the_import_and_wipes_nothing () {
   std::fs::write (&existing, "existing") . unwrap();
   let error : String = skg::import_org_roam::import_org_roam_directory (
     input . path(), output . path(),
-    &skg::types::misc::SourceName::from ("main") )
+    &skg::types::misc::RepoName::from ("main") )
     . err() . unwrap() . to_string();
   assert! (error . starts_with ("Nothing was imported."), "{}", error);
   assert! (error . contains ("bad.org:6: \"* inside\""), "{}", error);

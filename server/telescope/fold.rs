@@ -1,9 +1,9 @@
-//! The FOLD: sections (per-source slices, most public first) -> the
+//! The FOLD: sections (per-repo slices, most public first) -> the
 //! node's effective lists of relation partners. Total and deterministic: junk
 //! degrades to 'FoldWarning's, never errors (see types.rs).
 //!
-//! Semantics, per ordered relation: the fold THROUGH source k is
-//! exactly what a source-k viewer sees. The most public section
+//! Semantics, per ordered relation: the fold THROUGH repo k is
+//! exactly what a repo-k viewer sees. The most public section
 //! mentioning the relation contributes the base list; each more
 //! private section's prepend lands at the front, and each of its
 //! runs lands immediately after its anchor -- an anchor being any
@@ -14,11 +14,11 @@
 //! prepend if it is first (Jeff's fallback, 4_discussion.org).
 //!
 //! Unordered relations (hides, overrides) and aliases: union in
-//! source order; a member repeated across sources keeps its most
+//! repo order; a member repeated across repos keeps its most
 //! public occurrence, with a warning.
 
 use crate::telescope::types::{FoldWarning, ListItem, SectionSlices, Telescope};
-use crate::types::misc::{ID, MSV, RelPartner, SourceName};
+use crate::types::misc::{ID, MSV, RelPartner, RepoName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 use std::collections::HashMap;
@@ -29,10 +29,10 @@ use std::io;
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FoldedNode {
   pub title                        : Option<String>,
-  pub title_source                 : Option<SourceName>,
+  pub title_repo                 : Option<RepoName>,
   pub body                         : Option<String>,
-  pub body_source                  : Option<SourceName>,
-  pub home                         : Option<SourceName>,
+  pub body_repo                  : Option<RepoName>,
+  pub home                         : Option<RepoName>,
   // None = NO section mentioned the field (lowers to
   // MSV::Unspecified); contains has no such distinction, like
   // NodeComplete's.
@@ -95,11 +95,11 @@ pub fn nodecomplete_from_fold (
   misc      : Vec<FileProperty>,
   folded    : FoldedNode,
 ) -> Option<NodeComplete> {
-  let home : SourceName = folded . home ?;
+  let home : RepoName = folded . home ?;
   let overPrivateText_telescope : bool =
-    folded . title_source . as_ref () != Some (&home)
-    || folded . body_source . as_ref ()
-       .map ( |source| source != &home )
+    folded . title_repo . as_ref () != Some (&home)
+    || folded . body_repo . as_ref ()
+       .map ( |repo| repo != &home )
        .unwrap_or (false);
   let msv = |o : Option<Vec<RelPartner<ID>>>|
   -> MSV<RelPartner<ID>> {
@@ -112,7 +112,7 @@ pub fn nodecomplete_from_fold (
     aliases                      : match folded . aliases {
       None     => MSV::Unspecified,
       Some (v) => MSV::Specified (v), },
-    source                       : home,
+    home_repo                       : home,
     pid,
     extra_ids,
     body                         : folded . body,
@@ -124,11 +124,11 @@ pub fn nodecomplete_from_fold (
     misc, } ) }
 
 /// Fold SECTIONS (already sorted most public first -- the caller
-/// orders them via 'SkgConfig::ordered_sources') into effective
+/// orders them via 'SkgConfig::ordered_repos') into effective
 /// lists. 'resolve' maps any ID to its primary ID ('pid_of');
 /// anchors and members are compared through it.
 pub fn fold_sections (
-  sections : &[(SourceName, SectionSlices)],
+  sections : &[(RepoName, SectionSlices)],
   resolve  : &dyn Fn (&ID) -> ID,
 ) -> (FoldedNode, Vec<FoldWarning>) {
   let mut warnings : Vec<FoldWarning> = Vec::new ();
@@ -137,35 +137,35 @@ pub fn fold_sections (
     // in privacy order win. The home remains the first section,
     // whether or not it carries either scalar.
     folded . home = sections . first ()
-      . map ( |(source, _)| source . clone () );
-    for (source, section) in sections {
+      . map ( |(repo, _)| repo . clone () );
+    for (repo, section) in sections {
       if let Some (title) = &section . title {
-        match &folded . title_source {
+        match &folded . title_repo {
           None => {
             folded . title = Some (title . clone ());
-            folded . title_source = Some (source . clone ());
-            if folded . home . as_ref () != Some (source) {
+            folded . title_repo = Some (repo . clone ());
+            if folded . home . as_ref () != Some (repo) {
               warnings . push ( FoldWarning::TitleBelowHome {
                 home : folded . home . clone ()
                   . expect ("a section establishes the home"),
-                title_at : source . clone (), } ); }}
+                title_at : repo . clone (), } ); }}
           Some (selected_at) =>
             warnings . push ( FoldWarning::NonHomeTitle {
-              source      : source . clone (),
+              repo      : repo . clone (),
               selected_at : selected_at . clone (), } ), }}
       if let Some (body) = &section . body {
-        match &folded . body_source {
+        match &folded . body_repo {
           None => {
             folded . body = Some (body . clone ());
-            folded . body_source = Some (source . clone ());
-            if folded . home . as_ref () != Some (source) {
+            folded . body_repo = Some (repo . clone ());
+            if folded . home . as_ref () != Some (repo) {
               warnings . push ( FoldWarning::BodyBelowHome {
                 home : folded . home . clone ()
                   . expect ("a section establishes the home"),
-                body_at : source . clone (), } ); }}
+                body_at : repo . clone (), } ); }}
           Some (selected_at) =>
             warnings . push ( FoldWarning::NonHomeBody {
-              source      : source . clone (),
+              repo      : repo . clone (),
               selected_at : selected_at . clone (), } ), }} }
     if folded . title . is_none () {
       warnings . push ( FoldWarning::MissingTitle ); }}
@@ -200,12 +200,12 @@ pub fn fold_sections (
       let mut seen : std::collections::HashSet<String> =
         std::collections::HashSet::new ();
       let mut out : Vec<RelPartner<String>> = Vec::new ();
-      for (source, s) in sections {
+      for (repo, s) in sections {
         if let Some (aliases) = &s . aliases {
           for a in aliases {
             if seen . insert ( a . clone () ) {
-              out . push ( RelPartner::at_relSource (
-                source . clone (), a . clone () )); }
+              out . push ( RelPartner::at_relRepo (
+                repo . clone (), a . clone () )); }
             else {
               // No per-alias id to report; reuse DuplicateMember with
               // a synthetic ID carrying the alias text.
@@ -217,14 +217,14 @@ pub fn fold_sections (
 /// One ordered relation's fold. 'slice_of' projects a section's
 /// stored item sequence for this relation (None = no opinion).
 fn fold_ordered (
-  sections : &[(SourceName, SectionSlices)],
+  sections : &[(RepoName, SectionSlices)],
   slice_of : impl Fn (&SectionSlices) -> Option<&[ListItem]>,
   resolve  : &dyn Fn (&ID) -> ID,
   warnings : &mut Vec<FoldWarning>,
 ) -> Vec<RelPartner<ID>> {
   let mut effective : Vec<RelPartner<ID>> = Vec::new ();
   let mut any_section_yet : bool = false;
-  for (source, s) in sections {
+  for (repo, s) in sections {
     let Some (items) = slice_of (s) else { continue; };
     let is_base : bool = ! any_section_yet;
     any_section_yet = true;
@@ -284,23 +284,23 @@ fn fold_ordered (
                            + prepend . len () );
     for id in prepend {
       if keep (&id, warnings) {
-        next . push ( RelPartner::at_relSource (
-          source . clone (), id )); }}
+        next . push ( RelPartner::at_relRepo (
+          repo . clone (), id )); }}
     for m in effective {
       let key : ID = resolve ( &m . member );
       next . push (m);
       if let Some (queue) = queues . remove (&key) {
         for id in queue {
           if keep (&id, warnings) {
-            next . push ( RelPartner::at_relSource (
-              source . clone (), id )); }} }}
+            next . push ( RelPartner::at_relRepo (
+              repo . clone (), id )); }} }}
     effective = next; }
   effective }
 
-/// One unordered relation's fold: union in source order, most public
+/// One unordered relation's fold: union in repo order, most public
 /// occurrence winning.
 fn fold_unordered (
-  sections : &[(SourceName, SectionSlices)],
+  sections : &[(RepoName, SectionSlices)],
   slice_of : impl Fn (&SectionSlices) -> Option<&[ID]>,
   resolve  : &dyn Fn (&ID) -> ID,
   warnings : &mut Vec<FoldWarning>,
@@ -308,12 +308,12 @@ fn fold_unordered (
   let mut seen : std::collections::HashSet<ID> =
     std::collections::HashSet::new ();
   let mut out : Vec<RelPartner<ID>> = Vec::new ();
-  for (source, s) in sections {
+  for (repo, s) in sections {
     let Some (members) = slice_of (s) else { continue; };
     for id in members {
       if seen . insert ( resolve (id) ) {
-        out . push ( RelPartner::at_relSource (
-          source . clone (), id . clone () ));
+        out . push ( RelPartner::at_relRepo (
+          repo . clone (), id . clone () ));
       } else {
         warnings . push ( FoldWarning::DuplicateMember {
           member : id . clone () } ); }}}

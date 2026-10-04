@@ -53,7 +53,7 @@ pub(crate) struct GraphChangeSet {
   pub(crate) canonicalization_changes : Vec<CanonicalizationChange>,
   pub(crate) identity_acquisitions    : Vec<IdentityAcquisition>,
   pub(crate) owners_to_reindex        : HashSet<ID>,
-  pub(crate) override_sources_to_check : HashSet<ID>,
+  pub(crate) override_repos_to_check : HashSet<ID>,
   pub(crate) override_targets_to_check : HashSet<ID>,
   pub(crate) telescope_owners_to_check : HashSet<ID>,
   #[cfg(test)]
@@ -229,7 +229,7 @@ pub(crate) fn prepare_graph_update (
       tracing::info_span! ("derive_affected_override_scope") . entered ();
     derive_affected_override_scope (
       &base, &candidate, &changes . touched_pids, &changes . affected_ids) };
-  changes . override_sources_to_check = override_scope . sources . clone ();
+  changes . override_repos_to_check = override_scope . repos . clone ();
   changes . override_targets_to_check = override_scope . targets . clone ();
   changes . telescope_owners_to_check = derive_affected_telescope_owners (
     &base, &candidate, &changes . saved_pids, &changes . affected_ids);
@@ -254,7 +254,7 @@ pub(crate) fn prepare_graph_update (
     batch . final_graph_definitions . len (),
     changes . affected_ids . len (),
     changes . owners_to_reindex . len (),
-    changes . override_sources_to_check . len (),
+    changes . override_repos_to_check . len (),
     changes . override_targets_to_check . len (),
     affected_override_validation . chain_steps,
     local_index_validation . node_checks
@@ -352,8 +352,8 @@ fn user_owned_overriders_at (
   let mut result : Vec<ID> = graph . overriders_of . get (target)
     . into_iter () . flatten ()
     . filter (|pid| graph . nodes . get (*pid) . is_some_and (|node|
-      config . sources . get (&node . source)
-        . is_some_and (|source| source . user_owns_it)))
+      config . repos . get (&node . home_repo)
+        . is_some_and (|repo| repo . user_owns_it)))
     . cloned () . collect ();
   result . sort ();
   result
@@ -476,10 +476,10 @@ fn validate_identity_and_derive_changes (
       }); }}
   for definition in definitions {
     if let DefineNode::Save (SaveNode (node)) = definition {
-      if ! config . sources . contains_key (&node . source) {
+      if ! config . repos . contains_key (&node . home_repo) {
         errors . push (CompleteGraphError::UnconfiguredNodeHome {
           pid    : node . pid . clone (),
-          source : node . source . clone (),
+          repo : node . home_repo . clone (),
         }); }} }
   errors . sort_by_key ( |error| format! ("{:?}", error) );
 
@@ -542,7 +542,7 @@ fn validate_identity_and_derive_changes (
     canonicalization_changes,
     identity_acquisitions,
     owners_to_reindex,
-    override_sources_to_check : HashSet::new (),
+    override_repos_to_check : HashSet::new (),
     override_targets_to_check : HashSet::new (),
     telescope_owners_to_check : HashSet::new (),
     #[cfg(test)]

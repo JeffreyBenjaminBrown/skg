@@ -1,5 +1,5 @@
 use super::*;
-use crate::source_sets::SourceSetName;
+use crate::repo_sets::RepoSetName;
 use crate::types::git::NodeChanges;
 use crate::types::misc::MSV;
 use crate::types::nodes::complete::empty_node_complete;
@@ -7,7 +7,7 @@ use crate::types::nodes::fs::NodeFS;
 use std::collections::BTreeSet;
 
 fn id (s : &str) -> ID { ID ( s . to_string () ) }
-fn src (s : &str) -> SourceName { SourceName ( s . to_string () ) }
+fn src (s : &str) -> RepoName { RepoName ( s . to_string () ) }
 
 fn nodecomplete (
   pid       : &str,
@@ -54,9 +54,9 @@ fn added_entry (
     before_node : None,
     after_node : Some (after) } }
 
-fn empty_source_diff () -> SourceDiff {
-  SourceDiff {
-    is_git_repo   : true,
+fn empty_repo_diff () -> RepoDiff {
+  RepoDiff {
+    is_gitrepo   : true,
     staged        : HashMap::new (),
     unstaged      : HashMap::new (),
     added_nodes   : HashMap::new (),
@@ -65,7 +65,7 @@ fn empty_source_diff () -> SourceDiff {
 #[test]
 fn signs_come_from_modified_deleted_and_added_files_per_stage () {
   let owner : ID = id ("N");
-  let mut sd : SourceDiff = empty_source_diff ();
+  let mut sd : RepoDiff = empty_repo_diff ();
   // edge-r's Modified file removed its edge to N, STAGED.
   sd . staged . insert (
     PathBuf::from ("edge-r.skg"),
@@ -83,7 +83,7 @@ fn signs_come_from_modified_deleted_and_added_files_per_stage () {
   sd . unstaged . insert (
     PathBuf::from ("bystander.skg"),
     deleted_entry ( nodecomplete ("bystander", vec! []) ));
-  let diffs : Option<HashMap<SourceName, SourceDiff>> =
+  let diffs : Option<HashMap<RepoName, RepoDiff>> =
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
   let scan : HashMap<ID, MembershipAxes> =
     inverse_scan_for_inbound_folder (
@@ -101,12 +101,12 @@ fn signs_come_from_modified_deleted_and_added_files_per_stage () {
 
 #[test]
 fn owner_absent_from_every_diff_yields_nothing () {
-  let mut sd : SourceDiff = empty_source_diff ();
+  let mut sd : RepoDiff = empty_repo_diff ();
   sd . unstaged . insert (
     PathBuf::from ("other.skg"),
     modified_entry ( vec! [
       Diff_Item::Removed ( id ("SOMEONE-ELSE") ) ] ));
-  let diffs : Option<HashMap<SourceName, SourceDiff>> =
+  let diffs : Option<HashMap<RepoName, RepoDiff>> =
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
   let scan : HashMap<ID, MembershipAxes> =
     inverse_scan_for_inbound_folder (
@@ -120,7 +120,7 @@ fn each_relation_is_read_separately () {
   // override of N is untouched: the overriderFolder's scan must see
   // nothing, the subscriberFolder's scan the Minus.
   let owner : ID = id ("N");
-  let mut sd : SourceDiff = empty_source_diff ();
+  let mut sd : RepoDiff = empty_repo_diff ();
   sd . unstaged . insert (
     PathBuf::from ("m.skg"),
     NodeCompleteDiff {
@@ -131,7 +131,7 @@ fn each_relation_is_read_separately () {
         .. NodeChanges::default () } ),
       before_node : None,
       after_node : None } );
-  let diffs : Option<HashMap<SourceName, SourceDiff>> =
+  let diffs : Option<HashMap<RepoName, RepoDiff>> =
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
   assert! ( inverse_scan_for_inbound_folder (
       &owner, NodeRelation::OverridesViewOf, &diffs, None )
@@ -142,20 +142,20 @@ fn each_relation_is_read_separately () {
 }
 
 #[test]
-fn cross_source_move_yields_no_membership_change () {
-  // mover's file leaves source A and lands in source B within the
+fn cross_repo_move_yields_no_membership_change () {
+  // mover's file leaves Skg repo A and lands in Skg repo B within the
   // same stage, asserting the same edge to N before and after: the
   // Minus and Plus must cancel, leaving no membership sign at all.
   let owner : ID = id ("N");
-  let mut sd_a : SourceDiff = empty_source_diff ();
+  let mut sd_a : RepoDiff = empty_repo_diff ();
   sd_a . unstaged . insert (
     PathBuf::from ("mover.skg"),
     deleted_entry ( nodecomplete ("mover", vec! ["N"]) ));
-  let mut sd_b : SourceDiff = empty_source_diff ();
+  let mut sd_b : RepoDiff = empty_repo_diff ();
   sd_b . unstaged . insert (
     PathBuf::from ("mover.skg"),
     added_entry ( nodecomplete ("mover", vec! ["N"]) ));
-  let diffs : Option<HashMap<SourceName, SourceDiff>> =
+  let diffs : Option<HashMap<RepoName, RepoDiff>> =
     Some ( HashMap::from ([
       ( src ("a"), sd_a ),
       ( src ("b"), sd_b ) ]) );
@@ -167,9 +167,9 @@ fn cross_source_move_yields_no_membership_change () {
 }
 
 #[test]
-fn relSource_gates_deleted_stage_signs () {
+fn relRepo_gates_deleted_stage_signs () {
   // del-r's file was Deleted; its before_node's override of N was
-  // recorded in the PRIVATE source (a RelPartner whose source
+  // recorded in the PRIVATE Skg repo (a RelPartner whose Skg repo
   // differs from del-r's own -- public -- home). A public-only
   // active set must not see the resulting phantom sign; ungated
   // (None) still does.
@@ -177,18 +177,18 @@ fn relSource_gates_deleted_stage_signs () {
   let mut before : NodeComplete = empty_node_complete ();
   before . pid = id ("del-r");
   before . title = "del-r" . to_string ();
-  before . source = src ("public");
+  before . home_repo = src ("public");
   before . overrides_view_of = MSV::Specified ( vec! [
-    RelPartner::at_relSource ( src ("private"), owner . clone () ) ] );
-  let mut sd : SourceDiff = empty_source_diff ();
+    RelPartner::at_relRepo ( src ("private"), owner . clone () ) ] );
+  let mut sd : RepoDiff = empty_repo_diff ();
   sd . unstaged . insert (
     PathBuf::from ("del-r.skg"),
     deleted_entry ( before ) );
-  let diffs : Option<HashMap<SourceName, SourceDiff>> =
+  let diffs : Option<HashMap<RepoName, RepoDiff>> =
     Some ( HashMap::from ([ ( src ("public"), sd ) ]) );
-  let public_only : ActiveSourceSet = ActiveSourceSet {
-    name    : SourceSetName::from ("public"),
-    sources : BTreeSet::from ([ src ("public") ]) };
+  let public_only : ActiveRepoSet = ActiveRepoSet {
+    name    : RepoSetName::from ("public"),
+    repos : BTreeSet::from ([ src ("public") ]) };
   let gated : HashMap<ID, MembershipAxes> =
     inverse_scan_for_inbound_folder (
       &owner, NodeRelation::OverridesViewOf, &diffs,

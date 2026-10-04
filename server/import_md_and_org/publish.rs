@@ -33,17 +33,17 @@ pub(crate) fn prepare_import_publication (
   let config : &SkgConfig = &runtime . config;
   let mut claims : HashMap<ID, ID> = HashMap::new ();
   for node in nodes {
-    if ! config . user_owns_source (&node . source) {
+    if ! config . user_owns_repo (&node . home_repo) {
       return Err (format! ("Destination source {:?} is not owned",
-        node . source)); }
+        node . home_repo)); }
     for id in node . all_ids () {
       validate_safe_id (id)?;
       if let Some (owner) = claims . insert (id . clone (), node . pid . clone ()) {
         return Err (format! ("ID {} is claimed by both {} and {} in this import",
           id, owner, node . pid)); }
-      if let Some ((owner, source)) = runtime . graph . pid_and_source (id) {
+      if let Some ((owner, repo)) = runtime . graph . pid_and_repo (id) {
         return Err (format! ("ID {} already belongs to {} in source {}",
-          id, owner, source)); } } }
+          id, owner, repo)); } } }
   check_authoritative_disk_claims (&claims, config)?;
   let definitions : Vec<DefineNode> = nodes . iter () . cloned ()
     .map (|node| DefineNode::Save (SaveNode (node))) . collect ();
@@ -101,19 +101,19 @@ fn check_authoritative_disk_claims (
   claims : &HashMap<ID, ID>,
   config : &SkgConfig,
 ) -> Result<(), String> {
-  for source in config . ordered_sources () {
-    let sections = read_skg_sections_from_folder (&source, config)
-      .map_err (|error| format! ("Reading source {}: {}", source, error))?;
+  for repo in config . ordered_repos () {
+    let sections = read_skg_sections_from_folder (&repo, config)
+      .map_err (|error| format! ("Reading source {}: {}", repo, error))?;
     for (_, section) in sections {
       for id in std::iter::once (&section . pid)
         .chain (section . extra_ids . iter ()) {
         if let Some (new_owner) = claims . get (id) {
           return Err (format! (
             "ID {} for imported node {} is already claimed on disk by {} in source {}",
-            id, new_owner, section . pid, source)); } } }
+            id, new_owner, section . pid, repo)); } } }
     for pid in claims . values () {
-      let path : String = crate::util::path_from_pid_and_source (
-        config, &source, pid . clone ())?;
+      let path : String = crate::util::path_from_pid_and_repo (
+        config, &repo, pid . clone ())?;
       check_path_absent (Path::new (&path))?; } }
   Ok (())
 }

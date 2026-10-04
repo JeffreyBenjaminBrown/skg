@@ -12,14 +12,14 @@
 /// Phantoms are inserted wherever some stage's parent.contains had the
 /// child but the worktree's parent.contains lacks it.
 
-use crate::types::env::find_source_with_optional_tantivy;
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, SourceDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, added_membership_from_per_stage_diffs, existence_axes_in_source_diff, net_diff_from_per_stage, removed_membership_from_per_stage_diffs};
+use crate::types::env::find_repo_with_optional_tantivy;
+use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, RepoDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, added_membership_from_per_stage_diffs, existence_axes_in_repo_diff, net_diff_from_per_stage, removed_membership_from_per_stage_diffs};
 use crate::types::list::Diff_Item;
-use crate::types::misc::{ID, SkgConfig, SourceName, TantivyIndex};
+use crate::types::misc::{ID, SkgConfig, RepoName, TantivyIndex};
 use crate::types::phantom::title_for_phantom;
 use crate::types::viewnode::{ ViewNode, ViewNodeKind, mk_phantom_viewnode };
 use crate::types::viewnode::{Vognode, Phantom, QualFolder, Qual};
-use crate::types::tree::viewnode_nodecomplete::pid_and_source_from_treenode;
+use crate::types::tree::viewnode_nodecomplete::pid_and_repo_from_treenode;
 use crate::dbs::in_rust_graph::InRustGraph;
 
 use ego_tree::{NodeMut, NodeRef, NodeId};
@@ -34,22 +34,22 @@ use std::path::PathBuf;
 pub(crate) fn process_activeNode_diff (
   mut node_mut                   : NodeMut<ViewNode>,
   graph                          : &InRustGraph,
-  source_diffs                   : &HashMap<SourceName, SourceDiff>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  repo_diffs                   : &HashMap<RepoName, RepoDiff>,
+  deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
   tantivy_index                  : Option<&TantivyIndex>,
   config                         : &SkgConfig,
 ) -> Result<(), String> {
   let tree_node_id : NodeId =
     node_mut . id();
-  let (pid, source) : (ID, SourceName) =
-    pid_and_source_from_treenode (
+  let (pid, skgrepo) : (ID, RepoName) =
+    pid_and_repo_from_treenode (
       node_mut . tree(), tree_node_id, "process_activeNode_diff"
     ) . map_err ( |e| e . to_string() ) ?;
-  let source_diff : &SourceDiff =
-    match source_diffs . get (&source) {
+  let repo_diff : &RepoDiff =
+    match repo_diffs . get (&skgrepo) {
       Some (d) => d,
       None => return Ok (( )) };
-  if ! source_diff . is_git_repo {
+  if ! repo_diff . is_gitrepo {
     if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
       = node_mut . value() . kind
       { t . not_in_git = true; }
@@ -57,9 +57,9 @@ pub(crate) fn process_activeNode_diff (
   let file_path : PathBuf =
     PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
   let staged   : Option<&NodeCompleteDiff> =
-    source_diff . staged   . get (&file_path);
+    repo_diff . staged   . get (&file_path);
   let unstaged : Option<&NodeCompleteDiff> =
-    source_diff . unstaged . get (&file_path);
+    repo_diff . unstaged . get (&file_path);
   if staged . is_none () && unstaged . is_none ()
     { return Ok (( )); }
   // Stamp the node's existence axes from the per-stage file statuses.
@@ -166,7 +166,7 @@ pub(crate) fn process_activeNode_diff (
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
   insert_phantoms_for_missing_contains (
     &mut node_mut, graph, tree_node_id, &net_contains, &removed_membership_by_id,
-    source_diff, source_diffs,
+    repo_diff, repo_diffs,
     deleted_since_head_pid_src_map, tantivy_index, config ) ?;
   Ok (( )) }
 
@@ -249,8 +249,8 @@ fn mark_membership_on_existing_children (
       match &mut child . value() . kind {
         ViewNodeKind::Vognode (Vognode::Active (t)) =>
           Some ((t . id . clone (), &mut t . membership)),
-        // No Inactive arm: diff mode requires the "all" source set
-        // (diff_report.rs and source_sets.rs refuse otherwise), under
+        // No Inactive arm: diff mode requires the "all" Skg repo set
+        // (diff_report.rs and repo_sets.rs refuse otherwise), under
         // which no node is inactive, so inactive placeholders never
         // reach diff rendering.
         _ => None };
@@ -274,9 +274,9 @@ fn insert_phantoms_for_missing_contains (
   parent_node_id                 : NodeId,
   net_contains                   : &[Diff_Item<ID>],
   membership_by_id               : &HashMap<ID, MembershipAxes>,
-  source_diff                    : &SourceDiff,
-  source_diffs                   : &HashMap<SourceName, SourceDiff>,
-  deleted_since_head_pid_src_map : &HashMap<ID, SourceName>,
+  repo_diff                    : &RepoDiff,
+  repo_diffs                   : &HashMap<RepoName, RepoDiff>,
+  deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
   tantivy_index                  : Option<&TantivyIndex>,
   config                         : &SkgConfig,
 ) -> Result<(), String> {
@@ -296,32 +296,32 @@ fn insert_phantoms_for_missing_contains (
         ViewNodeKind::Phantom (Phantom::Diff (p))
           => { m . insert ( p . id . clone (), c . id () ); },
         // No Inactive arm: inactive placeholders never reach diff
-        // rendering (diff mode requires the "all" source set).
+        // rendering (diff mode requires the "all" Skg repo set).
         _ => {}, }}
     m };
   for (id, anchor) in plan {
     let membership : MembershipAxes =
       membership_by_id . get (&id) . copied () . unwrap_or_default ();
     // A removed-member diff-phantom is a *non-Active* viewnode. If its
-    // source can't be determined -- e.g. a contains pointer at HEAD to a
+    // Skg repo can't be determined -- e.g. a contains pointer at HEAD to a
     // node whose .skg file was deleted by an earlier commit and so exists
-    // in no source -- fall back to the NOT_FOUND sentinel rather than
+    // in no Skg repo -- fall back to the NOT_FOUND sentinel rather than
     // aborting the whole render (matching the PartnerFolder removed-member
     // path; TODO/DONE/local-view-update/plan_v2.org §7.6).
-    let child_source : SourceName =
-      find_source_with_optional_tantivy (
+    let child_repo : RepoName =
+      find_repo_with_optional_tantivy (
         graph, &id, deleted_since_head_pid_src_map,
         tantivy_index, config )
-        . unwrap_or_else ( SourceName::not_found );
+        . unwrap_or_else ( RepoName::not_found );
     let child_existence : ExistenceAxes =
-      existence_axes_for_phantom (&id, &child_source, source_diff, source_diffs);
+      existence_axes_for_phantom (&id, &child_repo, repo_diff, repo_diffs);
     let child_title : String =
       title_for_phantom (
-        graph, &id, &child_source,
-        Some (source_diffs), config );
+        graph, &id, &child_repo,
+        Some (repo_diffs), config );
     let phantom : ViewNode =
       mk_phantom_viewnode (
-        id . clone (), child_source, child_title,
+        id . clone (), child_repo, child_title,
         child_existence, membership );
     match anchor . and_then ( |a| child_node_by_id . get (&a) . copied () ) {
       Some (anchor_nid) =>
@@ -337,17 +337,17 @@ fn insert_phantoms_for_missing_contains (
 /// child's '.skg' file shows up as Deleted in either stage.
 fn existence_axes_for_phantom (
   id           : &ID,
-  source       : &SourceName,
-  source_diff  : &SourceDiff,
-  source_diffs : &HashMap<SourceName, SourceDiff>,
+  skgrepo       : &RepoName,
+  repo_diff  : &RepoDiff,
+  repo_diffs : &HashMap<RepoName, RepoDiff>,
 ) -> ExistenceAxes {
   let file_path : PathBuf =
     PathBuf::from ( format! ( "{}.skg", id . 0 ));
-  // Prefer the source_diff for the phantom's own source if available,
-  // otherwise fall back to the parent's source_diff.
-  let resolved : &SourceDiff =
-    source_diffs . get (source) . unwrap_or (source_diff);
-  existence_axes_in_source_diff ( Some (resolved), &file_path ) }
+  // Prefer the repo_diff for the phantom's own Skg repo if available,
+  // otherwise fall back to the parent's repo_diff.
+  let resolved : &RepoDiff =
+    repo_diffs . get (skgrepo) . unwrap_or (repo_diff);
+  existence_axes_in_repo_diff ( Some (resolved), &file_path ) }
 
 #[cfg(test)]
 #[path = "../../../tests/unit/render_diff.rs"]

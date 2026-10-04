@@ -1,5 +1,5 @@
 use crate::types::git::PathDiffStatus;
-use crate::types::misc::{ID, SkgConfig, SkgfileSource, SourceName};
+use crate::types::misc::{ID, SkgConfig, SkgfileRepo, RepoName};
 use crate::types::nodes::fs::NodeFS;
 use crate::types::nodes::complete::NodeComplete;
 
@@ -8,7 +8,7 @@ use std::error::Error as StdError;
 use std::path::{Path, PathBuf};
 use std::str::from_utf8;
 
-use super::misc::{diff_delta_to_entry, path_relative_to_repo};
+use super::misc::{diff_delta_to_entry, path_relative_to_gitrepo};
 
 
 /// Load a NodeComplete for a node whose worktree file is gone, preferring
@@ -17,31 +17,31 @@ use super::misc::{diff_delta_to_entry, path_relative_to_repo};
 /// Returns Err if neither location has the file.
 pub fn nodecomplete_from_index_or_head (
   pid    : &ID,
-  src    : &SourceName,
+  src    : &RepoName,
   config : &SkgConfig,
 ) -> Result<NodeComplete, Box<dyn StdError>> {
-  let source_config : &SkgfileSource =
-    config . sources . get (src)
+  let repo_config : &SkgfileRepo =
+    config . repos . get (src)
     . ok_or_else ( || format! ( "Source '{}' not found in config",
                                 src )) ?;
-  let source_path : &Path =
-    Path::new ( &source_config . path );
-  let repo : git2::Repository =
-    open_repo (source_path) . ok_or_else ( || format! (
-      "Could not open git repo at {:?}", source_path )) ?;
+  let repo_path : &Path =
+    Path::new ( &repo_config . path );
+  let gitrepo : git2::Repository =
+    open_gitrepo (repo_path) . ok_or_else ( || format! (
+      "Could not open git repo at {:?}", repo_path )) ?;
   let file_path : PathBuf =
     PathBuf::from ( format! ( "{}.skg", pid . 0 ));
   let rel_path : PathBuf =
-    path_relative_to_repo ( &repo, &source_path . join (&file_path) )
+    path_relative_to_gitrepo ( &gitrepo, &repo_path . join (&file_path) )
     . unwrap_or (file_path . clone ());
   // Index first.
-  if let Some (content) = get_file_content_at_index (&repo, &rel_path) ? {
+  if let Some (content) = get_file_content_at_index (&gitrepo, &rel_path) ? {
     let node_fs : NodeFS = serde_yaml::from_str (&content) . map_err (
       |e| format! ( "Failed to parse NodeComplete for {} from index: {}",
                     pid . 0, e )) ?;
     return Ok ( node_fs . into_complete_as_single_section ( src . clone ())); }
   // HEAD fallback.
-  let content : String = get_file_content_at_head (&repo, &rel_path) ?
+  let content : String = get_file_content_at_head (&gitrepo, &rel_path) ?
     . ok_or_else ( || format! (
       "File {:?} not found in index or HEAD", rel_path )) ?;
   let node_fs : NodeFS = serde_yaml::from_str (&content) . map_err (
@@ -52,15 +52,15 @@ pub fn nodecomplete_from_index_or_head (
 /// Get the list of staged changes: files whose contents in the index
 /// differ from HEAD.
 pub fn get_staged_changed_skg_files (
-  repo : &Repository
+  gitrepo : &Repository
 ) -> Result<Vec<PathDiffStatus>, Error> {
   let head_tree : git2::Tree =
-    repo . head() ? . peel_to_tree() ?;
+    gitrepo . head() ? . peel_to_tree() ?;
   let mut opts : DiffOptions =
     DiffOptions::new();
   opts . pathspec ("*.skg");
   let diff : Diff =
-    repo . diff_tree_to_index (
+    gitrepo . diff_tree_to_index (
       Some (&head_tree),
       None,
       Some (&mut opts)) ?;
@@ -69,14 +69,14 @@ pub fn get_staged_changed_skg_files (
 /// Get the list of unstaged changes: files whose worktree contents
 /// differ from the index. Includes untracked files.
 pub fn get_unstaged_changed_skg_files (
-  repo : &Repository
+  gitrepo : &Repository
 ) -> Result<Vec<PathDiffStatus>, Error> {
   let mut opts : DiffOptions =
     DiffOptions::new();
   opts . pathspec ("*.skg");
   opts . include_untracked (true);
   let diff : Diff =
-    repo . diff_index_to_workdir (
+    gitrepo . diff_index_to_workdir (
       None,
       Some (&mut opts)) ?;
   diff_to_entries (&diff) }
@@ -95,31 +95,31 @@ fn diff_to_entries (
 
 /// Open the repository containing the given path.
 /// Returns None if the path is not in a git repository.
-pub fn open_repo (
-  source_path : &Path
+pub fn open_gitrepo (
+  repo_path : &Path
 ) -> Option<Repository> {
-  Repository::discover (source_path) . ok () }
+  Repository::discover (repo_path) . ok () }
 
-/// The git remote a receiver would fetch this source from, as
+/// The git remote a receiver would fetch this Skg repo from, as
 /// `(remote_name, fetch_url)`: the remote named `origin` when one
 /// exists, else the first remote listed (whose name is reported
 /// alongside, precisely because it is not the conventional
 /// `origin`). The URL is the fetch URL -- the string `git remote -v`
 /// prints between the remote name and `(fetch)`.
 ///
-/// `None` when the source directory is not itself a git repository,
+/// `None` when the Skg repo directory is not itself a git repository,
 /// has no remotes, or the chosen remote carries no (utf-8) URL. The
 /// path is opened EXACTLY, without searching parent directories, so a
-/// bare source directory that merely sits inside some unrelated
+/// bare Skg repo directory that merely sits inside some unrelated
 /// enclosing repository is never mistaken for a repo of its own (and
-/// its enclosing repo's remote never misreported as the source's).
-pub fn source_git_remote (
-  source_path : &Path
+/// its enclosing repo's remote never misreported as the Skg repo's).
+pub fn repo_git_remote (
+  repo_path : &Path
 ) -> Option<(String, String)> {
-  let repo : Repository =
-    Repository::open (source_path) . ok () ?;
+  let gitrepo : Repository =
+    Repository::open (repo_path) . ok () ?;
   let remotes : git2::string_array::StringArray =
-    repo . remotes () . ok () ?;
+    gitrepo . remotes () . ok () ?;
   let names : Vec<&str> =
     remotes . iter () . flatten () . collect ();
   let chosen_name : &str =
@@ -128,7 +128,7 @@ pub fn source_git_remote (
     } else {
       names . first () . copied () ? };
   let remote : git2::Remote =
-    repo . find_remote (chosen_name) . ok () ?;
+    gitrepo . find_remote (chosen_name) . ok () ?;
   let url : String =
     remote . url () . map ( str::to_string ) ?;
   Some (( chosen_name . to_string (), url )) }
@@ -137,11 +137,11 @@ pub fn source_git_remote (
 /// Returns None if the file doesn't exist at HEAD.
 /// The path should be relative to the repository root.
 pub fn get_file_content_at_head (
-  repo     : &Repository,
+  gitrepo     : &Repository,
   rel_path : &Path
 ) -> Result<Option<String>, Error> {
   let head_commit : git2::Commit =
-    repo . head() ? . peel_to_commit() ?;
+    gitrepo . head() ? . peel_to_commit() ?;
   let tree : git2::Tree =
     head_commit . tree() ?;
   match tree . get_path (rel_path) { // Try to find the file in the tree
@@ -149,7 +149,7 @@ pub fn get_file_content_at_head (
       if entry . kind() != Some (ObjectType::Blob) {
         return Ok (None); }
       let blob : git2::Blob =
-        repo . find_blob ( entry . id() ) ?;
+        gitrepo . find_blob ( entry . id() ) ?;
       let content : Option<String> =
         from_utf8 ( blob . content() )
           . map ( |s| s . to_string() )
@@ -163,15 +163,15 @@ pub fn get_file_content_at_head (
 /// Returns None if the file is not in the index.
 /// The path should be relative to the repository root.
 pub fn get_file_content_at_index (
-  repo     : &Repository,
+  gitrepo     : &Repository,
   rel_path : &Path
 ) -> Result<Option<String>, Error> {
   let index : git2::Index =
-    repo . index () ?;
+    gitrepo . index () ?;
   match index . get_path ( rel_path, 0 ) {
     Some (entry) => {
       let blob : git2::Blob =
-        repo . find_blob ( entry . id ) ?;
+        gitrepo . find_blob ( entry . id ) ?;
       let content : Option<String> =
         from_utf8 ( blob . content () )
           . map ( |s| s . to_string () )
@@ -182,8 +182,8 @@ pub fn get_file_content_at_index (
 /// Check if HEAD is a merge commit (has multiple parents).
 /// This is used to abort saves when the comparison baseline is ambiguous.
 pub fn head_is_merge_commit (
-  repo : &Repository
+  gitrepo : &Repository
 ) -> Result<bool, Error> {
   let head_commit : git2::Commit =
-    repo . head() ? . peel_to_commit() ?;
+    gitrepo . head() ? . peel_to_commit() ?;
   Ok ( head_commit . parent_count() > 1 ) }

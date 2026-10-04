@@ -1,6 +1,6 @@
-/// Applying a source-set switch to an already-drawn view
-/// (TODO/full-schema/9-2_source-set-safety.org).  Two passes:
-/// convert every Active viewnode from a now-inactive source into an
+/// Applying a repo-set switch to an already-drawn view
+/// (TODO/full-schema/9-2_repo-set-safety.org).  Two passes:
+/// convert every Active viewnode from a now-inactive repo into an
 /// InactiveNode, then prune (DFS postorder, so emptied parents prune
 /// in the same sweep) every:
 /// - InactiveNode leaf;
@@ -16,7 +16,7 @@
 /// creation enabled) then rebuilds folders and members for the new
 /// active set.
 
-use crate::source_sets::ActiveSourceSet;
+use crate::repo_sets::ActiveRepoSet;
 use crate::types::viewnode::{
   mk_inactive_viewnode, PartnerFolder, QualFolder, ViewNode, ViewNodeKind,
   Vognode };
@@ -25,9 +25,9 @@ use crate::update_buffer::util::subtree_satisfies;
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::error::Error;
 
-pub fn convert_and_prune_for_source_switch (
+pub fn convert_and_prune_for_repo_switch (
   tree   : &mut Tree<ViewNode>,
-  active : &ActiveSourceSet,
+  active : &ActiveRepoSet,
 ) -> Result<(), Box<dyn Error>> {
   convert_now_inactive_actives (tree, active);
   let root : NodeId = tree . root () . id ();
@@ -36,7 +36,7 @@ pub fn convert_and_prune_for_source_switch (
 
 fn convert_now_inactive_actives (
   tree   : &mut Tree<ViewNode>,
-  active : &ActiveSourceSet,
+  active : &ActiveRepoSet,
 ) {
   if active . is_all () { return; }
   let ids : Vec<NodeId> =
@@ -48,7 +48,7 @@ fn convert_now_inactive_actives (
       tree . get (id)
       . and_then ( |n| match &n . value () . kind {
           ViewNodeKind::Vognode (Vognode::Active (t))
-            if ! active . contains_source (&t . source)
+            if ! active . contains_repo (&t . home_repo)
             => Some ( mk_inactive_viewnode () . kind ),
           _ => None } );
     if let Some (kind) = conversion {
@@ -124,5 +124,5 @@ fn should_prune (
       false, } ) }
 
 #[cfg(test)]
-#[path = "../../tests/unit/source_switch.rs"]
+#[path = "../../tests/unit/repo_switch.rs"]
 mod tests;

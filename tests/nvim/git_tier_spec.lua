@@ -27,7 +27,7 @@ describe('skg.git_add', function ()
     config_dir = vim.fn.tempname()
     vim.fn.mkdir(config_dir .. '/main-dir', 'p')
     vim.fn.writefile({
-      '[[sources]]', 'name = "main"', 'path = "main-dir"',
+      '[[repos]]', 'name = "main"', 'path = "main-dir"',
       'user_owns_it = true' }, config_dir .. '/skgconfig.toml')
     config.config_file_path = config_dir .. '/skgconfig.toml'
   end)

@@ -1,7 +1,7 @@
 // cargo test --test rebuild -- mentionerward_ancestry
 //
 // Tests that mentionerward view expansion inserts containerward
-// ancestry beneath each Birth::Backpath (RelationRole::MENTIONER) source node.
+// ancestry beneath each Birth::Backpath (RelationRole::MENTIONER) repo node.
 //
 // Graph (see fixtures-mentionerward-ancestry/):
 //   Links:        b -> a,  c -> b,  d -> a

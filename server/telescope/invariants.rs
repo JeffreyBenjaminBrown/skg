@@ -8,14 +8,14 @@
 //! fate of today's validations"): cross-file violations are
 //! WARNINGS with repair guidance, never load refusals -- they can
 //! arise from two perfectly correct saves on different machines, so
-//! a pull must never brick a source. Only single-file malformations
+//! a pull must never brick a repo. Only single-file malformations
 //! (unparseable YAML, empty-string title, pid/filename mismatch,
 //! anchors in unordered relations -- unrepresentable in the format)
 //! hard-error, and those live in the parser, not here.
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::telescope::types::FoldWarning;
-use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, SourceName};
+use crate::types::misc::{ID, MSV, RelPartner, SkgConfig, RepoName};
 use crate::types::nodes::rust::NodeRust;
 
 use std::collections::HashSet;
@@ -25,42 +25,42 @@ use std::path::Path;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TelescopeViolation {
-  /// THE leak shape: a relationship instance whose relSource is
+  /// THE leak shape: a relationship instance whose relRepo is
   /// more public than its target's home, so the (more public) file
   /// names an ID whose node is more private -- exactly what the
-  /// telescope exists to prevent. Repair: move the membership's relSource
-  /// to the target's home or beyond ('skg-set-relSource',
+  /// telescope exists to prevent. Repair: move the membership's relRepo
+  /// to the target's home or beyond ('skg-set-relRepo',
   /// C-c s r). NOTE the git caveat: the leaking file's
   /// history already contains the ID; repair only stops the
   /// bleeding.
   LeakShapedMember {
     relation    : &'static str,
-    relSource   : SourceName,
+    relRepo   : RepoName,
     member      : ID,
-    member_home : SourceName,
+    member_home : RepoName,
   },
   /// A dangling relationship recorded more publicly than its extant owner.
   /// With no target home to consult, the owner's home is the conservative
   /// privacy ceiling.
   AbsentTargetLeakShapedMember {
     relation   : &'static str,
-    relSource  : SourceName,
+    relRepo  : RepoName,
     member     : ID,
-    owner_home : SourceName,
+    owner_home : RepoName,
   },
-  /// An edge whose relSource names no configured source: its section
+  /// An edge whose relRepo names no configured repo: its section
   /// could never be written. Arises only from junk or a config
-  /// that lost a source.
-  UnconfiguredRelSource {
+  /// that lost a repo.
+  UnconfiguredRelRepo {
     relation : &'static str,
-    relSource: SourceName,
+    relRepo: RepoName,
     member   : ID,
   },
   /// Non-owned sections used the same pid as at least one owned
-  /// section. The owned telescope won and these sources were
+  /// section. The owned telescope won and these repos were
   /// ignored before folding or id-claim collection.
   IgnoredForeignPidFolderlision {
-    ignored_sources : Vec<SourceName>,
+    ignored_repos : Vec<RepoName>,
   },
   /// Anything the FOLD noticed while combining a node's sections
   /// (a dangling anchor, a title below the home, a stray second
@@ -76,26 +76,26 @@ impl fmt::Display for TelescopeViolation {
   ) -> fmt::Result {
     match self {
       TelescopeViolation::LeakShapedMember {
-        relation, relSource, member, member_home } =>
+        relation, relRepo, member, member_home } =>
         write! ( f,
           "leak-shaped {} member: relationship at relSource '{}' names '{}', whose home '{}' is more private. Move the membership with skg-set-relSource (C-c s r). The leaking file's git history already contains the ID.",
-          relation, relSource, member, member_home ),
-      TelescopeViolation::UnconfiguredRelSource {
-        relation, relSource, member } =>
+          relation, relRepo, member, member_home ),
+      TelescopeViolation::UnconfiguredRelRepo {
+        relation, relRepo, member } =>
         write! ( f,
           "{} member '{}' carries relSource '{}', which is not configured",
-          relation, member, relSource ),
+          relation, member, relRepo ),
       TelescopeViolation::AbsentTargetLeakShapedMember {
-        relation, relSource, member, owner_home } =>
+        relation, relRepo, member, owner_home } =>
         write! ( f,
           "leak-shaped {} member with absent target: relationship at relSource '{}' names '{}'; because the target is absent, privacy is judged against the extant owner's home '{}'. Move the membership with skg-set-relSource (C-c s r).",
-          relation, relSource, member, owner_home ),
+          relation, relRepo, member, owner_home ),
       TelescopeViolation::IgnoredForeignPidFolderlision {
-        ignored_sources } =>
+        ignored_repos } =>
         write! ( f,
           "non-owned source(s) [{}] use the same pid as one or more of your files. Skg kept your owned telescope, ignored those non-owned files, and left them untouched. Their contents are unreachable within Skg; inspect the raw .skg files if you need them.",
-          ignored_sources . iter ()
-            . map ( |source| format! ("'{}'", source) )
+          ignored_repos . iter ()
+            . map ( |repo| format! ("'{}'", repo) )
             . collect::<Vec<String>> () . join (", ") ),
       TelescopeViolation::Fold (w) =>
         write! ( f, "{}", w ), }}}
@@ -114,33 +114,33 @@ pub fn telescope_violations_of (
   let mut check = |relation : &'static str,
                    members  : &[RelPartner<ID>]| {
     for m in members {
-      if config . source_position ( &m . relSource ) . is_none () {
-        violations . push ( TelescopeViolation::UnconfiguredRelSource {
+      if config . repo_position ( &m . relRepo ) . is_none () {
+        violations . push ( TelescopeViolation::UnconfiguredRelRepo {
           relation,
-          relSource : m . relSource . clone (),
+          relRepo : m . relRepo . clone (),
           member : m . member . clone (), } );
         continue; }
-      let target_home : Option<SourceName> =
+      let target_home : Option<RepoName> =
         graph . pid_of ( &m . member )
         . and_then ( |p| graph . nodes . get (&p) )
-        . map ( |n| n . source . clone () );
-      let privacy_ceiling : &SourceName = target_home . as_ref ()
-        . unwrap_or (&node . source);
-      if config . is_strictly_more_public ( &m . relSource, privacy_ceiling ) {
+        . map ( |n| n . home_repo . clone () );
+      let privacy_ceiling : &RepoName = target_home . as_ref ()
+        . unwrap_or (&node . home_repo);
+      if config . is_strictly_more_public ( &m . relRepo, privacy_ceiling ) {
         match target_home {
           Some (home) =>
           violations . push ( TelescopeViolation::LeakShapedMember {
             relation,
-            relSource   : m . relSource . clone (),
+            relRepo   : m . relRepo . clone (),
             member      : m . member . clone (),
             member_home : home, } ),
           None =>
             violations . push (
               TelescopeViolation::AbsentTargetLeakShapedMember {
                 relation,
-                relSource  : m . relSource . clone (),
+                relRepo  : m . relRepo . clone (),
                 member     : m . member . clone (),
-                owner_home : node . source . clone (),
+                owner_home : node . home_repo . clone (),
               }), }} }};
   check ("contains", &node . contains);
   let msv = |m : &MSV<RelPartner<ID>>| -> Vec<RelPartner<ID>> {
@@ -166,12 +166,12 @@ pub fn derive_affected_telescope_owners (
   for raw in affected_ids {
     let old_pid : Option<ID> = base . pid_of (raw);
     let final_pid : Option<ID> = candidate . pid_of (raw);
-    let old_home : Option<SourceName> = old_pid . as_ref ()
+    let old_home : Option<RepoName> = old_pid . as_ref ()
       .and_then (|pid| base . nodes . get (pid))
-      .map (|node| node . source . clone ());
-    let final_home : Option<SourceName> = final_pid . as_ref ()
+      .map (|node| node . home_repo . clone ());
+    let final_home : Option<RepoName> = final_pid . as_ref ()
       .and_then (|pid| candidate . nodes . get (pid))
-      .map (|node| node . source . clone ());
+      .map (|node| node . home_repo . clone ());
     if old_pid == final_pid && old_home == final_home { continue; }
     let old_key : &ID = old_pid . as_ref () . unwrap_or (raw);
     let final_key : &ID = final_pid . as_ref () . unwrap_or (raw);

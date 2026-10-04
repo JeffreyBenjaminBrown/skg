@@ -1,8 +1,8 @@
 use crate::diff_report::types::{
   CommitStamp, DiffReport, DuplicateIDReport, ListDiffItem,
-  NodeDiffReport, RelationshipDiff, SourceForReport, TextDiffLine,
+  NodeDiffReport, RelationshipDiff, RepoForReport, TextDiffLine,
   ValueSetDiff, VanishedNodeReport};
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, RepoName};
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -35,7 +35,7 @@ pub fn render_report (
 }
 
 /// The vanished-nodes section (TODO/more.org): each id the worktree
-/// references though it exists in no source, with what git history
+/// references though it exists in no repo, with what git history
 /// says it used to be. Like the buckets, the (empty) heading renders
 /// even with nothing to report, so the reader knows it was checked.
 fn render_vanished_nodes (
@@ -56,7 +56,7 @@ fn render_vanished_nodes (
       continue; }
     for sighting in & report . sightings {
       out . push_str (&format! (
-        "*** in source {}\n", sighting . source ));
+        "*** in source {}\n", sighting . home_repo ));
       out . push_str (&format! (
         "**** title when last present: {}\n", sighting . title ));
       out . push_str (&format! (
@@ -98,20 +98,20 @@ fn render_duplicate_ids (
       abbreviation_for (&duplicate . id, abbreviations) ));
     out . push_str (&format! ("**** {}\n", duplicate . id));
     out . push_str ("**** source(s) before these changes\n");
-    render_sources (out, &duplicate . before_sources);
+    render_repos (out, &duplicate . before_repos);
     out . push_str ("**** source(s) after these changes\n");
-    render_sources (out, &duplicate . after_sources); }
+    render_repos (out, &duplicate . after_repos); }
 }
 
-fn render_sources (
+fn render_repos (
   out     : &mut String,
-  sources : &BTreeSet<SourceName>,
+  repos : &BTreeSet<RepoName>,
 ) {
-  if sources . is_empty () {
+  if repos . is_empty () {
     out . push_str ("***** none\n");
     return; }
-  for source in sources {
-    out . push_str (&format! ("***** {}\n", source)); }
+  for repo in repos {
+    out . push_str (&format! ("***** {}\n", repo)); }
 }
 
 fn render_node_report (
@@ -124,10 +124,10 @@ fn render_node_report (
     "*** {}\n",
     abbreviation_for (&node . pid, abbreviations) ));
   out . push_str ("**** identifiers\n");
-  out . push_str (&format! ("***** {}\n", source_text (&node . source)));
+  out . push_str (&format! ("***** {}\n", repo_text (&node . home_repo)));
   out . push_str (&format! ("***** {}\n", node . pid));
   out . push_str (&format! ("***** {}\n", node . title));
-  if let Some ((before, after)) = &node . source_change {
+  if let Some ((before, after)) = &node . repo_change {
     out . push_str ("**** source\n");
     out . push_str (&format! ("***** was: {}\n", before));
     out . push_str (&format! ("***** is: {}\n", after)); }
@@ -144,12 +144,12 @@ fn render_node_report (
     render_contained_list_diff (out, diff, abbreviations); }
 }
 
-fn source_text (
-  source : &SourceForReport,
+fn repo_text (
+  repo : &RepoForReport,
 ) -> String {
-  match source {
-    SourceForReport::Before (s) => s . to_string (),
-    SourceForReport::After  (s) => s . to_string (), }
+  match repo {
+    RepoForReport::Before (s) => s . to_string (),
+    RepoForReport::After  (s) => s . to_string (), }
 }
 
 fn render_text_diff (

@@ -71,8 +71,8 @@ name = "grouped_saves"
 path = "tests/grouped_saves.rs"
 
 [[test]]
-name = "grouped_sources"
-path = "tests/grouped_sources.rs"
+name = "grouped_repos"
+path = "tests/grouped_repos.rs"
 
 [[test]]
 name = "git_diff_view"

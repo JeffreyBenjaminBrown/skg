@@ -2,7 +2,7 @@ use skg::diff_report::diff::diff_snapshots;
 use skg::diff_report::types::{
   DiffReport, GraphSnapshot, NodeBucket, NodeDiffReport, RelationshipDiff,
   SnapshotPair, ValueSetDiff};
-use skg::types::misc::{ID, MSV, SourceName, rel_partners_at_relSource};
+use skg::types::misc::{ID, MSV, RepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 
 use std::collections::{BTreeSet, HashMap};
@@ -13,10 +13,10 @@ fn id (
   ID::new (s)
 }
 
-fn source (
+fn repo (
   s : &str,
-) -> SourceName {
-  SourceName::from (s)
+) -> RepoName {
+  RepoName::from (s)
 }
 
 fn node (
@@ -28,10 +28,10 @@ fn node (
     empty_node_complete ();
   node . pid = id (pid);
   node . title = title . to_string ();
-  node . source = source ("main");
+  node . home_repo = repo ("main");
   node . contains =
-    rel_partners_at_relSource (
-      &node . source,
+    rel_partners_at_relRepo (
+      &node . home_repo,
       contains . iter () . map ( |x| id (x) ) . collect () );
   node
 }
@@ -47,7 +47,7 @@ fn snapshot (
         . or_insert_with (std::collections::BTreeMap::new)
         . entry (node . pid . clone ())
         . or_insert_with (BTreeSet::new)
-        . insert (node . source . clone ()); }
+        . insert (node . home_repo . clone ()); }
     snapshot . nodes . insert (node . pid . clone (), node); }
   snapshot
 }
@@ -131,16 +131,16 @@ fn lost_container_reports_current_existing_containers () {
 fn backward_subscribee_reports_current_existing_related_nodes () {
   let mut old : NodeComplete =
     node ("old", "Old", &[]);
-  old . subscribes_to = MSV::Specified (rel_partners_at_relSource (&old . source, vec! [id ("target")]));
+  old . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&old . home_repo, vec! [id ("target")]));
   let mut stay : NodeComplete =
     node ("stay", "Stay", &[]);
-  stay . subscribes_to = MSV::Specified (rel_partners_at_relSource (&stay . source, vec! [id ("target")]));
+  stay . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&stay . home_repo, vec! [id ("target")]));
   let mut stay_after : NodeComplete =
     node ("stay", "Stay", &[]);
-  stay_after . subscribes_to = MSV::Specified (rel_partners_at_relSource (&stay_after . source, vec! [id ("target")]));
+  stay_after . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&stay_after . home_repo, vec! [id ("target")]));
   let mut new : NodeComplete =
     node ("new", "New", &[]);
-  new . subscribes_to = MSV::Specified (rel_partners_at_relSource (&new . source, vec! [id ("target")]));
+  new . subscribes_to = MSV::Specified (rel_partners_at_relRepo (&new . home_repo, vec! [id ("target")]));
   let report : DiffReport =
     report_for (
       vec! [ old, stay, node ("target", "Target", &[]) ],
@@ -191,7 +191,7 @@ fn links_are_reported_in_both_directions () {
     report_for (before, after);
   let reports : HashMap<ID, &NodeDiffReport> =
     reports_by_pid (&report);
-  let a_source : &RelationshipDiff =
+  let a_repo : &RelationshipDiff =
     reports . get (&id ("a")) . unwrap ()
       . relationship_diffs . iter ()
       . find ( |diff| diff . role == "mentioner" )
@@ -201,20 +201,20 @@ fn links_are_reported_in_both_directions () {
       . relationship_diffs . iter ()
       . find ( |diff| diff . role == "mentioned" )
       . unwrap ();
-  assert_eq! (a_source . gained, vec! [id ("b")]);
+  assert_eq! (a_repo . gained, vec! [id ("b")]);
   assert_eq! (b_dest . gained, vec! [id ("a")]);
 }
 
 #[test]
-fn duplicate_ids_across_sources_are_omitted_from_node_buckets () {
+fn duplicate_ids_across_repos_are_omitted_from_node_buckets () {
   let before : Vec<NodeComplete> =
     vec! [];
   let mut left : NodeComplete =
     node ("a", "A left", &[]);
-  left . source = source ("left");
+  left . home_repo = repo ("left");
   let mut right : NodeComplete =
     node ("b", "B right", &[]);
-  right . source = source ("right");
+  right . home_repo = repo ("right");
   right . extra_ids = vec! [id ("a")];
   let report : DiffReport =
     report_for (before, vec! [left, right]);
@@ -226,16 +226,16 @@ fn duplicate_ids_across_sources_are_omitted_from_node_buckets () {
 
 #[test]
 fn telescope_shape_is_not_a_duplicate () {
-  // One pid claimed from two SOURCES is the normal telescope shape
+  // One pid claimed from two REPOS is the normal telescope shape
   // (sections at two privacy levels), not a duplicate-ID violation.
   let mut telescope : NodeComplete =
     node ("a", "A", &[]);
-  telescope . source = source ("public");
+  telescope . home_repo = repo ("public");
   let mut snap_after : GraphSnapshot =
     snapshot (vec! [telescope]);
   snap_after . id_claims . get_mut (&id ("a")) . unwrap ()
     . get_mut (&id ("a")) . unwrap ()
-    . insert (source ("private"));
+    . insert (repo ("private"));
   let report : DiffReport =
     diff_snapshots (&SnapshotPair {
       before: snapshot (vec! []),
@@ -296,11 +296,11 @@ fn aliases_use_set_diff () {
   let mut before_node : NodeComplete =
     node ("a", "A", &[]);
   before_node . aliases =
-    MSV::Specified (rel_partners_at_relSource (&before_node . source, vec! ["old".to_string ()]));
+    MSV::Specified (rel_partners_at_relRepo (&before_node . home_repo, vec! ["old".to_string ()]));
   let mut after_node : NodeComplete =
     node ("a", "A", &[]);
   after_node . aliases =
-    MSV::Specified (rel_partners_at_relSource (&after_node . source, vec! ["new".to_string ()]));
+    MSV::Specified (rel_partners_at_relRepo (&after_node . home_repo, vec! ["new".to_string ()]));
   let report : DiffReport =
     report_for (vec! [before_node], vec! [after_node]);
   let reports : HashMap<ID, &NodeDiffReport> =
@@ -315,30 +315,30 @@ fn aliases_use_set_diff () {
 }
 
 #[test]
-fn source_move_is_reported () {
+fn repo_move_is_reported () {
   let mut before_node : NodeComplete =
     node ("a", "A", &[]);
-  before_node . source = source ("left");
+  before_node . home_repo = repo ("left");
   let mut after_node : NodeComplete =
     node ("a", "A", &[]);
-  after_node . source = source ("right");
+  after_node . home_repo = repo ("right");
   let report : DiffReport =
     report_for (vec! [before_node], vec! [after_node]);
   let reports : HashMap<ID, &NodeDiffReport> =
     reports_by_pid (&report);
   assert_eq! (
-    reports . get (&id ("a")) . unwrap () . source_change,
-    Some ((source ("left"), source ("right"))) );
+    reports . get (&id ("a")) . unwrap () . repo_change,
+    Some ((repo ("left"), repo ("right"))) );
 }
 
 #[test]
-fn source_move_uses_its_own_bucket () {
+fn repo_move_uses_its_own_bucket () {
   let mut before_node : NodeComplete =
     node ("a", "A", &[]);
-  before_node . source = source ("left");
+  before_node . home_repo = repo ("left");
   let mut after_node : NodeComplete =
     node ("a", "A", &[]);
-  after_node . source = source ("right");
+  after_node . home_repo = repo ("right");
   let report : DiffReport =
     report_for (vec! [before_node], vec! [after_node]);
   let move_bucket : &NodeBucket =

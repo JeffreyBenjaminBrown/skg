@@ -43,15 +43,15 @@ tantivy_folder = "$TEST_DIR/data/.index.tantivy"
 port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
 
-[[sources]]
+[[repos]]
 name = "owned"
 path = "$TEST_DIR/data/owned/owned"
 
-[[sources]]
+[[repos]]
 name = "owned2"
 path = "$TEST_DIR/data/owned/owned2"
 
-[[sources]]
+[[repos]]
 name = "foreign"
 path = "$TEST_DIR/data/foreign"
 EOF

@@ -17,7 +17,7 @@ pub mod search;
 pub mod write;
 
 use crate::consts::TANTIVY_PER_ID_LOOKUP_LIMIT;
-use crate::types::misc::{ID, SourceName, TantivyIndex};
+use crate::types::misc::{ID, RepoName, TantivyIndex};
 
 use tantivy::{Index, Term, Searcher, TantivyDocument};
 use tantivy::schema::document::Value;
@@ -49,7 +49,7 @@ pub(crate) fn tantivy_index_from_index (
     schema . get_field ("overPrivateText_telescope") ?;
   let no_search_matching_field : schema::Field =
     schema . get_field ("no_search_matching") ?;
-  let source_field : schema::Field =
+  let repo_field : schema::Field =
     schema . get_field ("source") ?;
   let context_origin_type_field : schema::Field =
     schema . get_field ("context_origin_type") ?;
@@ -67,7 +67,7 @@ pub(crate) fn tantivy_index_from_index (
     raw_title_field,
     overPrivateText_telescope_field,
     no_search_matching_field,
-    source_field,
+    repo_field,
     context_origin_type_field,
     is_title_field,
     had_id_field,
@@ -85,7 +85,7 @@ pub(crate) fn tantivy_index_from_index (
 ///                          was selected below the node's home.
 /// - "no_search_matching":  STRING | STORED — "true" when this
 ///                          document must not directly match text search.
-/// - "source":              STRING | STORED — the source name.
+/// - "repo":              STRING | STORED — the repo name.
 /// - "context_origin_type": STRING | STORED — Root/CycleMember/Target/…
 /// - "is_title":            STRING | STORED — "true" for the primary title,
 ///                          "false" for alias docs.
@@ -123,7 +123,7 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
     "body", schema::TEXT | schema::STORED);
   schema_builder . build() }
 
-/// Look up the canonical title and source for a node by its exact primary ID.
+/// Look up the canonical title and repo for a node by its exact primary ID.
 /// Prefers the document marked is_title="true"; falls back to the
 /// first title_or_alias found if no title document exists.
 ///
@@ -133,10 +133,10 @@ pub(super) fn mk_tantivy_schema() -> schema::Schema {
 /// and one whose title links to a different node also labelled
 /// "science". Alias-doc fallback paths use 'title_or_alias' because
 /// only is_title="true" docs carry a 'raw_title'.
-pub fn title_and_source_by_id (
+pub fn title_and_repo_by_id (
   tantivy_index : &TantivyIndex,
   id            : &ID,
-) -> Option < (String, SourceName) > {
+) -> Option < (String, RepoName) > {
   let searcher : Searcher = tantivy_index . reader . searcher ();
   let doc_addresses : Vec<tantivy::DocAddress> =
     doc_addresses_for_id (
@@ -154,10 +154,10 @@ pub fn title_and_source_by_id (
       . filter ( |s| ! s . is_empty () )
       . or_else ( || string_field (
         &doc, tantivy_index . title_or_alias_field )) ?;
-  let source : SourceName = SourceName::from (
-    string_field ( &doc, tantivy_index . source_field )
+  let repo : RepoName = RepoName::from (
+    string_field ( &doc, tantivy_index . repo_field )
       . unwrap_or_default () . as_str () );
-  Some ( (title, source) ) }
+  Some ( (title, repo) ) }
 
 /// Look up canonical titles for multiple IDs in a single searcher session.
 /// IDs not found in Tantivy are absent from the result.

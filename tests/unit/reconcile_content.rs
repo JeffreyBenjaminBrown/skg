@@ -1,9 +1,9 @@
-use crate::types::git::{GitDiffStatus, NodeChanges, NodeCompleteDiff, SourceDiff, per_stage_node_changes_for_activeNode};
+use crate::types::git::{GitDiffStatus, NodeChanges, NodeCompleteDiff, RepoDiff, per_stage_node_changes_for_activeNode};
 
 use super::*;
 use std::path::PathBuf;
 
-fn source_name (s: &str) -> SourceName { SourceName ( s . to_string () ) }
+fn repo_name (s: &str) -> RepoName { RepoName ( s . to_string () ) }
 fn id          (s: &str) -> ID          { ID ( s . to_string () ) }
 
 fn make_diff_entry (text_changed: bool) -> NodeCompleteDiff {
@@ -19,28 +19,28 @@ fn sd_with (
   pid     : &ID,
   staged  : Option<bool>,
   unstag  : Option<bool>,
-) -> SourceDiff {
+) -> RepoDiff {
   let file : PathBuf = PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
   let mut s : HashMap<PathBuf, NodeCompleteDiff> = HashMap::new ();
   let mut u : HashMap<PathBuf, NodeCompleteDiff> = HashMap::new ();
   if let Some (t) = staged { s . insert (file . clone (), make_diff_entry (t)); }
   if let Some (t) = unstag { u . insert (file,           make_diff_entry (t)); }
-  SourceDiff {
-    is_git_repo: true,
+  RepoDiff {
+    is_gitrepo: true,
     staged: s, unstaged: u,
     added_nodes: HashMap::new (),
     deleted_nodes: HashMap::new (), } }
 
-fn diffs_with (src: &SourceName, sd: SourceDiff)
-  -> Option<HashMap<SourceName, SourceDiff>> {
-  let mut m : HashMap<SourceName, SourceDiff> = HashMap::new ();
+fn diffs_with (src: &RepoName, sd: RepoDiff)
+  -> Option<HashMap<RepoName, RepoDiff>> {
+  let mut m : HashMap<RepoName, RepoDiff> = HashMap::new ();
   m . insert (src . clone (), sd);
   Some (m) }
 
 fn text_changed_both (
-  diffs : &Option<HashMap<SourceName, SourceDiff>>,
+  diffs : &Option<HashMap<RepoName, RepoDiff>>,
   pid   : &ID,
-  src   : &SourceName,
+  src   : &RepoName,
 ) -> (bool, bool) {
   let (s, u) = per_stage_node_changes_for_activeNode (diffs, pid, src);
   ( s . map ( |n| n . text_changed ) . unwrap_or (false),
@@ -49,7 +49,7 @@ fn text_changed_both (
 
 #[test]
 fn text_change_only_staged () {
-  let src = source_name ("public");
+  let src = repo_name ("public");
   let pid = id ("n");
   let diffs = diffs_with (&src, sd_with (&pid, Some (true), None));
   assert_eq! ( text_changed_both (&diffs, &pid, &src), (true, false) );
@@ -57,7 +57,7 @@ fn text_change_only_staged () {
 
 #[test]
 fn text_change_only_unstaged () {
-  let src = source_name ("public");
+  let src = repo_name ("public");
   let pid = id ("n");
   let diffs = diffs_with (&src, sd_with (&pid, None, Some (true)));
   assert_eq! ( text_changed_both (&diffs, &pid, &src), (false, true) );
@@ -65,7 +65,7 @@ fn text_change_only_unstaged () {
 
 #[test]
 fn text_change_both_stages () {
-  let src = source_name ("public");
+  let src = repo_name ("public");
   let pid = id ("n");
   let diffs = diffs_with (&src, sd_with (&pid, Some (true), Some (true)));
   assert_eq! ( text_changed_both (&diffs, &pid, &src), (true, true) );
@@ -73,7 +73,7 @@ fn text_change_both_stages () {
 
 #[test]
 fn no_diff_at_all () {
-  let src = source_name ("public");
+  let src = repo_name ("public");
   let pid = id ("n");
   assert_eq! ( text_changed_both (&None, &pid, &src), (false, false) );
 }
@@ -84,7 +84,7 @@ fn parent_with_unknown_child (child : &ID) -> (Tree<ViewNode>, NodeId, NodeId) {
   use crate::types::viewnode::{mk_definitive_viewnode, mk_unknown_viewnode};
   let mut tree : Tree<ViewNode> =
     Tree::new ( mk_definitive_viewnode (
-      id ("p"), source_name ("main"), "p" . to_string (), None ) );
+      id ("p"), repo_name ("main"), "p" . to_string (), None ) );
   let parent : NodeId = tree . root () . id ();
   let child_nid : NodeId =
     tree . root_mut () . append ( mk_unknown_viewnode (child . clone ()) ) . id ();
@@ -121,22 +121,22 @@ fn same_session_surviving_content_membership_becomes_unknown () {
   use crate::types::viewnode::mk_definitive_viewnode;
   let ghost : ID = id ("ghost");
   let mut tree : Tree<ViewNode> = Tree::new (mk_definitive_viewnode (
-    id ("parent"), source_name ("main"), "parent" . to_string (), None ));
+    id ("parent"), repo_name ("main"), "parent" . to_string (), None ));
   let parent : NodeId = tree . root () . id ();
   let mut active : ViewNode = mk_definitive_viewnode (
-    ghost . clone (), source_name ("main"), "last seen" . to_string (),
+    ghost . clone (), repo_name ("main"), "last seen" . to_string (),
     Some ("last seen body" . to_string ()) );
   active . focused = true;
   active . folded = true;
   let child : NodeId = tree . root_mut () . append (active) . id ();
-  let mut relSources : HashMap<ID, SourceName> = HashMap::new ();
-  relSources . insert (ghost . clone (), source_name ("private"));
+  let mut relRepos : HashMap<ID, RepoName> = HashMap::new ();
+  relRepos . insert (ghost . clone (), repo_name ("private"));
   let graph_snap : std::sync::Arc<InRustGraph> =
     std::sync::Arc::new (InRustGraph::new ());
 
   normalize_relationship_backed_content_unknowns (
-    &mut tree, parent, &[ghost . clone ()], &relSources,
-    &source_name ("main"), &graph_snap, &HashMap::new () ) . unwrap ();
+    &mut tree, parent, &[ghost . clone ()], &relRepos,
+    &repo_name ("main"), &graph_snap, &HashMap::new () ) . unwrap ();
 
   let rendered = tree . get (child) . unwrap () . value ();
   assert! (rendered . focused && rendered . folded,
@@ -144,9 +144,9 @@ fn same_session_surviving_content_membership_becomes_unknown () {
   match &rendered . kind {
     ViewNodeKind::Phantom (Phantom::Unknown (unknown)) => {
       assert_eq! (unknown . id, ghost);
-      assert_eq! (unknown . relSource,
-                  Some (source_name ("private")));
-      assert_eq! (unknown . relSource_request, None); },
+      assert_eq! (unknown . relRepo,
+                  Some (repo_name ("private")));
+      assert_eq! (unknown . relRepo_request, None); },
     other => panic! ("surviving relationship must render Unknown, got {other:?}"), }
 }
 
@@ -156,14 +156,14 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
   let primary : ID = id ("deleted-primary");
   let raw_extra : ID = id ("surviving-extra-id");
   let mut tree : Tree<ViewNode> = Tree::new (mk_definitive_viewnode (
-    id ("parent"), source_name ("main"), "parent" . to_string (), None ));
+    id ("parent"), repo_name ("main"), "parent" . to_string (), None ));
   let parent : NodeId = tree . root () . id ();
   let mut active : ViewNode = mk_definitive_viewnode (
-    primary . clone (), source_name ("main"), "last seen" . to_string (), None );
+    primary . clone (), repo_name ("main"), "last seen" . to_string (), None );
   active . focused = true;
   let child : NodeId = tree . root_mut () . append (active) . id ();
-  let mut relSources : HashMap<ID, SourceName> = HashMap::new ();
-  relSources . insert (raw_extra . clone (), source_name ("foreign"));
+  let mut relRepos : HashMap<ID, RepoName> = HashMap::new ();
+  relRepos . insert (raw_extra . clone (), repo_name ("foreign"));
   let graph_snap : std::sync::Arc<InRustGraph> =
     std::sync::Arc::new (InRustGraph::new ());
   let mut deleted_extra_ids : HashMap<ID, HashSet<ID>> = HashMap::new ();
@@ -171,8 +171,8 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
     primary, [raw_extra . clone ()] . into_iter () . collect ());
 
   normalize_relationship_backed_content_unknowns (
-    &mut tree, parent, &[raw_extra . clone ()], &relSources,
-    &source_name ("main"), &graph_snap, &deleted_extra_ids ) . unwrap ();
+    &mut tree, parent, &[raw_extra . clone ()], &relRepos,
+    &repo_name ("main"), &graph_snap, &deleted_extra_ids ) . unwrap ();
 
   let rendered = tree . get (child) . unwrap () . value ();
   assert! (rendered . focused,
@@ -181,7 +181,7 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
     ViewNodeKind::Phantom (Phantom::Unknown (unknown)) => {
       assert_eq! (unknown . id, raw_extra,
         "the retained on-disk spelling, not the deleted primary, is rendered");
-      assert_eq! (unknown . relSource, Some (source_name ("foreign"))); },
+      assert_eq! (unknown . relRepo, Some (repo_name ("foreign"))); },
     other => panic! ("surviving extra-id relationship must be Unknown, got {other:?}"), }
 }
 
@@ -199,23 +199,23 @@ fn independent_same_id_child_is_prefetched () {
   let goal : ID = id ("regression_independent_child");
   let mut tree : Tree<ViewNode> =
     Tree::new ( mk_definitive_viewnode (
-      id ("p"), source_name ("main"), "p" . to_string (), None ));
+      id ("p"), repo_name ("main"), "p" . to_string (), None ));
   let parent : NodeId = tree . root () . id ();
   let mut child : ViewNode =
     mk_definitive_viewnode (
-      goal . clone (), source_name ("main"), "c" . to_string (), None );
+      goal . clone (), repo_name ("main"), "c" . to_string (), None );
   if let ViewNodeKind::Vognode (Vognode::Active (t)) = &mut child . kind
     { t . affectsParent = AffectsParent::False; }
   tree . root_mut () . append (child);
   let config : SkgConfig =
-    SkgConfig::dummyFromSources ( HashMap::new () );
-  let no_deletes : HashMap<ID, SourceName> = HashMap::new ();
-  let no_relSources : HashMap<ID, SourceName> = HashMap::new ();
+    SkgConfig::dummyFromRepos ( HashMap::new () );
+  let no_deletes : HashMap<ID, RepoName> = HashMap::new ();
+  let no_relRepos : HashMap<ID, RepoName> = HashMap::new ();
   let graph_snap : std::sync::Arc<InRustGraph> =
     std::sync::Arc::new ( InRustGraph::new () );
   let data : HashMap<ID, ChildData> =
     build_child_creation_data (
-      &tree, parent, &[ goal . clone () ], &no_relSources,
+      &tree, parent, &[ goal . clone () ], &no_relRepos,
       &config, &graph_snap,
       &no_deletes, None, false )
       . unwrap ();

@@ -36,7 +36,7 @@
 ///    its children by ID.
 
 use crate::types::misc::{
-  ID, MSV, RelPartner, SourceName, rel_partners_at_relSource, rel_partners_at_relSource_msv};
+  ID, MSV, RelPartner, RepoName, rel_partners_at_relRepo, rel_partners_at_relRepo_msv};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 use std::path::Path;
@@ -298,24 +298,24 @@ fn nodecomplete_from_section_tree (
   let body : Option<String> =
     tree . section . override_body . clone()
       . or_else (|| collect_body (lines, tree . section . body_start, body_end));
-  // The real source is not known here; the caller (import_org_roam.rs)
-  // overwrites 'source' after parsing. Tag members with this
-  // placeholder source, matching the node's own source at
+  // The real repo is not known here; the caller (import_org_roam.rs)
+  // overwrites 'repo' after parsing. Tag members with this
+  // placeholder repo, matching the node's own repo at
   // construction time -- degenerate, and dropped at the FS boundary.
-  let source : SourceName = SourceName::default();
+  let repo : RepoName = RepoName::default();
   let aliases_msv : MSV<String> =
     match tree . section . roam_aliases . clone() {
       None    => MSV::Unspecified,
       Some(v) => MSV::Specified(v) };
   let aliases : MSV<RelPartner<String>> =
-    rel_partners_at_relSource_msv (&source, aliases_msv);
+    rel_partners_at_relRepo_msv (&repo, aliases_msv);
   let contains : Vec<RelPartner<ID>> =
-    rel_partners_at_relSource (&source, contained_ids);
+    rel_partners_at_relRepo (&repo, contained_ids);
   NodeComplete {
     title    : tree . section . headline . clone(),
     overPrivateText_telescope : false,
     aliases,
-    source,
+    home_repo: repo,
     pid      : ID::new (id_str),
     extra_ids: vec![],
     body,

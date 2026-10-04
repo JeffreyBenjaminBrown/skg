@@ -10,7 +10,7 @@ use skg::from_text::buffer_to_viewnodes::add_missing_info::{
 use skg::test_utils::{run_with_shared_test_stores, compare_viewnode_trees_modulo_id, compare_viewnode_trees};
 use skg::types::maybe_placed_viewnode::{
   MpViewnode, MpViewnodeKind, MpVognode};
-use skg::types::misc::{SkgConfig, ID, SourceName, TantivyIndex};
+use skg::types::misc::{SkgConfig, ID, RepoName, TantivyIndex};
 use skg::types::tree::forest::{
   MpViewForest,
   tree_forest_root_ids};
@@ -32,26 +32,26 @@ fn all_tests
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_source_inheritance_multi_level",
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
-      test_source_inheritance_multi_level (
+      test_repo_inheritance_multi_level (
         &s . config, &mut s . tantivy ) . await ?;
       s . reset ("test_sourceless_folder_member_gets_graph_source",
                  "tests/new/buffer_to_viewnodes/add_missing_info/fixtures") ?;
-      test_sourceless_folder_member_gets_graph_source (
+      test_repoless_folder_member_gets_graph_repo (
         &s . config ) . await ?;
       Ok (( )) } )) }
 
 /// Regression for TODO/DONE/BUG_reciprocal-subscribe.org: a subscribee
 /// pasted from the link stack arrives as a bare id under a
-/// 'subscribeeFolder' scaffold, with no source. Its org-parent is a
-/// scaffold, so 'inherit_parent_source_if_possible' cannot supply a
-/// source; enrichment must resolve it from the graph by id instead.
-/// Before the fix this node stayed sourceless and the save was refused
-/// with "ActiveNode must have a source that exists in the config".
-async fn test_sourceless_folder_member_gets_graph_source (
+/// 'subscribeeFolder' scaffold, with no repo. Its org-parent is a
+/// scaffold, so 'inherit_parent_repo_if_possible' cannot supply a
+/// repo; enrichment must resolve it from the graph by id instead.
+/// Before the fix this node stayed repoless and the save was refused
+/// with "ActiveNode must have a repo that exists in the config".
+async fn test_repoless_folder_member_gets_graph_repo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  // 'root' is an extra_id of fixture node 'root-pid', whose source is
-  // 'main'. The subscribee reference below carries neither source nor
+  // 'root' is an extra_id of fixture node 'root-pid', whose repo is
+  // 'main'. The subscribee reference below carries neither repo nor
   // the primary id, and is write-protected -- exactly the bare-paste shape
   // (a link-stack paste yields a write-protected node with only an id).
   let input : &str =
@@ -70,7 +70,7 @@ async fn test_sourceless_folder_member_gets_graph_source (
   match &member . value() . kind {
     MpViewnodeKind::Vognode (MpVognode::Active (t)) => {
       assert_eq! (
-        t . source, Some (SourceName::from ("main")),
+        t . home_repo, Some (RepoName::from ("main")),
         "Sourceless folder member should inherit its source from the \
          graph (node root-pid lives in source 'main'), not stay \
          sourceless." );
@@ -95,7 +95,7 @@ async fn test_add_missing_info_logic (
   // Applying 'add_missing_info_to_viewforest' should make
   // 'with_missing_info' equivalent to 'without_missing_info',
   // modulo the specific ID values added.
-  // Also tests source inheritance from parent to children.
+  // Also tests repo inheritance from parent to children.
   let with_missing_info: &str =
     indoc! {"
             * (skg (node (id root) (source main))) root
@@ -175,19 +175,19 @@ fn test_na_affectsParent_under_visible_parent_becomes_isContainer () {
     _ => panic! ("expected moved ActiveNode") }
 }
 
-async fn test_source_inheritance_multi_level (
+async fn test_repo_inheritance_multi_level (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      test_source_inheritance_logic ( config ) . await ?;
+      test_repo_inheritance_logic ( config ) . await ?;
       Ok (( )) }
 
-async fn test_source_inheritance_logic (
+async fn test_repo_inheritance_logic (
   config : &SkgConfig,
 
 ) -> Result<(), Box<dyn Error>> {
-  // Tests source inheritance through multiple levels,
-  // with explicit sources overriding inheritance at various depths.
+  // Tests repo inheritance through multiple levels,
+  // with explicit repos overriding inheritance at various depths.
   let input: &str =
     indoc! {"
             * (skg (node (id 1) (source main))) _

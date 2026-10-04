@@ -41,7 +41,7 @@ fn placed_forest_from_org (
   ViewForest::from_internal_tree (
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap() ) }
 
-/// This parses the way production does, including id/source
+/// This parses the way production does, including id/repo
 /// enrichment from the db. Orgs that mention on-disk nodes need it.
 async fn placed_forest_from_org_with_disk (
   input  : &str,
@@ -167,7 +167,7 @@ async fn pipeline_basic_mixed_tree (
                     MSV::Specified (vec![]) );
         assert_eq!( explicit . overrides_view_of,
                     MSV::Specified (vec![]) ); }
-      assert!( plan . source_moves . is_empty() );
+      assert!( plan . repo_moves . is_empty() );
       assert!( nodeMerge_acquisitions . is_empty() );
       Ok (( )) }
 

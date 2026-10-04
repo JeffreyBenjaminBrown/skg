@@ -5,18 +5,18 @@
 //! context-ranking score multiplier and 'NoSearchMatching' feeds Tantivy's
 //! mandatory direct-match exclusion.
 
-use crate::types::misc::{ID, MSV, RelPartner, SourceName};
+use crate::types::misc::{ID, MSV, RelPartner, RepoName};
 use crate::types::nodes::complete::{FileProperty, NodeComplete};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct NodeTantivy {
   pub pid     : ID,
-  pub source  : SourceName, // the home; each alias doc instead
+  pub home_repo  : RepoName, // the home; each alias doc instead
                             // carries ITS OWN level (see 'aliases')
   pub title   : String,
   pub overPrivateText_telescope : bool,
   // Aliases keep their PRIVACY LEVELS: each alias document's
-  // source field is the alias's relSource, not the node's home, so a
+  // repo field is the alias's relRepo, not the node's home, so a
   // restricted search cannot match a private alias of a public
   // node (dbs-and-search, 5_plan.org).
   pub aliases : MSV<RelPartner<String>>,
@@ -25,12 +25,12 @@ pub struct NodeTantivy {
 }
 
 impl From<&NodeComplete> for NodeTantivy {
-  /// Keep title, aliases (with relSources), body, misc (Tantivy indexes
+  /// Keep title, aliases (with relRepos), body, misc (Tantivy indexes
   /// these). Drop relations.
   fn from (c: &NodeComplete) -> Self {
     NodeTantivy {
       pid     : c . pid . clone (),
-      source  : c . source . clone (),
+      home_repo  : c . home_repo . clone (),
       title   : c . title . clone (),
       overPrivateText_telescope : c . overPrivateText_telescope,
       aliases : c . aliases . clone (),

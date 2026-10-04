@@ -24,13 +24,13 @@ use crate::dbs::node_lookup::nodecomplete_from_graph;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::from_text::supplement_from_disk::{
   build_diskSupplemented_defineNodes,
-  Definenodes_with_Sourcemoves };
+  Definenodes_with_Repomoves };
 use crate::from_text::validate::{buffernode_differs_from_disknode, suppress_writes_to_inactive_nodes};
 use crate::from_text::weave::member_is_visible;
-use crate::source_sets::ActiveSourceSet;
+use crate::repo_sets::ActiveRepoSet;
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::save::{
-  DefineNode, PostCommitNoticeCandidate, SaveNode, SourceMove };
+  DefineNode, PostCommitNoticeCandidate, SaveNode, RepoMove };
 use crate::types::tree::forest::ViewForest;
 use lower::{lower_collected_intents, nodeMerge_pairs, LoweringOutput};
 use resolve_visibility::resolve_visibility;
@@ -43,7 +43,7 @@ use std::collections::HashSet;
 
 pub struct NonmergeSavePlan {
   pub define_nodes : Vec<DefineNode>,
-  pub source_moves : Vec<SourceMove>,
+  pub repo_moves : Vec<RepoMove>,
   pub boolprop_targets : HashSet<ID>,
   pub warnings     : Vec<String>, // nonfatal, destined for SaveResponse.warnings (e.g. inactive-node rewrite suppression)
   pub post_commit_notice_candidates : Vec<PostCommitNoticeCandidate>,
@@ -57,7 +57,7 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
   viewforest : &ViewForest,
   graph      : &InRustGraph,
   config     : &SkgConfig,
-  restricted_source_set : Option<&ActiveSourceSet>, // None means no restriction; callers normalize 'all' to None.
+  restricted_repo_set : Option<&ActiveRepoSet>, // None means no restriction; callers normalize 'all' to None.
 ) -> Result<(NonmergeSavePlan, Vec<(ID, ID)>), Box<dyn Error>> {
   let _span : tracing::span::EnteredSpan = tracing::info_span!(
     "extract_nonmergeSavePlan_locally" ). entered();
@@ -78,26 +78,26 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
       . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
     resolve_visibility (
       intents, &visibility, &hidden_outside, graph, config,
-      restricted_source_set ) ? };
-  let with_disk : Definenodes_with_Sourcemoves =
+      restricted_repo_set ) ? };
+  let with_disk : Definenodes_with_Repomoves =
     build_diskSupplemented_defineNodes (
       resolved . into_ordered_intents(),
-      graph, config, restricted_source_set ) ?;
+      graph, config, restricted_repo_set ) ?;
   let sans_noops : Vec<DefineNode> =
     filter_wouldbe_noop_defineNodes (graph, with_disk . instructions);
-  let (define_nodes, source_moves, suppressed_writes)
-    : (Vec<DefineNode>, Vec<SourceMove>, bool)
+  let (define_nodes, repo_moves, suppressed_writes)
+    : (Vec<DefineNode>, Vec<RepoMove>, bool)
     = suppress_writes_to_inactive_nodes (
-        sans_noops, with_disk . source_moves,
-        restricted_source_set );
+        sans_noops, with_disk . repo_moves,
+        restricted_repo_set );
   let (nodeMerge_acquisitions, suppressed_merges)
     : (Vec<(ID, ID)>, bool)
-    = match restricted_source_set {
+    = match restricted_repo_set {
         None => (nodeMerge_acquisitions, false),
         Some (active) => {
           // A nodeMerge writes both nodes' files; under a restricted
           // set it is suppressed unless both sides are provably
-          // active (TODO/full-schema/9-2_source-set-safety.org).
+          // active (TODO/full-schema/9-2_repo-set-safety.org).
           let before : usize = nodeMerge_acquisitions . len ();
           let kept : Vec<(ID, ID)> =
             nodeMerge_acquisitions . into_iter ()
@@ -114,7 +114,7 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
     else { Vec::new () };
   Ok (( NonmergeSavePlan {
           define_nodes,
-          source_moves,
+          repo_moves,
           boolprop_targets,
           warnings,
           post_commit_notice_candidates },
@@ -124,13 +124,13 @@ pub fn extract_nonmergeSavePlan_locally_in_graph (
 pub fn extract_nonmergeSavePlan_locally (
   viewforest : &ViewForest,
   config     : &SkgConfig,
-  restricted_source_set : Option<&ActiveSourceSet>,
+  restricted_repo_set : Option<&ActiveRepoSet>,
 ) -> Result<(NonmergeSavePlan, Vec<(ID, ID)>), Box<dyn Error>> {
   let nodes = crate::dbs::filesystem::multiple_nodes
-    ::read_all_skg_files_from_sources (config)?;
+    ::read_all_skg_files_from_repos (config)?;
   let graph = InRustGraph::from_nodecompletes (&nodes);
   extract_nonmergeSavePlan_locally_in_graph (
-    viewforest, &graph, config, restricted_source_set ) }
+    viewforest, &graph, config, restricted_repo_set ) }
 
 /// Filters out Save instructions that would be no-ops,
 /// because they match the pre-save in-Rust graph entry
@@ -162,7 +162,7 @@ fn filter_wouldbe_noop_defineNodes (
 #[cfg(test)]
 mod property_noop_filter_tests {
   use super::*;
-  use crate::types::misc::SourceName;
+  use crate::types::misc::RepoName;
   use crate::types::nodes::complete::{
     FileProperty, NodeComplete, empty_node_complete};
 
@@ -172,7 +172,7 @@ mod property_noop_filter_tests {
   ) -> NodeComplete {
     NodeComplete {
       pid    : ID::from (pid),
-      source : SourceName::from ("main"),
+      home_repo : RepoName::from ("main"),
       title  : pid . to_string (),
       misc,
       .. empty_node_complete () }}

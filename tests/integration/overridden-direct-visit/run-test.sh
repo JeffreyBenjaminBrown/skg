@@ -39,15 +39,15 @@ tantivy_folder = "$TEST_DIR/data/.index.tantivy"
 port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
 
-[[sources]]
+[[repos]]
 name = "public"
 path = "$TEST_DIR/data/owned/skg"
 
-[[sources]]
+[[repos]]
 name = "Cheese"
 path = "$TEST_DIR/data/cheese"
 
-[[sources]]
+[[repos]]
 name = "private"
 path = "$TEST_DIR/data/owned/private"
 EOF

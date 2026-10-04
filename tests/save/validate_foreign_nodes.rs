@@ -4,7 +4,7 @@ use indoc::indoc;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::test_utils::run_with_shared_test_stores;
 use skg::types::errors::{SaveError, BufferValidationError};
-use skg::types::misc::{SkgConfig, ID, SourceName};
+use skg::types::misc::{SkgConfig, ID, RepoName};
 
 use skg::types::save::{DefineNode, SaveNode, DeleteNode};
 use std::error::Error;
@@ -21,10 +21,10 @@ fn all_tests
       test_unmodified_foreign_node_allowed (
         &s . config ) . await ?;
       s . reset_from_config ("test_modified_foreign_node_forks_with_default_source", CONFIG_PATH) ?;
-      test_modified_foreign_node_forks_with_default_source (
+      test_modified_foreign_node_forks_with_default_repo (
         &s . config ) . await ?;
       s . reset_from_config ("test_modified_foreign_node_body_forks_with_default_source", CONFIG_PATH) ?;
-      test_modified_foreign_node_body_forks_with_default_source (
+      test_modified_foreign_node_body_forks_with_default_repo (
         &s . config ) . await ?;
       s . reset_from_config ("test_writeProtected_foreign_node_filtered", CONFIG_PATH) ?;
       test_writeProtected_foreign_node_filtered (
@@ -69,12 +69,12 @@ async fn test_unmodified_foreign_node_allowed (
       Ok(())
     }
 
-async fn test_modified_foreign_node_forks_with_default_source (
+async fn test_modified_foreign_node_forks_with_default_repo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       // Editing a foreign node FORKS it. The foreign node is a ROOT with
-      // no owned ancestor to infer a clone source from, so the clone's
-      // source DEFAULTS to the user's first owned source ("main"). The
+      // no owned ancestor to infer a clone repo from, so the clone's
+      // repo DEFAULTS to the user's first owned repo ("main"). The
       // fork rides in the plan's fork_specs (committed only on
       // confirmation); the foreign node itself is not written.
       let org_text: &str = indoc! {"
@@ -87,8 +87,8 @@ async fn test_modified_foreign_node_forks_with_default_source (
       assert_eq! ( save_plan . fork_specs . len (), 1,
         "editing the foreign node should produce one fork" );
       assert_eq! ( save_plan . fork_specs[0] . original_id, ID::from ("foreign2") );
-      assert_eq! ( save_plan . fork_specs[0] . clone . 0 . source,
-                   SourceName::from ("main"),
+      assert_eq! ( save_plan . fork_specs[0] . clone . 0 . home_repo,
+                   RepoName::from ("main"),
         "with no owned ancestor, the clone defaults to the first owned source" );
       assert! ( save_plan . define_nodes . iter () . all ( |d| ! matches! (
                   d, DefineNode::Save (SaveNode (n))
@@ -97,11 +97,11 @@ async fn test_modified_foreign_node_forks_with_default_source (
       Ok(())
     }
 
-async fn test_modified_foreign_node_body_forks_with_default_source (
+async fn test_modified_foreign_node_body_forks_with_default_repo (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
       // Editing a foreign node's body forks it too; same no-owned-ancestor
-      // situation -> the clone defaults to the first owned source.
+      // situation -> the clone defaults to the first owned repo.
       let org_text: &str = indoc! {"
         * (skg (node (id foreign2) (source foreign))) Foreign node to modify
         MODIFIED BODY
@@ -111,8 +111,8 @@ async fn test_modified_foreign_node_body_forks_with_default_source (
           org_text, config, None )  ?;
       assert_eq! ( save_plan . fork_specs . len (), 1,
         "editing the body should produce one fork" );
-      assert_eq! ( save_plan . fork_specs[0] . clone . 0 . source,
-                   SourceName::from ("main"),
+      assert_eq! ( save_plan . fork_specs[0] . clone . 0 . home_repo,
+                   RepoName::from ("main"),
         "with no owned ancestor, the clone defaults to the first owned source" );
       Ok(())
     }
@@ -179,7 +179,7 @@ async fn test_delete_foreign_node_rejected (
 async fn test_new_foreign_node_rejected (
   config : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-      // Try to create a new node in foreign source
+      // Try to create a new node in foreign repo
       let org_text: &str = indoc! {"
         * (skg (node (id new_foreign) (source foreign))) New foreign node
         This should not be allowed
@@ -217,12 +217,12 @@ async fn test_mixed_owned_and_foreign_nodes (
       assert!(save_plan . define_nodes . len() > 0, "Should have owned node instructions");
       // Verify no foreign nodes in instructions
       for instr in &save_plan . define_nodes {
-        let source: &str = match instr {
+        let repo: &str = match instr {
           DefineNode::Save(SaveNode (node)) =>
-            node . source . as_str(),
-          DefineNode::Delete(DeleteNode { source, .. }) =>
-            source . as_str() };
-        assert_eq!( source, "main", "Only owned (in this case from source main) nodes should be in instructions"); }
+            node . home_repo . as_str(),
+          DefineNode::Delete(DeleteNode { home_repo: repo, .. }) =>
+            repo . as_str() };
+        assert_eq!( repo, "main", "Only owned (in this case from source main) nodes should be in instructions"); }
       Ok(())
     }
 

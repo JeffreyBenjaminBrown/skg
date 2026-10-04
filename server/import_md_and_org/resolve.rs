@@ -474,7 +474,7 @@ mod tests {
   use super::*;
   use super::super::build::build_document;
   use super::super::parse::parse_document;
-  use crate::types::misc::SourceName;
+  use crate::types::misc::RepoName;
   use std::fs;
 
   #[test]
@@ -486,11 +486,11 @@ mod tests {
         "* Section\n[[file:notes/a.md::*Same][ambiguous]]\n[[file:notes/a.md][root]]\n"
           . to_string ()),
     ];
-    let source : SourceName = SourceName::from ("owned");
+    let repo : RepoName = RepoName::from ("owned");
     let mut counter : usize = 0;
     let mut next = || { counter += 1; ID::new (&format! ("generated-{}", counter)) };
     let mut built : Vec<BuiltDocument> = documents . iter ()
-      . map (|doc| build_document (doc, &source, &mut next) . unwrap ())
+      . map (|doc| build_document (doc, &repo, &mut next) . unwrap ())
       . collect ();
     resolve_document_links (&mut documents, &mut built,
       Path::new ("/container/import"), None, &HashMap::new ());
@@ -515,10 +515,10 @@ mod tests {
       Path::new ("doc.org"),
       "* Top\n** Section\n:PROPERTIES:\n:CUSTOM_ID: sec\n:END:\n** Other\n[[#sec][by id]] [[*Section][by heading]]\n"
         . to_string ())];
-    let source : SourceName = SourceName::from ("owned");
+    let repo : RepoName = RepoName::from ("owned");
     let mut next = || ID::new (&uuid::Uuid::new_v4 () . to_string ());
     let mut built : Vec<BuiltDocument> = documents . iter ()
-      . map (|doc| build_document (doc, &source, &mut next) . unwrap ())
+      . map (|doc| build_document (doc, &repo, &mut next) . unwrap ())
       . collect ();
     resolve_document_links (&mut documents, &mut built,
       Path::new ("/input"), None, &HashMap::new ());
@@ -547,11 +547,11 @@ mod tests {
     let mut documents : Vec<ParsedDocument> = vec![parse_document (
       Path::new ("notes.md"),
       "# A\n# A-1\n# A\n[third](#a-2)\n" . to_string ())];
-    let source : SourceName = SourceName::from ("owned");
+    let repo : RepoName = RepoName::from ("owned");
     let mut counter : usize = 0;
     let mut next = || { counter += 1; ID::new (&format! ("generated-{}", counter)) };
     let mut built : Vec<BuiltDocument> = documents . iter ()
-      .map (|document| build_document (document, &source, &mut next) . unwrap ())
+      .map (|document| build_document (document, &repo, &mut next) . unwrap ())
       .collect ();
     let expected : ID = built [0] . nodes [3] . pid . clone ();
     resolve_document_links (&mut documents, &mut built,
@@ -566,11 +566,11 @@ mod tests {
       Path::new ("notes.md"),
       "# Topic\nOne[^a] and again[^a].\n\n[^a]: See [other](other.org).\n    More detail.\n"
         .to_string ())];
-    let source : SourceName = SourceName::from ("owned");
+    let repo : RepoName = RepoName::from ("owned");
     let mut counter : usize = 0;
     let mut next = || { counter += 1; ID::new (&format! ("generated-{}", counter)) };
     let mut built : Vec<BuiltDocument> = documents . iter ()
-      .map (|doc| build_document (doc, &source, &mut next) . unwrap ())
+      .map (|doc| build_document (doc, &repo, &mut next) . unwrap ())
       .collect ();
     let footnote_index : usize = built [0] . footnote_node_indices ["a"];
     let footnote_id : ID = built [0] . nodes [footnote_index] . pid . clone ();
@@ -597,10 +597,10 @@ mod tests {
       Path::new ("readme.md"),
       "See [chart](assets/chart.png), [code](../server/save.rs) and [gone](../gone.md)."
         . to_string ())];
-    let source : SourceName = SourceName::from ("owned");
+    let repo : RepoName = RepoName::from ("owned");
     let mut next = || ID::new (&uuid::Uuid::new_v4 () . to_string ());
     let mut built : Vec<BuiltDocument> = documents . iter ()
-      .map (|document| build_document (document, &source, &mut next) . unwrap ())
+      .map (|document| build_document (document, &repo, &mut next) . unwrap ())
       .collect ();
     resolve_document_links (&mut documents, &mut built,
       temp . path (), Some (Path::new ("/host/notes")), &HashMap::new ());
@@ -620,10 +620,10 @@ mod tests {
       Path::new ("refs.md"),
       "# Link\n[site][web]\n# Definitions\n[web]: https://example.org\n"
         .to_string ())];
-    let source : SourceName = SourceName::from ("owned");
+    let repo : RepoName = RepoName::from ("owned");
     let mut next = || ID::new (&uuid::Uuid::new_v4 () . to_string ());
     let mut built : Vec<BuiltDocument> = documents . iter ()
-      .map (|document| build_document (document, &source, &mut next) . unwrap ())
+      .map (|document| build_document (document, &repo, &mut next) . unwrap ())
       .collect ();
     resolve_document_links (&mut documents, &mut built,
       Path::new ("/input"), None, &HashMap::new ());

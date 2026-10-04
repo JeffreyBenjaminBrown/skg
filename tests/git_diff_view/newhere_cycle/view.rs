@@ -18,11 +18,11 @@ async fn test_newhere_cycle (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir . path();
-  setup_git_repo_with_fixtures (repo_path)?;
-  s . reset_with_source_path (
+  let gitrepo_path = temp_dir . path();
+  setup_gitrepo_with_fixtures (gitrepo_path)?;
+  s . reset_with_repo_path (
     "test_newhere_cycle",
-    repo_path ) ?;
+    gitrepo_path ) ?;
   let (config, _tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);
@@ -40,11 +40,11 @@ async fn test_newhere_cycle_staged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir . path();
-  setup_git_repo_with_fixtures_staged (repo_path)?;
-  s . reset_with_source_path (
+  let gitrepo_path = temp_dir . path();
+  setup_gitrepo_with_fixtures_staged (gitrepo_path)?;
+  s . reset_with_repo_path (
     "test_newhere_cycle_staged",
-    repo_path ) ?;
+    gitrepo_path ) ?;
   let (config, _tantivy)
     : (&SkgConfig, &mut TantivyIndex)
     = (&s . config, &mut s . tantivy);

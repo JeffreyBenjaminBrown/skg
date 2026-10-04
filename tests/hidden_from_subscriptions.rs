@@ -6,7 +6,7 @@
 // 2. After saving with definitive view requests, HiddenInSubscribeeFolder is shown
 
 use indoc::indoc;
-use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_sources;
+use skg::dbs::filesystem::multiple_nodes::read_all_skg_files_from_repos;
 use skg::assert_metadata_eq;
 use skg::test_utils::{
   extract_string_field_from_sexp,
@@ -287,7 +287,7 @@ fn node_from_disk (
   pid    : &str,
 ) -> Result<NodeComplete, Box<dyn Error>> {
   let id : ID = ID::from (pid);
-  read_all_skg_files_from_sources (config)?
+  read_all_skg_files_from_repos (config)?
     . into_iter()
     . find ( |node| node . pid == id )
     . ok_or_else ( || format! ("node not found on disk: {}", pid) . into() ) }

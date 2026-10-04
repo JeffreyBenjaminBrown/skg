@@ -15,11 +15,11 @@
 (require 'skg-config)
 
 (defvar test--config-public-and-private
-  (concat "[[sources]]\n"
+  (concat "[[repos]]\n"
           "name = \"public\"\n"
           "path = \"owned/public\"\n"
           "\n"
-          "[[sources]]\n"
+          "[[repos]]\n"
           "name = \"private\"\n"
           "path = \"owned/private\"\n"
           "")
@@ -27,7 +27,7 @@
 
 (defvar test--config-with-foreign-source
   (concat test--config-public-and-private
-          "\n[[sources]]\n"
+          "\n[[repos]]\n"
           "name = \"foreign\"\n"
           "path = \"" (expand-file-name
                        "test-skg-insert-heading-source-prompt/foreign"
@@ -36,21 +36,21 @@
   "Config text with two owned sources and one foreign source.")
 
 (defvar test--config-with-interleaved-source-sets
-  (concat "[[source_sets]]\n"
+  (concat "[[repo_sets]]\n"
           "name = \"public-set\"\n"
           "sources = [\"public\"]\n\n"
-          "[[sources]]\n"
+          "[[repos]]\n"
           "name = \"public\"\n"
           "path = \"owned/public\"\n"
           "\n"
-          "[[source_sets]]\n"
+          "[[repo_sets]]\n"
           "name = \"private-set\"\n"
           "sources = [\"private\"]\n\n"
-          "[[sources]]\n"
+          "[[repos]]\n"
           "name = \"private\"\n"
           "path = \"owned/private\"\n"
           "")
-  "Config text with [[sources]] interleaved among other array\ntables. The [[source_sets]] tables are RETIRED config the server\nwould reject; they remain here to pin that the elisp readers skip\ntables they do not care about.")
+  "Config text with [[repos]] interleaved among other array\ntables. The [[repo_sets]] tables are RETIRED config the server\nwould reject; they remain here to pin that the elisp readers skip\ntables they do not care about.")
 
 (defun test--with-skg-content-view (org-text config-text body-fn)
   "Run BODY-FN in a temp skg content-view buffer with ORG-TEXT.
@@ -118,7 +118,7 @@ insert metadata with chosen source, and not open the sexp-edit buffer."
   "When there is only one owned source, C-return should use it
 without prompting."
   (let ((one-source-config
-         (concat "[[sources]]\n"
+         (concat "[[repos]]\n"
                  "name = \"only\"\n"
                  "path = \"owned/only\"\n"
                  "")))
@@ -288,7 +288,7 @@ the sources in privacy order, then \"all\"."
                       "private"))))))
 
 (ert-deftest test-config-readers-handle-interleaved-source-tables ()
-  "Elisp config readers should not confuse [[sources]] and [[source_sets]]."
+  "Elisp config readers should not confuse [[repos]] and [[repo_sets]]."
   (test--with-skg-content-view
    "* (skg (node (id x) (source public))) x\n"
    test--config-with-interleaved-source-sets
@@ -302,7 +302,7 @@ the sources in privacy order, then \"all\"."
 ;; --- Empty-node metadata view (C-c v m on a metadata-less headline) ---
 
 (defvar test--config-one-source
-  (concat "[[sources]]\n"
+  (concat "[[repos]]\n"
           "name = \"only\"\n"
           "path = \"owned/only\"\n"
           "")

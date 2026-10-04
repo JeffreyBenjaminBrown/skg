@@ -1,11 +1,11 @@
 use crate::types::git::{MembershipAxes, NodeChanges};
-use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_source;
+use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::misc::{ID, SkgConfig, SourceName};
+use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::git::{SourceDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_activeNode};
+use crate::types::git::{RepoDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_activeNode};
 use crate::types::tree::generic::error_unless_node_satisfies;
-use crate::update_buffer::ancestry::pid_and_source_from_required_ancestor;
+use crate::update_buffer::ancestry::pid_and_repo_from_required_ancestor;
 use crate::types::viewnode::{ViewNode, ViewNodeKind};
 use crate::types::viewnode::{QualFolder, Qual};
 use crate::update_buffer::util::complete_relevant_children_in_viewnodetree;
@@ -26,7 +26,7 @@ pub fn reconcile_idFolder_children (
   idfolder_node_id : NodeId,
   tree          : &mut Tree<ViewNode>,
   graph         : &InRustGraph,
-  source_diffs  : &Option<HashMap<SourceName, SourceDiff>>,
+  repo_diffs  : &Option<HashMap<RepoName, RepoDiff>>,
   config        : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
@@ -36,18 +36,18 @@ pub fn reconcile_idFolder_children (
     "reconcile_idFolder_children: Node is not an IDFolder" )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: parent Active vognode read through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 0).
-  let (parent_pid, parent_source) : (ID, SourceName) =
-    pid_and_source_from_required_ancestor(
+  let (parent_pid, parent_repo) : (ID, RepoName) =
+    pid_and_repo_from_required_ancestor(
       tree, idfolder_node_id, 0,
       "reconcile_idFolder_children" ) ?;
   let parent_nodecomplete : NodeComplete =
-    nodecomplete_rustFirst_by_pid_and_source (
-      graph, config, &parent_pid, &parent_source )
+    nodecomplete_rustFirst_by_pid_and_repo (
+      graph, config, &parent_pid, &parent_repo )
     . map_err ( |_| "reconcile_idFolder_children: parent NodeComplete not found" ) ?;
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
     per_stage_node_changes_for_activeNode (
-      source_diffs, &parent_pid, &parent_source );
+      repo_diffs, &parent_pid, &parent_repo );
   let (goal_list, axes_map)
     : (Vec<ID>, HashMap<ID, MembershipAxes>) =
     if staged_nc . is_none () && unstaged_nc . is_none () {

@@ -3,16 +3,16 @@
 //! - fold(unfold(x)) == x for every list of relation partners ("round-trip");
 //! - unfold(fold(sections)) is idempotent from the first application
 //!   (unfold output is canonical);
-//! - every member's source survives both directions;
+//! - every member's repo survives both directions;
 //! - dangling/duplicate-anchor junk folds totally and
 //!   deterministically;
-//! - the silent-leak guard: no member ever changes source.
+//! - the silent-leak guard: no member ever changes repo.
 
 use super::fold::{FoldedNode, fold_sections, nodecomplete_from_fold};
 use super::types::{FoldWarning, ListItem, SectionSlices, Telescope};
 use super::unfold::{UnfoldInput, unfold_node};
 use crate::types::misc::{
-  ID, RelPartner, SkgConfig, SkgfileSource, SourceName,
+  ID, RelPartner, SkgConfig, SkgfileRepo, RepoName,
 };
 use crate::types::nodes::complete::FileProperty;
 
@@ -21,33 +21,33 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// The test privacy order: S0 most public .. S3 most private.
-fn source_universe () -> Vec<SourceName> {
-  (0..4) . map ( |i| SourceName ( format! ("S{}", i) ))
+fn repo_universe () -> Vec<RepoName> {
+  (0..4) . map ( |i| RepoName ( format! ("S{}", i) ))
     . collect () }
 
 fn telescope_config () -> SkgConfig {
-  let sources : HashMap<SourceName, SkgfileSource> =
-    source_universe () . into_iter ()
-    . map ( |source| (
-      source . clone (),
-      SkgfileSource {
-        name         : source . clone (),
+  let repos : HashMap<RepoName, SkgfileRepo> =
+    repo_universe () . into_iter ()
+    . map ( |repo| (
+      repo . clone (),
+      SkgfileRepo {
+        name         : repo . clone (),
         abbreviation : None,
-        path         : PathBuf::from (format! ("owned/{}", source)),
+        path         : PathBuf::from (format! ("owned/{}", repo)),
         user_owns_it : true,
       } ))
     . collect ();
-  let mut config : SkgConfig = SkgConfig::dummyFromSources (sources);
-  config . source_order = source_universe ();
+  let mut config : SkgConfig = SkgConfig::dummyFromRepos (repos);
+  config . repo_order = repo_universe ();
   config }
 
 fn unfold_sections (
   input : &UnfoldInput,
-) -> Vec<(SourceName, SectionSlices)> {
+) -> Vec<(RepoName, SectionSlices)> {
   unfold_node (input, &telescope_config ()) . unwrap ()
     . into_sections () . into_iter ()
-    . map ( |(source, node_fs)|
-      (source, node_fs . into_section_slices ()) )
+    . map ( |(repo, node_fs)|
+      (repo, node_fs . into_section_slices ()) )
     . collect () }
 
 fn identity_resolve (
@@ -56,17 +56,17 @@ fn identity_resolve (
   id . clone () }
 
 /// An arbitrary list of relation partners with UNIQUE members: up to N
-/// members, each at a random source in the universe. Uniqueness matters
+/// members, each at a random repo in the universe. Uniqueness matters
 /// because the fold dedups (with warnings), which round-trip inputs
 /// must not trigger.
 fn arb_rel_partners (
   max_len : usize,
 ) -> impl Strategy<Value = Vec<RelPartner<ID>>> {
   proptest::collection::vec ( 0usize..4, 0..max_len )
-    . prop_map ( |sources| {
-      let universe : Vec<SourceName> = source_universe ();
-      sources . into_iter () . enumerate ()
-        . map ( |(i, l)| RelPartner::at_relSource (
+    . prop_map ( |repos| {
+      let universe : Vec<RepoName> = repo_universe ();
+      repos . into_iter () . enumerate ()
+        . map ( |(i, l)| RelPartner::at_relRepo (
           universe [l] . clone (),
           ID ( format! ("id{}", i) )))
         . collect () } ) }
@@ -74,16 +74,16 @@ fn arb_rel_partners (
 /// Wrap ordered lists of relation partners (and nothing else) into an
 /// UnfoldInput-shaped FoldedNode for the round-trip tests.
 fn folded_from_lists (
-  home     : &SourceName,
+  home     : &RepoName,
   contains : Vec<RelPartner<ID>>,
   subs     : Vec<RelPartner<ID>>,
   hides    : Vec<RelPartner<ID>>,
 ) -> FoldedNode {
   FoldedNode {
     title                        : Some ("t" . to_string ()),
-    title_source                 : Some (home . clone ()),
+    title_repo                 : Some (home . clone ()),
     body                         : None,
-    body_source                  : None,
+    body_repo                  : None,
     home                         : Some ( home . clone () ),
     aliases                      : None,
     contains,
@@ -96,9 +96,9 @@ fn folded_from_lists (
 fn unfold_then_fold (
   folded : &FoldedNode,
 ) -> (FoldedNode, Vec<FoldWarning>) {
-  let home : SourceName =
+  let home : RepoName =
     folded . home . clone () . expect ("home set");
-  let sections : Vec<(SourceName, SectionSlices)> =
+  let sections : Vec<(RepoName, SectionSlices)> =
     unfold_sections (
       & UnfoldInput {
         pid      : &ID::new ("p"),
@@ -122,12 +122,12 @@ fn unfold_then_fold (
 
 #[test]
 fn file_properties_write_at_home_and_fold_defensively_from_all_sections () {
-  let home = SourceName::from ("S0");
-  let private = SourceName::from ("S2");
+  let home = RepoName::from ("S0");
+  let private = RepoName::from ("S2");
   let misc = vec![
     FileProperty::Had_ID_Before_Import,
     FileProperty::NoSearchMatching];
-  let contains = vec![RelPartner::at_relSource (
+  let contains = vec![RelPartner::at_relRepo (
     private . clone (), ID::from ("child"))];
   let mut sections = unfold_node (&UnfoldInput {
     pid: &ID::from ("p"), extra_ids: &[], misc: &misc,
@@ -140,7 +140,7 @@ fn file_properties_write_at_home_and_fold_defensively_from_all_sections () {
     . all (|(_, section)| section . misc . is_empty ()));
 
   let private_section = sections . iter_mut ()
-    . find (|(source, _)| source == &private) . unwrap ();
+    . find (|(repo, _)| repo == &private) . unwrap ();
   private_section . 1 . misc = vec![
     FileProperty::NoSearchMatching,
     FileProperty::Was_Overloaded];
@@ -164,15 +164,15 @@ proptest! {
     // distinct id spaces so the three lists cannot collide
     let subs : Vec<RelPartner<ID>> =
       subs_raw . into_iter ()
-      . map ( |m| RelPartner::at_relSource (
-        m . relSource, ID ( format! ("s-{}", m . member . 0 ))))
+      . map ( |m| RelPartner::at_relRepo (
+        m . relRepo, ID ( format! ("s-{}", m . member . 0 ))))
       . collect ();
     let hides : Vec<RelPartner<ID>> =
       hides_raw . into_iter ()
-      . map ( |m| RelPartner::at_relSource (
-        m . relSource, ID ( format! ("h-{}", m . member . 0 ))))
+      . map ( |m| RelPartner::at_relRepo (
+        m . relRepo, ID ( format! ("h-{}", m . member . 0 ))))
       . collect ();
-    let home : SourceName = SourceName::from ("S0");
+    let home : RepoName = RepoName::from ("S0");
     let folded : FoldedNode =
       folded_from_lists (&home, contains, subs, hides);
     let (refolded, warnings) = unfold_then_fold (&folded);
@@ -182,10 +182,10 @@ proptest! {
     prop_assert_eq! ( &refolded . subscribes_to,
                       &folded . subscribes_to );
     { // Unordered relations have no order to preserve: sections
-      // cannot express cross-source interleavings without anchors,
+      // cannot express cross-repo interleavings without anchors,
       // which unordered relations deliberately lack, so the fold's
-      // output order is CANONICAL (source-major). The law is
-      // set-equality with sources intact.
+      // output order is CANONICAL (repo-major). The law is
+      // set-equality with repos intact.
       let sort = |v : Option<&Vec<RelPartner<ID>>>|
       -> Vec<RelPartner<ID>> {
         let mut v : Vec<RelPartner<ID>> =
@@ -206,11 +206,11 @@ proptest! {
     contains in arb_rel_partners (12),
   ) {
     // unfold . fold . unfold == unfold  (sections are a normal form)
-    let home : SourceName = SourceName::from ("S0");
+    let home : RepoName = RepoName::from ("S0");
     let folded : FoldedNode = folded_from_lists (
       &home, contains, Vec::new (), Vec::new ());
     let (refolded, _) = unfold_then_fold (&folded);
-    let sections_once : Vec<(SourceName, SectionSlices)> =
+    let sections_once : Vec<(RepoName, SectionSlices)> =
       unfold_sections (
         & UnfoldInput {
           pid : &ID::new ("p"), extra_ids : &[], misc : &[],
@@ -220,7 +220,7 @@ proptest! {
           subscribes_to : &[],
           hides_from_its_subscriptions : &[],
           overrides_view_of : &[], } );
-    let sections_twice : Vec<(SourceName, SectionSlices)> =
+    let sections_twice : Vec<(RepoName, SectionSlices)> =
       unfold_sections (
         & UnfoldInput {
           pid : &ID::new ("p"), extra_ids : &[], misc : &[],
@@ -234,10 +234,10 @@ proptest! {
   }
 
   #[test]
-  fn no_member_ever_changes_source ( // the silent-leak guard
+  fn no_member_ever_changes_repo ( // the silent-leak guard
     contains in arb_rel_partners (12),
   ) {
-    let home : SourceName = SourceName::from ("S0");
+    let home : RepoName = RepoName::from ("S0");
     let folded : FoldedNode = folded_from_lists (
       &home, contains . clone (), Vec::new (), Vec::new ());
     let (refolded, _) = unfold_then_fold (&folded);
@@ -246,7 +246,7 @@ proptest! {
         refolded . contains . iter ()
         . find ( |n| n . member == m . member );
       prop_assert_eq! (
-        found . map ( |n| &n . relSource ), Some ( &m . relSource ),
+        found . map ( |n| &n . relRepo ), Some ( &m . relRepo ),
         "member {:?} changed source", m . member );
     }
   }
@@ -257,15 +257,15 @@ fn dangling_anchor_attaches_after_preceding_run_with_warning (
 ) {
   // S1's section: prepend [p], run (a,[x]), then a run whose anchor
   // is unknown -- its members must follow the PRECEDING run, warned.
-  let sections : Vec<(SourceName, SectionSlices)> = vec! [
-    ( SourceName::from ("S0"),
+  let sections : Vec<(RepoName, SectionSlices)> = vec! [
+    ( RepoName::from ("S0"),
       SectionSlices {
         title : Some ("t" . to_string ()),
         contains : Some ( vec! [
           ListItem::Member ( ID::new ("a") ),
           ListItem::Member ( ID::new ("b") ) ] ),
         .. SectionSlices::default () } ),
-    ( SourceName::from ("S1"),
+    ( RepoName::from ("S1"),
       SectionSlices {
         contains : Some ( vec! [
           ListItem::Member ( ID::new ("p") ),
@@ -290,14 +290,14 @@ fn dangling_anchor_attaches_after_preceding_run_with_warning (
 #[test]
 fn dangling_first_run_joins_the_prepend (
 ) {
-  let sections : Vec<(SourceName, SectionSlices)> = vec! [
-    ( SourceName::from ("S0"),
+  let sections : Vec<(RepoName, SectionSlices)> = vec! [
+    ( RepoName::from ("S0"),
       SectionSlices {
         title : Some ("t" . to_string ()),
         contains : Some ( vec! [
           ListItem::Member ( ID::new ("a") ) ] ),
         .. SectionSlices::default () } ),
-    ( SourceName::from ("S1"),
+    ( RepoName::from ("S1"),
       SectionSlices {
         contains : Some ( vec! [
           ListItem::Anchor { anchor : ID::new ("GONE") },
@@ -317,14 +317,14 @@ fn dangling_first_run_joins_the_prepend (
 #[test]
 fn duplicate_anchors_concatenate_in_file_order (
 ) {
-  let sections : Vec<(SourceName, SectionSlices)> = vec! [
-    ( SourceName::from ("S0"),
+  let sections : Vec<(RepoName, SectionSlices)> = vec! [
+    ( RepoName::from ("S0"),
       SectionSlices {
         title : Some ("t" . to_string ()),
         contains : Some ( vec! [
           ListItem::Member ( ID::new ("a") ) ] ),
         .. SectionSlices::default () } ),
-    ( SourceName::from ("S1"),
+    ( RepoName::from ("S1"),
       SectionSlices {
         contains : Some ( vec! [
           ListItem::Anchor { anchor : ID::new ("a") },
@@ -347,14 +347,14 @@ fn anchors_resolve_through_the_resolver ( // extra-id safety
   let resolve = |id : &ID| -> ID {
     // "a-alias" is an extra id of "a"
     if id . 0 == "a-alias" { ID::new ("a") } else { id . clone () }};
-  let sections : Vec<(SourceName, SectionSlices)> = vec! [
-    ( SourceName::from ("S0"),
+  let sections : Vec<(RepoName, SectionSlices)> = vec! [
+    ( RepoName::from ("S0"),
       SectionSlices {
         title : Some ("t" . to_string ()),
         contains : Some ( vec! [
           ListItem::Member ( ID::new ("a") ) ] ),
         .. SectionSlices::default () } ),
-    ( SourceName::from ("S1"),
+    ( RepoName::from ("S1"),
       SectionSlices {
         contains : Some ( vec! [
           ListItem::Anchor { anchor : ID::new ("a-alias") },
@@ -376,13 +376,13 @@ fn the_home_is_the_most_public_section_titled_or_not (
     // section. So the home is the most public SECTION, not the most
     // public section bearing a title; a titleless one above the
     // title is a violation to report, not a shape to search past.
-  let titleless_public : (SourceName, SectionSlices) =
-    ( SourceName::from ("public"),
+  let titleless_public : (RepoName, SectionSlices) =
+    ( RepoName::from ("public"),
       SectionSlices { contains : Some ( vec! [
         ListItem::Member ( ID::new ("C") ) ] ),
         .. SectionSlices::default () } );
-  let titled_private : (SourceName, SectionSlices) =
-    ( SourceName::from ("private"),
+  let titled_private : (RepoName, SectionSlices) =
+    ( RepoName::from ("private"),
       SectionSlices { title : Some ( "N" . to_string () ),
                       body  : Some ( "secret" . to_string () ),
                       .. SectionSlices::default () } );
@@ -391,25 +391,25 @@ fn the_home_is_the_most_public_section_titled_or_not (
       & [ titleless_public, titled_private ],
       & identity_resolve );
   assert_eq! ( folded . home,
-               Some ( SourceName::from ("public") ),
+               Some ( RepoName::from ("public") ),
                "the home is the most public section" );
   assert_eq! ( folded . title, Some ( "N" . to_string () ),
                "the title still folds in, from wherever it sits" );
   assert! ( warnings . contains ( & FoldWarning::TitleBelowHome {
-              home     : SourceName::from ("public"),
-              title_at : SourceName::from ("private"), } ),
+              home     : RepoName::from ("public"),
+              title_at : RepoName::from ("private"), } ),
             "the shape is reported: {:?}", warnings );
 }
 
 #[test]
 fn a_titled_most_public_section_raises_no_title_warning (
 ) {
-  let titled_public : (SourceName, SectionSlices) =
-    ( SourceName::from ("public"),
+  let titled_public : (RepoName, SectionSlices) =
+    ( RepoName::from ("public"),
       SectionSlices { title : Some ( "N" . to_string () ),
                       .. SectionSlices::default () } );
-  let titleless_private : (SourceName, SectionSlices) =
-    ( SourceName::from ("private"),
+  let titleless_private : (RepoName, SectionSlices) =
+    ( RepoName::from ("private"),
       SectionSlices { contains : Some ( vec! [
         ListItem::Member ( ID::new ("C") ) ] ),
         .. SectionSlices::default () } );
@@ -418,7 +418,7 @@ fn a_titled_most_public_section_raises_no_title_warning (
       & [ titled_public, titleless_private ],
       & identity_resolve );
   assert_eq! ( folded . home,
-               Some ( SourceName::from ("public") ) );
+               Some ( RepoName::from ("public") ) );
   assert! ( ! warnings . iter () . any ( |w| matches! (
               w, FoldWarning::TitleBelowHome { .. }
                  | FoldWarning::NonHomeTitle { .. }
@@ -428,7 +428,7 @@ fn a_titled_most_public_section_raises_no_title_warning (
 }
 
 fn text_node (
-  sections : Vec<(SourceName, SectionSlices)>,
+  sections : Vec<(RepoName, SectionSlices)>,
 ) -> (crate::types::nodes::complete::NodeComplete, Vec<FoldWarning>) {
   let (folded, warnings) = fold_sections (&sections, &identity_resolve);
   let node = nodecomplete_from_fold (
@@ -439,8 +439,8 @@ fn text_node (
 #[test]
 fn title_and_body_select_independently_and_mark_overPrivateTextness (
 ) {
-  let public = SourceName::from ("public");
-  let private = SourceName::from ("private");
+  let public = RepoName::from ("public");
+  let private = RepoName::from ("private");
 
   let (clean, _) = text_node (vec! [
     ( public . clone (), SectionSlices {
@@ -491,10 +491,10 @@ fn title_and_body_select_independently_and_mark_overPrivateTextness (
 }
 
 #[test]
-fn later_text_reports_the_source_that_actually_won (
+fn later_text_reports_the_repo_that_actually_won (
 ) {
-  let public = SourceName::from ("public");
-  let private = SourceName::from ("private");
+  let public = RepoName::from ("public");
+  let private = RepoName::from ("private");
   let (_node, warnings) = text_node (vec! [
     ( public . clone (), SectionSlices {
         title : Some ("winner" . to_string ()),
@@ -505,7 +505,7 @@ fn later_text_reports_the_source_that_actually_won (
         body  : Some ("later body" . to_string ()),
         .. SectionSlices::default () } ) ]);
   assert! (warnings . contains (&FoldWarning::NonHomeTitle {
-    source : private . clone (), selected_at : public . clone () }));
+    repo : private . clone (), selected_at : public . clone () }));
   assert! (warnings . contains (&FoldWarning::NonHomeBody {
-    source : private, selected_at : public }));
+    repo : private, selected_at : public }));
 }

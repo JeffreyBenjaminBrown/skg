@@ -15,13 +15,13 @@ use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_n
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::delete_references_to_absent_node::handle_delete_references_to_absent_node_request;
-use crate::serve::handlers::diff_report::handle_diff_report_request_with_source_set;
-use crate::serve::handlers::relSource_info::handle_relSource_info_request;
+use crate::serve::handlers::diff_report::handle_diff_report_request_with_repo_set;
+use crate::serve::handlers::relRepo_info::handle_relRepo_info_request;
 use crate::serve::handlers::boolprop_state::handle_boolprop_state_request;
 use crate::serve::handlers::export_to_org::handle_export_to_org_request;
 use crate::serve::handlers::import_md_and_org::{
   PendingImport, handle_import_md_and_org_request};
-use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_source_set;
+use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_repo_set;
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
 use crate::serve::handlers::rebuild_ephemeral_data_stores::handle_rebuild_ephemeral_data_stores_request;
 use crate::serve::handlers::rerender_all_views::{ handle_git_diff_toggle_and_rerender, handle_rerender_all_views_request};
@@ -31,22 +31,22 @@ use crate::serve::handlers::text_release::{
   decide as decide_text_release,
   exclude_overPrivateText_nodes_from_viewforest};
 use crate::serve::handlers::single_root_view::handle_single_root_view_request;
-use crate::serve::handlers::source_sets::handle_source_set_request;
+use crate::serve::handlers::repo_sets::handle_repo_set_request;
 use crate::serve::handlers::stage_moves::handle_stage_moves_request;
 use crate::serve::handlers::strip_body_whitespace::handle_strip_body_whitespace_request;
 use crate::serve::handlers::text_search::render_enriched_search_buffer::{insert_containerward_ancestries_into_search_view, insert_overrideward_view_subtrees};
 use crate::serve::handlers::text_search::{ handle_text_search_request, SearchEnrichmentPayload, mk_search_enrichment_sexp};
-use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request_with_source_set;
+use crate::serve::handlers::titles_by_ids::handle_titles_by_ids_request_with_repo_set;
 use crate::serve::handlers::link_statuses::handle_link_statuses_request;
 use crate::serve::protocol::{RequestType, TcpToClient};
 use crate::serve::util::{ read_length_prefixed_content, request_type_from_request, send_response_with_length_prefix, tag_text_response, value_from_request_sexp};
 use crate::to_org::util::mark_view_roots_parent_na;
 use crate::types::env::SkgEnv;
 use crate::types::errors::BufferValidationError;
-use crate::source_sets::ActiveSourceSet;
-use crate::source_sets::apply_source_set_to_viewforest;
+use crate::repo_sets::ActiveRepoSet;
+use crate::repo_sets::apply_repo_set_to_viewforest;
 use crate::types::maybe_placed_viewnode::{MpViewnode,maybePlaced_to_placed_tree};
-use crate::types::misc::SourceSetName;
+use crate::types::misc::RepoSetName;
 use crate::types::viewnode::ViewNode;
 use crate::types::views_state::{OpenViews, ViewUri};
 use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
@@ -101,16 +101,16 @@ fn handle_emacs (
     ViewsState {
       diff_mode_enabled : false,
       open_views        : OpenViews::new (), };
-  let mut active_source_set : ActiveSourceSet =
-    ActiveSourceSet::default_from_config (
+  let mut active_repo_set : ActiveRepoSet =
+    ActiveRepoSet::default_from_config (
       &runtime . config )
       . unwrap_or_else ( |e| {
         tracing::error! (
           error = %e,
           "failed to initialize active source-set; falling back to all");
-        ActiveSourceSet::named (
+        ActiveRepoSet::named (
           &runtime . config,
-          SourceSetName::from ("all"))
+          RepoSetName::from ("all"))
         . expect ("reserved source-set all should always resolve") });
 
   let enrichment_slot // To update search results once the 'enrichment' (containerward paths + graphnodestats) has been computed.
@@ -146,7 +146,7 @@ fn handle_emacs (
               &request_header,
               &env,
               &mut views_state,
-              &active_source_set ),
+              &active_repo_set ),
           Ok (RequestType::SaveBuffer) =>
             // PITFALL: Uses the same BufReader that read the request,
             // so that any already-buffered header/payload are visible.
@@ -156,7 +156,7 @@ fn handle_emacs (
               &request_header,
               &mut env,
               &mut views_state,
-              &active_source_set ),
+              &active_repo_set ),
           Ok (RequestType::CloseView) =>
             handle_close_view_request (
               &mut stream,
@@ -165,7 +165,7 @@ fn handle_emacs (
           Ok (RequestType::DeleteReferencesToAbsentNode) =>
             handle_delete_references_to_absent_node_request (
               &mut stream, &request_header, &mut env, &mut views_state,
-              &active_source_set ),
+              &active_repo_set ),
           Ok (RequestType::SnapshotResponse) => {
             snapshot_requested = false;
             handle_snapshot_response (
@@ -175,7 +175,7 @@ fn handle_emacs (
               &enrichment_slot,
               &env,
               &mut views_state,
-              &active_source_set ); }
+              &active_repo_set ); }
           Ok (RequestType::TextSearch) => {
             // Cancel any in-flight background search
             search_cancelled . store (true, Ordering::SeqCst);
@@ -187,7 +187,7 @@ fn handle_emacs (
               &enrichment_slot,
               &search_cancelled,
               &mut views_state,
-              &active_source_set ); }
+              &active_repo_set ); }
           Ok (RequestType::VerifyConnection) =>
             handle_verify_connection_request (
               &mut stream ),
@@ -195,43 +195,43 @@ fn handle_emacs (
             // Never returns - exits process
             handle_shutdown_request ( &mut stream, &env ),
           Ok (RequestType::GetFilePath) =>
-            handle_get_file_path_request_with_source_set ( &mut stream,
+            handle_get_file_path_request_with_repo_set ( &mut stream,
                                            &request_header,
                                            &runtime . config,
-                                           &active_source_set ),
+                                           &active_repo_set ),
           Ok (RequestType::TitlesByIds) =>
-            handle_titles_by_ids_request_with_source_set (
+            handle_titles_by_ids_request_with_repo_set (
               &mut stream, &request_header,
               &runtime . tantivy_index, &runtime . config,
               views_state . diff_mode_enabled,
-              &active_source_set,
+              &active_repo_set,
               &runtime . graph ),
           Ok (RequestType::LinkStatuses) =>
             handle_link_statuses_request (
               &mut stream, &request_header, &runtime . graph,
-              &runtime . config, &active_source_set ),
+              &runtime . config, &active_repo_set ),
           Ok (RequestType::DiffReport) =>
-            handle_diff_report_request_with_source_set (
+            handle_diff_report_request_with_repo_set (
               &mut stream, &request_header, &runtime . config,
-              &active_source_set ),
+              &active_repo_set ),
           Ok (RequestType::StageMoves) =>
             handle_stage_moves_request (
               &mut stream, &runtime . config ),
-          Ok (RequestType::RelSourceInfo) =>
-            handle_relSource_info_request (
+          Ok (RequestType::RelRepoInfo) =>
+            handle_relRepo_info_request (
               &mut stream, &request_header, &env ),
           Ok (RequestType::BoolPropState) =>
             handle_boolprop_state_request (
               &mut stream, &request_header, &env ),
-          Ok (RequestType::ListSourceSets)
-          | Ok (RequestType::ActiveSourceSet)
-          | Ok (RequestType::SetActiveSourceSet) =>
-            handle_source_set_request (
+          Ok (RequestType::ListRepoSets)
+          | Ok (RequestType::ActiveRepoSet)
+          | Ok (RequestType::SetActiveRepoSet) =>
+            handle_repo_set_request (
               &mut stream,
               &request_header,
               &env,
               &mut views_state,
-              &mut active_source_set,
+              &mut active_repo_set,
               &enrichment_slot,
               &search_cancelled ),
           Ok (RequestType::HeraldRules) =>
@@ -242,7 +242,7 @@ fn handle_emacs (
               &request_header,
               &env,
               &mut views_state,
-              &active_source_set ),
+              &active_repo_set ),
           Ok (RequestType::ExportToOrg) =>
             handle_export_to_org_request ( &mut stream,
                                            &runtime . config,
@@ -263,7 +263,7 @@ fn handle_emacs (
               &request_header,
               &env,
               &mut views_state,
-              &active_source_set ),
+              &active_repo_set ),
           Err (err) => {
             tracing::error!(error = %err, "Error determining request type");
             send_response_with_length_prefix (
@@ -312,7 +312,7 @@ fn handle_snapshot_response (
   enrichment_slot : &Arc<Mutex<Option<SearchEnrichmentPayload>>>,
   _env            : &SkgEnv,
   views_state      : &mut ViewsState,
-  active_source_set : &ActiveSourceSet,
+  active_repo_set : &ActiveRepoSet,
 ) {
   let terms : String
     = match value_from_request_sexp ("terms", request)
@@ -353,10 +353,10 @@ fn handle_snapshot_response (
   insert_containerward_ancestries_into_search_view (
     &mut viewforest, &runtime . graph, &payload . search_results,
     &payload . ancestry_by_id, &runtime . tantivy_index,
-    &runtime . config, active_source_set );
+    &runtime . config, active_repo_set );
   insert_overrideward_view_subtrees (
     &mut viewforest, &runtime . graph, &payload . search_results,
-    active_source_set );
+    active_repo_set );
   { let root_treeid : NodeId =
       viewforest . root () . id ();
     set_metadata_relationships_in_node_recursive (
@@ -372,10 +372,10 @@ fn handle_snapshot_response (
     & payload . graphnodestats . container_to_contents,
     & payload . graphnodestats . content_to_containers,
     &runtime . config,
-    Some (active_source_set) );
-  apply_source_set_to_viewforest (
+    Some (active_repo_set) );
+  apply_repo_set_to_viewforest (
     &mut viewforest,
-    active_source_set );
+    active_repo_set );
   if ! payload . include_overPrivateText_telescopes {
     exclude_overPrivateText_nodes_from_viewforest (
       &mut viewforest, &runtime . graph ); }
@@ -392,7 +392,7 @@ fn handle_snapshot_response (
       rendered_pids . iter () . cloned () . collect ()
     } else { std::collections::HashSet::new () };
   let release = decide_text_release (
-    "search-enrichment", active_source_set, &rendered_pids,
+    "search-enrichment", active_repo_set, &rendered_pids,
     &runtime . graph, &approved );
   if matches! (release, TextReleaseDecision::Challenge { .. }) {
     // Preflight and the load-bearing payload should make this unreachable.

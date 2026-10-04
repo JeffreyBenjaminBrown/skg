@@ -1,13 +1,13 @@
-//! Unit tests for the `relSource info` endpoint's core
-//! ('relSource_info', BUG-and-fix_make-edge-more-public.org): one
-//! edge's (default, current) relSources, as served to the
-//! client's 'skg-set-relSource' menu.
+//! Unit tests for the `relRepo info` endpoint's core
+//! ('relRepo_info', BUG-and-fix_make-edge-more-public.org): one
+//! edge's (default, current) relRepos, as served to the
+//! client's 'skg-set-relRepo' menu.
 
-use super::{relSource_info, relation_from_client_string};
+use super::{relRepo_info, relation_from_client_string};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::types::misc::{
-  ID, RelPartner, SkgConfig, SkgfileSource, SourceName};
+  ID, RelPartner, SkgConfig, SkgfileRepo, RepoName};
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 
 use std::collections::HashMap;
@@ -16,41 +16,41 @@ use std::path::PathBuf;
 fn config_with_order (
   names : &[&str],
 ) -> SkgConfig {
-  let mut sources : HashMap<SourceName, SkgfileSource> =
+  let mut repos : HashMap<RepoName, SkgfileRepo> =
     HashMap::new ();
   for name in names {
-    sources . insert (
-      SourceName::from (*name),
-      SkgfileSource {
-        name         : SourceName::from (*name),
+    repos . insert (
+      RepoName::from (*name),
+      SkgfileRepo {
+        name         : RepoName::from (*name),
         abbreviation : None,
         path         : PathBuf::from ( format! ("owned/{}", name) ),
         user_owns_it : true, } ); }
   let mut config : SkgConfig =
-    SkgConfig::dummyFromSources (sources);
-  config . source_order =
-    names . iter () . map ( |n| SourceName::from (*n) ) . collect ();
+    SkgConfig::dummyFromRepos (repos);
+  config . repo_order =
+    names . iter () . map ( |n| RepoName::from (*n) ) . collect ();
   config }
 
 fn node_at (
   pid    : &str,
-  source : &str,
+  repo : &str,
 ) -> NodeComplete {
   let mut n : NodeComplete = empty_node_complete ();
   n . pid = ID::new (pid);
   n . title = pid . to_string ();
-  n . source = SourceName::from (source);
+  n . home_repo = RepoName::from (repo);
   n }
 
 fn pm (
-  source : &str,
+  repo : &str,
   member : &str,
 ) -> RelPartner<ID> {
-  RelPartner::at_relSource (
-    SourceName::from (source), ID::new (member) ) }
+  RelPartner::at_relRepo (
+    RepoName::from (repo), ID::new (member) ) }
 
 #[test]
-fn default_is_more_private_of_homes_and_current_is_the_relSource (
+fn default_is_more_private_of_homes_and_current_is_the_relRepo (
 ) {
   let config : SkgConfig =
     config_with_order ( & ["public", "trusted", "private"] );
@@ -61,13 +61,13 @@ fn default_is_more_private_of_homes_and_current_is_the_relSource (
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes ( & [ owner, child ] );
   let (default, current) =
-    relSource_info (
+    relRepo_info (
       &graph, &config,
       & ID::new ("owner"), & ID::new ("child"),
       NodeRelation::Contains ) . unwrap ();
-  assert_eq! ( default, SourceName::from ("trusted"),
+  assert_eq! ( default, RepoName::from ("trusted"),
                "default = more private of the endpoints' homes" );
-  assert_eq! ( current, Some ( SourceName::from ("private") ),
+  assert_eq! ( current, Some ( RepoName::from ("private") ),
                "current = the source the graph records" );
 }
 
@@ -83,11 +83,11 @@ fn current_is_none_for_an_unrecorded_edge (
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes ( & [ owner, child ] );
   let (default, current) =
-    relSource_info (
+    relRepo_info (
       &graph, &config,
       & ID::new ("owner"), & ID::new ("child"),
       NodeRelation::Contains ) . unwrap ();
-  assert_eq! ( default, SourceName::from ("private") );
+  assert_eq! ( default, RepoName::from ("private") );
   assert_eq! ( current, None );
 }
 
@@ -99,31 +99,31 @@ fn unknown_owner_is_an_error_but_unknown_member_uses_owner_home (
   let owner : NodeComplete = node_at ("owner", "public");
   let graph : InRustGraph =
     InRustGraph::from_nodecompletes ( & [ owner ] );
-  assert! ( relSource_info (
+  assert! ( relRepo_info (
     &graph, &config,
     & ID::new ("ghost"), & ID::new ("owner"),
     NodeRelation::Contains ) . is_err (),
     "unknown owner" );
-  let (default, current) = relSource_info (
+  let (default, current) = relRepo_info (
     &graph, &config,
     & ID::new ("owner"), & ID::new ("ghost"),
     NodeRelation::Contains ) . unwrap ();
-  assert_eq! (default, SourceName::from ("public"));
+  assert_eq! (default, RepoName::from ("public"));
   assert_eq! (current, None);
 }
 
 #[test]
-fn raw_unresolved_member_keeps_its_exact_relSource (
+fn raw_unresolved_member_keeps_its_exact_relRepo (
 ) {
   let config : SkgConfig = config_with_order ( & ["public", "private"] );
   let mut owner : NodeComplete = node_at ("owner", "public");
   owner . contains = vec! [ pm ("private", "absent-raw") ];
   let graph : InRustGraph = InRustGraph::from_nodecompletes ( & [owner] );
-  let (default, current) = relSource_info (
+  let (default, current) = relRepo_info (
     &graph, &config, &ID::new ("owner"), &ID::new ("absent-raw"),
     NodeRelation::Contains ) . unwrap ();
-  assert_eq! (default, SourceName::from ("public"));
-  assert_eq! (current, Some (SourceName::from ("private")));
+  assert_eq! (default, RepoName::from ("public"));
+  assert_eq! (current, Some (RepoName::from ("private")));
 }
 
 #[test]
@@ -145,17 +145,17 @@ fn owned_owner_with_foreign_member_defaults_to_owner_home (
       [("public", "private"), ("private", "public")] {
     let mut config : SkgConfig =
       config_with_order ( & ["public", "private"] );
-    config . sources . get_mut (&SourceName::from (member_home))
+    config . repos . get_mut (&RepoName::from (member_home))
       . unwrap () . user_owns_it = false;
-    config . sources . get_mut (&SourceName::from (owner_home))
+    config . repos . get_mut (&RepoName::from (owner_home))
       . unwrap () . user_owns_it = true;
     let owner : NodeComplete = node_at ("owner", owner_home);
     let member : NodeComplete = node_at ("member", member_home);
     let graph : InRustGraph =
       InRustGraph::from_nodecompletes (&[owner, member]);
-    let (default, current) = relSource_info (
+    let (default, current) = relRepo_info (
       &graph, &config, &ID::new ("owner"), &ID::new ("member"),
       NodeRelation::Contains ) . unwrap ();
-    assert_eq! (default, SourceName::from (owner_home));
+    assert_eq! (default, RepoName::from (owner_home));
     assert_eq! (current, None); }
 }

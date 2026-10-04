@@ -1,10 +1,10 @@
 tantivy_folder = "/tmp/placeholder"
-default_source_set = "public"
+default_repo_set = "public"
 
-[[sources]]
+[[repos]]
 name = "public"
 path = "owned/public"
 
-[[source_sets]]
+[[repo_sets]]
 name = "all"
-sources = ["public"]
+repos = ["public"]

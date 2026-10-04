@@ -1,10 +1,10 @@
-// cargo nextest run --test grouped_unit -E 'test(source_inheritance_for_non_content::)'
+// cargo nextest run --test grouped_unit -E 'test(repo_inheritance_for_non_content::)'
 //
-// Verifies that if a node's parent has the same source,
-// then the node's source is not heralded,
+// Verifies that if a node's parent has the same repo,
+// then the node's repo is not heralded,
 // even if the parent ignores it.
 
-use skg::types::misc::{ ID, SourceName, SkgConfig, SkgfileSource };
+use skg::types::misc::{ ID, RepoName, SkgConfig, SkgfileRepo };
 use skg::types::viewnode::{ AffectsParent, ViewNode, ViewNodeKind, viewforest_root_viewnode, mk_definitive_viewnode, mk_writeProtected_viewnode };
 use skg::types::viewnode::Vognode;
 use skg::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
@@ -14,31 +14,31 @@ use ego_tree::Tree;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-fn two_source_config () -> SkgConfig {
-  let mut sources : HashMap<SourceName, SkgfileSource> =
+fn two_repo_config () -> SkgConfig {
+  let mut repos : HashMap<RepoName, SkgfileRepo> =
     HashMap::new ();
-  sources . insert (
-    SourceName::from ("pub"),
-    SkgfileSource {
-      name         : SourceName::from ("pub"),
+  repos . insert (
+    RepoName::from ("pub"),
+    SkgfileRepo {
+      name         : RepoName::from ("pub"),
       abbreviation : None,
       path         : PathBuf::from ("/tmp/pub"),
       user_owns_it : true } );
-  sources . insert (
-    SourceName::from ("priv"),
-    SkgfileSource {
-      name         : SourceName::from ("priv"),
+  repos . insert (
+    RepoName::from ("priv"),
+    SkgfileRepo {
+      name         : RepoName::from ("priv"),
       abbreviation : None,
       path         : PathBuf::from ("/tmp/priv"),
       user_owns_it : true } );
-  SkgConfig::dummyFromSources (sources) }
+  SkgConfig::dummyFromRepos (repos) }
 
-/// When a node N has the same source as its nearest activeNode ancestor,
+/// When a node N has the same repo as its nearest activeNode ancestor,
 /// even if N is marked affectsParent=false,
-/// sourceAtBoundary should be false.
+/// homeRepoAtBoundary should be false.
 #[test]
-fn source_inheritance_across_non_content_same_source () {
-  let config : SkgConfig = two_source_config ();
+fn repo_inheritance_across_non_content_same_repo () {
+  let config : SkgConfig = two_repo_config ();
   let container_to_contents : HashMap<ID, _> = HashMap::new ();
   let content_to_containers : HashMap<ID, _> = HashMap::new ();
   let mut viewforest : Tree<ViewNode> =
@@ -46,13 +46,13 @@ fn source_inheritance_across_non_content_same_source () {
   let a_id = {
     let vn : ViewNode = mk_definitive_viewnode (
       ID::from ("a"),
-      SourceName::from ("pub"),
+      RepoName::from ("pub"),
       "node A" . to_string (),
       None );
     viewforest . root_mut () . append (vn) . id () };
   { let vn : ViewNode = mk_writeProtected_viewnode (
       ID::from ("b"),
-      SourceName::from ("pub"),
+      RepoName::from ("pub"),
       "node B" . to_string (),
       AffectsParent::False );
     viewforest . get_mut (a_id) . unwrap () . append (vn); }
@@ -63,7 +63,7 @@ fn source_inheritance_across_non_content_same_source () {
     &content_to_containers,
     &config,
     None );
-  // B has same source as A, so sourceAtBoundary should be false,
+  // B has same repo as A, so homeRepoAtBoundary should be false,
   // even though B has affectsParent != Affected.
   let b_ref =
     viewforest . get (a_id) . unwrap ()
@@ -71,16 +71,16 @@ fn source_inheritance_across_non_content_same_source () {
   let ViewNodeKind::Vognode ( Vognode::Active (t) )
     = & b_ref . value () . kind
     else { panic! ("expected ActiveNode") };
-  assert! ( ! t . viewStats . sourceAtBoundary,
+  assert! ( ! t . viewStats . homeRepoAtBoundary,
             "Same source across non-content boundary \
              should NOT be at boundary" ); }
 
-/// When a non-content child (affectsParent != Affected) has a different source
+/// When a non-content child (affectsParent != Affected) has a different repo
 /// from its nearest activeNode ancestor,
-/// sourceAtBoundary should be true.
+/// homeRepoAtBoundary should be true.
 #[test]
-fn source_inheritance_across_non_content_different_source () {
-  let config : SkgConfig = two_source_config ();
+fn repo_inheritance_across_non_content_different_repo () {
+  let config : SkgConfig = two_repo_config ();
   let container_to_contents : HashMap<ID, _> = HashMap::new ();
   let content_to_containers : HashMap<ID, _> = HashMap::new ();
   let mut viewforest : Tree<ViewNode> =
@@ -88,13 +88,13 @@ fn source_inheritance_across_non_content_different_source () {
   let a_id = {
     let vn : ViewNode = mk_definitive_viewnode (
       ID::from ("a"),
-      SourceName::from ("pub"),
+      RepoName::from ("pub"),
       "node A" . to_string (),
       None );
     viewforest . root_mut () . append (vn) . id () };
   { let vn : ViewNode = mk_writeProtected_viewnode (
       ID::from ("b"),
-      SourceName::from ("priv"),
+      RepoName::from ("priv"),
       "node B" . to_string (),
       AffectsParent::False );
     viewforest . get_mut (a_id) . unwrap () . append (vn); }
@@ -111,6 +111,6 @@ fn source_inheritance_across_non_content_different_source () {
   let ViewNodeKind::Vognode ( Vognode::Active (t) )
     = & b_ref . value () . kind
     else { panic! ("expected ActiveNode") };
-  assert! ( t . viewStats . sourceAtBoundary,
+  assert! ( t . viewStats . homeRepoAtBoundary,
             "Different source across non-content boundary \
              should be at boundary" ); }

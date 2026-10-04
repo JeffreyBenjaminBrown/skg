@@ -28,7 +28,7 @@ async fn test_delete_removed_node_respawns (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
-  run_save_test(s, "skg-test-save-del-removed", |config, tantivy, repo_path| {
+  run_save_test(s, "skg-test-save-del-removed", |config, tantivy, gitrepo_path| {
     Box::pin(async move {
       // Scenario: User deletes the gets-removed line
       let input = without_lines_containing(
@@ -47,11 +47,11 @@ async fn test_delete_removed_node_respawns (
         ) . await?;
 
       // DISK: gets-removed.skg should still not exist
-      assert!(!repo_path . join ("gets-removed.skg") . exists(),
+      assert!(!gitrepo_path . join ("gets-removed.skg") . exists(),
         "gets-removed.skg should stay deleted");
 
       // DISK: 11.skg should still contain moves and not gets-removed
-      let node_11 = read_nodecomplete(repo_path, "11")?;
+      let node_11 = read_nodecomplete(gitrepo_path, "11")?;
       let contains_11 = members_of (&node_11 . contains);
       assert!(contains_11 . contains(&ID("moves" . to_string())),
         "11.skg should still contain moves");
@@ -69,7 +69,7 @@ async fn test_delete_removed_here_node_respawns (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
-  run_save_test(s, "skg-test-save-del-removed-here", |config, tantivy, repo_path| {
+  run_save_test(s, "skg-test-save-del-removed-here", |config, tantivy, gitrepo_path| {
     Box::pin(async move {
       // User deletes the removed-here node under 12 (called 'moves')
       let input =
@@ -88,13 +88,13 @@ async fn test_delete_removed_here_node_respawns (
       ) . await?;
 
       // DISK: 12.skg should still have empty contains
-      let node_12 = read_nodecomplete(repo_path, "12")?;
+      let node_12 = read_nodecomplete(gitrepo_path, "12")?;
       let contains_12 = members_of (&node_12 . contains);
       assert!(!contains_12 . contains(&ID("moves" . to_string())),
         "12.skg should not contain moves");
 
       // DISK: moves.skg should still exist
-      assert!(repo_path . join ("moves.skg") . exists(),
+      assert!(gitrepo_path . join ("moves.skg") . exists(),
         "moves.skg should still exist");
 
       // BUFFER: phantom moves should respawn under 12
@@ -108,7 +108,7 @@ async fn test_delete_new_here_updates_disk (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
-  run_save_test(s, "skg-test-save-del-new-here", |config, tantivy, repo_path| {
+  run_save_test(s, "skg-test-save-del-new-here", |config, tantivy, gitrepo_path| {
     Box::pin(async move {
       // User deleted 'moves' under 11 (the new-here one)
       // The "moves under 11" line is the new-here phantom (membership added).
@@ -127,13 +127,13 @@ async fn test_delete_new_here_updates_disk (
       ) . await?;
 
       // DISK: 11.skg should no longer contain moves
-      let node_11 = read_nodecomplete(repo_path, "11")?;
+      let node_11 = read_nodecomplete(gitrepo_path, "11")?;
       let contains_11 = members_of (&node_11 . contains);
       assert!(!contains_11 . contains(&ID("moves" . to_string())),
         "11.skg should no longer contain moves");
 
       // DISK: moves.skg should still exist
-      assert!(repo_path . join ("moves.skg") . exists(),
+      assert!(gitrepo_path . join ("moves.skg") . exists(),
         "moves.skg should still exist");
 
       // BUFFER: moves gone from 11, still under 12 as removed-here
@@ -151,7 +151,7 @@ async fn test_add_new_child_creates_on_disk (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
-  run_save_test(s, "skg-test-save-add-child", |config, tantivy, repo_path| {
+  run_save_test(s, "skg-test-save-add-child", |config, tantivy, gitrepo_path| {
     Box::pin(async move {
       // User added 'newer' as child of 12
       let input = insert_after(
@@ -172,16 +172,16 @@ async fn test_add_new_child_creates_on_disk (
       ) . await?;
 
       // DISK: newer.skg should be created with correct id and title
-      assert!(repo_path . join ("newer.skg") . exists(),
+      assert!(gitrepo_path . join ("newer.skg") . exists(),
         "newer.skg should be created");
-      let node_newer = read_nodecomplete(repo_path, "newer")?;
+      let node_newer = read_nodecomplete(gitrepo_path, "newer")?;
       assert_eq!(&node_newer . pid, &ID("newer" . to_string()),
         "newer.skg should have id 'newer'");
       assert_eq!(node_newer . title, "newer",
         "newer.skg should have title 'newer'");
 
       // DISK: 12.skg should contain newer
-      let node_12 = read_nodecomplete(repo_path, "12")?;
+      let node_12 = read_nodecomplete(gitrepo_path, "12")?;
       let contains_12 = members_of (&node_12 . contains);
       assert!(contains_12 . contains(&ID("newer" . to_string())),
         "12.skg should contain newer");
@@ -204,8 +204,8 @@ async fn test_diff_mode_as_subscribee_regenerates_phantom_children (
   run_save_test_with_setup(
     s,
     "skg-test-save-diff-as-subscribee-regenerates",
-    setup_git_repo_with_subscribee_fixtures,
-    |config, tantivy, _repo_path| { Box::pin(async move {
+    setup_gitrepo_with_subscribee_fixtures,
+    |config, tantivy, _gitrepo_path| { Box::pin(async move {
       let input = "\
 * (skg (node (id 1) (source main))) 1
 ** (skg subscribeeFolder)
@@ -245,8 +245,8 @@ async fn test_diff_mode_removed_subscribee_shows_removedM (
   run_save_test_with_setup(
     s,
     "skg-test-save-diff-removed-subscribee",
-    setup_git_repo_with_removed_subscribee_fixtures,
-    |config, tantivy, _repo_path| { Box::pin(async move {
+    setup_gitrepo_with_removed_subscribee_fixtures,
+    |config, tantivy, _gitrepo_path| { Box::pin(async move {
       let input = "\
 * (skg (node (id 1) (source main))) 1
 ** (skg subscribeeFolder)
@@ -281,8 +281,8 @@ async fn test_diff_mode_removed_subscribee_staged_shows_stagedM (
   run_save_test_with_setup(
     s,
     "skg-test-save-diff-removed-subscribee-staged",
-    setup_git_repo_with_removed_subscribee_fixtures_staged,
-    |config, tantivy, _repo_path| { Box::pin(async move {
+    setup_gitrepo_with_removed_subscribee_fixtures_staged,
+    |config, tantivy, _gitrepo_path| { Box::pin(async move {
       let input = "\
 * (skg (node (id 1) (source main))) 1
 ** (skg subscribeeFolder)
@@ -317,8 +317,8 @@ async fn test_diff_mode_added_subscribee_shows_newM (
   run_save_test_with_setup(
     s,
     "skg-test-save-diff-added-subscribee",
-    setup_git_repo_with_added_subscribee_fixtures,
-    |config, tantivy, _repo_path| { Box::pin(async move {
+    setup_gitrepo_with_added_subscribee_fixtures,
+    |config, tantivy, _gitrepo_path| { Box::pin(async move {
       let input = "\
 * (skg (node (id 1) (source main))) 1
 ** (skg subscribeeFolder)
@@ -358,8 +358,8 @@ async fn test_delete_removed_node_respawns_staged (
   run_save_test_with_setup(
     s,
     "skg-test-save-del-removed-staged",
-    setup_git_repo_with_fixtures_staged,
-    |config, tantivy, repo_path| { Box::pin(async move {
+    setup_gitrepo_with_fixtures_staged,
+    |config, tantivy, gitrepo_path| { Box::pin(async move {
       // Scenario: User deletes the gets-removed line
       let input = without_lines_containing(
         GIT_DIFF_VIEW_STAGED, "gets-removed");
@@ -377,11 +377,11 @@ async fn test_delete_removed_node_respawns_staged (
         ) . await?;
 
       // DISK: gets-removed.skg should still not exist
-      assert!(!repo_path . join ("gets-removed.skg") . exists(),
+      assert!(!gitrepo_path . join ("gets-removed.skg") . exists(),
         "gets-removed.skg should stay deleted");
 
       // DISK: 11.skg should still contain moves and not gets-removed
-      let node_11 = read_nodecomplete(repo_path, "11")?;
+      let node_11 = read_nodecomplete(gitrepo_path, "11")?;
       let contains_11 = members_of (&node_11 . contains);
       assert!(contains_11 . contains(&ID("moves" . to_string())),
         "11.skg should still contain moves");
@@ -411,7 +411,7 @@ where
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 {
   run_save_test_with_setup(
-    s, subtest_name, setup_git_repo_with_fixtures, test_fn) . await
+    s, subtest_name, setup_gitrepo_with_fixtures, test_fn) . await
 }
 
 async fn run_save_test_with_setup<S, F>(
@@ -430,9 +430,9 @@ where
   ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Box<dyn Error>>> + 'a>>
 {
   let temp_dir = TempDir::new()?;
-  let repo_path = temp_dir . path();
-  setup (repo_path)?;
-  s . reset_with_source_path (subtest_name, repo_path) ?;
+  let gitrepo_path = temp_dir . path();
+  setup (gitrepo_path)?;
+  s . reset_with_repo_path (subtest_name, gitrepo_path) ?;
 
-  test_fn(&s . config, &mut s . tantivy, repo_path) . await
+  test_fn(&s . config, &mut s . tantivy, gitrepo_path) . await
 }

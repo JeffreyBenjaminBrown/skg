@@ -1,8 +1,8 @@
 use skg::diff_report::render::render_report;
 use skg::diff_report::types::{
   DiffReport, ListDiffItem, NodeBucket, NodeDiffReport, RelationshipDiff,
-  SourceForReport};
-use skg::types::misc::{ID, SourceName};
+  RepoForReport};
+use skg::types::misc::{ID, RepoName};
 
 use std::collections::HashMap;
 
@@ -18,11 +18,11 @@ fn node_report (
 ) -> NodeDiffReport {
   NodeDiffReport {
     pid: id (pid),
-    source: SourceForReport::After (SourceName::from ("main")),
+    home_repo: RepoForReport::After (RepoName::from ("main")),
     title: title . to_string (),
     title_diff: None,
     body_diff: None,
-    source_change: None,
+    repo_change: None,
     value_set_diffs: Vec::new (),
     relationship_diffs: Vec::new (),
     contained_list_diff: None }

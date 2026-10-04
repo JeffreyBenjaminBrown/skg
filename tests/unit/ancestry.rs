@@ -5,7 +5,7 @@ use crate::types::viewnode::{
   Phantom, PhantomDeleted, Qual, QualFolder };
 
 fn sid (s : &str) -> ID { ID::from (s) }
-fn src () -> SourceName { SourceName::from ("main") }
+fn src () -> RepoName { RepoName::from ("main") }
 
 fn normal (title : &str, pi : AffectsParent) -> ViewNode {
   mk_writeProtected_viewnode (sid (title), src (), title . to_string (), pi) }
@@ -13,7 +13,7 @@ fn normal (title : &str, pi : AffectsParent) -> ViewNode {
 fn deleted (title : &str) -> ViewNode {
   ViewNode { focused : false, folded : false, body_folded : false,
     kind : ViewNodeKind::Phantom (Phantom::Deleted (PhantomDeleted {
-      id : sid (title), source : src (),
+      id : sid (title), home_repo : src (),
       title : title . to_string (), body : None })) } }
 
 fn role_folder (rc : PartnerFolder) -> ViewNode {
@@ -28,8 +28,8 @@ fn alias_qual (text : &str) -> ViewNode {
   ViewNode { focused : false, folded : false, body_folded : false,
     kind : ViewNodeKind::Qual (Qual::Alias {
       text : text . to_string (),
-      relSource : None,
-      relSource_request : None,
+      relRepo : None,
+      relRepo_request : None,
       membership : MembershipAxes::default () }) } }
 
 fn child (

@@ -5,7 +5,7 @@ use skg::dbs::in_rust_graph::override_invariants::{
   validate_affected_override_invariants,
   validate_override_invariants,
 };
-use skg::types::misc::{ID, MSV, SkgConfig, SkgfileSource, SourceName, rel_partners_at_relSource};
+use skg::types::misc::{ID, MSV, SkgConfig, SkgfileRepo, RepoName, rel_partners_at_relRepo};
 use skg::types::nodes::complete::{NodeComplete, empty_node_complete};
 use skg::types::save::{DefineNode, DeleteNode, SaveNode};
 
@@ -14,17 +14,17 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 fn config () -> SkgConfig {
-  SkgConfig::dummyFromSources (HashMap::from ([
-    ( SourceName::from ("owned"),
-      SkgfileSource {
-        name: SourceName::from ("owned"),
+  SkgConfig::dummyFromRepos (HashMap::from ([
+    ( RepoName::from ("owned"),
+      SkgfileRepo {
+        name: RepoName::from ("owned"),
         abbreviation: None,
         path: PathBuf::from ("/tmp/owned"),
         user_owns_it: true,
       }),
-    ( SourceName::from ("foreign"),
-      SkgfileSource {
-        name: SourceName::from ("foreign"),
+    ( RepoName::from ("foreign"),
+      SkgfileRepo {
+        name: RepoName::from ("foreign"),
         abbreviation: None,
         path: PathBuf::from ("/tmp/foreign"),
         user_owns_it: false,
@@ -33,21 +33,21 @@ fn config () -> SkgConfig {
 
 fn node (
   pid       : &str,
-  source    : &str,
+  repo    : &str,
   overrides : &[&str],
 ) -> NodeComplete {
   let mut node : NodeComplete =
     empty_node_complete ();
   node . pid = ID::from (pid);
   node . title = pid . to_string ();
-  node . source = SourceName::from (source);
+  node . home_repo = RepoName::from (repo);
   node . overrides_view_of =
     if overrides . is_empty () {
       MSV::Unspecified
     } else {
       MSV::Specified (
-        rel_partners_at_relSource (
-          &node . source,
+        rel_partners_at_relRepo (
+          &node . home_repo,
           overrides . iter ()
           . map ( |id| ID::from (*id) )
           . collect () ) )
@@ -285,7 +285,7 @@ fn edge_and_target_deletions_do_not_create_override_errors () {
       node ("source", "owned", &["target"]),
     ],
     vec![DefineNode::Delete (DeleteNode {
-      id : ID::from ("target"), source : SourceName::from ("owned"),
+      id : ID::from ("target"), home_repo : RepoName::from ("owned"),
     })]);
   assert_eq! (delete_affected, delete_full);
   assert! (delete_affected . is_empty ());

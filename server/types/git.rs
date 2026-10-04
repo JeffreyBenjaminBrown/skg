@@ -1,7 +1,7 @@
 /// Git-related types for diff view functionality.
 
 use crate::types::list::{Diff_Item, compute_interleaved_diff};
-use crate::types::misc::{ID, SourceName};
+use crate::types::misc::{ID, RepoName};
 use crate::types::nodes::complete::NodeComplete;
 
 use std::collections::HashMap;
@@ -39,13 +39,13 @@ pub struct MembershipAxes {
   pub unstaged : Option<Sign>,
 }
 
-/// Represents the per-stage diff for an entire source directory.
+/// Represents the per-stage diff for an entire Skg repo directory.
 /// 'staged'   maps each changed '.skg' file to its HEAD-vs-index diff.
 /// 'unstaged' maps each changed '.skg' file to its index-vs-worktree diff.
 /// A file may appear in either, both, or neither.
 #[derive(Debug, Clone)]
-pub struct SourceDiff {
-  pub is_git_repo: bool,
+pub struct RepoDiff {
+  pub is_gitrepo: bool,
   pub staged   : HashMap<PathBuf, NodeCompleteDiff>,
   pub unstaged : HashMap<PathBuf, NodeCompleteDiff>,
   /// Nodes that exist in the index or worktree but not in the
@@ -180,10 +180,10 @@ impl MembershipAxes {
       _                          => true, } }
 }
 
-impl SourceDiff {
-  pub fn new_not_git_repo () -> Self {
-    SourceDiff {
-      is_git_repo  : false,
+impl RepoDiff {
+  pub fn new_not_gitrepo () -> Self {
+    RepoDiff {
+      is_gitrepo  : false,
       staged       : HashMap::new(),
       unstaged     : HashMap::new(),
       added_nodes  : HashMap::new(),
@@ -210,14 +210,14 @@ impl GitDiffStatus {
 /// stages via 'net_diff_from_per_stage'. Consumers that need
 /// per-stage signs use 'axes_from_per_stage_diffs'.
 pub fn per_stage_node_changes_for_activeNode<'a> (
-  source_diffs : &'a Option<HashMap<SourceName, SourceDiff>>,
+  repo_diffs : &'a Option<HashMap<RepoName, RepoDiff>>,
   pid          : &ID,
-  source       : &SourceName,
+  skgrepo       : &RepoName,
 ) -> (Option<&'a NodeChanges>, Option<&'a NodeChanges>) {
-  let sd : Option<&SourceDiff> =
-    source_diffs . as_ref () . and_then ( |d| d . get (source) );
-  let sd : Option<&SourceDiff> =
-    sd . filter ( |sd| sd . is_git_repo );
+  let sd : Option<&RepoDiff> =
+    repo_diffs . as_ref () . and_then ( |d| d . get (skgrepo) );
+  let sd : Option<&RepoDiff> =
+    sd . filter ( |sd| sd . is_gitrepo );
   let file_path : PathBuf =
     PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
   let staged : Option<&NodeChanges> =
@@ -330,36 +330,36 @@ pub fn added_membership_from_per_stage_diffs<T: Clone + Eq + std::hash::Hash> (
   result }
 
 /// Per-stage file-level ExistenceAxes for a node, derived from
-/// 'SourceDiff's staged / unstaged maps. Each stage's sign comes
+/// 'RepoDiff's staged / unstaged maps. Each stage's sign comes
 /// from the file's git status in that stage (Added → Plus,
 /// Deleted → Minus, Modified / absent → None).
 ///
 /// Used by the definitive-expand path (extendDefinitiveSubtree_fromGit, for the
 /// ActiveNode's own existence axes and for phantoms of a removed parent's
 /// children).
-pub fn file_existence_axes_from_source_diff (
-  source_diffs : &Option<HashMap<SourceName, SourceDiff>>,
+pub fn file_existence_axes_from_repo_diff (
+  repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
   pid          : &ID,
-  source       : &SourceName,
+  skgrepo       : &RepoName,
 ) -> ExistenceAxes {
   let file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", pid . 0 ) );
-  existence_axes_in_source_diff (
-    source_diffs . as_ref () . and_then ( |d| d . get (source) ),
+  existence_axes_in_repo_diff (
+    repo_diffs . as_ref () . and_then ( |d| d . get (skgrepo) ),
     &file ) }
 
 /// The staged (HEAD->index) and unstaged (index->worktree) EXISTENCE signs for a
-/// `.skg` file within a single source's diff. The one place that reads a file's
-/// per-stage status; the callers differ only in how they pick the SourceDiff to
-/// read (by the node's own source, or with a fallback).
-pub fn existence_axes_in_source_diff (
-  source_diff : Option<&SourceDiff>,
+/// `.skg` file within a single Skg repo's diff. The one place that reads a file's
+/// per-stage status; the callers differ only in how they pick the RepoDiff to
+/// read (by the node's own Skg repo, or with a fallback).
+pub fn existence_axes_in_repo_diff (
+  repo_diff : Option<&RepoDiff>,
   file        : &PathBuf,
 ) -> ExistenceAxes {
-  let staged : Option<Sign> = source_diff
+  let staged : Option<Sign> = repo_diff
     . and_then ( |sd| sd . staged . get (file) )
     . and_then ( |d| d . status . to_existence_sign () );
-  let unstaged : Option<Sign> = source_diff
+  let unstaged : Option<Sign> = repo_diff
     . and_then ( |sd| sd . unstaged . get (file) )
     . and_then ( |d| d . status . to_existence_sign () );
   ExistenceAxes { staged, unstaged } }

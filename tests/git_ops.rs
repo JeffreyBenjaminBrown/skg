@@ -7,39 +7,39 @@ use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 use skg::git_ops::find_and_stage_moves::stage_moves_script;
-use skg::git_ops::read_repo::{ head_is_merge_commit, get_file_content_at_head };
+use skg::git_ops::read_gitrepo::{ head_is_merge_commit, get_file_content_at_head };
 use skg::types::list::{compute_interleaved_diff, Diff_Item};
-use skg::types::misc::{ SkgConfig, SkgfileSource, SourceName };
+use skg::types::misc::{ SkgConfig, SkgfileRepo, RepoName };
 
-fn setup_git_repo() -> (TempDir, Repository) {
+fn setup_gitrepo() -> (TempDir, Repository) {
   let dir : TempDir =
     TempDir::new() . unwrap();
-  let repo : Repository =
+  let gitrepo : Repository =
     Repository::init ( dir . path() ) . unwrap();
   { // Configure user for commits
     let mut config : git2::Config =
-      repo . config() . unwrap();
+      gitrepo . config() . unwrap();
     config . set_str ( "user.email", "test@test.com" ) . unwrap();
     config . set_str ( "user.name", "Test" ) . unwrap(); }
-  (dir, repo) }
+  (dir, gitrepo) }
 
 fn create_initial_commit (
-  repo : &Repository,
+  gitrepo : &Repository,
   dir  : &Path
 ) {
   fs::write ( dir . join ("test.skg"), "title: Test" ) . unwrap(); // Create a file
   { // Stage and commit
     let mut index : git2::Index =
-      repo . index() . unwrap();
+      gitrepo . index() . unwrap();
     index . add_path ( Path::new ("test.skg")) . unwrap();
     index . write() . unwrap();
     let tree_id : git2::Oid =
       index . write_tree() . unwrap();
     let tree : git2::Tree =
-      repo . find_tree (tree_id) . unwrap();
+      gitrepo . find_tree (tree_id) . unwrap();
     let sig : git2::Signature =
-      repo . signature() . unwrap();
-    repo . commit (
+      gitrepo . signature() . unwrap();
+    gitrepo . commit (
       Some ("HEAD"),
       &sig, &sig,
       "Initial commit",
@@ -48,24 +48,24 @@ fn create_initial_commit (
 
 #[test]
 fn test_head_is_merge_commit() {
-  let (dir, repo) : (TempDir, Repository) =
-    setup_git_repo();
-  create_initial_commit ( &repo, dir . path() );
-  assert! ( ! head_is_merge_commit (&repo) . unwrap() ); } // Single-parent commit is not a merge commit
+  let (dir, gitrepo) : (TempDir, Repository) =
+    setup_gitrepo();
+  create_initial_commit ( &gitrepo, dir . path() );
+  assert! ( ! head_is_merge_commit (&gitrepo) . unwrap() ); } // Single-parent commit is not a merge commit
 
 #[test]
 fn test_get_file_content_at_head() {
-  let (dir, repo) : (TempDir, Repository) =
-    setup_git_repo();
-  create_initial_commit ( &repo, dir . path() );
+  let (dir, gitrepo) : (TempDir, Repository) =
+    setup_gitrepo();
+  create_initial_commit ( &gitrepo, dir . path() );
   let content : Option<String> =
     get_file_content_at_head (
-      &repo,
+      &gitrepo,
       Path::new ("test.skg")) . unwrap();
   assert_eq! ( content, Some ( "title: Test" . to_string() ));
   let no_content : Option<String> = // Non-existent file should return None
     get_file_content_at_head (
-      &repo,
+      &gitrepo,
       Path::new ("nonexistent.skg")) . unwrap();
   assert_eq! ( no_content, None ); }
 
@@ -73,71 +73,71 @@ fn test_get_file_content_at_head() {
 // stage_moves
 //
 
-fn init_repo_with_user (
+fn init_gitrepo_with_user (
   dir : &Path
 ) -> Repository {
-  let repo : Repository =
+  let gitrepo : Repository =
     Repository::init (dir) . unwrap();
   { let mut config : git2::Config =
-      repo . config() . unwrap();
+      gitrepo . config() . unwrap();
     config . set_str ( "user.email", "test@test.com" ) . unwrap();
     config . set_str ( "user.name", "Test" ) . unwrap(); }
-  repo }
+  gitrepo }
 
 /// Write 'filename' into the repo and commit it. Works for the first
 /// commit and for later ones (parents = current HEAD if any).
 fn commit_file (
-  repo     : &Repository,
-  repo_dir : &Path,
+  gitrepo     : &Repository,
+  gitrepo_dir : &Path,
   filename : &str,
   contents : &str,
 ) {
-  fs::write ( repo_dir . join (filename), contents ) . unwrap();
+  fs::write ( gitrepo_dir . join (filename), contents ) . unwrap();
   let mut index : git2::Index =
-    repo . index() . unwrap();
+    gitrepo . index() . unwrap();
   index . add_path ( Path::new (filename) ) . unwrap();
   index . write() . unwrap();
   let tree : git2::Tree =
-    repo . find_tree ( index . write_tree() . unwrap() ) . unwrap();
+    gitrepo . find_tree ( index . write_tree() . unwrap() ) . unwrap();
   let sig : git2::Signature =
-    repo . signature() . unwrap();
+    gitrepo . signature() . unwrap();
   let parent : Option<git2::Commit> =
-    repo . head() . ok()
+    gitrepo . head() . ok()
     . and_then ( |h| h . peel_to_commit() . ok() );
   let parents : Vec<&git2::Commit> =
     parent . iter() . collect();
-  repo . commit (
+  gitrepo . commit (
     Some ("HEAD"),
     &sig, &sig,
     "commit",
     &tree,
     &parents ) . unwrap(); }
 
-fn mk_source (
+fn mk_repo (
   name : &str,
   path : PathBuf,
-) -> SkgfileSource {
-  SkgfileSource {
-    name         : SourceName::from (name),
+) -> SkgfileRepo {
+  SkgfileRepo {
+    name         : RepoName::from (name),
     abbreviation : None,
     path,
     user_owns_it : true } }
 
-/// Build a config whose data_root is 'root' and whose sources are the
+/// Build a config whose data_root is 'root' and whose repos are the
 /// named subdirectories of it, mirroring how 'make_paths_absolute'
-/// leaves source paths at load time (absolute, data_root-rooted).
+/// leaves Skg repo paths at load time (absolute, data_root-rooted).
 fn config_from_subdirs (
   root : &Path,
   names : &[&str],
 ) -> SkgConfig {
-  let mut sources : HashMap<SourceName, SkgfileSource> =
+  let mut repos : HashMap<RepoName, SkgfileRepo> =
     HashMap::new();
   for name in names {
-    sources . insert (
-      SourceName::from (*name),
-      mk_source ( name, root . join (name) ) ); }
+    repos . insert (
+      RepoName::from (*name),
+      mk_repo ( name, root . join (name) ) ); }
   let mut config : SkgConfig =
-    SkgConfig::dummyFromSources (sources);
+    SkgConfig::dummyFromRepos (repos);
   config . data_root = root . to_path_buf();
   config }
 
@@ -149,14 +149,14 @@ fn test_stage_moves_detects_single_pair_move() {
   let beta  : PathBuf = root . path() . join ("beta");
   fs::create_dir (&alpha) . unwrap();
   fs::create_dir (&beta)  . unwrap();
-  let alpha_repo : Repository =
-    init_repo_with_user (&alpha);
-  let _beta_repo : Repository =
-    init_repo_with_user (&beta);
+  let alpha_gitrepo : Repository =
+    init_gitrepo_with_user (&alpha);
+  let _beta_gitrepo : Repository =
+    init_gitrepo_with_user (&beta);
   { // node-1 is committed in alpha, then removed from alpha's
     // worktree and created (untracked) in beta -- a clean alpha->beta
     // move.
-    commit_file (&alpha_repo, &alpha, "node-1.skg", "title: One");
+    commit_file (&alpha_gitrepo, &alpha, "node-1.skg", "title: One");
     fs::remove_file ( alpha . join ("node-1.skg") ) . unwrap();
     fs::write ( beta . join ("node-1.skg"), "title: One" ) . unwrap(); }
   { // A brand-new node that only ever appeared in beta is NOT a move
@@ -187,16 +187,16 @@ fn test_stage_moves_skips_ambiguous_and_reports_none() {
   let gamma : PathBuf = root . path() . join ("gamma");
   for dir in [&alpha, &beta, &gamma] {
     fs::create_dir (dir) . unwrap(); }
-  let alpha_repo : Repository =
-    init_repo_with_user (&alpha);
-  let _beta_repo : Repository =
-    init_repo_with_user (&beta);
-  let _gamma_repo : Repository =
-    init_repo_with_user (&gamma);
+  let alpha_gitrepo : Repository =
+    init_gitrepo_with_user (&alpha);
+  let _beta_gitrepo : Repository =
+    init_gitrepo_with_user (&beta);
+  let _gamma_gitrepo : Repository =
+    init_gitrepo_with_user (&gamma);
   { // 'dup' vanished from alpha but appeared in BOTH beta and gamma,
     // so there are two candidate (old,new) pairs: not an unambiguous
     // move, hence skipped.
-    commit_file (&alpha_repo, &alpha, "dup.skg", "title: Dup");
+    commit_file (&alpha_gitrepo, &alpha, "dup.skg", "title: Dup");
     fs::remove_file ( alpha . join ("dup.skg") ) . unwrap();
     fs::write ( beta  . join ("dup.skg"), "title: Dup" ) . unwrap();
     fs::write ( gamma . join ("dup.skg"), "title: Dup" ) . unwrap(); }
@@ -217,20 +217,20 @@ fn test_stage_moves_title_presence_semantics() {
   let beta  : PathBuf = root . path() . join ("beta");
   fs::create_dir (&alpha) . unwrap();
   fs::create_dir (&beta)  . unwrap();
-  let alpha_repo : Repository =
-    init_repo_with_user (&alpha);
-  let beta_repo : Repository =
-    init_repo_with_user (&beta);
+  let alpha_gitrepo : Repository =
+    init_gitrepo_with_user (&alpha);
+  let beta_gitrepo : Repository =
+    init_gitrepo_with_user (&beta);
   { // 'releveled' lost its ALPHA FILE, but that file was titleless
-    // (a mere relationship record): a relSource change, not a move.
-    commit_file (&alpha_repo, &alpha, "releveled.skg",
+    // (a mere relationship record): a relRepo change, not a move.
+    commit_file (&alpha_gitrepo, &alpha, "releveled.skg",
                  "pid: releveled\ncontains:\n- x\n");
     fs::remove_file ( alpha . join ("releveled.skg") ) . unwrap(); }
   { // 'mixed' has a titled section moving alpha -> beta, but beta
     // ALREADY held a titleless section for it: report, don't stage.
-    commit_file (&alpha_repo, &alpha, "mixed.skg",
+    commit_file (&alpha_gitrepo, &alpha, "mixed.skg",
                  "title: Mixed\npid: mixed\n");
-    commit_file (&beta_repo, &beta, "mixed.skg",
+    commit_file (&beta_gitrepo, &beta, "mixed.skg",
                  "pid: mixed\ncontains:\n- y\n");
     fs::remove_file ( alpha . join ("mixed.skg") ) . unwrap();
     fs::write ( beta . join ("mixed.skg"),
@@ -239,7 +239,7 @@ fn test_stage_moves_title_presence_semantics() {
   { // 'titlemove' kept its alpha file but the TITLE left it for a
     // brand-new beta file: a home move, but the alpha side is a
     // file modification, so report rather than stage.
-    commit_file (&alpha_repo, &alpha, "titlemove.skg",
+    commit_file (&alpha_gitrepo, &alpha, "titlemove.skg",
                  "title: TM\npid: titlemove\ncontains:\n- z\n");
     fs::write ( alpha . join ("titlemove.skg"),
                 "pid: titlemove\ncontains:\n- z\n" ) . unwrap();

@@ -31,11 +31,11 @@ mod import_org_roam;
 #[path = "init_refusal.rs"]
 mod init_refusal;
 
-#[path = "multi_source_errors.rs"]
-mod multi_source_errors;
+#[path = "multi_repo_errors.rs"]
+mod multi_repo_errors;
 
-#[path = "multi_source_loading.rs"]
-mod multi_source_loading;
+#[path = "multi_repo_loading.rs"]
+mod multi_repo_loading;
 
 #[path = "render_util.rs"]
 mod render_util;
@@ -46,11 +46,11 @@ mod runtime_generation;
 #[path = "serve_text_search_test.rs"]
 mod serve_text_search_test;
 
-#[path = "source_inheritance_for_non_content.rs"]
-mod source_inheritance_for_non_content;
+#[path = "repo_inheritance_for_non_content.rs"]
+mod repo_inheritance_for_non_content;
 
-#[path = "source_path_validation.rs"]
-mod source_path_validation;
+#[path = "repo_path_validation.rs"]
+mod repo_path_validation;
 
 #[path = "subscribee_folder.rs"]
 mod subscribee_folder;

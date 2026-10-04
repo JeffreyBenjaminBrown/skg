@@ -14,14 +14,14 @@ cat > "$TEMP_CONFIG" << EOF
 tantivy_folder = "$DATA_DIR/.index.tantivy"
 port = $AVAILABLE_PORT
 beep_when_server_becomes_available = false
-default_source_set = "public"
+default_repo_set = "public"
 
-[[sources]]
+[[repos]]
 name = "public"
 abbreviation = "PUB"
 path = "$DATA_DIR/public"
 
-[[sources]]
+[[repos]]
 name = "private"
 abbreviation = "PRIV"
 path = "$DATA_DIR/private"

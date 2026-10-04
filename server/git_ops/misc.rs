@@ -24,11 +24,11 @@ pub(super) fn diff_delta_to_entry (
 
 /// Convert an absolute path to a path relative to the repository root.
 /// Returns None if the path is not within the repository.
-pub fn path_relative_to_repo (
-  repo     : &Repository,
+pub fn path_relative_to_gitrepo (
+  gitrepo     : &Repository,
   abs_path : &Path
 ) -> Option<PathBuf> {
   let workdir : &Path =
-    repo . workdir() ?;
+    gitrepo . workdir() ?;
   abs_path . strip_prefix (workdir) . ok () . map (
     |p| p . to_path_buf() ) }
