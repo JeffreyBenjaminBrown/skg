@@ -33,7 +33,7 @@ fn herald_rules_cover_the_emittable_vocabulary () {
 fn herald_rules_sexp_quotes_strings () {
   let sexp : String = herald_rules_sexp ();
   assert! ( sexp . starts_with ("(skg ") );
-  assert! ( sexp . contains ( r#"(GO INTERC "" staged "staged:""# ),
+  assert! ( sexp . contains ( r#"(GO INTERC "" staged "✓""# ),
             "labelled INTERC with quoted empty separator not found" );
   assert! ( sexp . contains ( r#"(MESSAGE aliasFolder "aliases")"# ));
   assert! ( sexp . contains ( r#"(CRUCIAL writeProtected ABUT "☮")"# ));

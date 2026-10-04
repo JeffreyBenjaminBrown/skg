@@ -168,24 +168,24 @@
 ---- styles: message*7
 ==== non-vognodes: text changed in both stages
 (skg (textChanged staged unstaged))
----- text: text changed : staged text changed : unstaged
----- styles: go*15 stop*6 -*1 go*15 stop*8
+---- text: text changed ✓ ✗
+---- styles: nonstandard*13 go*1 nonstandard*1 stop*1
 ==== diff: a relationship removed, unstaged
 (skg (node (id 1) (repo s) (unstaged removedR)))
----- text: unstaged:-R
----- styles: go*9 stop*2
+---- text: ✗-R
+---- styles: stop*1 nonstandard*2
 ==== diff: a node and relationship added, unstaged
 (skg (node (id 2) (repo s) (unstaged addedN addedR)))
----- text: unstaged:NR
----- styles: go*11
+---- text: ✗NR
+---- styles: stop*1 nonstandard*2
 ==== diff: an alias added, staged
 (skg alias (staged addedR))
----- text: alias staged:R
----- styles: message*5 -*1 go*8
+---- text: alias ✓R
+---- styles: message*5 -*1 go*1 nonstandard*1
 ==== diff: an alias removed, unstaged
 (skg alias (unstaged removedR))
----- text: alias unstaged:-R
----- styles: message*5 -*1 go*9 stop*2
+---- text: alias ✗-R
+---- styles: message*5 -*1 stop*1 nonstandard*2
 ==== placeholders: inactive node
 (skg inactiveNode)
 ---- text: node from inactive repo
@@ -250,3 +250,15 @@
 (skg (node (id x) (editRequest (merge y))))
 ---- text: merge:y
 ---- styles: nonstandard*7
+==== diff: text changed, staged only
+(skg (textChanged staged))
+---- text: text changed ✓
+---- styles: nonstandard*13 go*1
+==== diff: text changed, unstaged only
+(skg (textChanged unstaged))
+---- text: text changed ✗
+---- styles: nonstandard*13 stop*1
+==== diff: a node deleted, staged, and not in Git
+(skg (node (id x) (staged deletedN) notInGit))
+---- text: ✓-N diff:not-in-git
+---- styles: go*1 nonstandard*2 -*1 nonstandard*15

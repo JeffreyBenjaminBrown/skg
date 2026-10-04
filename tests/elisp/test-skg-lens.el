@@ -165,22 +165,22 @@ rule's SEP, and a literal-string prefix is prepended."
                         (right (ANY IT)))))
                  '("3{8"))))
 
-(ert-deftest test-skg-transform-sexp-flat-interc-missing-slot-still-emits-separator ()
-  "When one slot is empty but another is non-empty, the separator
-is still emitted between them. A solitary containsHerald-style
-`3{' comes out correctly when only the left slot fires."
+(ert-deftest test-skg-transform-sexp-flat-interc-skips-empty-slots ()
+  "When one slot is empty but another is non-empty, the empty slot
+contributes neither text nor a separator, so a one-mark
+`text changed ✗' has no stray space."
   (should (equal (skg-transform-sexp-flat
                   '(a (pair (left 3)))
                   '(a (INTERC "{" pair
                         (left  (ANY IT))
                         (right (ANY IT)))))
-                 '("3{")))
+                 '("3")))
   (should (equal (skg-transform-sexp-flat
                   '(a (pair (right 8)))
                   '(a (INTERC "{" pair
                         (left  (ANY IT))
                         (right (ANY IT)))))
-                 '("{8"))))
+                 '("8"))))
 
 (ert-deftest test-skg-transform-sexp-flat-interc-all-slots-empty-suppresses ()
   "When every slot is empty for a given match, INTERC emits

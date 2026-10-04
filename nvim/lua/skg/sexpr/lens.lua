@@ -212,7 +212,7 @@ end
 ---per child of OBJECT matching the label. Without one: the sub-rules
 ---run against OBJECT itself, at most one token. Each list sub-rule
 ---contributes one slot (the concatenation of its outputs, possibly
----empty); slots are joined with SEPARATOR; a literal-string prefix is
+---empty); nonempty slots are joined with SEPARATOR; a literal-string prefix is
 ---prepended; the token is suppressed if every slot is empty. The
 ---separator and prefix take the rule's inherited style context;
 ---each slot preserves its sub-rule's own styles per chunk.
@@ -253,8 +253,9 @@ function M.apply_interc (object, header, current_style)
   return results
 end
 
----Build an INTERC token: PREFIX + JOIN(SLOTS, SEPARATOR). PREFIX and
----SEPARATOR both carry STYLE; each slot's own chunk styles survive.
+---Build an INTERC token: PREFIX + JOIN(SLOTS, SEPARATOR), skipping empty
+---slots. PREFIX and SEPARATOR both carry STYLE; each slot's own chunk
+---styles survive.
 ---@param prefix string
 ---@param separator string
 ---@param slots table[][] chunk lists
@@ -264,11 +265,17 @@ function M.interc_token (prefix, separator, slots, style)
   local chunks = {}
   if #prefix > 0 then
     table.insert(chunks, { text = prefix, style = style }) end
-  for i, slot_chunks in ipairs(slots) do
-    if i > 1 and #separator > 0 then
-      table.insert(chunks, { text = separator, style = style }) end
-    for _, chunk in ipairs(slot_chunks) do
-      table.insert(chunks, chunk) end
+  local joined = 0
+  for _, slot_chunks in ipairs(slots) do
+    local slot_text = ''
+    for _, chunk in ipairs(slot_chunks) do slot_text = slot_text .. chunk.text end
+    if #slot_text > 0 then
+      joined = joined + 1
+      if joined > 1 and #separator > 0 then
+        table.insert(chunks, { text = separator, style = style }) end
+      for _, chunk in ipairs(slot_chunks) do
+        table.insert(chunks, chunk) end
+    end
   end
   return { chunks = chunks, abut = false }
 end

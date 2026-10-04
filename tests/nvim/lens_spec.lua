@@ -138,11 +138,11 @@ describe('skg.sexpr.lens INTERC', function ()
             '(a (INTERC "{" pair (left (ANY IT)) (right (ANY IT))))'))
   end)
 
-  it('still emits the separator when one slot is empty', function ()
-    assert.are.same({ '3{' },
+  it('skips an empty slot and its separator', function ()
+    assert.are.same({ '3' },
       texts('(a (pair (left 3)))',
             '(a (INTERC "{" pair (left (ANY IT)) (right (ANY IT))))'))
-    assert.are.same({ '{8' },
+    assert.are.same({ '8' },
       texts('(a (pair (right 8)))',
             '(a (INTERC "{" pair (left (ANY IT)) (right (ANY IT))))'))
   end)

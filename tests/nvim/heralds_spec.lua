@@ -192,7 +192,7 @@ describe('skg.heralds', function ()
   it('strips structural colons the way the elisp display does',
      function ()
     -- '⌂:public' -> '⌂public' ('⌂' is outside the keep-class), while
-    -- alphanumeric neighbors keep their colon ('staged:R').
+    -- alphanumeric neighbors keep their colon ('req:folder').
     local cells = heralds.strip_structural_colons(
       heralds.token_character_cells(
         { chunks = { { text = '⌂:public', style = nil } },

@@ -269,10 +269,12 @@ pub fn herald_rule_table () -> HeraldRule {
         . map (|flag| rule (
           flag . wire_name (), vec! [s (flag . herald_text ())]))
         . collect ()),
-      crule (Go, "textChanged", vec! [
-        s ("text changed : "),
-        leaf (Stop, "staged",   "staged"),
-        leaf (Stop, "unstaged", "unstaged") ]),
+      // A text change reads "text changed ✓ ✗", showing whichever
+      // stages it is in: ✓ staged, ✗ unstaged.
+      interc (Some (Nonstandard), " ", Some ("textChanged"), vec! [
+        s ("text changed "),
+        leaf (Go,   "staged",   "✓"),
+        leaf (Stop, "unstaged", "✗") ]),
       crule (Message, "deadViewnode", vec! [ s ("DELETED") ]),
       crule (Message, "deleted", vec! [
         s ("DELETED"),
@@ -294,13 +296,13 @@ pub fn herald_rule_table () -> HeraldRule {
       crule (Message, "inactiveNode", vec! [
         s ("node from inactive repo") ]),
       interc (Some (Go), "", Some ("staged"), vec! [
-        s ("staged:"),
-        leaf (Go, "addedR",     "R"),
-        leaf (Stop,   "removedR", "-R") ]),
-      interc (Some (Go), "", Some ("unstaged"), vec! [
-        s ("unstaged:"),
-        leaf (Go, "addedR",     "R"),
-        leaf (Stop,   "removedR", "-R") ]),
+        s ("✓"),
+        leaf (Nonstandard, "addedR", "R"),
+        leaf (Nonstandard, "removedR", "-R") ]),
+      interc (Some (Stop), "", Some ("unstaged"), vec! [
+        s ("✗"),
+        leaf (Nonstandard, "addedR", "R"),
+        leaf (Nonstandard, "removedR", "-R") ]),
       rule ("node", vec! [
         vac ("id"),
         vac ("repo"),
@@ -357,18 +359,18 @@ pub fn herald_rule_table () -> HeraldRule {
           rule ("flags", vec! [ s ("req:flags") ]),
           rule ("definitiveView", vec! [ s ("req:definitive") ]) ]),
         interc (Some (Go), "", Some ("staged"), vec! [
-          s ("staged:"),
-          leaf (Go, "addedN",     "N"),
-          leaf (Stop,   "deletedN", "-N"),
-          leaf (Go, "addedR",     "R"),
-          leaf (Stop,   "removedR", "-R") ]),
-        interc (Some (Go), "", Some ("unstaged"), vec! [
-          s ("unstaged:"),
-          leaf (Go, "addedN",     "N"),
-          leaf (Stop,   "deletedN", "-N"),
-          leaf (Go, "addedR",     "R"),
-          leaf (Stop,   "removedR", "-R") ]),
-        leaf (Stop, "notInGit", "diff:not-in-git") ]),
+          s ("✓"),
+          leaf (Nonstandard, "addedN", "N"),
+          leaf (Nonstandard, "deletedN", "-N"),
+          leaf (Nonstandard, "addedR", "R"),
+          leaf (Nonstandard, "removedR", "-R") ]),
+        interc (Some (Stop), "", Some ("unstaged"), vec! [
+          s ("✗"),
+          leaf (Nonstandard, "addedN", "N"),
+          leaf (Nonstandard, "deletedN", "-N"),
+          leaf (Nonstandard, "addedR", "R"),
+          leaf (Nonstandard, "removedR", "-R") ]),
+        leaf (Nonstandard, "notInGit", "diff:not-in-git") ]),
       // A PhantomDiff (a moved/removed node in git-diff mode) emits its
       // own root atom 'diffPhantom', not 'node'. Its grammar is the
       // strict subset of node's that phantomDiff_metadata_to_string can
@@ -381,18 +383,18 @@ pub fn herald_rule_table () -> HeraldRule {
         leaf_abut (Crucial, "writeProtected", "☮"),
         rule ("rels", vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
         interc (Some (Go), "", Some ("staged"), vec! [
-          s ("staged:"),
-          leaf (Go, "addedN",     "N"),
-          leaf (Stop,   "deletedN", "-N"),
-          leaf (Go, "addedR",     "R"),
-          leaf (Stop,   "removedR", "-R") ]),
-        interc (Some (Go), "", Some ("unstaged"), vec! [
-          s ("unstaged:"),
-          leaf (Go, "addedN",     "N"),
-          leaf (Stop,   "deletedN", "-N"),
-          leaf (Go, "addedR",     "R"),
-          leaf (Stop,   "removedR", "-R") ]),
-        leaf (Stop, "notInGit", "diff:not-in-git") ]) ] ] . concat (),
+          s ("✓"),
+          leaf (Nonstandard, "addedN", "N"),
+          leaf (Nonstandard, "deletedN", "-N"),
+          leaf (Nonstandard, "addedR", "R"),
+          leaf (Nonstandard, "removedR", "-R") ]),
+        interc (Some (Stop), "", Some ("unstaged"), vec! [
+          s ("✗"),
+          leaf (Nonstandard, "addedN", "N"),
+          leaf (Nonstandard, "deletedN", "-N"),
+          leaf (Nonstandard, "addedR", "R"),
+          leaf (Nonstandard, "removedR", "-R") ]),
+        leaf (Nonstandard, "notInGit", "diff:not-in-git") ]) ] ] . concat (),
   }}
 
 //

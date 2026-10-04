@@ -100,7 +100,7 @@ INTERC is a directive for rules of the form
 with SLOT semantics: each list sub-rule contributes exactly one
 slot whose content is the concatenation of that sub-rule's
 outputs (or the empty string if the sub-rule doesn't fire).
-Slots are joined with SEP, the literal string PREFIX is
+Nonempty slots are joined with SEP, the literal string PREFIX is
 prepended, and the result is emitted as a single token. If every
 slot is empty, no token is emitted.
   LABEL is optional: with it, INTERC matches children of OBJECT
@@ -290,8 +290,8 @@ Two modes depending on whether the rule has a LABEL:
   `(contents M)' as siblings inside `(graphStats ...)') and no
   wrapper form is needed.
 
-In both modes, each sub-rule contributes one slot; slots are
-joined with the header's SEPARATOR; a literal-string prefix is
+In both modes, each sub-rule contributes one slot; nonempty slots
+are joined with the header's SEPARATOR; a literal-string prefix is
 prepended; the token is suppressed if every slot is empty.
 
 Colors: the separator and prefix take the rule's inherited style
@@ -323,13 +323,13 @@ text properties on character ranges."
     (nreverse results)))
 
 (defun skg--interc--build-token (prefix sep slots style)
-  "Build an INTERC token: PREFIX + JOIN(SLOTS, SEP).
-PREFIX and SEP both carry STYLE via `skg-style'. Each slot
+  "Build an INTERC token: PREFIX + JOIN(SLOTS, SEP), skipping empty
+slots. PREFIX and SEP both carry STYLE via `skg-style'. Each slot
 string's own text properties survive the concatenation, so
 per-sub-rule styles remain visible as ranges on the final token."
   (let ((out (skg--propertize-style prefix style))
         (first t))
-    (dolist (slot slots)
+    (dolist (slot (cl-remove-if (lambda (slot) (= (length slot) 0)) slots))
       (unless first
         (setq out (concat out
                           (skg--propertize-style sep style))))
