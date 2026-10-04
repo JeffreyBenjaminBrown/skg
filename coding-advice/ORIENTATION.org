@@ -62,6 +62,8 @@ Read [[file:names.org]], [[file:formatting.org]], [[file:ai-agents.org]],
 also read [[file:when-to-stop.org]]. Consult [[file:architecture.md]] when the
 change crosses graph, storage, server, or client boundaries.
 ** Reviews and plans
+Read [[file:org-discussions.org]] for how discussions in Org files mark
+authorship and what needs attention.
 Read [[file:architecture.md]] for architectural work and [[file:when-to-stop.org]]
 when deciding which implementation choices need Jeff's input. Read the
 code-change advice when reviewing or specifying the corresponding details.

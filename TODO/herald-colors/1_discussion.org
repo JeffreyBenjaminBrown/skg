@@ -53,3 +53,824 @@ the same thing called two different things?
 Please study the herald system and then respond,
 in a level-two headline in this document, right after this one.
 What needs fleshing out? What's inelegant? What's dangerous?
+** Claude says (2026-10-04)
+*** Summary
+The vision is coherent and mostly implementable. Its central idea is that a
+herald's color states its *importance tier*, or for a few heralds its
+*polarity*, rather than its kind. That idea is also the principle the code
+lacks: today the server names colors by hue, the clients name some faces by
+hue and others by meaning, and two of the hue names are swapped. My main
+recommendation is to make the tiers a real vocabulary everywhere: wire
+keywords, Emacs faces, Neovim highlight groups, and docs.
+
+What still needs deciding: about a dozen heralds the vision does not
+assign, the colors of ancestor flags and fraction parts, and a collision
+between the proposed diff X and the existing existence-change X. The
+smaller items are open questions at the end.
+*** The vision against today's system
+**** Tiers should be a reified vocabulary
+The vision defines nine styles: crucial, high, medium, low, normal,
+message, stop, go and nonstandard. Jeff added a tenth, yucky. I recommend
+these become the only color names in the system:
+
+| Style       | Default look             | Today's nearest face                              |
+|-------------+--------------------------+---------------------------------------------------|
+| crucial     | black on cyan            | 'heralds-cyan-face' (used today for A I P)        |
+| high        | black on yellow          | 'heralds-highly-interesting-face'                 |
+| medium      | white on orange          | 'heralds-moderately-interesting-face'             |
+| low         | white on olive '#5e5e20' | 'heralds-slightly-interesting-face'               |
+| normal      | white on blue            | 'heralds-blue-face'                               |
+| message     | black on white           | 'heralds-birth-face' (birth letter moves to high) |
+| stop        | white on red             | 'heralds-red-face'                                |
+| go          | green (shade to decide)  | 'heralds-green-face'                              |
+| nonstandard | white on purple          | 'heralds-purple-face'                             |
+| yucky       | pink '#c84286' foreground, no background | 'heralds-confusable-face'         |
+
+Yucky is error-flavored but not too bad. It is the one style with no
+background, so that a broken link label in body text stays quiet.
+
+Skg views impose a black background, in both clients, rather than
+expecting one. So no style needs to survive a light theme.
+
+Concretely: 'HeraldColor' in 'server/heralds.rs' would become an enum of
+these styles. The wire keywords would be CRUCIAL, HIGH, and so on.
+The faces would be renamed, e.g. 'heralds-crucial-face' /
+'SkgHeraldCrucial'. Then a user who customizes the medium face changes
+every medium-tier herald, which is what customizing a meaning should do.
+Per your note, a comment by the enum would record foreground/background
+inversion as the reserve if more styles are ever needed.
+**** DONE Jeff says
+Let's add 'yucky' = pink, and keep it for broken links.
+The comments can explain 'it's error-flavored but not too bad'.
+***** Claude says: folded into the style table above.
+**** Assignments decided so far, compared with today
+This table started as the vision's assignments; the decisions made
+below have been folded in. Per-side relationship tiers are in
+[[*Relation sides could be a table]].
+
+| Herald                                       | Today                     | Decided                                 |
+|----------------------------------------------+---------------------------+-----------------------------------------|
+| ☮ write-protected (and abutting B)           | green                     | crucial                                 |
+| ⊥ affects not its parent                     | yellow ('Orange' in Rust) | crucial                                 |
+| ĥ overrides here                             | pink foreground           | crucial                                 |
+| birth relation letter                        | black on white            | high                                    |
+| other relation letters                       | C L blue, S O H purple    | normal (all five)                       |
+| relationship counts and ancestor flags       | various                   | per side; see the relation-sides table  |
+| A, I and F counts (F was P; see below)       | cyan                      | low                                     |
+| ⌂ home-repo herald                           | green                     | normal                                  |
+| link-annotation suffix, resolved             | green                     | normal                                  |
+| link-annotation suffix, unresolved           | shadow / Comment          | dim; whether ⌂ shows is open            |
+| folder and qual labels                       | green                     | message                                 |
+| ⟳ cycle                                      | blue                      | medium                                  |
+| =Reference to unknown node.=                 | yellow                    | message                                 |
+| =node from inactive source=                  | blue                      | message                                 |
+| =~NAME= relSource more private than default  | red                       | yucky                                   |
+| save and view requests                       | red; green                | nonstandard                             |
+| =DELETED= outside a diff                     | red                       | message                                 |
+| diff heralds                                 | green / red mix           | nonstandard; stop ✗ unstaged, go ✓ staged |
+| diff axes X, -X, M, -M                       | green / red               | renamed N, -N, R, -R; nonstandard       |
+| diff atoms newX, removedX, newM, removedM    |                           | addedN, deletedN, addedR, removedR      |
+| broken link label                            | pink, underlined          | yucky, underlined                       |
+
+Purple drops out of the relationship heralds entirely: all five letters
+become normal, and the letter alone tells them apart. That seems right to
+me.
+*** What needs fleshing out
+These heralds exist today, but the vision does not assign them. Each one
+is also listed in [[*Open questions]].
+**** Ancestor flags
+Today 'a' is low (olive) and 'b'+ is medium (orange). The vision assigns
+colors by the *side* of a relation. A flag sits inside a side, so it must
+either take the side's color or keep its own generation-based color. If
+it takes the side's color, the a-versus-b distinction becomes
+letter-only. If it keeps its own, an 'a' on an interesting side is low
+inside medium, which may read as "this side matters less."
+***** Jeff says
+'a' should always be at least low-interest, and higher ancestors
+at least medium interest. If the side is colored more interesting yet,
+and there is a number on that side to exhibit the color,
+then the number can carry that duty.
+If, however, the ancestor(s) is/are the only thing on that side
+to indicate that it is high-interest,
+then they themselves should be bumped up to high interest.
+
+This feels disappointingly procedural; I was excited about how
+declarative the spec was until I said this. If you have suggestions,
+I would love ot know.
+****** Claude says: it can be stated declaratively
+Order the tiers: normal < low < medium < high < crucial. Then three
+declarations reproduce your rule exactly.
+******* Floors
+Every glyph has a floor: 'a' is low, 'b' and higher are medium,
+everything else is normal.
+******* Side tiers
+Every side has a tier, given by the relation-sides table.
+******* Carriers
+Each side has one carrier: its numeral if it shows one, otherwise its
+ancestor flags. A carrier's tier is the greater of its floor and its
+side's tier. Every other glyph shows just its floor.
+******* An optional fourth declaration absorbs your contains rule
+You decided that a contains in-side consisting only of the parent is
+low. That is a special case of a more general idea: a side whose only
+members are the ancestors the birth relation already accounts for
+carries no news, because the high birth letter already says it. So:
+/a side containing only birth-explained ancestors has tier low/. With
+the floors, this gives 'aC' low and a subscribee's 'bS' medium (b's
+floor), and it treats every relation alike instead of special-casing
+contains. Do you want the general version, or just the contains case?
+******** js : brilliant
+Yes, your general one please.
+**** The slash, and multi-part sides
+The vision's "high/medium left of L" handles the link fraction's two
+numerals. The slash's own style is unassigned; today it takes the base
+color. Two related cases follow.
+
+***** The subscribee 'C2/8' fraction
+(unintegrated contents) is on contains'
+out-side, which the vision calls uninteresting. But its numerator is new
+information, not visible from the view-children, so it is arguably high.
+****** DONE Jeff says
+Let's color the numerator medium interest.
+******* Claude says: folded into the relation-sides table.
+***** Today an inbound contains count above 1
+is yellow (multiple containers).
+Under the vision, contains' in-side is uniformly medium. Should the
+special case survive?
+****** DONE Jeff says
+If the count is 1 and all we see is the parent 'a',
+low-intesret.
+If it's 0, it's omitted.
+If it's anything else, then the number is medium-interest,
+and any ancestors are low- ('a') or medium- (higher than 'a') interest,
+******* Claude says: folded into the relation-sides table.
+The multiple-containers special case (count > 1 is yellow) goes away.
+[[*Claude says: it can be stated declaratively][The declarative ancestor rule]] reproduces this, and offers to generalize it.
+**** DONE Quality counts: I is missing, and A is not a property
+The vision says "Properties (A, P)". In the code these are three
+*quals*: aliases, extra IDs and true file properties ('Qual',
+'QualFolder', 'GraphNodeStats'). 'I' (extra IDs) is not mentioned.
+***** Jeff says : It is low like the others.
+**** DONE Requests
+Requests have no category in the vision. There are save requests
+(=delete=, =merge:…=, =request:~NAME=, =request:(no) search matching=,
+today red) and view requests (=req:folder:…=, =req:path:…=,
+=req:properties=, =req:definitive=, today green). Red currently doubles
+as "problem" and "pending change", and the vision redefines red as stop.
+A request is neither stop nor go; it is something the user asked for and
+has not yet happened. Candidates are nonstandard or a new style.
+***** DONE Nonstandard
+****** Claude says: folded into the assignments table.
+**** Facts the vision does not mention
+| Herald                         | Today        | Tomorrow                                 |
+|--------------------------------+--------------+------------------------------------------|
+| ⟳ cycle                        | blue         | medium                                   |
+| =Reference to unknown node.=   | yellow       | message                                  |
+| =node from inactive source=    | blue         | message                                  |
+| =~NAME= relSource more private | red          | yucky                                    |
+| =⌂:…= link-annotation suffixes | green/shadow | resolved → normal; other states stay dim |
+***** ONGOING Jeff says
+I decided in the last column, except the last row -- what is a link annotation suffix?
+****** Claude says: it's the optional =[⌂:pub]= after a link
+'skg-toggle-source-overlay-on-links' (=C-c v L=; Neovim
+':SkgToggleSourceOverlayOnLinks') shows, after each =[[id:…][LABEL]]=
+in the body text, the home source of the link's target, e.g.
+=[⌂:pub]=. It starts off and is buffer-local. Unresolved targets show
+=[⌂:missing]=, =[⌂:inactive]=, =[⌂:…]= (pending) or
+=[⌂:unavailable]=; those use Emacs's 'shadow' face / Neovim's
+'Comment' group. See 'docs/heralds.org', section "Link annotations".
+
+My suggestion: a resolved suffix is normal, matching the ⌂ herald on
+headlines. The other states keep the editor's dim face, since they are
+"no answer (yet)" rather than facts. Alternatively, =[⌂:missing]= could
+be yucky, since it is the same fact as a broken link.
+******* js
+If the link goes to a missing repo, it should include no repo symbol.
+Otherwise yes, normal. (It's convenient that normal is different from
+the standard display of a link.)
+******** Claude says: which states lose the ⌂?
+Resolved suffixes being normal is folded into the assignments table.
+
+There are four unresolved states, and "missing repo" could mean either
+of two of them. =[⌂:missing]= means the target ID exists in no active
+skg repo, so it is a broken link and its label is already yucky.
+=[⌂:inactive]= means the target lives in a skg repo outside the active
+source-set. The other two, =[⌂:…]= (lookup pending) and
+=[⌂:unavailable]= (lookup failed), are not about the target at all.
+
+Since ⌂ asserts "this is the home repo", I'd drop it from all four:
+=[missing]=, =[inactive]=, =[…]= and =[unavailable]=, all dim. Is that
+what you meant, or only some of them?
+********* TODO js
+'unavailable' is a bad name; let's change that to 'lookup failed'.
+'missing' is ridiculous; we don't need to show that at all.
+All of them seem to deserve the color yucky.
+
+Did I say lose the house symbol? I would attach it to all of these
+(but don't show it either in the case of a broken link).
+**** Diff details
+Besides X and M, the diff vocabulary includes =-X=, =-M=, =DELETED=,
+=diff:not-in-git= and =text changed : staged unstaged=. The vision says
+"mostly nonstandard", but =DELETED= also appears outside diff mode, on
+deleted scaffolds. Should a deletion outside a diff be stop?
+***** DONE js
+A deletion outside should be message-colored.
+****** Claude says: folded into the assignments table.
+**** Broken links and the pink face
+A broken link label inherits 'heralds-confusable-face' and adds an
+underline; Neovim has a separate 'SkgBrokenLink' group. If ĥ moves to
+crucial, the pink face has only one user left. It should then be renamed
+for that use (e.g. 'skg-broken-link-face') rather than keep a name that
+describes the old ĥ-versus-h problem.
+***** js
+Yucky is the color. But I think it's used in more places;
+links should be underlined, and underlining (linkness)
+is orthogonal to yuckiness.
+****** Claude says: agreed; one choice remains
+Today the pink is used in exactly two places: ĥ, and broken link labels
+(Emacs inherits 'heralds-confusable-face' plus underline; Neovim's
+'SkgBrokenLink' copies the color plus underline). After the decisions
+here it is used for broken link labels and the =~NAME= relSource
+herald. The face becomes 'heralds-yucky-face' / 'SkgHeraldYucky'.
+Underlining stays a separate property added at the link site, so
+yuckiness and linkness compose as you describe.
+
+The remaining choice: every other style is black or white text on a
+colored background, but today's pink is a foreground with no
+background. Should yucky be a pink foreground, or black on a pink
+background like every other herald style? I prefer the foreground: in
+body text, a pink-background link label would be louder than "not too
+bad".
+******* DONE js : agreed
+******** Claude says: folded into the style table.
+*** What's inelegant
+**** DONE Wire color names are hues, and two of them are swapped
+'HeraldColor' in 'server/heralds.rs' has 'Orange' and 'Yellow'. Both
+clients map the keyword ORANGE to the *yellow* face and YELLOW to the
+*orange* face ('heralds--color-to-face' and
+'nvim/lua/skg/heralds.lua::color_to_highlight_group'). Commit 'fd7b8602'
+swapped the faces but kept the keyword names. As a result, the Rust
+source says 'Orange' for ⊥ and for the unknown-node marker, while both
+render yellow. Semantic keywords would remove this whole class of lie.
+**** Two coloring authorities
+Non-relationship heralds get their colors from the Rust rule table.
+Relationship heralds get theirs from code in each client. A shared
+style vocabulary is the minimum fix. A fuller fix would have the
+server's semantic '(rels …)' facts carry a style per span. That would
+restore one authority, at the cost of moving some presentation back to
+the server, which 'server/herald_tokens.rs' deliberately avoided.
+***** js
+But could all codebases (emacs, server, neovim, maybe etc.)
+not read from a single authoritative file (json or something)
+
+If not, let's go minimal for now.
+****** Claude says: yes for data, and I'd stop there
+This also answers [[*Two copies of the relationship renderer]] and
+[[*Relation sides could be a table]].
+******* What a shared file can hold
+A JSON file is readable by all three: 'serde_json' in Rust,
+'json-parse-string' in Emacs, and 'vim.json.decode' in Neovim. It
+would hold everything declarative: the style palette (name →
+foreground, background, underline), the relation-sides table (relation
+× side → tier), the ancestor floors, and the relation letters with
+their display order.
+******* What it should not hold
+The rendering *procedure* (fraction layout, count omission, carriers)
+would remain code in each client. Moving it into a DSL would mean two
+interpreters, each roughly as large as today's renderer and harder to
+debug. That trades a visible duplication for a hidden one. Instead,
+drift in the procedure would be caught by shared test fixtures: one
+file of cases (metadata → expected text and style spans) that both
+client test suites run.
+******** js
+Ooh I like the shared fixtures idea.
+Is that already a widespread feature of the tests?
+********* Claude says: not widespread; there are two precedents
+'tests/shared/literal-link-cases.txt' holds cases for which
+=[[id:…][…]]= text in an Org body is a real link. The Rust, Emacs and
+Neovim tests all read it ('tests/textlinks.rs',
+'tests/elisp/test-skg-link-annotations.el',
+'tests/nvim/link_annotations_spec.lua').
+
+'tests/elisp/herald-rules.sexp' is a pinned copy of the herald rule
+table. The Emacs and Neovim herald tests both install it, so neither
+needs a server.
+
+The herald rendering *expectations*, however, are duplicated by hand:
+'tests/nvim/heralds_spec.lua' says it "mirrors"
+'tests/elisp/test-heralds-minor-mode.el', case by case. Those are the
+cases a shared fixture file would replace, and 'tests/shared/' is the
+natural home for it.
+******* Where it lives and who reads it
+Both clients live in this repository, so each can read the file at
+load time by a path relative to its own source. Faces must exist
+before the client connects, so reading the file directly is simpler
+than having the server serve it. Rust needs only to check, in a
+conformance test, that every style its rule table names is defined in
+the file.
+******* The alternative I'd avoid
+The server could compute each span's style and send it, leaving the
+clients nothing to decide. That reverses the semantic-wire decision
+('TODO/DONE/semantic-heralds-wire/'): the wire carries facts, and
+clients own presentation. I don't think this proposal is a reason to
+revisit that.
+******* Recommendation
+Do the shared JSON data file and the shared fixtures, together. Both
+are small, and they remove most of the drift risk.
+******** DONE js : agreed
+**** Two copies of the relationship renderer
+'elisp/heralds-minor-mode.el' and 'nvim/lua/skg/heralds.lua' implement
+the same rendering logic, and each has its own tests. Every change
+in this proposal must be made in both places. That is a drift risk,
+not a reason to stop. Shared fixture cases (metadata → expected spans
+and styles) that both test suites read would contain it.
+***** DONE js
+Again, could we reify the rules in some kind of file
+that both know how to read?
+Both would then have to know a little DSL for herald-rendering,
+which would be duplicative itself, but maybe very small.
+****** Claude says: answered under [[*Two coloring authorities]].
+**** ☮ is baked into label strings
+'leaf_ro!' and 'FileProperty::herald_text' put =☮= at the start of a
+label string, e.g. "☮ It hides these…" and "☮ no search matching". The
+lens engine colors whole atoms, so this ☮ cannot be crucial while the
+rest of the label is a message. The rule table would need to emit ☮ as
+its own token, abutting the label, for the vision's "write-protected:
+crucial" to hold on folders and properties.
+***** js
+Seems good. Is there anything dangerous or otherwise undesirable
+about this that I'm missing?
+****** Claude says: nothing dangerous; two mechanical notes
+******* Spacing needs care
+The lens engine joins a rule's children with ':' and then strips
+"structural" colons that touch a non-alphanumeric character, so
+=☮= followed by a label would render as =☮It hides…= with no space.
+'leaf_ro!' exists precisely to dodge this with a compile-time
+'concat!'. A separate abutting ☮ token needs either a trailing space
+inside the ☮ token or a separator rule. This is the same in both
+clients, since Neovim ports that colon logic.
+******** js : please elaborate
+Please explain the problem to me like I don't (because I don't)
+remember how the lens engine works.
+********* Claude says: here's the engine, and the problem is smaller than I said
+********** How the engine turns metadata into heralds
+The rule table in 'server/heralds.rs' is a tree of rules shaped like the
+metadata. Each rule has a label, and it fires when the metadata
+contains that label at the same position, e.g. the rule 'hiddenFolder'
+fires on the atom 'hiddenFolder'. A firing leaf rule emits one /token/.
+A token is the rule's literal strings joined with ':', and the whole
+token gets the rule's one color.
+
+The renderer then lays tokens out in rule-table order, with a space
+between consecutive tokens. A token from a rule marked ABUT gets no
+space before it, so it glues onto its predecessor. Finally the renderer
+deletes "structural" colons, meaning any colon that touches a
+non-alphanumeric character. That is how a rule like '("3" "{")' once
+became =3{= rather than =3:{=.
+********** Why ☮ was baked into the label strings
+Put =☮= and =It hides these…= as two strings in one rule, and you get
+one token, =☮:It hides these…=. The colon touches ☮, so it is
+stripped, leaving =☮It hides these…= with no space, in one color.
+'leaf_ro!' avoids this by gluing "☮ " onto the label at compile time,
+so the rule has a single string. But that string is still one token,
+so it is still one color.
+********** The fix, and my correction
+I said earlier that a separate ☮ token would need a trailing space or a
+separator rule. That was wrong. Each rule scans the metadata
+independently ('skg--apply-ordinary-leaf' in
+'elisp/skg-sexpr/skg-lens.el'), so two rules may match the same atom.
+Then '(CRUCIAL hiddenFolder "☮")' followed by
+'(MESSAGE hiddenFolder "It hides these…")' emits two tokens, which
+the renderer separates with its ordinary space: =☮ It hides these…=,
+in two colors. No ABUT and no colon stripping is involved. The cost is
+one extra rule per write-protected label, and 'leaf_ro!' disappears.
+********** TODO js : solved!
+Or if I missed some question, let me know.
+(If I didn't, no need to confirm.)
+******* Tests pin the label strings
+The Emacs and Neovim herald tests and the Rust conformance test pin
+the current strings, so they change in the same commit. That's
+ordinary churn, not risk.
+**** Face docstrings and comments have drifted
+The cyan face's docstring says "A / I" (it also styles P).
+'heralds--color-to-face' lists five keywords. 'server/heralds.rs' still
+describes 'heralds--inject-default-affectsParent' and a "{" herald,
+neither of which exists anymore. 'docs/heralds.org' says "had ID before
+org-roam import", but the code says "had ID before import". I logged
+these in 'TODO/problems.org'.
+*** What's dangerous
+**** The proposed diff X collides with the existence-change X
+=X= and =-X= already mean "node came into / went out of existence"
+(=newX=, =removedX=). A stop-colored X for "unstaged" next to them would
+be read as a third existence fact. The glyphs ✗ (U+2717) and ✓
+(U+2713) avoid the clash, though ✗ and X are still close in some fonts.
+Renaming the existence axis (e.g. =E= / =-E=) would avoid it entirely.
+***** DONE js
+I like the ✗; do use that.
+But *also* let's rename the axis: N for node and R for relationship
+is more precise than X for exists ("what" exists?) and M for membership.
+****** Claude says: folded into the assignments table.
+R fits the code well: the membership axis already covers containment
+and the partner-folder relations (subscribes, hides, overrides), not
+just contents ('NodeChanges' in 'server/types/git.rs'). The atom names
+are discussed under [[*The same thing under several names]].
+**** Go and low may be indistinguishable
+Today's green ('#006400') and olive ('#5e5e20') are both dark, muddy
+backgrounds with white text. If go stays dark green and low stays olive,
+a user cannot reliably tell "staged" from "low-interest". Making go a
+bright green with black text would separate them, and would match the
+other bright styles (crucial, high).
+***** js
+Seems good.
+
+Is bright green something like 88FF88 instead of 00BB00?
+****** Claude says: either works; I'd pick between them
+'#88FF88' is a pastel green, and '#00BB00' is a saturated mid green.
+Both are bright enough for black text: the contrast ratios are roughly
+17:1 and 8:1. On a black background, the pastel sits close to crucial's
+cyan ('#00FFFF'), since both are pale and cool. The saturated green is
+distinct from cyan, yellow and olive alike. So I'd choose something
+like '#00CC00'. You may prefer to judge by eye; the shared style file
+would make trying both a one-line change.
+******* js : what have I been seeing?
+For instance, in the current color of the source (repo) heralds?
+******** Claude says: '#006400', dark green with white text
+That is 'heralds-green-face', used today for ⌂, folder labels, ☮ and
+much else. It is darker than both candidates. The 'a' flag's olive is
+'#5e5e20'. Either candidate would be a visibly brighter green with
+black text, so go would no longer look like anything you see today.
+********* TODO js : Let's use 00 BB 00
+**** Adjacent spans in one style merge into a blob
+Spans have backgrounds and no separators inside a token, so
+same-styled neighbors fuse. Under the vision, =5/L= with a fully
+interesting numerator would put a high 5, a slash, and a high birth L
+side by side; if the slash is also high, the result is one yellow
+block. Similarly, a birth O followed by ĥ would put high next to
+crucial, which is fine, but a crucial ⊥ abutting a crucial ☮ would fuse.
+The slash's style and the abutting markers should be chosen with this
+in mind.
+***** js
+Is that bad?
+****** Claude says: no; I withdraw the worry
+Adjacent glyphs with the same style share a tier, and the glyphs
+themselves stay distinct (a digit, a letter, a slash, ☮), so a fused
+block loses no information. Herald glyphs are never ambiguous about
+where one ends and the next begins. The slash still needs a style;
+see Q3.
+**** "Uninteresting" sides are not always visible elsewhere
+The tiering assumes the uninteresting side can be seen in the view, and
+that assumption fails in several cases.
+***** Contents are not visible
+when the node is folded, write-protected (no
+body), truncated, or not yet expanded.
+****** DONE js
+******* Folded: still uninteresting; they're close enough.
+******* Write-protected: low interest.
+******* Truncated: Is this different from write-protected?
+******* Not yet expanded: What's that?
+******* Claude says: those two are one case, and it differs from write-protected
+Folded and write-protected are folded into the relation-sides table.
+
+"Truncated" and "not yet expanded" were two names for one case; my
+mistake. A view render has a node budget ('initial_node_limit' in the
+config, default 1000). When it runs out, the remaining nodes are drawn,
+but their contents are not. Such a node is definitive and editable. A
+write-protected occurrence, by contrast, is a repeat of a node shown
+definitively elsewhere, and it never shows contents.
+
+The metadata does not currently mark a node as budget-truncated, so
+the clients cannot tell it apart from a node with nothing to show. I
+suggest treating it like folded (normal) rather than adding a new
+fact to the wire. Budget exhaustion is rare and visible: the view
+simply stops.
+******** DONE Are you sure?
+A definitive node drawn without its content would upon save
+immediately delete its relationships to that content.
+I hope budget-truncation creates write-protected viewnodes.
+********* Claude says: you're right, and I was wrong.
+Budget truncation does create write-protected viewnodes. Once the
+budget is spent, 'visit_normal_node' in
+'server/update_buffer/complete.rs' draws each further node
+write-protected and expands nothing under it ('tests/definitive_view_cascade_and_budget.rs'
+pins this). So "truncated" is simply write-protected, which is low. I
+folded that into the relation-sides table.
+***** Subscribees are not visible on write-protected occurrences:
+'maybe_add_subscribeeFolder_branch' returns early for them.
+****** DONE js
+Let's make subscribers high-interest and subscribees medium-interest,
+regardless of write-protection.
+
+I maybe be contradicting myself. When we write a definitive plan,
+please remind me I need to review all the rules!
+******* Claude says: folded into the relation-sides table.
+It does contradict the vision, which called the subscribee count
+uninteresting; the decision here wins. The reminder is recorded under
+[[*Reminders for the definitive plan]].
+***** Hidden nodes appear in the hidden-in/outside-subscribee folders,
+but the plain =hiddenFolder= exists only on request.
+****** DONE js : that's fine
+Hidden things are almost by definition super-uninteresting.
+**** DONE Color depth in Neovim
+Orange, olive and purple are hex colors. Without 'termguicolors',
+Neovim maps them to the nearest 256-color or 16-color entry, where
+orange and yellow, or olive and green, can collapse together. The
+new scheme depends more on fine distinctions than today's does.
+The Neovim setup docs should say that 'termguicolors' is assumed.
+**** White message backgrounds on light themes
+On a white Emacs background, black-on-white folder labels look like
+ordinary buffer text. That may be acceptable, since messages are prose.
+But it is the one style that disappears in light themes.
+***** DONE js
+I don't have bandwidth for user-defined styles.
+The user can have any background color they want as long as it's black.
+(Skg-mode should impose this, rather than expect it.)
+****** Claude says: folded into the style section.
+*** Making the herald system more principled
+**** "Interesting" means three things
+The word is used three ways.
+
+As a semantic predicate: an "interesting" link source has a body,
+content, or more than one target ('link_interesting', '(interesting …)'
+on the wire).
+
+As a display tier: the faces named highly, moderately and slightly
+interesting.
+
+In the vision, as a property of a relation's side.
+
+These will collide in conversation and in code. I suggest reserving
+"interest" for the display tier and renaming the link-source predicate,
+e.g. "substantive" sources. The side property could then be called
+"visible-elsewhere" versus "news".
+***** js
+'substantive' for links: yes.
+'visible elsewhere' vs. 'news': I like the distinction,
+but I'm not sure it will survive what I've said above;
+bring me back to this, please (by marking it TODO for me)
+after you've processed all my feedback.
+****** Claude says: it survives as a rationale, not as a mechanism
+Having processed everything, here is where each side's tier comes from.
+
+Visibility explains these: contents and link targets are normal because
+the view and the text show them. Hidden nodes are normal because they
+are uninteresting, which is close to the same thing. The parent-only
+contains in-side is low because the tree shows the parent.
+
+Visibility does not explain these: subscribers are high and subscribees
+medium regardless of whether a folder shows them. The overrides sides
+(in low, out medium) are judgments of importance. Write-protected
+contents are low, not normal, although they are invisible.
+
+So the tiers are ultimately per-side importance judgments, and
+"visible elsewhere" is one reason among several for a judgment. I'd
+keep the phrase in the docs, as the explanation for the normal rows,
+and give it no name in code or in the style file: the table just says
+"normal". The one place the idea does real work is the optional
+birth-explained rule under [[*Ancestor flags]], where it would be called
+something like "already explained by birth".
+******* js : agreed
+**** The same thing under several names
+| Concept                     | Names in use                                                                     | Tomorrow                          |
+|-----------------------------+----------------------------------------------------------------------------------+-----------------------------------|
+| cannot be edited here       | write-protected, read-only ('leaf_ro', "READ-ONLY folder scaffolds"), ☮, peace   | write-protected                   |
+| why this occurrence is here | birth, reason-for-being, "relation that explains presence"                       | birth                             |
+| ⊥                           | affectsParent false, "does not affect its parent's membership"                   | (fine; one atom)                  |
+| ĥ                           | overridesHere, substitution, "confusable"                                        | overrides-here                    |
+| A I P                       | action counts/heralds (docs, old vision), properties (this vision), quals (code) | property counts                   |
+| P alone                     | property, boolprop, FileProperty, "true file properties"                         | file property                     |
+| non-node view positions     | folder, scaffold, col (old vision), partner folder, qual folder                  | folder                            |
+| where a node lives          | source, home source, ⌂, sourceHerald, "source repo" (this vision)                | home source                       |
+| deletion                    | DELETED, deletedScaffold, delete (request), removedX                             | keep, but split fact from request |
+***** ONGOING js
+I edited the last column.
+
+Per ordinary English, aliases and IDs really are properties of a node.
+So let's rename those boolean 'properties' to 'flags' and use an F in the heralds.
+I *think* that's the least confusing user-facing option.
+
+Let's also use 'home repo', and furthermore change 'source' to 'repo' everywhere.
+'source' is confusable with link sources and really more generally to a user.
+
+'removed' does seem like it should be 'deleted', no?
+****** Claude says
+******* Flags and F: agreed; how deep should the rename go?
+F collides with no other herald letter. The user-facing part is
+small: the herald =F=, the folder label "flags", and the view
+request =req:properties= becoming =req:flags=. Beneath that are
+'FileProperty', 'QualFolder::BoolProps', 'boolprops' and the
+'properties' wire names. On disk, the flags sit in a .skg file's
+'misc' list as the enum's variant names, so renaming the type
+need not touch data. I'd rename the code too, so the code and the
+user speak one language. Agreed?
+******** DONE yes!
+This is a principle I intend to take as far as possible:
+Once concept ~ one name.
+(Sweeping all terms is out of scope for this plan,
+but if you find any more terms during the preparation or execution of this plan
+that are multiply-named, that would be in scope.)
+********* Claude says: recorded under [[*Reminders for the definitive plan]].
+******* 'repo' for 'source' is a large, separate change, and possibly inaccurate
+Two concerns.
+
+Accuracy: a source need not be a Git repository. The server tracks
+'is_git_repo' per source, and =diff:not-in-git= exists because some
+nodes have no Git counterpart. Calling a plain directory a "repo"
+would mislead in exactly the cases where Git behavior differs.
+
+Size: "source" is in the config file ('[[sources]]', source-sets,
+abbreviations), the metadata wire ('source', 'relSource',
+'sourceHerald'), stored relSource values, every client, and most docs.
+Renaming the config keys breaks existing 'skgconfig.toml' files. The
+no-legacy-support policy means no compatibility shim, so every user
+would migrate by hand.
+
+I'd give this its own TODO directory and keep it out of the herald
+work. Within the herald work, the user-facing word could already be
+"home repo" (or another word) without touching the code. If "repo"
+feels wrong for non-Git sources, alternatives include "store",
+"vault" and "collection". What would you like?
+******** ONGOING js
+Let's just specify: 'skg repo' and 'git repo'.
+I'm the only user and we're the only devs;
+big renames are safe in that sense.
+********* Claude says: settled words; two follow-ups
+The words are folded in: a source is now a /skg repo/, and a Git
+repository is a /git repo/. User-facing herald text uses "home repo".
+********** Does the rename ride in this plan?
+"Source" appears in the config file, the wire, stored relSource values,
+both clients, the tests and most docs: likely the largest rename in the
+codebase. I'd do it as its own plan ('TODO/source-to-skg-repo/'),
+before or after the herald work, so that neither diff buries the
+other. Your one-concept-one-name scope note says terms found during
+this plan are in scope. Does that include this one, or does it get
+its own plan?
+*********** TODO js : let it ride
+Let's do all renames before anything else,
+granularly committed however is natural
+(that is, two renames could ride the same commit if they are related).
+********** Identifiers
+In prose the full "skg repo" is needed, to avoid confusion with git
+repos. In code I'd use 'repo' alone where no Git type is nearby (e.g.
+'SourceName' → 'RepoName', '[[sources]]' → '[[repos]]', 'relSource' →
+'relRepo'), and 'skg_repo' only where Git repositories appear in the
+same scope (e.g. 'server/git_ops/'). Agreed?
+*********** TODO js : agreed
+******* 'removed' versus 'deleted': for nodes yes, for relationships no
+With your N/R axes the distinction becomes clean. A node that left the
+graph was deleted: =-N=, atom 'deletedN' (today 'removedX'). A
+relationship that ended deleted nothing; the node still exists
+elsewhere. So it was removed: =-R=, atom 'removedR' (today
+'removedM'). For symmetry the positive atoms would be 'createdN' and
+'addedR'. That leaves =DELETED= (fact), 'delete' (request) and
+'deletedN' (diff fact) as three distinct, accurate uses.
+******** DONE js
+Yes to all except let's use 'addedN' and 'addedR'
+to avoid the additional term 'created'.
+********* Claude says: folded into the assignments table.
+**** Categories that are not yet reified
+Every herald belongs to one of eight kinds: relationship heralds, qual
+counts, position markers (☮ B ⊥ ĥ ⟳), source heralds (⌂ ~), labels
+(folder and qual), requests (save and view), diff facts, and
+unknown/inactive placeholders. 'docs/heralds.org' calls most of these
+"Other heralds". Naming the kinds, with one table of kind → default
+style → glyphs in the docs, would make the color scheme checkable at a
+glance. It would also make a newly added herald obviously need a style.
+***** DONE js
+Hell yes.
+****** Claude says: recorded under [[*Reminders for the definitive plan]].
+**** Relation sides could be a table
+The vision's per-relation rules form a small table: for each relation
+and side, whether the side is usually visible elsewhere, and its tier.
+That table belongs in one place, not spread across conditionals.
+
+The table below includes the decisions made above.
+
+| Relation   | in-side (N nodes R it)          | out-side (it Rs N nodes)                                                         |
+|------------+---------------------------------+----------------------------------------------------------------------------------|
+| contains   | medium                          | normal; low on a write-protected occurrence (budget-truncated ones included); unintegrated numerator medium |
+| textlinks  | medium; substantive subset high | normal                                                                           |
+| subscribes | high                            | medium                                                                           |
+| overrides  | low                             | medium                                                                           |
+| hides      | medium                          | normal                                                                           |
+
+Four rules apply on top of the table, as agreed under [[*Ancestor flags]]:
+1. Tiers are ordered normal < low < medium < high < crucial.
+2. Floors: 'a' is at least low, and 'b' and higher are at least medium.
+3. Carriers: a side's numeral carries its tier; if it shows no numeral,
+   its ancestor flags do. A carrier shows the greater of its floor and
+   the side's tier, and every other glyph shows just its floor.
+4. Birth-explained sides: a side whose only members are ancestors that
+   the birth relation already accounts for has tier low. This subsumes
+   the earlier "parent as sole container is low" rule; e.g. 'aC' is low,
+   and a subscribee's 'bS' is medium because of b's floor.
+A fraction's slash takes its side's tier, the same as the denominator:
+in =2/5L= the 2 is high, and the slash and 5 are medium.
+***** DONE js
+Should it be in code? Maybe it should be json,
+so that multiple codebases (server, clients) can read it.
+****** Claude says: answered under [[*Two coloring authorities]].
+*** Reminders for the definitive plan
+**** Jeff will review all the rules
+Jeff asked to be reminded, when the definitive plan is written, to review
+every rule together for contradictions: the assignments table, the
+relation-sides table, and the ancestor rule.
+**** Name the herald kinds
+Accepted under [[*Categories that are not yet reified]]: 'docs/heralds.org'
+gets one table of herald kind → default style → glyphs, replacing the
+"Other heralds" grab-bag.
+**** One concept, one name
+Jeff's principle: one concept gets one name. Sweeping all terms is out
+of scope, but any multiply-named term found while preparing or executing
+this plan is in scope. Decided so far: boolean properties become
+/flags/ (herald F, folder "flags", =req:flags=, and the code too), a
+source becomes a /skg repo/ (as distinct from a /git repo/), link
+sources that are interesting become /substantive/, and the diff atoms
+become 'addedN', 'deletedN', 'addedR', 'removedR'.
+**** Smaller items
+The style definitions get a comment saying that foreground/background
+inversion is the reserve if more styles are ever needed. The Neovim
+setup docs say that 'termguicolors' is assumed. The drift items logged in
+'TODO/problems.org' (2026-10-04) get fixed along the way. The rename to
+semantic style names lands as its own commit, before any color changes.
+*** Open questions
+Terms: a /side/ of a relation is its in-side (how many nodes relate to
+this one) or its out-side (how many nodes this one relates to). The
+/tiers/, in increasing order, are normal, low, medium, high and crucial;
+the other styles are message, stop, go, nonstandard and yucky (see the
+style table above). An /ancestor flag/ is the lowercase letter
+(a = parent, b = grandparent, …) that replaces a count when an ancestor
+accounts for it. The /qual counts/ are aliases (A), extra IDs (I) and
+true boolean flags (F, formerly P).
+
+Each open question is also a TODO in the section it links to; answering
+in either place is enough.
+**** DONE js
+I was marking the remainders of these DONE etc. by hand,
+but again I think much of what I said above answers these.
+Please mark any DONE that are done now,
+and TODO the ones I need to process still.
+**** DONE Q1: Should colors become semantic keywords end to end?
+That is, the wire keywords, Emacs faces, Neovim groups and docs would
+all use the style names. I recommend yes, done as its own commit
+before any colors change.
+
+Answer: yes. I'm taking this from your adding 'yucky' as a style and
+marking the swapped-hue-names item DONE. Reopen it if I misread.
+**** DONE Q2: What color are ancestor flags?
+Answer: floors and carriers, plus the birth-explained rule; see the
+four rules under [[*Relation sides could be a table]].
+***** DONE js : yes and yes
+**** DONE Q3: What style is the slash?
+Fusion is no longer a concern ([[*Adjacent spans in one style merge into a blob]]).
+I suggest the slash take its side's tier, which is also the
+denominator's: in =2/5L= the 2 is high, and the slash and 5 are medium.
+***** DONE js : yes
+**** DONE Q4: What tiers for the C-unintegrated numerator and for multiple containers?
+Answer: the unintegrated numerator is medium. The multiple-containers
+special case is replaced: a contains in-side holding only the parent
+is low, and otherwise the count is medium.
+**** DONE Q5: Is I (extra IDs) low like A and P?
+Answer: yes.
+**** DONE Q6: What style do requests get?
+Answer: nonstandard, for save and view requests alike.
+**** DONE Q7: Styles for ⟳, unknown node, inactive node, and the =~NAME= relSource fact?
+Answer: ⟳ medium, unknown and inactive message, =~NAME= yucky.
+**** DONE Q8: Diff glyphs
+Answer: ✗ (stop) marks unstaged and ✓ (go) marks staged. The axes
+become N (node) and R (relationship), replacing X and M.
+**** DONE Q9: Is DELETED outside a diff stop, or nonstandard?
+Answer: message.
+**** DONE Q10: Which bright green is go?
+Black text in either case. '#88FF88' (pastel) or '#00BB00'-ish
+(saturated)? I suggest '#00CC00'. Today's green, for comparison, is
+'#006400' with white text. See [[*Go and low may be indistinguishable]].
+***** TODO js : resolved above
+**** DONE Q11: Is yucky a pink foreground or black on pink?
+Answer: a pink foreground. Underlining for links is separate.
+***** DONE js : yes
+**** DONE Q12: Should ☮ be split out of label strings?
+Answer: yes. Nothing dangerous; see [[*☮ is baked into label strings]].
+**** DONE Q13: Should "interesting" be reserved for the display tier?
+Answer: yes; interesting link sources become "substantive".
+**** TODO Q14: Which unresolved link-annotation suffixes lose the ⌂?
+Resolved suffixes are normal, and unresolved ones are dim. Remaining:
+I'd drop ⌂ from all four unresolved states (missing, inactive, pending,
+unavailable). See [[*Facts the vision does not mention]].
+***** DONE js : I think I resolved this earlier
+****** Claude says: mostly; one ambiguity is left, now the question above.
+**** DONE Q15: One shared JSON style file plus shared test fixtures?
+Answer: both, with the rendering procedure staying in code.
+**** DONE Q16: Does the flags rename reach the code?
+Answer: yes; one concept, one name.
+**** DONE Q17: Does the source → skg repo rename ride in this plan, and which identifiers?
+The words are settled: /skg repo/ and /git repo/. Remaining: whether
+the rename is part of this plan or its own (I suggest its own), and
+whether code uses bare 'repo' except near Git types. See
+[[*The same thing under several names]].
+***** TODO js : resolved above
+**** DONE Q18: Diff atom names
+Answer: 'addedN', 'deletedN', 'addedR', 'removedR'.
+**** DONE Q19: Treat a budget-truncated node's contents like folded (normal)?
+Answer: moot. Budget-truncated nodes are write-protected, so their
+contents count is low.
+**** DONE Q20: Keep "visible elsewhere" only as a documented rationale?
+Answer: yes.

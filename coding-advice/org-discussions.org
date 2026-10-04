@@ -1,0 +1,48 @@
+* Discussing plans and reviews in Org files
+Jeff and Claude discuss plans, reviews and design questions
+asynchronously, inside Org files under 'TODO/<topic>/' (for instance
+'1_discussion.org', '2_plan.org'). Jeff reads and answers in Emacs.
+* The two things that matter
+** Searching for "\* TODO" finds everything that needs attention
+After either of us finishes a pass, every heading that needs the other's
+attention is marked TODO, and nothing else is. So when you finish
+processing a TODO, clear it: mark it DONE, ONGOING, or something else,
+or remove the keyword. Which of those you choose doesn't matter, and
+Jeff is not consistent about it either. Other keywords (ONGOING,
+AWAITS, DONE) are informal notes on the state of a heading; nothing
+depends on them.
+
+A TODO is for whoever didn't write it. A TODO in Claude's voice is for
+Jeff, and a TODO in Jeff's voice is for Claude.
+** The voice switch is visible
+Every reply begins its headline with an author marker: 'Claude says'
+or 'Jeff says'. Jeff often abbreviates his to 'js'; Claude always
+writes the full 'Claude says'. More title text after the marker is
+optional, e.g. 'Claude says: yes for data, and I'd stop there'.
+Headings beneath a marked heading are by the same author until another
+marker starts a reply, so the marker need not be repeated.
+* Habits that help
+** Replying
+Reply to one of Jeff's headings as a child of it. Never alter his
+words; changing his keyword and adding children is fine. Claude may
+revise its own text, for instance to fold in decisions, but should leave
+Jeff's direct edits to Claude's text in place.
+** Folding decisions
+When Jeff settles something, fold it into the body (a table, a plan
+step, an open-question answer), and leave a one-line child saying
+where it went, e.g. 'Claude says: folded into the relation-sides
+table.'
+** One answer per question
+When one question appears in several places, answer it once and point
+there from the others, so Jeff processes each issue once.
+** Open questions
+A plan or discussion response ends with an open-questions section. It
+is self-contained: it defines its terms, so Jeff can answer it without
+reading the body. Each question gets its own headline, with a one-line
+answer added once it is answered. A question that is also discussed
+in a section links there.
+** Form
+Prefer headlines to bullets, and let the tree be as irregular as the
+content; see [[file:ORIENTATION.org][ORIENTATION]]. Use single apostrophes around code
+references. Do not commit planning files during discussion rounds;
+Jeff stages and commits them himself.
