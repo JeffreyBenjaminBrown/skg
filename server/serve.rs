@@ -15,7 +15,7 @@ use crate::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_n
 use crate::org_to_text::viewforest_to_string;
 use crate::serve::handlers::close_view::handle_close_view_request;
 use crate::serve::handlers::delete_references_to_absent_node::handle_delete_references_to_absent_node_request;
-use crate::serve::handlers::diff_analysis::handle_diff_analysis_request_with_source_set;
+use crate::serve::handlers::diff_report::handle_diff_report_request_with_source_set;
 use crate::serve::handlers::relSource_info::handle_relSource_info_request;
 use crate::serve::handlers::boolprop_state::handle_boolprop_state_request;
 use crate::serve::handlers::export_to_org::handle_export_to_org_request;
@@ -210,8 +210,8 @@ fn handle_emacs (
             handle_link_statuses_request (
               &mut stream, &request_header, &runtime . graph,
               &runtime . config, &active_source_set ),
-          Ok (RequestType::DiffAnalysis) =>
-            handle_diff_analysis_request_with_source_set (
+          Ok (RequestType::DiffReport) =>
+            handle_diff_report_request_with_source_set (
               &mut stream, &request_header, &runtime . config,
               &active_source_set ),
           Ok (RequestType::StageMoves) =>

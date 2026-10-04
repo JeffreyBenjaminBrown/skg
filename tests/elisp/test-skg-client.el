@@ -38,3 +38,45 @@
                  (error-message-string err)))))))
 
 (provide 'test-skg-client)
+
+(defmacro test-skg-client--with-live-connection (port-var &rest body)
+  "Connect `skg-rust-tcp-proc' to a throwaway local server around BODY,
+binding PORT-VAR to that server's port."
+  (declare (indent 1))
+  `(let* (( server (make-network-process
+                    :name "test-skg-server" :server t
+                    :host "127.0.0.1" :service t) )
+          ( ,port-var (process-contact server :service) )
+          ( skg-rust-tcp-proc (make-network-process
+                               :name "test-skg-client"
+                               :host "127.0.0.1" :service ,port-var) ))
+     (unwind-protect (progn ,@body)
+       (when (process-live-p skg-rust-tcp-proc)
+         (delete-process skg-rust-tcp-proc))
+       (delete-process server))))
+
+(ert-deftest test-skg-init-keeps-a-connection-to-the-same-port ()
+  (test-skg-client--with-live-connection port
+    (skg--end-connection-to-another-port port)
+    (should (process-live-p skg-rust-tcp-proc))))
+
+(ert-deftest test-skg-init-ends-a-connection-to-another-port ()
+  "With no skg buffers open, switching ports ends the old connection."
+  (test-skg-client--with-live-connection port
+    (let (( process skg-rust-tcp-proc ))
+      (cl-letf (( (symbol-function 'skg-buffer-p) #'ignore ))
+        (skg--end-connection-to-another-port (1+ port)))
+      (should-not (process-live-p process))
+      (should-not skg-rust-tcp-proc))))
+
+(ert-deftest test-skg-init-refuses-another-port-while-skg-buffers-are-open ()
+  "Views from the old server must not be saved into the new one."
+  (test-skg-client--with-live-connection port
+    (let (( view (generate-new-buffer "*test-port-switch*") ))
+      (with-current-buffer view (setq skg-view-uri "test-view"))
+      (unwind-protect
+          (progn
+            (should-error (skg--end-connection-to-another-port (1+ port))
+                          :type 'user-error)
+            (should (process-live-p skg-rust-tcp-proc)))
+        (kill-buffer view)))))

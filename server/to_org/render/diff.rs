@@ -250,7 +250,7 @@ fn mark_membership_on_existing_children (
         ViewNodeKind::Vognode (Vognode::Active (t)) =>
           Some ((t . id . clone (), &mut t . membership)),
         // No Inactive arm: diff mode requires the "all" source set
-        // (diff_analysis.rs and source_sets.rs refuse otherwise), under
+        // (diff_report.rs and source_sets.rs refuse otherwise), under
         // which no node is inactive, so inactive placeholders never
         // reach diff rendering.
         _ => None };

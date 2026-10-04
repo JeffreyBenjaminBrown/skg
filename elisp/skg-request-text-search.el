@@ -263,7 +263,8 @@ snapshot dirty because it contains unsaved user edits.
 Callers that do additional buffer work (e.g. org-mode setup)
 should bind inhibit-read-only themselves, since the buffer
 may already be read-only from a previous search."
-  (let ((inhibit-read-only t))
+  (let ((inhibit-read-only t)
+        (skg--inhibit-dirty-view-confirmation t))
     (erase-buffer)
     (insert (string-trim content))
     (when (> (length content) 0)

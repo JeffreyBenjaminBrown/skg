@@ -1,5 +1,5 @@
-use skg::diff_analysis::diff::diff_snapshots;
-use skg::diff_analysis::types::{
+use skg::diff_report::diff::diff_snapshots;
+use skg::diff_report::types::{
   DiffReport, GraphSnapshot, NodeBucket, NodeDiffReport, RelationshipDiff,
   SnapshotPair, ValueSetDiff};
 use skg::types::misc::{ID, MSV, SourceName, rel_partners_at_relSource};

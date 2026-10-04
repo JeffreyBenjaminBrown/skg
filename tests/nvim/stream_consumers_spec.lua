@@ -1,6 +1,6 @@
 -- Coverage for the rerender stream and its consumers (diff mode,
--- source sets), plus the report-shaped requests (diff analysis, stage
--- moves, export). Mirrors tests/elisp/test-skg-diff-analysis.el's
+-- source sets), plus the report-shaped requests (diff report, stage
+-- moves, export). Mirrors tests/elisp/test-skg-diff-report.el's
 -- wiring cases and test-skg-warning-channel.el's rerender-done
 -- channel, end-to-end through the loopback fake server.
 
@@ -8,7 +8,7 @@ local helpers = dofile(
   debug.getinfo(1, 'S').source:sub(2):match('^(.*)/') .. '/helpers.lua')
 
 local buffer = require('skg.buffer')
-local diff_analysis = require('skg.diff_analysis')
+local diff_report = require('skg.diff_report')
 local diff_mode = require('skg.diff_mode')
 local lock = require('skg.lock')
 local rerender = require('skg.rerender')
@@ -38,7 +38,7 @@ describe('skg stream consumers', function ()
     helpers.wipe_skg_buffers()
     lock.end_stream()
     wipe_named('skg://messages/rerender')
-    wipe_named('skg://diff-analysis')
+    wipe_named('skg://diff-report')
     wipe_named('skg://stage-moves')
   end)
 
@@ -143,21 +143,21 @@ describe('skg stream consumers', function ()
       seen)
   end)
 
-  it('shows the diff-analysis report with the navigation keymap',
+  it('shows the diff report with the navigation keymap',
      function ()
-    -- Mirrors test-skg-diff-analysis.el's wiring: stage flags on the
+    -- Mirrors test-skg-diff-report.el's wiring: stage flags on the
     -- wire, report buffer, keymap attached.
     local seen = nil
     server = helpers.connect_to_fake_server(function (line, respond)
-      if line:find('diff analysis', 1, true) then
+      if line:find('diff report', 1, true) then
         seen = line
         respond(helpers.framed(
-          '((response-type diff-analysis)'
+          '((response-type diff-report)'
           .. ' (content "* changed nodes\\n** some node")'
           .. ' (errors ()) (warnings ("one warning")))'))
       end
     end)
-    diff_analysis.diff_report(true, false)
+    diff_report.diff_report(true, false)
     vim.wait(3000, function () return seen ~= nil end, 10)
     assert.is_truthy(seen:find('(include-staged . "true")', 1, true))
     assert.is_truthy(seen:find('(include-unstaged . "false")', 1,
@@ -165,7 +165,7 @@ describe('skg stream consumers', function ()
     local report = nil
     vim.wait(2000, function ()
       for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-        if vim.api.nvim_buf_get_name(buf) == 'skg://diff-analysis'
+        if vim.api.nvim_buf_get_name(buf) == 'skg://diff-report'
         then report = buf end
       end
       return report ~= nil

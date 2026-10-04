@@ -1,5 +1,5 @@
-use crate::diff_analysis::diff_analysis_report_with_overPrivateText_pids;
-use crate::diff_analysis::types::DiffSelection;
+use crate::diff_report::diff_report_as_org_with_overPrivateText_pids;
+use crate::diff_report::types::DiffSelection;
 use crate::serve::protocol::TcpToClient;
 use crate::serve::handlers::text_release::{
   TextReleaseDecision, decide_for_overPrivateText_pids};
@@ -14,7 +14,7 @@ use crate::types::misc::SkgConfig;
 use std::net::TcpStream;
 use std::collections::HashSet;
 
-pub fn handle_diff_analysis_request (
+pub fn handle_diff_report_request (
   stream  : &mut TcpStream,
   request : &str,
   config  : &SkgConfig,
@@ -24,10 +24,10 @@ pub fn handle_diff_analysis_request (
       config,
       SourceSetName::from ("all"))
     . expect ("reserved source-set all should always resolve");
-  handle_diff_analysis_request_with_source_set (
+  handle_diff_report_request_with_source_set (
     stream, request, config, &active ) }
 
-pub fn handle_diff_analysis_request_with_source_set (
+pub fn handle_diff_report_request_with_source_set (
   stream  : &mut TcpStream,
   request : &str,
   config  : &SkgConfig,
@@ -37,30 +37,30 @@ pub fn handle_diff_analysis_request_with_source_set (
     if active . is_all () {
       parse_selection (request)
       . and_then ( |selection|
-        diff_analysis_report_with_overPrivateText_pids (config, selection) )
+        diff_report_as_org_with_overPrivateText_pids (config, selection) )
       . map ( |(report, overPrivateText_pids)| {
         let warnings = match decide_for_overPrivateText_pids (
-          "diff-analysis", active, overPrivateText_pids, &HashSet::new () ) {
+          "diff-report", active, overPrivateText_pids, &HashSet::new () ) {
           TextReleaseDecision::AllowWithWarning { warning } =>
             vec! [warning],
           _ => Vec::new (), };
         (report, warnings) } )
     } else {
       Err (format! (
-        "Diff analysis requires active source-set all; current active source-set is {}",
+        "Diff report requires active source-set all; current active source-set is {}",
         active . name )) };
   let (content, errors, warnings)
     : (String, Vec<String>, Vec<String>) =
     match result {
       Ok ((report, warnings)) => (report, Vec::new (), warnings),
       Err (e) => (
-        format! ("* diff analysis failed\n** {}\n", e),
+        format! ("* diff report failed\n** {}\n", e),
         vec! [e], Vec::new () ), };
   let response : String =
     format_buffer_response_sexp (&content, &errors, &warnings);
   send_response_with_length_prefix (
     stream,
-    &tag_sexp_response (TcpToClient::DiffAnalysis, &response) );
+    &tag_sexp_response (TcpToClient::DiffReport, &response) );
 }
 
 fn parse_selection (

@@ -38,7 +38,9 @@ function M.init (config_toml_path)
   local config = require('skg.config')
   config.config_file_path = absolute
   local client = require('skg.client')
-  client.port = config.port_from_toml(absolute)
+  local port = config.port_from_toml(absolute)
+  client.end_connection_to_another_port(port)
+  client.port = port
   client.connect()
   require('skg.misc_requests').connection_verify()
   require('skg.herald_rules').request_herald_rules()

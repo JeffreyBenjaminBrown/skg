@@ -58,7 +58,7 @@ pub struct DiffReport {
   pub titles        : HashMap<ID, String>,
   pub buckets       : Vec<NodeBucket>,
   /// Ids the worktree references though they exist in no source,
-  /// investigated in git history (diff_analysis/vanished.rs).
+  /// investigated in git history (diff_report/vanished.rs).
   pub vanished      : Vec<VanishedNodeReport>,
 }
 

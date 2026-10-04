@@ -18,7 +18,82 @@
   "Major mode for skg content view buffers, derived from org-mode.
 Rebinds C-x C-s to save via the skg server,
 and provides C-c prefix keybindings for skg commands."
-  (setq-local org-adapt-indentation nil))
+  (setq-local org-adapt-indentation nil)
+  (add-hook 'first-change-hook
+            #'skg--confirm-before-dirtying-another-view nil t))
+
+(defvar skg--inhibit-dirty-view-confirmation nil
+  "Non-nil while skg itself edits view text (re-rendering, save
+snapshots), so `skg--confirm-before-dirtying-another-view' stays quiet.")
+
+(defun skg--unsaved-view-buffers (&optional except)
+  "Return every live view with unsaved edits, other than EXCEPT.
+A view is a buffer with a non-nil `skg-view-uri': a content view or
+search results, but not the fork-confirmation buffer."
+  (cl-remove-if-not
+   (lambda (buf)
+     (and (not (eq buf except))
+          (buffer-local-value 'skg-view-uri buf)
+          (buffer-modified-p buf)))
+   (buffer-list)))
+
+(defvar skg--dirtying-view-approved nil
+  "The view whose next first edit the user approved despite another
+view's unsaved edits, or nil.  That edit consumes the approval, and
+point leaving the view revokes it (see
+`skg--revoke-dirtying-view-approval-if-point-left').")
+
+(defun skg--confirm-before-dirtying-another-view ()
+  "On `first-change-hook': if another view already has unsaved edits,
+cancel this view's first edit, then ask whether to make it anyway.
+The question waits until the editing command has finished, because a
+prompt opened mid-edit inherits that command's temporary state.  (E.g.
+`newline' adds a function to `post-self-insert-hook' that returns point
+to the start of the line, so an answer typed there came out reversed.)"
+  (cond
+   ((eq skg--dirtying-view-approved (current-buffer))
+    (skg--forget-dirtying-view-approval))
+   ((and skg-view-uri
+         (not skg--inhibit-dirty-view-confirmation)
+         (skg--unsaved-view-buffers (current-buffer)))
+    (run-at-time 0 nil #'skg--ask-to-dirty-another-view
+                 (current-buffer)
+                 (and this-command ;; nil when no command made the edit
+                      (this-command-keys-vector)))
+    (user-error "Edit paused: another skg buffer has unsaved edits"))))
+
+(defun skg--ask-to-dirty-another-view (buffer keys)
+  "Ask whether to edit BUFFER despite another view's unsaved edits.
+On yes, approve BUFFER's next first edit, and replay KEYS (the keys of
+the cancelled command) if they would reach BUFFER."
+  (when (and (buffer-live-p buffer)
+             (not (buffer-modified-p buffer)))
+    (if (not (yes-or-no-p "WARNING: Another buffer has unsaved edits. If you edit this one as well, your edits could clobber each other. Edit anyway? "))
+        (message "Edit cancelled")
+      (setq skg--dirtying-view-approved buffer)
+      (add-hook 'post-command-hook
+                #'skg--revoke-dirtying-view-approval-if-point-left)
+      (if (and (> (length keys) 0)
+               (eq buffer (window-buffer (selected-window))))
+          (setq unread-command-events
+                (append (listify-key-sequence keys) unread-command-events))
+        (message "Approved: repeat your edit.")))))
+
+(defun skg--revoke-dirtying-view-approval-if-point-left ()
+  "On `post-command-hook': revoke the approval once point is in another
+buffer, even if the approved view is still visible.  While the
+minibuffer is active, the window it will return to is what counts, so
+an edit command typed via M-x keeps the approval."
+  (unless (eq skg--dirtying-view-approved
+              (window-buffer (if (minibufferp)
+                                 (minibuffer-selected-window)
+                               (selected-window))))
+    (skg--forget-dirtying-view-approval)))
+
+(defun skg--forget-dirtying-view-approval ()
+  (setq skg--dirtying-view-approved nil)
+  (remove-hook 'post-command-hook
+               #'skg--revoke-dirtying-view-approval-if-point-left))
 
 (defvar-local skg-view-uri nil
   "Unique view URI for this skg buffer.")
@@ -176,7 +251,8 @@ otherwise generate a new UUID."
          (buffer (skg--generate-contentView-buffer buffer-name source))
         (uri (or view-uri (org-id-uuid))))
     (with-current-buffer buffer
-      (let ((inhibit-read-only t))
+      (let ((inhibit-read-only t)
+            (skg--inhibit-dirty-view-confirmation t))
         (erase-buffer)
         (insert org-text)
         (skg-content-view-mode)

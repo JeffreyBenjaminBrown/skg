@@ -14,7 +14,7 @@
 (require 'skg-view-new-empty)
 (require 'skg-request-file-path)
 (require 'skg-request-herald-rules)
-(require 'skg-request-diff-analysis)
+(require 'skg-request-diff-report)
 (require 'skg-request-delete-references-to-absent-node)
 (require 'skg-request-relSource-info)
 (require 'skg-request-boolprop-state)
@@ -36,7 +36,9 @@
 (require 'skg-keymaps-and-aliases)
 
 (defun skg-client-init (file)
-  (defvar skg-port (skg-port-from-toml file))
+  (let ((port (skg-port-from-toml file)))
+    (skg--end-connection-to-another-port port)
+    (setq skg-port port))
   (setq skg-config-dir (file-name-directory (expand-file-name file)))
   (skg-tcp-connect-to-rust)
   (skg-connection-verify)
@@ -71,6 +73,22 @@
                " See %slogs/server-to-user.log .")
        skg-port skg-config-dir))))
   ;; Skg, magit and global keybindings are in skg-keymaps-and-aliases.el.
+
+(defun skg--end-connection-to-another-port (port)
+  "Before connecting to PORT, end a live connection to another port.
+Refuse instead while any skg buffer is open: its views came from the
+other server, and saving one would write it into this server's graph."
+  (when (process-live-p skg-rust-tcp-proc)
+    (let ((connected-port (process-contact skg-rust-tcp-proc :service)))
+      (unless (equal connected-port port)
+        (when (cl-some #'skg-buffer-p (buffer-list))
+          (user-error
+           (concat "skg is connected to the server on port %s, and skg buffers"
+                   " from it are open. Close them all"
+                   " (M-x skg-close-all-skg-buffers) before connecting"
+                   " to the server on port %s.")
+           connected-port port))
+        (skg-connection-end)))))
 
 (defun skg-tcp-connect-to-rust ()
   "Connect, persistently, to the Rust TCP server."
@@ -118,7 +136,7 @@
       "  %s\n"
       "  %s\n"
       "Connection error: %s")
-     (if (boundp 'skg-port) skg-port "[unknown]")
+     (or skg-port "[unknown]")
      user-log
      watch-log
      (error-message-string err))))
