@@ -50,6 +50,11 @@ In an Org file, a line that looks like a heading inside a block or fence
 refuses the whole preview, listing each such line. Org would end the block
 there, so the intent is ambiguous; often the block is unclosed. Markdown
 files are exempt, since =#= lines in code blocks are ordinary code.
+** The import record links to the documents
+The plan had the record contain each file root. Viewing it then expanded
+every imported document (thousands of lines for docs/). Its body instead
+lists one link per document, labeled with the document's path, since a
+title could itself contain a link.
 ** The exporter changed too
 Not part of this plan, but needed for clean round trips.
 *** Headline links are kept

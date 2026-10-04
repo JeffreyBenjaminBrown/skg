@@ -10,7 +10,7 @@ use crate::dbs::in_rust_graph::{InRustGraph,
 use crate::export_org::claimed_export_targets;
 use crate::types::env::SkgEnv;
 use crate::types::textlinks::org_literal_ranges::HEADLINES_INSIDE_BLOCKS_EXPLANATION;
-use crate::types::misc::{ID, MSV, SkgConfig, SourceName, rel_partners_at_relSource};
+use crate::types::misc::{ID, MSV, SkgConfig, SourceName};
 use crate::types::nodes::complete::{NodeComplete, empty_node_complete};
 use std::collections::HashMap;
 use std::collections::BTreeMap;
@@ -30,6 +30,9 @@ pub struct PreparedImportBatch {
   pub export_targets : Vec<(PathBuf, String)>,
   config : Arc<SkgConfig>,
   destination_evidence : BTreeMap<PathBuf, Vec<u8>>,
+  /// Each document's path and the ID of its file root, which the import
+  /// record links to.
+  record_documents : Vec<(PathBuf, ID)>,
 }
 
 pub enum ImportPreparation {
@@ -90,14 +93,16 @@ pub fn prepare_import_batch_with (
   ensure_runtime_matches_disk (&existing, &runtime . graph)?;
   check_export_target_conflicts (
     &export_targets, &runtime . config, &existing)?;
-  let root_ids : Vec<ID> = built . iter ()
-    .map (|document| document . root_id . clone ()) . collect ();
+  let record_documents : Vec<(PathBuf, ID)> = documents . iter ()
+    . zip (built . iter ())
+    . map (|(document, built)| (document . path . clone (), built . root_id . clone ()))
+    . collect ();
   let mut nodes : Vec<NodeComplete> = built . into_iter ()
     .flat_map (|document| document . nodes) . collect ();
   let record_id : Option<ID> = if documents . is_empty () { None } else {
     let record_id : ID = new_id ();
     nodes . push (import_record (
-      record_id . clone (), &root_ids, input_directory,
+      record_id . clone (), &record_documents, input_directory,
       host_root, destination_source, "on confirmation"));
     Some (record_id) };
   if ! nodes . is_empty () {
@@ -109,6 +114,7 @@ pub fn prepare_import_batch_with (
     documents, nodes, record_id, export_targets,
     config : runtime . config . clone (),
     destination_evidence,
+    record_documents,
   }))
 }
 
@@ -184,8 +190,9 @@ impl PreparedImportBatch {
     let record : &mut NodeComplete = nodes . iter_mut ()
       .find (|node| node . pid == record_id) .unwrap ();
     record . body = Some (import_record_body (
-      &self . input_directory, self . host_root . as_deref (),
-      &self . destination_source, &execution_time));
+      &self . record_documents, &self . input_directory,
+      self . host_root . as_deref (), &self . destination_source,
+      &execution_time));
     let prepared = prepare_import_publication (&nodes, env)?;
     let created : usize = prepared . apply_under_mutation_gate (env)?;
     Ok ((created, record_id))
@@ -301,9 +308,11 @@ fn check_export_target_conflicts (
   Ok (())
 }
 
+/// The import record links to each document's file root rather than
+/// containing it, so viewing the record does not expand every document.
 fn import_record (
   id : ID,
-  roots : &[ID],
+  documents : &[(PathBuf, ID)],
   input_directory : &Path,
   host_root : Option<&Path>,
   source : &SourceName,
@@ -315,23 +324,28 @@ fn import_record (
     input_directory . display ());
   node . source = source . clone ();
   node . body = Some (import_record_body (
-    input_directory, host_root, source, time));
-  node . contains = rel_partners_at_relSource (source, roots . to_vec ());
+    documents, input_directory, host_root, source, time));
   node
 }
 
+/// Labels are paths, not titles: a title can contain a link, which a
+/// link label cannot.
 fn import_record_body (
+  documents : &[(PathBuf, ID)],
   input_directory : &Path,
   host_root : Option<&Path>,
   source : &SourceName,
   time : &str,
 ) -> String {
-  format! (
-    "Input directory: {}\nHost root: {}\nDestination source: {}\nUTC execution time: {}",
+  let mut body : String = format! (
+    "Input directory: {}\nHost root: {}\nDestination source: {}\nUTC execution time: {}\n\nImported documents:",
     input_directory . display (),
     host_root . map (|path| path . display () . to_string ())
       .unwrap_or_else (|| "none" . to_string ()),
-    source, time)
+    source, time);
+  for (path, root) in documents {
+    body . push_str (&format! ("\n- [[id:{}][{}]]", root, path . display ())); }
+  body
 }
 
 #[cfg(test)]
@@ -382,6 +396,13 @@ mod tests {
     };
     assert_eq! (prepared . documents . len (), 2);
     let record_id : ID = prepared . record_id . clone () . unwrap ();
+    { // The record links to each document's file root; it contains none.
+      let record : &NodeComplete = prepared . nodes . iter ()
+        . find (|node| node . pid == record_id) . unwrap ();
+      let body : &str = record . body . as_deref () . unwrap ();
+      assert! (record . contains . is_empty ());
+      assert! (body . contains ("][empty.md]]") && body . contains ("][notes.org]]"),
+               "{}", body); }
     let node_count : usize = prepared . nodes . len ();
     let report : String = prepared . preview_report ();
     assert! (report . starts_with ("* Import preview\n"), "{}", report);

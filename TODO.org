@@ -4,21 +4,6 @@
 * ONGOING TODO/import-md-and-org/
 ** data/skg-system/ should not need mention in the config
 * next
-** for docs : the org exporter
-*** ONGOING bug : flattening example links
-  - Example links inside verbatim text got flattened. The exporter treats a link
-    written as a literal example, like =[[id:X][LABEL]]= in COMMANDS.org, as a
-    real link to a node that wasn't exported, and replaces it with its label. So
-    "=[[id:X][LABEL]]= link is inserted at point" became "=LABEL= link is
-    inserted at point". The same happened to the example link in the
-    export-marker section I just wrote. That one points at the documentation
-    node in public, which wasn't exported, so it came out as : Export to Org.
-*** ONGOING List items that look like headings are lost.
-A Markdown list item at column 0 (* [Does it use plaintext?…] in FAQ.md)
-is now a line starting with * , which Org reads as a top-level heading.
-This breaks FAQ.org's outline.
-The exporter warned about this and similar lines (#+begin_src, #+title)
-but wrote them anyway.
 ** for video
 *** AWAITS navigate point through herald (overlay)
 walk point through the herald string normally
