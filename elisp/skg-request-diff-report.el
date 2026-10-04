@@ -5,11 +5,6 @@
 (require 'skg-buffer) ; for skg--unsaved-view-buffers
 (require 'skg-request-save) ; for skg-big-nonfatal-message
 
-(define-minor-mode skg-diff-report-mode
-  "Minor mode for skg diff report buffers."
-  :lighter " skg-diff-report"
-  :keymap skg-diff-report-mode-map)
-
 (defun skg-diff-report ()
   "Request an org report of semantic graph changes."
   (interactive)
@@ -65,7 +60,7 @@
            (skg-errors-and-warnings-to-org-string
             errors-list warnings-list)))
         (with-current-buffer "*skg diff report*"
-          (skg-diff-report-mode 1)))
+          (skg-report-mode 1)))
     (error
      (message "skg: diff-report handler error: %S" err))))
 

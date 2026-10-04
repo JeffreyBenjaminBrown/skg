@@ -453,7 +453,8 @@ TCP connection:
 - Initial preview request: =((request . "import md and org")
   (action . "preview") (input-directory . "/absolute/server/path")
   (destination-source . "OWNED-SOURCE"))=.
-- If absolute filesystem links are found, the server responds with
+- If absolute filesystem links to =.md= or =.org= files are found, the
+  server responds with
   =response-type= =import-md-and-org-host-mapping-needed= and a =content=
   explanation. The client asks for the absolute host path corresponding to
   the input directory, then retries the same preview with

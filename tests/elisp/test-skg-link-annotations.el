@@ -112,15 +112,47 @@
       (kill-buffer first)
       (kill-buffer second))))
 
-(ert-deftest test-skg-link-annotations-skip-example-links-in-literal-text ()
-  "Link syntax in text Org shows literally is not annotated.
-A headline ends an unclosed block, as a node body's end does."
+;; (NAME TEXT LIVE-IDS) for each case in the file, which the Rust and
+;; Neovim tests read too.
+(defconst test-skg-link-annotations--shared-cases-file
+  (expand-file-name "../shared/literal-link-cases.txt"
+                    (file-name-directory (or load-file-name buffer-file-name))))
+
+(defun test-skg-link-annotations--shared-cases ()
+  "Parse `test-skg-link-annotations--shared-cases-file'."
+  (let ((cases nil) (name nil) (text nil))
+    (dolist (line (split-string
+                   (with-temp-buffer
+                     (insert-file-contents test-skg-link-annotations--shared-cases-file)
+                     (buffer-string))
+                   "\n"))
+      (cond ((string-prefix-p "==== " line)
+             (setq name (substring line 5) text nil))
+            ((string-prefix-p "---- live:" line)
+             (push (list name (string-join (nreverse text) "\n")
+                         (split-string (substring line 10)))
+                   cases)
+             (setq name nil))
+            (name (push line text))))
+    (nreverse cases)))
+
+(ert-deftest test-skg-link-annotations-shared-literal-link-cases ()
+  "Only real links are annotated, per the cases shared with Rust and Neovim."
+  (let ((cases (test-skg-link-annotations--shared-cases)))
+    (should (> (length cases) 5))
+    (dolist (case cases)
+      (with-temp-buffer
+        (insert (nth 1 case))
+        (should (equal (list (car case)
+                             (mapcar (lambda (position) (nth 3 position))
+                                     (skg-link-annotations--scan)))
+                       (list (car case) (nth 2 case))))))))
+
+(ert-deftest test-skg-link-annotations-headline-ends-a-block ()
+  "A client sees whole buffers, so a headline ends an unclosed block,
+as the end of a node's body does on the server."
   (with-temp-buffer
-    (insert "* h\nreal [[id:a][A]] =[[id:b][B]]= (~[[id:c][C]]~)\n"
-            ": [[id:d][D]]\n#+BEGIN_SRC org\n[[id:e][E]]\n#+end_src\n"
-            "#+begin_example\n[[id:f][F]]\n* next [[id:g][G]]\n"
-            "```\n[[id:h][H]]\n```\nx=[[id:i][I]]=y\n"
-            "[[id:j][=verbatim= label]]\n")
+    (insert "* h\n#+begin_example\n[[id:a][A]]\n* next [[id:b][B]]\n")
     (should (equal (mapcar (lambda (position) (nth 3 position))
                            (skg-link-annotations--scan))
-                   '("a" "g" "i" "j")))))
+                   '("b")))))

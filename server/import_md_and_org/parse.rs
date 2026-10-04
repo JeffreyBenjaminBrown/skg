@@ -2,7 +2,9 @@
 
 use pulldown_cmark::{Event, LinkType, Options, Parser, Tag, TagEnd};
 use serde_yaml::Value;
-use crate::types::textlinks::org_literal_ranges::org_literal_ranges_and_unclosed_block;
+use crate::types::textlinks::org_literal_ranges::{
+  HeadlineInsideBlock, headlines_inside_blocks,
+  org_literal_ranges_and_unclosed_block};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 
@@ -478,22 +480,15 @@ fn parse_org_headings (
 ) {
   let (literal, unclosed_block_start) : (Vec<Range<usize>>, Option<usize>) =
     org_literal_ranges_and_unclosed_block (&document . text);
+  let inside_blocks : Vec<HeadlineInsideBlock> =
+    headlines_inside_blocks (&document . text);
   let lines : Vec<(usize, &str)> = lines_with_offsets (&document . text);
   for (index, (start, line)) in lines . iter () . enumerate () {
     let Some ((level, title)) : Option<(usize, String)> =
       org_heading (line) else { continue; };
     let line_end : usize = *start + line . len ();
-    if let Some (block) = literal . iter ()
-      . find (|range| range . start < *start && *start < range . end) {
-      // Org would read this line as a heading, ending the block early.
-      document . errors . push (Diagnostic {
-        range : *start..line_end,
-        message : format! (
-          "{:?} looks like a heading but is inside the block or fence that begins on line {}{}",
-          line, line_at (&document . text, block . start),
-          if unclosed_block_start == Some (block . start) {
-            ", which is never closed" } else { "" }), });
-      continue; }
+    if inside_blocks . iter () . any (|inside| inside . headline . start == *start) {
+      continue; } // an error, recorded below
     let (id, custom_id, aliases) :
       (Option<String>, Option<String>, Vec<String>) =
       if lines . get (index + 1) . is_some_and (|(_, next)|
@@ -509,6 +504,9 @@ fn parse_org_headings (
       custom_id,
       aliases,
     }); }
+  document . errors . extend (inside_blocks . into_iter () . map (|inside|
+    Diagnostic { range   : inside . headline . clone (),
+                 message : inside . to_string () }));
   if let Some (block_start) = unclosed_block_start {
     document . diagnostics . push (Diagnostic {
       range : block_start..block_start,

@@ -1,5 +1,6 @@
 ;;; -*- lexical-binding: t; -*-
 
+(require 'skg-keymaps-and-aliases) ; for skg-report-mode-map
 (require 'skg-log)
 (require 'skg-length-prefix)
 (require 'skg-org-fold)
@@ -957,8 +958,15 @@ COLUMN is a character offset from the line's start; nil means column 0."
       (with-selected-window window
         (recenter screen-line)))))
 
+(define-minor-mode skg-report-mode
+  "Minor mode for read-only skg report buffers, such as the diff report
+and the import result: links in them can be followed, and IDs used."
+  :lighter " skg-report"
+  :keymap skg-report-mode-map)
+
 (defun skg-big-nonfatal-message (buffer-name message-text content)
-  "Display CONTENT in BUFFER-NAME and show MESSAGE-TEXT in minibuffer."
+  "Display CONTENT in BUFFER-NAME and show MESSAGE-TEXT in minibuffer.
+Return the buffer."
   (with-current-buffer (get-buffer-create buffer-name)
     (let ((inhibit-read-only t))
       (erase-buffer)
@@ -967,7 +975,8 @@ COLUMN is a character offset from the line's start; nil means column 0."
       (set-buffer-modified-p nil)
       (goto-char (point-min)))
     (display-buffer buffer-name)
-    (message "%s" message-text)))
+    (message "%s" message-text)
+    (current-buffer)))
 
 (defun skg-show-save-errors-and-warnings
     (errors warnings content-present)

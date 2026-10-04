@@ -1,0 +1,62 @@
+# Which [[id:ID][LABEL]] links in Org body text are real links, and which
+# are examples in text Org shows literally. One contract, three
+# implementations, each tested against these cases:
+#   Rust:   server/types/textlinks/org_literal_ranges.rs
+#           (tests/textlinks.rs)
+#   Emacs:  elisp/skg-link-annotations.el
+#           (tests/elisp/test-skg-link-annotations.el)
+#   Neovim: nvim/lua/skg/link_annotations.lua
+#           (tests/nvim/link_annotations_spec.lua)
+#
+# Format: a case begins with a line '==== NAME', followed by its text,
+# and ends with a line '---- live:' then the IDs of the real links, in
+# order, separated by spaces. Lines before the first case are comments.
+# Case text contains no headlines, since the clients (which see whole
+# buffers) also end a block at a headline, and the server (which sees
+# one body at a time) never meets one.
+
+==== inline verbatim and code are literal
+real [[id:a][A]] and =[[id:b][B]]= (~[[id:c][C]]~)
+---- live: a
+==== verbatim markers need Org's borders
+x=[[id:d][D]]=y and = [[id:e][E]] = here
+---- live: d e
+==== fixed-width lines are literal, even indented
+: [[id:f][F]]
+  : [[id:g][G]]
+:
+not fixed-width:[[id:h][H]]
+---- live: h
+==== blocks of any kind are literal
+#+BEGIN_SRC org
+[[id:i][I]]
+#+end_src
+#+begin_quote
+[[id:j][J]]
+#+end_quote
+after [[id:k][K]]
+---- live: k
+==== a block ends only at its own end line
+#+begin_src
+#+end_example
+[[id:l][L]]
+#+end_src
+[[id:m][M]]
+---- live: m
+==== fences are literal
+```elisp
+[[id:n][N]]
+```
+after [[id:o][O]]
+---- live: o
+==== an unclosed block runs to the end
+before [[id:p][P]]
+#+begin_example
+[[id:q][Q]]
+---- live: p
+==== verbatim in a label is formatting
+[[id:r][=verbatim= label]] and [[id:s][~code~]]
+---- live: r s
+==== backticks are not literal in Org
+`[[id:t][T]]`
+---- live: t

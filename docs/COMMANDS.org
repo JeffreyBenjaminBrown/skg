@@ -40,7 +40,7 @@ newer graph. If dirty search results were enriched, the archive labels that
 the diff also includes enrichment presentation and is not a semantic patch
 of user intent alone.
 ** C-c <backspace> : deletion
-***     C-c <backspace> : skg-delete
+*** C-c <backspace> : skg-delete
 Marks the node at point for deletion from the graph.
 Upon saving the view, it will vanish not just from this view,
 but from the graph itself.
@@ -808,6 +808,7 @@ otherwise the file root is titled after the document.
 It also creates two kinds of nodes that do not so correspond:
 - a single import-record node with textlinks to all file roots,
   so you can see everything you just imported in one place.
+  The import result buffer links to it; follow the link with =C-c g RET=.
 - an export marker under each root,
   so you can export back to the same path if you want.
   But this is dangerous -- see "Re-export is dangerous" below.
@@ -820,6 +821,10 @@ footnotes are interpreted. Other Markdown/Org markup remains readable text,
 not a full format conversion. Unresolved links and unsupported constructs
 are left in place with warnings.
 
+Only links to =.md= and =.org= files are resolved, or warned about.
+A link to any other file (source code, an image, a folder) keeps pointing
+where it did, written as an Org link, without a warning.
+
 **** Re-export is dangerous.
 Subsequent Org export is for reading, not
 a round-trip backup: it does not preserve Markdown syntax or all Skg graph
@@ -827,11 +832,12 @@ semantics. Exporting to the original input directory would overwrite matching
 =.org= files, while leaving =.md= files alone. There is no dedicated undo or
 crash-recovery transaction; keep the originals and back up the owned source.
 
-**** Skg asks for a host-root mapping if it finds absolute filesystem links.
+**** Skg asks for a host-root mapping if it finds absolute links to documents.
 Skg runs in a Docker container.
 The folder /home/ubuntu/host in that container
 corresponds to some folder on the host system.
-If the files to be imported contain absolute links,
+If the files to be imported contain absolute links
+to =.md= or =.org= files,
 skg needs to know how those host-system paths
 correspond to paths in the docker container.
 
@@ -895,8 +901,12 @@ Paths are relative to the process's working directory unless absolute.
 Inside Docker, supply container-visible paths. There is no host-path
 mapping argument or interactive prompt.
 **** Before running: the destination is replaced
-The importer creates 'OUTPUT_DIR' if necessary, then deletes every immediate
-'.skg' file already in it, before reading the input. There is no confirmation,
+First, if any input file has a line that looks like a heading inside a
+'#+begin_' block or a fence, the command stops, naming those lines, and
+nothing is deleted or written; see
+[[*An Org heading inside a block or fence stops the import.][the same check in the interactive importer]].
+Otherwise the importer creates 'OUTPUT_DIR' if necessary, then deletes every
+immediate '.skg' file already in it, before importing the input. There is no confirmation,
 dry run, merge-with-destination mode, or automatic backup. Other files and
 nested directories are left alone. Use a fresh staging directory and inspect
 the result before replacing existing data.

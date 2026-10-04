@@ -281,8 +281,9 @@ M.file_bindings = {
   { 'Oi', 'PopId' }, { 'Ol', 'PopLink' }, { 'On', 'PopNode' },
 }
 
----The subset used by diff report buffers.
-M.diff_report_bindings = {
+---The subset used by read-only report buffers: the diff report and the
+---import result.
+M.report_bindings = {
   { 'ff', 'Search' }, { 'fi', 'SearchInteractive' },
   { 'gg', 'Goto' }, { 'GG', 'GotoAndCloseThis' },
   { 'gi', 'GotoById' }, { 'Gi', 'GotoByIdAndCloseThis' },
@@ -349,10 +350,10 @@ function M.attach_file_buffer (buf)
                  { buffer = buf, desc = M.commands.IdPrev.desc })
 end
 
----Attach the diff-report subset to BUF.
+---Attach the report subset to BUF.
 ---@param buf integer
-function M.attach_diff_report (buf)
-  M.apply_bindings(buf, M.diff_report_bindings)
+function M.attach_report (buf)
+  M.apply_bindings(buf, M.report_bindings)
 end
 
 return M
