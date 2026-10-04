@@ -1,0 +1,665 @@
+#+TITLE: Making Skg easier to change
+#+DATE: 2026-09-25
+#+STARTUP: overview
+
+* What I would do
+
+I would finish consolidating the domain machinery already here. Skg has a
+surprisingly substantial architecture: typed relationships, local edit
+intents, ordered and unordered list operations, prepared graph updates,
+immutable runtime generations, and a common view-completion engine. The
+expensive accretion is often in the connections between these abstractions:
+the same fact gets rediscovered, converted, or interpreted several times.
+
+Your algebra idea is promising. I would develop three small, connected
+vocabularies: edits and their composition; relationship queries; and property
+evaluation and transformation. Each should absorb concrete existing callers.
+A general graph language, universal property bag, or new execution framework
+would be a much larger bet than the evidence warrants.
+
+** Where I would start
+
+The priorities below balance reduction in future change cost against the
+difficulty of proving that behavior stayed the same. Sizes are relative
+judgments, not time or token estimates.
+
+| Priority | Change | Size | Why it helps the next change |
+|----------+--------+------+-----------------------------|
+| First | Consolidate node conversions and obsolete lookup wrappers | Small | Fewer places to update when a field or lookup contract changes |
+| First | Let completion populate new relationship folders once | Small/medium | One membership-construction path for initial and updated views |
+| Next | Extend typed relationship access; retire string triples | Medium | Relation semantics stop spreading through switches and callers |
+| Next | Resolve edits without dropping their provenance | Medium | New edit kinds need fewer side channels and repair passes |
+| Next | Reuse identity-change facts across update preparation | Medium/high | Indexing and validation agree about what changed |
+| Alongside | Property transformation policies and client contract cases | Small/medium | New properties and commands have fewer independent implementations |
+| Later | Unify store application and index-update policy | Medium/high | Fewer save/merge special cases, after their behavior is settled |
+
+I would begin with the first two rows. They offer useful deletions and expose
+the right interfaces without requiring a new data model. The shared
+identity-change calculation is probably the most valuable deeper refactor.
+
+* Foundations worth keeping
+
+** The current store boundary is already good
+
+The plaintext files are authoritative. The in-Rust graph and Tantivy are
+derived. 'RuntimeGeneration' and 'PreparedGraphUpdate' make coherent reads
+and checked publication explicit. See
+[[file:../server/types/env.rs][runtime generations]] and
+[[file:../server/dbs/in_rust_graph/prepared_update.rs][prepared updates]].
+
+Do not resurrect TypeDB-era adapters or introduce another graph store.
+Several TODO documents still describe the removed architecture.
+
+** Save interpretation already resembles a compiler
+
+The useful separation is present in
+[[file:../server/from_text.rs][from_text]] and
+[[file:../server/from_text/local_instruction_collection/mod.rs][local instruction collection]]:
+
+#+begin_example
+Org text -> enriched view occurrences -> collected local intents
+         -> resolved node edits -> complete node definitions
+         -> checked graph/filesystem preparation -> application
+#+end_example
+
+Each stage knows more than its predecessor. Validation at several stages is
+legitimate: syntax errors, occurrence-role violations, and final graph
+invariants require different information. Collapsing them into one giant
+validator would lose that distinction.
+
+** Rendering already has a common engine
+
+'render_initial_view' and 'rerender_view' in
+[[file:../server/update_buffer.rs][update_buffer]] both use
+'complete_viewforest' and 'finish_viewforest'.
+'complete_relevant_children_in_viewnodetree' already centralizes stale
+children, duplicates, focus, and ordering. 'PartnerFolder::policy' already
+distinguishes writable sets, read-only sets, and derived filters.
+
+The recommendation is to make more callers rely on these, not to build a
+second reconciliation engine.
+
+* An algebra of edits: preserve meaning until resolution
+
+** Give the existing intent algebra an explicit contract
+
+[[file:../server/from_text/local_instruction_collection/types.rs][NodeIntent_Local and CollectedIntents]]
+already implement a partial combination operation. Equal assignments to an
+exclusive slot are accepted; different assignments conflict; Delete excludes
+other exclusive edits; visibility and text-claim signals accumulate.
+
+These are different semantics from sequential graph updates. At the graph
+batch boundary, 'apply_definenodes_to_inRustGraph' uses simultaneous final
+identity resolution and last-definition-per-PID behavior. Do not conflate
+the two kinds of combination, or replace their conflict rules with a generic
+last-write-wins map.
+
+*** Useful laws to pin down
+
+For an individual exclusive field, combining an assignment with an identical
+assignment is idempotent; combining unequal assignments rejects. Unspecified
+intent contributes no assignment. Deleting a node conflicts with setting its
+fields. These are small truth tables, not a reason to add an expression
+interpreter.
+
+Do not claim that the whole collector is commutative: it preserves emission
+order, lists have order, and resolution deliberately sequences inferred
+hides before explicit visibility gestures. Likewise, do not make NodeMerge
+another 'DefineNode' variant: [[file:../server/types/save.rs][the type's existing warning]]
+explains why a merge lowers into saves and a delete instead.
+
+** Stop converting unresolved edits into apparently complete data
+
+The most concrete seam is
+[[file:../server/from_text/local_instruction_collection/lower.rs][NodeSaveIntent::into_nodecomplete]].
+It drops the explicit-source payload from relationship members and supplies
+temporary relationship sources. 'requested_relSources' first copies those
+requests into separate maps; supplementation later rejoins the facts and
+resolves sticky/default/explicit sources. The boolean-property request is
+also saved aside before conversion and applied afterward.
+
+This makes 'NodeComplete' do two jobs: a complete folded node, and a partly
+resolved write whose absent fields still mean “keep the old value.” The
+comments at the top of 'supplement_from_disk.rs' even still describe
+'None'/ 'Some([])', while the actual type is 'MSV'.
+
+*** Proposed small interface
+
+Keep 'NodeSaveIntent' as the unresolved representation. Resolve one field at
+a time against the captured graph and prospective homes, and construct a
+'NodeComplete' only when the save's choices are resolved. Conceptually:
+
+#+begin_example
+FieldEdit<T> = Keep | Set(T)
+RequestedMember<T> = { member: T, requested_source: Option<SourceName> }
+resolve(edit, old_node, prospective_homes, visibility) -> complete_node
+#+end_example
+
+This is an interface sketch, not a request to replace every 'MSV' with a new
+type. Start with one relationship field. Preserve its requested source until
+the resolver produces 'RelPartner<T>'; remove that field's parallel request
+map when its callers have migrated.
+
+Resolution must retain same-save home moves, extra-ID comparison, raw stored
+ID spelling, explicit source floors, and inactive members. These are the
+reason to retain provenance, not details a generic setter may discard.
+
+*** Preserve the distinction between absence and emptiness
+
+'MSV::Unspecified' and 'Specified([])' have real meanings in edit intent and
+in telescope sections. A missing folder means “leave this field alone”; an
+empty defining folder means “empty its editable part.” Do not normalize them
+globally just because one equality check treats empty values alike.
+
+'weave' and 'set_difference_merge' in
+[[file:../server/from_text/weave.rs][weave.rs]] already implement two useful
+list algebras. Keep their separate contracts: ordered lists retain invisible
+runs at anchors; unordered lists retain old order while removing visible
+deletions and appending additions. Share the field plumbing in
+'preserve_invisible_members', not the ordering semantics.
+
+** Make final-state diagnostics consume the prepared candidate
+
+'dead_link_warnings' in 'from_text.rs' guesses final existence from the old
+graph plus saved/forked nodes. The existing
+[[file:problems.org::*Dead-link warnings miss targets deleted by the same save (2026-09-13)][dead-link problem]]
+is still supported by that implementation: a link target deleted in this
+save is considered live because it existed before the save.
+
+'PreparedSave::final_candidate' already provides the actual answer, including
+merge identity transfers. Compute this diagnostic from that candidate,
+carrying any parse provenance needed to describe the originating link. This
+is a good first consumer of a cleaner preparation boundary. Test deletion,
+creation, and an acquiree ID retained by a merge together.
+
+* A relationship algebra: typed facts, explicit query scope
+
+** Extend the vocabulary already present
+
+[[file:../server/dbs/in_rust_graph/relation_accessors.rs][NodeRelation and RelationRole]]
+already name the five graph relations and their endpoint roles. Yet
+[[file:../server/dbs/in_rust_graph/query.rs][find_related_nodes]] accepts three
+strings and returns an empty set for invalid combinations. Paths convert
+between those strings and typed relationships again.
+
+Replace internal string triples with 'RelationRole' or a typed relation and
+direction. Keep string parsing at the protocol boundary. Add one exhaustive
+internal projection from 'NodeRelation' to outbound members and its inverse
+index. Index insertion/removal, accessors, and selected validation helpers
+currently repeat the five-way field selection.
+
+*** What queries need to say
+
+A useful query specifies its relation/direction, graph generation, visibility
+scope, and treatment of unresolved references. Start with ordinary Rust
+functions returning typed results. Add compositional query objects only if
+multiple callers actually need to store or transform queries.
+
+For example, the two derived hide folders are largely declarative set
+expressions already: HiddenIn selects hides intersecting one subscribee's
+contents; HiddenOutside selects hides outside the contents of all
+subscribees. Their graph fact calculation can be expressed separately from
+how an editable or read-only folder reconciles occurrences.
+
+*** Three identities must remain distinguishable
+
+The stored raw member ID, its resolved primary ID, and the ID displayed by an
+override occurrence can differ. 'RelationshipMemberKey' already handles the
+first two for comparison; 'collected_id' and 'overridesHere' handle the third.
+
+Preserve these distinctions in results, rather than returning a bare ID and
+making every caller rediscover its meaning. A relationship occurrence can
+carry its raw member, comparison key, and relSource. A resolved-node query
+can deliberately return only PIDs. Neither contract should silently replace
+the other: unknown raw members must remain editable in relationship views.
+
+*** Visibility belongs in traversal as well as rendering
+
+The current path implementation gates edges before deciding forks and
+cycles. This is already a correction to the older problem entry about
+hidden topology; it must survive the typed-query refactor.
+
+Do not unify 'member_is_visible' with 'relationship_member_is_visible' just
+because their names and bodies resemble each other. The latter deliberately
+allows an unresolved raw target when its relationship source is active; the
+former requires a known active home. Rename or document the query contract
+at the seam if needed.
+
+** A small relation policy can remove repetitive field plumbing
+
+The four stored structured lists recur in cleanup, supplementation, folding,
+unfolding, diff lookup, and indexing. Begin with an exhaustive relation list
+and typed accessors. Only add policy entries when a real consumer needs them:
+ordered versus unordered, stored versus text-derived, and member projection.
+
+For example, 'apply_delete_propagation_cleanup' in
+[[file:../server/save.rs][save.rs]] and 'rewrite' in
+[[file:../server/delete_references_to_absent_node.rs][absent-reference cleanup]]
+both filter the same four fields. They can share a shape-preserving raw-member
+filter. Their selection policies must remain separate: deleting a known node
+cleans its PID and extra IDs; explicitly cleaning an absent raw ID removes
+exact raw matches only. Foreign ownership checks stay at those boundaries.
+
+Text links are derived from text and require text rewriting to remove. Alias
+members are strings, not graph IDs. These should not be forced into the
+structured-edge editing API.
+
+** Keep telescope fold/unfold as a separate, smaller algebra
+
+[[file:../server/telescope/fold.rs][fold_ordered/fold_unordered]] and
+[[file:../server/telescope/unfold.rs][unfold_ordered/unfold_unordered]] already
+share the difficult algorithms. Small field descriptors could remove their
+repeated invocation for contains/subscribes/hides/overrides, beginning with
+the unordered pair. This is lower priority than the query and update seams.
+
+For valid normalized nodes, test semantic round-trip through unfold/fold,
+preservation of member order and relSources, and byte stability for unchanged
+valid section fixtures. Do not promise byte identity for arbitrary malformed
+or noncanonical input. Home selection, text release, and ownership remain
+explicit telescope policies.
+
+* Compute update facts once, with separate dependency scopes
+
+** The current duplication is deeper than repeated loops
+
+'GraphChangeSet' in
+[[file:../server/dbs/in_rust_graph/prepared_update.rs][prepared_update.rs]]
+records touched nodes, identity changes, and owners needing reindexing.
+'apply_definenodes_to_inRustGraph' independently computes affected raw IDs
+and inbound owners. 'derive_affected_override_scope' and
+'derive_affected_telescope_owners' perform related old/new identity walks.
+
+The common information is “what did this raw ID resolve to before, and what
+does it resolve to afterward?” Derive that once from the captured base and
+the complete final identity overlay, then reuse it.
+
+*** Proposed data boundary
+
+Extend the existing private change set with reusable identity transitions
+and relation-scoped old/new owners. The central invariant is:
+
+#+begin_example
+remove each affected owner's old contributions using the base resolver
+add its final contributions using the final resolver
+#+end_example
+
+Start by sharing this plan between preparation and index mutation. Then let
+override and telescope scope builders consume its facts. Keep the prepared
+token tied to its exact base generation; do not apply it to a newer graph.
+
+*** Affected is not one universal set
+
+Owners needing index repair, nodes requiring invariant checks, files to
+write, and views needing rerender are different sets. Share the underlying
+facts, not a single maximal neighborhood passed everywhere.
+
+'SaveAffectedIds::from_prepared' in
+[[file:../server/serve/handlers/save_dependencies/mod.rs][save dependencies]]
+already derives before/after view neighborhoods from the prepared save.
+Preserve this distinction when exposing the new change facts. Otherwise a
+cleanup intended to simplify dependencies can accidentally broaden writes or
+invalidate every view.
+
+** Use declarative invariant dependencies cautiously
+
+There is a useful property-oriented formulation: a named rule has a check
+and an affected-scope calculation. Full validation evaluates all relevant
+subjects; incremental validation evaluates a conservative affected subset.
+Override monogamy, cycle freedom, and telescope warnings have different
+dependencies and severity. A warning is not an invariant rejection.
+
+Share the semantic predicate when it is truly identical. Keep an independent
+full reconstruction/index oracle capable of catching errors in the optimized
+path. If the mutator and its “oracle” use exactly the same broken projection,
+their agreement proves very little. Existing property tests in
+[[file:../tests/unit/prepared_graph_update.rs][prepared_graph_update.rs]] are
+valuable foundations, including identity-overlay comparison and deliberately
+omitted canonical migrations.
+
+* A property algebra: several domains, with explicit transformations
+
+** Persisted flags already have a registry
+
+[[file:../server/types/nodes/complete.rs][FileProperty]] has 'ALL', wire
+names, display text, mutability, membership, and idempotent set/clear. Extend
+that registry when adding a flag. A generic string-keyed property store
+would discard useful exhaustiveness without removing the real rules.
+
+The missing consolidation is transformation policy. In
+[[file:../server/nodeMerge/nodeMergeInstructionTriple.rs][node merge]],
+'NoSearchMatching' on the surviving node is the AND of both inputs; the
+text preserver inherits the acquiree's value. Other historical flags on the
+survivor currently remain those of the cloned acquirer. In
+[[file:../server/from_text/fork.rs][forking]], only 'NoSearchMatching' is copied.
+
+Give those transformations named functions or a small exhaustive policy
+match associated with the property definitions. Pin their truth tables. Do
+not invent a uniform OR/union rule for all properties: that would change
+behavior, especially the historical provenance flags.
+
+** Separate stored flags, derived graph facts, and occurrence facts
+
+'textlinks_to' is parsed from title/body. 'overPrivateText_telescope' comes
+from folding. Relationship counts depend on graph and source scope. Cycle,
+ancestor, and birth information depend on a particular view occurrence.
+
+A useful evaluation context contains the captured generation and relevant
+source scope; occurrence evaluators additionally receive position/context.
+Do not cache all “node properties” by PID or persist all of them together.
+
+*** A modest immediate improvement
+
+'ids_that_can_have_graphnodestats' collects repeated IDs;
+'fetch_all_graphnodestats_in_rust' recomputes them. The decoration walk then
+looks up node data for each occurrence. Deduplicate graph-count requests and
+use a render-local cache for the applicable node lookup context. Keep view
+stats occurrence-specific and preserve counts-only output for diff phantoms.
+
+This reduces both repeated work and the number of places interpreting the
+same graph facts. No runtime speedup was measured in this review.
+
+* Finish consolidating view construction
+
+** Populate each new relationship folder through completion
+
+[[file:../server/to_org/complete/partner_folder/mod.rs][Folder creation]]
+eagerly calls 'build_initial_render_child_data' and
+'reconcile_partnerFolder_children_against_goal_list'. The completion queue
+then visits that new folder and invokes its reconciler again.
+
+The inspected callers do not require its members before that visit. Let
+creation determine scaffold existence, placement, and initial folding; let
+the existing completion pass create/reconcile members. The first candidate
+change removes the four eager build/reconcile blocks and, if unused, their
+helper. Confirm this with initial-view versus initial-then-rerender cases.
+
+*** Conditions the deletion must preserve
+
+Keep HEAD-only diff membership when deciding whether a folder exists, forced
+empty writable folders, a persistent empty SubscribeeFolder, newly folded
+hidden folders, and HiddenOutside's final position. Include unresolved
+members and restricted sources in the regression cases.
+
+Breadth-first traversal is semantic: it determines which occurrence becomes
+definitive and how the node budget is spent. Do not replace it with a generic
+DFS. Existing generic DFS helpers are suitable for independent decoration.
+
+** Share the derived-folder reconciliation tail
+
+[[file:../server/update_buffer/reconcile/hiddeninsubscribee_folder.rs][HiddenIn]]
+and [[file:../server/update_buffer/reconcile/hiddenoutsideof_subscribeefolder.rs][HiddenOutside]]
+repeat goal filtering, child-data construction, reconciliation, membership
+axes, warnings, and folding. Extract that sequence around the existing
+'ChildData' machinery. Inputs can describe the goal list, removed members,
+axes, relSources, and warning owner.
+
+Keep their goal/context calculations separate. One is an intersection with
+a particular subscribee; the other subtracts all subscribee contents. A
+helper should remove procedural repetition without obscuring those formulas.
+
+* Shrink representation and naming friction
+
+** Share conversions before changing the node representation
+
+'NodeRust' repeats almost all 'NodeComplete' fields and adds derived text
+links. The reverse field-by-field projection appears at least three times:
+'nodecomplete_from_graph' in
+[[file:../server/dbs/node_lookup.rs][node_lookup.rs]],
+'nodecomplete_from_noderust' in 'save.rs', and 'complete_from_rust' in
+[[file:../server/dbs/in_rust_graph/complete_validation.rs][complete_validation.rs]].
+
+Put one lossless projection next to these types and use it everywhere. This
+is a small, immediately useful change: adding a field no longer requires
+finding three copies of the same assignment list.
+
+After callers are settled, consider containing a complete node inside the
+indexed node, with derived text links beside it. That would eliminate the
+field duplication but cause wider caller churn; it is not necessary for the
+first win. Keep 'NodeFS' separate because serialization and telescope-section
+semantics differ, and keep 'NodeTantivy' as an index projection.
+
+** Remove names and parameters that promise nonexistent behavior
+
+'nodecomplete_rustFirst_by_pid_and_source' delegates to
+'nodecomplete_graphFirst_by_pid_and_source', which ignores config and source
+and consults only the supplied graph. 'opt_nodecomplete_by_id' wraps an
+infallible optional lookup in a Result. These wrappers obscure snapshot
+semantics and make callers appear to handle I/O they do not perform.
+
+Use a clearly named graph lookup, remove unused parameters and impossible
+errors, and migrate callers together. Keep genuinely disk-backed telescope
+lookups explicit. Test-only compatibility entry points in 'from_text.rs' and
+'local_instruction_collection/mod.rs' rebuild a graph from all configured
+files; move that convenience into test support as their callers migrate.
+
+This is where renaming pays. I would not undertake a repository-wide naming
+campaign. Prefer vocabulary that identifies a boundary: raw member versus
+resolved PID; view occurrence versus graph node; intent versus definition;
+captured graph versus disk. Preserve the useful 'nodeMerge' versus
+'instructionMerge' distinction.
+
+* Clients and protocol: share contracts and domain decisions
+
+** A confirmed policy drift provides a concrete starting case
+
+[[file:../elisp/skg-metadata.el][Emacs's source-move command]] skips
+write-protected occurrences and offers to publicize content relationships
+that would remain at their old, more private sources.
+[[file:../nvim/lua/skg/metadata.lua][Neovim's source-move command]] directly
+rewrites source metadata, including write-protected occurrences, and has no
+corresponding stuck-edge analysis in that path.
+
+This is a source-code finding, not a reproduced end-to-end data-loss claim.
+The server still validates saves. The immediate improvement is shared
+behavioral scenarios for both clients, then aligning the missing handling.
+If graph-dependent previews keep accumulating, move their decision logic
+into a server preview API; clients should retain their own prompts, cursor
+behavior, and unsaved-buffer editing. A preview must account for submitted
+buffer state, not merely query an older stored graph.
+
+** Parse request envelopes once
+
+'value_from_request_sexp' in [[file:../server/serve/util.rs][serve/util.rs]]
+parses the entire request for each requested field. Several handlers repeat
+that extraction and error shaping. A small parsed 'RequestFields' wrapper
+with required/optional accessors can remove this repetition one handler at
+a time. Keep the more complex save envelope's explicit parser.
+
+Request and response names are also synchronized manually across Rust,
+Elisp, and Lua. Start with shared contract fixtures and checks for supported
+request/response pairs. Use existing response-tag and S-expression builders
+consistently. A generated RPC framework would be disproportionate here.
+
+** Metadata needs cross-client examples more than another parser
+
+Rust already has the metadata parser, property/role vocabularies, and herald
+coverage checks; clients generally edit generic S-expression paths. Add a
+small shared corpus covering active/inactive/unknown/diff nodes, edit
+requests, properties, and relationship facts. Each client should interpret
+the parts it owns and preserve the rest. This catches vocabulary drift
+without cloning the full Rust grammar into both clients.
+
+* Consolidate store application only after stating its contract
+
+Ordinary saves and merges prepare graph/filesystem updates but apply derived
+search changes differently. 'apply_defineNodes' queues a background Tantivy
+delta with context types computed from the candidate.
+[[file:../server/nodeMerge.rs][apply_prepared_nodeMerges]] updates Tantivy
+synchronously, passes an empty context-type map, and rebuilds on failure.
+Its comment explicitly says merged context types are refreshed at rebuild.
+
+A shared application boundary could take the prepared graph/filesystem pair
+and a separately described index effect. First factor identical ownership,
+base-verification, and publication mechanics while preserving behavior. Then
+decide whether merges should use the ordinary queue and candidate-derived
+index data. That latter step changes search timing, recovery, and ranking
+behavior; it deserves its own tests and decision.
+
+'PreparedSave' also stores optional graph/filesystem preparations in
+parallel fields and joins them with 'zip'. An optional prepared-step struct
+containing both would express the pairing directly. Keep save-then-merge
+sequencing explicit until evidence permits composing their preparations.
+
+Preparation is not a crash-atomic transaction. The filesystem application
+still performs individual removals and writes; an I/O failure can occur
+after earlier effects. A common executor should document that boundary and
+distinguish rejection before application from failure after partial effects.
+Crash recovery or journaling would be a separate reliability project.
+
+* What the TODO archaeology changes about this advice
+
+** Several attractive-looking refactors are already substantially done
+
+[[file:ditch-typedb/progress.org][TypeDB removal]] records completion, and the
+current code uses captured graph generations. The adapter cleanup above is
+leftover work, not a recommendation to repeat that migration.
+
+[[file:incremental-validation/2_plan.org][Incremental validation]] and current
+'PreparedGraphUpdate' already provide local validation and a full oracle.
+Improve their common change facts; do not “optimize” saves by reinstalling
+full graph validation on every update.
+
+[[file:noindex-and-boolprops/3_plan.org][The boolean-property plan]] has major
+pieces visibly present: 'FileProperty', property intents, the property
+folder, and both clients. Treat it as a specification to verify, not an
+unstarted checklist. The source code is the evidence of implementation.
+
+[[file:split-and-extend-paths-and-cols/progress.org][Relationship/path generalization]],
+[[file:strip-inactive-node-fields-progress.org][anonymous inactive nodes]], and
+[[file:uniform-heralds/progress.org][uniform heralds]] likewise have completed
+work behind them. Preserve their established distinctions. In particular,
+anonymous inactive placeholders should not regain IDs for reconciliation
+convenience. Rule-table retirement remains separately tracked.
+
+** Some problem entries describe older implementations
+
+The hidden-topology entry still describes ungated traversal; current
+'paths.rs' gates before topology classification. The override-validation
+entry describes duplicated cycle walks; current validation already uses
+'resolve_override'. The useful remaining work there is shared change/scope
+facts, not reimplementing cycle detection.
+
+[[file:potential-optimizations.org][potential-optimizations.org]],
+[[file:what-affects-dbs.org][what-affects-dbs.org]],
+[[file:maybe-dead-things.org][maybe-dead-things.org]], and parts of
+[[file:partial-reload-and-magit/2_discussion.org][partial reload discussions]]
+still depend on TypeDB or incremental-init machinery from the old design.
+Keep their use cases, but verify all proposed mechanisms again.
+
+I have not mass-moved or rewritten old problem entries: establishing their
+complete resolution is broader than this review. A short current-status
+note at an old plan's top would often save more future investigation than
+another naming cleanup. In particular, do not resume an old plan solely
+because it is still in TODO.
+
+** Open problems that are good discriminating cases
+
+The dead-link warning described above is a concrete candidate-state
+consumer. The restricted-source hide-inference entry is also still visible
+in 'resolve_visibility': its signal loop infers hides from absent members
+without the source restriction used by the preceding removal-inference
+pass. Use that case when separating visibility projection from edit intent;
+do not treat absence from a restricted view as deletion.
+
+The diff-view test matcher still checks title/depth and expected
+parenthesized fragments, overlooking bare atoms and unexpected metadata.
+This should be strengthened before trusting it to validate reconciliation
+changes. Use parsed assertions where order is irrelevant, and explicit
+ordered checks where it matters.
+
+[[file:one-definitive-view/plan.org][One definitive view across buffers]] is a
+product-policy proposal with global-state consequences. I would defer it as
+a simplification vehicle: the current per-view completion engine can be
+cleaned up without deciding that behavior.
+
+* How to execute this without turning cleanup into another accretion
+
+** Make one representative consumer simpler before generalizing
+
+Start with the shared reverse conversion and graph lookup contract. Next
+remove eager folder population with output-preservation cases. Then migrate
+one typed relationship query family and one unresolved relationship edit.
+Use those results to choose the smallest shared interfaces before tackling
+identity-change planning across validation and mutation.
+
+Each slice should delete a competing implementation or a parallel side
+channel. A new abstraction that merely wraps existing branches and leaves
+all callers intact has not yet paid for itself. Remove temporary adapters
+when the last caller migrates; the repository has no external legacy-client
+obligation requiring them to remain.
+
+** Verification should prove the domain distinctions
+
+For edit resolution, cover unspecified versus explicit empty, restricted
+visibility, unknown raw members, alias spelling, same-save home moves, and
+explicit versus sticky relationship sources. For indexing, compare small
+generated update sequences with full reconstruction and retain tests that
+deliberately omit an affected owner. For views, compare initial completion
+and rerender while checking focus, folding, definitiveness, and diff axes.
+
+Useful existing entry points include 'tests/unit/weave.rs',
+'tests/unit/save_leveling.rs', 'tests/unit/prepared_graph_update.rs',
+'tests/unit/telescope.rs', 'tests/initial_view_bfs.rs',
+'tests/partner_folder_matrix.rs', and 'tests/hidden_from_subscriptions.rs'.
+
+Use the existing Cargo groups; standalone files are not all independent
+test targets. Examples for the relevant slices are:
+
+#+begin_src sh
+cargo test --lib prepared_update
+cargo test --lib weave
+cargo test --lib supplement_from_disk::tests
+cargo test --lib telescope
+cargo test --test grouped_views initial_view_bfs
+cargo test --test grouped_overrides partner_folder_matrix
+cargo test --test grouped_saves
+bash bash/emacs-tests.sh
+bash bash/nvim-tests.sh
+#+end_src
+
+Check that filtered commands actually select the intended cases. Run
+'cargo check --all-targets' after public signature changes, then the affected
+groups and the complete suite at the settled implementation boundary.
+Client/integration tests may require their documented server setup; this
+review did not start servers or exercise live data.
+
+Keep 'assert_metadata_eq!' for unordered metadata comparison, but its
+canonicalizer deliberately erases order inside relationship herald spans.
+Preserve the exact order checks for those spans. For test performance, keep
+the already-consolidated Cargo targets and shared sessions documented in
+[[file:faster-tests-progress.org][the test-speed work]].
+
+** Decisions that deserve your input during a later implementation
+
+The conservative slices above preserve current behavior. Decisions to
+change merge indexing/recovery, introduce a server preview command, change
+property inheritance, or impose global definitiveness should come with a
+concrete before/after contract. They are not prerequisites for the small
+cleanups. My preference is to finish those small cleanups first, then choose
+the next larger change from the feature you want to build.
+
+** Measure whether development got easier
+
+For the next relation, property, or edit gesture, record how many independent
+policy implementations need changing and which test proves the contract.
+The desired result is one semantic definition plus thin storage/view/client
+adapters. Also compare focused test/build turnaround where it matters.
+Lines deleted are useful evidence, but fewer independent decisions are the
+actual objective. This review supplies no measured speedup or cost savings.
+
+* Research scope and confidence
+
+This report describes revision 'a4c3c793' as inspected on 2026-09-25. I read
+the orientation and applicable advice, investigated save interpretation and
+application, and used three bounded Sol/medium recon missions for graph and
+properties, view machinery, and clients/protocol/tests. I checked the main
+cross-cutting claims against source and sampled relevant TODO plans and
+progress files. This is an architectural reconnaissance, not an exhaustive
+function-by-function audit, benchmark, or proof that every old problem is
+still open.
+
+No application code was changed and no application tests were run. The
+deliverables are this report and concise new findings in 'TODO/problems.org'.
+The existing untracked user files were left alone. Proposed type shapes are
+design sketches; recommended tests are future verification, not claimed
+passing results.

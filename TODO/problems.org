@@ -3,6 +3,51 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
+* Findings from the simplification reconnaissance (2026-09-25)
+  Research and proposed slices: [[file:astra-cleans-up.org][Making Skg easier to change]].
+  These are source-inspection findings; no application changes or runtime
+  reproduction were performed during the review.
+** Neovim source moves omit Emacs's write-protection and stuck-edge handling
+   'elisp/skg-metadata.el::skg--set-source-and-handle-stuck-edges' skips
+   write-protected occurrences and offers to publicize content edges left
+   at their old, more-private sources by a home move.
+   'nvim/lua/skg/metadata.lua::set_source' instead calls direct source
+   rewriting helpers, including on write-protected occurrences, without
+   that analysis. Its success message can therefore describe an edit the
+   save will not honor as expected. This is client-policy drift, not a
+   demonstrated bypass of server validation. Add shared behavioral cases
+   and align the commands; consider server-owned preview logic if such
+   graph-dependent policies continue to multiply.
+** New relationship folders are populated before their completion visit
+   'server/to_org/complete/partner_folder/mod.rs' eagerly builds child data
+   and reconciles newly created folders. 'complete_viewforest' subsequently
+   visits those folders and invokes their reconcilers again. Candidate
+   simplification: creation owns scaffold existence/order/folding, and the
+   completion visit owns members. Preserve forced empty writable folders,
+   HEAD-only diff membership, hidden-folder folding, and Unknown members.
+** Graph updates rediscover identity-change facts across several consumers
+   'GraphChangeSet' in 'server/dbs/in_rust_graph/prepared_update.rs' and
+   'apply_definenodes_to_inRustGraph' independently compute affected IDs
+   and owners. Override/telescope scope builders perform related old/new
+   identity walks. Share immutable identity-transition facts while retaining
+   distinct index, validation, write, and view dependency scopes and an
+   independent full reconstruction oracle.
+** Node-to-complete projections and lookup adapters multiply change sites
+   'nodecomplete_from_graph' in 'server/dbs/node_lookup.rs',
+   'nodecomplete_from_noderust' in 'server/save.rs', and
+   'complete_from_rust' in 'server/dbs/in_rust_graph/complete_validation.rs'
+   repeat the same field projection. Share it next to the node types.
+   The rustFirst/graphFirst lookup wrappers also ignore source/config
+   arguments and perform only graph lookup; their names and fallible
+   wrappers obscure the captured-generation contract.
+** Ordinary saves and node merges have different index application policies
+   'server/save.rs::apply_defineNodes' queues Tantivy updates with computed
+   context types. 'server/nodeMerge.rs::apply_prepared_nodeMerges' writes
+   synchronously with an empty context map and rebuild-on-failure behavior;
+   its comment defers context refresh to rebuild. A common application
+   boundary could reduce duplication, but unifying the index policy changes
+   timing, recovery, and potentially ranking. State and test that contract
+   before treating this as a mechanical refactor.
 * Some docs links retain paths relative to the repository root (2026-09-25)
   [[file:../docs/README-old.org][docs/README-old.org]] links to 'docs/FAQ.md', which resolves from its
   current directory to the absent 'docs/docs/FAQ.md'. Likewise,
