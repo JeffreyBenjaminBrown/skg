@@ -48,12 +48,12 @@ T.check(not root_line:find('(affectsParent false)', 1, true),
     'contained view-root should be content, not false; line: %s',
     root_line))
 T.check(not root_line:find(
-    '(affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth contains))', 1, true),
+    '(affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))', 1, true),
   string.format(
     'contained view-root should be content, not content; line: %s',
     root_line))
 T.check(not root_line:find(
-    '(affectsParent false) writeProtected (rels (links_to (out (ancestors 1))) (birth links_to))', 1, true),
+    '(affectsParent false) writeProtected (rels (links_to (out (ancestors 1))) (birth (links_to out 1)))', 1, true),
   string.format(
     'contained view-root should be content, not line: %s', root_line))
 
@@ -69,9 +69,9 @@ T.check(parent_line, string.format(
   'no level-2 headline for parent; buffer:\n%s', text))
 
 T.check(parent_line:find(
-    '(affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth contains))', 1, true) ~= nil,
+    '(affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1)))', 1, true) ~= nil,
   string.format(
-    'parent is not (affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth contains)); '
+    'parent is not (affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1))); '
     .. 'line: %s', parent_line))
 T.check(parent_line:find(' writeProtected%f[%A]') ~= nil,
   string.format('parent is not writeProtected; line: %s', parent_line))

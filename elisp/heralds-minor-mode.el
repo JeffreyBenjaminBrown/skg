@@ -439,7 +439,8 @@ inbound count>1 yellow,
 A/I/P cyan. Tokens are ordered C L S O H A I P and space-separated."
   (let ((rels (heralds--find-rels sexp)))
     (when rels
-      (let ((birth (cdr (assq 'birth (cdr rels))))
+      (let ((birth ;; the relations named by the birth facts (RELATION SIDE [GEN])
+             (mapcar #'car (cdr (assq 'birth (cdr rels)))))
             (overrides-here
              (assq 'overridesHere
                    (cdr (assq 'viewStats

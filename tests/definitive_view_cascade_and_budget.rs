@@ -104,24 +104,24 @@ async fn test_definitive_view_ample_budget (
       // With an ample budget, all children should be expanded
       let expected = indoc! {"
         * (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
-        ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
-        ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth contains)))) 12
+        ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
+        ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth (contains in 1))))) 12
         12 body
-        *** (skg (node (id 121) (repo main) (rels (contains (in 1 (ancestors 1)) (out 2)) (birth contains)))) 121
+        *** (skg (node (id 121) (repo main) (rels (contains (in 1 (ancestors 1)) (out 2)) (birth (contains in 1))))) 121
         121 body
-        **** (skg (node (id 1211) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1211
+        **** (skg (node (id 1211) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 1211
         1211 body
-        **** (skg (node (id 1212) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1212
+        **** (skg (node (id 1212) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 1212
         1212 body
-        *** (skg (node (id 122) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
+        *** (skg (node (id 122) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 122
         122 body
-        **** (skg (node (id 1221) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1221
+        **** (skg (node (id 1221) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 1221
         1221 body
-        *** (skg (node (id 123) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
+        *** (skg (node (id 123) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 123
         123 body
-        *** (skg (node (id 124) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 124
+        *** (skg (node (id 124) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 124
         124 body
-        ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
+        ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
         * (skg (node (id 2) (repo main) (affectsParent na))) 2
       "};
 
@@ -197,14 +197,14 @@ async fn test_definitive_view_limit_5_or_6 (
       // 121..124 are visited they stay write-protected (none expands -> no gen-3).
       let expected_5 = indoc! {"
         * (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
-        ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
-        ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth contains)))) 12
+        ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
+        ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth (contains in 1))))) 12
         12 body
-        *** (skg (node (id 121) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 2)) (birth contains)))) 121
-        *** (skg (node (id 122) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
-        *** (skg (node (id 123) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
-        *** (skg (node (id 124) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 124
-        ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
+        *** (skg (node (id 121) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 2)) (birth (contains in 1))))) 121
+        *** (skg (node (id 122) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 122
+        *** (skg (node (id 123) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 123
+        *** (skg (node (id 124) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 124
+        ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
         * (skg (node (id 2) (repo main) (affectsParent na))) 2
       "};
       // limit=6: one more expansion than limit=5 -- 121 (the 6th) now expands and
@@ -212,17 +212,17 @@ async fn test_definitive_view_limit_5_or_6 (
       // spent); 122..124 remain write-protected.
       let expected_6 = indoc! {"
         * (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
-        ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
-        ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth contains)))) 12
+        ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
+        ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth (contains in 1))))) 12
         12 body
-        *** (skg (node (id 121) (repo main) (rels (contains (in 1 (ancestors 1)) (out 2)) (birth contains)))) 121
+        *** (skg (node (id 121) (repo main) (rels (contains (in 1 (ancestors 1)) (out 2)) (birth (contains in 1))))) 121
         121 body
-        **** (skg (node (id 1211) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1211
-        **** (skg (node (id 1212) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1212
-        *** (skg (node (id 122) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
-        *** (skg (node (id 123) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
-        *** (skg (node (id 124) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 124
-        ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
+        **** (skg (node (id 1211) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 1211
+        **** (skg (node (id 1212) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 1212
+        *** (skg (node (id 122) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 122
+        *** (skg (node (id 123) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 123
+        *** (skg (node (id 124) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 124
+        ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
         * (skg (node (id 2) (repo main) (affectsParent na))) 2
       "};
 
@@ -297,9 +297,9 @@ async fn test_definitive_view_limit_1_to_4 (
       // none of 121.. is created. Root 2 still expands (root exemption).
       let expected_1 = indoc! {"
         * (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
-        ** (skg (node (id 11) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
-        ** (skg (node (id 12) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 4)) (birth contains)))) 12
-        ** (skg (node (id 13) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
+        ** (skg (node (id 11) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
+        ** (skg (node (id 12) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 4)) (birth (contains in 1))))) 12
+        ** (skg (node (id 13) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
         * (skg (node (id 2) (repo main) (affectsParent na))) 2
       "};
       // hiddenBody marks only 12: the saved buffer drew 11 and 13
@@ -310,14 +310,14 @@ async fn test_definitive_view_limit_1_to_4 (
       // after the budget is gone, so it too is write-protected.
       let expected_4 = indoc! {"
         * (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
-        ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
-        ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth contains)))) 12
+        ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
+        ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 4)) (birth (contains in 1))))) 12
         12 body
-        *** (skg (node (id 121) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 2)) (birth contains)))) 121
-        *** (skg (node (id 122) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
-        *** (skg (node (id 123) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
-        *** (skg (node (id 124) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth contains)))) 124
-        ** (skg (node (id 13) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
+        *** (skg (node (id 121) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 2)) (birth (contains in 1))))) 121
+        *** (skg (node (id 122) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 122
+        *** (skg (node (id 123) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 123
+        *** (skg (node (id 124) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 124
+        ** (skg (node (id 13) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
         * (skg (node (id 2) (repo main) (affectsParent na))) 2
       "};
 
@@ -373,12 +373,12 @@ async fn test_definitive_view_conflicting (
         // NOTE: The first 12 redefines the children of 12 as [122]
         // rather than [121,122,123,124].
         "* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 1))))) 1
-         ** (skg (node (id 12) (repo main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 12
-         *** (skg (node (id 122) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
+         ** (skg (node (id 12) (repo main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 12
+         *** (skg (node (id 122) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 122
          * (skg (node (id 12) (repo main) (affectsParent na) (rels (contains (in 1) (out 1))))) 12
-         ** (skg (node (id 122) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
+         ** (skg (node (id 122) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 122
          122 body
-         *** (skg (node (id 1221) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1221
+         *** (skg (node (id 1221) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 1221
          1221 body
       "};
 
@@ -424,9 +424,9 @@ async fn test_definitive_view_with_cycle (
       let expected = indoc! {"
         * (skg (node (id cyc-a) (repo main) (affectsParent na) (rels (contains (in 1) (out 1))))) cyc-a
         cyc-a body
-        ** (skg (node (id cyc-b) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1))) (birth contains)))) cyc-b
+        ** (skg (node (id cyc-b) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1))) (birth (contains in 1))))) cyc-b
         cyc-b body
-        *** (skg (node (id cyc-a) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1))) (birth contains)) (viewStats cycle))) cyc-a
+        *** (skg (node (id cyc-a) (repo main) writeProtected hiddenBody (rels (contains (in 1 (ancestors 1)) (out 1 (ancestors 1))) (birth (contains in 1))) (viewStats cycle))) cyc-a
       "};
 
       assert_metadata_eq!(result, expected,
@@ -478,14 +478,14 @@ async fn test_definitive_view_with_repeat (
         "* (skg (node (id 121) (repo main) (affectsParent na) writeProtected (rels (contains (in 1))))) 121
          * (skg (node (id 12) (repo main) (affectsParent na) (rels (contains (in 1) (out 4))))) 12
          12 body
-         ** (skg (node (id 121) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121
-         ** (skg (node (id 122) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 122
+         ** (skg (node (id 121) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 121
+         ** (skg (node (id 122) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 122
          122 body
-         *** (skg (node (id 1221) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 1221
+         *** (skg (node (id 1221) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 1221
          1221 body
-         ** (skg (node (id 123) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
+         ** (skg (node (id 123) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 123
          123 body
-         ** (skg (node (id 124) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 124
+         ** (skg (node (id 124) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 124
          124 body
       "};
 
@@ -581,8 +581,8 @@ async fn test_budget_aliasfolder_is_neutral (
         ** (skg aliasFolder)
         *** (skg alias) first alias
         *** (skg alias) second alias
-        ** (skg (node (id c1) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) c1
-        *** (skg (node (id c2) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) c2
+        ** (skg (node (id c1) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) c1
+        *** (skg (node (id c2) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) c2
       "};
       assert_metadata_eq!(result, expected,
         "budget 3 expands the whole content chain; the AliasFolder is whole + budget-neutral");

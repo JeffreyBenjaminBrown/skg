@@ -110,7 +110,7 @@ describe('skg.heralds', function ()
     -- ancestor "a" (muted yellow), and the birth "C" (black-on-white).
     local buf = scratch_buffer_with({
       'Line with (skg (node (id 123) (affectsParent false)'
-      .. ' (rels (contains (in 2 (ancestors 1))) (birth contains))'
+      .. ' (rels (contains (in 2 (ancestors 1))) (birth (contains in 1)))'
       .. ' (viewStats cycle) (editRequest delete))) text' })
     heralds.enable(buf)
     local marks = herald_extmarks(buf)

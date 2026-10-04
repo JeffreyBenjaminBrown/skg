@@ -82,14 +82,14 @@ fn assert_sharing_stats_in_view_of_R (
   for (folder, line) in &e_lines {
     match *folder {
       "subscribeeFolder" => {
-        assert! ( line . contains ("(birth subscribes_to)"),
+        assert! ( line . contains ("(birth (subscribes_to in 2))"),
           "{}: E-as-subscribee is born of the subscribe:\n{}", label, buf );
         assert! ( line . contains ("(overrides_view_of")
                   && line . contains ("(ancestors 2)"),
           "{}: E-as-subscribee also shows gO (R overrides E, gen 2):\n{}",
           label, buf ); },
       "overriddenFolder" => {
-        assert! ( line . contains ("(birth overrides_view_of)"),
+        assert! ( line . contains ("(birth (overrides_view_of in 2))"),
           "{}: E-as-overridden is born of the override:\n{}", label, buf );
         assert! ( line . contains ("(subscribes_to")
                   && line . contains ("(ancestors 2)"),

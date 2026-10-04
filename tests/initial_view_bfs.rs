@@ -84,20 +84,20 @@ async fn test_bfs_limit_across_multiple_trees (
       println!("BFS multi-tree limit result:\n{}", result);
 
       let expected = indoc! {"* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
-                              ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
-                              ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 12
-                              *** (skg (node (id 121) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121
-                              *** (skg (node (id 122) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 122
-                              *** (skg (node (id 123) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
-                              ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
+                              ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
+                              ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth (contains in 1))))) 12
+                              *** (skg (node (id 121) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 121
+                              *** (skg (node (id 122) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 122
+                              *** (skg (node (id 123) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 123
+                              ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
                               * (skg (node (id 2) (repo main) (affectsParent na) (rels (contains (out 3))))) 2
-                              ** (skg (node (id 21) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 21
-                              ** (skg (node (id 22) (repo main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 22
-                              ** (skg (node (id 23) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 23
+                              ** (skg (node (id 21) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 21
+                              ** (skg (node (id 22) (repo main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 3)) (birth (contains in 1))))) 22
+                              ** (skg (node (id 23) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 23
                               * (skg (node (id 3) (repo main) (affectsParent na) (rels (contains (out 3))))) 3
-                              ** (skg (node (id 31) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 31
-                              ** (skg (node (id 32) (repo main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 32
-                              ** (skg (node (id 33) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 33
+                              ** (skg (node (id 31) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 31
+                              ** (skg (node (id 32) (repo main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 3)) (birth (contains in 1))))) 32
+                              ** (skg (node (id 33) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 33
                               "};
       assert_metadata_eq!(result, expected,
                  "BFS truncates by the §5.5 budget, leaving whole groups writeProtected");
@@ -130,23 +130,23 @@ async fn test_bfs_limit_9_three_branches (
       println!("BFS limit=9 three branches result:\n{}", result);
 
       let expected = indoc! {"* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
-                              ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
-                              ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 12
-                              *** (skg (node (id 121) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121
-                              *** (skg (node (id 122) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 122
-                              *** (skg (node (id 123) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
-                              ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
+                              ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
+                              ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth (contains in 1))))) 12
+                              *** (skg (node (id 121) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 121
+                              *** (skg (node (id 122) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 122
+                              *** (skg (node (id 123) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 123
+                              ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
                               * (skg (node (id 2) (repo main) (affectsParent na) (rels (contains (out 3))))) 2
-                              ** (skg (node (id 21) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 21
-                              ** (skg (node (id 22) (repo main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 22
-                              *** (skg (node (id 221) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 221
-                              *** (skg (node (id 222) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 222
-                              *** (skg (node (id 223) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 223
-                              ** (skg (node (id 23) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 23
+                              ** (skg (node (id 21) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 21
+                              ** (skg (node (id 22) (repo main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth (contains in 1))))) 22
+                              *** (skg (node (id 221) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 221
+                              *** (skg (node (id 222) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 222
+                              *** (skg (node (id 223) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 223
+                              ** (skg (node (id 23) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 23
                               * (skg (node (id 3) (repo main) (affectsParent na) (rels (contains (out 3))))) 3
-                              ** (skg (node (id 31) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 31
-                              ** (skg (node (id 32) (repo main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 32
-                              ** (skg (node (id 33) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 33
+                              ** (skg (node (id 31) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 31
+                              ** (skg (node (id 32) (repo main) writeProtected (rels (contains (in 1 (ancestors 1)) (out 3)) (birth (contains in 1))))) 32
+                              ** (skg (node (id 33) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 33
                               "};
       assert_metadata_eq!(result, expected,
                  "BFS limit=9 fully expands the first two roots; the third stays write-protected");
@@ -178,19 +178,19 @@ async fn test_bfs_limit_8_two_branches (
       println!("BFS limit=8 two branches result:\n{}", result);
 
       let expected = indoc! {"* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (out 3))))) 1
-                              ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11
-                              ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 12
-                              *** (skg (node (id 121) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121
-                              *** (skg (node (id 122) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 122
-                              *** (skg (node (id 123) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 123
-                              ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13
+                              ** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11
+                              ** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth (contains in 1))))) 12
+                              *** (skg (node (id 121) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 121
+                              *** (skg (node (id 122) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 122
+                              *** (skg (node (id 123) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 123
+                              ** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13
                               * (skg (node (id 2) (repo main) (affectsParent na) (rels (contains (out 3))))) 2
-                              ** (skg (node (id 21) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 21
-                              ** (skg (node (id 22) (repo main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth contains)))) 22
-                              *** (skg (node (id 221) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 221
-                              *** (skg (node (id 222) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 222
-                              *** (skg (node (id 223) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth contains)))) 223
-                              ** (skg (node (id 23) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 23
+                              ** (skg (node (id 21) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 21
+                              ** (skg (node (id 22) (repo main) (rels (contains (in 1 (ancestors 1)) (out 3)) (birth (contains in 1))))) 22
+                              *** (skg (node (id 221) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 221
+                              *** (skg (node (id 222) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 222
+                              *** (skg (node (id 223) (repo main) writeProtected (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 223
+                              ** (skg (node (id 23) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 23
                               "};
       assert_metadata_eq!(result, expected,
                  "BFS limit=8 fully expands both roots' gen-2; gen-3 groups whole + writeProtected");
@@ -222,10 +222,10 @@ async fn test_budget_content_beats_subscribers (
 
       let expected = indoc! {"* (skg (node (id r) (repo main) (affectsParent na) (rels (contains (out 1)) (subscribes_to (out 2))))) r
                               ** (skg subscribeeFolder)
-                              *** (skg (node (id s1) (repo main) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribes_to (in 1 (ancestors 2))) (birth subscribes_to)))) s1
-                              *** (skg (node (id s2) (repo main) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribes_to (in 1 (ancestors 2))) (birth subscribes_to)))) s2
-                              ** (skg (node (id c1) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) c1
-                              *** (skg (node (id c2) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) c2
+                              *** (skg (node (id s1) (repo main) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribes_to (in 1 (ancestors 2))) (birth (subscribes_to in 2))))) s1
+                              *** (skg (node (id s2) (repo main) writeProtected (rels (contains (out 0 (unintegrated 0))) (subscribes_to (in 1 (ancestors 2))) (birth (subscribes_to in 2))))) s2
+                              ** (skg (node (id c1) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) c1
+                              *** (skg (node (id c2) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) c2
                               "};
       assert_metadata_eq!(result, expected,
                  "budget 3 expands the whole content chain; the SubscribeeFolder is whole + budget-neutral");

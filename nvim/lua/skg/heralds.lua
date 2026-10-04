@@ -370,8 +370,9 @@ function M.render_rel_facts (sexp)
   local overrides_here = assq(view_stats, 'overridesHere') ~= nil
   local birth_form = assq(rels, 'birth')
   if birth_form then
+    -- each birth fact is (RELATION SIDE [GEN])
     for i = 2, #birth_form do
-      birth[sexpr.atom_text(birth_form[i])] = true end
+      birth[sexpr.atom_text(birth_form[i][1])] = true end
   end
   local chunks = {}
   local function add_token (tok)

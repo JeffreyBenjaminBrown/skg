@@ -132,7 +132,7 @@ removal is dropped, other data is kept."
            (skg-strip-heralds-from-sexp
             '(skg (node (id x)
                         (rels (contains (in 1 (ancestors 1)) (out 3))
-                              (birth contains))
+                              (birth (contains in 1)))
                         (viewStats (homeRepoHerald ⌂:priv) cycle))))
            '(skg (node (id x) (viewStats cycle))))))
 

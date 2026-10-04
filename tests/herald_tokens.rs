@@ -4,7 +4,7 @@
 // in the clients. These pin the wire the emitter produces.
 
 use skg::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use skg::herald_tokens::{relationship_heralds_sexp, AncestorFlags};
+use skg::herald_tokens::{relationship_heralds_sexp, AncestorFlags, BirthFact, Side};
 use skg::types::viewnode::RelationCounts;
 
 fn counts () -> RelationCounts { RelationCounts::default () }
@@ -14,7 +14,7 @@ fn emit (
   al    : usize,
   ex    : usize,
   f     : &AncestorFlags,
-  birth : &[NodeRelation],
+  birth : &[BirthFact],
 ) -> Option<String> {
   relationship_heralds_sexp (c, al, ex, 0, f, birth, None) }
 
@@ -25,8 +25,10 @@ fn contains_birth () {
   let mut f = AncestorFlags::default ();
   f . record (NodeRelation::Contains, true, 1);
   assert_eq! (
-    emit (&c, 0, 0, &f, &[NodeRelation::Contains]) . as_deref (),
-    Some ("(rels (contains (in 1 (ancestors 1))) (birth contains))") );
+    emit (&c, 0, 0, &f,
+          &[BirthFact::new (NodeRelation::Contains, Side::In, Some (1))])
+      . as_deref (),
+    Some ("(rels (contains (in 1 (ancestors 1))) (birth (contains in 1)))") );
 }
 
 #[test]
@@ -36,8 +38,10 @@ fn contains_both_sides_and_multi () {
   let mut f = AncestorFlags::default ();
   f . record (NodeRelation::Contains, true, 1);
   assert_eq! (
-    emit (&c, 0, 0, &f, &[NodeRelation::Contains]) . as_deref (),
-    Some ("(rels (contains (in 2 (ancestors 1)) (out 1)) (birth contains))") );
+    emit (&c, 0, 0, &f,
+          &[BirthFact::new (NodeRelation::Contains, Side::In, Some (1))])
+      . as_deref (),
+    Some ("(rels (contains (in 2 (ancestors 1)) (out 1)) (birth (contains in 1)))") );
 }
 
 #[test]
@@ -56,8 +60,10 @@ fn subscribee_as_such () {
   let mut f = AncestorFlags::default ();
   f . record (NodeRelation::SubscribesTo, true, 2);
   assert_eq! (
-    emit (&c, 0, 0, &f, &[NodeRelation::SubscribesTo]) . as_deref (),
-    Some ("(rels (subscribes_to (in 1 (ancestors 2))) (birth subscribes_to))") );
+    emit (&c, 0, 0, &f,
+          &[BirthFact::new (NodeRelation::SubscribesTo, Side::In, Some (2))])
+      . as_deref (),
+    Some ("(rels (subscribes_to (in 1 (ancestors 2))) (birth (subscribes_to in 2)))") );
 }
 
 #[test]
@@ -84,8 +90,10 @@ fn overrider_as_such_out_side () {
   let mut f = AncestorFlags::default ();
   f . record (NodeRelation::OverridesViewOf, false, 2);
   assert_eq! (
-    emit (&c, 0, 0, &f, &[NodeRelation::OverridesViewOf]) . as_deref (),
-    Some ("(rels (overrides_view_of (out 1 (ancestors 2))) (birth overrides_view_of))") );
+    emit (&c, 0, 0, &f,
+          &[BirthFact::new (NodeRelation::OverridesViewOf, Side::Out, Some (2))])
+      . as_deref (),
+    Some ("(rels (overrides_view_of (out 1 (ancestors 2))) (birth (overrides_view_of out 2)))") );
 }
 
 #[test]
@@ -98,10 +106,13 @@ fn filter_folder_two_births_in_fixed_order () {
   f . record (NodeRelation::Contains, true, 2);
   assert_eq! (
     emit (&c, 0, 0, &f,
-          &[NodeRelation::HidesFromItsSubscriptions, NodeRelation::Contains])
+          &[BirthFact::new (
+              NodeRelation::HidesFromItsSubscriptions, Side::In, Some (4)),
+            BirthFact::new (NodeRelation::Contains, Side::In, Some (2))])
       . as_deref (),
     Some ("(rels (contains (in 1 (ancestors 2))) \
-           (hides_from_its_subscriptions (in 1 (ancestors 4))) (birth hides_from_its_subscriptions contains))") );
+           (hides_from_its_subscriptions (in 1 (ancestors 4))) \
+           (birth (hides_from_its_subscriptions in 4) (contains in 2)))") );
 }
 
 #[test]
@@ -128,8 +139,10 @@ fn mentioner_birth_out_only () {
   let mut f = AncestorFlags::default ();
   f . record (NodeRelation::LinksTo, false, 1);
   assert_eq! (
-    emit (&c, 0, 0, &f, &[NodeRelation::LinksTo]) . as_deref (),
-    Some ("(rels (links_to (out 1 (ancestors 1))) (birth links_to))") );
+    emit (&c, 0, 0, &f,
+          &[BirthFact::new (NodeRelation::LinksTo, Side::Out, Some (1))])
+      . as_deref (),
+    Some ("(rels (links_to (out 1 (ancestors 1))) (birth (links_to out 1)))") );
 }
 
 #[test]

@@ -117,12 +117,12 @@
                     "** 13\n"))
            (expected
             (concat "* (skg (node (id 1) (repo main) (affectsParent na) (rels (contains (in 1) (out 3))))) 1\n"
-                    "** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 11\n"
-                    "** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth contains)))) 12\n"
-                    "*** (skg (node (id 1) (repo main) (affectsParent false) writeProtected (rels (contains (in 1) (out 3 (ancestors 1))) (birth contains)) (viewStats cycle))) 1\n"
-                    "**** (skg (node (id 0) (repo main) (affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth contains)))) 0\n"
-                    "*** (skg (node (id 121) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 121\n"
-                    "** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth contains)))) 13\n")))
+                    "** (skg (node (id 11) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 11\n"
+                    "** (skg (node (id 12) (repo main) (rels (contains (in 1 (ancestors 1)) (out 1)) (birth (contains in 1))))) 12\n"
+                    "*** (skg (node (id 1) (repo main) (affectsParent false) writeProtected (rels (contains (in 1) (out 3 (ancestors 1))) (birth (contains out 1))) (viewStats cycle))) 1\n"
+                    "**** (skg (node (id 0) (repo main) (affectsParent false) writeProtected (rels (contains (out 1 (ancestors 1))) (birth (contains out 1))))) 0\n"
+                    "*** (skg (node (id 121) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 121\n"
+                    "** (skg (node (id 13) (repo main) (rels (contains (in 1 (ancestors 1))) (birth (contains in 1))))) 13\n")))
 
       (message "Buffer-Content with metadata: %s" buffer-content)
       (message "Expected buffer-content with metadata: %s" expected)

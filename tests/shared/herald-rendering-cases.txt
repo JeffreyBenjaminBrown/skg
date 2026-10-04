@@ -87,35 +87,35 @@
 ---- text: Oĥh
 ---- styles: nonstandard*1 yucky*1 medium*1
 ==== birth: links and overrides
-(skg (node (id x) (rels (links_to (in 5 (substantive 2)) (out 3)) (overrides_view_of (out 1)) (birth overrides_view_of))))
+(skg (node (id x) (rels (links_to (in 5 (substantive 2)) (out 3)) (overrides_view_of (out 1)) (birth (overrides_view_of out 1)))))
 ---- text: 2/5L3 O1
 ---- styles: high*1 normal*4 -*1 message*1 high*1
 ==== birth: contains
-(skg (node (id x) (rels (contains (in 1) (out 2)) (birth contains))))
+(skg (node (id x) (rels (contains (in 1) (out 2)) (birth (contains in 1)))))
 ---- text: 1C2
 ---- styles: normal*1 message*1 normal*1
 ==== birth: links_to
-(skg (node (id x) (rels (links_to (in 5 (substantive 2)) (out 3)) (birth links_to))))
+(skg (node (id x) (rels (links_to (in 5 (substantive 2)) (out 3)) (birth (links_to out 1)))))
 ---- text: 2/5L3
 ---- styles: high*1 normal*2 message*1 normal*1
 ==== birth: contains, unintegrated
-(skg (node (id x) (rels (contains (out 8 (unintegrated 2))) (birth contains))))
+(skg (node (id x) (rels (contains (out 8 (unintegrated 2))) (birth (contains in 1)))))
 ---- text: C2/8
 ---- styles: message*1 high*1 normal*2
 ==== birth: subscribes_to
-(skg (node (id x) (rels (subscribes_to (in 1) (out 2)) (birth subscribes_to))))
+(skg (node (id x) (rels (subscribes_to (in 1) (out 2)) (birth (subscribes_to in 2)))))
 ---- text: 1S2
 ---- styles: nonstandard*1 message*1 nonstandard*1
 ==== birth: overrides_view_of
-(skg (node (id x) (rels (overrides_view_of (in 1) (out 2)) (birth overrides_view_of))))
+(skg (node (id x) (rels (overrides_view_of (in 1) (out 2)) (birth (overrides_view_of in 2)))))
 ---- text: 1O2
 ---- styles: high*1 message*1 high*1
 ==== birth: hides_from_its_subscriptions
-(skg (node (id x) (rels (hides_from_its_subscriptions (in 1) (out 2)) (birth hides_from_its_subscriptions))))
+(skg (node (id x) (rels (hides_from_its_subscriptions (in 1) (out 2)) (birth (hides_from_its_subscriptions in 2)))))
 ---- text: 1H2
 ---- styles: nonstandard*1 message*1 nonstandard*1
 ==== node: independent, a cycle, a delete request, contained by the parent and another
-(skg (node (id 123) (affectsParent false) (rels (contains (in 2 (ancestors 1))) (birth contains)) (viewStats cycle) (editRequest delete)))
+(skg (node (id 123) (affectsParent false) (rels (contains (in 2 (ancestors 1))) (birth (contains in 1))) (viewStats cycle) (editRequest delete)))
 ---- text: ⊥ 2aC ⟳ delete
 ---- styles: high*1 -*1 high*1 low*1 message*1 -*1 normal*1 -*1 stop*6
 ==== property counts: flags

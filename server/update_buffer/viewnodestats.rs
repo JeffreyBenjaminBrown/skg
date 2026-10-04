@@ -2,7 +2,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::stats::mentioner_is_substantive;
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition, NodeRelation, RelationRole };
-use crate::herald_tokens::{AncestorFlags, relationship_heralds_sexp};
+use crate::herald_tokens::{AncestorFlags, BirthFact, Side, relationship_heralds_sexp};
 use crate::repo_sets::ActiveRepoSet;
 use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::viewnode::{
@@ -159,12 +159,12 @@ fn set_herald_strings_in_viewnode (
             flags . contents_unintegrated_out . push (*generation); } }
         Some (members . len ()) })
     } else { None };
-  let birth_rels : Vec<NodeRelation> =
-    birth_relations (&parent_kind, affectsParent, birth, &flags,
-                     overridesHere);
+  let birth_facts : Vec<BirthFact> =
+    birth_facts (&parent_kind, affectsParent, birth, &flags,
+                 overridesHere);
   let rel_heralds : Option<String> = relationship_heralds_sexp (
     &counts, gstats . aliases, gstats . extra_ids, gstats . flags,
-    &flags, &birth_rels, unintegrated );
+    &flags, &birth_facts, unintegrated );
   if let ViewnodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . rel_heralds = rel_heralds; } }
@@ -266,56 +266,79 @@ fn flag_ancestor_relations (
       RelationRole::new (rel, BinaryRolePosition::Second), active ) {
       flags . record (rel, false, generation); } } }
 
-/// The birth relation(s) -- which relation token(s) explain this
-/// occurrence. Usually a singleton; a HiddenInSubscribee member
-/// is [Hides, Contains].
-fn birth_relations (
+/// The birth facts -- which relations explain this occurrence, on which
+/// side of it, accounting for which ancestor. Usually a singleton; a
+/// HiddenInSubscribee member has two.
+fn birth_facts (
   parent_kind : &ParentKind,
   affectsParent    : AffectsParent,
   birth       : Birth,
   flags       : &AncestorFlags,
   overridesHere : bool, // whether the node is drawn in place of a node it overrides
-) -> Vec<NodeRelation> {
-  let mut rels : Vec<NodeRelation> = {
+) -> Vec<BirthFact> {
+  let mut facts : Vec<BirthFact> = {
     // A backpath graft's birth is its role's relation, regardless of
     // affectsParent (grafts are typically Independent/WriteProtected).
+    // The graft relates to its org-parent, one generation up.
     if let Birth::Backpath (role) = birth {
-      vec![ role . relation ]
+      vec![ BirthFact::new ( role . relation, side_of_role (role), Some (1) ) ]
     } else if affectsParent != AffectsParent::True { Vec::new ()
     } else {
       match parent_kind {
         ParentKind::Gnode (_) =>
           // Ordinary content: born of its parent containing it.
           if flags . contains_in . contains (&1) {
-            vec![ NodeRelation::Contains ]
+            vec![ BirthFact::new ( NodeRelation::Contains, Side::In, Some (1) ) ]
           } else { Vec::new () },
-        ParentKind::Folder (folder, _) => birth_relations_for_folder (*folder),
+        ParentKind::Folder (folder, _) => birth_facts_for_folder (*folder),
         ParentKind::Other => Vec::new (), }}};
   if overridesHere
-    && ! rels . contains (&NodeRelation::OverridesViewOf) {
+    && ! facts . iter () . any ( |fact|
+           fact . relation == NodeRelation::OverridesViewOf ) {
     // A drawn overrider (drawn in place of a node it overrides) is
     // born of that override: it leads with the O herald, like every
-    // other birth relation.
-    rels . insert (0, NodeRelation::OverridesViewOf); }
-  rels }
+    // other birth relation. The overridden node is not an ancestor.
+    facts . insert ( 0, BirthFact::new (
+      NodeRelation::OverridesViewOf, Side::Out, None ) ); }
+  facts }
 
-fn birth_relations_for_folder (
+/// The side of a node playing ROLE: the first role states the edge
+/// ("it RELATIONs N nodes"), so it is on the out side.
+fn side_of_role (
+  role : RelationRole,
+) -> Side {
+  if role . is_first_role () { Side::Out } else { Side::In } }
+
+/// A partner-folder member's birth facts. The folder's owner is the
+/// member's grandparent; the filter folders sit one or two levels
+/// deeper under the subscriber. (The table of birth facts is in
+/// docs/api-and-formats.org.)
+fn birth_facts_for_folder (
   folder : PartnerFolder,
-) -> Vec<NodeRelation> {
+) -> Vec<BirthFact> {
   match folder {
     PartnerFolder::Subscribee | PartnerFolder::Subscriber
     | PartnerFolder::Overridden | PartnerFolder::Overrider
     | PartnerFolder::Hider | PartnerFolder::Hidden =>
       match folder . relation_member_role () {
-        Some (role) => vec![ role . relation ],
+        Some (role) => vec![ BirthFact::new (
+          role . relation, side_of_role (role), Some (2) ) ],
         None => Vec::new (), },
-    // Filter folders: the subscriber-owner HIDES the member; a
-    // HiddenInSubscribee member is also CONTAINED by the subscribee.
+    // Filter folders. In
+    //   subscriber > subscribeeFolder > subscribee
+    //     > hiddenInSubscribeeFolder > member
+    // the subscriber (generation 4) HIDES the member, and the
+    // subscribee (generation 2) CONTAINS it. In
+    //   subscriber > subscribeeFolder
+    //     > hiddenOutsideOfSubscribeeFolder > member
+    // the subscriber (generation 3) hides it.
     PartnerFolder::HiddenInSubscribee =>
-      vec![ NodeRelation::HidesFromItsSubscriptions,
-            NodeRelation::Contains ],
+      vec![ BirthFact::new (
+              NodeRelation::HidesFromItsSubscriptions, Side::In, Some (4) ),
+            BirthFact::new ( NodeRelation::Contains, Side::In, Some (2) ) ],
     PartnerFolder::HiddenOutsideOfSubscribee =>
-      vec![ NodeRelation::HidesFromItsSubscriptions ], } }
+      vec![ BirthFact::new (
+              NodeRelation::HidesFromItsSubscriptions, Side::In, Some (3) ) ], } }
 
 /// Sets hidden_body on the active vognode at treeid: true iff the node
 /// is drawn WRITE_PROTECTED here while its graph node has a body -- one

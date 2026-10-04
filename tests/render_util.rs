@@ -148,9 +148,9 @@ fn test_rel_heralds_emitted () {
       1, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
       . unwrap () };
   let with_rels : String =
-    mk ( Some ("(rels (contains (in 2 (ancestors 1)) (out 1)) (birth contains))") );
+    mk ( Some ("(rels (contains (in 2 (ancestors 1)) (out 1)) (birth (contains in 1)))") );
   assert! ( with_rels . contains (
-    "(rels (contains (in 2 (ancestors 1)) (out 1)) (birth contains))" ),
+    "(rels (contains (in 2 (ancestors 1)) (out 1)) (birth (contains in 1)))" ),
             "rels not emitted verbatim: {}", with_rels );
   let neither : String = mk ( None );
   assert! ( ! neither . contains ("(rels ") );

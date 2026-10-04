@@ -781,7 +781,7 @@ assembled glyphs, omitted numerals or colors. For example:
                (out 3 (ancestors 2)))
   (overrides_view_of (out 1 (ancestors 1)))
   (aliases 2) (extraIds 1) (flags 3)
-  (birth overrides_view_of))
+  (birth (overrides_view_of out 1)))
 #+end_example
 
 Each relation side is =(in COUNT (ancestors GEN...))= or
@@ -798,7 +798,25 @@ adds =(unintegrated COUNT (ancestors GEN...))=, including when both counts
 are zero; absence of that subform means the role does not apply. The
 numerator counts members not already directly contained or hidden by that
 occurrence's subscriber. Subset counts cannot exceed their side's total.
-=(birth RELNAME...)= identifies the relation(s) behind this occurrence.
+=(birth (RELNAME SIDE [GEN])...)= identifies the relation(s) behind this
+occurrence: for each, the side of this node it is on (=in= or =out=) and
+the generation of the ancestor it accounts for. =GEN= is omitted when no
+ancestor accounts for it, as for a node drawn in place of a node it
+overrides, which carries =(overrides_view_of out)=.
+
+| Birth                            | Facts                                                        |
+|----------------------------------+--------------------------------------------------------------|
+| ordinary content                 | =(contains in 1)=                                            |
+| subscribee-folder member         | =(subscribes_to in 2)=                                       |
+| subscriber-folder member         | =(subscribes_to out 2)=                                      |
+| overridden-folder member         | =(overrides_view_of in 2)=                                   |
+| overrider-folder member          | =(overrides_view_of out 2)=                                  |
+| hidden-folder member             | =(hides_from_its_subscriptions in 2)=                        |
+| hider-folder member              | =(hides_from_its_subscriptions out 2)=                       |
+| hidden-in-subscribee member      | =(hides_from_its_subscriptions in 4) (contains in 2)=        |
+| hidden-outside-subscribee member | =(hides_from_its_subscriptions in 3)=                        |
+| drawn overrider (overrides-here) | =(overrides_view_of out)=                                    |
+| backpath graft                   | its role's relation, =out= for a first role and =in= for a second, =1= |
 Nonzero =(aliases K)=, =(extraIds K)= and =(flags K)= are property counts.
 See [[file:./heralds.org][heralds.org]] for the rendered notation and styles.
 

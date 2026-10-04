@@ -19,12 +19,52 @@
 //!     (aliases  K)
 //!     (extraIds K)
 //!     (flags K)
-//!     (birth RELNAME...))
+//!     (birth (RELNAME SIDE [GEN])...))
 //! GEN is a generation distance: 1 = visible parent, 2 = grandparent,
 //! ... `in` = "N nodes RELATION it"; `out` = "it RELATIONs N nodes".
+//! Each birth fact names a relation explaining why this occurrence is
+//! here, the side of this node it is on, and the generation of the
+//! ancestor it accounts for -- omitted when no ancestor does, as for a
+//! node drawn in place of a node it overrides.
 //! See TODO/heralds-semantic-wire.org.
 
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
+
+/// Which side of a node a relation fact is on: 'In' = "N nodes
+/// RELATION it"; 'Out' = "it RELATIONs N nodes".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Side { In, Out }
+
+impl Side {
+  pub fn wire_name (self) -> &'static str {
+    match self { Side::In => "in", Side::Out => "out" } } }
+
+/// One reason an occurrence is drawn where it is: a relation, the side
+/// of this node it is on, and the generation of the ancestor it
+/// accounts for (None when it accounts for no ancestor).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BirthFact {
+  pub relation   : NodeRelation,
+  pub side       : Side,
+  pub generation : Option<usize>,
+}
+
+impl BirthFact {
+  pub fn new (
+    relation   : NodeRelation,
+    side       : Side,
+    generation : Option<usize>,
+  ) -> BirthFact {
+    BirthFact { relation, side, generation } }
+
+  /// '(RELNAME SIDE [GEN])'
+  fn sexp (self) -> String {
+    match self . generation {
+      Some (generation) => format! ( "({} {} {})",
+        self . relation . relation_name (), self . side . wire_name (),
+        generation ),
+      None => format! ( "({} {})",
+        self . relation . relation_name (), self . side . wire_name () ), } } }
 use crate::types::viewnode::RelationCounts;
 
 /// Per-relation, per-side ancestor-flag generation distances (1 = the
@@ -174,7 +214,7 @@ pub fn relationship_heralds_sexp (
   extra_ids : usize,
   flag_count : usize,
   flags     : &AncestorFlags,
-  birth     : &[NodeRelation],
+  birth     : &[BirthFact],
   unintegrated : Option<usize>,
 ) -> Option<String> {
   let mut parts : Vec<String> = Vec::new ();
@@ -198,7 +238,7 @@ pub fn relationship_heralds_sexp (
   if flag_count > 0 {
     parts . push ( format! ("(flags {})", flag_count) ); }
   if ! birth . is_empty () {
-    let names : Vec<&str> = birth . iter () . map ( |&r| r . relation_name () ) . collect ();
-    parts . push ( format! ("(birth {})", names . join (" ")) ); }
+    let facts : Vec<String> = birth . iter () . map ( |fact| fact . sexp () ) . collect ();
+    parts . push ( format! ("(birth {})", facts . join (" ")) ); }
   if parts . is_empty () { None }
   else { Some ( format! ("(rels {})", parts . join (" ")) ) } }
