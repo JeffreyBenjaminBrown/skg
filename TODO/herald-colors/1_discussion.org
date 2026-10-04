@@ -1,0 +1,55 @@
+* heralds: colors, words for them, and their objects
+** vision
+*** colors
+Crucial: cyan (w/ black text). Reader must understand.
+High-interest: yellow
+Medium-interest: orange
+Low-interest: the dark color (green?) used by 'a'
+Normal: blue.
+Message: white (w/ black text),
+
+Stop: red
+Go: green
+Nonstandard: purple
+
+Unused: inversions of foreground/background.
+  Mention in comments that should we need more colors yet,
+  this is an option.
+*** things to color
+Write-protected: crucial
+Affects not its parent: crucial
+The h for 'overrides here': crucial
+Relation that explains presence: (one character): high
+Other relations: normal
+Uninteresting count side of a relation: normal
+  The uninteresting sides of the relations are:
+  - contents (uninteresting because they are
+    already immediately visible as view-children)
+  - link targets (visible from the text)
+  - subscribee count (visible from its subscription folder)
+  - overrides has no uninteresting side,
+    but from X's point of view, the number it overrides
+    is more interesting (medium interest)
+    than the number that override it (low interest)
+  - hides: the number it hides is uninteresting
+
+Interesting side of a relation: medium
+  Can go further -- e.g. "high/medium" left of the link L
+Properties (A, P), including their counts: low-interest
+Source repo: Normal.
+Messages: message. Applies to all folder labels, maybe more.
+Diff: Mostly nonstandard, but a stop-colored X for unstaged,
+  and a go-colored check mark for staged.
+  (Not that the characters themselves are that color;
+   they are, per usual, black text on the colored background.)
+*** also, organize
+Please report any opportunity to
+make the herald system more principled.
+Have we reified all the kinds of things
+that deserve to be nameable?
+Is there duplicative language --
+the same thing called two different things?
+** request
+Please study the herald system and then respond,
+in a level-two headline in this document, right after this one.
+What needs fleshing out? What's inelegant? What's dangerous?
