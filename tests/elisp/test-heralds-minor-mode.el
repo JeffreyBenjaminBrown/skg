@@ -5,76 +5,58 @@
 (require 'skg-request-herald-rules) ;; self-heal: skg-herald-rules-ensure
 (skg-test-install-herald-rules)
 
-(ert-deftest test-herald-fractions-and-substitution-styles ()
-  "L and C use the same subset grammar; ĥ is distinct from ancestor h."
-  (dolist (case '(("(links_to (in 5 (substantive 2)) (out 3))" . "2/5L3")
-                  ("(links_to (in 5 (substantive 0)) (out 3))" . "5L3")
-                  ("(links_to (in 5 (substantive 2)))" . "2/5L")
-                  ("(links_to (out 3))" . "L3")
-                  ("(links_to (in 5 (substantive 5)))" . "5/L")
-                  ("(links_to (in 1 (ancestors 1) (substantive 1 (ancestors 1))))" . "a/L")
-                  ("(links_to (in 2 (ancestors 1 2) (substantive 1 (ancestors 1))))" . "a/bL")
-                  ("(links_to (in 5 (ancestors 1) (substantive 1 (ancestors 1))))" . "a/5L")
-                  ("(links_to (in 5 (ancestors 1) (substantive 1)))" . "1/5aL")
-                  ("(links_to (in 1 (ancestors 1) (substantive 0)))" . "aL")
-                  ("(links_to (out 1 (ancestors 1)))" . "La")
-                  ("(links_to (out 3 (ancestors 1)))" . "L3a")
-                  ("(links_to (in 1 (ancestors 27) (substantive 1 (ancestors 27))))" . "{27}/L")
-                  ("(contains (in 2) (out 8 (unintegrated 2)))" . "2C2/8")
-                  ("(contains (out 8 (unintegrated 0)))" . "C8")
-                  ("(contains (out 8 (unintegrated 8)))" . "C8/")
-                  ("(contains (in 2) (out 0 (unintegrated 0)))" . "2C")))
-    (let ((display (heralds-from-metadata
-                    (format "(skg (node (id x) (rels %s)))" (car case)))))
-      (should (equal (substring-no-properties display) (cdr case)))))
-  (let* ((display (heralds-from-metadata
-                   "(skg (node (id x) (rels (overrides_view_of (out 1 (ancestors 8)))) (viewStats (overridesHere y))))"))
-         (plain (substring-no-properties display)))
-    (should (equal plain "Oĥh"))
-    (should (eq (get-text-property 1 'face display)
-                'heralds-yucky-face))
-    (should (eq (get-text-property 2 'face display)
-                'heralds-medium-face)))
-  (let ((display (heralds-from-metadata
-                  "(skg (node (id x) (rels (links_to (in 5 (substantive 2)) (out 3)) (overrides_view_of (out 1)) (birth overrides_view_of))))")))
-    (should (equal (substring-no-properties display) "2/5L3 O1"))
-    (should (eq (get-text-property 0 'face display) 'heralds-high-face))
-    (dolist (i '(1 2 3 4))
-      (should (eq (get-text-property i 'face display) 'heralds-normal-face)))
-    (should (eq (get-text-property 6 'face display) 'heralds-message-face))
-    (should (eq (get-text-property 7 'face display) 'heralds-high-face)))
-  (let ((display (heralds-from-metadata
-                  "(skg (node (id x) (rels (links_to (in 2 (ancestors 1 2) (substantive 1 (ancestors 1)))))))")))
-    (should (equal (substring-no-properties display) "a/bL"))
-    (should (eq (get-text-property 0 'face display) 'heralds-low-face))
-    (should (eq (get-text-property 2 'face display) 'heralds-medium-face))))
+;; (NAME METADATA TEXT STYLES) for each case in the file, which the
+;; Neovim tests read too. STYLES is one style name (or "-") per character.
+(defconst test-heralds--shared-cases-file
+  (expand-file-name "../shared/herald-rendering-cases.txt"
+                    (file-name-directory (or load-file-name buffer-file-name))))
 
-(ert-deftest test-herald-birth-face-covers-only-relation-letter ()
-  "Counts and fraction slashes beside a birth letter keep their own faces."
-  (dolist (case '(((contains (in 1) (out 2)) (birth contains)
-                  "1C2" (heralds-normal-face heralds-message-face heralds-normal-face))
-                 ((links_to (in 5 (substantive 2)) (out 3))
-                  (birth links_to) "2/5L3"
-                  (heralds-high-face heralds-normal-face
-                   heralds-normal-face heralds-message-face heralds-normal-face))
-                 ((contains (out 8 (unintegrated 2))) (birth contains)
-                  "C2/8" (heralds-message-face heralds-high-face
-                   heralds-normal-face heralds-normal-face))
-                 ((subscribes_to (in 1) (out 2)) (birth subscribes_to)
-                  "1S2" (heralds-nonstandard-face heralds-message-face heralds-nonstandard-face))
-                 ((overrides_view_of (in 1) (out 2)) (birth overrides_view_of)
-                  "1O2" (heralds-high-face heralds-message-face
-                   heralds-high-face))
-                 ((hides_from_its_subscriptions (in 1) (out 2)) (birth hides_from_its_subscriptions)
-                  "1H2" (heralds-nonstandard-face heralds-message-face heralds-nonstandard-face))))
-    (let ((display (heralds-from-metadata
-                    (format "(skg (node (id x) (rels %s %s)))"
-                            (prin1-to-string (car case))
-                            (prin1-to-string (cadr case))))))
-      (should (equal (substring-no-properties display) (nth 2 case)))
-      (cl-loop for face in (nth 3 case) for index from 0
-               do (should (eq (get-text-property index 'face display)
-                              face))))))
+(defun test-heralds--expand-style-runs (runs)
+  "Expand RUNS, a string of STYLE*COUNT runs, into one style per character."
+  (apply #'append
+         (mapcar (lambda (run)
+                   (let ((parts (split-string run "\\*")))
+                     (make-list (string-to-number (cadr parts)) (car parts))))
+                 (split-string runs " " t))))
+
+(defun test-heralds--shared-cases ()
+  "Parse `test-heralds--shared-cases-file'."
+  (let ((cases nil) (name nil) (metadata nil) (text nil))
+    (dolist (line (split-string
+                   (with-temp-buffer
+                     (insert-file-contents test-heralds--shared-cases-file)
+                     (buffer-string))
+                   "\n"))
+      (cond ((string-prefix-p "==== " line)
+             (setq name (substring line 5) metadata nil text nil))
+            ((string-prefix-p "---- text: " line)
+             (setq text (substring line 11)))
+            ((string-prefix-p "---- styles: " line)
+             (push (list name metadata text
+                         (test-heralds--expand-style-runs (substring line 13)))
+                   cases)
+             (setq name nil))
+            ((and name (not metadata)) (setq metadata line))))
+    (nreverse cases)))
+
+(defun test-heralds--style-of-face (face)
+  "The style name of herald FACE heralds-STYLE-face, or \"-\" for none."
+  (if (and face (string-match "\\`heralds-\\(.*\\)-face\\'" (symbol-name face)))
+      (match-string 1 (symbol-name face))
+    "-"))
+
+(ert-deftest test-heralds-shared-rendering-cases ()
+  "Metadata renders as the text and styles of the cases shared with Neovim."
+  (let ((cases (test-heralds--shared-cases)))
+    (should (> (length cases) 40))
+    (dolist (case cases)
+      (let ((display (heralds-from-metadata (nth 1 case))))
+        (should (equal (list (car case)
+                             (substring-no-properties display)
+                             (cl-loop for i below (length display)
+                                      collect (test-heralds--style-of-face
+                                               (get-text-property i 'face display))))
+                       (list (car case) (nth 2 case) (nth 3 case))))))))
 
 (ert-deftest test-heralds-minor-mode-toggle ()
   "Test that heralds-minor-mode properly adds and removes overlays."
@@ -153,129 +135,6 @@ the C token 2aC: the multi-contains \"2\" (yellow), the ancestor \"a\"
                 ( cl-find-if ( lambda ( ov ) ( overlay-get ov 'display ))
                              ( overlays-at herald-start ))) )
         ( should-not display-overlay )) )) )
-
-(ert-deftest test-heralds-viewrequests-display ()
-  "Test that viewRequests are displayed as req:* heralds."
-  (with-temp-buffer
-    ;; Test (folder aliases) viewRequest
-    (erase-buffer)
-    (insert "(skg (node (id 1) (viewRequests (folder aliases))))")
-    (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "req:folder:.*aliases" result)))
-
-    ;; Test (path container) viewRequest
-    (erase-buffer)
-    (insert "(skg (node (id 2) (viewRequests (path container))))")
-    (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "req:path:.*container" result)))
-
-    ;; Test (path mentioner) viewRequest
-    (erase-buffer)
-    (insert "(skg (node (id 3) (viewRequests (path mentioner))))")
-    (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "req:path:.*mentioner" result)))
-
-    ;; Test multiple viewRequests
-    (erase-buffer)
-    (insert "(skg (node (id 4) (viewRequests (folder aliases) (path container) (path mentioner))))")
-    (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "req:folder:.*aliases" result))
-      (should (string-match "req:path:.*container" result))
-      (should (string-match "req:path:.*mentioner" result)))))
-
-(ert-deftest test-heralds-flag-count-display ()
-  "True flags are summarized as one cyan Fn herald."
-  (let ((result (heralds-from-metadata
-                 "(skg (node (id 1) (rels (flags 2))))")))
-    (should (equal (substring-no-properties result) "F2"))
-    (should (eq (get-text-property 0 'face result)
-                'heralds-crucial-face))))
-
-(ert-deftest test-heralds-flag-viewnodes-are-friendly-and-colon-free ()
-  "Flag-viewnode heralds carry the whole titleless viewnode label."
-  (dolist (case '((hadId "☮ had ID before import")
-                  (wasOverloaded "☮ was overloaded during org-roam import")
-                  (noSearchMatching "☮ no search matching")))
-    (let ((result (heralds-from-metadata
-                   (format "(skg (flag %s))" (car case)))))
-      (should (equal (substring-no-properties result) (cadr case)))
-      (should-not (string-match-p ":" result))
-      (should (eq (get-text-property 0 'face result)
-                  'heralds-go-face)))))
-
-(ert-deftest test-heralds-flag-request-displays-one-semantic-state ()
-  "A flag edit request is one state change, not one herald per argument."
-  (dolist (case '((true  "request:no search matching")
-                  (false "request:search matching")))
-    (let ((result
-           (heralds-from-metadata
-            (format
-             "(skg (node (id 1) (editRequest (flag noSearchMatching %s))))"
-             (car case)))))
-      (should (equal (substring-no-properties result) (cadr case)))
-      (should (eq (get-text-property 0 'face result)
-                  'heralds-stop-face)))))
-
-(ert-deftest test-heralds-non-vognode-display ()
-  "Test that non-vognode kinds are displayed correctly."
-  (with-temp-buffer
-    ;; Test aliasFolder
-    (erase-buffer)
-    (insert "(skg aliasFolder)")
-    (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "aliases" result)))
-
-    ;; Test alias
-    (erase-buffer)
-    (insert "(skg alias)")
-    (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "alias" result)))
-
-    ;; Test aliasFolder with folded
-    (erase-buffer)
-    (insert "(skg folded aliasFolder)")
-    (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "aliases" result)))
-
-    ;; Test textChanged with both stages.
-    ;; The rule has a string-literal prefix "text changed : " that
-    ;; should ride along with each of the sub-rule outputs.
-    (erase-buffer)
-    (insert "(skg (textChanged staged unstaged))")
-    (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "text changed : staged" result))
-      (should (string-match "text changed : unstaged" result)))))
-
-(ert-deftest test-heralds-diff-display ()
-  "Test that staged/unstaged axes are displayed as staged:.../unstaged:... heralds."
-  (with-temp-buffer
-    ;; ActiveVognode with unstaged relationship removal (the v.1 'removed-here').
-    (erase-buffer)
-    (insert "(skg (node (id 1) (repo s) (unstaged removedR)))")
-    (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "unstaged" result))
-      (should (string-match "R" result)))
-
-    ;; ActiveVognode with unstaged file creation + relationship add (the v.1 'new').
-    (erase-buffer)
-    (insert "(skg (node (id 2) (repo s) (unstaged addedN addedR)))")
-    (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "unstaged" result))
-      (should (string-match "N" result))
-      (should (string-match "R" result)))
-
-    ;; Non-vognode alias with staged relationship add.
-    (erase-buffer)
-    (insert "(skg alias (staged addedR))")
-    (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "staged:R" result)))
-
-    ;; Non-vognode alias with unstaged relationship removal.
-    (erase-buffer)
-    (insert "(skg alias (unstaged removedR))")
-    (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "unstaged" result))
-      (should (string-match "-R" result)))))
 
 (ert-deftest test-heralds-inactive-node-display ()
   "An anonymous inactive-node placeholder displays as a blue herald.

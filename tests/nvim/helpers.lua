@@ -8,7 +8,7 @@ local M = {}
 ---'skg-test-install-herald-rules'), so specs need no server.
 function M.install_fixture_herald_rules ()
   local path =
-    _G.skg_test_repo_root() .. '/tests/elisp/herald-rules.sexp'
+    _G.skg_test_repo_root() .. '/tests/shared/herald-rules.sexp'
   local handle = assert(io.open(path, 'r'))
   local text = handle:read('*a')
   handle:close()

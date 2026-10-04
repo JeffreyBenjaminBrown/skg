@@ -1,0 +1,192 @@
+# How each client renders a headline's '(skg ...)' metadata as heralds:
+# the displayed text, and the style of each character. One contract,
+# two implementations, each tested against these cases:
+#   Emacs:  elisp/heralds-minor-mode.el
+#           (tests/elisp/test-heralds-minor-mode.el)
+#   Neovim: nvim/lua/skg/heralds.lua
+#           (tests/nvim/heralds_spec.lua)
+# Both use the served rule table pinned in tests/shared/herald-rules.sexp.
+#
+# Format: a case begins with a line '==== NAME', followed by one line of
+# metadata, then '---- text: ' and the displayed text, then '---- styles: '
+# and the styles of the text's characters, in order, as runs STYLE*COUNT.
+# A style is a name from shared/herald-styles.json, or '-' for an
+# unstyled character, such as the space between two heralds. Lines
+# before the first case are comments.
+
+==== links: substantive fraction, both sides
+(skg (node (id x) (rels (links_to (in 5 (substantive 2)) (out 3)))))
+---- text: 2/5L3
+---- styles: high*1 normal*4
+==== links: no substantive mentioner
+(skg (node (id x) (rels (links_to (in 5 (substantive 0)) (out 3)))))
+---- text: 5L3
+---- styles: normal*3
+==== links: in-side only
+(skg (node (id x) (rels (links_to (in 5 (substantive 2))))))
+---- text: 2/5L
+---- styles: high*1 normal*3
+==== links: out-side only
+(skg (node (id x) (rels (links_to (out 3)))))
+---- text: L3
+---- styles: normal*2
+==== links: every mentioner substantive
+(skg (node (id x) (rels (links_to (in 5 (substantive 5))))))
+---- text: 5/L
+---- styles: high*1 normal*2
+==== links: the parent is the only, substantive mentioner
+(skg (node (id x) (rels (links_to (in 1 (ancestors 1) (substantive 1 (ancestors 1)))))))
+---- text: a/L
+---- styles: low*1 normal*2
+==== links: the substantive parent and a grandparent
+(skg (node (id x) (rels (links_to (in 2 (ancestors 1 2) (substantive 1 (ancestors 1)))))))
+---- text: a/bL
+---- styles: low*1 normal*1 medium*1 normal*1
+==== links: the substantive parent among five
+(skg (node (id x) (rels (links_to (in 5 (ancestors 1) (substantive 1 (ancestors 1)))))))
+---- text: a/5L
+---- styles: low*1 normal*3
+==== links: one substantive mentioner, the parent among five
+(skg (node (id x) (rels (links_to (in 5 (ancestors 1) (substantive 1))))))
+---- text: 1/5aL
+---- styles: high*1 normal*2 low*1 normal*1
+==== links: the parent, not substantive
+(skg (node (id x) (rels (links_to (in 1 (ancestors 1) (substantive 0))))))
+---- text: aL
+---- styles: low*1 normal*1
+==== links: links to the parent
+(skg (node (id x) (rels (links_to (out 1 (ancestors 1))))))
+---- text: La
+---- styles: normal*1 low*1
+==== links: links to the parent and two more
+(skg (node (id x) (rels (links_to (out 3 (ancestors 1))))))
+---- text: L3a
+---- styles: normal*2 low*1
+==== links: a generation beyond z
+(skg (node (id x) (rels (links_to (in 1 (ancestors 27) (substantive 1 (ancestors 27)))))))
+---- text: {27}/L
+---- styles: medium*4 normal*2
+==== contains: unintegrated fraction
+(skg (node (id x) (rels (contains (in 2) (out 8 (unintegrated 2))))))
+---- text: 2C2/8
+---- styles: high*1 normal*1 high*1 normal*2
+==== contains: nothing unintegrated
+(skg (node (id x) (rels (contains (out 8 (unintegrated 0))))))
+---- text: C8
+---- styles: normal*2
+==== contains: everything unintegrated
+(skg (node (id x) (rels (contains (out 8 (unintegrated 8))))))
+---- text: C8/
+---- styles: normal*1 high*1 normal*1
+==== contains: no content
+(skg (node (id x) (rels (contains (in 2) (out 0 (unintegrated 0))))))
+---- text: 2C
+---- styles: high*1 normal*1
+==== overrides: overrides-here beside an ancestor h
+(skg (node (id x) (rels (overrides_view_of (out 1 (ancestors 8)))) (viewStats (overridesHere y))))
+---- text: Oĥh
+---- styles: nonstandard*1 yucky*1 medium*1
+==== birth: links and overrides
+(skg (node (id x) (rels (links_to (in 5 (substantive 2)) (out 3)) (overrides_view_of (out 1)) (birth overrides_view_of))))
+---- text: 2/5L3 O1
+---- styles: high*1 normal*4 -*1 message*1 high*1
+==== birth: contains
+(skg (node (id x) (rels (contains (in 1) (out 2)) (birth contains))))
+---- text: 1C2
+---- styles: normal*1 message*1 normal*1
+==== birth: links_to
+(skg (node (id x) (rels (links_to (in 5 (substantive 2)) (out 3)) (birth links_to))))
+---- text: 2/5L3
+---- styles: high*1 normal*2 message*1 normal*1
+==== birth: contains, unintegrated
+(skg (node (id x) (rels (contains (out 8 (unintegrated 2))) (birth contains))))
+---- text: C2/8
+---- styles: message*1 high*1 normal*2
+==== birth: subscribes_to
+(skg (node (id x) (rels (subscribes_to (in 1) (out 2)) (birth subscribes_to))))
+---- text: 1S2
+---- styles: nonstandard*1 message*1 nonstandard*1
+==== birth: overrides_view_of
+(skg (node (id x) (rels (overrides_view_of (in 1) (out 2)) (birth overrides_view_of))))
+---- text: 1O2
+---- styles: high*1 message*1 high*1
+==== birth: hides_from_its_subscriptions
+(skg (node (id x) (rels (hides_from_its_subscriptions (in 1) (out 2)) (birth hides_from_its_subscriptions))))
+---- text: 1H2
+---- styles: nonstandard*1 message*1 nonstandard*1
+==== node: independent, a cycle, a delete request, contained by the parent and another
+(skg (node (id 123) (affectsParent false) (rels (contains (in 2 (ancestors 1))) (birth contains)) (viewStats cycle) (editRequest delete)))
+---- text: ⊥ 2aC ⟳ delete
+---- styles: high*1 -*1 high*1 low*1 message*1 -*1 normal*1 -*1 stop*6
+==== property counts: flags
+(skg (node (id 1) (rels (flags 2))))
+---- text: F2
+---- styles: crucial*2
+==== view requests: a folder
+(skg (node (id 1) (viewRequests (folder aliases))))
+---- text: req:folder:aliases
+---- styles: go*18
+==== view requests: a path
+(skg (node (id 2) (viewRequests (path container))))
+---- text: req:path:container
+---- styles: go*18
+==== view requests: several
+(skg (node (id 4) (viewRequests (folder aliases) (path container) (path mentioner))))
+---- text: req:folder:aliases req:path:container req:path:mentioner
+---- styles: go*18 -*1 go*18 -*1 go*18
+==== flags: had ID before import
+(skg (flag hadId))
+---- text: ☮ had ID before import
+---- styles: go*22
+==== flags: was overloaded
+(skg (flag wasOverloaded))
+---- text: ☮ was overloaded during org-roam import
+---- styles: go*39
+==== flags: no search matching
+(skg (flag noSearchMatching))
+---- text: ☮ no search matching
+---- styles: go*20
+==== flag requests: no search matching
+(skg (node (id 1) (editRequest (flag noSearchMatching true))))
+---- text: request:no search matching
+---- styles: stop*26
+==== flag requests: search matching
+(skg (node (id 1) (editRequest (flag noSearchMatching false))))
+---- text: request:search matching
+---- styles: stop*23
+==== non-vognodes: alias folder
+(skg aliasFolder)
+---- text: aliases
+---- styles: go*7
+==== non-vognodes: alias
+(skg alias)
+---- text: alias
+---- styles: go*5
+==== non-vognodes: folded alias folder
+(skg folded aliasFolder)
+---- text: aliases
+---- styles: go*7
+==== non-vognodes: text changed in both stages
+(skg (textChanged staged unstaged))
+---- text: text changed : staged text changed : unstaged
+---- styles: go*15 stop*6 -*1 go*15 stop*8
+==== diff: a relationship removed, unstaged
+(skg (node (id 1) (repo s) (unstaged removedR)))
+---- text: unstaged:-R
+---- styles: go*9 stop*2
+==== diff: a node and relationship added, unstaged
+(skg (node (id 2) (repo s) (unstaged addedN addedR)))
+---- text: unstaged:NR
+---- styles: go*11
+==== diff: an alias added, staged
+(skg alias (staged addedR))
+---- text: alias staged:R
+---- styles: go*5 -*1 go*8
+==== diff: an alias removed, unstaged
+(skg alias (unstaged removedR))
+---- text: alias unstaged:-R
+---- styles: go*5 -*1 go*9 stop*2
+==== placeholders: inactive node
+(skg inactiveNode)
+---- text: node from inactive repo
+---- styles: normal*23

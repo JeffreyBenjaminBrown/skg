@@ -1,6 +1,7 @@
 -- Mirrors tests/elisp/test-heralds-minor-mode.el, with extmarks in
--- place of display-property overlays. The pinned fixture
--- tests/elisp/herald-rules.sexp is installed directly (the analog of
+-- place of display-property overlays; the rendering cases both read
+-- are in tests/shared/herald-rendering-cases.txt. The pinned fixture
+-- tests/shared/herald-rules.sexp is installed directly (the analog of
 -- skg-test-install-herald-rules), so no server is needed.
 
 local herald_rules = require('skg.herald_rules')
@@ -8,7 +9,7 @@ local heralds = require('skg.heralds')
 local sexpr = require('skg.sexpr.parse')
 
 local function install_fixture_rules ()
-  local path = _G.skg_test_repo_root() .. '/tests/elisp/herald-rules.sexp'
+  local path = _G.skg_test_repo_root() .. '/tests/shared/herald-rules.sexp'
   local handle = assert(io.open(path, 'r'))
   local text = handle:read('*a')
   handle:close()
@@ -31,82 +32,55 @@ local function herald_extmarks (buf)
     buf, heralds.namespace, 0, -1, { details = true })
 end
 
+---{name, metadata, text, styles} for each case in the file, which the
+---Emacs tests read too. STYLES has one style name (or '-') per character.
+local function shared_cases ()
+  local path = _G.skg_test_repo_root()
+    .. '/tests/shared/herald-rendering-cases.txt'
+  local cases, current = {}, nil
+  for line in io.lines(path) do
+    if line:sub(1, 5) == '==== ' then
+      current = { name = line:sub(6) }
+    elseif line:sub(1, 11) == '---- text: ' then
+      current.text = line:sub(12)
+    elseif line:sub(1, 13) == '---- styles: ' then
+      current.styles = {}
+      for _, run in ipairs(vim.split(line:sub(14), ' ', { trimempty = true })) do
+        local style, count = run:match('^(.*)%*(%d+)$')
+        for _ = 1, tonumber(count) do table.insert(current.styles, style) end
+      end
+      table.insert(cases, current)
+      current = nil
+    elseif current and current.metadata == nil then
+      current.metadata = line
+    end
+  end
+  return cases
+end
+
+---The style of each character of CHUNKS: the style whose highlight
+---group a chunk has, or '-'.
+local function character_styles (chunks)
+  local styles = {}
+  for _, chunk in ipairs(chunks) do
+    local style = chunk[2] and chunk[2]:match('^SkgHerald(.*)$')
+    style = style and style:lower() or '-'
+    for _ = 1, vim.fn.strchars(chunk[1]) do table.insert(styles, style) end
+  end
+  return styles
+end
+
 describe('skg.heralds', function ()
   before_each(install_fixture_rules)
 
-  it('renders subset fractions and distinguishes ĥ from ancestor h', function ()
-    for _, case in ipairs({
-      { '(links_to (in 5 (substantive 2)) (out 3))', '2/5L3' },
-      { '(links_to (in 5 (substantive 0)) (out 3))', '5L3' },
-      { '(links_to (in 5 (substantive 2)))', '2/5L' },
-      { '(links_to (out 3))', 'L3' },
-      { '(links_to (in 5 (substantive 5)))', '5/L' },
-      { '(links_to (in 1 (ancestors 1)'
-        .. ' (substantive 1 (ancestors 1))))', 'a/L' },
-      { '(links_to (in 2 (ancestors 1 2)'
-        .. ' (substantive 1 (ancestors 1))))', 'a/bL' },
-      { '(links_to (in 5 (ancestors 1)'
-        .. ' (substantive 1 (ancestors 1))))', 'a/5L' },
-      { '(links_to (in 5 (ancestors 1) (substantive 1)))', '1/5aL' },
-      { '(links_to (in 1 (ancestors 1) (substantive 0)))', 'aL' },
-      { '(links_to (out 1 (ancestors 1)))', 'La' },
-      { '(links_to (out 3 (ancestors 1)))', 'L3a' },
-      { '(links_to (in 1 (ancestors 27)'
-        .. ' (substantive 1 (ancestors 27))))', '{27}/L' },
-      { '(contains (in 2) (out 8 (unintegrated 2)))', '2C2/8' },
-      { '(contains (out 8 (unintegrated 0)))', 'C8' },
-      { '(contains (out 8 (unintegrated 8)))', 'C8/' },
-      { '(contains (in 2) (out 0 (unintegrated 0)))', '2C' },
-    }) do
-      assert.are.equal(case[2], herald_text(
-        '(skg (node (id x) (rels ' .. case[1] .. ')))'))
-    end
-    local chunks = heralds.chunks_from_metadata(
-      '(skg (node (id x) (rels (overrides_view_of (out 1 (ancestors 8))))'
-      .. ' (viewStats (overridesHere y))))')
-    assert.are.equal('Oĥh', heralds.chunks_text(chunks))
-    assert.are.equal('SkgHeraldYucky', chunks[2][2])
-    assert.are.equal('SkgHeraldMedium', chunks[3][2])
-    chunks = heralds.chunks_from_metadata(
-      '(skg (node (id x) (rels (links_to (in 5 (substantive 2))'
-      .. ' (out 3)) (overrides_view_of (out 1)) (birth overrides_view_of))))')
-    assert.are.equal('2/5L3 O1', heralds.chunks_text(chunks))
-    assert.are.equal('SkgHeraldHigh', chunks[1][2])
-    for i = 2, 5 do assert.are.equal('SkgHeraldNormal', chunks[i][2]) end
-    assert.are.equal('SkgHeraldMessage', chunks[7][2])
-    assert.are.equal('SkgHeraldHigh', chunks[8][2])
-    chunks = heralds.chunks_from_metadata(
-      '(skg (node (id x) (rels (links_to (in 2 (ancestors 1 2)'
-      .. ' (substantive 1 (ancestors 1)))))))')
-    assert.are.equal('a/bL', heralds.chunks_text(chunks))
-    assert.are.equal('SkgHeraldLow', chunks[1][2])
-    assert.are.equal('SkgHeraldMedium', chunks[3][2])
-  end)
-
-  it('styles only the birth relation letter with the birth highlight', function ()
-    for _, case in ipairs({
-      { '(contains (in 1) (out 2)) (birth contains)', '1C2',
-        { 'SkgHeraldNormal', 'SkgHeraldMessage', 'SkgHeraldNormal' } },
-      { '(links_to (in 5 (substantive 2)) (out 3)) (birth links_to)',
-        '2/5L3', { 'SkgHeraldHigh', 'SkgHeraldNormal',
-                  'SkgHeraldNormal', 'SkgHeraldMessage', 'SkgHeraldNormal' } },
-      { '(contains (out 8 (unintegrated 2))) (birth contains)', 'C2/8',
-        { 'SkgHeraldMessage', 'SkgHeraldHigh',
-          'SkgHeraldNormal', 'SkgHeraldNormal' } },
-      { '(subscribes_to (in 1) (out 2)) (birth subscribes_to)', '1S2',
-        { 'SkgHeraldNonstandard', 'SkgHeraldMessage', 'SkgHeraldNonstandard' } },
-      { '(overrides_view_of (in 1) (out 2)) (birth overrides_view_of)', '1O2',
-        { 'SkgHeraldHigh', 'SkgHeraldMessage',
-          'SkgHeraldHigh' } },
-      { '(hides_from_its_subscriptions (in 1) (out 2)) (birth hides_from_its_subscriptions)', '1H2',
-        { 'SkgHeraldNonstandard', 'SkgHeraldMessage', 'SkgHeraldNonstandard' } },
-    }) do
-      local chunks = heralds.chunks_from_metadata(
-        '(skg (node (id x) (rels ' .. case[1] .. ')))')
-      assert.are.equal(case[2], heralds.chunks_text(chunks))
-      assert.are.equal(#case[3], #chunks)
-      for i, hl in ipairs(case[3]) do
-        assert.are.equal(hl, chunks[i][2]) end
+  it('renders the cases shared with Emacs', function ()
+    local cases = shared_cases()
+    assert.is_true(#cases > 40)
+    for _, case in ipairs(cases) do
+      local chunks = heralds.chunks_from_metadata(case.metadata)
+      assert.are.same({ case.name, case.text, case.styles },
+                      { case.name, heralds.chunks_text(chunks),
+                        character_styles(chunks) })
     end
   end)
 
@@ -161,83 +135,6 @@ describe('skg.heralds', function ()
     assert.are.equal('SkgHeraldMessage', hl_of['C'])
     heralds.disable(buf)
     assert.are.equal(0, #herald_extmarks(buf))
-  end)
-
-  it('displays viewRequests as req:* heralds', function ()
-    assert.is_truthy(
-      herald_text('(skg (node (id 1) (viewRequests (folder aliases))))')
-      :find('req:folder:?aliases'))
-    assert.is_truthy(
-      herald_text('(skg (node (id 2) (viewRequests (path container))))')
-      :find('req:path:?container'))
-    local many = herald_text(
-      '(skg (node (id 4) (viewRequests (folder aliases)'
-      .. ' (path container) (path mentioner))))')
-    assert.is_truthy(many:find('req:folder:?aliases'))
-    assert.is_truthy(many:find('req:path:?container'))
-    assert.is_truthy(many:find('req:path:?mentioner'))
-  end)
-
-  it('displays the true-flag count as Fn', function ()
-    local chunks = heralds.chunks_from_metadata(
-      '(skg (node (id 1) (rels (flags 2))))')
-    assert.are.equal('F2', heralds.chunks_text(chunks))
-    assert.are.equal('SkgHeraldCrucial', chunks[1][2])
-  end)
-
-  it('displays friendly colon-free flag-viewnode heralds', function ()
-    for _, case in ipairs({
-      { flag = 'hadId',
-        expected = '☮ had ID before import' },
-      { flag = 'wasOverloaded',
-        expected = '☮ was overloaded during org-roam import' },
-      { flag = 'noSearchMatching',
-        expected = '☮ no search matching' } }) do
-      local chunks = heralds.chunks_from_metadata(
-        '(skg (flag ' .. case.flag .. '))')
-      assert.are.equal(case.expected, heralds.chunks_text(chunks))
-      assert.is_nil(heralds.chunks_text(chunks):find(':', 1, true))
-      assert.are.equal('SkgHeraldGo', chunks[1][2])
-    end
-  end)
-
-  it('displays a flag request as one semantic state', function ()
-    for _, case in ipairs({
-      { value = 'true',  expected = 'request:no search matching' },
-      { value = 'false', expected = 'request:search matching' } }) do
-      local chunks = heralds.chunks_from_metadata(
-        '(skg (node (id 1) (editRequest (flag noSearchMatching '
-        .. case.value .. '))))')
-      assert.are.equal(case.expected, heralds.chunks_text(chunks))
-      assert.are.equal('SkgHeraldStop', chunks[1][2])
-    end
-  end)
-
-  it('displays non-vognode kinds', function ()
-    assert.is_truthy(herald_text('(skg aliasFolder)'):find('aliases'))
-    assert.is_truthy(herald_text('(skg alias)'):find('alias'))
-    assert.is_truthy(
-      herald_text('(skg folded aliasFolder)'):find('aliases'))
-    local changed = herald_text('(skg (textChanged staged unstaged))')
-    assert.is_truthy(changed:find('text changed : staged', 1, true))
-    assert.is_truthy(changed:find('text changed : unstaged', 1, true))
-  end)
-
-  it('displays staged/unstaged axes', function ()
-    local removed =
-      herald_text('(skg (node (id 1) (repo s) (unstaged removedR)))')
-    assert.is_truthy(removed:find('unstaged'))
-    assert.is_truthy(removed:find('R'))
-    local new_both =
-      herald_text('(skg (node (id 2) (repo s) (unstaged addedN addedR)))')
-    assert.is_truthy(new_both:find('unstaged'))
-    assert.is_truthy(new_both:find('N'))
-    assert.is_truthy(new_both:find('R'))
-    assert.is_truthy(
-      herald_text('(skg alias (staged addedR))'):find('staged:R', 1, true))
-    local alias_removed = herald_text('(skg alias (unstaged removedR))')
-    assert.is_truthy(alias_removed:find('unstaged'))
-    assert.is_truthy(alias_removed:find('-R', 1, true))
   end)
 
   it('displays the inactive-node placeholder in blue', function ()
@@ -298,7 +195,7 @@ describe('skg.heralds', function ()
     -- alphanumeric neighbors keep their colon ('staged:R').
     local cells = heralds.strip_structural_colons(
       heralds.token_character_cells(
-        { chunks = { { text = '⌂:public', color = nil } },
+        { chunks = { { text = '⌂:public', style = nil } },
           abut = false }))
     local text = ''
     for _, cell in ipairs(cells) do text = text .. cell.character end

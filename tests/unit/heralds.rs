@@ -45,25 +45,25 @@ fn herald_rules_sexp_quotes_strings () {
       assert! ( depth >= 0, "unbalanced parens in {}", sexp ); }
     assert_eq! ( depth, 0, "unbalanced parens in {}", sexp ); }}
 
-// tests/elisp/herald-rules.sexp lets batch-mode elisp tests inject
+// tests/shared/herald-rules.sexp lets batch-mode elisp tests inject
 // the real table without a running server. It is generated, not
 // hand-maintained: regenerate with
-//   cargo run --bin emit-herald-rules > tests/elisp/herald-rules.sexp
+//   cargo run --bin emit-herald-rules > tests/shared/herald-rules.sexp
 // This test pins it to the live table so it cannot go stale silently.
 #[test]
 fn elisp_fixture_matches_the_live_table () {
   let fixture_path : std::path::PathBuf =
     std::path::Path::new ( env! ("CARGO_MANIFEST_DIR") )
-    . join ("tests/elisp/herald-rules.sexp");
+    . join ("tests/shared/herald-rules.sexp");
   let fixture : String =
     std::fs::read_to_string (&fixture_path)
     . unwrap_or_else ( |e| panic! (
         "could not read {:?}: {}. Generate it with: \
-         cargo run --bin emit-herald-rules > tests/elisp/herald-rules.sexp",
+         cargo run --bin emit-herald-rules > tests/shared/herald-rules.sexp",
         fixture_path, e ));
   assert_eq! ( fixture . trim_end (), herald_rules_sexp (),
-               "tests/elisp/herald-rules.sexp is stale. Regenerate with: \
-                cargo run --bin emit-herald-rules > tests/elisp/herald-rules.sexp" ); }
+               "tests/shared/herald-rules.sexp is stale. Regenerate with: \
+                cargo run --bin emit-herald-rules > tests/shared/herald-rules.sexp" ); }
 
 fn shared_json (
   file_name : &str,

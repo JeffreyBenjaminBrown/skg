@@ -157,7 +157,7 @@ end)
 describe('skg.sexpr.parse on the pinned herald-rules fixture', function ()
   it('round-trips the whole rule table', function ()
     local fixture_path =
-      _G.skg_test_repo_root() .. '/tests/elisp/herald-rules.sexp'
+      _G.skg_test_repo_root() .. '/tests/shared/herald-rules.sexp'
     local handle = assert(io.open(fixture_path, 'r'))
     local text = handle:read('*a')
     handle:close()

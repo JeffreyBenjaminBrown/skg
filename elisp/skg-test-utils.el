@@ -26,13 +26,13 @@
   "Install the herald rule table from the generated fixture.
 In production the table is fetched from the server at connect time
 \(it lives only in Rust, server/heralds.rs); batch-mode tests inject
-it from tests/elisp/herald-rules.sexp instead. That fixture is
+it from tests/shared/herald-rules.sexp instead. That fixture is
 pinned to the live table by the Rust test
 `elisp_fixture_matches_the_live_table', so it cannot go stale
 silently; regenerate it with
-  cargo run --bin emit-herald-rules > tests/elisp/herald-rules.sexp"
+  cargo run --bin emit-herald-rules > tests/shared/herald-rules.sexp"
   (require 'heralds-minor-mode)
-  (let ((fixture (expand-file-name "tests/elisp/herald-rules.sexp"
+  (let ((fixture (expand-file-name "tests/shared/herald-rules.sexp"
                                    skg-test--project-root)))
     (with-temp-buffer
       (insert-file-contents fixture)
