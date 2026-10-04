@@ -30,7 +30,11 @@
    save will not honor as expected. This is client-policy drift, not a
    demonstrated bypass of server validation. Add shared behavioral cases
    and align the commands; consider server-owned preview logic if such
-   graph-dependent policies continue to multiply.
+   graph-dependent policies continue to multiply. The Emacs-only policy
+   tables ('skg--writable-folder-relations',
+   'skg--relSource-unsupported-folder-atoms' in 'elisp/skg-metadata.el')
+   should then be served or shared, not copied into Neovim (noted from
+   [[file:herald-colors/2_plan.org][the herald-colors plan]], 2026-10-04).
 ** New relationship folders are populated before their completion visit
    'server/to_org/complete/partner_folder/mod.rs' eagerly builds child data
    and reconciles newly created folders. 'complete_viewforest' subsequently

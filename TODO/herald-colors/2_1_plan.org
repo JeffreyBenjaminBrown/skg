@@ -1,0 +1,432 @@
+* Herald colors and names: the definitive plan
+This plan supplants [[file:2_plan.org][2_plan.org]]. That file and [[file:1_discussion.org][1_discussion.org]] record how
+these decisions were reached. Nothing here is implemented yet.
+
+The plan has two parts. [[*The rules]] is the specification, written in
+the names that phase 1 introduces. [[*The phases]] says how to get there.
+* The rules
+** Styles
+A herald's color states its importance tier, or for a few heralds a
+polarity or kind, never its hue. There are ten styles. Each has one
+name everywhere: in the shared style file, on the wire, in the Emacs
+faces ('heralds-STYLE-face') and in the Neovim highlight groups
+('SkgHeraldSTYLE').
+
+| Style       | Look                                     | Meaning                         |
+|-------------+------------------------------------------+---------------------------------|
+| crucial     | black on cyan '#00ffff'                  | the reader must understand this |
+| high        | black on yellow                          | high interest                   |
+| medium      | white on orange '#d2691e'                | medium interest                 |
+| low         | white on olive '#5e5e20'                 | low interest                    |
+| normal      | white on blue                            | ordinary                        |
+| message     | black on white                           | prose meant to be read          |
+| stop        | white on red                             | polarity: bad, or not yet       |
+| go          | black on green '#00bb00'                 | polarity: good, done            |
+| nonstandard | white on purple '#8b00ff'                | requests and diff facts         |
+| yucky       | pink '#c84286' foreground, no background | error-flavored, but not too bad |
+
+Foreground/background inversions are an unused reserve. A comment beside
+the style definitions says so.
+
+Skg dictates every face in a Skg view, in both clients: a black
+background, a white default foreground, and Skg's own faces for the Org
+elements a view contains. These are colors and weights, not the
+typeface. Nothing from the user's theme shows, so no style needs to work
+on a light background.
+** Relationship heralds
+*** Letters
+The five relation letters are C (contains), L (links to), S (subscribes
+to), O (overrides the view of) and H (hides from its subscriptions).
+They are normal. A letter whose relation explains this occurrence's
+presence, its /birth/ relation, is high instead. Only the letter
+changes; its counts keep their own styles.
+*** Tier order
+normal < low < medium < high < crucial.
+*** Side tiers
+Each relation has an in-side ("N nodes R it") and an out-side ("it Rs N
+nodes").
+
+| Relation              | in-side                         | out-side                                                                                     |
+|-----------------------+---------------------------------+----------------------------------------------------------------------------------------------|
+| contains              | medium                          | normal; low on a write-protected occurrence (budget-truncated ones included); unintegrated numerator medium |
+| links to              | medium; substantive subset high | normal                                                                                       |
+| subscribes to         | high                            | medium                                                                                       |
+| overrides the view of | low                             | medium                                                                                       |
+| hides                 | medium                          | normal                                                                                       |
+
+A mentioner is /substantive/ if it has nonempty body text, visible
+direct content, or links to more than one distinct visible target.
+
+Most normal sides are normal because their members are usually visible
+elsewhere: as view-children, in the text, or in the
+hidden-in/outside-subscribee folders. This is a rationale for the
+table, not a mechanism.
+*** Ancestor flags
+Ancestor flags are the lowercase letters (a = parent, b = grandparent,
+…; folders count as generations) that replace a count when ancestors
+account for it.
+*** Floors
+Ancestor 'a' is at least low. 'b' and higher are at least medium. Every
+other glyph has floor normal.
+*** Carriers
+A glyph /shows/ a tier by being drawn in that tier's style. A side's
+tier is shown by one designated part of the side, its /carrier/; to
+/carry/ the side's tier is to be that part. The carrier is the side's
+numeral, if the side shows one; otherwise it is the side's ancestor
+flags, all of them together.
+
+A carrier shows the greater of its floor and the side's tier. Every
+other glyph on the side shows just its floor, except the slash. For
+example, on the subscribes-to in-side, whose tier is high, =2aS= draws
+the 2 high and the 'a' low. =aS= has no numeral, so the 'a' is the
+carrier and is drawn high.
+
+A fraction's numerator is a subset with a tier of its own, such as the
+substantive subset of mentioners, which is high. It gets its own
+carrier, chosen the same way from the numerator's glyphs. The side's
+carrier is chosen from the denominator's glyphs. On the links-to
+in-side, =1/5aL= draws the 1 high, the 5 medium and the 'a' low. =a/5L=
+draws the 'a' high, because it carries the subset's tier, and the 5
+medium. When the denominator shows nothing, as in =5/L=, only the slash
+shows the side's tier.
+*** Birth-explained sides
+A side whose only members are ancestors that the birth relation already
+accounts for has tier low. For example, 'aC' (the parent is the sole
+container) is low. A subscribee's 'bS' (its subscriber is the
+grandparent) is medium, because of b's floor.
+*** The slash
+A fraction's slash takes its side's tier, the same as its denominator.
+In =2/5L=, the 2 is high, and the slash and 5 are medium.
+*** Property counts
+A (aliases), I (extra IDs) and F (flags) are low.
+*** Markers
+ĥ (overrides here) is crucial.
+** Other heralds
+| Herald                                               | Style       |
+|------------------------------------------------------+-------------|
+| ☮ write-protected, on nodes, folders and flag rows   | crucial     |
+| B (hidden body, abutting ☮)                          | crucial     |
+| ⊥ affects not its parent                             | crucial     |
+| ⟳ cycle                                              | medium      |
+| ⌂ home-repo herald                                   | normal      |
+| folder labels and property-row labels                | message     |
+| =Reference to unknown node.=                         | message     |
+| =node from inactive repo=                            | message     |
+| =~NAME=, a relRepo more private than the default     | yucky       |
+| save requests and view requests                      | nonstandard |
+| =DELETED=, on a 'Phantom::Deleted' or a dead viewnode | message    |
+
+=DELETED= never appears on a 'Phantom::Diff', which renders diff axes
+instead. The dead-viewnode herald reads plain =DELETED=, without
+echoing its internal kind.
+** Diff heralds
+A go-styled ✓ marks staged changes, and a stop-styled ✗ marks unstaged
+ones, replacing the words "staged:" and "unstaged:". The axes are N
+(node existence) and R (relationship membership), with signed forms N,
+-N, R and -R. They and the other diff facts are nonstandard. The
+metadata atoms are 'addedN', 'deletedN', 'addedR' and 'removedR'.
+
+A text change reads =text changed ✓ ✗=, showing whichever marks apply:
+the words nonstandard, the ✓ go, the ✗ stop.
+** Link annotations
+The optional suffix after a body-text link shows the target's home repo.
+
+| Target state            | Suffix              | Style  |
+|-------------------------+---------------------+--------|
+| resolved                | =[⌂:pub]= etc.      | normal |
+| inactive repo           | =[⌂:inactive]=      | yucky  |
+| lookup pending          | =[⌂:…]=             | yucky  |
+| lookup failed           | =[⌂:lookup failed]= | yucky  |
+| missing (a broken link) | none                |        |
+
+A broken link's label is yucky and underlined. Underlining marks
+linkness and is independent of the style.
+** Names
+*** The principle
+One concept has one name. Sweeping every term is out of scope, but any
+multiply-named term found while executing this plan is in scope.
+
+Prose and code may spell a name differently. Code is compact enough to
+invite misreadings that prose doesn't, so it may close up a compound
+word: 'home_skg_repo' could be read as ((home skg) repo), so code writes
+'home_skgrepo'. Prose avoids unfamiliar compound words and writes "home
+Skg repo".
+*** The relations
+Each relation has one name in code, on the wire, in herald keys, in .skg
+fields and in the shared relations schema. Its Rust enum variant is the
+same name in CamelCase.
+
+| In prose                     | In code                      | Roles                  | Letter | Formerly                                               |
+|------------------------------+------------------------------+------------------------+--------+--------------------------------------------------------|
+| contains                     | contains                     | container, contained   | C      | (unchanged)                                            |
+| links to                     | links_to                     | mentioner, mentioned   | L      | textlinks_to, textlinksTo, TextlinksTo; source, dest   |
+| subscribes to                | subscribes_to                | subscriber, subscribee | S      | subscribes (wire and herald key), Subscribes           |
+| hides from its subscriptions | hides_from_its_subscriptions | hider, hidden          | H      | hides (herald key)                                     |
+| overrides the view of        | overrides_view_of            | overrider, overridden  | O      | overrides (herald key)                                 |
+
+Every name in the code column is already the .skg field name or is not
+stored, so no .skg data changes.
+*** Other terms
+| Concept                                    | Name                                                                    |
+|--------------------------------------------+-------------------------------------------------------------------------|
+| a directory of .skg files ("source")       | prose: Skg repo. Code: 'repo', or 'skgrepo' where Git repos share the scope |
+| a Git repository                           | prose: Git repo. Code: 'gitrepo'                                        |
+| where a node lives                         | prose: home repo, or home Skg repo. Code: 'home_repo', or 'home_skgrepo' |
+| boolean file properties                    | flags: herald F, folder "flags", =req:flags=; code 'Flag'               |
+| aliases, extra IDs and flags ("quals")     | properties; code 'Property', 'PropertyFolder'                           |
+| A, I and F together                        | property counts                                                         |
+| a substantive mentioner                    | substantive (formerly "interesting")                                    |
+| cannot be edited here                      | write-protected (not "read-only")                                       |
+| why this occurrence is here                | birth (not "reason-for-being")                                          |
+| ĥ                                          | overrides-here                                                          |
+| diff axes                                  | N (node), R (relationship)                                              |
+| a lookup that did not succeed              | lookup failed (not "unavailable")                                       |
+| deletion                                   | 'DELETED' (fact), 'delete' (request), 'deletedN' (diff fact)            |
+| a non-node view position ("scaffold")      | no general name: name the kind, or say "non-vognode"                    |
+*** The viewnode types
+#+begin_example
+viewnode = vognode | propertyFolder | property | partnerFolder
+         | bufferRoot | deadViewnode
+vognode  = active | inactive | phantom
+#+end_example
+A vognode represents a graphnode, which need not exist. The Rust types
+are 'Viewnode', 'ViewnodeKind', 'ViewnodeStats' and so on, with a
+lowercase n, so that 'DeadViewnode' cannot be read as ((dead view)
+node). The vognode variants are 'ActiveVognode', 'InactiveVognode' and
+'Vognode::Phantom'.
+*** The graphnode types
+| Type                 | What it is                               | Formerly       |
+|----------------------+------------------------------------------+----------------|
+| 'Graphnode'          | the full node, the canonical form        | 'NodeComplete' |
+| 'GraphnodeOnDisk'    | the shape of a .skg file                 | 'NodeFS'       |
+| 'GraphnodeInRust'    | the projection held in the in-Rust graph | 'NodeRust'     |
+| 'GraphnodeInTantivy' | what the search index stores             | 'NodeTantivy'  |
+| 'GraphnodeStats'     | a graphnode's relation counts            | 'GraphNodeStats' |
+
+The action types ('DefineNode', 'SaveNode', 'DeleteNode', 'NodeMerge',
+'NodeEditRequest', 'NodeChanges') keep their names. ego_tree's 'NodeId',
+'NodeRef' and 'NodeMut' name nodes of the view tree, come from an
+external crate, and also stay.
+** Shared files
+'shared/' holds data that the server and both clients read at runtime:
+'herald-styles.json' (the palette, the side-tier table and the floors)
+and 'relations.json' (the relations schema). 'tests/shared/' holds data
+that only tests read.
+* The phases
+Renames come first, then the style vocabulary, then behavior. Each step
+lands as one or more granular commits; related renames may share a
+commit. Every commit leaves all test suites passing.
+** Phase 1: renames
+No behavior change. Tests change only in names, and no .skg data
+changes. The order of 1a and 1b matters.
+*** 1a. The relations
+This step makes each relation's name match the relations table
+throughout: the Rust enum ('TextlinksTo' → 'LinksTo', 'Subscribes' →
+'SubscribesTo'), 'NodeRelation::relation_name' and
+'OUTBOUND_RELATIONSHIP_TYPES', the herald keys in the wire's
+'(rels …)' form, both clients' renderers and parsers, the Emacs relSource
+menu ('skg--relationship-kind-menu-tree'), tests and docs.
+
+The link relation's roles become mentioner and mentioned, replacing
+source and dest. "Textlink" becomes "link" in identifiers and prose
+(e.g. 'server/types/textlinks/' → 'server/types/links/'), and
+interesting link sources become substantive mentioners
+('link_source_is_interesting', 'links_interesting_in', the wire's
+'(interesting …)' sub-form).
+
+This step comes first because it removes the link-source sense of
+"source", which leaves 1b nearly mechanical.
+*** 1b. Source → Skg repo
+This is the largest rename: thousands of occurrences in 'server/',
+'elisp/', 'nvim/', 'tests/' and 'docs/'. After 1a, "source" in the code
+means the repo almost everywhere. The few remaining English uses
+("source code", an import's source files) are reviewed by hand. It is
+split into commits along these seams.
+**** Rust types and functions
+'SourceName' → 'RepoName', 'SourceDiff' → 'RepoDiff', 'ActiveSourceSet' →
+'ActiveRepoSet', 'source_sets' → 'repo_sets', and so on. In
+'server/git_ops/' and other Git-adjacent code, a Skg repo is 'skgrepo'
+and a Git repo is 'gitrepo' (e.g. 'is_git_repo' → 'is_gitrepo').
+**** Config
+'[[sources]]' → '[[repos]]' and source-sets → repo-sets, in the
+'skgconfig.toml' parser, the roughly 31 test config files,
+'example-data/' and 'data/skgconfig.toml'. There is no compatibility
+shim. The .skg files store no source field, so node data needs no
+migration.
+
+Each Skg repo's 'DEPENDENCIES.toml' is regenerated at every server start,
+and its header comment says "source". The first server start after
+this commit rewrites that comment in every Skg repo under 'data/', which
+leaves a diff in each of those Git repos for Jeff to commit. This plan
+commits nothing inside them.
+**** Wire and metadata atoms
+'source' → 'repo', 'relSource' → 'relRepo', 'sourceHerald' →
+'homeRepoHerald', and the request names ('relSource info', 'source
+sets'), on the server and in both clients.
+**** Client files and commands
+For example 'skg-request-source-sets.el' and
+'skg-request-relSource-info.el', plus user-facing command names and
+messages.
+**** Docs
+'docs/' and 'coding-advice/', including 'docs/telescopes.org' and the
+glossary.
+*** 1c. Boolean properties → flags
+'FileProperty' → 'Flag', 'QualFolder::BoolProps' and 'Qual::BoolProp' →
+flag forms, 'boolprops' → 'flags', the 'property' metadata and
+editRequest atom → 'flag', =req:properties= → =req:flags=,
+'skg-request-boolprop-state.el' → a flags name, and the herald letter P
+→ F. On disk, flags sit in a .skg file's 'misc' list as the enum's
+variant names. Those names stay, so nothing on disk changes.
+*** 1d. Diff axes
+'newX'/'removedX'/'newM'/'removedM' → 'addedN'/'deletedN'/'addedR'/'removedR';
+'ExistenceAxes' and 'MembershipAxes' → node and relationship axes; and
+the herald letters X/M → N/R. This touches 'server/types/git.rs', the
+rule table, both clients, and roughly 325 test occurrences.
+*** 1e. Smaller terms
+Read-only → write-protected, wherever it means write-protected.
+Reason-for-being → birth. "Action counts" → property counts. The
+link-annotation state 'unavailable' → 'lookup failed'.
+*** 1f. The viewnode types
+**** Renames
+'ViewNode' → 'Viewnode' everywhere ('ViewNodeKind', 'ViewNodeStats', …;
+about 900 occurrences in 'server/'). 'Qual' → 'Property' and
+'QualFolder' → 'PropertyFolder'. 'DeadScaffold' → 'DeadViewnode', and
+its metadata atom 'deletedScaffold' (whose value is 'deadScaffold') →
+'deadViewnode'. "Scaffold" retires. The generic helpers
+('insert_scaffold_as_child', 'unique_scaffold_child_of_viewnode',
+'detach_scaffold_transferring_focus', the 'Body_of_Scaffold' error, …)
+and roughly 400 identifier and comment uses get names that say which
+kinds they handle, or "non-vognode" where they handle every non-vognode
+kind.
+**** Phantom moves under Vognode
+This is the one step in phase 1 that is more than a rename, so it comes
+last. 'ViewNodeKind::Phantom' becomes 'Vognode::Phantom'. Patterns
+that name an inner variant (about 215 references to 'Vognode::Active'
+and its kin) are unaffected. Exhaustive matches on 'Vognode' fail to
+compile until they handle the phantom.
+
+Seven sites are audited by hand, because they match a whole vognode and
+may assume it is a current graph member:
+- 'id_if_vognode' in 'server/types/viewnode.rs'
+- 'server/to_org/util.rs'
+- 'server/types/tree/generic.rs'
+- 'server/update_buffer/ancestry.rs', which also holds the one
+  'Vognode (_) | Phantom (_)' pattern
+- 'server/types/tree/viewnode_nodecomplete.rs'
+So are the methods on 'Vognode' ('id', 'pid_and_source'), which define
+what a phantom returns. Doc comments that call vognodes graph-backed
+change to the new definition. The wire is unaffected: the metadata
+forms ('node', 'diffPhantom', 'deleted', 'unknown', 'inactiveNode')
+stay.
+*** 1g. The graphnode types
+The renames in [[*The graphnode types]], including the roughly 770
+'nodecomplete…' function names, plus 'ActiveNode' → 'ActiveVognode',
+'InactiveNode' → 'InactiveVognode' and 'MpActiveNode' alike.
+** Phase 2: shared files and the style vocabulary, with no visual change
+*** The shared style file
+'shared/herald-styles.json' holds the palette (style → foreground,
+background, underline), including the non-herald faces of phase 6, the
+side-tier table and the floors. Both clients read it at load time, by a
+path relative to their own source. In this phase it maps today's colors
+onto the new style names, so the clients render exactly as before.
+*** The shared relations schema
+'shared/relations.json' holds, per relation: its name, display letter
+and position in display order, its two roles, which role's .skg file
+stores the edge, and the folder kind for each role. Rust keeps its enum,
+for exhaustive matching. A conformance test checks the enum and
+'OUTBOUND_RELATIONSHIP_TYPES' against the file. Both herald renderers
+take letters and order from it. The Emacs relSource menu takes relation
+and role names from it, and keeps its menu prose. When Neovim gains the
+folder policies, it reads the same file.
+*** Server
+'HeraldColor' → 'HeraldStyle', with ten variants serialized as the style
+names. The rule table keeps its current visual assignments; today's
+'Orange' becomes high, which is what it already renders as. A
+conformance test checks that every style the rule table names is
+defined in the style file. 'tests/elisp/herald-rules.sexp' is
+regenerated.
+*** Clients
+The lens engines' color-keyword lists ('skg--color-keyword-p' in
+'elisp/skg-sexpr/skg-lens.el', and the keyword table in
+'nvim/lua/skg/sexpr/lens.lua') accept the style names. Faces and
+highlight groups are defined from the shared file, with the new names.
+This removes the swapped-hue keywords logged in 'TODO/problems.org'.
+** Phase 3: shared rendering fixtures
+A shared case file under 'tests/shared/' (metadata → expected text and
+style spans) is read by both 'tests/elisp/test-heralds-minor-mode.el'
+and 'tests/nvim/heralds_spec.lua'. Today's hand-mirrored cases move into
+it, as does the pinned rule table 'tests/elisp/herald-rules.sexp'. From
+here on, each rendering change is specified once.
+'tests/shared/literal-link-cases.txt' is the precedent.
+** Phase 4: birth facts name the explaining ancestor
+The birth-explained rule needs to know which ancestor, on which side,
+the birth relation accounts for. Each birth entry on the wire gains its
+side and generation, e.g. '(birth (contains in 1))' instead of '(birth
+contains)'. 'birth_relations' in 'server/update_buffer/viewnodestats.rs'
+supplies them:
+
+| Birth                             | Relation, side, generation                     |
+|-----------------------------------+------------------------------------------------|
+| ordinary content                  | contains, in, 1                                |
+| subscribee-folder member          | subscribes_to, in, 2                           |
+| subscriber-folder member          | subscribes_to, out, 2                          |
+| overridden-folder member          | overrides_view_of, in, 2                       |
+| overrider-folder member           | overrides_view_of, out, 2                      |
+| hidden-folder member              | hides_from_its_subscriptions, in, 2            |
+| hider-folder member               | hides_from_its_subscriptions, out, 2           |
+| hidden-in-subscribee member       | hides_from_its_subscriptions, in, 4; contains, in, 2 |
+| hidden-outside-subscribee member  | hides_from_its_subscriptions, in, 3            |
+| drawn overrider (overrides-here)  | overrides_view_of, out, no ancestor            |
+| backpath graft                    | its role's relation and side, at the graft's generation |
+
+The implementation verifies these generations against the code. The
+change covers 'server/herald_tokens.rs' and its wire doc, both clients'
+parsers, and the tests.
+** Phase 5: new style assignments
+Each item is a commit, with its fixture cases updated.
+*** Relationship renderer, in both clients
+All letters normal and the birth letter high; the side tiers, floors,
+carriers and birth-explained rule, read from the shared files; the slash;
+A, I and F low; ĥ crucial. The multiple-containers special case goes.
+*** Rule table
+☮ becomes its own crucial token: each write-protected label gets two
+rules matching the same atom, one emitting ☮ and one the message, and
+the renderer's ordinary space separates them. 'leaf_ro!' and the ☮
+prefix in 'Flag' herald text disappear. The remaining assignments follow
+[[*Other heralds]]: B and ⊥ crucial, ⟳ medium, ⌂ normal, labels message,
+unknown and inactive placeholders message, =~NAME= yucky, requests
+nonstandard, and =DELETED= message, without the echoed kind.
+*** Diff heralds
+The ✓/✗ prefixes and nonstandard N/R facts, in every form of the rule
+table that carries diff axes.
+*** Link annotations
+The suffix table in [[*Link annotations]], in
+'elisp/skg-link-annotations.el' and 'nvim/lua/skg/link_annotations.lua'.
+Broken-link labels use yucky plus an underline in both clients.
+*** Final palette values
+Go becomes '#00bb00' with black text, and yucky becomes a pure
+foreground. Every other value is unchanged from today's nearest face.
+** Phase 6: Skg dictates the faces in its views
+In Emacs, 'skg-content-view-mode' remaps buffer-locally the 'default'
+face to white on black, and the Org faces a view uses (headline levels,
+links, and the like) to Skg's own definitions. In Neovim, Skg view
+windows get window-local highlights ('winhighlight') doing the same,
+applied by the autocmd that sets their conceal options. The palette for
+these faces lives in 'shared/herald-styles.json'.
+** Phase 7: docs
+'docs/heralds.org' is rewritten around the styles and the herald kinds.
+One table of kind → style → glyphs covers relationship heralds, property
+counts, position markers, home-repo heralds, labels, requests, diff
+facts and placeholders, replacing "Other heralds". The docs state that
+Neovim assumes 'termguicolors'. The drift logged in 'TODO/problems.org'
+on 2026-10-04 is fixed, and that entry moves to 'TODO/DONE/problems.org'.
+** Verification
+After each commit, run the affected suites, one at a time:
+'bash/nextest.sh' (Rust), 'bash/emacs-tests.sh' and 'bash/nvim-tests.sh'
+(the clients), and 'bash/integration-tests.sh' for the wire, config and
+rename steps.
+
+Tests can check style names but not colors, so the work ends with Jeff
+looking at a view in each client.
+* Open questions
+None.

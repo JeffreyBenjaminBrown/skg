@@ -119,7 +119,8 @@ below have been folded in. Per-side relationship tiers are in
 | A, I and F counts (F was P; see below)       | cyan                      | low                                     |
 | ⌂ home-repo herald                           | green                     | normal                                  |
 | link-annotation suffix, resolved             | green                     | normal                                  |
-| link-annotation suffix, unresolved           | shadow / Comment          | dim; whether ⌂ shows is open            |
+| link-annotation suffix, inactive / pending / lookup failed | shadow / Comment | yucky, keeping ⌂ (=unavailable= renamed =lookup failed=) |
+| link-annotation suffix, missing target       | shadow / Comment          | none: no suffix at all                  |
 | folder and qual labels                       | green                     | message                                 |
 | ⟳ cycle                                      | blue                      | medium                                  |
 | =Reference to unknown node.=                 | yellow                    | message                                 |
@@ -260,13 +261,17 @@ source-set. The other two, =[⌂:…]= (lookup pending) and
 Since ⌂ asserts "this is the home repo", I'd drop it from all four:
 =[missing]=, =[inactive]=, =[…]= and =[unavailable]=, all dim. Is that
 what you meant, or only some of them?
-********* TODO js
+********* DONE js
 'unavailable' is a bad name; let's change that to 'lookup failed'.
 'missing' is ridiculous; we don't need to show that at all.
 All of them seem to deserve the color yucky.
 
 Did I say lose the house symbol? I would attach it to all of these
 (but don't show it either in the case of a broken link).
+********** Claude says: folded into the assignments table.
+A broken link (target missing) gets no suffix; its label is already
+yucky and underlined. The other unresolved states keep ⌂ and become
+yucky: =[⌂:inactive]=, =[⌂:…]= (pending) and =[⌂:lookup failed]=.
 **** Diff details
 Besides X and M, the diff vocabulary includes =-X=, =-M=, =DELETED=,
 =diff:not-in-git= and =text changed : staged unstaged=. The vision says
@@ -443,7 +448,7 @@ Then '(CRUCIAL hiddenFolder "☮")' followed by
 the renderer separates with its ordinary space: =☮ It hides these…=,
 in two colors. No ABUT and no colon stripping is involved. The cost is
 one extra rule per write-protected label, and 'leaf_ro!' disappears.
-********** TODO js : solved!
+********** DONE js : solved!
 Or if I missed some question, let me know.
 (If I didn't, no need to confirm.)
 ******* Tests pin the label strings
@@ -498,7 +503,7 @@ That is 'heralds-green-face', used today for ⌂, folder labels, ☮ and
 much else. It is darker than both candidates. The 'a' flag's olive is
 '#5e5e20'. Either candidate would be a visibly brighter green with
 black text, so go would no longer look like anything you see today.
-********* TODO js : Let's use 00 BB 00
+********* DONE js : Let's use 00 BB 00
 **** Adjacent spans in one style merge into a blob
 Spans have backgrounds and no separators inside a token, so
 same-styled neighbors fuse. Under the vision, =5/L= with a fully
@@ -703,7 +708,7 @@ before or after the herald work, so that neither diff buries the
 other. Your one-concept-one-name scope note says terms found during
 this plan are in scope. Does that include this one, or does it get
 its own plan?
-*********** TODO js : let it ride
+*********** DONE js : let it ride
 Let's do all renames before anything else,
 granularly committed however is natural
 (that is, two renames could ride the same commit if they are related).
@@ -713,7 +718,7 @@ repos. In code I'd use 'repo' alone where no Git type is nearby (e.g.
 'SourceName' → 'RepoName', '[[sources]]' → '[[repos]]', 'relSource' →
 'relRepo'), and 'skg_repo' only where Git repositories appear in the
 same scope (e.g. 'server/git_ops/'). Agreed?
-*********** TODO js : agreed
+*********** DONE js : agreed
 ******* 'removed' versus 'deleted': for nodes yes, for relationships no
 With your N/R axes the distinction becomes clean. A node that left the
 graph was deleted: =-N=, atom 'deletedN' (today 'removedX'). A
@@ -840,10 +845,8 @@ become N (node) and R (relationship), replacing X and M.
 **** DONE Q9: Is DELETED outside a diff stop, or nonstandard?
 Answer: message.
 **** DONE Q10: Which bright green is go?
-Black text in either case. '#88FF88' (pastel) or '#00BB00'-ish
-(saturated)? I suggest '#00CC00'. Today's green, for comparison, is
-'#006400' with white text. See [[*Go and low may be indistinguishable]].
-***** TODO js : resolved above
+Answer: '#00BB00', with black text.
+***** DONE js : resolved above
 **** DONE Q11: Is yucky a pink foreground or black on pink?
 Answer: a pink foreground. Underlining for links is separate.
 ***** DONE js : yes
@@ -851,10 +854,10 @@ Answer: a pink foreground. Underlining for links is separate.
 Answer: yes. Nothing dangerous; see [[*☮ is baked into label strings]].
 **** DONE Q13: Should "interesting" be reserved for the display tier?
 Answer: yes; interesting link sources become "substantive".
-**** TODO Q14: Which unresolved link-annotation suffixes lose the ⌂?
-Resolved suffixes are normal, and unresolved ones are dim. Remaining:
-I'd drop ⌂ from all four unresolved states (missing, inactive, pending,
-unavailable). See [[*Facts the vision does not mention]].
+**** DONE Q14: Which unresolved link-annotation suffixes lose the ⌂?
+Answer: a missing target gets no suffix. Inactive, pending and lookup
+failed (renamed from unavailable) keep ⌂ and are yucky. Resolved is
+normal.
 ***** DONE js : I think I resolved this earlier
 ****** Claude says: mostly; one ambiguity is left, now the question above.
 **** DONE Q15: One shared JSON style file plus shared test fixtures?
@@ -862,11 +865,10 @@ Answer: both, with the rendering procedure staying in code.
 **** DONE Q16: Does the flags rename reach the code?
 Answer: yes; one concept, one name.
 **** DONE Q17: Does the source → skg repo rename ride in this plan, and which identifiers?
-The words are settled: /skg repo/ and /git repo/. Remaining: whether
-the rename is part of this plan or its own (I suggest its own), and
-whether code uses bare 'repo' except near Git types. See
-[[*The same thing under several names]].
-***** TODO js : resolved above
+Answer: it rides in this plan. All renames come first, committed in
+natural granular units. Code uses bare 'repo' except where Git
+repositories share the scope, which use 'skg_repo'.
+***** DONE js : resolved above
 **** DONE Q18: Diff atom names
 Answer: 'addedN', 'deletedN', 'addedR', 'removedR'.
 **** DONE Q19: Treat a budget-truncated node's contents like folded (normal)?
