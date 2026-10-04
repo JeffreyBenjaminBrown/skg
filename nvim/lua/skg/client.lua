@@ -127,6 +127,23 @@ function M.send_string (text)
   tcp:write(text)
 end
 
+---Before connecting to PORT, end a live connection to another port.
+---Refuse instead while any skg buffer is open: its views came from the
+---other server, and saving one would write it into this server's graph.
+---@param port integer
+function M.end_connection_to_another_port (port)
+  if not (state.tcp and not state.tcp:is_closing())
+     or M.port == port then
+    return end
+  if #require('skg.buffer').all_skg_buffers() > 0 then
+    error(string.format(
+      'skg is connected to the server on port %s, and skg buffers from'
+      .. ' it are open. Close them all (:SkgCloseAllSkgBuffers) before'
+      .. ' connecting to the server on port %s.',
+      tostring(M.port), tostring(port)), 0) end
+  M.sentinel('ended to connect to port ' .. tostring(port))
+end
+
 ---Manually close the connection to the Rust server.
 function M.connection_end ()
   state.close_connection()

@@ -130,4 +130,36 @@ describe('skg.client', function ()
     local second = client.connect()
     assert.are.equal(first, second)
   end)
+
+  it('keeps a live connection when init names the same port', function ()
+    server = fake_server(function () end)
+    client.port = server.port
+    local tcp = client.connect()
+    client.end_connection_to_another_port(server.port)
+    assert.are.equal(tcp, state.tcp)
+  end)
+
+  it('ends a live connection to another port when no skg buffer is open',
+     function ()
+    helpers.wipe_skg_buffers()
+    server = fake_server(function () end)
+    client.port = server.port
+    client.connect()
+    client.end_connection_to_another_port(server.port + 1)
+    assert.is_nil(state.tcp)
+  end)
+
+  it('refuses another port while skg buffers are open', function ()
+    server = fake_server(function () end)
+    client.port = server.port
+    local tcp = client.connect()
+    local view = vim.api.nvim_create_buf(true, false)
+    vim.b[view].skg_view_uri = 'test-view'
+    local ok, message = pcall(client.end_connection_to_another_port,
+                              server.port + 1)
+    vim.api.nvim_buf_delete(view, { force = true })
+    assert.is_false(ok)
+    assert.is_truthy(message:find('SkgCloseAllSkgBuffers', 1, true))
+    assert.are.equal(tcp, state.tcp)
+  end)
 end)
