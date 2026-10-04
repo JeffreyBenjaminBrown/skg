@@ -51,7 +51,7 @@ fn contains_multi_not_birth () {
 
 #[test]
 fn subscribee_as_such () {
-  // bS: grandparent (gen 2) subscribes to it, born of subscribes.
+  // bS: grandparent (gen 2) subscribes to it, born of subscribes_to.
   let c = RelationCounts { subscribers : 1, .. counts () };
   let mut f = AncestorFlags::default ();
   f . record (NodeRelation::SubscribesTo, true, 2);
@@ -122,7 +122,7 @@ fn link_counts_and_interesting_subset () {
 }
 
 #[test]
-fn linksource_birth_out_only () {
+fn mentioner_birth_out_only () {
   // La: it links to its parent (out, gen 1), born of links.
   let c = RelationCounts { link_targets : 1, .. counts () };
   let mut f = AncestorFlags::default ();

@@ -7,7 +7,7 @@ Some terms and abbreviations used in this code.
 
 For a set of IDs in one graph snapshot, the *update-relevant
 neighborhood* contains the IDs themselves, their immediate neighbors in
-both directions along =contains=, =links_to=, =subscribes=, and
+both directions along =contains=, =links_to=, =subscribes_to=, and
 =hides_from_its_subscriptions=, and every node reachable by each of the
 two monotonic override walks. The overriderward and overriddenward walks
 start independently at the original IDs, never reverse direction, and
