@@ -537,10 +537,10 @@ This toggles whether, at the start of every node,
 metadata is shown in its full plain-text glory,
 or is instead summarized via brief 'heralds'.
 It is turned on at every view by default.
-See [[file:heralds.org][the herald legend]] for the tokens and colors.
+See [[file:heralds.org][the herald legend]] for the tokens and styles.
 *** <localleader>vL : :SkgToggleRepoOverlayOnLinks
 Toggle display-only home repo suffixes on Skg links in this buffer.
-The suffixes start off. Links confirmed missing are pink and underlined
+The suffixes start off. Links confirmed missing are yucky and underlined
 even with suffixes off. See [[file:heralds.org::*Link annotations][link annotations]].
 *** <localleader>vl : :SkgLimitRepoSet
 Limits display and search to one configured repo-set for this

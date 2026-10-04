@@ -177,7 +177,7 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 /// A few patterns (full engine semantics in skg-lens.el):
 ///
 ///   * Simple leaves -- e.g. the aliasFolder rule matches the bare atom
-///     'aliasFolder' and emits the literal "aliases" in green. Children
+///     'aliasFolder' and emits the literal "aliases" as a message. Children
 ///     are consumed positionally; 'any' in a child position matches
 ///     any leaf/atom.
 ///
@@ -186,8 +186,8 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///     each child's own style. Labelled INTERCs match a child of the
 ///     object bearing that label (e.g. the staged/unstaged forms);
 ///     unlabelled INTERCs run their sub-rules against the current
-///     object's own children (used at the graphStats level to build
-///     compact tokens like "N→M" and "N{M" from sibling atoms).
+///     object's own children. Empty slots and their separators are
+///     skipped, so "text changed ✓ ✗" shows only the marks that apply.
 ///
 ///   * 'leaf_abut' -- the emitted token glues onto the preceding
 ///     token with no space (used so the write-protected marker "☮" sits
@@ -211,14 +211,9 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///     axes because node-axis markers only apply to ActiveVognodes,
 ///     not to non-vognodes.
 ///
-///   * The 'affectsParent' sub-rule 'container' names an atom the server
-///     NEVER emits: the server leaves affectsParent=true implicit, and
-///     Emacs ('heralds--inject-default-affectsParent') inserts the
-///     internal-only 'container' atom so omitted ordinary content
-///     keeps its "{" herald while explicit '(affectsParent true)'
-///     stays quiet. 'true' itself is accepted on parse but never
-///     emitted. Both are in ACCEPTED_NOT_EMITTED_ATOMS in the
-///     conformance test.
+///   * The 'affectsParent' sub-rule 'true' is vacuous: the server leaves
+///     affectsParent=true implicit, and an explicit '(affectsParent
+///     true)', which the parser accepts, stays quiet.
 pub fn herald_rule_table () -> HeraldRule {
   HeraldRule {
     style : None, interc : None, label : Some ("skg"), abut : false,

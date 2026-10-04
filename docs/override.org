@@ -200,7 +200,7 @@ not become invalid merely because the active repo-set changed.
 ** Heralds and reasons for placement
 
 See [[file:heralds.org][the herald legend]] for the full relationship
-notation. A pink =ĥ= directly after =O= marks actual substitution at
+notation. A crucial =ĥ= directly after =O= marks actual substitution at
 this occurrence; ordinary override folders and paths have no =ĥ=.
 
 An ordinary relationship =O= says that the node participates in a

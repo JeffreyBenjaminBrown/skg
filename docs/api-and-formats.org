@@ -841,13 +841,13 @@ under different parents):
 - =cycle= — this position repeats an ancestor's ID;
 - =(homeRepoHerald ⌂:LABEL)= — the node sits at a Skg repo boundary (a
   root, or a Skg repo differing from its nearest truenode ancestor);
-- =(relRepo NAME)= — herald red "~NAME", drawn immediately before
+- =(relRepo NAME)= — yucky herald "~NAME", drawn immediately before
   the ⌂ Skg repo herald; the relRepo of the RELATIONSHIP this
   headline represents (the =contains= edge to a content child, or
   the folder's relation for a PartnerFolder member), when its privacy was
   deliberately raised above the edge's default. This is an observed,
   recomputed display fact: save never consumes it as an instruction.
-- =(editRequest (relRepo NAME))= — herald red "request:~NAME".
+- =(editRequest (relRepo NAME))= — nonstandard herald "request:~NAME".
   This is the sole explicit relRepo request, written by
   =skg-set-relRepo= (C-c s r) and consumed at save, where
   the server enforces the floor (an offered Skg repo more
@@ -866,7 +866,7 @@ under different parents):
   the request; a failed save leaves it in the buffer. Herald view presents the
   request as one red semantic state: =request:no search matching= for =true=,
   or =request:search matching= for =false=.
-- =(overridesHere N)= — pink =ĥ= immediately after the =O= token; the load-bearing
+- =(overridesHere N)= — crucial =ĥ= immediately after the =O= token; the load-bearing
   substitution marker, documented in the next subsection.
 
 ** Node flags
@@ -911,7 +911,7 @@ a node whose only overrider is invisible under the active repo-set is
 "overridden but drawn raw" too, so its children draw raw as well.
 
 A substituted viewnode carries the keyed viewStats form
-=(overridesHere N)= -- pink =ĥ= immediately after =O= -- naming the original it
+=(overridesHere N)= -- crucial =ĥ= immediately after =O= -- naming the original it
 stands for. The marker is LOAD-BEARING at save: wherever it
 appears, extraction collects N rather than the carrying node's own
 ID, so a container's contains list round-trips to the original

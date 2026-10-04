@@ -2,7 +2,7 @@
 
 ** What a herald describes
 An Skg headline begins with metadata. In a view, heralds condense that
-metadata into short colored tokens. Toggle the compact display with
+metadata into short styled tokens. Toggle the compact display with
 'skg-view-heralds-mode' (=C-c v h=) in Emacs or ':SkgHeraldsToggle'
 (=<localleader>vh=) in Neovim. The expanded metadata is useful when you
 need to inspect the exact facts or requests.
@@ -14,140 +14,194 @@ links or unsaved buffer edits as new graph facts. A folded body can still
 contribute links. A view's position can add ancestor flags and a birth
 style, so two occurrences of the same node can have different heralds.
 
-** Relationship tokens
+** Styles
+A herald's style states its importance tier, or for a few heralds a
+polarity or kind, never its hue. There are ten styles.
 
-The order is =C L S O H A I P=. =C= means contains, =L= text links to,
-=S= subscribes to, =O= overrides the view of, and =H= hides from its
-subscriptions. A number before the letter counts nodes pointing at this
-node; a number after it counts nodes this node points at. =2C3= thus
-means two containers and three direct contents. =C= and =L= are blue;
-=S=, =O= and =H= are purple. Missing sides and empty relations are
-omitted. =A3= counts aliases, =I2= extra IDs, and =F1= true
-flags; these property counts are cyan.
+| Style       | Look                           | Meaning                         |
+|-------------+--------------------------------+---------------------------------|
+| crucial     | black on cyan                  | the reader must understand this |
+| high        | black on yellow                | high interest                   |
+| medium      | white on orange                | medium interest                 |
+| low         | white on olive                 | low interest                    |
+| normal      | white on blue                  | ordinary                        |
+| message     | black on white                 | prose meant to be read          |
+| stop        | white on red                   | polarity: bad, or not yet       |
+| go          | black on green                 | polarity: good, done            |
+| nonstandard | white on purple                | requests and diff facts         |
+| yucky       | pink foreground, no background | error-flavored, but not too bad |
 
-A yellow numeral inside =C= or =L= has a narrower meaning. In =2/5L3=,
+The tiers, least to greatest, are normal, low, medium, high and crucial.
+
+Each style has one name everywhere. The looks are defined in
+[[file:../shared/herald-styles.json][shared/herald-styles.json]], which both clients read. In Emacs the
+style's face is 'heralds-STYLE-face' (for example 'heralds-high-face');
+customize it with 'customize-face'. In Neovim its highlight group is
+'SkgHeraldSTYLE' (for example 'SkgHeraldHigh'); override it with
+':highlight' or 'vim.api.nvim_set_hl' after Skg loads. The Neovim client
+assumes 'termguicolors', since the styles are given as RGB colors.
+
+** Herald kinds and their styles
+
+| Kind                 | Style       | Glyphs                                                                        |
+|----------------------+-------------+-------------------------------------------------------------------------------|
+| relationship letters | normal      | =C L S O H=                                                                   |
+| the birth letter     | high        | the letter of a relation that put this occurrence here                       |
+| relationship sides   | their tier  | counts and ancestor flags; see [[*Relationship heralds][Relationship heralds]]                     |
+| property counts      | low         | =A3= aliases, =I1= extra IDs, =F2= true flags                                 |
+| position markers     | crucial     | =☮= write-protected, =B= hidden body, =⊥= affects not its parent, =ĥ= overrides here |
+|                      | medium      | =⟳= cycle                                                                     |
+| home-repo heralds    | normal      | =⌂:LABEL=                                                                     |
+|                      | yucky       | =~NAME=, a relRepo more private than the default                              |
+| labels               | message     | folder labels, =alias=, =ID=, flag rows                                       |
+| requests             | nonstandard | =delete=, =merge:...=, =request:~NAME=, =request:...= flags, =req:...= views  |
+| diff facts           | nonstandard | =N -N R -R=, =text changed=, =diff:not-in-git=                                |
+|                      | go          | =✓= staged                                                                    |
+|                      | stop        | =✗= unstaged                                                                  |
+| placeholders         | message     | =Reference to unknown node.=, =node from inactive repo=, =DELETED=            |
+| link annotations     | normal      | a resolved target's =[⌂:pub]=                                                 |
+|                      | yucky       | =[⌂:inactive]=, =[⌂:…]=, =[⌂:lookup failed]=, a broken link's label           |
+
+** Relationship heralds
+*** Letters and sides
+The relations, in display order, are =C= contains, =L= links to, =S=
+subscribes to, =O= overrides the view of, and =H= hides from its
+subscriptions. A relation's token has an in-side before its letter and
+an out-side after it. The in-side counts nodes that relate to this node
+("N nodes contain it"); the out-side counts nodes this node relates to
+("it contains N nodes"). =2C3= thus means two containers and three
+direct contents. Missing sides and empty relations are omitted. The
+property counts =A=, =I= and =F= follow the relations.
+
+*** Tiers
+Each side has a tier, which says how much it deserves attention.
+
+| Relation              | in-side                         | out-side                                                                   |
+|-----------------------+---------------------------------+----------------------------------------------------------------------------|
+| contains              | medium                          | normal; low on a write-protected occurrence; unintegrated numerator medium |
+| links to              | medium; substantive subset high | normal                                                                     |
+| subscribes to         | high                            | medium                                                                     |
+| overrides the view of | low                             | medium                                                                     |
+| hides                 | medium                          | normal                                                                     |
+
+Most normal sides are normal because their members are usually visible
+elsewhere: as view-children, in the text, or in the hidden-in and
+hidden-outside-subscribee folders.
+
+*** Ancestor flags and floors
+Lowercase flags name tracked ancestors: =a= is the visible parent, =b=
+the grandparent, and so on, counting folders as generations. After =z=,
+a generation appears as ={27}=, ={28}=, etc. =aC= says the parent
+contains this node; =Ca= says this node contains its parent. A flag
+replaces a numeral when ancestors account for the whole side.
+
+Every glyph has a floor, the least tier it shows: =a= is at least low,
+=b= and higher at least medium, and every other glyph at least normal.
+
+*** Carriers
+A side's tier is shown by one part of the side, its carrier: its
+numeral, if it shows one, and otherwise all its ancestor flags. The
+carrier shows the greater of its floor and the side's tier; every other
+glyph shows just its floor. On the subscribes-to in-side, whose tier is
+high, =2aS= draws the 2 high and the 'a' low, while =aS= has no
+numeral, so its 'a' carries the tier and is drawn high.
+
+*** Fractions
+Two sides can show a subset with a tier of its own, as a fraction.
+
+On the links-to in-side, the numerator counts substantive mentioners. A
+mentioner is substantive if it has nonempty body text, visible direct
+content, or links to more than one distinct visible target. In =2/5L3=,
 five visible nodes link here, two are substantive, and this node links
-to three distinct visible targets. A mentioner is substantive if
-it has nonempty body text, visible direct content, or links to more
-than one distinct visible target. Whitespace-only bodies, repeated
-links and alternate IDs for the same target do not add to that count.
-The numerator can be zero (=5L3=), equal the total (=5/L3=), or the
-only populated side (=L3=). =5L= has no resolved outgoing target;
-there is no =L= token when both sides are empty. A self-link counts
-when visible.
+to three distinct visible targets. Whitespace-only bodies, repeated
+links and alternate IDs for the same target do not count. =5L= has no
+resolved outgoing target. A self-link counts when visible.
 
-On a subscribee shown under a subscriber, outgoing =C= has a similar
-fraction. =C2/8= means it has eight visible direct contents, two of
-which the subscriber has neither directly included nor hidden. =C8=
-means none remains unintegrated; =C8/= means all eight do. This count
+On a subscribee shown under a subscriber, the contains out-side counts
+the contents the subscriber has neither directly included nor hidden.
+=C2/8= means eight visible direct contents, two of them unintegrated.
+=C8= means none is unintegrated; =C8/= means all eight are. The count
 belongs to that occurrence: another subscriber can give the same
-subscribee a different numerator. Outside that role, =C= uses ordinary
-counts. The incoming side can combine with it, as in =2C3/8=.
+subscribee a different numerator.
 
-The slash is kept when a nonzero numerator equals its total; its
-denominator is then omitted. The slash never means zero divided by
-zero. Yellow also marks displayed =O= counts, even a count of one.
-The =O= letter keeps its usual purple or birth style.
+The numerator gets its own carrier, chosen the same way from its
+glyphs; the side's carrier is chosen from the denominator's. The slash
+shows the side's tier. =1/5aL= draws the 1 high, the 5 medium and the
+'a' low. =a/5L= draws the 'a' high, because it carries the subset's
+tier, and the 5 medium. In =5/L= the denominator shows nothing, so only
+the slash shows the side's tier. An ancestor appears once: before the
+slash if it belongs to the numerator, otherwise after the denominator's
+numeral. =a/bL= says both ancestors link here and only 'a' is
+substantive.
 
-** Ancestors and birth
+*** Birth
+The letter of a relation that put this occurrence here is drawn high;
+its counts keep their own styles. An occurrence can have more than one
+birth relation. A side whose only members are ancestors that the birth
+relation already accounts for has tier low: =aC= (the parent is the sole
+container) draws the 'a' low. A subscribee's =bS= (its subscriber is the
+grandparent) draws the 'b' medium, because of b's floor.
 
-Lowercase flags name tracked ancestors: =a= is the visible parent,
-=b= the grandparent, and so on, counting folders too. After
-=z=, a generation appears as ={27}=, ={28}=, etc. An =a= is muted
-yellow; =b= and higher are orange. =aC= says the parent
-contains this node; =Ca= says this node contains its parent. =Oa=
-and =aO= distinguish the direction of an override edge.
-
-A flag replaces a numeral when it fully explains a side. With
-fractions, an ancestor appears once: before the slash if it belongs
-to the numerator, otherwise after the denominator's numeral. =a/5L=
-means the parent is the sole interesting Skg repo among five; =1/5aL=
-means one other Skg repo is interesting and the parent is not. =a/L=
-means the parent is the sole incoming Skg repo and is interesting;
-=aL= means the sole parent Skg repo is uninteresting. =La= means the
-sole outgoing target is the parent; =L3a= counts three targets,
-including the parent. If distinct ancestors =a= and =b= are the only
-inbound Skg repos, and only =a= is interesting, =a/bL= expresses one
-interesting Skg repo out of two. The denominator still includes =a=;
-its numeral is omitted because both ancestors account for the total.
-
-A black-on-white relationship letter identifies the relation that put
-this occurrence here; its adjacent counts and slash keep their usual
-styles. Ordinary =O= facts merely report an edge;
-a birth-styled =O= explains this placement. An occurrence can have
-more than one birth relation. Immediately after =O=, a pink =ĥ=
-(precomposed h with circumflex) means this occurrence substitutes
-for an overridden node. =2Oĥ3= is an example. It comes from the
-load-bearing 'overridesHere' marker; an override folder or path
-occurrence without that marker has no =ĥ=. The eighth ancestor is
-plain orange =h=, so =Oĥh= shows the two different markers together.
-The marker preserves the original membership ID when a substituted
-view is saved. See [[file:override.org][override behavior]].
-
-** Colors and customization
-
-The herald faces in Emacs and their Neovim highlight groups are:
-
-| Meaning | Emacs face | Neovim highlight group | Default style |
-|---------+------------+------------------------+---------------|
-| Highly interesting counts and markers | 'heralds-highly-interesting-face' | 'SkgHeraldHighlyInteresting' | black on yellow |
-| Moderately interesting ancestors =b= and higher | 'heralds-moderately-interesting-face' | 'SkgHeraldModeratelyInteresting' | white on orange |
-| Slightly interesting parent =a= | 'heralds-slightly-interesting-face' | 'SkgHeraldSlightlyInteresting' | white on muted olive |
-| Confusable =ĥ= | 'heralds-confusable-face' | 'SkgHeraldConfusable' | pink foreground |
-| =C= and =L= | 'heralds-blue-face' | 'SkgHeraldBlue' | white on blue |
-| =S=, =O= and =H= | 'heralds-purple-face' | 'SkgHeraldPurple' | white on purple |
-| Skg repo and folder markers | 'heralds-green-face' | 'SkgHeraldGreen' | white on dark green |
-| Requests and deletions | 'heralds-red-face' | 'SkgHeraldRed' | white on red |
-| =A=, =I= and =P= counts | 'heralds-cyan-face' | 'SkgHeraldCyan' | black on cyan |
-| Birth relation letter only | 'heralds-birth-face' | 'SkgHeraldBirth' | black on white |
-
-Customize an Emacs face with 'customize-face'. In Neovim, override a
-highlight group with ':highlight' or 'vim.api.nvim_set_hl' after Skg loads.
-Confirmed broken link labels inherit 'heralds-confusable-face' and add
-an underline in Emacs; Neovim uses 'SkgBrokenLink' with the same pink
-foreground and an underline.
+Immediately after =O=, a crucial =ĥ= (precomposed h with circumflex)
+means this occurrence substitutes for a node it overrides. =2Oĥ3= is an
+example. It comes from the load-bearing 'overridesHere' marker; an
+override folder or path occurrence without that marker has no =ĥ=. The
+eighth ancestor is a plain =h=, so =Oĥh= shows the two markers together.
+The marker preserves the original membership ID when a substituted view
+is saved. See [[file:override.org][override behavior]].
 
 ** Other heralds
+=☮= marks a write-protected position: a node, a folder, or a flag row.
+On a node, =B= rides the ☮ when the node's body exists but is hidden.
+=⊥= means a displayed child does not affect its parent's membership on
+save. =⟳= marks a cycle.
 
-Green =⌂:LABEL= marks a node's home repo boundary. A red =~NAME=
-immediately before it reports a relationship stored at a more private
-relRepo than its default. A red =request:~NAME= is an explicit
-pending request to change that relationship Skg repo on save. The
-home repo belongs to the node; relRepo belongs to an edge. Green
-folder labels, =ID= and =alias= describe their respective view
-positions. The flags view spells out =☮ had ID before org-roam
-import=, =☮ was overloaded during org-roam import=, and
-=☮ no search matching= when true. =req:folder:...=, =req:path:...=,
-=req:flags= and =req:definitive= request a view. Red =delete=,
-=merge:...=, and =request:no search matching= or
-=request:search matching= are save requests.
+=⌂:LABEL= marks a node's home repo boundary. A =~NAME= immediately
+before it reports a relationship stored at a more private relRepo than
+its default; =request:~NAME= is an explicit pending request to change
+that relationship's Skg repo on save. The home repo belongs to the
+node; relRepo belongs to an edge.
 
-=☮= marks a write-protected position, with =B= attached when its body
-exists but is hidden. Yellow =⊥= means a displayed child does not
-affect its parent's membership on save. Blue =⟳= marks a cycle.
-An unknown node is labeled =Reference to unknown node.= in the
-interesting yellow style; an inactive Skg repo yields an anonymous
-=node from inactive repo= marker. Inactive placeholders reveal no
-node title or Skg repo. Red =DELETED= marks a deletion in a diff or
-edit, while =diff:not-in-git= marks a node without a Git counterpart.
-=staged:= and =unstaged:= prefixes report Git changes; =N= and =-N=
-mark node changes, =R= and =-R= relationship changes, and
-=text changed= reports text changes. These are view facts unless
-specifically identified above as requests.
+Folder labels, =alias=, =ID= and the flag rows describe their view
+positions. The flags folder spells out =had ID before import=, =was
+overloaded during org-roam import=, and =no search matching= when true.
+=req:folder:...=, =req:path:...=, =req:flags= and =req:definitive=
+request a view. =delete=, =merge:...=, and =request:no search matching=
+or =request:search matching= are save requests.
+
+An unknown node is labeled =Reference to unknown node.=; an inactive
+Skg repo yields an anonymous =node from inactive repo= marker, which
+reveals no node title or Skg repo. =DELETED= marks a deleted node, or a
+viewnode whose node was deleted.
+
+** Diff heralds
+In Git diff mode, =✓= introduces staged changes and =✗= unstaged ones.
+=N= and =-N= mark a node added or deleted; =R= and =-R= a relationship
+added or removed. =text changed ✓ ✗= reports a title or body change,
+showing whichever marks apply. =diff:not-in-git= marks a node without a
+Git counterpart.
 
 ** Link annotations
-
 The current buffer can display a suffix after each literal
 ='[[id:ID][LABEL]]'= link with the target's home repo abbreviation.
 Use 'skg-toggle-repo-overlay-on-links' (=C-c v L=) in Emacs or
 ':SkgToggleRepoOverlayOnLinks' (=<localleader>vL=) in Neovim.
 Suffixes start off and the toggle is local to the buffer. A resolved
-target appears in green, for example =[⌂:pub]=. Extra IDs resolve
-to their target's home repo. =⌂:missing=, =⌂:inactive=,
-=⌂:…= and =⌂:lookup failed= distinguish missing, inactive, pending
-and lookup-failed states. The latter states reveal no Skg repo name.
+target shows its repo, for example =[⌂:pub]=. Extra IDs resolve to
+their target's home repo. =[⌂:inactive]=, =[⌂:…]= and
+=[⌂:lookup failed]= distinguish inactive, pending and lookup-failed
+targets, and reveal no Skg repo name. A broken link gets no suffix.
 
 Even with suffixes off, the label of a link confirmed missing in the
-current graph is pink and underlined. Inactive or still unknown
+current graph is yucky and underlined. Inactive or still unknown
 targets are not marked broken. These display-only annotations do not
 change link text, save contents, or exact-ID navigation.
+
+** Skg's faces in views
+Skg dictates every face in a view, in both clients: a black background,
+a white default foreground, and Skg's own faces for the Org elements a
+view contains, such as headline levels and links. These are colors and
+weights, not the typeface, so nothing from the user's theme shows. They
+are defined in the view_faces of [[file:../shared/herald-styles.json][shared/herald-styles.json]]. Emacs
+remaps them buffer-locally in 'skg-content-view-mode'; Neovim maps them
+into a view window with 'winhighlight'.

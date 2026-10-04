@@ -353,7 +353,7 @@ chain's end. The resolver is 'resolve_override' in
 edges are display-only facts and never substitute.
 
 The drawn substitute carries the MARKER '(overridesHere N)'
-(herald red "Oh"), naming the original it stands for. A viewnode's
+(the crucial herald =ĥ= after =O=), naming the original it stands for. A viewnode's
 COLLECTED ID is what it contributes to its parent's saved lists:
 the marker's original if present, else its own ID -- so saving a
 view that draws R in place of N keeps N in the parent's contains.
@@ -448,7 +448,7 @@ The folder stays visible when empty. Edits within a retained folder are
 rejected before save, but deleting the entire folder safely dismisses the
 optional projection and changes no flag. =noSearchMatching= is changed
 through the dedicated setter, while the two org-roam import provenance
-flags have no setter. A node with =n= true flags has the cyan =Fn=
+flags have no setter. A node with =n= true flags has the low-styled =Fn=
 herald; no flag herald is shown at zero.
 
 *** Document

@@ -3,19 +3,27 @@
   resolved, or obsolete -- MOVE its entry out of this file and PREPEND
   it to the top of TODO/DONE/problems.org. Do not let finished entries
   accumulate here.
-* Herald color names and docs have drifted (2026-10-04)
-  'HeraldColor::Orange' in 'server/heralds.rs' renders yellow and the
-  unused 'Yellow' would render orange: both clients map the keyword
-  ORANGE to the highly-interesting (yellow) face and YELLOW to the
-  moderately-interesting (orange) one, since commit 'fd7b8602' swapped
-  the faces without renaming the keywords. Also stale: the
-  'heralds-cyan-face' docstring ("A / I"; it also styles P), the
-  'heralds--color-to-face' docstring, the 'server/heralds.rs' comment on
-  'heralds--inject-default-affectsParent' and its "{" herald (neither
-  exists), and 'docs/heralds.org' quoting "had ID before org-roam
-  import" where 'FileProperty::herald_text' says "had ID before import".
-  See [[file:herald-colors/1_discussion.org][the herald-colors discussion]], which proposes semantic
-  style keywords that would remove the swap. No code changed.
+* Problems noticed while executing the herald-colors renames (2026-10-04)
+** import-md-and-org integration test fails at baseline
+  Before any herald-colors change, 'bash/integration-tests.sh' fails
+  'import-md-and-org': its 'notes.org' fixture has a heading-like line
+  ("* not a heading") inside a block, which the importer now refuses
+  ("Import preview cannot be applied"), while the test expects that
+  line to be imported as escaped body text. Either the fixture or the
+  test's expectation is stale.
+** Intermittent 'DirectoryNotEmpty' in Rust test cleanup
+  In full 'bash/nextest.sh' runs, a different save test fails now and
+  then with 'Os { code: 39, kind: DirectoryNotEmpty }' (seen in
+  'save::none_node_fields_are_noops' and
+  'dangling_reference_renders_unknown_node'); each passes alone.
+  Probably a cleanup race with a background writer.
+** String-typed relation lookups fail silently
+  'find_related_nodes' in 'server/dbs/in_rust_graph/query.rs' takes
+  the relation and roles as strings, and an unknown combination
+  returns an empty set (the '_ => {}' arm). Renaming a relation left
+  test calls passing a stale name, which showed up only as a confusing
+  assertion failure. Taking a 'RelationRole' (or panicking on an
+  unknown triple) would make such mistakes loud.
 * Findings from the simplification reconnaissance (2026-09-25)
   Research and proposed slices: [[file:astra-cleans-up.org][Making Skg easier to change]].
   These are source-inspection findings; no application changes or runtime

@@ -316,7 +316,7 @@ pub struct ContainerwardPathStats {
 }
 
 /// Directional member counts for the five graph relations, plus the
-/// interesting inbound links and distinct outbound targets, feeding the uniform-herald token grammar
+/// substantive mentioners and distinct outbound targets, feeding the uniform-herald token grammar
 /// (server/herald_tokens.rs). All are graph-level (position-independent)
 /// counts of a node's members on each side of each relation.
 #[derive(Debug, Clone, Default, PartialEq)]

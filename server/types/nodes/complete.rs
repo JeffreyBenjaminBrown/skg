@@ -140,7 +140,7 @@ impl Graphnode {
 /// Normalize a node body: drop leading and trailing whitespace-only
 /// lines (a line is whitespace-only iff it trims to empty); if nothing
 /// remains, the body becomes 'None'. After this, "bodyless" is exactly
-/// 'body == None' -- the invariant the link-interestingness predicate
+/// 'body == None' -- the invariant the substantive-mentioner predicate
 /// relies on. Idempotent; enforced at every disk write ('GraphnodeOnDisk::from')
 /// and on the in-memory save Graphnode ('into_graphnode'), with a
 /// one-time migration ('data/bash/trim-node-bodies.org') for old data.

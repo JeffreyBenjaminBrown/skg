@@ -16,6 +16,13 @@ At startup the server reads every configured `.skg` file, validates an
 immutable in-Rust graph, and rebuilds Tantivy from the same nodes. The graph is
 the runtime graph store; Tantivy is only the derived full-text index.
 
+`shared/` holds data that the server and both clients read: the herald
+styles (`herald-styles.json`) and the relations schema (`relations.json`).
+The clients read them at load time, relative to their own source; Rust
+keeps its own types and checks them against these files in conformance
+tests. `tests/shared/` holds data only tests read, such as rendering
+cases both clients' tests share.
+
 The user views and edits the graph as Org text in Emacs or Neovim.
 When a client asks for a view, Rust sends a whole buffer of text.
 When the user saves, the client sends the whole buffer back. Saving

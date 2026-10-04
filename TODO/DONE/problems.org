@@ -1,3 +1,21 @@
+* Herald color names and docs have drifted (2026-10-04; fixed 2026-10-04)
+  'HeraldColor::Orange' in 'server/heralds.rs' renders yellow and the
+  unused 'Yellow' would render orange: both clients map the keyword
+  ORANGE to the highly-interesting (yellow) face and YELLOW to the
+  moderately-interesting (orange) one, since commit 'fd7b8602' swapped
+  the faces without renaming the keywords. Also stale: the
+  'heralds-cyan-face' docstring ("A / I"; it also styles P), the
+  'heralds--color-to-face' docstring, the 'server/heralds.rs' comment on
+  'heralds--inject-default-affectsParent' and its "{" herald (neither
+  exists), and 'docs/heralds.org' quoting "had ID before org-roam
+  import" where 'FileProperty::herald_text' says "had ID before import".
+  See [[file:../herald-colors/1_discussion.org][the herald-colors discussion]], which proposes semantic
+  style keywords that would remove the swap. No code changed.
+  Fixed by executing TODO/herald-colors/2_1_plan.org: heralds name
+  styles, not colors, so the swapped keywords and faces are gone; the
+  stale docstrings went with the faces they described; the
+  'server/heralds.rs' comment now describes the 'true' rule that
+  exists; and 'docs/heralds.org' quotes "had ID before import".
 * Link interestingness inspects inactive content relationships (fixed 2026-09-23)
   'link_split' in 'server/dbs/in_rust_graph/stats.rs' filters inbound
   linking nodes by active home source, then tests their raw 'contains'
