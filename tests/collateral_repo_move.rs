@@ -19,7 +19,7 @@ use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::views_state::{OpenViews, ViewUri};
-use skg::types::viewnode::ViewNode;
+use skg::types::viewnode::Viewnode;
 
 use ego_tree::Tree;
 use std::error::Error;
@@ -56,7 +56,7 @@ fn test_repo_move_updates_collateral_view_metadata (
       let root_ids : Vec<ID> =
         vec![ ID::new ("a") ];
       let (initial_buffer, pids, viewforest)
-        : (String, Vec<ID>, Tree<ViewNode>) =
+        : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view (
           &config, None, &root_ids, false )?;
       assert! (

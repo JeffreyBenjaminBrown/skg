@@ -1,4 +1,4 @@
-/// PURPOSE: "Integrate" a "path" into an ViewNode tree.
+/// PURPOSE: "Integrate" a "path" into an Viewnode tree.
 /// PITFALL: Both of those terms are tricky.
 /// - The 'path' is actually more general than that:
 ///   If at the end it forks, it includes the first layer of branches,
@@ -18,7 +18,7 @@ use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::tree::viewnode_nodecomplete::{ find_child_by_id, find_children_by_ids};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, AffectsParent, mk_writeProtected_from_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ Birth, Viewnode, ViewnodeKind, AffectsParent, mk_writeProtected_from_viewnode, mk_unknown_viewnode };
 use crate::types::viewnode::Vognode;
 
 use ego_tree::{NodeId,Tree};
@@ -32,7 +32,7 @@ use std::error::Error;
 /// ('RelationRole::backpath_triple'), so one call site serves all nine
 /// partner roles.
 pub fn build_and_integrate_path_view_then_drop_request (
-  tree          : &mut Tree<ViewNode>,
+  tree          : &mut Tree<Viewnode>,
   node_id       : NodeId,
   graph         : &InRustGraph,
   role          : RelationRole,
@@ -56,7 +56,7 @@ pub fn build_and_integrate_path_view_then_drop_request (
 /// repos). The container role itself IS that ancestry, so it does not
 /// re-attach.
 pub fn build_and_integrate_path_with_repo_set (
-  tree      : &mut Tree<ViewNode>,
+  tree      : &mut Tree<Viewnode>,
   node_id   : NodeId,
   graph     : &InRustGraph,
   role      : RelationRole,
@@ -76,11 +76,11 @@ pub fn build_and_integrate_path_with_repo_set (
       tree, node_id, role, graph, config, active ) ?; }
   Ok (( )) }
 
-/// Integrate a containerward path into a ViewNode tree (no ancestry
+/// Integrate a containerward path into a Viewnode tree (no ancestry
 /// re-attach). Thin wrapper kept for callers/tests; the engine is the
 /// generic 'build_and_integrate_path_with_repo_set'.
 pub fn build_and_integrate_containerward_path (
-  tree      : &mut Tree<ViewNode>,
+  tree      : &mut Tree<Viewnode>,
   node_id   : NodeId,
   graph     : &InRustGraph,
   config    : &SkgConfig,
@@ -89,7 +89,7 @@ pub fn build_and_integrate_containerward_path (
     tree, node_id, graph, RelationRole::CONTAINER, config, None ) }
 
 pub fn build_and_integrate_containerward_path_with_repo_set (
-  tree      : &mut Tree<ViewNode>,
+  tree      : &mut Tree<Viewnode>,
   node_id   : NodeId,
   graph     : &InRustGraph,
   config    : &SkgConfig,
@@ -102,7 +102,7 @@ pub fn build_and_integrate_containerward_path_with_repo_set (
 /// each repo's containerward ancestry. Thin wrapper over the generic
 /// engine with the mentioner role.
 pub fn build_and_integrate_mentionerward_path (
-  tree      : &mut Tree<ViewNode>,
+  tree      : &mut Tree<Viewnode>,
   node_id   : NodeId,
   graph     : &InRustGraph,
   config    : &SkgConfig,
@@ -120,7 +120,7 @@ pub fn build_and_integrate_mentionerward_path (
 /// Mentionerward callers use this to fetch ancestries for each
 /// link repo; containerward callers can ignore it.
 fn build_and_integrate_backpaths (
-  tree        : &mut Tree<ViewNode>,
+  tree        : &mut Tree<Viewnode>,
   node_id     : NodeId,
   graph       : &InRustGraph,
   config      : &SkgConfig,
@@ -145,7 +145,7 @@ fn build_and_integrate_backpaths (
 /// At 'node_id' in 'tree', integrate 'paths' of homogenous birth 'birth'.
 fn integrate_backpaths (
   node_id : NodeId,
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   graph   : &InRustGraph,
   paths   : Vec<PathToFirstNonlinearity>,
   birth   : Birth,
@@ -160,10 +160,10 @@ fn integrate_backpaths (
     ) ?; }
   Ok(()) }
 
-/// Integrate a (maybe forked or cyclic) path into an ViewNode tree,
+/// Integrate a (maybe forked or cyclic) path into an Viewnode tree,
 /// using provided backpath data.
 pub fn integrate_path_that_might_fork_or_cycle (
-  tree        : &mut Tree<ViewNode>,
+  tree        : &mut Tree<Viewnode>,
   node_id     : NodeId,
   path        : Vec < ID >,
   branches    : HashSet < ID >,
@@ -178,7 +178,7 @@ pub fn integrate_path_that_might_fork_or_cycle (
 }
 
 pub fn integrate_path_that_might_fork_or_cycle_with_repo_set (
-  tree        : &mut Tree<ViewNode>,
+  tree        : &mut Tree<Viewnode>,
   node_id     : NodeId,
   path        : Vec < ID >,
   branches    : HashSet < ID >,
@@ -207,7 +207,7 @@ pub fn integrate_path_that_might_fork_or_cycle_with_repo_set (
 /// Operates on a specific node and the remaining path.
 /// Returns the NodeId of the last node in the path.
 fn integrate_linear_portion_of_path (
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   node_id : NodeId,
   path    : &[ID],
   graph   : &InRustGraph,
@@ -243,7 +243,7 @@ fn integrate_linear_portion_of_path (
 /// Branches are added in sorted order (reversed for prepending).
 /// Branches that are already children are skipped.
 fn integrate_branches_in_node (
-  tree     : &mut Tree<ViewNode>,
+  tree     : &mut Tree<Viewnode>,
 
   node_id  : NodeId,
   branches : HashSet < ID >,
@@ -270,7 +270,7 @@ fn integrate_branches_in_node (
 /// Add cycle nodes as children of the specified node.
 /// Cycle nodes already present as children are skipped.
 fn integrate_cycle_nodes (
-  tree        : &mut Tree<ViewNode>,
+  tree        : &mut Tree<Viewnode>,
   node_id     : NodeId,
   cycle_nodes : HashSet < ID >,
   graph       : &InRustGraph,
@@ -316,7 +316,7 @@ fn extract_pids_from_paths (
 /// ancestry as subheadlines with Birth::Backpath(CONTAINER), so the
 /// partner is shown in its own container context.
 fn attach_containerward_ancestries_for_birth_role (
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   node_id : NodeId,
   role    : RelationRole,
   graph   : &InRustGraph,
@@ -328,7 +328,7 @@ fn attach_containerward_ancestries_for_birth_role (
     let mut result : Vec<NodeId> = Vec::new ();
     for edge in tree . get (node_id) . unwrap () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
-        if let ViewNodeKind::Vognode (Vognode::Active (t))
+        if let ViewnodeKind::Vognode (Vognode::Active (t))
           = &node_ref . value () . kind
         { if t . birth == Birth::Backpath (role) {
             result . push ( node_ref . id () ); }} }}
@@ -344,7 +344,7 @@ fn attach_containerward_ancestries_for_birth_role (
 /// or whose ancestry is `Root`/`Repeated`/`DepthTruncated`, are
 /// skipped.
 pub fn attach_containerward_ancestries_at_nodeids (
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   nodeids : &[NodeId],
   graph   : &InRustGraph,
   config  : &SkgConfig,
@@ -354,7 +354,7 @@ pub fn attach_containerward_ancestries_at_nodeids (
 }
 
 pub fn attach_containerward_ancestries_at_nodeids_with_repo_set (
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   nodeids : &[NodeId],
   graph   : &InRustGraph,
   config  : &SkgConfig,
@@ -365,7 +365,7 @@ pub fn attach_containerward_ancestries_at_nodeids_with_repo_set (
       . filter_map ( |nid|
         tree . get (*nid) . and_then ( |n|
           match & n . value () . kind {
-            ViewNodeKind::Vognode (Vognode::Active (t))
+            ViewnodeKind::Vognode (Vognode::Active (t))
               => Some ( (*nid, t . id . clone ()) ),
             _ => None } ) )
       . collect ();
@@ -383,7 +383,7 @@ pub fn attach_containerward_ancestries_at_nodeids_with_repo_set (
 /// `attach_containerward_ancestries_at_nodeids` and the surrounding
 /// recursive insertion both call into the same rev-prepend loop.
 fn attach_containerward_ancestries_from_map (
-  tree         : &mut Tree<ViewNode>,
+  tree         : &mut Tree<Viewnode>,
   pairs        : &[(NodeId, ID)],
   ancestry_map : &HashMap<ID, AncestryTree>,
   graph        : &InRustGraph,
@@ -408,7 +408,7 @@ fn attach_containerward_ancestries_from_map (
 pub fn insert_containerward_ancestry_tree_recursive (
   node       : &AncestryTree,
   parent_nid : NodeId,
-  tree       : &mut Tree<ViewNode>,
+  tree       : &mut Tree<Viewnode>,
   graph      : &InRustGraph,
   config     : &SkgConfig,
   active     : Option<&ActiveRepoSet>,
@@ -430,14 +430,14 @@ pub fn insert_containerward_ancestry_tree_recursive (
     Ok (()) }
 
 pub fn prepend_writeProtected_indep_child (
-  tree          : &mut Tree<ViewNode>,
+  tree          : &mut Tree<Viewnode>,
   parent_treeid : NodeId,
   child_skgid   : &ID,
   graph         : &InRustGraph,
   config        : &SkgConfig,
   birth         : Birth,
 ) -> Result < NodeId, Box<dyn Error> > {
-  let viewnode : ViewNode = match
+  let viewnode : Viewnode = match
     nodecomplete_and_viewnode_from_id (
       graph, config, child_skgid
     ) ? {
@@ -452,7 +452,7 @@ pub fn prepend_writeProtected_indep_child (
   Ok (new_child_treeid) }
 
 pub fn prepend_writeProtected_indep_child_with_repo_set (
-  tree          : &mut Tree<ViewNode>,
+  tree          : &mut Tree<Viewnode>,
   parent_treeid : NodeId,
   child_skgid   : &ID,
   graph         : &InRustGraph,

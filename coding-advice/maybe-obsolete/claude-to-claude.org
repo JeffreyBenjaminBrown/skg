@@ -67,7 +67,7 @@ There are three ways to test the code:
 
   The central pipeline. When Emacs saves a buffer, the server:
 
-  1. Parses buffer text -> ViewNode tree ('org_to_uninterpreted_nodes')
+  1. Parses buffer text -> Viewnode tree ('org_to_uninterpreted_nodes')
   2. Enriches with missing IDs/repos ('add_missing_info_to_forest')
      - New nodes get UUIDs; repoless nodes inherit parent's Skg repo
   3. Validates tree structure ('find_buffer_errors_for_saving')
@@ -91,7 +91,7 @@ There are three ways to test the code:
   9. Re-renders saved view and collateral views ('update_views_after_save')
 
   Key entry point: 'handle_save_buffer_request' in server/serve/handlers/save_buffer.rs.
-  Key data flow: buffer text -> MpViewnode -> ViewNode -> CollectedIntents -> NodeIntent -> DefineNode (Save|Delete) -> filesystem/graph/Tantivy.
+  Key data flow: buffer text -> MpViewnode -> Viewnode -> CollectedIntents -> NodeIntent -> DefineNode (Save|Delete) -> filesystem/graph/Tantivy.
 
 * Skg repo (RepoName)
 
@@ -114,15 +114,15 @@ There are three ways to test the code:
     (override substitution; see docs/glossary.org and docs/sharing-model.org)
   - links_to: org-roam style [[id:...]] hyperlinks
 
-  The view system is ephemeral scaffolding rebuilt every save:
+  The view system is ephemeral non-vognode viewnodes rebuilt every save:
   - ActiveNode: corresponds to an NodeComplete, can be Definitive (editable) or Write-protected
-  - Scaffold: display-only nodes; the relation folders are
+  - Non-vognode: display-only nodes; the relation folders are
     PartnerFolders (subscribeeFolder, subscriberFolder, overriddenFolder, ...),
     plus AliasFolder, IDFolder, etc. (see docs/glossary.org, "PartnerFolder")
   - 'complete_viewforest' (server/update_buffer/complete.rs) is one
     level-order BFS used for both de novo views and post-save
     rerendering; per-folder reconcilers add and reconcile the
-    scaffolds. (The older two-DFS-pass 'complete_viewtree' is gone;
+    non-vognodes. (The older two-DFS-pass 'complete_viewtree' is gone;
     see TODO/DONE/local-view-update/plan_v2.org.)
 
 * Recovery and source of truth

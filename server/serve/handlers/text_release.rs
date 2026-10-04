@@ -11,7 +11,7 @@ use crate::repo_sets::ActiveRepoSet;
 use crate::types::misc::ID;
 use crate::types::sexp::extract_string_list_from_sexp;
 use crate::types::viewnode::{
-  ViewNode, ViewNodeKind, Vognode, mk_inactive_viewnode};
+  Viewnode, ViewnodeKind, Vognode, mk_inactive_viewnode};
 
 use ego_tree::{NodeId, NodeMut, Tree};
 use sexp::{Atom, Sexp};
@@ -152,7 +152,7 @@ pub fn challenge_response (
 /// exclusion uses this after enrichment so ancestry and override grafting
 /// cannot broaden the choice made before the Tantivy query.
 pub fn exclude_overPrivateText_nodes_from_viewforest (
-  viewforest : &mut Tree<ViewNode>,
+  viewforest : &mut Tree<Viewnode>,
   graph      : &InRustGraph,
 ) {
   let node_ids : Vec<NodeId> =
@@ -163,14 +163,14 @@ pub fn exclude_overPrivateText_nodes_from_viewforest (
     let should_convert : bool =
       viewforest . get (node_id)
       . and_then ( |node| match &node . value () . kind {
-        ViewNodeKind::Vognode (Vognode::Active (active_node)) =>
+        ViewnodeKind::Vognode (Vognode::Active (active_node)) =>
           graph . pid_of (&active_node . id),
         _ => None, } )
       . and_then ( |pid| graph . get (&pid) )
       . map ( |node| node . overPrivateText_telescope )
       . unwrap_or (false);
     if should_convert {
-      let mut node : NodeMut<crate::types::viewnode::ViewNode> =
+      let mut node : NodeMut<crate::types::viewnode::Viewnode> =
         viewforest . get_mut (node_id) . unwrap ();
       node . value () . kind = mk_inactive_viewnode () . kind; }}
 }

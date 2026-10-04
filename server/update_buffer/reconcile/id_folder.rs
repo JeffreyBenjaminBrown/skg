@@ -6,8 +6,8 @@ use crate::types::nodes::complete::NodeComplete;
 use crate::types::git::{RepoDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_activeNode};
 use crate::types::tree::generic::error_unless_node_satisfies;
 use crate::update_buffer::ancestry::pid_and_repo_from_required_ancestor;
-use crate::types::viewnode::{ViewNode, ViewNodeKind};
-use crate::types::viewnode::{QualFolder, Qual};
+use crate::types::viewnode::{Viewnode, ViewnodeKind};
+use crate::types::viewnode::{PropertyFolder, Property};
 use crate::update_buffer::util::complete_relevant_children_in_viewnodetree;
 use ego_tree::{NodeId, Tree};
 use std::collections::HashMap;
@@ -24,7 +24,7 @@ use std::error::Error;
 /// - Reconcile children via complete_relevant_children_in_viewnodetree
 pub fn reconcile_idFolder_children (
   idfolder_node_id : NodeId,
-  tree          : &mut Tree<ViewNode>,
+  tree          : &mut Tree<Viewnode>,
   graph         : &InRustGraph,
   repo_diffs  : &Option<HashMap<RepoName, RepoDiff>>,
   config        : &SkgConfig,
@@ -32,7 +32,7 @@ pub fn reconcile_idFolder_children (
   error_unless_node_satisfies(
     tree, idfolder_node_id,
     |viewnode| matches!( &viewnode . kind,
-                         ViewNodeKind::QualFolder (QualFolder::ID) ),
+                         ViewnodeKind::PropertyFolder (PropertyFolder::ID) ),
     "reconcile_idFolder_children: Node is not an IDFolder" )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   // TODO/DONE/local-view-update/propagate-death-leafward/plan.org §4: parent Active vognode read through the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 ancestry table (index 0).
@@ -67,24 +67,24 @@ pub fn reconcile_idFolder_children (
       let amap : HashMap<ID, RelationshipAxes> =
         merged . into_iter () . collect ();
       ( goals, amap ) };
-  let is_id : fn (&ViewNode) -> bool =
+  let is_id : fn (&Viewnode) -> bool =
     |viewnode| matches!( &viewnode . kind,
-                         ViewNodeKind::Qual (Qual::ID { .. } ) );
-  let view_id_text : fn (&ViewNode) -> Result<ID, String> =
+                         ViewnodeKind::Property (Property::ID { .. } ) );
+  let view_id_text : fn (&Viewnode) -> Result<ID, String> =
     |viewnode| match &viewnode . kind {
-      ViewNodeKind::Qual (Qual::ID { id, .. } ) =>
+      ViewnodeKind::Property (Property::ID { id, .. } ) =>
         Ok ( id . clone() ),
-      _ => Err ( "reconcile_idFolder_children: relevant child is not an ID scaffold"
+      _ => Err ( "reconcile_idFolder_children: relevant child is not an ID property"
                  . to_string() ), };
-  let create_id = |id: &ID| -> Result<ViewNode, String> {
+  let create_id = |id: &ID| -> Result<Viewnode, String> {
     let relationship_axes : RelationshipAxes =
       axes_map . get (id) . copied () . unwrap_or_default ();
-    Ok ( ViewNode {
+    Ok ( Viewnode {
       focused     : false,
       folded      : false,
       body_folded : false,
-      kind        : ViewNodeKind::Qual (
-        Qual::ID {
+      kind        : ViewnodeKind::Property (
+        Property::ID {
           id: id . clone(), relationship_axes } ) } ) };
   complete_relevant_children_in_viewnodetree(
     tree,

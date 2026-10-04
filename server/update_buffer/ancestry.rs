@@ -1,7 +1,7 @@
 //! Death-leafward: a folder self-checks its required ancestry at its BFS visit.
 //!
 //! See TODO/local-view-update/DONE/propagate-death-leafward/plan.org. In the
-//! single-visit BFS (complete.rs), each folder (a non-vognode viewnode: QualFolder,
+//! single-visit BFS (complete.rs), each folder (a non-vognode viewnode: PropertyFolder,
 //! PartnerFolder) is reconciled at its own visit, and that reconcile reads its
 //! ancestor vognode(s). If a required ancestor died this save, the read would
 //! hit a missing NodeComplete, return Err, and abort the whole (often
@@ -30,8 +30,8 @@
 use crate::types::misc::{ID, RepoName};
 use crate::types::tree::generic::{ read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree };
 use crate::types::tree::viewnode_nodecomplete::write_at_activeNode_in_tree;
-use crate::types::viewnode::{ AffectsParent, PartnerFolder, ViewNode, ViewNodeKind, Vognode };
-use crate::update_buffer::util::detach_scaffold_transferring_focus;
+use crate::types::viewnode::{ AffectsParent, PartnerFolder, Viewnode, ViewnodeKind, Vognode };
+use crate::update_buffer::util::detach_viewnode_transferring_focus;
 
 use ego_tree::{ NodeId, NodeRef, Tree };
 use std::error::Error;
@@ -42,7 +42,7 @@ use std::error::Error;
 enum ExpectedAncestor {
   /// Must be a `Vognode::Active` (anything else at this depth means death).
   NormalVognode,
-  /// Must be exactly this folder kind (TODO/DONE/local-view-update/plan_v2.org §19: a folder = a collecting scaffold). The
+  /// Must be exactly this folder kind (TODO/DONE/local-view-update/plan_v2.org §19: a folder = a collecting non-vognode). The
   /// only intermediate-chain folder the table uses is the SubscribeeFolder.
   Folder (PartnerFolder),
 }
@@ -63,55 +63,55 @@ const ANC_NONE : &[ExpectedAncestor] = &[];
 /// The TODO/DONE/local-view-update/propagate-death-leafward/plan.org §3 required ancestry for a folder kind, nearest -> farthest. Non-folder kinds
 /// have none (they are never orphan-checked).
 fn required_ancestry (
-  kind : &ViewNodeKind,
+  kind : &ViewnodeKind,
 ) -> &'static [ExpectedAncestor] {
   match kind {
-    // QualFolder(Alias) and QualFolder(ID): parent Active vognode.
-    ViewNodeKind::QualFolder (_) => ANC_NORMAL,
+    // PropertyFolder(Alias) and PropertyFolder(ID): parent Active vognode.
+    ViewnodeKind::PropertyFolder (_) => ANC_NORMAL,
     // Subscribee folder: parent = subscriber (Normal).
     // PartnerFolders (Subscriber/Overridden/Overrider/Hider/Hidden): parent
     // Active vognode.
-    ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee)
-      | ViewNodeKind::PartnerFolder (PartnerFolder::Subscriber)
-      | ViewNodeKind::PartnerFolder (PartnerFolder::Overridden)
-      | ViewNodeKind::PartnerFolder (PartnerFolder::Overrider)
-      | ViewNodeKind::PartnerFolder (PartnerFolder::Hider)
-      | ViewNodeKind::PartnerFolder (PartnerFolder::Hidden) => ANC_NORMAL,
-    ViewNodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
+    ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)
+      | ViewnodeKind::PartnerFolder (PartnerFolder::Subscriber)
+      | ViewnodeKind::PartnerFolder (PartnerFolder::Overridden)
+      | ViewnodeKind::PartnerFolder (PartnerFolder::Overrider)
+      | ViewnodeKind::PartnerFolder (PartnerFolder::Hider)
+      | ViewnodeKind::PartnerFolder (PartnerFolder::Hidden) => ANC_NORMAL,
+    ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
       ANC_HIDDEN_OUTSIDE,
-    ViewNodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee) =>
+    ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee) =>
       ANC_HIDDEN_IN,
     _ => ANC_NONE,
   } }
 
 fn matches_expected (
-  actual   : &ViewNodeKind,
+  actual   : &ViewnodeKind,
   expected : &ExpectedAncestor,
 ) -> bool {
   match expected {
     ExpectedAncestor::NormalVognode =>
-      matches! ( actual, ViewNodeKind::Vognode (Vognode::Active (_)) ),
+      matches! ( actual, ViewnodeKind::Vognode (Vognode::Active (_)) ),
     ExpectedAncestor::Folder (rc) =>
-      matches! ( actual, ViewNodeKind::PartnerFolder (r) if r == rc ),
+      matches! ( actual, ViewnodeKind::PartnerFolder (r) if r == rc ),
   } }
 
 /// Whether `kind` is a FOLDER -- in Jeff's terminology (TODO/DONE/local-view-update/plan_v2.org §19) a folder is a
-/// *collecting* scaffold, i.e. a QualFolder (ID/Alias) or a PartnerFolder. (A SCAFFOLD
-/// is any non-Vognode viewnode; the non-folder scaffolds -- Qual leaves, BufferRoot,
-/// DeadScaffold -- are excluded here.) Folders are the kinds that carry a required
+/// *collecting* non-vognode, i.e. a PropertyFolder (ID/Alias) or a PartnerFolder. (A NON-VOGNODE
+/// is any non-Vognode viewnode; the non-folders -- Property leaves, BufferRoot,
+/// DeadViewnode -- are excluded here.) Folders are the kinds that carry a required
 /// ancestry and so are subject to the generalized-orphan check.
 pub fn is_folder_kind (
-  kind : &ViewNodeKind,
+  kind : &ViewnodeKind,
 ) -> bool {
   matches! ( kind,
-    ViewNodeKind::QualFolder (_) | ViewNodeKind::PartnerFolder (_) ) }
+    ViewnodeKind::PropertyFolder (_) | ViewnodeKind::PartnerFolder (_) ) }
 
 fn ancestor_nodeid (
-  tree       : &Tree<ViewNode>,
+  tree       : &Tree<Viewnode>,
   node       : NodeId,
   generation : usize,
 ) -> Option<NodeId> {
-  let mut node_ref : NodeRef<ViewNode> = tree . get (node) ?;
+  let mut node_ref : NodeRef<Viewnode> = tree . get (node) ?;
   for _ in 0 .. generation {
     node_ref = node_ref . parent () ?; }
   Some ( node_ref . id () ) }
@@ -124,10 +124,10 @@ fn ancestor_nodeid (
 /// missing ancestor (chain shorter than required) also counts as orphaned.
 /// Purely view-based: no graph / NodeComplete read.
 pub fn folder_is_generalized_orphan (
-  tree : &Tree<ViewNode>,
+  tree : &Tree<Viewnode>,
   folder  : NodeId,
 ) -> Result<bool, Box<dyn Error>> {
-  let kind : ViewNodeKind =
+  let kind : ViewnodeKind =
     read_at_node_in_tree ( tree, folder, |vn| vn . kind . clone () )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   for (i, expected) in required_ancestry (&kind) . iter () . enumerate () {
@@ -135,7 +135,7 @@ pub fn folder_is_generalized_orphan (
     let matches : bool =
       read_at_ancestor_in_tree (
         tree, folder, depth,
-        |vn : &ViewNode| matches_expected (&vn . kind, expected) )
+        |vn : &Viewnode| matches_expected (&vn . kind, expected) )
       . unwrap_or (false); // cannot climb that high => orphaned
     if ! matches { return Ok (true); } }
   Ok (false) }
@@ -151,11 +151,11 @@ pub fn folder_is_generalized_orphan (
 /// table-indexed ancestor directly. (The kind-validation lives in exactly one
 /// place, 'folder_is_generalized_orphan'.)
 pub fn required_ancestor (
-  tree : &Tree<ViewNode>,
+  tree : &Tree<Viewnode>,
   folder  : NodeId,
   i    : usize,
 ) -> Result<Option<NodeId>, Box<dyn Error>> {
-  let kind : ViewNodeKind =
+  let kind : ViewnodeKind =
     read_at_node_in_tree ( tree, folder, |vn| vn . kind . clone () )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   let spec : &[ExpectedAncestor] = required_ancestry (&kind);
@@ -168,7 +168,7 @@ pub fn required_ancestor (
 /// orphan pre-check and deadens an orphan before its reconcile is ever called,
 /// but the contract is what keeps a reconcile from reading an unlisted ancestor.
 pub fn pid_and_repo_from_required_ancestor (
-  tree   : &Tree<ViewNode>,
+  tree   : &Tree<Viewnode>,
   folder    : NodeId,
   i      : usize,
   caller : &str,
@@ -180,8 +180,8 @@ pub fn pid_and_repo_from_required_ancestor (
       caller, i ) ) ?;
   read_at_node_in_tree (
     tree, anc,
-    |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::Vognode (v) =>
+    |vn : &Viewnode| match &vn . kind {
+      ViewnodeKind::Vognode (v) =>
         v . pid_and_repo ()
         . map ( |(pid, repo)| (pid . clone (), repo . clone ()) ),
       _ => None } )
@@ -190,11 +190,11 @@ pub fn pid_and_repo_from_required_ancestor (
       "{}: required ancestor {} has no pid/repo", caller, i ) . into () ) }
 
 /// Deaden a generalized-orphan folder at its BFS visit (TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5): dispose each
-/// direct child, then convert the folder itself to a DeadScaffold and skip its
+/// direct child, then convert the folder itself to a DeadViewnode and skip its
 /// reconcile. The BFS still visits the (disposed) children; a demoted-
-/// Independent survivor is visited normally, a DeadScaffold child is a no-op.
+/// Independent survivor is visited normally, a DeadViewnode child is a no-op.
 pub fn deaden_generalized_orphan_folder (
-  tree : &mut Tree<ViewNode>,
+  tree : &mut Tree<Viewnode>,
   folder  : NodeId,
 ) -> Result<(), Box<dyn Error>> {
   let child_ids : Vec<NodeId> =
@@ -204,7 +204,7 @@ pub fn deaden_generalized_orphan_folder (
   for cid in child_ids {
     dispose_orphaned_folder_child (tree, cid) ?; }
   write_at_node_in_tree ( tree, folder,
-    |vn : &mut ViewNode| { vn . kind = ViewNodeKind::DeadScaffold; } )
+    |vn : &mut Viewnode| { vn . kind = ViewnodeKind::DeadViewnode; } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
   Ok (( )) }
 
@@ -212,36 +212,36 @@ pub fn deaden_generalized_orphan_folder (
 /// - an Affected (affectsParent=Affected Normal) view-leaf -> delete;
 /// - an Affected branch (has children) -> demote to affectsParent=Independent, so
 ///   the user's subtree survives;
-/// - a nested folder (QualFolder / PartnerFolder) -> LEAVE it untouched: it is itself a
+/// - a nested folder (PropertyFolder / PartnerFolder) -> LEAVE it untouched: it is itself a
 ///   generalized orphan under this now-dead folder, so it deadens itself -- and
 ///   disposes ITS OWN children -- at its own BFS visit. (This DEVIATES from
-///   TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5.1.a, which converted nested folders to DeadScaffold here; doing
+///   TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5.1.a, which converted nested folders to DeadViewnode here; doing
 ///   so would freeze a nested folder before it could dispose its own leaf members,
 ///   leaving them stranded under a dead chain. Leaving it to self-deaden is
 ///   what the TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5 note actually intends -- "a nested folder ... deadens
 ///   itself at its own visit too" -- and is what makes leaf members at every
-///   depth die. A Qual leaf does NOT self-dispatch, so it is still converted
+///   depth die. A Property leaf does NOT self-dispatch, so it is still converted
 ///   below.)
-/// - any other non-vognode, non-phantom child (a Qual, a DeadScaffold) -> convert
-///   to DeadScaffold;
+/// - any other non-vognode, non-phantom child (a Property, a DeadViewnode) -> convert
+///   to DeadViewnode;
 /// - any other child (a non-Affected vognode -- an Independent Active or an
 ///   Inactive -- or any Phantom: Diff/Deleted/Unknown) -> keep untouched.
 fn dispose_orphaned_folder_child (
-  tree  : &mut Tree<ViewNode>,
+  tree  : &mut Tree<Viewnode>,
   child : NodeId,
 ) -> Result<(), Box<dyn Error>> {
   let (affected, is_leaf, is_vognode_or_phantom, is_folder)
     : (bool, bool, bool, bool) = {
-    let c : NodeRef<ViewNode> = tree . get (child)
+    let c : NodeRef<Viewnode> = tree . get (child)
       . ok_or ("dispose_orphaned_folder_child: child not found") ?;
     ( c . value () . is_activeNode_and_affectsParent_true (),
       c . children () . next () . is_none (),
       matches! ( &c . value () . kind,
-                 ViewNodeKind::Vognode (_) | ViewNodeKind::Phantom (_) ),
+                 ViewnodeKind::Vognode (_) | ViewnodeKind::Phantom (_) ),
       is_folder_kind (&c . value () . kind) ) };
   if affected {
     if is_leaf {
-      detach_scaffold_transferring_focus (tree, child) ?;
+      detach_viewnode_transferring_focus (tree, child) ?;
     } else {
       write_at_activeNode_in_tree ( tree, child,
         |t| { t . affectsParent = AffectsParent::False; } )
@@ -250,7 +250,7 @@ fn dispose_orphaned_folder_child (
     // Leave it: a nested folder self-deadens at its own visit (see doc above).
   } else if ! is_vognode_or_phantom {
     write_at_node_in_tree ( tree, child,
-      |vn : &mut ViewNode| { vn . kind = ViewNodeKind::DeadScaffold; } )
+      |vn : &mut Viewnode| { vn . kind = ViewnodeKind::DeadViewnode; } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   // else: a non-Affected vognode or a phantom -- kept untouched.
   Ok (( )) }

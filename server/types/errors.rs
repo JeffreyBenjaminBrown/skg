@@ -25,8 +25,8 @@ pub enum SaveError {
 /// with any of these flags, the server should refuse.
 #[derive(Debug, Clone, PartialEq)]
 pub enum BufferValidationError {
-  Body_of_Scaffold               (String,   // Title from buffer
-                                  String),  // Scaffold kind (e.g. "aliasFolder", "alias")
+  Body_of_NonVognode               (String,   // Title from buffer
+                                  String),  // Non-vognode kind (e.g. "aliasFolder", "alias")
   Multiple_Defining_Viewnodes     (ID), // For any given ID, at most one occurrence can be definitive. (Its contents are intended to define those of the node.)
   AmbiguousDeletion              (ID),
   DuplicatedContent              (ID), // A node has multiple Content children with the same ID
@@ -105,7 +105,7 @@ impl std::fmt::Display for BufferValidationError {
     f: &mut std::fmt::Formatter<'_>
   ) -> std::fmt::Result {
     match self {
-      BufferValidationError::Body_of_Scaffold(title, kind) =>
+      BufferValidationError::Body_of_NonVognode(title, kind) =>
         write!(f, "{} node should not have a body. Node title: '{}'",
                kind, title),
       BufferValidationError::Multiple_Defining_Viewnodes (id) =>

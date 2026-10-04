@@ -4,7 +4,7 @@
 // The rule under test ('owned_ancestor_repos_for_foreign_vognodes'):
 // a foreign node's clone inherits the repo of its NEAREST vognode
 // ancestor, recorded only if that ancestor is an owned Active vognode.
-// The walk skips scaffolds (folders) but STOPS at the first vognode -- it
+// The walk skips non-vognodes (folders) but STOPS at the first vognode -- it
 // never passes a foreign or inactive ancestor to reach a distant owned
 // one.
 
@@ -13,7 +13,7 @@ use crate::types::misc::{SkgfileRepo, members_of, rel_partners_at_relRepo};
 use crate::types::nodes::complete::{
   Flag, empty_node_complete};
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerFolder,
+use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder,
                              mk_definitive_viewnode};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -32,13 +32,13 @@ fn config_two_owned_one_foreign () -> SkgConfig {
         user_owns_it : owns, } ); }
   SkgConfig::fromReposAndTantivyFolder ( repos, "/tmp/none" ) }
 
-fn active (id : &str, repo : &str) -> ViewNode {
+fn active (id : &str, repo : &str) -> Viewnode {
   mk_definitive_viewnode (
     ID::from (id), RepoName::from (repo), id . to_string (), None ) }
 
-fn subscribee_folder () -> ViewNode {
-  ViewNode { focused : false, folded : false, body_folded : false,
-             kind : ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee) } }
+fn subscribee_folder () -> Viewnode {
+  Viewnode { focused : false, folded : false, body_folded : false,
+             kind : ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) } }
 
 /// Build a forest exercising the three shapes:
 /// - owned2 P -> foreign F -> foreign N   (must infer NOTHING for N)
@@ -83,15 +83,15 @@ fn owned_N_still_infers_the_owned_repo () {
     "owned -> M must infer the owned ancestor's repo" ); }
 
 #[test]
-fn scaffold_ancestor_is_skipped () {
-  // owned1 R -> subscribeeFolder -> foreign S: the folder is a scaffold, so
+fn non_vognode_ancestor_is_skipped () {
+  // owned1 R -> subscribeeFolder -> foreign S: the folder is a non-vognode, so
   // S's nearest VOGNODE ancestor is the owned R.
   let config : SkgConfig = config_two_owned_one_foreign ();
   let map = owned_ancestor_repos_for_foreign_vognodes (
     & build_forest (), & config );
   assert_eq! ( map . get (& ID::from ("S")),
                Some (& RepoName::from ("owned1")),
-    "a scaffold between an owned ancestor and a foreign node is skipped" ); }
+    "a non-vognode between an owned ancestor and a foreign node is skipped" ); }
 
 /// A fork-to-be (clone) with an edited title over the original N it
 /// overrides, in N's foreign repo. (original_title is N's disk title.)

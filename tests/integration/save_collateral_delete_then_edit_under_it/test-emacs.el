@@ -1,18 +1,18 @@
 ;;; Integration test for delete-then-edit-under-deleted collateral updates
 ;;;
-;;; Buffer 1: multi-root view (scaffolded "1" + standalone subee root).
+;;; Buffer 1: multi-root view (placed under a non-vognode "1" + standalone subee root).
 ;;; Buffer 2: manually constructed (write-protected 11 + subee + subee-1).
 ;;;
 ;;; Phase 4: delete 11 from buffer 2 → 11 becomes DeletedNode,
-;;;   scaffolds become DeletedScaff in collateral buffer 1.
+;;;   non-vognodes become DeadViewnode in collateral buffer 1.
 ;;; Phase 6: add subee-2 under subee in buffer 1 → collateral
 ;;;   buffer 2 picks up subee-2.
-;;; Phase 8: add new-root under a deletedScaff in buffer 1 →
-;;;   Deleted/DeletedScaff round-trip harmlessly through save.
+;;; Phase 8: add new-root under a deadViewnode in buffer 1 →
+;;;   Deleted/DeadViewnode round-trip harmlessly through save.
 ;;;
-;;; Exercises DeletedNode / DeletedScaff degradation path in
+;;; Exercises DeletedNode / DeadViewnode degradation path in
 ;;; complete_viewtree, editing under a DeletedNode, and
-;;; re-saving a buffer containing Deleted/DeletedScaff nodes.
+;;; re-saving a buffer containing Deleted/DeadViewnode nodes.
 
 ;; Load the project elisp configuration
 (load-file "../../../elisp/skg-init.el")
@@ -162,7 +162,7 @@ which takes priority over subee.skg on disk."
   ;; Verify buffer 1 (collateral): the delete of 11 propagates to
   ;; node 1 (which contained it). 1.skg's contains has had 11
   ;; stripped, so on rerender the 11-subtree is gone entirely from
-  ;; buffer 1 -- no DeletedNode, no DeletedScaff descendants.
+  ;; buffer 1 -- no DeletedNode, no DeadViewnode descendants.
   (let ((buf1 (get-buffer "*1*")))
     (unless buf1
       (message "✗ FAIL [phase 5]: Buffer 1 no longer exists")
@@ -182,7 +182,7 @@ which takes priority over subee.skg on disk."
   (message "=== PHASE 6: Add subee-2 in buffer 1 ===")
   (setq integration-test-phase "phase-6-add-subee-2")
   (with-current-buffer "*1*"
-    ;; Find subee. The first match here is what used to be the second match, because the earlier first match was a child of a now-deleted scaffold.
+    ;; Find subee. The first match here is what used to be the second match, because the earlier first match was a child of a now-deleted non-vognode.
     (when (goto-nth-headline-with-title "subee" 1)
       (let ((subee-depth
              (let* ((line (buffer-substring-no-properties
@@ -247,13 +247,13 @@ which takes priority over subee.skg on disk."
 
 (defun phase-8-add-new-root-under-deleted-scaff ()
   "Add new-root as a sibling of the standalone subee in buffer 1.
-Originally this exercised inserting a node under a DeletedScaff;
+Originally this exercised inserting a node under a DeadViewnode;
 after the delete pipeline started cleaning up references to the
-deleted node, buffer 1 no longer contains a DeletedScaff, so the
+deleted node, buffer 1 no longer contains a DeadViewnode, so the
 phase now exercises adding a top-level root via metadata-only
-insertion (the BufferRoot, like a DeletedScaff, supplies no repo
+insertion (the BufferRoot, like a DeadViewnode, supplies no repo
 to inherit, so explicit (repo main) is still required)."
-  (message "=== PHASE 8: Add new-root under deletedScaff in buffer 1 ===")
+  (message "=== PHASE 8: Add new-root under deadViewnode in buffer 1 ===")
   (setq integration-test-phase "phase-8-add-new-root")
   (with-current-buffer "*1*"
     (when (goto-nth-headline-with-title "subee" 1)
@@ -282,11 +282,11 @@ to inherit, so explicit (repo main) is still required)."
   (skg-test-wait-for-response))
 
 (defun phase-9-verify-after-new-root ()
-  "Verify both buffers after saving with new-root under a deletedScaff."
+  "Verify both buffers after saving with new-root under a deadViewnode."
   (message "=== PHASE 9: Verify both buffers after new-root ===")
   (setq integration-test-phase "phase-9-verify-after-new-root")
 
-  ;; Verify buffer 1: new-root appears at depth 4 under deletedScaff,
+  ;; Verify buffer 1: new-root appears at depth 4 under deadViewnode,
   ;; everything else unchanged from phase 7.
   (let ((buf1 (get-buffer "*1*")))
     (unless buf1

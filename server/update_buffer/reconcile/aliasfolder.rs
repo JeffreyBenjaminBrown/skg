@@ -3,8 +3,8 @@ use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, RepoName, members_of};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, AffectsParent};
-use crate::types::viewnode::{Vognode, QualFolder, Qual};
+use crate::types::viewnode::{Viewnode, ViewnodeKind, AffectsParent};
+use crate::types::viewnode::{Vognode, PropertyFolder, Property};
 use crate::types::tree::generic::read_at_ancestor_in_tree;
 use crate::update_buffer::ancestry::pid_and_repo_from_required_ancestor;
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, treat_certain_children};
@@ -22,14 +22,14 @@ use std::error::Error;
 /// - Read its aliases into 'aliases'
 /// - Partition the AliasFolder's children into:
 ///   - ActiveNodes with affectsParent != Affected
-///   - Alias scaffold nodes
+///   - Alias property nodes
 ///   (Error if any child does not fit these categories.)
 /// - Reorder children: ignored ActiveNodes first, then Alias nodes
 /// - Among the Alias children, discard any not in 'aliases'
 /// - Create new Alias nodes for values in 'aliases' not already present
 /// - Order the final Alias children to match the order in 'aliases'
 pub fn reconcile_aliasFolder_children (
-  tree             : &mut Tree<ViewNode>,
+  tree             : &mut Tree<Viewnode>,
   aliasfolder_node_id : NodeId,
   graph            : &InRustGraph,
   repo_diffs     : &Option<HashMap<RepoName, RepoDiff>>,
@@ -39,7 +39,7 @@ pub fn reconcile_aliasFolder_children (
       read_at_ancestor_in_tree(
         tree, aliasfolder_node_id, 0,
         |viewnode| matches!( &viewnode . kind,
-                            ViewNodeKind::QualFolder (QualFolder::Alias)) )
+                            ViewnodeKind::PropertyFolder (PropertyFolder::Alias)) )
       . map_err( |e| -> Box<dyn Error> { e . into() } )?;
     if !is_aliasFolder { return Err(
       "reconcile_aliasFolder_children: Node is not an AliasFolder" . into() ); }}
@@ -76,24 +76,24 @@ pub fn reconcile_aliasFolder_children (
       let amap : HashMap<String, RelationshipAxes> =
         merged . into_iter () . collect ();
       ( goals, amap ) };
-  let is_alias : fn (&ViewNode) -> bool =
+  let is_alias : fn (&Viewnode) -> bool =
     // relevance to complete_relevant_children
     |viewnode| matches!( &viewnode . kind,
-                        ViewNodeKind::Qual (Qual::Alias { .. } ) );
-  let view_alias_text : fn (&ViewNode) -> Result<String, String> =
+                        ViewnodeKind::Property (Property::Alias { .. } ) );
+  let view_alias_text : fn (&Viewnode) -> Result<String, String> =
     |viewnode| match &viewnode . kind {
-      ViewNodeKind::Qual (Qual::Alias { text, .. } ) =>
+      ViewnodeKind::Property (Property::Alias { text, .. } ) =>
         Ok ( text . clone() ),
       _ => Err ( "reconcile_aliasFolder_children: relevant child is not an alias"
-                 . to_string() ), }; // relevance means Qual::Alias
-  let create_alias = |text: &String| -> Result<ViewNode, String> {
+                 . to_string() ), }; // relevance means Property::Alias
+  let create_alias = |text: &String| -> Result<Viewnode, String> {
     let relationship_axes : RelationshipAxes =
       axes_map . get (text) . copied () . unwrap_or_default ();
-    Ok ( ViewNode {
+    Ok ( Viewnode {
       focused     : false,
       folded      : false,
       body_folded : false,
-      kind : ViewNodeKind::Qual (Qual::Alias { text : text . clone(),
+      kind : ViewnodeKind::Property (Property::Alias { text : text . clone(),
                                                relRepo : alias_relRepos
                                                  . get (text)
                                                  . and_then ( |relRepo|
@@ -113,10 +113,10 @@ pub fn reconcile_aliasFolder_children (
       // children of AliasFolder. If that is later relaxed, only Normal
       // Vognodes need repair; affectsParent is a vestigial field in Phantoms.
       tree, aliasfolder_node_id,
-      |vn : &ViewNode| matches!( &vn . kind,
-                                  ViewNodeKind::Vognode (Vognode::Active (_)) ),
-      |vn : &mut ViewNode| {
-        if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
+      |vn : &Viewnode| matches!( &vn . kind,
+                                  ViewnodeKind::Vognode (Vognode::Active (_)) ),
+      |vn : &mut Viewnode| {
+        if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
           = vn . kind
           { t . affectsParent = AffectsParent::False; }},
     ) . map_err( |e| -> Box<dyn Error> { e . into() } )?;

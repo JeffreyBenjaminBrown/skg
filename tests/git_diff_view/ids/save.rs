@@ -1,7 +1,7 @@
 /// Tests for git diff view - save behavior with id changes.
 /// Deleting the whole idFolder is a no-op (absence means no opinion),
 /// but editing an idFolder's membership -- deleting, adding, editing or
-/// relocating id scaffolds -- aborts the save with IDFolder_Edited
+/// relocating id properties -- aborts the save with IDFolder_Edited
 /// (TODO/full-schema/8_readonly-set-ergonomics.org). Net-removed
 /// diff entries (removedR) are git history, not membership claims,
 /// and do not trip the check.
@@ -15,17 +15,17 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-git-diff-ids-save",
     |s| Box::pin ( async move {
-      test_delete_id_folder_scaffold_respawns (s) . await ?;
-      test_delete_id_scaffolds_aborts (s) . await ?;
-      test_edit_id_scaffold_aborts (s) . await ?;
-      test_reorder_id_scaffolds_saves (s) . await ?;
-      test_move_id_scaffolds_to_child_aborts (s) . await ?;
-      test_delete_id_folder_scaffold_respawns_staged (s) . await ?;
+      test_delete_id_folder_respawns (s) . await ?;
+      test_delete_id_properties_aborts (s) . await ?;
+      test_edit_id_property_aborts (s) . await ?;
+      test_reorder_id_properties_saves (s) . await ?;
+      test_move_id_properties_to_child_aborts (s) . await ?;
+      test_delete_id_folder_respawns_staged (s) . await ?;
       Ok (( )) } )) }
 
-/// Deleting an idFolder scaffold should be a no-op.
-/// The scaffold respawns in the returned buffer.
-async fn test_delete_id_folder_scaffold_respawns (
+/// Deleting an idFolder should be a no-op.
+/// The non-vognode respawns in the returned buffer.
+async fn test_delete_id_folder_respawns (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
@@ -33,7 +33,7 @@ async fn test_delete_id_folder_scaffold_respawns (
     s,
     "skg-test-save-del-idFolder",
     |config, tantivy, gitrepo_path| { Box::pin(async move {
-      // User deletes the entire idFolder scaffold (and its children)
+      // User deletes the entire idFolder (and its children)
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "skg id");
 
@@ -59,15 +59,15 @@ async fn test_delete_id_folder_scaffold_respawns (
       assert!(!node_1 . all_ids () . any(|id| id == &ID("2" . to_string())),
         "1.skg should not have id '2'");
 
-      // BUFFER: idFolder scaffold should respawn
+      // BUFFER: idFolder should respawn
       assert_buffer_contains(
         &response . saved_view, GIT_DIFF_VIEW);
       Ok(()) }) }) . await
 }
 
-/// Deleting individual id scaffolds (keeping the idFolder) aborts the
+/// Deleting individual id properties (keeping the idFolder) aborts the
 /// save with an IDFolder_Edited error, and the disk is untouched.
-async fn test_delete_id_scaffolds_aborts (
+async fn test_delete_id_properties_aborts (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
@@ -75,7 +75,7 @@ async fn test_delete_id_scaffolds_aborts (
     s,
     "skg-test-save-del-ids",
     |config, tantivy, gitrepo_path| { Box::pin(async move {
-      // User deletes the id scaffolds but keeps the idFolder
+      // User deletes the id properties but keeps the idFolder
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "(skg id)");
 
@@ -104,9 +104,9 @@ async fn test_delete_id_scaffolds_aborts (
       Ok(()) }) }) . await
 }
 
-/// Editing an id scaffold's text aborts the save with an
+/// Editing an id property's text aborts the save with an
 /// IDFolder_Edited error, and the disk is untouched.
-async fn test_edit_id_scaffold_aborts (
+async fn test_edit_id_property_aborts (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
@@ -114,7 +114,7 @@ async fn test_edit_id_scaffold_aborts (
     s,
     "skg-test-save-edit-id",
     |config, tantivy, gitrepo_path| { Box::pin(async move {
-      // User tries to change an id value in the scaffold
+      // User tries to change an id value in the non-vognode
       let input = GIT_DIFF_VIEW . replace(
         "(unstaged addedR)) 2'", "(unstaged addedR)) 2-modified");
 
@@ -132,7 +132,7 @@ async fn test_edit_id_scaffold_aborts (
       let err : String =
         format! ( "{:?}",
                   result . err ()
-                  . expect ("editing an id scaffold must abort the save") );
+                  . expect ("editing an id property must abort the save") );
       assert!(err . contains ("IDFolder_Edited"),
         "the error should be IDFolder_Edited: {}", err);
 
@@ -145,9 +145,9 @@ async fn test_edit_id_scaffold_aborts (
       Ok(()) }) }) . await
 }
 
-/// Reordering id scaffolds passes the membership check (multiset
+/// Reordering id properties passes the membership check (multiset
 /// equality); the rerender re-sorts them anyway.
-async fn test_reorder_id_scaffolds_saves (
+async fn test_reorder_id_properties_saves (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
@@ -178,7 +178,7 @@ async fn test_reorder_id_scaffolds_saves (
 
 /// Moving the idFolder to another node aborts the save: the receiving
 /// node's real ID list does not match the moved idFolder's claims.
-async fn test_move_id_scaffolds_to_child_aborts (
+async fn test_move_id_properties_to_child_aborts (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
@@ -186,7 +186,7 @@ async fn test_move_id_scaffolds_to_child_aborts (
     s,
     "skg-test-save-move-ids",
     |config, tantivy, gitrepo_path| { Box::pin(async move {
-      // User moves id scaffolds to be children of 'child' node
+      // User moves id properties to be children of 'child' node
       let input = "\
 * (skg (node (id 1) (repo main))) 1
 ** (skg (node (id child) (repo main))) child
@@ -229,13 +229,13 @@ async fn test_move_id_scaffolds_to_child_aborts (
       Ok(()) }) }) . await
 }
 
-/// Same as 'test_delete_id_folder_scaffold_respawns' but with the fixture
+/// Same as 'test_delete_id_folder_respawns' but with the fixture
 /// transition staged (git add) rather than unstaged. The respawned IDFolder
 /// children should report '(staged ...)' tags — this verifies that the
 /// save-rerender pipeline (reconcile_idFolder_children + complete_viewforest) honors the
 /// staged/unstaged distinction instead of merging stages and defaulting
 /// to unstaged.
-async fn test_delete_id_folder_scaffold_respawns_staged (
+async fn test_delete_id_folder_respawns_staged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {

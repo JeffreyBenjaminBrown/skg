@@ -91,7 +91,7 @@ describe('skg.modify_graph replacements', function ()
     '* (skg (node (id parent) (repo public))) container',
     '** (skg (node (id child) (repo public))) the leaf title',
     'leaf body',
-    '*** (skg aliasFolder) scaffolding under it' }, '\n')
+    '*** (skg aliasFolder) non-vognode viewnodes under it' }, '\n')
 
   it('replaces content with a link, from the body too', function ()
     buffer_with(container_and_leaf)

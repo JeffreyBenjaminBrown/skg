@@ -38,8 +38,8 @@ use crate::types::misc::{TantivyIndex, SkgConfig, ID, RepoName};
 use crate::repo_sets::{ActiveRepoSet, search_ids_for_repo_set_for_test as search_ids_for_repo_set_for_test_impl};
 use crate::types::sexp::extract_v_from_kv_pair_in_sexp;
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, AffectsParent, mk_writeProtected_viewnode};
-use crate::types::viewnode::{QualFolder, Qual};
+use crate::types::viewnode::{ Viewnode, ViewnodeKind, AffectsParent, mk_writeProtected_viewnode};
+use crate::types::viewnode::{PropertyFolder, Property};
 
 use ego_tree::{NodeId, NodeMut};
 use sexp::{Sexp, Atom};
@@ -632,23 +632,23 @@ pub fn build_search_viewforest (
         // PITFALL: The title might not be the best match,
         // in which case this makes it look like an alias.
         let aliasfolder_id : NodeId = {
-          let mut result_mut : NodeMut<ViewNode> =
+          let mut result_mut : NodeMut<Viewnode> =
             viewforest . get_mut (result_treeid) . unwrap ();
-          result_mut . append ( ViewNode {
+          result_mut . append ( Viewnode {
             focused     : false,
             folded      : true,
             body_folded : false,
-            kind        : ViewNodeKind::QualFolder (
-              QualFolder::Alias ) } )
+            kind        : ViewnodeKind::PropertyFolder (
+              PropertyFolder::Alias ) } )
           . id () };
         for (_score, title) in sorted_matches . iter () . skip (1) {
-          let mut aliasfolder_mut : NodeMut<ViewNode> =
+          let mut aliasfolder_mut : NodeMut<Viewnode> =
             viewforest . get_mut (aliasfolder_id) . unwrap ();
-          aliasfolder_mut . append ( ViewNode {
+          aliasfolder_mut . append ( Viewnode {
             focused     : false,
             folded      : false,
             body_folded : false,
-            kind        : ViewNodeKind::Qual (Qual::Alias {
+            kind        : ViewnodeKind::Property (Property::Alias {
                 text       : title . clone (),
                 relRepo : None,
                 relRepo_request : None,

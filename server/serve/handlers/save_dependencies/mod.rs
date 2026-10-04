@@ -10,7 +10,7 @@ use crate::types::misc::ID;
 use crate::types::links::links_from_text;
 use crate::types::tree::forest::{MpViewForest, ViewForest};
 use crate::types::viewnode::{
-  Editability, NodeEditRequest, Phantom, Qual, ViewNodeKind, Vognode,
+  Editability, NodeEditRequest, Phantom, Property, ViewnodeKind, Vognode,
 };
 use crate::types::views_state::ViewUri;
 
@@ -152,7 +152,7 @@ fn dependencies_from_uninterpreted (
         result . insert (phantom . id . clone ()); }
       MpViewnodeKind::Phantom (MpPhantom::Unknown (phantom)) => {
         result . insert (phantom . id . clone ()); }
-      MpViewnodeKind::Qual (Qual::ID { id, .. }) => {
+      MpViewnodeKind::Property (Property::ID { id, .. }) => {
         result . insert (id . clone ()); }
       _ => {}, }}
   result
@@ -164,20 +164,20 @@ fn dependencies_from_registered (
   let mut result : HashSet<ID> = HashSet::new ();
   for node in forest . nodes () {
     match &node . value () . kind {
-      ViewNodeKind::Vognode (Vognode::Active (active)) => {
+      ViewnodeKind::Vognode (Vognode::Active (active)) => {
         result . insert (active . id . clone ());
         result . extend (active . viewStats . overridesHere . iter () . cloned ());
         if let Editability::Definitive {
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
         } = &active . editability
         { result . insert (target . clone ()); }}
-      ViewNodeKind::Phantom (Phantom::Diff (phantom)) => {
+      ViewnodeKind::Phantom (Phantom::Diff (phantom)) => {
         result . insert (phantom . id . clone ()); }
-      ViewNodeKind::Phantom (Phantom::Deleted (phantom)) => {
+      ViewnodeKind::Phantom (Phantom::Deleted (phantom)) => {
         result . insert (phantom . id . clone ()); }
-      ViewNodeKind::Phantom (Phantom::Unknown (phantom)) => {
+      ViewnodeKind::Phantom (Phantom::Unknown (phantom)) => {
         result . insert (phantom . id . clone ()); }
-      ViewNodeKind::Qual (Qual::ID { id, .. }) => {
+      ViewnodeKind::Property (Property::ID { id, .. }) => {
         result . insert (id . clone ()); }
       _ => {}, }}
   result

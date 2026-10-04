@@ -2,19 +2,19 @@
 -- updates, nvim client. The Lua mirror of test-emacs.el in this
 -- directory.
 --
--- Buffer 1: multi-root view (scaffolded "1" + standalone subee root).
+-- Buffer 1: multi-root view (placed under a non-vognode "1" + standalone subee root).
 -- Buffer 2: manually constructed (write-protected 11 + subee + subee-1).
 --
 -- Phase 4: delete 11 from buffer 2 -> 11 becomes DeletedNode,
---   scaffolds become DeletedScaff in collateral buffer 1.
+--   non-vognodes become DeadViewnode in collateral buffer 1.
 -- Phase 6: add subee-2 under subee in buffer 1 -> collateral buffer 2
 --   picks up subee-2.
--- Phase 8: add new-root under a deletedScaff in buffer 1 ->
---   Deleted/DeletedScaff round-trip harmlessly through save.
+-- Phase 8: add new-root under a deadViewnode in buffer 1 ->
+--   Deleted/DeadViewnode round-trip harmlessly through save.
 --
--- Exercises DeletedNode / DeletedScaff degradation path in
+-- Exercises DeletedNode / DeadViewnode degradation path in
 -- complete_viewtree, editing under a DeletedNode, and re-saving a
--- buffer containing Deleted/DeletedScaff nodes.
+-- buffer containing Deleted/DeadViewnode nodes.
 
 local T = dofile('../test-nvim-lib.lua')
 T.arm_timeout(40)
@@ -27,7 +27,7 @@ local sexpr = require('skg.sexpr.parse')
 ---(depth type title) triples for every headline in BUF that carries
 ---skg metadata; headlines without metadata are skipped. Type is
 ---derived from the second element of the (skg ...) form: node,
----deleted, deletedScaffold, aliasFolder, etc. The port of
+---deleted, deadViewnode, aliasFolder, etc. The port of
 ---save_collateral_break_cycle/test-helpers.el's
 ---headline-types-and-titles.
 ---@param buf integer
@@ -231,7 +231,7 @@ assert_headline_types_and_titles(buf2,
 -- Buffer 1 (collateral): the delete of 11 propagates to node 1
 -- (which contained it). 1.skg's contains has had 11 stripped, so on
 -- rerender the 11-subtree is gone entirely from buffer 1 -- no
--- DeletedNode, no DeletedScaff descendants.
+-- DeletedNode, no DeadViewnode descendants.
 T.check(vim.api.nvim_buf_is_valid(buf1), 'Buffer 1 still exists')
 print('Buffer 1 after collateral delete:\n' .. T.buffer_text(buf1))
 assert_headline_types_and_titles(buf1,
@@ -244,7 +244,7 @@ print('=== PHASE 6: Add subee-2 in buffer 1 ===')
 -- Add subee-2 as a child of the standalone subee root in buffer 1
 -- and save. The first "subee" match is now what used to be the
 -- second match, because the earlier first match was a child of a
--- now-deleted scaffold.
+-- now-deleted non-vognode.
 vim.api.nvim_set_current_buf(buf1)
 do
   local subee_row = nth_line_with_title(buf1, 'subee', 1)
@@ -278,13 +278,13 @@ assert_headline_types_and_titles(buf2,
     { 2, 'node', 'subee-2' } },
   'phase 7: buffer 2 after updating collateral view')
 
-print('=== PHASE 8: Add new-root under deletedScaff in buffer 1 ===')
+print('=== PHASE 8: Add new-root under deadViewnode in buffer 1 ===')
 -- Add new-root as a sibling of the standalone subee in buffer 1.
--- Originally this exercised inserting a node under a DeletedScaff;
+-- Originally this exercised inserting a node under a DeadViewnode;
 -- after the delete pipeline started cleaning up references to the
--- deleted node, buffer 1 no longer contains a DeletedScaff, so this
+-- deleted node, buffer 1 no longer contains a DeadViewnode, so this
 -- phase now exercises adding a top-level root via metadata-only
--- insertion (the BufferRoot, like a DeletedScaff, supplies no repo
+-- insertion (the BufferRoot, like a DeadViewnode, supplies no repo
 -- to inherit, so explicit (repo main) is still required).
 vim.api.nvim_set_current_buf(buf1)
 do

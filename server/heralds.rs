@@ -20,7 +20,7 @@
 /// the matched value(s).
 
 use crate::types::nodes::complete::Flag;
-use crate::types::viewnode::{PartnerFolder, Qual, QualFolder, ViewRequest};
+use crate::types::viewnode::{PartnerFolder, Property, PropertyFolder, ViewRequest};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeraldColor { Red, Green, Blue, Yellow, Orange }
@@ -86,7 +86,7 @@ fn leaf (
 ) -> RuleChild {
   crule ( color, label, vec! [ s (text) ] ) }
 
-/// (COLOR label "☮ text") -- a write-protected folder scaffold leaf: the ☮
+/// (COLOR label "☮ text") -- a write-protected folder leaf: the ☮
 /// marker, a space, then its label text, meaning "this folder
 /// cannot be changed from here" -- the same sense ☮ ('writeProtected') carries
 /// on a node. (A lock 🔒 here is a one-line swap; the conformance test
@@ -179,15 +179,15 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///     let the conformance test demand that every emittable atom
 ///     appear here.
 ///
-///   * deletedScaffold vs deleted -- two shapes come in from the
-///     server depending on whether the deletion is on a scaffold viewnode
+///   * deadViewnode vs deleted -- two shapes come in from the
+///     server depending on whether the deletion is on a non-vognode viewnode
 ///     (like a deleted aliasFolder) or on a file-level node. Each gets
-///     its own matcher; both render as "DELETED ...".
+///     its own matcher; both render as "DELETED".
 ///
-///   * Two scaffold-level staged/unstaged INTERC rules and two
-///     node-level ones -- the scaffold-level pair omits the N / -N
+///   * Two non-vognode-level staged/unstaged INTERC rules and two
+///     node-level ones -- the non-vognode-level pair omits the N / -N
 ///     axes because node-axis markers only apply to ActiveNodes,
-///     not to scaffolds.
+///     not to non-vognodes.
 ///
 ///   * The 'affectsParent' sub-rule 'container' names an atom the server
 ///     NEVER emits: the server leaves affectsParent=true implicit, and
@@ -204,8 +204,8 @@ pub fn herald_rule_table () -> HeraldRule {
       vac ("focused"),
       vac ("folded"),
       vac ("bodyFolded"),
-      leaf (Green, QualFolder::Alias . repr_in_client (), "aliases"),
-      leaf (Green, "alias", "alias"), // Qual::Alias
+      leaf (Green, PropertyFolder::Alias . repr_in_client (), "aliases"),
+      leaf (Green, "alias", "alias"), // Property::Alias
       // An alias's stored relRepo is a display fact.  A
       // requested replacement lives under editRequest below, so the
       // two values can be rendered side by side without conflation.
@@ -213,7 +213,7 @@ pub fn herald_rule_table () -> HeraldRule {
       rule ("editRequest", vec! [
         crule (Red, "relRepo", vec! [
           any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]),
-      // The six WRITE-PROTECTED folder scaffolds carry ☮ ("cannot be changed
+      // The six WRITE-PROTECTED folders carry ☮ ("cannot be changed
       // from here"); the writable folders (subscribeeFolder, overriddenFolder,
       // aliasFolder) do not.
       leaf_write_protected! (Green, PartnerFolder::HiddenInSubscribee . repr_in_client (),
@@ -232,9 +232,9 @@ pub fn herald_rule_table () -> HeraldRule {
             "It overrides the view of these."),
       leaf_write_protected! (Green, PartnerFolder::Overrider . repr_in_client (),
             "These override the view of it."),
-      leaf (Green, QualFolder::ID . repr_in_client (), "IDs"),
-      leaf (Green, "id", "ID"), // Qual::ID
-      leaf_write_protected! (Green, QualFolder::flags () . repr_in_client (),
+      leaf (Green, PropertyFolder::ID . repr_in_client (), "IDs"),
+      leaf (Green, "id", "ID"), // Property::ID
+      leaf_write_protected! (Green, PropertyFolder::flags () . repr_in_client (),
                 "flags"),
       crule (Green, "flag", Flag::ALL . into_iter ()
         . map (|flag| rule (
@@ -244,8 +244,7 @@ pub fn herald_rule_table () -> HeraldRule {
         s ("text changed : "),
         leaf (Red, "staged",   "staged"),
         leaf (Red, "unstaged", "unstaged") ]),
-      crule (Red, "deletedScaffold", vec! [
-        any ( vec! [ s ("DELETED"), RuleChild::It ] ) ]),
+      crule (Red, "deadViewnode", vec! [ s ("DELETED") ]),
       crule (Red, "deleted", vec! [
         s ("DELETED"),
         vac ("id"),
@@ -261,7 +260,7 @@ pub fn herald_rule_table () -> HeraldRule {
             any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ]),
       // An inactive placeholder is anonymous and dataless: the bare
       // atom 'inactiveNode' (see InactiveNode), like the other dataless
-      // scaffold markers. Its id/repo would leak hidden content, so
+      // non-vognode markers. Its id/repo would leak hidden content, so
       // they are not emitted.
       crule (Blue, "inactiveNode", vec! [
         s ("node from inactive repo") ]),
@@ -430,7 +429,7 @@ pub fn atoms_in_rule_table () -> std::collections::HashSet<&'static str> {
 
 /// Every metadata atom the server can emit in a MATCH (label)
 /// position. Value-position data (counts, IDs, repo names,
-/// 'deadScaffold', the homeRepoHerald payload) is consumed by ANY/IT
+/// the homeRepoHerald payload) is consumed by ANY/IT
 /// rules and so is deliberately absent.
 ///
 /// Each component is derived from the type that owns it; the
@@ -442,7 +441,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
     "focused", "folded", "bodyFolded",
     // Form heads, from org_to_text.rs:
     "node", "diffPhantom", "deleted", "unknown", "inactiveNode",
-    "deletedScaffold",
+    "deadViewnode",
     // Keys inside node / diffPhantom / deleted / unknown forms:
     "id", "repo",
     "affectsParent", "writeProtected", "hiddenBody", "notInGit",
@@ -464,7 +463,7 @@ pub fn emittable_metadata_atoms () -> std::collections::HashSet<&'static str> {
   atoms . extend ( viewstats_atoms () );
   atoms . extend ( affectsParent_emitted_atoms () );
   atoms . extend ( axis_atoms () );
-  atoms . extend ( qual_and_folder_atoms () );
+  atoms . extend ( property_and_folder_atoms () );
   atoms . extend ( ViewRequest::EMITTABLE_MATCH_ATOMS );
   atoms . into_iter () . collect () }
 
@@ -484,13 +483,13 @@ fn graphstats_atoms () -> Vec<&'static str> {
   let _ = guard;
   vec! [] }
 
-/// ViewNodeStats match atoms, from activeNode_metadata_to_string's
+/// ViewnodeStats match atoms, from activeNode_metadata_to_string's
 /// view_stats (org_to_text.rs). Birth and relationship facts are
 /// node-level '(rels ...)' data, not viewStats sub-forms.
 fn viewstats_atoms () -> Vec<&'static str> {
-  use crate::types::viewnode::ViewNodeStats;
-  fn guard ( v : ViewNodeStats ) {
-    let ViewNodeStats {
+  use crate::types::viewnode::ViewnodeStats;
+  fn guard ( v : ViewnodeStats ) {
+    let ViewnodeStats {
       cycle : _,
       homeRepoAtBoundary : _, // -> the homeRepoHerald atom
       rel_heralds : _,      // -> the node-level rels atom (semantic sexp)
@@ -519,9 +518,9 @@ fn axis_atoms () -> Vec<&'static str> {
   let _ = guard;
   vec! [ "addedN", "deletedN", "addedR", "removedR" ] }
 
-/// Folder and Qual atoms, via the same repr_in_client constants the
+/// Folder and Property atoms, via the same repr_in_client constants the
 /// serializer uses.
-fn qual_and_folder_atoms () -> Vec<&'static str> {
+fn property_and_folder_atoms () -> Vec<&'static str> {
   fn partnerFolder_guard ( c : PartnerFolder ) { // compile error here = update all_partnerFolders
     match c {
       PartnerFolder::Subscribee | PartnerFolder::Subscriber
@@ -536,28 +535,28 @@ fn qual_and_folder_atoms () -> Vec<&'static str> {
     PartnerFolder::Hider, PartnerFolder::Hidden,
     PartnerFolder::HiddenInSubscribee,
     PartnerFolder::HiddenOutsideOfSubscribee ];
-  fn qualFolder_guard ( c : &QualFolder ) { // ditto
+  fn propertyFolder_guard ( c : &PropertyFolder ) { // ditto
     match c {
-      QualFolder::ID | QualFolder::Alias
-        | QualFolder::Flags { .. } => () }}
-  let _ = qualFolder_guard;
-  let all_qualFolders : [QualFolder; 3] = [
-    QualFolder::ID, QualFolder::Alias, QualFolder::flags () ];
-  for c in &all_qualFolders { qualFolder_guard (c); }
-  let all_qual_atoms : [&'static str; 4] = {
-    fn qual_guard ( q : &Qual ) { // ditto
+      PropertyFolder::ID | PropertyFolder::Alias
+        | PropertyFolder::Flags { .. } => () }}
+  let _ = propertyFolder_guard;
+  let all_propertyFolders : [PropertyFolder; 3] = [
+    PropertyFolder::ID, PropertyFolder::Alias, PropertyFolder::flags () ];
+  for c in &all_propertyFolders { propertyFolder_guard (c); }
+  let all_property_atoms : [&'static str; 4] = {
+    fn property_guard ( q : &Property ) { // ditto
       match q {
-        Qual::Alias { .. } | Qual::ID { .. } | Qual::TextChanged { .. }
-          | Qual::Flag { .. }
+        Property::Alias { .. } | Property::ID { .. } | Property::TextChanged { .. }
+          | Property::Flag { .. }
           => () }}
-    let _ = qual_guard;
+    let _ = property_guard;
     [ "alias", "id", "textChanged", "flag" ] };
   let mut out : Vec<&'static str> = Vec::new ();
   out . extend ( all_partnerFolders . iter ()
                  . map ( |c| c . repr_in_client () ) );
-  out . extend ( all_qualFolders . iter ()
+  out . extend ( all_propertyFolders . iter ()
                  . map ( |c| c . repr_in_client () ) );
-  out . extend ( all_qual_atoms );
+  out . extend ( all_property_atoms );
   out }
 
 #[cfg(test)]

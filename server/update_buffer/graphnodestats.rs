@@ -9,7 +9,7 @@ use crate::types::misc::{ID, SkgConfig};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{GraphNodeStats, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{GraphNodeStats, Viewnode, ViewnodeKind};
 use crate::types::viewnode::{Vognode, Phantom};
 
 use std::collections::{HashSet, HashMap};
@@ -20,7 +20,7 @@ use ego_tree::{NodeId, Tree};
 /// Also fetches and returns the containment maps, which callers
 /// can pass to `set_viewnodestats_in_viewforest`.
 pub fn set_graphnodestats_in_viewforest (
-  viewforest : &mut Tree<ViewNode>,
+  viewforest : &mut Tree<Viewnode>,
   graph : &InRustGraph,
   config : &SkgConfig,
 ) -> Result < ( HashMap < ID, HashSet < ID > >,
@@ -30,7 +30,7 @@ pub fn set_graphnodestats_in_viewforest (
     viewforest, graph, config, None ) }
 
 pub fn set_graphnodestats_in_viewforest_with_repo_set (
-  viewforest : &mut Tree<ViewNode>,
+  viewforest : &mut Tree<Viewnode>,
   graph : &InRustGraph,
   config : &SkgConfig,
   active : &ActiveRepoSet,
@@ -41,7 +41,7 @@ pub fn set_graphnodestats_in_viewforest_with_repo_set (
     viewforest, graph, config, Some (active) ) }
 
 fn set_graphnodestats_in_viewforest_inner (
-  viewforest : &mut Tree<ViewNode>,
+  viewforest : &mut Tree<Viewnode>,
   graph : &InRustGraph,
   config : &SkgConfig,
   active : Option<&ActiveRepoSet>,
@@ -76,7 +76,7 @@ fn set_graphnodestats_in_viewforest_inner (
         stats . content_to_containers )) }
 
 pub fn set_metadata_relationships_in_node_recursive (
-  tree   : &mut Tree<ViewNode>,
+  tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
   graph  : &InRustGraph,
   stats  : &AllGraphNodeStats,
@@ -88,14 +88,14 @@ pub fn set_metadata_relationships_in_node_recursive (
       // current data still falls back to false rather than querying
       // historical graph context for a placeholder.
       match & tree . get (treeid) . unwrap () . value () . kind {
-        ViewNodeKind::Vognode (Vognode::Active (t))
+        ViewnodeKind::Vognode (Vognode::Active (t))
           => { let nodecomplete_opt : Option<NodeComplete>
                  = nodecomplete_rustFirst_by_pid_and_repo (
                      graph, config, &t . id, &t . home_repo
                    ). ok ();
                Some ( graphnodestats_for_pid (
                  &t . id, stats, nodecomplete_opt . as_ref () )) },
-        ViewNodeKind::Phantom (Phantom::Diff (p))
+        ViewnodeKind::Phantom (Phantom::Diff (p))
           => { let nodecomplete_opt : Option<NodeComplete>
                  = nodecomplete_rustFirst_by_pid_and_repo (
                      graph, config, &p . id, &p . home_repo
@@ -109,9 +109,9 @@ pub fn set_metadata_relationships_in_node_recursive (
       // vognodes and phantoms can display node-explicit graphStats.
       match &mut tree . get_mut (treeid)
         . unwrap () . value () . kind
-        { ViewNodeKind::Vognode (Vognode::Active (t))
+        { ViewnodeKind::Vognode (Vognode::Active (t))
           => { t . graphStats = gs; },
-        ViewNodeKind::Phantom (Phantom::Diff (p))
+        ViewnodeKind::Phantom (Phantom::Diff (p))
           => { p . graphStats = gs; },
         _ => {} },
     None => {} }

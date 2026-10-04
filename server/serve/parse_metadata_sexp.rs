@@ -1,7 +1,7 @@
 /// PURPOSE: Parse (skg ...) metadata s-expressions from org headlines.
 ///
 /// Format:
-///   Scaffolds: (skg [focused] [folded] scaffoldKind)
+///   Non-vognodes: (skg [focused] [folded] nonVognodeKind)
 ///   ActiveNodes: (skg [focused] [folded]
 ///                   (node [(id ID)]
 ///                         [(repo REPO)]
@@ -22,8 +22,8 @@ use crate::types::errors::BufferValidationError;
 use crate::types::nodes::complete::Flag;
 use crate::types::git::{NodeAxes, RelationshipAxes, Sign};
 use crate::types::viewnode::{
-  GraphNodeStats, ViewNodeStats, NodeEditRequest, ViewRequest, FolderRelation,
-  Qual, QualFolder, PartnerFolder, PhantomDeleted, InactiveNode, PhantomUnknown,
+  GraphNodeStats, ViewnodeStats, NodeEditRequest, ViewRequest, FolderRelation,
+  Property, PropertyFolder, PartnerFolder, PhantomDeleted, InactiveNode, PhantomUnknown,
   Birth, Editability, AffectsParent,
 };
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
@@ -39,7 +39,7 @@ use std::collections::HashSet;
 // Parsing-internal types
 //
 
-/// Intermediate parsed metadata. Converted to ViewNode via viewnode_from_metadata().
+/// Intermediate parsed metadata. Converted to Viewnode via viewnode_from_metadata().
 #[derive(Debug, Clone, PartialEq)]
 pub struct ViewnodeMetadata {
   pub focused: bool,
@@ -47,29 +47,29 @@ pub struct ViewnodeMetadata {
   pub body_folded: bool,
   // None means vognode, Some means non-vognode.
   pub non_vognode: Option<MpViewnodeKind>,
-  // ActiveNode fields (ignored if scaffold is Some)
+  // ActiveNode fields (ignored if non-vognode is Some)
   pub id: Option<ID>,
   pub home_repo: Option<RepoName>,
   pub affectsParent: AffectsParent,
   pub birth: Birth,
   pub writeProtected: bool,
   pub graphStats: GraphNodeStats,
-  pub viewStats: ViewNodeStats,
+  pub viewStats: ViewnodeStats,
   pub edit_request: Option<NodeEditRequest>,
   pub relRepo_request: Option<RepoName>,
   pub view_requests: HashSet<ViewRequest>,
   pub activeNode_node_axes  : NodeAxes,
   pub activeNode_relationship_axes : RelationshipAxes,
   pub activeNode_not_in_git : bool,
-  pub scaffold_relationship_axes : RelationshipAxes,
-  pub scaffold_relRepo : Option<RepoName>,
-  pub scaffold_relRepo_request : Option<RepoName>,
+  pub property_relationship_axes : RelationshipAxes,
+  pub property_relRepo : Option<RepoName>,
+  pub property_relRepo_request : Option<RepoName>,
   pub textchanged_staged   : bool,
   pub textchanged_unstaged : bool,
   // When true, this is a PhantomDeleted (id and repo are used).
   pub is_deleted_node: bool,
   // When true, this is a deleted non-vognode placeholder.
-  pub is_dead_scaffold: bool,
+  pub is_dead_viewnode: bool,
   // When Some, this is an PhantomUnknown (a placeholder for a missing
   // referent). Carries only the id; no repo/title/body apply.
   pub unknown_node_id: Option<ID>,
@@ -97,20 +97,20 @@ pub fn default_metadata() -> ViewnodeMetadata {
     birth: Birth::Unremarkable,
     writeProtected: false,
     graphStats: GraphNodeStats::default(),
-    viewStats: ViewNodeStats::default(),
+    viewStats: ViewnodeStats::default(),
     edit_request: None,
     relRepo_request: None,
     view_requests: HashSet::new(),
     activeNode_node_axes  : NodeAxes::default(),
     activeNode_relationship_axes : RelationshipAxes::default(),
     activeNode_not_in_git : false,
-    scaffold_relationship_axes : RelationshipAxes::default(),
-    scaffold_relRepo : None,
-    scaffold_relRepo_request : None,
+    property_relationship_axes : RelationshipAxes::default(),
+    property_relRepo : None,
+    property_relRepo_request : None,
     textchanged_staged   : false,
     textchanged_unstaged : false,
     is_deleted_node: false,
-    is_dead_scaffold: false,
+    is_dead_viewnode: false,
     unknown_node_id: None,
     unknown_relRepo: None,
     unknown_relRepo_request: None,
@@ -120,11 +120,11 @@ pub fn default_metadata() -> ViewnodeMetadata {
 /// Create an MpViewnode from parsed metadata components.
 /// This is the bridge between parsing (ViewnodeMetadata) and runtime (MpViewnode).
 /// Returns (MpViewnode, error, warning):
-/// - error if a Scaffold has a body;
-/// - warning if a folder header (QualFolder or PartnerFolder) has nonempty
+/// - error if a Non-vognode has a body;
+/// - warning if a folder header (PropertyFolder or PartnerFolder) has nonempty
 ///   title text, which the server discards: folder headlines are
 ///   titleless server-side (heralds supply their labels), so any
-///   text there is a user edit that cannot be saved. Qual leaves
+///   text there is a user edit that cannot be saved. Property leaves
 ///   are exempt -- their title IS their data.
 pub fn viewnode_from_metadata (
   metadata : &ViewnodeMetadata,
@@ -157,8 +157,8 @@ pub fn viewnode_from_metadata (
         ( MpViewnodeKind::Vognode (
             MpVognode::Inactive ( InactiveNode ) ),
           error, None )
-      } else if metadata . is_dead_scaffold {
-        ( MpViewnodeKind::DeadScaffold, None, None )
+      } else if metadata . is_dead_viewnode {
+        ( MpViewnodeKind::DeadViewnode, None, None )
       } else if metadata . is_deleted_node {
         ( MpViewnodeKind::Phantom (
             MpPhantom::Deleted ( PhantomDeleted {
@@ -171,12 +171,12 @@ pub fn viewnode_from_metadata (
           } ) ), None, None )
       } else if let Some ( ref non_vognode ) = metadata . non_vognode {
         let is_flags_folder = matches! (non_vognode,
-          MpViewnodeKind::QualFolder (QualFolder::Flags { .. }));
+          MpViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }));
         let is_flag = matches! (non_vognode,
-          MpViewnodeKind::Qual (Qual::Flag { .. }));
+          MpViewnodeKind::Property (Property::Flag { .. }));
         let error : Option<BufferValidationError> =
           if body . is_some () && ! is_flags_folder && ! is_flag {
-            Some ( BufferValidationError::Body_of_Scaffold (
+            Some ( BufferValidationError::Body_of_NonVognode (
               title . clone (),
               maybeplaced_kind_error_label (non_vognode) ))
           } else { None };
@@ -184,7 +184,7 @@ pub fn viewnode_from_metadata (
           if ! title . is_empty ()
             && ! is_flags_folder
             && matches! ( non_vognode,
-                          MpViewnodeKind::QualFolder (_)
+                          MpViewnodeKind::PropertyFolder (_)
                           | MpViewnodeKind::PartnerFolder (_) )
           { Some ( format! (
               "Headline text on a {} is not saved; discarded: {:?}",
@@ -192,29 +192,29 @@ pub fn viewnode_from_metadata (
               title )) }
           else { None };
         let non_vognode_with_title : MpViewnodeKind = match non_vognode {
-          // Use headline title for string and apply scaffold relationship axes
-          MpViewnodeKind::Qual (Qual::Alias { .. }) =>
-            MpViewnodeKind::Qual (Qual::Alias {
+          // Use headline title for string and apply non-vognode relationship axes
+          MpViewnodeKind::Property (Property::Alias { .. }) =>
+            MpViewnodeKind::Property (Property::Alias {
                               text: title . clone (),
                               relRepo:
-                                metadata . scaffold_relRepo . clone (),
+                                metadata . property_relRepo . clone (),
                               relRepo_request:
-                                metadata . scaffold_relRepo_request . clone (),
-                              relationship_axes: metadata . scaffold_relationship_axes }),
-          MpViewnodeKind::Qual (Qual::ID { .. }) =>
-            MpViewnodeKind::Qual (Qual::ID {
+                                metadata . property_relRepo_request . clone (),
+                              relationship_axes: metadata . property_relationship_axes }),
+          MpViewnodeKind::Property (Property::ID { .. }) =>
+            MpViewnodeKind::Property (Property::ID {
                               id: title . clone () . into (),
-                              relationship_axes: metadata . scaffold_relationship_axes }),
-          MpViewnodeKind::Qual (Qual::Flag { flag, .. }) =>
-            MpViewnodeKind::Qual (Qual::Flag {
+                              relationship_axes: metadata . property_relationship_axes }),
+          MpViewnodeKind::Property (Property::Flag { flag, .. }) =>
+            MpViewnodeKind::Property (Property::Flag {
               flag : *flag,
               title    : title . clone (),
               body     : body . clone () }),
-          MpViewnodeKind::QualFolder (QualFolder::Flags { .. }) =>
-            MpViewnodeKind::QualFolder (QualFolder::Flags {
+          MpViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }) =>
+            MpViewnodeKind::PropertyFolder (PropertyFolder::Flags {
               title : title . clone (), body : body . clone () }),
-          MpViewnodeKind::Qual (Qual::TextChanged { .. }) =>
-            MpViewnodeKind::Qual (Qual::TextChanged {
+          MpViewnodeKind::Property (Property::TextChanged { .. }) =>
+            MpViewnodeKind::Property (Property::TextChanged {
                               staged   : metadata . textchanged_staged,
                               unstaged : metadata . textchanged_unstaged }),
           other => other . clone () };
@@ -286,16 +286,16 @@ fn maybeplaced_kind_error_label (
   kind : &MpViewnodeKind,
 ) -> String {
   match kind {
-    MpViewnodeKind::QualFolder (folder) =>
+    MpViewnodeKind::PropertyFolder (folder) =>
       folder . repr_in_client () . to_string (),
-    MpViewnodeKind::Qual (qual) =>
-      qual . repr_in_client () . to_string (),
+    MpViewnodeKind::Property (property) =>
+      property . repr_in_client () . to_string (),
     MpViewnodeKind::PartnerFolder (partnerFolder) =>
       partnerFolder . repr_in_client () . to_string (),
     MpViewnodeKind::BufferRoot =>
       "forestRoot" . to_string (),
-    MpViewnodeKind::DeadScaffold =>
-      "deadScaffold" . to_string (),
+    MpViewnodeKind::DeadViewnode =>
+      "deadViewnode" . to_string (),
     MpViewnodeKind::Vognode (_) | MpViewnodeKind::Phantom (_) =>
       MpViewnode {
         focused     : false,
@@ -356,25 +356,25 @@ pub fn parse_metadata_to_viewnodemd (
           "inactiveNode" => {
             parse_inactivenode_sexp ( &items[1..], &mut result ) ?; },
           "staged" => {
-            // (staged ATOMS) at top level is for Quals (Alias/ID).
-            apply_axis_atoms_to_relationship_scaffold (
+            // (staged ATOMS) at top level is for Properties (Alias/ID).
+            apply_axis_atoms_to_property (
               &items[1..],
               true,  // staged
-              &mut result . scaffold_relationship_axes ) ?; },
+              &mut result . property_relationship_axes ) ?; },
           "unstaged" => {
-            apply_axis_atoms_to_relationship_scaffold (
+            apply_axis_atoms_to_property (
               &items[1..],
               false, // unstaged
-              &mut result . scaffold_relationship_axes ) ?; },
+              &mut result . property_relationship_axes ) ?; },
           "relRepo" => {
             if items . len () != 2 {
               return Err (
                 "relRepo requires exactly one repo name"
                 . to_string () ); }
-            if result . scaffold_relRepo . is_some () {
+            if result . property_relRepo . is_some () {
               return Err ( "Alias relRepo may appear only once"
                            . to_string () ); }
-            result . scaffold_relRepo = Some ( RepoName::from (
+            result . property_relRepo = Some ( RepoName::from (
               atom_to_string (&items [1]) ? )); },
           "editRequest" => {
             let mut request_metadata : ViewnodeMetadata = default_metadata ();
@@ -383,16 +383,16 @@ pub fn parse_metadata_to_viewnodemd (
             if request_metadata . edit_request . is_some () {
               return Err ( "Only Alias may carry a top-level editRequest relRepo"
                            . to_string () ); }
-            if result . scaffold_relRepo_request . is_some () {
+            if result . property_relRepo_request . is_some () {
               return Err ( "Alias editRequest may appear only once"
                            . to_string () ); }
-            result . scaffold_relRepo_request =
+            result . property_relRepo_request =
               request_metadata . relRepo_request; },
           "textChanged" => {
-            // (textChanged STAGE_TAGS) for the TextChanged qual.
+            // (textChanged STAGE_TAGS) for the TextChanged property.
             result . non_vognode = Some (
-              MpViewnodeKind::Qual (
-                Qual::TextChanged { staged: false, unstaged: false } ) );
+              MpViewnodeKind::Property (
+                Property::TextChanged { staged: false, unstaged: false } ) );
             for tag in &items[1..] {
               let tag_str : String = atom_to_string (tag) ?;
               match tag_str . as_str () {
@@ -400,12 +400,6 @@ pub fn parse_metadata_to_viewnodemd (
                 "unstaged" => result . textchanged_unstaged = true,
                 other => return Err ( format! (
                   "Unknown textChanged stage tag: {}", other )), } } },
-          "deletedScaffold" => {
-            if items . len () != 2 {
-              return Err ( "deletedScaffold requires exactly one kind value" . to_string () ); }
-            let _kind_str : String =
-              atom_to_string ( &items[1] ) ?;
-            result . is_dead_scaffold = true; },
           "flag" => {
             if items . len () != 2 {
               return Err ("flag requires exactly one flag name"
@@ -413,8 +407,8 @@ pub fn parse_metadata_to_viewnodemd (
             let name : String = atom_to_string (&items[1]) ?;
             let flag : Flag = Flag::from_wire_name (&name)
               . ok_or_else (|| format! ("Unknown flag: {}", name)) ?;
-            result . non_vognode = Some (MpViewnodeKind::Qual (
-              Qual::Flag {
+            result . non_vognode = Some (MpViewnodeKind::Property (
+              Property::Flag {
                 flag, title: String::new (), body: None })); },
           // Note: "alias" as a list like (alias "string") is no longer supported.
           // Use bare "alias" atom instead - the alias string comes from headline title.
@@ -423,7 +417,7 @@ pub fn parse_metadata_to_viewnodemd (
             return Err ( format! (
               "Legacy metadata format detected (found '{}' at top level). \
                The new format uses (skg [focused] [folded] (node ...)) for ActiveNodes \
-               and (skg [focused] [folded] scaffoldKind) for Scaffolds.",
+               and (skg [focused] [folded] nonVognodeKind) for Non-vognodes.",
               first )); },
           _ => { return Err ( format! ( "Unknown metadata key: {}",
                                          first )); }} },
@@ -439,11 +433,11 @@ pub fn parse_metadata_to_viewnodemd (
           // '(inactiveNode ...)' is still tolerated by the List arm
           // above so a stale buffer round-trips.
           "inactiveNode" => result . is_inactive_node = true,
-          // Scaffold kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
-          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::Alias { text: String::new(), relRepo: None, relRepo_request: None, relationship_axes: RelationshipAxes::default() } ) ),
-          "aliasFolder" => result . non_vognode = Some (MpViewnodeKind::QualFolder (QualFolder::Alias)),
+          // Non-vognode kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
+          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Property ( Property::Alias { text: String::new(), relRepo: None, relRepo_request: None, relationship_axes: RelationshipAxes::default() } ) ),
+          "aliasFolder" => result . non_vognode = Some (MpViewnodeKind::PropertyFolder (PropertyFolder::Alias)),
           "flagsFolder" => result . non_vognode = Some (
-            MpViewnodeKind::QualFolder (QualFolder::flags ())),
+            MpViewnodeKind::PropertyFolder (PropertyFolder::flags ())),
           "forestRoot" => result . non_vognode = Some (MpViewnodeKind::BufferRoot),
           "hiddenInSubscribeeFolder" =>
             result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)),
@@ -463,25 +457,24 @@ pub fn parse_metadata_to_viewnodemd (
             result . non_vognode = Some (MpViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)),
           "textChanged" =>
             result . non_vognode = Some (
-              MpViewnodeKind::Qual (
-                Qual::TextChanged { staged: false, unstaged: false } ) ),
+              MpViewnodeKind::Property (
+                Property::TextChanged { staged: false, unstaged: false } ) ),
           "idFolder" =>
-            result . non_vognode = Some (MpViewnodeKind::QualFolder (QualFolder::ID)),
+            result . non_vognode = Some (MpViewnodeKind::PropertyFolder (PropertyFolder::ID)),
           "id" =>
-            result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::ID { id: ID::default(), relationship_axes: RelationshipAxes::default() } ) ),
-          "deletedScaffold" =>
-            return Err ( "deletedScaffold as bare atom is no longer supported; use (deletedScaffold kindString)" . to_string () ),
+            result . non_vognode = Some ( MpViewnodeKind::Property ( Property::ID { id: ID::default(), relationship_axes: RelationshipAxes::default() } ) ),
+          "deadViewnode" => result . is_dead_viewnode = true,
           _ => {
             return Err ( format! ( "Unknown top-level value: {}",
                                     bare_value )); }} },
       _ => { return Err ( format! (
         "Unexpected element in metadata sexp: {}",
         sexp_str )); }} }
-  if ( result . scaffold_relRepo . is_some ()
-       || result . scaffold_relRepo_request . is_some () )
+  if ( result . property_relRepo . is_some ()
+       || result . property_relRepo_request . is_some () )
      && ! matches! ( result . non_vognode,
-                     Some (MpViewnodeKind::Qual (Qual::Alias { .. })) )
-  { return Err ( "relRepo and its editRequest are valid only on Alias scaffolds"
+                     Some (MpViewnodeKind::Property (Property::Alias { .. })) )
+  { return Err ( "relRepo and its editRequest are valid only on Alias properties"
                  . to_string () ); }
   Ok (result) }
 
@@ -592,8 +585,8 @@ fn apply_axis_atoms_to_activeNode (
     *slot = Some (sign); }
   Ok (( )) }
 
-/// Apply axis atoms (addedR, removedR only) to a Scaffold's relationship axes.
-fn apply_axis_atoms_to_relationship_scaffold (
+/// Apply axis atoms (addedR, removedR only) to a Non-vognode's relationship axes.
+fn apply_axis_atoms_to_property (
   atoms      : &[Sexp],
   is_staged  : bool,
   relationship_axes : &mut RelationshipAxes,
@@ -606,7 +599,7 @@ fn apply_axis_atoms_to_relationship_scaffold (
           "Unknown axis atom: {}", atom_str )) ?;
     if axis != 'R' {
       return Err ( format! (
-        "Scaffold (alias/id) only supports R axis atoms, got: {}",
+        "Property (alias/id) only supports R axis atoms, got: {}",
         atom_str )); }
     let slot : &mut Option<Sign> =
       if is_staged { &mut relationship_axes . staged }
@@ -638,7 +631,7 @@ fn parse_unknownnode_sexp (
           "viewStats" => {
             if metadata . unknown_relRepo . is_some () {
               return Err ( "unknown viewStats may appear only once" . to_string () ); }
-            let mut stats : ViewNodeStats = ViewNodeStats::default ();
+            let mut stats : ViewnodeStats = ViewnodeStats::default ();
             parse_viewstats_sexp ( &subitems[1..], &mut stats ) ?;
             if stats . relRepo . is_none ()
                || stats . cycle || stats . overridesHere . is_some () {
@@ -712,7 +705,7 @@ fn parse_deleted_sexp (
 /// facts, parsed and discarded at node level instead.
 fn parse_viewstats_sexp (
   items : &[Sexp],
-  stats : &mut ViewNodeStats
+  stats : &mut ViewnodeStats
 ) -> Result<(), String> {
   for element in items {
     match element {

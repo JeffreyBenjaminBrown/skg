@@ -17,7 +17,7 @@ use skg::test_utils::run_with_test_stores;
 use skg::to_org::render::content_view::multi_root_view;
 use skg::types::misc::ID;
 use ego_tree::Tree;
-use skg::types::viewnode::ViewNode;
+use skg::types::viewnode::Viewnode;
 
 #[test]
 fn raw_drawn_overridden_root_children_are_raw
@@ -28,7 +28,7 @@ fn raw_drawn_overridden_root_children_are_raw
     "/tmp/tantivy-test-expand-raw-overridden-children",
     |config, tantivy| Box::pin ( async move {
       let (x_view, _pids, _tree)
-        : (String, Vec<ID>, Tree<ViewNode>) =
+        : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view (
           config, Some (tantivy), &[ID::from ("X")], false )
  ?;

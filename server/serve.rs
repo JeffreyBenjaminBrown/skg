@@ -47,7 +47,7 @@ use crate::repo_sets::ActiveRepoSet;
 use crate::repo_sets::apply_repo_set_to_viewforest;
 use crate::types::maybe_placed_viewnode::{MpViewnode,maybePlaced_to_placed_tree};
 use crate::types::misc::RepoSetName;
-use crate::types::viewnode::ViewNode;
+use crate::types::viewnode::Viewnode;
 use crate::types::views_state::{OpenViews, ViewUri};
 use crate::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
 use crate::update_buffer::set_viewnodestats_in_viewforest;
@@ -340,7 +340,7 @@ fn handle_snapshot_response (
   let parse_result : Result<(Tree<MpViewnode>,
                              Vec<BufferValidationError>), String>
     = org_to_uninterpreted_nodes (&buffer_text);
-  let mut viewforest : Tree<ViewNode> = match parse_result {
+  let mut viewforest : Tree<Viewnode> = match parse_result {
     Ok (( maybePlaced_viewforest, _errors )) =>
       match maybePlaced_to_placed_tree (maybePlaced_viewforest) {
         Ok (f) => f,
@@ -382,7 +382,7 @@ fn handle_snapshot_response (
   let rendered_pids : Vec<_> =
     viewforest . root () . descendants ()
     . filter_map ( |node| match &node . value () . kind {
-      crate::types::viewnode::ViewNodeKind::Vognode (
+      crate::types::viewnode::ViewnodeKind::Vognode (
         crate::types::viewnode::Vognode::Active (active_node)) =>
           Some (active_node . id . clone ()),
       _ => None, } )

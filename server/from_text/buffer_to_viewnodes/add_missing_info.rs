@@ -7,7 +7,7 @@ use crate::types::git::RelationshipAxes;
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::viewnode::AffectsParent;
-use crate::types::viewnode::{Editability, QualFolder, Qual};
+use crate::types::viewnode::{Editability, PropertyFolder, Property};
 use crate::types::misc::{ID, RepoName};
 use crate::types::tree::forest::MpViewForest;
 use crate::types::tree::generic::do_everywhere_in_tree_dfs;
@@ -118,7 +118,7 @@ pub fn na_affectsParent_under_visible_parent_becomes_isContainer (
       = &mut node_mut . value() . kind
       { t . affectsParent = AffectsParent::True; }}}
 
-/// Make it a Qual::Alias if both:
+/// Make it a Property::Alias if both:
 /// - it is an ActiveNode
 /// - its parent is an AliasFolder
 fn make_alias_if_appropriate(
@@ -131,7 +131,7 @@ fn make_alias_if_appropriate(
       node . parent()
       . map(|mut p|
             matches!(&p . value() . kind,
-                     MpViewnodeKind::QualFolder (QualFolder::Alias)))
+                     MpViewnodeKind::PropertyFolder (PropertyFolder::Alias)))
       . unwrap_or (false);
     if affects_parent_aliasFolder { // Make it an Alias.
       let org : &mut MpViewnode = node . value();
@@ -139,8 +139,8 @@ fn make_alias_if_appropriate(
         : &MpViewnodeKind
         = &org . kind
       else { unreachable!() };
-      org . kind = MpViewnodeKind::Qual (
-        Qual::Alias { text: t . title . clone(),
+      org . kind = MpViewnodeKind::Property (
+        Property::Alias { text: t . title . clone(),
                       relRepo: t . viewStats . relRepo . clone (),
                       relRepo_request: t . relRepo_request . clone (),
                       relationship_axes: RelationshipAxes::default () } ); }}
@@ -210,7 +210,7 @@ fn collect_repoless_active_ids (
 /// DFS). This is how a bare folder-member reference acquires the repo of
 /// the existing node it names -- something
 /// 'inherit_parent_repo_if_possible' cannot do, since the org-parent
-/// is a scaffold rather than an ActiveNode with a repo. The
+/// is a non-vognode rather than an ActiveNode with a repo. The
 /// write-protected gate matches the folder above, so a definitive node
 /// sharing an id with a write-protected one is never filled.
 fn fill_repo_from_graph_map (

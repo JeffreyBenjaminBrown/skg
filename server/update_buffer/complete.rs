@@ -14,13 +14,13 @@ use crate::types::misc::{ID, RepoName, TantivyIndex};
 use crate::types::tree::generic::{ do_everywhere_in_tree_dfs_readonly, read_at_node_in_tree, read_at_ancestor_in_tree};
 use crate::to_org::complete::partner_folder::maybe_add_default_partnerFolder_branches;
 use crate::update_buffer::ancestry::{ folder_is_generalized_orphan, deaden_generalized_orphan_folder, is_folder_kind};
-use crate::update_buffer::util::detach_scaffold_transferring_focus;
+use crate::update_buffer::util::detach_viewnode_transferring_focus;
 use crate::update_buffer::warnings::CompletionWarning;
 use crate::to_org::render::diff::process_activeNode_diff;
 use crate::types::tree::viewnode_nodecomplete::{
   pid_and_repo_from_treenode, write_at_activeNode_in_tree};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerFolder, ViewRequest, Editability};
-use crate::types::viewnode::{Vognode, Phantom, QualFolder};
+use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder, ViewRequest, Editability};
+use crate::types::viewnode::{Vognode, Phantom, PropertyFolder};
 use super::reconcile::hiddeninsubscribee_folder::reconcile_hiddenInSubscribeeFolder_children;
 use super::reconcile::hiddenoutsideof_subscribeefolder::reconcile_hiddenoutsideSubscribeeFolder_children;
 use super::reconcile::partner_folder::reconcile_partnerFolder_children;
@@ -37,7 +37,7 @@ pub(super) struct CompletionContext<'a> {
   pub(super) defmap                         : &'a mut DefinitiveMap,
   /// The per-repo git diffs (Some in diff mode, None otherwise). This is the
   /// single diff handle: it drives the per-node process_activeNode_diff (content
-  /// axes, the phantom flip, TextChanged/IDFolder/AliasFolder), the diff-aware QualFolder
+  /// axes, the phantom flip, TextChanged/IDFolder/AliasFolder), the diff-aware PropertyFolder
   /// reconcilers, and the PartnerFolders' removed-member phantoms. The content
   /// reconcile itself produces only the pure worktree view; process_activeNode_diff
   /// applies every content diff effect afterward at the node's own visit (TODO/DONE/local-view-update/plan_v2.org §9
@@ -50,12 +50,12 @@ pub(super) struct CompletionContext<'a> {
   pub(super) deleted_by_this_save_pids      : &'a HashSet<ID>,
   pub(super) deleted_by_this_save_extra_ids : &'a HashMap<ID, HashSet<ID>>,
   pub(super) active_repo_set              : Option<&'a ActiveRepoSet>,
-  /// TODO/DONE/local-view-update/plan_v2.org §5.5 per-buffer node limit: the remaining budget of *new* ViewNodes
+  /// TODO/DONE/local-view-update/plan_v2.org §5.5 per-buffer node limit: the remaining budget of *new* Viewnodes
   /// the ordinary update pass may create. Initialized once per rerender to
   /// `config.initial_node_limit` and decremented as content children are
   /// created; when it reaches 0 no further new content is drawn (and the
   /// cascade stops). The inline diff is exempt (TODO/DONE/local-view-update/plan_v2.org §5.5): every diff phantom and
-  /// diff scaffold is created regardless of the budget.
+  /// diff-only property is created regardless of the budget.
   pub(super) node_budget                    : usize,
   /// Phase 8 (TODO/DONE/local-view-update/plan_v2.org §13): true only for a DE-NOVO (initial) render driven through
   /// view completion. When set, each fresh definitive node gets its default
@@ -82,7 +82,7 @@ pub(super) struct CompletionContext<'a> {
 }
 
 pub(super) fn complete_viewforest (
-  viewforest : &mut Tree<ViewNode>,
+  viewforest : &mut Tree<Viewnode>,
   context    : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
   let root_treeid : NodeId = viewforest . root () . id ();
@@ -110,7 +110,7 @@ pub(super) fn complete_viewforest (
 /// node's expansion depends only on its ancestors and the graph, never on
 /// siblings or descendants, so it can be processed the moment it is dequeued.
 fn complete_nodes_in_level_order (
-  tree     : &mut Tree<ViewNode>,
+  tree     : &mut Tree<Viewnode>,
   root_treeid : NodeId,
   context  : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
@@ -131,11 +131,11 @@ fn complete_nodes_in_level_order (
 /// (TODO/DONE/local-view-update/plan_v2.org §3/§4). Folders are reconciled at their own visit (the BFS reaches a
 /// folder after its Normal parent created it).
 fn dispatch_node_update (
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
   context : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
-  let kind : ViewNodeKind =
+  let kind : ViewnodeKind =
     tree . get (treeid) . unwrap () . value () . kind . clone ();
   // Death-leafward (TODO/DONE/local-view-update/propagate-death-leafward/plan.org §5): before reconciling any
   // folder, self-check its required ancestry. If it is a generalized orphan (some
@@ -149,9 +149,9 @@ fn dispatch_node_update (
     deaden_generalized_orphan_folder (tree, treeid) ?;
     return Ok (( )); }
   match &kind {
-    ViewNodeKind::Vognode (Vognode::Active (_)) =>
+    ViewnodeKind::Vognode (Vognode::Active (_)) =>
       visit_normal_node (tree, treeid, context) ?,
-    ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee) =>
+    ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) =>
       // A folder fills its members WHOLE and is budget-neutral (TODO/DONE/local-view-update/plan_v2.org §5.5): the owning
       // vognode already spent its 1 budget unit when it expanded, so drawing all
       // the members here costs nothing more and never truncates a group.
@@ -160,21 +160,21 @@ fn dispatch_node_update (
         context . deleted_since_head_pid_src_map,
         context . deleted_by_this_save_extra_ids,
         context . active_repo_set ) ?,
-    ViewNodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee) =>
+    ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee) =>
       reconcile_hiddenInSubscribeeFolder_children (
         treeid, tree, context . repo_diffs, context . runtime,
         context . deleted_since_head_pid_src_map,
         context . deleted_by_this_save_extra_ids,
         context . active_repo_set,
         context . warning_sink . as_deref_mut () ) ?,
-    ViewNodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
+    ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
       reconcile_hiddenoutsideSubscribeeFolder_children (
         treeid, tree, context . repo_diffs, context . runtime,
         context . deleted_since_head_pid_src_map,
         context . deleted_by_this_save_extra_ids,
         context . active_repo_set,
         context . warning_sink . as_deref_mut () ) ?,
-    ViewNodeKind::PartnerFolder (role)
+    ViewnodeKind::PartnerFolder (role)
       // This arm serves one FolderPolicy::WritableSet folder (Overridden;
       // Subscribee has its own completer above) and every
       // FolderPolicy::WriteProtectedSet folder. The reconciler branches on
@@ -187,19 +187,19 @@ fn dispatch_node_update (
         context . deleted_by_this_save_extra_ids,
         context . active_repo_set,
         context . warning_sink . as_deref_mut () ) ?,
-    // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the IDFolder/AliasFolder diff scaffolds are created inline by
+    // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the IDFolder/AliasFolder diff-only properties are created inline by
     // process_activeNode_diff at the owner's BFS visit, so their reconcilers must
     // see the real diffs (repo_diffs) or they would clobber the just-created
     // diff entries. Diffs flow inline for both de-novo and post-save.
-    ViewNodeKind::QualFolder (QualFolder::Alias) =>
+    ViewnodeKind::PropertyFolder (PropertyFolder::Alias) =>
       super::reconcile::aliasfolder::reconcile_aliasFolder_children (
         tree, treeid, &context . runtime . graph,
         context . repo_diffs, &context . runtime . config ) ?,
-    ViewNodeKind::QualFolder (QualFolder::ID) =>
+    ViewnodeKind::PropertyFolder (PropertyFolder::ID) =>
       super::reconcile::id_folder::reconcile_idFolder_children (
         treeid, tree, &context . runtime . graph,
         context . repo_diffs, &context . runtime . config ) ?,
-    ViewNodeKind::QualFolder (QualFolder::Flags { .. }) =>
+    ViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }) =>
       super::reconcile::flags_folder::reconcile_flags_folder_children (
         tree, treeid, &context . runtime . graph,
         &context . runtime . config ) ?,
@@ -208,7 +208,7 @@ fn dispatch_node_update (
       // identity, and flipping it to a "DELETED" marker would leak that
       // a hidden node vanished; it just lingers until the next full
       // rerender drops it), Unknown (unresolvable-id placeholder),
-      // Deleted, DeadScaffold, Qual leaves, BufferRoot, and Diff phantom
+      // Deleted, DeadViewnode, Property leaves, BufferRoot, and Diff phantom
       // (a diff-only placeholder, inert here, TODO/DONE/local-view-update/plan_v2.org §6.3). The prune sweep handles empty/dead nodes.
     } }
   Ok(( )) }
@@ -220,7 +220,7 @@ fn dispatch_node_update (
 /// finally (in diff mode) compute this node's diff inline. The BFS reaches
 /// every folder/child this creates and reconciles it in turn.
 fn visit_normal_node (
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
   context : &mut CompletionContext<'_>,
 ) -> Result<(), Box<dyn Error>> {
@@ -238,8 +238,8 @@ fn visit_normal_node (
     return Ok (( )); }
   let had_dvr : bool =
     read_at_node_in_tree ( tree, treeid,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Active (t)) =>
+      |vn : &Viewnode| match &vn . kind {
+        ViewnodeKind::Vognode (Vognode::Active (t)) =>
           t . view_requests . contains (& ViewRequest::Definitive),
         _ => false } ) ?;
   let mut settled : bool = false; // TODO/DONE/local-view-update/plan_v2.org §5.2 draw rule already ran
@@ -253,7 +253,7 @@ fn visit_normal_node (
   // (The ancestor read is short-circuited to only run when the budget is spent.)
   if context . node_budget == 0
     && ! read_at_ancestor_in_tree ( tree, treeid, 1,
-           |vn : &ViewNode| matches! ( &vn . kind, ViewNodeKind::BufferRoot ) )
+           |vn : &Viewnode| matches! ( &vn . kind, ViewnodeKind::BufferRoot ) )
          . unwrap_or (false) {
     // Budget spent and this is not a view root: draw it write-protected and expand
     // nothing under it; strip any DVR so it is not treated as Final. The content
@@ -288,8 +288,8 @@ fn visit_normal_node (
   // (process_activeNode_diff, below), after content + folders + view requests.
   let still_normal : bool =
     read_at_node_in_tree ( tree, treeid,
-      |vn : &ViewNode| matches! ( &vn . kind,
-        ViewNodeKind::Vognode (Vognode::Active (_)) ) ) ?;
+      |vn : &Viewnode| matches! ( &vn . kind,
+        ViewnodeKind::Vognode (Vognode::Active (_)) ) ) ?;
   if ! still_normal { return Ok (( )); }
   // Create the default folders when this node is first presented as
   // definitive: on a de-novo render, or when a definitive-view request has
@@ -316,7 +316,7 @@ fn visit_normal_node (
     &context . runtime . config,
     context . active_repo_set,
     context . repo_diffs ) ?;
-  // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3 / Jeff): compute this node's content+scaffold diff LOCALLY,
+  // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3 / Jeff): compute this node's content+non-vognode diff LOCALLY,
   // at its own BFS visit. Runs last, after the node is fully completed as a
   // worktree Active node (content, folders, view requests), so process_activeNode_diff
   // sees its final children. The flip to a phantom happens here; the node's folders
@@ -324,7 +324,7 @@ fn visit_normal_node (
   // check. Gated on diff mode (repo_diffs = Some); both de-novo and post-save
   // feed the real diffs here, so the diff is computed inline for both.
   if let Some (real_diffs) = context . repo_diffs {
-    let node_mut : NodeMut<ViewNode> =
+    let node_mut : NodeMut<Viewnode> =
       tree . get_mut (treeid) . unwrap ();
     process_activeNode_diff (
       node_mut, &context . runtime . graph, real_diffs,
@@ -338,29 +338,29 @@ fn visit_normal_node (
 /// single postorder prune sweep removes it once it is childless. This is the
 /// one place self-deletion lives -- per-kind reconcilers no longer detach
 /// themselves when empty.
-/// - DeadScaffold and a childless Vognode::Deleted (TODO/DONE/local-view-update/plan_v2.org §6.6).
+/// - DeadViewnode and a childless Vognode::Deleted (TODO/DONE/local-view-update/plan_v2.org §6.6).
 /// - the write-protected PartnerFolders Subscriber/Overrider/Hider/Hidden (a graph
 ///   relationship the user cannot edit from this side, so an emptied one is
 ///   just noise) -- but NOT Overridden (the editable interface for adding
 ///   overrides, preserved when empty like AliasFolder).
 /// - HiddenInSubscribeeFolder / HiddenOutsideOfSubscribeeFolder.
-/// - QualFolder::ID (largely moot -- an IDFolder always holds at least the PID).
+/// - PropertyFolder::ID (largely moot -- an IDFolder always holds at least the PID).
 /// PRESERVED when empty (so NOT here): PartnerFolder(Subscribee), PartnerFolder
-/// (Overridden), QualFolder(Alias) -- each an *editable interface onto the origin*
+/// (Overridden), PropertyFolder(Alias) -- each an *editable interface onto the origin*
 /// that the user must be able to refill, removed only by hand (TODO/DONE/local-view-update/plan_v2.org §3.4 exception).
 fn is_self_deletable_when_empty (
-  kind : &ViewNodeKind,
+  kind : &ViewnodeKind,
 ) -> bool {
   matches! ( kind,
-    ViewNodeKind::DeadScaffold
-    | ViewNodeKind::Phantom (Phantom::Deleted (_))
-    | ViewNodeKind::PartnerFolder (PartnerFolder::Subscriber)
-    | ViewNodeKind::PartnerFolder (PartnerFolder::Overrider)
-    | ViewNodeKind::PartnerFolder (PartnerFolder::Hider)
-    | ViewNodeKind::PartnerFolder (PartnerFolder::Hidden)
-    | ViewNodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)
-    | ViewNodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee)
-    | ViewNodeKind::QualFolder (QualFolder::ID) ) }
+    ViewnodeKind::DeadViewnode
+    | ViewnodeKind::Phantom (Phantom::Deleted (_))
+    | ViewnodeKind::PartnerFolder (PartnerFolder::Subscriber)
+    | ViewnodeKind::PartnerFolder (PartnerFolder::Overrider)
+    | ViewnodeKind::PartnerFolder (PartnerFolder::Hider)
+    | ViewnodeKind::PartnerFolder (PartnerFolder::Hidden)
+    | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)
+    | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee)
+    | ViewnodeKind::PropertyFolder (PropertyFolder::ID) ) }
 
 /// The TODO/DONE/local-view-update/plan_v2.org §3.4 postorder prune sweep -- the *one* place self-deletion happens.
 /// Removes, bottom-up, every childless `is_self_deletable_when_empty` node:
@@ -371,7 +371,7 @@ fn is_self_deletable_when_empty (
 /// parent if the removed node held it. Never prunes a *view root* (child of the
 /// invisible BufferRoot): the user should still see a deleted root.
 fn prune_self_deletable_when_empty (
-  tree : &mut Tree<ViewNode>,
+  tree : &mut Tree<Viewnode>,
 ) -> Result<(), Box<dyn Error>> {
   let nodes : Vec<NodeId> =
     collect_matching_nodeids (
@@ -386,18 +386,18 @@ fn prune_self_deletable_when_empty (
     let affects_parent_buffer_root : bool =
       node . parent ()
       . map ( |p| matches! ( &p . value () . kind,
-                             ViewNodeKind::BufferRoot ) )
+                             ViewnodeKind::BufferRoot ) )
       . unwrap_or (false);
     if ! has_children && ! affects_parent_buffer_root {
-      detach_scaffold_transferring_focus (tree, treeid) ?; }
+      detach_viewnode_transferring_focus (tree, treeid) ?; }
   }
   Ok (( )) }
 
 fn collect_matching_nodeids<Predicate> (
-  tree      : &Tree<ViewNode>,
+  tree      : &Tree<Viewnode>,
   predicate : Predicate,
 ) -> Result<Vec<NodeId>, Box<dyn Error>>
-where Predicate : Fn (&ViewNode) -> bool {
+where Predicate : Fn (&Viewnode) -> bool {
   let root_treeid : NodeId = tree . root () . id ();
   let mut result : Vec<NodeId> = Vec::new ();
   do_everywhere_in_tree_dfs_readonly (

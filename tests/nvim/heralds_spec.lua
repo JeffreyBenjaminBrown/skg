@@ -213,7 +213,7 @@ describe('skg.heralds', function ()
     end
   end)
 
-  it('displays scaffold kinds', function ()
+  it('displays non-vognode kinds', function ()
     assert.is_truthy(herald_text('(skg aliasFolder)'):find('aliases'))
     assert.is_truthy(herald_text('(skg alias)'):find('alias'))
     assert.is_truthy(

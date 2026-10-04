@@ -166,20 +166,20 @@ async fn test_find_buffer_errors_for_saving (
         assert_eq!(repo_errors . len(), 2,
                    "Should find 2 repo validation errors"); }
 
-      // Body_of_Scaffold (from parsing phase)
-      { let body_of_scaffold_errors: Vec<&BufferValidationError> = errors . iter()
-          . filter(|e| matches!(e, BufferValidationError::Body_of_Scaffold(_, _)))
+      // Body_of_NonVognode (from parsing phase)
+      { let body_of_non_vognode_errors: Vec<&BufferValidationError> = errors . iter()
+          . filter(|e| matches!(e, BufferValidationError::Body_of_NonVognode(_, _)))
           . collect();
-        assert_eq!(body_of_scaffold_errors . len(), 2,
-                   "Should find 2 Body_of_Scaffold errors");
-        assert!(body_of_scaffold_errors . iter() . any(|e| {
-          matches!(e, BufferValidationError::Body_of_Scaffold(title, kind)
+        assert_eq!(body_of_non_vognode_errors . len(), 2,
+                   "Should find 2 Body_of_NonVognode errors");
+        assert!(body_of_non_vognode_errors . iter() . any(|e| {
+          matches!(e, BufferValidationError::Body_of_NonVognode(title, kind)
                    if title == "AliasFolder with body problem" && kind == "aliasFolder")
-        }), "Should find Body_of_Scaffold error for aliasFolder");
-        assert!(body_of_scaffold_errors . iter() . any(|e| {
-          matches!(e, BufferValidationError::Body_of_Scaffold(title, kind)
+        }), "Should find Body_of_NonVognode error for aliasFolder");
+        assert!(body_of_non_vognode_errors . iter() . any(|e| {
+          matches!(e, BufferValidationError::Body_of_NonVognode(title, kind)
                    if title == "Alias with body problem and orphaned" && kind == "alias")
-        }), "Should find Body_of_Scaffold error for alias"); }
+        }), "Should find Body_of_NonVognode error for alias"); }
 
       // View roots must be ActiveNodes or deleted nodes.
       { let viewroot_re = Regex::new(r"(?i)view roots.*must.*activeNode.*deleted") . unwrap();

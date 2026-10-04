@@ -8,7 +8,7 @@ use skg::update_buffer::reconcile::aliasfolder::reconcile_aliasFolder_children;
 use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nodes;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::{run_with_shared_test_stores, graph_handle_from_config};
-use skg::types::viewnode::ViewNode;
+use skg::types::viewnode::Viewnode;
 use skg::types::misc::SkgConfig;
 use skg::types::misc::RepoName;
 use skg::types::misc::TantivyIndex;
@@ -64,7 +64,7 @@ async fn test_reconcile_alias_folder_children_logic (
 
   let unchecked_viewforest =
     org_to_uninterpreted_nodes (org_text) ?. 0;
-  let mut viewforest : Tree < ViewNode > =
+  let mut viewforest : Tree < Viewnode > =
     maybePlaced_to_placed_tree (unchecked_viewforest) ?;
 
   // Get the first "tree root" (node "a" and its children)
@@ -120,7 +120,7 @@ async fn test_reconcile_alias_folder_children_logic (
   {
     let aliasfolder_2_ref =
       viewforest . get (aliasfolder_2_id) . unwrap ();
-    let aliasfolder_2_new : &ViewNode = aliasfolder_2_ref . value ();
+    let aliasfolder_2_new : &Viewnode = aliasfolder_2_ref . value ();
     let children : Vec < String > =
       aliasfolder_2_ref . children () . map (
         |n| n . value() . title() . to_string() )
@@ -198,7 +198,7 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
 
   let unchecked_viewforest =
     org_to_uninterpreted_nodes (org_text) ?. 0;
-  let mut viewforest : Tree < ViewNode > =
+  let mut viewforest : Tree < Viewnode > =
     maybePlaced_to_placed_tree (unchecked_viewforest) ?;
 
   let tree_root_id : NodeId =
@@ -229,8 +229,8 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
   {
     let aliasfolder_ref =
       viewforest . get (first_aliasfolder_id) . unwrap ();
-    let aliasfolder_vn : &ViewNode = aliasfolder_ref . value ();
-    let children_new : Vec < &ViewNode > =
+    let aliasfolder_vn : &Viewnode = aliasfolder_ref . value ();
+    let children_new : Vec < &Viewnode > =
       aliasfolder_ref . children ()
       . map ( |n| n . value () )
       . collect ();
@@ -276,7 +276,7 @@ async fn test_reconcile_alias_folder_children_duplicate_aliases_different_orders
   {
     let aliasfolder_ref =
       viewforest . get (second_aliasfolder_id) . unwrap ();
-    let children : Vec < &ViewNode > =
+    let children : Vec < &Viewnode > =
       aliasfolder_ref . children ()
       . map ( |n| n . value () )
       . collect ();

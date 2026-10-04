@@ -4,16 +4,16 @@ use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
 use crate::types::git::RelationshipAxes;
 use crate::types::misc::{ID, RelPartner, SkgConfig, RepoName};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest, FolderRelation};
-use crate::types::viewnode::{QualFolder, Qual};
+use crate::types::viewnode::{Viewnode, ViewnodeKind, ViewRequest, FolderRelation};
+use crate::types::viewnode::{PropertyFolder, Property};
 use crate::types::tree::viewnode_nodecomplete::{
-  insert_scaffold_as_child, unique_scaffold_child_of_viewnode};
+  insert_non_vognode_as_child, unique_non_vognode_child_of_viewnode};
 
 use ego_tree::Tree;
 use std::error::Error;
 
 pub fn build_and_integrate_aliases_view_then_drop_request (
-  tree          : &mut Tree<ViewNode>,
+  tree          : &mut Tree<Viewnode>,
   node_id       : ego_tree::NodeId,
   graph         : &InRustGraph,
   config        : &SkgConfig,
@@ -29,7 +29,7 @@ pub fn build_and_integrate_aliases_view_then_drop_request (
     errors, result ) }
 
 /// Integrate an AliasFolder child with its Alias grandchildren
-/// into the ViewNode tree containing the target node.
+/// into the Viewnode tree containing the target node.
 ///
 /// PITFALL: This function fetches aliases from disk and
 /// populates them immediately, whereas 'reconcile_aliasFolder_children' (in
@@ -41,16 +41,16 @@ pub fn build_and_integrate_aliases_view_then_drop_request (
 /// so any newly-created empty AliasFolder
 /// would not be visited in the same save cycle.
 pub fn build_and_integrate_aliases (
-  tree      : &mut Tree<ViewNode>,
+  tree      : &mut Tree<Viewnode>,
   node_id   : ego_tree::NodeId,
   graph     : &InRustGraph,
   _config    : &SkgConfig,
 ) -> Result < (), Box<dyn Error> > {
   let node_id_val : ID =
     get_id_from_treenode ( tree, node_id ) ?;
-  if unique_scaffold_child_of_viewnode (
+  if unique_non_vognode_child_of_viewnode (
     tree, node_id,
-    &ViewNodeKind::QualFolder (QualFolder::Alias) )? . is_some ()
+    &ViewnodeKind::PropertyFolder (PropertyFolder::Alias) )? . is_some ()
   { // If it already has an AliasFolder child,
     // then reconcile_aliasFolder_children (in update_buffer) already handled it.
     return Ok (( )); }
@@ -62,13 +62,13 @@ pub fn build_and_integrate_aliases (
     . map ( |node| node . aliases . or_default () . to_vec () )
     . unwrap_or_default ();
   let aliasfolder_id : ego_tree::NodeId =
-    insert_scaffold_as_child ( tree, node_id,
-      ViewNodeKind::QualFolder (QualFolder::Alias), true ) ?;
+    insert_non_vognode_as_child ( tree, node_id,
+      ViewnodeKind::PropertyFolder (PropertyFolder::Alias), true ) ?;
   for alias in & aliases {
-    insert_scaffold_as_child (
+    insert_non_vognode_as_child (
       tree, aliasfolder_id,
-      ViewNodeKind::Qual (
-        Qual::Alias { text: alias . member . clone (),
+      ViewnodeKind::Property (
+        Property::Alias { text: alias . member . clone (),
                       relRepo: home . as_ref ()
                         .and_then ( |home|
                           if &alias . relRepo == home { None }

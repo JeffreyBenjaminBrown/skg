@@ -6,7 +6,7 @@ use crate::herald_tokens::{AncestorFlags, relationship_heralds_sexp};
 use crate::repo_sets::ActiveRepoSet;
 use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::viewnode::{
-  Birth, GraphNodeStats, AffectsParent, PartnerFolder, ViewNode, ViewNodeKind, Vognode };
+  Birth, GraphNodeStats, AffectsParent, PartnerFolder, Viewnode, ViewnodeKind, Vognode };
 use crate::update_buffer::ancestry::required_ancestor;
 use crate::update_buffer::reconcile::content::unintegrated_content_ids;
 use ego_tree::{Tree, NodeId};
@@ -21,7 +21,7 @@ const GRAPH_RELATIONS : [NodeRelation; 4] = [
   NodeRelation::OverridesViewOf, ];
 
 pub fn set_viewnodestats_in_viewforest (
-  viewforest            : &mut Tree<ViewNode>,
+  viewforest            : &mut Tree<Viewnode>,
   graph                 : &InRustGraph,
   container_to_contents : &HashMap<ID, HashSet<ID>>,
   content_to_containers : &HashMap<ID, HashSet<ID>>,
@@ -43,7 +43,7 @@ pub fn set_viewnodestats_in_viewforest (
     content_to_containers ); }
 
 fn set_viewnodestats_recursive (
-  tree                  : &mut Tree<ViewNode>,
+  tree                  : &mut Tree<Viewnode>,
   treeid                : NodeId,
   multi_repo          : bool,
   graph                 : Option<&InRustGraph>,
@@ -54,7 +54,7 @@ fn set_viewnodestats_recursive (
   content_to_containers : &HashMap<ID, HashSet<ID>>,
 ) {
   let opt_pid : Option<ID> =
-    if let ViewNodeKind::Vognode (Vognode::Active (t)) =
+    if let ViewnodeKind::Vognode (Vognode::Active (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     { let node_pid : ID = t . id . clone ();
       detect_and_mark_cycle_v2 (
@@ -91,7 +91,7 @@ fn set_viewnodestats_recursive (
     { ancestor_ids . remove (pid); } } }
 
 /// What the active vognode at treeid is born of, and which ancestors to
-/// flag. The visible PARENT is a generation-1 ancestor (a scaffold folder
+/// flag. The visible PARENT is a generation-1 ancestor (a non-vognode folder
 /// carries no flag); a folder member additionally flags the folder's
 /// required-ancestry gnodes (owner = the last entry) at their tree-gen
 /// distances.
@@ -104,7 +104,7 @@ enum ParentKind {
 /// Compute and store semantic relationship and birth facts for
 /// the active vognode at treeid.
 fn set_herald_strings_in_viewnode (
-  tree                  : &mut Tree<ViewNode>,
+  tree                  : &mut Tree<Viewnode>,
   treeid                : NodeId,
   node_pid              : &ID,
   graph                 : Option<&InRustGraph>,
@@ -114,7 +114,7 @@ fn set_herald_strings_in_viewnode (
 ) {
   let (gstats, affectsParent, birth, overridesHere)
     : (GraphNodeStats, AffectsParent, Birth, bool) = {
-    let ViewNodeKind::Vognode (Vognode::Active (t)) =
+    let ViewnodeKind::Vognode (Vognode::Active (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
     ( t . graphStats . clone (), t . affectsParent, t . birth,
@@ -165,30 +165,30 @@ fn set_herald_strings_in_viewnode (
   let rel_heralds : Option<String> = relationship_heralds_sexp (
     &counts, gstats . aliases, gstats . extra_ids, gstats . flags,
     &flags, &birth_rels, unintegrated );
-  if let ViewNodeKind::Vognode (Vognode::Active (t)) =
+  if let ViewnodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . rel_heralds = rel_heralds; } }
 
 fn parent_kind_of (
-  tree   : &Tree<ViewNode>,
+  tree   : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> ParentKind {
   let parent_ref = match tree . get (treeid) . unwrap () . parent () {
     Some (p) => p, None => return ParentKind::Other, };
   match & parent_ref . value () . kind {
-    ViewNodeKind::Vognode (Vognode::Active (t)) =>
+    ViewnodeKind::Vognode (Vognode::Active (t)) =>
       ParentKind::Gnode ( t . id . clone () ),
-    ViewNodeKind::PartnerFolder (folder) =>
+    ViewnodeKind::PartnerFolder (folder) =>
       ParentKind::Folder ( *folder, parent_ref . id () ),
     _ => ParentKind::Other, } }
 
 /// The (pid, generation) of each tracked ancestor: the visible parent
 /// gnode (gen 1), or -- for a folder member -- the folder's required-ancestry
 /// gnodes (gen i+2 for the i-th required ancestor, since the folder itself
-/// is gen 1). Scaffold ancestors in the chain carry no flag and are
+/// is gen 1). Non-vognode ancestors in the chain carry no flag and are
 /// skipped.
 fn tracked_ancestors (
-  tree        : &Tree<ViewNode>,
+  tree        : &Tree<Viewnode>,
   parent_kind : &ParentKind,
 ) -> Vec<(ID, usize)> {
   match parent_kind {
@@ -207,11 +207,11 @@ fn tracked_ancestors (
     ParentKind::Other => Vec::new (), } }
 
 fn active_vognode_pid (
-  tree   : &Tree<ViewNode>,
+  tree   : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Option<ID> {
   match & tree . get (treeid) ? . value () . kind {
-    ViewNodeKind::Vognode (Vognode::Active (t)) => Some ( t . id . clone () ),
+    ViewnodeKind::Vognode (Vognode::Active (t)) => Some ( t . id . clone () ),
     _ => None, } }
 
 /// Record, for the tracked ancestor 'anc_pid' at 'generation', every
@@ -322,13 +322,13 @@ fn birth_relations_for_folder (
 /// the rendering hides. Herald "B" on the ☮ (TODO/more.org). False
 /// without a graph handle (some tests): better no B than a wrong one.
 fn set_hidden_body (
-  tree     : &mut Tree<ViewNode>,
+  tree     : &mut Tree<Viewnode>,
   treeid   : NodeId,
   node_pid : &ID,
   graph    : Option<&InRustGraph>,
 ) {
   let hidden_body : bool = {
-    let ViewNodeKind::Vognode (Vognode::Active (t)) =
+    let ViewnodeKind::Vognode (Vognode::Active (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
     t . is_writeProtected ()
@@ -337,12 +337,12 @@ fn set_hidden_body (
              . unwrap_or_else ( || node_pid . clone () );
            g . nodes . get (&pid)
              . map_or ( false, |n| n . body . is_some () ) } ) };
-  if let ViewNodeKind::Vognode (Vognode::Active (t)) =
+  if let ViewnodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . hidden_body = hidden_body; }}
 
 /// Sets relRepo on the active vognode at treeid (render-and-gating,
-/// 5_plan.org; see 'ViewNodeStats::relRepo' for the full contract).
+/// 5_plan.org; see 'ViewnodeStats::relRepo' for the full contract).
 /// Computes the (owner, relation, target) triple that identifies the
 /// binding edge this position represents -- contains for an ordinary
 /// Gnode-parent content child; the folder's relation for a simple
@@ -356,7 +356,7 @@ fn set_hidden_body (
 /// 'relation_member_role'); no recorded edge; unresolvable homes;
 /// or the repo equalling the default.
 fn set_relRepo (
-  tree   : &mut Tree<ViewNode>,
+  tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
   graph  : Option<&InRustGraph>,
   config : &SkgConfig,
@@ -365,7 +365,7 @@ fn set_relRepo (
     let graph : &InRustGraph = match graph {
       Some (g) => g, None => break 'compute None, };
     let (node_pid, affectsParent, birth) : (ID, AffectsParent, Birth) = {
-      let ViewNodeKind::Vognode (Vognode::Active (t)) =
+      let ViewnodeKind::Vognode (Vognode::Active (t)) =
         & tree . get (treeid) . unwrap () . value () . kind
       else { break 'compute None; };
       ( t . collected_id (), t . affectsParent, t . birth ) };
@@ -410,7 +410,7 @@ fn set_relRepo (
           config . default_relRepo (&a, &b),
         _ => break 'compute None, }};
     if repo == default { None } else { Some (repo) } };
-  if let ViewNodeKind::Vognode (Vognode::Active (t)) =
+  if let ViewnodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . relRepo = relRepo; }}
 
@@ -454,7 +454,7 @@ mod relationship_default_tests {
     let graph : InRustGraph =
       InRustGraph::from_nodecompletes (&[owner, member]);
 
-    let mut tree : Tree<ViewNode> =
+    let mut tree : Tree<Viewnode> =
       Tree::new (viewforest_root_viewnode ());
     let owner_treeid : NodeId = tree . root_mut () . append (
       mk_definitive_viewnode (
@@ -467,7 +467,7 @@ mod relationship_default_tests {
 
     set_relRepo (
       &mut tree, member_treeid, Some (&graph), &config );
-    let ViewNodeKind::Vognode (Vognode::Active (rendered_member)) =
+    let ViewnodeKind::Vognode (Vognode::Active (rendered_member)) =
       & tree . get (member_treeid) . unwrap () . value () . kind
     else { panic! ("member should be active"); };
     assert_eq! ( rendered_member . viewStats . relRepo, None,
@@ -479,11 +479,11 @@ mod relationship_default_tests {
 /// True if no active vognode ancestor exists (i.e. a root),
 /// or if the nearest active vognode ancestor has a different repo.
 fn set_repo_at_boundary (
-  tree   : &mut Tree<ViewNode>,
+  tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
 ) {
   let node_repo : RepoName = {
-    let ViewNodeKind::Vognode (Vognode::Active (t)) =
+    let ViewnodeKind::Vognode (Vognode::Active (t)) =
       & tree . get (treeid) . unwrap () . value () . kind
     else { return; };
     t . home_repo . clone () };
@@ -493,21 +493,21 @@ fn set_repo_at_boundary (
     match ancestor_repo {
       None => true,
       Some (s) => s != node_repo };
-  if let ViewNodeKind::Vognode (Vognode::Active (t)) =
+  if let ViewnodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . homeRepoAtBoundary = at_boundary; }}
 
 /// Walk rootward from treeid (exclusive) to find
 /// the nearest active vognode ancestor's repo.
 fn nearest_activeNode_ancestor_repo (
-  tree   : &Tree<ViewNode>,
+  tree   : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Option<RepoName> {
   let mut current : NodeId = treeid;
   while let Some (parent_ref)
     = tree . get (current) . unwrap () . parent ()
     { current = parent_ref . id ();
-      if let ViewNodeKind::Vognode (Vognode::Active (t))
+      if let ViewnodeKind::Vognode (Vognode::Active (t))
         = & parent_ref . value () . kind
         { return Some ( t . home_repo . clone () ); }}
   None }
@@ -515,11 +515,11 @@ fn nearest_activeNode_ancestor_repo (
 /// The node's 'cycle' field becomes equal to
 /// whether the 'ancestor_ids' argument contains its ID.
 fn detect_and_mark_cycle_v2 (
-  tree         : &mut Tree<ViewNode>,
+  tree         : &mut Tree<Viewnode>,
   treeid       : NodeId,
   node_pid     : &ID,
   ancestor_ids : &HashSet<ID>,
 ) {
-  if let ViewNodeKind::Vognode (Vognode::Active (t)) =
+  if let ViewnodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (treeid) . unwrap () . value () . kind
   { t . viewStats . cycle = ancestor_ids . contains (node_pid); } }

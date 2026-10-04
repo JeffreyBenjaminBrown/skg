@@ -50,19 +50,19 @@ fn graph_with (nodes: Vec<NodeRust>) -> InRustGraph {
   g }
 
 fn affectsParent_if_normal (
-  viewforest : &Tree<ViewNode>,
+  viewforest : &Tree<Viewnode>,
   nid    : NodeId,
 ) -> AffectsParent {
   match & viewforest . get (nid) . unwrap () . value () . kind {
-    ViewNodeKind::Vognode (Vognode::Active (t)) => t . affectsParent,
+    ViewnodeKind::Vognode (Vognode::Active (t)) => t . affectsParent,
     _ => panic! ("expected ActiveNode") } }
 
 fn birth_if_normal (
-  viewforest : &Tree<ViewNode>,
+  viewforest : &Tree<Viewnode>,
   nid    : NodeId,
 ) -> Birth {
   match & viewforest . get (nid) . unwrap () . value () . kind {
-    ViewNodeKind::Vognode (Vognode::Active (t)) => t . birth,
+    ViewnodeKind::Vognode (Vognode::Active (t)) => t . birth,
     _ => panic! ("expected ActiveNode") } }
 
 #[test]
@@ -73,7 +73,7 @@ fn linksto_false_claim_flipped_to_independent () {
     mk_node ("P", &[], &[], &[]),
     mk_node ("C", &[], &[], &[]),   // links_to: empty
   ]);
-  let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (id ("P"), src (), "P" . to_string (),
@@ -97,7 +97,7 @@ fn linksto_true_claim_preserved () {
     mk_node ("P", &[], &[], &[]),
     mk_node ("C", &[], &[], &["P"]), // C links to P
   ]);
-  let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (id ("P"), src (), "P" . to_string (),
@@ -121,7 +121,7 @@ fn containerof_false_claim_flipped () {
     mk_node ("P", &[], &[],    &[]),
     mk_node ("C", &[], &["X"], &[]),  // C contains some other pid
   ]);
-  let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (id ("P"), src (), "P" . to_string (),
@@ -139,11 +139,11 @@ fn containerof_false_claim_flipped () {
 #[test]
 fn orphan_under_dead_parent_demoted_member_under_folder_kept () {
   // §A (Jeff's invariant): an Affected Active node under a non-container
-  // parent (Diff phantom / DeadScaffold) demotes to Independent; a legitimate
+  // parent (Diff phantom / DeadViewnode) demotes to Independent; a legitimate
   // folder MEMBER (Affected Normal under a PartnerFolder) is left untouched.
   use crate::types::viewnode::{ mk_phantom_viewnode, PartnerFolder };
   use crate::types::git::{ NodeAxes, RelationshipAxes };
-  let mut vf : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut vf : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = vf . root () . id ();
   let phantom : NodeId = vf . get_mut (root) . unwrap () . append (
     mk_phantom_viewnode ( id ("PH"), src (), "PH" . to_string (),
@@ -153,14 +153,14 @@ fn orphan_under_dead_parent_demoted_member_under_folder_kept () {
     mk_writeProtected_viewnode (id ("A"), src (), "A" . to_string (),
                               AffectsParent::True) ) . id ();
   let dead : NodeId = vf . get_mut (root) . unwrap () . append (
-    ViewNode { focused: false, folded: false, body_folded: false,
-               kind: ViewNodeKind::DeadScaffold } ) . id ();
+    Viewnode { focused: false, folded: false, body_folded: false,
+               kind: ViewnodeKind::DeadViewnode } ) . id ();
   let under_dead : NodeId = vf . get_mut (dead) . unwrap () . append (
     mk_writeProtected_viewnode (id ("B"), src (), "B" . to_string (),
                               AffectsParent::True) ) . id ();
   let folder : NodeId = vf . get_mut (root) . unwrap () . append (
-    ViewNode { focused: false, folded: false, body_folded: false,
-               kind: ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee) } ) . id ();
+    Viewnode { focused: false, folded: false, body_folded: false,
+               kind: ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) } ) . id ();
   let member : NodeId = vf . get_mut (folder) . unwrap () . append (
     mk_writeProtected_viewnode (id ("C"), src (), "C" . to_string (),
                               AffectsParent::True) ) . id ();
@@ -170,7 +170,7 @@ fn orphan_under_dead_parent_demoted_member_under_folder_kept () {
   assert_eq! (affectsParent_if_normal (&vf, under_phantom), AffectsParent::False,
     "Affected child under a Diff phantom must demote to Independent");
   assert_eq! (affectsParent_if_normal (&vf, under_dead), AffectsParent::False,
-    "Affected child under a DeadScaffold must demote to Independent");
+    "Affected child under a DeadViewnode must demote to Independent");
   assert_eq! (affectsParent_if_normal (&vf, member), AffectsParent::True,
     "Affected member under a PartnerFolder must stay Affected (legitimate membership)");
 }
@@ -187,7 +187,7 @@ fn containerof_via_merged_extra_id_preserved () {
     mk_node ("P", &["P-old"], &[],        &[]),
     mk_node ("C", &[],        &["P-old"], &[]),
   ]);
-  let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (id ("P"), src (), "P" . to_string (),
@@ -213,7 +213,7 @@ fn containerof_view_affects_parent_acquiree_preserved () {
     mk_node ("P", &["P-old"], &[],    &[]),
     mk_node ("C", &[],        &["P"], &[]),
   ]);
-  let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (id ("P-old"), src (), "P" . to_string (),
@@ -238,7 +238,7 @@ fn contentof_writeProtected_parent_false_claim_flipped () {
     mk_node ("P", &[], &[], &[]),   // P.contains empty
     mk_node ("C", &[], &[], &[]),
   ]);
-  let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (id ("P"), src (), "P" . to_string (),
@@ -261,7 +261,7 @@ fn contentof_definitive_parent_skipped () {
     mk_node ("P", &[], &[], &[]),  // P.contains empty in the in-Rust graph
     mk_node ("C", &[], &[], &[]),
   ]);
-  let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_definitive_viewnode (id ("P"), src (),
@@ -283,7 +283,7 @@ fn independent_always_preserved () {
     mk_node ("P", &[], &[], &[]),
     mk_node ("C", &[], &[], &[]),
   ]);
-  let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (id ("P"), src (), "P" . to_string (),
@@ -303,7 +303,7 @@ fn absent_under_visible_parent_becomes_container () {
     mk_node ("P", &[], &[], &["C"]),
     mk_node ("C", &[], &[], &[]),
   ]);
-  let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (id ("P"), src (), "P" . to_string (),
@@ -342,7 +342,7 @@ fn moved_containerof_relationship_holds_preserved () {
     mk_node ("p_new", &[], &[],                   &[]),
     mk_node ("C",     &[], &["p_old", "p_new"],   &[]),
   ]);
-  let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (id ("p_new"), src (), "p_new" . to_string (),
@@ -367,7 +367,7 @@ fn moved_containerof_relationship_broken_flipped () {
     mk_node ("p_new", &[], &[],        &[]),
     mk_node ("C",     &[], &["p_old"], &[]),
   ]);
-  let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (id ("p_new"), src (), "p_new" . to_string (),
@@ -394,7 +394,7 @@ fn moved_contentof_writeProtected_parent_relationship_holds_preserved () {
     mk_node ("p_new", &[], &["C"], &[]), // p_new really contains C
     mk_node ("C",     &[], &[],    &[]),
   ]);
-  let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (id ("p_new"), src (), "p_new" . to_string (),
@@ -417,7 +417,7 @@ fn moved_contentof_writeProtected_parent_relationship_broken_flipped () {
     mk_node ("p_new", &[], &[],    &[]), // p_new doesn't contain C
     mk_node ("C",     &[], &[],    &[]),
   ]);
-  let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (id ("p_new"), src (), "p_new" . to_string (),
@@ -443,7 +443,7 @@ fn moved_linksto_relationship_holds_preserved () {
     mk_node ("p_new", &[], &[], &[]),
     mk_node ("C",     &[], &[], &["p_old", "p_new"]),
   ]);
-  let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (id ("p_new"), src (), "p_new" . to_string (),
@@ -467,7 +467,7 @@ fn moved_linksto_relationship_broken_flipped () {
     mk_node ("p_new", &[], &[], &[]),
     mk_node ("C",     &[], &[], &["p_old"]),
   ]);
-  let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = viewforest . root () . id ();
   let p_new_id : NodeId = viewforest . get_mut (root) . unwrap () . append (
     mk_writeProtected_viewnode (id ("p_new"), src (), "p_new" . to_string (),

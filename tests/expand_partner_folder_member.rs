@@ -20,7 +20,7 @@ use skg::serve::handlers::save_buffer::SaveResponse;
 use skg::types::views_state::OpenViews;
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
 use ego_tree::Tree;
-use skg::types::viewnode::ViewNode;
+use skg::types::viewnode::Viewnode;
 
 async fn save (
   buf     : &str,
@@ -124,7 +124,7 @@ fn initial_and_as_such_definitive_nodes_get_only_the_default_folders
       let graph : InRustGraphHandle =
         graph_handle_from_config (config) ?;
       let (n_view, _pids, _tree)
-        : (String, Vec<ID>, Tree<ViewNode>) =
+        : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view (
           config, Some (tantivy), &[ID::from ("N")], false )
  ?;

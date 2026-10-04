@@ -2,50 +2,50 @@ use super::*;
 use crate::types::git::RelationshipAxes;
 use crate::types::viewnode::{
   mk_writeProtected_viewnode, viewforest_root_viewnode,
-  Phantom, PhantomDeleted, Qual, QualFolder };
+  Phantom, PhantomDeleted, Property, PropertyFolder };
 
 fn sid (s : &str) -> ID { ID::from (s) }
 fn src () -> RepoName { RepoName::from ("main") }
 
-fn normal (title : &str, pi : AffectsParent) -> ViewNode {
+fn normal (title : &str, pi : AffectsParent) -> Viewnode {
   mk_writeProtected_viewnode (sid (title), src (), title . to_string (), pi) }
 
-fn deleted (title : &str) -> ViewNode {
-  ViewNode { focused : false, folded : false, body_folded : false,
-    kind : ViewNodeKind::Phantom (Phantom::Deleted (PhantomDeleted {
+fn deleted (title : &str) -> Viewnode {
+  Viewnode { focused : false, folded : false, body_folded : false,
+    kind : ViewnodeKind::Phantom (Phantom::Deleted (PhantomDeleted {
       id : sid (title), home_repo : src (),
       title : title . to_string (), body : None })) } }
 
-fn role_folder (rc : PartnerFolder) -> ViewNode {
-  ViewNode { focused : false, folded : false, body_folded : false,
-    kind : ViewNodeKind::PartnerFolder (rc) } }
+fn role_folder (rc : PartnerFolder) -> Viewnode {
+  Viewnode { focused : false, folded : false, body_folded : false,
+    kind : ViewnodeKind::PartnerFolder (rc) } }
 
-fn qual_folder (qc : QualFolder) -> ViewNode {
-  ViewNode { focused : false, folded : false, body_folded : false,
-    kind : ViewNodeKind::QualFolder (qc) } }
+fn property_folder (qc : PropertyFolder) -> Viewnode {
+  Viewnode { focused : false, folded : false, body_folded : false,
+    kind : ViewnodeKind::PropertyFolder (qc) } }
 
-fn alias_qual (text : &str) -> ViewNode {
-  ViewNode { focused : false, folded : false, body_folded : false,
-    kind : ViewNodeKind::Qual (Qual::Alias {
+fn alias_property (text : &str) -> Viewnode {
+  Viewnode { focused : false, folded : false, body_folded : false,
+    kind : ViewnodeKind::Property (Property::Alias {
       text : text . to_string (),
       relRepo : None,
       relRepo_request : None,
       relationship_axes : RelationshipAxes::default () }) } }
 
 fn child (
-  tree : &mut Tree<ViewNode>, parent : NodeId, vn : ViewNode
+  tree : &mut Tree<Viewnode>, parent : NodeId, vn : Viewnode
 ) -> NodeId {
   tree . get_mut (parent) . unwrap () . append (vn) . id () }
 
-fn kind_at (tree : &Tree<ViewNode>, id : NodeId) -> ViewNodeKind {
+fn kind_at (tree : &Tree<Viewnode>, id : NodeId) -> ViewnodeKind {
   tree . get (id) . unwrap () . value () . kind . clone () }
 
-fn parentis_at (tree : &Tree<ViewNode>, id : NodeId) -> Option<AffectsParent> {
+fn parentis_at (tree : &Tree<Viewnode>, id : NodeId) -> Option<AffectsParent> {
   match &tree . get (id) . unwrap () . value () . kind {
-    ViewNodeKind::Vognode (Vognode::Active (t)) => Some (t . affectsParent),
+    ViewnodeKind::Vognode (Vognode::Active (t)) => Some (t . affectsParent),
     _ => None } }
 
-fn is_detached (tree : &Tree<ViewNode>, parent : NodeId, id : NodeId) -> bool {
+fn is_detached (tree : &Tree<Viewnode>, parent : NodeId, id : NodeId) -> bool {
   ! tree . get (parent) . unwrap () . children ()
     . any ( |c| c . id () == id ) }
 
@@ -53,27 +53,27 @@ fn is_detached (tree : &Tree<ViewNode>, parent : NodeId, id : NodeId) -> bool {
 
 #[test]
 fn aliasfolder_under_normal_is_not_orphan () {
-  let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let n : NodeId = child (&mut t, root, normal ("N", AffectsParent::True));
-  let ac : NodeId = child (&mut t, n, qual_folder (QualFolder::Alias));
+  let ac : NodeId = child (&mut t, n, property_folder (PropertyFolder::Alias));
   assert! ( ! folder_is_generalized_orphan (&t, ac) . unwrap () ); }
 
 #[test]
 fn aliasfolder_under_deleted_is_orphan () {
-  let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let d : NodeId = child (&mut t, root, deleted ("D"));
-  let ac : NodeId = child (&mut t, d, qual_folder (QualFolder::Alias));
+  let ac : NodeId = child (&mut t, d, property_folder (PropertyFolder::Alias));
   assert! ( folder_is_generalized_orphan (&t, ac) . unwrap () ); }
 
 #[test]
-fn relation_folder_under_deadscaffold_is_orphan () {
-  let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+fn relation_folder_under_deadviewnode_is_orphan () {
+  let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let dead : NodeId = child (&mut t, root,
-    ViewNode { focused : false, folded : false, body_folded : false,
-      kind : ViewNodeKind::DeadScaffold });
+    Viewnode { focused : false, folded : false, body_folded : false,
+      kind : ViewnodeKind::DeadViewnode });
   let rc : NodeId = child (&mut t, dead, role_folder (PartnerFolder::Subscriber));
   assert! ( folder_is_generalized_orphan (&t, rc) . unwrap () ); }
 
@@ -81,9 +81,9 @@ fn relation_folder_under_deadscaffold_is_orphan () {
 // FAR ancestor (subscriber, depth 3) is dead -- the generalized (not just
 // immediate-parent) check must catch it.
 fn build_subscribee_chain (
-  subscriber : ViewNode,
-) -> (Tree<ViewNode>, NodeId, NodeId, NodeId, NodeId) {
-  let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  subscriber : Viewnode,
+) -> (Tree<Viewnode>, NodeId, NodeId, NodeId, NodeId) {
+  let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let sber : NodeId = child (&mut t, root, subscriber);
   let subscribee_folder : NodeId = child (&mut t, sber, role_folder (PartnerFolder::Subscribee));
@@ -137,7 +137,7 @@ fn required_ancestor_reads_without_revalidating_kind () {
 
 #[test]
 fn deaden_disposes_each_child_kind () {
-  let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let d : NodeId = child (&mut t, root, deleted ("D"));
   let subscribee_folder : NodeId = child (&mut t, d, role_folder (PartnerFolder::Subscribee));
@@ -154,27 +154,27 @@ fn deaden_disposes_each_child_kind () {
 
   deaden_generalized_orphan_folder (&mut t, subscribee_folder) . unwrap ();
 
-  assert! ( matches! ( kind_at (&t, subscribee_folder), ViewNodeKind::DeadScaffold ),
-    "the orphan folder itself becomes a DeadScaffold" );
+  assert! ( matches! ( kind_at (&t, subscribee_folder), ViewnodeKind::DeadViewnode ),
+    "the orphan folder itself becomes a DeadViewnode" );
   assert! ( is_detached (&t, subscribee_folder, leaf),
     "an Affected leaf is deleted" );
   assert_eq! ( parentis_at (&t, branch), Some (AffectsParent::False),
     "an Affected branch is demoted to Independent and kept" );
   assert! ( ! is_detached (&t, subscribee_folder, branch) );
   assert! ( matches! ( kind_at (&t, nested),
-                       ViewNodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) ),
+                       ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) ),
     "a nested folder is left untouched to self-deaden at its visit" );
   assert_eq! ( parentis_at (&t, indep), Some (AffectsParent::False),
     "a non-Affected vognode is kept untouched" ); }
 
 #[test]
-fn deaden_converts_qual_leaf_to_deadscaffold () {
-  let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+fn deaden_converts_property_leaf_to_deadviewnode () {
+  let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let d : NodeId = child (&mut t, root, deleted ("D"));
-  let ac : NodeId = child (&mut t, d, qual_folder (QualFolder::Alias));
-  let q : NodeId = child (&mut t, ac, alias_qual ("eleven"));
+  let ac : NodeId = child (&mut t, d, property_folder (PropertyFolder::Alias));
+  let q : NodeId = child (&mut t, ac, alias_property ("eleven"));
   deaden_generalized_orphan_folder (&mut t, ac) . unwrap ();
-  assert! ( matches! ( kind_at (&t, ac), ViewNodeKind::DeadScaffold ) );
-  assert! ( matches! ( kind_at (&t, q), ViewNodeKind::DeadScaffold ),
-    "a Qual leaf (which does not self-dispatch) is converted to DeadScaffold" ); }
+  assert! ( matches! ( kind_at (&t, ac), ViewnodeKind::DeadViewnode ) );
+  assert! ( matches! ( kind_at (&t, q), ViewnodeKind::DeadViewnode ),
+    "a Property leaf (which does not self-dispatch) is converted to DeadViewnode" ); }

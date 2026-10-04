@@ -216,8 +216,8 @@ the C token 2aC: the multi-contains \"2\" (yellow), the ancestor \"a\"
       (should (eq (get-text-property 0 'face result)
                   'heralds-red-face)))))
 
-(ert-deftest test-heralds-scaffold-display ()
-  "Test that scaffold kinds are displayed correctly."
+(ert-deftest test-heralds-non-vognode-display ()
+  "Test that non-vognode kinds are displayed correctly."
   (with-temp-buffer
     ;; Test aliasFolder
     (erase-buffer)
@@ -264,13 +264,13 @@ the C token 2aC: the multi-contains \"2\" (yellow), the ancestor \"a\"
       (should (string-match "N" result))
       (should (string-match "R" result)))
 
-    ;; Scaffold alias with staged relationship add.
+    ;; Non-vognode alias with staged relationship add.
     (erase-buffer)
     (insert "(skg alias (staged addedR))")
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "staged:R" result)))
 
-    ;; Scaffold alias with unstaged relationship removal.
+    ;; Non-vognode alias with unstaged relationship removal.
     (erase-buffer)
     (insert "(skg alias (unstaged removedR))")
     (let ((result (heralds-from-metadata (buffer-string))))
@@ -280,7 +280,7 @@ the C token 2aC: the multi-contains \"2\" (yellow), the ancestor \"a\"
 (ert-deftest test-heralds-inactive-node-display ()
   "An anonymous inactive-node placeholder displays as a blue herald.
 The server emits the bare atom `inactiveNode' (like the other
-dataless scaffold markers) -- it carries no id/repo, because those
+dataless non-vognode markers) -- it carries no id/repo, because those
 would leak content the user hid by restricting the repo-set."
   (with-temp-buffer
     (insert "(skg inactiveNode)")

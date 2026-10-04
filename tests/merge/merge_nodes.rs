@@ -8,7 +8,7 @@ use skg::nodeMerge::merge_nodes;
 use skg::test_utils::{run_with_shared_test_stores, tantivy_contains_id, graph_handle_from_config, audit_inrustgraph_or_panic};
 use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, RepoName};
 use skg::types::tree::forest::ViewForest;
-use skg::types::viewnode::{NodeEditRequest, ViewNode, ViewNodeKind, Vognode, ActiveNode, Editability, viewforest_root_viewnode, default_activeNode};
+use skg::types::viewnode::{NodeEditRequest, Viewnode, ViewnodeKind, Vognode, ActiveNode, Editability, viewforest_root_viewnode, default_activeNode};
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::NodeMerge;
 use skg::dbs::filesystem::one_node::nodecomplete_from_pid_and_repo;
@@ -26,7 +26,7 @@ fn mk_test_viewnode (
   title        : &str,
   id           : &str,
   edit_request : Option<NodeEditRequest>,
-) -> ViewNode {
+) -> Viewnode {
   let t : ActiveNode = ActiveNode {
     editability : Editability::Definitive {
       body         : None,
@@ -34,10 +34,10 @@ fn mk_test_viewnode (
     .. default_activeNode ( ID::from (id),
                           RepoName::from ("main"),
                           title . to_string() ) };
-  ViewNode { focused     : false,
+  Viewnode { focused     : false,
             folded      : false,
             body_folded : false,
-            kind        : ViewNodeKind::Vognode (Vognode::Active (t)) }}
+            kind        : ViewnodeKind::Vognode (Vognode::Active (t)) }}
 
 #[test]
 fn all_tests
@@ -72,7 +72,7 @@ async fn test_merge_2_into_1_impl(
 ) -> Result<(), Box<dyn Error>> {
   // Create viewnode viewforest with node 1 requesting to merge node 2
   let view_node_1 = mk_test_viewnode("1", "1", Some(NodeEditRequest::NodeMerge(ID::from ("2"))));
-  let mut viewforest: Tree<ViewNode> = Tree::new(viewforest_root_viewnode());
+  let mut viewforest: Tree<Viewnode> = Tree::new(viewforest_root_viewnode());
   viewforest . root_mut() . append (view_node_1);
 
   // Generate NodeMerge from merge request
@@ -248,7 +248,7 @@ async fn test_merge_1_into_2_impl(
 ) -> Result<(), Box<dyn Error>> {
   // Create viewnode viewforest with node 2 requesting to merge node 1
   let view_node_2 = mk_test_viewnode("2", "2", Some(NodeEditRequest::NodeMerge(ID::from ("1"))));
-  let mut viewforest: Tree<ViewNode> = Tree::new(viewforest_root_viewnode());
+  let mut viewforest: Tree<Viewnode> = Tree::new(viewforest_root_viewnode());
   viewforest . root_mut() . append (view_node_2);
 
   // Generate NodeMerge from merge request
@@ -436,7 +436,7 @@ async fn test_inrustgraph_queries_resolve_aliases_after_merge_impl (
   let view_node_2 =
     mk_test_viewnode ("2", "2",
                       Some (NodeEditRequest::NodeMerge (ID::from ("1"))));
-  let mut viewforest : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut viewforest : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   viewforest . root_mut () . append (view_node_2);
   let nodeMerge_instructions : Vec<NodeMerge> =
     nodeMerge_instructions_from_viewforest (

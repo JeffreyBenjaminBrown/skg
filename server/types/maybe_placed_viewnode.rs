@@ -1,4 +1,4 @@
-/// Mp variants of ViewNode and ViewNodeKind,
+/// Mp variants of Viewnode and ViewnodeKind,
 /// plus conversions between placed and maybePlaced trees.
 /// 'Mp' means id and repo might be absent.
 /// Only needed briefly after parsing a buffer from the client;
@@ -10,7 +10,7 @@ use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
 use super::git::{NodeAxes, RelationshipAxes};
-use super::viewnode::{ ViewNode, ViewNodeKind, ActiveNode, Vognode, Phantom, QualFolder, Qual, PartnerFolder, PhantomDeleted, InactiveNode, PhantomUnknown, GraphNodeStats, ViewNodeStats, Birth, Editability, AffectsParent, };
+use super::viewnode::{ Viewnode, ViewnodeKind, ActiveNode, Vognode, Phantom, PropertyFolder, Property, PartnerFolder, PhantomDeleted, InactiveNode, PhantomUnknown, GraphNodeStats, ViewnodeStats, Birth, Editability, AffectsParent, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
 use std::collections::{HashMap, HashSet};
@@ -19,7 +19,7 @@ use std::collections::{HashMap, HashSet};
 // Type declarations
 //
 
-/// Every ViewNode has an ID and a repo.
+/// Every Viewnode has an ID and a repo.
 /// In MpViewnode, those two fields are optional.
 /// That's the only difference.
 #[derive(Debug, Clone, PartialEq)]
@@ -36,11 +36,11 @@ pub struct MpViewnode {
 pub enum MpViewnodeKind {
   Vognode      (MpVognode),
   Phantom      (MpPhantom),
-  QualFolder      (QualFolder),
-  Qual         (Qual),
+  PropertyFolder      (PropertyFolder),
+  Property         (Property),
   PartnerFolder   (PartnerFolder),
   BufferRoot,
-  DeadScaffold,
+  DeadViewnode,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -120,44 +120,44 @@ impl From<PhantomDiff> for MpPhantomDiff {
   }
 }
 
-impl TryFrom<MpViewnodeKind> for ViewNodeKind {
+impl TryFrom<MpViewnodeKind> for ViewnodeKind {
   type Error = String;
 
   fn try_from(u: MpViewnodeKind) -> Result<Self, Self::Error> {
     match u {
       MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
-        Ok (ViewNodeKind::Vognode (
+        Ok (ViewnodeKind::Vognode (
           Vognode::Active (ActiveNode::try_from (t)?))),
       MpViewnodeKind::Vognode (MpVognode::Inactive (i)) =>
-        Ok (ViewNodeKind::Vognode (Vognode::Inactive (i))),
+        Ok (ViewnodeKind::Vognode (Vognode::Inactive (i))),
       MpViewnodeKind::Phantom (MpPhantom::Diff (p)) =>
-        Ok (ViewNodeKind::Phantom (
+        Ok (ViewnodeKind::Phantom (
           Phantom::Diff (PhantomDiff::try_from (p)?))),
       MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
-        Ok (ViewNodeKind::Phantom (Phantom::Deleted (d))),
+        Ok (ViewnodeKind::Phantom (Phantom::Deleted (d))),
       MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
-        Ok (ViewNodeKind::Phantom (Phantom::Unknown (u))),
-      MpViewnodeKind::QualFolder (c) =>
-        Ok (ViewNodeKind::QualFolder (c)),
-      MpViewnodeKind::Qual (q) =>
-        Ok (ViewNodeKind::Qual (q)),
+        Ok (ViewnodeKind::Phantom (Phantom::Unknown (u))),
+      MpViewnodeKind::PropertyFolder (c) =>
+        Ok (ViewnodeKind::PropertyFolder (c)),
+      MpViewnodeKind::Property (q) =>
+        Ok (ViewnodeKind::Property (q)),
       MpViewnodeKind::PartnerFolder (r) =>
-        Ok (ViewNodeKind::PartnerFolder (r)),
+        Ok (ViewnodeKind::PartnerFolder (r)),
       MpViewnodeKind::BufferRoot =>
-        Ok (ViewNodeKind::BufferRoot),
-      MpViewnodeKind::DeadScaffold =>
-        Ok (ViewNodeKind::DeadScaffold), }}
+        Ok (ViewnodeKind::BufferRoot),
+      MpViewnodeKind::DeadViewnode =>
+        Ok (ViewnodeKind::DeadViewnode), }}
 }
 
-impl TryFrom<MpViewnode> for ViewNode {
+impl TryFrom<MpViewnode> for Viewnode {
   type Error = String;
 
   fn try_from(u: MpViewnode) -> Result<Self, Self::Error> {
-    Ok(ViewNode {
+    Ok(Viewnode {
       focused     : u . focused,
       folded      : u . folded,
       body_folded : u . body_folded,
-      kind        : ViewNodeKind::try_from(u . kind)?,
+      kind        : ViewnodeKind::try_from(u . kind)?,
     })
   }
 }
@@ -184,35 +184,35 @@ impl From<ActiveNode> for MpActiveNode {
   }
 }
 
-impl From<ViewNodeKind> for MpViewnodeKind {
-  fn from(k: ViewNodeKind) -> Self {
+impl From<ViewnodeKind> for MpViewnodeKind {
+  fn from(k: ViewnodeKind) -> Self {
     match k {
-      ViewNodeKind::Vognode (Vognode::Active (t)) =>
+      ViewnodeKind::Vognode (Vognode::Active (t)) =>
         MpViewnodeKind::Vognode (
           MpVognode::Active (MpActiveNode::from (t))),
-      ViewNodeKind::Vognode (Vognode::Inactive (i)) =>
+      ViewnodeKind::Vognode (Vognode::Inactive (i)) =>
         MpViewnodeKind::Vognode (MpVognode::Inactive (i)),
-      ViewNodeKind::Phantom (Phantom::Diff (p)) =>
+      ViewnodeKind::Phantom (Phantom::Diff (p)) =>
         MpViewnodeKind::Phantom (
           MpPhantom::Diff (MpPhantomDiff::from (p))),
-      ViewNodeKind::Phantom (Phantom::Deleted (d)) =>
+      ViewnodeKind::Phantom (Phantom::Deleted (d)) =>
         MpViewnodeKind::Phantom (MpPhantom::Deleted (d)),
-      ViewNodeKind::Phantom (Phantom::Unknown (u)) =>
+      ViewnodeKind::Phantom (Phantom::Unknown (u)) =>
         MpViewnodeKind::Phantom (MpPhantom::Unknown (u)),
-      ViewNodeKind::QualFolder (c) =>
-        MpViewnodeKind::QualFolder (c),
-      ViewNodeKind::Qual (q) =>
-        MpViewnodeKind::Qual (q),
-      ViewNodeKind::PartnerFolder (r) =>
+      ViewnodeKind::PropertyFolder (c) =>
+        MpViewnodeKind::PropertyFolder (c),
+      ViewnodeKind::Property (q) =>
+        MpViewnodeKind::Property (q),
+      ViewnodeKind::PartnerFolder (r) =>
         MpViewnodeKind::PartnerFolder (r),
-      ViewNodeKind::BufferRoot =>
+      ViewnodeKind::BufferRoot =>
         MpViewnodeKind::BufferRoot,
-      ViewNodeKind::DeadScaffold =>
-        MpViewnodeKind::DeadScaffold, }}
+      ViewnodeKind::DeadViewnode =>
+        MpViewnodeKind::DeadViewnode, }}
 }
 
-impl From<ViewNode> for MpViewnode {
-  fn from(o: ViewNode) -> Self {
+impl From<Viewnode> for MpViewnode {
+  fn from(o: Viewnode) -> Self {
     MpViewnode {
       focused     : o . focused,
       folded      : o . folded,
@@ -224,11 +224,11 @@ impl From<ViewNode> for MpViewnode {
 
 /// Does *not* compute missing repo or ID.
 /// Merely converts a Tree<MpViewnode>
-///              to a Tree<ViewNode>,
+///              to a Tree<Viewnode>,
 /// failing if it finds any repo or ID missing.
 pub fn maybePlaced_to_placed_tree (
   unchecked: Tree<MpViewnode>
-) -> Result<Tree<ViewNode>, String> {
+) -> Result<Tree<Viewnode>, String> {
   Ok (
     maybePlaced_to_placed_viewforest (
       MpViewForest::from_internal_tree (unchecked)) ?
@@ -241,9 +241,9 @@ pub fn maybePlaced_to_placed_viewforest (
     unchecked . into_internal_tree ();
   let unchecked_root_id: NodeId =
     unchecked . root() . id();
-  let mut checked: Tree<ViewNode> =
+  let mut checked: Tree<Viewnode> =
     // This tree begins as a clone of the other's root.
-    Tree::new( ViewNode::try_from(
+    Tree::new( Viewnode::try_from(
       unchecked . root() . value() . clone() )? );
   let mut id_map: HashMap< NodeId, // key : unchecked
                            NodeId > // value : checked
@@ -258,15 +258,15 @@ pub fn maybePlaced_to_placed_viewforest (
     | {
       if node_ref . id() == unchecked_root_id {
         return Ok (( )); } // already converted
-      let checked_node: ViewNode =
-        ViewNode::try_from(
+      let checked_node: Viewnode =
+        Viewnode::try_from(
           node_ref . value() . clone() )?;
       let parent_checked_id: NodeId =
         *id_map . get (
           &node_ref . parent() . unwrap() . id()
         ) . unwrap();
       let checked_id: NodeId = {
-        let mut parent_mut: NodeMut<ViewNode> =
+        let mut parent_mut: NodeMut<Viewnode> =
           checked . get_mut (parent_checked_id) . unwrap();
         parent_mut . append (checked_node) . id() };
       id_map . insert( node_ref . id(),
@@ -288,7 +288,7 @@ impl Default for MpActiveNode {
       affectsParent       : AffectsParent::True,
       birth          : Birth::Unremarkable,
       graphStats     : GraphNodeStats::default(),
-      viewStats      : ViewNodeStats::default(),
+      viewStats      : ViewnodeStats::default(),
       relRepo_request : None,
       view_requests  : HashSet::new(),
       node_axes      : NodeAxes::default(),
@@ -324,12 +324,12 @@ impl MpViewnode {
       MpViewnodeKind::Phantom (MpPhantom::Diff (p)) => &p . title,
       MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
         &d . title,
-      MpViewnodeKind::Qual (q) =>
+      MpViewnodeKind::Property (q) =>
         q . title (),
-      MpViewnodeKind::QualFolder (folder) => folder . title (),
+      MpViewnodeKind::PropertyFolder (folder) => folder . title (),
       MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::BufferRoot
-        | MpViewnodeKind::DeadScaffold
+        | MpViewnodeKind::DeadViewnode
         | MpViewnodeKind::Vognode (MpVognode::Inactive (_))
         | MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) =>
         "", }}
@@ -341,24 +341,24 @@ impl MpViewnode {
         => t . title . clone(),
       MpViewnodeKind::Phantom (MpPhantom::Diff (p))
         => p . title . clone(),
-      MpViewnodeKind::Qual (Qual::Alias { text, .. }) =>
-        format!("qual:alias({})", text),
-      MpViewnodeKind::Qual (Qual::ID { id, .. }) =>
-        format!("qual:id({})", id),
-      MpViewnodeKind::Qual (Qual::Flag { flag, .. }) =>
-        format!("qual:flag({})", flag . wire_name ()),
-      MpViewnodeKind::Qual (Qual::TextChanged { .. }) =>
-        "qual:textChanged" . to_string (),
-      MpViewnodeKind::QualFolder (folder) =>
-        format!("qualFolder:{}", folder . repr_in_client ()),
+      MpViewnodeKind::Property (Property::Alias { text, .. }) =>
+        format!("property:alias({})", text),
+      MpViewnodeKind::Property (Property::ID { id, .. }) =>
+        format!("property:id({})", id),
+      MpViewnodeKind::Property (Property::Flag { flag, .. }) =>
+        format!("property:flag({})", flag . wire_name ()),
+      MpViewnodeKind::Property (Property::TextChanged { .. }) =>
+        "property:textChanged" . to_string (),
+      MpViewnodeKind::PropertyFolder (folder) =>
+        format!("propertyFolder:{}", folder . repr_in_client ()),
       MpViewnodeKind::PartnerFolder (partnerFolder) =>
         format!("partnerFolder:{}", partnerFolder . repr_in_client ()),
       MpViewnodeKind::BufferRoot =>
         "forestRoot" . to_string (),
       MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
         format!("deleted:{}", d . id . 0),
-      MpViewnodeKind::DeadScaffold =>
-        "deadScaffold" . to_string (),
+      MpViewnodeKind::DeadViewnode =>
+        "deadViewnode" . to_string (),
       MpViewnodeKind::Vognode (MpVognode::Inactive (_)) =>
         "inactive" . to_string (),
       MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
@@ -373,11 +373,11 @@ impl MpViewnode {
         => p . body (),
       MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
         d . body . as_ref(),
-      MpViewnodeKind::QualFolder (folder) => folder . body (),
-      MpViewnodeKind::Qual (qual) => qual . body (),
+      MpViewnodeKind::PropertyFolder (folder) => folder . body (),
+      MpViewnodeKind::Property (property) => property . body (),
       MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::BufferRoot
-        | MpViewnodeKind::DeadScaffold
+        | MpViewnodeKind::DeadViewnode
         | MpViewnodeKind::Vognode (MpVognode::Inactive (_))
         | MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) =>
         None, }}
@@ -396,11 +396,11 @@ impl MpViewnode {
         None,
       MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
         Some (&u . id),
-      MpViewnodeKind::QualFolder (_)
-        | MpViewnodeKind::Qual (_)
+      MpViewnodeKind::PropertyFolder (_)
+        | MpViewnodeKind::Property (_)
         | MpViewnodeKind::PartnerFolder (_)
         | MpViewnodeKind::BufferRoot
-        | MpViewnodeKind::DeadScaffold =>
+        | MpViewnodeKind::DeadViewnode =>
         None, }}
 
   /// True for the two ActiveNode-ish kinds: an Active vognode or a Diff phantom.

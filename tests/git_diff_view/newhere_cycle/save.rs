@@ -50,8 +50,8 @@ fn test_newhere_cycle_survives_save()
 /// fixture transition staged (git add) rather than unstaged. The
 /// respawned cycle child should keep '(staged addedR)' instead of
 /// '(unstaged addedR)' -- guards the save-rerender pipeline's per-stage
-/// attribution for the newhere-cycle scaffold, mirroring
-/// ids::save::test_delete_id_folder_scaffold_respawns_staged.
+/// attribution for the newhere-cycle non-vognode, mirroring
+/// ids::save::test_delete_id_folder_respawns_staged.
 #[test]
 fn test_newhere_cycle_survives_save_staged()
   -> Result<(), Box<dyn Error>>

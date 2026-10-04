@@ -239,7 +239,7 @@ impl SkgConfig {
     self . data_root . join ("logs") } }
 
 /// Each repo has a unique name, defined in the SkgConfig,
-/// used in ViewNode metadata to track provenance.
+/// used in Viewnode metadata to track provenance.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct RepoName ( pub String );
 

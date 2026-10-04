@@ -31,7 +31,7 @@ Notice that subee appears twice in that buffer:
 Once as a subscribee, and once as a standalone root.
 
 In a second buffer we have just two roots, 11 and subee,
-with none of the scaffolding.
+with none of the non-vognode viewnodes.
 
 #+begin_example
   * (writeProtected) 11
@@ -46,12 +46,12 @@ Now the first buffer should look like:
 #+begin_example
   * 1
   ** (deleted)
-  *** (deletedscaff)
+  *** (deadviewnode)
   **** subee
   ***** subee-1  ;; tricky!
-  ***** (deletedscaff)
+  ***** (deadviewnode)
   ****** subee-1
-  **** (deletedscaff)
+  **** (deadviewnode)
   ***** also-hidden
   * subee
   ** subee-1
@@ -68,13 +68,13 @@ to subee:
 #+begin_example
   * 1
   ** (deleted)
-  *** (deletedscaff)
+  *** (deadviewnode)
   **** subee
   ***** subee-1
   ***** subee-2
-  ***** (deletedscaff)
+  ***** (deadviewnode)
   ****** subee-1
-  **** (deletedscaff)
+  **** (deadviewnode)
   ***** also-hidden
   * subee
   ** subee-1
@@ -95,16 +95,16 @@ After saving that, the other buffer should now read:
 This integration test exercises:
 1. Node deletion via =(editRequest delete)=: a save from one buffer
    deletes a =.skg= file, and the collateral buffer degrades the
-   node to =DeletedNode= with scaffolds becoming =DeletedScaff=.
+   node to =DeletedNode= with non-vognodes becoming =DeadViewnode=.
 2. Editing under a =DeletedNode=: a subsequent save from the
    collateral buffer adds a new child node, and the other buffer
    picks up the change.
-3. Re-saving a buffer containing =Deleted= / =DeletedScaff= nodes:
+3. Re-saving a buffer containing =Deleted= / =DeadViewnode= nodes:
    they round-trip through parse → completion → render unchanged,
-   and a new node created under a =DeletedScaff= gets a UUID.
+   and a new node created under a =DeadViewnode= gets a UUID.
 
 All existing collateral tests deal only with containment changes.
-This is the first to exercise the =DeletedNode= / =DeletedScaff=
+This is the first to exercise the =DeletedNode= / =DeadViewnode=
 degradation path in =complete_viewtree=.
 
 * Fixtures
@@ -162,12 +162,12 @@ ids:
   - also-hidden
 #+end_src
 
-* Buffer 1: multi-root view (scaffolded "1" + standalone subee)
+* Buffer 1: multi-root view (placed under a non-vognode "1" + standalone subee)
 
 Constructed in two steps:
 
 1. Request =skg-request-single-root-content-view-from-id "1"=.
-   The server renders all scaffolding for node 11 (subscribeeFolder,
+   The server renders all non-vognode viewnodes for node 11 (subscribeeFolder,
    hiddenInSubscribeeFolder, hiddenOutsideOfSubscribeeFolder).
    This gives us a single-root view with root "1".
 
@@ -186,7 +186,7 @@ Constructed in two steps:
 
 ** Expected initial structure (titles)
 
-Scaffold rendering uses fixed titles ("it subscribes to these",
+Non-vognode rendering uses fixed titles ("it subscribes to these",
 =server/types/viewnode.rs=. Non-vognode folder headlines no
 longer carry explanatory titles; the client herald rules explain them.
 The expected =headline-titles= output is approximately:
@@ -260,15 +260,15 @@ Line 1 metadata should contain =(deleted (id 11) ...)=.
 
 ** Expected collateral buffer 1 after deletion
 
-Node 11 degrades to =DeletedNode=. Its scaffolds
+Node 11 degrades to =DeletedNode=. Its non-vognodes
 (subscribeeFolder, hiddenInSubscribeeFolder,
-hiddenOutsideOfSubscribeeFolder) become =DeletedScaff=. The
-aliasFolder also becomes =DeletedScaff=; its leaf child
-(the =alias= scaffold) becomes a childless =DeletedScaff=
+hiddenOutsideOfSubscribeeFolder) become =DeadViewnode=. The
+aliasFolder also becomes =DeadViewnode=; its leaf child
+(the =alias= non-vognode) becomes a childless =DeadViewnode=
 which the postorder pass detaches. So aliasFolder and its
 alias disappear entirely.
 
-subee is a TrueNode under the (now =DeletedScaff=)
+subee is a TrueNode under the (now =DeadViewnode=)
 subscribeeFolder. =complete_viewtree= completes it normally,
 adding subee-1 as a real child. This is the "tricky" line.
 
@@ -276,25 +276,25 @@ Expected headline-titles (approximately):
 #+begin_example
 ((1 . "1")
  (2 . "11")           ;; DeletedNode
- (3 . "")             ;; DeletedScaff (was subscribeeFolder)
+ (3 . "")             ;; DeadViewnode (was subscribeeFolder)
  (4 . "subee")        ;; TrueNode, completed
  (5 . "subee-1")      ;; child from completion
- (5 . "")             ;; DeletedScaff (was hiddenInSubscribeeFolder)
+ (5 . "")             ;; DeadViewnode (was hiddenInSubscribeeFolder)
  (6 . "subee-1")      ;; hidden node preserved
- (4 . "")             ;; DeletedScaff (was hiddenOutsideOfSubscribeeFolder)
+ (4 . "")             ;; DeadViewnode (was hiddenOutsideOfSubscribeeFolder)
  (5 . "also-hidden")  ;; hidden node preserved
  (1 . "subee")        ;; standalone root, unaffected
  (2 . "subee-1"))     ;; its child
 #+end_example
 
 Note: Childless DeletedNode stays in the tree (the postorder
-handler is a no-op for Deleted; only childless DeletedScaff
-is detached). The aliasFolder scaffold becomes DeletedScaff;
-its leaf child (the =alias= scaffold) also becomes childless
-DeletedScaff and IS detached. So aliasFolder and its alias
+handler is a no-op for Deleted; only childless DeadViewnode
+is detached). The aliasFolder becomes DeadViewnode;
+its leaf child (the =alias= non-vognode) also becomes childless
+DeadViewnode and IS detached. So aliasFolder and its alias
 disappear entirely.
 
-DeletedScaff has no title (renders as empty). The assertion
+DeadViewnode has no title (renders as empty). The assertion
 should check for the presence of the right number of
 empty-titled headlines at the right depths, and the TrueNode
 titles at the right depths.
@@ -307,7 +307,7 @@ Edit buffer 1 (the one with deleted structure):
 - Insert =****** subee-2= (a bare headline with no metadata)
 - Save
 
-Deleted and DeletedScaff nodes are inert (generate no save
+Deleted and DeadViewnode nodes are inert (generate no save
 instructions). The save pipeline creates a new node for subee-2
 and updates subee's =contains= to include it.
 
@@ -322,13 +322,13 @@ Expected headline-titles (approximately):
 #+begin_example
 ((1 . "1")
  (2 . "11")           ;; DeletedNode, still present
- (3 . "")             ;; DeletedScaff
+ (3 . "")             ;; DeadViewnode
  (4 . "subee")        ;; TrueNode, completed
  (5 . "subee-1")      ;; existing child
  (5 . "subee-2")      ;; new child (now has UUID + metadata)
- (5 . "")             ;; DeletedScaff
+ (5 . "")             ;; DeadViewnode
  (6 . "subee-1")      ;; hidden node preserved
- (4 . "")             ;; DeletedScaff
+ (4 . "")             ;; DeadViewnode
  (5 . "also-hidden")  ;; hidden node preserved
  (1 . "subee")        ;; standalone root, completed
  (2 . "subee-1")
@@ -351,19 +351,19 @@ Expected headline-titles:
  (2 . "subee-2"))     ;; new child from collateral update
 #+end_example
 
-* Phase 5: Add new-root under deletedScaff in buffer 1
+* Phase 5: Add new-root under deadViewnode in buffer 1
 
 Insert =new-root= as a sibling of =subee= under the depth-3
-=DeletedScaff= (formerly =subscribeeFolder=) in buffer 1. Repo
+=DeadViewnode= (formerly =subscribeeFolder=) in buffer 1. Repo
 metadata must be supplied explicitly (=(repo main)=) because
-=DeletedScaff= has no repo to inherit from.
+=DeadViewnode= has no repo to inherit from.
 
 This exercises:
-- =Deleted= / =DeletedScaff= round-tripping through the save
+- =Deleted= / =DeadViewnode= round-tripping through the save
   pipeline (parse → completion → render) without disruption.
-- Creating a new node under a =DeletedScaff=: the node gets a
+- Creating a new node under a =DeadViewnode=: the node gets a
   UUID and is saved to disk, but no parent claims it in its
-  =contains= (the =DeletedScaff= generates no save instructions).
+  =contains= (the =DeadViewnode= generates no save instructions).
 
 ** Expected buffer 1 after save
 
@@ -373,10 +373,10 @@ Expected headline-titles (approximately):
 #+begin_example
 ((1 . "1")
  (2 . "11")           ;; DeletedNode
- (3 . "")             ;; DeletedScaff
+ (3 . "")             ;; DeadViewnode
  (4 . "subee")        ;; TrueNode (writeProtected)
  (4 . "new-root")     ;; new TrueNode (now has UUID)
- (4 . "")             ;; DeletedScaff
+ (4 . "")             ;; DeadViewnode
  (5 . "also-hidden")  ;; hidden node preserved
  (1 . "subee")        ;; standalone root, unchanged
  (2 . "subee-1")
@@ -467,8 +467,8 @@ with =skg-split-as-stars-metadata-title= and check the
 metadata sexp itself — e.g., that it contains =(deleted ...)=
 rather than =(node ...)=.
 
-For =DeletedScaff= lines, check that metadata contains
-=deletedScaffold=.
+For =DeadViewnode= lines, check that metadata contains
+=deadViewnode=.
 
 * Reusable tools
 
@@ -497,44 +497,44 @@ bash tests/integration/run-all-tests.sh
 
 ** Multi-root buffer 1 (resolved)
 
-Buffer 1 has two roots: the scaffolded "1" tree and a standalone
+Buffer 1 has two roots: the placed under a non-vognode "1" tree and a standalone
 =subee= root. Built by requesting single-root view from "1",
 appending two lines for standalone =subee= + =subee-1=, and
 saving to register. The two-root structure is needed so that
 the standalone subee root reflects collateral updates (e.g.,
 gains subee-2 after phase 4's save).
 
-** DeletedScaff title rendering
+** DeadViewnode title rendering
 
-=DeletedScaff= nodes render via =deleted_scaff_metadata_to_string=
-(=server/org_to_text.rs=) which produces =(skg deletedScaffold)=
-with NO title. The scaffolds they replaced (subscribeeFolder, etc.)
+=DeadViewnode= nodes render via =deleted_scaff_metadata_to_string=
+(=server/org_to_text.rs=) which produces =(skg deadViewnode)=
+with NO title. The non-vognodes they replaced (subscribeeFolder, etc.)
 had titles like "it subscribes to these". After degradation,
-=deletedScaff= is an opaque tombstone — it renders as:
+=deadViewnode= is an opaque tombstone — it renders as:
 
 #+begin_example
-  *** (skg deletedScaffold)
+  *** (skg deadViewnode)
 #+end_example
 
 This means =skg-split-as-stars-metadata-title= will return an
-empty title for =DeletedScaff= lines. The assertion strategy
+empty title for =DeadViewnode= lines. The assertion strategy
 needs to account for this: check depths and the count of
-empty-titled lines, not their original scaffold names.
+empty-titled lines, not their original non-vognode names.
 
 However, I should verify whether =skg-split-as-stars-metadata-title=
-can parse =(skg deletedScaffold)= at all. It might fail if it
+can parse =(skg deadViewnode)= at all. It might fail if it
 expects =(skg (node ...))= structure.
 
 ** The notation in the prompt (resolved)
 
 The prompt uses shorthand throughout: =** (deleted)= means a
-=DeletedNode=, =*** (deletedscaff)= means =DeletedScaff=,
+=DeletedNode=, =*** (deadviewnode)= means =DeadViewnode=,
 =* (writeProtected) 11= means a write-protected TrueNode, etc. None of these
 are the literal org-mode rendering.
 
 The actual rendering would be:
 - =(deleted)= → =(skg (deleted (id 11) (repo main))) 11=
-- =(deletedscaff)= → =(skg deletedScaffold)= (no title)
+- =(deadviewnode)= → =(skg deadViewnode)= (no title)
 - =(writeProtected) 11= → =(skg (node (id 11) (repo main) writeProtected)) 11=
 
 ** Childless DeletedNode stays in tree (resolved)
@@ -544,9 +544,9 @@ It has no children in buffer 2, but it stays in the tree.
 
 Confirmed from code: in =complete_postorder_with_limited_recursion=
 (=server/update_buffer/complete.rs= line ~194), =DeletedNode= is
-a no-op ("Deleted nodes are inert"). Only =DeletedScaff= checks
+a no-op ("Deleted nodes are inert"). Only =DeadViewnode= checks
 for childlessness and detaches. So:
-- Childless =DeletedScaff= → detached (removed from tree)
+- Childless =DeadViewnode= → detached (removed from tree)
 - Childless =DeletedNode= → stays (inert, no-op)
 
 The prompt's expected outputs are correct.

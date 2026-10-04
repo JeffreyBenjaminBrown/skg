@@ -54,9 +54,9 @@ pub fn handle_repo_set_request (
 /// TODO/full-schema/9-2_repo-set-safety.org: a repo-set switch
 /// RE-RENDERS open views in place rather than closing them.  Each
 /// view gets the convert-and-prune prepass (now-inactive Actives
-/// become InactiveNodes; childless inactive branches, quals of
+/// become InactiveNodes; childless inactive branches, properties of
 /// inactive owners, write-protected partners, emptied folders and dead
-/// scaffolds are pruned), then completion with PartnerFolder creation
+/// non-vognodes are pruned), then completion with PartnerFolder creation
 /// enabled, because a switch can also ACTIVATE repos, revealing
 /// members and folders.  Results stream via the rerender-all message
 /// flow (lock, per-view, done).

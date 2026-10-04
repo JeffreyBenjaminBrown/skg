@@ -27,7 +27,7 @@ use skg::types::misc::{ID, MSV, SkgConfig, TantivyIndex, members_of, members_msv
 use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, NodeMerge, SaveNode, DeleteNode};
 use skg::types::tree::forest::{MpViewForest, ViewForest};
-use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode};
+use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
 use std::error::Error;
 
 const SUBSCRIBEE_EDIT_CONFIG : &str =
@@ -263,7 +263,7 @@ async fn pipeline_phantom_subtree (
             *** (skg (node (id survivor) (repo main))) survivor
             "};
       let forest : ViewForest = {
-        let mut tree : Tree<ViewNode> = {
+        let mut tree : Tree<Viewnode> = {
           let maybePlaced_viewforest : Tree<MpViewnode> =
             org_to_uninterpreted_nodes (input) . unwrap() . 0;
           maybePlaced_to_placed_tree (maybePlaced_viewforest)
@@ -272,11 +272,11 @@ async fn pipeline_phantom_subtree (
           tree . nodes()
           . find ( |n| matches!(
               &n . value() . kind,
-              ViewNodeKind::Vognode (Vognode::Active (t))
+              ViewnodeKind::Vognode (Vognode::Active (t))
                 if t . id == ID::from ("fading") ))
           . map ( |n| n . id() )
           . expect ("fading node not found");
-        if let ViewNodeKind::Vognode (Vognode::Active (t)) =
+        if let ViewnodeKind::Vognode (Vognode::Active (t)) =
           &mut tree . get_mut (fading_treeid) . unwrap() . value() . kind
         { t . relationship_axes . unstaged = Some (Sign::Minus); }
         tree . get_mut (fading_treeid) . unwrap()

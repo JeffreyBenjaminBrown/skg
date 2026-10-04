@@ -3,7 +3,7 @@
 pub use super::super::common::*;
 
 /// The expected git diff view output for id changes.
-/// When an id is added or removed, an idFolder scaffold appears showing the diff.
+/// When an id is added or removed, an idFolder appears showing the diff.
 /// Individual ids appear as children with diff markers for added/removed.
 pub const GIT_DIFF_VIEW: &str = "\
 * (skg (node (id 1) (repo main))) 1

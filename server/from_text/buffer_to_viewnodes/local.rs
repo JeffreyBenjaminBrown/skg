@@ -1,10 +1,10 @@
-/// Local validation functions for ViewNode trees.
+/// Local validation functions for Viewnode trees.
 /// These check structural flags of individual nodes
 /// without requiring global context.
 
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind, MpActiveNode, MpPhantomDiff};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
-use crate::types::viewnode::{NodeEditRequest, Editability, AffectsParent, PartnerFolder, Qual, QualFolder};
+use crate::types::viewnode::{NodeEditRequest, Editability, AffectsParent, PartnerFolder, Property, PropertyFolder};
 use crate::types::misc::{ID, SkgConfig};
 use crate::types::tree::viewnode_nodecomplete::{
   generation_includes_only,
@@ -43,9 +43,9 @@ pub fn validate_local_structure (
         validate_phantom(tree, node_id, p),
       MpViewnodeKind::BufferRoot =>
         Vec::new (),
-      MpViewnodeKind::Qual (Qual::Alias { .. }) =>
+      MpViewnodeKind::Property (Property::Alias { .. }) =>
           validate_alias(tree, node_id),
-      MpViewnodeKind::QualFolder (QualFolder::Alias) =>
+      MpViewnodeKind::PropertyFolder (PropertyFolder::Alias) =>
           validate_aliasfolder(tree, node_id),
       MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee) =>
           validate_hiddenInSubscribee_folder(tree, node_id),
@@ -60,19 +60,19 @@ pub fn validate_local_structure (
         => validate_relation_folder(tree, node_id, *role),
       MpViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) =>
           validate_subscribeefolder(tree, node_id),
-      MpViewnodeKind::Qual (Qual::TextChanged { .. }) =>
+      MpViewnodeKind::Property (Property::TextChanged { .. }) =>
           validate_text_changed(tree, node_id),
-      MpViewnodeKind::QualFolder (QualFolder::ID) =>
+      MpViewnodeKind::PropertyFolder (PropertyFolder::ID) =>
           validate_idFolder(tree, node_id),
-      MpViewnodeKind::Qual (Qual::ID { .. }) =>
-          validate_idscaffold(tree, node_id),
-      MpViewnodeKind::QualFolder (QualFolder::Flags { .. }) =>
+      MpViewnodeKind::Property (Property::ID { .. }) =>
+          validate_id_property(tree, node_id),
+      MpViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }) =>
           validate_flags_folder (tree, node_id),
-      MpViewnodeKind::Qual (Qual::Flag { .. }) =>
+      MpViewnodeKind::Property (Property::Flag { .. }) =>
           validate_flag (tree, node_id),
       MpViewnodeKind::Phantom (MpPhantom::Deleted (_))
         => Vec::new(),
-      MpViewnodeKind::DeadScaffold => Vec::new(),
+      MpViewnodeKind::DeadViewnode => Vec::new(),
       MpViewnodeKind::Vognode (MpVognode::Inactive (_))
         => validate_inactive_node(tree, node_id),
       MpViewnodeKind::Phantom (MpPhantom::Unknown (_))
@@ -99,7 +99,7 @@ fn validate_alias (
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::QualFolder (QualFolder::Alias)))
+                    MpViewnodeKind::PropertyFolder (PropertyFolder::Alias)))
     { errors . push("Alias must have an AliasFolder parent." . to_string()); }
   errors }
 
@@ -111,7 +111,7 @@ fn validate_aliasfolder (
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::Qual (Qual::Alias { .. } )))
+                    MpViewnodeKind::Property (Property::Alias { .. } )))
     { errors . push("AliasFolder's (non-ignored) children must include only Aliases."
                     . to_string()); }
   if !generation_exists_and_includes(
@@ -123,7 +123,7 @@ fn validate_aliasfolder (
   if !siblings_cannot_include(
     tree, node_id,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::QualFolder (QualFolder::Alias)))
+                    MpViewnodeKind::PropertyFolder (PropertyFolder::Alias)))
     { errors . push("AliasFolder must be unique among its siblings."
                     . to_string()); }
   errors }
@@ -139,7 +139,7 @@ fn validate_flag (
   if ! generation_exists_and_includes (
     tree, node_id, -1, false,
     |node| matches! (&node . kind,
-      MpViewnodeKind::QualFolder (QualFolder::Flags { .. })))
+      MpViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. })))
   { errors . push ("Flag must have a FlagsFolder parent."
                    . to_string ()); }
   errors
@@ -153,7 +153,7 @@ fn validate_flags_folder (
   if ! generation_includes_only (
     tree, node_id, 1, true,
     |node| matches! (&node . kind,
-      MpViewnodeKind::Qual (Qual::Flag { .. })))
+      MpViewnodeKind::Property (Property::Flag { .. })))
   { errors . push (
       "FlagsFolder's children must include only Flags."
       . to_string ()); }
@@ -166,7 +166,7 @@ fn validate_flags_folder (
   if ! siblings_cannot_include (
     tree, node_id,
     |node| matches! (&node . kind,
-      MpViewnodeKind::QualFolder (QualFolder::Flags { .. })))
+      MpViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. })))
   { errors . push (
       "FlagsFolder must be unique among its siblings." . to_string ()); }
   errors
@@ -370,7 +370,7 @@ fn validate_text_changed (
   if !siblings_cannot_include(
     tree, node_id,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::Qual (Qual::TextChanged { .. })))
+                    MpViewnodeKind::Property (Property::TextChanged { .. })))
     { errors . push("TextChanged must be unique among its siblings." . to_string()); }
   errors }
 
@@ -386,28 +386,28 @@ fn validate_idFolder (
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::Qual (Qual::ID { .. } )) )
-    { errors . push("IDFolder's (non-ignored) children can only be ID scaffolds."
+                    MpViewnodeKind::Property (Property::ID { .. } )) )
+    { errors . push("IDFolder's (non-ignored) children can only be ID properties."
                     . to_string() ); }
   if !siblings_cannot_include(
     tree, node_id,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::QualFolder (QualFolder::ID)))
+                    MpViewnodeKind::PropertyFolder (PropertyFolder::ID)))
     { errors . push("IDFolder must be unique among its siblings." . to_string()); }
   errors }
 
-fn validate_idscaffold (
+fn validate_id_property (
   tree    : &Tree<MpViewnode>,
   node_id : NodeId,
 ) -> Vec<String> {
   let mut errors : Vec<String> = Vec::new();
   if !generation_does_not_exist(tree, node_id, 1, true) {
-    errors . push("ID scaffold must have no (non-ignored) children." . to_string()); }
+    errors . push("ID property must have no (non-ignored) children." . to_string()); }
   if !generation_exists_and_includes(
     tree, node_id, -1, false,
     |node| matches!(&node . kind,
-                    MpViewnodeKind::QualFolder (QualFolder::ID)))
-    { errors . push("ID scaffold must have an IDFolder parent." . to_string()); }
+                    MpViewnodeKind::PropertyFolder (PropertyFolder::ID)))
+    { errors . push("ID property must have an IDFolder parent." . to_string()); }
   errors }
 
 fn validate_inactive_node (
@@ -427,11 +427,11 @@ fn validate_inactive_node (
     |node| node . is_active_or_diff_phantom ()
            || matches! ( &node . kind,
                          MpViewnodeKind::Vognode (MpVognode::Inactive (_))
-                         | MpViewnodeKind::QualFolder (_)
+                         | MpViewnodeKind::PropertyFolder (_)
                          | MpViewnodeKind::PartnerFolder (_)
-                         | MpViewnodeKind::DeadScaffold
+                         | MpViewnodeKind::DeadViewnode
                          | MpViewnodeKind::BufferRoot )) // an InactiveNode can be a view root: a root that went inactive but was retained for its active children
-    { errors . push("Inactive placeholder must have an ActiveNode, folder or DeadScaffold parent, or be a view root."
+    { errors . push("Inactive placeholder must have an ActiveNode, folder or DeadViewnode parent, or be a view root."
                     . to_string()); }
   errors }
 
@@ -514,8 +514,8 @@ fn cannot_be_child_of_gnode (
 ) -> bool {
   matches!(&node . kind,
     MpViewnodeKind::BufferRoot |
-    MpViewnodeKind::Qual (
-      Qual::Alias { .. } | Qual::ID { .. } | Qual::Flag { .. }) |
+    MpViewnodeKind::Property (
+      Property::Alias { .. } | Property::ID { .. } | Property::Flag { .. }) |
     MpViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee))
   || ( ! affects_parent_subscribee_as_such
        // validate_hiddenin REQUIRES a gnode parent; a

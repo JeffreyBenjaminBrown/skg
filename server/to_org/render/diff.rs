@@ -4,7 +4,7 @@
 /// node's own BFS visit (server/update_buffer/complete.rs), for both the
 /// post-save and de-novo paths.
 ///
-/// Each ActiveNode and Scaffold is decorated with per-stage diff axes:
+/// Each ActiveNode and Non-vognode is decorated with per-stage diff axes:
 ///   N (node) describes whether the node's '.skg' file changed
 ///     between HEAD↔index (staged) or index↔worktree (unstaged).
 ///   R (relationship) describes whether the node's appearance at this
@@ -17,8 +17,8 @@ use crate::types::git::{NodeAxes, RelationshipAxes, Sign, RepoDiff, NodeComplete
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, RepoName, TantivyIndex};
 use crate::types::phantom::title_for_phantom;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, mk_phantom_viewnode };
-use crate::types::viewnode::{Vognode, Phantom, QualFolder, Qual};
+use crate::types::viewnode::{ Viewnode, ViewnodeKind, mk_phantom_viewnode };
+use crate::types::viewnode::{Vognode, Phantom, PropertyFolder, Property};
 use crate::types::tree::viewnode_nodecomplete::pid_and_repo_from_treenode;
 use crate::dbs::in_rust_graph::InRustGraph;
 
@@ -32,7 +32,7 @@ use std::path::PathBuf;
 /// the node flips to a phantom here and its folders then self-deaden via their own
 /// generalized-orphan check at their later visits.
 pub(crate) fn process_activeNode_diff (
-  mut node_mut                   : NodeMut<ViewNode>,
+  mut node_mut                   : NodeMut<Viewnode>,
   graph                          : &InRustGraph,
   repo_diffs                   : &HashMap<RepoName, RepoDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
@@ -50,7 +50,7 @@ pub(crate) fn process_activeNode_diff (
       Some (d) => d,
       None => return Ok (( )) };
   if ! repo_diff . is_gitrepo {
-    if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
+    if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
       = node_mut . value() . kind
       { t . not_in_git = true; }
     return Ok (( )); }
@@ -67,17 +67,17 @@ pub(crate) fn process_activeNode_diff (
     staged   . and_then ( |d| d . status . to_node_axis_sign ());
   let unstaged_n : Option<Sign> =
     unstaged . and_then ( |d| d . status . to_node_axis_sign ());
-  if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
+  if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
     = node_mut . value() . kind
     { t . node_axes . staged   = staged_n;
       t . node_axes . unstaged = unstaged_n; }
   node_mut . value() . normal_to_phantom ();
   let node_flipped_to_phantom : bool =
     matches! ( node_mut . value() . kind,
-      ViewNodeKind::Phantom (Phantom::Diff (_)) );
+      ViewnodeKind::Phantom (Phantom::Diff (_)) );
   // For an Added or Deleted file we don't read node_changes
   // (the comparison is degenerate). NewHere/RemovedHere on children
-  // and IDFolder/textChanged scaffolds only apply to Modified files.
+  // and IDFolder/textChanged properties only apply to Modified files.
   let staged_changes   : Option<&NodeChanges> =
     staged   . and_then ( |d| match d . status {
       GitDiffStatus::Modified => d . node_changes . as_ref (),
@@ -92,15 +92,15 @@ pub(crate) fn process_activeNode_diff (
     . map ( |c| c . text_changed ) . unwrap_or (false);
   if staged_text || unstaged_text {
     node_mut . prepend (
-      ViewNode {
+      Viewnode {
         focused     : false,
         folded      : false,
         body_folded : false,
-        kind        : ViewNodeKind::Qual (
-          Qual::TextChanged {
+        kind        : ViewnodeKind::Property (
+          Property::TextChanged {
             staged   : staged_text,
             unstaged : unstaged_text } ) } ); }
-  // The IDFolder/AliasFolder diff scaffolds are folders, so if this node flipped to a
+  // The IDFolder/AliasFolder diff-only properties are folders, so if this node flipped to a
   // phantom they would be generalized orphans (a folder requires a Active-vognode
   // ancestor) and get deadened + pruned at their own BFS visit -- i.e. emitted
   // here only to be destroyed before render. Skip creating them on a flipped
@@ -121,13 +121,13 @@ pub(crate) fn process_activeNode_diff (
     if list_diff_has_change (
          staged_changes   . map ( |c| c . ids_diff . as_slice () ),
          unstaged_changes . map ( |c| c . ids_diff . as_slice () ) )
-      && ! has_qualFolder_child ( &mut node_mut, tree_node_id, QualFolder::ID ) {
-      prepend_empty_diff_folder ( &mut node_mut, QualFolder::ID ); }
+      && ! has_propertyFolder_child ( &mut node_mut, tree_node_id, PropertyFolder::ID ) {
+      prepend_empty_diff_folder ( &mut node_mut, PropertyFolder::ID ); }
     if list_diff_has_change (
          staged_changes   . map ( |c| c . aliases_diff . as_slice () ),
          unstaged_changes . map ( |c| c . aliases_diff . as_slice () ) )
-      && ! has_qualFolder_child ( &mut node_mut, tree_node_id, QualFolder::Alias ) {
-      prepend_empty_diff_folder ( &mut node_mut, QualFolder::Alias ); } }
+      && ! has_propertyFolder_child ( &mut node_mut, tree_node_id, PropertyFolder::Alias ) {
+      prepend_empty_diff_folder ( &mut node_mut, PropertyFolder::Alias ); } }
   // Per-stage contains diff for the parent, split into position-specific
   // relationship axes. A REORDERED id appears in one stage as both Removed (its
   // old slot) and New (its new slot); a single RelationshipAxes keyed by id
@@ -144,7 +144,7 @@ pub(crate) fn process_activeNode_diff (
   mark_relationship_axes_on_existing_children (
     &mut node_mut, tree_node_id, &added_relationship_axes_by_id );
   if matches! ( & node_mut . value () . kind,
-                ViewNodeKind::Vognode (Vognode::Active (t))
+                ViewnodeKind::Vognode (Vognode::Active (t))
                   if t . is_writeProtected () ) {
     // TODO/fork-fixes.org: no git ghosts under a write-protected node.
     // It draws none of its worktree children, so a removed-member
@@ -204,50 +204,50 @@ fn list_diff_has_change<T> (
         Diff_Item::New (_) | Diff_Item::Removed (_) ) )) };
   changed (staged) || changed (unstaged) }
 
-/// True iff the node already has a child QualFolder of KIND.
-fn has_qualFolder_child (
-  node_mut     : &mut NodeMut<ViewNode>,
+/// True iff the node already has a child PropertyFolder of KIND.
+fn has_propertyFolder_child (
+  node_mut     : &mut NodeMut<Viewnode>,
   tree_node_id : NodeId,
-  kind         : QualFolder,
+  kind         : PropertyFolder,
 ) -> bool {
-  let node_ref : NodeRef<ViewNode> =
+  let node_ref : NodeRef<Viewnode> =
     node_mut . tree () . get (tree_node_id) . unwrap ();
   node_ref . children () . any ( |c| matches! (
     & c . value () . kind,
-    ViewNodeKind::QualFolder (k) if *k == kind )) }
+    ViewnodeKind::PropertyFolder (k) if *k == kind )) }
 
-/// Prepend an EMPTY QualFolder diff scaffold (an IDFolder or AliasFolder). Its per-entry
+/// Prepend an EMPTY PropertyFolder diff-only property (an IDFolder or AliasFolder). Its per-entry
 /// children -- each carrying its relationship axes -- are filled when the BFS
 /// reaches the folder, by reconcile_idFolder_children / reconcile_aliasFolder_children.
 fn prepend_empty_diff_folder (
-  node_mut : &mut NodeMut<ViewNode>,
-  kind     : QualFolder,
+  node_mut : &mut NodeMut<Viewnode>,
+  kind     : PropertyFolder,
 ) {
   node_mut . prepend (
-    ViewNode {
+    Viewnode {
       focused     : false,
       folded      : false,
       body_folded : false,
-      kind        : ViewNodeKind::QualFolder (kind) } ); }
+      kind        : ViewnodeKind::PropertyFolder (kind) } ); }
 
 /// For each existing child in the worktree's contains list, copy any
 /// per-stage ADDITION (Plus) axes from the added-relationship-axes map, so a member
 /// added (or moved to a new slot) since HEAD renders 'addedR'.
 fn mark_relationship_axes_on_existing_children (
-  node_mut     : &mut NodeMut<ViewNode>,
+  node_mut     : &mut NodeMut<Viewnode>,
   tree_node_id : NodeId,
   by_id        : &HashMap<ID, RelationshipAxes>,
 ) {
   let child_ids : Vec<NodeId> = {
-    let node_ref : NodeRef<ViewNode> =
+    let node_ref : NodeRef<Viewnode> =
       node_mut . tree() . get (tree_node_id) . unwrap();
     node_ref . children() . map ( |c| c . id() ) . collect() };
   for child_id in child_ids {
-    let mut child : NodeMut<ViewNode> =
+    let mut child : NodeMut<Viewnode> =
       node_mut . tree() . get_mut (child_id) . unwrap();
     let child_id_and_relationship_axes : Option<(ID, &mut RelationshipAxes)> =
       match &mut child . value() . kind {
-        ViewNodeKind::Vognode (Vognode::Active (t)) =>
+        ViewnodeKind::Vognode (Vognode::Active (t)) =>
           Some ((t . id . clone (), &mut t . relationship_axes)),
         // No Inactive arm: diff mode requires the "all" Skg repo set
         // (diff_report.rs and repo_sets.rs refuse otherwise), under
@@ -269,7 +269,7 @@ fn mark_relationship_axes_on_existing_children (
 /// siblings (per 'phantom_insertion_plan'), carrying its R axes (from the
 /// merged contains diff) and N axes (if its file is also gone in some stage).
 fn insert_phantoms_for_missing_contains (
-  node_mut                       : &mut NodeMut<ViewNode>,
+  node_mut                       : &mut NodeMut<Viewnode>,
   graph                          : &InRustGraph,
   parent_node_id                 : NodeId,
   net_contains                   : &[Diff_Item<ID>],
@@ -286,14 +286,14 @@ fn insert_phantoms_for_missing_contains (
   // Map each surviving child's id to its NodeId, so an anchor id resolves
   // to the tree node we insert the phantom before.
   let child_node_by_id : HashMap<ID, NodeId> = {
-    let node_ref : NodeRef<ViewNode> =
+    let node_ref : NodeRef<Viewnode> =
       node_mut . tree () . get (parent_node_id) . unwrap ();
     let mut m : HashMap<ID, NodeId> = HashMap::new ();
     for c in node_ref . children () {
       match &c . value () . kind {
-        ViewNodeKind::Vognode (Vognode::Active (t))
+        ViewnodeKind::Vognode (Vognode::Active (t))
           => { m . insert ( t . id . clone (), c . id () ); },
-        ViewNodeKind::Phantom (Phantom::Diff (p))
+        ViewnodeKind::Phantom (Phantom::Diff (p))
           => { m . insert ( p . id . clone (), c . id () ); },
         // No Inactive arm: inactive placeholders never reach diff
         // rendering (diff mode requires the "all" Skg repo set).
@@ -319,7 +319,7 @@ fn insert_phantoms_for_missing_contains (
       title_for_phantom (
         graph, &id, &child_repo,
         Some (repo_diffs), config );
-    let phantom : ViewNode =
+    let phantom : Viewnode =
       mk_phantom_viewnode (
         id . clone (), child_repo, child_title,
         child_node_axes, relationship_axes );

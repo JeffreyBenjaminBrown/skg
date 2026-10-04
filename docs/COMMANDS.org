@@ -450,7 +450,7 @@ It refuses foreign and write-protected nodes and conflicts with another
 =editRequest=. It does not save; save the view to apply it.
 
 With =C-u=, the selected value is applied uniformly to the true-content
-subtree only. Scaffolds, backpaths, independent children, inactive nodes, and
+subtree only. Non-vognodes, backpaths, independent children, inactive nodes, and
 phantoms are pruned. Repeated PIDs are changed once; ineligible descendants
 are skipped and reported in =*Messages*=.
 *** C-c s m : skg-set-merge-request
@@ -555,7 +555,7 @@ The walk applies to, and recurses on, only viewchildren that affect
 their viewparents: affectsParent=true activeNodes, through the two
 writable folders. It prunes below write-protected nodes and
 subscribee-as-such members (their org-children's edges are not
-collected at save), and prunes write-protected folders and other scaffolds
+collected at save), and prunes write-protected folders and other non-vognodes
 entirely.
 
 This is the gesture for republicizing a subtree's relationship
@@ -618,7 +618,7 @@ and an org-child of a definitive activeNode whose Skg repo is
 owned in =skgconfig.toml=. The command acts locally,
 replacing only this occurrence in the current buffer:
 the headline at point and all of its org-descendents,
-including scaffolds and phantoms,
+including non-vognodes and phantoms,
 are removed from the view and replaced by a same-level headline
 whose title is an =[[id:...][...]]= link to the original node.
 

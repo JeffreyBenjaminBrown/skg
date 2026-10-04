@@ -42,8 +42,8 @@ fn all_tests
 
 /// Regression for TODO/DONE/BUG_reciprocal-subscribe.org: a subscribee
 /// pasted from the link stack arrives as a bare id under a
-/// 'subscribeeFolder' scaffold, with no repo. Its org-parent is a
-/// scaffold, so 'inherit_parent_repo_if_possible' cannot supply a
+/// 'subscribeeFolder' non-vognode, with no repo. Its org-parent is a
+/// non-vognode, so 'inherit_parent_repo_if_possible' cannot supply a
 /// repo; enrichment must resolve it from the graph by id instead.
 /// Before the fix this node stayed repoless and the save was refused
 /// with "ActiveNode must have a repo that exists in the config".

@@ -1,8 +1,8 @@
 // Tests for to_org util functions
 
 use skg::to_org::util::get_id_from_treenode;
-use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode, ActiveNode, default_activeNode};
-use skg::types::viewnode::QualFolder;
+use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode, ActiveNode, default_activeNode};
+use skg::types::viewnode::PropertyFolder;
 use skg::types::misc::{ID, RepoName};
 use ego_tree::{NodeId,Tree};
 
@@ -15,12 +15,12 @@ fn test_get_id_from_treenode_with_id() {
     default_activeNode ( id . clone(),
                        RepoName::from ("main"),
                        "Test" . to_string() );
-  let viewnode : ViewNode =
-    ViewNode { focused     : false,
+  let viewnode : Viewnode =
+    Viewnode { focused     : false,
               folded      : false,
               body_folded : false,
-              kind        : ViewNodeKind::Vognode (Vognode::Active (t)) };
-  let tree : Tree<ViewNode> = Tree::new (viewnode);
+              kind        : ViewnodeKind::Vognode (Vognode::Active (t)) };
+  let tree : Tree<Viewnode> = Tree::new (viewnode);
   let root_id : NodeId = tree . root() . id();
   let result : Result<ID, Box<dyn std::error::Error>> =
     get_id_from_treenode(&tree, root_id);
@@ -29,17 +29,17 @@ fn test_get_id_from_treenode_with_id() {
 }
 
 #[test]
-fn test_get_id_from_treenode_scaffold() {
-  // Scaffold → returns error
+fn test_get_id_from_treenode_non_vognode() {
+  // Non-vognode → returns error
   let viewnode :
-    ViewNode =
-    ViewNode {
+    Viewnode =
+    Viewnode {
       focused     : false,
       folded       : false,
       body_folded : false,
-      kind        : ViewNodeKind::QualFolder (
-        QualFolder::Alias) };
-  let tree : Tree<ViewNode> = Tree::new (viewnode);
+      kind        : ViewnodeKind::PropertyFolder (
+        PropertyFolder::Alias) };
+  let tree : Tree<Viewnode> = Tree::new (viewnode);
   let root_id : NodeId = tree . root() . id();
   let result :
     Result<ID, Box<dyn std::error::Error>> =

@@ -8,7 +8,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nod
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::types::misc::{ID, SkgConfig, TantivyIndex};
-use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode, Birth};
+use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode, Birth};
 use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 
 use skg::org_to_text::viewforest_to_string;
@@ -58,7 +58,7 @@ async fn test_path_with_cycle_impl(
   "};
 
   let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
-  let mut viewforest: Tree<ViewNode> = maybePlaced_to_placed_tree (unchecked_viewforest)?;
+  let mut viewforest: Tree<Viewnode> = maybePlaced_to_placed_tree (unchecked_viewforest)?;
   assert_eq!(viewforest . root() . children() . count(), 1,
              "Should have exactly 1 tree");
 
@@ -93,7 +93,7 @@ async fn test_path_with_cycle_impl(
   "};
 
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
-  let expected_trees: Tree<ViewNode> = maybePlaced_to_placed_tree (expected_unchecked)?;
+  let expected_trees: Tree<Viewnode> = maybePlaced_to_placed_tree (expected_unchecked)?;
 
   let actual_str = viewforest_to_string (&viewforest, config)?;
   let expected_str = viewforest_to_string (&expected_trees, config)?;
@@ -123,7 +123,7 @@ async fn test_path_with_branches_no_cycle_impl(
   "};
 
   let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
-  let mut viewforest: Tree<ViewNode> = maybePlaced_to_placed_tree (unchecked_viewforest)?;
+  let mut viewforest: Tree<Viewnode> = maybePlaced_to_placed_tree (unchecked_viewforest)?;
   assert_eq!(viewforest . root() . children() . count(), 1,
              "Should have exactly 1 tree");
 
@@ -131,7 +131,7 @@ async fn test_path_with_branches_no_cycle_impl(
   let mut node_1_id : Option<NodeId> = None;
   for edge in viewforest . root() . traverse() {
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
-      if let ViewNodeKind::Vognode (
+      if let ViewnodeKind::Vognode (
         Vognode::Active (t)) =
         &node_ref . value() . kind {
         if t . id . 0 == "1" {
@@ -171,7 +171,7 @@ async fn test_path_with_branches_no_cycle_impl(
   "};
 
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
-  let expected_trees: Tree<ViewNode> = maybePlaced_to_placed_tree (expected_unchecked)?;
+  let expected_trees: Tree<Viewnode> = maybePlaced_to_placed_tree (expected_unchecked)?;
 
   let actual_str = viewforest_to_string (&viewforest, config)?;
   let expected_str = viewforest_to_string (&expected_trees, config)?;
@@ -201,7 +201,7 @@ async fn test_path_with_branches_with_cycle_impl(
   "};
 
   let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
-  let mut viewforest: Tree<ViewNode> = maybePlaced_to_placed_tree (unchecked_viewforest)?;
+  let mut viewforest: Tree<Viewnode> = maybePlaced_to_placed_tree (unchecked_viewforest)?;
   assert_eq!(viewforest . root() . children() . count(), 1,
              "Should have exactly 1 tree");
 
@@ -210,7 +210,7 @@ async fn test_path_with_branches_with_cycle_impl(
     None;
   for edge in viewforest . root() . traverse() {
     if let ego_tree::iter::Edge::Open (node_ref) = edge {
-      if let ViewNodeKind::Vognode (
+      if let ViewnodeKind::Vognode (
         Vognode::Active (t)) =
         &node_ref . value() . kind {
         if t . id . 0 == "1" {
@@ -250,7 +250,7 @@ async fn test_path_with_branches_with_cycle_impl(
   "};
 
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
-  let expected_trees: Tree<ViewNode> = maybePlaced_to_placed_tree (expected_unchecked)?;
+  let expected_trees: Tree<Viewnode> = maybePlaced_to_placed_tree (expected_unchecked)?;
 
   let actual_str = viewforest_to_string (&viewforest, config)?;
   let expected_str = viewforest_to_string (&expected_trees, config)?;
@@ -278,7 +278,7 @@ async fn test_fork_expansion_at_origin_impl(
     * (skg (node (id a11) (repo main))) a11
   "};
   let unchecked_viewforest = org_to_uninterpreted_nodes (input)?. 0;
-  let mut viewforest: Tree<ViewNode> =
+  let mut viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (unchecked_viewforest)?;
   let node_a11_id : NodeId =
     viewforest . root () . first_child () . unwrap () . id ();
@@ -303,7 +303,7 @@ async fn test_fork_expansion_at_origin_impl(
     *** (skg (node (id a) (repo main) (affectsParent false) writeProtected)) a
   "};
   let expected_unchecked = org_to_uninterpreted_nodes (expected)?. 0;
-  let expected_trees: Tree<ViewNode> =
+  let expected_trees: Tree<Viewnode> =
     maybePlaced_to_placed_tree (expected_unchecked)?;
   let actual_str : String =
     viewforest_to_string (&viewforest, config)?;

@@ -1,5 +1,5 @@
 /// Tests for git diff view - save behavior with title/body changes.
-/// TextChanged scaffolds should be disregarded during save.
+/// TextChanged properties should be disregarded during save.
 
 use super::common::*;
 use skg::test_utils::{run_with_shared_test_stores, SharedStoreSession};
@@ -10,17 +10,17 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-git-diff-text-save",
     |s| Box::pin ( async move {
-      test_delete_text_changed_scaffold_respawns (s) . await ?;
+      test_delete_text_changed_property_respawns (s) . await ?;
       test_edit_text_changed_node_updates_disk (s) . await ?;
-      test_edit_text_changed_scaffold_respawns (s) . await ?;
-      test_move_text_changed_scaffold_respawns (s) . await ?;
+      test_edit_text_changed_property_respawns (s) . await ?;
+      test_move_text_changed_property_respawns (s) . await ?;
       test_move_text_changed_to_unedited_node_respawns (s) . await ?;
-      test_delete_text_changed_scaffold_respawns_staged (s) . await ?;
+      test_delete_text_changed_property_respawns_staged (s) . await ?;
       Ok (( )) } )) }
 
-/// Deleting a textChanged scaffold should be a no-op.
-/// The scaffold respawns in the returned buffer.
-async fn test_delete_text_changed_scaffold_respawns (
+/// Deleting a textChanged property should be a no-op.
+/// The non-vognode respawns in the returned buffer.
+async fn test_delete_text_changed_property_respawns (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
@@ -28,7 +28,7 @@ async fn test_delete_text_changed_scaffold_respawns (
     s,
     "skg-test-save-del-textchanged",
     |config, tantivy, gitrepo_path| { Box::pin(async move {
-      // User deletes the textChanged scaffold under node 1
+      // User deletes the textChanged property under node 1
       let input = without_lines_containing(
         GIT_DIFF_VIEW, "textChanged");
 
@@ -53,13 +53,13 @@ async fn test_delete_text_changed_scaffold_respawns (
       assert_eq!(node_11 . body, Some("11 has a new body." . to_string()),
         "11.skg should still have the new body");
 
-      // BUFFER: textChanged scaffolds should respawn
+      // BUFFER: textChanged properties should respawn
       assert_buffer_contains(
         &response . saved_view, GIT_DIFF_VIEW);
       Ok(( )) }) }) . await }
 
 /// Editing a node with textChanged should update the disk normally.
-/// The scaffold should still appear since worktree differs from HEAD.
+/// The non-vognode should still appear since worktree differs from HEAD.
 async fn test_edit_text_changed_node_updates_disk (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
@@ -86,29 +86,29 @@ async fn test_edit_text_changed_node_updates_disk (
       assert_eq!(node_1 . title, "1 has an even newer title.",
         "1.skg should have the edited title");
 
-      // BUFFER: textChanged scaffold should still appear (still differs from HEAD)
+      // BUFFER: textChanged property should still appear (still differs from HEAD)
       assert!(
         response . saved_view . contains ("textChanged"),
-        "textChanged scaffold should still appear");
+        "textChanged property should still appear");
       Ok(())
     })
   }) . await
 }
 
-/// Editing a textChanged scaffold itself should be a no-op.
-/// The scaffold respawns unchanged in the returned buffer.
-async fn test_edit_text_changed_scaffold_respawns (
+/// Editing a textChanged property itself should be a no-op.
+/// The non-vognode respawns unchanged in the returned buffer.
+async fn test_edit_text_changed_property_respawns (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test(
     s,
-    "skg-test-save-edit-scaffold",
+    "skg-test-save-edit-property",
     |config, tantivy, gitrepo_path| { Box::pin(async move {
-      // User tries to change the title of a textChanged scaffold
+      // User tries to change the title of a textChanged property
       let input = GIT_DIFF_VIEW . replace(
         "** (skg (textChanged unstaged))",
-        "** (skg (textChanged unstaged)) User edited this scaffold.");
+        "** (skg (textChanged unstaged)) User edited this non-vognode.");
 
       let graph : InRustGraphHandle =
         graph_handle_from_config (&config)?;
@@ -126,22 +126,22 @@ async fn test_edit_text_changed_scaffold_respawns (
       assert_eq!(node_1 . title, "1 has a new title.",
         "1.skg should be unchanged");
 
-      // BUFFER: textChanged scaffolds respawn with original text
+      // BUFFER: textChanged properties respawn with original text
       assert_buffer_contains( &response . saved_view,
                               GIT_DIFF_VIEW);
       Ok (( )) }) }) . await }
 
-/// Moving a textChanged scaffold should be a no-op.
-/// The scaffold respawns in its original location.
-async fn test_move_text_changed_scaffold_respawns (
+/// Moving a textChanged property should be a no-op.
+/// The non-vognode respawns in its original location.
+async fn test_move_text_changed_property_respawns (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
   run_save_test(
     s,
-    "skg-test-save-move-scaffold",
+    "skg-test-save-move-property",
     |config, tantivy, gitrepo_path| { Box::pin(async move {
-      // Below, user moves the textChanged scaffold
+      // Below, user moves the textChanged property
       // from first among its siblings to last.
       let input = "\
 * (skg (node (id 1) (repo main))) 1 has a new title.
@@ -168,14 +168,14 @@ async fn test_move_text_changed_scaffold_respawns (
       assert_eq!(node_1 . title, "1 has a new title.",
         "1.skg should be unchanged");
 
-      // BUFFER: textChanged scaffolds should respawn in correct locations
+      // BUFFER: textChanged properties should respawn in correct locations
       assert_buffer_contains(
         &response . saved_view, GIT_DIFF_VIEW);
       Ok(()) }) }) . await
 }
 
-/// Moving a textChanged scaffold to an unedited node should be a no-op.
-/// The scaffold respawns where it belongs (under the edited node).
+/// Moving a textChanged property to an unedited node should be a no-op.
+/// The non-vognode respawns where it belongs (under the edited node).
 async fn test_move_text_changed_to_unedited_node_respawns (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
@@ -184,7 +184,7 @@ async fn test_move_text_changed_to_unedited_node_respawns (
     s,
     "skg-test-save-move-to-unedited",
     |config, tantivy, gitrepo_path| { Box::pin(async move {
-      // User moves a textChanged scaffold to under node 12 (which wasn't edited)
+      // User moves a textChanged property to under node 12 (which wasn't edited)
       let input = without_lines_containing(GIT_DIFF_VIEW, "textChanged");
       let input = insert_after(&input, "(id 12)",
         "*** (skg (textChanged unstaged))");
@@ -208,20 +208,20 @@ async fn test_move_text_changed_to_unedited_node_respawns (
       assert!(contains_12 . is_empty(),
         "12.skg should not have any children");
 
-      // BUFFER: textChanged scaffolds should respawn in their correct locations
+      // BUFFER: textChanged properties should respawn in their correct locations
       // (under nodes 1 and 11, not under 12)
       assert_buffer_contains(
         &response . saved_view, GIT_DIFF_VIEW);
       Ok(()) }) }) . await
 }
 
-/// Same as 'test_delete_text_changed_scaffold_respawns' but with the
+/// Same as 'test_delete_text_changed_property_respawns' but with the
 /// fixture transition staged (git add) rather than unstaged. The
-/// respawned scaffold should report '(textChanged staged)' instead
+/// respawned non-vognode should report '(textChanged staged)' instead
 /// of '(textChanged unstaged)' -- guards the save-rerender pipeline's
 /// per-stage attribution for text changes, mirroring
-/// ids::save::test_delete_id_folder_scaffold_respawns_staged.
-async fn test_delete_text_changed_scaffold_respawns_staged (
+/// ids::save::test_delete_id_folder_respawns_staged.
+async fn test_delete_text_changed_property_respawns_staged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
@@ -229,7 +229,7 @@ async fn test_delete_text_changed_scaffold_respawns_staged (
     s,
     "skg-test-save-del-textchanged-staged",
     |config, tantivy, gitrepo_path| { Box::pin(async move {
-      // User deletes the textChanged scaffold under node 1
+      // User deletes the textChanged property under node 1
       let input = without_lines_containing(
         GIT_DIFF_VIEW_STAGED, "textChanged");
 
@@ -254,7 +254,7 @@ async fn test_delete_text_changed_scaffold_respawns_staged (
       assert_eq!(node_11 . body, Some("11 has a new body." . to_string()),
         "11.skg should still have the new body");
 
-      // BUFFER: textChanged scaffolds should respawn, staged
+      // BUFFER: textChanged properties should respawn, staged
       assert_buffer_contains(
         &response . saved_view, GIT_DIFF_VIEW_STAGED);
       Ok(( )) }) }) . await }

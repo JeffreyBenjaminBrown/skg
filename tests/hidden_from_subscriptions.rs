@@ -52,7 +52,7 @@ fn mk_test_tcp_stream_pair ()
 
 /// Add (viewRequests definitiveView) to all subscribee nodes in org text.
 /// Modifies the node section of each subscribee to request a definitive view.
-/// Subscribees are ActiveNode children of SubscribeeFolder scaffolds.
+/// Subscribees are ActiveNode children of SubscribeeFolders.
 ///
 /// KLUDGE: We identify subscribees by matching on "subscribee-" in the title.
 /// That's easier than navigating the org-tree's topoogy.

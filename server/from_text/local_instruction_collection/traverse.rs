@@ -50,8 +50,8 @@ use crate::from_text::local_instruction_collection::types::{
 use crate::types::misc::{ID, RepoName};
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  NodeEditRequest, AffectsParent, Qual, QualFolder, PartnerFolder, ActiveNode, ViewNode,
-  ViewNodeKind, Vognode, Phantom };
+  NodeEditRequest, AffectsParent, Property, PropertyFolder, PartnerFolder, ActiveNode, Viewnode,
+  ViewnodeKind, Vognode, Phantom };
 
 use ego_tree::NodeRef;
 use std::collections::HashSet;
@@ -66,20 +66,20 @@ pub fn collect_instructions_locally (
   Ok (collected) }
 
 fn visit (
-  node_ref : NodeRef<ViewNode>,
+  node_ref : NodeRef<Viewnode>,
   context  : &LocalContext,
   collected : &mut CollectedIntents,
 ) -> Result<(), String> {
   match &node_ref . value() . kind {
-    ViewNodeKind::Vognode (Vognode::Active (t)) =>
+    ViewnodeKind::Vognode (Vognode::Active (t)) =>
       visit_active_vognode (node_ref, t, context, collected),
-    ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
+    ViewnodeKind::Vognode (Vognode::Inactive (_)) =>
       // An Inactive vognode is anonymous and emits nothing; its
       // membership is owned by the disk weave, not extraction. With no
-      // identity it owns no defining folder, so (like a DeadScaffold) any
+      // identity it owns no defining folder, so (like a DeadViewnode) any
       // folder found under it stays silent.
       recurse_under_gnode (node_ref, None, None, collected),
-    ViewNodeKind::Phantom (p) =>
+    ViewnodeKind::Phantom (p) =>
       recurse_under_gnode (
         node_ref,
         Some ( DefiningFolderOwner {
@@ -92,37 +92,37 @@ fn visit (
           is_definitive    : false,
           is_saveEligible : false } ),
         None, collected),
-    ViewNodeKind::DeadScaffold =>
+    ViewnodeKind::DeadViewnode =>
       recurse_under_gnode (node_ref, None, None, collected),
-    ViewNodeKind::BufferRoot =>
+    ViewnodeKind::BufferRoot =>
       // A BufferRoot is unreachable as a child, but the traversal
       // stays total anyway.
       recurse_with_uniform_context (
         node_ref, &LocalContext::TopLevel, collected),
-    ViewNodeKind::QualFolder (QualFolder::Alias) =>
+    ViewnodeKind::PropertyFolder (PropertyFolder::Alias) =>
       visit_aliasFolder (node_ref, context, collected),
     // The two arms below are exactly the FolderPolicy::WritableSet
     // PartnerFolders; the catch-all PartnerFolder arm after them covers the
     // WriteProtectedSet and WriteProtectedFilter policies. If a new PartnerFolder is
     // added, 'PartnerFolder::policy' says which group it joins.
-    ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee) =>
+    ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) =>
       visit_subscribee_folder (node_ref, context, collected),
-    ViewNodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
+    ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
       visit_hiddenOutside_folder (node_ref, context, collected),
-    ViewNodeKind::PartnerFolder (PartnerFolder::Overridden) =>
+    ViewnodeKind::PartnerFolder (PartnerFolder::Overridden) =>
       visit_overridden_folder (node_ref, context, collected),
-    ViewNodeKind::QualFolder (QualFolder::ID)
-      | ViewNodeKind::QualFolder (QualFolder::Flags { .. })
-      | ViewNodeKind::Qual (_)
-      | ViewNodeKind::PartnerFolder (_) =>
-      // These are the write-protected folders and the Qual leaves. Vognodes
+    ViewnodeKind::PropertyFolder (PropertyFolder::ID)
+      | ViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. })
+      | ViewnodeKind::Property (_)
+      | ViewnodeKind::PartnerFolder (_) =>
+      // These are the write-protected folders and the Property leaves. Vognodes
       // found inside them are self-writers; their membership in the
       // folder is never read.
       recurse_with_uniform_context (
         node_ref, &LocalContext::UnderWriteProtectedFolder, collected), }}
 
 fn visit_active_vognode (
-  node_ref  : NodeRef<ViewNode>,
+  node_ref  : NodeRef<Viewnode>,
   t         : &ActiveNode,
   context   : &LocalContext,
   collected : &mut CollectedIntents,
@@ -214,9 +214,9 @@ fn visit_active_vognode (
 /// This recurses into a gnode-ish node's children. Vognode-ish
 /// children get 'UnderVognode'; defining-folder children get
 /// 'UnderDefiningFolder', carrying the owner's identity (when it has
-/// one); and write-protected folders and Quals get 'UnderWriteProtectedFolder'.
+/// one); and write-protected folders and Properties get 'UnderWriteProtectedFolder'.
 fn recurse_under_gnode (
-  node_ref            : NodeRef<ViewNode>,
+  node_ref            : NodeRef<Viewnode>,
   owner               : Option<DefiningFolderOwner>,
   parent_if_writeable : Option<ID>,
   collected           : &mut CollectedIntents,
@@ -224,24 +224,24 @@ fn recurse_under_gnode (
   for child in node_ref . children() {
     let child_context : LocalContext =
       match &child . value() . kind {
-        ViewNodeKind::QualFolder (QualFolder::Alias)
+        ViewnodeKind::PropertyFolder (PropertyFolder::Alias)
           // The two PartnerFolders here are exactly the
           // FolderPolicy::WritableSet ones; the write-protected policies fall
           // to the UnderWriteProtectedFolder arm below.
-          | ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee)
-          | ViewNodeKind::PartnerFolder (PartnerFolder::Overridden) =>
+          | ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)
+          | ViewnodeKind::PartnerFolder (PartnerFolder::Overridden) =>
           match &owner {
             Some (o) =>
               LocalContext::UnderDefiningFolder (o . clone()),
             None =>
-              // The owner has no identity (it is a DeadScaffold), so
+              // The owner has no identity (it is a DeadViewnode), so
               // the folder will stay silent.
               LocalContext::UnderVognode {
                 parent_if_writeable : None } },
-        ViewNodeKind::QualFolder (
-          QualFolder::ID | QualFolder::Flags { .. })
-          | ViewNodeKind::Qual (_)
-          | ViewNodeKind::PartnerFolder (_) =>
+        ViewnodeKind::PropertyFolder (
+          PropertyFolder::ID | PropertyFolder::Flags { .. })
+          | ViewnodeKind::Property (_)
+          | ViewnodeKind::PartnerFolder (_) =>
           LocalContext::UnderWriteProtectedFolder,
         _ =>
           LocalContext::UnderVognode {
@@ -250,7 +250,7 @@ fn recurse_under_gnode (
   Ok (( )) }
 
 fn recurse_with_uniform_context (
-  node_ref  : NodeRef<ViewNode>,
+  node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
   collected : &mut CollectedIntents,
 ) -> Result<(), String> {
@@ -259,7 +259,7 @@ fn recurse_with_uniform_context (
   Ok (( )) }
 
 fn visit_aliasFolder (
-  node_ref  : NodeRef<ViewNode>,
+  node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
   collected : &mut CollectedIntents,
 ) -> Result<(), String> {
@@ -269,7 +269,7 @@ fn visit_aliasFolder (
         let mut aliases : Vec<(String, Option<RepoName>)> = Vec::new();
         let mut seen : HashSet<String> = HashSet::new ();
         for child in node_ref . children() {
-          if let ViewNodeKind::Qual (Qual::Alias {
+          if let ViewnodeKind::Property (Property::Alias {
             text, relRepo_request, .. })
             = &child . value() . kind
           { if seen . insert (text . clone ()) {
@@ -286,7 +286,7 @@ fn visit_aliasFolder (
     node_ref, &LocalContext::UnderWriteProtectedFolder, collected) }
 
 fn visit_subscribee_folder (
-  node_ref  : NodeRef<ViewNode>,
+  node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
   collected : &mut CollectedIntents,
 ) -> Result<(), String> {
@@ -300,7 +300,7 @@ fn visit_subscribee_folder (
       for child in node_ref . children() {
         let child_context : LocalContext =
           match &child . value() . kind {
-            ViewNodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
+            ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
               LocalContext::HiddenOutsidePosition {
                 subscriber      : owner . id . clone(),
                 is_saveEligible : owner . is_saveEligible },
@@ -325,7 +325,7 @@ fn visit_subscribee_folder (
 /// derived filter rather than a direct relationship set, so its meaning is
 /// resolved only after ordinary subscribee visibility inference has run.
 fn visit_hiddenOutside_folder (
-  node_ref  : NodeRef<ViewNode>,
+  node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
   collected : &mut CollectedIntents,
 ) -> Result<(), String> {
@@ -336,12 +336,12 @@ fn visit_hiddenOutside_folder (
       let mut members : Vec<ID> = Vec::new ();
       for child in node_ref . children() {
         match &child . value() . kind {
-          ViewNodeKind::Vognode (Vognode::Active (t))
+          ViewnodeKind::Vognode (Vognode::Active (t))
             if member_counts_for_partnerFolder (t) => {
               if t . relRepo_request . is_some () {
                 return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
               members . push (t . id . clone ()); },
-          ViewNodeKind::Phantom (Phantom::Unknown (unknown)) => {
+          ViewnodeKind::Phantom (Phantom::Unknown (unknown)) => {
             if unknown . relRepo_request . is_some () {
               return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
             members . push (unknown . id . clone ()); },
@@ -354,7 +354,7 @@ fn visit_hiddenOutside_folder (
 }
 
 fn visit_overridden_folder (
-  node_ref  : NodeRef<ViewNode>,
+  node_ref  : NodeRef<Viewnode>,
   context   : &LocalContext,
   collected : &mut CollectedIntents,
 ) -> Result<(), String> {
@@ -396,16 +396,16 @@ fn dedup_members_by_id (
 /// members from display, and the set-difference merge preserves
 /// them at save.  TODO/full-schema/9-2_repo-set-safety.org.)
 fn partnerFolder_members (
-  node_ref : NodeRef<ViewNode>,
+  node_ref : NodeRef<Viewnode>,
 ) -> Vec<(ID, Option<RepoName>)> {
   let mut members : Vec<(ID, Option<RepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t))
+      ViewnodeKind::Vognode (Vognode::Active (t))
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . id . clone(),
                            t . relRepo_request . clone())),
-      ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
+      ViewnodeKind::Phantom (Phantom::Unknown (unknown)) =>
           members . push ((unknown . id . clone(),
                            unknown . relRepo_request . clone())),
       _ => {}, }}
@@ -422,16 +422,16 @@ fn partnerFolder_members (
 /// '(editRequest (relRepo NAME))' request, if any.
 #[allow(non_snake_case)]
 fn subscribeeFolder_members (
-  node_ref : NodeRef<ViewNode>,
+  node_ref : NodeRef<Viewnode>,
 ) -> Vec<(ID, Option<RepoName>)> {
   let mut members : Vec<(ID, Option<RepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t))
+      ViewnodeKind::Vognode (Vognode::Active (t))
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . id . clone(),
                            t . relRepo_request . clone())),
-      ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
+      ViewnodeKind::Phantom (Phantom::Unknown (unknown)) =>
           members . push ((unknown . id . clone(),
                            unknown . relRepo_request . clone())),
       _ => {}, }}
@@ -455,19 +455,19 @@ fn subscribeeFolder_members (
 /// write-protected placeholder. (See TODO/problems.org, "Retained inactive
 /// nodes emit positional save intentions for their container".)
 fn content_members (
-  node_ref : NodeRef<ViewNode>,
+  node_ref : NodeRef<Viewnode>,
 ) -> Vec<(ID, Option<RepoName>)> {
   let mut contents : Vec<(ID, Option<RepoName>)> = Vec::new();
   for child in node_ref . children() {
     match &child . value() . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t)) => {
+      ViewnodeKind::Vognode (Vognode::Active (t)) => {
         if active_child_counts_as_content (t) {
           contents . push ((
             // collected_id, not id: a drawn overrider stands for
             // the original member it was drawn in place of.
             t . collected_id (),
             t . relRepo_request . clone() )); }},
-      ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
+      ViewnodeKind::Phantom (Phantom::Unknown (unknown)) =>
         // An Unknown is inert as a node, but its raw ID is load-bearing
         // membership data at a structured relationship position. `None` asks
         // disk supplementation to keep an existing destination repo sticky.
@@ -482,18 +482,18 @@ fn content_members (
 /// subscriber's hides/unhides are inferred, downstream. It is not
 /// deduplicated.
 fn visible_content_members (
-  node_ref : NodeRef<ViewNode>,
+  node_ref : NodeRef<Viewnode>,
 ) -> Vec<ID> {
   let mut visible : Vec<ID> = Vec::new();
   for child in node_ref . children() {
     match &child . value () . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t))
+      ViewnodeKind::Vognode (Vognode::Active (t))
         if active_child_counts_as_visible_content (t) => {
         visible . push (
           // collected_id: a drawn overrider presents the original,
           // so hide/unhide inference must speak of the original.
           t . collected_id ()); },
-      ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
+      ViewnodeKind::Phantom (Phantom::Unknown (unknown)) =>
         visible . push (unknown . id . clone ()),
       _ => {}, }}
   visible }

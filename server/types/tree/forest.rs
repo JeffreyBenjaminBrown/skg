@@ -1,7 +1,7 @@
 use crate::types::maybe_placed_viewnode::{
   MpViewnode,
   maybePlaced_viewforest_root_viewnode};
-use crate::types::viewnode::{ViewNode, viewforest_root_viewnode};
+use crate::types::viewnode::{Viewnode, viewforest_root_viewnode};
 
 use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
 use std::ops::{Deref, DerefMut};
@@ -15,10 +15,10 @@ use std::ops::{Deref, DerefMut};
 pub struct Forest<T> {
   tree : Tree<T> }
 
-pub type ViewForest = Forest<ViewNode>;
+pub type ViewForest = Forest<Viewnode>;
 pub type MpViewForest = Forest<MpViewnode>;
 
-impl Forest<ViewNode> {
+impl Forest<Viewnode> {
   pub fn new () -> Self {
     Forest { tree : Tree::new (
       viewforest_root_viewnode () ) }}

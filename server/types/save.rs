@@ -163,7 +163,7 @@ fn format_buffer_validation_error (
   error : &BufferValidationError
 ) -> String {
   match error {
-    BufferValidationError::Body_of_Scaffold(title, kind) => {
+    BufferValidationError::Body_of_NonVognode(title, kind) => {
       format!("{} node has a body (not allowed):\n- Title: {}\n",
               kind, title) },
     BufferValidationError::IDFolder_Edited(owner, buffer_ids, real_ids) => {

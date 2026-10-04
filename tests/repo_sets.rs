@@ -40,8 +40,8 @@ use skg::types::nodes::complete::NodeComplete;
 use skg::types::save::{DefineNode, SaveNode};
 use skg::types::viewnode::{
   Birth,
-  ViewNode,
-  ViewNodeKind,
+  Viewnode,
+  ViewnodeKind,
   viewforest_root_viewnode};
 use skg::types::viewnode::{Vognode, Phantom};
 use skg::types::views_state::{OpenViews, ViewState, ViewUri};
@@ -136,7 +136,7 @@ fn override_substitute_across_repo_switch_anonymizes_and_keeps_original (
 
       // 1. Under "all", R is drawn in place of N (substitution).
       let (view_all, _pids, tree_all)
-        : (String, Vec<ID>, Tree<ViewNode>) =
+        : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view (
           config, Some (tantivy),
           &[ ID::from ("ovr-sub-container") ], false ) ?;
@@ -256,25 +256,25 @@ fn saved_or_graph_node_by_id (
 
 fn viewforest_from_org (
   input : &str,
-) -> Result<Tree<ViewNode>, Box<dyn Error>> {
+) -> Result<Tree<Viewnode>, Box<dyn Error>> {
   let unchecked_viewforest =
     org_to_uninterpreted_nodes (input)? . 0;
   Ok ( maybePlaced_to_placed_tree (unchecked_viewforest)? ) }
 
 fn first_child_id (
-  tree : &Tree<ViewNode>,
+  tree : &Tree<Viewnode>,
 ) -> NodeId {
   tree . root () . first_child () . unwrap () . id () }
 
 fn true_child_ids (
-  tree      : &Tree<ViewNode>,
+  tree      : &Tree<Viewnode>,
   parent_id : NodeId,
 ) -> BTreeSet<ID> {
   tree . get (parent_id) . unwrap () . children ()
     . filter_map ( |child| match &child . value () . kind {
-      ViewNodeKind::Vognode ( Vognode::Active (node) )
+      ViewnodeKind::Vognode ( Vognode::Active (node) )
         => Some (node . id . clone ()),
-      ViewNodeKind::Phantom ( Phantom::Diff (p) )
+      ViewnodeKind::Phantom ( Phantom::Diff (p) )
         => Some (p . id . clone ()),
       _ => None, })
     . collect () }
@@ -404,7 +404,7 @@ async fn content_view_omits_inactive_contained_nodes (
         ActiveRepoSet::named (
           &config,
           RepoSetName::from ("public"))?;
-      let (actual, pids, _viewforest) : (String, Vec<ID>, Tree<ViewNode>) =
+      let (actual, pids, _viewforest) : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view_with_repo_set (
           config, None,
           &[ID::from ("root")],
@@ -434,7 +434,7 @@ async fn diff_view_omits_inactive_members_without_content_leak (
         ActiveRepoSet::named (
           &config,
           RepoSetName::from ("public"))?;
-      let (actual, _pids, _viewforest) : (String, Vec<ID>, Tree<ViewNode>) =
+      let (actual, _pids, _viewforest) : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view_with_repo_set (
           config, None,
           &[ID::from ("diff-root")],
@@ -590,7 +590,7 @@ async fn restricted_repo_search_and_save_work_together_end_to_end (
         ids,
         vec![ID::from ("active-search-hit")],
         "restricted search should only return active-repo hits" );
-      let (rendered, _pids, _viewforest) : (String, Vec<ID>, Tree<ViewNode>) =
+      let (rendered, _pids, _viewforest) : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view_with_repo_set (
           config, None,
           &[ID::from ("root")],
@@ -675,7 +675,7 @@ fn backward_path_filters_forks_per_branch_and_omits_empty_forks (
     filter_branches_to_active_repos_for_test (
       &graph, &config, &active, inactive_branches)?
     . is_empty (),
-    "fully inactive forks should not render an empty fork scaffold" );
+    "fully inactive forks should not render an empty fork folder" );
   Ok (( )) }
 
 async fn containerward_expansion_truncates_before_inactive_container (
@@ -687,7 +687,7 @@ async fn containerward_expansion_truncates_before_inactive_container (
         ActiveRepoSet::named (
           &config,
           RepoSetName::from ("public"))?;
-      let mut viewforest : Tree<ViewNode> =
+      let mut viewforest : Tree<Viewnode> =
         viewforest_from_org (indoc! {"
           * (skg (node (id child-for-backpath) (repo public))) child-for-backpath
         "})?;
@@ -727,7 +727,7 @@ async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks 
         ActiveRepoSet::named (
           &config,
           RepoSetName::from ("public"))?;
-      let mut viewforest : Tree<ViewNode> =
+      let mut viewforest : Tree<Viewnode> =
         viewforest_from_org (indoc! {"
           * (skg (node (id child-with-fork) (repo public))) child-with-fork
         "})?;
@@ -751,7 +751,7 @@ async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks 
         "mentionerward fork expansion should retain active branches \
          independently and omit inactive branches" );
 
-      let mut empty_fork_viewforest : Tree<ViewNode> =
+      let mut empty_fork_viewforest : Tree<Viewnode> =
         viewforest_from_org (indoc! {"
           * (skg (node (id child-with-fork) (repo public))) child-with-fork
         "})?;
@@ -773,7 +773,7 @@ async fn mentionerward_expansion_filters_forks_per_branch_and_omits_empty_forks 
         true_child_ids (&empty_fork_viewforest, empty_fork_child_id)
         . is_empty (),
         "all-inactive mentionerward forks should not leave children or \
-         empty fork scaffolding" );
+         empty fork folders" );
       Ok (( )) }
 
 #[test]

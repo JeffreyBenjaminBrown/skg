@@ -37,7 +37,7 @@ async fn test_collateral_view_preserves_diff_annotations (
   // 1. Get an initial diff view of "a".
   let root_ids : Vec<ID> = vec![ID("a" . to_string())];
   let (initial_buffer, pids, viewforest)
-    : (String, Vec<ID>, Tree<ViewNode>) =
+    : (String, Vec<ID>, Tree<Viewnode>) =
     multi_root_view (
       &config, None, &root_ids, true ) ?;
 
@@ -147,7 +147,7 @@ async fn test_collateral_view_staged_text_and_unstaged_add (
 
   let root_ids : Vec<ID> = vec![ID("a" . to_string())];
   let (initial_buffer, pids, viewforest)
-    : (String, Vec<ID>, Tree<ViewNode>) =
+    : (String, Vec<ID>, Tree<Viewnode>) =
     multi_root_view (
       &config, None, &root_ids, true ) ?;
 

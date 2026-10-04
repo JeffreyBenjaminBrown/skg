@@ -305,13 +305,13 @@ fn test_org_to_uninterpreted_nodes2_invalid_metadata() {
   assert!(result . is_err());
   assert!(result . unwrap_err() . contains ("Unknown node key: invalidKey"));
 
-  // Test invalid scaffold value
-  let input_invalid_value = "* (skg invalidScaffold) invalid value";
+  // Test invalid non-vognode value
+  let input_invalid_value = "* (skg invalidAtom) invalid value";
   let result = org_to_uninterpreted_nodes (input_invalid_value);
   assert!(result . is_err());
   // Error message for unknown top-level element
   let err_msg = result . unwrap_err();
-  assert!(err_msg . contains ("Unknown top-level value") && err_msg . contains ("invalidScaffold"));
+  assert!(err_msg . contains ("Unknown top-level value") && err_msg . contains ("invalidAtom"));
 
   // Test unknown flag
   let input_unknown_flag = "* (skg unknownFlag) unknown flag";

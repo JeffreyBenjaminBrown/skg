@@ -19,14 +19,14 @@ use crate::update_buffer::ancestry::pid_and_repo_from_required_ancestor;
 use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::update_buffer::util::RepairSummary;
 use crate::update_buffer::warnings::{CompletionWarning, RepairKind};
-use crate::types::viewnode::{FolderPolicy, AffectsParent, PartnerFolder, ViewNode, ViewNodeKind, Vognode};
+use crate::types::viewnode::{FolderPolicy, AffectsParent, PartnerFolder, Viewnode, ViewnodeKind, Vognode};
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::sync::Arc;
 
-/// Reconciles one PartnerFolder (TODO/DONE/local-view-update/plan_v2.org §19 terminology: a folder = a collecting scaffold)
+/// Reconciles one PartnerFolder (TODO/DONE/local-view-update/plan_v2.org §19 terminology: a folder = a collecting non-vognode)
 /// from a node in the view tree with the current in-Rust graph snapshot's data
 /// about that node.
 /// Makes the folder's ActiveNode children marked affectsParent=true match a goal list,
@@ -34,7 +34,7 @@ use std::sync::Arc;
 /// then demotes stale children marked affectsParent=true to 'affectsParent=false'.
 pub fn reconcile_partnerFolder_children (
   node         : NodeId, // The PartnerFolder. Its parent is an ActiveNode.
-  tree         : &mut Tree<ViewNode>,
+  tree         : &mut Tree<Viewnode>,
   kind         : PartnerFolder,
   repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
   runtime      : &RuntimeGeneration,
@@ -248,7 +248,7 @@ pub fn push_repair_warnings (
 /// The resulting order is view-local: it is never written to disk,
 /// and two open views of the same folder may disagree.
 fn view_order_preserving_goal_list (
-  tree          : &Tree<ViewNode>,
+  tree          : &Tree<Viewnode>,
   folder           : NodeId,
   graph_members : &[ID],
 ) -> Result<Vec<ID>, Box<dyn Error>> {
@@ -256,11 +256,11 @@ fn view_order_preserving_goal_list (
     graph_members . iter () . collect ();
   let mut seen : HashSet<ID> = HashSet::new ();
   let mut goal : Vec<ID> = Vec::new ();
-  { let folder_ref : NodeRef<ViewNode> =
+  { let folder_ref : NodeRef<Viewnode> =
       tree . get (folder)
       . ok_or ("view_order_preserving_goal_list: folder not found") ?;
     for child in folder_ref . children () {
-      if let ViewNodeKind::Vognode (Vognode::Active (t))
+      if let ViewnodeKind::Vognode (Vognode::Active (t))
         = & child . value () . kind
       { if t . affectsParent == AffectsParent::True
           && member_set . contains (&t . id)

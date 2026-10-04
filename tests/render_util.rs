@@ -4,18 +4,18 @@ use skg::assert_metadata_eq;
 use skg::org_to_text::viewnode_to_text;
 use skg::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
 use skg::types::misc::{ID, SkgConfig, SkgfileRepo, RepoName};
-use skg::types::viewnode::{ ViewNode, ViewNodeKind, Vognode, ActiveNode, Editability, ViewNodeStats, default_activeNode };
-use skg::types::viewnode::QualFolder;
+use skg::types::viewnode::{ Viewnode, ViewnodeKind, Vognode, ActiveNode, Editability, ViewnodeStats, default_activeNode };
+use skg::types::viewnode::PropertyFolder;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 #[test]
 fn test_viewnode_to_text_no_metadata () {
-  let node : ViewNode = ViewNode {
+  let node : Viewnode = Viewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind    : ViewNodeKind::Vognode (Vognode::Active (
+    kind    : ViewnodeKind::Vognode (Vognode::Active (
       default_activeNode ( ID::from ("test"),
                          RepoName::from ("main"),
                          "Test Title" . to_string() ))) };
@@ -33,11 +33,11 @@ fn test_viewnode_to_text_with_body () {
     .. default_activeNode ( ID::from ("test"),
                           RepoName::from ("main"),
                           "Test Title" . to_string() ) };
-  let node : ViewNode = ViewNode {
+  let node : Viewnode = Viewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind    : ViewNodeKind::Vognode (Vognode::Active (t)), };
+    kind    : ViewnodeKind::Vognode (Vognode::Active (t)), };
   let result : String =
     viewnode_to_text ( 2, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
     . expect ("ActiveNode rendering never fails");
@@ -45,12 +45,12 @@ fn test_viewnode_to_text_with_body () {
 
 #[test]
 fn test_viewnode_to_text_with_metadata () {
-  let mut node = ViewNode {
+  let mut node = Viewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind        : ViewNodeKind::QualFolder (
-      QualFolder::Alias) };
+    kind        : ViewnodeKind::PropertyFolder (
+      PropertyFolder::Alias) };
   node . folded = true;
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
@@ -64,11 +64,11 @@ fn test_viewnode_to_text_with_id_metadata () {
     .. default_activeNode ( ID::from ("test123"),
                           RepoName::from ("main"),
                           "Test Title" . to_string() ) };
-  let node : ViewNode = ViewNode {
+  let node : Viewnode = Viewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind    : ViewNodeKind::Vognode (Vognode::Active (t)), };
+    kind    : ViewnodeKind::Vognode (Vognode::Active (t)), };
   let result : String =
     viewnode_to_text ( 3, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
     . expect ("ActiveNode rendering never fails");
@@ -82,11 +82,11 @@ fn repo_name_with_whitespace_is_one_round_trippable_atom () {
       ID::from ("cheese-node"), repo . clone (),
       "Cooking" . to_string () );
   active_node . viewStats . homeRepoAtBoundary = true;
-  let node : ViewNode = ViewNode {
+  let node : Viewnode = Viewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind : ViewNodeKind::Vognode (Vognode::Active (active_node)) };
+    kind : ViewnodeKind::Vognode (Vognode::Active (active_node)) };
   let config = SkgConfig::dummyFromRepos (HashMap::from ([
     ( repo . clone (), SkgfileRepo {
         name         : repo,
@@ -113,17 +113,17 @@ fn repo_name_with_whitespace_is_one_round_trippable_atom () {
 #[test]
 fn test_metadata_ordering () {
   let t : ActiveNode = ActiveNode {
-    viewStats : ViewNodeStats {
+    viewStats : ViewnodeStats {
       cycle             : true,
-      .. ViewNodeStats::default() },
+      .. ViewnodeStats::default() },
     .. default_activeNode ( ID::from ("xyz"),
                           RepoName::from ("main"),
                           "Test" . to_string() ) };
-  let node : ViewNode = ViewNode {
+  let node : Viewnode = Viewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind    : ViewNodeKind::Vognode (Vognode::Active (t)), };
+    kind    : ViewnodeKind::Vognode (Vognode::Active (t)), };
   let result : String =
     viewnode_to_text ( 1, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
     . expect ("ActiveNode rendering never fails");
@@ -135,15 +135,15 @@ fn test_rel_heralds_emitted () {
   // none emits no rels atom.
   let mk = | rels : Option<&str> | -> String {
     let t : ActiveNode = ActiveNode {
-      viewStats : ViewNodeStats {
+      viewStats : ViewnodeStats {
         rel_heralds : rels . map ( |s| s . to_string () ),
-        .. ViewNodeStats::default () },
+        .. ViewnodeStats::default () },
       .. default_activeNode ( ID::from ("n"),
                             RepoName::from ("main"),
                             "N" . to_string () ) };
-    let node = ViewNode {
+    let node = Viewnode {
       focused : false, folded : false, body_folded : false,
-      kind : ViewNodeKind::Vognode (Vognode::Active (t)) };
+      kind : ViewnodeKind::Vognode (Vognode::Active (t)) };
     viewnode_to_text (
       1, &node, &SkgConfig::dummyFromRepos (HashMap::new ()) )
       . unwrap () };

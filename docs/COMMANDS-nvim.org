@@ -438,7 +438,7 @@ desired state without saving. Foreign/write-protected/unsaved roots and an
 existing =editRequest= are refused.
 *** <localleader>sX : :SkgSetFlagSearchMatchingRecursive
 Applies one selected state uniformly through the true-content subtree,
-deduplicating PIDs and reporting ineligible descendants. It prunes scaffolds,
+deduplicating PIDs and reporting ineligible descendants. It prunes non-vognodes,
 backpaths, independent branches, inactive nodes, and phantoms. Save with
 =:w= afterward.
 *** <localleader>sm : :SkgSetMergeRequest
@@ -506,7 +506,7 @@ and an org-child of a definitive activeNode whose Skg repo is
 owned in =skgconfig.toml=. The command acts locally,
 replacing only this occurrence in the current buffer:
 the headline at point and all of its org-descendents,
-including scaffolds and phantoms,
+including non-vognodes and phantoms,
 are removed from the view and replaced by a same-level headline
 whose title is an =[[id:...][...]]= link to the original node.
 

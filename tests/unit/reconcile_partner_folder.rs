@@ -1,29 +1,29 @@
 use super::*;
 use crate::types::viewnode::{mk_writeProtected_viewnode, viewforest_root_viewnode};
 
-fn active_affected (id_str : &str) -> ViewNode {
+fn active_affected (id_str : &str) -> Viewnode {
   mk_writeProtected_viewnode (
     ID::from (id_str), RepoName::from ("main"),
     id_str . to_string (), AffectsParent::True ) }
 
-fn active_independent (id_str : &str) -> ViewNode {
+fn active_independent (id_str : &str) -> Viewnode {
   mk_writeProtected_viewnode (
     ID::from (id_str), RepoName::from ("main"),
     id_str . to_string (), AffectsParent::False ) }
 
-fn mk_folder (kind : PartnerFolder) -> ViewNode {
-  ViewNode {
+fn mk_folder (kind : PartnerFolder) -> Viewnode {
+  Viewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind        : ViewNodeKind::PartnerFolder (kind) } }
+    kind        : ViewnodeKind::PartnerFolder (kind) } }
 
 // The user's view order of present members survives; missing graph
 // members are appended in graph order; nonmembers and Independent
 // children contribute nothing to the goal.
 #[test]
 fn view_order_wins_and_missing_members_append () {
-  let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let folder : NodeId = t . get_mut (root) . unwrap ()
     . append (mk_folder (PartnerFolder::Subscriber)) . id ();
@@ -42,7 +42,7 @@ fn view_order_wins_and_missing_members_append () {
 // A duplicated member keeps its first view position only.
 #[test]
 fn duplicate_member_first_occurrence_wins () {
-  let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let folder : NodeId = t . get_mut (root) . unwrap ()
     . append (mk_folder (PartnerFolder::Hider)) . id ();

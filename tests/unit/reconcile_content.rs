@@ -79,10 +79,10 @@ fn no_diff_at_all () {
 }
 
 // §6.5: an Unknown content child whose id is no longer in the parent's
-// contains converts to DeadScaffold; one still in contains is retained.
-fn parent_with_unknown_child (child : &ID) -> (Tree<ViewNode>, NodeId, NodeId) {
+// contains converts to DeadViewnode; one still in contains is retained.
+fn parent_with_unknown_child (child : &ID) -> (Tree<Viewnode>, NodeId, NodeId) {
   use crate::types::viewnode::{mk_definitive_viewnode, mk_unknown_viewnode};
-  let mut tree : Tree<ViewNode> =
+  let mut tree : Tree<Viewnode> =
     Tree::new ( mk_definitive_viewnode (
       id ("p"), repo_name ("main"), "p" . to_string (), None ) );
   let parent : NodeId = tree . root () . id ();
@@ -90,13 +90,13 @@ fn parent_with_unknown_child (child : &ID) -> (Tree<ViewNode>, NodeId, NodeId) {
     tree . root_mut () . append ( mk_unknown_viewnode (child . clone ()) ) . id ();
   (tree, parent, child_nid) }
 
-fn is_dead (tree : &Tree<ViewNode>, nid : NodeId) -> bool {
+fn is_dead (tree : &Tree<Viewnode>, nid : NodeId) -> bool {
   matches! ( tree . get (nid) . unwrap () . value () . kind,
-             ViewNodeKind::DeadScaffold ) }
+             ViewnodeKind::DeadViewnode ) }
 
-fn is_unknown (tree : &Tree<ViewNode>, nid : NodeId) -> bool {
+fn is_unknown (tree : &Tree<Viewnode>, nid : NodeId) -> bool {
   matches! ( & tree . get (nid) . unwrap () . value () . kind,
-             ViewNodeKind::Phantom (Phantom::Unknown (_)) ) }
+             ViewnodeKind::Phantom (Phantom::Unknown (_)) ) }
 
 #[test]
 fn nonmember_unknown_child_becomes_dead () {
@@ -104,7 +104,7 @@ fn nonmember_unknown_child_becomes_dead () {
   convert_nonmember_unknown_children_to_dead (
     &mut tree, parent, &[ id ("kept") ] ) . unwrap ();
   assert! ( is_dead (&tree, child),
-            "an Unknown no longer in contains should become DeadScaffold" );
+            "an Unknown no longer in contains should become DeadViewnode" );
 }
 
 #[test]
@@ -120,10 +120,10 @@ fn member_unknown_child_is_retained () {
 fn same_session_surviving_content_membership_becomes_unknown () {
   use crate::types::viewnode::mk_definitive_viewnode;
   let ghost : ID = id ("ghost");
-  let mut tree : Tree<ViewNode> = Tree::new (mk_definitive_viewnode (
+  let mut tree : Tree<Viewnode> = Tree::new (mk_definitive_viewnode (
     id ("parent"), repo_name ("main"), "parent" . to_string (), None ));
   let parent : NodeId = tree . root () . id ();
-  let mut active : ViewNode = mk_definitive_viewnode (
+  let mut active : Viewnode = mk_definitive_viewnode (
     ghost . clone (), repo_name ("main"), "last seen" . to_string (),
     Some ("last seen body" . to_string ()) );
   active . focused = true;
@@ -142,7 +142,7 @@ fn same_session_surviving_content_membership_becomes_unknown () {
   assert! (rendered . focused && rendered . folded,
     "same-session normalization preserves view wrapper state");
   match &rendered . kind {
-    ViewNodeKind::Phantom (Phantom::Unknown (unknown)) => {
+    ViewnodeKind::Phantom (Phantom::Unknown (unknown)) => {
       assert_eq! (unknown . id, ghost);
       assert_eq! (unknown . relRepo,
                   Some (repo_name ("private")));
@@ -155,10 +155,10 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
   use crate::types::viewnode::mk_definitive_viewnode;
   let primary : ID = id ("deleted-primary");
   let raw_extra : ID = id ("surviving-extra-id");
-  let mut tree : Tree<ViewNode> = Tree::new (mk_definitive_viewnode (
+  let mut tree : Tree<Viewnode> = Tree::new (mk_definitive_viewnode (
     id ("parent"), repo_name ("main"), "parent" . to_string (), None ));
   let parent : NodeId = tree . root () . id ();
-  let mut active : ViewNode = mk_definitive_viewnode (
+  let mut active : Viewnode = mk_definitive_viewnode (
     primary . clone (), repo_name ("main"), "last seen" . to_string (), None );
   active . focused = true;
   let child : NodeId = tree . root_mut () . append (active) . id ();
@@ -178,7 +178,7 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
   assert! (rendered . focused,
     "extra-id normalization preserves the active child wrapper state");
   match &rendered . kind {
-    ViewNodeKind::Phantom (Phantom::Unknown (unknown)) => {
+    ViewnodeKind::Phantom (Phantom::Unknown (unknown)) => {
       assert_eq! (unknown . id, raw_extra,
         "the retained on-disk spelling, not the deleted primary, is rendered");
       assert_eq! (unknown . relRepo, Some (repo_name ("foreign"))); },
@@ -197,14 +197,14 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
 fn independent_same_id_child_is_prefetched () {
   use crate::types::viewnode::{ mk_definitive_viewnode, AffectsParent };
   let goal : ID = id ("regression_independent_child");
-  let mut tree : Tree<ViewNode> =
+  let mut tree : Tree<Viewnode> =
     Tree::new ( mk_definitive_viewnode (
       id ("p"), repo_name ("main"), "p" . to_string (), None ));
   let parent : NodeId = tree . root () . id ();
-  let mut child : ViewNode =
+  let mut child : Viewnode =
     mk_definitive_viewnode (
       goal . clone (), repo_name ("main"), "c" . to_string (), None );
-  if let ViewNodeKind::Vognode (Vognode::Active (t)) = &mut child . kind
+  if let ViewnodeKind::Vognode (Vognode::Active (t)) = &mut child . kind
     { t . affectsParent = AffectsParent::False; }
   tree . root_mut () . append (child);
   let config : SkgConfig =

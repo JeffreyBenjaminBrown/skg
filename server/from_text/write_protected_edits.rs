@@ -10,7 +10,7 @@ use crate::types::errors::BufferValidationError;
 use crate::types::misc::{ID, RepoName};
 use crate::types::nodes::complete::Flag;
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{PartnerFolder, Qual, QualFolder, Phantom, ViewNode, ViewNodeKind, Vognode};
+use crate::types::viewnode::{PartnerFolder, Property, PropertyFolder, Phantom, Viewnode, ViewnodeKind, Vognode};
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::node_lookup::nodecomplete_from_graph;
 use crate::types::nodes::complete::flag_is_true;
@@ -25,13 +25,13 @@ enum OccurrencePathStep {
   DiffPhantom (ID),
   DeletedPhantom (ID),
   UnknownPhantom (ID),
-  QualFolder (QualFolder),
+  PropertyFolder (PropertyFolder),
   Alias,
   ID,
   Flag,
   TextChanged,
   PartnerFolder (PartnerFolder),
-  DeadScaffold,
+  DeadViewnode,
 }
 
 /// The parts of a write-protected occurrence that save extraction does not read.
@@ -194,23 +194,23 @@ fn flags_surfaces_in (forest : &ViewForest) -> Vec<LocatedFlagsSurface> {
 }
 
 fn collect_flags_surfaces (
-  node        : NodeRef<ViewNode>,
+  node        : NodeRef<Viewnode>,
   parent_path : &[OccurrencePathStep],
   result      : &mut Vec<LocatedFlagsSurface>,
 ) {
   let mut own_path : Vec<OccurrencePathStep> = parent_path . to_vec ();
   own_path . push (path_step (node . value ()));
-  if let ViewNodeKind::Vognode (Vognode::Active (owner)) = &node . value () . kind {
+  if let ViewnodeKind::Vognode (Vognode::Active (owner)) = &node . value () . kind {
     let folders : Vec<FlagsFolderSurface> = node . children ()
       . filter_map (|child| {
-        let ViewNodeKind::QualFolder (QualFolder::Flags {
+        let ViewnodeKind::PropertyFolder (PropertyFolder::Flags {
           title, body }) = &child . value () . kind
         else { return None; };
         let mut viewnodes : Vec<(Flag, String, Option<String>)> = Vec::new ();
         let mut other_children : Vec<String> = Vec::new ();
         for leaf in child . children () {
           match &leaf . value () . kind {
-            ViewNodeKind::Qual (Qual::Flag {
+            ViewnodeKind::Property (Property::Flag {
               flag, title, body }) =>
               viewnodes . push ((*flag, title . clone (), body . clone ())),
             other => other_children . push (format! ("{:?}", other)), } }
@@ -382,13 +382,13 @@ fn occurrences_in (
 }
 
 fn collect_occurrences (
-  node        : NodeRef<ViewNode>,
+  node        : NodeRef<Viewnode>,
   parent_path : &[OccurrencePathStep],
   occurrences : &mut Vec<LocatedWriteProtectedOccurrence>,
 ) {
   let mut own_path : Vec<OccurrencePathStep> = parent_path . to_vec ();
   own_path . push (path_step (node . value ()));
-  if let ViewNodeKind::Vognode (Vognode::Active (active)) =
+  if let ViewnodeKind::Vognode (Vognode::Active (active)) =
     &node . value () . kind
   { if active . is_writeProtected () {
     occurrences . push (LocatedWriteProtectedOccurrence {
@@ -409,34 +409,34 @@ fn collect_occurrences (
 }
 
 fn path_step (
-  node : &ViewNode,
+  node : &Viewnode,
 ) -> OccurrencePathStep {
   match &node . kind {
-    ViewNodeKind::Vognode (Vognode::Active (active)) =>
+    ViewnodeKind::Vognode (Vognode::Active (active)) =>
       OccurrencePathStep::Active (active . id . clone ()),
-    ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
+    ViewnodeKind::Vognode (Vognode::Inactive (_)) =>
       OccurrencePathStep::Inactive,
-    ViewNodeKind::Phantom (Phantom::Diff (phantom)) =>
+    ViewnodeKind::Phantom (Phantom::Diff (phantom)) =>
       OccurrencePathStep::DiffPhantom (phantom . id . clone ()),
-    ViewNodeKind::Phantom (Phantom::Deleted (phantom)) =>
+    ViewnodeKind::Phantom (Phantom::Deleted (phantom)) =>
       OccurrencePathStep::DeletedPhantom (phantom . id . clone ()),
-    ViewNodeKind::Phantom (Phantom::Unknown (phantom)) =>
+    ViewnodeKind::Phantom (Phantom::Unknown (phantom)) =>
       OccurrencePathStep::UnknownPhantom (phantom . id . clone ()),
-    ViewNodeKind::QualFolder (folder) =>
-      OccurrencePathStep::QualFolder (folder . clone ()),
-    ViewNodeKind::Qual (Qual::Alias { .. }) =>
+    ViewnodeKind::PropertyFolder (folder) =>
+      OccurrencePathStep::PropertyFolder (folder . clone ()),
+    ViewnodeKind::Property (Property::Alias { .. }) =>
       OccurrencePathStep::Alias,
-    ViewNodeKind::Qual (Qual::ID { .. }) =>
+    ViewnodeKind::Property (Property::ID { .. }) =>
       OccurrencePathStep::ID,
-    ViewNodeKind::Qual (Qual::Flag { .. }) =>
+    ViewnodeKind::Property (Property::Flag { .. }) =>
       OccurrencePathStep::Flag,
-    ViewNodeKind::Qual (Qual::TextChanged { .. }) =>
+    ViewnodeKind::Property (Property::TextChanged { .. }) =>
       OccurrencePathStep::TextChanged,
-    ViewNodeKind::PartnerFolder (folder) =>
+    ViewnodeKind::PartnerFolder (folder) =>
       OccurrencePathStep::PartnerFolder (*folder),
-    ViewNodeKind::DeadScaffold =>
-      OccurrencePathStep::DeadScaffold,
-    ViewNodeKind::BufferRoot => unreachable! (
+    ViewnodeKind::DeadViewnode =>
+      OccurrencePathStep::DeadViewnode,
+    ViewnodeKind::BufferRoot => unreachable! (
       "the internal forest root is not traversed as an occurrence"),
   }
 }
@@ -452,48 +452,48 @@ fn make_direct_active_children_independent (
     . collect ();
   for child_id in child_ids {
     if let Some (mut child) = viewforest . get_mut (child_id) {
-      if let ViewNodeKind::Vognode (Vognode::Active (active)) =
+      if let ViewnodeKind::Vognode (Vognode::Active (active)) =
         &mut child . value () . kind
       { active . affectsParent = crate::types::viewnode::AffectsParent::False; }} }
 }
 
 fn content_members (
-  node : NodeRef<ViewNode>,
+  node : NodeRef<Viewnode>,
 ) -> Vec<(ID, Option<RepoName>)> {
   node . children () . filter_map ( |child| match &child . value () . kind {
-    ViewNodeKind::Vognode (Vognode::Active (active))
+    ViewnodeKind::Vognode (Vognode::Active (active))
       if active_child_counts_as_content (active) =>
         Some ((active . collected_id (), active . relRepo_request . clone ())),
-    ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
+    ViewnodeKind::Phantom (Phantom::Unknown (unknown)) =>
       Some ((unknown . id . clone (), unknown . relRepo_request . clone ())),
     _ => None,
   }) . collect ()
 }
 
 fn aliases (
-  node : NodeRef<ViewNode>,
+  node : NodeRef<Viewnode>,
 ) -> Option<Vec<(String, Option<RepoName>)>> {
   node . children () . find ( |child| matches! (
-    &child . value () . kind, ViewNodeKind::QualFolder (QualFolder::Alias)))
+    &child . value () . kind, ViewnodeKind::PropertyFolder (PropertyFolder::Alias)))
     . map ( |alias_folder| alias_folder . children () . filter_map ( |alias| {
-      let ViewNodeKind::Qual (Qual::Alias { text, relRepo_request, .. }) =
+      let ViewnodeKind::Property (Property::Alias { text, relRepo_request, .. }) =
         &alias . value () . kind else { return None; };
       Some ((text . clone (), relRepo_request . clone ()))
     }) . collect () )
 }
 
 fn partner_members (
-  node : NodeRef<ViewNode>,
+  node : NodeRef<Viewnode>,
   wanted : PartnerFolder,
 ) -> Option<Vec<(ID, Option<RepoName>)>> {
   node . children () . find ( |child| matches! (
-    &child . value () . kind, ViewNodeKind::PartnerFolder (folder) if *folder == wanted))
+    &child . value () . kind, ViewnodeKind::PartnerFolder (folder) if *folder == wanted))
     . map ( |folder| folder . children () . filter_map ( |member| {
       match &member . value () . kind {
-        ViewNodeKind::Vognode (Vognode::Active (active))
+        ViewnodeKind::Vognode (Vognode::Active (active))
           if member_counts_for_partnerFolder (active) =>
             Some ((active . id . clone (), active . relRepo_request . clone ())),
-        ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
+        ViewnodeKind::Phantom (Phantom::Unknown (unknown)) =>
           Some ((unknown . id . clone (), unknown . relRepo_request . clone ())),
         _ => None,
       }
@@ -501,19 +501,19 @@ fn partner_members (
 }
 
 fn hidden_outside_members (
-  node : NodeRef<ViewNode>,
+  node : NodeRef<Viewnode>,
 ) -> Option<Vec<ID>> {
   node . children () . find ( |child| matches! (
     &child . value () . kind,
-    ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee)))
+    ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)))
     . and_then ( |subscribee_folder| subscribee_folder . children () . find ( |child|
       matches! (&child . value () . kind,
-        ViewNodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee))))
+        ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee))))
     . map ( |hidden_outside| hidden_outside . children () . filter_map ( |member|
       match &member . value () . kind {
-        ViewNodeKind::Vognode (Vognode::Active (active))
+        ViewnodeKind::Vognode (Vognode::Active (active))
           if member_counts_for_partnerFolder (active) => Some (active . id . clone ()),
-        ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
+        ViewnodeKind::Phantom (Phantom::Unknown (unknown)) =>
           Some (unknown . id . clone ()),
         _ => None,
       }) . collect () )
@@ -580,7 +580,7 @@ mod tests {
       &mut current, &original) . is_empty ());
     let child = current . nodes () . find_map ( |node| match
       &node . value () . kind
-    { ViewNodeKind::Vognode (Vognode::Active (active))
+    { ViewnodeKind::Vognode (Vognode::Active (active))
         if active . id == ID::from ("child") => Some (active),
       _ => None, }) . unwrap ();
     assert_eq! (child . affectsParent, AffectsParent::False);

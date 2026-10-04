@@ -262,7 +262,7 @@ fn view_can_display_absent_reference_change (
     .any (|pid| affected_owner_pids . contains (pid))
   || viewforest . nodes () . any (|node| matches! (
        &node . value () . kind,
-       crate::types::viewnode::ViewNodeKind::Phantom (
+       crate::types::viewnode::ViewnodeKind::Phantom (
          crate::types::viewnode::Phantom::Unknown (unknown))
        if unknown . id == *raw_id ))
 }

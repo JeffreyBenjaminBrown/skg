@@ -146,7 +146,7 @@ async fn write_protected_folder_repairs_warn_impl (
   assert! ( ! line_containing (&saved, "subscriberFolder")
               . contains ("HELLO"),
     "the folder headline edit must not survive the rerender:\n{}", saved );
-  { // A BODY on a scaffold still aborts the save (Body_of_Scaffold).
+  { // A BODY on a non-vognode still aborts the save (Body_of_NonVognode).
     let folder_line : String =
       line_containing (&saved, "subscriberFolder") . to_string ();
     let with_body : String =
@@ -155,7 +155,7 @@ async fn write_protected_folder_repairs_warn_impl (
     let result =
       save_buffer (&with_body, config, tantivy, &graph) . await;
     assert! ( result . is_err (),
-      "a body on a folder scaffold must still abort the save" ); }
+      "a body on a folder must still abort the save" ); }
   Ok (( )) }
 
 async fn failed_save_carries_warnings_with_errors (

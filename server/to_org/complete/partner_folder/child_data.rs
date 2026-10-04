@@ -8,7 +8,7 @@
 /// - A `goal_list` is the ordered list of node IDs that a folder
 ///   should present after completion.  The list is computed from the
 ///   graph and, in diff views, from git-diff state.
-/// - A goal child is a child ViewNode whose ActiveNode ID appears in
+/// - A goal child is a child Viewnode whose ActiveNode ID appears in
 ///   that `goal_list`, whether it already existed in the buffer or
 ///   was created during reconciliation.
 /// - A relevant child is one this reconciliation pass is allowed to
@@ -24,7 +24,7 @@ use crate::types::git::{NodeAxes, RelationshipAxes, Sign, RepoDiff};
 use crate::types::misc::{ID, RepoName};
 use crate::types::phantom::title_for_phantom;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
+use crate::types::viewnode::{Viewnode, ViewnodeKind, Vognode, AffectsParent, PartnerFolder, mk_writeProtected_viewnode, mk_phantom_viewnode, mk_unknown_viewnode};
 use crate::update_buffer::util::{complete_relevant_children_in_viewnodetree, RepairSummary};
 use crate::update_buffer::util::treat_certain_children;
 
@@ -63,7 +63,7 @@ pub struct ChildData {
 /// compare derived membership), so an axis can never silently come
 /// from a different relation involving the same ID.
 pub fn build_child_data (
-  tree                           : &Tree<ViewNode>,
+  tree                           : &Tree<Viewnode>,
   folder_node                       : NodeId,
   goal_list                      : &[ID],
   removed_ids                    : &HashSet<ID>,
@@ -75,12 +75,12 @@ pub fn build_child_data (
   runtime                        : &RuntimeGeneration,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
   let existing_children : HashMap<ID, (RepoName, String)> = {
-    let node_ref : NodeRef<ViewNode> =
+    let node_ref : NodeRef<Viewnode> =
       tree . get (folder_node)
         . ok_or ("build_child_data: node not found") ?;
     let mut m : HashMap<ID, (RepoName, String)> = HashMap::new ();
     for child_ref in node_ref . children () {
-      if let ViewNodeKind::Vognode (Vognode::Active (t))
+      if let ViewnodeKind::Vognode (Vognode::Active (t))
         = & child_ref . value () . kind
         { m . insert ( t . id . clone (),
                        ( t . home_repo . clone (),
@@ -162,7 +162,7 @@ pub fn build_child_data (
 /// produce phantom viewnodes; non-phantom entries produce
 /// write-protected viewnodes marked AffectsParent::True.
 pub fn reconcile_partnerFolder_children_against_goal_list (
-  tree          : &mut Tree<ViewNode>,
+  tree          : &mut Tree<Viewnode>,
   folder_node      : NodeId,
   kind          : PartnerFolder,
   goal_list     : &[ID],
@@ -175,7 +175,7 @@ pub fn reconcile_partnerFolder_children_against_goal_list (
 /// As above, with the raw aliases captured for nodes deleted by the current
 /// save.  Only the immediate post-save rerender has this information.
 pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds (
-  tree          : &mut Tree<ViewNode>,
+  tree          : &mut Tree<Viewnode>,
   folder_node      : NodeId,
   kind          : PartnerFolder,
   goal_list     : &[ID],
@@ -193,16 +193,16 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
     // every inactive member, and a retained placeholder already in the
     // folder survives as an irrelevant child (preserved as-is, not
     // goal-matched), so it needs no id.
-    |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t))
+    |vn : &Viewnode| match &vn . kind {
+      ViewnodeKind::Vognode (Vognode::Active (t))
         => t . affectsParent == AffectsParent::True,
-      ViewNodeKind::Phantom (crate::types::viewnode::Phantom::Unknown (_))
+      ViewnodeKind::Phantom (crate::types::viewnode::Phantom::Unknown (_))
         => true,
       _ => false },
-    |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t))
+    |vn : &Viewnode| match &vn . kind {
+      ViewnodeKind::Vognode (Vognode::Active (t))
         => Ok ( t . id . clone () ),
-      ViewNodeKind::Phantom (crate::types::viewnode::Phantom::Unknown (u))
+      ViewnodeKind::Phantom (crate::types::viewnode::Phantom::Unknown (u))
         => Ok ( u . id . clone () ),
       _ => Err ( format! (
         "{}: relevant child not a normal graph node", label )) },
@@ -214,8 +214,8 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
                        label, id . 0 )) ?;
       Ok (
         if d . unknown {
-          let mut unknown : ViewNode = mk_unknown_viewnode (id . clone ());
-          if let ViewNodeKind::Phantom (
+          let mut unknown : Viewnode = mk_unknown_viewnode (id . clone ());
+          if let ViewnodeKind::Phantom (
             crate::types::viewnode::Phantom::Unknown (u)) = &mut unknown . kind
           { u . relRepo = d . relRepo . clone (); }
           unknown
@@ -238,15 +238,15 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
 /// turn it into Unknown before the generic deletion pass.  Replacing only the
 /// kind keeps focus/folding state but removes title, body, home, and node edits.
 fn normalize_relationship_backed_partner_unknowns (
-  tree       : &mut Tree<ViewNode>,
+  tree       : &mut Tree<Viewnode>,
   folder_node   : NodeId,
   child_data : &HashMap<ID, ChildData>,
   deleted_by_this_save_extra_ids : &HashMap<ID, HashSet<ID>>,
 ) -> Result<(), Box<dyn Error>> {
   treat_certain_children (
     tree, folder_node,
-    |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::Vognode (Vognode::Active (active)) =>
+    |vn : &Viewnode| match &vn . kind {
+      ViewnodeKind::Vognode (Vognode::Active (active)) =>
         active . affectsParent == AffectsParent::True
         && (child_data . get (&active . id)
             . is_some_and (|data| data . unknown)
@@ -255,9 +255,9 @@ fn normalize_relationship_backed_partner_unknowns (
                  |raw_id| child_data . get (raw_id)
                    . is_some_and (|data| data . unknown)))),
       _ => false },
-    |vn : &mut ViewNode| {
+    |vn : &mut Viewnode| {
       let active_id : ID = match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Active (active)) => active . id . clone (),
+        ViewnodeKind::Vognode (Vognode::Active (active)) => active . id . clone (),
         _ => unreachable! (), };
       let id : ID = if child_data . get (&active_id)
         . is_some_and (|data| data . unknown) { active_id . clone () }
@@ -269,7 +269,7 @@ fn normalize_relationship_backed_partner_unknowns (
         . clone () };
       let relRepo : Option<RepoName> = child_data . get (&id)
         . and_then (|data| data . relRepo . clone ());
-      vn . kind = ViewNodeKind::Phantom (
+      vn . kind = ViewnodeKind::Phantom (
         crate::types::viewnode::Phantom::Unknown (
           crate::types::viewnode::PhantomUnknown {
             id, relRepo, relRepo_request: None })); })
@@ -290,17 +290,17 @@ fn normalize_relationship_backed_partner_unknowns (
 ///   and flips to a phantom, so the rendered buffer cannot show a
 ///   removed edge as a live member.
 pub fn apply_relationship_axes_to_folder_members (
-  tree       : &mut Tree<ViewNode>,
+  tree       : &mut Tree<Viewnode>,
   folder_node   : NodeId,
   axes_by_id : &HashMap<ID, RelationshipAxes>,
 ) -> Result<(), Box<dyn Error>> {
   if axes_by_id . is_empty () { return Ok (( )); }
   treat_certain_children (
     tree, folder_node,
-    |vn : &ViewNode| matches! (
-      &vn . kind, ViewNodeKind::Vognode (Vognode::Active (_)) ),
-    |vn : &mut ViewNode| {
-      if let ViewNodeKind::Vognode (Vognode::Active (t))
+    |vn : &Viewnode| matches! (
+      &vn . kind, ViewnodeKind::Vognode (Vognode::Active (_)) ),
+    |vn : &mut Viewnode| {
+      if let ViewnodeKind::Vognode (Vognode::Active (t))
         = &mut vn . kind
       { if let Some (m) = axes_by_id . get (&t . id) {
           if m . net_is_present () {
@@ -327,11 +327,11 @@ mod tests {
   fn deleted_primary_with_surviving_extra_member_becomes_unknown () {
     let primary : ID = id ("deleted-primary");
     let raw_extra : ID = id ("surviving-extra");
-    let mut tree : Tree<ViewNode> = Tree::new (
-      ViewNode { focused: false, folded: false, body_folded: false,
-                 kind: ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee) });
+    let mut tree : Tree<Viewnode> = Tree::new (
+      Viewnode { focused: false, folded: false, body_folded: false,
+                 kind: ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) });
     let folder : NodeId = tree . root () . id ();
-    let mut child : ViewNode = mk_writeProtected_viewnode (
+    let mut child : Viewnode = mk_writeProtected_viewnode (
       primary . clone (), repo ("main"), "last seen" . to_string (),
       AffectsParent::True );
     child . focused = true;
@@ -352,7 +352,7 @@ mod tests {
     assert! (rendered . focused,
       "normalization must preserve the existing view wrapper state");
     match &rendered . kind {
-      ViewNodeKind::Phantom (Phantom::Unknown (unknown)) => {
+      ViewnodeKind::Phantom (Phantom::Unknown (unknown)) => {
         assert_eq! (unknown . id, raw_extra);
         assert_eq! (unknown . relRepo, Some (repo ("foreign"))); },
       other => panic! ("expected raw extra member as Unknown, got {other:?}"), }
@@ -365,7 +365,7 @@ mod tests {
 /// membership marker is stale, so the folder continues to own them
 /// as generated folder members.
 fn mark_goal_children_as_folder_members (
-  tree          : &mut Tree<ViewNode>,
+  tree          : &mut Tree<Viewnode>,
   folder_node      : NodeId,
   goal_list     : &[ID],
 ) -> Result<(), Box<dyn Error>> {
@@ -373,13 +373,13 @@ fn mark_goal_children_as_folder_members (
     goal_list . iter () . cloned () . collect ();
   treat_certain_children (
     tree, folder_node,
-    |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t)) =>
+    |vn : &Viewnode| match &vn . kind {
+      ViewnodeKind::Vognode (Vognode::Active (t)) =>
         goal_set . contains (&t . id)
         && ! t . should_be_diffPhantom (),
       _ => false },
-    |vn : &mut ViewNode| {
-      if let ViewNodeKind::Vognode (Vognode::Active (t))
+    |vn : &mut Viewnode| {
+      if let ViewnodeKind::Vognode (Vognode::Active (t))
         = &mut vn . kind
         { t . affectsParent = AffectsParent::True; }} )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;

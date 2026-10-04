@@ -3,7 +3,7 @@
 pub use super::super::common::*;
 
 /// The expected git diff view output for title/body changes.
-/// TextChanged scaffolds appear as children of nodes whose title or body changed.
+/// TextChanged properties appear as children of nodes whose title or body changed.
 pub const GIT_DIFF_VIEW: &str = "\
 * (skg (node (id 1) (repo main))) 1 has a new title.
 ** (skg (textChanged unstaged))

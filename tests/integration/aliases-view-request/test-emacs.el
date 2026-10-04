@@ -24,7 +24,7 @@
 
 (defun strip-metadata-details-and-bodies (text)
   "Return TEXT with metadata details and body content removed.
-The SKG metadata kind is retained, so folder scaffolds remain
+The SKG metadata kind is retained, so folders remain
 visible in expected strings."
   (with-temp-buffer
     (insert text)

@@ -1,8 +1,8 @@
 /// Skg lets users control a graph, viewing it through a tree view in a text editor.
 /// Nodes of the graph are represented via the 'NodeComplete' type.
-/// Nodes of the tree are represented via the 'ViewNode' type.
+/// Nodes of the tree are represented via the 'Viewnode' type.
 ///   (That name might change once there are more clients. The only client so far is written in Emacs org-mode; hence the name.)
-/// Some 'ViewNode's correspond to whole graph nodes; these are 'Vognode's.
+/// Some 'Viewnode's correspond to whole graph nodes; these are 'Vognode's.
 /// Others encode information about neighboring tree nodes, such as
 /// aliases, IDs, and partner folders.
 
@@ -53,22 +53,22 @@ pub enum Birth {
 
 /// Corresponds to an Emacs headline-body pair.
 #[derive( Debug, Clone, PartialEq )]
-pub struct ViewNode {
+pub struct Viewnode {
   pub focused     : bool,
   pub folded      : bool, // Is this     hidden in its parent?
   pub body_folded : bool, // Is the body hidden in this?
-  pub kind        : ViewNodeKind,
+  pub kind        : ViewnodeKind,
 }
 
 #[derive( Debug, Clone, PartialEq )]
-pub enum ViewNodeKind {
+pub enum ViewnodeKind {
   Vognode       (Vognode),
   Phantom       (Phantom),
-  QualFolder       (QualFolder),
-  Qual          (Qual),
+  PropertyFolder       (PropertyFolder),
+  Property          (Property),
   PartnerFolder    (PartnerFolder),
   BufferRoot,
-  DeadScaffold,
+  DeadViewnode,
 }
 
 /// The two graph-backed kinds: each corresponds to a real, current node.
@@ -142,7 +142,7 @@ pub struct PhantomDeleted {
 /// no instructions, though its descendants still might, so extraction recurses
 /// through it). If it is still a member of its parent's contains it is retained
 /// (a present-but-unresolvable reference); if it is no longer a member it
-/// converts to a DeadScaffold (`convert_nonmember_unknown_children_to_dead`) and
+/// converts to a DeadViewnode (`convert_nonmember_unknown_children_to_dead`) and
 /// is pruned.
 ///
 /// DISTINCT INFO: it carries ONLY the `id`. Unlike PhantomDeleted it has no repo
@@ -184,7 +184,7 @@ pub type ActiveNode   = ActiveNode_Generic < ID, RepoName >;
 pub type MpActiveNode = ActiveNode_Generic < Option < ID >,
                                              Option < RepoName >>;
 
-/// A ViewNode that corresponds to a NodeComplete.
+/// A Viewnode that corresponds to a NodeComplete.
 #[derive( Debug, Clone, PartialEq )]
 pub struct ActiveNode_Generic < Id, Src > {
   pub title         : String,
@@ -195,7 +195,7 @@ pub struct ActiveNode_Generic < Id, Src > {
 
   // The next two *Stats fields only influence how the node is shown. Editing them and saving the buffer leaves the graph unchanged, and those edits will be immediately lost, as this data is regenerated each time the view is rebuilt.
   pub graphStats    : GraphNodeStats,
-  pub viewStats     : ViewNodeStats,
+  pub viewStats     : ViewnodeStats,
   /// A requested repo for this occurrence's binding relationship. Unlike
   /// `viewStats.relRepo`, this is save intent.
   pub relRepo_request : Option<RepoName>,
@@ -348,7 +348,7 @@ pub struct GraphNodeStats {
 /// These depend on the node's position in the current view tree.
 /// `cycle` depends on ancestors; `affectsParent*` depends on the specific parent.
 #[derive(Debug, Clone, PartialEq)]
-pub struct ViewNodeStats {
+pub struct ViewnodeStats {
   pub cycle             : bool,
   pub homeRepoAtBoundary  : bool, // True if a root or if repo differs from repo of nearest activeNode ancestor.
   /// The relationship heralds as the SEMANTIC `(rels ...)` sexp string
@@ -398,14 +398,14 @@ pub struct ViewNodeStats {
 }
 
 #[derive( Debug, Clone, PartialEq, Eq, Hash )]
-pub enum QualFolder {
+pub enum PropertyFolder {
   ID,
   Alias,
   Flags { title : String, body : Option<String> },
 }
 
 #[derive( Debug, Clone, PartialEq )]
-pub enum Qual {
+pub enum Property {
   Alias { text: String, // an alias for the node's grandparent
           relRepo: Option<RepoName>,
           relRepo_request: Option<RepoName>,
@@ -643,52 +643,52 @@ impl PartnerFolder {
 
 }
 
-impl QualFolder {
-  pub fn flags () -> QualFolder {
-    QualFolder::Flags { title : String::new (), body : None } }
+impl PropertyFolder {
+  pub fn flags () -> PropertyFolder {
+    PropertyFolder::Flags { title : String::new (), body : None } }
 
   pub fn is_flags (&self) -> bool {
-    matches! (self, QualFolder::Flags { .. }) }
+    matches! (self, PropertyFolder::Flags { .. }) }
 
   pub fn repr_in_client (&self) -> &'static str {
     match self {
-      QualFolder::Alias => "aliasFolder",
-      QualFolder::ID    => "idFolder",
-      QualFolder::Flags { .. } => "flagsFolder",
+      PropertyFolder::Alias => "aliasFolder",
+      PropertyFolder::ID    => "idFolder",
+      PropertyFolder::Flags { .. } => "flagsFolder",
     } }
 
   pub fn title (&self) -> &str {
     match self {
-      QualFolder::Flags { title, .. } => title,
-      QualFolder::Alias | QualFolder::ID => "", } }
+      PropertyFolder::Flags { title, .. } => title,
+      PropertyFolder::Alias | PropertyFolder::ID => "", } }
 
   pub fn body (&self) -> Option<&String> {
     match self {
-      QualFolder::Flags { body, .. } => body . as_ref (),
-      QualFolder::Alias | QualFolder::ID => None, } }
+      PropertyFolder::Flags { body, .. } => body . as_ref (),
+      PropertyFolder::Alias | PropertyFolder::ID => None, } }
 
 }
 
-impl Qual {
+impl Property {
   pub fn repr_in_client (&self) -> &'static str {
     match self {
-      Qual::Alias { .. }       => "alias",
-      Qual::ID { .. }          => "id",
-      Qual::Flag { .. }    => "flag",
-      Qual::TextChanged { .. } => "textChanged",
+      Property::Alias { .. }       => "alias",
+      Property::ID { .. }          => "id",
+      Property::Flag { .. }    => "flag",
+      Property::TextChanged { .. } => "textChanged",
     } }
 
   pub fn title (&self) -> &str {
     match self {
-      Qual::Alias { text, .. } => text,
-      Qual::ID    { id, .. }   => id,
-      Qual::Flag { title, .. } => title,
-      Qual::TextChanged { .. } => "",
+      Property::Alias { text, .. } => text,
+      Property::ID    { id, .. }   => id,
+      Property::Flag { title, .. } => title,
+      Property::TextChanged { .. } => "",
     } }
 
   pub fn body (&self) -> Option<&String> {
     match self {
-      Qual::Flag { body, .. } => body . as_ref (),
+      Property::Flag { body, .. } => body . as_ref (),
       _ => None, } }
 }
 
@@ -739,15 +739,15 @@ impl ViewRequest {
     [ "folder", "path", "flags", "definitiveView" ];
 }
 
-impl AsRef<ViewNode> for ViewNode {
-  fn as_ref (&self) -> &ViewNode {
+impl AsRef<Viewnode> for Viewnode {
+  fn as_ref (&self) -> &Viewnode {
     self }}
 
-impl AsMut<ViewNode> for ViewNode {
-  fn as_mut (&mut self) -> &mut ViewNode {
+impl AsMut<Viewnode> for Viewnode {
+  fn as_mut (&mut self) -> &mut Viewnode {
     self }}
 
-impl ViewNode {
+impl Viewnode {
   /// Consume every save-only `(editRequest ...)` carried by this occurrence.
   /// Call only after the save has committed: failed saves and confirmation
   /// round-trips must leave requests in the user's buffer. `view_requests` are
@@ -756,21 +756,21 @@ impl ViewNode {
     &mut self,
   ) {
     match &mut self . kind {
-      ViewNodeKind::Vognode (Vognode::Active (active)) => {
+      ViewnodeKind::Vognode (Vognode::Active (active)) => {
         active . relRepo_request = None;
         if let Editability::Definitive { edit_request, .. } =
           &mut active . editability
         { *edit_request = None; }},
-      ViewNodeKind::Phantom (Phantom::Unknown (unknown)) =>
+      ViewnodeKind::Phantom (Phantom::Unknown (unknown)) =>
         unknown . relRepo_request = None,
-      ViewNodeKind::Qual (Qual::Alias { relRepo_request, .. }) =>
+      ViewnodeKind::Property (Property::Alias { relRepo_request, .. }) =>
         *relRepo_request = None,
       _ => {}, }}
 
   pub fn normal_to_phantom (
     &mut self,
   ) {
-    if let ViewNodeKind::Vognode (Vognode::Active (t))
+    if let ViewnodeKind::Vognode (Vognode::Active (t))
       = &self . kind
       { if t . should_be_diffPhantom ()
         { // A phantom is ALWAYS write-protected and renders no body (Jeff's
@@ -784,62 +784,62 @@ impl ViewNode {
           // write-protected by construction.
           let phantom : PhantomDiff =
             PhantomDiff::from_activeNode ( t . clone () );
-          self . kind = ViewNodeKind::Phantom (
+          self . kind = ViewnodeKind::Phantom (
             Phantom::Diff (phantom)); }}}
 
   pub fn title (&self) -> &str {
     match &self . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t)) => &t . title,
-      ViewNodeKind::Phantom (Phantom::Diff (p)) => &p . title,
-      ViewNodeKind::Phantom (Phantom::Deleted (d)) =>
+      ViewnodeKind::Vognode (Vognode::Active (t)) => &t . title,
+      ViewnodeKind::Phantom (Phantom::Diff (p)) => &p . title,
+      ViewnodeKind::Phantom (Phantom::Deleted (d)) =>
         &d . title,
-      ViewNodeKind::Qual (q) =>
+      ViewnodeKind::Property (q) =>
         q . title (),
-      ViewNodeKind::QualFolder (folder) => folder . title (),
-      ViewNodeKind::PartnerFolder (_)
-        | ViewNodeKind::BufferRoot
-        | ViewNodeKind::DeadScaffold
-        | ViewNodeKind::Phantom (Phantom::Unknown (_))
-        | ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
+      ViewnodeKind::PropertyFolder (folder) => folder . title (),
+      ViewnodeKind::PartnerFolder (_)
+        | ViewnodeKind::BufferRoot
+        | ViewnodeKind::DeadViewnode
+        | ViewnodeKind::Phantom (Phantom::Unknown (_))
+        | ViewnodeKind::Vognode (Vognode::Inactive (_)) =>
         "",
     }}
 
-  /// Reasonable for both ActiveNodes and Scaffolds.
+  /// Reasonable for both ActiveNodes and Non-vognodes.
   pub fn body (&self) -> Option < &String > {
     match &self . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t)) => t . body (),
-      ViewNodeKind::Phantom (Phantom::Diff (p)) => p . body (),
-      ViewNodeKind::Phantom (Phantom::Deleted (d)) => d . body . as_ref (),
-      ViewNodeKind::QualFolder (folder) => folder . body (),
-      ViewNodeKind::Qual (qual) => qual . body (),
-      ViewNodeKind::Phantom (Phantom::Unknown (_))
-        | ViewNodeKind::Vognode (Vognode::Inactive (_))
-        | ViewNodeKind::PartnerFolder (_)
-        | ViewNodeKind::BufferRoot
-        | ViewNodeKind::DeadScaffold => None,
+      ViewnodeKind::Vognode (Vognode::Active (t)) => t . body (),
+      ViewnodeKind::Phantom (Phantom::Diff (p)) => p . body (),
+      ViewnodeKind::Phantom (Phantom::Deleted (d)) => d . body . as_ref (),
+      ViewnodeKind::PropertyFolder (folder) => folder . body (),
+      ViewnodeKind::Property (property) => property . body (),
+      ViewnodeKind::Phantom (Phantom::Unknown (_))
+        | ViewnodeKind::Vognode (Vognode::Inactive (_))
+        | ViewnodeKind::PartnerFolder (_)
+        | ViewnodeKind::BufferRoot
+        | ViewnodeKind::DeadViewnode => None,
     }}
 
   pub fn is_activeNode_and_affectsParent_true (&self) -> bool {
     match &self . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t)) =>
+      ViewnodeKind::Vognode (Vognode::Active (t)) =>
         t . affectsParent == AffectsParent::True,
       _ => false,
     }}
 
   pub fn id_if_vognode (&self) -> Option<&ID> {
     match &self . kind {
-      ViewNodeKind::Vognode (v) => v . id (),
+      ViewnodeKind::Vognode (v) => v . id (),
       _ => None,
     }}
 
   /// The id of an Active vognode or a Diff phantom -- the two ActiveNode-ish kinds,
   /// which before the Vognode/Phantom split both lived in Vognode and were
   /// reached by `Vognode::normal_or_phantom_id`. None for everything else
-  /// (Inactive, Deleted/Unknown phantoms, folders, scaffolds, BufferRoot).
+  /// (Inactive, Deleted/Unknown phantoms, folders, non-vognodes, BufferRoot).
   pub fn active_or_diff_phantom_id (&self) -> Option<&ID> {
     match &self . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t)) => Some (&t . id),
-      ViewNodeKind::Phantom (Phantom::Diff (p))   => Some (&p . id),
+      ViewnodeKind::Vognode (Vognode::Active (t)) => Some (&t . id),
+      ViewnodeKind::Phantom (Phantom::Diff (p))   => Some (&p . id),
       _ => None,
     }}
 }
@@ -897,9 +897,9 @@ impl Default for GraphNodeStats {
       rels      : None,
     }} }
 
-impl Default for ViewNodeStats {
+impl Default for ViewnodeStats {
   fn default () -> Self {
-    ViewNodeStats {
+    ViewnodeStats {
       cycle             : false,
       homeRepoAtBoundary  : false,
       rel_heralds       : None,
@@ -926,7 +926,7 @@ pub fn default_activeNode (
     affectsParent       : AffectsParent::True,
     birth          : Birth::Unremarkable,
     graphStats     : GraphNodeStats::default(),
-    viewStats      : ViewNodeStats::default(),
+    viewStats      : ViewnodeStats::default(),
     relRepo_request : None,
     view_requests  : HashSet::new(),
     node_axes      : NodeAxes::default(),
@@ -937,7 +937,7 @@ pub fn default_activeNode (
       edit_request : None },
   }}
 
-/// Create a write-protected phantom ViewNode with the given diff axes.
+/// Create a write-protected phantom Viewnode with the given diff axes.
 /// At least one relationship axis or the unstaged-node axis should be
 /// negative for this to be a real phantom; callers must ensure that.
 pub fn mk_phantom_viewnode (
@@ -946,13 +946,13 @@ pub fn mk_phantom_viewnode (
   title      : String,
   node_axes  : NodeAxes,
   relationship_axes : RelationshipAxes,
-) -> ViewNode {
-  let mut viewnode : ViewNode =
+) -> Viewnode {
+  let mut viewnode : Viewnode =
     mk_writeProtected_viewnode ( id, repo, title, AffectsParent::True );
-  if let ViewNodeKind::Vognode (Vognode::Active (mut t)) = viewnode . kind
+  if let ViewnodeKind::Vognode (Vognode::Active (mut t)) = viewnode . kind
     { t . node_axes  = node_axes;
       t . relationship_axes = relationship_axes;
-      viewnode . kind = ViewNodeKind::Phantom (
+      viewnode . kind = ViewnodeKind::Phantom (
         Phantom::Diff ( PhantomDiff::from_activeNode (t) )); }
   else
     // mk_writeProtected_viewnode always yields an Active vognode; if that ever
@@ -966,7 +966,7 @@ pub fn mk_definitive_viewnode (
   repo : RepoName,
   title  : String,
   body   : Option < String >,
-) -> ViewNode { mk_viewnode ( id,
+) -> Viewnode { mk_viewnode ( id,
                             repo,
                             title,
                             AffectsParent::True,
@@ -982,12 +982,12 @@ pub fn mk_definitive_viewnode (
 /// rather than aborting the whole BFS expansion.
 pub fn mk_unknown_viewnode (
   id : ID,
-) -> ViewNode {
-  ViewNode {
+) -> Viewnode {
+  Viewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind        : ViewNodeKind::Phantom (
+    kind        : ViewnodeKind::Phantom (
       Phantom::Unknown ( PhantomUnknown {
         id,
         relRepo         : None,
@@ -996,23 +996,23 @@ pub fn mk_unknown_viewnode (
   }}
 
 pub fn mk_inactive_viewnode (
-) -> ViewNode {
-  ViewNode {
+) -> Viewnode {
+  Viewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind        : ViewNodeKind::Vognode (
+    kind        : ViewnodeKind::Vognode (
       Vognode::Inactive ( InactiveNode ) ),
   }}
 
-/// Create a write-protected ViewNode from disk data.
+/// Create a write-protected Viewnode from disk data.
 /// Body is always None since write-protected nodes don't have editable content.
 pub fn mk_writeProtected_viewnode (
   id     : ID,
   repo : RepoName,
   title  : String,
   affectsParent  : AffectsParent,
-) -> ViewNode {
+) -> Viewnode {
   mk_writeProtected_viewnode_with_birth (
     id, repo, title, affectsParent, Birth::Unremarkable ) }
 
@@ -1022,7 +1022,7 @@ pub fn mk_writeProtected_viewnode_with_birth (
   title    : String,
   affectsParent : AffectsParent,
   birth    : Birth,
-) -> ViewNode { mk_viewnode ( id,
+) -> Viewnode { mk_viewnode ( id,
                             repo,
                             title,
                             affectsParent,
@@ -1030,16 +1030,16 @@ pub fn mk_writeProtected_viewnode_with_birth (
                             Editability::WriteProtected,
                             HashSet::new ( )) } // view_requests
 
-/// Convert a definitive ViewNode to write-protected.
+/// Convert a definitive Viewnode to write-protected.
 /// Discards body and edit_request.
 /// Errors if the input is not an ActiveNode.
 pub fn mk_writeProtected_from_viewnode (
-  mut viewnode : ViewNode,
+  mut viewnode : Viewnode,
   affectsParent    : AffectsParent,
   birth       : Birth,
-) -> Result < ViewNode, String > {
+) -> Result < Viewnode, String > {
   match &mut viewnode . kind {
-    ViewNodeKind::Vognode (Vognode::Active (t)) => {
+    ViewnodeKind::Vognode (Vognode::Active (t)) => {
       // Mutate in place, so that every field not named here
       // (view_requests, diff axes, graphStats, viewStats, and any
       // field added later) is preserved rather than silently reset.
@@ -1048,7 +1048,7 @@ pub fn mk_writeProtected_from_viewnode (
       t . editability = // discards body and edit_request
         Editability::WriteProtected;
       Ok (viewnode) },
-    ViewNodeKind::Phantom (Phantom::Diff (p)) =>
+    ViewnodeKind::Phantom (Phantom::Diff (p)) =>
       // A phantom carries none of the fields preserved above,
       // so it is rebuilt rather than mutated.
       Ok ( mk_writeProtected_viewnode_with_birth (
@@ -1058,10 +1058,10 @@ pub fn mk_writeProtected_from_viewnode (
       "mk_writeProtected_from_viewnode: expected ActiveNode"
         . to_string () ) }}
 
-/// Create a ViewNode with *nearly* full metadata control.
-/// The exception is that the 'GraphNodeStats' and 'ViewNodeStats' are intentionally omitted,
+/// Create a Viewnode with *nearly* full metadata control.
+/// The exception is that the 'GraphNodeStats' and 'ViewnodeStats' are intentionally omitted,
 /// because it would be difficult and dangerous to set that in isolation,
-/// without considering the rest of the ViewNode tree.
+/// without considering the rest of the Viewnode tree.
 pub fn mk_viewnode (
   id            : ID,
   repo        : RepoName,
@@ -1070,11 +1070,11 @@ pub fn mk_viewnode (
   birth         : Birth,
   editability  : Editability,
   view_requests : HashSet < ViewRequest >,
-) -> ViewNode {
-  ViewNode { focused     : false,
+) -> Viewnode {
+  Viewnode { focused     : false,
              folded      : false,
              body_folded : false,
-             kind        : ViewNodeKind::Vognode (
+             kind        : ViewnodeKind::Vognode (
                Vognode::Active (
                  ActiveNode { affectsParent,
                             birth,
@@ -1083,13 +1083,13 @@ pub fn mk_viewnode (
                             .. default_activeNode (
                               id, repo, title ) } ) ) }}
 
-/// Helper to create a BufferRoot ViewNode.
-pub fn viewforest_root_viewnode () -> ViewNode {
-  ViewNode {
+/// Helper to create a BufferRoot Viewnode.
+pub fn viewforest_root_viewnode () -> Viewnode {
+  Viewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind        : ViewNodeKind::BufferRoot,
+    kind        : ViewnodeKind::BufferRoot,
   }}
 
 #[cfg(test)]

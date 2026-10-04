@@ -11,7 +11,7 @@ use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::update_buffer::reconcile::partner_folder::push_repair_warnings;
 use crate::update_buffer::util::fold_members_of_newborn_folder;
 use crate::update_buffer::warnings::CompletionWarning;
-use crate::types::viewnode::{ViewNode, PartnerFolder};
+use crate::types::viewnode::{Viewnode, PartnerFolder};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::{HashMap, HashSet};
@@ -29,7 +29,7 @@ struct HiddenOutsideContext {
 ///
 /// Tree structure:
 ///   Subscriber (ActiveNode)                       <- ancestor 2
-///     └─ SubscribeeFolder (Scaffold)               <- ancestor 1 = parent
+///     └─ SubscribeeFolder (Non-vognode)               <- ancestor 1 = parent
 ///          ├─ Subscribee_A (ActiveNode)           <- sibling
 ///          ├─ Subscribee_B (ActiveNode)           <- sibling
 ///          └─ HiddenOutsideOfSubscribeeFolder      <- self
@@ -39,7 +39,7 @@ struct HiddenOutsideContext {
 /// but that are NOT top-level content of any subscribee.
 pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
   node                           : NodeId,
-  tree                           : &mut Tree<ViewNode>,
+  tree                           : &mut Tree<Viewnode>,
   repo_diffs                   : &Option<HashMap<RepoName, RepoDiff>>,
   runtime                        : &RuntimeGeneration,
   deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
@@ -115,7 +115,7 @@ pub fn reconcile_hiddenoutsideSubscribeeFolder_children (
   Ok(( )) }
 
 fn read_hiddenoutside_context (
-  tree               : &Tree<ViewNode>,
+  tree               : &Tree<Viewnode>,
   node               : NodeId,
   kind               : PartnerFolder,
   runtime            : &RuntimeGeneration,

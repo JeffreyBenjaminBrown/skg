@@ -53,7 +53,7 @@ So far there are these endpoints:
   - Phase 1, immediate: Server sends LP =((response-type
     search-results) (content "ORG") (warnings ("..." ...)))=.
     Results are ordinary write-protected non-content TrueNodes (not
-    special scaffold types). A no-match or error response has the same
+    special non-vognode types). A no-match or error response has the same
     response type and a single =content= field.
 
   - Phase 2, enrichment: A three-message sequence:
@@ -788,7 +788,7 @@ Each relation side is =(in COUNT (ancestors GEN...))= or
 =(out COUNT (ancestors GEN...))=. Empty sides are generally omitted;
 =COUNT= is the complete distinct visible node count even when ancestor
 flags let the client omit its numeral. Generation 1 is the visible parent,
-2 the grandparent, counting scaffold levels. Relation keys are =contains=,
+2 the grandparent, counting non-vognode levels. Relation keys are =contains=,
 =links_to=, =subscribes=, =overrides=, and =hides=. The =links_to=
 incoming side adds =(substantive COUNT (ancestors GEN...))= for the subset
 whose Skg repo has a nonempty body, visible direct content, or more than one
@@ -1086,8 +1086,8 @@ and right before another whitespace and the node's title.
 The metadata grammar (which keys are recognized and how they're
 parsed) lives in =server/serve/parse_metadata_sexp.rs=. The
 in-memory types those keys correspond to are in
-=server/types/viewnode.rs= (=TrueNode=, =ViewNodeKind=, =QualFolder=,
-=Qual=, =PartnerFolder=)
+=server/types/viewnode.rs= (=TrueNode=, =ViewnodeKind=, =PropertyFolder=,
+=Property=, =PartnerFolder=)
 and =server/types/git.rs= (=NodeAxes=, =RelationshipAxes=, =Sign=).
 
 Metadata is not WYSIWYG; its appearance in the client
@@ -1095,9 +1095,9 @@ is determined by =elisp/heralds-minor-mode=, whose rule table is
 served by Rust (see "Herald rules" above; the table lives in
 =server/heralds.rs=).
 
-PartnerFolder scaffolds are represented in Rust as
-=ViewNodeKind::PartnerFolder (PartnerFolder)=, but their external metadata
-remains the established bare scaffold atom:
+PartnerFolders are represented in Rust as
+=ViewnodeKind::PartnerFolder (PartnerFolder)=, but their external metadata
+remains the established bare non-vognode atom:
 =subscribeeFolder=, =subscriberFolder=, =overriddenFolder=, =overriderFolder=,
 =hiderFolder=, =hiddenFolder=, =hiddenInSubscribeeFolder=, or
 =hiddenOutsideOfSubscribeeFolder=.
@@ -1105,7 +1105,7 @@ remains the established bare scaffold atom:
 ** Diff-related metadata
 
 When git diff mode is on, additional keys decorate nodes and
-scaffolds with per-stage diff information. The 'staged' stage
+non-vognodes with per-stage diff information. The 'staged' stage
 compares HEAD to the index; 'unstaged' compares the index to the
 worktree.
 
@@ -1133,12 +1133,12 @@ still renders in diff mode, holding only phantoms. Phantoms define
 nothing: saving a buffer ignores them, and a writable folder's phantom
 is never collected as a member.
 
-At top level inside =(skg ...)= (Scaffolds for Alias / ID):
+At top level inside =(skg ...)= (Non-vognodes for Alias / ID):
 - =(staged AXES)= and/or =(unstaged AXES)= with =AXES= drawn only
-  from ={addedR, removedR}= (scaffolds have no =.skg= file of their
+  from ={addedR, removedR}= (non-vognodes have no =.skg= file of their
   own and so no N axis).
 
-Also at top level, for the TextChanged scaffold:
+Also at top level, for the TextChanged property:
 - =(textChanged STAGE_TAGS)= where =STAGE_TAGS= is a subset of
   ={staged, unstaged}= indicating which side(s) the node's title or
   body changed on.

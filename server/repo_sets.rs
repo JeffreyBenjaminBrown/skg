@@ -6,7 +6,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, RepoName, TantivyIndex};
 pub use crate::types::misc::RepoSetName;
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, mk_inactive_viewnode};
+use crate::types::viewnode::{Viewnode, ViewnodeKind, mk_inactive_viewnode};
 use crate::types::viewnode::{Vognode, Phantom};
 use crate::test_utils::cleanup_test_tantivy;
 
@@ -110,7 +110,7 @@ pub fn filter_branches_to_active_repos_for_test (
   Ok (result) }
 
 pub fn apply_repo_set_to_viewforest (
-  viewforest : &mut Tree<ViewNode>,
+  viewforest : &mut Tree<Viewnode>,
   active     : &ActiveRepoSet,
 ) {
   if active . is_all () {
@@ -125,10 +125,10 @@ pub fn apply_repo_set_to_viewforest (
       let Some (n) = viewforest . get (id) else { continue; }; // already detached with an ancestor
       let has_children : bool = n . has_children ();
       match &n . value () . kind {
-        ViewNodeKind::Vognode (Vognode::Active (t))
+        ViewnodeKind::Vognode (Vognode::Active (t))
           if ! active . contains_repo (&t . home_repo)
           => Some ( Treatment::Convert ),
-        ViewNodeKind::Phantom (Phantom::Diff (p))
+        ViewnodeKind::Phantom (Phantom::Diff (p))
           if ! active . contains_repo (&p . home_repo)
           // TODO/full-schema/9-2_repo-set-safety.org (interim,
           // until diff mode and restricted sets refuse to combine):
@@ -142,12 +142,12 @@ pub fn apply_repo_set_to_viewforest (
     match treatment {
       None => {},
       Some (Treatment::Convert) => {
-        let mut node_mut : NodeMut<ViewNode> =
+        let mut node_mut : NodeMut<Viewnode> =
           viewforest . get_mut (id) . unwrap ();
         node_mut . value () . kind =
           mk_inactive_viewnode () . kind; },
       Some (Treatment::Detach) => {
-        let mut node_mut : NodeMut<ViewNode> =
+        let mut node_mut : NodeMut<Viewnode> =
           viewforest . get_mut (id) . unwrap ();
         node_mut . detach (); }, }}}
 

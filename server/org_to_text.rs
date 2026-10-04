@@ -3,7 +3,7 @@ use crate::types::git::RelationshipAxes;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
-  ViewNode, ViewNodeKind, Vognode, Phantom, Qual, QualFolder, ActiveNode, PhantomDiff,
+  Viewnode, ViewnodeKind, Vognode, Phantom, Property, PropertyFolder, ActiveNode, PhantomDiff,
   PhantomDeleted, PhantomUnknown, NodeEditRequest, GraphNodeStats,
   AffectsParent,
 };
@@ -27,28 +27,28 @@ pub(crate) fn metadata_value_atom (
 pub trait ViewForestRenderRoots {
   fn render_roots<'a> (
     &'a self,
-  ) -> Result<Box<dyn Iterator<Item = NodeRef<'a, ViewNode>> + 'a>,
+  ) -> Result<Box<dyn Iterator<Item = NodeRef<'a, Viewnode>> + 'a>,
               Box<dyn Error>>;
 }
 
 impl ViewForestRenderRoots for ViewForest {
   fn render_roots<'a> (
     &'a self,
-  ) -> Result<Box<dyn Iterator<Item = NodeRef<'a, ViewNode>> + 'a>,
+  ) -> Result<Box<dyn Iterator<Item = NodeRef<'a, Viewnode>> + 'a>,
               Box<dyn Error>> {
     Ok (Box::new (self . roots ())) }
 }
 
-impl ViewForestRenderRoots for Tree<ViewNode> {
+impl ViewForestRenderRoots for Tree<Viewnode> {
   fn render_roots<'a> (
     &'a self,
-  ) -> Result<Box<dyn Iterator<Item = NodeRef<'a, ViewNode>> + 'a>,
+  ) -> Result<Box<dyn Iterator<Item = NodeRef<'a, Viewnode>> + 'a>,
               Box<dyn Error>> {
-    let root_ref : NodeRef<ViewNode> = self . root ();
+    let root_ref : NodeRef<Viewnode> = self . root ();
     let is_viewforest_root : bool =
       matches! (
         & root_ref . value () . kind,
-        ViewNodeKind::BufferRoot);
+        ViewnodeKind::BufferRoot);
     if ! is_viewforest_root {
       return Err (
         "viewforest_to_string: root is not a BufferRoot" . into() ); }
@@ -66,14 +66,14 @@ where R : ViewForestRenderRoots + ?Sized {
 /// Compatibility helper for callers that still hold the old
 /// single-tree representation with an internal BufferRoot.
 pub fn viewforest_tree_to_string (
-  viewforest : &Tree<ViewNode>,
+  viewforest : &Tree<Viewnode>,
   config : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
-  let root_ref : NodeRef<ViewNode> = viewforest . root ();
+  let root_ref : NodeRef<Viewnode> = viewforest . root ();
   let is_viewforest_root : bool =
     matches! (
       & root_ref . value () . kind,
-      ViewNodeKind::BufferRoot);
+      ViewnodeKind::BufferRoot);
   if ! is_viewforest_root {
     return Err (
       "viewforest_tree_to_string: root is not a BufferRoot" . into() ); }
@@ -81,15 +81,15 @@ pub fn viewforest_tree_to_string (
     root_ref . children (), config ) }
 
 fn render_view_roots_to_string <'a> (
-  roots  : impl Iterator<Item = NodeRef<'a, ViewNode>>,
+  roots  : impl Iterator<Item = NodeRef<'a, Viewnode>>,
   config : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   fn render_node_subtree_to_org (
-    node_ref : NodeRef < ViewNode >,
+    node_ref : NodeRef < Viewnode >,
     level    : usize,
     config   : &SkgConfig,
   ) -> Result < String, Box<dyn Error> > {
-    let viewnode : &ViewNode = node_ref . value ();
+    let viewnode : &Viewnode = node_ref . value ();
     let mut out : String =
       viewnode_to_text ( level, viewnode, config )?;
     for child in node_ref . children () {
@@ -106,12 +106,12 @@ fn render_view_roots_to_string <'a> (
       & render_node_subtree_to_org ( child, 1, config )? ); }
   Ok (result) }
 
-/// Renders an ViewNode as org-mode formatted text.
+/// Renders an Viewnode as org-mode formatted text.
 /// Not recursive -- just stars, metadata, title, and maybe a body.
 /// ERRORS: If viewnode is a BufferRoot.
 pub fn viewnode_to_text (
   level    : usize,
-  viewnode : &ViewNode,
+  viewnode : &Viewnode,
   config   : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   let metadata_str : String =
@@ -143,45 +143,45 @@ pub fn viewnode_to_text (
   Ok (result) }
 
 pub fn viewnode_to_string (
-  viewnode : &ViewNode,
+  viewnode : &Viewnode,
   config   : &SkgConfig,
 ) -> Result < String, Box<dyn Error> > {
   match &viewnode . kind {
-    ViewNodeKind::QualFolder (folder) =>
-      qualFolder_metadata_to_string (
+    ViewnodeKind::PropertyFolder (folder) =>
+      propertyFolder_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, folder ),
-    ViewNodeKind::Qual (qual) =>
-      qual_metadata_to_string (
+    ViewnodeKind::Property (property) =>
+      property_metadata_to_string (
         viewnode . focused, viewnode . folded,
-        viewnode . body_folded, qual ),
-    ViewNodeKind::PartnerFolder (partnerFolder) =>
+        viewnode . body_folded, property ),
+    ViewnodeKind::PartnerFolder (partnerFolder) =>
       Ok ( non_vognode_atom_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, partnerFolder . repr_in_client () ) ),
-    ViewNodeKind::BufferRoot =>
+    ViewnodeKind::BufferRoot =>
       Err ( "viewnode_to_string: BufferRoot should never be rendered" . into () ),
-    ViewNodeKind::DeadScaffold =>
-      Ok ( deleted_scaff_metadata_to_string (
+    ViewnodeKind::DeadViewnode =>
+      Ok ( dead_viewnode_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded )),
-    ViewNodeKind::Vognode (Vognode::Active (activeNode)) =>
+    ViewnodeKind::Vognode (Vognode::Active (activeNode)) =>
       Ok ( activeNode_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, activeNode, config )),
-    ViewNodeKind::Phantom (Phantom::Diff (phantom)) =>
+    ViewnodeKind::Phantom (Phantom::Diff (phantom)) =>
       Ok ( phantomDiff_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, phantom, config )),
-    ViewNodeKind::Phantom (Phantom::Deleted (deleted_node)) =>
+    ViewnodeKind::Phantom (Phantom::Deleted (deleted_node)) =>
       Ok ( phantomDeleted_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, deleted_node )),
-    ViewNodeKind::Phantom (Phantom::Unknown (unknown_node)) =>
+    ViewnodeKind::Phantom (Phantom::Unknown (unknown_node)) =>
       Ok ( phantomUnknown_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, unknown_node )),
-    ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
+    ViewnodeKind::Vognode (Vognode::Inactive (_)) =>
       Ok ( inactive_node_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded )) } }
@@ -199,27 +199,27 @@ fn non_vognode_atom_metadata_to_string (
   parts . push (atom . to_string ());
   parts . join (" ") }
 
-fn qualFolder_metadata_to_string (
+fn propertyFolder_metadata_to_string (
   focused     : bool,
   folded      : bool,
   body_folded : bool,
-  folder         : &QualFolder,
+  folder         : &PropertyFolder,
 ) -> Result < String, Box<dyn Error> > {
   Ok ( non_vognode_atom_metadata_to_string (
     focused, folded, body_folded, folder . repr_in_client () ) ) }
 
-fn qual_metadata_to_string (
+fn property_metadata_to_string (
   focused     : bool,
   folded      : bool,
   body_folded : bool,
-  qual        : &Qual,
+  property        : &Property,
 ) -> Result < String, Box<dyn Error> > {
   let mut parts : Vec < String > = Vec::new ();
   if focused     { parts . push ( "focused"    . to_string () ); }
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  match qual {
-    Qual::Alias { relRepo, relRepo_request, relationship_axes, .. } => {
+  match property {
+    Property::Alias { relRepo, relRepo_request, relationship_axes, .. } => {
       parts . push ( "alias" . to_string () );
       if let Some (repo) = relRepo {
         parts . push ( format! (
@@ -229,7 +229,7 @@ fn qual_metadata_to_string (
           "(editRequest (relRepo {}))",
           metadata_value_atom (repo) ) ); }
       append_relationship_axes_stage_forms (&mut parts, relationship_axes); }
-    Qual::TextChanged { staged, unstaged } => {
+    Property::TextChanged { staged, unstaged } => {
       let mut tags : Vec<&'static str> = Vec::new ();
       if *staged   { tags . push ("staged"); }
       if *unstaged { tags . push ("unstaged"); }
@@ -237,10 +237,10 @@ fn qual_metadata_to_string (
       { parts . push ( "textChanged" . to_string () ); }
       else
       { parts . push ( format! ( "(textChanged {})", tags . join (" ") )); } }
-    Qual::ID { relationship_axes, .. } => {
+    Property::ID { relationship_axes, .. } => {
       parts . push ( "id" . to_string () );
       append_relationship_axes_stage_forms (&mut parts, relationship_axes); }
-    Qual::Flag { flag, .. } =>
+    Property::Flag { flag, .. } =>
       parts . push ( format! ("(flag {})", flag . wire_name ()) ),
   }
   Ok ( parts . join (" ")) }
@@ -478,7 +478,7 @@ fn phantomUnknown_metadata_to_string (
   parts . join (" ") }
 
 /// Render an inactive placeholder as the bare atom 'inactiveNode',
-/// like the other dataless scaffold markers (aliasFolder, subscribeeFolder,
+/// like the other dataless non-vognode markers (aliasFolder, subscribeeFolder,
 /// ...). It carries no id/repo/etc. -- those describe content the
 /// user hid by restricting the repo-set, so emitting them would leak
 /// (see InactiveNode).
@@ -494,9 +494,9 @@ fn inactive_node_metadata_to_string (
   parts . push ( "inactiveNode" . to_string () );
   parts . join (" ") }
 
-/// Render metadata for a DeletedScaff:
-///   (skg [focused] [folded] (deletedScaffold kindString))
-fn deleted_scaff_metadata_to_string (
+/// Render metadata for a DeadViewnode:
+///   (skg [focused] [folded] deadViewnode)
+fn dead_viewnode_metadata_to_string (
   focused     : bool,
   folded      : bool,
   body_folded : bool,
@@ -505,7 +505,7 @@ fn deleted_scaff_metadata_to_string (
   if focused     { parts . push ( "focused"    . to_string () ); }
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
-  parts . push ( "(deletedScaffold deadScaffold)" . to_string () );
+  parts . push ( "deadViewnode" . to_string () );
   parts . join (" ") }
 
 /// The relationship-herald atom for a phantom: counts-only semantic

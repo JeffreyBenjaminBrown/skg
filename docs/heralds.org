@@ -52,7 +52,7 @@ The =O= letter keeps its usual purple or birth style.
 ** Ancestors and birth
 
 Lowercase flags name tracked ancestors: =a= is the visible parent,
-=b= the grandparent, and so on, counting folder scaffolds too. After
+=b= the grandparent, and so on, counting folders too. After
 =z=, a generation appears as ={27}=, ={28}=, etc. An =a= is muted
 yellow; =b= and higher are orange. =aC= says the parent
 contains this node; =Ca= says this node contains its parent. =Oa=

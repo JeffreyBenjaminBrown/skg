@@ -342,7 +342,7 @@ or nil when REPO is nil or names no configured repo."
 (defconst skg--relRepo-unsupported-folder-atoms
   '(subscriberFolder overriderFolder hiderFolder hiddenFolder
     hiddenInSubscribeeFolder hiddenOutsideOfSubscribeeFolder)
-  "The PartnerFolder scaffold atoms where an explicit relRepo
+  "The PartnerFolder atoms where an explicit relRepo
 request is unsupported from this side.  HiddenOutside membership is
 editable as a derived filter, but hide repos are still derived and
 cannot carry this request.
@@ -353,7 +353,7 @@ be meaningless.")
 (defconst skg--writable-folder-relations
   '((subscribeeFolder . "subscribes_to")
     (overriddenFolder . "overrides_view_of"))
-  "The PartnerFolder scaffold atoms whose members' edges are WRITABLE
+  "The PartnerFolder atoms whose members' edges are WRITABLE
 from this side, each mapped to its relation's wire name
 (NodeRelation::relation_name, server/dbs/in_rust_graph/
 relation_accessors.rs). The folder's org-parent (the anchor) owns the
@@ -456,7 +456,7 @@ member of a write-protected folder, or with an ID missing."
                    (eq (caar values) 'relRepo))))))
 
 (defun skg--alias-headline-p ()
-  "Return non-nil when point is on an alias scaffold headline."
+  "Return non-nil when point is on an alias property headline."
   (and (org-at-heading-p)
        (let ((metadata (skg--metadata-sexp-at-point-or-nil)))
          (and metadata (memq 'alias (cdr metadata))))))
@@ -582,7 +582,7 @@ its view-parent counts when it matches) and recurses only on
 viewchildren that affect their viewparents: affectsParent=true
 activeNodes and writable folders. It prunes below write-protected nodes
 and subscribee-as-such members (their org-children's edges are not
-collected at save), and prunes write-protected folders and other scaffolds
+collected at save), and prunes write-protected folders and other non-vognodes
 entirely.
 
 Like other metadata edits, this only modifies the buffer; it does
@@ -685,7 +685,7 @@ to its view-parent is of KIND (`contained', `subscribee' or
 where edits still affect the graph: it prunes below write-protected
 nodes and subscribee-as-such members, prunes non-true
 (affectsParent=false) nodes -- except the walk's root, which the
-user chose deliberately -- and prunes scaffolds other than the two
+user chose deliberately -- and prunes non-vognodes other than the two
 writable folders. Returns the number of edges true."
   (let ((targets (skg--relRepo-recursive-targets kind)))
     ;; Do not let a late conflict leave earlier targets edited.  This
@@ -759,11 +759,11 @@ the matching writable folder with a definitive anchor."
                     (and (eq kind 'contained)
                          (not (skg--node-write-protected-p parent-sexp))
                          (not (skg--subscribee-as-such-at-point-p))))
-                   ((skg--scaffold-atom-present-p parent-sexp
+                   ((skg--non-vognode-atom-present-p parent-sexp
                                                   'subscribeeFolder)
                     (and (eq kind 'subscribee)
                          (skg--folder-anchor-definitive-p)))
-                   ((skg--scaffold-atom-present-p parent-sexp
+                   ((skg--non-vognode-atom-present-p parent-sexp
                                                   'overriddenFolder)
                     (and (eq kind 'overridden)
                          (skg--folder-anchor-definitive-p)))
@@ -786,7 +786,7 @@ position: an true activeNode member of a subscribeeFolder."
          (skg--node-affectsParent-content-of-p meta)
          (save-excursion
            (and (org-up-heading-safe)
-                (skg--scaffold-atom-present-p
+                (skg--non-vognode-atom-present-p
                  (skg--metadata-sexp-at-point-or-nil)
                  'subscribeeFolder))))))
 
@@ -801,13 +801,13 @@ atoms on their members have no effect."
            (and (skg--activeNode-sexp-p anchor-sexp)
                 (not (skg--node-write-protected-p anchor-sexp)))))))
 
-(defun skg--scaffold-atom-present-p (metadata-sexp atom)
+(defun skg--non-vognode-atom-present-p (metadata-sexp atom)
   "Non-nil iff METADATA-SEXP is a (skg ...) sexp carrying the bare ATOM."
   (and (consp metadata-sexp)
        (memq atom (cdr metadata-sexp))))
 
 (defun skg--writable-folder-sexp-p (metadata-sexp)
-  "Non-nil iff METADATA-SEXP is a writable-folder scaffold's metadata:
+  "Non-nil iff METADATA-SEXP is a writable-folder's metadata:
 it carries one of the `skg--writable-folder-relations' atoms."
   (and (consp metadata-sexp)
        (seq-find (lambda (entry)

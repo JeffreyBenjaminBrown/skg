@@ -29,7 +29,7 @@ use skg::test_utils::{graph_handle_from_config, run_with_shared_test_stores};
 use skg::to_org::util::mark_view_roots_parent_na;
 use skg::types::misc::{ID, SkgConfig, RepoName};
 use skg::types::tree::forest::ViewForest;
-use skg::types::viewnode::{Birth, ViewNode, ViewNodeKind, Vognode};
+use skg::types::viewnode::{Birth, Viewnode, ViewnodeKind, Vognode};
 use skg::update_buffer::graphnodestats::set_metadata_relationships_in_node_recursive;
 use skg::update_buffer::set_viewnodestats_in_viewforest;
 
@@ -184,15 +184,15 @@ fn override_relatives_graft_as_descendants (
     build_search_viewforest ( "cooking", &matches, &HashSet::new () );
   insert_overrideward_view_subtrees (
     &mut viewforest, graph, &results, active );
-  let tree : Tree<ViewNode> = viewforest . into_internal_tree ();
-  let u : NodeRef<ViewNode> =
+  let tree : Tree<Viewnode> = viewforest . into_internal_tree ();
+  let u : NodeRef<Viewnode> =
     find_result_root ( &tree, "U" ) . expect ("U is a result root");
-  let f : NodeRef<ViewNode> =
+  let f : NodeRef<Viewnode> =
     find_child ( u, "F" )
     . expect ("F (the node U overrides) should be grafted under U");
   assert! ( is_overriddenward_graft (f),
     "F should carry the OVERRIDDEN backpath role under U" );
-  let g : NodeRef<ViewNode> =
+  let g : NodeRef<Viewnode> =
     find_child ( f, "G" )
     . expect ("G (the node F overrides) should be grafted under F");
   assert! ( is_overriddenward_graft (g),
@@ -203,30 +203,30 @@ fn override_relatives_graft_as_descendants (
   Ok (( )) }
 
 fn find_result_root<'a> (
-  tree : &'a Tree<ViewNode>,
+  tree : &'a Tree<Viewnode>,
   id   : &str,
-) -> Option<NodeRef<'a, ViewNode>> {
+) -> Option<NodeRef<'a, Viewnode>> {
   tree . root () . children ()
     . find ( |c| active_id_is (*c, id) ) }
 
 fn find_child<'a> (
-  parent : NodeRef<'a, ViewNode>,
+  parent : NodeRef<'a, Viewnode>,
   id     : &str,
-) -> Option<NodeRef<'a, ViewNode>> {
+) -> Option<NodeRef<'a, Viewnode>> {
   parent . children () . find ( |c| active_id_is (*c, id) ) }
 
 fn active_id_is (
-  node : NodeRef<ViewNode>,
+  node : NodeRef<Viewnode>,
   id   : &str,
 ) -> bool {
   matches! ( &node . value () . kind,
-    ViewNodeKind::Vognode (Vognode::Active (t))
+    ViewnodeKind::Vognode (Vognode::Active (t))
       if t . id == ID::from (id) ) }
 
 fn is_overriddenward_graft (
-  node : NodeRef<ViewNode>,
+  node : NodeRef<Viewnode>,
 ) -> bool {
   matches! ( &node . value () . kind,
-    ViewNodeKind::Vognode (Vognode::Active (t))
+    ViewnodeKind::Vognode (Vognode::Active (t))
       if matches! ( &t . birth,
         Birth::Backpath (r) if r . rolename () == "overridden" ) ) }

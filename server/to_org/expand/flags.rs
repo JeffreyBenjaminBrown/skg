@@ -5,15 +5,15 @@ use crate::types::misc::{ID, SkgConfig};
 use crate::types::nodes::complete::{
   Flag, NodeComplete, flag_is_true};
 use crate::types::tree::viewnode_nodecomplete::{
-  insert_scaffold_as_child, unique_scaffold_child_of_viewnode};
+  insert_non_vognode_as_child, unique_non_vognode_child_of_viewnode};
 use crate::types::viewnode::{
-  Qual, QualFolder, ViewNode, ViewNodeKind, ViewRequest};
+  Property, PropertyFolder, Viewnode, ViewnodeKind, ViewRequest};
 
 use ego_tree::Tree;
 use std::error::Error;
 
 pub fn build_and_integrate_flags_then_drop_request (
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   node_id : ego_tree::NodeId,
   graph   : &InRustGraph,
   config  : &SkgConfig,
@@ -29,26 +29,26 @@ pub fn build_and_integrate_flags_then_drop_request (
 /// Add the write-protected folder of true flags.  The folder itself is
 /// useful even when empty, so it is always created and preserved.
 pub fn build_and_integrate_flags (
-  tree     : &mut Tree<ViewNode>,
+  tree     : &mut Tree<Viewnode>,
   node_id  : ego_tree::NodeId,
   graph    : &InRustGraph,
   _config  : &SkgConfig,
 ) -> Result<(), Box<dyn Error>> {
-  if unique_scaffold_child_of_viewnode (
+  if unique_non_vognode_child_of_viewnode (
     tree, node_id,
-    &ViewNodeKind::QualFolder (QualFolder::flags ())) ? . is_some ()
+    &ViewnodeKind::PropertyFolder (PropertyFolder::flags ())) ? . is_some ()
   { return Ok (()); }
   let pid : ID = get_id_from_treenode (tree, node_id) ?;
   let node : Option<NodeComplete> = nodecomplete_from_graph (graph, &pid);
-  let folder : ego_tree::NodeId = insert_scaffold_as_child (
+  let folder : ego_tree::NodeId = insert_non_vognode_as_child (
     tree, node_id,
-    ViewNodeKind::QualFolder (QualFolder::flags ()), false ) ?;
+    ViewnodeKind::PropertyFolder (PropertyFolder::flags ()), false ) ?;
   if let Some (node) = node {
     for flag in Flag::ALL {
       if flag_is_true (&node . misc, flag) {
-        insert_scaffold_as_child (
+        insert_non_vognode_as_child (
           tree, folder,
-          ViewNodeKind::Qual (Qual::Flag {
+          ViewnodeKind::Property (Property::Flag {
             flag,
             title : String::new (),
             body  : None, }),
@@ -98,7 +98,7 @@ mod tests {
     let folder = tree . get (root) . unwrap () . children () . next () . unwrap ();
     let viewnodes : Vec<(Flag, String)> = folder . children ()
       . map (|child| match &child . value () . kind {
-        ViewNodeKind::Qual (Qual::Flag { flag, title, .. }) =>
+        ViewnodeKind::Property (Property::Flag { flag, title, .. }) =>
           (*flag, title . clone ()),
         other => panic! ("unexpected viewnode: {:?}", other), })
       . collect ();
@@ -114,7 +114,7 @@ mod tests {
     let empty_folder = empty_tree . get (empty_root) . unwrap ()
       . children () . next () . unwrap ();
     assert! (matches! (&empty_folder . value () . kind,
-      ViewNodeKind::QualFolder (QualFolder::Flags { .. })));
+      ViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. })));
     assert_eq! (empty_folder . children () . count (), 0);
   }
 

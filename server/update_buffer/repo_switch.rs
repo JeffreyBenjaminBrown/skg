@@ -4,12 +4,12 @@
 /// InactiveNode, then prune (DFS postorder, so emptied parents prune
 /// in the same sweep) every:
 /// - InactiveNode leaf;
-/// - Qual leaf whose owning gnode (grandparent) is inactive;
+/// - Property leaf whose owning gnode (grandparent) is inactive;
 /// - write-protected leaf partner (child of a PartnerFolder), active or
 ///   inactive: a write-protected partner defines nothing, and
 ///   completion regenerates current membership afterward;
-/// - empty QualFolder or PartnerFolder;
-/// - DeadScaffold leaf.
+/// - empty PropertyFolder or PartnerFolder;
+/// - DeadViewnode leaf.
 /// What survives includes active nodes, inactive nodes with
 /// surviving children (the retained case), and definitive partners
 /// (the user may be mid-edit inside them).  Completion (run with folder
@@ -18,7 +18,7 @@
 
 use crate::repo_sets::ActiveRepoSet;
 use crate::types::viewnode::{
-  mk_inactive_viewnode, PartnerFolder, QualFolder, ViewNode, ViewNodeKind,
+  mk_inactive_viewnode, PartnerFolder, PropertyFolder, Viewnode, ViewnodeKind,
   Vognode };
 use crate::update_buffer::util::subtree_satisfies;
 
@@ -26,7 +26,7 @@ use ego_tree::{NodeId, NodeRef, Tree};
 use std::error::Error;
 
 pub fn convert_and_prune_for_repo_switch (
-  tree   : &mut Tree<ViewNode>,
+  tree   : &mut Tree<Viewnode>,
   active : &ActiveRepoSet,
 ) -> Result<(), Box<dyn Error>> {
   convert_now_inactive_actives (tree, active);
@@ -35,7 +35,7 @@ pub fn convert_and_prune_for_repo_switch (
   Ok (( )) }
 
 fn convert_now_inactive_actives (
-  tree   : &mut Tree<ViewNode>,
+  tree   : &mut Tree<Viewnode>,
   active : &ActiveRepoSet,
 ) {
   if active . is_all () { return; }
@@ -44,10 +44,10 @@ fn convert_now_inactive_actives (
     . map ( |n| n . id () )
     . collect ();
   for id in ids {
-    let conversion : Option<ViewNodeKind> =
+    let conversion : Option<ViewnodeKind> =
       tree . get (id)
       . and_then ( |n| match &n . value () . kind {
-          ViewNodeKind::Vognode (Vognode::Active (t))
+          ViewnodeKind::Vognode (Vognode::Active (t))
             if ! active . contains_repo (&t . home_repo)
             => Some ( mk_inactive_viewnode () . kind ),
           _ => None } );
@@ -58,9 +58,9 @@ fn convert_now_inactive_actives (
 /// itself should be detached (the parent's loop detaches it, so the
 /// forest root is never detached).  If a detached subtree contained
 /// the focused node, focus transfers to 'node' (the surviving
-/// parent), mirroring 'detach_scaffold_transferring_focus'.
+/// parent), mirroring 'detach_viewnode_transferring_focus'.
 fn prune_children_postorder (
-  tree : &mut Tree<ViewNode>,
+  tree : &mut Tree<Viewnode>,
   node : NodeId,
 ) -> Result<bool, Box<dyn Error>> {
   let child_ids : Vec<NodeId> =
@@ -71,7 +71,7 @@ fn prune_children_postorder (
     if prune_children_postorder (tree, child) ? {
       let had_focus : bool =
         subtree_satisfies (
-          tree, child, &|vn : &ViewNode| vn . focused ) ?;
+          tree, child, &|vn : &Viewnode| vn . focused ) ?;
       if had_focus {
         tree . get_mut (node) . unwrap ()
           . value () . focused = true; }
@@ -79,10 +79,10 @@ fn prune_children_postorder (
   should_prune (tree, node) }
 
 fn should_prune (
-  tree : &Tree<ViewNode>,
+  tree : &Tree<Viewnode>,
   node : NodeId,
 ) -> Result<bool, Box<dyn Error>> {
-  let node_ref : NodeRef<ViewNode> =
+  let node_ref : NodeRef<Viewnode> =
     tree . get (node)
     . ok_or ("should_prune: node not found") ?;
   let is_leaf : bool =
@@ -90,37 +90,37 @@ fn should_prune (
   let affects_parent_partnerFolder : bool =
     node_ref . parent ()
     . map ( |p| matches! ( &p . value () . kind,
-                           ViewNodeKind::PartnerFolder (_) ))
+                           ViewnodeKind::PartnerFolder (_) ))
     . unwrap_or (false);
   let grandaffects_parent_inactive : bool =
     node_ref . parent ()
     . and_then ( |p| p . parent () )
     . map ( |gp| matches! ( &gp . value () . kind,
-                            ViewNodeKind::Vognode (Vognode::Inactive (_)) ))
+                            ViewnodeKind::Vognode (Vognode::Inactive (_)) ))
     . unwrap_or (false);
   Ok ( match &node_ref . value () . kind {
-    ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
+    ViewnodeKind::Vognode (Vognode::Inactive (_)) =>
       is_leaf,
-    ViewNodeKind::Qual (_) =>
+    ViewnodeKind::Property (_) =>
       is_leaf && grandaffects_parent_inactive,
-    ViewNodeKind::Vognode (Vognode::Active (t)) =>
+    ViewnodeKind::Vognode (Vognode::Active (t)) =>
       is_leaf && affects_parent_partnerFolder && t . is_writeProtected (),
-    ViewNodeKind::QualFolder (QualFolder::ID)
-      | ViewNodeKind::QualFolder (QualFolder::Alias)
-      | ViewNodeKind::QualFolder (QualFolder::Flags { .. })
-      | ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee)
-      | ViewNodeKind::PartnerFolder (PartnerFolder::Subscriber)
-      | ViewNodeKind::PartnerFolder (PartnerFolder::Overridden)
-      | ViewNodeKind::PartnerFolder (PartnerFolder::Overrider)
-      | ViewNodeKind::PartnerFolder (PartnerFolder::Hider)
-      | ViewNodeKind::PartnerFolder (PartnerFolder::Hidden)
-      | ViewNodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)
-      | ViewNodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
+    ViewnodeKind::PropertyFolder (PropertyFolder::ID)
+      | ViewnodeKind::PropertyFolder (PropertyFolder::Alias)
+      | ViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. })
+      | ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)
+      | ViewnodeKind::PartnerFolder (PartnerFolder::Subscriber)
+      | ViewnodeKind::PartnerFolder (PartnerFolder::Overridden)
+      | ViewnodeKind::PartnerFolder (PartnerFolder::Overrider)
+      | ViewnodeKind::PartnerFolder (PartnerFolder::Hider)
+      | ViewnodeKind::PartnerFolder (PartnerFolder::Hidden)
+      | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)
+      | ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) =>
       is_leaf, // empty folder (children, if any, were pruned first)
-    ViewNodeKind::DeadScaffold =>
+    ViewnodeKind::DeadViewnode =>
       is_leaf,
-    ViewNodeKind::Phantom (_)
-      | ViewNodeKind::BufferRoot =>
+    ViewnodeKind::Phantom (_)
+      | ViewnodeKind::BufferRoot =>
       false, } ) }
 
 #[cfg(test)]

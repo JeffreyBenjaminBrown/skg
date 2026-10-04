@@ -177,12 +177,12 @@ etc.
 
 **** Some extremely technical details
 
-It is the =ViewNodeKind::PartnerFolder= variant and the payload
-type of the same name.  “Folder” here describes an org scaffold that groups
+It is the =ViewnodeKind::PartnerFolder= variant and the payload
+type of the same name.  “Folder” here describes an org non-vognode that groups
 viewnodes; it does not mean a filesystem directory.  “Role col”, “relation
 col”, and bare “sharing col” are retired names for the general concept.
 
-There are eight PartnerFolders, named by their external scaffold atom:
+There are eight PartnerFolders, named by their external non-vognode atom:
 
 - writable: =subscribeeFolder=, =overriddenFolder=;
 - write-protected inbound: =subscriberFolder=, =overriderFolder=, =hiderFolder=,
@@ -419,11 +419,11 @@ rewritten to 'Independent', and have no effect on N.
 The user could delete R, but it will respawn as soon as they save,
 because, again, the subscriberFolder is a write-protected set.
 
-*** scaffold
+*** non-vognode
 
 A view of a graph consists of viewnodes.
 Some of these correspond to individual graphnodes.
-The rest are "scaffolds".
+The rest are "non-vognodes".
 
 *** title != headline
 
@@ -441,7 +441,7 @@ decluttering, not privacy.
 
 *** flags folder and Flag
 
-=flagsFolder= is a generated, write-protected scaffold under a graphnode. Its
+=flagsFolder= is a generated, write-protected non-vognode under a graphnode. Its
 =(flag FLAG)= leaves list the node's true flags in canonical
 order. Each leaf is titleless because its herald supplies the visible label.
 The folder stays visible when empty. Edits within a retained folder are

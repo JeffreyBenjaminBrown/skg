@@ -9,9 +9,9 @@ use crate::types::phantom::phantom_axes;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::types::misc::{ID, RelPartner, RepoName};
 use crate::types::tree::generic::{read_at_node_in_tree, with_node_mut};
-use crate::types::tree::viewnode_nodecomplete::{ unique_scaffold_child_of_viewnode, insert_scaffold_as_child};
+use crate::types::tree::viewnode_nodecomplete::{ unique_non_vognode_child_of_viewnode, insert_non_vognode_as_child};
 use crate::update_buffer::ancestry::required_ancestor;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, PartnerFolder};
+use crate::types::viewnode::{ Viewnode, ViewnodeKind, PartnerFolder};
 use crate::types::viewnode::Vognode;
 use crate::update_buffer::util::move_child_to_end;
 
@@ -38,7 +38,7 @@ struct SubscribeeFolderContext {
 /// - Ensure HiddenOutsideOfSubscribeeFolder exists and is last.
 pub fn reconcile_subscribeeFolder_children (
   node                           : NodeId,
-  tree                           : &mut Tree<ViewNode>,
+  tree                           : &mut Tree<Viewnode>,
   repo_diffs                   : &Option<HashMap<RepoName, RepoDiff>>,
   runtime                        : &RuntimeGeneration,
   deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
@@ -119,7 +119,7 @@ pub fn reconcile_subscribeeFolder_children (
   Ok(( )) }
 
 fn read_subscribeeFolder_context (
-  tree               : &Tree<ViewNode>,
+  tree               : &Tree<Viewnode>,
   node               : NodeId,
   runtime            : &RuntimeGeneration,
   active_repo_set  : Option<&ActiveRepoSet>,
@@ -134,8 +134,8 @@ fn read_subscribeeFolder_context (
     : (ID, RepoName)
     = read_at_node_in_tree(
       tree, subscriber,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Active (t))
+      |vn : &Viewnode| match &vn . kind {
+        ViewnodeKind::Vognode (Vognode::Active (t))
           => Some(( t . id . clone(),
                     t . home_repo . clone() )),
         _ => None } )
@@ -174,20 +174,20 @@ fn read_subscribeeFolder_context (
     relRepos }) }
 
 fn ensure_hiddenOutsideOfSubscribeeFolder_is_last (
-  tree : &mut Tree<ViewNode>,
+  tree : &mut Tree<Viewnode>,
   node : NodeId,
 ) -> Result<(), Box<dyn Error>> {
   let hidden_outside : Option<NodeId> =
-    unique_scaffold_child_of_viewnode(
+    unique_non_vognode_child_of_viewnode(
       tree, node,
-      &ViewNodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) ) ?;
+      &ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee) ) ?;
   match hidden_outside {
     Some (child) => { move_child_to_end( tree, node, child ) ?; },
     None => {
       let new_folder : NodeId =
-        insert_scaffold_as_child(
+        insert_non_vognode_as_child(
           tree, node,
-          ViewNodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee),
+          ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee),
           false ) ?;
       with_node_mut ( tree, new_folder,
         |mut n| {

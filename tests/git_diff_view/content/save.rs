@@ -350,7 +350,7 @@ async fn test_diff_mode_added_subscribee_shows_addedR (
 /// phantom should report '(staged deletedN removedR)' instead of
 /// '(unstaged deletedN removedR)' -- guards phantom_axes' per-stage
 /// attribution on the save-rerender path, mirroring
-/// ids::save::test_delete_id_folder_scaffold_respawns_staged.
+/// ids::save::test_delete_id_folder_respawns_staged.
 async fn test_delete_removed_node_respawns_staged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>

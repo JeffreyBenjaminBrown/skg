@@ -12,7 +12,7 @@ use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::util::setlike_vector_subtraction;
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, PhantomDeleted, Editability,
+    Viewnode, ViewnodeKind, PhantomDeleted, Editability,
     AffectsParent, ViewRequest, mk_definitive_viewnode};
 use crate::types::viewnode::{Vognode, Phantom, PartnerFolder};
 use crate::types::tree::generic::{error_unless_node_satisfies, pid_and_repo_from_ancestor, read_at_ancestor_in_tree, read_at_node_in_tree, write_at_node_in_tree};
@@ -66,11 +66,11 @@ struct ChildData {
 /// - `cascade`: this node is Final (DVR-made); per TODO/DONE/local-view-update/plan_v2.org §5.3 it hands a
 ///   ViewRequest::Definitive to each of its affected content children so the
 ///   BFS draws each Final (clobbering competing Tentative occurrences).
-/// - `node_budget`: the TODO/DONE/local-view-update/plan_v2.org §5.5 remaining budget of new ViewNodes; content-child
+/// - `node_budget`: the TODO/DONE/local-view-update/plan_v2.org §5.5 remaining budget of new Viewnodes; content-child
 ///   creation is capped against it.
 pub fn expand_true_content_at_activeNode (
   node               : NodeId,
-  tree               : &mut Tree<ViewNode>,
+  tree               : &mut Tree<Viewnode>,
   defmap             : &mut DefinitiveMap,
   config             : &SkgConfig,
   graph_snap                     : &Arc<InRustGraph>,
@@ -87,8 +87,8 @@ pub fn expand_true_content_at_activeNode (
   // real content nodes.
   error_unless_node_satisfies(
     tree, node,
-    |vn : &ViewNode| matches!( &vn . kind,
-                                ViewNodeKind::Vognode (Vognode::Active (_))),
+    |vn : &Viewnode| matches!( &vn . kind,
+                                ViewnodeKind::Vognode (Vognode::Active (_))),
     "expand_true_content_at_activeNode: expected Active vognode" ) ?;
   if ! settled {
     // A DVR node was already resolved by apply_definitive_draw_rule; running
@@ -100,12 +100,12 @@ pub fn expand_true_content_at_activeNode (
     pid_and_repo_from_treenode( tree, node,
                                   "expand_true_content_at_activeNode" ) ?;
   // This content path produces the pure worktree view; the node's git diff
-  // (axes, phantom flip, diff scaffolds) is applied by process_activeNode_diff at
+  // (axes, phantom flip, diff-only properties) is applied by process_activeNode_diff at
   // the end of the node's BFS visit (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3).
   { let is_writeProtected : bool =
       read_at_node_in_tree( tree, node,
-        |vn : &ViewNode| match &vn . kind {
-          ViewNodeKind::Vognode (Vognode::Active (t))
+        |vn : &Viewnode| match &vn . kind {
+          ViewnodeKind::Vognode (Vognode::Active (t))
             => t . is_writeProtected (),
           _ => false } ) ?;
     if is_writeProtected {
@@ -134,24 +134,24 @@ pub fn expand_true_content_at_activeNode (
     substitute_existing_content_overrides ) ?;
   if cascade {
     attach_cascade_dvrs_to_affected_content( tree, node ) ?; }
-  order_children_as_scaffolds_then_ignored_then_content(
+  order_children_as_non_vognodes_then_ignored_then_content(
     tree, node ) ?;
   Ok(( )) }
 
 /// TODO/DONE/local-view-update/plan_v2.org §5.3 cascade: hand a ViewRequest::Definitive to each affected,
 /// non-phantom Active content child of a Final node -- new and existing
 /// alike -- so the main BFS draws each Final (and it in turn cascades to its
-/// own content). The cascade does *not* flow through scaffolds, so only
+/// own content). The cascade does *not* flow through non-vognodes, so only
 /// affectsParent=true content children receive it.
 fn attach_cascade_dvrs_to_affected_content (
-  tree : &mut Tree<ViewNode>,
+  tree : &mut Tree<Viewnode>,
   node : NodeId,
 ) -> Result<(), Box<dyn Error>> {
   let child_ids : Vec<NodeId> =
     tree . get (node) . unwrap ()
     . children ()
     . filter ( |c| matches!( &c . value () . kind,
-        ViewNodeKind::Vognode (Vognode::Active (t))
+        ViewnodeKind::Vognode (Vognode::Active (t))
           if t . affectsParent == AffectsParent::True
              && ! t . should_be_diffPhantom () ) )
     . map ( |c| c . id () )
@@ -168,7 +168,7 @@ fn attach_cascade_dvrs_to_affected_content (
 /// alike -- after extraction the snapshot already holds the saved buffer's text,
 /// so the saved node re-syncs to the same content it just defined.
 fn sync_activeNode_from_disk (
-  tree         : &mut Tree<ViewNode>,
+  tree         : &mut Tree<Viewnode>,
   node         : NodeId,
   nodecomplete : &NodeComplete,
 ) -> Result<(), Box<dyn Error>> {
@@ -188,7 +188,7 @@ fn sync_activeNode_from_disk (
 /// children against it, and mark any surviving non-goal children
 /// as AffectsParent::False.
 fn reconcile_content_children (
-  tree                           : &mut Tree<ViewNode>,
+  tree                           : &mut Tree<Viewnode>,
   node                           : NodeId,
   nodecomplete                   : &NodeComplete,
   config                         : &SkgConfig,
@@ -292,7 +292,7 @@ fn reconcile_content_children (
 /// folds), while its `overridesHere` marker keeps the parent's membership
 /// attached to the original ID on the next save.
 fn replace_raw_content_children_with_visible_overriders (
-  tree                 : &mut Tree<ViewNode>,
+  tree                 : &mut Tree<Viewnode>,
   node                 : NodeId,
   config               : &SkgConfig,
   graph_snap           : &Arc<InRustGraph>,
@@ -305,7 +305,7 @@ fn replace_raw_content_children_with_visible_overriders (
       . ok_or ("replace_raw_content_children_with_visible_overriders: node not found") ?;
     let mut result : Vec<(NodeId, ID, NodeComplete)> = Vec::new ();
     for child in node_ref . children () {
-      let ViewNodeKind::Vognode (Vognode::Active (active)) =
+      let ViewnodeKind::Vognode (Vognode::Active (active)) =
         &child . value () . kind else { continue; };
       if active . affectsParent != AffectsParent::True
          || active . viewStats . overridesHere . is_some ()
@@ -341,13 +341,13 @@ fn replace_raw_content_children_with_visible_overriders (
 
 /// TODO/DONE/local-view-update/plan_v2.org §6.5: an Unknown content placeholder (a dangling reference the parent kept
 /// rather than failing the whole view) that is *no longer a member* of the
-/// parent's contains converts to a DeadScaffold; the TODO/DONE/local-view-update/plan_v2.org §3.4 postorder prune sweep
+/// parent's contains converts to a DeadViewnode; the TODO/DONE/local-view-update/plan_v2.org §3.4 postorder prune sweep
 /// then removes it. An Unknown still in contains is retained (a present-but-
 /// unresolvable reference). Self-deletion is the sweep's job -- this only
 /// decides member-vs-convert, so a Dead -> Unknown -> Dead chain collapses in
 /// one sweep.
 fn convert_nonmember_unknown_children_to_dead (
-  tree       : &mut Tree<ViewNode>,
+  tree       : &mut Tree<Viewnode>,
   node       : NodeId,
   member_ids : &[ID],
 ) -> Result<(), Box<dyn Error>> {
@@ -355,29 +355,29 @@ fn convert_nonmember_unknown_children_to_dead (
     member_ids . iter () . cloned () . collect ();
   treat_certain_children(
     tree, node,
-    |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::Phantom (Phantom::Unknown (u)) =>
+    |vn : &Viewnode| match &vn . kind {
+      ViewnodeKind::Phantom (Phantom::Unknown (u)) =>
         ! member_set . contains (&u . id),
       _ => false },
-    |vn : &mut ViewNode| { vn . kind = ViewNodeKind::DeadScaffold; },
+    |vn : &mut Viewnode| { vn . kind = ViewnodeKind::DeadViewnode; },
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
 pub(in crate::update_buffer) fn mutate_activeNode_to_deletednode (
-  tree   : &mut Tree<ViewNode>,
+  tree   : &mut Tree<Viewnode>,
   node   : NodeId,
   pid    : &ID,
   repo : &RepoName,
 ) -> Result<(), Box<dyn Error>> {
   let (title, body) : (String, Option<String>) =
     read_at_node_in_tree ( tree, node,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Active (t))
+      |vn : &Viewnode| match &vn . kind {
+        ViewnodeKind::Vognode (Vognode::Active (t))
           => ( t . title . clone(),
                t . body () . cloned() ),
         _ => ( String::new(), None ) } ) ?;
   write_at_node_in_tree ( tree, node,
-    |vn : &mut ViewNode| {
-      vn . kind = ViewNodeKind::Phantom (
+    |vn : &mut Viewnode| {
+      vn . kind = ViewnodeKind::Phantom (
         Phantom::Deleted ( PhantomDeleted {
         id     : pid . clone(),
         home_repo : repo . clone(),
@@ -401,7 +401,7 @@ pub(in crate::update_buffer) fn mutate_activeNode_to_deletednode (
 ///   raw original, so it is excluded (its children substitute as
 ///   usual).
 fn is_overridden_drawn_raw (
-  tree       : &Tree<ViewNode>,
+  tree       : &Tree<Viewnode>,
   node       : NodeId,
   config     : &SkgConfig,
   graph_snap : &Arc<InRustGraph>,
@@ -409,8 +409,8 @@ fn is_overridden_drawn_raw (
   let in_raw_position : bool = {
     let affects_parent_raw_drawing_folder : bool =
       read_at_ancestor_in_tree( tree, node, 1,
-        |vn : &ViewNode| match &vn . kind {
-          ViewNodeKind::PartnerFolder (pc)
+        |vn : &Viewnode| match &vn . kind {
+          ViewnodeKind::PartnerFolder (pc)
             => ! matches!( pc, PartnerFolder::Subscribee ),
           _ => false } )
       . unwrap_or (false);
@@ -419,15 +419,15 @@ fn is_overridden_drawn_raw (
       // sentinel; its 'affectsParent == Absent' is stamped only later, at
       // render.
       read_at_ancestor_in_tree( tree, node, 1,
-        |vn : &ViewNode| matches!( &vn . kind,
-          ViewNodeKind::BufferRoot ))
+        |vn : &Viewnode| matches!( &vn . kind,
+          ViewnodeKind::BufferRoot ))
       . unwrap_or (false);
     affects_parent_raw_drawing_folder || is_view_root };
   if ! in_raw_position { return Ok (false); }
   let (id, has_marker) : (Option<ID>, bool) =
     read_at_node_in_tree( tree, node,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Active (t))
+      |vn : &Viewnode| match &vn . kind {
+        ViewnodeKind::Vognode (Vognode::Active (t))
           => ( Some (t . id . clone ()),
                t . viewStats . overridesHere . is_some () ),
         _ => ( None, false ) } ) ?;
@@ -440,19 +440,19 @@ fn is_overridden_drawn_raw (
 /// Whether this node claims affectsParent=true
 /// and is a child of SubscribeeFolder (and not a phantom).
 fn is_subscribee (
-  tree : &Tree<ViewNode>,
+  tree : &Tree<Viewnode>,
   node : NodeId,
 ) -> Result<bool, Box<dyn Error>> {
   let is_member_of_parent : bool =
     read_at_node_in_tree( tree, node,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Active (t))
+      |vn : &Viewnode| match &vn . kind {
+        ViewnodeKind::Vognode (Vognode::Active (t))
           => t . affectsParent == AffectsParent::True,
         _ => false } ) ?;
   let affects_parent_subscribeeFolder : bool =
     read_at_ancestor_in_tree( tree, node, 1,
-      |vn : &ViewNode| matches!( &vn . kind,
-        ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee)))
+      |vn : &Viewnode| matches!( &vn . kind,
+        ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)))
     . unwrap_or (false);
   Ok( is_member_of_parent && affects_parent_subscribeeFolder ) }
 
@@ -471,7 +471,7 @@ fn is_subscribee (
 /// visit (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3), so the main content path produces only the pure
 /// worktree view.
 fn content_goal_list (
-  tree               : &Tree<ViewNode>,
+  tree               : &Tree<Viewnode>,
   node               : NodeId,
   content_ids        : &[ID],
   is_subscribee      : bool,
@@ -542,9 +542,9 @@ pub fn unintegrated_content_ids (
 /// Reconcile the node's non-parentIgnored ActiveNode children
 /// against the goal list (content IDs, possibly interleaved with
 /// phantom IDs in diff view). Missing children are created as
-/// write-protected ViewNodes or phantom ViewNodes as appropriate.
+/// write-protected Viewnodes or phantom Viewnodes as appropriate.
 fn complete_content_children (
-  tree               : &mut Tree<ViewNode>,
+  tree               : &mut Tree<Viewnode>,
   node               : NodeId,
   goal_list          : &[ID],
   relRepos : &HashMap<ID, RepoName>,
@@ -568,13 +568,13 @@ fn complete_content_children (
   // folder, so its reconciliation is not a "repair" to warn about.
   complete_relevant_children_in_viewnodetree(
     tree, node,
-    |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t))
+    |vn : &Viewnode| match &vn . kind {
+      ViewnodeKind::Vognode (Vognode::Active (t))
         => t . affectsParent == AffectsParent::True,
-      ViewNodeKind::Phantom (Phantom::Diff (_))
+      ViewnodeKind::Phantom (Phantom::Diff (_))
         // Existing phantoms are reordered or replaced, not duplicated.
         => true,
-      ViewNodeKind::Phantom (Phantom::Unknown (_))
+      ViewnodeKind::Phantom (Phantom::Unknown (_))
         // An Unknown is a real raw relationship member.  Match it by
         // its raw ID so a rerender retains one placeholder rather than
         // appending another one for the same dangling edge.
@@ -585,17 +585,17 @@ fn complete_content_children (
       // omits every inactive member (omit_inactive_members), so it is
       // never created here either.
       _ => false },
-    |vn : &ViewNode| match &vn . kind {
+    |vn : &Viewnode| match &vn . kind {
       // Active, Diff-phantom, and Unknown children participate. COLLECTED
       // ids (the overridesHere original when present), so goal lists
       // stay in original IDs, an existing drawn substitute satisfies
       // its original goal member, and only genuinely missing members
       // are created -- which keeps post-save rerendering stable.
-      ViewNodeKind::Vognode (Vognode::Active (t))
+      ViewnodeKind::Vognode (Vognode::Active (t))
         => Ok ( t . collected_id () ),
-      ViewNodeKind::Phantom (Phantom::Diff (p))
+      ViewnodeKind::Phantom (Phantom::Diff (p))
         => Ok ( p . id . clone() ),
-      ViewNodeKind::Phantom (Phantom::Unknown (u))
+      ViewnodeKind::Phantom (Phantom::Unknown (u))
         => Ok ( u . id . clone() ),
       _ => Err(
         "complete_content_children: relevant child had no content ID"
@@ -615,11 +615,11 @@ fn complete_content_children (
             Some (drawn) => {
               // Override substitution: draw the overrider, marked
               // with the original it stands for.
-              let mut vn : ViewNode =
+              let mut vn : Viewnode =
                 mk_definitive_viewnode(
                   drawn . clone(), d . home_repo . clone(),
                   d . title . clone(), d . body . clone() );
-              if let ViewNodeKind::Vognode (
+              if let ViewnodeKind::Vognode (
                 Vognode::Active (ref mut t)) = vn . kind
               { t . viewStats . overridesHere =
                   Some ( id . clone() ); }
@@ -627,8 +627,8 @@ fn complete_content_children (
         ContentReality::Inactive =>
           mk_inactive_viewnode (),
         ContentReality::Unknown => {
-          let mut unknown : ViewNode = mk_unknown_viewnode ( id . clone() );
-          if let ViewNodeKind::Phantom (Phantom::Unknown (u)) =
+          let mut unknown : Viewnode = mk_unknown_viewnode ( id . clone() );
+          if let ViewnodeKind::Phantom (Phantom::Unknown (u)) =
             &mut unknown . kind
           { u . relRepo = d . relRepo . clone ()
               . filter ( |repo| repo != owner_home ); }
@@ -644,7 +644,7 @@ fn complete_content_children (
 /// not a last-seen Deleted node.  Assigning only `kind` deliberately preserves
 /// the wrapper's focus and fold state.
 fn normalize_relationship_backed_content_unknowns (
-  tree                 : &mut Tree<ViewNode>,
+  tree                 : &mut Tree<Viewnode>,
   node                 : NodeId,
   goal_list            : &[ID],
   relRepos : &HashMap<ID, RepoName>,
@@ -654,8 +654,8 @@ fn normalize_relationship_backed_content_unknowns (
 ) -> Result<(), Box<dyn Error>> {
   treat_certain_children (
     tree, node,
-    |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::Vognode (Vognode::Active (active)) =>
+    |vn : &Viewnode| match &vn . kind {
+      ViewnodeKind::Vognode (Vognode::Active (active)) =>
         active . affectsParent == AffectsParent::True
         && graph_snap . pid_of (&active . collected_id ()) . is_none ()
         && goal_list . iter () . any (|raw_member|
@@ -664,9 +664,9 @@ fn normalize_relationship_backed_content_unknowns (
              . get (&active . collected_id ())
              . is_some_and (|extra_ids| extra_ids . contains (raw_member))),
       _ => false },
-    |vn : &mut ViewNode| {
+    |vn : &mut Viewnode| {
       let active_id : ID = match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Active (active)) =>
+        ViewnodeKind::Vognode (Vognode::Active (active)) =>
           active . collected_id (),
         _ => unreachable! (), };
       let id : ID = goal_list . iter () . find (|raw_member|
@@ -674,7 +674,7 @@ fn normalize_relationship_backed_content_unknowns (
         || deleted_by_this_save_extra_ids . get (&active_id)
            . is_some_and (|extra_ids| extra_ids . contains (*raw_member)))
         . expect ("normalization predicate found a raw member") . clone ();
-      vn . kind = ViewNodeKind::Phantom (Phantom::Unknown (
+      vn . kind = ViewnodeKind::Phantom (Phantom::Unknown (
         crate::types::viewnode::PhantomUnknown {
           relRepo: relRepos . get (&id) . cloned ()
             . filter (|repo| repo != owner_home),
@@ -695,7 +695,7 @@ fn normalize_relationship_backed_content_unknowns (
 /// placement, we would rewrite the phantom to `AffectsParent::False` and
 /// lose the information that the diff is about removed content.
 fn mark_erroneous_content_children_as_indep (
-  tree        : &mut Tree<ViewNode>,
+  tree        : &mut Tree<Viewnode>,
   node        : NodeId,
   content_ids : &[ID],
 ) -> Result<(), Box<dyn Error>> {
@@ -703,47 +703,47 @@ fn mark_erroneous_content_children_as_indep (
     content_ids . iter() . cloned() . collect();
   treat_certain_children(
     tree, node,
-    |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t)) =>
+    |vn : &Viewnode| match &vn . kind {
+      ViewnodeKind::Vognode (Vognode::Active (t)) =>
         t . affectsParent == AffectsParent::True
         // collected_id: a drawn substitute is a member via its
         // original, and must not be demoted to Independent.
         && !content_id_set . contains( &t . collected_id () )
         && !t . should_be_diffPhantom(), // see this function's docstring
       _ => false },
-    |vn : &mut ViewNode| {
-      if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
+    |vn : &mut Viewnode| {
+      if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
         = vn . kind
         { t . affectsParent = AffectsParent::False; }},
   ) . map_err( |e| -> Box<dyn Error> { e . into() } ) }
 
 /// Reorder children into three groups:
-/// - scaffolds first
+/// - non-vognodes first
 /// - parentIgnored ActiveNodes
 /// - non-ignored ActiveNodes last
 /// Preserves relative order within each group.
-fn order_children_as_scaffolds_then_ignored_then_content (
-  tree    : &mut Tree<ViewNode>,
+fn order_children_as_non_vognodes_then_ignored_then_content (
+  tree    : &mut Tree<Viewnode>,
   node : NodeId,
 ) -> Result<(), Box<dyn Error>> {
   let groups : HashMap<i32, Vec<NodeId>> =
     partition_children( tree, node,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::QualFolder (_)
-          | ViewNodeKind::Qual (_)
-          | ViewNodeKind::PartnerFolder (_)
-          | ViewNodeKind::BufferRoot
-          | ViewNodeKind::DeadScaffold                => 0,
-        ViewNodeKind::Vognode (Vognode::Active (t))
+      |vn : &Viewnode| match &vn . kind {
+        ViewnodeKind::PropertyFolder (_)
+          | ViewnodeKind::Property (_)
+          | ViewnodeKind::PartnerFolder (_)
+          | ViewnodeKind::BufferRoot
+          | ViewnodeKind::DeadViewnode                => 0,
+        ViewnodeKind::Vognode (Vognode::Active (t))
           if t . affectsParent != AffectsParent::True                  => 1,
-        ViewNodeKind::Phantom (Phantom::Diff (_))  => 2,
-        ViewNodeKind::Vognode (Vognode::Active (_))   => 2,
-        ViewNodeKind::Phantom (Phantom::Deleted (_))  => 2,
-        ViewNodeKind::Vognode (Vognode::Inactive (_)) => 2,
+        ViewnodeKind::Phantom (Phantom::Diff (_))  => 2,
+        ViewnodeKind::Vognode (Vognode::Active (_))   => 2,
+        ViewnodeKind::Phantom (Phantom::Deleted (_))  => 2,
+        ViewnodeKind::Vognode (Vognode::Inactive (_)) => 2,
         // PhantomUnknown is a content-position placeholder: order it
         // alongside the Deleted/True content children rather than as
-        // a scaffold.
-        ViewNodeKind::Phantom (Phantom::Unknown (_))  => 2,
+        // a non-vognode.
+        ViewnodeKind::Phantom (Phantom::Unknown (_))  => 2,
       } ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   let empty : Vec<NodeId> = Vec::new();
   for &cid in groups . get( &0 ) . unwrap_or (&empty) . iter()
@@ -765,7 +765,7 @@ fn order_children_as_scaffolds_then_ignored_then_content (
 /// and does not conflict with the &mut tree borrow
 /// in complete_relevant_children_in_viewnodetree.
 fn build_child_creation_data (
-  tree               : &Tree<ViewNode>,
+  tree               : &Tree<Viewnode>,
   node               : NodeId,
   goal_list          : &[ID],
   relRepos : &HashMap<ID, RepoName>,
@@ -776,7 +776,7 @@ fn build_child_creation_data (
   substitution_enabled : bool,
 ) -> Result<HashMap<ID, ChildData>, Box<dyn Error>> {
   let child_repos : HashMap<ID, RepoName> =
-    { let node_ref : NodeRef<ViewNode> =
+    { let node_ref : NodeRef<Viewnode> =
         tree . get (node)
           . ok_or ("build_child_creation_data: node not found") ?;
       let mut m : HashMap<ID, RepoName> = HashMap::new();
@@ -790,11 +790,11 @@ fn build_child_creation_data (
           // the create closure and child_data.get(id).expect(..) panics.
           // Keys are COLLECTED ids, matching the reconcile's orderkey:
           // an existing drawn substitute registers under its original.
-          ViewNodeKind::Vognode (Vognode::Active (t))
+          ViewnodeKind::Vognode (Vognode::Active (t))
             if t . affectsParent == AffectsParent::True
             => { m . insert( t . collected_id (),
                              t . home_repo . clone()); },
-          ViewNodeKind::Phantom (Phantom::Diff (p))
+          ViewnodeKind::Phantom (Phantom::Diff (p))
             => { m . insert( p . id . clone(),
                              p . home_repo . clone()); },
           // No Inactive arm: an inactive child is never a goal member

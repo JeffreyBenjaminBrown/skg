@@ -38,7 +38,7 @@ use validate::{validate_and_filter_foreign_instructions, validate_no_simultaneou
 
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{ViewNodeKind, Vognode, ViewRequest};
+use crate::types::viewnode::{ViewnodeKind, Vognode, ViewRequest};
 use std::collections::{HashMap, HashSet};
 use crate::types::misc::RepoName;
 use crate::types::save::ForkSpec;
@@ -377,7 +377,7 @@ fn explicit_fork_specs_from_viewforest (
   let mut errors : Vec<BufferValidationError> = Vec::new ();
   let mut seen   : HashSet<ID> = HashSet::new ();
   for node in viewforest . nodes () {
-    let ViewNodeKind::Vognode (Vognode::Active (t)) = & node . value () . kind
+    let ViewnodeKind::Vognode (Vognode::Active (t)) = & node . value () . kind
       else { continue; };
     if ! t . view_requests . contains (& ViewRequest::Fork) { continue; }
     let pid : &ID = & t . id;

@@ -6,7 +6,7 @@ use crate::dbs::in_rust_graph::override_resolution::{
 use crate::dbs::in_rust_graph::override_invariants::existing_user_owned_overrider_of;
 use crate::dbs::node_lookup::opt_nodecomplete_by_id;
 use crate::types::misc::{ID, SkgConfig};
-use crate::types::viewnode::{AffectsParent, Qual, QualFolder, ViewRequest};
+use crate::types::viewnode::{AffectsParent, Property, PropertyFolder, ViewRequest};
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 use crate::types::tree::forest::MpViewForest;
@@ -113,9 +113,9 @@ pub fn find_buffer_errors_for_saving (
 /// vision.org, via metaplan_2.org and
 /// TODO/full-schema/8_readonly-set-ergonomics.org): for each present
 /// idFolder whose parent is an ActiveNode with an ID, the multiset of ID
-/// scaffolds beneath it must equal the owner's real ID list (pid
+/// non-vognodes beneath it must equal the owner's real ID list (pid
 /// plus extra_ids). Reordering passes (the rerender re-sorts
-/// anyway); adding, deleting or text-editing an ID scaffold fails,
+/// anyway); adding, deleting or text-editing an ID property fails,
 /// with a message naming the escape hatch (edit the .skg file
 /// directly). In diff mode, an ID entry whose relationship axes mark
 /// it net-removed is git history, not a membership claim, and is
@@ -134,7 +134,7 @@ fn idFolder_membership_errors (
     let node_ref = match edge {
       Edge::Open (node_ref)
         if matches! ( &node_ref . value () . kind,
-                      MpViewnodeKind::QualFolder (QualFolder::ID) )
+                      MpViewnodeKind::PropertyFolder (PropertyFolder::ID) )
         => node_ref,
       _ => continue };
     let owner : ID =
@@ -148,7 +148,7 @@ fn idFolder_membership_errors (
     let mut buffer_ids : Vec<ID> =
       node_ref . children ()
       . filter_map ( |child| match &child . value () . kind {
-          MpViewnodeKind::Qual (Qual::ID { id, relationship_axes })
+          MpViewnodeKind::Property (Property::ID { id, relationship_axes })
             if relationship_axes . net_is_present ()
             => Some ( id . clone () ),
           _ => None } )
@@ -280,7 +280,7 @@ fn validate_view_roots (
 /// - The node is write-protected.
 /// - It has no content children (ActiveNode children with affectsParent ==
 ///   Container). Non-content children — containerward ancestry stubs,
-///   mentioners, scaffolds, etc. — don't block expansion:
+///   mentioners, non-vognodes, etc. — don't block expansion:
 ///   they won't be clobbered by it.
 /// - No other node with the same ID has a definitive view request,
 ///   because there can only be one definitive view.

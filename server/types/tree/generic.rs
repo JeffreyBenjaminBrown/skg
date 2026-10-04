@@ -1,26 +1,26 @@
 use crate::types::misc::{ID, RepoName};
-use crate::types::viewnode::{ViewNode, ViewNodeKind};
+use crate::types::viewnode::{Viewnode, ViewnodeKind};
 
 use ego_tree::{Tree, NodeId, NodeMut, NodeRef};
 use std::error::Error;
 
 /// ERRORS if the ancestor is not found or cannot provide both PID and repo.
 pub fn pid_and_repo_from_ancestor (
-  tree       : &Tree<ViewNode>,
+  tree       : &Tree<Viewnode>,
   node       : NodeId,
   generation : usize,
   caller     : &str,
 ) -> Result<(ID, RepoName), Box<dyn Error>> {
   read_at_ancestor_in_tree(
     tree, node, generation,
-    |vn : &ViewNode| match &vn . kind {
-      ViewNodeKind::Vognode (v) =>
+    |vn : &Viewnode| match &vn . kind {
+      ViewnodeKind::Vognode (v) =>
         v . pid_and_repo ()
         . map ( |(pid, repo)| (pid . clone (), repo . clone ()) )
         . ok_or_else (|| format!(
           "{}: ancestor {} has no repo",
           caller, generation )),
-      ViewNodeKind::Phantom (p) =>
+      ViewnodeKind::Phantom (p) =>
         p . pid_and_repo ()
         . map ( |(pid, repo)| (pid . clone (), repo . clone ()) )
         . ok_or_else (|| format!(
@@ -51,18 +51,18 @@ where F: FnOnce (&T) -> R, {
   Ok(f(node_ref . value() )) }
 
 /// Find the unique child that matches `target_kind`.
-pub fn unique_scaffold_child<T, F> (
+pub fn unique_non_vognode_child<T, F> (
   tree          : &Tree<T>,
   node_id       : NodeId,
-  target_kind   : &ViewNodeKind,
+  target_kind   : &ViewnodeKind,
   kind_from_node : F,
 ) -> Result<Option<NodeId>, String>
 where
-  F : for<'a> Fn (&'a T) -> Option<&'a ViewNodeKind>,
+  F : for<'a> Fn (&'a T) -> Option<&'a ViewnodeKind>,
 {
   let node_ref : NodeRef<T> =
     tree . get (node_id) . ok_or (
-      "unique_scaffold_child: node not found")?;
+      "unique_non_vognode_child: node not found")?;
   let matches : Vec<NodeId> =
     node_ref . children()
     . filter (|child|
@@ -164,7 +164,7 @@ where F: FnOnce(NodeMut<T>) -> R {
 /// ```ignore
 /// do_everywhere_in_tree_dfs(&mut tree, root_id, true, |mut node| {
 ///   if let Some(parent) = node.parent() {
-///     if matches!(parent.value(), ViewNode { kind: Scaff(AliasFolder), .. }) {
+///     if matches!(parent.value(), Viewnode { kind: Scaff(AliasFolder), .. }) {
 ///       // Convert to Alias
 ///       let val = node.value();
 ///       // mutate val

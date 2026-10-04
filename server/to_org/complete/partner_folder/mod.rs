@@ -20,13 +20,13 @@ use crate::to_org::util::nodecomplete_and_viewnode_from_id;
 use crate::types::git::RepoDiff;
 use crate::types::misc::{ID, SkgConfig, RepoName, members_of};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::{ViewNode, ViewNodeKind, PartnerFolder};
+use crate::types::viewnode::{Viewnode, ViewnodeKind, PartnerFolder};
 use crate::types::viewnode::Vognode;
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::{
-  insert_scaffold_as_child,
+  insert_non_vognode_as_child,
   pid_for_subscribee_and_its_subscriber_grandparent,
-  unique_scaffold_child_of_viewnode };
+  unique_non_vognode_child_of_viewnode };
 
 use ego_tree::{NodeId, NodeRef, Tree};
 use std::collections::{HashMap, HashSet};
@@ -56,7 +56,7 @@ fn build_initial_render_child_data (
   let mut goal     : Vec<ID>                = Vec::with_capacity (ids . len ());
   let mut resolved : HashMap<ID, ChildData> = HashMap::new ();
   for id in ids {
-    let lookup : Option<(NodeComplete, ViewNode)> =
+    let lookup : Option<(NodeComplete, Viewnode)> =
       nodecomplete_and_viewnode_from_id (graph, config, id) ?;
     let (primary_pid, repo, title, unknown) : (ID, RepoName, String, bool) = match lookup {
       Some ((nc, _vn)) =>
@@ -78,14 +78,14 @@ fn build_initial_render_child_data (
   Ok ((goal, resolved)) }
 
 /// Check if a node's type and parent type are consistent with being a Subscribee.
-/// A Subscribee is an ActiveNode whose parent is a SubscribeeFolder scaffold.
+/// A Subscribee is an ActiveNode whose parent is a SubscribeeFolder.
 /// (Checking that its grandparent (the subscriber) is an ActiveNode
 /// happens from the SubscribeeFolder, so needn't be repeated here.)
 pub fn type_and_parent_type_consistent_with_subscribee (
-  tree    : &Tree<ViewNode>,
+  tree    : &Tree<Viewnode>,
   node_id : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
-  let node_ref : NodeRef < ViewNode > =
+  let node_ref : NodeRef < Viewnode > =
     tree . get (node_id)
     . ok_or ("type_and_parent_type_consistent_with_subscribee: node not found") ?;
   let is_activeNode_and_affectsParent_true : bool =
@@ -94,7 +94,7 @@ pub fn type_and_parent_type_consistent_with_subscribee (
     node_ref . parent ()
     . map ( |p| matches! (
               & p . value () . kind,
-              ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee)))
+              ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)))
     . unwrap_or (false);
   Ok ( is_activeNode_and_affectsParent_true
        && affects_parent_subscribeeFolder ) }
@@ -104,7 +104,7 @@ pub fn type_and_parent_type_consistent_with_subscribee (
 /// - if any hidden nodes are outside subscribee content,
 ///   a HiddenOutsideOfSubscribeeFolder
 pub fn maybe_add_subscribeeFolder_branch (
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   node_id : NodeId, // if applicable, this is the subscriber
   graph   : &InRustGraph,
   config  : &SkgConfig,
@@ -117,26 +117,26 @@ pub fn maybe_add_subscribeeFolder_branch (
   error_unless_node_satisfies(
     tree, node_id,
     |vn| matches!( &vn . kind,
-                    ViewNodeKind::Vognode (Vognode::Active (_))),
+                    ViewnodeKind::Vognode (Vognode::Active (_))),
     "maybe_add_subscribeeFolder_branch: expected ActiveNode" ) ?;
   { let is_writeProtected : bool =
       read_at_node_in_tree(
         tree, node_id,
         |vn| matches!( &vn . kind,
-                        ViewNodeKind::Vognode (Vognode::Active (t))
+                        ViewnodeKind::Vognode (Vognode::Active (t))
                         if t . is_writeProtected () ))
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_writeProtected { return Ok(( )); } }
   { // Pre-existing SubscribeeFolder children are reconciled by view completion (complete_nodes_in_level_order), which dispatches to 'reconcile_subscribeeFolder_children'.
-    if unique_scaffold_child_of_viewnode (
+    if unique_non_vognode_child_of_viewnode (
       tree, node_id,
-      &ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee) )? . is_some ()
+      &ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee) )? . is_some ()
     { return Ok (( )); }}
   let ( subscriber_pid, subscriber_repo ) : (ID, RepoName) =
     read_at_node_in_tree (
       tree, node_id,
       |vn| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Active (t))
+        ViewnodeKind::Vognode (Vognode::Active (t))
           => Some (( graph . pid_of (&t . id)
                        . unwrap_or_else (|| t . id . clone ()),
                      t . home_repo . clone () )),
@@ -189,8 +189,8 @@ pub fn maybe_add_subscribeeFolder_branch (
       . cloned () . collect () };
 
   let subscribee_folder_nid : NodeId =
-    insert_scaffold_as_child ( tree, node_id,
-      ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee), true ) ?;
+    insert_non_vognode_as_child ( tree, node_id,
+      ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee), true ) ?;
   { let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
       build_initial_render_child_data (
         &subscribee_ids, graph, config ) ?;
@@ -219,9 +219,9 @@ pub fn maybe_add_subscribeeFolder_branch (
      || hidden_outside_head_side_occupied {
     // HiddenOutsideOfSubscribeeFolder presents last, if it exists.
     let hidden_outside_folder_nid : NodeId =
-      insert_scaffold_as_child (
+      insert_non_vognode_as_child (
         tree, subscribee_folder_nid,
-        ViewNodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee),
+        ViewnodeKind::PartnerFolder (PartnerFolder::HiddenOutsideOfSubscribee),
         false ) ?;
     with_node_mut ( tree, hidden_outside_folder_nid,
       |mut n| {
@@ -246,7 +246,7 @@ pub fn maybe_add_subscribeeFolder_branch (
 /// initial presentation; the other relation folders are available through
 /// `(viewRequests (folder ...))` when their heralds indicate they are useful.
 pub fn maybe_add_default_partnerFolder_branches (
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   node_id : NodeId,
   graph   : &InRustGraph,
   config  : &SkgConfig,
@@ -256,13 +256,13 @@ pub fn maybe_add_default_partnerFolder_branches (
   error_unless_node_satisfies(
     tree, node_id,
     |vn| matches!( &vn . kind,
-                    ViewNodeKind::Vognode (Vognode::Active (_) )),
+                    ViewnodeKind::Vognode (Vognode::Active (_) )),
     "maybe_add_default_partnerFolder_branches: expected ActiveNode" ) ?;
   { let is_writeProtected : bool =
       read_at_node_in_tree(
         tree, node_id,
         |vn| matches!( &vn . kind,
-                        ViewNodeKind::Vognode (Vognode::Active (t))
+                        ViewnodeKind::Vognode (Vognode::Active (t))
                         if t . is_writeProtected () ) )
       . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
     if is_writeProtected { return Ok(( )); } }
@@ -280,7 +280,7 @@ pub fn maybe_add_default_partnerFolder_branches (
 /// passed 'true' for a writable folder; an empty write-protected folder would just
 /// be pruned again.)
 pub fn maybe_add_one_partnerFolder (
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   node_id : NodeId,
   kind    : PartnerFolder,
   config  : &SkgConfig,
@@ -289,8 +289,8 @@ pub fn maybe_add_one_partnerFolder (
   repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
   force_create_when_empty : bool,
 ) -> Result < (), Box<dyn Error> > {
-  if unique_scaffold_child_of_viewnode (
-      tree, node_id, &ViewNodeKind::PartnerFolder (kind)
+  if unique_non_vognode_child_of_viewnode (
+      tree, node_id, &ViewnodeKind::PartnerFolder (kind)
     )? . is_some ()
   { // There already is one. Don't draw a new one.
     return Ok (( )); }
@@ -298,12 +298,12 @@ pub fn maybe_add_one_partnerFolder (
     read_at_node_in_tree (
       tree, node_id,
       |vn| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Active (t))
+        ViewnodeKind::Vognode (Vognode::Active (t))
           => Ok (( t . id . clone (), t . home_repo . clone () )),
         _ => Err ("expected ActiveNode" . to_string ()), } )
     .map_err( |e| -> Box<dyn Error> { e . into() } ) ??;
   let Some (member_role) = kind . relation_member_role ()
-    // The two Hidden*SubscribeeFolder scaffolds lack this, hence end here.
+    // The two Hidden*SubscribeeFolders lack this, hence end here.
     else { return Ok (( )); };
   let owner_role =
     member_role . opposite_role ();
@@ -339,8 +339,8 @@ pub fn maybe_add_one_partnerFolder (
     if ! head_side_occupied && ! force_create_when_empty {
       return Ok (( )); }}
   let folder_nid : NodeId =
-    insert_scaffold_as_child (
-      tree, node_id, ViewNodeKind::PartnerFolder (kind), true) ?;
+    insert_non_vognode_as_child (
+      tree, node_id, ViewnodeKind::PartnerFolder (kind), true) ?;
   let (goal, data) : (Vec<ID>, HashMap<ID, ChildData>) =
     build_initial_render_child_data (
       &member_ids, graph, config ) ?;
@@ -354,7 +354,7 @@ pub fn maybe_add_one_partnerFolder (
 /// The subscriber is the Subscribee's grandparent:
 ///   subscriber -> SubscribeeFolder -> Subscribee
 pub fn maybe_add_hiddenInSubscribeeFolder_branch (
-  tree              : &mut Tree<ViewNode>,
+  tree              : &mut Tree<Viewnode>,
   subscribee_treeid : NodeId,
   graph             : &InRustGraph,
   config            : &SkgConfig,
@@ -364,10 +364,10 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
   if ! type_and_parent_type_consistent_with_subscribee (
     tree, subscribee_treeid )?
   { return Err ( "maybe_add_hiddenInSubscribeeFolder_branch called on non-subscribee" . into ( )); }
-  if unique_scaffold_child_of_viewnode (
+  if unique_non_vognode_child_of_viewnode (
       // Pre-existing HiddenIn folders are instead reconciled by the rerender pipeline's 'reconcile_hiddenIn_folders', which dispatches to 'reconcile_hiddenInSubscribeeFolder_children'.
        tree, subscribee_treeid,
-       &ViewNodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)
+       &ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee)
      )? . is_some ()
   { return Ok (( )); }
   let ( subscribee_pid, subscriber_pid ) : ( ID, ID ) =
@@ -434,9 +434,9 @@ pub fn maybe_add_hiddenInSubscribeeFolder_branch (
   let hidden_in_ids : Vec<ID> =
     hidden_in_content . into_iter () . collect ();
   let hidden_folder_nid : NodeId =
-    insert_scaffold_as_child (
+    insert_non_vognode_as_child (
       tree, subscribee_treeid,
-      ViewNodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee),
+      ViewnodeKind::PartnerFolder (PartnerFolder::HiddenInSubscribee),
       true ) ?;
   with_node_mut ( tree, hidden_folder_nid,
     |mut n| {

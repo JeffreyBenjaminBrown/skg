@@ -12,29 +12,29 @@ fn active_public () -> ActiveRepoSet {
     name    : RepoSetName ("public" . to_string ()),
     repos : BTreeSet::from ([ RepoName::from ("public") ]) }}
 
-fn def (id : &str, repo : &str) -> ViewNode {
+fn def (id : &str, repo : &str) -> Viewnode {
   mk_definitive_viewnode (
     ID::from (id), RepoName::from (repo),
     id . to_string (), None ) }
 
-fn writeProtected (id : &str, repo : &str) -> ViewNode {
+fn writeProtected (id : &str, repo : &str) -> Viewnode {
   mk_writeProtected_viewnode (
     ID::from (id), RepoName::from (repo),
     id . to_string (), AffectsParent::True ) }
 
-fn folder (kind : PartnerFolder) -> ViewNode {
-  ViewNode {
+fn folder (kind : PartnerFolder) -> Viewnode {
+  Viewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind        : ViewNodeKind::PartnerFolder (kind) } }
+    kind        : ViewnodeKind::PartnerFolder (kind) } }
 
 // A now-inactive childless branch disappears; a now-inactive node
 // with an active child is retained as an InactiveNode (converted,
 // not pruned); the active child survives.
 #[test]
 fn conversion_and_retention () {
-  let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let parent : NodeId = t . get_mut (root) . unwrap ()
     . append (def ("parent", "public")) . id ();
@@ -51,7 +51,7 @@ fn conversion_and_retention () {
     "a childless now-inactive node is pruned" );
   assert! ( matches! (
       &t . get (kept) . unwrap () . value () . kind,
-      ViewNodeKind::Vognode (Vognode::Inactive (_)) ),
+      ViewnodeKind::Vognode (Vognode::Inactive (_)) ),
     "a now-inactive node with an active child is retained as an InactiveNode" );
   assert! (
     t . get (kept) . unwrap () . children () . count () == 1,
@@ -62,7 +62,7 @@ fn conversion_and_retention () {
 // survives.
 #[test]
 fn partners_and_folders_prune () {
-  let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let owner : NodeId = t . get_mut (root) . unwrap ()
     . append (def ("owner", "public")) . id ();
@@ -90,7 +90,7 @@ fn partners_and_folders_prune () {
 // Pruning a focused subtree transfers focus to the surviving parent.
 #[test]
 fn focus_transfers_to_surviving_parent () {
-  let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   let parent : NodeId = t . get_mut (root) . unwrap ()
     . append (def ("parent", "public")) . id ();

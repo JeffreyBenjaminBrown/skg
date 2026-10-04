@@ -1,7 +1,7 @@
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::many_to_many::ManyToMany;
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::ViewNodeKind;
+use crate::types::viewnode::ViewnodeKind;
 use crate::types::viewnode::Vognode;
 use super::misc::ID;
 
@@ -174,7 +174,7 @@ pub fn pids_from_viewforest (
 ) -> HashSet<ID> {
   viewforest . nodes ()
     . filter_map ( |n| match &n . value () . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t)) =>
+      ViewnodeKind::Vognode (Vognode::Active (t)) =>
         Some ( t . id . clone () ),
       _ => None } )
     . collect () }

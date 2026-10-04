@@ -2,7 +2,7 @@ use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
-use crate::types::viewnode::ViewNode;
+use crate::types::viewnode::Viewnode;
 use crate::types::tree::viewnode_nodecomplete::{ pid_and_repo_from_treenode, write_at_activeNode_in_tree };
 
 use ego_tree::{NodeId, Tree};
@@ -15,7 +15,7 @@ use std::error::Error;
 ///
 /// EXPECTS: The input node is write-protected.
 pub fn clobberWriteProtectedViewnode (
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   treeid  : NodeId,
   graph   : &InRustGraph,
   config  : &SkgConfig,

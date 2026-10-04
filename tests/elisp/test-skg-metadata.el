@@ -310,7 +310,7 @@ C-c p o must bind to distinct commands."
       "** (skg (node (id link-child) (repo public) (affectsParent false) (birth backpath mentioner))) link child\n"
       "*** (skg (node (id under-link) (repo public))) under link\n"
       "** (skg aliasFolder) aliases\n"
-      "*** (skg (node (id under-scaffold) (repo public))) under scaffold\n"))
+      "*** (skg (node (id under-non-vognode) (repo public))) under non-vognode\n"))
     (goto-char (point-min))
     (cl-letf (((symbol-function 'skg--prompt-for-repo-change)
                (lambda (current-repo)
@@ -335,7 +335,7 @@ C-c p o must bind to distinct commands."
                  '(skg (node (repo private)))))
     (dolist (id '("link-child"
                   "under-link"
-                  "under-scaffold"))
+                  "under-non-vognode"))
       (should (skg-sexp-subtree-p
                (test-skg--metadata-sexp-by-id id)
                '(skg (node (repo public)))))

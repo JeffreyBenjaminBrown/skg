@@ -10,11 +10,11 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-git-diff-ids-view",
     |s| Box::pin ( async move {
-      test_ids_diff_shows_id_folder_scaffold (s) . await ?;
+      test_ids_diff_shows_id_folder (s) . await ?;
       test_ids_diff_staged_shows_staged_tag (s) . await ?;
       Ok (( )) } )) }
 
-async fn test_ids_diff_shows_id_folder_scaffold (
+async fn test_ids_diff_shows_id_folder (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
@@ -22,7 +22,7 @@ async fn test_ids_diff_shows_id_folder_scaffold (
   let gitrepo_path = temp_dir . path();
   setup_gitrepo_with_fixtures (gitrepo_path)?;
   s . reset_with_repo_path (
-    "test_ids_diff_shows_id_folder_scaffold",
+    "test_ids_diff_shows_id_folder",
     gitrepo_path ) ?;
   let (config, _tantivy)
     : (&SkgConfig, &mut TantivyIndex)

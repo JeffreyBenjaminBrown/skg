@@ -34,32 +34,32 @@ use skg::to_org::render::content_view::multi_root_view_with_repo_set;
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::types::misc::ID;
 use skg::types::nodes::complete::NodeComplete;
-use skg::types::viewnode::{Phantom, RelationCounts, ViewNode, ViewNodeKind, Vognode};
+use skg::types::viewnode::{Phantom, RelationCounts, Viewnode, ViewnodeKind, Vognode};
 use skg::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
 
 use std::collections::HashMap;
 
 fn viewforest_from_org (
   input : &str,
-) -> Result<Tree<ViewNode>, Box<dyn Error>> {
+) -> Result<Tree<Viewnode>, Box<dyn Error>> {
   let unchecked_viewforest =
     org_to_uninterpreted_nodes (input)? . 0;
   Ok ( maybePlaced_to_placed_tree (unchecked_viewforest)? ) }
 
 fn first_child_id (
-  tree : &Tree<ViewNode>,
+  tree : &Tree<Viewnode>,
 ) -> NodeId {
   tree . root () . first_child () . unwrap () . id () }
 
 fn true_child_ids (
-  tree      : &Tree<ViewNode>,
+  tree      : &Tree<Viewnode>,
   parent_id : NodeId,
 ) -> BTreeSet<ID> {
   tree . get (parent_id) . unwrap () . children ()
     . filter_map ( |child| match &child . value () . kind {
-      ViewNodeKind::Vognode ( Vognode::Active (node) )
+      ViewnodeKind::Vognode ( Vognode::Active (node) )
         => Some (node . id . clone ()),
-      ViewNodeKind::Phantom ( Phantom::Diff (p) )
+      ViewnodeKind::Phantom ( Phantom::Diff (p) )
         => Some (p . id . clone ()),
       _ => None, })
     . collect () }
@@ -80,7 +80,7 @@ fn content_view_of_N_gates_privately_contained_C (
       // At "public": N's private membership of C must not render --
       // neither C's id nor its title -- even though C itself is a
       // fully public, individually-visible node.
-      let (at_public, _pids, _tree) : (String, Vec<ID>, Tree<ViewNode>) =
+      let (at_public, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view_with_repo_set (
           config, Some (tantivy),
           &[ ID::from ("N") ], false, &public ) ?;
@@ -93,7 +93,7 @@ fn content_view_of_N_gates_privately_contained_C (
         "N itself is public and must render: {}", at_public );
 
       // At "all": the private membership is visible.
-      let (at_all, _pids, _tree) : (String, Vec<ID>, Tree<ViewNode>) =
+      let (at_all, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view_with_repo_set (
           config, Some (tantivy),
           &[ ID::from ("N") ], false, &all ) ?;
@@ -144,7 +144,7 @@ fn inbound_containerward_data_hides_N_at_public (
         graph_handle_from_config (config)? );
       let graph = graph_handle . load_full ();
       {
-        let mut viewforest : Tree<ViewNode> =
+        let mut viewforest : Tree<Viewnode> =
           viewforest_from_org (
             "* (skg (node (id C) (repo public))) leak-battery-C\n" )?;
         let c_id : NodeId = first_child_id (&viewforest);
@@ -162,7 +162,7 @@ fn inbound_containerward_data_hides_N_at_public (
            public: {}", rendered );
       }
       {
-        let mut viewforest : Tree<ViewNode> =
+        let mut viewforest : Tree<Viewnode> =
           viewforest_from_org (
             "* (skg (node (id C) (repo public))) leak-battery-C\n" )?;
         let c_id : NodeId = first_child_id (&viewforest);
@@ -231,7 +231,7 @@ fn default_subscribeeFolder_requires_an_active_subscription_edge (
       // S and C are both public, but S's subscription to C is recorded
       // only in private.  The default folder's existence must follow the
       // edge repo, not merely the visibility of its endpoints.
-      let (at_public, _pids, _tree) : (String, Vec<ID>, Tree<ViewNode>) =
+      let (at_public, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view_with_repo_set (
           config, Some (tantivy),
           &[ ID::from ("S") ], false, &public ) ?;
@@ -240,7 +240,7 @@ fn default_subscribeeFolder_requires_an_active_subscription_edge (
         "an inactive subscription must not leave an empty default \
          subscribeeFolder behind:\n{}", at_public );
 
-      let (at_all, _pids, _tree) : (String, Vec<ID>, Tree<ViewNode>) =
+      let (at_all, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
         multi_root_view_with_repo_set (
           config, Some (tantivy),
           &[ ID::from ("S") ], false, &all ) ?;
@@ -275,7 +275,7 @@ fn ancestor_heralds_gate_privately_recorded_relations (
       // (Both nodes are individually public; the EDGE is what gates.)
       let herald_of_S = | active : &ActiveRepoSet |
       -> Result<Option<String>, Box<dyn Error>> {
-        let mut viewforest : Tree<ViewNode> =
+        let mut viewforest : Tree<Viewnode> =
           viewforest_from_org (
             "* (skg (node (id C) (repo public))) leak-battery-C\n\
              ** (skg (node (id S) (repo public))) leak-battery-S\n" )?;
@@ -284,7 +284,7 @@ fn ancestor_heralds_gate_privately_recorded_relations (
           // early-return before the ancestor flags (its "no stats ->
           // no heralds" guard). Zero counts render no tokens of
           // their own, so any token present comes from a flag.
-          if let ViewNodeKind::Vognode (Vognode::Active (t)) =
+          if let ViewnodeKind::Vognode (Vognode::Active (t)) =
             &mut value . kind {
             t . graphStats . rels =
               Some ( RelationCounts::default () ); }}
@@ -298,7 +298,7 @@ fn ancestor_heralds_gate_privately_recorded_relations (
         let c_treeid : NodeId = first_child_id (&viewforest);
         let s_ref = viewforest . get (c_treeid) . unwrap ()
           . first_child () . unwrap ();
-        let ViewNodeKind::Vognode (Vognode::Active (t)) =
+        let ViewnodeKind::Vognode (Vognode::Active (t)) =
           & s_ref . value () . kind
         else { return Err ("S is not an Active vognode" . into ()); };
         Ok ( t . viewStats . rel_heralds . clone () ) };

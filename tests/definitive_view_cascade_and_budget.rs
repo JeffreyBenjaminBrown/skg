@@ -544,7 +544,7 @@ async fn test_definitive_view_request_cleared (
 // Fixture: root r contains the chain c1 -> c2, and r has two aliases. The budget
 // counts vognode EXPANSIONS (cost 1), so the whole content here is exactly 3
 // expansions: r, c1, c2. With limit=3 the chain fully expands (c2 definitive)
-// AND the AliasFolder shows BOTH aliases. The alias members are scaffolds, so they
+// AND the AliasFolder shows BOTH aliases. The alias members are non-vognodes, so they
 // cost nothing: were they charged, the 3 units could not also cover c2, which
 // would then be left write-protected (verified: at limit=2 c2 *is* write-protected
 // while the AliasFolder stays whole). That c2 is definitive here is the guarantee

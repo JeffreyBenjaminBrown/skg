@@ -40,7 +40,7 @@ use skg::dbs::in_rust_graph::InRustGraphHandle;
 use skg::dbs::node_lookup::nodecomplete_by_id;
 use skg::from_text::buffer_to_validated_saveplan;
 use skg::types::errors::{SaveError, BufferValidationError};
-use skg::types::viewnode::ViewNode;
+use skg::types::viewnode::Viewnode;
 use ego_tree::Tree;
 use indoc::indoc;
 
@@ -102,7 +102,7 @@ async fn render (
   root    : &str,
   config : &SkgConfig,
 ) -> Result<String, Box<dyn Error>> {
-  let (buf, _pids, _tree) : (String, Vec<ID>, Tree<ViewNode>) =
+  let (buf, _pids, _tree) : (String, Vec<ID>, Tree<Viewnode>) =
     multi_root_view (
       config, None, &[ ID::from (root) ], false ) ?;
   Ok (buf) }
@@ -687,7 +687,7 @@ async fn omission_scenarios (
     ActiveRepoSet::named (config, RepoSetName::from ("public")) ?;
   { // write-protected subscriberFolder: inactive omitted, active shown
     let s : &str = "subscriberFolder/omission";
-    let (buf, _p, _t) : (String, Vec<ID>, Tree<ViewNode>) =
+    let (buf, _p, _t) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view_with_repo_set (
         config, None, &[ID::from ("omSub-owner")],
         false, &active ) ?;
@@ -697,7 +697,7 @@ async fn omission_scenarios (
   { // writable subscribeeFolder: inactive omitted from render, but the
     // restricted save weaves it back into subscribes_to.
     let s : &str = "subscribeeFolder/omission";
-    let (buf, _p, _t) : (String, Vec<ID>, Tree<ViewNode>) =
+    let (buf, _p, _t) : (String, Vec<ID>, Tree<Viewnode>) =
       multi_root_view_with_repo_set (
         config, None, &[ID::from ("omWsub-owner")],
         false, &active ) ?;

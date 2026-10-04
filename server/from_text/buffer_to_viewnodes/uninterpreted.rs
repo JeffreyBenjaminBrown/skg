@@ -19,7 +19,7 @@ type HeadlineResult = Result<HeadlineInfo, String>;
 
 /// Represents a parsed org node with its headline and body lines
 #[derive(Debug, Clone)]
-struct ViewNodeLineCol {
+struct ViewnodeLineCol {
   headline: HeadlineInfo,
   body: Vec<String>,
 }
@@ -51,7 +51,7 @@ pub fn org_to_uninterpreted_nodes(
   Ok ( ( viewforest . into_internal_tree (), parsing_errors ) ) }
 
 /// The third element of the result is nonfatal parse warnings
-/// (e.g. discarded headline text on a folder scaffold), destined for
+/// (e.g. discarded headline text on a folder), destined for
 /// 'SaveResponse.warnings'.
 pub fn org_to_uninterpreted_viewforest(
   input: &str
@@ -70,7 +70,7 @@ pub fn org_to_uninterpreted_viewforest(
       viewforest . internal_root_id ();
     viewforest_root_treeid } ];
   for view_node_line_col in & {
-    let view_node_line_cols: Vec<ViewNodeLineCol> =
+    let view_node_line_cols: Vec<ViewnodeLineCol> =
       divide_into_viewNodeLineCols (input)?;
     view_node_line_cols } {
     let (level, viewnode, error_opt, warning_opt)
@@ -105,10 +105,10 @@ pub fn org_to_uninterpreted_viewforest(
 /// Returns an error if any headline has invalid metadata.
 fn divide_into_viewNodeLineCols (
   input: &str
-) -> Result<Vec<ViewNodeLineCol>, String> {
+) -> Result<Vec<ViewnodeLineCol>, String> {
   let lines: Vec<&str> = // Trailing whitespace is stripped from every line at save. (Titles are trimmed again downstream; this is what strips body lines.)
     input . lines() . map ( str::trim_end ) . collect();
-  let mut result: Vec<ViewNodeLineCol> = Vec::new();
+  let mut result: Vec<ViewnodeLineCol> = Vec::new();
   let mut i: usize = 0;
   while i < lines . len() {
     match headline_to_triple( lines[i] ) {
@@ -128,7 +128,7 @@ fn divide_into_viewNodeLineCols (
             Err (e) => return Err (e), // Invalid metadata
           }
         }
-        result . push ( ViewNodeLineCol {
+        result . push ( ViewnodeLineCol {
           headline: headline_info,
           body: body_lines, } );
       },
@@ -150,18 +150,18 @@ mod imported_body_tests {
     let body : &str = ":PROPERTIES:\n:ID: example-not-a-node\n:END:\n* literal heading\n,* existing comma heading\n```org\n** fenced heading\n```\n#+begin_src org\n* repo heading\n#+end_src";
     let rendered : String = format! ("* File root\n{}\n",
       crate::body_view_escape::encode_body_for_view (body));
-    let parsed : Vec<ViewNodeLineCol> =
+    let parsed : Vec<ViewnodeLineCol> =
       divide_into_viewNodeLineCols (&rendered) . unwrap ();
     assert_eq! (parsed . len (), 1);
     assert_eq! (parsed [0] . body . join ("\n"), body);
   }
 }
 
-/// Create an MpViewnode from an ViewNodeLineCol.
+/// Create an MpViewnode from an ViewnodeLineCol.
 /// This helper extracts the node creation logic from the main parsing function.
 /// Returns (level, MpViewnode, error, warning).
 fn linecol_to_viewnode(
-  view_node_line_col: &ViewNodeLineCol
+  view_node_line_col: &ViewnodeLineCol
 ) -> Result < ( usize, MpViewnode,
                 Option<BufferValidationError>,
                 Option<String> ),

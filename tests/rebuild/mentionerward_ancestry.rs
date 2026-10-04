@@ -32,7 +32,7 @@ use skg::from_text::buffer_to_viewnodes::uninterpreted::org_to_uninterpreted_nod
 use skg::types::maybe_placed_viewnode::maybePlaced_to_placed_tree;
 use skg::test_utils::{graph_handle_from_config, run_with_test_stores};
 use skg::types::misc::SkgConfig;
-use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode, Birth};
+use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode, Birth};
 use skg::dbs::in_rust_graph::relation_accessors::RelationRole;
 
 
@@ -41,12 +41,12 @@ use std::error::Error;
 
 /// Collect (pid, affectsParent) pairs for all ActiveNode children of a node.
 fn children_info (
-  tree : &Tree<ViewNode>,
+  tree : &Tree<Viewnode>,
   node_id : NodeId,
 ) -> Vec<(String, Birth)> {
   tree . get (node_id) . unwrap () . children ()
     . filter_map ( |child| {
-      if let ViewNodeKind::Vognode (
+      if let ViewnodeKind::Vognode (
         Vognode::Active (t)) =
         &child . value () . kind {
         Some (( t.id.0 . clone (), t.birth ))
@@ -55,13 +55,13 @@ fn children_info (
 
 /// Find a child ActiveNode by pid, returning its NodeId.
 fn find_child (
-  tree : &Tree<ViewNode>,
+  tree : &Tree<Viewnode>,
   parent : NodeId,
   pid : &str,
 ) -> Option<NodeId> {
   tree . get (parent) . unwrap () . children ()
     . find ( |child| {
-      if let ViewNodeKind::Vognode (
+      if let ViewnodeKind::Vognode (
         Vognode::Active (t)) =
         &child . value () . kind {
         t.id.0 == pid
@@ -88,7 +88,7 @@ async fn test_mentionerward_ancestry_impl (
   "};
   let unchecked_viewforest =
     org_to_uninterpreted_nodes (input) ? . 0;
-  let mut viewforest : Tree<ViewNode> =
+  let mut viewforest : Tree<Viewnode> =
     maybePlaced_to_placed_tree (unchecked_viewforest) ?;
   let node_a : NodeId =
     viewforest . root () . first_child () . unwrap () . id ();

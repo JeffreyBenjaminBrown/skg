@@ -1,18 +1,18 @@
-/// Node access utilities for ego_tree::Tree<ViewNode> and Tree<MpViewnode>
+/// Node access utilities for ego_tree::Tree<Viewnode> and Tree<MpViewnode>
 
 use crate::to_org::util::get_id_from_treenode;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, MSV, SkgConfig, RepoName};
 use crate::types::viewnode::{
-    ViewNode, ViewNodeKind, ActiveNode, AffectsParent };
-use crate::types::viewnode::{Vognode, Phantom, QualFolder, Qual, PartnerFolder};
+    Viewnode, ViewnodeKind, ActiveNode, AffectsParent };
+use crate::types::viewnode::{Vognode, Phantom, PropertyFolder, Property, PartnerFolder};
 use crate::types::maybe_placed_viewnode::{
     MpViewnode, MpViewnodeKind };
 use crate::types::maybe_placed_viewnode::{MpVognode, MpPhantom};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::list::dedup_vector;
-use super::generic::{ unique_scaffold_child, write_at_node_in_tree, with_node_mut };
+use super::generic::{ unique_non_vognode_child, write_at_node_in_tree, with_node_mut };
 
 use ego_tree::{Tree, NodeId, NodeRef};
 use std::collections::{HashMap, HashSet};
@@ -21,7 +21,7 @@ use std::error::Error;
 /// Apply a mutating function to the ActiveNode at the given tree position.
 /// Errors if the node is not found or is not an ActiveNode.
 pub fn write_at_activeNode_in_tree<F, R> (
-  tree   : &mut Tree<ViewNode>,
+  tree   : &mut Tree<Viewnode>,
   treeid : NodeId,
   f      : F,
 ) -> Result<R, String>
@@ -32,7 +32,7 @@ where F: FnOnce (&mut ActiveNode) -> R {
       // TODO/DONE/local-view-update/plan_v2.org §11: a phantom is not an ActiveNode (it carries a slim PhantomDiff), so
       // this Normal-only mutator cannot apply to one (a phantom has no
       // view_requests/editability/etc).
-      ViewNodeKind::Vognode (Vognode::Active (t))
+      ViewnodeKind::Vognode (Vognode::Active (t))
         => Ok ( f (t) ),
       _ => Err ( "write_at_activeNode_in_tree: expected ActiveNode"
                    . to_string () ) }} ) ? }
@@ -40,15 +40,15 @@ where F: FnOnce (&mut ActiveNode) -> R {
 /// Extract (ID, repo) from a vognode that carries both.
 /// Returns an error if the node is not found or cannot provide both fields.
 pub fn pid_and_repo_from_treenode (
-  tree        : &Tree<ViewNode>,
+  tree        : &Tree<Viewnode>,
   treeid      : NodeId,
   caller_name : &str,
 ) -> Result<(ID, RepoName), Box<dyn Error>> {
-  let node_ref : NodeRef<ViewNode> =
+  let node_ref : NodeRef<Viewnode> =
     tree . get (treeid) . ok_or_else ( ||
       format! ( "{}: node not found", caller_name ) ) ?;
   match &node_ref . value() . kind {
-    ViewNodeKind::Vognode (v) =>
+    ViewnodeKind::Vognode (v) =>
       v . pid_and_repo ()
       . map ( |(pid, repo)| (pid . clone (), repo . clone ()) )
       . ok_or_else (|| format!(
@@ -82,38 +82,38 @@ pub fn id_from_self_or_nearest_ancestor (
 /// Returns None if no child has the kind,
 /// Some(child_id) if exactly one does,
 /// or an error if multiple children have it.
-pub fn unique_scaffold_child_of_viewnode (
-  tree          : &Tree<ViewNode>,
+pub fn unique_non_vognode_child_of_viewnode (
+  tree          : &Tree<Viewnode>,
   node_id       : NodeId,
-  scaffold_kind : &ViewNodeKind,
+  non_vognode_kind : &ViewnodeKind,
 ) -> Result<Option<NodeId>, Box<dyn Error>> {
-  unique_scaffold_child (
+  unique_non_vognode_child (
     tree,
     node_id,
-    scaffold_kind,
-    |child : &ViewNode| Some (&child . kind))
+    non_vognode_kind,
+    |child : &Viewnode| Some (&child . kind))
   . map_err (|e| -> Box<dyn Error> { e . into() }) }
 
 /// Extract PIDs for a Subscribee and its grandparent (the subscriber).
 /// Expects: subscriber -> SubscribeeFolder -> Subscribee (this node)
 pub fn pid_for_subscribee_and_its_subscriber_grandparent (
-  tree    : &Tree<ViewNode>,
+  tree    : &Tree<Viewnode>,
   node_id : NodeId,
   graph   : &InRustGraph,
   config  : &SkgConfig,
 ) -> Result < ( ID, ID ), Box<dyn Error> > {
   let subscribee_pid : ID = get_id_from_treenode ( tree, node_id ) ?;
-  let node_ref : NodeRef < ViewNode > =
+  let node_ref : NodeRef < Viewnode > =
     tree . get (node_id) . ok_or (
       "pid_for_subscribee_and_its_subscriber_grandparent: node not found" ) ?;
-  let parent_ref : NodeRef < ViewNode > =
+  let parent_ref : NodeRef < Viewnode > =
     node_ref . parent ()
     . ok_or ("Subscribee has no parent (SubscribeeFolder)") ?;
   if ! matches! ( &parent_ref . value () . kind,
-                  ViewNodeKind::PartnerFolder (PartnerFolder::Subscribee)) {
+                  ViewnodeKind::PartnerFolder (PartnerFolder::Subscribee)) {
     return Err ( "Subscribee's parent is not a SubscribeeFolder" .
                  into () ); }
-  let grandparent_ref : NodeRef < ViewNode > =
+  let grandparent_ref : NodeRef < Viewnode > =
     parent_ref . parent ()
     . ok_or ("SubscribeeFolder has no parent (subscriber)") ?;
   let (subscriber_id, subscriber_repo) : (ID, RepoName) =
@@ -126,18 +126,18 @@ pub fn pid_for_subscribee_and_its_subscriber_grandparent (
   Ok (( subscribee_pid,
         nodecomplete . pid . clone() )) }
 
-pub fn insert_scaffold_as_child (
-  tree          : &mut Tree<ViewNode>,
+pub fn insert_non_vognode_as_child (
+  tree          : &mut Tree<Viewnode>,
   parent_id     : NodeId,
-  scaffold_kind : ViewNodeKind,
+  non_vognode_kind : ViewnodeKind,
   prepend       : bool, // otherwise, append
 ) -> Result < NodeId, Box<dyn Error> > {
-  let viewnode : ViewNode =
-    ViewNode {
+  let viewnode : Viewnode =
+    Viewnode {
       focused     : false,
       folded      : false,
       body_folded : false,
-      kind        : scaffold_kind };
+      kind        : non_vognode_kind };
   let folder_id : NodeId = with_node_mut (
     tree, parent_id,
     |mut parent_mut| {
@@ -153,24 +153,24 @@ pub fn insert_scaffold_as_child (
 /// Returns None ("no opinion") if no AliasFolder found.
 /// Returns Some(vec) if AliasFolder found, even if empty.
 pub fn collect_grandchild_aliases_for_viewnode (
-  tree: &Tree<ViewNode>,
+  tree: &Tree<Viewnode>,
   node_id: NodeId,
 ) -> Result<MSV<String>, String> {
   let alias_folder_id : Option<NodeId> =
-    unique_scaffold_child_of_viewnode (
-      tree, node_id, &ViewNodeKind::QualFolder (QualFolder::Alias) )
+    unique_non_vognode_child_of_viewnode (
+      tree, node_id, &ViewnodeKind::PropertyFolder (PropertyFolder::Alias) )
     . map_err ( |e| e . to_string() ) ?;
   match alias_folder_id {
     None => Ok (MSV::Unspecified),
     Some (folder_id) => {
       let aliases : Vec<String> = {
-        let folder_ref : NodeRef<ViewNode> =
+        let folder_ref : NodeRef<Viewnode> =
           tree . get (folder_id) . expect ("collect_grandchild_aliases_for_viewnode: AliasFolder not found");
         let mut aliases : Vec<String> = Vec::new();
         for alias_child in folder_ref . children() {
           { // check for invalid state
             if ! matches!(&alias_child . value() . kind,
-                          ViewNodeKind::Qual (Qual::Alias { .. } )) {
+                          ViewnodeKind::Property (Property::Alias { .. } )) {
               return Err ( format! (
                 "AliasFolder has non-Alias child with kind: {:?}",
                 alias_child . value() . kind )); }}
@@ -182,7 +182,7 @@ pub fn collect_grandchild_aliases_for_viewnode (
 /// Find a child node by its ID.
 /// Returns the NodeId of the child if found, None otherwise.
 pub fn find_child_by_id (
-  tree          : & Tree<ViewNode>,
+  tree          : & Tree<Viewnode>,
   parent_treeid : NodeId,
   target_skgid  : & ID,
 ) -> Option < NodeId > {
@@ -195,17 +195,17 @@ pub fn find_child_by_id (
 /// Returns a map from ID to NodeId for children that were found.
 /// IDs not found as children are not included in the result.
 pub fn find_children_by_ids (
-  tree          : & Tree<ViewNode>,
+  tree          : & Tree<Viewnode>,
   parent_treeid : NodeId,
   target_skgids : & HashSet < ID >,
 ) -> HashMap < ID, NodeId > {
   let mut result : HashMap < ID, NodeId > = HashMap::new();
   for child in tree . get (parent_treeid) . unwrap() . children() {
     match &child . value() . kind {
-      ViewNodeKind::Vognode (Vognode::Active (t)) =>
+      ViewnodeKind::Vognode (Vognode::Active (t)) =>
         if target_skgids . contains (&t . id)
         { result . insert (t . id . clone (), child . id()); },
-      ViewNodeKind::Phantom (p @ (Phantom::Diff (_)
+      ViewnodeKind::Phantom (p @ (Phantom::Diff (_)
                                   | Phantom::Deleted (_))) =>
         if target_skgids . contains (p . id ())
         { result . insert (p . id () . clone (), child . id()); },

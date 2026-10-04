@@ -1,4 +1,4 @@
-use crate::types::viewnode::{AffectsParent, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{AffectsParent, Viewnode, ViewnodeKind};
 use crate::types::viewnode::Vognode;
 use crate::types::tree::generic::{with_node_mut, write_at_ancestor_in_tree};
 
@@ -42,7 +42,7 @@ where
 /// 'folded' only when it sat inside a folded ancestor; its members
 /// then already carry the mark, so the transfer changes nothing.
 pub fn fold_members_of_newborn_folder (
-  tree : &mut Tree<ViewNode>,
+  tree : &mut Tree<Viewnode>,
   folder  : NodeId,
 ) -> Result<(), String> {
   let newborn : bool =
@@ -55,8 +55,8 @@ pub fn fold_members_of_newborn_folder (
     . map_err ( |e| -> String { e . into () } ) ?;
   treat_certain_children (
     tree, folder,
-    |_vn : &ViewNode| true,
-    |vn : &mut ViewNode| { vn . folded = true; } ) }
+    |_vn : &Viewnode| true,
+    |vn : &mut Viewnode| { vn . folded = true; } ) }
 
 /// Classify children of a node based on a classifier function.
 /// Returns a HashMap from classification key to Vec<NodeId>.
@@ -93,20 +93,20 @@ where Predicate: Fn (&Node) -> bool {
       return Ok (true); } }
   Ok (false) }
 
-/// Detach a scaffold node, transferring focus to its parent first if
+/// Detach a non-vognode node, transferring focus to its parent first if
 /// the detached subtree contained the focused node. Used when a
-/// scaffold collapses (e.g. SubscribeeFolder with no goal subscribees,
+/// non-vognode collapses (e.g. SubscribeeFolder with no goal subscribees,
 /// HiddenInSubscribeeFolder with no remaining hidden children).
-pub fn detach_scaffold_transferring_focus (
-  tree : &mut Tree<ViewNode>,
+pub fn detach_viewnode_transferring_focus (
+  tree : &mut Tree<Viewnode>,
   node : NodeId,
 ) -> Result<(), Box<dyn Error>> {
   let has_focus : bool =
-    subtree_satisfies ( tree, node, &|n : &ViewNode| n . focused ) ?;
+    subtree_satisfies ( tree, node, &|n : &Viewnode| n . focused ) ?;
   if has_focus {
     write_at_ancestor_in_tree (
       tree, node, 1,
-      |vn : &mut ViewNode| { vn . focused = true; } )
+      |vn : &mut Viewnode| { vn . focused = true; } )
       . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?; }
   with_node_mut ( tree, node,
                   |mut n| { n . detach (); } )
@@ -150,50 +150,50 @@ impl<Orderkey> RepairSummary<Orderkey> {
       deleted_duplicates : Vec::new (), }}
 }
 
-/// ViewNode-specialized version of complete_relevant_children.
+/// Viewnode-specialized version of complete_relevant_children.
 /// See that one's description for more info.
 /// This one specializes it so that:
 /// - problem discards are those that would discard the focused node.
 /// - if any discard is problematic, transfer focus to 'treeid'
 pub fn complete_relevant_children_in_viewnodetree
 <Orderkey, Relevant, View> (
-  tree                : &mut Tree<ViewNode>,
+  tree                : &mut Tree<Viewnode>,
   treeid              : NodeId,
   relevant            : Relevant,
   view_child_orderkey : View,
   goal_list           : &[Orderkey],
-  create_child        : impl Fn (&Orderkey) -> Result<ViewNode, String>,
+  create_child        : impl Fn (&Orderkey) -> Result<Viewnode, String>,
 ) -> Result<RepairSummary<Orderkey>, Box<dyn Error>>
-where Relevant : Fn (&ViewNode) -> bool,
-      View     : Fn (&ViewNode) -> Result<Orderkey, String>,
+where Relevant : Fn (&Viewnode) -> bool,
+      View     : Fn (&Viewnode) -> Result<Orderkey, String>,
       Orderkey : Eq + Hash + Clone,
 {
   let problem_discard =
-    |tree: &Tree<ViewNode>, node_id: NodeId| -> Result<bool, String> {
-      subtree_satisfies( tree, node_id, &|n: &ViewNode| n . focused ) };
+    |tree: &Tree<Viewnode>, node_id: NodeId| -> Result<bool, String> {
+      subtree_satisfies( tree, node_id, &|n: &Viewnode| n . focused ) };
   let problem_discard_response =
-    |n: &mut ViewNode| { n . focused = true; };
+    |n: &mut Viewnode| { n . focused = true; };
   // TODO/DONE/local-view-update/plan_v2.org §6.0 stale-member rule: a stale member (relevant child not in the goal)
   // that is a Normal, affectsParent=true *branch* (has children) is demoted to
   // Independent so the user's subtree survives; a stale InactiveNode
-  // *branch* is deadened to a DeadScaffold instead (it has no
+  // *branch* is deadened to a DeadViewnode instead (it has no
   // affectsParent to demote; the orphan handling then preserves its
   // subtree as independent -- TODO/full-schema/9-2_repo-set-safety.org);
-  // everything else stale -- a leaf, a diff-phantom, a qual -- is
+  // everything else stale -- a leaf, a diff-phantom, a property -- is
   // deleted by the reconciler. Returns true iff it kept the node.
   let demote_invalid =
-    |tree: &mut Tree<ViewNode>, node_id: NodeId|
+    |tree: &mut Tree<Viewnode>, node_id: NodeId|
       -> Result<bool, Box<dyn Error>> {
       enum StaleTreatment { Demote, Deaden, Detach }
       let treatment : StaleTreatment = {
-        let n : NodeRef<ViewNode> = tree . get (node_id)
+        let n : NodeRef<Viewnode> = tree . get (node_id)
           . ok_or ("demote_invalid: node not found") ?;
         let has_children : bool = n . children () . next () . is_some ();
         match &n . value () . kind {
-          ViewNodeKind::Vognode (Vognode::Active (t))
+          ViewnodeKind::Vognode (Vognode::Active (t))
             if has_children && t . affectsParent == AffectsParent::True
             => StaleTreatment::Demote,
-          ViewNodeKind::Vognode (Vognode::Inactive (_))
+          ViewnodeKind::Vognode (Vognode::Inactive (_))
             if has_children
             => StaleTreatment::Deaden,
           _ => StaleTreatment::Detach } };
@@ -201,14 +201,14 @@ where Relevant : Fn (&ViewNode) -> bool,
         StaleTreatment::Detach => Ok (false),
         StaleTreatment::Demote => {
           with_node_mut ( tree, node_id, |mut n| {
-            if let ViewNodeKind::Vognode (Vognode::Active (t))
+            if let ViewnodeKind::Vognode (Vognode::Active (t))
               = &mut n . value () . kind
               { t . affectsParent = AffectsParent::False; } } )
             . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
           Ok (true) },
         StaleTreatment::Deaden => {
           with_node_mut ( tree, node_id, |mut n| {
-            n . value () . kind = ViewNodeKind::DeadScaffold; } )
+            n . value () . kind = ViewnodeKind::DeadViewnode; } )
             . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;
           Ok (true) }, }};
   complete_relevant_children(

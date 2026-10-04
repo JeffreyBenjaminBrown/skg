@@ -15,7 +15,7 @@
 use crate::types::tree::forest::ViewForest;
 use crate::types::misc::{ID, SkgConfig, TantivyIndex};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::viewnode::ViewNode;
+use crate::types::viewnode::Viewnode;
 use crate::types::views_state::pids_from_viewforest;
 use crate::repo_sets::ActiveRepoSet;
 use crate::types::env::SkgEnv;
@@ -34,7 +34,7 @@ pub fn single_root_view (
   tantivy_index     : Option<&TantivyIndex>,
   root_id           : &ID,
   diff_mode_enabled : bool,
-) -> Result < (String, Vec<ID>, Tree<ViewNode>),
+) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   multi_root_view (
     config,
@@ -48,7 +48,7 @@ pub fn multi_root_view (
   tantivy_index     : Option<&TantivyIndex>,
   root_ids          : &[ID],
   diff_mode_enabled : bool,
-) -> Result < (String, Vec<ID>, Tree<ViewNode>),
+) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   multi_root_view_inner (
     config, tantivy_index, root_ids,
@@ -66,7 +66,7 @@ fn multi_root_view_inner (
   root_ids          : &[ID],
   diff_mode_enabled : bool,
   active_repo_set : Option<&ActiveRepoSet>,
-) -> Result < (String, Vec<ID>, Tree<ViewNode>),
+) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   let tantivy_owned : TantivyIndex = match tantivy_index {
     Some (t) => t . clone (),
@@ -100,7 +100,7 @@ pub fn multi_root_view_via_env (
   diff_mode_enabled : bool,
   active_repo_set : Option<&ActiveRepoSet>,
   warnings_out      : &mut Vec<String>,
-) -> Result < (String, Vec<ID>, Tree<ViewNode>),
+) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   let runtime = env . runtime_snapshot ();
   multi_root_view_via_runtime (
@@ -114,7 +114,7 @@ pub(crate) fn multi_root_view_via_runtime (
   diff_mode_enabled : bool,
   active_repo_set : Option<&ActiveRepoSet>,
   warnings_out      : &mut Vec<String>,
-) -> Result < (String, Vec<ID>, Tree<ViewNode>), Box<dyn Error> > {
+) -> Result < (String, Vec<ID>, Tree<Viewnode>), Box<dyn Error> > {
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the diff (when diff_mode_enabled) is computed inline by
   // view completion, per Active node at its BFS visit.
   let mut viewforest : ViewForest =
@@ -147,7 +147,7 @@ pub fn multi_root_view_with_repo_set (
   root_ids          : &[ID],
   diff_mode_enabled : bool,
   active_repo_set : &ActiveRepoSet,
-) -> Result < (String, Vec<ID>, Tree<ViewNode>),
+) -> Result < (String, Vec<ID>, Tree<Viewnode>),
               Box<dyn Error> > {
   // multi_root_view_inner applies the repo set during rendering (inside
   // multi_root_view_via_env), so this wrapper just forwards it.

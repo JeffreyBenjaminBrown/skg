@@ -3,7 +3,7 @@ use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::nodes::complete::{
   Flag, NodeComplete, flag_is_true};
-use crate::types::viewnode::{Qual, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{Property, Viewnode, ViewnodeKind};
 use crate::update_buffer::ancestry::pid_and_repo_from_required_ancestor;
 use crate::update_buffer::util::{
   complete_relevant_children_in_viewnodetree, treat_certain_children};
@@ -12,7 +12,7 @@ use ego_tree::{NodeId, Tree};
 use std::error::Error;
 
 pub fn reconcile_flags_folder_children (
-  tree      : &mut Tree<ViewNode>,
+  tree      : &mut Tree<Viewnode>,
   folder_id : NodeId,
   graph     : &InRustGraph,
   config    : &SkgConfig,
@@ -29,16 +29,16 @@ pub fn reconcile_flags_folder_children (
   complete_relevant_children_in_viewnodetree (
     tree, folder_id,
     |viewnode| matches! (&viewnode . kind,
-      ViewNodeKind::Qual (Qual::Flag { .. })),
+      ViewnodeKind::Property (Property::Flag { .. })),
     |viewnode| match &viewnode . kind {
-      ViewNodeKind::Qual (Qual::Flag { flag, .. }) => Ok (*flag),
+      ViewnodeKind::Property (Property::Flag { flag, .. }) => Ok (*flag),
       _ => Err ("relevant child is not a Flag" . to_string ()), },
     &goals,
-    |flag| Ok (ViewNode {
+    |flag| Ok (Viewnode {
       focused     : false,
       folded      : false,
       body_folded : false,
-      kind        : ViewNodeKind::Qual (Qual::Flag {
+      kind        : ViewnodeKind::Property (Property::Flag {
         flag : *flag,
         title    : String::new (),
         body     : None, }), })) ?;
@@ -47,8 +47,8 @@ pub fn reconcile_flags_folder_children (
   treat_certain_children (
     tree, folder_id,
     |viewnode| matches! (&viewnode . kind,
-      ViewNodeKind::Qual (Qual::Flag { .. })),
-    |viewnode| if let ViewNodeKind::Qual (Qual::Flag {
+      ViewnodeKind::Property (Property::Flag { .. })),
+    |viewnode| if let ViewnodeKind::Property (Property::Flag {
       title, body, .. }) = &mut viewnode . kind
     { *title = String::new ();
       *body = None; }) ?;

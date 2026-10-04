@@ -683,18 +683,18 @@ fn relrepo_fact_and_request_round_trip_separately (
   use crate::org_to_text::viewnode_to_string;
   use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
   use crate::types::viewnode::{
-    default_activeNode, ActiveNode, ViewNode, ViewNodeKind, Vognode };
+    default_activeNode, ActiveNode, Viewnode, ViewnodeKind, Vognode };
 
   let mut t : ActiveNode =
     default_activeNode (
       ID::new ("n"), RepoName::from ("public"), "N" . to_string () );
   t . viewStats . relRepo = Some ( RepoName::from ("private") );
   t . relRepo_request = Some ( RepoName::from ("secret") );
-  let viewnode : ViewNode = ViewNode {
+  let viewnode : Viewnode = Viewnode {
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind        : ViewNodeKind::Vognode ( Vognode::Active (t) ), };
+    kind        : ViewnodeKind::Vognode ( Vognode::Active (t) ), };
   let config : SkgConfig =
     config_with_order ( & ["public", "private"] );
   let rendered : String =
@@ -722,7 +722,7 @@ fn relrepo_requests_are_contextual_and_singular (
   assert! ( parse_metadata_to_viewnodemd (
     "(skg alias (relRepo private) (editRequest (relRepo secret)))" )
             . is_ok (),
-            "Alias is the only scaffold which carries a relRepo" );
+            "Alias is the only non-vognode which carries a relRepo" );
   for malformed in [
     "(skg (node (id n)) (editRequest (relRepo private)))",
     "(skg id (relRepo private))",
@@ -749,8 +749,8 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
   use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
   use crate::types::nodes::complete::Flag;
   use crate::types::viewnode::{
-    default_activeNode, ActiveNode, NodeEditRequest, ViewNode,
-    ViewNodeKind, Vognode};
+    default_activeNode, ActiveNode, NodeEditRequest, Viewnode,
+    ViewnodeKind, Vognode};
 
   for value in [false, true] {
     let mut active : ActiveNode = default_activeNode (
@@ -761,11 +761,11 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
         flag : Flag::NoSearchMatching,
         value, }); }
     else { unreachable! (); }
-    let mut node : ViewNode = ViewNode {
+    let mut node : Viewnode = Viewnode {
       focused     : false,
       folded      : false,
       body_folded : false,
-      kind        : ViewNodeKind::Vognode (Vognode::Active (active)), };
+      kind        : ViewnodeKind::Vognode (Vognode::Active (active)), };
     let config : SkgConfig = config_with_order (&["public"]);
     let rendered : String = viewnode_to_string (&node, &config) . unwrap ();
     assert! ( rendered . contains (&format! (
@@ -776,7 +776,7 @@ fn flag_requests_parse_round_trip_and_reject_write_protected_flags (
       Some (NodeEditRequest::SetFlag {
         flag : Flag::NoSearchMatching, value }) );
     node . consume_edit_request_after_save ();
-    let ViewNodeKind::Vognode (Vognode::Active (active)) = &node . kind
+    let ViewnodeKind::Vognode (Vognode::Active (active)) = &node . kind
       else { unreachable! (); };
     assert_eq! (active . edit_request (), None); }
 
@@ -796,10 +796,10 @@ fn unknown_relrepo_fact_and_request_round_trip_separately (
 ) {
   use crate::org_to_text::viewnode_to_string;
   use crate::serve::parse_metadata_sexp::parse_metadata_to_viewnodemd;
-  use crate::types::viewnode::{mk_unknown_viewnode, Phantom, ViewNodeKind};
+  use crate::types::viewnode::{mk_unknown_viewnode, Phantom, ViewnodeKind};
 
   let mut unknown = mk_unknown_viewnode ( ID::new ("absent-raw") );
-  if let ViewNodeKind::Phantom (Phantom::Unknown (u)) = &mut unknown . kind {
+  if let ViewnodeKind::Phantom (Phantom::Unknown (u)) = &mut unknown . kind {
     u . relRepo = Some ( RepoName::from ("private") );
     u . relRepo_request = Some ( RepoName::from ("secret") );
   } else { unreachable! (); }

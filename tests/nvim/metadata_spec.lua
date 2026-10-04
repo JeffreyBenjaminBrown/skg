@@ -169,7 +169,7 @@ describe('skg.metadata commands', function ()
       '** (skg (node (id link-child) (repo public) (affectsParent false) (birth backpath mentioner))) link child',
       '*** (skg (node (id under-link) (repo public))) under link',
       '** (skg aliasFolder) aliases',
-      '*** (skg (node (id under-scaffold) (repo public))) under scaffold' },
+      '*** (skg (node (id under-non-vognode) (repo public))) under non-vognode' },
       '\n'))
     local original = picker.prompt_for_repo_change
     picker.prompt_for_repo_change = function (current)
@@ -189,7 +189,7 @@ describe('skg.metadata commands', function ()
     assert.is_true(subtree_p(metadata_sexp_by_id('mismatched-content'),
       '(skg (node (repo foreign)))'))
     for _, id in ipairs({ 'link-child', 'under-link',
-                          'under-scaffold' }) do
+                          'under-non-vognode' }) do
       assert.is_true(subtree_p(metadata_sexp_by_id(id),
         '(skg (node (repo public)))'), id)
       assert.is_false(subtree_p(metadata_sexp_by_id(id),

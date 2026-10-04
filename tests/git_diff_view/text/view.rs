@@ -10,11 +10,11 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-git-diff-text-view",
     |s| Box::pin ( async move {
-      test_title_diff_shows_text_changed_scaffolds (s) . await ?;
-      test_title_diff_staged_shows_staged_scaffolds (s) . await ?;
+      test_title_diff_shows_text_changed_property (s) . await ?;
+      test_title_diff_staged_shows_staged_text_changed_property (s) . await ?;
       Ok (( )) } )) }
 
-async fn test_title_diff_shows_text_changed_scaffolds (
+async fn test_title_diff_shows_text_changed_property (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
@@ -22,7 +22,7 @@ async fn test_title_diff_shows_text_changed_scaffolds (
   let gitrepo_path = temp_dir . path();
   setup_gitrepo_with_fixtures (gitrepo_path)?;
   s . reset_with_repo_path (
-    "test_title_diff_shows_text_changed_scaffolds",
+    "test_title_diff_shows_text_changed_property",
     gitrepo_path ) ?;
   let (config, _tantivy)
     : (&SkgConfig, &mut TantivyIndex)
@@ -38,11 +38,11 @@ async fn test_title_diff_shows_text_changed_scaffolds (
 }
 
 /// Same scenario but with the text changes staged rather than
-/// unstaged — asserts the TextChanged scaffold says 'staged' not
-/// 'unstaged'. Exercises the per-stage scaffold emission after a
+/// unstaged — asserts the TextChanged property says 'staged' not
+/// 'unstaged'. Exercises the per-stage non-vognode emission after a
 /// 'git add' that matches what the save-rerender path would see
 /// when the worktree has been rewritten to match the index.
-async fn test_title_diff_staged_shows_staged_scaffolds (
+async fn test_title_diff_staged_shows_staged_text_changed_property (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
@@ -50,7 +50,7 @@ async fn test_title_diff_staged_shows_staged_scaffolds (
   let gitrepo_path = temp_dir . path();
   setup_gitrepo_with_fixtures_staged (gitrepo_path)?;
   s . reset_with_repo_path (
-    "test_title_diff_staged_shows_staged_scaffolds",
+    "test_title_diff_staged_shows_staged_text_changed_property",
     gitrepo_path ) ?;
   let (config, _tantivy)
     : (&SkgConfig, &mut TantivyIndex)

@@ -6,7 +6,7 @@ use crate::to_org::expand::flags::build_and_integrate_flags_then_drop_request;
 use crate::to_org::util::{ DefinitiveMap, Finalizable, get_id_from_treenode, makeWriteProtectedAndClobber, activeNode_in_tree_is_writeProtected };
 use crate::types::misc::{ID, SkgConfig, RepoName};
 use crate::types::git::RepoDiff;
-use crate::types::viewnode::{ ViewNode, ViewNodeKind, ViewRequest, FolderRelation, Editability, AffectsParent };
+use crate::types::viewnode::{ Viewnode, ViewnodeKind, ViewRequest, FolderRelation, Editability, AffectsParent };
 use crate::types::viewnode::Vognode;
 use crate::types::nodes::complete::NodeComplete;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::error::Error;
 
 pub fn execute_view_requests (
-  viewforest    : &mut Tree<ViewNode>,
+  viewforest    : &mut Tree<Viewnode>,
   requests      : Vec < (NodeId, ViewRequest) >,
   graph         : &crate::dbs::in_rust_graph::InRustGraph,
   config        : &SkgConfig,
@@ -87,7 +87,7 @@ pub enum DrawOutcome {
 /// Final-ness before view completion (complete_nodes_in_level_order) draws
 /// (and cascades) content.
 pub fn apply_definitive_draw_rule (
-  viewforest : &mut Tree<ViewNode>,
+  viewforest : &mut Tree<Viewnode>,
   node_id    : NodeId,
   graph      : &InRustGraph,
   config     : &SkgConfig,
@@ -130,11 +130,11 @@ pub fn apply_definitive_draw_rule (
 /// - Mark a node, and its entire content subtree, as write-protected.
 /// - Remove them from `visited`.
 /// Only recurses into non-ignored ActiveNode children;
-///   ignored and scaffold children persist unchanged.
+///   ignored and non-vognode children persist unchanged.
 /// TODO : This will need complication to properly handle
 ///   sharing-related nodes among the input node's descendents.
 fn writeProtect_content_subtree (
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   node_id : NodeId,
   visited : &mut DefinitiveMap,
   graph   : &InRustGraph,
@@ -142,7 +142,7 @@ fn writeProtect_content_subtree (
 ) -> Result < (), Box<dyn Error> > {
   let (node_pid, content_child_treeids)
     : (ID, Vec <NodeId>) =
-    { let node_ref : NodeRef < ViewNode > =
+    { let node_ref : NodeRef < Viewnode > =
         tree . get (node_id) . ok_or (
           "writeProtect_content_subtree: NodeId not in tree" ) ?;
       let node_pid : ID =
@@ -150,7 +150,7 @@ fn writeProtect_content_subtree (
       let content_child_treeids : Vec < NodeId > =
         node_ref . children ()
         . filter ( |c| matches! ( &c . value() . kind,
-                                  ViewNodeKind::Vognode (Vognode::Active (t))
+                                  ViewnodeKind::Vognode (Vognode::Active (t))
                                   if t . affectsParent == AffectsParent::True ))
         . map ( |c| c . id () )
         . collect ();
@@ -165,9 +165,9 @@ fn writeProtect_content_subtree (
 
 /// Fetches NodeComplete from the in-Rust graph or disk.
 /// Updates title and body.
-/// Preserves all other ViewNode data.
+/// Preserves all other Viewnode data.
 fn from_disk_replace_title_body_and_nodecomplete (
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   node_id : NodeId,
   graph   : &InRustGraph,
   config  : &SkgConfig,

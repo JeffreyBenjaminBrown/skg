@@ -19,7 +19,7 @@ use std::collections::HashMap;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LocalContext {
   TopLevel, // The node is a child of the BufferRoot.
-  UnderVognode { // The node's parent is a vognode, a phantom, or a DeadScaffold.
+  UnderVognode { // The node's parent is a vognode, a phantom, or a DeadViewnode.
     parent_if_writeable : Option<ID>, }, // This is Some iff the parent is save-eligible.
   UnderDefiningFolder ( // The node is inside an AliasFolder, a SubscribeeFolder, or an OverriddenFolder.
     DefiningFolderOwner ),
@@ -29,7 +29,7 @@ pub enum LocalContext {
   HiddenOutsidePosition { // The one derived-but-editable filter under a SubscribeeFolder.
     subscriber       : ID,
     is_saveEligible  : bool, },
-  UnderWriteProtectedFolder, // The node is inside one of the six write-protected RoleFolders, an IDFolder, or a Qual.
+  UnderWriteProtectedFolder, // The node is inside one of the six write-protected RoleFolders, an IDFolder, or a Property.
 }
 
 /// A DefiningFolderOwner is what a defining folder knows about its owner

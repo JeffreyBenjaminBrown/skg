@@ -21,7 +21,7 @@ use crate::types::nodes::complete::{
   Flag, NodeComplete, flag_is_true};
 use crate::types::save::{ForkSpec, SaveNode};
 use crate::types::tree::forest::ViewForest;
-use crate::types::viewnode::{ViewNodeKind, Vognode};
+use crate::types::viewnode::{ViewnodeKind, Vognode};
 
 use std::collections::{HashMap, HashSet};
 
@@ -30,7 +30,7 @@ use std::collections::{HashMap, HashSet};
 /// vognode. A fork's clone C must live in an owned repo; the foreign
 /// node N's own repo is write-protected, so C inherits from N's IMMEDIATE
 /// container context -- the nearest vognode ancestor reached by skipping
-/// only scaffolds (folders, etc.). The walk STOPS at that nearest vognode
+/// only non-vognodes (folders, etc.). The walk STOPS at that nearest vognode
 /// ancestor and never passes it: if the ancestor is foreign (or
 /// inactive), nothing is inferred (the repo then defaults, or the user
 /// sets it in the confirmation buffer). Inferring a distant owned node
@@ -46,25 +46,25 @@ pub fn owned_ancestor_repos_for_foreign_vognodes (
 ) -> HashMap<ID, RepoName> {
   let mut map : HashMap<ID, RepoName> = HashMap::new ();
   for node in viewforest . nodes () {
-    let ViewNodeKind::Vognode (Vognode::Active (t)) = & node . value () . kind
+    let ViewnodeKind::Vognode (Vognode::Active (t)) = & node . value () . kind
       else { continue; };
     if config . user_owns_repo (& t . home_repo) { continue; } // not foreign
     let mut current = node;
     while let Some (parent) = current . parent () {
       match & parent . value () . kind {
-        ViewNodeKind::Vognode (Vognode::Active (pt)) => {
+        ViewnodeKind::Vognode (Vognode::Active (pt)) => {
           // N's nearest vognode ancestor: record its repo IFF owned,
           // then stop -- never walk past it.
           if config . user_owns_repo (& pt . home_repo) {
             map . entry ( t . id . clone () )
               . or_insert_with ( || pt . home_repo . clone () ); }
           break; }
-        ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
+        ViewnodeKind::Vognode (Vognode::Inactive (_)) =>
           // An inactive vognode is a real container boundary too (and
           // never an owned repo): infer nothing.
           break,
         _ =>
-          // A scaffold (folder, etc.): skip it and keep walking rootward.
+          // A non-vognode (folder, etc.): skip it and keep walking rootward.
           { current = parent; }} }}
   map }
 
@@ -77,7 +77,7 @@ pub fn owned_ancestor_repos_for_foreign_vognodes (
 /// of the foreign node whose fork it rides: its nearest Active
 /// vognode ancestor that is not itself such a new node (a chain of
 /// new headlines climbs to the first non-new node), skipping
-/// scaffolds. No entry is recorded when the anchor is missing,
+/// non-vognodes. No entry is recorded when the anchor is missing,
 /// Inactive, or (impossibly, since the repo was inherited down the
 /// chain) owned -- the node is then still judged a foreign creation.
 /// The DefineNode rewrite driven by this map happens in
@@ -90,7 +90,7 @@ pub fn new_foreign_nodes_adopting_clone_repos (
 ) -> HashMap<ID, ID> {
   let mut map : HashMap<ID, ID> = HashMap::new ();
   for node in viewforest . nodes () {
-    let ViewNodeKind::Vognode (Vognode::Active (t)) = & node . value () . kind
+    let ViewnodeKind::Vognode (Vognode::Active (t)) = & node . value () . kind
       else { continue; };
     if ! new_nodes_with_inherited_repos . contains (& t . id)
       { continue; }
@@ -99,7 +99,7 @@ pub fn new_foreign_nodes_adopting_clone_repos (
     let mut current = node;
     while let Some (parent) = current . parent () {
       match & parent . value () . kind {
-        ViewNodeKind::Vognode (Vognode::Active (pt)) => {
+        ViewnodeKind::Vognode (Vognode::Active (pt)) => {
           if new_nodes_with_inherited_repos . contains (& pt . id) {
             // Another new headline in the same chain: keep climbing.
             current = parent;
@@ -107,10 +107,10 @@ pub fn new_foreign_nodes_adopting_clone_repos (
           if ! config . user_owns_repo (& pt . home_repo) {
             map . insert ( t . id . clone (), pt . id . clone () ); }
           break; }
-        ViewNodeKind::Vognode (Vognode::Inactive (_)) =>
+        ViewnodeKind::Vognode (Vognode::Inactive (_)) =>
           break,
         _ =>
-          // A scaffold (folder, etc.): skip it and keep walking rootward.
+          // A non-vognode (folder, etc.): skip it and keep walking rootward.
           { current = parent; }} }}
   map }
 
@@ -180,12 +180,12 @@ pub fn explicit_new_child_repos_for_foreign_vognodes (
   let mut map : HashMap<ID, RepoName> = HashMap::new ();
   let mut ambiguous : HashSet<ID> = HashSet::new ();
   for node in viewforest . nodes () {
-    let ViewNodeKind::Vognode (Vognode::Active (t)) = & node . value () . kind
+    let ViewnodeKind::Vognode (Vognode::Active (t)) = & node . value () . kind
       else { continue; };
     if config . user_owns_repo (& t . home_repo)
       { continue; } // only a foreign node forks
     for child in node . children () {
-      let ViewNodeKind::Vognode (Vognode::Active (ct))
+      let ViewnodeKind::Vognode (Vognode::Active (ct))
         = & child . value () . kind
         else { continue; };
       if ! new_nodes_with_explicit_repos . contains (& ct . id)

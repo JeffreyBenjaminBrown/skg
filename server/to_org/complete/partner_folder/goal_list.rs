@@ -1,7 +1,7 @@
-/// Goal-list computers for sharing-scaffold rerender completers.
+/// Goal-list computers for sharing-non-vognode rerender completers.
 ///
 /// Each function returns `(Vec<ID>, HashSet<ID>)`: the ordered goal
-/// list of children the scaffold should contain, and the set of IDs
+/// list of children the non-vognode should contain, and the set of IDs
 /// that should appear as phantoms (present at HEAD but absent in the
 /// worktree). Outside diff view, the second element is empty.
 

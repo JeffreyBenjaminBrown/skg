@@ -16,14 +16,14 @@ use crate::to_org::complete::partner_folder::{
 use crate::to_org::util::remove_completed_view_request;
 use crate::types::git::RepoDiff;
 use crate::types::misc::{SkgConfig, RepoName};
-use crate::types::viewnode::{ViewNode, ViewRequest, FolderRelation, PartnerFolder};
+use crate::types::viewnode::{Viewnode, ViewRequest, FolderRelation, PartnerFolder};
 
 use ego_tree::{NodeId, Tree};
 use std::collections::HashMap;
 use std::error::Error;
 
 pub fn build_and_integrate_folder_then_drop_request (
-  tree          : &mut Tree<ViewNode>,
+  tree          : &mut Tree<Viewnode>,
   node_id       : NodeId,
   graph         : &InRustGraph,
   rel           : FolderRelation,
@@ -47,7 +47,7 @@ pub fn build_and_integrate_folder_then_drop_request (
 /// a populated relation's folders are not doubled, while the empty
 /// writable folder is still forced in.
 fn build_and_integrate_folder (
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   node_id : NodeId,
   rel     : FolderRelation,
   graph   : &InRustGraph,

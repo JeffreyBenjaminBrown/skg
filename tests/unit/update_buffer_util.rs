@@ -10,16 +10,16 @@ use ego_tree::Tree;
 // the Err conversion 2026-06-10.)
 #[test]
 fn relevant_child_of_wrong_kind_yields_err_not_panic () {
-  let mut t : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
+  let mut t : Tree<Viewnode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = t . root () . id ();
   t . get_mut (root) . unwrap () . append (
     mk_inactive_viewnode () );
   let result : Result<RepairSummary<ID>, Box<dyn Error>> =
     complete_relevant_children_in_viewnodetree (
       &mut t, root,
-      |_vn : &ViewNode| true, // relevance admits the Inactive child
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Active (activeNode))
+      |_vn : &Viewnode| true, // relevance admits the Inactive child
+      |vn : &Viewnode| match &vn . kind {
+        ViewnodeKind::Vognode (Vognode::Active (activeNode))
           => Ok ( activeNode . id . clone () ),
         _ => Err ( "child is not an Active vognode" . to_string () ) },
       & [] as &[ID],

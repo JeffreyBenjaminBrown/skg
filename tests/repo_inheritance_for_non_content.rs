@@ -5,7 +5,7 @@
 // even if the parent ignores it.
 
 use skg::types::misc::{ ID, RepoName, SkgConfig, SkgfileRepo };
-use skg::types::viewnode::{ AffectsParent, ViewNode, ViewNodeKind, viewforest_root_viewnode, mk_definitive_viewnode, mk_writeProtected_viewnode };
+use skg::types::viewnode::{ AffectsParent, Viewnode, ViewnodeKind, viewforest_root_viewnode, mk_definitive_viewnode, mk_writeProtected_viewnode };
 use skg::types::viewnode::Vognode;
 use skg::update_buffer::viewnodestats::set_viewnodestats_in_viewforest;
 use skg::dbs::in_rust_graph::InRustGraph;
@@ -41,16 +41,16 @@ fn repo_inheritance_across_non_content_same_repo () {
   let config : SkgConfig = two_repo_config ();
   let container_to_contents : HashMap<ID, _> = HashMap::new ();
   let content_to_containers : HashMap<ID, _> = HashMap::new ();
-  let mut viewforest : Tree<ViewNode> =
+  let mut viewforest : Tree<Viewnode> =
     Tree::new ( viewforest_root_viewnode () );
   let a_id = {
-    let vn : ViewNode = mk_definitive_viewnode (
+    let vn : Viewnode = mk_definitive_viewnode (
       ID::from ("a"),
       RepoName::from ("pub"),
       "node A" . to_string (),
       None );
     viewforest . root_mut () . append (vn) . id () };
-  { let vn : ViewNode = mk_writeProtected_viewnode (
+  { let vn : Viewnode = mk_writeProtected_viewnode (
       ID::from ("b"),
       RepoName::from ("pub"),
       "node B" . to_string (),
@@ -68,7 +68,7 @@ fn repo_inheritance_across_non_content_same_repo () {
   let b_ref =
     viewforest . get (a_id) . unwrap ()
     . first_child () . unwrap ();
-  let ViewNodeKind::Vognode ( Vognode::Active (t) )
+  let ViewnodeKind::Vognode ( Vognode::Active (t) )
     = & b_ref . value () . kind
     else { panic! ("expected ActiveNode") };
   assert! ( ! t . viewStats . homeRepoAtBoundary,
@@ -83,16 +83,16 @@ fn repo_inheritance_across_non_content_different_repo () {
   let config : SkgConfig = two_repo_config ();
   let container_to_contents : HashMap<ID, _> = HashMap::new ();
   let content_to_containers : HashMap<ID, _> = HashMap::new ();
-  let mut viewforest : Tree<ViewNode> =
+  let mut viewforest : Tree<Viewnode> =
     Tree::new ( viewforest_root_viewnode () );
   let a_id = {
-    let vn : ViewNode = mk_definitive_viewnode (
+    let vn : Viewnode = mk_definitive_viewnode (
       ID::from ("a"),
       RepoName::from ("pub"),
       "node A" . to_string (),
       None );
     viewforest . root_mut () . append (vn) . id () };
-  { let vn : ViewNode = mk_writeProtected_viewnode (
+  { let vn : Viewnode = mk_writeProtected_viewnode (
       ID::from ("b"),
       RepoName::from ("priv"),
       "node B" . to_string (),
@@ -108,7 +108,7 @@ fn repo_inheritance_across_non_content_different_repo () {
   let b_ref =
     viewforest . get (a_id) . unwrap ()
     . first_child () . unwrap ();
-  let ViewNodeKind::Vognode ( Vognode::Active (t) )
+  let ViewnodeKind::Vognode ( Vognode::Active (t) )
     = & b_ref . value () . kind
     else { panic! ("expected ActiveNode") };
   assert! ( t . viewStats . homeRepoAtBoundary,

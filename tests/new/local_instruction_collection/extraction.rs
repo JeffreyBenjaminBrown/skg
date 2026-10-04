@@ -27,7 +27,7 @@ use skg::types::maybe_placed_viewnode::{
   maybePlaced_to_placed_tree,
   maybePlaced_to_placed_viewforest};
 use skg::types::tree::forest::{MpViewForest, ViewForest};
-use skg::types::viewnode::{ViewNode, ViewNodeKind, viewforest_root_viewnode};
+use skg::types::viewnode::{Viewnode, ViewnodeKind, viewforest_root_viewnode};
 use skg::types::viewnode::{Vognode, Phantom};
 use std::error::Error;
 
@@ -54,7 +54,7 @@ fn saved_node_by_id<'a> (
 
 fn checked_viewforest_from_org (
   input : &str,
-) -> Tree<ViewNode> {
+) -> Tree<Viewnode> {
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
   maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap() }
@@ -62,7 +62,7 @@ fn checked_viewforest_from_org (
 /// This runs collection plus lowering, with no disk involved: the
 /// pure half of extraction.
 fn definenodes_from_tree (
-  viewforest : Tree<ViewNode>,
+  viewforest : Tree<Viewnode>,
 ) -> Result<Vec<DefineNode>, String> {
   let forest : ViewForest =
     ViewForest::from_internal_tree (viewforest);
@@ -77,7 +77,7 @@ fn definenodes_from_tree (
 /// This returns the (subscriber, visibility-signal) pairs that
 /// collection emits.
 fn visibility_pairs_from_tree (
-  viewforest : Tree<ViewNode>,
+  viewforest : Tree<Viewnode>,
 ) -> Vec<(ID, SubscribeeVisibility)> {
   let forest : ViewForest =
     ViewForest::from_internal_tree (viewforest);
@@ -93,7 +93,7 @@ fn visibility_pairs_from_org (
     checked_viewforest_from_org (input) ) }
 
 fn hiddenoutside_edits_from_tree (
-  viewforest : Tree<ViewNode>,
+  viewforest : Tree<Viewnode>,
 ) -> Vec<(ID, skg::from_text::local_instruction_collection::types::HiddenOutsideEdit)> {
   let forest : ViewForest = ViewForest::from_internal_tree (viewforest);
   lower_collected_intents (
@@ -131,7 +131,7 @@ fn unknown_members_write_their_editable_relationship_owners_only () {
 }
 
 fn set_relationship_axes_unstaged_minus (
-  tree : &mut Tree<ViewNode>,
+  tree : &mut Tree<Viewnode>,
   id   : &str,
 ) {
   set_relationship_axes_unstaged_minus_keeping_active (tree, id);
@@ -146,25 +146,25 @@ fn set_relationship_axes_unstaged_minus (
 /// node Active: a would-be diff phantom that has not been converted,
 /// which is how such nodes reach save extraction.
 fn set_relationship_axes_unstaged_minus_keeping_active (
-  tree : &mut Tree<ViewNode>,
+  tree : &mut Tree<Viewnode>,
   id   : &str,
 ) {
   let target_id : ego_tree::NodeId =
     find_active_or_phantom (tree, id);
-  if let ViewNodeKind::Vognode (Vognode::Active (t)) =
+  if let ViewnodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (target_id) . unwrap() . value() . kind
   { t . relationship_axes . unstaged = Some (Sign::Minus); }}
 
 fn find_active_or_phantom (
-  tree : &Tree<ViewNode>,
+  tree : &Tree<Viewnode>,
   id   : &str,
 ) -> ego_tree::NodeId {
   for node_ref in tree . nodes() {
     let is_target : bool =
       match &node_ref . value() . kind {
-        ViewNodeKind::Vognode (Vognode::Active (t)) =>
+        ViewnodeKind::Vognode (Vognode::Active (t)) =>
           t . id == ID::from (id),
-        ViewNodeKind::Phantom (Phantom::Diff (p)) =>
+        ViewnodeKind::Phantom (Phantom::Diff (p)) =>
           p . id == ID::from (id),
         _ => false,
       };
@@ -203,7 +203,7 @@ fn test_extract_nonmergeSavePlan_basic() {
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<ViewNode> =
+  let viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap();
@@ -256,7 +256,7 @@ fn test_extract_nonmergeSavePlan_with_aliases() {
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<ViewNode> =
+  let viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap();
@@ -297,7 +297,7 @@ fn test_extract_nonmergeSavePlan_no_aliases() {
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<ViewNode> =
+  let viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap();
@@ -326,7 +326,7 @@ fn inactive_placeholders_emit_neither_savenode_nor_contains () {
             ** (skg (inactiveNode (id hidden) (repo private)))
             ** (skg (node (id active-b) (repo main))) active B
         "};
-  let viewforest : Tree<ViewNode> =
+  let viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
@@ -358,7 +358,7 @@ fn test_extract_nonmergeSavePlan_multiple_alias_folders() {
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<ViewNode> =
+  let viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let result : Result<Vec<DefineNode>, String> =
     definenodes_from_tree (viewforest);
@@ -383,7 +383,7 @@ fn test_extract_nonmergeSavePlan_mixed_relations() {
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<ViewNode> =
+  let viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap();
@@ -412,7 +412,7 @@ fn extraction_preserves_content_and_independent_children (
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<ViewNode> =
+  let viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap();
@@ -439,7 +439,7 @@ fn extraction_skips_alias_and_id_display_nodes (
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<ViewNode> =
+  let viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap();
@@ -471,7 +471,7 @@ fn extraction_collects_subscribees_without_hidden_branches (
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<ViewNode> =
+  let viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap();
@@ -508,7 +508,7 @@ fn extraction_collects_overridden_folder (
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<ViewNode> =
+  let viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap();
@@ -538,7 +538,7 @@ fn empty_overridden_folder_means_empty_override_set (
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<ViewNode> =
+  let viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap();
@@ -565,7 +565,7 @@ fn write_protected_folder_members_save_themselves_but_not_their_owner (
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<ViewNode> =
+  let viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap();
@@ -697,7 +697,7 @@ fn subscribee_hiderel_intent_excludes_non_content_delete_and_phantom_children (
             **** (skg (node (id delete-me) (repo main) (editRequest delete))) delete me
             **** (skg (node (id phantom) (repo main))) phantom
             "};
-  let mut viewforest : Tree<ViewNode> =
+  let mut viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
   set_relationship_axes_unstaged_minus (&mut viewforest, "phantom");
   let intents : Vec<(ID, SubscribeeVisibility)> =
@@ -712,7 +712,7 @@ fn subscribee_hiderel_intent_excludes_non_content_delete_and_phantom_children (
        })]); }
 
 #[test]
-fn subscribee_hiderel_intent_ignores_hidden_scaffold_contents (
+fn subscribee_hiderel_intent_ignores_hidden_folder_contents (
 ) {
   let input : &str =
     indoc! {"
@@ -753,7 +753,7 @@ fn intent_layer_preserves_mixed_naive_instruction_shape (
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<ViewNode> =
+  let viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap();
@@ -797,7 +797,7 @@ fn split_extraction_passes_preserve_mixed_instruction_shape (
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<ViewNode> =
+  let viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap();
@@ -1135,7 +1135,7 @@ fn idfolder_resident_activeNode_saves_itself_but_is_not_content (
             ** (skg (node (id real-child) (repo main))) real child
             "};
 
-  let viewforest : Tree<ViewNode> =
+  let viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
   let instructions: Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap();
@@ -1274,7 +1274,7 @@ fn test_extract_nonmergeSavePlan_deep_nesting() {
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<ViewNode> =
+  let viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap();
@@ -1313,7 +1313,7 @@ fn test_extract_nonmergeSavePlan_error_missing_id() {
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let result : Result<Tree<ViewNode>, String> =
+  let result : Result<Tree<Viewnode>, String> =
     // This conversion fails because of missing ID
     maybePlaced_to_placed_tree (maybePlaced_viewforest);
 
@@ -1325,7 +1325,7 @@ fn test_extract_nonmergeSavePlan_error_missing_id() {
 
 #[test]
 fn test_extract_nonmergeSavePlan_empty_input() {
-  let viewforest: Tree<ViewNode> = Tree::new(viewforest_root_viewnode());
+  let viewforest: Tree<Viewnode> = Tree::new(viewforest_root_viewnode());
   let instructions: Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap();
 
@@ -1344,7 +1344,7 @@ fn test_extract_nonmergeSavePlan_only_aliases() {
 
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<ViewNode> =
+  let viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap();
@@ -1377,7 +1377,7 @@ fn test_extract_nonmergeSavePlan_complex_scenario() {
         "};
   let maybePlaced_viewforest : Tree<MpViewnode> =
     org_to_uninterpreted_nodes (input) . unwrap() . 0;
-  let viewforest: Tree<ViewNode> =
+  let viewforest: Tree<Viewnode> =
     maybePlaced_to_placed_tree (maybePlaced_viewforest) . unwrap();
   let instructions: Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap();
@@ -1428,7 +1428,7 @@ fn would_be_diff_phantom_child_is_excluded_from_contains (
             ** (skg (node (id a) (repo main))) a
             ** (skg (node (id b) (repo main))) b
         "};
-  let mut viewforest : Tree<ViewNode> =
+  let mut viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
   set_relationship_axes_unstaged_minus_keeping_active (&mut viewforest, "b");
   let instructions : Vec<DefineNode> =
@@ -1447,7 +1447,7 @@ fn toDelete_member_is_excluded_from_subscribees (
             *** (skg (node (id keep) (repo main))) keep
             *** (skg (node (id doomed) (repo main) (editRequest delete))) doomed
         "};
-  let viewforest : Tree<ViewNode> =
+  let viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
@@ -1465,7 +1465,7 @@ fn would_be_diff_phantom_member_is_excluded_from_subscribees (
             *** (skg (node (id keep) (repo main))) keep
             *** (skg (node (id ghost) (repo main))) ghost
         "};
-  let mut viewforest : Tree<ViewNode> =
+  let mut viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
   set_relationship_axes_unstaged_minus_keeping_active (&mut viewforest, "ghost");
   let instructions : Vec<DefineNode> =
@@ -1484,7 +1484,7 @@ fn toDelete_member_is_excluded_from_overriddens (
             *** (skg (node (id keep) (repo main))) keep
             *** (skg (node (id doomed) (repo main) (editRequest delete))) doomed
         "};
-  let viewforest : Tree<ViewNode> =
+  let viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
@@ -1502,7 +1502,7 @@ fn independent_member_is_excluded_from_overriddens (
             *** (skg (node (id keep) (repo main))) keep
             *** (skg (node (id bystander) (repo main) (affectsParent false))) bystander
         "};
-  let viewforest : Tree<ViewNode> =
+  let viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
@@ -1524,7 +1524,7 @@ fn would_be_diff_phantom_child_still_counts_as_visible_content (
             *** (skg (node (id subscribee) (repo main))) subscribee
             **** (skg (node (id still-visible) (repo main))) still visible
         "};
-  let mut viewforest : Tree<ViewNode> =
+  let mut viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
   set_relationship_axes_unstaged_minus_keeping_active (
     &mut viewforest, "still-visible");
@@ -1560,7 +1560,7 @@ fn duplicate_members_of_defining_folders_are_silently_deduplicated (
             *** (skg (node (id o2) (repo main) writeProtected)) o2
             *** (skg (node (id o1) (repo main) writeProtected)) o1
         "};
-  let viewforest : Tree<ViewNode> =
+  let viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
@@ -1598,7 +1598,7 @@ fn reordering_subscribees_reorders_subscribes_to (
             *** (skg (node (id a) (repo main))) a
             *** (skg (node (id b) (repo main))) b
         "};
-  let viewforest : Tree<ViewNode> =
+  let viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
@@ -1619,7 +1619,7 @@ fn removing_one_subscribee_keeps_the_rest (
             *** (skg (node (id a) (repo main))) a
             *** (skg (node (id c) (repo main))) c
         "};
-  let viewforest : Tree<ViewNode> =
+  let viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
@@ -1640,7 +1640,7 @@ fn reordering_overridden_folder_is_harmless (
             *** (skg (node (id b) (repo main))) b
             *** (skg (node (id a) (repo main))) a
         "};
-  let viewforest : Tree<ViewNode> =
+  let viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
@@ -1672,7 +1672,7 @@ fn deleting_from_hiddenFolder_emits_no_hide_change (
             ** (skg hiddenFolder)
             *** (skg (node (id hidden) (repo main))) hidden
         "};
-  let viewforest : Tree<ViewNode> =
+  let viewforest : Tree<Viewnode> =
     checked_viewforest_from_org (input);
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();

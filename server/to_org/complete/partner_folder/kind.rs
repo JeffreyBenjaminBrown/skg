@@ -12,7 +12,7 @@
 //! fact, 'PartnerFolder::policy', lives with the type.
 
 use crate::types::tree::generic::error_unless_node_satisfies;
-use crate::types::viewnode::{PartnerFolder, ViewNode, ViewNodeKind};
+use crate::types::viewnode::{PartnerFolder, Viewnode, ViewnodeKind};
 use crate::dbs::in_rust_graph::relation_accessors::{
   BinaryRolePosition,
   NodeRelation,
@@ -74,14 +74,14 @@ impl PartnerFolder {
   ///   "<caller_label>: expected <folder-kind>".
   pub fn error_unless_node_is_this_kind (
     self,
-    tree : &Tree<ViewNode>,
+    tree : &Tree<Viewnode>,
     node : NodeId,
   ) -> Result<(), Box<dyn Error>> {
     error_unless_node_satisfies (
       tree, node,
-      |vn : &ViewNode| matches! (
+      |vn : &Viewnode| matches! (
         &vn . kind,
-        ViewNodeKind::PartnerFolder (partnerFolder) if *partnerFolder == self ),
+        ViewnodeKind::PartnerFolder (partnerFolder) if *partnerFolder == self ),
       &format! ( "{}: expected {:?}",
                  self . caller_label (),
                  self ),

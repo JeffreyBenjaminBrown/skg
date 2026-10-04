@@ -18,7 +18,7 @@ use skg::types::maybe_placed_viewnode::{
 use skg::types::misc::ID;
 use skg::types::nodes::complete::Flag;
 use skg::types::tree::forest::ViewForest;
-use skg::types::viewnode::{ViewNode, ViewNodeKind, Vognode};
+use skg::types::viewnode::{Viewnode, ViewnodeKind, Vognode};
 
 fn collected_from_org (
   input : &str,
@@ -209,13 +209,13 @@ fn definitive_node_inside_diff_phantom_subtree_emits () {
       forest . nodes()
       . find ( |n| matches!(
           &n . value() . kind,
-          ViewNodeKind::Vognode (Vognode::Active (t))
+          ViewnodeKind::Vognode (Vognode::Active (t))
             if t . id == ID::from ("fading") ))
       . map ( |n| n . id() )
       . expect ("fading node not found");
-    { let tree : &mut Tree<ViewNode> =
+    { let tree : &mut Tree<Viewnode> =
         forest . as_internal_tree_mut();
-      if let ViewNodeKind::Vognode (Vognode::Active (t)) =
+      if let ViewnodeKind::Vognode (Vognode::Active (t)) =
         &mut tree . get_mut (fading_treeid) . unwrap() . value() . kind
       { t . relationship_axes . unstaged = Some (Sign::Minus); }
       tree . get_mut (fading_treeid) . unwrap()

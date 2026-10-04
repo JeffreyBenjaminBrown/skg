@@ -4,7 +4,7 @@ use crate::repo_sets::ActiveRepoSet;
 use crate::types::git::RepoDiff;
 use crate::types::misc::{SkgConfig, RepoName};
 use crate::types::tree::generic::{error_unless_node_satisfies, read_at_node_in_tree};
-use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest};
+use crate::types::viewnode::{Viewnode, ViewnodeKind, ViewRequest};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 use crate::types::viewnode::Vognode;
 
@@ -14,7 +14,7 @@ use std::error::Error;
 
 pub fn execute_activeNode_view_requests (
   node               : NodeId,
-  tree               : &mut Tree<ViewNode>,
+  tree               : &mut Tree<Viewnode>,
   graph              : &crate::dbs::in_rust_graph::InRustGraph,
   config             : &SkgConfig,
   errors             : &mut Vec<String>,
@@ -23,8 +23,8 @@ pub fn execute_activeNode_view_requests (
 ) -> Result<(), Box<dyn Error>> {
   error_unless_node_satisfies(
     tree, node,
-    |vn : &ViewNode| matches!( &vn . kind,
-                                ViewNodeKind::Vognode (Vognode::Active (_)) ),
+    |vn : &Viewnode| matches!( &vn . kind,
+                                ViewnodeKind::Vognode (Vognode::Active (_)) ),
     "execute_activeNode_view_requests: expected ActiveNode" )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
   let requests : Vec<(NodeId, ViewRequest)> =
@@ -36,7 +36,7 @@ pub fn execute_activeNode_view_requests (
   Ok(( )) }
 
 pub fn ensure_hiddenInFolder_under_definitive_subscribee (
-  tree   : &mut Tree<ViewNode>,
+  tree   : &mut Tree<Viewnode>,
   node   : NodeId,
   graph  : &crate::dbs::in_rust_graph::InRustGraph,
   config : &SkgConfig,
@@ -49,8 +49,8 @@ pub fn ensure_hiddenInFolder_under_definitive_subscribee (
   if ! is_subscribee { return Ok (( )); }
   let is_writeProtected : bool =
     read_at_node_in_tree( tree, node,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Active (t))
+      |vn : &Viewnode| match &vn . kind {
+        ViewnodeKind::Vognode (Vognode::Active (t))
           => t . is_writeProtected (),
         _ => false } )
     . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
@@ -65,13 +65,13 @@ pub fn ensure_hiddenInFolder_under_definitive_subscribee (
 /// only Folder/Path requests should remain here; execute_view_requests
 /// errors loudly if a Definitive one survives.
 fn extract_view_requests (
-  tree : &Tree<ViewNode>,
+  tree : &Tree<Viewnode>,
   node : NodeId,
 ) -> Result<Vec<(NodeId, ViewRequest)>, Box<dyn Error>> {
   let mut view_requests : HashSet<ViewRequest> =
     read_at_node_in_tree( tree, node,
-      |vn : &ViewNode| match &vn . kind {
-        ViewNodeKind::Vognode (Vognode::Active (t))
+      |vn : &Viewnode| match &vn . kind {
+        ViewnodeKind::Vognode (Vognode::Active (t))
           => t . view_requests . clone(),
         _ => HashSet::new() } )
     . map_err( |e| -> Box<dyn Error> { e . into() } )?;
@@ -85,7 +85,7 @@ fn extract_view_requests (
   let is_view_root : bool =
     tree . get (node)
       . and_then ( |n| n . parent () )
-      . map ( |p| matches! ( p . value () . kind, ViewNodeKind::BufferRoot ) )
+      . map ( |p| matches! ( p . value () . kind, ViewnodeKind::BufferRoot ) )
       . unwrap_or (false);
   if is_view_root {
     view_requests . remove (& ViewRequest::Path (RelationRole::CONTAINER)); }

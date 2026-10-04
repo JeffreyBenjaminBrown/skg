@@ -67,14 +67,14 @@ and some relationships to other nodes.
     they are represented as N's descendents in the org view:
 #+begin_example
   * N                                   # true node
-  ** its aliases                        # 'scaffold' node
-  *** alias 1                           # 'scaffold' node
-  *** alias 2                           # 'scaffold' node
+  ** its aliases                        # 'non-vognode' node
+  *** alias 1                           # 'non-vognode' node
+  *** alias 2                           # 'non-vognode' node
   ** the first SkgNode that N contains  # true node
   ** the second SkgNode that N contains # true node
 #+end_example
 As the comments indicate, some of those org nodes
-correspond to true skg nodes, while others ('scaffold' nodes)
+correspond to true skg nodes, while others ('non-vognode' nodes)
 describe an ancestor -- in this case, the SkgNode N.
 *** two familiar relations
 **** Nodes contain each other.

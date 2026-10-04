@@ -23,42 +23,42 @@ fn partnerFolder_policy_mapping () {
 
 #[test]
 fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
-  let mut active : ViewNode = mk_viewnode (
+  let mut active : Viewnode = mk_viewnode (
     ID::from ("active"), RepoName::from ("public"), "active" . into (),
     AffectsParent::True, Birth::Unremarkable,
     Editability::Definitive {
       body : None,
       edit_request : Some (NodeEditRequest::Delete) },
     [ViewRequest::Definitive] . into_iter () . collect () );
-  if let ViewNodeKind::Vognode (Vognode::Active (node)) = &mut active . kind {
+  if let ViewnodeKind::Vognode (Vognode::Active (node)) = &mut active . kind {
     node . relRepo_request = Some (RepoName::from ("private")); }
   active . consume_edit_request_after_save ();
-  let ViewNodeKind::Vognode (Vognode::Active (active)) = &active . kind
+  let ViewnodeKind::Vognode (Vognode::Active (active)) = &active . kind
   else { panic! ("expected active node"); };
   assert_eq! (active . relRepo_request, None);
   assert_eq! (active . edit_request (), None);
   assert! (active . view_requests . contains (&ViewRequest::Definitive));
 
-  let mut unknown : ViewNode = ViewNode {
+  let mut unknown : Viewnode = Viewnode {
     focused : false, folded : false, body_folded : false,
-    kind : ViewNodeKind::Phantom (Phantom::Unknown (PhantomUnknown {
+    kind : ViewnodeKind::Phantom (Phantom::Unknown (PhantomUnknown {
       id : ID::from ("unknown"),
       relRepo : None,
       relRepo_request : Some (RepoName::from ("private")), })) };
   unknown . consume_edit_request_after_save ();
-  let ViewNodeKind::Phantom (Phantom::Unknown (unknown)) = &unknown . kind
+  let ViewnodeKind::Phantom (Phantom::Unknown (unknown)) = &unknown . kind
   else { panic! ("expected unknown node"); };
   assert_eq! (unknown . relRepo_request, None);
 
-  let mut alias : ViewNode = ViewNode {
+  let mut alias : Viewnode = Viewnode {
     focused : false, folded : false, body_folded : false,
-    kind : ViewNodeKind::Qual (Qual::Alias {
+    kind : ViewnodeKind::Property (Property::Alias {
       text : "alias" . into (),
       relRepo : None,
       relRepo_request : Some (RepoName::from ("private")),
       relationship_axes : RelationshipAxes::default (), }) };
   alias . consume_edit_request_after_save ();
-  let ViewNodeKind::Qual (Qual::Alias { relRepo_request, .. }) =
+  let ViewnodeKind::Property (Property::Alias { relRepo_request, .. }) =
     &alias . kind
   else { panic! ("expected alias"); };
   assert_eq! (*relRepo_request, None);

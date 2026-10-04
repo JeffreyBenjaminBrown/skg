@@ -10,10 +10,10 @@
   If the root IDs of the view are the singleton set [1],
   then the view should look like:
   * 1
-  ** (skg (scaffold idFolder))
-  *** (skg (scaffold id) 1
-  *** (skg (scaffold id) (diff removed)) 2
-  *** (skg (scaffold id) (diff new)) 2'
+  ** (skg (non-vognode idFolder))
+  *** (skg (non-vognode id) 1
+  *** (skg (non-vognode id) (diff removed)) 2
+  *** (skg (non-vognode id) (diff new)) 2'
   *** 3
   ** child
   (I might have the metadata format wrong but that's the idea.)

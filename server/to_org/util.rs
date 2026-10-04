@@ -9,7 +9,7 @@ use crate::types::nodes::rust::NodeRust;
 use crate::types::tree::generic::{read_at_node_in_tree, read_at_ancestor_in_tree, with_node_mut};
 use crate::types::tree::viewnode_nodecomplete::write_at_activeNode_in_tree;
 use crate::types::viewnode::ViewRequest;
-use crate::types::viewnode::{ Birth, ViewNode, ViewNodeKind, Editability, AffectsParent, ActiveNode, mk_definitive_viewnode, mk_unknown_viewnode };
+use crate::types::viewnode::{ Birth, Viewnode, ViewnodeKind, Editability, AffectsParent, ActiveNode, mk_definitive_viewnode, mk_unknown_viewnode };
 use crate::types::viewnode::{Vognode, Phantom};
 use crate::types::tree::forest::{ViewForest, tree_forest_root_ids};
 
@@ -55,11 +55,11 @@ pub type DefinitiveMap =
 
 
 // ======================================================
-// Fetching, building and modifying NodeCompletes and ViewNodes
+// Fetching, building and modifying NodeCompletes and Viewnodes
 // ======================================================
 
 /// Fetch a NodeComplete from the in-Rust graph or disk. Resolves id→(pid,repo)
-/// via 'pid_and_repo_from_id', then reads. Makes a ViewNode with
+/// via 'pid_and_repo_from_id', then reads. Makes a Viewnode with
 /// validated title. Returns both.
 /// Returns Ok(None) when SKGID has no record anywhere -- not as a
 /// primary pid or extra_id in the captured graph.
@@ -69,7 +69,7 @@ pub fn nodecomplete_and_viewnode_from_id (
   graph  : &InRustGraph,
   config : &SkgConfig,
   skgid  : &ID,
-) -> Result < Option<( NodeComplete, ViewNode )>, Box<dyn Error> > {
+) -> Result < Option<( NodeComplete, Viewnode )>, Box<dyn Error> > {
   let resolved : Option<(ID, RepoName)> =
     { let _span : tracing::span::EnteredSpan = tracing::info_span!(
         "nodecomplete_and_viewnode_from_id" ). entered();
@@ -88,13 +88,13 @@ pub fn nodecomplete_and_viewnode_from_id (
         Err (e) => Err (e), } } }
 
 /// Fetch a NodeComplete from the in-Rust graph or disk given PID and repo.
-/// Makes an ViewNode with validated title. Returns both.
+/// Makes an Viewnode with validated title. Returns both.
 pub(super) fn nodecomplete_and_viewnode_from_pid_and_repo (
   graph  : &InRustGraph,
   config : &SkgConfig,
   pid    : &ID,
   repo : &RepoName,
-) -> Result < ( NodeComplete, ViewNode ), Box<dyn Error> > {
+) -> Result < ( NodeComplete, Viewnode ), Box<dyn Error> > {
   let nodecomplete : NodeComplete =
     nodecomplete_graphFirst_by_pid_and_repo (
       graph, config, pid, repo )?;
@@ -104,7 +104,7 @@ pub(super) fn nodecomplete_and_viewnode_from_pid_and_repo (
       io::ErrorKind::InvalidData,
       format! ( "NodeComplete with ID {} has an empty title",
                  pid ), )) ); }
-  let viewnode : ViewNode = mk_definitive_viewnode (
+  let viewnode : Viewnode = mk_definitive_viewnode (
     pid . clone (),
     repo . clone (),
     title,
@@ -114,7 +114,7 @@ pub(super) fn nodecomplete_and_viewnode_from_pid_and_repo (
 /// Set node to write-protected,
 /// and reset title and repo.
 pub(super) fn makeWriteProtectedAndClobber (
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   node_id : NodeId,
   graph   : &crate::dbs::in_rust_graph::InRustGraph,
   config  : &SkgConfig,
@@ -134,7 +134,7 @@ pub(super) fn makeWriteProtectedAndClobber (
 /// - handle repeats, cycles and the visited map
 /// - build a subscribee branch if needed
 pub fn complete_branch_minus_content (
-  tree     : &mut Tree<ViewNode>,
+  tree     : &mut Tree<Viewnode>,
   node_id  : NodeId,
   visited  : &mut DefinitiveMap,
   graph    : &crate::dbs::in_rust_graph::InRustGraph,
@@ -166,11 +166,11 @@ pub fn complete_branch_minus_content (
 /// with marking things write-protected, because the defmap
 /// is how we know whether to mark something write-protected.
 pub fn make_writeProtected_if_repeat_then_extend_defmap (
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   node_id : NodeId,
   defMap  : &mut DefinitiveMap,
 ) -> Result<(), Box<dyn Error>> {
-  let pid : ID = // Will error if node is a Scaffold.
+  let pid : ID = // Will error if node is a Non-vognode.
     get_id_from_treenode ( tree, node_id ) ?;
   let is_writeProtected : bool =
     write_at_activeNode_in_tree (
@@ -188,7 +188,7 @@ pub fn make_writeProtected_if_repeat_then_extend_defmap (
 /// Check if the node's PID appears in its ancestors,
 /// and if so, mark viewData.cycle = true.
 pub fn detect_and_mark_cycle_v1 (
-  tree    : &mut Tree<ViewNode>,
+  tree    : &mut Tree<Viewnode>,
   node_id : NodeId,
 ) -> Result<(), Box<dyn Error>> {
   let is_cycle : bool = {
@@ -228,15 +228,15 @@ pub fn stub_viewforest_from_root_ids (
 
 /// Mark forest-root ActiveNodes as having no parent in the view.
 pub fn mark_view_roots_parent_na (
-  viewforest : &mut Tree<ViewNode>,
+  viewforest : &mut Tree<Viewnode>,
 ) {
   let root_ids : Vec<NodeId> =
     tree_forest_root_ids (viewforest);
   for root_id in root_ids {
-    let mut node_mut : NodeMut<ViewNode> =
+    let mut node_mut : NodeMut<Viewnode> =
       viewforest . get_mut (root_id) . unwrap ();
-    let vn : &mut ViewNode = node_mut . value ();
-    if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
+    let vn : &mut Viewnode = node_mut . value ();
+    if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
       = vn . kind
       { t . affectsParent = AffectsParent::NA; }}}
 
@@ -267,7 +267,7 @@ pub fn mark_view_roots_parent_na (
 /// graph before the rerender pass runs (see
 /// 'update_views_after_save').
 pub fn validate_affectsParent_relationships (
-  viewforest : &mut Tree<ViewNode>,
+  viewforest : &mut Tree<Viewnode>,
   graph  : &InRustGraph,
 ) {
   // Collect correction targets in a read-only first pass so the
@@ -282,14 +282,14 @@ pub fn validate_affectsParent_relationships (
     if let Edge::Open (child_ref) = edge {
       let child_tn : &ActiveNode =
         match & child_ref . value () . kind {
-          ViewNodeKind::Vognode (Vognode::Active (t)) => t,
+          ViewnodeKind::Vognode (Vognode::Active (t)) => t,
           _ => continue };
-      let parent_ref : NodeRef<ViewNode> = match child_ref . parent () {
+      let parent_ref : NodeRef<Viewnode> = match child_ref . parent () {
         Some (p) => p, None => continue };
       let parent_tn : &ActiveNode =
         match & parent_ref . value () . kind {
-          ViewNodeKind::Vognode (Vognode::Active (t)) => t,
-          // A non-ActiveNode parent (BufferRoot, Scaffold, Deleted, DeletedScaff) is not a legitimate subject for any of these relational claims; skip without correcting.
+          ViewnodeKind::Vognode (Vognode::Active (t)) => t,
+          // A non-ActiveNode parent (BufferRoot, a property or folder, Deleted, DeadViewnode) is not a legitimate subject for any of these relational claims; skip without correcting.
           _ => continue };
       if child_tn . affectsParent == AffectsParent::NA {
         // The child was a root, and the user gave it a parent, so let the parent contain it.
@@ -320,37 +320,37 @@ pub fn validate_affectsParent_relationships (
         Birth::Unremarkable => true, };
       if ! birth_claim_ok { to_unremarkable . push ( child_ref . id () ); }}}
   for id in to_independent {
-    let mut node_mut : NodeMut<ViewNode> =
+    let mut node_mut : NodeMut<Viewnode> =
       viewforest . get_mut (id) . unwrap ();
-    if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
+    if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
       = node_mut . value () . kind
     { t . affectsParent = AffectsParent::False; } }
   for id in to_affected {
-    let mut node_mut : NodeMut<ViewNode> =
+    let mut node_mut : NodeMut<Viewnode> =
       viewforest . get_mut (id) . unwrap ();
-    if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
+    if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
       = node_mut . value () . kind
     { t . affectsParent = AffectsParent::True; } }
   for id in to_unremarkable {
-    let mut node_mut : NodeMut<ViewNode> =
+    let mut node_mut : NodeMut<Viewnode> =
       viewforest . get_mut (id) . unwrap ();
-    if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
+    if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
       = node_mut . value () . kind
     { t . birth = Birth::Unremarkable; } } }
 
 /// Jeff's invariant (TODO/DONE/local-view-update/progress.org §11 thread): a *non-dead generalized orphan*
 /// must have AffectsParent=False. A Active node whose PARENT is a
-/// non-container -- a Diff phantom, a Deleted, or a DeadScaffold -- is exactly
+/// non-container -- a Diff phantom, a Deleted, or a DeadViewnode -- is exactly
 /// that: it survives (is not itself dead) but its container is gone, so its
 /// =Affected= claim (that it is part of that parent's membership) cannot hold.
 /// Demote it to Independent so it renders as its own graph-contains root rather
 /// than claiming to affect a parent that no longer contains anything.
 ///
 /// Scope, deliberately narrow:
-/// - PARENT is Diff phantom / Deleted / DeadScaffold -> demote an Affected child.
-/// - PARENT is a Folder (QualFolder / PartnerFolder): the child is a legitimate folder
+/// - PARENT is Diff phantom / Deleted / DeadViewnode -> demote an Affected child.
+/// - PARENT is a Folder (PropertyFolder / PartnerFolder): the child is a legitimate folder
 ///   MEMBER; Affected is correct -> leave. (A folder whose own ancestry broke is
-///   deadened to DeadScaffold first, and then THIS pass catches its members.)
+///   deadened to DeadViewnode first, and then THIS pass catches its members.)
 /// - PARENT is an Active vognode: handled by validate_affectsParent_relationships.
 /// - PARENT is BufferRoot: the child is a forest root, handled by
 ///   mark_view_roots_parent_na.
@@ -361,27 +361,27 @@ pub fn validate_affectsParent_relationships (
 /// phantom's content children), in both the post-save and de-novo paths. Purely
 /// structural -- no graph read.
 pub fn mark_orphans_under_dead_parents_false (
-  viewforest : &mut Tree<ViewNode>,
+  viewforest : &mut Tree<Viewnode>,
 ) {
   let mut targets : Vec<NodeId> = Vec::new ();
   for edge in viewforest . root () . traverse () {
     if let Edge::Open (child_ref) = edge {
       let is_affected_normal : bool =
         matches! ( & child_ref . value () . kind,
-          ViewNodeKind::Vognode (Vognode::Active (t))
+          ViewnodeKind::Vognode (Vognode::Active (t))
             if t . affectsParent == AffectsParent::True );
       if ! is_affected_normal { continue; }
       let affects_parent_non_container : bool =
         child_ref . parent () . map_or ( false, |p|
           matches! ( & p . value () . kind,
-            ViewNodeKind::Phantom (Phantom::Diff (_))
-              | ViewNodeKind::Phantom (Phantom::Deleted (_))
-              | ViewNodeKind::DeadScaffold ) );
+            ViewnodeKind::Phantom (Phantom::Diff (_))
+              | ViewnodeKind::Phantom (Phantom::Deleted (_))
+              | ViewnodeKind::DeadViewnode ) );
       if affects_parent_non_container { targets . push ( child_ref . id () ); }}}
   for id in targets {
-    let mut node_mut : NodeMut<ViewNode> =
+    let mut node_mut : NodeMut<Viewnode> =
       viewforest . get_mut (id) . unwrap ();
-    if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
+    if let ViewnodeKind::Vognode (Vognode::Active ( ref mut t ))
       = node_mut . value () . kind
     { t . affectsParent = AffectsParent::False; } } }
 
@@ -403,7 +403,7 @@ fn child_contained_by_parent (
       == child_pid ) }
 
 pub fn ids_that_can_have_graphnodestats (
-  tree : &Tree<ViewNode>,
+  tree : &Tree<Viewnode>,
 ) -> Vec < ID > {
   let mut ids : Vec < ID > = Vec::new ();
   for edge in tree . root () . traverse () {
@@ -416,7 +416,7 @@ pub fn ids_that_can_have_graphnodestats (
 /// Check if `target_skgid` appears in the ancestor path of `treeid`.
 /// Used for cycle detection.
 fn is_ancestor_id (
-  tree          : &Tree<ViewNode>,
+  tree          : &Tree<Viewnode>,
   origin_treeid : NodeId,
   target_skgid  : &ID,
 ) -> Result<bool, Box<dyn Error>> {
@@ -434,16 +434,16 @@ fn is_ancestor_id (
       Err (_) => return Ok (false), }}
   unreachable!() }
 
-/// Errors if the node is a Scaffold or not found.
+/// Errors if the node is a Non-vognode or not found.
 pub fn get_id_from_treenode (
-  tree   : &Tree<ViewNode>,
+  tree   : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Result < ID, Box<dyn Error> > {
-  let node_kind: ViewNodeKind =
+  let node_kind: ViewnodeKind =
     read_at_node_in_tree (
       tree, treeid, |viewnode| viewnode . kind . clone() )?;
   match node_kind {
-    ViewNodeKind::Vognode (v)
+    ViewnodeKind::Vognode (v)
       => v . id () . cloned () . ok_or_else (
            || "get_id_from_treenode: inactive vognode has no id"
               . into () ),
@@ -458,7 +458,7 @@ pub fn get_id_from_treenode (
 /// - If tree_and_parent is None, creates a new tree (not returned).
 /// - If tree_and_parent is Some, appends to the existing tree.
 pub fn build_node_branch_minus_content (
-  tree_and_parent : Option<(&mut Tree<ViewNode>, NodeId)>, // if modifying an existing tree, attach as a child here
+  tree_and_parent : Option<(&mut Tree<Viewnode>, NodeId)>, // if modifying an existing tree, attach as a child here
   skgid           : &ID, // what to fetch
   graph           : &crate::dbs::in_rust_graph::InRustGraph,
   config          : &SkgConfig,
@@ -469,12 +469,12 @@ pub fn build_node_branch_minus_content (
   let result : Result < NodeId, Box<dyn Error> > =
     match tree_and_parent {
       Some ( (tree, parent_treeid) ) => {
-        let lookup : Option<(NodeComplete, ViewNode)> =
+        let lookup : Option<(NodeComplete, Viewnode)> =
           nodecomplete_and_viewnode_from_id (
             graph, config, skgid ) ?;
         match lookup {
           Some ((_nc, viewnode)) => {
-            let child_treeid : NodeId = // Add ViewNode to tree
+            let child_treeid : NodeId = // Add Viewnode to tree
               with_node_mut (
                 tree, parent_treeid,
                 ( |mut parent_mut|
@@ -485,7 +485,7 @@ pub fn build_node_branch_minus_content (
               graph, config, active_repo_set ) ?;
             Ok (child_treeid) },
           None => { // Uknown node. Add it, don't 'complete' it.
-            let viewnode : ViewNode =
+            let viewnode : Viewnode =
               mk_unknown_viewnode (skgid . clone ());
             let child_treeid : NodeId =
               with_node_mut (
@@ -495,12 +495,12 @@ pub fn build_node_branch_minus_content (
               . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
             Ok (child_treeid) }} },
       None => {
-        let lookup : Option<(NodeComplete, ViewNode)> =
+        let lookup : Option<(NodeComplete, Viewnode)> =
           nodecomplete_and_viewnode_from_id (
             graph, config, skgid ) ?;
         match lookup {
           Some ((_nc, viewnode)) => {
-            let mut tree : Tree<ViewNode> =
+            let mut tree : Tree<Viewnode> =
               Tree::new (viewnode);
             let root_treeid : NodeId = tree . root () . id ();
             complete_branch_minus_content (
@@ -508,9 +508,9 @@ pub fn build_node_branch_minus_content (
               graph, config, active_repo_set ) ?;
             Ok (root_treeid) },
           None => { // A singleton tree with an PhantomUnknown.
-            let viewnode : ViewNode =
+            let viewnode : Viewnode =
               mk_unknown_viewnode (skgid . clone ());
-            let tree : Tree<ViewNode> = Tree::new (viewnode);
+            let tree : Tree<Viewnode> = Tree::new (viewnode);
             Ok (tree . root () . id ()) }} }, };
   tracing::info!("{}: {:.3}s",
                  format! ("build_node_branch_minus_content({})", skgid),
@@ -518,25 +518,25 @@ pub fn build_node_branch_minus_content (
   result }
 
 // ==============================================
-// Reading from NodeCompletes and ViewNodes, esp. in trees
+// Reading from NodeCompletes and Viewnodes, esp. in trees
 // ==============================================
 
 /// Check if an ActiveNode is write-protected.
-/// Errs if given a Scaffold.
+/// Errs if given a Non-vognode.
 pub fn activeNode_in_tree_is_writeProtected (
-  tree   : &Tree<ViewNode>,
+  tree   : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Result < bool, Box<dyn Error> > {
-  let node_kind: ViewNodeKind =
+  let node_kind: ViewnodeKind =
     read_at_node_in_tree ( tree, treeid,
                            |viewnode| viewnode . kind . clone() )
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   match node_kind {
-    ViewNodeKind::Vognode (Vognode::Active (t))   => Ok (t . is_writeProtected ()),
-    ViewNodeKind::Phantom (Phantom::Diff (p)) => Ok (p . is_writeProtected ()),
-    ViewNodeKind::Phantom (Phantom::Deleted (_))
-      | ViewNodeKind::Vognode (Vognode::Inactive (_))
-      | ViewNodeKind::Phantom (Phantom::Unknown (_)) => Ok (false),
+    ViewnodeKind::Vognode (Vognode::Active (t))   => Ok (t . is_writeProtected ()),
+    ViewnodeKind::Phantom (Phantom::Diff (p)) => Ok (p . is_writeProtected ()),
+    ViewnodeKind::Phantom (Phantom::Deleted (_))
+      | ViewnodeKind::Vognode (Vognode::Inactive (_))
+      | ViewnodeKind::Phantom (Phantom::Unknown (_)) => Ok (false),
     _                                                => Err (
       "is_writeProtected: caller must pass a vognode" . into( )),
   }}
@@ -544,10 +544,10 @@ pub fn activeNode_in_tree_is_writeProtected (
 /// Collect all child tree NodeIds from a node.
 /// Returns an error if the node is not found.
 pub fn collect_child_treeids (
-  tree    : &Tree<ViewNode>,
+  tree    : &Tree<Viewnode>,
   treeid : NodeId,
 ) -> Result < Vec < NodeId >, Box<dyn Error> > {
-  let node_ref : NodeRef < ViewNode > =
+  let node_ref : NodeRef < Viewnode > =
     tree . get (treeid)
     . ok_or ("collect_child_treeids: NodeId not in tree") ?;
   Ok ( node_ref . children () . map ( |c| c . id () ) . collect () ) }
@@ -568,13 +568,13 @@ pub(super) fn remove_completed_view_request<T> (
   errors       : &mut Vec < String >,
   result       : Result < (), Box<dyn Error> >,
 ) -> Result < (), Box<dyn Error> >
-where T: AsMut<ViewNode>,
+where T: AsMut<Viewnode>,
 {
   if let Err (e) = result {
     errors . push ( format! ( "{}: {}", error_msg, e )); }
   let mut node_mut : NodeMut<T> =
     tree . get_mut (node_id) . ok_or ("remove_completed_view_request: node not found") ?;
-  if let ViewNodeKind::Vognode (Vognode::Active (t))
+  if let ViewnodeKind::Vognode (Vognode::Active (t))
     = &mut node_mut . value () . as_mut () . kind
     { t . view_requests . remove (&view_request); }
   Ok (()) }

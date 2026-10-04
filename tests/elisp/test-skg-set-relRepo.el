@@ -127,7 +127,7 @@ org-parent), relation = the folder's relation."
        (should (string-match-p "Root headline" (cadr err)))))))
 
 (ert-deftest test-rel-refuses-off-activeNode ()
-  "Refuses on a scaffold headline (no (node ...) form)."
+  "Refuses on a non-vognode headline (no (node ...) form)."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (repo public))) owner\n"
@@ -219,7 +219,7 @@ the displayed relRepo fact; its message says the SAVED repo survives
        (should (equal (test--buffer-line 1) before))))))
 
 (ert-deftest test-apply-relRepo-on-alias-uses-flat-metadata ()
-  "Alias relRepo intent is a flat scaffold editRequest, not node viewStats."
+  "Alias relRepo intent is a flat non-vognode editRequest, not node viewStats."
   (test--with-skg-content-view
    (concat
     "* (skg (node (id owner) (repo public))) owner\n"

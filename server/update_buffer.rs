@@ -34,8 +34,8 @@ use crate::types::tree::generic::{ do_everywhere_in_tree_dfs, do_everywhere_in_t
 use crate::types::tree::forest::ViewForest;
 use crate::to_org::util::{mark_view_roots_parent_na, validate_affectsParent_relationships, mark_orphans_under_dead_parents_false};
 use crate::update_buffer::warnings::{CompletionWarning, render_completion_warnings};
-use crate::types::viewnode::{Editability, ViewNode, ViewNodeKind};
-use crate::types::viewnode::{Vognode, Phantom, QualFolder, Qual, ViewRequest};
+use crate::types::viewnode::{Editability, Viewnode, ViewnodeKind};
+use crate::types::viewnode::{Vognode, Phantom, PropertyFolder, Property, ViewRequest};
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
 
 use ego_tree::{Tree, NodeId, NodeMut};
@@ -95,7 +95,7 @@ impl<'a> RerenderAfterSaveContext<'a> {
       . unwrap_or_default();
     let deleted_by_this_save_pids : HashSet<ID> =
       // PITFALL: Can overlap deleted_since_head_pid_src_map, but neither is necessarily a subset of the other. If you delete something that you added since head, it will only be here. And if you deleted something since head but not in this save, it will only be there.
-      // PITFALL: Looks dangerous but isn't: Each nodeMerge includes an acquiree deletion. This would make ViewNodes with that ID invalid (since ViewNodes by this point should have PIDs). It doesn't, though, because rewriteInPlace_viewnodes_whose_id_is_newly_extra will rewrite those ViewNodes to instead use the acquirer's PID (i.e. to depict the acquirer now, instead of the acquiree as before) before using this set.
+      // PITFALL: Looks dangerous but isn't: Each nodeMerge includes an acquiree deletion. This would make Viewnodes with that ID invalid (since Viewnodes by this point should have PIDs). It doesn't, though, because rewriteInPlace_viewnodes_whose_id_is_newly_extra will rewrite those Viewnodes to instead use the acquirer's PID (i.e. to depict the acquirer now, instead of the acquiree as before) before using this set.
       define_nodes . iter()
       . filter_map( |instr| match instr {
         DefineNode::Delete (d) => Some( d . id . clone() ),
@@ -280,7 +280,7 @@ fn active_ids_in_viewforest (
 ) -> Vec<ID> {
   viewforest . nodes ()
     .filter_map ( |node| match &node . value () . kind {
-      ViewNodeKind::Vognode (Vognode::Active (active)) =>
+      ViewnodeKind::Vognode (Vognode::Active (active)) =>
         Some ( active . id . clone () ),
       _ => None,
     } )
@@ -302,7 +302,7 @@ fn replace_saved_view_fork_roots (
     let original : Option<ID> =
       viewforest . get (root_id) . and_then (|root| match
         &root . value () . kind {
-          ViewNodeKind::Vognode (Vognode::Active (active)) =>
+          ViewnodeKind::Vognode (Vognode::Active (active)) =>
             Some (active . id . clone ()),
           _ => None, });
     let Some (original) = original else { continue; };
@@ -312,7 +312,7 @@ fn replace_saved_view_fork_roots (
     let clone = & spec . clone . 0;
     let mut root = viewforest . get_mut (root_id)
       . ok_or ("replace_saved_view_fork_roots: root not found") ?;
-    if let ViewNodeKind::Vognode (Vognode::Active (active)) =
+    if let ViewnodeKind::Vognode (Vognode::Active (active)) =
       &mut root . value () . kind
     { active . id = clone . pid . clone ();
       active . home_repo = clone . home_repo . clone ();
@@ -397,7 +397,7 @@ pub fn render_initial_view (
   // ViewRequest::Definitive; adding one would over-trigger the TODO/DONE/local-view-update/plan_v2.org §5.3 cascade.)
   for root_nid in viewforest . root_ids () {
     if let Some (mut node_mut) = viewforest . get_mut (root_nid) {
-      if let ViewNodeKind::Vognode (Vognode::Active (t)) =
+      if let ViewnodeKind::Vognode (Vognode::Active (t)) =
         &mut node_mut . value () . kind
       { t . view_requests . insert ( ViewRequest::Path (RelationRole::CONTAINER) ); }} }
   let graph_snap : Arc<InRustGraph> = runtime . graph . clone ();
@@ -405,7 +405,7 @@ pub fn render_initial_view (
   let mut errors : Vec<String> = Vec::new ();
   // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): de-novo diff is computed INLINE by view completion, exactly
   // like post-save -- compute the real diffs here and feed them via repo_diffs
-  // (which drives the inline process_activeNode_diff and the diff-aware QualFolder /
+  // (which drives the inline process_activeNode_diff and the diff-aware PropertyFolder /
   // PartnerFolder reconcilers).
   let real_diffs : Option<HashMap<RepoName, RepoDiff>> =
     if diff_mode { Some ( compute_diff_for_every_repo (&runtime . config) ) }
@@ -456,7 +456,7 @@ pub fn rerender_view (
       defmap                         : &mut defmap,
       // The real per-repo diffs drive ALL diff inline: process_activeNode_diff
       // (content axes + phantom flip + TextChanged/IDFolder/AliasFolder) and the
-      // diff-aware QualFolder / PartnerFolder reconcilers, each at its own BFS visit
+      // diff-aware PropertyFolder / PartnerFolder reconcilers, each at its own BFS visit
       // (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3). The content reconcile itself stays worktree-only.
       repo_diffs                   : &context . repo_diffs,
       runtime                        : &context . runtime,
@@ -480,7 +480,7 @@ pub fn rerender_view (
         "complete_viewforest" ). entered();
       complete_viewforest (
         viewforest, &mut completion_context ) ? }; }
-  // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the content/scaffold diff was applied INLINE during the
+  // TODO/DONE/local-view-update/plan_v2.org §9 reversal (#3): the content/non-vognode diff was applied INLINE during the
   // BFS above (process_activeNode_diff at each Active node's visit, driven by
   // repo_diffs = the real diffs).
   let result : String =
@@ -529,7 +529,7 @@ pub fn finish_viewforest (
       viewforest, graph, config, active_repo_set ) ? ; }
   mark_view_roots_parent_na ( viewforest );
   // §A (Jeff's invariant): an Active survivor left under a non-container parent
-  // (a phantom / Deleted / DeadScaffold) is a non-dead generalized orphan and
+  // (a phantom / Deleted / DeadViewnode) is a non-dead generalized orphan and
   // must become Independent.
   mark_orphans_under_dead_parents_false ( viewforest );
   // Correct any affectsParent markers whose claimed relation to the parent doesn't
@@ -555,9 +555,9 @@ pub fn finish_viewforest (
     viewforest_to_string ( viewforest, config ) } }
 
 /// When the server first receives the buffer, it replaces
-/// each ViewNode's ID with a PID (`replace_ids_with_pids`).
+/// each Viewnode's ID with a PID (`replace_ids_with_pids`).
 /// Later it updates the graph, which can involve merging nodes.
-/// After a nodeMerge, the acquiree is gone, and what was the ViewNode
+/// After a nodeMerge, the acquiree is gone, and what was the Viewnode
 /// onto it now an extra_id of the acquirer, not a PID.
 /// This is intended to replaces such a
 /// viewnode to carry the primary's pid, repo, title, and body.
@@ -570,7 +570,7 @@ pub fn finish_viewforest (
 /// It merely identifies each ActiveNode in 'viewforest'
 /// whose pid is an extra_id of some distinct node in the snapshot.
 fn rewriteInPlace_viewnodes_whose_id_is_newly_extra (
-  viewforest : &mut Tree<ViewNode>,
+  viewforest : &mut Tree<Viewnode>,
   graph_snap : &Arc<InRustGraph>,
 ) -> Result<(), Box<dyn Error>> {
   let nodeids : Vec<NodeId> =
@@ -584,7 +584,7 @@ fn rewriteInPlace_viewnodes_whose_id_is_newly_extra (
       match &n_ref . value () . kind {
         // Only Active nodes are rewritten below (a phantom is never an
         // editable instance), so only they need a swap computed.
-        ViewNodeKind::Vognode (Vognode::Active (t))
+        ViewnodeKind::Vognode (Vognode::Active (t))
           => { match graph_snap . pid_of (&t . id)
                { Some (primary) if primary != t . id => {
                      graph_snap . get (&primary) . map ( |r| (
@@ -597,7 +597,7 @@ fn rewriteInPlace_viewnodes_whose_id_is_newly_extra (
     if let Some ((new_pid, new_repo, new_title, new_body)) = swap
     { let mut n_mut = viewforest . get_mut (nid)
         . ok_or ("rewriteInPlace_viewnodes_whose_id_is_newly_extra: node_mut failed") ?;
-      if let ViewNodeKind::Vognode (Vognode::Active (t))
+      if let ViewnodeKind::Vognode (Vognode::Active (t))
       = &mut n_mut . value () . kind
       { t . id = new_pid;
         t . home_repo = new_repo;
@@ -614,7 +614,7 @@ fn strip_stale_diff_state (
   viewforest : &mut ViewForest
 ) -> Result<(), Box<dyn Error>> {
   remove_branches_that_git_marked_removed (viewforest) ?;
-  remove_diff_only_scaffolds (viewforest) ?;
+  remove_diff_only_properties (viewforest) ?;
   clear_diff_metadata (viewforest) ?;
   Ok (( )) }
 
@@ -623,9 +623,9 @@ fn strip_stale_diff_state (
 /// but a forest root is removed, whatever its affectsParent. Disposal depends on
 /// whether it has children:
 ///   - childless phantom -> detached (deleted) and its branch pruned;
-///   - phantom WITH children -> demoted to DeadScaffold, so any real user
+///   - phantom WITH children -> demoted to DeadViewnode, so any real user
 ///     subtree parented under it survives (the TODO/DONE/local-view-update/plan_v2.org §3.4 postorder prune sweep
-///     later removes the DeadScaffold if it ends up childless). We recurse
+///     later removes the DeadViewnode if it ends up childless). We recurse
 ///     into it so nested phantoms are stripped too.
 /// Exception: a forest root (top-level view node) is NOT stripped -- stripping
 /// it would empty the view, and unlike a content phantom the diff overlay does
@@ -655,7 +655,7 @@ fn remove_branches_that_git_marked_removed (
   do_everywhere_in_tree_dfs_prunable (
     viewforest,
     viewforest_root_id,
-    &mut |mut node : NodeMut<ViewNode>| -> Result<bool, String> {
+    &mut |mut node : NodeMut<Viewnode>| -> Result<bool, String> {
       let is_viewforest_root_child : bool = {
         match node . parent() {
           Some (p) =>
@@ -663,13 +663,13 @@ fn remove_branches_that_git_marked_removed (
           None => false } };
       let is_phantom : bool =
         matches! ( &node . value() . kind,
-          ViewNodeKind::Phantom (Phantom::Diff (_)) );
+          ViewnodeKind::Phantom (Phantom::Diff (_)) );
       if ! is_phantom || is_viewforest_root_child {
         return Ok (true); } // not a strippable phantom: recurse normally
       if node . has_children () {
         // Keep any real subtree the user parented here; mark this dead and
         // recurse so nested phantoms are still stripped.
-        node . value() . kind = ViewNodeKind::DeadScaffold;
+        node . value() . kind = ViewnodeKind::DeadViewnode;
         Ok (true)
       } else {
         node . detach();
@@ -677,7 +677,7 @@ fn remove_branches_that_git_marked_removed (
       }} )? ;
   Ok (( )) }
 
-/// Remove scaffolds that exist only to display diff information:
+/// Remove non-vognodes that exist only to display diff information:
 /// TextChanged and IDFolder.
 /// These are regenerated from scratch by 'process_activeNode_diff' (the inline
 /// per-node diff) at each node's BFS visit, so stale ones must be stripped first.
@@ -686,7 +686,7 @@ fn remove_branches_that_git_marked_removed (
 /// is not worth the complexity. Phantom Alias children (injected by
 /// diff mode) are cleaned up by reconcile_aliasFolder_children during the postorder
 /// pass: its goal list won't include them, so they are detached.
-fn remove_diff_only_scaffolds (
+fn remove_diff_only_properties (
   viewforest : &mut ViewForest
 ) -> Result<(), Box<dyn Error>> {
   let viewforest_root_id : NodeId =
@@ -694,20 +694,20 @@ fn remove_diff_only_scaffolds (
   do_everywhere_in_tree_dfs_prunable (
     viewforest,
     viewforest_root_id,
-    &mut |mut node : NodeMut<ViewNode>| -> Result<bool, String> {
-      let is_diff_scaffold : bool =
+    &mut |mut node : NodeMut<Viewnode>| -> Result<bool, String> {
+      let is_diff_only_property : bool =
         matches! ( &node . value() . kind,
-          ViewNodeKind::Qual (Qual::TextChanged { .. }) |
-          ViewNodeKind::QualFolder (QualFolder::ID) );
-      if is_diff_scaffold {
+          ViewnodeKind::Property (Property::TextChanged { .. }) |
+          ViewnodeKind::PropertyFolder (PropertyFolder::ID) );
+      if is_diff_only_property {
         node . detach();
         Ok (false) // pruned — don't recurse into detached children
       } else { Ok (true) } } ) ?;
   Ok (( )) }
 
 /// Clear diff metadata from all ActiveNodes in the viewforest.
-/// Diff-only scaffolds (TextChanged, IDFolder) are
-/// removed by 'remove_diff_only_scaffolds' before this runs.
+/// Diff-only non-vognodes (TextChanged, IDFolder) are
+/// removed by 'remove_diff_only_properties' before this runs.
 fn clear_diff_metadata (
   viewforest : &mut ViewForest
 ) -> Result<(), Box<dyn Error>> {
@@ -717,16 +717,16 @@ fn clear_diff_metadata (
     viewforest,
     viewforest_root_id,
     true,
-    &mut |mut node : NodeMut<ViewNode>| -> Result<(), String>
-      { // Ignores scaffolds: some (Alias, ID) carry diff data,
+    &mut |mut node : NodeMut<Viewnode>| -> Result<(), String>
+      { // Ignores non-vognodes: some (Alias, ID) carry diff data,
         // but they are regenerated from scratch by their reconcilers at their
         // own BFS visit, so clearing them here is unnecessary.
         match &mut node . value() . kind {
-          ViewNodeKind::Vognode (Vognode::Active (t)) => {
+          ViewnodeKind::Vognode (Vognode::Active (t)) => {
             t . node_axes  = NodeAxes::default ();
             t . relationship_axes = RelationshipAxes::default ();
             t . not_in_git = false; }
-          ViewNodeKind::Phantom (Phantom::Diff (p)) => {
+          ViewnodeKind::Phantom (Phantom::Diff (p)) => {
             p . node_axes  = NodeAxes::default ();
             p . relationship_axes = RelationshipAxes::default ();
             p . not_in_git = false; }
@@ -757,7 +757,7 @@ fn fulfill_root_containerward_requests (
     viewforest . root_ids () . into_iter ()
       . filter ( |nid| viewforest . get (*nid)
           . map ( |n| match &n . value () . kind {
-              ViewNodeKind::Vognode (Vognode::Active (t)) =>
+              ViewnodeKind::Vognode (Vognode::Active (t)) =>
                 t . view_requests . contains (& ViewRequest::Path (RelationRole::CONTAINER)),
               _ => false } )
           . unwrap_or (false) )
@@ -767,7 +767,7 @@ fn fulfill_root_containerward_requests (
     viewforest, &requesting_root_nodeids, graph, config, active ) ?;
   for nid in requesting_root_nodeids { // drop the now-fulfilled request
     if let Some (mut node_mut) = viewforest . get_mut (nid) {
-      if let ViewNodeKind::Vognode (Vognode::Active (t)) =
+      if let ViewnodeKind::Vognode (Vognode::Active (t)) =
         &mut node_mut . value () . kind
       { t . view_requests . remove (& ViewRequest::Path (RelationRole::CONTAINER)); }} }
   Ok (( )) }
@@ -786,9 +786,9 @@ fn attach_containerward_ancestries_to_removedhere_phantoms (
     for edge in viewforest . root () . traverse () {
       if let ego_tree::iter::Edge::Open (node_ref) = edge {
         let is_removedhere : bool = match &node_ref . value () . kind {
-          ViewNodeKind::Vognode (Vognode::Active (t)) =>
+          ViewnodeKind::Vognode (Vognode::Active (t)) =>
             t . is_removedhere_diffPhantom (),
-          ViewNodeKind::Phantom (Phantom::Diff (p)) =>
+          ViewnodeKind::Phantom (Phantom::Diff (p)) =>
             p . is_removedhere_diffPhantom (),
           _ => false };
         if is_removedhere
