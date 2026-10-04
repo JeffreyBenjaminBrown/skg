@@ -106,8 +106,8 @@ describe('skg.heralds', function ()
   it('conceals the metadata extent and renders semantic rel facts',
      function ()
     -- rels payload (contains (in 2 (ancestors 1))), birth contains
-    -- renders as the C token 2aC: the multi-contains "2" (yellow), the
-    -- ancestor "a" (muted yellow), and the birth "C" (black-on-white).
+    -- renders as the C token 2aC: the in-side numeral "2" (medium), the
+    -- ancestor "a" at its floor (low), and the birth letter "C" (high).
     local buf = scratch_buffer_with({
       'Line with (skg (node (id 123) (affectsParent false)'
       .. ' (rels (contains (in 2 (ancestors 1))) (birth (contains in 1)))'
@@ -130,9 +130,9 @@ describe('skg.heralds', function ()
     assert.is_truthy(text:find('⟳', 1, true))
     assert.is_truthy(text:find('delete', 1, true))
     -- per-span highlight groups on the 2aC token
-    assert.are.equal('SkgHeraldHigh', hl_of['2'])
+    assert.are.equal('SkgHeraldMedium', hl_of['2'])
     assert.are.equal('SkgHeraldLow', hl_of['a'])
-    assert.are.equal('SkgHeraldMessage', hl_of['C'])
+    assert.are.equal('SkgHeraldHigh', hl_of['C'])
     heralds.disable(buf)
     assert.are.equal(0, #herald_extmarks(buf))
   end)

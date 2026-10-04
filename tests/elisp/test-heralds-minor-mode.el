@@ -93,8 +93,8 @@
 faces, the ⊥/⟳/delete heralds appear, the sentinel placeholder never
 leaks, and the overlay clears on disable. The injected node's rels
 payload -- (contains (in 2 (ancestors 1))), birth contains -- renders as
-the C token 2aC: the multi-contains \"2\" (yellow), the ancestor \"a\"
-(muted yellow), and the birth \"C\" (black-on-white)."
+the C token 2aC: the in-side numeral \"2\" (medium), the ancestor \"a\"
+at its floor (low), and the birth letter \"C\" (high)."
   (with-temp-buffer
     (insert "Line with (skg (node (id 123) (affectsParent false) (rels (contains (in 2 (ancestors 1))) (birth (contains in 1))) (viewStats cycle) (editRequest delete))) text")
     (progn ;; what happens upon enabling heralds-minor-mode
@@ -119,11 +119,11 @@ the C token 2aC: the multi-contains \"2\" (yellow), the ancestor \"a\"
           ;; per-span faces on the 2aC relationship token
           (let ( ( i ( string-match "2aC" display-text )) )
             ( should ( eq ( get-text-property i 'face display-text )
-                          'heralds-high-face )) ;; the "2"
+                          'heralds-medium-face )) ;; the "2"
             ( should ( eq ( get-text-property (+ i 1) 'face display-text )
                           'heralds-low-face )) ;; the "a"
             ( should ( eq ( get-text-property (+ i 2) 'face display-text )
-                          'heralds-message-face )) )))) ;; the "C"
+                          'heralds-high-face )) )))) ;; the "C"
     (progn ;; what happens upon disabling it
       (heralds-minor-mode -1)
       (let* ( ( herald-start

@@ -189,9 +189,16 @@ end
 
 -- ── relationship heralds: render the server's SEMANTIC facts ─────────
 -- ALL presentation lives here (letters, styles, order, count-omission,
--- link and subscribee fractions); the server sends only facts. See
--- TODO/heralds-semantic-wire.org. Mirrors the elisp renderer
--- (heralds--render-rel-facts et al.) exactly.
+-- fractions); the server sends only facts. The letters and order come
+-- from shared/relations.json, and the tiers and floors from
+-- shared/herald-styles.json, which the elisp renderer
+-- (heralds--render-rel-facts et al.) reads too; the two mirror each
+-- other. docs/heralds.org states the rules: a side's tier is shown by
+-- its carrier, which is its numeral if it shows one, else its ancestor
+-- flags; every other glyph shows its floor, except the slash, which
+-- shows the side's tier.
+
+local relationship_styles = shared.herald_styles.relationship_heralds
 
 ---Relation names in display order, from 'shared/relations.json'.
 local REL_ORDER = {}
@@ -204,9 +211,16 @@ local function rel_letter (rel)
   return relation and relation.letter or '?'
 end
 
-local function rel_base_hl (rel)
-  if rel == 'contains' or rel == 'links_to' then return 'SkgHeraldNormal' end
-  return 'SkgHeraldNonstandard' -- subscribes / overrides / hides
+---The greater of tiers A and B, per tier_order.
+local function max_tier (a, b)
+  local rank = {}
+  for i, tier in ipairs(shared.herald_styles.tier_order) do rank[tier] = i end
+  return rank[a] > rank[b] and a or b
+end
+
+---TEXT as a chunk in the highlight group of STYLE (e.g. 'high').
+local function styled (text, style)
+  return { text, shared.style_highlight_group(style) }
 end
 
 ---The child of SEXP (from index 2) whose head is the symbol NAME, or nil.
@@ -218,6 +232,15 @@ local function assq (sexp, name)
       return child end
   end
   return nil
+end
+
+---Whether SEXP has the bare atom NAME among its elements (from index 2).
+local function has_atom (sexp, name)
+  if not sexpr.is_list(sexp) then return false end
+  for i = 2, #sexp do
+    if sexp[i] == sexpr.symbol(name) then return true end
+  end
+  return false
 end
 
 ---The first number among SEXP's elements (from index 2), or nil.
@@ -237,7 +260,7 @@ local function ancestors_of (side)
   return gens
 end
 
----GENS as sorted distinct letters: 1->a, 2->b, ...
+---GENS sorted and distinct.
 local function distinct_gens (gens)
   local seen, sorted = {}, {}
   for _, g in ipairs(gens) do
@@ -247,132 +270,148 @@ local function distinct_gens (gens)
   return sorted
 end
 
-local function ancestor_chunks (gens)
+---Ancestor-flag chunks for GENS (1 -> a, 2 -> b, ...). Each shows its
+---floor, or the greater of its floor and CARRIER_TIER when the flags
+---carry a tier.
+local function ancestor_chunks (gens, carrier_tier)
   local out = {}
   for _, g in ipairs(distinct_gens(gens)) do
     local letter = (type(g) == 'number' and g >= 1 and g <= 26)
       and string.char(96 + g) or '{' .. tostring(g) .. '}'
-    table.insert(out, { letter, g == 1 and 'SkgHeraldLow'
-                                  or 'SkgHeraldMedium' })
+    local floor = g == 1 and relationship_styles.floors.ancestor_a
+                         or relationship_styles.floors.ancestor_b_and_higher
+    table.insert(out, styled(letter, carrier_tier
+                                     and max_tier(floor, carrier_tier)
+                                     or floor))
   end
   return out
 end
 
----Chunks for one side: the count then ancestor letters. Omits the count
----when it equals the number of ancestors (>=1). MULTI (contains inbound)
----makes a count > 1 yellow; parent a is muted, higher ancestors orange.
-local function side_chunks (count, gens, base_hl, multi)
-  gens = distinct_gens(gens)
-  local n = #gens
+---COUNT then its ancestor flags GENS, carrying TIER. The numeral is
+---omitted when it equals the number of ancestor members, MEMBERS_GENS
+---(default GENS); then the flags carry the tier.
+local function part_chunks (count, gens, tier, members_gens)
   local chunks = {}
-  if count > 0 or n > 0 then
-    if not (n > 0 and count == n) then
-      local hl = (multi and count > 1) and 'SkgHeraldHigh' or base_hl
-      table.insert(chunks, { tostring(count), hl })
-    end
-    for _, c in ipairs(ancestor_chunks(gens)) do table.insert(chunks, c) end
-  end
+  local show_numeral = count ~= #distinct_gens(members_gens or gens)
+  if show_numeral then table.insert(chunks, styled(tostring(count), tier)) end
+  for _, c in ipairs(ancestor_chunks(gens, not show_numeral and tier or nil)) do
+    table.insert(chunks, c) end
   return chunks
 end
 
+---Chunks for a side with COUNT members and ancestor flags GENS, at TIER.
+local function side_chunks (count, gens, tier)
+  if count == 0 and #gens == 0 then return {} end
+  return part_chunks(count, gens, tier)
+end
+
+---Chunks for a side with a subset of its own tier: NUMERATOR (with
+---flags NUMERATOR_GENS, at SUBSET_TIER) of TOTAL (with flags TOTAL_GENS,
+---at SIDE_TIER). The slash shows SIDE_TIER.
 local function fraction_chunks (total, total_gens, numerator,
-                                numerator_gens, base_hl)
+                                numerator_gens, side_tier, subset_tier)
   assert(numerator <= total, 'herald subset exceeds total')
   if total == 0 then return {} end
   if numerator == 0 then
-    return side_chunks(total, total_gens, base_hl, false) end
+    return side_chunks(total, total_gens, side_tier) end
   total_gens = distinct_gens(total_gens)
   numerator_gens = distinct_gens(numerator_gens)
   local numerator_set = {}
   for _, g in ipairs(numerator_gens) do numerator_set[g] = true end
-  local chunks = {}
-  if numerator ~= #numerator_gens then
-    table.insert(chunks, { tostring(numerator), 'SkgHeraldHigh' }) end
-  for _, c in ipairs(ancestor_chunks(numerator_gens)) do
-    table.insert(chunks, c) end
-  table.insert(chunks, { '/', base_hl })
+  local remaining_gens = {}
+  for _, g in ipairs(total_gens) do
+    if not numerator_set[g] then table.insert(remaining_gens, g) end end
+  local chunks = part_chunks(numerator, numerator_gens, subset_tier)
+  table.insert(chunks, styled('/', side_tier))
   if numerator ~= total then
-    if total ~= #total_gens then
-      table.insert(chunks, { tostring(total), base_hl }) end
-    for _, g in ipairs(total_gens) do
-      if not numerator_set[g] then
-        for _, c in ipairs(ancestor_chunks({g})) do
-          table.insert(chunks, c) end end end
+    for _, c in ipairs(part_chunks(total, remaining_gens, side_tier,
+                                   total_gens)) do
+      table.insert(chunks, c) end
   end
   return chunks
 end
 
-local function rel_side (form, side)
+---Whether the side's only members are ancestors that BIRTH, a list of
+---{relation, side, generation} facts, already accounts for.
+local function birth_explained (rel, side, count, gens, birth)
+  gens = distinct_gens(gens)
+  if #gens == 0 or count ~= #gens then return false end
+  for _, g in ipairs(gens) do
+    local accounted = false
+    for _, fact in ipairs(birth) do
+      if fact.relation == rel and fact.side == side
+         and fact.generation == g then accounted = true end
+    end
+    if not accounted then return false end
+  end
+  return true
+end
+
+---Chunks for relation REL's SIDE ('in' or 'out') from FORM.
+local function rel_side_chunks (rel, side, form, birth, write_protected)
   local s = assq(form, side)
-  if not s then return nil end
-  return { count = first_number(s) or 0, gens = ancestors_of(s) }
+  if not s then return {} end
+  local count, gens = first_number(s) or 0, ancestors_of(s)
+  local tiers = relationship_styles.side_tiers[rel]
+  local tier
+  if birth_explained(rel, side, count, gens, birth) then
+    tier = relationship_styles.birth_explained_side
+  elseif rel == 'contains' and side == 'out' and write_protected then
+    tier = tiers.out_write_protected
+  else tier = tiers[side] end
+  local subset_key, subset_tier = nil, nil
+  if rel == 'contains' and side == 'out' then
+    subset_key, subset_tier = 'unintegrated', tiers.out_unintegrated
+  elseif rel == 'links_to' and side == 'in' then
+    subset_key, subset_tier = 'substantive', tiers.in_substantive end
+  local subset = subset_key and assq(s, subset_key) or nil
+  if subset then
+    return fraction_chunks(count, gens, first_number(subset) or 0,
+                           ancestors_of(subset), tier, subset_tier) end
+  return side_chunks(count, gens, tier)
 end
 
-local function ordinary_rel_chunks (rel, form, base_hl, letter_hl,
-                                    overrides_here)
-  local inn = rel_side(form, 'in')
-  local out = rel_side(form, 'out')
-  local number_hl = rel == 'overrides_view_of' and 'SkgHeraldHigh'
-                                       or base_hl
-  local in_c = side_chunks(inn and inn.count or 0, inn and inn.gens or {},
-                           number_hl, rel == 'contains')
-  local unintegrated = rel == 'contains' and assq(assq(form, 'out'),
-                                                 'unintegrated') or nil
-  local out_c
-  if unintegrated then
-    out_c = fraction_chunks(out and out.count or 0, out and out.gens or {},
-      first_number(unintegrated) or 0, ancestors_of(unintegrated), number_hl)
-  else
-    out_c = side_chunks(out and out.count or 0, out and out.gens or {},
-                        number_hl, false) end
-  if #in_c == 0 and #out_c == 0
-     and not (rel == 'overrides_view_of' and overrides_here) then return nil end
+---Chunks for relation REL's token from FORM, or nil if it shows nothing.
+local function rel_chunks (rel, form, birth, write_protected, overrides_here)
+  local in_c = rel_side_chunks(rel, 'in', form, birth, write_protected)
+  local out_c = rel_side_chunks(rel, 'out', form, birth, write_protected)
+  local here = rel == 'overrides_view_of' and overrides_here
+  if #in_c == 0 and #out_c == 0 and not here then return nil end
+  local born = false
+  for _, fact in ipairs(birth) do
+    if fact.relation == rel then born = true end end
   local chunks = {}
   for _, c in ipairs(in_c) do table.insert(chunks, c) end
-  table.insert(chunks, { rel_letter(rel), letter_hl })
-  if rel == 'overrides_view_of' and overrides_here then
-    table.insert(chunks, { 'ĥ', 'SkgHeraldYucky' }) end
-  for _, c in ipairs(out_c) do table.insert(chunks, c) end
-  return chunks
-end
-
-local function link_rel_chunks (form, base_hl, letter_hl)
-  local inn = rel_side(form, 'in')
-  local out = rel_side(form, 'out')
-  local substantive = assq(assq(form, 'in'), 'substantive')
-  local in_c = fraction_chunks(inn and inn.count or 0,
-    inn and inn.gens or {}, substantive and first_number(substantive) or 0,
-    substantive and ancestors_of(substantive) or {}, base_hl)
-  local out_c = side_chunks(out and out.count or 0,
-    out and out.gens or {}, base_hl, false)
-  if #in_c == 0 and #out_c == 0 then return nil end
-  local chunks = {}
-  for _, c in ipairs(in_c) do table.insert(chunks, c) end
-  table.insert(chunks, { 'L', letter_hl })
+  table.insert(chunks, styled(rel_letter(rel),
+    born and relationship_styles.birth_letter or relationship_styles.letter))
+  if here then
+    table.insert(chunks, styled('ĥ', relationship_styles.overrides_here)) end
   for _, c in ipairs(out_c) do table.insert(chunks, c) end
   return chunks
 end
 
 ---Render the semantic (rels ...) payload in SEXP to virtual-text chunks,
----or nil if there is none / it produces nothing. Coloring: group base
----(C/L blue, S/O/H purple), the birth letter black-on-white,
----ancestor a muted and higher ancestors white-on-orange, contains
----inbound count>1 yellow,
----A/I/P cyan. Tokens ordered C L S O H A I P, space-separated.
+---or nil if there is none / it produces nothing. Tokens are the
+---relations in display order (C L S O H), then the property counts
+---A I F, space-separated.
 ---@param sexp any
 ---@return table[]|nil
 function M.render_rel_facts (sexp)
   local rels = M.find_rels(sexp)
   if not rels then return nil end
-  local birth = {}
   local node = assq(sexp, 'node')
   local view_stats = assq(node, 'viewStats')
   local overrides_here = assq(view_stats, 'overridesHere') ~= nil
+  local write_protected = has_atom(node, 'writeProtected')
+  local birth = {}
   local birth_form = assq(rels, 'birth')
   if birth_form then
     -- each birth fact is (RELATION SIDE [GEN])
     for i = 2, #birth_form do
-      birth[sexpr.atom_text(birth_form[i][1])] = true end
+      local fact = birth_form[i]
+      table.insert(birth, { relation = sexpr.atom_text(fact[1]),
+                            side = sexpr.atom_text(fact[2]),
+                            generation = fact[3] }) end
   end
   local chunks = {}
   local function add_token (tok)
@@ -384,25 +423,16 @@ function M.render_rel_facts (sexp)
   for _, rel in ipairs(REL_ORDER) do
     local form = assq(rels, rel)
     if form or (rel == 'overrides_view_of' and overrides_here) then
-      local base = rel_base_hl(rel)
-      local letter_hl = birth[rel] and 'SkgHeraldMessage' or base
-      add_token((rel == 'links_to')
-        and link_rel_chunks(form, base, letter_hl)
-        or ordinary_rel_chunks(rel, form, base, letter_hl, overrides_here))
+      add_token(rel_chunks(rel, form, birth, write_protected, overrides_here))
     end
   end
-  local aliases = assq(rels, 'aliases')
-  if aliases then
-    add_token({ { 'A' .. tostring(first_number(aliases)), 'SkgHeraldCrucial' } })
-  end
-  local extra = assq(rels, 'extraIds')
-  if extra then
-    add_token({ { 'I' .. tostring(first_number(extra)), 'SkgHeraldCrucial' } })
-  end
-  local flags = assq(rels, 'flags')
-  if flags then
-    add_token({ { 'F' .. tostring(first_number(flags)),
-                  'SkgHeraldCrucial' } })
+  for _, count in ipairs({ { 'aliases', 'A' }, { 'extraIds', 'I' },
+                           { 'flags', 'F' } }) do
+    local form = assq(rels, count[1])
+    if form then
+      add_token({ styled(count[2] .. tostring(first_number(form)),
+                         relationship_styles.property_counts) })
+    end
   end
   if #chunks == 0 then return nil end
   return chunks

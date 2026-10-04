@@ -300,9 +300,13 @@ na anyway) any stray sentinel token is dropped."
 
 ;; ── relationship heralds: render the server's SEMANTIC facts ─────────
 ;; ALL presentation lives here (letters, styles, order, count-omission,
-;; link and subscribee fractions); the server sends only facts. See
-;; TODO/heralds-semantic-wire.org. The nvim client mirrors this exactly
-;; (nvim/lua/skg/heralds.lua).
+;; fractions); the server sends only facts. The letters and order come
+;; from shared/relations.json, and the tiers and floors from
+;; shared/herald-styles.json, which the nvim client
+;; (nvim/lua/skg/heralds.lua) reads too. docs/heralds.org states the
+;; rules: a side's tier is shown by its carrier, which is its numeral if
+;; it shows one, else its ancestor flags; every other glyph shows its
+;; floor, except the slash, which shows the side's tier.
 
 (defconst heralds--rel-order
   (mapcar (lambda (relation) (intern (alist-get 'name relation)))
@@ -315,157 +319,183 @@ na anyway) any stray sentinel token is dropped."
   (let ((relation (skg-shared-relation (symbol-name rel))))
     (if relation (alist-get 'letter relation) "?")))
 
-(defun heralds--rel-base-face (rel)
-  "Group base face for REL's counts and slash: C/L blue, S/O/H purple."
-  (pcase rel ((or 'contains 'links_to) 'heralds-normal-face)
-             (_ 'heralds-nonstandard-face)))
+(defun heralds--relationship-style (key)
+  "The tier or style named at KEY in the relationship_heralds section of
+'shared/herald-styles.json', as a symbol."
+  (intern (alist-get key (alist-get 'relationship_heralds
+                                    skg-shared-herald-styles))))
+
+(defun heralds--side-tier (rel key)
+  "The tier of relation REL's side KEY (`in', `out', or a variant such as
+`in_substantive') in the side-tier table."
+  (intern (alist-get key (alist-get rel (alist-get 'side_tiers
+                                                   (alist-get 'relationship_heralds
+                                                              skg-shared-herald-styles))))))
+
+(defun heralds--floor (key)
+  "The floor named KEY in 'shared/herald-styles.json'."
+  (intern (alist-get key (alist-get 'floors
+                                    (alist-get 'relationship_heralds
+                                               skg-shared-herald-styles)))))
+
+(defun heralds--max-tier (a b)
+  "The greater of tiers A and B, per tier_order."
+  (let ((order (mapcar #'intern (alist-get 'tier_order skg-shared-herald-styles))))
+    (if (> (cl-position a order) (cl-position b order)) a b)))
+
+(defun heralds--styled (text style)
+  "TEXT in the face of STYLE (a symbol such as `high')."
+  (propertize text 'face (intern (format "heralds-%s-face" style))))
 
 (defun heralds--gen-list (gens)
   "Return sorted distinct generation integers from GENS."
   (sort (delete-dups (copy-sequence gens)) #'<))
 
-(defun heralds--ancestor-text (gens)
-  "Render GENS with the muted face for a and the ordinary face otherwise."
+(defun heralds--ancestor-glyph (generation)
+  "The ancestor flag for GENERATION: a for the parent, b for the
+grandparent, ..., then {N}."
+  (if (and (>= generation 1) (<= generation 26))
+      (char-to-string (+ ?a (1- generation)))
+    (format "{%s}" generation)))
+
+(defun heralds--ancestor-text (gens carrier-tier)
+  "Render the ancestor flags GENS. Each shows its floor, or the greater
+of its floor and CARRIER-TIER when the flags carry a tier."
   (mapconcat
-   (lambda (g)
-     (propertize (if (and (>= g 1) (<= g 26))
-                     (char-to-string (+ ?a (1- g)))
-                   (format "{%s}" g))
-                 'face (if (= g 1) 'heralds-low-face
-                         'heralds-medium-face)))
+   (lambda (generation)
+     (let ((floor (heralds--floor (if (= generation 1) 'ancestor_a
+                                    'ancestor_b_and_higher))))
+       (heralds--styled (heralds--ancestor-glyph generation)
+                        (if carrier-tier (heralds--max-tier floor carrier-tier)
+                          floor))))
    (heralds--gen-list gens) ""))
 
-(defun heralds--rel-side (form side)
-  "FORM is a relation form like (contains (in 2 (ancestors 1)) (out 1));
-return (COUNT . GENS) for SIDE (`in' or `out'), or nil if na."
-  (let ((s (assq side (cdr form))))
-    (when s
-      (cons (or (cl-find-if #'integerp (cdr s)) 0)
-            (cdr (assq 'ancestors (cdr s)))))))
-
-(defun heralds--rel-side-string (count gens base-face multi)
-  "COUNT then ancestor letters, as a propertized string. Omit the count
-when it equals the number of ancestors (>=1). BASE-FACE styles the
-count, unless MULTI (the contains inbound side) and count > 1, which is
-yellow. The parent flag is muted; higher ancestors are orange."
+(defun heralds--part-text (count gens tier &optional members-gens)
+  "COUNT then its ancestor flags GENS, carrying TIER. The numeral is
+omitted when it equals the number of ancestor members, MEMBERS-GENS
+\(default GENS); then the flags carry the tier."
   (let* ((gens (heralds--gen-list (or gens '())))
-         (n (length gens))
-         (out ""))
-    (when (or (> count 0) (> n 0))
-      (unless (and (> n 0) (= count n))
-        (setq out (propertize (number-to-string count) 'face
-                              (if (and multi (> count 1))
-                                  'heralds-high-face base-face))))
-      (when (> n 0)
-        (setq out (concat out (heralds--ancestor-text gens)))))
-    out))
+         (show-numeral
+          (not (= count (length (heralds--gen-list (or members-gens gens)))))))
+    (concat (if show-numeral
+                (heralds--styled (number-to-string count) tier) "")
+            (heralds--ancestor-text gens (unless show-numeral tier)))))
 
-(defun heralds--fraction-side-string
-    (total total-gens numerator numerator-gens base-face)
-  "Render a subset fraction with complete ancestor membership facts."
+(defun heralds--side-text (count gens tier)
+  "Render a side with COUNT members and ancestor flags GENS, at TIER."
+  (if (and (= count 0) (null gens)) ""
+    (heralds--part-text count gens tier)))
+
+(defun heralds--fraction-text
+    (total total-gens numerator numerator-gens side-tier subset-tier)
+  "Render a side with a subset of its own tier: NUMERATOR (with flags
+NUMERATOR-GENS, at SUBSET-TIER) of TOTAL (with flags TOTAL-GENS, at
+SIDE-TIER). The slash shows SIDE-TIER."
   (unless (<= numerator total)
     (error "Herald subset %s exceeds total %s" numerator total))
   (let* ((total-gens (heralds--gen-list (or total-gens '())))
          (numerator-gens (heralds--gen-list (or numerator-gens '())))
-         (remaining-gens (cl-set-difference total-gens numerator-gens))
-         (numerator-text
-          (concat (if (= numerator (length numerator-gens)) ""
-                    (propertize (number-to-string numerator)
-                                'face 'heralds-high-face))
-                  (heralds--ancestor-text numerator-gens)))
-         (denominator-text
-          (if (= numerator total) ""
-            (concat (if (= total (length total-gens)) ""
-                      (propertize (number-to-string total) 'face base-face))
-                    (heralds--ancestor-text remaining-gens)))))
+         (remaining-gens (cl-set-difference total-gens numerator-gens)))
     (cond ((= total 0) "")
           ((= numerator 0)
-           (heralds--rel-side-string total total-gens base-face nil))
-          (t (concat numerator-text (propertize "/" 'face base-face)
-                     denominator-text)))))
+           (heralds--side-text total total-gens side-tier))
+          (t (concat (heralds--part-text numerator numerator-gens subset-tier)
+                     (heralds--styled "/" side-tier)
+                     (if (= numerator total) ""
+                       (heralds--part-text total remaining-gens side-tier
+                                           total-gens)))))))
 
-(defun heralds--ordinary-rel-token (rel form base-face letter-face overrides-here)
-  "Render a non-link relation token, or nil if empty.
-BASE-FACE styles ordinary counts; LETTER-FACE styles only the relation letter."
-  (let* ((in  (heralds--rel-side form 'in))
-         (out (heralds--rel-side form 'out))
-         (number-face (if (eq rel 'overrides_view_of)
-                          'heralds-high-face base-face))
-         (in-s  (heralds--rel-side-string
-                 (if in (car in) 0) (and in (cdr in)) number-face
-                 (eq rel 'contains)))
-         (unintegrated (and (eq rel 'contains)
-                            (assq 'unintegrated
-                                  (cdr (assq 'out (cdr form))))))
-         (out-s (if unintegrated
-                    (heralds--fraction-side-string
-                     (if out (car out) 0) (and out (cdr out))
-                     (or (cl-find-if #'integerp (cdr unintegrated)) 0)
-                     (cdr (assq 'ancestors (cdr unintegrated)))
-                     number-face)
-                  (heralds--rel-side-string
-                   (if out (car out) 0) (and out (cdr out))
-                   number-face nil))))
-    (unless (and (string-empty-p in-s) (string-empty-p out-s)
-                 (not (and (eq rel 'overrides_view_of) overrides-here)))
-      (concat in-s (propertize (heralds--rel-letter rel) 'face letter-face)
-              (if (and (eq rel 'overrides_view_of) overrides-here)
-                  (propertize "ĥ" 'face 'heralds-yucky-face) "")
+(defun heralds--side-facts (form side)
+  "FORM is a relation form like (contains (in 2 (ancestors 1)) (out 1));
+return (COUNT GENS SUBFORMS) for SIDE (`in' or `out'), or nil if absent."
+  (let ((s (assq side (cdr form))))
+    (when s
+      (list (or (cl-find-if #'integerp (cdr s)) 0)
+            (cdr (assq 'ancestors (cdr s)))
+            (cdr s)))))
+
+(defun heralds--subset-facts (side-facts key)
+  "The (COUNT . GENS) of subset KEY (e.g. `substantive') in SIDE-FACTS."
+  (let ((subset (assq key (nth 2 side-facts))))
+    (when subset
+      (cons (or (cl-find-if #'integerp (cdr subset)) 0)
+            (cdr (assq 'ancestors (cdr subset)))))))
+
+(defun heralds--birth-explained-p (rel side count gens birth)
+  "Non-nil if the side's only members are ancestors that BIRTH, a list
+of birth facts (RELATION SIDE [GEN]), already accounts for."
+  (and gens
+       (= count (length (heralds--gen-list gens)))
+       (cl-every (lambda (generation)
+                   (cl-some (lambda (fact)
+                              (and (eq (nth 0 fact) rel)
+                                   (eq (nth 1 fact) side)
+                                   (eql (nth 2 fact) generation)))
+                            birth))
+                 gens)))
+
+(defun heralds--rel-side-text (rel side form birth write-protected)
+  "Render relation REL's SIDE from FORM."
+  (let ((facts (heralds--side-facts form side)))
+    (if (not facts) ""
+      (let* ((count (nth 0 facts))
+             (gens (nth 1 facts))
+             (tier (cond ((heralds--birth-explained-p rel side count gens birth)
+                          (heralds--relationship-style 'birth_explained_side))
+                         ((and (eq rel 'contains) (eq side 'out) write-protected)
+                          (heralds--side-tier rel 'out_write_protected))
+                         (t (heralds--side-tier rel side))))
+             (subset-key (cond ((and (eq rel 'contains) (eq side 'out)) 'unintegrated)
+                               ((and (eq rel 'links_to) (eq side 'in)) 'substantive)))
+             (subset (and subset-key (heralds--subset-facts facts subset-key))))
+        (if subset
+            (heralds--fraction-text
+             count gens (car subset) (cdr subset) tier
+             (heralds--side-tier rel (if (eq subset-key 'unintegrated)
+                                         'out_unintegrated 'in_substantive)))
+          (heralds--side-text count gens tier))))))
+
+(defun heralds--rel-token (rel form birth write-protected overrides-here)
+  "Render relation REL's token from FORM, or nil if it has nothing to show."
+  (let ((in-s (heralds--rel-side-text rel 'in form birth write-protected))
+        (out-s (heralds--rel-side-text rel 'out form birth write-protected))
+        (here (and (eq rel 'overrides_view_of) overrides-here)))
+    (unless (and (string-empty-p in-s) (string-empty-p out-s) (not here))
+      (concat in-s
+              (heralds--styled (heralds--rel-letter rel)
+                               (if (assq rel birth)
+                                   (heralds--relationship-style 'birth_letter)
+                                 (heralds--relationship-style 'letter)))
+              (if here (heralds--styled "ĥ" (heralds--relationship-style
+                                             'overrides_here))
+                "")
               out-s))))
-
-(defun heralds--link-rel-token (form base-face letter-face)
-  "Render inbound substantive mentioners and outbound resolved targets.
-BASE-FACE styles ordinary counts and slash; LETTER-FACE styles only L."
-  (let* ((in (heralds--rel-side form 'in))
-         (out (heralds--rel-side form 'out))
-         (substantive-form (assq 'substantive (cdr (assq 'in (cdr form)))))
-         (substantive (or (and substantive-form
-                               (cl-find-if #'integerp (cdr substantive-form))) 0))
-         (in-s (heralds--fraction-side-string
-                (if in (car in) 0) (and in (cdr in))
-                substantive (cdr (assq 'ancestors (cdr substantive-form)))
-                base-face))
-         (out-s (heralds--rel-side-string
-                 (if out (car out) 0) (and out (cdr out)) base-face nil)))
-    (unless (and (string-empty-p in-s) (string-empty-p out-s))
-      (concat in-s (propertize "L" 'face letter-face) out-s))))
 
 (defun heralds--render-rel-facts (sexp)
   "Render the semantic `(rels ...)' payload in SEXP to one propertized
-string, or nil if there is none / it produces nothing. Coloring: group
-base (C/L blue, S/O/H purple), the birth letter black-on-white,
-ancestor a muted and higher ancestors white-on-orange, the contains
-inbound count>1 yellow,
-A/I/P cyan. Tokens are ordered C L S O H A I P and space-separated."
+string, or nil if there is none / it produces nothing. Tokens are the
+relations in display order (C L S O H), then the property counts A I F,
+space-separated."
   (let ((rels (heralds--find-rels sexp)))
     (when rels
-      (let ((birth ;; the relations named by the birth facts (RELATION SIDE [GEN])
-             (mapcar #'car (cdr (assq 'birth (cdr rels)))))
-            (overrides-here
-             (assq 'overridesHere
-                   (cdr (assq 'viewStats
-                              (cdr (assq 'node (cdr sexp)))))))
-            (tokens '()))
+      (let* ((node (cdr (assq 'node (cdr sexp))))
+             (birth (cdr (assq 'birth (cdr rels)))) ;; facts (RELATION SIDE [GEN])
+             (write-protected (memq 'writeProtected node))
+             (overrides-here
+              (assq 'overridesHere (cdr (assq 'viewStats node))))
+             (property-style (heralds--relationship-style 'property_counts))
+             (tokens '()))
         (dolist (rel heralds--rel-order)
           (let ((form (assq rel (cdr rels))))
             (when (or form (and (eq rel 'overrides_view_of) overrides-here))
-              (let* ((base (heralds--rel-base-face rel))
-                     (letter-face (if (memq rel birth) 'heralds-message-face
-                                    base))
-                     (tok (if (eq rel 'links_to)
-                              (heralds--link-rel-token form base letter-face)
-                            (heralds--ordinary-rel-token
-                             rel form base letter-face overrides-here))))
+              (let ((tok (heralds--rel-token rel form birth write-protected
+                                             overrides-here)))
                 (when tok (push tok tokens))))))
-        (let ((a (cadr (assq 'aliases (cdr rels)))))
-          (when a (push (propertize (format "A%d" a) 'face 'heralds-crucial-face)
-                        tokens)))
-        (let ((i (cadr (assq 'extraIds (cdr rels)))))
-          (when i (push (propertize (format "I%d" i) 'face 'heralds-crucial-face)
-                        tokens)))
-        (let ((p (cadr (assq 'flags (cdr rels)))))
-          (when p (push (propertize (format "F%d" p) 'face 'heralds-crucial-face)
-                        tokens)))
+        (dolist (count '((aliases . "A") (extraIds . "I") (flags . "F")))
+          (let ((k (cadr (assq (car count) (cdr rels)))))
+            (when k (push (heralds--styled (format "%s%d" (cdr count) k)
+                                           property-style)
+                          tokens))))
         (setq tokens (nreverse tokens))
         (when tokens (mapconcat #'identity tokens " "))))))
 
