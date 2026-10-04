@@ -35,8 +35,8 @@ fn herald_rules_sexp_quotes_strings () {
   assert! ( sexp . starts_with ("(skg ") );
   assert! ( sexp . contains ( r#"(GO INTERC "" staged "staged:""# ),
             "labelled INTERC with quoted empty separator not found" );
-  assert! ( sexp . contains ( r#"(GO aliasFolder "aliases")"# ));
-  assert! ( sexp . contains ( r#"(GO writeProtected ABUT "☮")"# ));
+  assert! ( sexp . contains ( r#"(MESSAGE aliasFolder "aliases")"# ));
+  assert! ( sexp . contains ( r#"(CRUCIAL writeProtected ABUT "☮")"# ));
   { let mut depth : i64 = 0; // balanced parens (no parens occur inside the table's strings, so plain counting suffices)
     for c in sexp . chars () {
       match c { '(' => depth += 1,

@@ -79,7 +79,7 @@ pub struct HeraldRule {
 // Constructor sugar, so the table below stays close to the sexp it serializes to.
 //
 
-use HeraldStyle::{Stop, Go, Normal, High};
+use HeraldStyle::{Crucial, Medium, Normal, Message, Stop, Go, Nonstandard, Yucky};
 
 /// (label children...)
 fn rule (
@@ -108,17 +108,17 @@ fn leaf (
 ) -> RuleChild {
   crule ( style, label, vec! [ s (text) ] ) }
 
-/// (STYLE label "☮ text") -- a write-protected folder leaf: the ☮
-/// marker, a space, then its label text, meaning "this folder
-/// cannot be changed from here" -- the same sense ☮ ('writeProtected') carries
-/// on a node. (A lock 🔒 here is a one-line swap; the conformance test
-/// pins atoms, not the emitted glyph.) A macro, not a function, because
-/// 'concat!' needs 'text' as a literal to fold the ☮ and its trailing
-/// space into one '&'static str' token at compile time -- two separate
-/// children would be joined by the lens engine's ':', not a space.
-macro_rules! leaf_write_protected {
-  ( $style:expr, $label:expr, $text:literal ) => {
-    crule ( $style, $label, vec! [ s ( concat! ("☮ ", $text) ) ] ) }; }
+/// The two rules for a write-protected label: one emits the crucial ☮,
+/// meaning "this cannot be changed from here" -- the sense ☮
+/// ('writeProtected') carries on a node -- and the other the label's
+/// text, as a message. Both match the same atom; the renderer's
+/// ordinary space separates their tokens.
+fn write_protected_leaves (
+  label : &'static str,
+  text  : &'static str,
+) -> Vec<RuleChild> {
+  vec! [ leaf (Crucial, label, "☮"),
+         leaf (Message, label, text) ] }
 
 /// (label) -- matches and emits nothing; consumes the atom so the
 /// table documents it. (The engine ignores unmatched atoms anyway;
@@ -222,43 +222,50 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 pub fn herald_rule_table () -> HeraldRule {
   HeraldRule {
     style : None, interc : None, label : Some ("skg"), abut : false,
-    children : vec! [
+    children : [ vec! [
       vac ("focused"),
       vac ("folded"),
       vac ("bodyFolded"),
-      leaf (Go, PropertyFolder::Alias . repr_in_client (), "aliases"),
-      leaf (Go, "alias", "alias"), // Property::Alias
+      leaf (Message, PropertyFolder::Alias . repr_in_client (), "aliases"),
+      leaf (Message, "alias", "alias"), // Property::Alias
       // An alias's stored relRepo is a display fact.  A
       // requested replacement lives under editRequest below, so the
       // two values can be rendered side by side without conflation.
-      crule (Stop, "relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
+      crule (Yucky, "relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
       rule ("editRequest", vec! [
-        crule (Stop, "relRepo", vec! [
-          any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]),
+        crule (Nonstandard, "relRepo", vec! [
+          any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ],
       // The six WRITE-PROTECTED folders carry ☮ ("cannot be changed
       // from here"); the writable folders (subscribeeFolder, overriddenFolder,
       // aliasFolder) do not.
-      leaf_write_protected! (Go, PartnerFolder::HiddenInSubscribee . repr_in_client (),
+      write_protected_leaves (PartnerFolder::HiddenInSubscribee . repr_in_client (),
             "It contains these, but the subscribing ancestor hides them."),
-      leaf (Go, PartnerFolder::HiddenOutsideOfSubscribee . repr_in_client (),
+      vec! [
+      leaf (Message, PartnerFolder::HiddenOutsideOfSubscribee . repr_in_client (),
             "The subscriber ancestor hides these, but subscribes to nothing that contains them."),
-      leaf (Go, PartnerFolder::Subscribee . repr_in_client (),
-            "It subscribes to these."),
-      leaf_write_protected! (Go, PartnerFolder::Subscriber . repr_in_client (),
+      leaf (Message, PartnerFolder::Subscribee . repr_in_client (),
+            "It subscribes to these.") ],
+      write_protected_leaves (PartnerFolder::Subscriber . repr_in_client (),
             "These subscribe to it."),
-      leaf_write_protected! (Go, PartnerFolder::Hidden . repr_in_client (),
+      write_protected_leaves (PartnerFolder::Hidden . repr_in_client (),
             "It hides these from its subscriptions."),
-      leaf_write_protected! (Go, PartnerFolder::Hider . repr_in_client (),
+      write_protected_leaves (PartnerFolder::Hider . repr_in_client (),
             "These hide it from their subscriptions."),
-      leaf (Go, PartnerFolder::Overridden . repr_in_client (),
-            "It overrides the view of these."),
-      leaf_write_protected! (Go, PartnerFolder::Overrider . repr_in_client (),
+      vec! [
+      leaf (Message, PartnerFolder::Overridden . repr_in_client (),
+            "It overrides the view of these.") ],
+      write_protected_leaves (PartnerFolder::Overrider . repr_in_client (),
             "These override the view of it."),
-      leaf (Go, PropertyFolder::ID . repr_in_client (), "IDs"),
-      leaf (Go, "id", "ID"), // Property::ID
-      leaf_write_protected! (Go, PropertyFolder::flags () . repr_in_client (),
+      vec! [
+      leaf (Message, PropertyFolder::ID . repr_in_client (), "IDs"),
+      leaf (Message, "id", "ID") ], // Property::ID
+      write_protected_leaves (PropertyFolder::flags () . repr_in_client (),
                 "flags"),
-      crule (Go, "flag", Flag::ALL . into_iter ()
+      vec! [
+      // A flag row is write-protected too: one rule emits its ☮, the
+      // other its text.
+      crule (Crucial, "flag", vec! [ any (vec! [ s ("☮") ]) ]),
+      crule (Message, "flag", Flag::ALL . into_iter ()
         . map (|flag| rule (
           flag . wire_name (), vec! [s (flag . herald_text ())]))
         . collect ()),
@@ -266,25 +273,25 @@ pub fn herald_rule_table () -> HeraldRule {
         s ("text changed : "),
         leaf (Stop, "staged",   "staged"),
         leaf (Stop, "unstaged", "unstaged") ]),
-      crule (Stop, "deadViewnode", vec! [ s ("DELETED") ]),
-      crule (Stop, "deleted", vec! [
+      crule (Message, "deadViewnode", vec! [ s ("DELETED") ]),
+      crule (Message, "deleted", vec! [
         s ("DELETED"),
         vac ("id"),
         vac ("repo") ]),
-      crule (High, "unknown", vec! [
+      crule (Message, "unknown", vec! [
         s ("Reference to unknown node."),
         vac ("id"),
-        crule (Normal, "viewStats", vec! [
-          crule (Stop, "relRepo", vec! [
+        rule ("viewStats", vec! [
+          crule (Yucky, "relRepo", vec! [
             any (vec! [ s ("~"), RuleChild::It ]) ]) ]),
         rule ("editRequest", vec! [
-          crule (Stop, "relRepo", vec! [
+          crule (Nonstandard, "relRepo", vec! [
             any (vec! [ s ("request:~"), RuleChild::It ]) ]) ]) ]),
       // An inactive placeholder is anonymous and dataless: the bare
       // atom 'inactiveNode' (see InactiveVognode), like the other dataless
       // non-vognode markers. Its id/repo would leak hidden content, so
       // they are not emitted.
-      crule (Normal, "inactiveNode", vec! [
+      crule (Message, "inactiveNode", vec! [
         s ("node from inactive repo") ]),
       interc (Some (Go), "", Some ("staged"), vec! [
         s ("staged:"),
@@ -300,13 +307,13 @@ pub fn herald_rule_table () -> HeraldRule {
         rule ("affectsParent", vec! [
           vac ("na"),
           vac ("true"),
-          leaf (High, "false", "⊥") ]),
+          leaf (Crucial, "false", "⊥") ]),
         // The server emits the atom 'writeProtected'
         // (see org_to_text.rs); we match that here.
-        leaf_abut (Go, "writeProtected", "☮"),
+        leaf_abut (Crucial, "writeProtected", "☮"),
         // Emitted only on a write-protected node whose graph node has a
         // body -- one the rendering hides. ABUT so the B rides the ☮.
-        leaf_abut (Go, "hiddenBody", "B"),
+        leaf_abut (Crucial, "hiddenBody", "B"),
         // The relationship heralds are per-CHARACTER styled spans that
         // the lens cannot style, so the server assembles semantic
         // (rels ...) facts and the CLIENT renders them. This rule only POSITIONS them: the
@@ -314,27 +321,27 @@ pub fn herald_rule_table () -> HeraldRule {
         // the span sub-forms, and it emits the sentinel token, which the
         // client swaps for the rendered spans.
         rule ("rels", vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
-        crule (Normal, "viewStats", vec! [
-          leaf (Normal, "cycle", "⟳"),
-          // overridesHere is displayed as pink ĥ inside the O token
+        rule ("viewStats", vec! [
+          leaf (Medium, "cycle", "⟳"),
+          // overridesHere is displayed as a crucial ĥ inside the O token
           // by the client relationship renderer. The atom's
           // ID payload is load-bearing save metadata, never displayed.
           vac ("overridesHere"),
           // relRepo is a display fact, not a save request.  It
           // echoes its own value directly:
-          // "~" + the repo name, red, immediately before the ⌂
+          // "~" + the repo name, yucky, immediately before the ⌂
           // homeRepoHerald below (table ORDER is presentation order,
           // per the module doc, so placing this rule first guarantees
           // that regardless of the atoms' order in the raw sexp).
-          crule (Stop, "relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
-          crule (Go, "homeRepoHerald", vec! [ any (vec! [RuleChild::It]) ]) ]),
+          crule (Yucky, "relRepo", vec! [ any (vec! [ s ("~"), RuleChild::It ]) ]),
+          crule (Normal, "homeRepoHerald", vec! [ any (vec! [RuleChild::It]) ]) ]),
         rule ("editRequest", vec! [
-          leaf (Stop, "delete", "delete"),
-          crule (Stop, "merge", vec! [
+          leaf (Nonstandard, "delete", "delete"),
+          crule (Nonstandard, "merge", vec! [
             any ( vec! [ s ("merge:"), RuleChild::It ] ) ]),
-          crule (Stop, "relRepo", vec! [
+          crule (Nonstandard, "relRepo", vec! [
             any (vec! [ s ("request:~"), RuleChild::It ]) ]),
-          crule (Stop, "flag", vec! [
+          crule (Nonstandard, "flag", vec! [
             // A flag request is flat metadata:
             //   (flag noSearchMatching true|false)
             // Matching the literal boolean child lets the existing rule
@@ -344,7 +351,7 @@ pub fn herald_rule_table () -> HeraldRule {
             vac (Flag::NoSearchMatching . wire_name ()),
             rule ("true",  vec! [s ("request:no search matching")]),
             rule ("false", vec! [s ("request:search matching")]) ]) ]),
-        crule (Go, "viewRequests", vec! [
+        crule (Nonstandard, "viewRequests", vec! [
           rule ("folder",  vec! [ any (vec! [ s ("req:folder:"),  RuleChild::It ]) ]),
           rule ("path", vec! [ any (vec! [ s ("req:path:"), RuleChild::It ]) ]),
           rule ("flags", vec! [ s ("req:flags") ]),
@@ -371,7 +378,7 @@ pub fn herald_rule_table () -> HeraldRule {
       rule ("diffPhantom", vec! [
         vac ("id"),
         vac ("repo"),
-        leaf_abut (Go, "writeProtected", "☮"),
+        leaf_abut (Crucial, "writeProtected", "☮"),
         rule ("rels", vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
         interc (Some (Go), "", Some ("staged"), vec! [
           s ("staged:"),
@@ -385,7 +392,7 @@ pub fn herald_rule_table () -> HeraldRule {
           leaf (Stop,   "deletedN", "-N"),
           leaf (Go, "addedR",     "R"),
           leaf (Stop,   "removedR", "-R") ]),
-        leaf (Stop, "notInGit", "diff:not-in-git") ]) ],
+        leaf (Stop, "notInGit", "diff:not-in-git") ]) ] ] . concat (),
   }}
 
 //

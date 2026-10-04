@@ -117,7 +117,7 @@
 ==== node: independent, a cycle, a delete request, contained by the parent and another
 (skg (node (id 123) (affectsParent false) (rels (contains (in 2 (ancestors 1))) (birth (contains in 1))) (viewStats cycle) (editRequest delete)))
 ---- text: ⊥ 2aC ⟳ delete
----- styles: high*1 -*1 medium*1 low*1 high*1 -*1 normal*1 -*1 stop*6
+---- styles: crucial*1 -*1 medium*1 low*1 high*1 -*1 medium*1 -*1 nonstandard*6
 ==== property counts: flags
 (skg (node (id 1) (rels (flags 2))))
 ---- text: F2
@@ -125,47 +125,47 @@
 ==== view requests: a folder
 (skg (node (id 1) (viewRequests (folder aliases))))
 ---- text: req:folder:aliases
----- styles: go*18
+---- styles: nonstandard*18
 ==== view requests: a path
 (skg (node (id 2) (viewRequests (path container))))
 ---- text: req:path:container
----- styles: go*18
+---- styles: nonstandard*18
 ==== view requests: several
 (skg (node (id 4) (viewRequests (folder aliases) (path container) (path mentioner))))
 ---- text: req:folder:aliases req:path:container req:path:mentioner
----- styles: go*18 -*1 go*18 -*1 go*18
+---- styles: nonstandard*18 -*1 nonstandard*18 -*1 nonstandard*18
 ==== flags: had ID before import
 (skg (flag hadId))
 ---- text: ☮ had ID before import
----- styles: go*22
+---- styles: crucial*1 -*1 message*20
 ==== flags: was overloaded
 (skg (flag wasOverloaded))
 ---- text: ☮ was overloaded during org-roam import
----- styles: go*39
+---- styles: crucial*1 -*1 message*37
 ==== flags: no search matching
 (skg (flag noSearchMatching))
 ---- text: ☮ no search matching
----- styles: go*20
+---- styles: crucial*1 -*1 message*18
 ==== flag requests: no search matching
 (skg (node (id 1) (editRequest (flag noSearchMatching true))))
 ---- text: request:no search matching
----- styles: stop*26
+---- styles: nonstandard*26
 ==== flag requests: search matching
 (skg (node (id 1) (editRequest (flag noSearchMatching false))))
 ---- text: request:search matching
----- styles: stop*23
+---- styles: nonstandard*23
 ==== non-vognodes: alias folder
 (skg aliasFolder)
 ---- text: aliases
----- styles: go*7
+---- styles: message*7
 ==== non-vognodes: alias
 (skg alias)
 ---- text: alias
----- styles: go*5
+---- styles: message*5
 ==== non-vognodes: folded alias folder
 (skg folded aliasFolder)
 ---- text: aliases
----- styles: go*7
+---- styles: message*7
 ==== non-vognodes: text changed in both stages
 (skg (textChanged staged unstaged))
 ---- text: text changed : staged text changed : unstaged
@@ -181,15 +181,15 @@
 ==== diff: an alias added, staged
 (skg alias (staged addedR))
 ---- text: alias staged:R
----- styles: go*5 -*1 go*8
+---- styles: message*5 -*1 go*8
 ==== diff: an alias removed, unstaged
 (skg alias (unstaged removedR))
 ---- text: alias unstaged:-R
----- styles: go*5 -*1 go*9 stop*2
+---- styles: message*5 -*1 go*9 stop*2
 ==== placeholders: inactive node
 (skg inactiveNode)
 ---- text: node from inactive repo
----- styles: normal*23
+---- styles: message*23
 ==== carriers: two subscribers, one the parent
 (skg (node (id x) (rels (subscribes_to (in 2 (ancestors 1))))))
 ---- text: 2aS
@@ -213,8 +213,40 @@
 ==== write-protected: its contents are low
 (skg (node (id x) writeProtected (rels (contains (in 1) (out 3)))))
 ---- text: ☮ 1C3
----- styles: go*1 -*1 medium*1 normal*1 low*1
+---- styles: crucial*1 -*1 medium*1 normal*1 low*1
 ==== property counts: aliases, extra IDs and flags
 (skg (node (id x) (rels (aliases 3) (extraIds 1) (flags 2))))
 ---- text: A3 I1 F2
 ---- styles: low*2 -*1 low*2 -*1 low*2
+==== folders: a write-protected folder
+(skg subscriberFolder)
+---- text: ☮ These subscribe to it.
+---- styles: crucial*1 -*1 message*22
+==== folders: a writable folder
+(skg subscribeeFolder)
+---- text: It subscribes to these.
+---- styles: message*23
+==== placeholders: unknown node
+(skg (unknown (id gone)))
+---- text: Reference to unknown node.
+---- styles: message*26
+==== placeholders: deleted node
+(skg (deleted (id gone) (repo main)))
+---- text: DELETED
+---- styles: message*7
+==== placeholders: dead viewnode
+(skg deadViewnode)
+---- text: DELETED
+---- styles: message*7
+==== node: write-protected with a hidden body
+(skg (node (id x) writeProtected hiddenBody))
+---- text: ☮B
+---- styles: crucial*2
+==== node: a private relRepo and its home repo
+(skg (node (id x) (viewStats (relRepo priv) (homeRepoHerald ⌂:pub))))
+---- text: ~priv ⌂pub
+---- styles: yucky*5 -*1 normal*4
+==== node: a merge request
+(skg (node (id x) (editRequest (merge y))))
+---- text: merge:y
+---- styles: nonstandard*7

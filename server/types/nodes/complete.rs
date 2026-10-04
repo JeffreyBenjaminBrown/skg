@@ -49,11 +49,11 @@ impl Flag {
   pub fn herald_text (self) -> &'static str {
     match self {
       Flag::Had_ID_Before_Import =>
-        "☮ had ID before import",
+        "had ID before import",
       Flag::Was_Overloaded =>
-        "☮ was overloaded during org-roam import",
+        "was overloaded during org-roam import",
       Flag::NoSearchMatching =>
-        "☮ no search matching",
+        "no search matching",
     } }
 
   pub fn is_mutable (self) -> bool {

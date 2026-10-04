@@ -137,11 +137,11 @@ describe('skg.heralds', function ()
     assert.are.equal(0, #herald_extmarks(buf))
   end)
 
-  it('displays the inactive-node placeholder in blue', function ()
+  it('displays the inactive-node placeholder as a message', function ()
     local chunks = heralds.chunks_from_metadata('(skg inactiveNode)')
     assert.are.equal('node from inactive repo',
                      heralds.chunks_text(chunks))
-    assert.are.equal('SkgHeraldNormal', chunks[1][2])
+    assert.are.equal('SkgHeraldMessage', chunks[1][2])
   end)
 
   it('self-heals a missing rule table via the fetcher', function ()

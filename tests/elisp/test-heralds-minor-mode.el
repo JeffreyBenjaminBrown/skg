@@ -137,7 +137,7 @@ at its floor (low), and the birth letter \"C\" (high)."
         ( should-not display-overlay )) )) )
 
 (ert-deftest test-heralds-inactive-node-display ()
-  "An anonymous inactive-node placeholder displays as a blue herald.
+  "An anonymous inactive-node placeholder displays as a message herald.
 The server emits the bare atom `inactiveNode' (like the other
 dataless non-vognode markers) -- it carries no id/repo, because those
 would leak content the user hid by restricting the repo-set."
@@ -148,7 +148,7 @@ would leak content the user hid by restricting the repo-set."
       (should (equal (substring-no-properties result)
                      "node from inactive repo"))
       (should (eq (get-text-property 0 'face result)
-                  'heralds-normal-face)))
+                  'heralds-message-face)))
     (heralds-minor-mode 1)
     (let* ((display-overlay
             (cl-find-if (lambda (ov) (overlay-get ov 'display))
@@ -158,7 +158,7 @@ would leak content the user hid by restricting the repo-set."
       (should (equal (substring-no-properties display-text)
                      "node from inactive repo"))
       (should (eq (get-text-property 0 'face display-text)
-                  'heralds-normal-face)))))
+                  'heralds-message-face)))))
 
 (ert-deftest test-heralds-survive-major-mode-switch ()
   "After a major-mode switch orphans overlays, disabling heralds
