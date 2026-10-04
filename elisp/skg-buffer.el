@@ -37,9 +37,11 @@ search results, but not the fork-confirmation buffer."
           (buffer-modified-p buf)))
    (buffer-list)))
 
-(defvar-local skg--dirtying-view-approved nil
-  "Non-nil when the user has approved the next first edit of this view
-despite another view's unsaved edits.  The next first change consumes it.")
+(defvar skg--dirtying-view-approved nil
+  "The view whose next first edit the user approved despite another
+view's unsaved edits, or nil.  That edit consumes the approval, and
+point leaving the view revokes it (see
+`skg--revoke-dirtying-view-approval-if-point-left').")
 
 (defun skg--confirm-before-dirtying-another-view ()
   "On `first-change-hook': if another view already has unsaved edits,
@@ -49,8 +51,8 @@ prompt opened mid-edit inherits that command's temporary state.  (E.g.
 `newline' adds a function to `post-self-insert-hook' that returns point
 to the start of the line, so an answer typed there came out reversed.)"
   (cond
-   (skg--dirtying-view-approved
-    (setq skg--dirtying-view-approved nil))
+   ((eq skg--dirtying-view-approved (current-buffer))
+    (skg--forget-dirtying-view-approval))
    ((and skg-view-uri
          (not skg--inhibit-dirty-view-confirmation)
          (skg--unsaved-view-buffers (current-buffer)))
@@ -68,13 +70,30 @@ the cancelled command) if they would reach BUFFER."
              (not (buffer-modified-p buffer)))
     (if (not (yes-or-no-p "WARNING: Another buffer has unsaved edits. If you edit this one as well, your edits could clobber each other. Edit anyway? "))
         (message "Edit cancelled")
-      (with-current-buffer buffer
-        (setq skg--dirtying-view-approved t))
+      (setq skg--dirtying-view-approved buffer)
+      (add-hook 'post-command-hook
+                #'skg--revoke-dirtying-view-approval-if-point-left)
       (if (and (> (length keys) 0)
                (eq buffer (window-buffer (selected-window))))
           (setq unread-command-events
                 (append (listify-key-sequence keys) unread-command-events))
         (message "Approved: repeat your edit.")))))
+
+(defun skg--revoke-dirtying-view-approval-if-point-left ()
+  "On `post-command-hook': revoke the approval once point is in another
+buffer, even if the approved view is still visible.  While the
+minibuffer is active, the window it will return to is what counts, so
+an edit command typed via M-x keeps the approval."
+  (unless (eq skg--dirtying-view-approved
+              (window-buffer (if (minibufferp)
+                                 (minibuffer-selected-window)
+                               (selected-window))))
+    (skg--forget-dirtying-view-approval)))
+
+(defun skg--forget-dirtying-view-approval ()
+  (setq skg--dirtying-view-approved nil)
+  (remove-hook 'post-command-hook
+               #'skg--revoke-dirtying-view-approval-if-point-left))
 
 (defvar-local skg-view-uri nil
   "Unique view URI for this skg buffer.")

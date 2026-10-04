@@ -98,7 +98,36 @@ point back after each typed character, reversing the answer."
       (cl-letf (( (symbol-function 'yes-or-no-p) (lambda (_prompt) t) ))
         (apply (car deferred) (cdr deferred)))
       (should (equal unread-command-events '(?x)))
-      (should (buffer-local-value 'skg--dirtying-view-approved b)))))
+      (should (eq skg--dirtying-view-approved b))
+      (skg--forget-dirtying-view-approval))))
+
+(ert-deftest test-skg-dirty-view-confirmation-approval-ends-when-point-leaves ()
+  "Approval survives commands in the approved view, and is revoked by
+the first command after which point is in another buffer, even though
+the approved view stays visible."
+  (skg-test--with-views (a b)
+    (skg-test--edit-answering a nil)
+    (switch-to-buffer b)
+    (let (( deferred (skg-test--edit-capturing-question
+                      b (lambda () (insert "x"))) ))
+      (cl-letf (( (symbol-function 'yes-or-no-p) (lambda (_prompt) t) ))
+        (apply (car deferred) (cdr deferred))))
+    (unwind-protect
+        (progn
+          (run-hooks 'post-command-hook)
+          (should (eq skg--dirtying-view-approved b))
+          (delete-other-windows)
+          (split-window)
+          (switch-to-buffer a) ; b remains visible in the other window
+          (run-hooks 'post-command-hook)
+          (should-not skg--dirtying-view-approved)
+          (should-not (memq #'skg--revoke-dirtying-view-approval-if-point-left
+                            (default-value 'post-command-hook)))
+          (switch-to-buffer b)
+          (should (skg-test--edit-capturing-question
+                   b (lambda () (insert "x")))))
+      (skg--forget-dirtying-view-approval)
+      (delete-other-windows))))
 
 (ert-deftest test-skg-dirty-view-confirmation-ignores-uri-less-buffers ()
   "A content-view-mode buffer with no view URI (like the fork
