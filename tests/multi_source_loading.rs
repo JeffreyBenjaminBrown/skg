@@ -428,7 +428,7 @@ fn test_many_id_conflicts_create_org_file() {
   let mut expected : String = String::new();
   expected . push_str ("#+title: IDs claimed by more than one node\n");
   expected . push_str ("#+date: <generated at initialization>\n\n");
-  expected . push_str ("15 id(s) claimed by more than one node. Same-id files ACROSS SOURCES are not this: those are the sections of one privacy telescope (docs/telescopes.md). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n");
+  expected . push_str ("15 id(s) claimed by more than one node. Same-id files ACROSS SOURCES are not this: those are the sections of one privacy telescope (docs/telescopes.org). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n");
 
   // IDs are sorted alphabetically (lexicographic), not numerically
   // So: dup_id_1, dup_id_10, dup_id_11, ..., dup_id_2, ...

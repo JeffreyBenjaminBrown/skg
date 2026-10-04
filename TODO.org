@@ -2,7 +2,23 @@
 ** not to dirty the production skg's code.
 ** to set the model
 * ONGOING TODO/import-md-and-org/
+** data/skg-system/ should not need mention in the config
 * next
+** for docs : the org exporter
+*** ONGOING bug : flattening example links
+  - Example links inside verbatim text got flattened. The exporter treats a link
+    written as a literal example, like =[[id:X][LABEL]]= in COMMANDS.org, as a
+    real link to a node that wasn't exported, and replaces it with its label. So
+    "=[[id:X][LABEL]]= link is inserted at point" became "=LABEL= link is
+    inserted at point". The same happened to the example link in the
+    export-marker section I just wrote. That one points at the documentation
+    node in public, which wasn't exported, so it came out as : Export to Org.
+*** ONGOING List items that look like headings are lost.
+A Markdown list item at column 0 (* [Does it use plaintext?…] in FAQ.md)
+is now a line starting with * , which Org reads as a top-level heading.
+This breaks FAQ.org's outline.
+The exporter warned about this and similar lines (#+begin_src, #+title)
+but wrote them anyway.
 ** for video
 *** AWAITS navigate point through herald (overlay)
 walk point through the herald string normally
@@ -14,6 +30,32 @@ A config option, for recording videos.
 Could put a second minibuffer line,
 that reads if anything (key sequence -> command),
 leaving a trail for five seconds or until interrupted.
+** TODO CRITICAL : git commit workflow
+**** ? worry about telescopes
+**** Render the git diff report v2 like a content view, in Skg.
+**** Include all sources.
+Refuse the view if that conflicts with the source set
+(the current maximum privacy level shown --
+what's the term used in the code for that?)
+**** make TextChanged more informative
+Now TextChanged shows a synthetic OldText child,
+with no content but the old title and the old body,
+and also a BodyDiff node with a diff of the two bodies.
+**** show current positions under each RemovedHere node
+That is, if content E was removed from container A,
+then the RemovedHere image of E under A
+should include as children all the current containers of E.
+**** show old containers under each Removed node
+**** update heralds to include "commit-readiness annotations"
+***** user can mark nodes well-placed
+This prevents redundant work.
+It affects the NewHere and RemovedHere images of the node.
+It doesn't describe edits to the node itself,
+but rather to its containers.
+***** user can mark nodes well-edited
+Indicates that all changes to that node can be committed.
+**** decide what are roots of the view
+minimizing redundancy, maximizing informativity
 ** docs
 *** test skg-to-org
 **** what happens to multi-contained 'export me' markers?
@@ -24,6 +66,9 @@ e.g. weird b/c it has a link
 ** embarrasssments
 *** the org-export and docs nodes should be in another repo
 ** bugs
+*** heralds temporarily lose the overlay
+If I save a big buffer, and then quickly move a node
+while the buffer is still saving.
 *** TODO bugs in make-link / make-content
 **** bug: making a link into content gives an unavailable view error
 ***** what I did
@@ -63,6 +108,8 @@ intending to replace it, but can't replace it.
 There are likely other viewnode kinds for which this happens.
 ** behavior changes
 *** TODO/help.org
+*** Telescope sections are confusing from magit.
+Would like to be able to see them all at a glance for a given ID.
 *** text search across containment paths
 *** making a link into content
 **** should rewrite edges, including text links, that pointed to the node with the link
@@ -93,7 +140,7 @@ Yes—these rules are user-facing documented in docs/COMMANDS.org:51.
   - Ranking formula and graph-role multipliers (docs/COMMANDS.org:183): BM25 × text-term coverage × context-origin multiplier.
   - The graph roles are explicitly listed: Root 100×, CycleMember ~32×, Dest 10×, HadID 10×, MultiContained ~3.2×; everything else 1×. It also says these only rerank—every match is returned.
 
-  The Neovim-facing equivalent is docs/COMMANDS-nvim.org:63. The API-level synopsis is api-and-formats.md:26.
+  The Neovim-facing equivalent is docs/COMMANDS-nvim.org:63. The API-level synopsis is docs/api-and-formats.md:26.
 
   For implementation authority, see server/context.rs:1 (how graph-origin types are assigned) and server/serve/handlers/text_search.rs:448 (the combined ranking calculation).
 *** matching all words should be much more highly valued
@@ -777,9 +824,6 @@ Compare the state of both sources.
 ** If I need to graft a forest's trees onto a false root,
    rctree can
    egotree can't
-* dubious
-** fold body into false headline
-   there in Emacs but (at worst ignored) when Rust rebuilds
 * if anyone else is reading this
 ** Most plans are not here but online.
    e.g. here:

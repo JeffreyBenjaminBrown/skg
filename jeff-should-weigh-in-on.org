@@ -144,7 +144,7 @@ general subscriber rule, not a fork-specific one: on save, for any
 OWNED node F, any id removed from F's contains that is (per disk)
 content of some node F subscribes to becomes a hide by F. Rationale:
 "fork" has no distinct identity in the graph -- it is exactly
-subscribe + override -- and docs/sharing-model.md already promised
+subscribe + override -- and docs/sharing-model.org already promised
 this behavior for clones ("Branches you then delete from the clone,
 or move elsewhere, become branches the clone
 hides_from_its_subscriptions"). Consequences you might weigh in on:

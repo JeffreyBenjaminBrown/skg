@@ -1,4 +1,4 @@
-* vision
+* DONE vision
 I'd like to give Skg the ability to import from org (not org-roam).
 It would ask the user for the root folder (in Docker) to import,
 and the same folder's name on the host system.
@@ -23,3 +23,622 @@ in which you describe all the remaining decisions
 Also push back on anything that deserves it.
 It's probably worth thinking through whether complications will arise
 when a user uses this in conjunction with org-roam import and org export.
+* ONGOING Codex response: decisions before implementation
+** DONE jeff speaking
+The TODOs I have added here, please mark DONE if upon reading them
+you know what to do and my eye is no longer needed;
+otherwise, please mark them ONGOING and add at least one TODO underneath,
+for me to process.
+
+Where I marked something DONE without adding a TODO bullet under it,
+I'm going with your recommendations.
+
+If I marked something DONE but it still includes pending decisions
+you hadn't opined on, please mark it ONGOING and flag the decisions
+underneath in a TODO for me.
+*** Codex: reprocessed 2026-09-25
+Your later instructions take precedence over my earlier recommendations.
+'DONE' below means the design decision is settled, not that code is written.
+The remaining questions are the TODO headlines beneath ONGOING sections.
+This remains a discussion; no importer implementation has begun.
+** DONE Recommended scope
+I recommend one command that imports a mixed folder into an existing,
+owned Skg source, creating a file node and ordered headline children for
+each document. Resolve links across both formats in the same import.
+Preserve explicit Org IDs, generate IDs where absent, and report anything
+we cannot faithfully translate. Leave the input files untouched.
+
+The main decision is whether this is a one-time conversion or a repeatable
+way to synchronize external documents. I recommend conversion first,
+with enough provenance to identify an earlier import and refuse accidental
+duplication. Synchronization is a substantially larger feature.
+*** DONE yes, just once
+I intend to make skg the source of truth and export back into,
+for example, docs/.
+** DONE Pushback: more than text substitution
+Links are the biggest difficulty, but parsing structure and preserving body
+syntax also matter. A Markdown heading inside a code fence must remain
+code; a list item is not necessarily a graph node. Tables, reference links,
+embedded HTML, and Org drawers need explicit treatment. Raw Markdown in an
+Org view can change meaning or render poorly.
+
+I recommend format-aware parsers feeding a shared document representation,
+then a shared identity/link-resolution pass and Skg writer. Specific parser
+libraries and internal types are implementation choices, not decisions you
+need to make now.
+*** DONE need info
+Tables, reference links, HTML and even properties can all just be
+copied verbatim into the body, no?
+When you say 'reference links' what do you mean?
+**** Codex: yes, with special handling for links and structural boundaries
+Yes. Tables, HTML, and properties can be retained as body text. My earlier
+wording overstated how much formatting conversion is necessary. If you are
+happy to preserve Markdown syntax as text while editing in Skg, we do not
+need to translate every construct into Org syntax. Preserving the text does
+not guarantee that it renders the same way in an Org view or Org export:
+for example, raw HTML will not automatically become rendered HTML there.
+
+By a Markdown reference link I mean a link whose destination is declared
+separately from where the link appears. For example:
+
+#+begin_example
+See [installation instructions][setup].
+
+[setup]: ./installation.md "Installation guide"
+#+end_example
+
+The first line uses the label 'setup' to look up the destination declared
+on the last line. This contrasts with an inline Markdown link such as
+'[installation instructions](./installation.md)'. Markdown also allows
+'[setup][]' and '[setup]' to use a matching reference definition.
+
+We can preserve all that text, but copying alone does not turn the link
+into a working Skg link. Also, the definition can be elsewhere in the
+original file, under a different heading. Once headings become separate
+nodes, a view containing the link might not contain its definition.
+I recommend resolving these references across the whole original file
+before splitting it into nodes, then rewriting links to imported targets
+as Skg ID links. Definitions can be retained as original text if desired;
+the converted link would no longer depend on them. External destinations
+can become ordinary Org links so they remain usable in Skg and Org export.
+
+Properties can likewise remain in the body while the importer reads the
+ones it needs: an Org 'ID' supplies identity, and 'CUSTOM_ID' can identify
+a local link target. Reading a property does not require deleting its text.
+We should distinguish retained original properties from Skg's own metadata;
+an original 'ID' kept as body text should not independently control later
+Skg saves or imply that export preserves the complete graph identity.
+
+The remaining parsing requirement is to know which text is structure and
+which is literal content. For example, '# Example' inside a Markdown code
+fence must not create a node. Similarly, we should not rewrite apparent
+links inside code examples. Tables and HTML can contain real links too;
+if we leave those constructs entirely opaque, their text survives but their
+embedded destinations will not be repaired automatically.
+
+Given your one-time import followed by Skg becoming the source of truth,
+I recommend preserving body formatting by default, parsing enough to split
+headings correctly, and converting supported links. Unsupported link forms
+should be reported and retained. Full Markdown-to-Org formatting conversion
+can be a separate choice rather than a prerequisite for import.
+***** DONE agreed to all
+** DONE What becomes a node?
+*** DONE File roots and headings
+Should every file become a node, even when it has one top-level heading?
+I recommend yes: a file link then has an unambiguous destination, and text
+before the first heading has somewhere to live. The cost is sometimes
+having both a file root and a child with the same title.
+
+Choose title precedence: Org '#+title:', Markdown front-matter title,
+first heading, or filename. My default is explicit document title, then
+filename; do not consume the first heading merely to avoid repetition.
+Decide whether empty files should create empty file nodes; I would include
+them so links to them still resolve.
+**** DONE agreed on all points
+*** DONE Hierarchy, lists, and directories
+I recommend one node per heading, using the nearest preceding shallower
+heading as parent and retaining sibling order. Lists remain body text.
+Directory paths belong in provenance; optional folder nodes or a single
+import container are a separate navigation choice.
+
+The current Org-roam parser creates special grouping nodes for some skipped
+heading levels. Should ordinary Org and Markdown do that too? I recommend
+ordinary nesting by default, with the existing grouping behavior confined
+to an explicit Org-roam compatibility option.
+**** DONE let's create an import record node
+Its body would state the arguments -- hence recording the source path --
+and its children would be links to each created doc.
+It should also record the time of execution.
+***** Codex: interpretation
+One record node per successful import, in the selected destination source.
+Its body records the arguments actually used and execution time in UTC.
+I interpret its children as the imported file-root nodes themselves, through
+'contains', so expanding the record lists the imported documents. No folder
+nodes or separate wrapper node per link are needed. The record is created
+as part of the same batch as the imported nodes.
+**** DONE let's use the same grouping trick
+***** Codex: this overrides my ordinary-nesting recommendation
+Use the existing Org-roam grouping rule for both input formats. Its generated
+explanatory text should refer to the original document, not claim every
+document came from Org-roam. The grouping intentionally changes sibling
+placement, as the current importer does.
+** DONE Supported text and metadata
+*** DONE Syntax and preservation policy
+Choose the initial Markdown dialect and extensions: ordinary headings,
+inline/reference links, lists, fenced/indented code, and emphasis are a
+reasonable baseline; tables, task lists, footnotes, math, HTML, wiki links,
+and explicit heading anchors need a stated support policy.
+
+For Org, decide how to handle TODO states, priorities, tags, scheduling,
+property/logbook drawers, source/example blocks, footnotes, and directives.
+I recommend preserving their text where no structured Skg equivalent exists,
+converting Markdown to Org syntax where supported, and reporting unsupported
+constructs without silently dropping them. Never evaluate code, includes,
+macros, or other executable input as part of importing.
+
+Should unsupported syntax stop the import or remain visibly literal with
+a warning? I recommend warnings for preserved formatting, errors where
+structure or text would be lost. Exact whitespace/byte preservation would
+require a separate archival promise: current Skg body normalization already
+trims outer blank lines.
+**** DONE let's mostly duck
+Everything from the imported-from body
+just lands in the imported-to body, verbatim,
+and similarly for the title (e.g. TODO|DONE go there).
+
+The one that really seems to warrant graph structure is footnotes;
+those live somewhere else and can be multiply linked to.
+I've never used org footnotes, though, and don't care;
+if the natural implementation any harder than
+'make a footnotes node at the end of the document,
+put all the footnotes in it,
+and each mention of a footnote becomes a link to one of those'
+I'll probably just ask you to not bother.
+
+Let's explain in the docs that skg makes almost no attempt
+at interpreting anything but content and link structure.
+It should, however, permit mixed web links (unchanged)
+and links to other org or markdown sections
+(which become ordinary skg links).
+***** Codex: the text-preservation policy is settled
+Preserve titles and bodies, including TODO/DONE words, markup, tables, HTML,
+and unknown metadata. Rewrite supported internal links; leave web links in
+their original syntax. This overrides my earlier suggestion to convert
+external Markdown links to Org syntax. Document that retained syntax may
+not render as intended in Org, and that existing Skg whitespace normalization
+still applies. Parsing must distinguish actual headings and links from
+examples inside literal blocks; preserving formatting does not remove that
+requirement. Any further escaping needed to carry text safely through Skg
+views must preserve its stored meaning, not silently change it.
+***** DONE Footnotes: accept this limited first version?
+I recommend supporting named Markdown footnotes with separate definitions:
+one 'Footnotes' child at the end of each imported file root, one child per
+definition, and ID links from each reference to its definition node. Resolve
+names within the original file, including definitions under other headings;
+remove a moved definition from its old body so it is not duplicated.
+Keep definition text and resolve its supported links as elsewhere.
+
+Leave Org footnotes and unsupported Markdown forms as original body text,
+with a report when their references may cease to work after splitting the
+document. Missing or duplicate definitions should be reported, not guessed.
+This is limited structural extraction, not full footnote rendering or
+renumbering on export. Is that scope worth doing, or should the first version
+preserve all footnotes as text? You expressed a preference conditional on
+complexity, so I have not treated it as an unconditional requirement.
+****** DONE yeah, let's do it that simple way
+**** DONE What are directives?
+***** Codex: instructions embedded in Org text
+I meant Org lines beginning '#+', such as '#+title: My notes',
+'#+options: toc:nil', '#+include: "other.org"', and block delimiters such as
+'#+begin_src' and '#+end_src'. They tell Org how to interpret, display, or
+export text. Here, read the title for the file node and recognize literal
+block boundaries, while preserving the original text. Do not execute code,
+expand includes, or apply export options during import. Those choices follow
+your minimal-interpretation policy; no additional decision is needed.
+****** DONE let's support the title directive
+but not the others
+******* Codex: settled
+Interpret '#+title:' as the document title. Preserve other directives as
+text without applying them. Still recognize source/example block boundaries
+to avoid treating examples as real headings or links; that is parsing their
+boundaries, not executing their instructions.
+*** DONE Data worth carrying besides title, body, and contains
+**** DONE Explicit Org IDs
+are useful outside Org-roam too. Preserve them and the
+existing 'Had_ID_Before_Import' distinction; its display text currently
+mentions Org-roam and would need generalizing.
+**** DONE Recognized 'ROAM_ALIASES'
+can populate aliases even through this command.
+Decide whether Markdown front-matter aliases should do so too, and which
+schema counts. Tags are not automatically aliases: I recommend retaining
+tags as text until you choose tag-node or other semantics.
+***** DONE sure, do markdown the same way
+****** DONE Accept YAML front matter with 'title' and 'aliases'?
+There is no schema selected yet for the Markdown equivalent. I recommend
+recognizing a YAML block delimited by '---' at the beginning of the file,
+reading 'title' as a string and 'aliases' as either one string or a list of
+strings. A single string is one alias, even if it contains spaces; tags
+remain text, not aliases. Retain the original front matter in the body.
+Other metadata formats remain uninterpreted text. Is that sufficient for
+the Markdown you want to import?
+******* DONE Yes. Let's read aliaess as a list of strings
+where an alias can include whitespace by using quotation marks
+******** Codex: settled as a YAML list
+For example, 'aliases: [energy, "machine learning"]'. Each list element is
+one alias; quoted whitespace stays within that alias. Accept YAML block lists
+too. This supersedes my single-string alternative: do not split a scalar on
+spaces or accept it as an alternative alias-list schema. Preserve malformed
+or differently shaped metadata as text and report that aliases were not read.
+**** DONE more
+Retain unknown properties/front matter as text rather than discarding them.
+'CUSTOM_ID' and local targets should normally be document-scoped addresses,
+not globally claimed Skg IDs. File timestamps, author data, and source paths
+could be recorded as provenance, but need not become semantic properties.
+
+Your empty hide/override/subscription policy fits newly created nodes.
+If updates to existing nodes are allowed, it must not erase relationships
+already added in Skg; that is a separate update-policy decision.
+** DONE Links and filesystem mapping
+*** DONE What the two roots mean
+I recommend a container input root plus an optional corresponding absolute
+host root. Relative file links are resolved from the containing document's
+directory; they do not inherently need the host root. The host mapping is
+needed for absolute host paths and for displaying usable external paths.
+
+For example, container '/imports/notes/a.org' corresponding to host
+'/home/jeff/notes/a.org' can resolve 'sub/b.md' through its relative path.
+An absolute '/home/jeff/notes/sub/b.md' maps to that same imported file.
+This must compare path components, not blindly replace string prefixes.
+
+Decide whether one mapping is enough initially. Links into other mounts,
+home-relative paths, Windows paths, and site-root-relative Markdown URLs
+need additional declared conventions. The container's home directory is
+not a substitute for the host user's home directory. I recommend leaving
+unmapped paths unresolved and reporting them.
+**** DONE agreed. also, let's simplify
+Changing what I asked for:
+Let's not ask for a host root initially;
+let's only prompt for that if we find an absolute path.
+***** Codex: prompt only when the scan finds an absolute filesystem link
+The initial prompts are container input root and destination source. Scan
+before asking for the corresponding host root. An 'https:' URL is not an
+absolute filesystem path and does not trigger this prompt. Apply one mapping
+to absolute host file paths; report unmapped cases as already agreed.
+
+If a relative link points outside the imported set, normalize it using the
+input document's location. Without a host mapping, the report must say that
+the retained container path may not work in the host editor. This is the
+accepted external-link limitation, not grounds for importing extra files or
+silently guessing a host path.
+*** DONE Which addresses resolve to graph nodes?
+**** DONE The shared index
+should cover file roots, heading addresses, Org IDs,
+'CUSTOM_ID', and supported named targets, across '.org' and '.md'. Resolve
+addresses against the original documents before converting their text.
+**** DONE Choose supported Org search suffixes and Markdown fragment rules.
+In particular, heading slugs differ between Markdown ecosystems; choose a
+named convention rather than guessing. Duplicate headings or targets,
+extensionless links, and wiki links need an ambiguity policy. I recommend
+exact, uniquely resolved matches only, with diagnostics for the rest.
+***** DONE agreed
+****** DONE Accept these concrete address conventions?
+Your agreement settles the unique-match rule, but I had not selected the
+actual dialects. I recommend CommonMark headings and inline/reference links,
+with GitHub-style heading fragments, plus the explicitly agreed metadata and
+footnote extensions. For Org, support file links, IDs, heading searches
+('::*Heading'), custom-ID searches ('::#name'), and exact named targets.
+Support equivalent same-document targets too. Within a body, resolve a target
+to its containing node as you requested below.
+
+Leave wiki links, extensionless filename guessing, Org line-number/regexp
+searches, and HTML anchor interpretation unsupported initially: preserve
+them and report unresolved destinations. Duplicate addresses remain
+ambiguous unless the selected convention assigns distinct addresses, as
+GitHub-style duplicate-heading suffixes do. Does this fit your documents?
+******* DONE That all sounds good, but please review docs/
+to see if it includes syntax we haven't covered
+******** Codex: review results
+The existing file links, cross-format links, and section links fit the agreed
+address conventions. Examples include 'COMMANDS.org::#import-org-roam' in
+[[file:../../docs/setup.org][setup.org]], 'heralds.org::*Link annotations' in
+[[file:../../docs/COMMANDS.org][COMMANDS.org]], and a Markdown heading fragment in
+[[file:../../docs/integrate-public-and-private.md][integrate-public-and-private.md]]. Org links without an explicit 'file:'
+prefix also occur and should be recognized, as in [[file:../../docs/data-model_technical.org][data-model_technical.org]].
+
+Tables, TODO words, and ordinary formatting can remain body/title text as
+agreed. The scan did not find actual footnote definitions or HTML anchors
+requiring additional support. Literal link examples occur frequently in code
+blocks and inline code; those must remain examples, not become graph links.
+
+One additional case is mixed syntax within a file: [[file:../../docs/README-old.org][README-old.org]] uses
+Markdown links despite its '.org' extension. [[file:../../docs/setup.org][setup.org]] and
+[[file:../../docs/data-model_friendly.org][data-model_friendly.org]] use Markdown code fences inside Org documents.
+This is distinct from links between separate Markdown and Org files.
+
+Some destinations are already wrong: for example, 'docs/FAQ.md' from
+'docs/README-old.org' resolves to 'docs/docs/FAQ.md', which does not exist.
+Links to Rust files or '../api-and-formats.md' also leave the input set if
+only 'docs/' is imported. Apply the agreed unresolved/external-link policy;
+do not guess corrected destinations or expand the import. I recorded the
+stale relative-path examples in 'TODO/problems.org'.
+******** DONE Recognize Markdown links and code fences inside Org files too?
+I recommend yes for these two constructs, because your docs actually use
+them. Keep Org heading rules for '.org' files; recognizing a Markdown fence
+protects its contents from heading/link interpretation. Recognize Markdown
+links outside literal text alongside ordinary Org links. This is a small
+explicit extension to the selected syntax, not automatic format detection
+or a promise to understand arbitrary mixtures. Alternatively, retain these
+constructs as text and report that their links were not converted.
+********* TODO yes please
+**** Targets within a body
+raise another choice: link to the containing node,
+make a dedicated node, or retain a location-bearing external link. Linking
+to the containing node is simplest but loses position; report that loss.
+***** DONE the simplest
+****** Codex: link to the containing node and report lost position
+**** DONE Successful internal references
+should become '[[id:ID][label]]' in titles
+and bodies, preserving labels and supplying one for originally bare links.
+That is the form Skg's current text-link parser recognizes. Formatting
+conversion must handle escaping and literal code separately from links.
+*** DONE Missing targets, existing nodes, and attachments
+Should 'id:' links be allowed to resolve against nodes already in Skg?
+I recommend yes, through the configured graph's primary and extra IDs,
+while reporting absent targets. File paths outside the import do not imply
+an existing graph node unless retained provenance establishes that mapping.
+
+For unresolved or ambiguous file/heading links, choose between aborting,
+retaining an external link, or making placeholder nodes. I recommend
+retaining a usable external link where possible and reporting it, without
+inventing graph nodes. Leaving a relative link unchanged after moving its
+text into Skg does not necessarily preserve its destination.
+
+Images and other attachments need their own policy: leave them in place
+with rewritten paths, or copy them to managed storage. I recommend leaving
+them in place initially, explicitly sacrificing portability. Copying needs
+a storage location, filename-collision rules, and an export policy.
+Web/mail links can remain external; importing should not fetch their targets.
+**** DONE agreed to all
+** DONE Identity, repeated imports, and coexistence with Org-roam
+*** DONE Collision policy is consequential
+An explicit ID already used in any configured source, including an extra
+ID, must be checked before writing. A match could mean the same imported
+note, unrelated data with a reused ID, or a section of a privacy telescope.
+Importing into a different source is not automatically a separate identity.
+
+I recommend refusing collisions pending an explicit policy, rather than
+merging bodies, overwriting nodes, or creating telescope sections implicitly.
+Likewise reject duplicate explicit IDs within the batch. If you want the
+old Org-roam duplicate-merging behavior, make it an intentional option.
+*** DONE What should running the command twice do?
+Choose reject, skip unchanged documents, create copies, or update earlier
+imports. My initial recommendation is to reject recognized prior imports
+and collisions, with a report explaining them. A path alone cannot prove
+identity after rename, and a fresh UUID cannot recognize a repeated import.
+
+Even basic repeat detection needs persisted provenance: an import identity,
+original relative file/section location, assigned ID, and preferably an
+input fingerprint. Decide whether this lives in Skg data or a sidecar
+manifest; a manifest is a small initial approach, but it then needs backup
+and must be consulted by all participating import commands.
+
+If you want updates, we also need policies for edits made on both sides,
+renamed/moved headings, deleted input nodes with incoming Skg references,
+and changed containment. I recommend treating those as synchronization work,
+not quietly adopting last-writer-wins.
+**** DONE don't bother detecting reruns.
+It's not intended to be run more than once.
+***** Codex: no repeat-detection manifest
+This removes my proposal for persistent fingerprints and import matching.
+The import record is for browsing and provenance, not rerun detection.
+Still reject explicit ID collisions, as agreed above. A repeated import of
+ID-less documents can create duplicate nodes; do not attempt to identify or
+synchronize them. The old Org-roam command remains a separate command.
+*** DONE Reusing the current importer
+[[file:../../server/import_org_roam/parse.rs][The current Org-roam parser]] requires a file-level ':ID:', assigns fresh
+UUIDs to ID-less headings, and extracts IDs and aliases from drawers.
+It cannot simply be called unchanged for arbitrary Org files.
+
+[[file:../../server/import_org_roam.rs][Its directory importer]] removes existing '.skg' files in the output directory
+before parsing, then merges duplicate IDs. Reusing that entry point against
+an ordinary populated source would be destructive.
+
+Choose whether the new command eventually replaces that command or coexists
+with it. I recommend sharing parsing/identity machinery where appropriate
+and keeping the old command's special semantics explicit. Importing the
+same notes through both commands otherwise duplicates ID-less headings or
+collides on explicit IDs; old imports without provenance cannot always be
+matched automatically.
+** ONGOING Org export is not an inverse
+*** DONE the problem
+[[file:../../server/export_org.rs][The current exporter]] renders selected content views as plain Org, removes
+Skg metadata, turns ID links into file/heading links, and renders cycles or
+repeated occurrences within a file as link leaves. It also removes links
+from headline text in favor of their labels. Missing destinations become
+links to a warning note or plain labels.
+
+Consequently reimport can recover a readable outline and many text links,
+but cannot reliably recover original IDs, shared-node identity, containment
+edges represented by link leaves, aliases, privacy sections, or the three
+relationship kinds you intend to leave empty. A file root added by import
+also surrounds the export's root headline unless handled specially.
+
+*** DONE Decide whether acceptable behavior is
+importing an export as new notes,
+or restoring/editing the same graph. I recommend the former for this feature.
+The latter needs an explicitly different export contract carrying stable
+identities and relationship/provenance data; it cannot be inferred reliably
+from today's plain Org. Do not infer that two equal headings are one node.
+**** DONE agreed, don't bother
+*** ONGOING There is a separate convenience decision:
+automatically add export-marker
+children to imported file roots so later export can reproduce the directory
+layout? I recommend opt-in, preserving relative paths and checking collisions
+such as 'a.md' and 'a.org' both wanting 'a.org'. This still would not restore
+original Markdown syntax or provide round-trip graph fidelity.
+**** ONGOING is this what I decided earlier?
+I titled that response 'let's create an import record node'.
+***** Codex: they serve different purposes
+The import record lists what an import created and records its arguments
+and time. An export marker tells the existing exporter that a particular
+node is a document root and supplies that document's output path.
+
+For input 'guide/setup.md', the record would contain the imported file node.
+A separate marker child beneath that file node could request export to
+'guide/setup.org', relative to whichever output directory you later choose.
+The record alone does not supply the instruction the exporter requires.
+***** Add export markers automatically to the imported file roots?
+Since you want Skg to become the source of truth and export back into
+'docs/', I now recommend yes, without another import-time prompt. Preserve
+relative directory paths and replace the source extension with '.org'.
+Refuse the batch if two documents would claim the same export path, with a
+report naming both, so you can rename or exclude one before retrying.
+
+This exports Markdown inputs as Org, not Markdown. It also leaves original
+'.md' files in place; import should not delete them. If retaining Markdown
+output is required, that is additional exporter work. Please confirm that
+Org output and these automatic markers are what you want.
+***** DONE please explain this whole issue to me from scratch
+and with a glossary
+****** Codex: importing and exporting are two separate operations
+Import reads your existing files and creates Skg nodes. After that, Skg stores
+the material in '.skg' files, with a node for each document and each heading.
+It no longer depends on the original documents for its contents.
+
+Later, export reads Skg nodes and writes ordinary '.org' documents. It needs
+to know which nodes should start separate documents and what to name those
+documents. The question here is whether the importer should supply those
+instructions automatically, so you do not have to add them by hand later.
+******* Glossary
+******** File-root node
+The Skg node representing one imported document as a whole. Its descendants
+represent that document's headings. It is distinct from the filesystem
+folder that held the input file.
+******** Import record node
+The node you already requested: it records when the import ran and its
+arguments, and contains the imported file-root nodes. It answers 'What did
+this import create?' It does not instruct the exporter to write files.
+******** Export root
+A Skg node selected to become a separate exported document, together with
+its contained material. A file-root node is a natural choice, but merely
+being imported does not currently make a node an export root.
+******** Export marker
+A small instruction node contained by an export root. The existing exporter
+recognizes it because its title links to Skg's export-instruction node and
+its body specifies 'target_filepath'. The marker itself is omitted from the
+exported document. It is ordinary stored Skg data, not an import-time flag.
+******** Target filepath
+The output filename and any subfolders, relative to the export output
+directory. The existing marker omits the extension: 'target_filepath = guide'
+means 'guide.org'. 'target_filepath = tutorials/guide' means
+'tutorials/guide.org'. The exporter supplies '.org'.
+******** Output directory
+The folder you choose when running export. For example, choose '/project/docs'
+and a marker with 'target_filepath = tutorials/guide' produces
+'/project/docs/tutorials/guide.org'. It is separate from the Skg source
+directory that stores '.skg' files.
+******* Example using your intended workflow
+Suppose you import '/project/docs', containing 'setup.org' and
+'tutorials/start.md'. Import creates a file-root node for each, plus the
+import record containing both. You then edit their contents in Skg.
+
+If we automatically add export markers, the 'setup' file root gets a marker
+with 'target_filepath = setup'; the other gets
+'target_filepath = tutorials/start'. When you later export to '/project/docs',
+the exporter writes 'setup.org' and 'tutorials/start.org'. It overwrites an
+existing file at either of those paths. It leaves 'tutorials/start.md' alone.
+Adding markers during import does not itself run export or overwrite inputs.
+
+Without automatic markers, both file-root nodes are still imported and
+editable, but neither is selected for export until you add the required
+marker yourself. The import record works the same way in either case.
+******* What this does not promise
+The existing exporter writes Org only. It will not turn 'start.md' back into
+Markdown. Under our agreed preservation policy, Markdown body formatting
+may also remain literal text inside the exported Org document.
+
+Export is a readable representation of the Skg contents, not restoration of
+the original file: it adds a root heading and does not preserve every kind
+of Skg relationship or identity. That limitation is already accepted.
+
+If the input has both 'guide.md' and 'guide.org' in the same directory, both
+would request 'guide.org' on export. They need different output names.
+My recommendation is to report that collision before import writes anything,
+so you can rename an input and retry. Also check against export paths already
+claimed by existing roots, rather than checking only within the new batch.
+****** TODO Should import automatically prepare each document for Org export?
+I recommend yes: add the markers automatically, preserving the relative
+folder layout, and refuse conflicting export paths with a clear report.
+Your import record remains separate and does not get an export marker.
+Choose no if you prefer to select documents and assign their export paths
+manually later. This is the remaining export decision; neither choice runs
+export automatically.
+******* TODO ah! yes yes yes
+Really glad you thought of this.
+** DONE Command behavior and architectural boundaries
+*** DONE Input selection and destination
+Choose recursive discovery rules, exclusions, symlink traversal, and accepted
+extensions. I recommend recursive '.org' and '.md', excluding '.git', no
+symlink traversal by default, and configurable exclusions for generated
+exports or other duplicate trees. Do not recursively chase linked documents
+outside the selected input set without an explicit scope expansion.
+
+Choose whether the target must already be configured or can be created by
+the command. I recommend an existing owned source, never a source-set or
+foreign source. Source choice determines privacy; a mixed public/private
+input folder should be split into separate imports if those distinctions
+must survive. A single destination cannot infer them from ordinary files.
+**** DONE agreed except
+don't bother with the configurable exclusions.
+The user can just move documents on disk for that.
+*** DONE Interactive command, CLI, or both?
+I recommend a server operation with client prompts for the three inputs,
+and a reusable core so a CLI can use the same conversion. Decide whether
+both Emacs and Neovim commands are required initially, and whether offline
+CLI import is required in the first delivery. Offline writes need exclusive
+access; they cannot leave a running server serving stale graph/index state.
+**** DONE neovim and emacs, but no offline CLI
+*** DONE Failure behavior and review
+Choose all-or-nothing import or partial success. I recommend preflight of
+the complete batch, a preview with counts and diagnostics, and no writes
+when parsing, identity, or graph validation fails. Preserved but unresolved
+links can be warnings under the chosen policy. Inputs should be checked for
+changes between preview and application.
+
+Publishing must use the existing validated storage/graph update boundaries
+and refresh derived search state and affected client views. A preview does
+not by itself make multi-file writes crash-atomic: staging, recovery, and
+an import manifest should make interruption diagnosable and recoverable.
+Decide whether preview is mandatory or available as a dry-run option.
+
+An undo policy also matters: I recommend recording exactly which nodes and
+files the import created, allowing removal only while unchanged and after
+checking later references. Clearing the destination directory is not undo.
+**** DONE All-or-nothing, without recovery handling
+All-or-nothing.
+No recovery handling needed, just good reports on what went wrong.
+***** DONE What guarantee should apply to a failure during writing?
+All-or-nothing before writing is straightforward: parse the whole batch,
+resolve identities, validate the resulting graph, and refuse on errors.
+But if writing the tenth file fails, the first nine may already exist.
+A report alone cannot undo them. Publishing the in-memory graph atomically
+does not make the collection of on-disk files atomic.
+
+I recommend preflight plus rollback of newly created files on ordinary write
+failures, with no new persistent recovery system and no guarantee against a
+process crash or power loss. Report any cleanup failure and exact leftover
+paths; do not claim success. Existing source files must never be overwritten.
+Does that match your intended meaning, or do you require crash-safe
+all-or-nothing publication? The latter needs more architecture than reports.
+****** DONE that's good
+***** DONE Should the preview require confirmation?
+I had recommended a preview but left its interaction undecided. I recommend
+showing counts, destination, and warnings, then requiring confirmation in
+either client before writing. Revalidate inputs and destination state when
+applying. Alternatively, the command could apply immediately after successful
+preflight and only show its report afterward. Which do you prefer?
+
+My earlier suggestion of a dedicated import-undo facility is not necessary
+to the one-time conversion. I recommend leaving that out too; the import
+record remains useful, but is not a promise of an automatic undo operation.
+****** DONE confirmation seems nice; do require it

@@ -13,14 +13,19 @@
 //! unit-testable. The server handler and the `export-org`
 //! subcommand both call it.
 
-use crate::source_sets::ActiveSourceSet;
+use crate::source_sets::{ActiveSourceSet, SourceSetName};
+use crate::types::misc::SkgConfig;
 use crate::types::misc::{ID, RelPartner};
 use crate::types::nodes::complete::NodeComplete;
-use crate::types::textlinks::replace_each_link_with_its_label;
+use crate::types::textlinks::org_literal_ranges::org_literal_ranges;
+use crate::types::textlinks::{
+  replace_each_link_with_its_label, textlinks_from_text,
+  textlinks_with_ranges_from_text};
 
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
+use std::ops::Range;
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
@@ -88,9 +93,14 @@ struct ExportRoot {
   target   : String, // relative, no extension, e.g. "docs/setup"
 }
 
+/// A 'search' is the org search option addressing a heading within
+/// its file: '*Heading' for a plain title, or '#PID' (the node's
+/// CUSTOM_ID) where '*Heading' would miss: for a title containing a
+/// link (org's '*' search cannot match a headline whose text includes
+/// link markup), or for a title repeating an earlier headline's.
 enum HomeKind {
-  Root    { title  : String }, // links to the file (top), or *title same-file
-  Content { anchor : String }, // links to *anchor (deep)
+  Root    { search : String }, // links to the file (top), or to search same-file
+  Content { search : String }, // links to search (deep)
 }
 
 /// Where a node id lives in the export: which file, and how to
@@ -159,7 +169,9 @@ pub fn export_to_org (
     . collect ();
 
   let homes : HashMap<ID, Home> =
-    build_homes (&roots, &root_events, &by_pid, &mut warnings);
+    build_homes (&roots, &root_events, &by_pid);
+  let custom_id_targets : HashSet<ID> =
+    custom_id_link_targets (&root_events, &homes, &by_pid, &alias_to_pid);
 
   let mut report : ExportReport = ExportReport {
     output_base   : output_base . display () . to_string (),
@@ -171,7 +183,7 @@ pub fn export_to_org (
   for (root, events) in &root_events {
     let content : String =
       render_root (
-        root, events, &homes, &by_pid, &alias_to_pid,
+        root, events, &homes, &custom_id_targets, &by_pid, &alias_to_pid,
         &mut report . broken_links, &mut report . warnings );
     let rel : String = format! ("{}.org", root . target);
     let path : std::path::PathBuf = output_base . join (&rel);
@@ -217,6 +229,26 @@ pub fn export_candidate_pids (
   let mut candidates : Vec<ID> = candidates . into_iter () . collect ();
   candidates . sort ();
   candidates
+}
+
+/// All currently valid export-root claims across configured sources. Import
+/// uses this read-only view to reject a new automatic target that would
+/// compete with an existing export root.
+pub(crate) fn claimed_export_targets (
+  nodes : &[NodeComplete],
+  config : &SkgConfig,
+) -> Result<Vec<(ID, String)>, String> {
+  let active : ActiveSourceSet = ActiveSourceSet::named (
+    config, SourceSetName::from ("all"))
+    .map_err (|error| error . to_string ())?;
+  let aliases : HashMap<ID, ID> = nodes . iter ()
+    .flat_map (|node| node . extra_ids . iter ()
+      .map (|extra| (extra . clone (), node . pid . clone ())))
+    .collect ();
+  let mut warnings : Vec<String> = Vec::new ();
+  let (roots, _) = discover_roots (nodes, &aliases, &active, &mut warnings);
+  Ok (roots . into_values ()
+    .map (|root| (root . root_pid, root . target)) . collect ())
 }
 
 fn write_export_file (
@@ -432,56 +464,83 @@ fn build_homes (
   roots       : &[&ExportRoot],
   root_events : &[(&ExportRoot, Vec<Ev>)],
   by_pid      : &HashMap<ID, &NodeComplete>,
-  warnings    : &mut Vec<String>,
 ) -> HashMap<ID, Home> {
   let mut homes : HashMap<ID, Home> = HashMap::new ();
   // A node that is itself a root always homes to its own file.
   for r in roots {
-    let title : String = match by_pid . get (&r . root_pid) {
-      Some (n) => anchor_text (n),
+    let search : String = match by_pid . get (&r . root_pid) {
+      Some (n) => org_search_for_heading (n),
       None     => String::new (), };
     homes . insert (
       r . root_pid . clone (),
       Home { target : r . target . clone (),
-             kind   : HomeKind::Root { title } } ); }
+             kind   : HomeKind::Root { search } } ); }
   // Then non-root content nodes; first appearance (in target order)
-  // wins. Pre-seed each file's anchor set with its root heading.
-  let mut anchors_per_file : HashMap<String, HashSet<String>> =
-    HashMap::new ();
-  for r in roots {
-    if let Some (n) = by_pid . get (&r . root_pid) {
-      anchors_per_file . entry (r . target . clone ())
-        . or_default () . insert ( anchor_text (n) ); }}
+  // wins. Org's '*Heading' search finds the first headline in the
+  // file with that text, so a node whose plain title repeats an
+  // earlier headline in its home file is addressed by CUSTOM_ID.
   for (root, events) in root_events {
+    let mut earlier_anchors : HashSet<String> = HashSet::new ();
     for ev in events {
       if ! matches! (ev . kind, EvKind::Normal) { continue; }
-      if homes . contains_key (&ev . pid) { continue; }
       let node : &NodeComplete = match by_pid . get (&ev . pid) {
         Some (n) => n,
         None     => continue, };
-      let anchor : String = anchor_text (node);
-      let file_anchors : &mut HashSet<String> =
-        anchors_per_file . entry (root . target . clone ())
-        . or_default ();
-      if ! file_anchors . insert (anchor . clone ()) {
-        warnings . push ( format! (
-          "ambiguous heading {:?} in {}.org: deep links to it \
-           resolve to the first occurrence",
-          anchor, root . target ) ); }
+      let anchor_is_repeat : bool =
+        ! title_has_link (node) // such a headline never matches a '*' search
+        && ! earlier_anchors . insert ( anchor_text (node) );
+      if homes . contains_key (&ev . pid) { continue; }
+      let search : String =
+        if anchor_is_repeat { format! ("#{}", node . pid) }
+        else { org_search_for_heading (node) };
       homes . insert (
         ev . pid . clone (),
         Home { target : root . target . clone (),
-               kind   : HomeKind::Content { anchor } } ); }}
+               kind   : HomeKind::Content { search } } ); }}
   homes }
 
 //
 // Rendering
 //
 
+/// PIDs that some rendered link addresses by CUSTOM_ID. Only their
+/// headlines get a ':CUSTOM_ID:' drawer. Mirrors what 'render_root'
+/// emits: textlinks in titles and bodies of Normal events (broken
+/// ones going to the sink), and LinkLeaf headlines.
+fn custom_id_link_targets (
+  root_events  : &[(&ExportRoot, Vec<Ev>)],
+  homes        : &HashMap<ID, Home>,
+  by_pid       : &HashMap<ID, &NodeComplete>,
+  alias_to_pid : &HashMap<ID, ID>,
+) -> HashSet<ID> {
+  let sink_pid : ID = ID::from (BROKEN_LINK_SINK_ID);
+  let mut targets : HashSet<ID> = HashSet::new ();
+  for (root, events) in root_events {
+    let mut linked : Vec<ID> = Vec::new ();
+    for ev in events {
+      match ev . kind {
+        EvKind::LinkLeaf => linked . push (ev . pid . clone ()),
+        EvKind::Normal => {
+          let Some (node) = by_pid . get (&ev . pid) else { continue; };
+          let texts : [&str; 2] =
+            [ &node . title, node . body . as_deref () . unwrap_or ("") ];
+          for text in texts {
+            for textlink in textlinks_from_text (text) {
+              let pid : ID = resolve_pid (&textlink . id, alias_to_pid);
+              linked . push (
+                if homes . contains_key (&pid) { pid }
+                else { sink_pid . clone () } ); }} }, }}
+    for pid in linked {
+      if let Some (home) = homes . get (&pid) {
+        if link_uses_custom_id (home, &root . target) {
+          targets . insert (pid); }}}}
+  targets }
+
 fn render_root (
   root         : &ExportRoot,
   events       : &[Ev],
   homes        : &HashMap<ID, Home>,
+  custom_id_targets : &HashSet<ID>,
   by_pid       : &HashMap<ID, &NodeComplete>,
   alias_to_pid : &HashMap<ID, ID>,
   broken       : &mut usize,
@@ -494,10 +553,6 @@ fn render_root (
       Some (n) => n,
       None     => continue, };
     let stars : String = "*" . repeat (ev . depth);
-    // A heading is always the title's plain-label form (links
-    // collapsed to their labels). This keeps the headline text
-    // identical to the anchor used for deep links to it, and keeps
-    // fragile link markup out of headlines; links live in bodies.
     let label : String = anchor_text (node);
     match ev . kind {
       EvKind::LinkLeaf => {
@@ -506,13 +561,18 @@ fn render_root (
           None        => label, }; // unreachable: link-leaf targets are homed
         out . push_str ( & format! ("{} {}\n", stars, link) ); },
       EvKind::Normal => {
-        out . push_str ( & format! ("{} {}\n", stars, label) );
+        let headline : String = // keeps its links, rewritten like body links
+          rewrite_links ( &node . title, target, homes,
+                          alias_to_pid, broken, warnings );
+        out . push_str ( & format! ("{} {}\n", stars, headline . trim ()) );
+        if custom_id_targets . contains (&node . pid) {
+          out . push_str ( & format! (
+            ":PROPERTIES:\n:CUSTOM_ID: {}\n:END:\n", node . pid ) ); }
         if let Some (body) = node . body . as_deref () {
           if ! body . trim () . is_empty () {
-            let body : String =
-              rewrite_links ( body, target, homes,
-                              alias_to_pid, broken, warnings );
-            warn_body_structure (&node . pid, &body, warnings);
+            let body : String = defuse_headline_lines (
+              & rewrite_links ( body, target, homes,
+                                alias_to_pid, broken, warnings ));
             out . push_str ( body . trim_end_matches ('\n') );
             out . push ('\n'); }} }, }}
   out }
@@ -528,12 +588,16 @@ fn rewrite_links (
   warnings       : &mut Vec<String>,
 ) -> String {
   let sink_pid : ID = ID::from (BROKEN_LINK_SINK_ID);
-  TEXTLINK_PATTERN . replace_all (text, |caps : &regex::Captures| {
-    let uid : ID = ID::from (&caps[1]);
-    let label : &str = &caps[2];
+  let mut out : String = String::new ();
+  let mut copied_up_to : usize = 0;
+  for (range, textlink) in textlinks_with_ranges_from_text (text) {
+    out . push_str (&text [copied_up_to .. range . start]);
+    copied_up_to = range . end;
+    let uid : ID = textlink . id;
+    let label : &str = &textlink . label;
     let pid : ID =
       alias_to_pid . get (&uid) . cloned () . unwrap_or (uid);
-    match homes . get (&pid) {
+    out . push_str (& match homes . get (&pid) {
       Some (home) => org_link_for_home (home, current_target, label),
       None => {
         *broken += 1;
@@ -546,8 +610,10 @@ fn rewrite_links (
                source-set, and the broken-link note is not either; \
                emitting the label as plain text",
               pid, label ) );
-            label . to_string () }, }}, }
-  } ) . into_owned () }
+            label . to_string () }, }}, } ); }
+  out . push_str (&text [copied_up_to ..]);
+  out }
+
 
 fn org_link_for_home (
   home           : &Home,
@@ -556,16 +622,27 @@ fn org_link_for_home (
 ) -> String {
   let same : bool = home . target == current_target;
   match &home . kind {
-    HomeKind::Root { title } =>
-      if same { format! ("[[*{}][{}]]", title, label) }
+    HomeKind::Root { search } =>
+      if same { format! ("[[{}][{}]]", search, label) }
       else    { format! ("[[{}][{}]]",
                          relpath (current_target, &home . target),
                          label) },
-    HomeKind::Content { anchor } =>
-      if same { format! ("[[*{}][{}]]", anchor, label) }
-      else    { format! ("[[{}::*{}][{}]]",
+    HomeKind::Content { search } =>
+      if same { format! ("[[{}][{}]]", search, label) }
+      else    { format! ("[[{}::{}][{}]]",
                          relpath (current_target, &home . target),
-                         anchor, label) }, }}
+                         search, label) }, }}
+
+/// Whether 'org_link_for_home' would address this home by CUSTOM_ID
+/// from a link in 'current_target'.
+fn link_uses_custom_id (
+  home           : &Home,
+  current_target : &str,
+) -> bool {
+  match &home . kind {
+    HomeKind::Root { search } =>
+      home . target == current_target && search . starts_with ('#'),
+    HomeKind::Content { search } => search . starts_with ('#'), }}
 
 /// Relative path from the file at `from_target` to the file at
 /// `to_target` (both extension-less, '/'-separated, under the same
@@ -594,21 +671,31 @@ fn relpath (
   let joined : String = parts . join ("/");
   if ups == 0 { format! ("./{}", joined) } else { joined } }
 
-fn warn_body_structure (
-  pid      : &ID,
-  body     : &str,
-  warnings : &mut Vec<String>,
-) {
-  for line in body . lines () {
-    let is_headline : bool =
-      line . starts_with ('*')
-      && line . trim_start_matches ('*') . starts_with (' ');
-    if is_headline || line . starts_with ("#+") {
-      warnings . push ( format! (
-        "node {}: body line {:?} begins like org structure and may \
-         render as a spurious headline/keyword",
-        pid, line ) );
-      return; }}} // one warning per node is enough
+/// A body line that Org would read as a headline ('*'s then a space)
+/// would split the exported document. Inside a '#+begin_' block, Org's
+/// own comma escape hides it; elsewhere, two leading spaces make it a
+/// list item (for '* ') or plain text.
+fn defuse_headline_lines (
+  body : &str,
+) -> String {
+  let org_blocks : Vec<Range<usize>> = org_literal_ranges (body)
+    . into_iter ()
+    . filter ( |range| body [range . clone ()] . trim_start ()
+                       . to_ascii_lowercase () . starts_with ("#+begin_") )
+    . collect ();
+  let mut out : String = String::new ();
+  let mut line_start : usize = 0;
+  for line in body . split_inclusive ('\n') {
+    let looks_like_headline : bool = {
+      let stars : usize = line . bytes () . take_while (|b| *b == b'*') . count ();
+      stars > 0 && line [stars ..] . starts_with (' ') };
+    if looks_like_headline {
+      let in_org_block : bool = org_blocks . iter ()
+        . any ( |range| range . start < line_start && line_start < range . end );
+      out . push_str (if in_org_block { "," } else { "  " }); }
+    out . push_str (line);
+    line_start += line . len (); }
+  out }
 
 //
 // Small shared helpers
@@ -634,6 +721,17 @@ fn relSource_is_active (
   active : &ActiveSourceSet,
 ) -> bool {
   active . is_all () || active . contains_source (&member . relSource) }
+
+fn title_has_link (
+  node : &NodeComplete,
+) -> bool {
+  TEXTLINK_PATTERN . is_match (&node . title) }
+
+fn org_search_for_heading (
+  node : &NodeComplete,
+) -> String {
+  if title_has_link (node) { format! ("#{}", node . pid) }
+  else { format! ("*{}", anchor_text (node)) }}
 
 fn anchor_text (
   node : &NodeComplete,

@@ -19,6 +19,8 @@ use crate::serve::handlers::diff_analysis::handle_diff_analysis_request_with_sou
 use crate::serve::handlers::relSource_info::handle_relSource_info_request;
 use crate::serve::handlers::boolprop_state::handle_boolprop_state_request;
 use crate::serve::handlers::export_to_org::handle_export_to_org_request;
+use crate::serve::handlers::import_md_and_org::{
+  PendingImport, handle_import_md_and_org_request};
 use crate::serve::handlers::get_file_path::handle_get_file_path_request_with_source_set;
 use crate::serve::handlers::herald_rules::handle_herald_rules_request;
 use crate::serve::handlers::rebuild_ephemeral_data_stores::handle_rebuild_ephemeral_data_stores_request;
@@ -117,6 +119,7 @@ fn handle_emacs (
   let search_cancelled : Arc<AtomicBool> =
     Arc::new ( AtomicBool::new (false) );
   let mut snapshot_requested : bool = false;
+  let mut pending_import : Option<PendingImport> = None;
 
   let peer : SocketAddr =
     stream . peer_addr() . unwrap();
@@ -244,6 +247,9 @@ fn handle_emacs (
             handle_export_to_org_request ( &mut stream,
                                            &runtime . config,
                                            &request_header ),
+          Ok (RequestType::ImportMdAndOrg) =>
+            handle_import_md_and_org_request (
+              &mut stream, &request_header, &env, &mut pending_import ),
           Ok (RequestType::RebuildEphemeralDataStores) =>
             handle_rebuild_ephemeral_data_stores_request ( &mut stream,
                                          &mut env,

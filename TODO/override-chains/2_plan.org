@@ -297,7 +297,7 @@
     'skg-fork-node' gesture for owned nodes, distinguishing it from the
     implicit (foreign, on-edit) fork.
   - [[../../docs/COMMANDS.org][COMMANDS.org]]: document 'skg-fork-node' / =C-c m f=.
-  - [[../../glossary.md][glossary.md]]: "fork" now spans foreign and owned; chains are followed
+  - [[../../docs/glossary.md][glossary.md]]: "fork" now spans foreign and owned; chains are followed
     to the last *visible* node.
 
 * Phase F — Verification (manual, via /run)

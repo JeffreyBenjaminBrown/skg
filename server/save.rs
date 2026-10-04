@@ -137,7 +137,7 @@ fn apply_defineNodes (
     &candidate, tantivy_index, node_defs );
   Ok (None) }
 
-fn enqueue_tantivy_delta (
+pub(crate) fn enqueue_tantivy_delta (
   candidate     : &InRustGraph,
   tantivy_index : &TantivyIndex,
   node_defs     : Vec<DefineNode>,

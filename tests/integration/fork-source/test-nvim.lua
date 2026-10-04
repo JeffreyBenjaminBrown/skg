@@ -92,7 +92,7 @@ vim.api.nvim_set_current_buf(confirm_buf)
 -- The elisp original asserts '(source owned)' here, which is STALE:
 -- the server always pre-fills the PICK-A-SOURCE placeholder and only
 -- SUGGESTS the inferred source in a comment line (fork.rs; documented
--- in COMMANDS.org and glossary.md). The emacs test fails on this
+-- in COMMANDS.org and glossary.org). The emacs test fails on this
 -- today -- see the problems.org entry filed with the vim-client port.
 -- This mirror asserts the documented behavior instead.
 local confirmation_text = T.buffer_text(confirm_buf)

@@ -32,7 +32,7 @@ repairs to it: the skip branch's unquoted 'cd $ORIGIN' is dropped
 entirely (every iteration cds absolutely, so no cd-back is needed);
 the trailing cd after the loop goes to "$ORIGIN" rather than
 "$ORIGIN/$NEW"; and all expansions are quoted. Updated the script
-copy in api-and-formats.md and the assertions in tests/git_ops.rs.
+copy in docs/api-and-formats.org and the assertions in tests/git_ops.rs.
 One pre-existing rarity left as-is: a source OUTSIDE the data root
 renders as an absolute path, which "$ORIGIN/$OLD" would mangle --
 but the old relative-cd loop mishandled that case too.

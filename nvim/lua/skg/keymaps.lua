@@ -156,6 +156,8 @@ M.commands = {
                  desc = 'Semantic report of git-visible graph changes' },
   ExportToOrg = { module = 'skg.export', fn = 'export_some_to_org',
                   desc = 'Export a source-set to plain .org files' },
+  ImportMdAndOrg = { module = 'skg.import_md_and_org', fn = 'import_md_and_org',
+                     desc = 'Preview and import Markdown/Org into an owned source' },
   RebuildEphemeralDataStores = { module = 'skg.misc_requests', fn = 'rebuild_ephemeral_data_stores',
                  desc = 'Rebuild the graph and Tantivy from the .skg files' },
   StripBodyWhitespace = { module = 'skg.misc_requests',

@@ -261,7 +261,7 @@
     true. Add a short section on the explicit 'skg-fork-node' gesture for
     owned nodes.
   - [[../../docs/COMMANDS.org][COMMANDS.org]]: document 'skg-fork-node' / =C-c m f=.
-  - [[../../glossary.md][glossary.md]] (override substitution / "fork"): note chains are
+  - [[../../docs/glossary.md][glossary.md]] (override substitution / "fork"): note chains are
     followed to the last /visible/ node; "fork" now applies to owned nodes
     too.
 

@@ -1,0 +1,398 @@
+#+title: Import Markdown and Org into Skg
+
+* Objective and scope
+Implement one interactive mixed Markdown/Org import operation, available in
+Emacs and Neovim. The user imports once, makes Skg the source of truth, and
+subsequently exports readable Org documents using the existing exporter.
+This document is the implementation specification; it consolidates the final
+decisions in '1_discussion.org' without requiring its conversational history.
+
+Import adds nodes to an existing owned source. It preserves input files and
+existing Skg files. It creates an import record and automatically prepares
+each imported document for Org export. A preview and explicit confirmation
+precede every import that writes data.
+
+There is no offline CLI, synchronization, repeat detection, persistent import
+manifest, dedicated undo command, attachment copying, Markdown export, or
+crash-recovery system. The existing Org-roam importer remains a separate
+command with its present semantics. Do not route this operation through its
+destructive directory-import entry point.
+
+* User interaction
+** Commands and initial inputs
+Expose 'M-x skg-import-md-and-org' and ':SkgImportMdAndOrg'. Both invoke the
+same server operation and present equivalent choices and reports.
+
+Prompt for the input directory in the server/container filesystem and an
+existing owned destination source. A source-set is not a destination. Explain
+that the chosen source determines privacy for everything imported. Do not
+create sources or edit configuration. Use existing source pickers restricted
+to owned sources; do not offer host-side completion for a server path.
+** Conditional host-root prompt
+Scan for actual absolute filesystem links before requesting a host root.
+If such links occur, prompt for the absolute host path corresponding to the
+container input directory, then rebuild the preview with that mapping.
+Web URLs and literal examples do not trigger the prompt. A blank mapping
+leaves unmappable paths unresolved with warnings; cancellation abandons the
+operation. Only one host/container root mapping is supported.
+** Preview and confirmation
+Display the resolved arguments, destination, document/node counts, generated
+export paths, and diagnostics. Separate errors that prevent application from
+warnings about preserved but unresolved or unsupported material. Include
+source file and location in individual diagnostics.
+
+Require explicit confirmation after a valid preview, including one with no
+warnings. Declining writes nothing. Confirmation approves that exact preview;
+changed input or destination state requires a fresh preview and confirmation.
+Do not hold the mutation gate while waiting for user input.
+
+On success, report created files/nodes, the import-record ID, and warnings.
+Make the record accessible through an ordinary Skg ID link. An empty input
+set produces a no-op report rather than an empty import record.
+
+* Input interpretation
+** Discovery and original text
+Recursively discover files with exact '.md' and '.org' extensions, excluding
+'.git' and skipping symlinks. Use deterministic relative-path ordering.
+Do not follow links outside that discovered set or provide configurable
+exclusions. Traversal, read, and decoding failures are explicit preflight
+errors, not silently skipped files. Include empty documents.
+
+Keep original text and source ranges while parsing. Preserve title/body text
+except for structural heading delimiters, supported link replacement,
+relocated footnote definitions, and existing Skg body normalization. Preserve
+unknown metadata, TODO/DONE words, priorities, tags, tables, HTML, math,
+lists, and formatting. Do not convert all Markdown formatting to Org.
+
+Parsing distinguishes literal content from real structure. Code examples and
+inline code are not link-rewrite targets. Do not execute source blocks,
+includes, macros, or other input instructions. Unsupported constructs remain
+text with actionable warnings where structure or links may be affected.
+** Document roots and headings
+Create one file-root node for every document, including empty files. Its
+title comes from the explicit document title, otherwise the filename stem.
+Retain a first heading even when its title equals the file-root title.
+Text before the first heading belongs to the file root.
+
+Create a node for each genuine heading. Use the nearest preceding shallower
+heading as parent, initially retaining sibling order. Lists remain body text.
+Calculate original body ranges before inserting synthetic grouping nodes.
+
+Apply the existing Org-roam super-indentation grouping rule in both formats:
+when a parent's children span multiple heading levels, group the deepest
+children under 'These are special!' and the remainder under 'These are
+normal.', recursively grouping the remainder as necessary. Retain relative
+order within each group. Use explanatory bodies referring to the original
+document, not specifically to Org-roam. Give synthetic nodes fresh IDs.
+** Org syntax and metadata
+Recognize Org headings, property drawers, literal source/example blocks,
+and '#+title:'. Interpret only the title directive for document metadata;
+preserve other directives without applying them. Recognizing literal-block
+boundaries remains necessary even though directives are not executed.
+
+Retain explicit file and heading 'ID' properties as node identities. Import
+'ROAM_ALIASES' with its quoted, whitespace-separated alias syntax. Preserve
+the original drawers and directives as body text, including properties read
+for identity or aliases. 'CUSTOM_ID' and named targets are addresses local
+to their original document, not additional globally claimed Skg IDs.
+
+Unlike the old importer, ordinary Org requires no file-level ID and no drawer
+at the very first line. Read real file/heading metadata in its structural
+context, not apparent properties inside examples or unrelated body drawers.
+** Markdown syntax and metadata
+Use CommonMark heading and link syntax, including ATX and setext headings,
+inline/reference links, inline code, and fenced/indented code blocks. Use
+GitHub-style heading fragments, including duplicate-heading suffixes. Base
+addresses on the original document, before rewriting titles or grouping.
+
+Read an initial YAML front-matter block delimited by '---'. A string 'title'
+supplies the file-root title. 'aliases' is a YAML list of strings, in flow or
+block form; 'aliases: [energy, "machine learning"]' contains two aliases.
+Do not accept a scalar as an alternative alias list or split aliases on
+whitespace. Retain front matter in the body. Malformed or differently shaped
+metadata remains text with a diagnostic; do not invent aliases or identities.
+** Mixed syntax in Org files
+Recognize Markdown links and Markdown fenced code blocks inside '.org'
+files as well. Keep Org heading rules for those files. Fences protect their
+contents from heading/link interpretation. Do not introduce automatic format
+detection or assume arbitrary Markdown constructs have Org semantics.
+** Footnotes
+For named Markdown footnotes with separate definitions, append a 'Footnotes'
+node to the document's content, with one child node per definition in
+definition order. Resolve names over the entire original document. Move
+definitions out of their original bodies, preserving their text and converting
+supported links within them. Replace references with Skg ID links to the
+corresponding definition node, retaining a recognizable label.
+
+Preserve Org footnotes and unsupported Markdown footnotes as text. Missing
+or duplicate definitions receive diagnostics; leave ambiguous references
+and definitions intact rather than choosing a target or losing text.
+There is no footnote renumbering or special footnote export renderer.
+
+* Identity and graph construction
+** IDs and properties
+Preserve explicit Org IDs; generate fresh UUIDs for every other node. Reject
+duplicate explicit IDs within the batch and collisions with any primary or
+extra ID in any configured source, including foreign sources. Check generated
+IDs too. Reject invalid IDs that cannot safely pass existing filename and
+graph invariants. Do not merge, overwrite, or implicitly create telescope
+sections. There is no rerun identity matching.
+
+Preserve 'Had_ID_Before_Import' for explicit IDs. Generalize its user-facing
+wording to 'Had ID before import', retaining its existing stored/wire identity.
+No duplicate merging means no new 'Was_Overloaded' property for this importer.
+Aliases and containment belong to the selected destination source. All new
+nodes have no subscriptions, hides, or overrides; existing nodes are untouched.
+** Import record
+Create one record node containing the file-root nodes in deterministic path
+order, without folder nodes or link-wrapper children. Its body records the
+actual input directory, optional host mapping, destination source, and UTC
+execution time. It is committed with the rest of the batch and is not itself
+an export root. Its role is navigation and provenance, not repeat detection.
+
+* Link resolution
+** Shared address index
+Index all original document paths, heading addresses, explicit Org IDs,
+'CUSTOM_ID' values, and supported named targets before rewriting links.
+Resolve cross-format and same-document links through this index. Resolve
+Org heading searches ('::*Heading'), custom-ID searches ('::#name'), named
+targets, and file links with or without 'file:'. Resolve Markdown fragments
+using the selected GitHub convention.
+
+Resolve Markdown reference definitions over the entire original document,
+including definitions beneath other headings. Support explicit, collapsed,
+and shortcut references. Keep original definitions as text; rewritten internal
+links no longer depend on them. Preserve external reference-link syntax and
+definitions; warn when splitting the document separates an external reference
+from its definition and may affect later rendering.
+
+Match only unique addresses. Duplicate heading fragments assigned distinct
+suffixes by the chosen convention are not ambiguous. Link targets within a
+body resolve to the containing node with a warning about the lost position.
+Existing 'id:' targets may resolve through configured primary or extra IDs;
+report absent targets without fabricating nodes.
+** Paths
+Resolve relative file links from the original containing document's directory.
+Map absolute host paths to the container input root by whole path components.
+Normalize path segments and decode syntax-specific escapes without confusing
+fragments/search suffixes with filenames. Never expand '~' using the server's
+home or assume Windows/site-root conventions that were not configured.
+
+Unmapped, missing, ambiguous, and unsupported targets remain text or usable
+external links, with diagnostics. Rewrite relative external file/attachment
+paths to preserve their destination where possible. Without a host mapping,
+report when the normalized container path may be unusable in the host editor.
+Do not guess a different base directory to repair stale input links.
+** Rewriting and limits
+Rewrite supported internal links in titles and bodies to
+'[[id:ID][label]]', preserving labels and supplying a useful label for bare
+links. Respect escaping, Unicode, literal spans, and source byte offsets.
+Leave web/mail links in their original syntax and never fetch them.
+
+Attachments stay where they are; no copying or managed storage is added.
+Wiki links, extensionless filename guessing, Org line-number/regexp searches,
+and HTML-anchor interpretation remain unsupported and are reported when
+encountered as unresolved destinations. HTML is preserved, not rendered or
+rewritten by an HTML parser.
+
+* Automatic Org export preparation
+Add one export-marker child to each file root. Its title links to the existing
+'EXPORT_MARKER_ID' instruction node; its body contains a safely quoted
+'target_filepath' understood by the current exporter. Reuse its constant and
+path/marker rules. Do not generate a replacement instruction node with that ID.
+
+Derive the target from the input-relative document path without its final
+extension: 'tutorials/start.md' becomes 'target_filepath = tutorials/start'.
+The exporter supplies '.org'. Keep the marker before a generated Footnotes
+child so footnotes remain the final document content; markers are omitted
+by export. Creation of markers does not invoke export.
+
+Reject conflicting export paths within the batch and with existing configured
+export roots. Check normalized output paths, including file/directory conflicts,
+not just raw marker strings. Report the documents/roots involved before writing.
+The input pair 'guide.md' and 'guide.org' therefore cannot both be imported
+with their automatic paths unchanged.
+
+Later export to the original folder overwrites matching '.org' paths and
+leaves original '.md' files alone. Document this behavior. Export preserves
+readable content, not original bytes, Markdown syntax, identities, aliases,
+all graph relationships, or privacy sections. Do not extend export into a
+round-trip backup format as part of this work.
+
+* Server architecture and publication
+** Pure preparation core
+Use format-aware parsing front ends with a shared document representation,
+address index, diagnostics, and graph builder. Preserve text spans rather
+than regenerating complete documents through a formatter. Choose a maintained
+Markdown parser with source offsets; check its actual API and license before
+adding a dependency. Do not implement CommonMark with ad hoc substitutions.
+
+Separate discovery/read, parse, identity assignment, address resolution,
+node construction, and publication. Keep UUID/time injection available to
+tests. A prepared batch carries the assigned IDs, nodes, input evidence,
+export targets, diagnostics, and the source/configuration state needed for
+confirmation. IDs remain stable between preview and application.
+** Protocol and approval lifetime
+Add an 'import md and org' request and dedicated tagged responses for host
+mapping needed, preview, and result. Initial arguments name the input directory
+and destination source; a mapping retry adds the host root; application
+supplies an opaque approval token identifying server-retained preparation.
+Define and document the concrete S-expression fields together with both
+clients. Reuse existing framing, escaping, response dispatch, and report UI.
+
+Bind approval to its client session, arguments, assigned IDs, input evidence,
+and preview. A new preview replaces the prior one. Consume approval once;
+clear retained state on cancellation or disconnect. Unknown, stale, reused,
+or cross-session tokens cannot authorize writes. Do not trust a client-sent
+list of nodes as the approved batch.
+** Revalidation and mutation gate
+Under the existing mutation gate, revalidate source ownership/configuration,
+the discovered input set and contents, identity availability, export-path
+claims, and destination file absence. Detect added/deleted inputs as well as
+modified files; timestamps alone are insufficient. Use the retained text for
+the approved conversion. Refuse changed state and request a new preview.
+
+Prepare and validate the candidate graph and serialize all new filesystem
+sections through the existing checked telescope boundary before publication.
+Check authoritative disk claims as well as the runtime graph so files created
+outside the server cannot be overwritten or acquire duplicate identities.
+** Creation-only writes and failure handling
+The existing 'PreparedFilesystemUpdate.apply' writes files sequentially and
+does not provide the rollback required here. Reuse graph validation and
+serialization, but add a creation-only batch publication path that cannot
+overwrite existing files, including a file appearing after an absence check.
+
+Track exactly which files this operation creates, including a partly written
+current file. On an ordinary write failure, remove only those new files;
+leave the graph and index unpublished. Report every rollback failure and
+exact leftover path. Do not delete a file another writer has replaced.
+Tests must inject a failure after at least one successful file creation.
+
+Complete fallible graph preparation and base-generation verification before
+writing. Any remaining failure after file creation but before authoritative
+runtime publication uses the same rollback path. Do not enqueue indexing or
+send success for an unpublished candidate.
+
+Once all authoritative files are complete, publish the validated graph and
+coherent runtime generation, then enqueue the normal derived Tantivy delta.
+Keep publication under the mutation gate. A background indexing failure
+does not retroactively make a successful authoritative import uncommitted;
+use the existing indexing/rebuild error behavior. A process crash or power
+loss may leave partial files; no crash-atomic guarantee is made.
+** Views and preserved text
+Use existing save-dependency and rerender rules for affected live views.
+New IDs can resolve previously absent references and change displayed
+statistics; do not assume that adding nodes affects no open view. Preserve
+dirty client text and obey existing text-release/privacy approval rules.
+
+Prove that imported bodies containing drawers, literal Org-looking headings,
+and mixed code fences survive render, client save, and reload without becoming
+unintended nodes or save instructions. The ordinary view parser is distinct
+from the importer. Use the narrowest shared encoding/parsing adjustment needed
+to carry literal text safely; no silent dropping or indentation mangling.
+Treat an unanticipated change to persisted text semantics as a substantive
+implementation blocker under 'coding-advice/when-to-stop.org'.
+
+* Repository implementation map
+** Existing code to reuse or inspect
+Read 'coding-advice/ORIENTATION.org' and its relevant advice first. The current
+implementation, not old plans, determines integration details.
+
+'server/import_org_roam/parse.rs' and its 'super-indentation-rules.org' contain
+the grouping and alias behavior. Share focused helpers where useful without
+changing the existing importer contract. Do not reuse its input-skipping,
+duplicate-merging, destination-clearing, or whitespace-rewriting behavior.
+
+'server/types/nodes/complete.rs', 'server/types/nodes/fs.rs', the telescope
+modules, 'server/dbs/in_rust_graph/prepared_update.rs', and 'server/save.rs'
+provide node construction, validation, serialization, and publication logic.
+'server/types/env.rs' defines the mutation gate and coherent runtime snapshots.
+
+'server/export_org.rs' defines marker recognition and export targets.
+'server/serve/protocol.rs', 'server/serve/handlers/mod.rs', and their dispatch
+callers are the protocol integration points. The absent-reference cleanup
+handler demonstrates approval checking and runtime publication; the export
+handler demonstrates reports. Neither is an import transaction to copy whole.
+
+'elisp/skg-request-export-org.el' and 'nvim/lua/skg/export.lua' provide client
+prompt/report patterns. Register the new command and response handlers in
+both clients, including Emacs load/reload lists and Neovim user commands.
+Clear response handlers and pending-response bookkeeping on every exit path.
+** Work order
+Implement the pure document parser and graph conversion with mixed-format
+fixtures first. Add address resolution, footnotes, grouping, record nodes,
+and export markers to that tested core. Implement preview retention and the
+creation-only publication path next, including failure injection. Connect
+the server protocol, then both clients. Finish with cross-client integration,
+export verification, documentation, and the required full test run.
+
+Use focused tests after each coherent change. Keep implementation choices
+local; avoid redesigning general storage or import/export systems. Record
+meaningful deviations or substantive blockers in this folder's 'progress.org'
+as required by repository advice. Do not create commits or change Git state.
+
+* Verification and completion
+** Parsing, addresses, and content
+Fixtures cover empty documents, preambles, explicit titles, un-IDed Org,
+YAML string-list aliases, retained unknown metadata, heading levels, grouping,
+and intact parent bodies. Cover both CommonMark heading forms and literal
+blocks containing apparent headings, properties, links, and footnotes.
+
+Cover cross-format file and section links, Org links without 'file:', local
+targets, duplicate Markdown slugs, references defined under other headings,
+existing extra IDs, Unicode/escaped filenames and labels, and absolute host
+mapping. Cover unresolved/malformed links, out-of-root targets, web links
+unchanged, literal inline examples, and Markdown links/fences inside Org.
+
+Cover footnote relocation, repeated references to one definition, multiline
+definitions, missing/duplicate definitions, and preserved Org footnotes.
+Assert exact retained text where possible, not just node counts.
+** Publication, approval, and clients
+Test duplicate IDs within input, configured-source/extra-ID collisions,
+existing destination files, export collisions, foreign-source rejection,
+read/traversal errors, cancellation, no-op inputs, stale previews, changed
+source ownership, added input files, and replayed approval tokens. Every
+refusal before publication leaves authoritative files and runtime unchanged.
+
+Inject write and rollback failures. Verify prior files remain byte-identical,
+new files are removed where possible, no graph/index delta is published on
+failed writes, and residual paths are reported accurately. Test a destination
+file appearing between preflight and attempted creation.
+
+For both clients, exercise conditional host prompting, preview display,
+confirmation/decline, error handling, handler cleanup, successful record
+navigation, and refreshed views without losing dirty edits. Verify subsequent
+search after draining Tantivy writes and render/save/reload of preserved text.
+** Export and real documentation samples
+Import a fixture with nested Markdown and Org files, then export to a temporary
+directory using the real exporter. Check output paths, marker omission,
+rewritten links, footnote content, retained originals, and no automatic export
+during import. Existing Org-roam tests continue to pass.
+
+Use focused samples from 'docs/setup.org', 'docs/README-old.org',
+'docs/data-model_friendly.org', and 'docs/integrate-public-and-private.md' for
+the mixed syntax discovered during review. Stale 'docs/docs/...' destinations
+are warnings, not automatically repaired. Any trial import of the actual
+'docs/' tree uses isolated temporary data and never the user's live sources.
+** Test registration and final checks
+'Cargo.toml' disables automatic integration-test discovery. Register new Rust
+tests in an appropriate grouped target or as explicit tests; merely adding a
+'tests/*.rs' file is insufficient. Run targeted parser/publication tests, the
+affected Rust groups, and both client suites. Run 'cargo check --all-targets'
+at interface/dependency changes and the complete repository test suite at the
+settled endpoint, following repository guidance. Available runners include
+'bash/emacs-tests.sh', 'bash/nvim-tests.sh', and 'bash/all-tests.sh --no-sound'.
+Read container/isolation advice before starting test servers. Tests use unique
+temporary directories and 'wait_for_tantivy_writes_idle' before index assertions.
+
+Document both commands in 'docs/COMMANDS.org' and 'docs/COMMANDS-nvim.org',
+wire fields and state transitions in 'api-and-formats.md', and setup/export
+limitations in the relevant user docs. Distinguish the safe additive command
+from the existing replacement-style Org-roam CLI. Explain minimal syntax
+interpretation, preview confirmation, external-path limitations, automatic
+markers, and the absence of synchronization and crash recovery.
+
+Completion requires implemented commands in both clients, the verified
+conversion/publication/export behavior above, updated documentation, and an
+honest final report of checks and any unresolved failures. Do not mark the
+feature complete based only on parser tests or a successful preview.

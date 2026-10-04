@@ -154,6 +154,17 @@ pub(crate) struct PreparedTelescopeWrite {
 }
 
 impl PreparedTelescopeWrite {
+  /// Serialized sections for a new telescope. Import checks all configured
+  /// paths for absence and publishes these with create_new rather than using
+  /// the ordinary overwrite/delete mutation path.
+  pub(crate) fn creation_files (
+    &self,
+  ) -> Vec<(std::path::PathBuf, String)> {
+    self . writes . iter ()
+      . map (|(_, path, yaml)| (std::path::PathBuf::from (path), yaml . clone ()))
+      . collect ()
+  }
+
   pub(crate) fn apply (
     &self,
     config : &SkgConfig,

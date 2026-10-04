@@ -94,7 +94,7 @@ Work:
   identified by its most private source, plus =all=.
   =default_source_set= becomes a source name (the default level);
   =all= keeps meaning everything.
-*** Endpoints ([[../../api-and-formats.md][api-and-formats.md]] "Source sets"): "list source sets"
+*** Endpoints ([[../../../docs/api-and-formats.md][api-and-formats.md]] "Source sets"): "list source sets"
   returns the sources in order (the client renders them as
   selectable levels); "set active source set" takes a source name
   or =all=. The diff-mode interlock (requires =all=) is unchanged.
@@ -621,11 +621,11 @@ wholesale.
 
 ** docs: the format, the model, the commands
 Work:
-*** [[../../api-and-formats.md][api-and-formats.md]]: the .skg section format (uniform sequence
+*** [[../../../docs/api-and-formats.md][api-and-formats.md]]: the .skg section format (uniform sequence
   serialization with anchor entries, optional title), the
   =(relSource ...)= atom, the reshaped source-set endpoints,
   migration endpoint.
-*** [[../../glossary.md][glossary.md]]: privacy accordion, accordion section, home,
+*** [[../../../docs/glossary.md][glossary.md]]: privacy accordion, accordion section, home,
   privacy level, fold (visible vs full), placement, the sticky
   rule — long forms per the terminology note.
 **** DONE jbb

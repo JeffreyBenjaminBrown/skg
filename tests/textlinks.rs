@@ -153,3 +153,36 @@ fn test_replace_each_link_with_its_label() {
       result, expected,
       "Failed for input: '{}'. Expected: '{}', Got: '{}'",
       input, expected, result ); }}
+
+#[test]
+fn example_links_in_literal_org_text_are_not_textlinks () {
+  let text : &str = "\
+real [[id:a][A]] and =[[id:b][B]]=
+: [[id:c][C]]
+#+begin_src org
+[[id:d][D]]
+#+end_src";
+  assert_eq! ( textlinks_from_text (text),
+               vec! [ TextLink::new ("a", "A") ] );
+  assert_eq! (
+    replace_each_link_with_its_label (text),
+    text . replacen ("[[id:a][A]]", "A", 1) );
+}
+
+#[test]
+fn node_body_first_line_is_a_line_start () {
+  // Were title and body joined on one line, the body's opening
+  // '#+begin_example' would not start a line, and its link would count.
+  let mut node : NodeComplete = empty_node_complete ();
+  node . title = "title [[id:t][T]]" . to_string ();
+  node . body = Some (
+    "#+begin_example\n[[id:x][X]]\n#+end_example" . to_string () );
+  assert_eq! ( textlinks_from_node (&node),
+               vec! [ TextLink::new ("t", "T") ] );
+}
+
+#[test]
+fn verbatim_in_a_link_label_does_not_make_it_an_example () {
+  assert_eq! ( textlinks_from_text ("see [[id:a][=code= label]] and =x="),
+               vec! [ TextLink::new ("a", "=code= label") ] );
+}

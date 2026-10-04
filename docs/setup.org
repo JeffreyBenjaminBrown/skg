@@ -10,27 +10,29 @@ Please ask an AI for help setting it up.
    See ../bash/docker.sh
 ** within the Docker container
 *** start the Skg server
-    See ../bash/start-servers.sh
+See ../bash/start-servers.sh
 *** optional : import data from org-roam
-    cargo run --bin skg -- import-org-roam [source] [target] [nickname]
-    (Eventually importing will support more formats.)
-
-    After importing it into and manipulating it in Skg,
-    extracting your data [[../docs/undoing-import.org][might be annoying.]]
+See [[file:COMMANDS.org::#import-org-roam][importing from Org-roam]] for arguments,
+supported input, and setup steps. Use a fresh staging directory:
+the command deletes existing '.skg' files in its destination.
+For an additive, previewed import of mixed Markdown and ordinary Org files
+into an existing owned source, use [[file:COMMANDS.org::#import-md-and-org][=M-x skg-import-md-and-org=]]
+after starting the server and client instead. Keep the source documents as
+a backup; Org export is readable but not a round trip.
 ** set up your data folder
    You can make your thoughts entirely private, entirely public,
    or a mix, and you can share with anyone.
    See example-data/ for how.
 ** start the client
-```elisp
+#+begin_src elisp
   (progn (load-file "../elisp/skg-reload.el")
          (skg-reload)
          (skg-client-init "../data/skgconfig.toml"))
-```
-** Now you can use it. See [[../docs/COMMANDS.org][commands]].
+#+end_src
+** Now you can use it. See [[./COMMANDS.org][commands]].
 ** stop the server later if you want
-   ```
+   #+begin_example
    ../bash/stop-servers.sh
-   ```
+   #+end_example
 
    You can't use the client (much) when the server isn't running.

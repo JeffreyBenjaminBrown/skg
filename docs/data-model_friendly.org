@@ -32,16 +32,16 @@ Any text at any node (so both title and body) can contain any number of hyperlin
 Usually, probably, most nodes in the view will correspond to nodes in the graph, but not always. It thus helps to distinguish view-nodes from graph-nodes.
 
 When a view is first created, each view-node represents a graph-node. Here's some example data -- probably private -- representing an initial view of a node called 'Go to the dentist.':
-```
+#+begin_example
   * Go to the dentist.
   ** Tooth #5 hurt when I drank lemonade.
   *** Is lemon bad for teeth?
   ** Retrieve the hat I left there.
-```
+#+end_example
 (Each of those nodes has a title and no body, which is valid.)
 
 Each parent-child relationship in an initial view like the one above is the 'contains' relationship. However, the user can request information about other relationships. For instance, they might say 'show me everything that links to the first node', causing three new nodes to be added to the view::
-```
+#+begin_example
   * go to the dentist
   ** <<< these link to it >>>                                   # NEW
   *** I promised _name_redacted_ I would [[go to the dentist]]      # NEW
@@ -49,7 +49,7 @@ Each parent-child relationship in an initial view like the one above is the 'con
   ** tooth #5 hurt when I drank lemonade
   *** Is lemon bad for teeth?
   ** retrieve the hat I left there
-```
+#+end_example
 
 The third and fourth view-nodes represent graph-nodes that link to the first. The second view-node *does not represent a graph-node* at all; it just introduces the 'hyperlinks' relationships from nodes 3 and 4 to node 1.
 

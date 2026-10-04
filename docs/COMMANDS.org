@@ -347,7 +347,7 @@ this one -- read-only, ☮).
 Shows the read-only =propertiesFolder=. It lists only true node-file
 properties as titleless viewnodes whose heralds carry their labels, in canonical
 order, and remains visible when none are true.
-=Had ID before org-roam import= and =Was overloaded during org-roam import=
+=Had ID before import= and =Was overloaded during org-roam import=
 are provenance; =No search matching= is the user setting. Edit none of these
 generated viewnodes directly. Delete the whole folder branch to dismiss this
 optional view; doing so does not change any property.
@@ -603,7 +603,7 @@ strips the fork request so the next save does not re-fork).
 The clone subscribes to and overrides the node, and the original
 keeps its own (owned) content. A node may have at most one clone
 you own; forking an already-forked node is rejected, naming the
-existing clone. See =docs/forks.md=.
+existing clone. See =docs/forks.org=.
 *** C-c m l : skg-replace-content-with-link
 Replace the branch at point with a link to the node that used to
 be there, then save the buffer.
@@ -774,8 +774,199 @@ Like skg-paste-node,
 but also removes the node from the stack.
 **** C-c v s : skg-view-id-stack
 repeated here; described earlier in this doc
-** exporting to org
-*** skg-export-some-to-org
+** import and export
+*** skg-import-md-and-org : additive mixed-document import
+:PROPERTIES:
+:CUSTOM_ID: import-md-and-org
+:END:
+**** ordinary usage
+Run =M-x skg-import-md-and-org= with the server running. Choose an absolute
+directory in the server/container filesystem and an existing owned source.
+That source determines where every new node will be written. The importer scans
+exact =.md= and =.org= files recursively, skips symlinks and =.git=, and
+leaves the originals untouched.
+
+Review the preview of files, generated =.org= export paths, and warnings,
+then explicitly approve or decline. Approval applies only to that preview;
+another run requires a new one.
+
+The operation creates file-root and heading nodes,
+which correspond 1-to-1 to sections of the imported data.
+A document whose only top-level heading has nothing before it
+is that heading, so the heading is its file root;
+otherwise the file root is titled after the document.
+It also creates two kinds of nodes that do not so correspond:
+- a single import-record node with textlinks to all file roots,
+  so you can see everything you just imported in one place.
+- an export marker under each root,
+  so you can export back to the same path if you want.
+  But this is dangerous -- see "Re-export is dangerous" below.
+
+The importer does not merge into existing nodes,
+copy attachments, synchronize later edits, or automatically export.
+
+Only document structure, selected metadata, links, and named Markdown
+footnotes are interpreted. Other Markdown/Org markup remains readable text,
+not a full format conversion. Unresolved links and unsupported constructs
+are left in place with warnings.
+
+**** Re-export is dangerous.
+Subsequent Org export is for reading, not
+a round-trip backup: it does not preserve Markdown syntax or all Skg graph
+semantics. Exporting to the original input directory would overwrite matching
+=.org= files, while leaving =.md= files alone. There is no dedicated undo or
+crash-recovery transaction; keep the originals and back up the owned source.
+
+**** Skg asks for a host-root mapping if it finds absolute filesystem links.
+Skg runs in a Docker container.
+The folder /home/ubuntu/host in that container
+corresponds to some folder on the host system.
+If the files to be imported contain absolute links,
+skg needs to know how those host-system paths
+correspond to paths in the docker container.
+
+**** Link syntax in literal text is an example, not a link.
+In an Org file, the importer leaves alone any link written inside text
+that Org shows literally:
+- inline =verbatim= or ~code~, like =[[id:ID][label]]=,
+- a fixed-width line, which begins with a colon and a space
+  (=: [[id:ID][label]]=), or is a lone colon,
+- a =#+begin_...= / =#+end_...= block of any kind, and
+- a =```= fence (Markdown syntax, but common in Org files too).
+Such links are not resolved or rewritten, and do not produce warnings.
+Backticks (=`code`=) are not literal in Org, so a link inside them is a link.
+Use =verbatim= or ~code~ instead.
+(To insert a block in Emacs, use =C-c C-,=, which is =org-insert-structure-template=.)
+The rest of Skg (saving, link statistics, link annotations, export)
+treats links in literal text the same way.
+
+**** An Org heading inside a block or fence stops the import.
+If a line of an Org file looks like a heading (asterisks at the start of
+the line, then a space) but is inside a =#+begin_...= block or a =```= fence,
+nothing is imported, and the preview explains which lines are the problem.
+Org would read the line as a heading and end the block there,
+so Skg cannot tell what was meant.
+Often the block was never closed.
+If the line belongs inside the block, escape it with a leading comma
+(=,* ...=), as Org does. This check applies only to Org files;
+in a Markdown file, a =#= line in a code block is ordinary code.
+
+**** Imported Markdown hard breaks become Org's two-backslash hard breaks.
+In Markdown you can put a slash or two spaces after a line
+to ensure that the next line is shown on a separate line,
+rather than smooshed into a single flowing paragraph.
+In Org, such a "hard break" is represented by two slashes,
+so the importer makes that conversion.
+
+*** importing from org-roam
+:PROPERTIES:
+:CUSTOM_ID: import-org-roam
+:END:
+**** import-org-roam : terminal command
+This imports Org-roam '.org' files into Skg. It is a Cargo subcommand,
+not an Emacs command, and needs no running server. Unlike the additive
+interactive importer above, this legacy command replaces its destination.
+
+Run from the repository root, where Cargo and the input files are available:
+
+#+begin_src sh
+cargo run --bin skg -- import-org-roam ORG_DIR OUTPUT_DIR SOURCE_NAME
+#+end_src
+
+All three arguments are required. 'ORG_DIR' contains your Org-roam notes;
+'OUTPUT_DIR' receives the '.skg' files; 'SOURCE_NAME' names the destination
+Skg source. For example, using a fresh staging directory:
+
+#+begin_src sh
+cargo run --bin skg -- import-org-roam /imports/org-roam /tmp/skg-import-review imported-notes
+#+end_src
+
+Paths are relative to the process's working directory unless absolute.
+Inside Docker, supply container-visible paths. There is no host-path
+mapping argument or interactive prompt.
+**** Before running: the destination is replaced
+The importer creates 'OUTPUT_DIR' if necessary, then deletes every immediate
+'.skg' file already in it, before reading the input. There is no confirmation,
+dry run, merge-with-destination mode, or automatic backup. Other files and
+nested directories are left alone. Use a fresh staging directory and inspect
+the result before replacing existing data.
+
+An incorrect or unreadable input can leave the destination empty. Traversal
+errors are skipped; unreadable files and files without the required file-level
+ID silently produce no nodes. The report counts files read, nodes written,
+and write errors, but a successful exit does not establish that every input
+was imported. Check the output against your originals.
+**** What is imported
+The scan recurses for the exact extension '.org', skipping '.git' directories.
+Each file must begin with a ':PROPERTIES:' drawer containing ':ID:'.
+Indentation on that first drawer line is accepted; blank lines before it
+are not. Files without this file-level ID are skipped even if headings have IDs.
+
+Each accepted file becomes a node, titled from '#+title:' or, if absent,
+the filename without its extension. Each heading becomes a node, with
+ordered 'contains' relationships representing the outline. Existing IDs are
+retained; headings without IDs get fresh UUIDs on every run. Some skipped
+heading levels introduce grouping nodes titled 'These are special!' and
+'These are normal.' rather than reproducing the outline literally.
+
+'ROAM_ALIASES' becomes Skg aliases. Nodes with an original ID receive the
+'Had ID before import' property. Duplicate IDs within the input
+are merged: children and aliases are combined, and additional titles and
+bodies are appended with a separator. Such nodes receive 'Was overloaded
+during org-roam import'. This does not compare or merge with existing
+nodes in your configured Skg sources.
+***** Text and links
+Bodies are copied with whitespace normalization. Parsed property drawers
+are consumed; properties other than 'ID' and 'ROAM_ALIASES' are not retained
+from those drawers. The parser uses line-based heading detection, so this
+is not a lossless general-purpose Org conversion.
+
+Existing =[[id:ID][label]]= links retain their targets. File links and heading
+search links are not converted to Skg ID links, and attachments are not copied.
+Relative file links may no longer resolve after import. The importer does not
+validate that linked IDs exist. It creates no subscriptions, hides, or overrides.
+**** Making the imported data available in Skg
+The command writes one 'ID.skg' file per resulting node. It does not edit
+configuration, start the server, or refresh a running server's graph and
+search index. 'SOURCE_NAME' labels the source during conversion; the permanent
+source association comes from the configured directory, not a source field
+inside each file.
+
+After reviewing the output, place it in the intended owned source directory
+and configure that source with the intended name and privacy order. See
+[[file:api-and-formats.org][the configuration reference]]. Check for ID collisions with existing sources
+before loading: the importer itself does not check them.
+
+For a first setup, configure the source before starting Skg. When replacing
+existing data, save and close affected views and stop the server before
+changing its source files, then restart it. If files in an already configured
+source changed while the server remained running,
+'M-x skg-rebuild-ephemeral-data-stores' reloads them; close stale views and
+open fresh ones before editing. Configuration changes require a restart.
+
+The Cargo command prints a reminder to commit the imported files so Git
+diff views have a baseline; it does not run Git. Reimporting replaces the
+destination and gives ID-less headings new IDs, so it is not an incremental
+update workflow. Keep your originals and a backup of Skg edits you want to
+retain. [[file:undoing-import.org][Exporting back to Org]] does not restore the original files or all graph
+semantics.
+**** bash/import-org-roam.sh : host-side Docker and Git wrapper
+[[file:../bash/import-org-roam.sh][This script]] accepts 'SOURCE DEST NICKNAME' and prompts for a Docker
+container. Unlike the Cargo command, it offers to remove the destination's
+'.git' directory as well as its '.skg' files, then runs the importer,
+initializes Git, stages the destination, and opens an editor for a commit.
+Declining its cleanup prompt does not prevent the underlying importer from
+deleting existing '.skg' files.
+
+It also offers to request a server rebuild, reading the port from 'SKG_CONFIG'
+(default 'data/skgconfig.toml'). Its Docker working directory is hard-coded
+to '/home/ubuntu', while host-side paths use the shell's working directory.
+Check that the mounts and paths identify the intended directories on both
+sides. Use the Cargo command directly when you do not want Git operations.
+*** skg-export-some-to-org : exporting to org
+:PROPERTIES:
+:CUSTOM_ID: export-org
+:END:
 Exports Skg data to plain =.org= files, so the data can be read
 (and navigated on GitHub) without running Skg. No keybinding.
 
@@ -789,23 +980,63 @@ It asks two things:
   container whose filesystem differs from the host Emacs runs on,
   this prompt has no tab completion. An absolute path is used
   as-is.
+  Existing files in the output dir are overwritten in place; other
+  files there are left untouched.
+  A body line Org would read as a headline (such as a Markdown
+  =* item=) is indented two spaces, making it a list item, or inside a
+  =#+begin_= block is escaped with a comma, as Org itself does.
 
-A node N is exported when the title of a node C it contains
-links to the export-instruction node and C's body defines a
-=target_filepath=
-(using TOML-ish syntax, e.g. =target_filepath = docs/setup=,
-with the path quoted if it contains whitespace).
-That parent is written to
-=<output-dir>/<target_filepath>.org= as a recursive content view,
-stripped of skg metadata. The marker child is omitted.
+**** choosing what to export: export markers
+Nothing is exported unless you mark
+it. To make node N into an exported file,
+make N contain a child node, called an /export marker/, such that:
+- The marker's title contains a link to the ID
+  =3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f=.
+  That ID is a fixed constant that the exporter looks for.
+  The node it names only documents this feature.
+  The link works even if your sources do not contain that node.
+  The link's label is up to you, for example:
+  : [[id:3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f][Export to Org]]
+- The marker's body contains a line saying where to write the file,
+  relative to the output directory and without the =.org= extension:
+  : target_filepath = docs/setup
+  Quote the path if it contains whitespace
+  (=target_filepath = "my notes/setup"=).
+  The path cannot be absolute or contain =.= or =..= components.
 
-Existing files in the output dir are overwritten in place; other
-files there are left untouched.
+N is then written to =<output-dir>/<target_filepath>.org= as a
+recursive content view: N's title and body,
+each of its content nodes' titles and bodies,
+each of *their* content nodes' titles and bodies, etc.,
+stripped of Skg metadata. The export marker itself is left out of the file.
+N's position does not matter; it can be anywhere in the graph.
+But N must belong to a source included in the export;
+otherwise it is skipped, with a warning.
+If N has several markers, the first one is used, with a warning.
+If two nodes claim the same path, only one of them is exported, with a warning.
+
+A node whose title links to that ID but whose body has no =target_filepath=
+line is not a marker. It is exported as ordinary content, so you can
+mention the feature in your notes without triggering it.
+If the =target_filepath= is malformed, the node is dropped from the
+export, N is not exported, and you get a warning.
+
+[[#import-md-and-org][skg-import-md-and-org]] adds a marker to each
+imported document automatically.
+
 **** links and overlap
-Links are rewritten to relative org links. A link to another
+Links are rewritten to relative org links. Link syntax that Org shows
+literally (in =verbatim= or ~code~, a fixed-width =:= line, or a
+=#+begin_...= block or code fence) is an example, and is left alone. A link to another
 exported file's root points at that file; a link to a non-root
 node points deep, to the relevant headline of the document,
 via =[[./file.org::*Heading][label]]=.
+Links in headlines are kept. Org cannot find a headline containing
+a link by its text, and finds only the first of several headlines
+with the same text. So a link to either kind of headline uses its
+node's ID instead, =[[./file.org::#ID][label]]=, and that headline
+gets a =:CUSTOM_ID: ID= property. Only headlines something links to
+get one.
 
 if an exported node contains another export root,
 the second root’s contents go in its own file,

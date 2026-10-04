@@ -314,7 +314,7 @@ giving both ID and title.
 
 =collection= is retired vocabulary in this repository; the glossary says the
 old “col” name has been expunged in favor of “folder”
-([[file:../../glossary.md][glossary.md]]).  =viewprops= is also broader than a folder that contains
+([[file:../../docs/glossary.md][glossary.md]]).  =viewprops= is also broader than a folder that contains
 only booleans.
 
 I recommend:

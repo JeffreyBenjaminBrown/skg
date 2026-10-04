@@ -51,7 +51,7 @@ fn file_property_registry_has_stable_public_names_and_order () {
     ["hadId", "wasOverloaded", "noSearchMatching"] );
   assert_eq! (
     FileProperty::ALL . map (FileProperty::herald_text),
-    ["☮ had ID before org-roam import",
+    ["☮ had ID before import",
      "☮ was overloaded during org-roam import",
      "☮ no search matching"] );
   for property in FileProperty::ALL {

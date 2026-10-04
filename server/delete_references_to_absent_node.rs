@@ -8,7 +8,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::save::nodecomplete_from_noderust;
 use crate::types::misc::{ID, RelPartner, MSV, SkgConfig, SourceName};
 use crate::types::save::{DefineNode, SaveNode};
-use crate::types::textlinks::textlinks_from_text;
+use crate::types::textlinks::textlinks_with_ranges_from_text;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum StructuredField {
@@ -166,19 +166,15 @@ fn record_text_links (
   field       : TextField,
   text        : &str,
 ) {
-  let mut search_from : usize = 0;
-  for link in textlinks_from_text (text) . into_iter ()
-    . filter (|link| &link . id == raw_id) {
-    let rendered : String = link . to_string ();
-    let Some (offset) = text [search_from ..] . find (&rendered) else { continue; };
-    let start : usize = search_from + offset;
+  for (range, link) in textlinks_with_ranges_from_text (text) . into_iter ()
+    . filter (|(_, link)| &link . id == raw_id) {
+    let start : usize = range . start;
     occurrences . push (TextLinkOccurrence {
       owner_pid    : node . pid . clone (),
       owner_source : node . source . clone (),
       field,
       line         : text [..start] . bytes () . filter (|b| *b == b'\n') . count () + 1,
-      label        : link . label, });
-    search_from = start + rendered . len (); }
+      label        : link . label, }); }
 }
 
 /// Build one verbatim SaveNode per owned affected telescope.  It removes only
@@ -249,7 +245,9 @@ mod tests {
     node . pid = id (pid);
     node . source = SourceName::from (source);
     node . title = format! ("{} [[id:gone][title label]]", pid);
-    node . body = Some ("line one\n[[id:gone][body label]]" . to_string ());
+    node . body = Some ( // the verbatim example is not a reference
+      "line one\n=[[id:gone][body label]]= example\n[[id:gone][body label]]"
+      . to_string ());
     node
   }
 
@@ -270,7 +268,7 @@ mod tests {
     assert_eq! (scanned . text_links . len (), 2);
     assert! (scanned . structural . iter ()
               . all (|occurrence| occurrence . owner_pid == id ("owned")));
-    assert_eq! (scanned . text_links [1] . line, 2);
+    assert_eq! (scanned . text_links [1] . line, 3);
     let approval = scanned . opaque_approval ();
     assert_eq! (approval, preview (&graph, &config (), &id ("gone"))
                 . unwrap () . opaque_approval ());

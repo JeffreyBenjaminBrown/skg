@@ -484,7 +484,7 @@ They are advisory.  Save-time ownership validation remains authoritative.
 
 Cover true, false, both provenance properties, extra-ID canonicalization,
 unknown ID, unknown property, and owned/foreign sources.  Document the request
-and response in [[file:../../api-and-formats.md][api-and-formats.md]].
+and response in [[file:../../docs/api-and-formats.md][api-and-formats.md]].
 
 ** 9. Implement the Emacs gestures
 
@@ -595,12 +595,12 @@ access control.
 
 *** Formats and vocabulary
 
-Update [[file:../../api-and-formats.md][api-and-formats.md]] with =NoSearchMatching= YAML, the
+Update [[file:../../docs/api-and-formats.md][api-and-formats.md]] with =NoSearchMatching= YAML, the
 =no_search_matching= Tantivy term, property state endpoint, desired-state edit
 request, bare =properties= view request, and =propertiesFolder=/=property=
 metadata.
 
-Update [[file:../../glossary.md][glossary.md]] with no search matching, properties folder, Property,
+Update [[file:../../docs/glossary.md][glossary.md]] with no search matching, properties folder, Property,
 and the read-only surface rule.  Do not introduce “collection,” =NoIndex=, or
 “not indexed” as aliases.
 

@@ -35,6 +35,19 @@ pub fn read_all_skg_files_from_sources (
                      "telescope violation found at load" ); }
   Ok (nodes) }
 
+/// Import preflight must inspect authoritative export claims without
+/// creating or removing the loader's diagnostic reports.
+pub(crate) fn read_all_skg_files_from_sources_read_only (
+  config : &SkgConfig,
+) -> io::Result<Vec<NodeComplete>> {
+  let (nodes, violations) =
+    read_all_skg_files_from_sources_impl (config, false)?;
+  if ! violations . is_empty () {
+    return Err (io::Error::new (io::ErrorKind::InvalidData,
+      "Configured sources have telescope violations; resolve them before import")); }
+  Ok (nodes)
+}
+
 /// As 'read_all_skg_files_from_sources', but hands back the
 /// load-time telescope violations rather than logging them, so
 /// init and rebuild can report them alongside the graph-level ones
@@ -47,6 +60,13 @@ pub fn read_all_skg_files_from_sources (
 ///   use the same pid. The owned telescope wins before folding.
 pub fn read_all_skg_files_from_sources_collecting_violations (
   config: &SkgConfig
+) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
+  read_all_skg_files_from_sources_impl (config, true)
+}
+
+fn read_all_skg_files_from_sources_impl (
+  config : &SkgConfig,
+  report_errors : bool,
 ) -> io::Result<(Vec<NodeComplete>, Vec<(ID, TelescopeViolation)>)> {
   let mut sections_by_pid
     : HashMap<ID, Vec<(SourceName, NodeFS)>> = HashMap::new();
@@ -73,7 +93,8 @@ pub fn read_all_skg_files_from_sources_collecting_violations (
           source . path . display() . to_string(),
           e . to_string()
         )); }} }
-  report_load_errors (&load_errors, &config . data_root) ?;
+  if report_errors {
+    report_load_errors (&load_errors, &config . data_root) ?; }
   if ! load_errors . is_empty() {
     return Err (io::Error::new (
       io::ErrorKind::InvalidData,
@@ -167,7 +188,7 @@ fn fold_grouped_sections (
 
 /// NOT AN ERROR: same-id files across sources. Those are the
 /// SECTIONS of one privacy telescope, grouped and folded at load,
-/// and they are the feature -- see docs/telescopes.md. Sections of
+/// and they are the feature -- see docs/telescopes.org. Sections of
 /// one telescope share a pid, so they can never trip this check.
 ///
 /// THE ERROR: one id claimed by two DIFFERENT nodes -- an id
@@ -308,7 +329,7 @@ fn report_ids_claimed_by_two_nodes(
     content . push_str ("#+title: IDs claimed by more than one node\n");
     content . push_str ("#+date: <generated at initialization>\n\n");
     content . push_str( &format!(
-      "{} id(s) claimed by more than one node. Same-id files ACROSS SOURCES are not this: those are the sections of one privacy telescope (docs/telescopes.md). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n",
+      "{} id(s) claimed by more than one node. Same-id files ACROSS SOURCES are not this: those are the sections of one privacy telescope (docs/telescopes.org). Each id below is claimed, as a primary or extra id, by the distinct nodes listed under it.\n\n",
       count));
     let mut sorted_ids: Vec<(&ID, &Vec<(ID, SourceName)>)> =
       // for deterministic output

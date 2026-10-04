@@ -121,7 +121,8 @@ fn divide_into_viewNodeLineCols (
             Ok (_) => break, // Found another headline
             Err (e) if e == "__NOT_A_HEADLINE__" => {
               // Not a headline, it's a body line
-              body_lines . push( lines[i] . to_string() );
+              body_lines . push (
+                crate::body_view_escape::decode_body_line_from_view (lines[i]));
               i += 1;
             },
             Err (e) => return Err (e), // Invalid metadata
@@ -139,6 +140,22 @@ fn divide_into_viewNodeLineCols (
     }
   }
   Ok (result) }
+
+#[cfg(test)]
+mod imported_body_tests {
+  use super::*;
+
+  #[test]
+  fn literal_headings_drawers_and_mixed_fences_remain_one_body_on_save () {
+    let body : &str = ":PROPERTIES:\n:ID: example-not-a-node\n:END:\n* literal heading\n,* existing comma heading\n```org\n** fenced heading\n```\n#+begin_src org\n* source heading\n#+end_src";
+    let rendered : String = format! ("* File root\n{}\n",
+      crate::body_view_escape::encode_body_for_view (body));
+    let parsed : Vec<ViewNodeLineCol> =
+      divide_into_viewNodeLineCols (&rendered) . unwrap ();
+    assert_eq! (parsed . len (), 1);
+    assert_eq! (parsed [0] . body . join ("\n"), body);
+  }
+}
 
 /// Create an MpViewnode from an ViewNodeLineCol.
 /// This helper extracts the node creation logic from the main parsing function.

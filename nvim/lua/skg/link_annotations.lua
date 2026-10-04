@@ -22,21 +22,116 @@ local function valid (buf)
          and vim.b[buf].skg_link_annotations_enabled == true
 end
 
----All literal [[id:ID][LABEL]] links in BUF, with byte columns.
+-- Characters Org accepts just before an opening = or ~,
+-- and just after a closing one.
+local VERBATIM_PRE = "-('\"{"
+local VERBATIM_POST = "-.,:!?;'\")}\\["
+
+local function is_space (char)
+  return char == ' ' or char == '\t' or char == '\r' or char == '\f'
+end
+
+---=verbatim= and ~code~ spans in LINE, as {start, finish} byte columns
+---(1-based, inclusive). The opening marker follows the line start,
+---whitespace or a VERBATIM_PRE character, and precedes a non-space; the
+---closing marker follows a non-space and precedes the line end,
+---whitespace or a VERBATIM_POST character.
+function M.inline_verbatim_spans (line)
+  local spans = {}
+  local index = 1
+  while index <= #line do
+    local marker = line:sub(index, index)
+    local before = line:sub(index - 1, index - 1)
+    local opens = (marker == '=' or marker == '~')
+      and (index == 1 or is_space(before)
+           or VERBATIM_PRE:find(before, 1, true) ~= nil)
+      and index < #line
+      and not is_space(line:sub(index + 1, index + 1))
+    local closing = nil
+    if opens then
+      for candidate = index + 2, #line do
+        local after = line:sub(candidate + 1, candidate + 1)
+        if line:sub(candidate, candidate) == marker
+           and not is_space(line:sub(candidate - 1, candidate - 1))
+           and (candidate == #line or is_space(after)
+                or VERBATIM_POST:find(after, 1, true) ~= nil) then
+          closing = candidate
+          break
+        end
+      end
+    end
+    if closing then
+      table.insert(spans, { index, closing })
+      index = closing + 1
+    else
+      index = index + 1
+    end
+  end
+  return spans
+end
+
+---For each line of LINES, true if the whole line is shown literally by
+---Org, else its inline literal spans. Mirrors the server's
+---'org_literal_ranges' (server/types/textlinks/org_literal_ranges.rs):
+---#+begin_X ... #+end_X blocks, ``` fences, fixed-width lines, and
+---inline =verbatim= and ~code~. A headline ends any open block, as the
+---end of a node's body does on the server.
+function M.literal_lines (lines)
+  local result = {}
+  local closing = nil
+  for row, line in ipairs(lines) do
+    local trimmed = line:gsub('^%s+', ''):lower()
+    if closing and line:find('^%*+ ') then closing = nil end
+    if closing then
+      result[row] = true
+      if trimmed:sub(1, #closing) == closing then closing = nil end
+    elseif trimmed:sub(1, 8) == '#+begin_' then
+      result[row] = true
+      closing = '#+end_' .. (trimmed:sub(9):match('^%S*'))
+    elseif trimmed:sub(1, 3) == '```' then
+      result[row] = true
+      closing = '```'
+    elseif trimmed == ':' or trimmed:sub(1, 2) == ': ' then
+      result[row] = true
+    else
+      result[row] = M.inline_verbatim_spans(line)
+    end
+  end
+  return result
+end
+
+---Whether bytes START..FINISH of a line lie within its LITERAL_ROW
+---(an entry of 'M.literal_lines'). Only a literal span containing the
+---whole link makes it an example; =verbatim= in a link's label is just
+---its formatting.
+local function within_literal (literal_row, start, finish)
+  if literal_row == true then return true end
+  for _, span in ipairs(literal_row) do
+    if span[1] <= start and finish <= span[2] then return true end
+  end
+  return false
+end
+
+---All [[id:ID][LABEL]] links in BUF that Org treats as links, with byte
+---columns. Link syntax in text Org shows literally is an example.
 function M.collect (buf)
   local positions = {}
-  for row, line in ipairs(vim.api.nvim_buf_get_lines(buf, 0, -1, false)) do
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  local literal = M.literal_lines(lines)
+  for row, line in ipairs(lines) do
     local from = 1
     while true do
       local start, finish, id, label =
         line:find('%[%[id:([^%]\n]+)%]%[([^%]\n]*)%]%]', from)
       if not start then break end
-      local label_start = start + 6 + #id
-      table.insert(positions, {
-        row = row - 1, label_start = label_start,
-        label_end = label_start + #label, link_end = finish,
-        id = id })
       from = finish + 1
+      if not within_literal(literal[row], start, finish) then
+        local label_start = start + 6 + #id
+        table.insert(positions, {
+          row = row - 1, label_start = label_start,
+          label_end = label_start + #label, link_end = finish,
+          id = id })
+      end
     end
   end
   return positions

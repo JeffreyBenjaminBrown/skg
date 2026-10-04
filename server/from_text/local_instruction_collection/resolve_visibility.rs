@@ -177,7 +177,7 @@ fn apply_hiddenoutside_edits (
 /// that child is disk-content of a node F subscribes to, HIDES the
 /// child from F's subscriptions -- otherwise the child would
 /// reappear under F as unintegrated subscribed content the user just
-/// dismissed (docs/sharing-model.md: branches deleted from a clone
+/// dismissed (docs/sharing-model.org: branches deleted from a clone
 /// become hides). Symmetrically, re-adding such a child to F's
 /// contains drops a stale hide of it by F. Details:
 /// - Members invisible under the restricted source-set were OMITTED

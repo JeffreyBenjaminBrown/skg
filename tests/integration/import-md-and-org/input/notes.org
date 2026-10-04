@@ -1,0 +1,10 @@
+#+title: Sample
+:PROPERTIES:
+:ID: import-root
+:END:
+Preamble
+#+begin_src org
+* not a heading
+#+end_src
+* Real heading
+Body with [[file:guide.md][guide]].
