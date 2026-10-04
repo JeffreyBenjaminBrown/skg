@@ -20,7 +20,7 @@ privacy for every imported node.  No input file is changed."
    (list (read-string "Input directory on server (absolute path): ")
          (progn
            (message "Choose an owned source; it determines privacy for every imported node.")
-           (skg--prompt-for-owned-source))))
+           (skg--prompt-for-owned-source "Import into source: "))))
   (unless destination-source (user-error "No owned source selected"))
   (skg--import-md-and-org-send
    `((action . "preview")

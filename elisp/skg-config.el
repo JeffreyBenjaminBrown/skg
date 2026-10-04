@@ -57,14 +57,15 @@ hook after the cycle bindings are installed."
        prompt collection predicate require-match initial-input hist def
        inherit-input-method))))
 
-(defun skg--prompt-for-owned-source ()
+(defun skg--prompt-for-owned-source (&optional prompt)
   "Prompt the user to choose an owned source, with S-left/S-right cycling.
+PROMPT defaults to \"Source: \".
 If there is only one owned source, return it without prompting."
   (let ((owned-sources (skg--owned-sources)))
     (if (= (length owned-sources) 1)
         (car owned-sources)
       (skg--completing-read-with-cycle
-       "Source: " owned-sources nil t nil nil nil nil owned-sources))))
+       (or prompt "Source: ") owned-sources nil t nil nil nil nil owned-sources))))
 
 (defun skg--prompt-for-source-change (current-source)
   "Prompt for a source to replace CURRENT-SOURCE.

@@ -89,7 +89,7 @@ function M.import_md_and_org (input_directory, destination_source)
   if not destination_source then
     vim.notify('Choose an owned source; it determines privacy for every imported node.')
   end
-  destination_source = destination_source or picker.prompt_for_owned_source()
+  destination_source = destination_source or picker.prompt_for_owned_source('Import into source: ')
   if not destination_source then return end
   send({ action = 'preview', ['input-directory'] = input_directory,
     ['destination-source'] = destination_source },
