@@ -9,7 +9,7 @@ use super::viewnode::PhantomDiff;
 use super::misc::ID;
 use super::tree::generic::do_everywhere_in_tree_dfs_readonly;
 use super::tree::forest::{MpViewForest, ViewForest};
-use super::git::{ExistenceAxes, MembershipAxes};
+use super::git::{NodeAxes, RelationshipAxes};
 use super::viewnode::{ ViewNode, ViewNodeKind, ActiveNode, Vognode, Phantom, QualFolder, Qual, PartnerFolder, PhantomDeleted, InactiveNode, PhantomUnknown, GraphNodeStats, ViewNodeStats, Birth, Editability, AffectsParent, };
 
 use ego_tree::{Tree, NodeId, NodeMut};
@@ -78,8 +78,8 @@ impl TryFrom<MpActiveNode> for ActiveNode {
       viewStats      : u . viewStats,
       relRepo_request : u . relRepo_request,
       view_requests  : u . view_requests,
-      existence      : u . existence,
-      membership     : u . membership,
+      node_axes      : u . node_axes,
+      relationship_axes     : u . relationship_axes,
       not_in_git     : u . not_in_git,
       editability   : u . editability,
     })
@@ -98,8 +98,8 @@ impl TryFrom<MpPhantomDiff> for PhantomDiff {
       title      : u . title,
       id,
       home_repo: repo,
-      existence  : u . existence,
-      membership : u . membership,
+      node_axes  : u . node_axes,
+      relationship_axes : u . relationship_axes,
       not_in_git : u . not_in_git,
       graphStats : u . graphStats,
     })
@@ -112,8 +112,8 @@ impl From<PhantomDiff> for MpPhantomDiff {
       title      : p . title,
       id         : Some(p . id),
       home_repo     : Some(p . home_repo),
-      existence  : p . existence,
-      membership : p . membership,
+      node_axes  : p . node_axes,
+      relationship_axes : p . relationship_axes,
       not_in_git : p . not_in_git,
       graphStats : p . graphStats,
     }
@@ -176,8 +176,8 @@ impl From<ActiveNode> for MpActiveNode {
       viewStats      : t . viewStats,
       relRepo_request : t . relRepo_request,
       view_requests  : t . view_requests,
-      existence      : t . existence,
-      membership     : t . membership,
+      node_axes      : t . node_axes,
+      relationship_axes     : t . relationship_axes,
       not_in_git     : t . not_in_git,
       editability   : t . editability,
     }
@@ -291,8 +291,8 @@ impl Default for MpActiveNode {
       viewStats      : ViewNodeStats::default(),
       relRepo_request : None,
       view_requests  : HashSet::new(),
-      existence      : ExistenceAxes::default(),
-      membership     : MembershipAxes::default(),
+      node_axes      : NodeAxes::default(),
+      relationship_axes     : RelationshipAxes::default(),
       not_in_git     : false,
       editability   : Editability::Definitive {
         body         : None,

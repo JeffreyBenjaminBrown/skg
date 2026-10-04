@@ -197,7 +197,7 @@ diff_mode.toggle()
 T.wait_for_response(20)
 -- Verify that a removed-here phantom c appears under b.
 local content_after_diff = T.buffer_text(buf_a)
-T.check(content_after_diff:find('(unstaged removedM)', 1, true) ~= nil,
+T.check(content_after_diff:find('(unstaged removedR)', 1, true) ~= nil,
         'removed-here phantom present')
 
 print('=== PHASE 4: Note containerward path behavior ===')

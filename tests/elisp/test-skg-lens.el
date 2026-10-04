@@ -234,20 +234,20 @@ literal prefix inherit it; sub-rule colors still override."
   "An empty-string separator makes INTERC concatenate slots with
 nothing between them -- the pattern the stage-axis rules use."
   (should (equal (skg-transform-sexp-flat
-                  '(a (stage removedX removedM))
+                  '(a (stage deletedN removedR))
                   '(a (INTERC "" stage "stage:"
-                        (removedX "-X")
-                        (removedM "-M"))))
-                 '("stage:-X-M"))))
+                        (deletedN "-N")
+                        (removedR "-R"))))
+                 '("stage:-N-R"))))
 
 (ert-deftest test-skg-transform-sexp-flat-interc-emits-per-matching-child ()
   "If OBJECT has multiple matching children, INTERC emits one
 token per match."
   (should (equal (skg-transform-sexp-flat
-                  '(a (stage removedX) (stage newM))
+                  '(a (stage deletedN) (stage addedR))
                   '(a (INTERC "" stage "stage:"
-                        (removedX "-X")
-                        (newM     "M"))))
-                 '("stage:-X" "stage:M"))))
+                        (deletedN "-N")
+                        (addedR "R"))))
+                 '("stage:-N" "stage:R"))))
 
 (provide 'test-skg-lens)

@@ -117,7 +117,7 @@ fn hiddenin_signs_come_from_either_input_list_with_exact_stages () {
   assert_eq! (goal, ids (&["h1", "h2"]));
   assert! (removed . is_empty ());
   assert_eq! ( axes [ &id ("h2") ],
-    MembershipAxes { staged : Some (Sign::Plus), unstaged : None } );
+    RelationshipAxes { staged : Some (Sign::Plus), unstaged : None } );
   assert! ( ! axes . contains_key (&id ("h1")),
     "an unchanged member contributes no signs" );
 }
@@ -145,7 +145,7 @@ fn hiddenin_removed_member_gets_exact_stage_label () {
   assert_eq! (goal, ids (&["h1"]));
   assert! (removed . contains (&id ("h1")));
   assert_eq! ( axes [ &id ("h1") ],
-    MembershipAxes { staged : None, unstaged : Some (Sign::Minus) } );
+    RelationshipAxes { staged : None, unstaged : Some (Sign::Minus) } );
 }
 
 #[test]

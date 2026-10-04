@@ -6,7 +6,7 @@ pub use super::super::common::*;
 /// Node 1 contains itself – the child occurrence should show (diff new-here).
 pub const GIT_DIFF_VIEW: &str = "\
 * (skg (node (id 1) (repo main))) 1
-** (skg (node (id 1) (unstaged newM))) 1
+** (skg (node (id 1) (unstaged addedR))) 1
 ";
 
 /// Create a git repo with head->worktree transition from newhere_cycle fixtures.
@@ -34,5 +34,5 @@ pub fn setup_gitrepo_with_fixtures_staged(
 /// Expected output when the transition is staged.
 pub const GIT_DIFF_VIEW_STAGED: &str = "\
 * (skg (node (id 1) (repo main))) 1
-** (skg (node (id 1) (staged newM))) 1
+** (skg (node (id 1) (staged addedR))) 1
 ";

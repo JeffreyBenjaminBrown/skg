@@ -137,7 +137,7 @@ Returns the parsed s-expression or nil if not found."
      (concat
       "* (skg (node (id 1) (repo public))) root\n"
       "body line\n"
-      "** (skg alias (staged newM)) alias title\n"
+      "** (skg alias (staged addedR)) alias title\n"
       "** plain child\n"))
     (concat
      "* root\n"

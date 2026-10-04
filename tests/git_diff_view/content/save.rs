@@ -16,9 +16,9 @@ fn all_tests
       test_delete_new_here_updates_disk (s) . await ?;
       test_add_new_child_creates_on_disk (s) . await ?;
       test_diff_mode_as_subscribee_regenerates_phantom_children (s) . await ?;
-      test_diff_mode_removed_subscribee_shows_removedM (s) . await ?;
+      test_diff_mode_removed_subscribee_shows_removedR (s) . await ?;
       test_diff_mode_removed_subscribee_staged_shows_stagedM (s) . await ?;
-      test_diff_mode_added_subscribee_shows_newM (s) . await ?;
+      test_diff_mode_added_subscribee_shows_addedR (s) . await ?;
       test_delete_removed_node_respawns_staged (s) . await ?;
       Ok (( )) } )) }
 
@@ -73,7 +73,7 @@ async fn test_delete_removed_here_node_respawns (
     Box::pin(async move {
       // User deletes the removed-here node under 12 (called 'moves')
       let input =
-        without_lines_containing(GIT_DIFF_VIEW, "(unstaged removedM)");
+        without_lines_containing(GIT_DIFF_VIEW, "(unstaged removedR)");
 
       let graph : InRustGraphHandle =
         graph_handle_from_config (&config)?;
@@ -112,7 +112,7 @@ async fn test_delete_new_here_updates_disk (
     Box::pin(async move {
       // User deleted 'moves' under 11 (the new-here one)
       // The "moves under 11" line is the new-here phantom (membership added).
-      let input = without_lines_containing(GIT_DIFF_VIEW, "(unstaged newM)");
+      let input = without_lines_containing(GIT_DIFF_VIEW, "(unstaged addedR)");
 
       let graph : InRustGraphHandle =
         graph_handle_from_config (&config)?;
@@ -138,7 +138,7 @@ async fn test_delete_new_here_updates_disk (
 
       // BUFFER: moves gone from 11, still under 12 as removed-here
       let expected = without_lines_containing(
-        GIT_DIFF_VIEW, "(unstaged newM)");
+        GIT_DIFF_VIEW, "(unstaged addedR)");
       assert_buffer_contains(&response . saved_view,
                              &expected);
       Ok(())
@@ -189,7 +189,7 @@ async fn test_add_new_child_creates_on_disk (
       // BUFFER: 12 has moves (removed-here) and newer (new).
       // PITFALL: I'm not sure 12's children will be in this order.
       let expected = insert_after(GIT_DIFF_VIEW, "(id 12)",
-        "*** (skg (node (id newer) (unstaged newX newM))) newer");
+        "*** (skg (node (id newer) (unstaged addedN addedR))) newer");
       assert_buffer_contains(&response . saved_view,
                              &expected);
       Ok(())
@@ -210,7 +210,7 @@ async fn test_diff_mode_as_subscribee_regenerates_phantom_children (
 * (skg (node (id 1) (repo main))) 1
 ** (skg subscribeeFolder)
 *** (skg (node (id 11) (repo main))) 11
-**** (skg (node (id moves) (unstaged newM))) moves
+**** (skg (node (id moves) (unstaged addedR))) moves
 ";
 
       let graph : InRustGraphHandle =
@@ -228,17 +228,17 @@ async fn test_diff_mode_as_subscribee_regenerates_phantom_children (
       assert_buffer_contains(
         &response . saved_view,
         "*** (skg (node (id 11) (repo main))) 11\n\
-         **** (skg (node (id gets-removed) (repo main) writeProtected (unstaged removedX removedM))) gets-removed\n\
+         **** (skg (node (id gets-removed) (repo main) writeProtected (unstaged deletedN removedR))) gets-removed\n\
          **** (skg (node (id moves) (repo main))) moves" );
       Ok (( )) }) }) . await
 }
 
 /// #1 fix: a subscribee removed from the subscriber's subscribes_to list (but
-/// whose .skg still exists) renders as a phantom with (unstaged removedM). Its
+/// whose .skg still exists) renders as a phantom with (unstaged removedR). Its
 /// relation is subscribes_to, not contains, so the membership marker comes from
 /// build_child_data's net-removal fallback rather than phantom_axes(contains).
 /// Without the fix the phantom would carry NO membership marker.
-async fn test_diff_mode_removed_subscribee_shows_removedM (
+async fn test_diff_mode_removed_subscribee_shows_removedR (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
@@ -267,12 +267,12 @@ async fn test_diff_mode_removed_subscribee_shows_removedM (
 
       assert_buffer_contains(
         &response . saved_view,
-        "*** (skg (node (id 22) (repo main) writeProtected (unstaged removedM))) 22" );
+        "*** (skg (node (id 22) (repo main) writeProtected (unstaged removedR))) 22" );
       Ok (( )) }) }) . await
 }
 
 /// §C: the SAME removed subscribee, but staged -- the phantom must now report
-/// (staged removedM), proving phantom_axes reads subscribes_to PER STAGE (not
+/// (staged removedR), proving phantom_axes reads subscribes_to PER STAGE (not
 /// just the net unstaged fallback). Guards the per-stage sharing-relation diff.
 async fn test_diff_mode_removed_subscribee_staged_shows_stagedM (
   s : &mut SharedStoreSession,
@@ -303,14 +303,14 @@ async fn test_diff_mode_removed_subscribee_staged_shows_stagedM (
 
       assert_buffer_contains(
         &response . saved_view,
-        "*** (skg (node (id 22) (repo main) writeProtected (staged removedM))) 22" );
+        "*** (skg (node (id 22) (repo main) writeProtected (staged removedR))) 22" );
       Ok (( )) }) }) . await
 }
 
 /// The added direction for an outbound folder: a subscribee newly added
 /// to the subscriber's subscribes_to renders PRESENT with
-/// (unstaged newM), mirroring content's mark_membership rule.
-async fn test_diff_mode_added_subscribee_shows_newM (
+/// (unstaged addedR), mirroring content's mark_membership rule.
+async fn test_diff_mode_added_subscribee_shows_addedR (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>>
 {
@@ -341,14 +341,14 @@ async fn test_diff_mode_added_subscribee_shows_newM (
       assert_buffer_contains(
         &response . saved_view,
         "*** (skg (node (id 11) (repo main))) 11\n\
-         *** (skg (node (id 22) (repo main) (unstaged newM))) 22" );
+         *** (skg (node (id 22) (repo main) (unstaged addedR))) 22" );
       Ok (( )) }) }) . await
 }
 
 /// Same as 'test_delete_removed_node_respawns' but with the fixture
 /// transition staged (git add) rather than unstaged. The respawned
-/// phantom should report '(staged removedX removedM)' instead of
-/// '(unstaged removedX removedM)' -- guards phantom_axes' per-stage
+/// phantom should report '(staged deletedN removedR)' instead of
+/// '(unstaged deletedN removedR)' -- guards phantom_axes' per-stage
 /// attribution on the save-rerender path, mirroring
 /// ids::save::test_delete_id_folder_scaffold_respawns_staged.
 async fn test_delete_removed_node_respawns_staged (

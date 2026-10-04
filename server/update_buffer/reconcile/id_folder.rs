@@ -1,4 +1,4 @@
-use crate::types::git::{MembershipAxes, NodeChanges};
+use crate::types::git::{RelationshipAxes, NodeChanges};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, RepoName};
@@ -49,7 +49,7 @@ pub fn reconcile_idFolder_children (
     per_stage_node_changes_for_activeNode (
       repo_diffs, &parent_pid, &parent_repo );
   let (goal_list, axes_map)
-    : (Vec<ID>, HashMap<ID, MembershipAxes>) =
+    : (Vec<ID>, HashMap<ID, RelationshipAxes>) =
     if staged_nc . is_none () && unstaged_nc . is_none () {
       // No git diff view, or no changes for this file in either stage.
       let goals : Vec<ID> =
@@ -58,13 +58,13 @@ pub fn reconcile_idFolder_children (
           . collect();
       ( goals, HashMap::new() )
     } else {
-      let merged : Vec<(ID, MembershipAxes)> =
+      let merged : Vec<(ID, RelationshipAxes)> =
         axes_from_per_stage_diffs (
           staged_nc   . map ( |c| c . ids_diff . as_slice () ),
           unstaged_nc . map ( |c| c . ids_diff . as_slice () ) );
       let goals : Vec<ID> =
         merged . iter () . map ( |(id, _)| id . clone () ) . collect ();
-      let amap : HashMap<ID, MembershipAxes> =
+      let amap : HashMap<ID, RelationshipAxes> =
         merged . into_iter () . collect ();
       ( goals, amap ) };
   let is_id : fn (&ViewNode) -> bool =
@@ -77,7 +77,7 @@ pub fn reconcile_idFolder_children (
       _ => Err ( "reconcile_idFolder_children: relevant child is not an ID scaffold"
                  . to_string() ), };
   let create_id = |id: &ID| -> Result<ViewNode, String> {
-    let membership : MembershipAxes =
+    let relationship_axes : RelationshipAxes =
       axes_map . get (id) . copied () . unwrap_or_default ();
     Ok ( ViewNode {
       focused     : false,
@@ -85,7 +85,7 @@ pub fn reconcile_idFolder_children (
       body_folded : false,
       kind        : ViewNodeKind::Qual (
         Qual::ID {
-          id: id . clone(), membership } ) } ) };
+          id: id . clone(), relationship_axes } ) } ) };
   complete_relevant_children_in_viewnodetree(
     tree,
     idfolder_node_id,

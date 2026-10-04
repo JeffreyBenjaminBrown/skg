@@ -130,8 +130,8 @@ interesting yellow style; an inactive Skg repo yields an anonymous
 =node from inactive repo= marker. Inactive placeholders reveal no
 node title or Skg repo. Red =DELETED= marks a deletion in a diff or
 edit, while =diff:not-in-git= marks a node without a Git counterpart.
-=staged:= and =unstaged:= prefixes report Git changes; =X= and =-X=
-mark existence changes, =M= and =-M= membership changes, and
+=staged:= and =unstaged:= prefixes report Git changes; =N= and =-N=
+mark node changes, =R= and =-R= relationship changes, and
 =text changed= reports text changes. These are view facts unless
 specifically identified above as requests.
 

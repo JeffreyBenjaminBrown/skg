@@ -3,19 +3,19 @@
 /// the INVERSE SCAN supplies the per-stage signs
 /// (TODO/full-schema/12-2_diff-mode-policy_discussion.org).  Members
 /// removed since HEAD appear as phantoms appended after the real
-/// members; members added since HEAD carry per-stage 'newM'.
+/// members; members added since HEAD carry per-stage 'addedR'.
 ///
 /// Fixture, all transitions HEAD -> worktree:
 /// - del-r overrode N1; del-r's FILE was deleted
-///   -> phantom under N1's overriderFolder with removedX AND removedM.
+///   -> phantom under N1's overriderFolder with deletedN AND removedR.
 /// - edge-r overrode N2; only the EDGE was removed
-///   -> phantom under N2's overriderFolder with removedM alone.
-/// - new-r (an old file) newly overrides N3 -> member with newM.
-/// - newfile-r (a NEW file) overrides N4 -> member with newX newM.
+///   -> phantom under N2's overriderFolder with removedR alone.
+/// - new-r (an old file) newly overrides N3 -> member with addedR.
+/// - newfile-r (a NEW file) overrides N4 -> member with addedN addedR.
 /// - del-s subscribed to SN; file deleted -> subscriberFolder analogue.
-/// - new-s newly subscribes to SN -> subscriberFolder newM.
+/// - new-s newly subscribes to SN -> subscriberFolder addedR.
 /// - edge-h hid HN; edge removed -> hiderFolder analogue.
-/// - new-h newly hides HN -> hiderFolder newM.
+/// - new-h newly hides HN -> hiderFolder addedR.
 
 use super::common::*;
 use skg::test_utils::graph_handle_from_config;
@@ -64,35 +64,35 @@ const INPUT : &str = "\
 const EXPECTED_UNSTAGED : &str = "\
 * (skg (node (id N1) (repo main))) N1
 ** (skg overriderFolder)
-*** (skg (node (id del-r) (repo main) writeProtected (unstaged removedX removedM))) del-r
+*** (skg (node (id del-r) (repo main) writeProtected (unstaged deletedN removedR))) del-r
 * (skg (node (id N2) (repo main))) N2
 ** (skg overriderFolder)
-*** (skg (node (id edge-r) (repo main) writeProtected (unstaged removedM))) edge-r
+*** (skg (node (id edge-r) (repo main) writeProtected (unstaged removedR))) edge-r
 * (skg (node (id N3) (repo main))) N3
 ** (skg overriderFolder)
-*** (skg (node (id new-r) (repo main) (unstaged newM))) new-r
+*** (skg (node (id new-r) (repo main) (unstaged addedR))) new-r
 * (skg (node (id N4) (repo main))) N4
 ** (skg overriderFolder)
-*** (skg (node (id newfile-r) (repo main) (unstaged newX newM))) newfile-r
+*** (skg (node (id newfile-r) (repo main) (unstaged addedN addedR))) newfile-r
 * (skg (node (id SN) (repo main))) SN
 ** (skg subscriberFolder)
-*** (skg (node (id del-s) (repo main) writeProtected (unstaged removedX removedM))) del-s
-*** (skg (node (id new-s) (repo main) (unstaged newM))) new-s
+*** (skg (node (id del-s) (repo main) writeProtected (unstaged deletedN removedR))) del-s
+*** (skg (node (id new-s) (repo main) (unstaged addedR))) new-s
 * (skg (node (id HN) (repo main))) HN
 ** (skg hiderFolder)
-*** (skg (node (id edge-h) (repo main) writeProtected (unstaged removedM))) edge-h
-*** (skg (node (id new-h) (repo main) (unstaged newM))) new-h
+*** (skg (node (id edge-h) (repo main) writeProtected (unstaged removedR))) edge-h
+*** (skg (node (id new-h) (repo main) (unstaged addedR))) new-h
 ";
 
 const EXPECTED_STAGED : &str = "\
-*** (skg (node (id del-r) (repo main) writeProtected (staged removedX removedM))) del-r
-*** (skg (node (id edge-r) (repo main) writeProtected (staged removedM))) edge-r
-*** (skg (node (id new-r) (repo main) (staged newM))) new-r
-*** (skg (node (id newfile-r) (repo main) (staged newX newM))) newfile-r
-*** (skg (node (id del-s) (repo main) writeProtected (staged removedX removedM))) del-s
-*** (skg (node (id new-s) (repo main) (staged newM))) new-s
-*** (skg (node (id edge-h) (repo main) writeProtected (staged removedM))) edge-h
-*** (skg (node (id new-h) (repo main) (staged newM))) new-h
+*** (skg (node (id del-r) (repo main) writeProtected (staged deletedN removedR))) del-r
+*** (skg (node (id edge-r) (repo main) writeProtected (staged removedR))) edge-r
+*** (skg (node (id new-r) (repo main) (staged addedR))) new-r
+*** (skg (node (id newfile-r) (repo main) (staged addedN addedR))) newfile-r
+*** (skg (node (id del-s) (repo main) writeProtected (staged deletedN removedR))) del-s
+*** (skg (node (id new-s) (repo main) (staged addedR))) new-s
+*** (skg (node (id edge-h) (repo main) writeProtected (staged removedR))) edge-h
+*** (skg (node (id new-h) (repo main) (staged addedR))) new-h
 ";
 
 #[test]
@@ -101,8 +101,8 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-git-diff-inbound",
     |s| Box::pin ( async move {
-      inbound_folders_show_phantoms_and_newM_unstaged (s) . await ?;
-      inbound_folders_show_phantoms_and_newM_staged (s) . await ?;
+      inbound_folders_show_phantoms_and_addedR_unstaged (s) . await ?;
+      inbound_folders_show_phantoms_and_addedR_staged (s) . await ?;
       Ok (( )) } )) }
 
 async fn run_inbound_save_test (
@@ -150,14 +150,14 @@ async fn run_inbound_save_test (
          lives in edge-r's file, which the folder cannot edit" ); }
     Ok (( )) }
 
-async fn inbound_folders_show_phantoms_and_newM_unstaged (
+async fn inbound_folders_show_phantoms_and_addedR_unstaged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   run_inbound_save_test (
     s, "skg-test-git-diff-inbound-unstaged", false,
     EXPECTED_UNSTAGED ) . await }
 
-async fn inbound_folders_show_phantoms_and_newM_staged (
+async fn inbound_folders_show_phantoms_and_addedR_staged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   run_inbound_save_test (

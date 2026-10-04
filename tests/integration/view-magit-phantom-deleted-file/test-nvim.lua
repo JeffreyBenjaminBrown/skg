@@ -78,7 +78,7 @@ local content_view = find_content_view_buffer_matching('(id a)')
 if not content_view then T.fail('Timeout waiting for content view of a') end
 T.check(true, 'Content view of a loaded')
 
--- PHASE 2: toggle diff mode on; verify phantom b (removedX axis --
+-- PHASE 2: toggle diff mode on; verify phantom b (deletedN axis --
 -- b.skg is deleted from disk).
 print('=== PHASE 2: Toggle diff mode, verify phantom b ===')
 vim.api.nvim_set_current_buf(content_view)
@@ -88,8 +88,8 @@ do
   local content = T.buffer_text(content_view)
   T.check(content:find('(id b)', 1, true) ~= nil,
           string.format('No (id b) in buffer. Content: %s', content))
-  T.check(content:find('removedX', 1, true) ~= nil,
-          string.format('No removedX axis on phantom. Content: %s',
+  T.check(content:find('deletedN', 1, true) ~= nil,
+          string.format('No deletedN axis on phantom. Content: %s',
                         content))
 end
 

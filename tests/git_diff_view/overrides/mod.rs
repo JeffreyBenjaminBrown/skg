@@ -1,13 +1,13 @@
 /// Git diff view tests for explicitly requested OUTBOUND sharing folders
 /// (overriddenFolder, hiddenFolder): members removed since HEAD appear as phantoms carrying
-/// per-stage 'removedM', and members added since HEAD carry per-stage
-/// 'newM', all read from the owner's per-stage relation diff
+/// per-stage 'removedR', and members added since HEAD carry per-stage
+/// 'addedR', all read from the owner's per-stage relation diff
 /// (TODO/full-schema/12-2_diff-mode-policy_discussion.org).
 ///
 /// Fixture: R overrides [Z, W] and hides [ha, hb] at HEAD;
 /// in the worktree R overrides [Z, O] and hides [ha, hc].  Every
 /// leaf file exists unchanged on both sides, so all signs are
-/// membership-only (no X axes).
+/// relationship-only (no N axes).
 ///
 /// Folder-existence companions (every relation EMPTIED since HEAD, so
 /// in diff mode each folder must still render, holding only phantoms):
@@ -40,23 +40,23 @@ fn setup_overrides_fixtures_staged (
 const EXPECTED_UNSTAGED : &str = "\
 ** (skg overriddenFolder)
 *** (skg (node (id Z) (repo main))) Z
-*** (skg (node (id W) (repo main) writeProtected (unstaged removedM))) W
-*** (skg (node (id O) (repo main) (unstaged newM))) O
+*** (skg (node (id W) (repo main) writeProtected (unstaged removedR))) W
+*** (skg (node (id O) (repo main) (unstaged addedR))) O
 ** (skg hiddenFolder)
 *** (skg (node (id ha) (repo main))) ha
-*** (skg (node (id hb) (repo main) writeProtected (unstaged removedM))) hb
-*** (skg (node (id hc) (repo main) (unstaged newM))) hc
+*** (skg (node (id hb) (repo main) writeProtected (unstaged removedR))) hb
+*** (skg (node (id hc) (repo main) (unstaged addedR))) hc
 ";
 
 const EXPECTED_STAGED : &str = "\
 ** (skg overriddenFolder)
 *** (skg (node (id Z) (repo main))) Z
-*** (skg (node (id W) (repo main) writeProtected (staged removedM))) W
-*** (skg (node (id O) (repo main) (staged newM))) O
+*** (skg (node (id W) (repo main) writeProtected (staged removedR))) W
+*** (skg (node (id O) (repo main) (staged addedR))) O
 ** (skg hiddenFolder)
 *** (skg (node (id ha) (repo main))) ha
-*** (skg (node (id hb) (repo main) writeProtected (staged removedM))) hb
-*** (skg (node (id hc) (repo main) (staged newM))) hc
+*** (skg (node (id hb) (repo main) writeProtected (staged removedR))) hb
+*** (skg (node (id hc) (repo main) (staged addedR))) hc
 ";
 
 #[test]
@@ -65,9 +65,9 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-git-diff-overrides",
     |s| Box::pin ( async move {
-      requested_outbound_folders_show_phantoms_and_newM_unstaged (s) . await ?;
+      requested_outbound_folders_show_phantoms_and_addedR_unstaged (s) . await ?;
       emptied_requested_folders_still_render_in_diff_mode (s) . await ?;
-      requested_outbound_folders_show_phantoms_and_newM_staged (s) . await ?;
+      requested_outbound_folders_show_phantoms_and_addedR_staged (s) . await ?;
       diff_mode_save_is_noop_and_regenerates_outbound_phantoms (s) . await ?;
       Ok (( )) } )) }
 
@@ -113,14 +113,14 @@ async fn run_overrides_view_test (
     assert_buffer_contains (&rendered . saved_view, expected);
     Ok (( )) }
 
-async fn requested_outbound_folders_show_phantoms_and_newM_unstaged (
+async fn requested_outbound_folders_show_phantoms_and_addedR_unstaged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   run_overrides_view_test (
     s, "skg-test-git-diff-overrides-unstaged", false,
     EXPECTED_UNSTAGED ) . await }
 
-/// Folder existence: in diff mode, a requested folder whose worktree
+/// Folder node_axes: in diff mode, a requested folder whose worktree
 /// membership is EMPTY but whose HEAD side is not still renders, holding only
 /// phantoms -- for an outbound folder
 /// (overriddenFolder, hiddenFolder), an inbound folder (overriderFolder, via the
@@ -174,15 +174,15 @@ async fn emptied_requested_folders_still_render_in_diff_mode (
       assert_buffer_contains ( &response . saved_view, "\
 * (skg (node (id E) (repo main))) E
 ** (skg overriddenFolder)
-*** (skg (node (id EZ) (repo main) writeProtected (unstaged removedM))) EZ
+*** (skg (node (id EZ) (repo main) writeProtected (unstaged removedR))) EZ
 ** (skg hiddenFolder)
-*** (skg (node (id EH) (repo main) writeProtected (unstaged removedM))) EH
+*** (skg (node (id EH) (repo main) writeProtected (unstaged removedR))) EH
 * (skg (node (id EN) (repo main))) EN
 ** (skg overriderFolder)
-*** (skg (node (id ER) (repo main) writeProtected (unstaged removedM))) ER
+*** (skg (node (id ER) (repo main) writeProtected (unstaged removedR))) ER
 * (skg (node (id ES) (repo main))) ES
 ** (skg subscribeeFolder)
-*** (skg (node (id EB) (repo main) writeProtected (unstaged removedM))) EB
+*** (skg (node (id EB) (repo main) writeProtected (unstaged removedR))) EB
 " ); }
     { // Outside diff mode, the emptied folders still do not appear.
       let mut warnings : Vec<String> = Vec::new ();
@@ -196,7 +196,7 @@ async fn emptied_requested_folders_still_render_in_diff_mode (
           folder, plain_view ); }}
     Ok (( )) }
 
-async fn requested_outbound_folders_show_phantoms_and_newM_staged (
+async fn requested_outbound_folders_show_phantoms_and_addedR_staged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   run_overrides_view_test (

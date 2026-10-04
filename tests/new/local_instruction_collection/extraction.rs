@@ -130,11 +130,11 @@ fn unknown_members_write_their_editable_relationship_owners_only () {
               "HiddenOutside passes the raw Unknown ID to its hide resolver");
 }
 
-fn set_membership_unstaged_minus (
+fn set_relationship_axes_unstaged_minus (
   tree : &mut Tree<ViewNode>,
   id   : &str,
 ) {
-  set_membership_unstaged_minus_keeping_active (tree, id);
+  set_relationship_axes_unstaged_minus_keeping_active (tree, id);
   let target_id : ego_tree::NodeId =
     find_active_or_phantom (tree, id);
   // The target is an Active node here; the next line flips it to a phantom.
@@ -142,10 +142,10 @@ fn set_membership_unstaged_minus (
     . value()
     . normal_to_phantom (); }
 
-/// This is like 'set_membership_unstaged_minus', but it leaves the
+/// This is like 'set_relationship_axes_unstaged_minus', but it leaves the
 /// node Active: a would-be diff phantom that has not been converted,
 /// which is how such nodes reach save extraction.
-fn set_membership_unstaged_minus_keeping_active (
+fn set_relationship_axes_unstaged_minus_keeping_active (
   tree : &mut Tree<ViewNode>,
   id   : &str,
 ) {
@@ -153,7 +153,7 @@ fn set_membership_unstaged_minus_keeping_active (
     find_active_or_phantom (tree, id);
   if let ViewNodeKind::Vognode (Vognode::Active (t)) =
     &mut tree . get_mut (target_id) . unwrap() . value() . kind
-  { t . membership . unstaged = Some (Sign::Minus); }}
+  { t . relationship_axes . unstaged = Some (Sign::Minus); }}
 
 fn find_active_or_phantom (
   tree : &Tree<ViewNode>,
@@ -699,7 +699,7 @@ fn subscribee_hiderel_intent_excludes_non_content_delete_and_phantom_children (
             "};
   let mut viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
-  set_membership_unstaged_minus (&mut viewforest, "phantom");
+  set_relationship_axes_unstaged_minus (&mut viewforest, "phantom");
   let intents : Vec<(ID, SubscribeeVisibility)> =
     visibility_pairs_from_tree (viewforest);
 
@@ -1430,7 +1430,7 @@ fn would_be_diff_phantom_child_is_excluded_from_contains (
         "};
   let mut viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
-  set_membership_unstaged_minus_keeping_active (&mut viewforest, "b");
+  set_relationship_axes_unstaged_minus_keeping_active (&mut viewforest, "b");
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
   assert_eq!(
@@ -1467,7 +1467,7 @@ fn would_be_diff_phantom_member_is_excluded_from_subscribees (
         "};
   let mut viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
-  set_membership_unstaged_minus_keeping_active (&mut viewforest, "ghost");
+  set_relationship_axes_unstaged_minus_keeping_active (&mut viewforest, "ghost");
   let instructions : Vec<DefineNode> =
     definenodes_from_tree (viewforest) . unwrap ();
   assert_eq!(
@@ -1526,7 +1526,7 @@ fn would_be_diff_phantom_child_still_counts_as_visible_content (
         "};
   let mut viewforest : Tree<ViewNode> =
     checked_viewforest_from_org (input);
-  set_membership_unstaged_minus_keeping_active (
+  set_relationship_axes_unstaged_minus_keeping_active (
     &mut viewforest, "still-visible");
   let intents : Vec<(ID, SubscribeeVisibility)> =
     visibility_pairs_from_tree (viewforest);

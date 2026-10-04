@@ -38,21 +38,21 @@ fn relation_folder_membership_conditions () {
     let mut t : ActiveNode = base_activeNode ();
     t . affectsParent = AffectsParent::False;
     assert!( ! member_counts_for_partnerFolder (&t) ); }
-  { // A negative staged membership axis (would-be diff phantom) excludes.
+  { // A negative staged relationship axis (would-be diff phantom) excludes.
     let mut t : ActiveNode = base_activeNode ();
-    t . membership . staged = Some (Sign::Minus);
+    t . relationship_axes . staged = Some (Sign::Minus);
     assert!( ! member_counts_for_partnerFolder (&t) ); }
-  { // A negative unstaged membership axis excludes.
+  { // A negative unstaged relationship axis excludes.
     let mut t : ActiveNode = base_activeNode ();
-    t . membership . unstaged = Some (Sign::Minus);
+    t . relationship_axes . unstaged = Some (Sign::Minus);
     assert!( ! member_counts_for_partnerFolder (&t) ); }
-  { // A negative unstaged existence axis (file deleted) excludes.
+  { // A negative unstaged node axis (file deleted) excludes.
     let mut t : ActiveNode = base_activeNode ();
-    t . existence . unstaged = Some (Sign::Minus);
+    t . node_axes . unstaged = Some (Sign::Minus);
     assert!( ! member_counts_for_partnerFolder (&t) ); }
   { // A positive axis does not exclude.
     let mut t : ActiveNode = base_activeNode ();
-    t . membership . unstaged = Some (Sign::Plus);
+    t . relationship_axes . unstaged = Some (Sign::Plus);
     assert!( member_counts_for_partnerFolder (&t) ); }
   // A Delete edit request excludes; a NodeMerge edit request does not.
   assert!( ! member_counts_for_partnerFolder (
@@ -73,10 +73,10 @@ fn content_membership_coincides_with_relation_folder_membership () {
       t . affectsParent = AffectsParent::False;
       cases . push (t); }
     { let mut t : ActiveNode = base_activeNode ();
-      t . membership . unstaged = Some (Sign::Minus);
+      t . relationship_axes . unstaged = Some (Sign::Minus);
       cases . push (t); }
     { let mut t : ActiveNode = base_activeNode ();
-      t . existence . unstaged = Some (Sign::Minus);
+      t . node_axes . unstaged = Some (Sign::Minus);
       cases . push (t); }
     cases };
   for t in &cases {
@@ -100,7 +100,7 @@ fn visible_content_membership_conditions () {
     // here, unlike in the contains and PartnerFolder
     // predicates.
     let mut t : ActiveNode = base_activeNode ();
-    t . membership . staged   = Some (Sign::Minus);
-    t . membership . unstaged = Some (Sign::Minus);
-    t . existence  . unstaged = Some (Sign::Minus);
+    t . relationship_axes . staged   = Some (Sign::Minus);
+    t . relationship_axes . unstaged = Some (Sign::Minus);
+    t . node_axes  . unstaged = Some (Sign::Minus);
     assert!( active_child_counts_as_visible_content (&t) ); }}

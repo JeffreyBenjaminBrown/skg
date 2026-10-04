@@ -278,7 +278,7 @@ async fn pipeline_phantom_subtree (
           . expect ("fading node not found");
         if let ViewNodeKind::Vognode (Vognode::Active (t)) =
           &mut tree . get_mut (fading_treeid) . unwrap() . value() . kind
-        { t . membership . unstaged = Some (Sign::Minus); }
+        { t . relationship_axes . unstaged = Some (Sign::Minus); }
         tree . get_mut (fading_treeid) . unwrap()
           . value() . normal_to_phantom ();
         ViewForest::from_internal_tree (tree) };

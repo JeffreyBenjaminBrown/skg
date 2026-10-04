@@ -7,7 +7,7 @@
 
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::types::git::{GitDiffStatus, MembershipAxes, NodeChanges, NodeCompleteDiff, Sign, RepoDiff, axes_from_per_stage_diffs, net_diff_from_per_stage, per_stage_node_changes_for_activeNode};
+use crate::types::git::{GitDiffStatus, RelationshipAxes, NodeChanges, NodeCompleteDiff, Sign, RepoDiff, axes_from_per_stage_diffs, net_diff_from_per_stage, per_stage_node_changes_for_activeNode};
 use crate::types::list::{compute_interleaved_diff, itemlist_and_removedset_from_diff, Diff_Item};
 use crate::dbs::node_lookup::nodecomplete_graphFirst_by_pid_and_repo;
 use crate::types::misc::{ID, RelationshipMemberKey, SkgConfig, RepoName, members_of};
@@ -59,9 +59,9 @@ pub fn goal_list_for_outbound_folder (
       unstaged_nc . and_then ( |c| relation . diff_in_nodechanges (c) ));
   itemlist_and_removedset_from_diff (&net) }
 
-/// The per-stage membership axes of an outbound folder's members, read
+/// The per-stage relationship axes of an outbound folder's members, read
 /// from the owner's per-stage diff of the named relation.  Used to
-/// stamp 'newM' on PRESENT members; removed members are phantoms,
+/// stamp 'addedR' on PRESENT members; removed members are phantoms,
 /// which carry their axes already.  Empty when the owner's file is
 /// Modified in neither stage map.
 pub fn outbound_member_axes (
@@ -69,7 +69,7 @@ pub fn outbound_member_axes (
   owner_repo : &RepoName,
   relation     : NodeRelation,
   repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
-) -> HashMap<ID, MembershipAxes> {
+) -> HashMap<ID, RelationshipAxes> {
   let (staged_nc, unstaged_nc)
     : (Option<&NodeChanges>, Option<&NodeChanges>) =
     per_stage_node_changes_for_activeNode (
@@ -158,7 +158,7 @@ fn relation_list_of_nodecomplete (
     NodeRelation::LinksTo =>
       Vec::new (), } }
 
-/// Exact per-stage membership axes from three derived-membership
+/// Exact per-stage relationship axes from three derived-membership
 /// snapshots: the staged signs are the HEAD-to-index changes and the
 /// unstaged signs the index-to-worktree ones.  Members present (or
 /// absent) in all three snapshots contribute nothing.
@@ -166,7 +166,7 @@ fn axes_from_three_snapshots (
   head     : &[ID],
   index    : &[ID],
   worktree : &[ID],
-) -> HashMap<ID, MembershipAxes> {
+) -> HashMap<ID, RelationshipAxes> {
   let head_set     : HashSet<&ID> = head     . iter () . collect ();
   let index_set    : HashSet<&ID> = index    . iter () . collect ();
   let worktree_set : HashSet<&ID> = worktree . iter () . collect ();
@@ -175,12 +175,12 @@ fn axes_from_three_snapshots (
       (false, true) => Some (Sign::Plus),
       (true, false) => Some (Sign::Minus),
       _             => None } };
-  let mut result : HashMap<ID, MembershipAxes> = HashMap::new ();
+  let mut result : HashMap<ID, RelationshipAxes> = HashMap::new ();
   for id in head_set . iter ()
             . chain ( index_set . iter () )
             . chain ( worktree_set . iter () ) {
     if result . contains_key (*id) { continue; }
-    let axes : MembershipAxes = MembershipAxes {
+    let axes : RelationshipAxes = RelationshipAxes {
       staged   : sign_between ( head_set  . contains (*id),
                                 index_set . contains (*id) ),
       unstaged : sign_between ( index_set    . contains (*id),
@@ -194,9 +194,9 @@ fn axes_from_three_snapshots (
 /// diff mode, the DERIVED membership is compared at the three
 /// snapshots (HEAD, index, worktree), so removed members phantom at
 /// their HEAD positions with EXACT per-stage labels and added
-/// members get per-stage 'newM' -- honest signs for a membership no
+/// members get per-stage 'addedR' -- honest signs for a membership no
 /// single relation's diff can express.  Returns (goal list,
-/// removed-id set, per-member membership axes).
+/// removed-id set, per-member relationship axes).
 pub fn goal_list_for_hiddenInSubscribee_folder (
   graph                : &InRustGraph,
   subscribee_pid      : &ID,
@@ -206,7 +206,7 @@ pub fn goal_list_for_hiddenInSubscribee_folder (
   subscribee_contains : &[ID],
   subscriber_hides    : &[ID],
   repo_diffs        : &Option<HashMap<RepoName, RepoDiff>>,
-) -> (Vec<ID>, HashSet<ID>, HashMap<ID, MembershipAxes>) {
+) -> (Vec<ID>, HashSet<ID>, HashMap<ID, RelationshipAxes>) {
   let derived = | hides : &[ID], contains : &[ID] | -> Vec<ID> {
     // Intersection, preserving order from the hides list.
     let contains_set : HashSet<RelationshipMemberKey> =
@@ -231,7 +231,7 @@ pub fn goal_list_for_hiddenInSubscribee_folder (
     [ derived (&hides3 [0], &contains3 [0]),
       derived (&hides3 [1], &contains3 [1]),
       derived (&hides3 [2], &contains3 [2]) ];
-  let axes : HashMap<ID, MembershipAxes> =
+  let axes : HashMap<ID, RelationshipAxes> =
     axes_from_three_snapshots (
       &derived3 [0], &derived3 [1], &derived3 [2] );
   let diff : Vec<Diff_Item<ID>> =
@@ -247,8 +247,8 @@ pub fn goal_list_for_hiddenInSubscribee_folder (
 /// subscribee list, and every involved subscribee's contains list
 /// are each reconstructed per snapshot -- so removed members phantom
 /// with exact per-stage labels and added members get per-stage
-/// 'newM'.  Returns (goal list, removed-id set, per-member
-/// membership axes).
+/// 'addedR'.  Returns (goal list, removed-id set, per-member
+/// relationship axes).
 pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
   graph                : &InRustGraph,
   subscriber_pid       : &ID,
@@ -257,7 +257,7 @@ pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
   wt_subscribees       : &[ID],
   repo_diffs         : &Option<HashMap<RepoName, RepoDiff>>,
   config               : &SkgConfig,
-) -> (Vec<ID>, HashSet<ID>, HashMap<ID, MembershipAxes>) {
+) -> (Vec<ID>, HashSet<ID>, HashMap<ID, RelationshipAxes>) {
   let derived = | hides : &[ID],
                   all_subscribee_content : &HashSet<RelationshipMemberKey> | -> Vec<ID> {
     hides . iter ()
@@ -324,7 +324,7 @@ pub fn goal_list_for_hiddenOutsideOfSubscribee_folder (
           . map (|id| relationship_member_key (graph, &id))
           . collect ();
       derived ( &hides3 [k], &all_subscribee_content ) } );
-  let axes : HashMap<ID, MembershipAxes> =
+  let axes : HashMap<ID, RelationshipAxes> =
     axes_from_three_snapshots (
       &derived3 [0], &derived3 [1], &derived3 [2] );
   let diff : Vec<Diff_Item<ID>> =

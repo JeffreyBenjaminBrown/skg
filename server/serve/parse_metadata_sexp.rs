@@ -20,7 +20,7 @@ use crate::types::sexp::atom_to_string;
 use crate::types::misc::{ID, RepoName};
 use crate::types::errors::BufferValidationError;
 use crate::types::nodes::complete::Flag;
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign};
+use crate::types::git::{NodeAxes, RelationshipAxes, Sign};
 use crate::types::viewnode::{
   GraphNodeStats, ViewNodeStats, NodeEditRequest, ViewRequest, FolderRelation,
   Qual, QualFolder, PartnerFolder, PhantomDeleted, InactiveNode, PhantomUnknown,
@@ -58,10 +58,10 @@ pub struct ViewnodeMetadata {
   pub edit_request: Option<NodeEditRequest>,
   pub relRepo_request: Option<RepoName>,
   pub view_requests: HashSet<ViewRequest>,
-  pub activeNode_existence  : ExistenceAxes,
-  pub activeNode_membership : MembershipAxes,
+  pub activeNode_node_axes  : NodeAxes,
+  pub activeNode_relationship_axes : RelationshipAxes,
   pub activeNode_not_in_git : bool,
-  pub scaffold_membership : MembershipAxes,
+  pub scaffold_relationship_axes : RelationshipAxes,
   pub scaffold_relRepo : Option<RepoName>,
   pub scaffold_relRepo_request : Option<RepoName>,
   pub textchanged_staged   : bool,
@@ -101,10 +101,10 @@ pub fn default_metadata() -> ViewnodeMetadata {
     edit_request: None,
     relRepo_request: None,
     view_requests: HashSet::new(),
-    activeNode_existence  : ExistenceAxes::default(),
-    activeNode_membership : MembershipAxes::default(),
+    activeNode_node_axes  : NodeAxes::default(),
+    activeNode_relationship_axes : RelationshipAxes::default(),
     activeNode_not_in_git : false,
-    scaffold_membership : MembershipAxes::default(),
+    scaffold_relationship_axes : RelationshipAxes::default(),
     scaffold_relRepo : None,
     scaffold_relRepo_request : None,
     textchanged_staged   : false,
@@ -192,7 +192,7 @@ pub fn viewnode_from_metadata (
               title )) }
           else { None };
         let non_vognode_with_title : MpViewnodeKind = match non_vognode {
-          // Use headline title for string and apply scaffold membership axes
+          // Use headline title for string and apply scaffold relationship axes
           MpViewnodeKind::Qual (Qual::Alias { .. }) =>
             MpViewnodeKind::Qual (Qual::Alias {
                               text: title . clone (),
@@ -200,11 +200,11 @@ pub fn viewnode_from_metadata (
                                 metadata . scaffold_relRepo . clone (),
                               relRepo_request:
                                 metadata . scaffold_relRepo_request . clone (),
-                              membership: metadata . scaffold_membership }),
+                              relationship_axes: metadata . scaffold_relationship_axes }),
           MpViewnodeKind::Qual (Qual::ID { .. }) =>
             MpViewnodeKind::Qual (Qual::ID {
                               id: title . clone () . into (),
-                              membership: metadata . scaffold_membership }),
+                              relationship_axes: metadata . scaffold_relationship_axes }),
           MpViewnodeKind::Qual (Qual::Flag { flag, .. }) =>
             MpViewnodeKind::Qual (Qual::Flag {
               flag : *flag,
@@ -256,15 +256,15 @@ pub fn viewnode_from_metadata (
             viewStats        : metadata . viewStats . clone (),
             relRepo_request : metadata . relRepo_request . clone (),
             view_requests    : metadata . view_requests . clone (),
-            existence        : metadata . activeNode_existence,
-            membership       : metadata . activeNode_membership,
+            node_axes        : metadata . activeNode_node_axes,
+            relationship_axes       : metadata . activeNode_relationship_axes,
             not_in_git       : metadata . activeNode_not_in_git,
             editability, };
         let node_kind : MpViewnodeKind =
           if metadata . is_diff_phantom
           { // TODO/DONE/local-view-update/plan_v2.org §11: a phantom carries only the slim MpPhantomDiff. The
             // root atom 'diffPhantom' (not the diff axes) decides this, so a
-            // live node carrying e.g. removedM stays a Vognode. The
+            // live node carrying e.g. removedR stays a Vognode. The
             // EditRequestOnWriteProtectedOccurrence validation above already fired if this
             // phantom (write-protected) carried an edit_request, so dropping
             // editability/affectsParent/etc. here loses nothing.
@@ -357,15 +357,15 @@ pub fn parse_metadata_to_viewnodemd (
             parse_inactivenode_sexp ( &items[1..], &mut result ) ?; },
           "staged" => {
             // (staged ATOMS) at top level is for Quals (Alias/ID).
-            apply_axis_atoms_to_membership_scaffold (
+            apply_axis_atoms_to_relationship_scaffold (
               &items[1..],
               true,  // staged
-              &mut result . scaffold_membership ) ?; },
+              &mut result . scaffold_relationship_axes ) ?; },
           "unstaged" => {
-            apply_axis_atoms_to_membership_scaffold (
+            apply_axis_atoms_to_relationship_scaffold (
               &items[1..],
               false, // unstaged
-              &mut result . scaffold_membership ) ?; },
+              &mut result . scaffold_relationship_axes ) ?; },
           "relRepo" => {
             if items . len () != 2 {
               return Err (
@@ -440,7 +440,7 @@ pub fn parse_metadata_to_viewnodemd (
           // above so a stale buffer round-trips.
           "inactiveNode" => result . is_inactive_node = true,
           // Scaffold kinds as bare atoms (alias/id string comes from title in viewnode_from_metadata)
-          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::Alias { text: String::new(), relRepo: None, relRepo_request: None, membership: MembershipAxes::default() } ) ),
+          "alias"    => result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::Alias { text: String::new(), relRepo: None, relRepo_request: None, relationship_axes: RelationshipAxes::default() } ) ),
           "aliasFolder" => result . non_vognode = Some (MpViewnodeKind::QualFolder (QualFolder::Alias)),
           "flagsFolder" => result . non_vognode = Some (
             MpViewnodeKind::QualFolder (QualFolder::flags ())),
@@ -468,7 +468,7 @@ pub fn parse_metadata_to_viewnodemd (
           "idFolder" =>
             result . non_vognode = Some (MpViewnodeKind::QualFolder (QualFolder::ID)),
           "id" =>
-            result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::ID { id: ID::default(), membership: MembershipAxes::default() } ) ),
+            result . non_vognode = Some ( MpViewnodeKind::Qual ( Qual::ID { id: ID::default(), relationship_axes: RelationshipAxes::default() } ) ),
           "deletedScaffold" =>
             return Err ( "deletedScaffold as bare atom is no longer supported; use (deletedScaffold kindString)" . to_string () ),
           _ => {
@@ -538,14 +538,14 @@ fn parse_node_sexp (
             apply_axis_atoms_to_activeNode (
               &subitems[1..],
               true,  // staged
-              &mut metadata . activeNode_existence,
-              &mut metadata . activeNode_membership ) ?; },
+              &mut metadata . activeNode_node_axes,
+              &mut metadata . activeNode_relationship_axes ) ?; },
           "unstaged" => {
             apply_axis_atoms_to_activeNode (
               &subitems[1..],
               false, // unstaged
-              &mut metadata . activeNode_existence,
-              &mut metadata . activeNode_membership ) ?; },
+              &mut metadata . activeNode_node_axes,
+              &mut metadata . activeNode_relationship_axes ) ?; },
           _ => { return Err ( format! ( "Unknown node key: {}",
                                          key )); }} },
       Sexp::Atom (_) => {
@@ -569,13 +569,13 @@ fn parse_node_sexp (
                            . to_string () ); }} }
   Ok (( )) }
 
-/// Apply a sequence of axis atoms (newX, removedX, newM, removedM) to
-/// an ActiveNode's existence and membership axes for the given stage.
+/// Apply a sequence of axis atoms (addedN, deletedN, addedR, removedR) to
+/// an ActiveNode's node and relationship axes for the given stage.
 fn apply_axis_atoms_to_activeNode (
   atoms      : &[Sexp],
   is_staged  : bool,
-  existence  : &mut ExistenceAxes,
-  membership : &mut MembershipAxes,
+  node_axes  : &mut NodeAxes,
+  relationship_axes : &mut RelationshipAxes,
 ) -> Result<(), String> {
   for atom in atoms {
     let atom_str : String = atom_to_string (atom) ?;
@@ -584,19 +584,19 @@ fn apply_axis_atoms_to_activeNode (
         . ok_or_else ( || format! (
           "Unknown axis atom: {}", atom_str )) ?;
     let slot : &mut Option<Sign> = match (axis, is_staged) {
-      ('X', true)  => &mut existence  . staged,
-      ('X', false) => &mut existence  . unstaged,
-      ('M', true)  => &mut membership . staged,
-      ('M', false) => &mut membership . unstaged,
+      ('N', true)  => &mut node_axes . staged,
+      ('N', false) => &mut node_axes . unstaged,
+      ('R', true)  => &mut relationship_axes . staged,
+      ('R', false) => &mut relationship_axes . unstaged,
       _ => unreachable!(), };
     *slot = Some (sign); }
   Ok (( )) }
 
-/// Apply axis atoms (newM, removedM only) to a Scaffold's membership.
-fn apply_axis_atoms_to_membership_scaffold (
+/// Apply axis atoms (addedR, removedR only) to a Scaffold's relationship axes.
+fn apply_axis_atoms_to_relationship_scaffold (
   atoms      : &[Sexp],
   is_staged  : bool,
-  membership : &mut MembershipAxes,
+  relationship_axes : &mut RelationshipAxes,
 ) -> Result<(), String> {
   for atom in atoms {
     let atom_str : String = atom_to_string (atom) ?;
@@ -604,13 +604,13 @@ fn apply_axis_atoms_to_membership_scaffold (
       Sign::parse_axis_atom (&atom_str)
         . ok_or_else ( || format! (
           "Unknown axis atom: {}", atom_str )) ?;
-    if axis != 'M' {
+    if axis != 'R' {
       return Err ( format! (
-        "Scaffold (alias/id) only supports M axis atoms, got: {}",
+        "Scaffold (alias/id) only supports R axis atoms, got: {}",
         atom_str )); }
     let slot : &mut Option<Sign> =
-      if is_staged { &mut membership . staged }
-      else         { &mut membership . unstaged };
+      if is_staged { &mut relationship_axes . staged }
+      else         { &mut relationship_axes . unstaged };
     *slot = Some (sign); }
   Ok (( )) }
 

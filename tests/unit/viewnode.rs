@@ -56,7 +56,7 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
       text : "alias" . into (),
       relRepo : None,
       relRepo_request : Some (RepoName::from ("private")),
-      membership : MembershipAxes::default (), }) };
+      relationship_axes : RelationshipAxes::default (), }) };
   alias . consume_edit_request_after_save ();
   let ViewNodeKind::Qual (Qual::Alias { relRepo_request, .. }) =
     &alias . kind

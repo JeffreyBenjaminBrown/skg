@@ -51,9 +51,9 @@ fn staged_removal_is_attributed_to_staged_side () {
   let (ex, mem) = phantom_axes (
     &child, &src, &parent, &src,
     NodeRelation::Contains, Some (&diffs) );
-  assert_eq! ( mem, MembershipAxes {
+  assert_eq! ( mem, RelationshipAxes {
     staged: Some (Sign::Minus), unstaged: None } );
-  assert_eq! ( ex, ExistenceAxes::default () );
+  assert_eq! ( ex, NodeAxes::default () );
 }
 
 #[test]
@@ -70,7 +70,7 @@ fn unstaged_removal_is_attributed_to_unstaged_side () {
   let (_, mem) = phantom_axes (
     &child, &src, &parent, &src,
     NodeRelation::Contains, Some (&diffs) );
-  assert_eq! ( mem, MembershipAxes {
+  assert_eq! ( mem, RelationshipAxes {
     staged: None, unstaged: Some (Sign::Minus) } );
 }
 
@@ -88,7 +88,7 @@ fn staged_add_then_unstaged_remove () {
   let (_, mem) = phantom_axes (
     &child, &src, &parent, &src,
     NodeRelation::Contains, Some (&diffs) );
-  assert_eq! ( mem, MembershipAxes {
+  assert_eq! ( mem, RelationshipAxes {
     staged: Some (Sign::Plus), unstaged: Some (Sign::Minus) } );
 }
 
@@ -103,7 +103,7 @@ fn no_parent_contains_diff_falls_back_to_unstaged_minus () {
   let (_, mem) = phantom_axes (
     &child, &src, &parent, &src,
     NodeRelation::Contains, Some (&diffs) );
-  assert_eq! ( mem, MembershipAxes {
+  assert_eq! ( mem, RelationshipAxes {
     staged: None, unstaged: Some (Sign::Minus) } );
 }
 
@@ -147,13 +147,13 @@ fn each_relation_reads_its_own_diff_when_one_owner_bears_both () {
   let (_, contains_mem) = phantom_axes (
     &child, &src, &parent, &src,
     NodeRelation::Contains, Some (&diffs) );
-  assert_eq! ( contains_mem, MembershipAxes {
+  assert_eq! ( contains_mem, RelationshipAxes {
     staged: Some (Sign::Minus), unstaged: None },
     "the content phantom is labeled from contains_diff only" );
   let (_, overrides_mem) = phantom_axes (
     &child, &src, &parent, &src,
     NodeRelation::OverridesViewOf, Some (&diffs) );
-  assert_eq! ( overrides_mem, MembershipAxes {
+  assert_eq! ( overrides_mem, RelationshipAxes {
     staged: None, unstaged: Some (Sign::Minus) },
     "the overriddenFolder phantom is labeled from \
      overrides_view_of_diff only" );

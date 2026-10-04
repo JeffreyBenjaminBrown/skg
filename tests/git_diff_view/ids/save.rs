@@ -3,7 +3,7 @@
 /// but editing an idFolder's membership -- deleting, adding, editing or
 /// relocating id scaffolds -- aborts the save with IDFolder_Edited
 /// (TODO/full-schema/8_readonly-set-ergonomics.org). Net-removed
-/// diff entries (removedM) are git history, not membership claims,
+/// diff entries (removedR) are git history, not membership claims,
 /// and do not trip the check.
 
 use super::common::*;
@@ -116,7 +116,7 @@ async fn test_edit_id_scaffold_aborts (
     |config, tantivy, gitrepo_path| { Box::pin(async move {
       // User tries to change an id value in the scaffold
       let input = GIT_DIFF_VIEW . replace(
-        "(unstaged newM)) 2'", "(unstaged newM)) 2-modified");
+        "(unstaged addedR)) 2'", "(unstaged addedR)) 2-modified");
 
       let graph : InRustGraphHandle =
         graph_handle_from_config (&config)?;
@@ -192,8 +192,8 @@ async fn test_move_id_scaffolds_to_child_aborts (
 ** (skg (node (id child) (repo main))) child
 *** (skg idFolder)
 **** (skg id) 1
-**** (skg id (unstaged removedM)) 2
-**** (skg id (unstaged newM)) 2'
+**** (skg id (unstaged removedR)) 2
+**** (skg id (unstaged addedR)) 2'
 **** (skg id) 3
 ";
 

@@ -217,7 +217,7 @@ fn definitive_node_inside_diff_phantom_subtree_emits () {
         forest . as_internal_tree_mut();
       if let ViewNodeKind::Vognode (Vognode::Active (t)) =
         &mut tree . get_mut (fading_treeid) . unwrap() . value() . kind
-      { t . membership . unstaged = Some (Sign::Minus); }
+      { t . relationship_axes . unstaged = Some (Sign::Minus); }
       tree . get_mut (fading_treeid) . unwrap()
         . value() . normal_to_phantom (); }
     forest };

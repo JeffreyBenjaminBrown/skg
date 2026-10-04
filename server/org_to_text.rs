@@ -1,5 +1,5 @@
 use crate::herald_tokens::{AncestorFlags, relationship_heralds_sexp};
-use crate::types::git::MembershipAxes;
+use crate::types::git::RelationshipAxes;
 use crate::types::misc::SkgConfig;
 use crate::types::tree::forest::ViewForest;
 use crate::types::viewnode::{
@@ -219,7 +219,7 @@ fn qual_metadata_to_string (
   if folded      { parts . push ( "folded"     . to_string () ); }
   if body_folded { parts . push ( "bodyFolded" . to_string () ); }
   match qual {
-    Qual::Alias { relRepo, relRepo_request, membership, .. } => {
+    Qual::Alias { relRepo, relRepo_request, relationship_axes, .. } => {
       parts . push ( "alias" . to_string () );
       if let Some (repo) = relRepo {
         parts . push ( format! (
@@ -228,7 +228,7 @@ fn qual_metadata_to_string (
         parts . push ( format! (
           "(editRequest (relRepo {}))",
           metadata_value_atom (repo) ) ); }
-      append_membership_stage_forms (&mut parts, membership); }
+      append_relationship_axes_stage_forms (&mut parts, relationship_axes); }
     Qual::TextChanged { staged, unstaged } => {
       let mut tags : Vec<&'static str> = Vec::new ();
       if *staged   { tags . push ("staged"); }
@@ -237,23 +237,23 @@ fn qual_metadata_to_string (
       { parts . push ( "textChanged" . to_string () ); }
       else
       { parts . push ( format! ( "(textChanged {})", tags . join (" ") )); } }
-    Qual::ID { membership, .. } => {
+    Qual::ID { relationship_axes, .. } => {
       parts . push ( "id" . to_string () );
-      append_membership_stage_forms (&mut parts, membership); }
+      append_relationship_axes_stage_forms (&mut parts, relationship_axes); }
     Qual::Flag { flag, .. } =>
       parts . push ( format! ("(flag {})", flag . wire_name ()) ),
   }
   Ok ( parts . join (" ")) }
 
-/// Emit '(staged AXES)' and/or '(unstaged AXES)' for a MembershipAxes.
+/// Emit '(staged AXES)' and/or '(unstaged AXES)' for a RelationshipAxes.
 /// Adds nothing if neither stage has a change.
-fn append_membership_stage_forms (
+fn append_relationship_axes_stage_forms (
   parts      : &mut Vec<String>,
-  membership : &MembershipAxes,
+  relationship_axes : &RelationshipAxes,
 ) {
-  if let Some (atom) = membership . staged_atom ()
+  if let Some (atom) = relationship_axes . staged_atom ()
     { parts . push ( format! ( "(staged {})", atom ) ); }
-  if let Some (atom) = membership . unstaged_atom ()
+  if let Some (atom) = relationship_axes . unstaged_atom ()
     { parts . push ( format! ( "(unstaged {})", atom ) ); } }
 
 /// Render metadata for an ActiveNode:
@@ -324,17 +324,17 @@ fn activeNode_metadata_to_string (
                        request_strings . join (" ") )) }
     fn staged_axes ( activeNode : & ActiveNode ) -> Option < String > {
       let mut atoms : Vec<&'static str> = Vec::new ();
-      if let Some (a) = activeNode . existence  . staged_atom ()
+      if let Some (a) = activeNode . node_axes  . staged_atom ()
         { atoms . push (a); }
-      if let Some (a) = activeNode . membership . staged_atom ()
+      if let Some (a) = activeNode . relationship_axes . staged_atom ()
         { atoms . push (a); }
       if atoms . is_empty () { None }
       else { Some ( format! ( "(staged {})", atoms . join (" "))) } }
     fn unstaged_axes ( activeNode : & ActiveNode ) -> Option < String > {
       let mut atoms : Vec<&'static str> = Vec::new ();
-      if let Some (a) = activeNode . existence  . unstaged_atom ()
+      if let Some (a) = activeNode . node_axes  . unstaged_atom ()
         { atoms . push (a); }
-      if let Some (a) = activeNode . membership . unstaged_atom ()
+      if let Some (a) = activeNode . relationship_axes . unstaged_atom ()
         { atoms . push (a); }
       if atoms . is_empty () { None }
       else { Some ( format! ( "(unstaged {})", atoms . join (" "))) } }
@@ -415,13 +415,13 @@ fn phantomDiff_metadata_to_string (
     if let Some (s) = phantom_rels_atom (& phantom . graphStats)
     { parts . push (s); }
     { let mut atoms : Vec<&'static str> = Vec::new ();
-      if let Some (a) = phantom . existence  . staged_atom () { atoms . push (a); }
-      if let Some (a) = phantom . membership . staged_atom () { atoms . push (a); }
+      if let Some (a) = phantom . node_axes  . staged_atom () { atoms . push (a); }
+      if let Some (a) = phantom . relationship_axes . staged_atom () { atoms . push (a); }
       if ! atoms . is_empty ()
       { parts . push ( format! ( "(staged {})", atoms . join (" "))); } }
     { let mut atoms : Vec<&'static str> = Vec::new ();
-      if let Some (a) = phantom . existence  . unstaged_atom () { atoms . push (a); }
-      if let Some (a) = phantom . membership . unstaged_atom () { atoms . push (a); }
+      if let Some (a) = phantom . node_axes  . unstaged_atom () { atoms . push (a); }
+      if let Some (a) = phantom . relationship_axes . unstaged_atom () { atoms . push (a); }
       if ! atoms . is_empty ()
       { parts . push ( format! ( "(unstaged {})", atoms . join (" "))); } }
     if phantom . not_in_git

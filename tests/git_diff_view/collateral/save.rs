@@ -111,7 +111,7 @@ async fn test_collateral_view_preserves_diff_annotations (
   // c should appear with diff new
   // (its .skg file didn't exist at HEAD).
   assert_buffer_contains ( &collateral_buffer,
-    "** (skg (node (id c) (unstaged newX newM))) c" );
+    "** (skg (node (id c) (unstaged addedN addedR))) c" );
 
   // DISK: c.skg should exist (created by the save).
   assert!( gitrepo_path . join ("c.skg") . exists (),
@@ -211,7 +211,7 @@ async fn test_collateral_view_staged_text_and_unstaged_add (
   // c is new on the unstaged side — save wrote c.skg to worktree
   // but didn't git add it.
   assert_buffer_contains ( &collateral_buffer,
-    "** (skg (node (id c) (unstaged newX newM))) c" );
+    "** (skg (node (id c) (unstaged addedN addedR))) c" );
 
   assert!( gitrepo_path . join ("c.skg") . exists (),
     "c.skg should have been created on disk" );

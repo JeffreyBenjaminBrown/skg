@@ -1,4 +1,4 @@
-use crate::types::git::{MembershipAxes, NodeChanges, RepoDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_activeNode};
+use crate::types::git::{RelationshipAxes, NodeChanges, RepoDiff, axes_from_per_stage_diffs, per_stage_node_changes_for_activeNode};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::types::misc::{ID, SkgConfig, RepoName, members_of};
@@ -61,19 +61,19 @@ pub fn reconcile_aliasFolder_children (
     per_stage_node_changes_for_activeNode (
       repo_diffs, &parent_pid, &parent_repo );
   let (goal_list, axes_map)
-    : (Vec<String>, HashMap<String, MembershipAxes>) =
+    : (Vec<String>, HashMap<String, RelationshipAxes>) =
     if staged_nc . is_none () && unstaged_nc . is_none () {
       let goals : Vec<String> =
         members_of ( parent_nodecomplete . aliases . or_default() );
       ( goals, HashMap::new() )
     } else {
-      let merged : Vec<(String, MembershipAxes)> =
+      let merged : Vec<(String, RelationshipAxes)> =
         axes_from_per_stage_diffs (
           staged_nc   . map ( |c| c . aliases_diff . as_slice () ),
           unstaged_nc . map ( |c| c . aliases_diff . as_slice () ) );
       let goals : Vec<String> =
         merged . iter () . map ( |(t, _)| t . clone () ) . collect ();
-      let amap : HashMap<String, MembershipAxes> =
+      let amap : HashMap<String, RelationshipAxes> =
         merged . into_iter () . collect ();
       ( goals, amap ) };
   let is_alias : fn (&ViewNode) -> bool =
@@ -87,7 +87,7 @@ pub fn reconcile_aliasFolder_children (
       _ => Err ( "reconcile_aliasFolder_children: relevant child is not an alias"
                  . to_string() ), }; // relevance means Qual::Alias
   let create_alias = |text: &String| -> Result<ViewNode, String> {
-    let membership : MembershipAxes =
+    let relationship_axes : RelationshipAxes =
       axes_map . get (text) . copied () . unwrap_or_default ();
     Ok ( ViewNode {
       focused     : false,
@@ -100,7 +100,7 @@ pub fn reconcile_aliasFolder_children (
                                                    if relRepo == &parent_nodecomplete . home_repo { None }
                                                    else { Some (relRepo . clone ()) } ),
                                                relRepo_request : None,
-                                               membership } ), })};
+                                               relationship_axes } ), })};
   complete_relevant_children_in_viewnodetree(
     tree,
     aliasfolder_node_id,

@@ -121,7 +121,7 @@ fn test_org_to_uninterpreted_nodes2_inactive_placeholder() {
   // an anonymous, dataless, titleless placeholder.
   let input: &str =
     indoc! {"
-            * (skg (inactiveNode (id hidden) (repo private) (unstaged newM)))
+            * (skg (inactiveNode (id hidden) (repo private) (unstaged addedR)))
         "};
 
   let viewforest: Tree<MpViewnode> =

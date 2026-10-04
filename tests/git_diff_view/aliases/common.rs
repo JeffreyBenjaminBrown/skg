@@ -8,8 +8,8 @@ pub use super::super::common::*;
 pub const GIT_DIFF_VIEW: &str = "\
 * (skg (node (id 1) (repo main))) 1
 ** (skg aliasFolder)
-*** (skg alias (unstaged removedM)) old-alias
-*** (skg alias (unstaged newM)) new-alias
+*** (skg alias (unstaged removedR)) old-alias
+*** (skg alias (unstaged addedR)) new-alias
 *** (skg alias) keep
 ** (skg (node (id child) (repo main))) child
 ";

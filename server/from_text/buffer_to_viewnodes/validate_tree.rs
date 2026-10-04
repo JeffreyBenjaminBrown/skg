@@ -117,7 +117,7 @@ pub fn find_buffer_errors_for_saving (
 /// plus extra_ids). Reordering passes (the rerender re-sorts
 /// anyway); adding, deleting or text-editing an ID scaffold fails,
 /// with a message naming the escape hatch (edit the .skg file
-/// directly). In diff mode, an ID entry whose membership axes mark
+/// directly). In diff mode, an ID entry whose relationship axes mark
 /// it net-removed is git history, not a membership claim, and is
 /// excluded before comparing. An absent idFolder means no opinion, as
 /// for other folders. Shapes that other validations reject (an idFolder
@@ -148,8 +148,8 @@ fn idFolder_membership_errors (
     let mut buffer_ids : Vec<ID> =
       node_ref . children ()
       . filter_map ( |child| match &child . value () . kind {
-          MpViewnodeKind::Qual (Qual::ID { id, membership })
-            if membership . net_is_present ()
+          MpViewnodeKind::Qual (Qual::ID { id, relationship_axes })
+            if relationship_axes . net_is_present ()
             => Some ( id . clone () ),
           _ => None } )
       . collect ();

@@ -26,7 +26,7 @@ pub fn member_counts_for_partnerFolder (
 /// This returns true iff the given Active vognode counts as content
 /// of its parent. The condition coincides with
 /// 'member_counts_for_partnerFolder' -- the same three
-/// membership axes govern both -- but the two policies are
+/// relationship axes govern both -- but the two policies are
 /// conceptually distinct, so each keeps its own name.
 /// (The caller must also know the child is in content position;
 /// that is context, not a fact about the node.)

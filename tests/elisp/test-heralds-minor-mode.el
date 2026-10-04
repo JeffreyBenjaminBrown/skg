@@ -249,33 +249,33 @@ the C token 2aC: the multi-contains \"2\" (yellow), the ancestor \"a\"
 (ert-deftest test-heralds-diff-display ()
   "Test that staged/unstaged axes are displayed as staged:.../unstaged:... heralds."
   (with-temp-buffer
-    ;; ActiveNode with unstaged membership removal (the v.1 'removed-here').
+    ;; ActiveNode with unstaged relationship removal (the v.1 'removed-here').
     (erase-buffer)
-    (insert "(skg (node (id 1) (repo s) (unstaged removedM)))")
+    (insert "(skg (node (id 1) (repo s) (unstaged removedR)))")
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "unstaged" result))
-      (should (string-match "M" result)))
+      (should (string-match "R" result)))
 
-    ;; ActiveNode with unstaged file creation + membership add (the v.1 'new').
+    ;; ActiveNode with unstaged file creation + relationship add (the v.1 'new').
     (erase-buffer)
-    (insert "(skg (node (id 2) (repo s) (unstaged newX newM)))")
+    (insert "(skg (node (id 2) (repo s) (unstaged addedN addedR)))")
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "unstaged" result))
-      (should (string-match "X" result))
-      (should (string-match "M" result)))
+      (should (string-match "N" result))
+      (should (string-match "R" result)))
 
-    ;; Scaffold alias with staged membership add.
+    ;; Scaffold alias with staged relationship add.
     (erase-buffer)
-    (insert "(skg alias (staged newM))")
+    (insert "(skg alias (staged addedR))")
     (let ((result (heralds-from-metadata (buffer-string))))
-      (should (string-match "staged:M" result)))
+      (should (string-match "staged:R" result)))
 
-    ;; Scaffold alias with unstaged membership removal.
+    ;; Scaffold alias with unstaged relationship removal.
     (erase-buffer)
-    (insert "(skg alias (unstaged removedM))")
+    (insert "(skg alias (unstaged removedR))")
     (let ((result (heralds-from-metadata (buffer-string))))
       (should (string-match "unstaged" result))
-      (should (string-match "-M" result)))))
+      (should (string-match "-R" result)))))
 
 (ert-deftest test-heralds-inactive-node-display ()
   "An anonymous inactive-node placeholder displays as a blue herald.

@@ -5,15 +5,15 @@
 /// post-save and de-novo paths.
 ///
 /// Each ActiveNode and Scaffold is decorated with per-stage diff axes:
-///   X (existence) describes whether the node's '.skg' file changed
+///   N (node) describes whether the node's '.skg' file changed
 ///     between HEAD↔index (staged) or index↔worktree (unstaged).
-///   M (membership) describes whether the node's appearance at this
+///   R (relationship) describes whether the node's appearance at this
 ///     position in its parent's contains list changed in each stage.
 /// Phantoms are inserted wherever some stage's parent.contains had the
 /// child but the worktree's parent.contains lacks it.
 
 use crate::types::env::find_repo_with_optional_tantivy;
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, RepoDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, added_membership_from_per_stage_diffs, existence_axes_in_repo_diff, net_diff_from_per_stage, removed_membership_from_per_stage_diffs};
+use crate::types::git::{NodeAxes, RelationshipAxes, Sign, RepoDiff, NodeCompleteDiff, GitDiffStatus, NodeChanges, added_relationship_axes_from_per_stage_diffs, node_axes_in_repo_diff, net_diff_from_per_stage, removed_relationship_axes_from_per_stage_diffs};
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, SkgConfig, RepoName, TantivyIndex};
 use crate::types::phantom::title_for_phantom;
@@ -62,15 +62,15 @@ pub(crate) fn process_activeNode_diff (
     repo_diff . unstaged . get (&file_path);
   if staged . is_none () && unstaged . is_none ()
     { return Ok (( )); }
-  // Stamp the node's existence axes from the per-stage file statuses.
-  let staged_x   : Option<Sign> =
-    staged   . and_then ( |d| d . status . to_existence_sign ());
-  let unstaged_x : Option<Sign> =
-    unstaged . and_then ( |d| d . status . to_existence_sign ());
+  // Stamp the node's N axes from the per-stage file statuses.
+  let staged_n   : Option<Sign> =
+    staged   . and_then ( |d| d . status . to_node_axis_sign ());
+  let unstaged_n : Option<Sign> =
+    unstaged . and_then ( |d| d . status . to_node_axis_sign ());
   if let ViewNodeKind::Vognode (Vognode::Active ( ref mut t ))
     = node_mut . value() . kind
-    { t . existence . staged   = staged_x;
-      t . existence . unstaged = unstaged_x; }
+    { t . node_axes . staged   = staged_n;
+      t . node_axes . unstaged = unstaged_n; }
   node_mut . value() . normal_to_phantom ();
   let node_flipped_to_phantom : bool =
     matches! ( node_mut . value() . kind,
@@ -108,7 +108,7 @@ pub(crate) fn process_activeNode_diff (
   // sub-diffs are noise on a removed node anyway.)
   if ! node_flipped_to_phantom {
     // Emit an EMPTY IDFolder / AliasFolder when this node's id-list / alias-list
-    // changed. Their per-id / per-alias children (each carrying its membership
+    // changed. Their per-id / per-alias children (each carrying its relationship
     // axes) are filled when the BFS later reaches the folder, by
     // reconcile_idFolder_children / reconcile_aliasFolder_children -- the single
     // place that derives them from the per-stage diff. So we only DECIDE here
@@ -129,20 +129,20 @@ pub(crate) fn process_activeNode_diff (
       && ! has_qualFolder_child ( &mut node_mut, tree_node_id, QualFolder::Alias ) {
       prepend_empty_diff_folder ( &mut node_mut, QualFolder::Alias ); } }
   // Per-stage contains diff for the parent, split into position-specific
-  // membership axes. A REORDERED id appears in one stage as both Removed (its
-  // old slot) and New (its new slot); a single MembershipAxes keyed by id
+  // relationship axes. A REORDERED id appears in one stage as both Removed (its
+  // old slot) and New (its new slot); a single RelationshipAxes keyed by id
   // (axes_from_per_stage_diffs) collapses that pair to whichever it applies
   // last, so the moved member's two slots cannot both be labelled. Keeping the
   // added (Plus on New) and removed (Minus on Removed) maps apart lets the live
-  // worktree child render 'newM' at its new slot and the phantom 'removedM' at
+  // worktree child render 'addedR' at its new slot and the phantom 'removedR' at
   // its old slot -- a git-style move that round-trips (the old slot, carrying a
   // Minus, re-parses as a phantom, not a duplicate live vognode).
-  let added_membership_by_id : HashMap<ID, MembershipAxes> =
-    added_membership_from_per_stage_diffs (
+  let added_relationship_axes_by_id : HashMap<ID, RelationshipAxes> =
+    added_relationship_axes_from_per_stage_diffs (
       staged_changes   . map ( |c| c . contains_diff . as_slice () ),
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
-  mark_membership_on_existing_children (
-    &mut node_mut, tree_node_id, &added_membership_by_id );
+  mark_relationship_axes_on_existing_children (
+    &mut node_mut, tree_node_id, &added_relationship_axes_by_id );
   if matches! ( & node_mut . value () . kind,
                 ViewNodeKind::Vognode (Vognode::Active (t))
                   if t . is_writeProtected () ) {
@@ -160,12 +160,12 @@ pub(crate) fn process_activeNode_diff (
     net_diff_from_per_stage (
       staged_changes   . map ( |c| c . contains_diff . as_slice () ),
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
-  let removed_membership_by_id : HashMap<ID, MembershipAxes> =
-    removed_membership_from_per_stage_diffs (
+  let removed_relationship_axes_by_id : HashMap<ID, RelationshipAxes> =
+    removed_relationship_axes_from_per_stage_diffs (
       staged_changes   . map ( |c| c . contains_diff . as_slice () ),
       unstaged_changes . map ( |c| c . contains_diff . as_slice () ) );
   insert_phantoms_for_missing_contains (
-    &mut node_mut, graph, tree_node_id, &net_contains, &removed_membership_by_id,
+    &mut node_mut, graph, tree_node_id, &net_contains, &removed_relationship_axes_by_id,
     repo_diff, repo_diffs,
     deleted_since_head_pid_src_map, tantivy_index, config ) ?;
   Ok (( )) }
@@ -217,7 +217,7 @@ fn has_qualFolder_child (
     ViewNodeKind::QualFolder (k) if *k == kind )) }
 
 /// Prepend an EMPTY QualFolder diff scaffold (an IDFolder or AliasFolder). Its per-entry
-/// children -- each carrying its membership axes -- are filled when the BFS
+/// children -- each carrying its relationship axes -- are filled when the BFS
 /// reaches the folder, by reconcile_idFolder_children / reconcile_aliasFolder_children.
 fn prepend_empty_diff_folder (
   node_mut : &mut NodeMut<ViewNode>,
@@ -231,12 +231,12 @@ fn prepend_empty_diff_folder (
       kind        : ViewNodeKind::QualFolder (kind) } ); }
 
 /// For each existing child in the worktree's contains list, copy any
-/// per-stage ADDITION (Plus) axes from the added-membership map, so a member
-/// added (or moved to a new slot) since HEAD renders 'newM'.
-fn mark_membership_on_existing_children (
+/// per-stage ADDITION (Plus) axes from the added-relationship-axes map, so a member
+/// added (or moved to a new slot) since HEAD renders 'addedR'.
+fn mark_relationship_axes_on_existing_children (
   node_mut     : &mut NodeMut<ViewNode>,
   tree_node_id : NodeId,
-  by_id        : &HashMap<ID, MembershipAxes>,
+  by_id        : &HashMap<ID, RelationshipAxes>,
 ) {
   let child_ids : Vec<NodeId> = {
     let node_ref : NodeRef<ViewNode> =
@@ -245,35 +245,35 @@ fn mark_membership_on_existing_children (
   for child_id in child_ids {
     let mut child : NodeMut<ViewNode> =
       node_mut . tree() . get_mut (child_id) . unwrap();
-    let child_id_and_membership : Option<(ID, &mut MembershipAxes)> =
+    let child_id_and_relationship_axes : Option<(ID, &mut RelationshipAxes)> =
       match &mut child . value() . kind {
         ViewNodeKind::Vognode (Vognode::Active (t)) =>
-          Some ((t . id . clone (), &mut t . membership)),
+          Some ((t . id . clone (), &mut t . relationship_axes)),
         // No Inactive arm: diff mode requires the "all" Skg repo set
         // (diff_report.rs and repo_sets.rs refuse otherwise), under
         // which no node is inactive, so inactive placeholders never
         // reach diff rendering.
         _ => None };
-    if let Some ((id, membership)) = child_id_and_membership {
+    if let Some ((id, relationship_axes)) = child_id_and_relationship_axes {
       if let Some (m) = by_id . get (&id) {
         // Only Plus signs are meaningful here (the child appears in
         // worktree.contains; '-' positions are phantoms, handled separately).
         if m . staged   == Some (Sign::Plus)
-          { membership . staged   = Some (Sign::Plus); }
+          { relationship_axes . staged   = Some (Sign::Plus); }
         if m . unstaged == Some (Sign::Plus)
-          { membership . unstaged = Some (Sign::Plus); }}}} }
+          { relationship_axes . unstaged = Some (Sign::Plus); }}}} }
 
 /// Insert a removed-member phantom for each net-Removed id in the parent's
 /// contains diff (ids present in HEAD but absent from worktree.contains).
 /// Each phantom is placed at its correct HEAD position among surviving
-/// siblings (per 'phantom_insertion_plan'), carrying its M axes (from the
-/// merged contains diff) and X axes (if its file is also gone in some stage).
+/// siblings (per 'phantom_insertion_plan'), carrying its R axes (from the
+/// merged contains diff) and N axes (if its file is also gone in some stage).
 fn insert_phantoms_for_missing_contains (
   node_mut                       : &mut NodeMut<ViewNode>,
   graph                          : &InRustGraph,
   parent_node_id                 : NodeId,
   net_contains                   : &[Diff_Item<ID>],
-  membership_by_id               : &HashMap<ID, MembershipAxes>,
+  relationship_axes_by_id               : &HashMap<ID, RelationshipAxes>,
   repo_diff                    : &RepoDiff,
   repo_diffs                   : &HashMap<RepoName, RepoDiff>,
   deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
@@ -300,8 +300,8 @@ fn insert_phantoms_for_missing_contains (
         _ => {}, }}
     m };
   for (id, anchor) in plan {
-    let membership : MembershipAxes =
-      membership_by_id . get (&id) . copied () . unwrap_or_default ();
+    let relationship_axes : RelationshipAxes =
+      relationship_axes_by_id . get (&id) . copied () . unwrap_or_default ();
     // A removed-member diff-phantom is a *non-Active* viewnode. If its
     // Skg repo can't be determined -- e.g. a contains pointer at HEAD to a
     // node whose .skg file was deleted by an earlier commit and so exists
@@ -313,8 +313,8 @@ fn insert_phantoms_for_missing_contains (
         graph, &id, deleted_since_head_pid_src_map,
         tantivy_index, config )
         . unwrap_or_else ( RepoName::not_found );
-    let child_existence : ExistenceAxes =
-      existence_axes_for_phantom (&id, &child_repo, repo_diff, repo_diffs);
+    let child_node_axes : NodeAxes =
+      node_axes_for_phantom (&id, &child_repo, repo_diff, repo_diffs);
     let child_title : String =
       title_for_phantom (
         graph, &id, &child_repo,
@@ -322,7 +322,7 @@ fn insert_phantoms_for_missing_contains (
     let phantom : ViewNode =
       mk_phantom_viewnode (
         id . clone (), child_repo, child_title,
-        child_existence, membership );
+        child_node_axes, relationship_axes );
     match anchor . and_then ( |a| child_node_by_id . get (&a) . copied () ) {
       Some (anchor_nid) =>
         { node_mut . tree () . get_mut (anchor_nid) . unwrap ()
@@ -333,21 +333,21 @@ fn insert_phantoms_for_missing_contains (
   Ok (( )) }
 
 
-/// Compute existence axes for a phantom: derived from whether the
+/// Compute node axes for a phantom: derived from whether the
 /// child's '.skg' file shows up as Deleted in either stage.
-fn existence_axes_for_phantom (
+fn node_axes_for_phantom (
   id           : &ID,
   skgrepo       : &RepoName,
   repo_diff  : &RepoDiff,
   repo_diffs : &HashMap<RepoName, RepoDiff>,
-) -> ExistenceAxes {
+) -> NodeAxes {
   let file_path : PathBuf =
     PathBuf::from ( format! ( "{}.skg", id . 0 ));
   // Prefer the repo_diff for the phantom's own Skg repo if available,
   // otherwise fall back to the parent's repo_diff.
   let resolved : &RepoDiff =
     repo_diffs . get (skgrepo) . unwrap_or (repo_diff);
-  existence_axes_in_repo_diff ( Some (resolved), &file_path ) }
+  node_axes_in_repo_diff ( Some (resolved), &file_path ) }
 
 #[cfg(test)]
 #[path = "../../../tests/unit/render_diff.rs"]

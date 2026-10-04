@@ -1,7 +1,7 @@
 use crate::dbs::node_lookup::nodecomplete_from_graph;
 use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::util::{get_id_from_treenode, remove_completed_view_request};
-use crate::types::git::MembershipAxes;
+use crate::types::git::RelationshipAxes;
 use crate::types::misc::{ID, RelPartner, SkgConfig, RepoName};
 use crate::types::nodes::complete::NodeComplete;
 use crate::types::viewnode::{ViewNode, ViewNodeKind, ViewRequest, FolderRelation};
@@ -74,6 +74,6 @@ pub fn build_and_integrate_aliases (
                           if &alias . relRepo == home { None }
                           else { Some (alias . relRepo . clone ()) } ),
                       relRepo_request: None,
-                      membership: MembershipAxes::default () } ),
+                      relationship_axes: RelationshipAxes::default () } ),
       false ) ?; }
   Ok (( )) }

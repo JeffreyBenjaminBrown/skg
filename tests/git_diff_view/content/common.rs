@@ -7,10 +7,10 @@ pub use super::super::common::*;
 pub const GIT_DIFF_VIEW: &str = "\
 * (skg (node (id 1) (repo main))) 1
 ** (skg (node (id 11) (repo main))) 11
-*** (skg (node (id gets-removed) (repo main) writeProtected (unstaged removedX removedM))) gets-removed
-*** (skg (node (id moves) (unstaged newM))) moves
+*** (skg (node (id gets-removed) (repo main) writeProtected (unstaged deletedN removedR))) gets-removed
+*** (skg (node (id moves) (unstaged addedR))) moves
 ** (skg (node (id 12) (repo main))) 12
-*** (skg (node (id moves) (repo main) writeProtected (unstaged removedM))) moves
+*** (skg (node (id moves) (repo main) writeProtected (unstaged removedR))) moves
 * (skg (node (id new) (repo main))) new
 ";
 
@@ -49,7 +49,7 @@ pub fn setup_gitrepo_with_subscribee_fixtures(
 /// #1 fix coverage: a subscriber whose subscribes_to dropped node 22 between
 /// HEAD and worktree (22's .skg file still present, so the removal is
 /// membership-only). The removed subscribee 22 must render as a phantom with
-/// (unstaged removedM) -- its relation is subscribes_to, not contains, so the
+/// (unstaged removedR) -- its relation is subscribes_to, not contains, so the
 /// marker comes from build_child_data's net-removal fallback, not phantom_axes.
 pub fn setup_gitrepo_with_removed_subscribee_fixtures(
   gitrepo_path: &Path,
@@ -62,7 +62,7 @@ pub fn setup_gitrepo_with_removed_subscribee_fixtures(
 }
 
 /// §C: the same removed-subscribee transition, but STAGED -- so the phantom's
-/// membership axis must report (staged removedM), proving per-stage works for a
+/// relationship axis must report (staged removedR), proving per-stage works for a
 /// sharing relation (subscribes_to), not just the net unstaged fallback.
 pub fn setup_gitrepo_with_removed_subscribee_fixtures_staged(
   gitrepo_path: &Path,
@@ -76,7 +76,7 @@ pub fn setup_gitrepo_with_removed_subscribee_fixtures_staged(
 
 /// The added direction: a subscriber whose subscribes_to GAINED node 22
 /// between HEAD and worktree, so the present member 22 must carry
-/// (unstaged newM) (TODO/full-schema/12-2_diff-mode-policy_discussion.org,
+/// (unstaged addedR) (TODO/full-schema/12-2_diff-mode-policy_discussion.org,
 /// outbound folder completeness).
 pub fn setup_gitrepo_with_added_subscribee_fixtures(
   gitrepo_path: &Path,
@@ -96,19 +96,19 @@ pub const GIT_DIFF_VIEW_WRITE_PROTECTED_NO_GHOSTS: &str = "\
 * (skg (node (id 1) (repo main))) 1
 ** (skg (node (id 11) (repo main) writeProtected)) 11
 ** (skg (node (id 12) (repo main))) 12
-*** (skg (node (id moves) (repo main) writeProtected (unstaged removedM))) moves
+*** (skg (node (id moves) (repo main) writeProtected (unstaged removedR))) moves
 * (skg (node (id 11) (repo main))) 11
-** (skg (node (id gets-removed) (repo main) writeProtected (unstaged removedX removedM))) gets-removed
-** (skg (node (id moves) (unstaged newM))) moves
+** (skg (node (id gets-removed) (repo main) writeProtected (unstaged deletedN removedR))) gets-removed
+** (skg (node (id moves) (unstaged addedR))) moves
 ";
 
 /// Expected output when the transition is staged rather than unstaged.
 pub const GIT_DIFF_VIEW_STAGED: &str = "\
 * (skg (node (id 1) (repo main))) 1
 ** (skg (node (id 11) (repo main))) 11
-*** (skg (node (id gets-removed) (repo main) writeProtected (staged removedX removedM))) gets-removed
-*** (skg (node (id moves) (staged newM))) moves
+*** (skg (node (id gets-removed) (repo main) writeProtected (staged deletedN removedR))) gets-removed
+*** (skg (node (id moves) (staged addedR))) moves
 ** (skg (node (id 12) (repo main))) 12
-*** (skg (node (id moves) (repo main) writeProtected (staged removedM))) moves
+*** (skg (node (id moves) (repo main) writeProtected (staged removedR))) moves
 * (skg (node (id new) (repo main))) new
 ";

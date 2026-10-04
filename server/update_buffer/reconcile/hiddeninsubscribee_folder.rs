@@ -1,8 +1,8 @@
 use crate::repo_sets::ActiveRepoSet;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::to_org::complete::partner_folder::child_data::{ChildData, apply_membership_axes_to_folder_members, build_child_data, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
+use crate::to_org::complete::partner_folder::child_data::{ChildData, apply_relationship_axes_to_folder_members, build_child_data, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
 use crate::to_org::complete::partner_folder::goal_list::goal_list_for_hiddenInSubscribee_folder;
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, RepoDiff, file_existence_axes_from_repo_diff};
+use crate::types::git::{NodeAxes, RelationshipAxes, Sign, RepoDiff, file_node_axes_from_repo_diff};
 use crate::types::misc::{ID, RepoName};
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::types::nodes::complete::NodeComplete;
@@ -56,7 +56,7 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
   let context : HiddenInContext =
     read_hiddenin_context (tree, node, kind, runtime, active_repo_set) ?;
   let (goal_list, removed_ids, member_axes)
-    : (Vec<ID>, HashSet<ID>, HashMap<ID, MembershipAxes>) =
+    : (Vec<ID>, HashSet<ID>, HashMap<ID, RelationshipAxes>) =
     goal_list_for_hiddenInSubscribee_folder (
       &runtime . graph,
       &context . subscribee_pid, &context . subscribee_repo,
@@ -76,14 +76,14 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
   let axes_for_removed =
     // This folder's membership is DERIVED (subscriber hides ∩ subscribee
     // contains), so no single relation diff is authoritative: the
-    // membership signs come from the three-snapshot comparison;
-    // existence from the member's own file statuses.
+    // relationship signs come from the three-snapshot comparison;
+    // node signs from the member's own file statuses.
     |child : &ID, child_src : &RepoName|
-    -> (ExistenceAxes, MembershipAxes) {
-    ( file_existence_axes_from_repo_diff (
+    -> (NodeAxes, RelationshipAxes) {
+    ( file_node_axes_from_repo_diff (
         repo_diffs, child, child_src ),
       member_axes . get (child) . copied ()
-        . unwrap_or ( MembershipAxes {
+        . unwrap_or ( RelationshipAxes {
             staged : None, unstaged : Some (Sign::Minus) } )) };
   let child_data : HashMap<ID, ChildData> =
     build_child_data (
@@ -102,8 +102,8 @@ pub fn reconcile_hiddenInSubscribeeFolder_children (
       &goal_list, &child_data, deleted_by_this_save_extra_ids ) ?;
   if repo_diffs . is_some () {
     // Present members newly derived-in in some stage get that
-    // stage's 'newM'; removed members are the phantoms above.
-    apply_membership_axes_to_folder_members (
+    // stage's 'addedR'; removed members are the phantoms above.
+    apply_relationship_axes_to_folder_members (
       tree, node, &member_axes ) ?; }
   if let Some (sink) = warning_sink {
     push_repair_warnings (

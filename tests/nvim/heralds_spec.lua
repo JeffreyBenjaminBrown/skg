@@ -225,19 +225,19 @@ describe('skg.heralds', function ()
 
   it('displays staged/unstaged axes', function ()
     local removed =
-      herald_text('(skg (node (id 1) (repo s) (unstaged removedM)))')
+      herald_text('(skg (node (id 1) (repo s) (unstaged removedR)))')
     assert.is_truthy(removed:find('unstaged'))
-    assert.is_truthy(removed:find('M'))
+    assert.is_truthy(removed:find('R'))
     local new_both =
-      herald_text('(skg (node (id 2) (repo s) (unstaged newX newM)))')
+      herald_text('(skg (node (id 2) (repo s) (unstaged addedN addedR)))')
     assert.is_truthy(new_both:find('unstaged'))
-    assert.is_truthy(new_both:find('X'))
-    assert.is_truthy(new_both:find('M'))
+    assert.is_truthy(new_both:find('N'))
+    assert.is_truthy(new_both:find('R'))
     assert.is_truthy(
-      herald_text('(skg alias (staged newM))'):find('staged:M', 1, true))
-    local alias_removed = herald_text('(skg alias (unstaged removedM))')
+      herald_text('(skg alias (staged addedR))'):find('staged:R', 1, true))
+    local alias_removed = herald_text('(skg alias (unstaged removedR))')
     assert.is_truthy(alias_removed:find('unstaged'))
-    assert.is_truthy(alias_removed:find('-M', 1, true))
+    assert.is_truthy(alias_removed:find('-R', 1, true))
   end)
 
   it('displays the inactive-node placeholder in blue', function ()
@@ -295,7 +295,7 @@ describe('skg.heralds', function ()
   it('strips structural colons the way the elisp display does',
      function ()
     -- '⌂:public' -> '⌂public' ('⌂' is outside the keep-class), while
-    -- alphanumeric neighbors keep their colon ('staged:M').
+    -- alphanumeric neighbors keep their colon ('staged:R').
     local cells = heralds.strip_structural_colons(
       heralds.token_character_cells(
         { chunks = { { text = '⌂:public', color = nil } },

@@ -6,7 +6,7 @@
 /// Others encode information about neighboring tree nodes, such as
 /// aliases, IDs, and partner folders.
 
-use super::git::{ExistenceAxes, MembershipAxes, Sign};
+use super::git::{NodeAxes, RelationshipAxes, Sign};
 use super::misc::{ID, RepoName};
 use super::nodes::complete::Flag;
 use crate::dbs::in_rust_graph::relation_accessors::RelationRole;
@@ -201,11 +201,11 @@ pub struct ActiveNode_Generic < Id, Src > {
   pub relRepo_request : Option<RepoName>,
 
   pub view_requests : HashSet < ViewRequest >,
-  /// Per-stage diff state for the node's '.skg' file existence.
-  pub existence     : ExistenceAxes,
-  /// Per-stage diff state for the node's membership at this position
-  /// in the parent's contains list.
-  pub membership    : MembershipAxes,
+  /// Per-stage diff state for the node's '.skg' file (the node axis).
+  pub node_axes     : NodeAxes,
+  /// Per-stage diff state for the node's relationship at this position
+  /// in the parent's contains list (the relationship axis).
+  pub relationship_axes    : RelationshipAxes,
   /// True iff the node's repo is not a git repo (or has no commits).
   /// A per-repo fact, not an axis.
   pub not_in_git    : bool,
@@ -224,8 +224,8 @@ pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
 /// both detected by `diff_axes_require_phantom`: a "removed" member (present in
 /// the parent's HEAD/index contains but gone from the worktree's, inserted by
 /// `insert_phantoms_for_missing_contains` / `mk_phantom_viewnode`), or a Normal
-/// node flipped in place by `normal_to_phantom` because its own membership/
-/// existence axes went negative. "removed" vs "removedHere" (its .skg file is
+/// node flipped in place by `normal_to_phantom` because its own relationship/
+/// node axes went negative. "removed" vs "removedHere" (its .skg file is
 /// still in the worktree, so the graph can still answer about it) is told apart by
 /// `is_removedhere_diffPhantom`.
 ///
@@ -236,7 +236,7 @@ pub type MpPhantomDiff = PhantomDiff_Generic < Option < ID >,
 /// Affected); a Normal child left under it is demoted to Independent.
 ///
 /// DISTINCT INFO: it is the only phantom that carries the git-diff coordinates
-/// -- per-stage `existence` and `membership` axes plus `not_in_git` -- because
+/// -- per-stage `node_axes` and `relationship_axes` plus `not_in_git` -- because
 /// it exists solely to show a change between git snapshots. It keeps a `title`
 /// and `repo` (resolved via `title_for_phantom`; the repo may be the
 /// RepoName NOT_FOUND sentinel) and `graphStats`, which IS rendered on
@@ -248,11 +248,11 @@ pub struct PhantomDiff_Generic < Id, Src > {
   pub title      : String,
   pub id         : Id,
   pub home_repo     : Src,
-  /// Per-stage diff state for the node's '.skg' file existence.
-  pub existence  : ExistenceAxes,
-  /// Per-stage diff state for the node's membership at this position
-  /// in the parent's contains list.
-  pub membership : MembershipAxes,
+  /// Per-stage diff state for the node's '.skg' file (the node axis).
+  pub node_axes  : NodeAxes,
+  /// Per-stage diff state for the node's relationship at this position
+  /// in the parent's contains list (the relationship axis).
+  pub relationship_axes : RelationshipAxes,
   /// True iff the node's repo is not a git repo (or has no commits).
   pub not_in_git : bool,
   pub graphStats : GraphNodeStats,
@@ -268,8 +268,8 @@ impl < Id, Src > PhantomDiff_Generic < Id, Src > {
       title      : t . title,
       id         : t . id,
       home_repo     : t . home_repo,
-      existence  : t . existence,
-      membership : t . membership,
+      node_axes  : t . node_axes,
+      relationship_axes : t . relationship_axes,
       not_in_git : t . not_in_git,
       graphStats : t . graphStats,
     }}
@@ -281,12 +281,12 @@ impl < Id, Src > PhantomDiff_Generic < Id, Src > {
   /// True iff this node's diff axes require phantom display; for a correctly
   /// constructed phantom this holds, but some shared code asks regardless.
   pub fn should_be_diffPhantom (&self) -> bool {
-    diff_axes_require_phantom (&self . existence, &self . membership) }
+    diff_axes_require_phantom (&self . node_axes, &self . relationship_axes) }
 
   /// A "removed-here" phantom whose '.skg' file is still in the worktree.
   pub fn is_removedhere_diffPhantom (&self) -> bool {
     self . should_be_diffPhantom ()
-    && self . existence . unstaged != Some (Sign::Minus) }
+    && self . node_axes . unstaged != Some (Sign::Minus) }
 }
 
 /// Each ActiveNode has one of these.
@@ -409,9 +409,9 @@ pub enum Qual {
   Alias { text: String, // an alias for the node's grandparent
           relRepo: Option<RepoName>,
           relRepo_request: Option<RepoName>,
-          membership: MembershipAxes },
+          relationship_axes: RelationshipAxes },
   ID { id: ID, // an ID of grandparent (the parent being an IDFolder)
-       membership: MembershipAxes },
+       relationship_axes: RelationshipAxes },
   /// A true file-level boolean flag of the node's grandparent.
   Flag {
     flag : Flag,
@@ -532,24 +532,24 @@ pub enum ViewRequest {
 
 /// True when a node's diff axes require displaying it with the
 /// `Phantom::Diff` variant. Triggered by either:
-/// - any membership axis being '-' (removed in some stage), or
-/// - the worktree existence axis being '-' (file deleted), or
+/// - any relationship axis being '-' (removed in some stage), or
+/// - the worktree node axis being '-' (file deleted), or
 /// - the "moved twice" pattern: stagedM = +, unstagedM = -.
 /// Shared by ActiveNode_Generic and PhantomDiff_Generic, which both carry
 /// these axes.
 pub fn diff_axes_require_phantom (
-  existence  : &ExistenceAxes,
-  membership : &MembershipAxes,
+  node_axes  : &NodeAxes,
+  relationship_axes : &RelationshipAxes,
 ) -> bool {
-  membership . staged   == Some (Sign::Minus)
-  || membership . unstaged == Some (Sign::Minus)
-  || existence  . unstaged == Some (Sign::Minus) }
+  relationship_axes . staged   == Some (Sign::Minus)
+  || relationship_axes . unstaged == Some (Sign::Minus)
+  || node_axes  . unstaged == Some (Sign::Minus) }
 
 impl < Id, Src > ActiveNode_Generic < Id, Src > {
   pub fn should_be_diffPhantom (
     &self,
   ) -> bool {
-    diff_axes_require_phantom (&self . existence, &self . membership) }
+    diff_axes_require_phantom (&self . node_axes, &self . relationship_axes) }
 
   /// A "removed-here" phantom: a phantom whose '.skg' file is still
   /// present in the worktree (so the graph still knows the node and can
@@ -559,7 +559,7 @@ impl < Id, Src > ActiveNode_Generic < Id, Src > {
     &self,
   ) -> bool {
     self . should_be_diffPhantom ()
-    && self . existence . unstaged != Some (Sign::Minus) }
+    && self . node_axes . unstaged != Some (Sign::Minus) }
 
   pub fn is_writeProtected (&self) -> bool {
     matches! ( self . editability,
@@ -929,8 +929,8 @@ pub fn default_activeNode (
     viewStats      : ViewNodeStats::default(),
     relRepo_request : None,
     view_requests  : HashSet::new(),
-    existence      : ExistenceAxes::default(),
-    membership     : MembershipAxes::default(),
+    node_axes      : NodeAxes::default(),
+    relationship_axes     : RelationshipAxes::default(),
     not_in_git     : false,
     editability   : Editability::Definitive {
       body         : None,
@@ -938,20 +938,20 @@ pub fn default_activeNode (
   }}
 
 /// Create a write-protected phantom ViewNode with the given diff axes.
-/// At least one membership axis or the unstaged-existence axis should be
+/// At least one relationship axis or the unstaged-node axis should be
 /// negative for this to be a real phantom; callers must ensure that.
 pub fn mk_phantom_viewnode (
   id         : ID,
   repo     : RepoName,
   title      : String,
-  existence  : ExistenceAxes,
-  membership : MembershipAxes,
+  node_axes  : NodeAxes,
+  relationship_axes : RelationshipAxes,
 ) -> ViewNode {
   let mut viewnode : ViewNode =
     mk_writeProtected_viewnode ( id, repo, title, AffectsParent::True );
   if let ViewNodeKind::Vognode (Vognode::Active (mut t)) = viewnode . kind
-    { t . existence  = existence;
-      t . membership = membership;
+    { t . node_axes  = node_axes;
+      t . relationship_axes = relationship_axes;
       viewnode . kind = ViewNodeKind::Phantom (
         Phantom::Diff ( PhantomDiff::from_activeNode (t) )); }
   else

@@ -9,8 +9,8 @@ pub const GIT_DIFF_VIEW: &str = "\
 * (skg (node (id 1) (repo main))) 1
 ** (skg idFolder)
 *** (skg id) 1
-*** (skg id (unstaged removedM)) 2
-*** (skg id (unstaged newM)) 2'
+*** (skg id (unstaged removedR)) 2
+*** (skg id (unstaged addedR)) 2'
 *** (skg id) 3
 ** (skg (node (id child) (repo main))) child
 ";
@@ -42,8 +42,8 @@ pub const GIT_DIFF_VIEW_STAGED: &str = "\
 * (skg (node (id 1) (repo main))) 1
 ** (skg idFolder)
 *** (skg id) 1
-*** (skg id (staged removedM)) 2
-*** (skg id (staged newM)) 2'
+*** (skg id (staged removedR)) 2
+*** (skg id (staged addedR)) 2'
 *** (skg id) 3
 ** (skg (node (id child) (repo main))) child
 ";

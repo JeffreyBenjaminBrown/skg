@@ -466,7 +466,7 @@ fn is_subscribee (
 /// "hiding your own content is silly", resolve_visibility -- so without the
 /// contains subtraction it would double-show, once as integrated content and
 /// once as unintegrated; forks plan.org Prerequisite / discussion.org Option B).
-/// The git-diff decorations (removed-member phantoms, membership axes) are NOT
+/// The git-diff decorations (removed-member phantoms, relationship axes) are NOT
 /// computed here: they are applied per node by process_activeNode_diff at its BFS
 /// visit (TODO/DONE/local-view-update/plan_v2.org §9 reversal / #3), so the main content path produces only the pure
 /// worktree view.

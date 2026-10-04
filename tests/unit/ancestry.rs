@@ -1,5 +1,5 @@
 use super::*;
-use crate::types::git::MembershipAxes;
+use crate::types::git::RelationshipAxes;
 use crate::types::viewnode::{
   mk_writeProtected_viewnode, viewforest_root_viewnode,
   Phantom, PhantomDeleted, Qual, QualFolder };
@@ -30,7 +30,7 @@ fn alias_qual (text : &str) -> ViewNode {
       text : text . to_string (),
       relRepo : None,
       relRepo_request : None,
-      membership : MembershipAxes::default () }) } }
+      relationship_axes : RelationshipAxes::default () }) } }
 
 fn child (
   tree : &mut Tree<ViewNode>, parent : NodeId, vn : ViewNode

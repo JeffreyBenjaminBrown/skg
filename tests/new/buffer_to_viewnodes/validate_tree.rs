@@ -344,8 +344,8 @@ async fn test_no_duplicated_content_error_for_phantom_siblings (
   config : &SkgConfig,
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
-      // A phantom sibling (a diffPhantom carrying unstaged removedX
-      // removedM) sharing an ID with a real sibling should not trigger a
+      // A phantom sibling (a diffPhantom carrying unstaged deletedN
+      // removedR) sharing an ID with a real sibling should not trigger a
       // duplicate error. The 'diffPhantom' root atom -- not the diff axes
       // -- is what marks it a phantom, matching what the diff renderer
       // emits and what the user saves back.
@@ -353,7 +353,7 @@ async fn test_no_duplicated_content_error_for_phantom_siblings (
         indoc! {"
                 * (skg (node (id root) (repo main))) parent
                 ** (skg (node (id 1) (repo main))) real child
-                ** (skg (diffPhantom (id 1) (repo main) (unstaged removedX removedM))) phantom child
+                ** (skg (diffPhantom (id 1) (repo main) (unstaged deletedN removedR))) phantom child
             "};
 
       let viewforest: MpViewForest =
@@ -576,7 +576,7 @@ fn test_edit_request_on_writeProtected_is_rejected_at_parse_time() {
   let input_delete: &str =
     indoc! {"
       * (skg (node (id root) (repo main))) parent
-      ** (skg (diffPhantom (id phantom) (repo main) writeProtected (unstaged removedM) (editRequest delete))) phantom child
+      ** (skg (diffPhantom (id phantom) (repo main) writeProtected (unstaged removedR) (editRequest delete))) phantom child
     "};
   let (_viewforest, parsing_errors, _warnings)
     : (MpViewForest, Vec<BufferValidationError>, Vec<String>)

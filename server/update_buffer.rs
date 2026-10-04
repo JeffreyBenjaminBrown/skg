@@ -26,7 +26,7 @@ use crate::serve::util::{ format_single_view_sexp, send_response_with_length_pre
 use crate::repo_sets::{ActiveRepoSet, apply_repo_set_to_viewforest};
 use crate::to_org::expand::backpath::attach_containerward_ancestries_at_nodeids_with_repo_set;
 use crate::to_org::util::DefinitiveMap;
-use crate::types::git::{ExistenceAxes, MembershipAxes, RepoDiff};
+use crate::types::git::{NodeAxes, RelationshipAxes, RepoDiff};
 use crate::types::views_state::ViewUri;
 use crate::types::misc::{ID, RepoName, SkgConfig};
 use crate::types::save::{DefineNode, ForkSpec};
@@ -723,12 +723,12 @@ fn clear_diff_metadata (
         // own BFS visit, so clearing them here is unnecessary.
         match &mut node . value() . kind {
           ViewNodeKind::Vognode (Vognode::Active (t)) => {
-            t . existence  = ExistenceAxes::default ();
-            t . membership = MembershipAxes::default ();
+            t . node_axes  = NodeAxes::default ();
+            t . relationship_axes = RelationshipAxes::default ();
             t . not_in_git = false; }
           ViewNodeKind::Phantom (Phantom::Diff (p)) => {
-            p . existence  = ExistenceAxes::default ();
-            p . membership = MembershipAxes::default ();
+            p . node_axes  = NodeAxes::default ();
+            p . relationship_axes = RelationshipAxes::default ();
             p . not_in_git = false; }
           _ => {} }
         Ok (( )) } ) ?;

@@ -1088,7 +1088,7 @@ parsed) lives in =server/serve/parse_metadata_sexp.rs=. The
 in-memory types those keys correspond to are in
 =server/types/viewnode.rs= (=TrueNode=, =ViewNodeKind=, =QualFolder=,
 =Qual=, =PartnerFolder=)
-and =server/types/git.rs= (=ExistenceAxes=, =MembershipAxes=, =Sign=).
+and =server/types/git.rs= (=NodeAxes=, =RelationshipAxes=, =Sign=).
 
 Metadata is not WYSIWYG; its appearance in the client
 is determined by =elisp/heralds-minor-mode=, whose rule table is
@@ -1111,16 +1111,16 @@ worktree.
 
 Inside a =(node ...)= form (TrueNodes):
 - =(staged AXES)= and/or =(unstaged AXES)=, where =AXES= is a sequence
-  of bare atoms drawn from ={newX, removedX, newM, removedM}=. =X= =
-  existence (the node's =.skg= file appeared/disappeared in this
-  stage); =M= = membership (the node's appearance at this position in
+  of bare atoms drawn from ={addedN, deletedN, addedR, removedR}=. =N= =
+  node (the node's =.skg= file appeared/disappeared in this
+  stage); =R= = relationship (the node's appearance at this position in
   its parent's membership appeared/disappeared in this stage).
 - bare atom =notInGit= if the node's Skg repo is not a git repo.
 
 PartnerFolder members carry the same axes, in both directions, for
 every folder: a member removed since HEAD appears as a phantom with
-per-stage =removedM=; a member added since HEAD carries per-stage
-=newM=; =X= axes describe the member's own file as usual. For an
+per-stage =removedR=; a member added since HEAD carries per-stage
+=addedR=; =N= axes describe the member's own file as usual. For an
 outbound folder (subscribeeFolder, overriddenFolder, hiddenFolder) the signs
 come from the owner's relation diff; for an inbound folder
 (subscriberFolder, overriderFolder, hiderFolder) from the members' files'
@@ -1135,8 +1135,8 @@ is never collected as a member.
 
 At top level inside =(skg ...)= (Scaffolds for Alias / ID):
 - =(staged AXES)= and/or =(unstaged AXES)= with =AXES= drawn only
-  from ={newM, removedM}= (scaffolds have no =.skg= file of their
-  own and so no X axis).
+  from ={addedR, removedR}= (scaffolds have no =.skg= file of their
+  own and so no N axis).
 
 Also at top level, for the TextChanged scaffold:
 - =(textChanged STAGE_TAGS)= where =STAGE_TAGS= is a subset of
@@ -1145,10 +1145,10 @@ Also at top level, for the TextChanged scaffold:
 
 Examples:
 #+begin_example
-(skg (node (id 7) (repo main) (unstaged newX newM)))
-(skg (node (id 9) (repo main) writeProtected (staged removedM) (unstaged newM)))
-(skg alias (staged newM))
-(skg id (unstaged removedM))
+(skg (node (id 7) (repo main) (unstaged addedN addedR)))
+(skg (node (id 9) (repo main) writeProtected (staged removedR) (unstaged addedR)))
+(skg alias (staged addedR))
+(skg id (unstaged removedR))
 (skg (textChanged staged unstaged))
 #+end_example
 

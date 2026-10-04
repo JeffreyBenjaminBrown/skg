@@ -64,14 +64,14 @@
     (skg-test-wait-for-response 20)
     (let ((content (buffer-substring-no-properties
                     (point-min) (point-max))))
-      ;; Phantom b shows up as a child of a with 'removedM on the
-      ;; unstaged side (removed from contains) and 'removedX on the
+      ;; Phantom b shows up as a child of a with 'removedR on the
+      ;; unstaged side (removed from contains) and 'deletedN on the
       ;; unstaged side (b.skg deleted).
       (unless (string-match-p "(id b)" content)
         (test-fail "No (id b) in buffer. Content:\n%s" content))
-      (unless (string-match-p "removedX" content)
-        (test-fail "No removedX axis on phantom. Content:\n%s" content))
-      (test-pass "Phantom b present with removedX axis"))))
+      (unless (string-match-p "deletedN" content)
+        (test-fail "No deletedN axis on phantom. Content:\n%s" content))
+      (test-pass "Phantom b present with deletedN axis"))))
 
 (defun phase-3-call-view-magit-on-phantom-b ()
   (setq integration-test-phase "phase-3")

@@ -30,7 +30,7 @@
 
 (defun skg--explain-if-blind-to-new-files (path-count)
   "When PATH-COUNT is 0 because git diff mode is off, say so.
-New files are recognized by the `(unstaged newX)' markers that only a
+New files are recognized by the `(unstaged addedN)' markers that only a
 diff-mode render carries, so with diff mode off this command is blind
 -- reporting \"0 files\" as if the user did it right would mislead.
 Returns non-nil when it explained (the caller then skips its own
@@ -38,7 +38,7 @@ report)."
   (when (and (zerop path-count)
              (not skg--git-diff-mode-enabled))
     (message
-     "Git diff mode is off, so new files cannot be recognized: this command looks for the newX markers only a diff-mode view carries. Toggle diff mode (C-c v d), then retry.")
+     "Git diff mode is off, so new files cannot be recognized: this command looks for the addedN markers only a diff-mode view carries. Toggle diff mode (C-c v d), then retry.")
     t))
 
 (defun skg-git-add-if-new-recursive ()
@@ -60,7 +60,7 @@ you might not want to review the command manually.)"
 (defun skg-git-add-if-new-recursive-preview ()
   "Show an executable buffer that stages new files in the current subtree.
 The current heading and its org-descendants are scanned for ActiveNode
-metadata containing `(unstaged newX)'. The generated form rechecks
+metadata containing `(unstaged addedN)'. The generated form rechecks
 the git index before staging each file, so evaluating it will not
 stage later modifications to files that are already known to git."
   (interactive)
@@ -146,8 +146,8 @@ DIR-AND-FILES is (DIR . FILES), where FILES are basenames."
     (delete-dups (nreverse paths))))
 
 (defun skg--subtree-unstaged-new-file-id-and-repo-pairs ()
-  "Return (id . repo) pairs in this subtree whose metadata has unstaged newX.
-This collects file-existence changes, not membership-only `newM'
+  "Return (id . repo) pairs in this subtree whose metadata has unstaged addedN.
+This collects node changes, not relationship-only `addedR'
 changes."
   (skg--subtree-id-and-repo-pairs-if
    #'skg--metadata-has-unstaged-new-file-p))
@@ -179,6 +179,6 @@ interactively-folded content view."
 
 (defun skg--metadata-has-unstaged-new-file-p (sexp)
   "Return t if SEXP is an ActiveNode marked as a new worktree file."
-  (memq 'newX (skg-sexp-cdr-at-path sexp '(skg node unstaged))))
+  (memq 'addedN (skg-sexp-cdr-at-path sexp '(skg node unstaged))))
 
 (provide 'skg-git-add)

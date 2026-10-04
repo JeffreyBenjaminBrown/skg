@@ -443,7 +443,7 @@ async fn marked_view_is_shape_stable_across_diff_toggle (
         assert_eq! ( marked_lines (view, "N") . len (), 1,
           "{}: exactly one marked substitute survives:\n{}",
           when, view );
-        assert! ( ! view . contains ("removedM"),
+        assert! ( ! view . contains ("removedR"),
           "{}: no phantom -- P's contains still names N, and the \
            marked R collects N:\n{}", when, view ); };
       { let on : String = toggle (&mut views_state);

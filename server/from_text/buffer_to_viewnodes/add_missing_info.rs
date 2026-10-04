@@ -3,7 +3,7 @@
 /// - when treatment should be Alias, make it so
 /// - add missing IDs where treatment is Content
 
-use crate::types::git::MembershipAxes;
+use crate::types::git::RelationshipAxes;
 use crate::types::maybe_placed_viewnode::{MpViewnode, MpViewnodeKind};
 use crate::types::maybe_placed_viewnode::MpVognode;
 use crate::types::viewnode::AffectsParent;
@@ -143,7 +143,7 @@ fn make_alias_if_appropriate(
         Qual::Alias { text: t . title . clone(),
                       relRepo: t . viewStats . relRepo . clone (),
                       relRepo_request: t . relRepo_request . clone (),
-                      membership: MembershipAxes::default () } ); }}
+                      relationship_axes: RelationshipAxes::default () } ); }}
   Ok (( )) }
 
 /// Inherit parent's repo if both:

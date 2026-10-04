@@ -3,8 +3,8 @@
 ///
 /// Two scenarios that used to render a buffer the save then rejected:
 /// - a contains member REORDERED within one parent (its old slot used to come
-///   out as a second live vognode -- 'newM' -- tripping the content-child
-///   uniqueness check; it must be a 'removedM' phantom);
+///   out as a second live vognode -- 'addedR' -- tripping the content-child
+///   uniqueness check; it must be a 'removedR' phantom);
 /// - a contains member referenced at HEAD whose .skg file exists in no repo
 ///   (deleted by an earlier commit), which renders with the NOT_FOUND repo
 ///   sentinel (validate_phantom used to reject that).

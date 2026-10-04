@@ -41,14 +41,14 @@ describe('skg.git_add', function ()
 
   it('collects only unstaged-new files, from the body too', function ()
     buffer_with(table.concat({
-      '* (skg (node (id root-id) (repo main) (unstaged newX newM)))'
+      '* (skg (node (id root-id) (repo main) (unstaged addedN addedR)))'
       .. ' root',
       'a body line',
-      '** (skg (node (id staged-only) (repo main) (staged newX)))'
+      '** (skg (node (id staged-only) (repo main) (staged addedN)))'
       .. ' staged already',
-      '** (skg (node (id member-only) (repo main) (unstaged newM)))'
+      '** (skg (node (id member-only) (repo main) (unstaged addedR)))'
       .. ' membership only',
-      '** (skg (node (id also-new) (repo main) (unstaged newX)))'
+      '** (skg (node (id also-new) (repo main) (unstaged addedN)))'
       .. ' also new' }, '\n'))
     vim.api.nvim_win_set_cursor(0, { 2, 3 }) -- in the body
     local plan = git_add.git_add_new_files_recursive_plan()
@@ -63,7 +63,7 @@ describe('skg.git_add', function ()
 
   it('previews without touching git state', function ()
     buffer_with('* (skg (node (id n1) (repo main)'
-                .. ' (unstaged newX))) n1')
+                .. ' (unstaged addedN))) n1')
     git_add.git_add_if_new_recursive_preview()
     local preview = vim.api.nvim_get_current_buf()
     assert.are.equal('sh', vim.bo[preview].filetype)

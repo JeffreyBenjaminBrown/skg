@@ -85,16 +85,16 @@ fn signs_come_from_modified_deleted_and_added_files_per_stage () {
     deleted_entry ( nodecomplete ("bystander", vec! []) ));
   let diffs : Option<HashMap<RepoName, RepoDiff>> =
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
-  let scan : HashMap<ID, MembershipAxes> =
+  let scan : HashMap<ID, RelationshipAxes> =
     inverse_scan_for_inbound_folder (
       &owner, NodeRelation::OverridesViewOf, &diffs, None );
   assert_eq! ( scan . len (), 3, "{:?}", scan );
   assert_eq! ( scan [ &id ("edge-r") ],
-    MembershipAxes { staged : Some (Sign::Minus), unstaged : None } );
+    RelationshipAxes { staged : Some (Sign::Minus), unstaged : None } );
   assert_eq! ( scan [ &id ("del-r") ],
-    MembershipAxes { staged : None, unstaged : Some (Sign::Minus) } );
+    RelationshipAxes { staged : None, unstaged : Some (Sign::Minus) } );
   assert_eq! ( scan [ &id ("newfile-r") ],
-    MembershipAxes { staged : None, unstaged : Some (Sign::Plus) } );
+    RelationshipAxes { staged : None, unstaged : Some (Sign::Plus) } );
   assert! ( ! scan [ &id ("del-r") ] . net_is_present () );
   assert! ( scan [ &id ("newfile-r") ] . net_is_present () );
 }
@@ -108,7 +108,7 @@ fn owner_absent_from_every_diff_yields_nothing () {
       Diff_Item::Removed ( id ("SOMEONE-ELSE") ) ] ));
   let diffs : Option<HashMap<RepoName, RepoDiff>> =
     Some ( HashMap::from ([ ( src ("main"), sd ) ]) );
-  let scan : HashMap<ID, MembershipAxes> =
+  let scan : HashMap<ID, RelationshipAxes> =
     inverse_scan_for_inbound_folder (
       &id ("N"), NodeRelation::OverridesViewOf, &diffs, None );
   assert! ( scan . is_empty (), "{:?}", scan );
@@ -138,7 +138,7 @@ fn each_relation_is_read_separately () {
     . is_empty () );
   assert_eq! ( inverse_scan_for_inbound_folder (
       &owner, NodeRelation::SubscribesTo, &diffs, None ) [ &id ("m") ],
-    MembershipAxes { staged : None, unstaged : Some (Sign::Minus) } );
+    RelationshipAxes { staged : None, unstaged : Some (Sign::Minus) } );
 }
 
 #[test]
@@ -159,7 +159,7 @@ fn cross_repo_move_yields_no_membership_change () {
     Some ( HashMap::from ([
       ( src ("a"), sd_a ),
       ( src ("b"), sd_b ) ]) );
-  let scan : HashMap<ID, MembershipAxes> =
+  let scan : HashMap<ID, RelationshipAxes> =
     inverse_scan_for_inbound_folder (
       &owner, NodeRelation::OverridesViewOf, &diffs, None );
   assert! ( scan . is_empty (),
@@ -189,14 +189,14 @@ fn relRepo_gates_deleted_stage_signs () {
   let public_only : ActiveRepoSet = ActiveRepoSet {
     name    : RepoSetName::from ("public"),
     repos : BTreeSet::from ([ src ("public") ]) };
-  let gated : HashMap<ID, MembershipAxes> =
+  let gated : HashMap<ID, RelationshipAxes> =
     inverse_scan_for_inbound_folder (
       &owner, NodeRelation::OverridesViewOf, &diffs,
       Some (&public_only) );
   assert! ( gated . is_empty (),
     "a Deleted-stage sign recorded at an inactive repo must not \
      surface: {:?}", gated );
-  let ungated : HashMap<ID, MembershipAxes> =
+  let ungated : HashMap<ID, RelationshipAxes> =
     inverse_scan_for_inbound_folder (
       &owner, NodeRelation::OverridesViewOf, &diffs, None );
   assert! ( ! ungated . is_empty (),

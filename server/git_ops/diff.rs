@@ -201,7 +201,7 @@ fn compare_nodecompletes (
       &old_contains,
       &new_contains );
   // §C: per-stage diffs of the sharing relations, so a removed
-  // subscribee / hidden-outside member gets a per-stage membership axis.
+  // subscribee / hidden-outside member gets a per-stage relationship axis.
   let old_subscribes_to : MSV<ID> = members_msv (& old . subscribes_to);
   let new_subscribes_to : MSV<ID> = members_msv (& new . subscribes_to);
   let subscribes_to_diff : Vec<Diff_Item<ID>> =

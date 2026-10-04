@@ -2,7 +2,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use crate::to_org::complete::partner_folder::child_data::{
   build_child_data,
   ChildData,
-  apply_membership_axes_to_folder_members,
+  apply_relationship_axes_to_folder_members,
   reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds,
 };
 use crate::to_org::complete::partner_folder::goal_list::{
@@ -11,7 +11,7 @@ use crate::to_org::complete::partner_folder::goal_list::{
 };
 use crate::to_org::complete::partner_folder::inverse_scan::inverse_scan_for_inbound_folder;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, RepoDiff, file_existence_axes_from_repo_diff};
+use crate::types::git::{NodeAxes, RelationshipAxes, Sign, RepoDiff, file_node_axes_from_repo_diff};
 use crate::types::misc::{ID, RelPartner, RepoName};
 use crate::repo_sets::ActiveRepoSet;
 use crate::types::phantom::{phantom_axes, home_from_disk};
@@ -70,7 +70,7 @@ pub fn reconcile_partnerFolder_children (
     graph_snap . outbound_rel_partners_for_relation_gated (
       &owner_pid, member_role . relation, active_repo_set )
   } else { Vec::new () };
-  let inbound_scan : HashMap<ID, MembershipAxes> =
+  let inbound_scan : HashMap<ID, RelationshipAxes> =
     // Inbound folders' edges live in the MEMBERS' files; the inverse
     // scan reads those files' diffs (Modified relation diffs,
     // Deleted before_node lists, Added after_node lists). Empty
@@ -158,22 +158,22 @@ pub fn reconcile_partnerFolder_children (
       (goal, removed) }};
   let outbound_axes = // the owner's own relation diff
     |child : &ID, child_src : &RepoName|
-    -> (ExistenceAxes, MembershipAxes) {
+    -> (NodeAxes, RelationshipAxes) {
     phantom_axes ( child, child_src,
                    &owner_pid, &owner_repo,
                    member_role . relation,
                    repo_diffs . as_ref () ) };
-  let inbound_axes = // membership from the inverse scan; existence
-                     // from the member's own file statuses
+  let inbound_axes = // relationship axes from the inverse scan; node
+                     // axes from the member's own file statuses
     |child : &ID, child_src : &RepoName|
-    -> (ExistenceAxes, MembershipAxes) {
-    ( file_existence_axes_from_repo_diff (
+    -> (NodeAxes, RelationshipAxes) {
+    ( file_node_axes_from_repo_diff (
         repo_diffs, child, child_src ),
       inbound_scan . get (child) . copied ()
-        . unwrap_or ( MembershipAxes {
+        . unwrap_or ( RelationshipAxes {
             staged : None, unstaged : Some (Sign::Minus) } )) };
   let axes_for_removed // the relation this folder represents
-    : &dyn Fn (&ID, &RepoName) -> (ExistenceAxes, MembershipAxes) =
+    : &dyn Fn (&ID, &RepoName) -> (NodeAxes, RelationshipAxes) =
     if outbound { &outbound_axes } else { &inbound_axes };
   // TODO/DONE/local-view-update/plan_v2.org §5.5: a folder fills its members WHOLE and is budget-neutral -- the owning
   // vognode already spent its budget unit when it expanded, so drawing all the
@@ -200,14 +200,14 @@ pub fn reconcile_partnerFolder_children (
       deleted_by_this_save_extra_ids ) ?;
   if repo_diffs . is_some () {
     // Present members whose edge is New in some stage get that
-    // stage's 'newM'; removed members are the phantoms above.
-    let axes_by_id : HashMap<ID, MembershipAxes> =
+    // stage's 'addedR'; removed members are the phantoms above.
+    let axes_by_id : HashMap<ID, RelationshipAxes> =
       if outbound {
         outbound_member_axes (
           &owner_pid, &owner_repo, member_role . relation,
           repo_diffs )
       } else { inbound_scan . clone () };
-    apply_membership_axes_to_folder_members (
+    apply_relationship_axes_to_folder_members (
       tree, node, &axes_by_id ) ?; }
   if kind . policy () != FolderPolicy::WritableSet {
     // Repairs to a writable folder are not repairs: its membership IS

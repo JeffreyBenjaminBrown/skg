@@ -122,10 +122,10 @@ describe('skg.sexpr.parse printing', function ()
     round_trips('((busy-initializing . "still loading"))')
     round_trips('((response-type "titles-by-ids") (content '
                 .. '((3861db2c-aaaa . "title one") (deadbeef . "two"))))')
-    round_trips('(skg (node (id 7) (repo main) (unstaged newX newM)))')
+    round_trips('(skg (node (id 7) (repo main) (unstaged addedN addedR)))')
     round_trips('(skg (node (id 9) (repo main) writeProtected '
-                .. '(staged removedM) (unstaged newM)))')
-    round_trips('(skg alias (staged newM))')
+                .. '(staged removedR) (unstaged addedR)))')
+    round_trips('(skg alias (staged addedR))')
     round_trips('(skg (textChanged staged unstaged))')
     round_trips('(skg (node (id x) (viewStats (homeRepoHerald ⌂:public) '
                 .. 'cycle (overridesHere 4))))')

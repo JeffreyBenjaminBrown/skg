@@ -134,8 +134,8 @@ function M.group_paths_by_dir (paths)
 end
 
 ---{id, repo} pairs in this subtree whose metadata carries the
----unstaged newX axis (file-existence changes, not membership-only
----newM).
+---unstaged addedN axis (node changes, not relationship-only
+---addedR).
 ---@return table[]
 function M.subtree_unstaged_new_file_pairs ()
   local start = focus.owning_headline_line()
@@ -168,7 +168,7 @@ function M.metadata_has_unstaged_new_file_p (sexp)
   local values = metadata.sexp_cdr_at_path(sexp,
                                            { 'skg', 'node', 'unstaged' })
   for _, value in ipairs(values or {}) do
-    if value == sexpr.symbol('newX') then return true end
+    if value == sexpr.symbol('addedN') then return true end
   end
   return false
 end

@@ -19,13 +19,13 @@
 /// A CROSS-REPO MOVE (Deleted in one Skg repo, Added in another,
 /// within one stage) contributes both signs for one (member, stage);
 /// they CANCEL to no sign, because the edge existed before and after
-/// the move -- a move must not fabricate a membership change.  The
-/// member's existence axes (its file's per-repo statuses) tell the
+/// the move -- a move must not fabricate a relationship change.  The
+/// member's node axes (its file's per-repo statuses) tell the
 /// move story instead.
 
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
 use crate::repo_sets::ActiveRepoSet;
-use crate::types::git::{GitDiffStatus, MembershipAxes, NodeCompleteDiff, Sign, RepoDiff};
+use crate::types::git::{GitDiffStatus, RelationshipAxes, NodeCompleteDiff, Sign, RepoDiff};
 use crate::types::list::Diff_Item;
 use crate::types::misc::{ID, RelPartner, RepoName};
 use crate::types::nodes::complete::NodeComplete;
@@ -37,9 +37,9 @@ use std::path::PathBuf;
 /// 'owner' under 'relation'.  Members with no surviving sign in
 /// either stage (e.g. a cancelled cross-repo move) are omitted.
 /// A member whose axes' net result is "gone from the worktree"
-/// ('MembershipAxes::net_is_present' = false) belongs in the folder's
+/// ('RelationshipAxes::net_is_present' = false) belongs in the folder's
 /// goal list as a phantom; a present member's Plus signs become its
-/// 'newM' marks.
+/// 'addedR' marks.
 ///
 /// 'active': relRepo gating (render-and-gating, 5_plan.org). A
 /// Deleted/Added file's before/after NodeComplete carries full
@@ -55,7 +55,7 @@ pub fn inverse_scan_for_inbound_folder (
   relation     : NodeRelation,
   repo_diffs : &Option<HashMap<RepoName, RepoDiff>>,
   active       : Option<&ActiveRepoSet>,
-) -> HashMap<ID, MembershipAxes> {
+) -> HashMap<ID, RelationshipAxes> {
   let Some (diffs) = repo_diffs else {
     return HashMap::new (); };
   let mut signs : HashMap<ID, [Vec<Sign>; 2]> =
@@ -72,7 +72,7 @@ pub fn inverse_scan_for_inbound_folder (
   signs . into_iter ()
     . map ( |(member, [staged, unstaged])| (
         member,
-        MembershipAxes {
+        RelationshipAxes {
           staged   : resolve_one_stage (&staged),
           unstaged : resolve_one_stage (&unstaged) } ))
     . filter ( |(_, axes)| ! axes . is_empty () )

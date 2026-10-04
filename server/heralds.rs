@@ -185,8 +185,8 @@ pub const RELS_SPANS_SENTINEL : &str = "__RELS_SPANS__";
 ///     its own matcher; both render as "DELETED ...".
 ///
 ///   * Two scaffold-level staged/unstaged INTERC rules and two
-///     node-level ones -- the scaffold-level pair omits the X / -X
-///     axes because existence-change markers only apply to ActiveNodes,
+///     node-level ones -- the scaffold-level pair omits the N / -N
+///     axes because node-axis markers only apply to ActiveNodes,
 ///     not to scaffolds.
 ///
 ///   * The 'affectsParent' sub-rule 'container' names an atom the server
@@ -267,12 +267,12 @@ pub fn herald_rule_table () -> HeraldRule {
         s ("node from inactive repo") ]),
       interc (Some (Green), "", Some ("staged"), vec! [
         s ("staged:"),
-        leaf (Green, "newM",     "M"),
-        leaf (Red,   "removedM", "-M") ]),
+        leaf (Green, "addedR",     "R"),
+        leaf (Red,   "removedR", "-R") ]),
       interc (Some (Green), "", Some ("unstaged"), vec! [
         s ("unstaged:"),
-        leaf (Green, "newM",     "M"),
-        leaf (Red,   "removedM", "-M") ]),
+        leaf (Green, "addedR",     "R"),
+        leaf (Red,   "removedR", "-R") ]),
       rule ("node", vec! [
         vac ("id"),
         vac ("repo"),
@@ -330,16 +330,16 @@ pub fn herald_rule_table () -> HeraldRule {
           rule ("definitiveView", vec! [ s ("req:definitive") ]) ]),
         interc (Some (Green), "", Some ("staged"), vec! [
           s ("staged:"),
-          leaf (Green, "newX",     "X"),
-          leaf (Red,   "removedX", "-X"),
-          leaf (Green, "newM",     "M"),
-          leaf (Red,   "removedM", "-M") ]),
+          leaf (Green, "addedN",     "N"),
+          leaf (Red,   "deletedN", "-N"),
+          leaf (Green, "addedR",     "R"),
+          leaf (Red,   "removedR", "-R") ]),
         interc (Some (Green), "", Some ("unstaged"), vec! [
           s ("unstaged:"),
-          leaf (Green, "newX",     "X"),
-          leaf (Red,   "removedX", "-X"),
-          leaf (Green, "newM",     "M"),
-          leaf (Red,   "removedM", "-M") ]),
+          leaf (Green, "addedN",     "N"),
+          leaf (Red,   "deletedN", "-N"),
+          leaf (Green, "addedR",     "R"),
+          leaf (Red,   "removedR", "-R") ]),
         leaf (Red, "notInGit", "diff:not-in-git") ]),
       // A PhantomDiff (a moved/removed node in git-diff mode) emits its
       // own root atom 'diffPhantom', not 'node'. Its grammar is the
@@ -354,16 +354,16 @@ pub fn herald_rule_table () -> HeraldRule {
         rule ("rels", vec! [ any (vec! [ s (RELS_SPANS_SENTINEL) ]) ]),
         interc (Some (Green), "", Some ("staged"), vec! [
           s ("staged:"),
-          leaf (Green, "newX",     "X"),
-          leaf (Red,   "removedX", "-X"),
-          leaf (Green, "newM",     "M"),
-          leaf (Red,   "removedM", "-M") ]),
+          leaf (Green, "addedN",     "N"),
+          leaf (Red,   "deletedN", "-N"),
+          leaf (Green, "addedR",     "R"),
+          leaf (Red,   "removedR", "-R") ]),
         interc (Some (Green), "", Some ("unstaged"), vec! [
           s ("unstaged:"),
-          leaf (Green, "newX",     "X"),
-          leaf (Red,   "removedX", "-X"),
-          leaf (Green, "newM",     "M"),
-          leaf (Red,   "removedM", "-M") ]),
+          leaf (Green, "addedN",     "N"),
+          leaf (Red,   "deletedN", "-N"),
+          leaf (Green, "addedR",     "R"),
+          leaf (Red,   "removedR", "-R") ]),
         leaf (Red, "notInGit", "diff:not-in-git") ]) ],
   }}
 
@@ -517,7 +517,7 @@ fn axis_atoms () -> Vec<&'static str> {
   fn guard ( s : Sign ) { // compile error here = update the list below
     match s { Sign::Plus | Sign::Minus => () }}
   let _ = guard;
-  vec! [ "newX", "removedX", "newM", "removedM" ] }
+  vec! [ "addedN", "deletedN", "addedR", "removedR" ] }
 
 /// Folder and Qual atoms, via the same repr_in_client constants the
 /// serializer uses.

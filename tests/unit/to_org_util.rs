@@ -142,12 +142,12 @@ fn orphan_under_dead_parent_demoted_member_under_folder_kept () {
   // parent (Diff phantom / DeadScaffold) demotes to Independent; a legitimate
   // folder MEMBER (Affected Normal under a PartnerFolder) is left untouched.
   use crate::types::viewnode::{ mk_phantom_viewnode, PartnerFolder };
-  use crate::types::git::{ ExistenceAxes, MembershipAxes };
+  use crate::types::git::{ NodeAxes, RelationshipAxes };
   let mut vf : Tree<ViewNode> = Tree::new (viewforest_root_viewnode ());
   let root : NodeId = vf . root () . id ();
   let phantom : NodeId = vf . get_mut (root) . unwrap () . append (
     mk_phantom_viewnode ( id ("PH"), src (), "PH" . to_string (),
-                          ExistenceAxes::default (), MembershipAxes::default () )
+                          NodeAxes::default (), RelationshipAxes::default () )
   ) . id ();
   let under_phantom : NodeId = vf . get_mut (phantom) . unwrap () . append (
     mk_writeProtected_viewnode (id ("A"), src (), "A" . to_string (),

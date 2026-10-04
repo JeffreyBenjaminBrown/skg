@@ -184,16 +184,16 @@ describe('skg.sexpr.lens INTERC', function ()
   end)
 
   it('empty separator concatenates slots', function ()
-    assert.are.same({ 'stage:-X-M' },
-      texts('(a (stage removedX removedM))',
+    assert.are.same({ 'stage:-N-R' },
+      texts('(a (stage deletedN removedR))',
             '(a (INTERC "" stage "stage:"'
-            .. ' (removedX "-X") (removedM "-M")))'))
+            .. ' (deletedN "-N") (removedR "-R")))'))
   end)
 
   it('emits one token per matching child', function ()
-    assert.are.same({ 'stage:-X', 'stage:M' },
-      texts('(a (stage removedX) (stage newM))',
+    assert.are.same({ 'stage:-N', 'stage:R' },
+      texts('(a (stage deletedN) (stage addedR))',
             '(a (INTERC "" stage "stage:"'
-            .. ' (removedX "-X") (newM "M")))'))
+            .. ' (deletedN "-N") (addedR "R")))'))
   end)
 end)

@@ -8,7 +8,7 @@ use crate::dbs::in_rust_graph::InRustGraph;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use super::git::{ExistenceAxes, MembershipAxes, NodeCompleteDiff, Sign, RepoDiff, existence_axes_in_repo_diff};
+use super::git::{NodeAxes, RelationshipAxes, NodeCompleteDiff, Sign, RepoDiff, node_axes_in_repo_diff};
 use super::list::Diff_Item;
 use super::misc::{ID, SkgConfig, SkgfileRepo, RepoName};
 
@@ -50,16 +50,16 @@ pub fn phantom_axes (
   parent_repo : &RepoName,
   relation      : NodeRelation, // the relation the caller's folder represents
   repo_diffs  : Option<&HashMap<RepoName, RepoDiff>>,
-) -> (ExistenceAxes, MembershipAxes) {
-  // Existence: the child's own file-level status in each stage.
+) -> (NodeAxes, RelationshipAxes) {
+  // Node axes: the child's own file-level status in each stage.
   let child_file : PathBuf =
     PathBuf::from ( format! ( "{}.skg", child_id . 0 ) );
-  let existence : ExistenceAxes =
-    existence_axes_in_repo_diff (
+  let node_axes : NodeAxes =
+    node_axes_in_repo_diff (
       repo_diffs . and_then ( |d| d . get (child_repo) ),
       &child_file );
 
-  // Membership: the child's presence in the parent's list for the
+  // Relationship axes: the child's presence in the parent's list for the
   // NAMED relation, in each stage. New(id) -> Plus; Removed(id) ->
   // Minus. Exactly one relation diff is read -- the folder's own -- so
   // a phantom's stage label can never come from a DIFFERENT relation
@@ -83,8 +83,8 @@ pub fn phantom_axes (
     parent_sd . and_then ( |sd| sign_from_parent_stage (&sd . staged) );
   let mem_unstaged : Option<Sign> =
     parent_sd . and_then ( |sd| sign_from_parent_stage (&sd . unstaged) );
-  let membership : MembershipAxes =
-    MembershipAxes { staged: mem_staged, unstaged: mem_unstaged };
+  let relationship_axes : RelationshipAxes =
+    RelationshipAxes { staged: mem_staged, unstaged: mem_unstaged };
 
   // Fall back to a net "unstaged Minus" only when the named relation's
   // per-stage diff carries no signal for this child. A per-stage
@@ -96,12 +96,12 @@ pub fn phantom_axes (
   // can change while no single input relation's diff names the child
   // (its three-snapshot comparison supplies exact labels instead, and
   // bypasses this function).
-  let membership : MembershipAxes =
-    if membership . is_empty ()
-      { MembershipAxes { staged: None, unstaged: Some (Sign::Minus) } }
-    else { membership };
+  let relationship_axes : RelationshipAxes =
+    if relationship_axes . is_empty ()
+      { RelationshipAxes { staged: None, unstaged: Some (Sign::Minus) } }
+    else { relationship_axes };
 
-  (existence, membership) }
+  (node_axes, relationship_axes) }
 
 /// A node's HOME read from disk. When owned and non-owned files use
 /// the same pid, the owned telescope wins; otherwise the home is

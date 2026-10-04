@@ -16,9 +16,9 @@ fn all_tests
       Ok (( )) } )) }
 
 /// A within-parent reorder must render the moved member at BOTH slots -- a
-/// 'removedM' phantom (old slot) and a 'newM' live child (new slot), git-style
+/// 'removedR' phantom (old slot) and an 'addedR' live child (new slot), git-style
 /// -- and the rendered buffer must save with no validation errors. Regression:
-/// the old slot used to come out 'newM', re-parse as a second live vognode, and
+/// the old slot used to come out 'addedR', re-parse as a second live vognode, and
 /// trip the content-child uniqueness check.
 async fn reorder_within_parent_shows_move_and_roundtrips (
   s : &mut SharedStoreSession,
@@ -36,26 +36,26 @@ async fn reorder_within_parent_shows_move_and_roundtrips (
   let (actual, _pids, _) : (String, Vec<ID>, _) =
     multi_root_view (&config, None, &root_ids, true) ?;
 
-  // The moved member is drawn at BOTH slots: 'removedM' at its old slot and
-  // 'newM' at its new slot (a git-style move). Which member git's LCS treats as
+  // The moved member is drawn at BOTH slots: 'removedR' at its old slot and
+  // 'addedR' at its new slot (a git-style move). Which member git's LCS treats as
   // "moved" is not contractual, so identify it by the axes, not by name.
-  let removedm_line : &str = actual . lines ()
-    . find ( |l| l . contains ("removedM") )
-    . unwrap_or_else ( || panic! ("expected a removedM old-slot phantom:\n{actual}") );
-  let newm_line : &str = actual . lines ()
-    . find ( |l| l . contains ("newM") )
-    . unwrap_or_else ( || panic! ("expected a newM new-slot child:\n{actual}") );
+  let removedr_line : &str = actual . lines ()
+    . find ( |l| l . contains ("removedR") )
+    . unwrap_or_else ( || panic! ("expected a removedR old-slot phantom:\n{actual}") );
+  let addedr_line : &str = actual . lines ()
+    . find ( |l| l . contains ("addedR") )
+    . unwrap_or_else ( || panic! ("expected an addedR new-slot child:\n{actual}") );
   let id_of = | line : &str | -> String {
     line . split ("(id ") . nth (1) . unwrap ()
       . split ( |c| c == ')' || c == ' ' ) . next () . unwrap () . to_string () };
-  assert_eq! ( id_of (removedm_line), id_of (newm_line),
-    "the removedM (old slot) and newM (new slot) must be the same moved member:\n{actual}" );
+  assert_eq! ( id_of (removedr_line), id_of (addedr_line),
+    "the removedR (old slot) and addedR (new slot) must be the same moved member:\n{actual}" );
 
   assert_diff_buffer_roundtrips ( &actual, config, tantivy ) . await ?;
   Ok (( )) }
 
 /// A contains member referenced at HEAD whose .skg file exists in no Skg repo
-/// renders as a removedM phantom carrying the NOT_FOUND Skg repo sentinel; that
+/// renders as a removedR phantom carrying the NOT_FOUND Skg repo sentinel; that
 /// buffer must save with no validation errors. Regression: validate_phantom
 /// used to reject a phantom whose Skg repo is not in the config.
 async fn dangling_at_head_member_roundtrips (

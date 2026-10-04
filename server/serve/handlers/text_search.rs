@@ -32,7 +32,7 @@ use crate::serve::handlers::text_release::{
   search_choice_from_request};
 use crate::serve::protocol::TcpToClient;
 use crate::serve::util::{ send_response_with_length_prefix, tag_text_response};
-use crate::types::git::MembershipAxes;
+use crate::types::git::RelationshipAxes;
 use crate::types::views_state::ViewUri;
 use crate::types::misc::{TantivyIndex, SkgConfig, ID, RepoName};
 use crate::repo_sets::{ActiveRepoSet, search_ids_for_repo_set_for_test as search_ids_for_repo_set_for_test_impl};
@@ -652,5 +652,5 @@ pub fn build_search_viewforest (
                 text       : title . clone (),
                 relRepo : None,
                 relRepo_request : None,
-                membership : MembershipAxes::default () } ) } ); }} }
+                relationship_axes : RelationshipAxes::default () } ) } ); }} }
   (viewforest, search_results) }

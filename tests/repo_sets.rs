@@ -913,7 +913,7 @@ async fn inactive_subscribee_placeholder_does_not_contribute_to_subscribes_to (
   _tantivy : &mut TantivyIndex,
 ) -> Result<(), Box<dyn Error>> {
   // An inactive placeholder emits no subscribes_to membership, just as
-  // it emits no contains membership: 'subscribes_to' is
+  // it emits no contains relationship_axes: 'subscribes_to' is
   // order-meaningful, but the disk merge (weave) owns invisible
   // subscribees, so a buffer-present placeholder must not feed the
   // owner's subscribeeFolder. (root has no subscribes_to on disk, so the

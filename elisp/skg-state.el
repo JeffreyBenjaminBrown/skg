@@ -68,7 +68,7 @@ Set by `skg-view-diff-mode's response handler; reset to nil whenever
 a fresh TCP connection is made (the server starts each connection
 with diff mode off). Consumers use it only to EXPLAIN -- e.g.
 `skg-git-add-if-new-recursive' finds new files via the diff-mode
-newX markers, so with diff mode off it says why nothing was found
+addedN markers, so with diff mode off it says why nothing was found
 instead of reporting 0 files.")
 
 (provide 'skg-state)

@@ -20,7 +20,7 @@
 ///   the tree is being mutated.
 
 use crate::types::env::{RuntimeGeneration, SkgEnv};
-use crate::types::git::{ExistenceAxes, MembershipAxes, Sign, RepoDiff};
+use crate::types::git::{NodeAxes, RelationshipAxes, Sign, RepoDiff};
 use crate::types::misc::{ID, RepoName};
 use crate::types::phantom::title_for_phantom;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
@@ -42,7 +42,7 @@ use std::io;
 pub struct ChildData {
   pub home_repo  : RepoName,
   pub title   : String,
-  pub phantom : Option<(ExistenceAxes, MembershipAxes)>,
+  pub phantom : Option<(NodeAxes, RelationshipAxes)>,
   /// True when the exact stored relationship member has no current
   /// node.  It is rendered as an Unknown, never as a title-less active
   /// fallback.
@@ -68,7 +68,7 @@ pub fn build_child_data (
   goal_list                      : &[ID],
   removed_ids                    : &HashSet<ID>,
   axes_for_removed               : &dyn Fn (&ID, &RepoName)
-                                     -> (ExistenceAxes, MembershipAxes),
+                                     -> (NodeAxes, RelationshipAxes),
   repo_diffs                   : &Option<HashMap<RepoName, RepoDiff>>,
   deleted_since_head_pid_src_map : &HashMap<ID, RepoName>,
   relRepos           : &HashMap<ID, RepoName>,
@@ -97,7 +97,7 @@ pub fn build_child_data (
         SkgEnv::find_repo_in_generation (
           runtime, child_skgid, deleted_since_head_pid_src_map)
         . unwrap_or_else ( RepoName::not_found );
-      let axes : (ExistenceAxes, MembershipAxes) =
+      let axes : (NodeAxes, RelationshipAxes) =
         axes_for_removed ( child_skgid, &child_src );
       let child_title : String =
         title_for_phantom ( &runtime . graph, child_skgid, &child_src,
@@ -281,7 +281,7 @@ fn normalize_relationship_backed_partner_unknowns (
 /// owner's relation diff via 'outbound_member_axes'; an inbound folder
 /// reads the inverse scan):
 /// - a member PRESENT after both stages gets only its Plus signs
-///   ('newM'), mirroring 'mark_membership_on_existing_children's
+///   ('addedR'), mirroring 'mark_relationship_axes_on_existing_children's
 ///   rule for content children (Minus positions are phantoms,
 ///   handled by the goal list);
 /// - an Active child whose net result is REMOVED -- reachable only
@@ -289,10 +289,10 @@ fn normalize_relationship_backed_partner_unknowns (
 ///   read-only-folder member whose edge is gone -- gets the full axes
 ///   and flips to a phantom, so the rendered buffer cannot show a
 ///   removed edge as a live member.
-pub fn apply_membership_axes_to_folder_members (
+pub fn apply_relationship_axes_to_folder_members (
   tree       : &mut Tree<ViewNode>,
   folder_node   : NodeId,
-  axes_by_id : &HashMap<ID, MembershipAxes>,
+  axes_by_id : &HashMap<ID, RelationshipAxes>,
 ) -> Result<(), Box<dyn Error>> {
   if axes_by_id . is_empty () { return Ok (( )); }
   treat_certain_children (
@@ -305,11 +305,11 @@ pub fn apply_membership_axes_to_folder_members (
       { if let Some (m) = axes_by_id . get (&t . id) {
           if m . net_is_present () {
             if m . staged   == Some (Sign::Plus)
-              { t . membership . staged   = Some (Sign::Plus); }
+              { t . relationship_axes . staged   = Some (Sign::Plus); }
             if m . unstaged == Some (Sign::Plus)
-              { t . membership . unstaged = Some (Sign::Plus); }
+              { t . relationship_axes . unstaged = Some (Sign::Plus); }
           } else {
-            t . membership = *m; }}}
+            t . relationship_axes = *m; }}}
       vn . normal_to_phantom (); // flips only when the axes require
     } )
     . map_err ( |e| -> Box<dyn Error> { e . into () } ) ?;

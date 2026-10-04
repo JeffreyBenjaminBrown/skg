@@ -29,7 +29,7 @@ Initial state:
 - old.skg      : committed (present in HEAD).
 - new.skg      : on disk, untracked.
 - child.skg    : on disk, untracked.
-- staged.skg   : on disk, staged but never committed (`(staged newX)` shape).
+- staged.skg   : on disk, staged but never committed (`(staged addedN)` shape).
 
 Returns the absolute data-root path."
   (let* ((root (make-temp-file "skg-git-add-" t))
@@ -69,11 +69,11 @@ Returns the absolute data-root path."
     (with-current-buffer buf
       (erase-buffer)
       (insert
-       "* (skg (node (id new) (repo main) (unstaged newX newM))) new\n"
+       "* (skg (node (id new) (repo main) (unstaged addedN addedR))) new\n"
        "body\n"
-       "** (skg (node (id child) (repo main) (unstaged newX newM))) child\n"
-       "** (skg (node (id old) (repo main) (unstaged newM))) old\n"
-       "* (skg (node (id staged) (repo main) (staged newX))) staged\n")
+       "** (skg (node (id child) (repo main) (unstaged addedN addedR))) child\n"
+       "** (skg (node (id old) (repo main) (unstaged addedR))) old\n"
+       "* (skg (node (id staged) (repo main) (staged addedN))) staged\n")
       (skg-content-view-mode)
       (goto-char (point-min)))
     buf))
@@ -96,7 +96,7 @@ Returns the absolute data-root path."
     (string-trim (buffer-string))))
 
 (ert-deftest test-skg-git-add-if-new-recursive-runs-previewed-command ()
-  "The recursive executor stages the same newX subtree files as the preview."
+  "The recursive executor stages the same addedN subtree files as the preview."
   (unwind-protect
       (let* ((root (test-skg-git-add--setup))
              (src  (expand-file-name "main" root))
@@ -123,7 +123,7 @@ Returns the absolute data-root path."
     (test-skg-git-add--teardown)))
 
 (ert-deftest test-skg-git-add-preview-collects-only-unstaged-new-files ()
-  "The preview collector uses newX, not membership-only newM or staged newX."
+  "The preview collector uses addedN, not relationship-only addedR or staged addedN."
   (unwind-protect
       (progn
         (test-skg-git-add--setup)
@@ -202,9 +202,9 @@ ellipsis object to `call-process' instead of a string."
         (setq ids (nreverse ids))
         (with-current-buffer buf
           (erase-buffer)
-          (insert "* (skg (node (id old) (repo main) (unstaged newM))) old\n")
+          (insert "* (skg (node (id old) (repo main) (unstaged addedR))) old\n")
           (dolist (id ids)
-            (insert (format "** (skg (node (id %s) (repo main) (unstaged newX newM))) %s\n"
+            (insert (format "** (skg (node (id %s) (repo main) (unstaged addedN addedR))) %s\n"
                             id id)))
           (skg-content-view-mode)
           (goto-char (point-min)))
@@ -227,7 +227,7 @@ ellipsis object to `call-process' instead of a string."
     (test-skg-git-add--teardown)))
 
 (ert-deftest test-skg-git-add-explains-when-diff-mode-off ()
-  "With git diff mode off and no newX markers in the subtree, both
+  "With git diff mode off and no addedN markers in the subtree, both
 commands must explain that diff mode is required to recognize new
 files, rather than reporting 0 files as if the user did it right
 (TODO/more.org)."

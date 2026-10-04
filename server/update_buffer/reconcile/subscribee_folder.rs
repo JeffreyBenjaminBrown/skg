@@ -1,10 +1,10 @@
 use crate::repo_sets::ActiveRepoSet;
 use crate::types::env::{RuntimeGeneration, SkgEnv};
 use crate::dbs::in_rust_graph::relation_accessors::NodeRelation;
-use crate::to_org::complete::partner_folder::child_data::{ChildData, build_child_data, apply_membership_axes_to_folder_members, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
+use crate::to_org::complete::partner_folder::child_data::{ChildData, build_child_data, apply_relationship_axes_to_folder_members, reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds};
 use crate::update_buffer::reconcile::omit_inactive_members;
 use crate::to_org::complete::partner_folder::goal_list::{goal_list_for_outbound_folder, outbound_member_axes};
-use crate::types::git::{ExistenceAxes, MembershipAxes, RepoDiff};
+use crate::types::git::{NodeAxes, RelationshipAxes, RepoDiff};
 use crate::types::phantom::phantom_axes;
 use crate::dbs::node_lookup::nodecomplete_rustFirst_by_pid_and_repo;
 use crate::types::misc::{ID, RelPartner, RepoName};
@@ -92,7 +92,7 @@ pub fn reconcile_subscribeeFolder_children (
     // its subscribees here costs nothing and never truncates the group.
     let axes_for_removed = // the relation this folder represents
       |child : &ID, child_src : &RepoName|
-      -> (ExistenceAxes, MembershipAxes) {
+      -> (NodeAxes, RelationshipAxes) {
       phantom_axes ( child, child_src,
                      &context . parent_pid, &context . parent_repo,
                      NodeRelation::SubscribesTo,
@@ -108,8 +108,8 @@ pub fn reconcile_subscribeeFolder_children (
       &goal_list, &child_data, deleted_by_this_save_extra_ids ) ?;
     if repo_diffs . is_some () {
       // Present members whose edge is New in some stage get that
-      // stage's 'newM'; removed members are the phantoms above.
-      apply_membership_axes_to_folder_members (
+      // stage's 'addedR'; removed members are the phantoms above.
+      apply_relationship_axes_to_folder_members (
         tree, node,
         & outbound_member_axes (
           &context . parent_pid, &context . parent_repo,

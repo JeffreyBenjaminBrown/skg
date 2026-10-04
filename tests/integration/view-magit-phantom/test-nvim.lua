@@ -67,7 +67,7 @@ require('skg.diff_mode').toggle()
 T.check(T.wait_for_response(20), 'diff-mode-on response arrived')
 do
   local content = T.buffer_text(content_view)
-  T.check(content:find('(unstaged removedM)', 1, true) ~= nil,
+  T.check(content:find('(unstaged removedR)', 1, true) ~= nil,
           string.format('removed-here phantom b present. Buffer: %s',
                         content))
 end
@@ -79,7 +79,7 @@ do
   local lines = vim.api.nvim_buf_get_lines(content_view, 0, -1, false)
   local phantom_line = nil
   for lnum, line in ipairs(lines) do
-    if line:find('(unstaged removedM)', 1, true) then
+    if line:find('(unstaged removedR)', 1, true) then
       phantom_line = lnum break
     end
   end

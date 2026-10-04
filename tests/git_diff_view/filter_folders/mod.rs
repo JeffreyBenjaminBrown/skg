@@ -12,13 +12,13 @@
 /// Derived hiddenIn  = hides ∩ contains: [h1, h4] -> [h1, h2, h3]
 /// Derived hiddenOut = hides − contains: [h3, h6] -> [h5]
 /// So:
-/// - h2 newly hidden-in because the HIDES list gained it -> newM;
-/// - h3 newly hidden-in because the CONTAINS list gained it -> newM
-///   under hiddenIn, AND a removedM phantom under hiddenOutside
+/// - h2 newly hidden-in because the HIDES list gained it -> addedR;
+/// - h3 newly hidden-in because the CONTAINS list gained it -> addedR
+///   under hiddenIn, AND a removedR phantom under hiddenOutside
 ///   (it stopped being hidden-outside without any hides change);
 /// - h4 stopped being hidden-in (hides dropped it) -> exact-label
 ///   phantom under hiddenIn;
-/// - h5 newly hidden-outside -> newM there;
+/// - h5 newly hidden-outside -> addedR there;
 /// - h6 no longer hidden at all -> exact-label phantom under
 ///   hiddenOutside.
 
@@ -61,21 +61,21 @@ const INPUT : &str = "\
 
 const EXPECTED_UNSTAGED : &str = "\
 ***** (skg (node (id h1) (repo main))) h1
-***** (skg (node (id h2) (repo main) (unstaged newM))) h2
-***** (skg (node (id h3) (repo main) (unstaged newM))) h3
-***** (skg (node (id h4) (repo main) writeProtected (unstaged removedM))) h4
-**** (skg (node (id h5) (repo main) (unstaged newM))) h5
-**** (skg (node (id h3) (repo main) writeProtected (unstaged removedM))) h3
-**** (skg (node (id h6) (repo main) writeProtected (unstaged removedM))) h6
+***** (skg (node (id h2) (repo main) (unstaged addedR))) h2
+***** (skg (node (id h3) (repo main) (unstaged addedR))) h3
+***** (skg (node (id h4) (repo main) writeProtected (unstaged removedR))) h4
+**** (skg (node (id h5) (repo main) (unstaged addedR))) h5
+**** (skg (node (id h3) (repo main) writeProtected (unstaged removedR))) h3
+**** (skg (node (id h6) (repo main) writeProtected (unstaged removedR))) h6
 ";
 
 const EXPECTED_STAGED : &str = "\
-***** (skg (node (id h2) (repo main) (staged newM))) h2
-***** (skg (node (id h3) (repo main) (staged newM))) h3
-***** (skg (node (id h4) (repo main) writeProtected (staged removedM))) h4
-**** (skg (node (id h5) (repo main) (staged newM))) h5
-**** (skg (node (id h3) (repo main) writeProtected (staged removedM))) h3
-**** (skg (node (id h6) (repo main) writeProtected (staged removedM))) h6
+***** (skg (node (id h2) (repo main) (staged addedR))) h2
+***** (skg (node (id h3) (repo main) (staged addedR))) h3
+***** (skg (node (id h4) (repo main) writeProtected (staged removedR))) h4
+**** (skg (node (id h5) (repo main) (staged addedR))) h5
+**** (skg (node (id h3) (repo main) writeProtected (staged removedR))) h3
+**** (skg (node (id h6) (repo main) writeProtected (staged removedR))) h6
 ";
 
 #[test]
@@ -84,9 +84,9 @@ fn all_tests
   run_with_shared_test_stores (
     "skg-test-git-diff-filter-folders",
     |s| Box::pin ( async move {
-      filter_folders_show_exact_phantoms_and_newM_unstaged (s) . await ?;
+      filter_folders_show_exact_phantoms_and_addedR_unstaged (s) . await ?;
       emptied_filter_folders_still_render_in_diff_mode (s) . await ?;
-      filter_folders_show_exact_phantoms_and_newM_staged (s) . await ?;
+      filter_folders_show_exact_phantoms_and_addedR_staged (s) . await ?;
       Ok (( )) } )) }
 
 async fn run_filter_folder_test (
@@ -130,7 +130,7 @@ async fn run_filter_folder_test (
         "filter-folder phantoms must not edit the hides list" ); }
     Ok (( )) }
 
-async fn filter_folders_show_exact_phantoms_and_newM_unstaged (
+async fn filter_folders_show_exact_phantoms_and_addedR_unstaged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   run_filter_folder_test (
@@ -169,10 +169,10 @@ async fn emptied_filter_folders_still_render_in_diff_mode (
         true, &Err (String::new ()), &mut views_state ) . await ?;
       assert_buffer_contains ( &response . saved_view, "\
 **** (skg hiddenInSubscribeeFolder)
-***** (skg (node (id x2) (repo main) writeProtected (unstaged removedM))) x2
+***** (skg (node (id x2) (repo main) writeProtected (unstaged removedR))) x2
 **** (skg (node (id x2) (repo main))) x2
 *** (skg hiddenOutsideOfSubscribeeFolder)
-**** (skg (node (id y2) (repo main) writeProtected (unstaged removedM))) y2
+**** (skg (node (id y2) (repo main) writeProtected (unstaged removedR))) y2
 " ); }
     { // The same save outside diff mode creates neither folder.
       let mut views_state : ViewsState = ViewsState {
@@ -189,7 +189,7 @@ async fn emptied_filter_folders_still_render_in_diff_mode (
           folder, response . saved_view ); }}
     Ok (( )) }
 
-async fn filter_folders_show_exact_phantoms_and_newM_staged (
+async fn filter_folders_show_exact_phantoms_and_addedR_staged (
   s : &mut SharedStoreSession,
 ) -> Result<(), Box<dyn Error>> {
   run_filter_folder_test (
