@@ -113,34 +113,43 @@ pub fn prepare_import_batch_with (
 }
 
 impl PreparedImportBatch {
-  /// An Org document: a summary, then warnings grouped by file, then
-  /// where each document's export marker would write it.
+  /// An Org document: a summary, warnings grouped by file, then the
+  /// imported documents, those whose export marker would write them
+  /// under a different name first.
   pub fn preview_report (
     &self,
   ) -> String {
     let mut out : String = format! (
-      "* Import preview\nImport directory: {}\nDestination source: {} (determines privacy)\nHost root: {}\nDocuments: {}\nNew nodes: {}\n",
+      "* Import preview\nImport directory: {}\nDestination source: {} (determines privacy)\nHost root: {}\n",
       self . input_directory . display (), self . destination_source,
       self . host_root . as_ref () . map (|path| path . display () . to_string ())
-        . unwrap_or_else (|| "none" . to_string ()),
-      self . documents . len (), self . nodes . len ());
+        . unwrap_or_else (|| "none" . to_string ()));
     let warning_count : usize = self . documents . iter ()
       . map (|document| document . diagnostics . len ()) . sum ();
     if warning_count == 0 {
-      out . push_str ("** No warnings\n");
+      out . push_str ("* No warnings\n");
     } else {
-      out . push_str (&format! ("** Warnings ({})\n", warning_count));
+      out . push_str (&format! ("* Warnings ({})\n", warning_count));
       for document in self . documents . iter ()
         . filter (|document| ! document . diagnostics . is_empty ()) {
-        out . push_str (&format! ("*** {}\n", document . path . display ()));
+        out . push_str (&format! ("** {}\n", document . path . display ()));
         for diagnostic in &document . diagnostics {
           out . push_str (&format! ("- line {}: {}\n",
             line_at (&document . text, diagnostic . range . start),
             diagnostic . message)); }}}
-    out . push_str ("** Export paths\nWhere each document's export marker would write it, relative to the export's output directory:\n");
-    for (source, target) in &self . export_targets {
-      out . push_str (&format! (
-        "- {} -> {}.org\n", source . display (), target)); }
+    out . push_str (&format! ("* New nodes ({}, from {} documents)\n",
+      self . nodes . len (), self . documents . len ()));
+    let (renamed, same) : (Vec<(String, String)>, Vec<(String, String)>) =
+      self . export_targets . iter ()
+      . map (|(source, target)|
+        (source . display () . to_string (), format! ("{}.org", target)))
+      . partition (|(input, output)| input != output);
+    out . push_str ("** whose input and (eventual) output names do *not* match\n");
+    for (input, output) in renamed {
+      out . push_str (&format! ("*** {}\nwill export as {}\n", input, output)); }
+    out . push_str ("** whose input and (eventual) output names match\n");
+    for (input, _) in same {
+      out . push_str (&format! ("*** {}\n", input)); }
     out
   }
 
@@ -377,8 +386,9 @@ mod tests {
     let node_count : usize = prepared . nodes . len ();
     let report : String = prepared . preview_report ();
     assert! (report . starts_with ("* Import preview\n"), "{}", report);
-    assert! (report . contains ("** No warnings\n** Export paths\n"), "{}", report);
-    assert! (report . contains ("- empty.md -> empty.org"), "{}", report);
+    assert! (report . contains (
+      "* No warnings\n* New nodes (6, from 2 documents)\n** whose input and (eventual) output names do *not* match\n*** empty.md\nwill export as empty.org\n** whose input and (eventual) output names match\n*** notes.org\n"),
+      "{}", report);
     let gate = env . mutation_gate ();
     let _guard = futures::executor::block_on (gate . lock ());
     let (created, reported_id) = prepared . apply_under_mutation_gate (&env) .unwrap ();
