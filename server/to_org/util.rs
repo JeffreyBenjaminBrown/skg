@@ -374,8 +374,8 @@ pub fn mark_orphans_under_dead_parents_false (
       let affects_parent_non_container : bool =
         child_ref . parent () . map_or ( false, |p|
           matches! ( & p . value () . kind,
-            ViewnodeKind::Phantom (Phantom::Diff (_))
-              | ViewnodeKind::Phantom (Phantom::Deleted (_))
+            ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (_)))
+              | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))
               | ViewnodeKind::DeadViewnode ) );
       if affects_parent_non_container { targets . push ( child_ref . id () ); }}}
   for id in targets {
@@ -427,14 +427,14 @@ fn is_ancestor_id (
   for generation in 1.. {
     match read_at_ancestor_in_tree(
       tree, origin_treeid, generation,
-      |viewnode| viewnode . id_if_vognode () . cloned () )
+      |viewnode| viewnode . id_if_graph_member () . cloned () )
     { Ok(Some (id)) if &id == target_skgid
         => return Ok (true),
       Ok (_) => continue,
       Err (_) => return Ok (false), }}
   unreachable!() }
 
-/// Errors if the node is a Non-vognode or not found.
+/// Errors if the node is a phantom, a non-vognode, or not found.
 pub fn get_id_from_treenode (
   tree   : &Tree<Viewnode>,
   treeid : NodeId,
@@ -443,11 +443,11 @@ pub fn get_id_from_treenode (
     read_at_node_in_tree (
       tree, treeid, |viewnode| viewnode . kind . clone() )?;
   match node_kind {
-    ViewnodeKind::Vognode (v)
+    ViewnodeKind::Vognode (v) if v . is_graph_member ()
       => v . id () . cloned () . ok_or_else (
            || "get_id_from_treenode: inactive vognode has no id"
               . into () ),
-    _ => Err ( "get_id_from_treenode: caller must pass a vognode" . into() ),
+    _ => Err ( "get_id_from_treenode: caller must pass a non-phantom vognode" . into() ),
   }}
 
 
@@ -533,10 +533,10 @@ pub fn activeNode_in_tree_is_writeProtected (
     . map_err ( |e| -> Box<dyn Error> { e . into() } ) ?;
   match node_kind {
     ViewnodeKind::Vognode (Vognode::Active (t))   => Ok (t . is_writeProtected ()),
-    ViewnodeKind::Phantom (Phantom::Diff (p)) => Ok (p . is_writeProtected ()),
-    ViewnodeKind::Phantom (Phantom::Deleted (_))
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) => Ok (p . is_writeProtected ()),
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))
       | ViewnodeKind::Vognode (Vognode::Inactive (_))
-      | ViewnodeKind::Phantom (Phantom::Unknown (_)) => Ok (false),
+      | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_))) => Ok (false),
     _                                                => Err (
       "is_writeProtected: caller must pass a vognode" . into( )),
   }}

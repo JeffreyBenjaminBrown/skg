@@ -196,13 +196,13 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Active (t))
         => t . affectsParent == AffectsParent::True,
-      ViewnodeKind::Phantom (crate::types::viewnode::Phantom::Unknown (_))
+      ViewnodeKind::Vognode (Vognode::Phantom (crate::types::viewnode::Phantom::Unknown (_)))
         => true,
       _ => false },
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Active (t))
         => Ok ( t . id . clone () ),
-      ViewnodeKind::Phantom (crate::types::viewnode::Phantom::Unknown (u))
+      ViewnodeKind::Vognode (Vognode::Phantom (crate::types::viewnode::Phantom::Unknown (u)))
         => Ok ( u . id . clone () ),
       _ => Err ( format! (
         "{}: relevant child not a normal graph node", label )) },
@@ -215,8 +215,8 @@ pub fn reconcile_partnerFolder_children_against_goal_list_with_deleted_extraIds 
       Ok (
         if d . unknown {
           let mut unknown : Viewnode = mk_unknown_viewnode (id . clone ());
-          if let ViewnodeKind::Phantom (
-            crate::types::viewnode::Phantom::Unknown (u)) = &mut unknown . kind
+          if let ViewnodeKind::Vognode (Vognode::Phantom (
+            crate::types::viewnode::Phantom::Unknown (u))) = &mut unknown . kind
           { u . relRepo = d . relRepo . clone (); }
           unknown
         } else { match d . phantom {
@@ -269,10 +269,10 @@ fn normalize_relationship_backed_partner_unknowns (
         . clone () };
       let relRepo : Option<RepoName> = child_data . get (&id)
         . and_then (|data| data . relRepo . clone ());
-      vn . kind = ViewnodeKind::Phantom (
+      vn . kind = ViewnodeKind::Vognode (Vognode::Phantom (
         crate::types::viewnode::Phantom::Unknown (
           crate::types::viewnode::PhantomUnknown {
-            id, relRepo, relRepo_request: None })); })
+            id, relRepo, relRepo_request: None }))); })
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }
 
@@ -352,7 +352,7 @@ mod tests {
     assert! (rendered . focused,
       "normalization must preserve the existing view wrapper state");
     match &rendered . kind {
-      ViewnodeKind::Phantom (Phantom::Unknown (unknown)) => {
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
         assert_eq! (unknown . id, raw_extra);
         assert_eq! (unknown . relRepo, Some (repo ("foreign"))); },
       other => panic! ("expected raw extra member as Unknown, got {other:?}"), }

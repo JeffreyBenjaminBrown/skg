@@ -41,12 +41,12 @@ fn consuming_edit_requests_covers_every_carrier_but_not_view_requests () {
 
   let mut unknown : Viewnode = Viewnode {
     focused : false, folded : false, body_folded : false,
-    kind : ViewnodeKind::Phantom (Phantom::Unknown (PhantomUnknown {
+    kind : ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (PhantomUnknown {
       id : ID::from ("unknown"),
       relRepo : None,
-      relRepo_request : Some (RepoName::from ("private")), })) };
+      relRepo_request : Some (RepoName::from ("private")), }))) };
   unknown . consume_edit_request_after_save ();
-  let ViewnodeKind::Phantom (Phantom::Unknown (unknown)) = &unknown . kind
+  let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) = &unknown . kind
   else { panic! ("expected unknown node"); };
   assert_eq! (unknown . relRepo_request, None);
 

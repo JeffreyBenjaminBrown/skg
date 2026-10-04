@@ -134,13 +134,13 @@ pub fn viewnode_from_metadata (
   let (kind, error, warning)
     : (MpViewnodeKind, Option<BufferValidationError>, Option<String>)
     = if let Some (ref uid) = metadata . unknown_node_id {
-        ( MpViewnodeKind::Phantom (
+        ( MpViewnodeKind::Vognode (MpVognode::Phantom (
             MpPhantom::Unknown (
               PhantomUnknown {
                 id                 : uid . clone (),
                 relRepo         : metadata . unknown_relRepo . clone (),
                 relRepo_request : metadata . unknown_relRepo_request . clone (),
-              } ) ),
+              } ) )),
           if body . is_some () || ! title . is_empty () {
             Some ( BufferValidationError::Other (
               "Unknown placeholder content cannot be edited" . to_string () ))
@@ -160,7 +160,7 @@ pub fn viewnode_from_metadata (
       } else if metadata . is_dead_viewnode {
         ( MpViewnodeKind::DeadViewnode, None, None )
       } else if metadata . is_deleted_node {
-        ( MpViewnodeKind::Phantom (
+        ( MpViewnodeKind::Vognode (MpVognode::Phantom (
             MpPhantom::Deleted ( PhantomDeleted {
             id     : metadata . id . clone ()
                        . unwrap_or_else ( || ID::from ("")),
@@ -168,7 +168,7 @@ pub fn viewnode_from_metadata (
                        . unwrap_or_else ( || RepoName::from ("")),
             title,
             body,
-          } ) ), None, None )
+          } ) )), None, None )
       } else if let Some ( ref non_vognode ) = metadata . non_vognode {
         let is_flags_folder = matches! (non_vognode,
           MpViewnodeKind::PropertyFolder (PropertyFolder::Flags { .. }));
@@ -268,9 +268,9 @@ pub fn viewnode_from_metadata (
             // EditRequestOnWriteProtectedOccurrence validation above already fired if this
             // phantom (write-protected) carried an edit_request, so dropping
             // editability/affectsParent/etc. here loses nothing.
-            MpViewnodeKind::Phantom (
+            MpViewnodeKind::Vognode (MpVognode::Phantom (
               MpPhantom::Diff (
-                MpPhantomDiff::from_activeNode (t) )) }
+                MpPhantomDiff::from_activeNode (t) ))) }
           else
           { MpViewnodeKind::Vognode ( MpVognode::Active (t) ) };
         ( node_kind,
@@ -296,7 +296,7 @@ fn maybeplaced_kind_error_label (
       "forestRoot" . to_string (),
     MpViewnodeKind::DeadViewnode =>
       "deadViewnode" . to_string (),
-    MpViewnodeKind::Vognode (_) | MpViewnodeKind::Phantom (_) =>
+    MpViewnodeKind::Vognode (_) =>
       MpViewnode {
         focused     : false,
         folded      : false,

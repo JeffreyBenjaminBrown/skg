@@ -74,7 +74,7 @@ pub(crate) fn process_activeNode_diff (
   node_mut . value() . normal_to_phantom ();
   let node_flipped_to_phantom : bool =
     matches! ( node_mut . value() . kind,
-      ViewnodeKind::Phantom (Phantom::Diff (_)) );
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (_))) );
   // For an Added or Deleted file we don't read node_changes
   // (the comparison is degenerate). NewHere/RemovedHere on children
   // and IDFolder/textChanged properties only apply to Modified files.
@@ -293,7 +293,7 @@ fn insert_phantoms_for_missing_contains (
       match &c . value () . kind {
         ViewnodeKind::Vognode (Vognode::Active (t))
           => { m . insert ( t . id . clone (), c . id () ); },
-        ViewnodeKind::Phantom (Phantom::Diff (p))
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
           => { m . insert ( p . id . clone (), c . id () ); },
         // No Inactive arm: inactive placeholders never reach diff
         // rendering (diff mode requires the "all" Skg repo set).

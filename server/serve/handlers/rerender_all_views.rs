@@ -250,7 +250,7 @@ fn prepare_rerender_views_where (
 }
 
 /// A cleanup changes an open view only when it currently displays the exact
-/// dangling member, or when it displays a graph-backed owner whose relationship
+/// dangling member, or when it displays a graph-member owner whose relationship
 /// list was rewritten.  `pids_from_viewforest` intentionally excludes Unknown,
 /// so inspect both representations rather than introducing a new view index.
 fn view_can_display_absent_reference_change (
@@ -262,8 +262,8 @@ fn view_can_display_absent_reference_change (
     .any (|pid| affected_owner_pids . contains (pid))
   || viewforest . nodes () . any (|node| matches! (
        &node . value () . kind,
-       crate::types::viewnode::ViewnodeKind::Phantom (
-         crate::types::viewnode::Phantom::Unknown (unknown))
+       crate::types::viewnode::ViewnodeKind::Vognode (crate::types::viewnode::Vognode::Phantom (
+         crate::types::viewnode::Phantom::Unknown (unknown)))
        if unknown . id == *raw_id ))
 }
 

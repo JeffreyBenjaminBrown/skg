@@ -169,15 +169,15 @@ pub fn viewnode_to_string (
       Ok ( activeNode_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, activeNode, config )),
-    ViewnodeKind::Phantom (Phantom::Diff (phantom)) =>
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (phantom))) =>
       Ok ( phantomDiff_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, phantom, config )),
-    ViewnodeKind::Phantom (Phantom::Deleted (deleted_node)) =>
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (deleted_node))) =>
       Ok ( phantomDeleted_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, deleted_node )),
-    ViewnodeKind::Phantom (Phantom::Unknown (unknown_node)) =>
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown_node))) =>
       Ok ( phantomUnknown_metadata_to_string (
         viewnode . focused, viewnode . folded,
         viewnode . body_folded, unknown_node )),

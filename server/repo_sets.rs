@@ -128,7 +128,7 @@ pub fn apply_repo_set_to_viewforest (
         ViewnodeKind::Vognode (Vognode::Active (t))
           if ! active . contains_repo (&t . home_repo)
           => Some ( Treatment::Convert ),
-        ViewnodeKind::Phantom (Phantom::Diff (p))
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
           if ! active . contains_repo (&p . home_repo)
           // TODO/full-schema/9-2_repo-set-safety.org (interim,
           // until diff mode and restricted sets refuse to combine):

@@ -416,11 +416,11 @@ fn path_step (
       OccurrencePathStep::Active (active . id . clone ()),
     ViewnodeKind::Vognode (Vognode::Inactive (_)) =>
       OccurrencePathStep::Inactive,
-    ViewnodeKind::Phantom (Phantom::Diff (phantom)) =>
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (phantom))) =>
       OccurrencePathStep::DiffPhantom (phantom . id . clone ()),
-    ViewnodeKind::Phantom (Phantom::Deleted (phantom)) =>
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (phantom))) =>
       OccurrencePathStep::DeletedPhantom (phantom . id . clone ()),
-    ViewnodeKind::Phantom (Phantom::Unknown (phantom)) =>
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (phantom))) =>
       OccurrencePathStep::UnknownPhantom (phantom . id . clone ()),
     ViewnodeKind::PropertyFolder (folder) =>
       OccurrencePathStep::PropertyFolder (folder . clone ()),
@@ -464,7 +464,7 @@ fn content_members (
     ViewnodeKind::Vognode (Vognode::Active (active))
       if active_child_counts_as_content (active) =>
         Some ((active . collected_id (), active . relRepo_request . clone ())),
-    ViewnodeKind::Phantom (Phantom::Unknown (unknown)) =>
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
       Some ((unknown . id . clone (), unknown . relRepo_request . clone ())),
     _ => None,
   }) . collect ()
@@ -493,7 +493,7 @@ fn partner_members (
         ViewnodeKind::Vognode (Vognode::Active (active))
           if member_counts_for_partnerFolder (active) =>
             Some ((active . id . clone (), active . relRepo_request . clone ())),
-        ViewnodeKind::Phantom (Phantom::Unknown (unknown)) =>
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
           Some ((unknown . id . clone (), unknown . relRepo_request . clone ())),
         _ => None,
       }
@@ -513,7 +513,7 @@ fn hidden_outside_members (
       match &member . value () . kind {
         ViewnodeKind::Vognode (Vognode::Active (active))
           if member_counts_for_partnerFolder (active) => Some (active . id . clone ()),
-        ViewnodeKind::Phantom (Phantom::Unknown (unknown)) =>
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
           Some (unknown . id . clone ()),
         _ => None,
       }) . collect () )

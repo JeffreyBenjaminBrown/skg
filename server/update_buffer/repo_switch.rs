@@ -119,7 +119,7 @@ fn should_prune (
       is_leaf, // empty folder (children, if any, were pruned first)
     ViewnodeKind::DeadViewnode =>
       is_leaf,
-    ViewnodeKind::Phantom (_)
+    ViewnodeKind::Vognode (Vognode::Phantom (_))
       | ViewnodeKind::BufferRoot =>
       false, } ) }
 

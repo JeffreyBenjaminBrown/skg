@@ -59,7 +59,7 @@ fn true_child_ids (
     . filter_map ( |child| match &child . value () . kind {
       ViewnodeKind::Vognode ( Vognode::Active (node) )
         => Some (node . id . clone ()),
-      ViewnodeKind::Phantom ( Phantom::Diff (p) )
+      ViewnodeKind::Vognode (Vognode::Phantom ( Phantom::Diff (p) ))
         => Some (p . id . clone ()),
       _ => None, })
     . collect () }

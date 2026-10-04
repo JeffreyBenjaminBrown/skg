@@ -1086,7 +1086,7 @@ and right before another whitespace and the node's title.
 The metadata grammar (which keys are recognized and how they're
 parsed) lives in =server/serve/parse_metadata_sexp.rs=. The
 in-memory types those keys correspond to are in
-=server/types/viewnode.rs= (=TrueNode=, =ViewnodeKind=, =PropertyFolder=,
+=server/types/viewnode.rs= (=ViewnodeKind=, =Vognode=, =PropertyFolder=,
 =Property=, =PartnerFolder=)
 and =server/types/git.rs= (=NodeAxes=, =RelationshipAxes=, =Sign=).
 

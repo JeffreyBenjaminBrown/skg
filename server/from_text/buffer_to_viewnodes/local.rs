@@ -39,7 +39,7 @@ pub fn validate_local_structure (
     match &node_ref . value() . kind
     { MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
         validate_activeNode(tree, node_id, t, config),
-      MpViewnodeKind::Phantom (MpPhantom::Diff (p)) =>
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) =>
         validate_phantom(tree, node_id, p),
       MpViewnodeKind::BufferRoot =>
         Vec::new (),
@@ -70,12 +70,12 @@ pub fn validate_local_structure (
           validate_flags_folder (tree, node_id),
       MpViewnodeKind::Property (Property::Flag { .. }) =>
           validate_flag (tree, node_id),
-      MpViewnodeKind::Phantom (MpPhantom::Deleted (_))
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_)))
         => Vec::new(),
       MpViewnodeKind::DeadViewnode => Vec::new(),
       MpViewnodeKind::Vognode (MpVognode::Inactive (_))
         => validate_inactive_node(tree, node_id),
-      MpViewnodeKind::Phantom (MpPhantom::Unknown (_))
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
         => Vec::new() };
 
   if errors . is_empty() {
@@ -188,7 +188,7 @@ fn validate_hiddenInSubscribee_folder (
     tree, node_id, 1, true,
     |node| node . is_active_or_diff_phantom ()
            || matches! ( &node . kind,
-                         MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) ))
+                         MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) ))
     { errors . push(
         "HiddenInSubscribeeFolder's children can only be ActiveNodes or Unknown placeholders (to hide)."
         . to_string()); }
@@ -197,9 +197,9 @@ fn validate_hiddenInSubscribee_folder (
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t))
         => t . affectsParent == AffectsParent::True,
-      MpViewnodeKind::Phantom (MpPhantom::Diff (_))
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_)))
         => true,
-      MpViewnodeKind::Phantom (MpPhantom::Unknown (_))
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
         => true,
       _ => false, } )
     { errors . push(
@@ -235,16 +235,16 @@ fn validate_hiddenOutsideOfSubscribee_folder (
     tree, node_id, 1, true,
     |node| node . is_active_or_diff_phantom ()
            || matches! ( &node . kind,
-                         MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) ))
+                         MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) ))
     { errors . push("HiddenOutsideOfSubscribeeFolder's children must include only ActiveNodes or Unknown placeholders." . to_string()); }
   if !generation_includes_only(
     tree, node_id, 1, true,
     |node| match &node . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t))
         => t . affectsParent == AffectsParent::True,
-      MpViewnodeKind::Phantom (MpPhantom::Diff (_))
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_)))
         => true,
-      MpViewnodeKind::Phantom (MpPhantom::Unknown (_))
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
         => true,
       _ => false, } )
     { errors . push(
@@ -278,7 +278,7 @@ fn validate_subscribeefolder (
     |node| node . is_active_or_diff_phantom ()
            || matches!(&node . kind,
                     MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive subscribee may sit here as an inert display placeholder; it emits no subscribes_to membership (TODO/full-schema/9-2_repo-set-safety.org)
-                      | MpViewnodeKind::Phantom (MpPhantom::Unknown (_))
+                      | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
                       | MpViewnodeKind::PartnerFolder (
                           PartnerFolder::HiddenOutsideOfSubscribee) ))
     { errors . push( "SubscribeeFolder's children must include only ActiveNodes, Unknown or inactive placeholders, or HiddenOutsideOfSubscribeeFolder." . to_string()); }
@@ -289,9 +289,9 @@ fn validate_subscribeefolder (
         t . affectsParent == AffectsParent::True,
       MpViewnodeKind::Vognode (MpVognode::Inactive (_)) =>
         true,
-      MpViewnodeKind::Phantom (MpPhantom::Diff (_)) =>
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_))) =>
         true,
-      MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) =>
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
         true,
       MpViewnodeKind::PartnerFolder (
         PartnerFolder::HiddenOutsideOfSubscribee)
@@ -323,7 +323,7 @@ fn validate_relation_folder (
     |node| node . is_active_or_diff_phantom ()
            || ( partnerFolder == PartnerFolder::Overridden
                 && matches! ( &node . kind,
-                              MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) ))
+                              MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) ))
            || matches!(&node . kind,
                        MpViewnodeKind::Vognode (MpVognode::Inactive (_)))) // tolerated from stale buffers; the rerender removes it (TODO/full-schema/9-2_repo-set-safety.org)
     { errors . push(format!("{}'s children must include only ActiveNodes, inactive placeholders, or (for OverriddenFolder) Unknown placeholders.", label)); }
@@ -334,9 +334,9 @@ fn validate_relation_folder (
         => t . affectsParent == AffectsParent::True,
       MpViewnodeKind::Vognode (MpVognode::Inactive (_))
         => true,
-      MpViewnodeKind::Phantom (MpPhantom::Diff (_))
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_)))
         => true,
-      MpViewnodeKind::Phantom (MpPhantom::Unknown (_))
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_)))
         if partnerFolder == PartnerFolder::Overridden => true,
       _ => false, } )
     { errors . push(format!(
@@ -568,7 +568,7 @@ pub fn nonignored_children_have_distinct_ids (
         MpViewnodeKind::Vognode (MpVognode::Active (t))
           if t . affectsParent == AffectsParent::True
           => t . collected_id (),
-        MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
+        MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
           Some (u . id . clone()),
         // An inactive placeholder is not a content member (its
         // membership is owned by the disk weave), so it does not
@@ -591,7 +591,7 @@ fn partnerFolder_children_have_distinct_ids (
       (match &child . value() . kind {
         MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
           t . id . clone(),
-        MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
+        MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
           Some (u . id . clone()),
         _ => None,
       })

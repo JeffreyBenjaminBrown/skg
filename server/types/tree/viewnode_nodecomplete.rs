@@ -37,7 +37,7 @@ where F: FnOnce (&mut ActiveNode) -> R {
       _ => Err ( "write_at_activeNode_in_tree: expected ActiveNode"
                    . to_string () ) }} ) ? }
 
-/// Extract (ID, repo) from a vognode that carries both.
+/// Extract (ID, repo) from a non-phantom vognode that carries both.
 /// Returns an error if the node is not found or cannot provide both fields.
 pub fn pid_and_repo_from_treenode (
   tree        : &Tree<Viewnode>,
@@ -48,13 +48,13 @@ pub fn pid_and_repo_from_treenode (
     tree . get (treeid) . ok_or_else ( ||
       format! ( "{}: node not found", caller_name ) ) ?;
   match &node_ref . value() . kind {
-    ViewnodeKind::Vognode (v) =>
+    ViewnodeKind::Vognode (v) if v . is_graph_member () =>
       v . pid_and_repo ()
       . map ( |(pid, repo)| (pid . clone (), repo . clone ()) )
       . ok_or_else (|| format!(
         "{}: vognode has no repo", caller_name ) . into () ),
     _ => Err ( format! (
-      "{}: expected a vognode with PID and repo",
+      "{}: expected a non-phantom vognode with PID and repo",
       caller_name ) . into() ),
   }}
 
@@ -72,7 +72,7 @@ pub fn id_from_self_or_nearest_ancestor (
     match &node . value() . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t)) =>
         { if let Some (id) = &t . id { return Ok(id . clone()); }}
-      MpViewnodeKind::Phantom (MpPhantom::Diff (p)) =>
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) =>
         { if let Some (id) = &p . id { return Ok(id . clone()); }}
       _ => {} }
     node = node . parent()
@@ -205,8 +205,8 @@ pub fn find_children_by_ids (
       ViewnodeKind::Vognode (Vognode::Active (t)) =>
         if target_skgids . contains (&t . id)
         { result . insert (t . id . clone (), child . id()); },
-      ViewnodeKind::Phantom (p @ (Phantom::Diff (_)
-                                  | Phantom::Deleted (_))) =>
+      ViewnodeKind::Vognode (Vognode::Phantom (p @ (Phantom::Diff (_)
+                                  | Phantom::Deleted (_)))) =>
         if target_skgids . contains (p . id ())
         { result . insert (p . id () . clone (), child . id()); },
       _ => {} } }

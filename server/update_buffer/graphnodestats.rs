@@ -95,7 +95,7 @@ pub fn set_metadata_relationships_in_node_recursive (
                    ). ok ();
                Some ( graphnodestats_for_pid (
                  &t . id, stats, nodecomplete_opt . as_ref () )) },
-        ViewnodeKind::Phantom (Phantom::Diff (p))
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
           => { let nodecomplete_opt : Option<NodeComplete>
                  = nodecomplete_rustFirst_by_pid_and_repo (
                      graph, config, &p . id, &p . home_repo
@@ -111,7 +111,7 @@ pub fn set_metadata_relationships_in_node_recursive (
         . unwrap () . value () . kind
         { ViewnodeKind::Vognode (Vognode::Active (t))
           => { t . graphStats = gs; },
-        ViewnodeKind::Phantom (Phantom::Diff (p))
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
           => { p . graphStats = gs; },
         _ => {} },
     None => {} }

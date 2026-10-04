@@ -146,11 +146,11 @@ fn dependencies_from_uninterpreted (
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
         } = &active . editability
         { result . insert (target . clone ()); }}
-      MpViewnodeKind::Phantom (MpPhantom::Diff (phantom)) =>
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (phantom))) =>
         result . extend (phantom . id . iter () . cloned ()),
-      MpViewnodeKind::Phantom (MpPhantom::Deleted (phantom)) => {
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (phantom))) => {
         result . insert (phantom . id . clone ()); }
-      MpViewnodeKind::Phantom (MpPhantom::Unknown (phantom)) => {
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (phantom))) => {
         result . insert (phantom . id . clone ()); }
       MpViewnodeKind::Property (Property::ID { id, .. }) => {
         result . insert (id . clone ()); }
@@ -171,11 +171,11 @@ fn dependencies_from_registered (
           edit_request : Some (NodeEditRequest::NodeMerge (target)), ..
         } = &active . editability
         { result . insert (target . clone ()); }}
-      ViewnodeKind::Phantom (Phantom::Diff (phantom)) => {
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (phantom))) => {
         result . insert (phantom . id . clone ()); }
-      ViewnodeKind::Phantom (Phantom::Deleted (phantom)) => {
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (phantom))) => {
         result . insert (phantom . id . clone ()); }
-      ViewnodeKind::Phantom (Phantom::Unknown (phantom)) => {
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (phantom))) => {
         result . insert (phantom . id . clone ()); }
       ViewnodeKind::Property (Property::ID { id, .. }) => {
         result . insert (id . clone ()); }

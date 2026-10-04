@@ -268,8 +268,8 @@ fn validate_view_roots (
       &root . value () . kind,
         MpViewnodeKind::Vognode (MpVognode::Active (_))
         | MpViewnodeKind::Vognode (MpVognode::Inactive (_)) // a retained inactive root (TODO/full-schema/9-2_repo-set-safety.org)
-        | MpViewnodeKind::Phantom (MpPhantom::Deleted (_))
-        | MpViewnodeKind::Phantom (MpPhantom::Unknown (_)))
+        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_)))
+        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))))
     { errors . push (
         BufferValidationError::Other (
           "View roots must be ActiveNodes, inactive placeholders, deleted nodes or Unknown placeholders."

@@ -12,9 +12,9 @@ fn normal (title : &str, pi : AffectsParent) -> Viewnode {
 
 fn deleted (title : &str) -> Viewnode {
   Viewnode { focused : false, folded : false, body_folded : false,
-    kind : ViewnodeKind::Phantom (Phantom::Deleted (PhantomDeleted {
+    kind : ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (PhantomDeleted {
       id : sid (title), home_repo : src (),
-      title : title . to_string (), body : None })) } }
+      title : title . to_string (), body : None }))) } }
 
 fn role_folder (rc : PartnerFolder) -> Viewnode {
   Viewnode { focused : false, folded : false, body_folded : false,

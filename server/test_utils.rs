@@ -649,9 +649,9 @@ fn compare_two_viewnode_branches_recursively_modulo_id (
   let n2 : &MpViewnode = node2 . value();
   match (&n1 . kind, &n2 . kind) {
     ( MpViewnodeKind::Vognode (MpVognode::Active (_))
-        | MpViewnodeKind::Phantom (MpPhantom::Diff (_)),
+        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_))),
       MpViewnodeKind::Vognode (MpVognode::Active (_))
-        | MpViewnodeKind::Phantom (MpPhantom::Diff (_))) =>
+        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_)))) =>
     { // Copy the ID from one to the other, then compare. TODO/DONE/local-view-update/plan_v2.org §11: Normal and
       // Diff phantom payloads are now different types, so read n2's id via the
       // shared accessor and write n1_copy's per variant.
@@ -660,7 +660,7 @@ fn compare_two_viewnode_branches_recursively_modulo_id (
         n1 . clone();
       match &mut n1_copy . kind {
         MpViewnodeKind::Vognode (MpVognode::Active (t)) => t . id = id2,
-        MpViewnodeKind::Phantom (MpPhantom::Diff (p)) => p . id = id2,
+        MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) => p . id = id2,
         _ => {} }
       if n1_copy != *n2 { return false; }}
     ( MpViewnodeKind::PropertyFolder (_)
@@ -672,8 +672,8 @@ fn compare_two_viewnode_branches_recursively_modulo_id (
       | MpViewnodeKind::PartnerFolder (_)
       | MpViewnodeKind::BufferRoot) =>
     { if n1 != n2 { return false; }}
-    ( MpViewnodeKind::Phantom (MpPhantom::Deleted (_)),
-      MpViewnodeKind::Phantom (MpPhantom::Deleted (_))) =>
+    ( MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_))),
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (_)))) =>
     { if n1 != n2 { return false; }}
     ( MpViewnodeKind::DeadViewnode,
       MpViewnodeKind::DeadViewnode) =>

@@ -46,5 +46,5 @@ fn test_get_id_from_treenode_non_vognode() {
     get_id_from_treenode(&tree, root_id);
   assert!(result . is_err(), "Should fail for non-vognode node");
   assert!(result . unwrap_err() . to_string()
-          . contains ("caller must pass a vognode"));
+          . contains ("caller must pass a non-phantom vognode"));
 }

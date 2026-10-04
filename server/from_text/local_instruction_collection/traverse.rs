@@ -79,7 +79,7 @@ fn visit (
       // identity it owns no defining folder, so (like a DeadViewnode) any
       // folder found under it stays silent.
       recurse_under_gnode (node_ref, None, None, collected),
-    ViewnodeKind::Phantom (p) =>
+    ViewnodeKind::Vognode (Vognode::Phantom (p)) =>
       recurse_under_gnode (
         node_ref,
         Some ( DefiningFolderOwner {
@@ -341,7 +341,7 @@ fn visit_hiddenOutside_folder (
               if t . relRepo_request . is_some () {
                 return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
               members . push (t . id . clone ()); },
-          ViewnodeKind::Phantom (Phantom::Unknown (unknown)) => {
+          ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
             if unknown . relRepo_request . is_some () {
               return Err ("HiddenOutsideOfSubscribee membership is editable, but hide relRepos are derived." . to_string ()); }
             members . push (unknown . id . clone ()); },
@@ -405,7 +405,7 @@ fn partnerFolder_members (
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . id . clone(),
                            t . relRepo_request . clone())),
-      ViewnodeKind::Phantom (Phantom::Unknown (unknown)) =>
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
           members . push ((unknown . id . clone(),
                            unknown . relRepo_request . clone())),
       _ => {}, }}
@@ -431,7 +431,7 @@ fn subscribeeFolder_members (
         if member_counts_for_partnerFolder (t) =>
           members . push ((t . id . clone(),
                            t . relRepo_request . clone())),
-      ViewnodeKind::Phantom (Phantom::Unknown (unknown)) =>
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
           members . push ((unknown . id . clone(),
                            unknown . relRepo_request . clone())),
       _ => {}, }}
@@ -467,7 +467,7 @@ fn content_members (
             // the original member it was drawn in place of.
             t . collected_id (),
             t . relRepo_request . clone() )); }},
-      ViewnodeKind::Phantom (Phantom::Unknown (unknown)) =>
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
         // An Unknown is inert as a node, but its raw ID is load-bearing
         // membership data at a structured relationship position. `None` asks
         // disk supplementation to keep an existing destination repo sticky.
@@ -493,7 +493,7 @@ fn visible_content_members (
           // collected_id: a drawn overrider presents the original,
           // so hide/unhide inference must speak of the original.
           t . collected_id ()); },
-      ViewnodeKind::Phantom (Phantom::Unknown (unknown)) =>
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
         visible . push (unknown . id . clone ()),
       _ => {}, }}
   visible }

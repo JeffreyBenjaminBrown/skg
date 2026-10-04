@@ -164,7 +164,7 @@ fn find_active_or_phantom (
       match &node_ref . value() . kind {
         ViewnodeKind::Vognode (Vognode::Active (t)) =>
           t . id == ID::from (id),
-        ViewnodeKind::Phantom (Phantom::Diff (p)) =>
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) =>
           p . id == ID::from (id),
         _ => false,
       };

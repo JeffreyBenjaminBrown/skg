@@ -96,7 +96,7 @@ fn is_dead (tree : &Tree<Viewnode>, nid : NodeId) -> bool {
 
 fn is_unknown (tree : &Tree<Viewnode>, nid : NodeId) -> bool {
   matches! ( & tree . get (nid) . unwrap () . value () . kind,
-             ViewnodeKind::Phantom (Phantom::Unknown (_)) ) }
+             ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_))) ) }
 
 #[test]
 fn nonmember_unknown_child_becomes_dead () {
@@ -142,7 +142,7 @@ fn same_session_surviving_content_membership_becomes_unknown () {
   assert! (rendered . focused && rendered . folded,
     "same-session normalization preserves view wrapper state");
   match &rendered . kind {
-    ViewnodeKind::Phantom (Phantom::Unknown (unknown)) => {
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
       assert_eq! (unknown . id, ghost);
       assert_eq! (unknown . relRepo,
                   Some (repo_name ("private")));
@@ -178,7 +178,7 @@ fn same_session_extra_id_membership_becomes_unknown_with_raw_id () {
   assert! (rendered . focused,
     "extra-id normalization preserves the active child wrapper state");
   match &rendered . kind {
-    ViewnodeKind::Phantom (Phantom::Unknown (unknown)) => {
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) => {
       assert_eq! (unknown . id, raw_extra,
         "the retained on-disk spelling, not the deleted primary, is rendered");
       assert_eq! (unknown . relRepo, Some (repo_name ("foreign"))); },

@@ -663,7 +663,7 @@ fn remove_branches_that_git_marked_removed (
           None => false } };
       let is_phantom : bool =
         matches! ( &node . value() . kind,
-          ViewnodeKind::Phantom (Phantom::Diff (_)) );
+          ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (_))) );
       if ! is_phantom || is_viewforest_root_child {
         return Ok (true); } // not a strippable phantom: recurse normally
       if node . has_children () {
@@ -726,7 +726,7 @@ fn clear_diff_metadata (
             t . node_axes  = NodeAxes::default ();
             t . relationship_axes = RelationshipAxes::default ();
             t . not_in_git = false; }
-          ViewnodeKind::Phantom (Phantom::Diff (p)) => {
+          ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) => {
             p . node_axes  = NodeAxes::default ();
             p . relationship_axes = RelationshipAxes::default ();
             p . not_in_git = false; }
@@ -788,7 +788,7 @@ fn attach_containerward_ancestries_to_removedhere_phantoms (
         let is_removedhere : bool = match &node_ref . value () . kind {
           ViewnodeKind::Vognode (Vognode::Active (t)) =>
             t . is_removedhere_diffPhantom (),
-          ViewnodeKind::Phantom (Phantom::Diff (p)) =>
+          ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) =>
             p . is_removedhere_diffPhantom (),
           _ => false };
         if is_removedhere

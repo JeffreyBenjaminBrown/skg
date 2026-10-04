@@ -356,7 +356,7 @@ fn convert_nonmember_unknown_children_to_dead (
   treat_certain_children(
     tree, node,
     |vn : &Viewnode| match &vn . kind {
-      ViewnodeKind::Phantom (Phantom::Unknown (u)) =>
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
         ! member_set . contains (&u . id),
       _ => false },
     |vn : &mut Viewnode| { vn . kind = ViewnodeKind::DeadViewnode; },
@@ -377,12 +377,12 @@ pub(in crate::update_buffer) fn mutate_activeNode_to_deletednode (
         _ => ( String::new(), None ) } ) ?;
   write_at_node_in_tree ( tree, node,
     |vn : &mut Viewnode| {
-      vn . kind = ViewnodeKind::Phantom (
+      vn . kind = ViewnodeKind::Vognode (Vognode::Phantom (
         Phantom::Deleted ( PhantomDeleted {
         id     : pid . clone(),
         home_repo : repo . clone(),
         title,
-        body, } ) ); }
+        body, } ) )); }
   ) . map_err ( |e| -> Box<dyn Error> { e . into() } ) }
 
 /// Whether this node is overridden yet drawn RAW by its position, so
@@ -571,10 +571,10 @@ fn complete_content_children (
     |vn : &Viewnode| match &vn . kind {
       ViewnodeKind::Vognode (Vognode::Active (t))
         => t . affectsParent == AffectsParent::True,
-      ViewnodeKind::Phantom (Phantom::Diff (_))
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (_)))
         // Existing phantoms are reordered or replaced, not duplicated.
         => true,
-      ViewnodeKind::Phantom (Phantom::Unknown (_))
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))
         // An Unknown is a real raw relationship member.  Match it by
         // its raw ID so a rerender retains one placeholder rather than
         // appending another one for the same dangling edge.
@@ -593,9 +593,9 @@ fn complete_content_children (
       // are created -- which keeps post-save rerendering stable.
       ViewnodeKind::Vognode (Vognode::Active (t))
         => Ok ( t . collected_id () ),
-      ViewnodeKind::Phantom (Phantom::Diff (p))
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
         => Ok ( p . id . clone() ),
-      ViewnodeKind::Phantom (Phantom::Unknown (u))
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u)))
         => Ok ( u . id . clone() ),
       _ => Err(
         "complete_content_children: relevant child had no content ID"
@@ -628,7 +628,7 @@ fn complete_content_children (
           mk_inactive_viewnode (),
         ContentReality::Unknown => {
           let mut unknown : Viewnode = mk_unknown_viewnode ( id . clone() );
-          if let ViewnodeKind::Phantom (Phantom::Unknown (u)) =
+          if let ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =
             &mut unknown . kind
           { u . relRepo = d . relRepo . clone ()
               . filter ( |repo| repo != owner_home ); }
@@ -674,12 +674,12 @@ fn normalize_relationship_backed_content_unknowns (
         || deleted_by_this_save_extra_ids . get (&active_id)
            . is_some_and (|extra_ids| extra_ids . contains (*raw_member)))
         . expect ("normalization predicate found a raw member") . clone ();
-      vn . kind = ViewnodeKind::Phantom (Phantom::Unknown (
+      vn . kind = ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (
         crate::types::viewnode::PhantomUnknown {
           relRepo: relRepos . get (&id) . cloned ()
             . filter (|repo| repo != owner_home),
           relRepo_request: None,
-          id })); })
+          id }))); })
     . map_err ( |e| -> Box<dyn Error> { e . into () } )
 }
 
@@ -736,14 +736,14 @@ fn order_children_as_non_vognodes_then_ignored_then_content (
           | ViewnodeKind::DeadViewnode                => 0,
         ViewnodeKind::Vognode (Vognode::Active (t))
           if t . affectsParent != AffectsParent::True                  => 1,
-        ViewnodeKind::Phantom (Phantom::Diff (_))  => 2,
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (_)))  => 2,
         ViewnodeKind::Vognode (Vognode::Active (_))   => 2,
-        ViewnodeKind::Phantom (Phantom::Deleted (_))  => 2,
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))  => 2,
         ViewnodeKind::Vognode (Vognode::Inactive (_)) => 2,
         // PhantomUnknown is a content-position placeholder: order it
         // alongside the Deleted/True content children rather than as
         // a non-vognode.
-        ViewnodeKind::Phantom (Phantom::Unknown (_))  => 2,
+        ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))  => 2,
       } ) . map_err( |e| -> Box<dyn Error> { e . into() } ) ?;
   let empty : Vec<NodeId> = Vec::new();
   for &cid in groups . get( &0 ) . unwrap_or (&empty) . iter()
@@ -794,7 +794,7 @@ fn build_child_creation_data (
             if t . affectsParent == AffectsParent::True
             => { m . insert( t . collected_id (),
                              t . home_repo . clone()); },
-          ViewnodeKind::Phantom (Phantom::Diff (p))
+          ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))
             => { m . insert( p . id . clone(),
                              p . home_repo . clone()); },
           // No Inactive arm: an inactive child is never a goal member

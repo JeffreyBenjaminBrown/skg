@@ -2,7 +2,8 @@
 /// Nodes of the graph are represented via the 'NodeComplete' type.
 /// Nodes of the tree are represented via the 'Viewnode' type.
 ///   (That name might change once there are more clients. The only client so far is written in Emacs org-mode; hence the name.)
-/// Some 'Viewnode's correspond to whole graph nodes; these are 'Vognode's.
+/// Some 'Viewnode's represent graphnodes, which need not exist; these are
+/// 'Vognode's (active, inactive, or phantom).
 /// Others encode information about neighboring tree nodes, such as
 /// aliases, IDs, and partner folders.
 
@@ -63,7 +64,6 @@ pub struct Viewnode {
 #[derive( Debug, Clone, PartialEq )]
 pub enum ViewnodeKind {
   Vognode       (Vognode),
-  Phantom       (Phantom),
   PropertyFolder       (PropertyFolder),
   Property          (Property),
   PartnerFolder    (PartnerFolder),
@@ -71,11 +71,14 @@ pub enum ViewnodeKind {
   DeadViewnode,
 }
 
-/// The two graph-backed kinds: each corresponds to a real, current node.
+/// A viewnode that represents a graphnode, which need not exist: Active
+/// and Inactive vognodes represent current graph members; a Phantom
+/// represents a missing or historical one.
 #[derive( Debug, Clone, PartialEq )]
 pub enum Vognode {
   Active   (ActiveNode),
   Inactive (InactiveNode), // From a repo that is inactive (see "repo sets").
+  Phantom  (Phantom),
 }
 
 /// The three display-only placeholder kinds. None of them is a current graph
@@ -694,11 +697,12 @@ impl Property {
 
 impl Vognode {
   /// None for an Inactive vognode: it is an anonymous placeholder with
-  /// no id (see InactiveNode).
+  /// no id (see InactiveNode). A phantom returns the id it stands for.
   pub fn id (&self) -> Option<&ID> {
     match self {
       Vognode::Active   (t) => Some (&t . id),
       Vognode::Inactive (_) => None,
+      Vognode::Phantom  (p) => Some (p . id ()),
     } }
 
   pub fn pid_and_repo (
@@ -707,7 +711,13 @@ impl Vognode {
     match self {
       Vognode::Active   (t) => Some ((&t . id, &t . home_repo)),
       Vognode::Inactive (_) => None,
+      Vognode::Phantom  (p) => p . pid_and_repo (),
     } }
+
+  /// Whether this vognode represents a current graph member
+  /// (Active or Inactive), as opposed to a phantom.
+  pub fn is_graph_member (&self) -> bool {
+    ! matches! (self, Vognode::Phantom (_)) }
 }
 
 impl Phantom {
@@ -761,7 +771,7 @@ impl Viewnode {
         if let Editability::Definitive { edit_request, .. } =
           &mut active . editability
         { *edit_request = None; }},
-      ViewnodeKind::Phantom (Phantom::Unknown (unknown)) =>
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (unknown))) =>
         unknown . relRepo_request = None,
       ViewnodeKind::Property (Property::Alias { relRepo_request, .. }) =>
         *relRepo_request = None,
@@ -784,14 +794,14 @@ impl Viewnode {
           // write-protected by construction.
           let phantom : PhantomDiff =
             PhantomDiff::from_activeNode ( t . clone () );
-          self . kind = ViewnodeKind::Phantom (
-            Phantom::Diff (phantom)); }}}
+          self . kind = ViewnodeKind::Vognode (Vognode::Phantom (
+            Phantom::Diff (phantom))); }}}
 
   pub fn title (&self) -> &str {
     match &self . kind {
       ViewnodeKind::Vognode (Vognode::Active (t)) => &t . title,
-      ViewnodeKind::Phantom (Phantom::Diff (p)) => &p . title,
-      ViewnodeKind::Phantom (Phantom::Deleted (d)) =>
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) => &p . title,
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) =>
         &d . title,
       ViewnodeKind::Property (q) =>
         q . title (),
@@ -799,7 +809,7 @@ impl Viewnode {
       ViewnodeKind::PartnerFolder (_)
         | ViewnodeKind::BufferRoot
         | ViewnodeKind::DeadViewnode
-        | ViewnodeKind::Phantom (Phantom::Unknown (_))
+        | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))
         | ViewnodeKind::Vognode (Vognode::Inactive (_)) =>
         "",
     }}
@@ -808,11 +818,11 @@ impl Viewnode {
   pub fn body (&self) -> Option < &String > {
     match &self . kind {
       ViewnodeKind::Vognode (Vognode::Active (t)) => t . body (),
-      ViewnodeKind::Phantom (Phantom::Diff (p)) => p . body (),
-      ViewnodeKind::Phantom (Phantom::Deleted (d)) => d . body . as_ref (),
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) => p . body (),
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) => d . body . as_ref (),
       ViewnodeKind::PropertyFolder (folder) => folder . body (),
       ViewnodeKind::Property (property) => property . body (),
-      ViewnodeKind::Phantom (Phantom::Unknown (_))
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (_)))
         | ViewnodeKind::Vognode (Vognode::Inactive (_))
         | ViewnodeKind::PartnerFolder (_)
         | ViewnodeKind::BufferRoot
@@ -826,20 +836,21 @@ impl Viewnode {
       _ => false,
     }}
 
-  pub fn id_if_vognode (&self) -> Option<&ID> {
+  /// The id of a vognode that represents a current graph member: None
+  /// for phantoms, inactive vognodes and non-vognodes.
+  pub fn id_if_graph_member (&self) -> Option<&ID> {
     match &self . kind {
-      ViewnodeKind::Vognode (v) => v . id (),
+      ViewnodeKind::Vognode (v) if v . is_graph_member () => v . id (),
       _ => None,
     }}
 
-  /// The id of an Active vognode or a Diff phantom -- the two ActiveNode-ish kinds,
-  /// which before the Vognode/Phantom split both lived in Vognode and were
-  /// reached by `Vognode::normal_or_phantom_id`. None for everything else
+  /// The id of an Active vognode or a Diff phantom -- the two ActiveNode-ish
+  /// kinds. None for everything else
   /// (Inactive, Deleted/Unknown phantoms, folders, non-vognodes, BufferRoot).
   pub fn active_or_diff_phantom_id (&self) -> Option<&ID> {
     match &self . kind {
       ViewnodeKind::Vognode (Vognode::Active (t)) => Some (&t . id),
-      ViewnodeKind::Phantom (Phantom::Diff (p))   => Some (&p . id),
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p)))   => Some (&p . id),
       _ => None,
     }}
 }
@@ -952,8 +963,8 @@ pub fn mk_phantom_viewnode (
   if let ViewnodeKind::Vognode (Vognode::Active (mut t)) = viewnode . kind
     { t . node_axes  = node_axes;
       t . relationship_axes = relationship_axes;
-      viewnode . kind = ViewnodeKind::Phantom (
-        Phantom::Diff ( PhantomDiff::from_activeNode (t) )); }
+      viewnode . kind = ViewnodeKind::Vognode (Vognode::Phantom (
+        Phantom::Diff ( PhantomDiff::from_activeNode (t) ))); }
   else
     // mk_writeProtected_viewnode always yields an Active vognode; if that ever
     // changes, fail loudly rather than silently return a non-phantom.
@@ -987,12 +998,12 @@ pub fn mk_unknown_viewnode (
     focused     : false,
     folded      : false,
     body_folded : false,
-    kind        : ViewnodeKind::Phantom (
+    kind        : ViewnodeKind::Vognode (Vognode::Phantom (
       Phantom::Unknown ( PhantomUnknown {
         id,
         relRepo         : None,
         relRepo_request : None,
-      } ) ),
+      } ) )),
   }}
 
 pub fn mk_inactive_viewnode (
@@ -1048,7 +1059,7 @@ pub fn mk_writeProtected_from_viewnode (
       t . editability = // discards body and edit_request
         Editability::WriteProtected;
       Ok (viewnode) },
-    ViewnodeKind::Phantom (Phantom::Diff (p)) =>
+    ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) =>
       // A phantom carries none of the fields preserved above,
       // so it is rebuilt rather than mutated.
       Ok ( mk_writeProtected_viewnode_with_birth (

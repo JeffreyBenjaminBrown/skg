@@ -353,7 +353,7 @@ fn is_self_deletable_when_empty (
 ) -> bool {
   matches! ( kind,
     ViewnodeKind::DeadViewnode
-    | ViewnodeKind::Phantom (Phantom::Deleted (_))
+    | ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (_)))
     | ViewnodeKind::PartnerFolder (PartnerFolder::Subscriber)
     | ViewnodeKind::PartnerFolder (PartnerFolder::Overrider)
     | ViewnodeKind::PartnerFolder (PartnerFolder::Hider)

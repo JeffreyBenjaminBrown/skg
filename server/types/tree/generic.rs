@@ -20,12 +20,6 @@ pub fn pid_and_repo_from_ancestor (
         . ok_or_else (|| format!(
           "{}: ancestor {} has no repo",
           caller, generation )),
-      ViewnodeKind::Phantom (p) =>
-        p . pid_and_repo ()
-        . map ( |(pid, repo)| (pid . clone (), repo . clone ()) )
-        . ok_or_else (|| format!(
-          "{}: ancestor {} has no repo",
-          caller, generation )),
       _ => Err( format!(
         "{}: ancestor {} cannot provide PID and repo",
         caller, generation )) } )

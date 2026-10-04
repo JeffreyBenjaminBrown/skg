@@ -181,7 +181,7 @@ pub fn pid_and_repo_from_required_ancestor (
   read_at_node_in_tree (
     tree, anc,
     |vn : &Viewnode| match &vn . kind {
-      ViewnodeKind::Vognode (v) =>
+      ViewnodeKind::Vognode (v) if v . is_graph_member () =>
         v . pid_and_repo ()
         . map ( |(pid, repo)| (pid . clone (), repo . clone ()) ),
       _ => None } )
@@ -237,7 +237,7 @@ fn dispose_orphaned_folder_child (
     ( c . value () . is_activeNode_and_affectsParent_true (),
       c . children () . next () . is_none (),
       matches! ( &c . value () . kind,
-                 ViewnodeKind::Vognode (_) | ViewnodeKind::Phantom (_) ),
+                 ViewnodeKind::Vognode (_) ),
       is_folder_kind (&c . value () . kind) ) };
   if affected {
     if is_leaf {

@@ -35,7 +35,6 @@ pub struct MpViewnode {
 #[derive(Debug, Clone, PartialEq)]
 pub enum MpViewnodeKind {
   Vognode      (MpVognode),
-  Phantom      (MpPhantom),
   PropertyFolder      (PropertyFolder),
   Property         (Property),
   PartnerFolder   (PartnerFolder),
@@ -47,6 +46,7 @@ pub enum MpViewnodeKind {
 pub enum MpVognode {
   Active   (MpActiveNode),
   Inactive (InactiveNode),
+  Phantom  (MpPhantom),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -130,13 +130,13 @@ impl TryFrom<MpViewnodeKind> for ViewnodeKind {
           Vognode::Active (ActiveNode::try_from (t)?))),
       MpViewnodeKind::Vognode (MpVognode::Inactive (i)) =>
         Ok (ViewnodeKind::Vognode (Vognode::Inactive (i))),
-      MpViewnodeKind::Phantom (MpPhantom::Diff (p)) =>
-        Ok (ViewnodeKind::Phantom (
-          Phantom::Diff (PhantomDiff::try_from (p)?))),
-      MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
-        Ok (ViewnodeKind::Phantom (Phantom::Deleted (d))),
-      MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
-        Ok (ViewnodeKind::Phantom (Phantom::Unknown (u))),
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) =>
+        Ok (ViewnodeKind::Vognode (Vognode::Phantom (
+          Phantom::Diff (PhantomDiff::try_from (p)?)))),
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
+        Ok (ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d)))),
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
+        Ok (ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u)))),
       MpViewnodeKind::PropertyFolder (c) =>
         Ok (ViewnodeKind::PropertyFolder (c)),
       MpViewnodeKind::Property (q) =>
@@ -192,13 +192,13 @@ impl From<ViewnodeKind> for MpViewnodeKind {
           MpVognode::Active (MpActiveNode::from (t))),
       ViewnodeKind::Vognode (Vognode::Inactive (i)) =>
         MpViewnodeKind::Vognode (MpVognode::Inactive (i)),
-      ViewnodeKind::Phantom (Phantom::Diff (p)) =>
-        MpViewnodeKind::Phantom (
-          MpPhantom::Diff (MpPhantomDiff::from (p))),
-      ViewnodeKind::Phantom (Phantom::Deleted (d)) =>
-        MpViewnodeKind::Phantom (MpPhantom::Deleted (d)),
-      ViewnodeKind::Phantom (Phantom::Unknown (u)) =>
-        MpViewnodeKind::Phantom (MpPhantom::Unknown (u)),
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Diff (p))) =>
+        MpViewnodeKind::Vognode (MpVognode::Phantom (
+          MpPhantom::Diff (MpPhantomDiff::from (p)))),
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Deleted (d))) =>
+        MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))),
+      ViewnodeKind::Vognode (Vognode::Phantom (Phantom::Unknown (u))) =>
+        MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))),
       ViewnodeKind::PropertyFolder (c) =>
         MpViewnodeKind::PropertyFolder (c),
       ViewnodeKind::Property (q) =>
@@ -321,8 +321,8 @@ impl MpViewnode {
   pub fn title (&self) -> &str {
     match &self . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t)) => &t . title,
-      MpViewnodeKind::Phantom (MpPhantom::Diff (p)) => &p . title,
-      MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p))) => &p . title,
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
         &d . title,
       MpViewnodeKind::Property (q) =>
         q . title (),
@@ -331,7 +331,7 @@ impl MpViewnode {
         | MpViewnodeKind::BufferRoot
         | MpViewnodeKind::DeadViewnode
         | MpViewnodeKind::Vognode (MpVognode::Inactive (_))
-        | MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) =>
+        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
         "", }}
 
   /// A distinguishable label for error messages.
@@ -339,7 +339,7 @@ impl MpViewnode {
     match &self . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t))
         => t . title . clone(),
-      MpViewnodeKind::Phantom (MpPhantom::Diff (p))
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p)))
         => p . title . clone(),
       MpViewnodeKind::Property (Property::Alias { text, .. }) =>
         format!("property:alias({})", text),
@@ -355,13 +355,13 @@ impl MpViewnode {
         format!("partnerFolder:{}", partnerFolder . repr_in_client ()),
       MpViewnodeKind::BufferRoot =>
         "forestRoot" . to_string (),
-      MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
         format!("deleted:{}", d . id . 0),
       MpViewnodeKind::DeadViewnode =>
         "deadViewnode" . to_string (),
       MpViewnodeKind::Vognode (MpVognode::Inactive (_)) =>
         "inactive" . to_string (),
-      MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
         format!("unknown:{}", u . id . 0), }}
 
   /// The body text to render for this node, when it has one.
@@ -369,9 +369,9 @@ impl MpViewnode {
     match &self . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t))
         => t . body (),
-      MpViewnodeKind::Phantom (MpPhantom::Diff (p))
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p)))
         => p . body (),
-      MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
         d . body . as_ref(),
       MpViewnodeKind::PropertyFolder (folder) => folder . body (),
       MpViewnodeKind::Property (property) => property . body (),
@@ -379,7 +379,7 @@ impl MpViewnode {
         | MpViewnodeKind::BufferRoot
         | MpViewnodeKind::DeadViewnode
         | MpViewnodeKind::Vognode (MpVognode::Inactive (_))
-        | MpViewnodeKind::Phantom (MpPhantom::Unknown (_)) =>
+        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (_))) =>
         None, }}
 
   /// PITFALL: Don't let this convince you a Scaff can have an ID.
@@ -387,14 +387,14 @@ impl MpViewnode {
     match &self . kind {
       MpViewnodeKind::Vognode (MpVognode::Active (t))
         => t . id . as_ref(),
-      MpViewnodeKind::Phantom (MpPhantom::Diff (p))
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (p)))
         => p . id . as_ref(),
-      MpViewnodeKind::Phantom (MpPhantom::Deleted (d)) =>
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Deleted (d))) =>
         Some (&d . id),
       // An inactive placeholder is anonymous: no id.
       MpViewnodeKind::Vognode (MpVognode::Inactive (_)) =>
         None,
-      MpViewnodeKind::Phantom (MpPhantom::Unknown (u)) =>
+      MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Unknown (u))) =>
         Some (&u . id),
       MpViewnodeKind::PropertyFolder (_)
         | MpViewnodeKind::Property (_)
@@ -407,7 +407,7 @@ impl MpViewnode {
   pub fn is_active_or_diff_phantom (&self) -> bool {
     matches! ( &self . kind,
       MpViewnodeKind::Vognode (MpVognode::Active (_))
-        | MpViewnodeKind::Phantom (MpPhantom::Diff (_)) ) }
+        | MpViewnodeKind::Vognode (MpVognode::Phantom (MpPhantom::Diff (_))) ) }
 }
 
 //
