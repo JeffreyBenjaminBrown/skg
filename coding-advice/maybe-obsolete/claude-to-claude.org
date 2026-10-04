@@ -36,7 +36,7 @@ When writing or modifying code:
 
 `bash/all-tests.sh --no-sound` manages the server instances needed by the
 integration tests. Rust tests do not require an external database service.
-Config files such as `data/skgconfig.toml` select distinct TCP ports, source
+Config files such as `data/skgconfig.toml` select distinct TCP ports, Skg repo
 folders, and Tantivy folders for concurrently running Skg instances.
 
 * Running Tests
@@ -68,8 +68,8 @@ There are three ways to test the code:
   The central pipeline. When Emacs saves a buffer, the server:
 
   1. Parses buffer text -> ViewNode tree ('org_to_uninterpreted_nodes')
-  2. Enriches with missing IDs/sources ('add_missing_info_to_forest')
-     - New nodes get UUIDs; sourceless nodes inherit parent's source
+  2. Enriches with missing IDs/repos ('add_missing_info_to_forest')
+     - New nodes get UUIDs; repoless nodes inherit parent's Skg repo
   3. Validates tree structure ('find_buffer_errors_for_saving')
   4. Converts to placed types ('maybePlaced_to_placed_tree')
   5. Extracts save intents via local instruction collection
@@ -93,19 +93,19 @@ There are three ways to test the code:
   Key entry point: 'handle_save_buffer_request' in server/serve/handlers/save_buffer.rs.
   Key data flow: buffer text -> MpViewnode -> ViewNode -> CollectedIntents -> NodeIntent -> DefineNode (Save|Delete) -> filesystem/graph/Tantivy.
 
-* Source (SourceName)
+* Skg repo (RepoName)
 
-  Source is a SourceName (String wrapper) identifying which configured directory holds a node's .skg file. It is:
+  Skg repo is a RepoName (String wrapper) identifying which configured directory holds a node's .skg file. It is:
   - NOT serialized in .skg files — inferred from file location at load time
   - Stored in the complete in-Rust node and in Tantivy as a search field
-  - Used by 'path_from_pid_and_source' to compute file paths: source.path / pid.skg
-  - Governed by user_owns_it flag: foreign sources are read-only
+  - Used by 'path_from_pid_and_repo' to compute file paths: repo.path / pid.skg
+  - Governed by user_owns_it flag: foreign Skg repos are read-only
 
-  All graph relationships (contains, subscribes_to, etc.) reference nodes by ID, not by source. Source is purely about where the .skg file lives on disk.
+  All graph relationships (contains, subscribes_to, etc.) reference nodes by ID, not by Skg repo. Skg repo is purely about where the .skg file lives on disk.
 
 * Relationships and the view system
 
-  Graph relationships (all ID-based, source-independent):
+  Graph relationships (all ID-based, repo-independent):
   - contains: parent -> child ordering (Vec<ID>, order matters)
   - subscribes: subscriber -> subscribee (forking foreign data)
   - hides_from_its_subscriptions: filtering within subscriptions

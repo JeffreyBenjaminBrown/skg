@@ -8,7 +8,7 @@ metadata into short colored tokens. Toggle the compact display with
 need to inspect the exact facts or requests.
 
 Relationship counts describe the latest rendered graph under the active
-source-set. They count distinct visible nodes, including visible
+repo-set. They count distinct visible nodes, including visible
 relationship edges, and resolve extra IDs. They do not count repeated
 links or unsaved buffer edits as new graph facts. A folded body can still
 contribute links. A view's position can add ancestor flags and a birth
@@ -61,14 +61,14 @@ and =aO= distinguish the direction of an override edge.
 A flag replaces a numeral when it fully explains a side. With
 fractions, an ancestor appears once: before the slash if it belongs
 to the numerator, otherwise after the denominator's numeral. =a/5L=
-means the parent is the sole interesting source among five; =1/5aL=
-means one other source is interesting and the parent is not. =a/L=
-means the parent is the sole incoming source and is interesting;
-=aL= means the sole parent source is uninteresting. =La= means the
+means the parent is the sole interesting Skg repo among five; =1/5aL=
+means one other Skg repo is interesting and the parent is not. =a/L=
+means the parent is the sole incoming Skg repo and is interesting;
+=aL= means the sole parent Skg repo is uninteresting. =La= means the
 sole outgoing target is the parent; =L3a= counts three targets,
 including the parent. If distinct ancestors =a= and =b= are the only
-inbound sources, and only =a= is interesting, =a/bL= expresses one
-interesting source out of two. The denominator still includes =a=;
+inbound Skg repos, and only =a= is interesting, =a/bL= expresses one
+interesting Skg repo out of two. The denominator still includes =a=;
 its numeral is omitted because both ancestors account for the total.
 
 A black-on-white relationship letter identifies the relation that put
@@ -96,7 +96,7 @@ The herald faces in Emacs and their Neovim highlight groups are:
 | Confusable =ĥ= | 'heralds-confusable-face' | 'SkgHeraldConfusable' | pink foreground |
 | =C= and =L= | 'heralds-blue-face' | 'SkgHeraldBlue' | white on blue |
 | =S=, =O= and =H= | 'heralds-purple-face' | 'SkgHeraldPurple' | white on purple |
-| Source and folder markers | 'heralds-green-face' | 'SkgHeraldGreen' | white on dark green |
+| Skg repo and folder markers | 'heralds-green-face' | 'SkgHeraldGreen' | white on dark green |
 | Requests and deletions | 'heralds-red-face' | 'SkgHeraldRed' | white on red |
 | =A=, =I= and =P= counts | 'heralds-cyan-face' | 'SkgHeraldCyan' | black on cyan |
 | Birth relation letter only | 'heralds-birth-face' | 'SkgHeraldBirth' | black on white |
@@ -109,11 +109,11 @@ foreground and an underline.
 
 ** Other heralds
 
-Green =⌂:LABEL= marks a node's home-source boundary. A red =~NAME=
+Green =⌂:LABEL= marks a node's home repo boundary. A red =~NAME=
 immediately before it reports a relationship stored at a more private
-relSource than its default. A red =request:~NAME= is an explicit
-pending request to change that relationship source on save. The
-home source belongs to the node; relSource belongs to an edge. Green
+relRepo than its default. A red =request:~NAME= is an explicit
+pending request to change that relationship Skg repo on save. The
+home repo belongs to the node; relRepo belongs to an edge. Green
 folder labels, =ID= and =alias= describe their respective view
 positions. The properties view spells out =☮ had ID before org-roam
 import=, =☮ was overloaded during org-roam import=, and
@@ -126,9 +126,9 @@ import=, =☮ was overloaded during org-roam import=, and
 exists but is hidden. Yellow =⊥= means a displayed child does not
 affect its parent's membership on save. Blue =⟳= marks a cycle.
 An unknown node is labeled =Reference to unknown node.= in the
-interesting yellow style; an inactive source yields an anonymous
-=node from inactive source= marker. Inactive placeholders reveal no
-node title or source. Red =DELETED= marks a deletion in a diff or
+interesting yellow style; an inactive Skg repo yields an anonymous
+=node from inactive repo= marker. Inactive placeholders reveal no
+node title or Skg repo. Red =DELETED= marks a deletion in a diff or
 edit, while =diff:not-in-git= marks a node without a Git counterpart.
 =staged:= and =unstaged:= prefixes report Git changes; =X= and =-X=
 mark existence changes, =M= and =-M= membership changes, and
@@ -138,14 +138,14 @@ specifically identified above as requests.
 ** Link annotations
 
 The current buffer can display a suffix after each literal
-='[[id:ID][LABEL]]'= link with the target's home-source abbreviation.
-Use 'skg-toggle-source-overlay-on-links' (=C-c v L=) in Emacs or
-':SkgToggleSourceOverlayOnLinks' (=<localleader>vL=) in Neovim.
+='[[id:ID][LABEL]]'= link with the target's home repo abbreviation.
+Use 'skg-toggle-repo-overlay-on-links' (=C-c v L=) in Emacs or
+':SkgToggleRepoOverlayOnLinks' (=<localleader>vL=) in Neovim.
 Suffixes start off and the toggle is local to the buffer. A resolved
 target appears in green, for example =[⌂:pub]=. Extra IDs resolve
-to their target's home source. =⌂:missing=, =⌂:inactive=,
+to their target's home repo. =⌂:missing=, =⌂:inactive=,
 =⌂:…= and =⌂:unavailable= distinguish missing, inactive, pending
-and lookup-error states. The latter states reveal no source name.
+and lookup-error states. The latter states reveal no Skg repo name.
 
 Even with suffixes off, the label of a link confirmed missing in the
 current graph is pink and underlined. Inactive or still unknown

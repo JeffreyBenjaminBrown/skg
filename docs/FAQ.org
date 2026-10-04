@@ -11,7 +11,7 @@ see [[file:./COMMANDS.org][COMMANDS]].
 
 *** How to [[file:./merging.org][merge two nodes]]
 
-*** How to [[file:./moving-nodes-across-repos.org][move a node]] to a different source repository
+*** How to [[file:./moving-nodes-across-repos.org][move a node]] to a different Skg repo
 
 ** Context
 

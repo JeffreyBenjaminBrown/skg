@@ -35,7 +35,7 @@ This is a build-artifact failure. Do not delete any data.
 Three things conspire to make this look like a mystery:
 
 1. *"The code hasn't changed."* True -- and irrelevant. What changed is
-   the compiled artifacts on disk, not the source.
+   the compiled artifacts on disk, not the Skg repo.
 
 2. *Cargo will not rebuild the broken file.* Cargo decides freshness
    from fingerprints and mtimes; it never checksums its own output. If
@@ -155,7 +155,7 @@ artifacts. Specifically intact were:
 
 - The Tantivy index (=data/.index.tantivy=). Incremental init
   succeeded; no reindex was needed.
-- The git working tree and the source.
+- The git working tree and the Skg repo.
 
 So resist the urge to "fix" this by deleting databases or reindexing.
 The one thing a power loss reliably corrupts is whatever was being

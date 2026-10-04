@@ -22,7 +22,7 @@ save proceeds. Abort leaves every file byte-for-byte unchanged. Scripts
 and maintenance writers have no prompt and refuse this repair.
 
 That disk-publication choice is separate from displaying the result. If
-a successful save under a restricted source-set would rerender text from
+a successful save under a restricted repo-set would rerender text from
 an overPrivateText telescope, Skg asks for a second, request-scoped approval. Decline
 leaves the save committed but sends no new view text and changes no
 open-view registry entry.
@@ -68,12 +68,12 @@ The 'f' is for 'find'.
 "Rooty" nodes (roots, cycle members,
 mentioned nodes, and nodes that had an org-roam ID before import)
 are bumped in the ranking via their context-origin multiplier.
-**** how search treats data source restrictions
-If the source-set is restricted, if the search index contains any overPrivateText
+**** how search treats Skg repo restrictions
+If the repo-set is restricted, if the search index contains any overPrivateText
 telescope (one whose selected title or body lies below home), Skg asks
 whether to include or exclude overPrivateText telescopes before running the query.
 Exclude filters them in Tantivy before matching; Include is permission
-for this search only. Under source-set =all= they are included without a
+for this search only. Under repo-set =all= they are included without a
 prompt and the result carries a warning.
 *** C-c f RET : skg-search
 Text search across titles and aliases, returning every
@@ -299,27 +299,27 @@ These four commands are described elsewhere in this document.
 Asks whether to include staged changes and, if so,
 whether to include unstaged changes.
 Then opens an org report summarizing semantic graph changes
-across all configured sources.
+across all configured Skg repos.
 
 The report is based on git/index/worktree state,
 so the command refuses to run while any Skg view buffer
 has unsaved edits.
 *** C-c t m         : skg-stage-moves
-Scans the git status of every configured source and finds each
-node whose .skg file "moved": it vanished from exactly one source
-(committed there in git HEAD, now gone from that source's worktree)
-and appeared in exactly one other source (present in that source's
+Scans the git status of every configured Skg repo and finds each
+node whose .skg file "moved": it vanished from exactly one Skg repo
+(committed there in git HEAD, now gone from that Skg repo's worktree)
+and appeared in exactly one other Skg repo (present in that Skg repo's
 worktree, not yet committed). A node that vanished from, or appeared
-in, more than one source is ambiguous and is skipped.
+in, more than one Skg repo is ambiguous and is skipped.
 
 Opens a buffer holding a bash script: a list of the moves followed by
-one loop that 'git rm's each file in its old source and 'git add's it
+one loop that 'git rm's each file in its old Skg repo and 'git add's it
 in the new one. Before removing, the loop checks that the file is
-already gone from the old source's worktree (that is how the move was
+already gone from the old Skg repo's worktree (that is how the move was
 detected); a file still present there is skipped, not deleted, since
 'git rm' would silently remove it. Review the script, then run it from
 the skg data root. Unlike most commands here, this one does not depend
-on the node at point; it reports moves across all sources.
+on the node at point; it reports moves across all Skg repos.
 ** C-c l : show a folder (both folders of a relation)
 These commands don't edit the graph. Each inserts a request into the
 metadata of the node at point that, on save, causes the server to
@@ -411,14 +411,14 @@ In brief, it means edits to its title, body or
 will not affect it
   (although edits to its children will affect those children,
   unless they are also write-protected).
-*** C-c s s : skg-set-source
-Changes the source of the node at point.
-The prompt starts with the current source as editable minibuffer text.
-You can type the new source name directly,
-or use shift-left / shift-right to cycle through owned sources.
+*** C-c s s : skg-set-repo
+Changes the Skg repo of the node at point.
+The prompt starts with the current Skg repo as editable minibuffer text.
+You can type the new Skg repo name directly,
+or use shift-left / shift-right to cycle through owned Skg repos.
 Press C-? from the prompt to open an org buffer listing every
-configured source name as a headline,
-with that source's path as the headline body.
+configured Skg repo name as a headline,
+with that Skg repo's path as the headline body.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the move.
@@ -426,20 +426,20 @@ Save the view afterward to apply the move.
 Two safeguards, shared with the recursive form below:
 
 - If the move would leave content relationships stuck at their old,
-  more-private sources (the sticky rule never moves an edge's
+  more-private Skg repos (the sticky rule never moves an edge's
   privacy without an explicit gesture), the command says so and
   offers to publicize them in the same go, by writing the same
-  =(editRequest (relSource ...))= requests 'skg-set-relSource' would.
+  =(editRequest (relRepo ...))= requests 'skg-set-relRepo' would.
   Declining leaves them and notes that =C-c s R= can publicize them
-  later. Edges already carrying an explicit source request
-  already have a deliberate relSource and are never touched.
+  later. Edges already carrying an explicit Skg repo request
+  already have a deliberate relRepo and are never touched.
 - A write-protected instance is NOT changed -- the save would
-  silently ignore its source edit -- and produces a loud WARNING,
+  silently ignore its Skg repo edit -- and produces a loud WARNING,
   with the full ID list written to =*Messages*=.
-*** C-c s S : skg-set-source-recursive
-Like 'skg-set-source', but it also
-changes the source of every content descendent of the node at point
-whose source matches the original source of the node at point.
+*** C-c s S : skg-set-repo-recursive
+Like 'skg-set-repo', but it also
+changes the Skg repo of every content descendent of the node at point
+whose Skg repo matches the original Skg repo of the node at point.
 Only descendents for which AffectsParent=True are traversed.
 The stuck-relationship offer and the write-protected warning described
 under =C-c s s= apply here too, across the whole subtree.
@@ -464,8 +464,8 @@ and edits the acquirer's metadata to request a merge.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the merge.
-*** C-c s r : skg-set-relSource
-Sets the relSource of the relationship instance the headline at
+*** C-c s r : skg-set-relRepo
+Sets the relRepo of the relationship instance the headline at
 point represents -- =contains= for a content child, the folder's
 relation for a writable PartnerFolder member, or the alias membership
 for an alias headline. An Unknown placeholder in one of those writable
@@ -476,48 +476,48 @@ privacy in both directions, see
 =BUG-and-fix_make-edge-more-public.org=.)
 
 For a node-to-node edge, the command asks the server for its default
-relSource and current relSource (the
-"relSource info" endpoint), then prompts -- with both
-tab-completion and S-left/S-right cycling, like the other source
-dialogs -- over the sources at least as private as the default (more
+relRepo and current relRepo (the
+"relRepo info" endpoint), then prompts -- with both
+tab-completion and S-left/S-right cycling, like the other Skg repo
+dialogs -- over the Skg repos at least as private as the default (more
 public ones could leak an endpoint's ID and would be rejected at
 save), plus a no-override choice. The minibuffer starts pre-filled
-with a pending request when it is offerable, else the current relSource
+with a pending request when it is offerable, else the current relRepo
 or default, so RET keeps the most specific available choice. If the server cannot resolve the edge
-(e.g. a node not yet saved), every source is offered and the save's
+(e.g. a node not yet saved), every Skg repo is offered and the save's
 floor check backstops. For an alias, its default is its owner's home
-and the current relSource is read directly from the alias metadata, so
+and the current relRepo is read directly from the alias metadata, so
 no synthetic graph edge or broader endpoint is needed.
 
 For an edge from an owned owner to a foreign member, the default is
 the owner's home regardless of privacy order. That choice deliberately
 shares the foreign ID and relationship with readers of the owned
-source; Skg never offers the foreign source as a write destination.
+Skg repo; Skg never offers the foreign Skg repo as a write destination.
 
-Choosing a source writes an =(editRequest (relSource SOURCE))= metadata
+Choosing a Skg repo writes an =(editRequest (relRepo REPO))= metadata
 request. This
 both raises privacy above the default and lowers it back down to
 (never below) the default -- the way to publicize an edge stuck at
-an old, more private source after its endpoint's home moved. An edge
+an old, more private Skg repo after its endpoint's home moved. An edge
 sitting more private than its default is marked with a red =~NAME= herald
-immediately before the ⌂ source herald; once saved at its default,
+immediately before the ⌂ Skg repo herald; once saved at its default,
 request and display herald disappear.
 
 The no-override choice removes the request, which means "no opinion":
-a saved edge keeps its saved source (sticky). It does NOT reset the
+a saved edge keeps its saved Skg repo (sticky). It does NOT reset the
 edge to its default -- to reach the default, choose it.
 
 Refuses with an error when point is on a member of a read-only folder
 (subscriberFolder, overriderFolder, hiderFolder, hiddenFolder,
 hiddenInSubscribeeFolder, hiddenOutsideOfSubscribeeFolder): the
-relationship belongs to the other end there, so setting its source
+relationship belongs to the other end there, so setting its Skg repo
 from this side would be meaningless. Also refuses on a root
 headline, which represents no edge.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward to apply the change.
 
-Note that the name 'skg-set-relSource' is somewhat misleading.
+Note that the name 'skg-set-relRepo' is somewhat misleading.
 Normally, by 'relationship' we mean
 'a relationship between two nodes in the graph'.
 But for this command we need to broaden the definition to
@@ -525,9 +525,9 @@ But for this command we need to broaden the definition to
 (which might be an alias) to what its parent represents (a node in the graph)'.
 
 With a prefix argument (=C-u C-c s r=) it instead runs
-'skg-set-relSource-recursive', described next.
-*** C-c s R : skg-set-relSource-recursive
-Like 'skg-set-relSource', but applied throughout the
+'skg-set-relRepo-recursive', described next.
+*** C-c s R : skg-set-relRepo-recursive
+Like 'skg-set-relRepo', but applied throughout the
 subtree at point (the node at point's own edge to its view-parent
 included). Also reachable as =C-u C-c s r=.
 
@@ -540,15 +540,15 @@ position -- =contained= (ordinary content), =subscribee= (a
 subscribeeFolder member) and =overridden= (an overriddenFolder member);
 RET on any other role explains why its edge cannot be set from
 there (read-only folders belong to the other end; links carry no
-independent source; hide sources are derived at save). RET picks a
+independent Skg repo; hide Skg repos are derived at save). RET picks a
 role; q aborts.
 
-It then prompts for a source over the whole ladder, plus the
-no-override choice, which instead REMOVES existing source requests
+It then prompts for a Skg repo over the whole ladder, plus the
+no-override choice, which instead REMOVES existing Skg repo requests
 throughout the subtree. Unlike the single-edge command, no
 per-edge default is fetched -- the subtree's edges have different
-defaults -- so every source is offered and the save's floor check
-validates each edge (an offered source more public than some edge's
+defaults -- so every Skg repo is offered and the save's floor check
+validates each edge (an offered Skg repo more public than some edge's
 default makes the save fail, naming that edge).
 
 The walk applies to, and recurses on, only viewchildren that affect
@@ -559,9 +559,9 @@ collected at save), and prunes read-only folders and other scaffolds
 entirely.
 
 This is the gesture for republicizing a subtree's relationship
-edges after 'skg-set-source-recursive' moved its nodes to a more
-public source: the sticky rule keeps each edge at its old, more
-private source, so the contains edges stay behind until explicitly
+edges after 'skg-set-repo-recursive' moved its nodes to a more
+public Skg repo: the sticky rule keeps each edge at its old, more
+private Skg repo, so the contains edges stay behind until explicitly
 moved to the new default (see
 =MAYBE-BUG_recursive-move-to-more-public-leaves-relations-private.org=).
 
@@ -579,7 +579,7 @@ ID, the command warns that the old node might become an orphan.
 The headline title plus body must contain exactly one org bracket
 link, and that link must be an =id:= link. The node must have no
 org-descendents. Its org-parent must be a definitive activeNode
-whose source is owned in =skgconfig.toml=.
+whose Skg repo is owned in =skgconfig.toml=.
 
 The command replaces the whole leaf with a same-level
 write-protected activeNode for the link target. The parent is
@@ -597,8 +597,8 @@ Refuses if the buffer has unsaved changes ("Save the buffer
 before forking."), so the clone's snapshot matches what you see.
 Otherwise it stamps the node and auto-saves; the server returns
 the usual fork-confirmation buffer. There you MUST set the clone's
-source with =C-c s s= (it starts as the placeholder PICK-A-SOURCE,
-with your config-first owned source suggested above it), then
+Skg repo with =C-c s s= (it starts as the placeholder PICK-A-REPO,
+with your config-first owned Skg repo suggested above it), then
 approve with =C-c C-c=; or decline with =C-c C-k= (which also
 strips the fork request so the next save does not re-fork).
 
@@ -614,7 +614,7 @@ Point can be on the headline or in the node body.
 The command uses the headline either way.
 
 The node being replaced must be an existing activeNode with an ID,
-and an org-child of a definitive activeNode whose source is
+and an org-child of a definitive activeNode whose Skg repo is
 owned in =skgconfig.toml=. The command acts locally,
 replacing only this occurrence in the current buffer:
 the headline at point and all of its org-descendents,
@@ -654,14 +654,14 @@ enable this view to see what you've changed since your last commit,
 i.e. how your worktree differs from HEAD.
 
 If toggling the mode would rerender overPrivateText telescope text under a
-restricted source-set, Skg asks before changing the mode or any view.
+restricted repo-set, Skg asks before changing the mode or any view.
 Declining leaves the mode and buffers unchanged; the protocol still sends
 an empty rerender stream so preemptive client locks are released.
 *** C-c v e : skg-view-new-empty
 Opens a blank Skg content view in which to create new nodes.
 **** why
-Creating a headline through Skg's commands prompts for any source it
-cannot inherit.  Save validation also catches a root whose source was
+Creating a headline through Skg's commands prompts for any Skg repo it
+cannot inherit.  Save validation also catches a root whose Skg repo was
 omitted when the headline was entered as plain text.
 *** C-c v h : skg-view-heralds-mode
 This command toggles it.
@@ -670,19 +670,19 @@ metadata is shown in its full plain-text glory,
 or is instead summarized via brief 'heralds'.
 It is turned on at every view by default.
 See [[file:heralds.org][the herald legend]] for the tokens and colors.
-*** C-c v L : skg-toggle-source-overlay-on-links
-Toggle display-only home-source suffixes on Skg links in this buffer.
+*** C-c v L : skg-toggle-repo-overlay-on-links
+Toggle display-only home repo suffixes on Skg links in this buffer.
 The suffixes start off. Links confirmed missing are pink and underlined
 even with suffixes off. See [[file:heralds.org::*Link annotations][link annotations]].
-*** C-c v l : skg-limit-source-set
-Limits display and search to one source-set for this Emacs
-connection. Source-sets are the prefixes of the config's privacy
+*** C-c v l : skg-limit-repo-set
+Limits display and search to one repo-set for this Emacs
+connection. Repo-sets are the prefixes of the config's privacy
 order, so the question the command asks is really "what is the most
-private source to make available?" -- choosing a source activates it
+private Skg repo to make available?" -- choosing a Skg repo activates it
 and everything more public. Tab completion and shift-left /
 shift-right cycling walk the ladder in privacy order. The command
 then re-renders open Skg buffers after confirmation, and tells the
-server to use that source-set for subsequent requests. Choose =all=
+server to use that repo-set for subsequent requests. Choose =all=
 (the whole ladder) to remove the limit.
 
 If the proposed set would rerender overPrivateText telescope text, Skg asks before
@@ -706,7 +706,7 @@ server round-trip at all. See =C-c v R= for when it goes stale.
 Empties the session's ID-to-title cache (see =C-c v r=) and
 re-annotates the current buffer. Use it after anything that changes
 what titles the server would answer with: a node retitled, or the
-active source-set widened (IDs inactive under the old set were
+active repo-set widened (IDs inactive under the old set were
 cached as unresolvable).
 *** C-c v s : skg-view-id-stack
 View and maybe edit the set of links you've stored.
@@ -791,8 +791,8 @@ repeated here; described earlier in this doc
 :END:
 **** ordinary usage
 Run =M-x skg-import-md-and-org= with the server running. Choose an absolute
-directory in the server/container filesystem and an existing owned source.
-That source determines where every new node will be written. The importer scans
+directory in the server/container filesystem and an existing owned Skg repo.
+That Skg repo determines where every new node will be written. The importer scans
 exact =.md= and =.org= files recursively, skips symlinks and =.git=, and
 leaves the originals untouched.
 
@@ -830,7 +830,7 @@ Subsequent Org export is for reading, not
 a round-trip backup: it does not preserve Markdown syntax or all Skg graph
 semantics. Exporting to the original input directory would overwrite matching
 =.org= files, while leaving =.md= files alone. There is no dedicated undo or
-crash-recovery transaction; keep the originals and back up the owned source.
+crash-recovery transaction; keep the originals and back up the owned Skg repo.
 
 **** Skg asks for a host-root mapping if it finds absolute links to documents.
 Skg runs in a Docker container.
@@ -886,12 +886,12 @@ interactive importer above, this legacy command replaces its destination.
 Run from the repository root, where Cargo and the input files are available:
 
 #+begin_src sh
-cargo run --bin skg -- import-org-roam ORG_DIR OUTPUT_DIR SOURCE_NAME
+cargo run --bin skg -- import-org-roam ORG_DIR OUTPUT_DIR REPO_NAME
 #+end_src
 
 All three arguments are required. 'ORG_DIR' contains your Org-roam notes;
-'OUTPUT_DIR' receives the '.skg' files; 'SOURCE_NAME' names the destination
-Skg source. For example, using a fresh staging directory:
+'OUTPUT_DIR' receives the '.skg' files; 'REPO_NAME' names the destination
+Skg Skg repo. For example, using a fresh staging directory:
 
 #+begin_src sh
 cargo run --bin skg -- import-org-roam /imports/org-roam /tmp/skg-import-review imported-notes
@@ -934,7 +934,7 @@ heading levels introduce grouping nodes titled 'These are special!' and
 are merged: children and aliases are combined, and additional titles and
 bodies are appended with a separator. Such nodes receive 'Was overloaded
 during org-roam import'. This does not compare or merge with existing
-nodes in your configured Skg sources.
+nodes in your configured Skg Skg repos.
 ***** Text and links
 Bodies are copied with whitespace normalization. Parsed property drawers
 are consumed; properties other than 'ID' and 'ROAM_ALIASES' are not retained
@@ -948,19 +948,19 @@ validate that linked IDs exist. It creates no subscriptions, hides, or overrides
 **** Making the imported data available in Skg
 The command writes one 'ID.skg' file per resulting node. It does not edit
 configuration, start the server, or refresh a running server's graph and
-search index. 'SOURCE_NAME' labels the source during conversion; the permanent
-source association comes from the configured directory, not a source field
+search index. 'REPO_NAME' labels the Skg repo during conversion; the permanent
+Skg repo association comes from the configured directory, not a Skg repo field
 inside each file.
 
-After reviewing the output, place it in the intended owned source directory
-and configure that source with the intended name and privacy order. See
-[[file:api-and-formats.org][the configuration reference]]. Check for ID collisions with existing sources
+After reviewing the output, place it in the intended owned Skg repo directory
+and configure that Skg repo with the intended name and privacy order. See
+[[file:api-and-formats.org][the configuration reference]]. Check for ID collisions with existing Skg repos
 before loading: the importer itself does not check them.
 
-For a first setup, configure the source before starting Skg. When replacing
+For a first setup, configure the Skg repo before starting Skg. When replacing
 existing data, save and close affected views and stop the server before
-changing its source files, then restart it. If files in an already configured
-source changed while the server remained running,
+changing the files in its Skg repos, then restart it. If files in an already configured
+Skg repo changed while the server remained running,
 'M-x skg-rebuild-ephemeral-data-stores' reloads them; close stale views and
 open fresh ones before editing. Configuration changes require a restart.
 
@@ -971,7 +971,7 @@ update workflow. Keep your originals and a backup of Skg edits you want to
 retain. [[file:undoing-import.org][Exporting back to Org]] does not restore the original files or all graph
 semantics.
 **** bash/import-org-roam.sh : host-side Docker and Git wrapper
-[[file:../bash/import-org-roam.sh][This script]] accepts 'SOURCE DEST NICKNAME' and prompts for a Docker
+[[file:../bash/import-org-roam.sh][This script]] accepts 'REPO DEST NICKNAME' and prompts for a Docker
 container. Unlike the Cargo command, it offers to remove the destination's
 '.git' directory as well as its '.skg' files, then runs the importer,
 initializes Git, stages the destination, and opens an editor for a commit.
@@ -991,9 +991,9 @@ Exports Skg data to plain =.org= files, so the data can be read
 (and navigated on GitHub) without running Skg. No keybinding.
 
 It asks two things:
-- the most private source to include. The export includes
-  that source and every source more public than it.
-  Choose all to include every source.
+- the most private Skg repo to include. The export includes
+  that Skg repo and every Skg repo more public than it.
+  Choose all to include every Skg repo.
 - which directory to write to (default =org-exports=). This path
   is interpreted *by the server*, relative to the project root the
   server runs from. Because the server may run inside a Docker
@@ -1014,7 +1014,7 @@ make N contain a child node, called an /export marker/, such that:
   =3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f=.
   That ID is a fixed constant that the exporter looks for.
   The node it names only documents this feature.
-  The link works even if your sources do not contain that node.
+  The link works even if your Skg repos do not contain that node.
   The link's label is up to you, for example:
   : [[id:3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f][Export to Org]]
 - The marker's body contains a line saying where to write the file,
@@ -1030,7 +1030,7 @@ each of its content nodes' titles and bodies,
 each of *their* content nodes' titles and bodies, etc.,
 stripped of Skg metadata. The export marker itself is left out of the file.
 N's position does not matter; it can be anywhere in the graph.
-But N must belong to a source included in the export;
+But N must belong to a Skg repo included in the export;
 otherwise it is skipped, with a warning.
 If N has several markers, the first one is used, with a warning.
 If two nodes claim the same path, only one of them is exported, with a warning.
@@ -1068,11 +1068,11 @@ is not exported under the chosen set points to a "some links
 might be broken" note.
 **** privacy
 If a restricted export would include overPrivateText telescope text, Skg asks for
-approval for each such ID before writing any file. Source-set =all= exports
+approval for each such ID before writing any file. Repo-set =all= exports
 it with a warning. The noninteractive form "fails closed" (fails before writing any files) unless passed
 =--include-overPrivateText-telescopes=:
 
-: cargo run --bin skg -- export-org [config-path] [source-set] [output-dir] [--include-overPrivateText-telescopes]
+: cargo run --bin skg -- export-org [config-path] [repo-set] [output-dir] [--include-overPrivateText-telescopes]
 ** connection, reload, rebuild ephemeral data stores
 Unless you're coding or troubleshooting,
 you probably won't need these.
@@ -1090,8 +1090,8 @@ they belong to the previous runtime generation.
 *** skg-strip-trailing-whitespace-from-bodies
 Strips trailing whitespace from every line of every body,
 and trailing blank lines from each body's tail,
-in every source you own.
-Foreign sources are read-only and left untouched.
+in every Skg repo you own.
+Foreign Skg repos are read-only and left untouched.
 Rewrites exactly the .skg files whose bodies change;
 the derived caches are refreshed to match.
 Review the result with 'git diff --ignore-all-space',

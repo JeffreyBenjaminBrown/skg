@@ -60,7 +60,7 @@ log that previews the first 200 bytes:
 #+end_src
 
 For the guitar node, the rendered org text contained
-=sourceHerald ⌂:public=. The =⌂= character (3 bytes) happened
+=homeRepoHerald ⌂:public=. The =⌂= character (3 bytes) happened
 to sit at byte positions 198-200. Slicing at byte 200 landed
 inside the character:
 

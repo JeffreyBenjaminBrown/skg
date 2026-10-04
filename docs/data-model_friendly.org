@@ -2,7 +2,7 @@
 ** It's not very strange.
 Using skg is much like ordinary reading and writing. You read something you want to keep. You add it to your data. (Although unusually, edits to that thing will propogate into your data.) You write text. You divide, subdivide, organize, make links. You make some things public and others private (although with unusual granularity). You might learn someone enjoyed some of your public knowledge (although unusually, the way you would learn this is through their revelation of how it fit into their knowledge).
 ** graph, view and the 'contains' relationship
-A user's knowledge is represented as a graph ("linked forest"). Each node ("point") in the graph has a "title" (just text), a "body" (just text), a unique ID (a long number) and a 'data source'. Sources are for sharing and privacy, described later.
+A user's knowledge is represented as a graph ("linked forest"). Each node ("point") in the graph has a "title" (just text), a "body" (just text), a unique ID (a long number) and a 'home repo'. Skg repos are for sharing and privacy, described later.
 
 There is too much data to see it all at once, so we use trees to visualize parts of the graph. (This should eventually be extended to include tables and other presentation schemes.) The distinction between the underlying data and the view is important; I will refer to them as 'graph' and 'view'.
 
@@ -11,7 +11,7 @@ A node's body text can be hidden from view. The title can also be hidden, but on
 The foundational relationship in the graph is "contains". The tree providing a view of a node shows not its node's text, but also the other nodes that it contains, and the nodes they contain, etc., recursively until reaching the 'leaves' of the tree, which contain nothing. Or until running into cycles, in which case the second and future occurences of the same node do show its children. The software is prepared to show containment cycles, because users have complete control over their data, but the 'contains' relationship is not intended to be cyclic.
 
 'contains' is the relationship between sections and subsections, subsections and sub-subsections, etc. An initial view of a node is just itself plus everything it contains, recursively. The view might show other kinds of relationships, once the user starts exploring it, but initially, every parent-child relationship is the contains relationship.
-** sources, privacy and sharing
+** Skg repos, privacy and sharing
 'Sharing' makes it sound like more work than it is.
 Integration need not be mutual.
 If someone integrates knowledge that you made available into theirs,
@@ -19,7 +19,7 @@ and they make available the context
 into which they integrated your knowledge,
 you don't have to look, or even be notified.
 
-Recall that each node has a 'source'. If your notes are entirely private, you only need one source, but you might want to distinguish between a private source and a public source, or maybe more kinds than that.
+Recall that each node has a 'home repo'. If your notes are entirely private, you only need one Skg repo, but you might want to distinguish between a private Skg repo and a public Skg repo, or maybe more kinds than that.
 
 Note that a private node can contain a public one, and vice versa. You do not, thus, have to decide whether a topic in its entirety is public or private; you can decide node by node whether to share each part of that document.
 

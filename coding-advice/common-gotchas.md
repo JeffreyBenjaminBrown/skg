@@ -41,7 +41,7 @@ has committed. The production text-search handler does this for you, and
 every save that finished before it.
 
 In TESTS this bites you directly: a test that saves and then reads
-Tantivy (via 'search_index' or a helper like 'tantivy_source_for_id')
+Tantivy (via 'search_index' or a helper like 'tantivy_repo_for_id')
 must call 'wait_for_tantivy_writes_idle' between the save and the read.
 Otherwise the read races the background commit and the test flakes ---
 typically a Tantivy read that returns 'None' or stale data

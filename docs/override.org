@@ -12,8 +12,8 @@ R.overrides_view_of = [N]
 #+end_example
 
 The stored value is a =RelPartner<ID>=.  Its =member= is =N= and its
-=relSource= says which telescope section records the relationship.
-The relSource is independent of either endpoint's home source: two
+=relRepo= says which telescope section records the relationship.
+The relRepo is independent of either endpoint's home repo: two
 public nodes can be connected by an override relationship recorded only
 in =private=.
 
@@ -34,8 +34,8 @@ automatic substitution.
 Visiting an ID opens that exact node as the raw root of a content view.
 It does not redirect to an overrider and does not stop at a choice
 buffer.  Re-visiting an ID that is already a root switches to its open
-content view.  A node whose home source is inactive in the current
-source-set cannot be visited.
+content view.  A node whose home repo is inactive in the current
+repo-set cannot be visited.
 
 This makes every viewnode used for navigation a stable destination.  In
 particular, selecting a node in search results, an override folder, or
@@ -60,7 +60,7 @@ containing visible override relatives in both directions:
 Each direction is recursive and cycle-guarded.  The inserted viewnodes are
 write-protected non-content descendants with an override birth reason,
 so their highlighted =O= herald explains why they occur at that
-position.  Node visibility and the override relationship's relSource
+position.  Node visibility and the override relationship's relRepo
 both gate the subtree.
 
 Search also groups matching owned override chains.  If a user-owned
@@ -86,7 +86,7 @@ when it is empty.  Absence means that the buffer expresses no opinion
 about the stored list; a present empty folder means to set the visible
 list empty.  The folder's members are /overridden-as-such/: they show
 the original target rather than a substitute.  The outbound member is
-also the surface from which the relationship's relSource can be edited.
+also the surface from which the relationship's relRepo can be edited.
 
 *** =overriderFolder=: what overrides this node
 
@@ -114,8 +114,8 @@ subscribee-as-such is the exception: in addition to its ordinary
 content, it automatically includes a nonempty folder for content hidden
 there.
 
-Under a restricted source-set, both override folders omit relationships
-whose relSource is inactive and partners whose home source is inactive.
+Under a restricted repo-set, both override folders omit relationships
+whose relRepo is inactive and partners whose home repo is inactive.
 Saving the visible subset preserves memberships stored in hidden
 telescope sections.
 
@@ -137,8 +137,8 @@ the resolver walks toward user-owned nodes that override it.  For
 D overrides C overrides N
 #+end_example
 
-a full-source content view draws =D= where =N= occurs.  If =D='s home
-source is inactive but =C='s is active, it draws =C=.  If no user-owned
+a full-repo content view draws =D= where =N= occurs.  If =D='s home
+Skg repo is inactive but =C='s is active, it draws =C=.  If no user-owned
 overrider is drawable, it draws =N=.  A monogamy violation makes the
 resolver refuse to choose a branch; a cycle makes it abandon
 substitution and return the originally requested node.
@@ -195,7 +195,7 @@ carrier's title, body, or folders still edits the carrier itself.
 The server rejects a forged or stale marker whose carrier is not on
 =N='s user-owned override chain.  The validation walk is intentionally
 visibility-ungated so that a marker which was honest when rendered does
-not become invalid merely because the active source-set changed.
+not become invalid merely because the active repo-set changed.
 
 ** Heralds and reasons for placement
 
@@ -242,7 +242,7 @@ imported =.skg= data can likewise contain existing override facts.
 
 When node =A= acquires node =B=, their outbound =overrides_view_of=
 lists are combined.  Duplicate partners keep the more-private
-relSource, and each relSource is clamped no more public than =A='s
+relRepo, and each relRepo is clamped no more public than =A='s
 home.  References to =B='s primary or extra IDs resolve canonically to
 =A= after the merge.
 
@@ -264,22 +264,22 @@ from owned data.
 An unknown override target can otherwise remain visible as an unknown
 folder member.  It cannot substitute because there is no node to draw.
 
-** Source-set behavior
+** Repo-set behavior
 
 Override folders, paths, search grouping, search overrideward
 view-subtrees, =O= relationship counts, and automatic substitution all
-derive their topology from relSource-gated relationship accessors.
+derive their topology from relRepo-gated relationship accessors.
 
 For automatic substitution, an override hop is followable only when the
-edge's relSource and the overrider node's home source are active and the
-overrider is user-owned.  A relationship outside the active source-set
+edge's relRepo and the overrider node's home repo are active and the
+overrider is user-owned.  A relationship outside the active repo-set
 therefore cannot silently select a node which the corresponding folders,
 paths, heralds, and search subtree omit.
 
 *** Other relationships
 
 Initial construction of the default =subscribeeFolder= also obtains its
-members through the generic directional, relSource-gated accessor before
+members through the generic directional, relRepo-gated accessor before
 deciding whether the folder would be empty.  A private subscription between
 two public nodes therefore creates neither a member nor an empty default
 folder in a public-only view.  An explicitly requested writable folder may
@@ -288,7 +288,7 @@ still be created empty, as intended.
 The other relationship-driven presentation paths do not have the same
 problem:
 
-- =contains= memberships are relSource-gated before recursive content is
+- =contains= memberships are relRepo-gated before recursive content is
   reconciled, including the contains-minus-hides treatment of a subscribee;
 - =hides_from_its_subscriptions= and the containment memberships used to
   derive =hiddenHere= and hidden-outside folders are gated in both initial and
@@ -296,16 +296,16 @@ problem:
 - ordinary relationship folders, paths, backpaths, herald counts, and
   ancestor heralds use the generic gated accessors for every stored
   node-to-node relationship;
-- =links_to= has no independently movable relationship source: it is
-  derived from the source node's title and body, so its effective relSource is
-  that node's home source.
+- =links_to= has no independently movable relationship Skg repo: it is
+  derived from the Skg repo node's title and body, so its effective relRepo is
+  that node's home repo.
 
 Raw relationship reads in save, merge, deletion, and invariant-checking code
-are intentionally full-graph operations rather than source-set presentation.
+are intentionally full-graph operations rather than repo-set presentation.
 
 ** Org export
 
-Org export follows the stored, source-gated =contains= graph.  It does
+Org export follows the stored, repo-gated =contains= graph.  It does
 not perform interactive override substitution.
 
 ** Principal implementation references
@@ -325,7 +325,7 @@ not perform interactive override substitution.
 - [[file:../server/dbs/in_rust_graph/prepared_update.rs][merge collision diagnostics]]
 - [[file:../server/save.rs][delete propagation]]
 - [[file:../server/export_org.rs][raw contains-based Org export]]
-- [[file:../server/dbs/in_rust_graph/relation_accessors.rs][relSource-gated relationship access]]
-- [[file:../server/dbs/in_rust_graph/stats.rs][source-set-gated herald counts]]
+- [[file:../server/dbs/in_rust_graph/relation_accessors.rs][relRepo-gated relationship access]]
+- [[file:../server/dbs/in_rust_graph/stats.rs][repo-set-gated herald counts]]
 - [[file:../tests/overrideward_view_subtree.rs][search subtree regression coverage]]
 - [[file:../tests/integration/overridden-direct-visit/][exact-visit integration coverage]]

@@ -2,20 +2,20 @@
 
 Skg lets a single node live at several privacy levels at once. The
 mechanism is the *privacy telescope*: same-ID =.skg= files across
-your sources, each file one *telescope section* holding the slice
-of the node recorded at that source's level. There is no linking
+your Skg repos, each file one *telescope section* holding the slice
+of the node recorded at that Skg repo's level. There is no linking
 relationship between the sections — sharing an ID /is/ being the
 same node. (Why "telescope"? Because it extends one section at a
-time: widening your source-set to the next privacy level pulls out
+time: widening your repo-set to the next privacy level pulls out
 exactly one more section per node, whereas an accordion — the
 term's rejected predecessor — expands uniformly.)
 
 ** The privacy order
 
-Your =skgconfig.toml= lists sources in privacy order, most public
+Your =skgconfig.toml= lists Skg repos in privacy order, most public
 first (see =api-and-formats.org=). That order is the ladder of
-*privacy levels*. A *source-set* is a prefix of the ladder —
-choosing one is answering "what is the most private source I want
+*privacy levels*. A *repo-set* is a prefix of the ladder —
+choosing one is answering "what is the most private Skg repo I want
 visible right now?" — and the reserved set =all= is the whole
 ladder. Screen-sharing with a colleague, you might switch to the
 =public= prefix; alone, back to =all=.
@@ -38,10 +38,10 @@ title/body-only edits in the =.skg= sections. Noninteractive and
 maintenance writers have no implicit Hoist answer and refuse. Every
 relationship edge (a =contains=
 membership, a subscription, a hide, an override) carries its own
-relSource: the source of the section that records it.
+relRepo: the Skg repo of the section that records it.
 
 Reading the node *folds* the sections, most public first, into one
-effective node. Under a restricted source-set you see the *visible
+effective node. Under a restricted repo-set you see the *visible
 fold* — only the active sections' contributions — while =all= shows
 the *full fold*. A more private section can both /add/ members and
 /place/ them: its members interleave into the more public list via
@@ -55,13 +55,13 @@ One normalization rule determines what "retained" means when raw
 repositories collide. If any owned section uses a PID, Skg keeps the
 complete owned telescope for that PID and ignores every same-PID foreign
 section before folding, ID-conflict checks, indexing, or any other semantic
-read. It emits a deterministic warning naming the ignored sources and never
+read. It emits a deterministic warning naming the ignored Skg repos and never
 edits those files; their contents are visible only by inspecting the raw
 foreign repository. A wholly foreign telescope is retained normally.
 
 If folding has to select a title or body below home, Skg marks the
-whole telescope *overPrivateText*. Source-set =all= displays that text with a
-warning. A restricted source-set asks before releasing it, using an
+whole telescope *overPrivateText*. Repo-set =all= displays that text with a
+warning. A restricted repo-set asks before releasing it, using an
 approval scoped to the exact PIDs and the single request; search asks
 whether to include or exclude overPrivateText telescopes before it matches. This
 release approval does not authorize Hoist. Conversely, approving
@@ -72,33 +72,33 @@ changed.
 
 ** Where new relationships land: the sticky-else-default rule
 
-When you save, each relationship edge keeps the relSource it already had
-on disk (*sticky*), unless an =(editRequest (relSource ...))= request explicitly
-names another source at least as private as the edge's default. A NEW
+When you save, each relationship edge keeps the relRepo it already had
+on disk (*sticky*), unless an =(editRequest (relRepo ...))= request explicitly
+names another Skg repo at least as private as the edge's default. A NEW
 edge between owned nodes defaults to the more-private endpoint home —
-the most public source that leaks neither endpoint. A new edge from
+the most public Skg repo that leaks neither endpoint. A new edge from
 an owned owner to a foreign member instead defaults to the owner's
 home, regardless of the foreign home: Skg never proposes writing the
-foreign source. This deliberately exposes the foreign node's ID and
-the relationship to readers of the owned source. An explicit
-An explicit request may select any configured, owned source at least as private
-as that owner home. Every relSource is clamped to be no more
+foreign Skg repo. This deliberately exposes the foreign node's ID and
+the relationship to readers of the owned Skg repo. An explicit
+An explicit request may select any configured, owned Skg repo at least as private
+as that owner home. Every relRepo is clamped to be no more
 public than the owner's home (a section more public than the home
 would imply a title-less public face). Hides floor higher:
 a hide reveals that you hide something, so it must be at least as
 private as both endpoints and the most public subscription that
 explains it.
 
-** Setting a relationship's source
+** Setting a relationship's Skg repo
 
-=skg-set-relSource= (=C-c s r=, see =docs/COMMANDS.org=;
-formerly =skg-privatize-relationship=) sets the relSource of the
+=skg-set-relRepo= (=C-c s r=, see =docs/COMMANDS.org=;
+formerly =skg-privatize-relationship=) sets the relRepo of the
 relationship the headline at point represents. It asks the server
-for the edge's default and current relSources (the "relSource info"
-endpoint, see =api-and-formats.org=) and offers the sources at least
+for the edge's default and current relRepos (the "relRepo info"
+endpoint, see =api-and-formats.org=) and offers the Skg repos at least
 as private as the default. An edge sitting more private than its default is
-marked with a red =~NAME= herald and a display =(relSource NAME)= fact;
-the pending write is =(editRequest (relSource NAME))=. The server re-checks at save that any offered source is no
+marked with a red =~NAME= herald and a display =(relRepo NAME)= fact;
+the pending write is =(editRequest (relRepo NAME))=. The server re-checks at save that any offered Skg repo is no
 more public than the edge's default. The canonical use: your public
 reading-list node contains a book you would rather not advertise —
 privatize the /membership/ and the book stays public, the list
@@ -106,13 +106,13 @@ stays public, but the edge between them lives in your private
 section.
 
 The same gesture lowers privacy: choose the default or any
-more-private source, and the next save moves the edge's membership
+more-private Skg repo, and the next save moves the edge's membership
 line. For an owned-to-owned edge there is nothing more public to
 choose — that would leak the more-private endpoint's ID. To publicize
 such a relationship further, publicize the more-private endpoint
 (move its home) first; the edge's default follows it. Note that
 removing the atom is not a way toward the default: no atom means "no
-opinion", so a saved edge keeps its sticky source.
+opinion", so a saved edge keeps its sticky Skg repo.
 
 A legacy or hand-authored edge can already sit /more public/ than its
 default. Such an edge renders with the atom (it is off-default), saves
@@ -125,10 +125,10 @@ Two things are documented inexpressibles, by design:
 
 - *Private links.* A link lives in the body, and the body
   lives in the home section. A link in a public body is public;
-  there is no per-link relSource. Keep the sentence in a
+  there is no per-link relRepo. Keep the sentence in a
   private child instead.
 - *Moving a relationship more public than its default.* As above:
-  a relationship may move to a more-private source, never to one
+  a relationship may move to a more-private Skg repo, never to one
   more public than its default.
 
 ** What leaks, and what repair fixes
@@ -137,8 +137,8 @@ A public file naming a private node's ID is a "leak-shaped
 membership". It can arrive from a hand edit or a pull, and it is what
 this model exists to prevent. The server warns about these
 (=telescope-warnings.org= in your data root) rather than erroring: a
-pull must never brick a source. Repair one with
-=skg-set-relSource= (=C-c s r=), which moves the
+pull must never brick a Skg repo. Repair one with
+=skg-set-relRepo= (=C-c s r=), which moves the
 membership into the right section. What no repair can fix: if a
 public repo ever /committed/ a leaked ID, its git history still holds
 it; rewriting history is manual.
@@ -150,10 +150,10 @@ starts with telescopes in place.)
 
 ** Ownership and folders
 
-A source is yours iff its directory sits under the config's
+A Skg repo is yours iff its directory sits under the config's
 =owned_folder= (default =owned/=) — see =api-and-formats.org=. Only
 owned sections are ever written; a save that empties an owned
 section deletes the file, and re-privatizing later recreates it.
-Each owned source also receives a generated =DEPENDENCIES.toml=
-naming the sources it may reference (everything at least as public),
+Each owned Skg repo also receives a generated =DEPENDENCIES.toml=
+naming the Skg repos it may reference (everything at least as public),
 so a repo you share carries its own dependency claim.

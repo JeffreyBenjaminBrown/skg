@@ -20,13 +20,23 @@ neighborhood independently in the before and after graph snapshots.
 In code and comments the short form "telescope" always means the
 privacy telescope; see "privacy telescope" below.
 
+*** Skg repo, home repo, repo-set, gitrepo
+
+A *Skg repo* is a directory of =.skg= files, configured by one
+=[[repos]]= entry in =skgconfig.toml=. A node's *home repo* is the Skg
+repo that holds its home section (see below). A *repo-set* is a prefix of
+the config's privacy order: the repos made available together. In code a
+Skg repo is 'repo', or 'skgrepo' where a Git repo shares the scope; a
+Git repo is 'gitrepo'. (Skg repos are usually Git repos too, but they
+need not be.)
+
 *** privacy telescope, telescope section, home
 
 One node can be recorded at several privacy levels at once: same-ID
-=.skg= files across sources, at most one per source. That family of
+=.skg= files across Skg repos, at most one per Skg repo. That family of
 files is the node's *privacy telescope*; each file is one
 *telescope section* ("section" for short in code), holding the
-slice of the node recorded at its source's level. The *home* is
+slice of the node recorded at its Skg repo's level. The *home* is
 the MOST PUBLIC RETAINED section; it alone holds title, body, and extra
 ids. That the home carries the title is an INVARIANT, not a
 search rule: a node's text always lives in its most public
@@ -49,19 +59,19 @@ section. The flag applies to the whole telescope, even if only one text
 field is below home. This violates the rule that the node's text lives at
 home; see [[file:./telescopes.org][privacy telescopes]].
 
-Source-set =all= can show that text with a warning. A restricted request
+Repo-set =all= can show that text with a warning. A restricted request
 asks for approval scoped to the affected node IDs and that request before
 releasing it; search asks whether to include or exclude such telescopes.
 Approval to display the text does not authorize *Hoist*, the separate
 repair that moves the selected title and body to home.
 
-*** privacy order and relSource
+*** privacy order and relRepo
 
-The position of a source in the config's privacy order (most public
+The position of a Skg repo in the config's privacy order (most public
 first) is its privacy level. Live code does not use "level" for the
 value carried by an edge: every relationship member carries its
-*relSource*, the source whose section records it. In code
-that is =RelPartner { relSource, member }=; a collection of them is
+*relRepo*, the Skg repo whose section records it. In code
+that is =RelPartner { relRepo, member }=; a collection of them is
 a *list of relation partners*. "More private" = later in the
 privacy order.
 
@@ -70,7 +80,7 @@ privacy order.
 The *fold* of a telescope combines its sections, most public
 first, into one effective node (=server/telescope/fold.rs=). The
 *full fold* uses every section; a *visible fold* uses only the
-sections active under the current source-set, and is what a
+sections active under the current repo-set, and is what a
 restricted view renders. *Unfold* is the save-side inverse:
 splitting the effective node back into sections, byte-stably.
 
@@ -86,19 +96,19 @@ never go stale in memory.
 
 *** sticky rule (sticky-else-default)
 
-Where a relationship edge's relSource comes from at save time:
-an edge already on disk keeps its relSource (*sticky*); a new edge
+Where a relationship edge's relRepo comes from at save time:
+an edge already on disk keeps its relRepo (*sticky*); a new edge
 between owned nodes defaults to the more-private endpoint home. A new
 edge from an owned owner to a foreign member defaults to the owner's
 home, deliberately making the foreign ID and relationship visible at
-that owned source without proposing a foreign write. Every relSource is
+that owned Skg repo without proposing a foreign write. Every relRepo is
 clamped to be no more public than the owner's home. Hides
 floor higher (at least the most public subscription explaining them). A
-=(relSource NAME)= atom (the =skg-set-relSource= gesture)
-overrides sticky with any source at least as private as the edge's
-DEFAULT — raising privacy, or moving a stuck source back to the
+=(relRepo NAME)= atom (the =skg-set-relRepo= gesture)
+overrides sticky with any Skg repo at least as private as the edge's
+DEFAULT — raising privacy, or moving a stuck Skg repo back to the
 default; a more-public choice is a save error. A legacy or
-hand-authored edge whose disk relSource already sits more public than
+hand-authored edge whose disk relRepo already sits more public than
 its default may be held or made more private, never made still more
 public. See =server/from_text/supplement_from_disk.rs=.
 
@@ -242,7 +252,7 @@ In Skg a fork can split into any number.
 *** clone, and the fork operation
 
 To *fork* a node N is to turn it into an editable *clone* C in a
-source you own. C copies N's title, body, and child-list (the child IDs
+Skg repo you own. C copies N's title, body, and child-list (the child IDs
 only — shallow), =subscribes_to= N (so N's later additions surface to C
 as unintegrated subscribed content) and =overrides_view_of= N (so
 override substitution draws C wherever N would appear). Children of N
@@ -325,7 +335,7 @@ wire strings, where only nodes can merge.
 
 *** mp = maybe-placed
 
-A viewnode that might have an ID and source,
+A viewnode that might have an ID and Skg repo,
 but might not, is maybe-placed.
 
 *** override substitution, and the vocabulary around it

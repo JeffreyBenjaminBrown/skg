@@ -1,6 +1,6 @@
 # This file is generated to mirror docs/COMMANDS.org (the Emacs-client
 # command reference), translated to Neovim keybindings and :Skg*
-# Ex commands. nvim/lua/skg/keymaps.lua is the authoritative source
+# Ex commands. nvim/lua/skg/keymaps.lua is the authoritative Skg repo
 # for every binding named here; if this file and that module disagree,
 # keymaps.lua wins. Where COMMANDS.org describes Emacs-only mechanics
 # (the minibuffer, magit), the text below is rewritten for the nvim
@@ -35,7 +35,7 @@ save proceeds. Abort leaves every file byte-for-byte unchanged. Scripts
 and maintenance writers have no prompt and refuse this repair.
 
 That disk-publication choice is separate from displaying the result. If
-a successful save under a restricted source-set would rerender text from
+a successful save under a restricted repo-set would rerender text from
 an overPrivateText telescope, Skg asks for a second, request-scoped approval. Decline
 leaves the save committed but sends no new view text and changes no
 open-view registry entry.
@@ -90,11 +90,11 @@ Prompts for search terms. All search axes take their conservative
 defaults: no per-token regex, titles only (no body), no Tantivy
 phrase and operator syntax.
 
-Under a restricted source-set, if the search index contains any overPrivateText
+Under a restricted repo-set, if the search index contains any overPrivateText
 telescope (one whose selected title or body lies below home), Skg asks
 whether to include or exclude overPrivateText telescopes before running the query.
 Exclude filters them in Tantivy before matching; Include is permission
-for this search only. Under source-set =all= they are included without a
+for this search only. Under repo-set =all= they are included without a
 prompt and the result carries a warning.
 
 Run 'Goto' (<localleader>gg, below) from one of the links in the
@@ -299,28 +299,28 @@ These four commands are described elsewhere in this document.
 Asks whether to include staged changes and, if so,
 whether to include unstaged changes.
 Then opens an org report (=skg://diff-report=) summarizing
-semantic graph changes across all configured sources.
+semantic graph changes across all configured Skg repos.
 
 The report is based on git/index/worktree state,
 so the command refuses to run while any Skg view buffer
 has unsaved edits.
 *** <localleader>tm         : :SkgStageMoves
-Scans the git status of every configured source and finds each
-node whose .skg file "moved": it vanished from exactly one source
-(committed there in git HEAD, now gone from that source's worktree)
-and appeared in exactly one other source (present in that source's
+Scans the git status of every configured Skg repo and finds each
+node whose .skg file "moved": it vanished from exactly one Skg repo
+(committed there in git HEAD, now gone from that Skg repo's worktree)
+and appeared in exactly one other Skg repo (present in that Skg repo's
 worktree, not yet committed). A node that vanished from, or appeared
-in, more than one source is ambiguous and is skipped.
+in, more than one Skg repo is ambiguous and is skipped.
 
 Opens a buffer (=skg://stage-moves=) holding a bash script: a list
 of the moves followed by one loop that 'git rm's each file in its
-old source and 'git add's it in the new one. Before removing, the
-loop checks that the file is already gone from the old source's
+old Skg repo and 'git add's it in the new one. Before removing, the
+loop checks that the file is already gone from the old Skg repo's
 worktree (that is how the move was detected); a file still present
 there is skipped, not deleted, since 'git rm' would silently remove
 it. Review the script, then run it from the skg data root. Unlike
 most commands here, this one does not depend on the node at point;
-it reports moves across all sources.
+it reports moves across all Skg repos.
 ** <localleader>c : show a folder (both folders of a relation)
 These commands don't edit the graph. Each inserts a request into the
 metadata of the node at point that, on save, causes the server to
@@ -411,26 +411,26 @@ In brief, it means edits to its title, body or
 will not affect it
   (although edits to its children will affect those children,
   unless they are also write-protected).
-*** <localleader>ss : :SkgSetSource
-Changes the source of the node at point.
-The prompt starts with the current source as editable command-line
-text. You can type the new source name directly,
-or use S-Left / S-Right to cycle through owned sources;
-TAB completes among all configured source names.
+*** <localleader>ss : :SkgSetRepo
+Changes the Skg repo of the node at point.
+The prompt starts with the current Skg repo as editable command-line
+text. You can type the new Skg repo name directly,
+or use S-Left / S-Right to cycle through owned Skg repos;
+TAB completes among all configured Skg repo names.
 
 The Emacs client's C-? helper (which opened an org buffer listing
-every source from inside the minibuffer) has no cmdline analog --
+every Skg repo from inside the minibuffer) has no cmdline analog --
 few terminals deliver C-? reliably -- so it's dropped; run
-':SkgViewSourceList' beforehand (or afterward) instead. It shows
-the same thing: an org buffer listing every configured source name
-as a headline, with that source's path as the headline body.
+':SkgViewRepoList' beforehand (or afterward) instead. It shows
+the same thing: an org buffer listing every configured Skg repo name
+as a headline, with that Skg repo's path as the headline body.
 
 The command only edits the node's metadata in the current buffer.
 Save the view afterward (':w') to apply the move.
-*** <localleader>sS : :SkgSetSourceRecursive
-Like 'SetSource', but it also
-changes the source of every content descendent of the node at point
-whose source matches the original source of the node at point.
+*** <localleader>sS : :SkgSetRepoRecursive
+Like 'SetRepo', but it also
+changes the Skg repo of every content descendent of the node at point
+whose Skg repo matches the original Skg repo of the node at point.
 Only descendents for which AffectsParent=True are traversed.
 *** <localleader>sx : :SkgSetPropertySearchMatching
 Prompts between =search matching= and =no search matching= and stages the
@@ -464,7 +464,7 @@ ID, the command warns that the old node might become an orphan.
 The headline title plus body must contain exactly one org bracket
 link, and that link must be an =id:= link. The node must have no
 org-descendents. Its org-parent must be a definitive activeNode
-whose source is owned in =skgconfig.toml=.
+whose Skg repo is owned in =skgconfig.toml=.
 
 The command replaces the whole leaf with a same-level
 write-protected activeNode for the link target. The parent is
@@ -482,9 +482,9 @@ Refuses if the buffer has unsaved changes ("Save the buffer
 before forking."), so the clone's snapshot matches what you see.
 Otherwise it stamps the node and auto-saves; the server returns
 the usual fork-confirmation buffer (=skg://fork-confirmation=).
-There you MUST set the clone's source with 'SetSource'
-(<localleader>ss) (it starts as the placeholder PICK-A-SOURCE,
-with your config-first owned source suggested above it), then
+There you MUST set the clone's repo with 'SetRepo'
+(<localleader>ss) (it starts as the placeholder PICK-A-REPO,
+with your config-first owned Skg repo suggested above it), then
 approve with <localleader>cc; or decline with <localleader>ck
 (which also strips the fork request so the next save does not
 re-fork). ':w' on the fork-confirmation buffer refuses and points
@@ -502,7 +502,7 @@ Point can be on the headline or in the node body.
 The command uses the headline either way.
 
 The node being replaced must be an existing activeNode with an ID,
-and an org-child of a definitive activeNode whose source is
+and an org-child of a definitive activeNode whose Skg repo is
 owned in =skgconfig.toml=. The command acts locally,
 replacing only this occurrence in the current buffer:
 the headline at point and all of its org-descendents,
@@ -520,17 +520,17 @@ i.e. how your worktree differs from HEAD.
 Refuses while any skg buffer has unsaved edits.
 
 If toggling the mode would rerender overPrivateText telescope text under a
-restricted source-set, Skg asks before changing the mode or any view.
+restricted repo-set, Skg asks before changing the mode or any view.
 Declining leaves the mode and buffers unchanged; the protocol still sends
 an empty rerender stream so preemptive client locks are released.
 *** <localleader>ve : :SkgViewNewEmpty
-Asks you to pick a data source,
-and then provides a root node with that source.
+Asks you to pick a Skg repo,
+and then provides a root node with that Skg repo.
 **** why
-Every node needs a source.
+Every node needs a Skg repo.
 Children can inherit from their parents,
 but to make a root (which has no parents)
-you need to choose its source explicitly.
+you need to choose its Skg repo explicitly.
 *** <localleader>vh : :SkgHeraldsToggle
 This command toggles it.
 This toggles whether, at the start of every node,
@@ -538,17 +538,17 @@ metadata is shown in its full plain-text glory,
 or is instead summarized via brief 'heralds'.
 It is turned on at every view by default.
 See [[file:heralds.org][the herald legend]] for the tokens and colors.
-*** <localleader>vL : :SkgToggleSourceOverlayOnLinks
-Toggle display-only home-source suffixes on Skg links in this buffer.
+*** <localleader>vL : :SkgToggleRepoOverlayOnLinks
+Toggle display-only home repo suffixes on Skg links in this buffer.
 The suffixes start off. Links confirmed missing are pink and underlined
 even with suffixes off. See [[file:heralds.org::*Link annotations][link annotations]].
-*** <localleader>vl : :SkgLimitSourceSet
-Limits display and search to one configured source-set for this
+*** <localleader>vl : :SkgLimitRepoSet
+Limits display and search to one configured repo-set for this
 Neovim connection.
 
-The command asks which source-set to activate, with TAB completion
+The command asks which repo-set to activate, with TAB completion
 and S-Left / S-Right cycling. After confirmation it tells the server
-to use that source-set and rerenders open Skg buffers in place. Choose
+to use that repo-set and rerenders open Skg buffers in place. Choose
 =all= to remove the limit.
 
 If the proposed set would rerender overPrivateText telescope text, Skg asks before
@@ -558,9 +558,9 @@ an empty rerender stream releases the client's preemptive locks.
 When called from a node in a view of the graph,
 this switches to a view of the metadata of that node,
 with one field per org branch. ':w' (or <localleader>cc) commits
-the edited tree back into the source headline; ':bd!' cancels;
+the edited tree back into the Skg repo headline; ':bd!' cancels;
 S-Left / S-Right cycle a field's value (writeProtected, affectsParent,
-editRequest, source, ...).
+editRequest, Skg repo, ...).
 It's easy to edit this way.
 Note that some properties don't make sense to edit,
 like the count of how many contents it has.
@@ -692,8 +692,8 @@ after the stars and before the (possibly new) keyword.
 ** importing Markdown and Org
 *** :SkgImportMdAndOrg
 With the server running, choose an absolute input directory in the
-server/container filesystem and an existing owned destination source. The
-source determines the privacy of all new nodes. Skg scans exact =.md= and
+server/container filesystem and an existing owned destination Skg repo. The
+Skg repo determines the privacy of all new nodes. Skg scans exact =.md= and
 =.org= files recursively, leaves the originals untouched, and asks for a
 host-root mapping only when absolute links to =.md= or =.org= files occur.
 Blank mapping leaves unresolved links with warnings. Links to other kinds of
@@ -727,9 +727,9 @@ Exports Skg data to plain =.org= files, so the data can be read
 (and navigated on GitHub) without running Skg. No keybinding.
 
 It asks two things:
-- which source-set to export (command-line input with TAB
+- which repo-set to export (command-line input with TAB
   completion and S-Left / S-Right cycling); only nodes from that
-  set are included. Choose a public-facing source-set so private
+  set are included. Choose a public-facing repo-set so private
   notes are not exported; exporting =all= warns you about this.
 - which directory to write to (default =org-exports=). This path
   is interpreted *by the server*, relative to the project root the
@@ -739,11 +739,11 @@ It asks two things:
   as-is.
 
 If a restricted export would include overPrivateText telescope text, Skg asks for
-request-scoped approval before writing any file. Source-set =all= exports
+request-scoped approval before writing any file. Repo-set =all= exports
 it with a warning. The noninteractive form fails closed unless passed
 =--include-overPrivateText-telescopes=:
 
-: cargo run --bin skg -- export-org [config-path] [source-set] [output-dir] [--include-overPrivateText-telescopes]
+: cargo run --bin skg -- export-org [config-path] [repo-set] [output-dir] [--include-overPrivateText-telescopes]
 
 A node is exported when one of its children's title links to the
 export-instruction node and that child's body gives a
