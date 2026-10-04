@@ -1,0 +1,115 @@
+#+title: Making Skg readable and editable for AI agents
+
+* Why
+Jeff wants to edit Skg data with an agent's help. The first case: merge the
+good parts of an old document (the 'public' copy of OVERVIEW) into the new
+one (the 'skg' copy, created by importing docs/). Today an agent can only
+read and write Skg through the TCP protocol or by editing raw .skg files,
+and neither is pleasant or safe for real work.
+
+* What an agent sees today
+A content view is Org text whose every headline carries metadata:
+: * (skg (node (id 6f1c...) (source skg) (affectsParent na))) foundation : org-mode
+Real views add relationship and fold data, and IDs are 36-character UUIDs,
+so most of a view's characters are metadata. Heralds compress this for
+humans, in the clients only; the server sends the raw metadata.
+
+* Jeff's proposal: 'skg-for-ai' views
+** The idea
+Render an ordinary content view, then derive a compact view in which each
+headline's metadata is replaced by a pointer to the corresponding line of
+the full view. An agent reads the compact view, and looks up a line's
+metadata only when it needs it.
+** Claude's assessment
+Reading this way is cheap and clearly worthwhile. The hard part is editing:
+the server saves a view only as a full buffer, metadata included, so edits
+made in a compact view must be mapped back onto the full one before saving.
+*** A possible editing loop
+1. Render the full view through the server, and keep it.
+2. Derive the compact view, each headline tagged with a short handle.
+3. The agent edits the compact view.
+4. A tool rebuilds the full buffer: each tagged headline gets its original
+   metadata back; an untagged headline is a new node, which Skg creates
+   from a bare headline.
+5. Save through the server, as a client would. The save reply re-renders
+   the view, which closes the loop.
+*** Risks in that loop
+**** Moved or deleted headlines
+In Skg, deleting a headline from a view removes it from its container; it
+does not delete the node (that takes an explicit deletion marker). A tool
+that silently drops a missing handle's metadata could therefore change the
+graph in ways the agent did not intend. The rebuild step should report every
+structural change before saving.
+**** Stale views
+If the data changes between rendering and saving, the save must fail
+rather than overwrite. Clients rely on the server's existing checks; the
+tool should too, and never write .skg files directly.
+
+* Questions for Jeff
+** Where should agents edit real data?
+This workspace's data is a stale copy, and the main server on any workspace
+writes real data. The 'verify' skill forbids editing through the main
+server. Editing real data needs an explicit exception: which workspace and
+server, and do you want to review a diff (each data folder is a Git repo)
+before anything is committed?
+*** Jeff
+Yes, I want to be the only one who commits,
+and I want skg (the production workspace) not to do this.
+Can you see that you're in skg2?
+
+There can be no blanket policy of
+'editing .skg data is safe if you're in this workspace'.
+Rather, I would like the AI to ask me each time.
+** Pointer format
+Line numbers into the saved full view, as you proposed, or short handles
+(e.g. 'n12') tied to node IDs? Handles survive edits that shift lines; line
+numbers are simpler to look up by hand.
+*** Jeff
+The problem with using graphnode ids is that
+multiple viewnodes can use the same one,
+and some viewnodes (e.g. an aliases folder) do not represent a graphnode
+but rather an aspect of one.
+
+Shifting line numbers is a real problem, good point.
+Let's do this:
+We start with a skg view.
+We transform it iinto a list of pairs (Just $ line number, line).
+(I'm speaking Haskell.)
+Into that list the AI can insert new lines,
+which look like (Nothing, line).
+
+Will that solve the problem?
+** How much metadata should the compact view keep?
+Possibly nothing but the handle. Or a few cheap facts an agent usually
+needs: the source (for privacy), and whether the node is foreign
+(read-only), a link leaf, or folded.
+
+*** Jeff
+Eventually we may need a DSL to define little programs for this.
+For now though I think nothing at all will do the job.
+The metadata is most important for weird things -- looking backward
+(containers, link sources), aliases, etc. For editing docs,
+the top-down hierarchical view should suffice.
+** Read-only first?
+A read-only compact view could be built and used immediately. Editing
+needs the rebuild step and its safety checks. Start with reading, and edit
+full views directly in the meantime?
+*** Jeff
+No, let's do the whole thing.
+** Where should the tool live?
+- A project skill (.claude/skills/), with a script beside it, like 'verify':
+  quick to build, and only agents use it.
+- A server feature (a view-rendering option): one implementation, usable by
+  any client, but a protocol change.
+*** Jeff
+I don't think the server should swallow this, but it's not Claude-specific.
+Let's make a tool in tools/ called skg-for-ai/.
+Maybe it will deserve a Claude skill; up to you.
+It should be documented in tools/ sufficient for anyone,
+even a human, to understand.
+* The OVERVIEW merge, meanwhile
+The 'skg' copy lacks three headline links that the 'public' copy has (an
+old exporter flattened them): "revise [[*viewing the data]]", the OrgNode
+heading's link, and a GitHub link whose target ('rust/types.rs') no longer
+exists. This is small enough to do by editing a full view directly, once
+the question of where to edit real data is answered.

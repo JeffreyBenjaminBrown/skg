@@ -36,6 +36,39 @@ use std::sync::LazyLock;
 pub const EXPORT_MARKER_ID : &str =
   "3d9aa9be-d95a-48bc-b362-33f9e7ebdf6f";
 
+/// The comment heading each exported file, around its root's ID.
+/// 'export_header' writes it; 'export_header_length' finds it, so that
+/// the Markdown/Org importer can ignore it.
+const EXPORT_HEADER_FIRST_LINE : &str =
+  "# This file was generated from the skg node with this ID:";
+const EXPORT_HEADER_LAST_LINE : &str =
+  "# DON'T EDIT THIS FILE. Such edits would be clobbered by the next skg export.";
+
+pub fn export_header (
+  root_pid : &ID,
+) -> String {
+  format! ("{}\n# {}\n{}\n\n",
+           EXPORT_HEADER_FIRST_LINE, root_pid, EXPORT_HEADER_LAST_LINE) }
+
+/// Bytes of 'text' taken by a leading 'export_header' and the blank
+/// lines after it; 0 if 'text' does not begin with one.
+pub fn export_header_length (
+  text : &str,
+) -> usize {
+  let mut lines = text . split_inclusive ('\n');
+  let header_lines : [Option<&str>; 3] =
+    [ lines . next (), lines . next (), lines . next () ];
+  let [Some (first), Some (id), Some (last)] = header_lines else { return 0; };
+  let id_is_one_word : bool = id . strip_prefix ("# ")
+    . is_some_and (|rest| ! rest . trim () . is_empty ()
+                          && ! rest . trim () . contains (char::is_whitespace));
+  if first . trim_end () != EXPORT_HEADER_FIRST_LINE || ! id_is_one_word
+     || last . trim_end () != EXPORT_HEADER_LAST_LINE { return 0; }
+  let mut length : usize = first . len () + id . len () + last . len ();
+  for blank in lines . take_while (|line| line . trim () . is_empty ()) {
+    length += blank . len (); }
+  length }
+
 /// Broken links (whose target is not exported under the chosen
 /// source-set) point at the export of this node.
 pub const BROKEN_LINK_SINK_ID : &str =
@@ -181,8 +214,8 @@ pub fn export_to_org (
     warnings,        // moved; further warnings push via report.warnings
   };
   for (root, events) in &root_events {
-    let content : String =
-      render_root (
+    let content : String = export_header (&root . root_pid) +
+      &render_root (
         root, events, &homes, &custom_id_targets, &by_pid, &alias_to_pid,
         &mut report . broken_links, &mut report . warnings );
     let rel : String = format! ("{}.org", root . target);

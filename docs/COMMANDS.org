@@ -821,6 +821,9 @@ footnotes are interpreted. Other Markdown/Org markup remains readable text,
 not a full format conversion. Unresolved links and unsupported constructs
 are left in place with warnings.
 
+The comment lines that begin a file exported by Skg are ignored,
+so an exported file imports back to the same shape.
+
 Only links to =.md= and =.org= files are resolved, or warned about.
 A link to any other file (source code, an image, a folder) keeps pointing
 where it did, written as an Org link, without a warning.
@@ -1005,6 +1008,9 @@ It asks two things:
   A body line Org would read as a headline (such as a Markdown
   =* item=) is indented two spaces, making it a list item, or inside a
   =#+begin_= block is escaped with a comma, as Org itself does.
+  Each exported file begins with comment lines naming the ID of the node
+  it was generated from, and warning that edits made directly to the
+  file will be clobbered by the next export.
 
 **** choosing what to export: export markers
 Nothing is exported unless you mark

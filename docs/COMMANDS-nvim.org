@@ -725,6 +725,9 @@ detail.
 *** :SkgExportToOrg
 Exports Skg data to plain =.org= files, so the data can be read
 (and navigated on GitHub) without running Skg. No keybinding.
+Each file begins with comments naming its source node's ID and warning
+that direct edits will be clobbered by the next export; the importer
+ignores them.
 
 It asks two things:
 - which source-set to export (command-line input with TAB

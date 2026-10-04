@@ -511,7 +511,10 @@ one automatically.
     export root, and writes each to
     =<output-dir>/<target_filepath>.org= as a recursive content view
     limited to =NAME=, stripped of skg metadata, with
-    =[[id:..][label]]= links rewritten to relative org links.
+    =[[id:..][label]]= links rewritten to relative org links. Each
+    file begins with three comment lines: a fixed first line, then
+    =# ROOT-PID=, then a fixed warning against editing the file. The
+    importer ignores exactly this header.
     Existing files are overwritten; others are left untouched. Needs
     neither the live graph nor Tantivy.
     Before writing anything, a restricted export involving overPrivateText

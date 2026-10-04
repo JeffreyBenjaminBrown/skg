@@ -4,6 +4,7 @@
 * ONGOING TODO/import-md-and-org/
 ** data/skg-system/ should not need mention in the config
 * next
+** TODO/skg-for-ai/1_discussion.org
 ** for video
 *** AWAITS navigate point through herald (overlay)
 walk point through the herald string normally
