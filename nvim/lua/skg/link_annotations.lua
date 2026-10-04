@@ -152,14 +152,15 @@ function M.paint (buf, positions)
           end_row = position.row, end_col = position.label_end,
           hl_group = 'SkgBrokenLink', priority = 150 })
     end
-    if suffix_enabled then
-      local label = ({ missing = '⌂:missing', inactive = '⌂:inactive',
+    -- A broken link's label is styled above and gets no suffix.
+    if suffix_enabled and kind ~= 'missing' then
+      local label = ({ inactive = '⌂:inactive',
                        lookup_failed = '⌂:lookup failed', pending = '⌂:…' })[kind]
                     or ('⌂:' .. status[3])
-      local group = kind == 'resolved' and 'SkgHeraldGo' or 'Comment'
+      local group = kind == 'resolved' and 'SkgHeraldNormal' or 'SkgHeraldYucky'
       vim.api.nvim_buf_set_extmark(buf, M.namespace,
         position.row, position.link_end, {
-          virt_text = { { ' [' .. label .. ']', group } },
+          virt_text = { { ' ', 'Normal' }, { '[' .. label .. ']', group } },
           virt_text_pos = 'inline', right_gravity = false })
     end
   end

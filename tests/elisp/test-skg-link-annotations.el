@@ -35,10 +35,10 @@
                                  (overlays-in (point-min) (point-max))
                                  for text = (overlay-get overlay 'after-string)
                                  when text collect (substring-no-properties text))))
+          ;; The broken link [[id:gone]] gets no suffix.
           (should (member " [⌂:pub]" suffixes))
-          (should (member " [⌂:missing]" suffixes))
           (should (member " [⌂:inactive]" suffixes))
-          (should (= (length suffixes) 3)))
+          (should (= (length suffixes) 2)))
         (should (equal (buffer-string) original))
         (should-not (buffer-modified-p))
         (skg-content-view-mode)

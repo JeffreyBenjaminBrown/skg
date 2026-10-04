@@ -26,6 +26,17 @@
        (and text (string-match-p (regexp-quote fragment) text))))
    (overlays-in (point-min) (point-max))))
 
+(defvar link-test-broken-before 0
+  "How many links were styled as broken before deleting a target.")
+
+(defun link-test-broken-count ()
+  "How many link labels are styled as broken links."
+  (cl-count-if
+   (lambda (overlay)
+     (let ((face (overlay-get overlay 'face)))
+       (and (consp face) (plist-get face :underline))))
+   (overlays-in (point-min) (point-max))))
+
 (let* ((data (getenv "SKG_TEST_DATA_DIR"))
        (view-text
         (concat "* (skg (node (id src) (repo public))) "
@@ -55,9 +66,10 @@
                      (= skg-lp--pending-count 0))))
     (skg-toggle-repo-overlay-on-links)
     (unless (and (link-test-suffix "⌂:PUB")
-                 (link-test-suffix "⌂:missing")
                  (link-test-suffix "⌂:inactive")
-                 (not (link-test-suffix "PRIV")))
+                 (not (link-test-suffix "PRIV"))
+                 (not (link-test-suffix "missing"))
+                 (> (link-test-broken-count) 0))
       (error "Repo suffixes did not distinguish visible and unavailable links"))
     (org-fold-hide-subtree)
     (org-fold-show-all)
@@ -84,10 +96,12 @@
     (skg-rebuild-ephemeral-data-stores)
     (link-test-wait (lambda ()
                       (link-test-status "private-node" 'resolved)))
+    (setq link-test-broken-before (link-test-broken-count))
     (delete-file (expand-file-name "public/dest.skg" data))
     (skg-rebuild-ephemeral-data-stores)
     (link-test-wait (lambda () (link-test-status "old-dest" 'missing)))
-    (unless (link-test-suffix "⌂:missing")
-      (error "Deleted target did not become unavailable")))
+    (link-test-wait (lambda () (> (link-test-broken-count) link-test-broken-before)))
+    (unless (> (link-test-broken-count) link-test-broken-before)
+      (error "A link to the deleted target was not styled as broken")))
   (message "PASS: live Emacs link annotation cycle")
   (kill-emacs 0))

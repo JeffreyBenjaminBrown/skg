@@ -10,7 +10,9 @@ local function suffixes (buf)
   local result = {}
   for _, mark in ipairs(marks(buf)) do
     if mark[4].virt_text then
-      table.insert(result, mark[4].virt_text[1][1]) end end
+      local text = ''
+      for _, chunk in ipairs(mark[4].virt_text) do text = text .. chunk[1] end
+      table.insert(result, text) end end
   return result
 end
 
@@ -70,12 +72,12 @@ describe('skg.link_annotations', function ()
     assert.is_true(broken_link.underline)
     assert.are.equal(0, #suffixes(buf))
     annotations.toggle_repo_overlay(buf)
-    assert.same({ ' [⌂:pub]', ' [⌂:missing]', ' [⌂:inactive]' },
-                suffixes(buf))
+    -- the broken link [[id:gone]] gets no suffix
+    assert.same({ ' [⌂:pub]', ' [⌂:inactive]' }, suffixes(buf))
     assert.same(lines, vim.api.nvim_buf_get_lines(buf, 0, -1, false))
     assert.is_false(vim.bo[buf].modified)
     annotations.refresh(buf)
-    assert.are.equal(3, #suffixes(buf))
+    assert.are.equal(2, #suffixes(buf))
     annotations.toggle_repo_overlay(buf)
     assert.are.equal(0, #suffixes(buf))
     annotations.disable(buf)

@@ -158,19 +158,21 @@ character."
           (overlay-put overlay 'skg-link-annotation t)
           (overlay-put overlay 'face
                        '(:inherit heralds-yucky-face :underline t))))
-      (when skg-link-annotations--repo-suffix-enabled
+      ;; A broken link's label is styled above and gets no suffix.
+      (when (and skg-link-annotations--repo-suffix-enabled
+                 (not (eq kind 'missing)))
         (let* ((label (pcase kind
                         ('resolved (format "⌂:%s" (nth 2 status)))
-                        ('missing "⌂:missing")
                         ('inactive "⌂:inactive")
                         ('lookup-failed "⌂:lookup failed")
                         (_ "⌂:…")))
                (face (if (eq kind 'resolved)
-                         'heralds-go-face 'shadow))
+                         'heralds-normal-face 'heralds-yucky-face))
                (overlay (make-overlay link-end link-end nil nil t)))
           (overlay-put overlay 'skg-link-annotation t)
           (overlay-put overlay 'after-string
-                       (propertize (format " [%s]" label) 'face face)))))))
+                       (concat " " (propertize (format "[%s]" label)
+                                               'face face))))))))
 
 (defun skg-link-annotations-refresh ()
   "Rescan this view and refresh annotations without changing its text."

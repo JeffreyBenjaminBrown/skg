@@ -26,10 +26,21 @@ end
 local function suffix (fragment)
   for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(
       buf, annotations.namespace, 0, -1, { details = true })) do
-    local text = mark[4].virt_text and mark[4].virt_text[1][1] or ''
+    local text = ''
+    for _, chunk in ipairs(mark[4].virt_text or {}) do text = text .. chunk[1] end
     if text:find(fragment, 1, true) then return true end
   end
   return false
+end
+
+---How many link labels are styled as broken links.
+local function broken_count ()
+  local count = 0
+  for _, mark in ipairs(vim.api.nvim_buf_get_extmarks(
+      buf, annotations.namespace, 0, -1, { details = true })) do
+    if mark[4].hl_group == 'SkgBrokenLink' then count = count + 1 end
+  end
+  return count
 end
 
 T.check(T.wait_for(function ()
@@ -53,9 +64,9 @@ T.check(T.wait_for(function ()
          and state.lp_pending_count == 0 end, 10),
   'narrowing the repo-set hides its repo again')
 annotations.toggle_repo_overlay(buf)
-T.check(suffix('⌂:PUB') and suffix('⌂:missing')
-        and suffix('⌂:inactive') and not suffix('PRIV'),
-        'suffixes distinguish visible and unavailable targets')
+T.check(suffix('⌂:PUB') and suffix('⌂:inactive') and not suffix('PRIV')
+        and not suffix('missing') and broken_count() > 0,
+        'suffixes distinguish visible and unavailable targets; broken links get none')
 save.replace_buffer_with_new_content(buf, view_text)
 T.check(vim.b[buf].skg_link_repo_suffix == true
         and not vim.bo[buf].modified,
@@ -83,10 +94,12 @@ misc.rebuild_ephemeral_data_stores()
 T.check(T.wait_for(function ()
   return status('private-node', 'resolved') end, 10),
   'repo move refreshes inactive target')
+local broken_before = broken_count()
 assert(os.remove(data .. '/public/dest.skg'))
 misc.rebuild_ephemeral_data_stores()
 T.check(T.wait_for(function () return status('old-dest', 'missing') end, 10),
         'deleted target becomes missing')
-T.check(suffix('⌂:missing'), 'deleted target gets unavailable suffix')
+T.check(T.wait_for(function () return broken_count() > broken_before end, 10),
+        'a link to the deleted target is styled as broken')
 
 T.pass('PASS: live Neovim link annotation cycle')
